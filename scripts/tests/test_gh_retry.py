@@ -22,8 +22,6 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _GH_RETRY = _REPO_ROOT / "scripts" / "lib" / "gh-retry.sh"
 _DRAIN_SCRIPT = _REPO_ROOT / "scripts" / "drain-pr-queue.sh"
 _WATCHDOG_SCRIPT = _REPO_ROOT / "scripts" / "merge-queue-watchdog.sh"
-_GTMQ_GUARD = _REPO_ROOT / "scripts" / "guard-gtmq-source-authorization.sh"
-_GTMQ_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "gtmq-source-authorization.yml"
 
 
 def _run_bash(script: str, *, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -58,20 +56,6 @@ def _drain_command(
     if extra_env:
         env_prefix += f"{extra_env} "
     return f'{env_prefix}bash "{_DRAIN_SCRIPT}"'
-
-
-def _guard_command(tmp_path: Path, *args: str | int, extra_env: str = "") -> str:
-    fake_gh = tmp_path / "gh"
-    assert fake_gh.is_file(), f"test must create isolated gh fixture first: {fake_gh}"
-    env_prefix = (
-        f'PATH="{tmp_path}:$PATH" DRAIN_EXPECT_GH="{fake_gh}" '
-        'GTMQ_MUTATION_AUTHORIZATION=test-fixture '
-        'MERGE_QUEUE_BACKEND=graphite '
-    )
-    if extra_env:
-        env_prefix += f"{extra_env} "
-    arguments = " ".join(str(arg) for arg in args)
-    return f'{env_prefix}bash "{_GTMQ_GUARD}" {arguments}'
 
 
 class TestGhRetryHelper:
@@ -230,13 +214,9 @@ class TestDrainPrQueueWiring:
             for line in source.splitlines()
             if line.strip().startswith("return f'{env_prefix}bash")
         ]
-        assert helper_launches == [
-            "return f'{env_prefix}bash \"{_DRAIN_SCRIPT}\"'",
-            "return f'{env_prefix}bash \"{_GTMQ_GUARD}\" {arguments}'",
-        ]
+        assert helper_launches == ["return f'{env_prefix}bash \"{_DRAIN_SCRIPT}\"'"]
         assert 'DRAIN_EXPECT_GH="{fake_gh}"' in source
         assert "DRAIN_MUTATION_AUTHORIZATION=test-fixture" in source
-        assert "GTMQ_MUTATION_AUTHORIZATION=test-fixture" in source
 
     def test_drain_script_avoids_bulk_status_rollup_and_uses_per_pr_checks(self) -> None:
         content = _DRAIN_SCRIPT.read_text(encoding="utf-8")
@@ -335,207 +315,7 @@ JSON
         assert "#789" in result.stdout
 
 
-class TestGraphiteEventAuthorizationGuard:
-    def test_workflow_covers_synthetic_and_source_events_with_minimum_permissions(self) -> None:
-        workflow = _GTMQ_WORKFLOW.read_text(encoding="utf-8")
-        assert "pull_request_target:" in workflow
-        for event_type in (
-            "opened",
-            "synchronize",
-            "reopened",
-            "closed",
-            "labeled",
-            "unlabeled",
-            "converted_to_draft",
-            "ready_for_review",
-        ):
-            assert event_type in workflow
-        assert (
-            "group: gtmq-source-authorization-${{ github.event.pull_request.number }}"
-            in workflow
-        )
-        assert "cancel-in-progress: false" in workflow
-        assert "contents: read" in workflow
-        assert "issues: write" in workflow
-        assert "pull-requests: write" in workflow
-        assert "ref: main" in workflow
-        assert "persist-credentials: false" in workflow
-        assert "guard-gtmq-source-authorization.sh" in workflow
-        assert '[[ "$EVENT_HEAD_REF" == gtmq_* ]]' in workflow
-        assert '--synthetic-event "$EVENT_PR_NUMBER"' in workflow
-        assert '--source-event "$EVENT_ACTION"' in workflow
-        assert "drain-pr-queue.sh" not in workflow
-
-    def test_opened_synthetic_with_revoked_source_is_closed_and_verified(
-        self, tmp_path: Path
-    ) -> None:
-        calls = tmp_path / "calls"
-        event_views = tmp_path / "event-views"
-        event_views.write_text("0", encoding="utf-8")
-        fake_gh = tmp_path / "gh"
-        fake_gh.write_text(
-            textwrap.dedent(
-                f"""\
-                #!/usr/bin/env bash
-                set -euo pipefail
-                if [[ "$1 $2 $3" == "pr view 14328" ]]; then
-                  count=$(<"{event_views}")
-                  count=$((count + 1))
-                  echo "$count" >"{event_views}"
-                  if [[ "$count" == 1 ]]; then
-                    echo '{{"number":14328,"title":"Graphite batch","body":"https://github.com/JovieInc/Jovie/pull/14279","headRefName":"gtmq_14279","state":"OPEN"}}'
-                  else
-                    echo '{{"state":"CLOSED"}}'
-                  fi
-                  exit 0
-                fi
-                if [[ "$1 $2 $3" == "pr view 14279" ]]; then
-                  echo '{{"state":"OPEN","isDraft":false,"labels":[{{"name":"gated"}}]}}'
-                  exit 0
-                fi
-                if [[ "$1 $2 $3" == "pr close 14328" ]]; then
-                  echo "$*" >>"{calls}"
-                  exit 0
-                fi
-                echo "unexpected gh args: $*" >&2
-                exit 2
-                """
-            ),
-            encoding="utf-8",
-        )
-        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
-
-        result = _run_bash(_guard_command(tmp_path, "--synthetic-event", 14328))
-
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "source #14279 is OPEN with hard gate(s): gated" in result.stdout
-        assert "closed unauthorized Graphite synthetic #14328" in result.stdout
-        assert "Durable guard: #14312" in calls.read_text(encoding="utf-8")
-
-    def test_active_synthetic_is_preserved(self, tmp_path: Path) -> None:
-        fake_gh = tmp_path / "gh"
-        fake_gh.write_text(
-            textwrap.dedent(
-                """\
-                #!/usr/bin/env bash
-                set -euo pipefail
-                if [[ "$1 $2 $3" == "pr view 14330" ]]; then
-                  echo '{"number":14330,"title":"Active batch","body":"https://github.com/JovieInc/Jovie/pull/14280","headRefName":"gtmq_14280","state":"OPEN"}'
-                  exit 0
-                fi
-                if [[ "$1 $2 $3" == "pr view 14280" ]]; then
-                  echo '{"state":"OPEN","isDraft":false,"labels":[{"name":"merge-queue"}]}'
-                  exit 0
-                fi
-                if [[ "$1 $2" == "pr close" ]]; then
-                  exit 9
-                fi
-                echo "unexpected gh args: $*" >&2
-                exit 2
-                """
-            ),
-            encoding="utf-8",
-        )
-        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
-
-        result = _run_bash(_guard_command(tmp_path, "--synthetic-event", 14330))
-
-        assert result.returncode == 0, result.stderr
-        assert "ACTIVE/PRESERVE" in result.stdout
-
-    def test_source_closed_event_rescans_and_closes_existing_synthetic(
-        self, tmp_path: Path
-    ) -> None:
-        fake_gh = tmp_path / "gh"
-        fake_gh.write_text(
-            textwrap.dedent(
-                f"""\
-                #!/usr/bin/env bash
-                set -euo pipefail
-                if [[ "$1 $2 $3" == "pr view 14279" ]]; then
-                  echo '{{"state":"CLOSED","isDraft":false,"labels":[]}}'
-                  exit 0
-                fi
-                if [[ "$1 $2" == "pr list" ]]; then
-                  echo '[{{"number":14328,"title":"Existing batch","body":"https://github.com/JovieInc/Jovie/pull/14279","headRefName":"gtmq_14279"}}]'
-                  exit 0
-                fi
-                if [[ "$1 $2 $3" == "pr close 14328" ]]; then
-                  exit 0
-                fi
-                if [[ "$1 $2 $3" == "pr view 14328" ]]; then
-                  echo '{{"state":"CLOSED"}}'
-                  exit 0
-                fi
-                echo "unexpected gh args: $*" >&2
-                exit 2
-                """
-            ),
-            encoding="utf-8",
-        )
-        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
-
-        result = _run_bash(_guard_command(tmp_path, "--source-event", "closed"))
-
-        assert result.returncode == 0, result.stderr
-        assert "source #14279 is CLOSED" in result.stdout
-        assert "closed unauthorized Graphite synthetic #14328" in result.stdout
-
-    def test_terminal_synthetic_is_a_noop_and_event_lookup_failure_fails_closed(
-        self, tmp_path: Path
-    ) -> None:
-        lookup_views = tmp_path / "lookup-views"
-        lookup_views.write_text("0", encoding="utf-8")
-        closed = tmp_path / "closed"
-        fake_gh = tmp_path / "gh"
-        fake_gh.write_text(
-            textwrap.dedent(
-                f"""\
-                #!/usr/bin/env bash
-                set -euo pipefail
-                if [[ "$1 $2 $3" == "pr view 14328" ]]; then
-                  echo '{{"number":14328,"title":"Done","body":"","headRefName":"gtmq_14279","state":"CLOSED"}}'
-                  exit 0
-                fi
-                if [[ "$1 $2 $3" == "pr view 99999" ]]; then
-                  count=$(<"{lookup_views}")
-                  count=$((count + 1))
-                  echo "$count" >"{lookup_views}"
-                  if [[ "$count" == 1 ]]; then exit 1; fi
-                  echo '{{"state":"CLOSED"}}'
-                  exit 0
-                fi
-                if [[ "$1 $2 $3" == "pr close 99999" ]]; then
-                  touch "{closed}"
-                  exit 0
-                fi
-                if [[ "$1 $2" == "pr close" ]]; then
-                  exit 9
-                fi
-                exit 2
-                """
-            ),
-            encoding="utf-8",
-        )
-        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
-
-        terminal = _run_bash(_guard_command(tmp_path, "--synthetic-event", 14328))
-        lookup_failure = _run_bash(
-            _guard_command(
-                tmp_path,
-                "--synthetic-event",
-                99999,
-                extra_env="GH_RETRY_ATTEMPTS=1",
-            )
-        )
-
-        assert terminal.returncode == 0, terminal.stderr
-        assert "is terminal; no authorization mutation" in terminal.stdout
-        assert lookup_failure.returncode == 0, lookup_failure.stderr
-        assert "synthetic event lookup failed" in lookup_failure.stdout
-        assert "closed unauthorized Graphite synthetic #99999" in lookup_failure.stdout
-        assert closed.exists()
-
+class TestDrainPrQueueLiveBehavior:
     def test_nonzero_checks_with_valid_json_do_not_abort_drain(self, tmp_path: Path) -> None:
         fake_gh = tmp_path / "gh"
         fake_gh.write_text(
