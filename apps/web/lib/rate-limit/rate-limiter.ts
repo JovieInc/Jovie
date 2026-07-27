@@ -7,6 +7,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 import type { Ratelimit } from '@upstash/ratelimit';
+import { after } from 'next/server';
 import { env } from '@/lib/env-server';
 import { withTimeout } from '@/lib/resilience/primitives';
 import { parseWindowToMs } from './config';
@@ -124,6 +125,13 @@ export class RateLimiter {
           context: `rate-limit:${this.config.name}`,
           timeoutMessage: `[RateLimit:${this.config.name}] Redis timeout`,
         });
+        // Upstash analytics fires a background POST and returns it as `pending`.
+        // Register it with Next.js after() so the runtime keeps the function
+        // alive long enough to complete it — without this the promise is
+        // deferred to the next invocation, bloating that trace by 54+ seconds.
+        if (result.pending) {
+          after(() => result.pending.catch(console.error));
+        }
         return {
           success: result.success,
           limit: result.limit,

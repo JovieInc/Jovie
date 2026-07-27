@@ -56,7 +56,7 @@ export function createRedisRateLimiter(
       config.limit,
       toUpstashWindow(config.window)
     ),
-    analytics: config.analytics ?? true,
+    analytics: config.analytics ?? false,
     prefix: config.prefix,
   });
 }
