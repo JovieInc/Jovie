@@ -100,4 +100,38 @@ describe('AudioBar', () => {
       'w-8'
     );
   });
+
+  it('routes keyboard-accessible cue actions by stable id without adding transport controls', () => {
+    const onCueJump = vi.fn();
+    render(
+      <AudioBar
+        {...baseProps}
+        waveformOn
+        cues={[{ id: 'cue_drop', atSeconds: 30, label: 'Drop' }]}
+        onCueJump={onCueJump}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Jump to Drop at 0:30' })
+    );
+    expect(onCueJump).toHaveBeenCalledWith('cue_drop');
+    expect(screen.getAllByRole('button', { name: /^Play/ })).toHaveLength(1);
+  });
+
+  it('disables cue jumps until duration metadata is available', () => {
+    render(
+      <AudioBar
+        {...baseProps}
+        waveformOn
+        duration={Number.NaN}
+        cues={[{ id: 'cue_intro', atSeconds: 0, label: 'Intro' }]}
+        onCueJump={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Jump to Intro at 0:00' })
+    ).toBeDisabled();
+  });
 });

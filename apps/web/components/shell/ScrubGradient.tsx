@@ -14,8 +14,10 @@ const WAVE_AMP = WAVE_H / 2 - 1;
 const TIME_LABEL = 'text-3xs tabular-nums text-quaternary-token w-8 shrink-0';
 
 export interface ScrubCue {
-  /** Position as a percent (0–100) of the track duration. */
-  readonly at: number;
+  /** Stable canonical cue identity used by the player jump authority. */
+  readonly id: string;
+  /** Sample-indexed cue position converted to seconds at the UI boundary. */
+  readonly atSeconds: number;
   /** Cue label shown in the tooltip. */
   readonly label: string;
 }
@@ -85,7 +87,8 @@ const FILLED_PATH = filledStrandsPath();
  * <ScrubGradient
  *   currentTime={78}
  *   duration={213}
- *   cues={[{ at: 12, label: 'Intro' }, { at: 31, label: 'Verse' }]}
+ *   cues={[{ id: 'cue_intro', atSeconds: 12, label: 'Intro' }]}
+ *   onCueJump={id => player.jumpToCue(id)}
  *   loopMode='off'
  * />
  * ```
@@ -94,6 +97,7 @@ export function ScrubGradient({
   currentTime,
   duration,
   onSeek,
+  onCueJump,
   cues = [],
   loopMode = 'off',
   loopSection,
@@ -102,6 +106,7 @@ export function ScrubGradient({
   readonly currentTime: number;
   readonly duration: number;
   readonly onSeek?: (time: number) => void;
+  readonly onCueJump?: (cueId: string) => void;
   readonly cues?: readonly ScrubCue[];
   readonly loopMode?: 'off' | 'track' | 'section';
   /** Required when `loopMode === 'section'`. */
@@ -176,10 +181,14 @@ export function ScrubGradient({
           </g>
           {/* Cue dots — small markers above the waveform. */}
           {cues.map(c => {
-            const cx = (c.at / 100) * SCRUB_W;
+            const cuePercent =
+              safeDuration > 0
+                ? Math.max(0, Math.min(100, (c.atSeconds / safeDuration) * 100))
+                : 0;
+            const cx = (cuePercent / 100) * SCRUB_W;
             return (
               <circle
-                key={`${c.at}-${c.label}`}
+                key={c.id}
                 cx={cx}
                 cy={3}
                 r={1.6}
@@ -187,7 +196,7 @@ export function ScrubGradient({
                 className='text-quaternary-token'
               >
                 <title>
-                  {c.label} · {formatTime((c.at / 100) * safeDuration)}
+                  {c.label} · {formatTime(c.atSeconds)}
                 </title>
               </circle>
             );
@@ -226,9 +235,31 @@ export function ScrubGradient({
             aria-label='Seek Track Waveform'
             aria-valuetext={`${formatTime(safeCurrent)} of ${formatTime(safeDuration)}`}
             disabled={safeDuration <= 0}
-            className='absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-default'
+            className='absolute inset-0 z-10 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-default'
           />
         ) : null}
+        {onCueJump
+          ? cues.map(cue => {
+              const cuePercent =
+                safeDuration > 0
+                  ? Math.max(
+                      0,
+                      Math.min(100, (cue.atSeconds / safeDuration) * 100)
+                    )
+                  : 0;
+              return (
+                <button
+                  key={cue.id}
+                  type='button'
+                  onClick={() => onCueJump(cue.id)}
+                  aria-label={`Jump to ${cue.label} at ${formatTime(cue.atSeconds)}`}
+                  disabled={safeDuration <= 0}
+                  className='absolute top-1/2 z-20 h-11 w-11 -translate-x-1/2 -translate-y-1/2 rounded-full opacity-0 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none'
+                  style={{ left: `${cuePercent}%` }}
+                />
+              );
+            })
+          : null}
       </div>
       <span className={TIME_LABEL}>{formatTime(safeDuration)}</span>
     </div>

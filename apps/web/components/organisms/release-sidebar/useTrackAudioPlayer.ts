@@ -1,12 +1,27 @@
 'use client';
 
 import {
+  type AudioCueJumpTarget,
   type AudioPlaybackEvent,
   type AudioPlaybackSourceKind,
   type AudioPlaybackStatus,
+  type AudioTimelineDocumentV1,
+  type AudioTimelineEdit,
+  type AudioTimelineHistory,
+  applyAudioTimelineHistoryEdit,
+  createAudioTimelineDocument,
+  createAudioTimelineHistory,
   getNextAudioPlaybackStatus,
+  redoAudioTimelineEdit,
+  resolveAudioCueJump,
+  undoAudioTimelineEdit,
 } from '@jovie/audio-contracts';
 import { useCallback, useEffect, useState } from 'react';
+import {
+  type InteractionLatencyMarkHandle,
+  markInteractionStart,
+  measureInteractionPoint,
+} from '@/lib/monitoring/interaction-latency';
 
 export interface AudioTrackSource {
   readonly id: string;
@@ -20,6 +35,7 @@ export interface AudioTrackSource {
   readonly artistName?: string;
   readonly artworkUrl?: string | null;
   readonly hasLyrics?: boolean;
+  readonly timeline?: AudioTimelineDocumentV1 | null;
 }
 
 export interface ToggleTrackOptions {
@@ -36,6 +52,7 @@ export interface PlaybackState {
     | 'play_rejected'
     | 'media_error'
     | 'missing_source'
+    | 'invalid_timeline'
     | null;
   readonly currentTime: number;
   readonly duration: number;
@@ -44,6 +61,9 @@ export interface PlaybackState {
   readonly artistName: string | null;
   readonly artworkUrl: string | null;
   readonly hasLyrics: boolean;
+  readonly timeline: AudioTimelineDocumentV1 | null;
+  readonly canUndoTimelineEdit: boolean;
+  readonly canRedoTimelineEdit: boolean;
   readonly queueLength: number;
   readonly queueIndex: number;
   readonly hasNext: boolean;
@@ -63,6 +83,9 @@ let _queueIndex = -1;
 let _interruptionDepth = 0;
 let _wasPlayingBeforeInterruption = false;
 let _mediaSessionBound = false;
+let _cueJumpLatencyMark: InteractionLatencyMarkHandle | null = null;
+let _cueEditLatencyMark: InteractionLatencyMarkHandle | null = null;
+let _timelineHistory: AudioTimelineHistory | null = null;
 /** ~4 Hz progress notify for cross-surface scrub without rAF thrash. */
 const PROGRESS_NOTIFY_MS = 250;
 
@@ -90,6 +113,7 @@ function getAudio(): HTMLAudioElement | null {
  */
 function replaceAudioElement(): HTMLAudioElement | null {
   if (typeof Audio === 'undefined') return null;
+  _cueJumpLatencyMark = finishLatencyMark(_cueJumpLatencyMark, 'superseded');
   const previousAudio = _audio;
   const nextAudio = createAudioElement();
   _audio = nextAudio;
@@ -153,6 +177,9 @@ let state: PlaybackState = {
   artistName: null,
   artworkUrl: null,
   hasLyrics: false,
+  timeline: null,
+  canUndoTimelineEdit: false,
+  canRedoTimelineEdit: false,
   queueLength: 0,
   queueIndex: -1,
   hasNext: false,
@@ -198,6 +225,37 @@ function getTransitionStatus(
     hasActiveTrack: Boolean(state.activeTrackId),
     isPaused,
   });
+}
+
+function finishLatencyMark(
+  mark: InteractionLatencyMarkHandle | null,
+  point: string
+): null {
+  const measureName = measureInteractionPoint(mark, point);
+  if (
+    mark &&
+    typeof performance !== 'undefined' &&
+    typeof performance.clearMarks === 'function'
+  ) {
+    performance.clearMarks(mark.startMark);
+    performance.clearMarks(`${mark.id}:${point}`);
+  }
+  if (
+    measureName &&
+    typeof performance !== 'undefined' &&
+    typeof performance.clearMeasures === 'function'
+  ) {
+    performance.clearMeasures(measureName);
+  }
+  return null;
+}
+
+function startLatencyMark(
+  name: string,
+  previousMark: InteractionLatencyMarkHandle | null
+): InteractionLatencyMarkHandle | null {
+  finishLatencyMark(previousMark, 'superseded');
+  return markInteractionStart(name);
 }
 
 function getMediaSession(): MediaSession | null {
@@ -298,6 +356,93 @@ function seekToTime(time: number): void {
   });
 }
 
+function jumpToCue(id: string): AudioCueJumpTarget | null {
+  const audio = getAudio();
+  const timeline = state.timeline;
+  if (!audio || !timeline || timeline.trackId !== state.activeTrackId) {
+    return null;
+  }
+  if (!Number.isFinite(audio.duration) || audio.duration <= 0) return null;
+
+  const target = resolveAudioCueJump(timeline, id, audio.duration);
+  _cueJumpLatencyMark = startLatencyMark('audio-cue-jump', _cueJumpLatencyMark);
+  audio.currentTime = target.targetSeconds;
+  return target;
+}
+
+function commitTimelineHistory(history: AudioTimelineHistory): void {
+  _timelineHistory = history;
+  _queue = _queue.map(track =>
+    track.id === state.activeTrackId &&
+    (track.sourceKind ?? 'catalog') === state.sourceKind
+      ? { ...track, timeline: history.present }
+      : track
+  );
+  setState({
+    timeline: history.present,
+    canUndoTimelineEdit: history.past.length > 0,
+    canRedoTimelineEdit: history.future.length > 0,
+  });
+}
+
+function editTimeline(edit: AudioTimelineEdit): AudioTimelineDocumentV1 | null {
+  const history = _timelineHistory;
+  if (!history || history.present.trackId !== state.activeTrackId) return null;
+
+  _cueEditLatencyMark = startLatencyMark('audio-cue-edit', _cueEditLatencyMark);
+  try {
+    const next = applyAudioTimelineHistoryEdit(history, {
+      expectedRevision: history.present.revision,
+      edit,
+    });
+    commitTimelineHistory(next);
+    _cueEditLatencyMark = finishLatencyMark(_cueEditLatencyMark, 'committed');
+    return next.present;
+  } catch {
+    _cueEditLatencyMark = finishLatencyMark(_cueEditLatencyMark, 'rejected');
+    return null;
+  }
+}
+
+function undoTimeline(): AudioTimelineDocumentV1 | null {
+  const history = _timelineHistory;
+  if (!history || history.present.trackId !== state.activeTrackId) return null;
+  _cueEditLatencyMark = startLatencyMark('audio-cue-edit', _cueEditLatencyMark);
+  const next = undoAudioTimelineEdit(history, history.present.revision);
+  if (next === history) {
+    _cueEditLatencyMark = finishLatencyMark(_cueEditLatencyMark, 'unchanged');
+    return history.present;
+  }
+  commitTimelineHistory(next);
+  _cueEditLatencyMark = finishLatencyMark(_cueEditLatencyMark, 'committed');
+  return next.present;
+}
+
+function redoTimeline(): AudioTimelineDocumentV1 | null {
+  const history = _timelineHistory;
+  if (!history || history.present.trackId !== state.activeTrackId) return null;
+  _cueEditLatencyMark = startLatencyMark('audio-cue-edit', _cueEditLatencyMark);
+  const next = redoAudioTimelineEdit(history, history.present.revision);
+  if (next === history) {
+    _cueEditLatencyMark = finishLatencyMark(_cueEditLatencyMark, 'unchanged');
+    return history.present;
+  }
+  commitTimelineHistory(next);
+  _cueEditLatencyMark = finishLatencyMark(_cueEditLatencyMark, 'committed');
+  return next.present;
+}
+
+function normalizeTrackTimeline(
+  track: AudioTrackSource
+): AudioTimelineDocumentV1 | null {
+  if (!track.timeline) return null;
+  const timeline = createAudioTimelineDocument(track.timeline);
+  if (timeline.trackId !== track.id) {
+    throw new TypeError();
+  }
+  return timeline;
+}
+
 function notifyPlaybackError(reason: PlaybackState['lastErrorReason']): void {
   for (const cb of errorListeners) {
     cb(reason);
@@ -312,6 +457,10 @@ function handlePlaybackFailure(
     audio.pause();
     audio.src = '';
   }
+  _activeTrackIsrc = null;
+  _hasRetriedRefresh = false;
+  _cueJumpLatencyMark = finishLatencyMark(_cueJumpLatencyMark, 'failed');
+  _timelineHistory = null;
   clearPlaybackQueue();
   setState({
     activeTrackId: null,
@@ -326,6 +475,9 @@ function handlePlaybackFailure(
     artistName: null,
     artworkUrl: null,
     hasLyrics: false,
+    timeline: null,
+    canUndoTimelineEdit: false,
+    canRedoTimelineEdit: false,
     ...getQueueSnapshot(),
   });
   notifyPlaybackError(reason);
@@ -333,18 +485,25 @@ function handlePlaybackFailure(
 
 async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
   const sourceKind = track.sourceKind ?? 'catalog';
-  const audio =
-    state.activeTrackId &&
-    (state.activeTrackId !== track.id || state.sourceKind !== sourceKind)
-      ? replaceAudioElement()
-      : getAudio();
+  const audio = state.activeTrackId ? replaceAudioElement() : getAudio();
+  // Stryker disable next-line ConditionalExpression: queue callers retain the SSR fail-closed guard even though interactive callers already proved Audio exists.
   if (!audio) return;
+
+  let timeline: AudioTimelineDocumentV1 | null;
+  try {
+    timeline = normalizeTrackTimeline(track);
+  } catch {
+    handlePlaybackFailure(audio, 'invalid_timeline');
+    return;
+  }
+  _timelineHistory = timeline ? createAudioTimelineHistory(timeline) : null;
 
   if (!track.audioUrl) {
     handlePlaybackFailure(audio, 'missing_source');
     return;
   }
 
+  // Stryker disable next-line UpdateOperator: either direction produces a fresh request token.
   const token = ++_playToken;
   _activeTrackIsrc = track.isrc ?? null;
   _hasRetriedRefresh = false;
@@ -363,6 +522,9 @@ async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
     artistName: track.artistName ?? null,
     artworkUrl: track.artworkUrl ?? null,
     hasLyrics: Boolean(track.hasLyrics),
+    timeline,
+    canUndoTimelineEdit: false,
+    canRedoTimelineEdit: false,
     ...getQueueSnapshot(),
   });
 
@@ -374,7 +536,6 @@ async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
     }
     throw error;
   }
-
   if (_playToken !== token) {
     return;
   }
@@ -482,6 +643,7 @@ function bindAudioEvents(el: HTMLAudioElement): void {
   });
   bindCurrentAudioEvent('seeked', () => {
     lastNotifiedAt = -Infinity; // invalidate throttle so next timeupdate fires
+    _cueJumpLatencyMark = finishLatencyMark(_cueJumpLatencyMark, 'settled');
     setState({
       isPlaying: !el.paused,
       playbackStatus: getTransitionStatus('seeked', el.paused),
@@ -654,6 +816,17 @@ export function useTrackAudioPlayer() {
     seekToTime(time);
   }, []);
 
+  const jumpCue = useCallback((id: string) => {
+    return jumpToCue(id);
+  }, []);
+
+  const editCueTimeline = useCallback((edit: AudioTimelineEdit) => {
+    return editTimeline(edit);
+  }, []);
+
+  const undoCueTimelineEdit = useCallback(() => undoTimeline(), []);
+  const redoCueTimelineEdit = useCallback(() => redoTimeline(), []);
+
   const stop = useCallback(() => {
     // Invalidate any in-flight play() from earlier toggleTrack calls
     _playToken += 1;
@@ -664,7 +837,11 @@ export function useTrackAudioPlayer() {
       audio.pause();
       audio.src = '';
     }
+    _activeTrackIsrc = null;
+    _hasRetriedRefresh = false;
     clearPlaybackQueue();
+    _cueJumpLatencyMark = finishLatencyMark(_cueJumpLatencyMark, 'stopped');
+    _timelineHistory = null;
     setState({
       activeTrackId: null,
       sourceKind: null,
@@ -678,6 +855,9 @@ export function useTrackAudioPlayer() {
       artistName: null,
       artworkUrl: null,
       hasLyrics: false,
+      timeline: null,
+      canUndoTimelineEdit: false,
+      canRedoTimelineEdit: false,
       ...getQueueSnapshot(),
     });
   }, []);
@@ -698,6 +878,10 @@ export function useTrackAudioPlayer() {
     playNext,
     playPrevious,
     seek,
+    jumpToCue: jumpCue,
+    editTimeline: editCueTimeline,
+    undoTimelineEdit: undoCueTimelineEdit,
+    redoTimelineEdit: redoCueTimelineEdit,
     stop,
     onError,
     pauseForInterruption: pausePlaybackForInterruption,

@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MALFORMED_AUDIO_FIXTURES,
   REAL_AUDIO_FIXTURES,
+  STRESS_AUDIO_FIXTURES,
 } from '../../../fixtures/audio/manifest';
 
 function readFixture(fileName: string): Buffer {
@@ -47,6 +48,18 @@ describe('real audio media fixtures', () => {
       expectedChromiumCanPlayType: '',
       expectedChromiumDecode: 'unsupported',
     });
+  });
+
+  it.each(
+    STRESS_AUDIO_FIXTURES
+  )('pins the $scenarioId real-media stress corpus', fixture => {
+    const bytes = readFixture(fixture.fileName);
+    const digest = createHash('sha256').update(bytes).digest('hex');
+
+    expect(bytes.byteLength).toBeGreaterThan(200_000);
+    expect(bytes.byteLength).toBeLessThan(300_000);
+    expect(digest).toBe(fixture.sha256);
+    expect(fixture.decodedDurationSeconds.minimum).toBeGreaterThan(30);
   });
 
   it('covers every canonical format with a pinned truncated container', () => {

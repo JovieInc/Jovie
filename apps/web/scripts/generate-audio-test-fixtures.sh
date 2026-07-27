@@ -5,6 +5,7 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly WEB_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 readonly FIXTURE_ROOT="${WEB_ROOT}/tests/fixtures/audio"
 readonly SOURCE_WAV="${FIXTURE_ROOT}/.source.wav"
+readonly LONG_SOURCE_WAV="${FIXTURE_ROOT}/.long-source.wav"
 
 for command_name in ffmpeg ffprobe; do
   if ! command -v "${command_name}" >/dev/null 2>&1; then
@@ -20,9 +21,17 @@ ffmpeg -hide_banner -loglevel error -y \
   -map_metadata -1 -fflags +bitexact -flags:a +bitexact \
   -c:a pcm_s16le "${SOURCE_WAV}"
 
+ffmpeg -hide_banner -loglevel error -y \
+  -f lavfi -i 'sine=frequency=220:sample_rate=44100:duration=60' \
+  -map_metadata -1 -fflags +bitexact -flags:a +bitexact \
+  -c:a pcm_s16le "${LONG_SOURCE_WAV}"
+
 ffmpeg -hide_banner -loglevel error -y -i "${SOURCE_WAV}" \
   -map_metadata -1 -fflags +bitexact -flags:a +bitexact \
   -c:a libmp3lame -b:a 128k "${FIXTURE_ROOT}/tone.mp3"
+ffmpeg -hide_banner -loglevel error -y -i "${LONG_SOURCE_WAV}" \
+  -map_metadata -1 -fflags +bitexact -flags:a +bitexact \
+  -c:a libmp3lame -q:a 6 "${FIXTURE_ROOT}/long-vbr-tone.mp3"
 ffmpeg -hide_banner -loglevel error -y -i "${SOURCE_WAV}" \
   -map_metadata -1 -fflags +bitexact -flags:a +bitexact \
   -c:a pcm_s16le "${FIXTURE_ROOT}/tone.wav"
@@ -51,9 +60,13 @@ for fixture_path in \
     -of default=noprint_wrappers=1 "${fixture_path}" >/dev/null
 done
 
+ffprobe -v error -select_streams a:0 \
+  -show_entries format=duration:stream=codec_name,sample_rate,channels \
+  -of default=noprint_wrappers=1 "${FIXTURE_ROOT}/long-vbr-tone.mp3" >/dev/null
+
 for extension in mp3 wav flac aiff aac m4a; do
   head -c 32 "${FIXTURE_ROOT}/tone.${extension}" \
     >"${FIXTURE_ROOT}/truncated.${extension}"
 done
 
-rm "${SOURCE_WAV}"
+rm "${SOURCE_WAV}" "${LONG_SOURCE_WAV}"
