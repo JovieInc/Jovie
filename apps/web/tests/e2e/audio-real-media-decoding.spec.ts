@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { Readable } from 'node:stream';
 import { expect, type Page, test } from '@playwright/test';
+import { prepareAiffPlaybackDerivative } from '../../lib/audio/aiff-to-wav';
 import {
   MALFORMED_AUDIO_FIXTURES,
   REAL_AUDIO_FIXTURES,
@@ -85,4 +87,48 @@ test.describe('canonical real audio corpus', () => {
       });
     });
   }
+
+  test('a streamed AIFF derivative becomes real Chromium-decodable WAV audio', async ({
+    page,
+  }) => {
+    const aiff = readFileSync(
+      resolve(process.cwd(), 'tests/fixtures/audio', 'tone.aiff')
+    );
+    const source = Readable.toWeb(
+      Readable.from(
+        (function* chunks() {
+          for (let offset = 0; offset < aiff.length; offset += 17) {
+            yield aiff.subarray(offset, offset + 17);
+          }
+        })()
+      )
+    ) as ReadableStream<Uint8Array>;
+    const prepared = await prepareAiffPlaybackDerivative(source);
+    const outputChunks: Buffer[] = [];
+    for await (const chunk of prepared.stream) {
+      outputChunks.push(Buffer.from(chunk));
+    }
+    const derivative = Buffer.concat(outputChunks);
+
+    expect(derivative.byteLength).toBe(prepared.outputBytes);
+    const result = await page.evaluate(async encodedBytes => {
+      const decodedBytes = Uint8Array.from(atob(encodedBytes), character =>
+        character.charCodeAt(0)
+      );
+      const context = new AudioContext();
+      try {
+        const decoded = await context.decodeAudioData(decodedBytes.buffer);
+        return {
+          channels: decoded.numberOfChannels,
+          duration: decoded.duration,
+        };
+      } finally {
+        await context.close();
+      }
+    }, derivative.toString('base64'));
+
+    expect(result.channels).toBe(1);
+    expect(result.duration).toBeGreaterThanOrEqual(0.99);
+    expect(result.duration).toBeLessThanOrEqual(1.01);
+  });
 });
