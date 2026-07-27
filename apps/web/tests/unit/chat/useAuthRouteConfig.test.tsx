@@ -65,6 +65,7 @@ describe('useAuthRouteConfig', () => {
     expect(result.current.breadcrumbs).toEqual([
       { label: 'Library', href: '/app/library' },
     ]);
+    expect(result.current.isTableRoute).toBe(true);
   });
 
   it('keeps other library views labeled Library', () => {

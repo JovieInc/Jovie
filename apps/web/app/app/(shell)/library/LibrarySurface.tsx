@@ -14,6 +14,9 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from '@jovie/ui';
 import {
   type ColumnDef,
@@ -65,7 +68,6 @@ import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-sh
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
 import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
 import { toast } from '@/components/feedback';
-import { AppSearchField } from '@/components/molecules/AppSearchField';
 import {
   DrawerHeader,
   DrawerSection,
@@ -85,10 +87,10 @@ import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useT
 import {
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_ICON_CLASS,
-  PAGE_TOOLBAR_MENU_TRIGGER_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbar,
   PageToolbarActionButton,
+  PageToolbarTabButton,
   TableEmptyState,
   UnifiedTable,
   UnifiedTableSkeleton,
@@ -102,7 +104,6 @@ import {
   DspAvatarStack,
 } from '@/components/shell/DspAvatarStack';
 import type { FilterPill } from '@/components/shell/pill-search.types';
-import { ShellDropdown } from '@/components/shell/ShellDropdown';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
@@ -541,17 +542,6 @@ const ApprovalStatusCell = memo(function ApprovalStatusCell({
   );
 });
 
-function assetMatchesSearchQuery(
-  asset: LibraryReleaseAsset,
-  normalizedQuery: string
-): boolean {
-  if (!normalizedQuery) return true;
-  return (
-    asset.title.toLowerCase().includes(normalizedQuery) ||
-    asset.artist.toLowerCase().includes(normalizedQuery)
-  );
-}
-
 /**
  * Neutral fallback avatar color for provider keys missing from
  * `PROVIDER_CONFIG`. Points at a System B text token — no raw hex here.
@@ -667,6 +657,20 @@ const LIBRARY_CATALOG_COLUMNS = [
     enableSorting: false,
     meta: { className: 'px-2' },
   }),
+  libraryColumnHelper.display({
+    id: 'releaseDate',
+    header: 'Release Date',
+    cell: ({ row }) => (
+      <span className='system-b-library-meta-text block whitespace-nowrap text-right tabular-nums text-tertiary-token'>
+        {row.original.releaseDate
+          ? formatLibraryReleaseDate(row.original.releaseDate)
+          : 'No date'}
+      </span>
+    ),
+    size: 112,
+    minSize: 96,
+    meta: { className: 'pl-2 pr-3' },
+  }),
   libraryColumnHelper.accessor('artist', {
     id: 'artist',
     header: 'Artist',
@@ -692,6 +696,20 @@ const LIBRARY_TABLE_COLUMNS = [
     size: 9999,
     enableSorting: false,
     meta: { className: 'pl-2.5 pr-2' },
+  }),
+  libraryColumnHelper.display({
+    id: 'releaseDate',
+    header: 'Release Date',
+    cell: ({ row }) => (
+      <span className='system-b-library-meta-text block whitespace-nowrap text-right tabular-nums text-tertiary-token'>
+        {row.original.releaseDate
+          ? formatLibraryReleaseDate(row.original.releaseDate)
+          : 'No date'}
+      </span>
+    ),
+    size: 112,
+    minSize: 96,
+    meta: { className: 'pl-2 pr-3' },
   }),
   // Release + Approval share the same md breakpoint so a Released+Draft
   // row never shows bare "Draft" alone (JOV-3333 / #10384).
@@ -734,20 +752,6 @@ const LIBRARY_TABLE_COLUMNS = [
     enableSorting: false,
     meta: { className: 'hidden lg:table-cell px-2' },
   }),
-  libraryColumnHelper.display({
-    id: 'releaseDate',
-    header: 'Release Date',
-    cell: ({ row }) => (
-      <span className='system-b-library-meta-text block whitespace-nowrap text-right tabular-nums text-tertiary-token'>
-        {row.original.releaseDate
-          ? formatLibraryReleaseDate(row.original.releaseDate)
-          : 'No date'}
-      </span>
-    ),
-    size: 112,
-    minSize: 96,
-    meta: { className: 'hidden sm:table-cell pl-2 pr-3' },
-  }),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
 
 const LIBRARY_VIEW_FILTER_CHIP_KEYS = PRESETS.map(preset => preset.id);
@@ -786,40 +790,9 @@ export function LibraryLoadingState() {
         minWidth={LIBRARY_TABLE_MIN_WIDTH}
         skeletonRows={SKELETON_ROW_COUNT.TABLE}
         skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
-        containerClassName={cn('h-full', LIBRARY_CONTENT_INSET_CLASS)}
+        containerClassName='h-full'
       />
     </PageShell>
-  );
-}
-
-function LibraryViewFilterChip({
-  label,
-  count,
-  active,
-  onClick,
-}: {
-  readonly label: string;
-  readonly count: number;
-  readonly active: boolean;
-  readonly onClick: () => void;
-}) {
-  return (
-    <button
-      type='button'
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        'system-b-library-filter-pill h-7 rounded-full px-3 font-caption transition-colors duration-subtle ease-subtle',
-        active
-          ? 'system-b-library-filter-pill-active'
-          : 'system-b-library-filter-pill-idle'
-      )}
-    >
-      {label}
-      <span className='system-b-library-rail-count ml-1 tabular-nums'>
-        {count}
-      </span>
-    </button>
   );
 }
 
@@ -838,10 +811,16 @@ function LibraryViewFilterChips({
       data-testid='library-view-filter-chips'
     >
       {PRESETS.map(view => (
-        <LibraryViewFilterChip
+        <PageToolbarTabButton
           key={view.id}
-          label={view.label}
-          count={assets.filter(view.predicate).length}
+          label={
+            <>
+              {view.label}
+              <span className='system-b-library-rail-count ml-1 tabular-nums text-tertiary-token'>
+                {assets.filter(view.predicate).length}
+              </span>
+            </>
+          }
           active={preset === view.id}
           onClick={() => onPreset(view.id)}
         />
@@ -1197,67 +1176,76 @@ function LibraryFiltersControl({
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
 }) {
-  const label = (
-    <>
-      <span>Show Filters</span>
-      <span
-        data-testid='library-filter-count-slot'
-        aria-hidden='true'
-        className='inline-block w-8 shrink-0 text-right tabular-nums'
-      >
-        {activeFilterCount > 0 ? `(${activeFilterCount})` : null}
-      </span>
-    </>
-  );
   const ariaLabel =
     activeFilterCount > 0
       ? `Show filters (${activeFilterCount})`
       : 'Show filters';
   const trigger = (
     <PageToolbarActionButton
-      label={label}
-      icon={<Filter className={PAGE_TOOLBAR_ICON_CLASS} />}
+      label='Show Filters'
+      icon={
+        <span className='relative grid place-items-center'>
+          <Filter className={PAGE_TOOLBAR_ICON_CLASS} />
+          {activeFilterCount > 0 ? (
+            <span
+              data-testid='library-filter-active-indicator'
+              className='absolute -right-1 -top-0.5 h-1.5 w-1.5 rounded-full bg-accent'
+              aria-hidden='true'
+            />
+          ) : null}
+        </span>
+      }
       ariaLabel={ariaLabel}
       active={open}
-      className={isDesktop ? undefined : 'min-h-11 min-w-11'}
+      iconOnly
     />
   );
 
   if (isDesktop) {
     return (
-      <Popover open={open} onOpenChange={onOpenChange}>
-        <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-        <PopoverContent
-          aria-label='Library Filters'
-          align='end'
-          sideOffset={6}
-          className='flex max-h-[min(36rem,var(--radix-popover-content-available-height))] w-80 overflow-hidden p-0'
-          testId='library-filter-popover'
-        >
-          {filterPanel}
-        </PopoverContent>
-      </Popover>
+      <Tooltip>
+        <Popover open={open} onOpenChange={onOpenChange}>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+          </TooltipTrigger>
+          <PopoverContent
+            aria-label='Library Filters'
+            align='end'
+            sideOffset={6}
+            className='flex max-h-[min(36rem,var(--radix-popover-content-available-height))] w-80 overflow-hidden p-0'
+            testId='library-filter-popover'
+          >
+            {filterPanel}
+          </PopoverContent>
+        </Popover>
+        <TooltipContent side='bottom'>Show filters</TooltipContent>
+      </Tooltip>
     );
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetTrigger asChild>{trigger}</SheetTrigger>
-      <SheetContent
-        side='right'
-        className='flex w-full max-w-[22rem] flex-col gap-0 p-0'
-        testId='library-filter-sheet'
-      >
-        <SheetHeader className='shrink-0 border-b border-subtle px-4 py-3 text-left'>
-          <SheetTitle>Library Filters</SheetTitle>
-          <SheetDescription className='sr-only'>
-            Filter by saved view, approval, release status, type, asset, or
-            provider.
-          </SheetDescription>
-        </SheetHeader>
-        {filterPanel}
-      </SheetContent>
-    </Sheet>
+    <Tooltip>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <TooltipTrigger asChild>
+          <SheetTrigger asChild>{trigger}</SheetTrigger>
+        </TooltipTrigger>
+        <SheetContent
+          side='right'
+          className='flex w-full max-w-[22rem] flex-col gap-0 p-0'
+          testId='library-filter-sheet'
+        >
+          <SheetHeader className='shrink-0 border-b border-subtle px-4 py-3 text-left'>
+            <SheetTitle>Library Filters</SheetTitle>
+            <SheetDescription className='sr-only'>
+              Filter by saved view, approval, release status, type, asset, or
+              provider.
+            </SheetDescription>
+          </SheetHeader>
+          {filterPanel}
+        </SheetContent>
+      </Sheet>
+      <TooltipContent side='bottom'>Show filters</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -1269,33 +1257,44 @@ function SortDropdown({
   readonly onSort: (sort: LibrarySortKey) => void;
 }) {
   return (
-    <ShellDropdown
-      align='end'
-      side='bottom'
-      sideOffset={6}
-      width={184}
-      trigger={
-        <button type='button' className={PAGE_TOOLBAR_MENU_TRIGGER_CLASS}>
-          <ArrowUpDown className={PAGE_TOOLBAR_ICON_CLASS} strokeWidth={2.25} />
-          <span className='hidden sm:inline'>{SORT_LABELS[sort]}</span>
-          <ChevronDown className='h-3 w-3' strokeWidth={2.25} />
-        </button>
-      }
-    >
-      <ShellDropdown.Label>Sort By</ShellDropdown.Label>
-      <ShellDropdown.RadioGroup
-        value={sort}
-        onValueChange={value => onSort(value as LibrarySortKey)}
-      >
-        {(Object.keys(SORT_LABELS) as LibrarySortKey[]).map(key => (
-          <ShellDropdown.RadioItem
-            key={key}
-            value={key}
-            label={SORT_LABELS[key]}
-          />
-        ))}
-      </ShellDropdown.RadioGroup>
-    </ShellDropdown>
+    <Tooltip>
+      <DropdownMenu>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>
+            <PageToolbarActionButton
+              label={`Sort by ${SORT_LABELS[sort]}`}
+              icon={
+                <ArrowUpDown
+                  className={PAGE_TOOLBAR_ICON_CLASS}
+                  strokeWidth={2.25}
+                />
+              }
+              ariaLabel={`Sort by ${SORT_LABELS[sort]}`}
+              iconOnly
+            />
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <DropdownMenuContent
+          align='end'
+          side='bottom'
+          sideOffset={6}
+          aria-label='Sort Library'
+          className={TOOLBAR_MENU_CONTENT_CLASS}
+        >
+          {(Object.keys(SORT_LABELS) as LibrarySortKey[]).map(key => (
+            <ToolbarMenuChoiceItem
+              key={key}
+              active={sort === key}
+              label={SORT_LABELS[key]}
+              onSelect={() => onSort(key)}
+            />
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <TooltipContent side='bottom'>
+        Sort by {SORT_LABELS[sort].toLowerCase()}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -1373,8 +1372,6 @@ function LibraryToolbar({
   onView,
   gridDensity,
   onGridDensity,
-  searchQuery,
-  onSearchQuery,
   visibleCount,
   totalCount,
   filtersOpen,
@@ -1392,8 +1389,6 @@ function LibraryToolbar({
   readonly onView: (view: LibraryViewMode) => void;
   readonly gridDensity: LibraryGridDensity;
   readonly onGridDensity: (density: LibraryGridDensity) => void;
-  readonly searchQuery: string;
-  readonly onSearchQuery: (query: string) => void;
   readonly visibleCount: number;
   readonly totalCount: number;
   readonly filtersOpen: boolean;
@@ -1419,13 +1414,6 @@ function LibraryToolbar({
       }
       end={
         <>
-          <AppSearchField
-            value={searchQuery}
-            onChange={onSearchQuery}
-            placeholder='Search library'
-            ariaLabel='Search library by title'
-            className='w-36 sm:w-48'
-          />
           <LibraryFiltersControl
             activeFilterCount={activeFilterCount}
             filterPanel={filterPanel}
@@ -1738,7 +1726,7 @@ function LibraryReleaseTable({
       minWidth={LIBRARY_TABLE_MIN_WIDTH}
       hideHeader={hideHeader}
       className='system-b-library-table'
-      containerClassName={cn('h-full', LIBRARY_CONTENT_INSET_CLASS)}
+      containerClassName='h-full'
       skeletonRows={SKELETON_ROW_COUNT.TABLE}
       skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
     />
@@ -1761,6 +1749,7 @@ function EmptyCatalog() {
       aria-label='Library'
       frame='content-container'
       contentPadding='none'
+      surfaceMode='table'
       data-testid='library-surface'
     >
       <NavigationDestinationReady destination='library' />
@@ -1790,7 +1779,7 @@ function NoResults({ onReset }: { readonly onReset: () => void }) {
     <TableEmptyState
       title='No Assets Match'
       description='No library items match the selected view or filters.'
-      className='m-3 min-h-75'
+      className='min-h-75'
       action={
         <button
           type='button'
@@ -2441,29 +2430,22 @@ function AssetDrawer({
 function LibraryStatusBar({
   visibleCount,
   totalCount,
-  sort,
-  view,
   activePreviewTitle,
 }: {
   readonly visibleCount: number;
   readonly totalCount: number;
-  readonly sort: LibrarySortKey;
-  readonly view: LibraryViewMode;
   readonly activePreviewTitle: string | null;
 }) {
-  const viewLabel =
-    view === 'grid' ? 'Grid' : view === 'table' ? 'Table' : 'List';
-  const idleSummary = `${SORT_LABELS[sort]} - ${viewLabel}`;
-  const playbackSummary = activePreviewTitle
-    ? `Playing ${activePreviewTitle}`
-    : idleSummary;
-
   return (
-    <div className='system-b-library-status-bar hidden h-8 shrink-0 items-center justify-between gap-3 border-t border-subtle px-(--linear-app-header-padding-x) sm:flex'>
+    <div className='system-b-library-status-bar hidden h-(--app-shell-footer-row-height) shrink-0 items-center justify-between gap-3 border-t border-(--app-shell-frame-seam) px-(--linear-app-header-padding-x) sm:flex'>
       <span className='min-w-0 truncate'>
         {visibleCount} of {totalCount} Items
       </span>
-      <span className='min-w-0 truncate text-right'>{playbackSummary}</span>
+      {activePreviewTitle ? (
+        <span className='min-w-0 truncate text-right'>
+          Playing {activePreviewTitle}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -2496,7 +2478,6 @@ export function LibrarySurface({
     readPersistedLibrarySavedView()
   );
   const [filters, setFilters] = useState<LibraryFilters>(() => emptyFilters());
-  const [searchQuery, setSearchQuery] = useState('');
   const [sort, setSort] = useState<LibrarySortKey>('releaseDate');
   const { view, setView } = useLibraryViewMode();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -2511,7 +2492,6 @@ export function LibrarySurface({
   const deferredSavedView = useDeferredValue(savedView);
   const deferredPills = useDeferredValue(pills);
   const deferredSort = useDeferredValue(sort);
-  const deferredSearchQuery = useDeferredValue(searchQuery);
 
   useEffect(() => {
     setPreset(parseLibraryViewParam(searchParams.get('view')));
@@ -2555,21 +2535,18 @@ export function LibrarySurface({
       PRESETS.find(item => item.id === deferredPreset)?.predicate ??
       (() => true);
     const savedViewPredicate = getLibrarySavedViewPredicate(deferredSavedView);
-    const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
 
     return effectiveAssets
       .filter(presetPredicate)
       .filter(savedViewPredicate)
       .filter(asset => assetMatchesFilters(asset, deferredFilters))
       .filter(asset => assetMatchesPills(asset, deferredPills))
-      .filter(asset => assetMatchesSearchQuery(asset, normalizedQuery))
       .toSorted(compareAssets(deferredSort));
   }, [
     deferredFilters,
     deferredPills,
     deferredPreset,
     deferredSavedView,
-    deferredSearchQuery,
     deferredSort,
     effectiveAssets,
   ]);
@@ -2690,7 +2667,6 @@ export function LibrarySurface({
     handleSavedViewChange('all');
     setFilters(emptyFilters());
     setPills([]);
-    setSearchQuery('');
   }
 
   function openAsset(id: string) {
@@ -2859,6 +2835,7 @@ export function LibrarySurface({
       aria-label='Library'
       frame='content-container'
       contentPadding='none'
+      surfaceMode='table'
       data-testid='library-surface'
       toolbar={
         <LibraryToolbar
@@ -2871,8 +2848,6 @@ export function LibrarySurface({
           onView={setView}
           gridDensity={gridDensity}
           onGridDensity={setGridDensity}
-          searchQuery={searchQuery}
-          onSearchQuery={setSearchQuery}
           visibleCount={visibleAssets.length}
           totalCount={effectiveAssets.length}
           filtersOpen={filtersOpen}
@@ -2936,8 +2911,6 @@ export function LibrarySurface({
           <LibraryStatusBar
             visibleCount={visibleAssets.length}
             totalCount={effectiveAssets.length}
-            sort={sort}
-            view={view}
             activePreviewTitle={activePreviewTitle}
           />
         </div>

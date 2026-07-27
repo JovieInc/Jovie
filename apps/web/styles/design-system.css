@@ -95,6 +95,7 @@
   --app-shell-sidebar-width: var(--linear-app-sidebar-width);
   --app-shell-header-height: var(--linear-app-header-height);
   --app-shell-header-height-compact: var(--linear-app-header-height-compact);
+  --app-shell-footer-row-height: calc(var(--space-6) + var(--space-1-5));
   --app-shell-gap: var(--linear-app-shell-gap);
   --app-shell-radius: var(--linear-app-shell-radius);
   --app-shell-border: var(--linear-app-shell-border);
