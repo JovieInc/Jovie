@@ -332,7 +332,7 @@
     "drizzle-zod": "^0.8.3",
     "eslint": "^10.2.1",
     "eslint-config-next": "^16.2.3",
-    "eslint-plugin-boundaries": "^6.0.2",
+    "eslint-plugin-boundaries": "^7.1.0",
     "fast-check": "^4.8.0",
     "glob": "^13.0.6",
     "jsdom": "29.0.2",
