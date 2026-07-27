@@ -69,6 +69,25 @@ async function importFresh() {
   return mod.useTrackAudioPlayer;
 }
 
+function timeline(trackId = 'track-1') {
+  return {
+    version: 1 as const,
+    trackId,
+    revision: 0,
+    sampleRateHz: 48_000 as never,
+    durationSamples: 480_000 as never,
+    cues: [
+      {
+        id: 'cue_drop' as never,
+        kind: 'drop' as const,
+        label: 'Drop',
+        sampleOffset: 240_000 as never,
+      },
+    ],
+    beatGrid: null,
+  };
+}
+
 describe('useTrackAudioPlayer', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -250,6 +269,111 @@ describe('useTrackAudioPlayer', () => {
       playbackStatus: 'loading',
       lastErrorReason: null,
     });
+  });
+
+  it('jumps to sample-indexed cues without pausing and measures settlement', async () => {
+    const markSpy = vi.spyOn(performance, 'mark');
+    const measureSpy = vi.spyOn(performance, 'measure');
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+        timeline: timeline(),
+      });
+    });
+    const pauseCountBeforeJump = mockAudio.pause.mock.calls.length;
+    let target: ReturnType<typeof result.current.jumpToCue> = null;
+    act(() => {
+      mockAudio.duration = 10;
+      target = result.current.jumpToCue('cue_drop');
+      fireAudioEvent('seeking');
+      mockAudio.currentTime = 5;
+      fireAudioEvent('seeked');
+    });
+
+    expect(target).toMatchObject({
+      cueId: 'cue_drop',
+      targetSeconds: 5,
+      durationBound: 'known',
+      clamped: false,
+    });
+    expect(mockAudio.currentTime).toBe(5);
+    expect(mockAudio.pause).toHaveBeenCalledTimes(pauseCountBeforeJump);
+    expect(result.current.playbackState.timeline?.trackId).toBe('track-1');
+    expect(markSpy).toHaveBeenCalledWith(
+      expect.stringContaining('audio-cue-jump')
+    );
+    expect(measureSpy).toHaveBeenCalledWith(
+      'audio-cue-jump:event-to-settled',
+      expect.any(String),
+      expect.any(String)
+    );
+  });
+
+  it('fails cue jumps closed for missing duration and stale timelines', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+        timeline: timeline(),
+      });
+    });
+    act(() => {
+      mockAudio.duration = Number.NaN;
+    });
+    expect(result.current.jumpToCue('cue_drop')).toBeNull();
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-2',
+        title: 'Next Song',
+        audioUrl: 'https://cdn.example.com/next.mp3',
+      });
+    });
+    expect(result.current.playbackState.timeline).toBeNull();
+    expect(result.current.jumpToCue('cue_drop')).toBeNull();
+  });
+
+  it('rejects mismatched or malformed timeline documents before playback', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+        timeline: timeline('track-2'),
+      });
+    });
+    expect(result.current.playbackState).toMatchObject({
+      activeTrackId: null,
+      timeline: null,
+      lastErrorReason: 'invalid_timeline',
+      playbackStatus: 'error',
+    });
+    expect(mockAudio.play).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+        timeline: { ...timeline(), sampleRateHz: 1 } as never,
+      });
+    });
+    expect(result.current.playbackState.lastErrorReason).toBe(
+      'invalid_timeline'
+    );
+    expect(mockAudio.play).not.toHaveBeenCalled();
   });
 
   it('resets state and notifies error listeners on audio error', async () => {

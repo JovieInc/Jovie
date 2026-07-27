@@ -72,6 +72,7 @@ export function AudioBar({
   isPlaying,
   onPlay,
   onSeek,
+  onCueJump,
   onShuffle,
   onPrevious,
   onNext,
@@ -93,6 +94,7 @@ export function AudioBar({
   readonly isPlaying: boolean;
   readonly onPlay: () => void;
   readonly onSeek?: (time: number) => void;
+  readonly onCueJump?: (cueId: string) => void;
   readonly onShuffle?: () => void;
   readonly onPrevious?: () => void;
   readonly onNext?: () => void;
@@ -258,6 +260,7 @@ export function AudioBar({
               currentTime={currentTime}
               duration={duration}
               onSeek={onSeek}
+              onCueJump={onCueJump}
               cues={cues}
               loopMode={loopMode}
               loopSection={loopSection}
