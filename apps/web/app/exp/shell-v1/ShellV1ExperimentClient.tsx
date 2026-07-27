@@ -5413,6 +5413,7 @@ function DrawerHero({
   return (
     <ProductionDrawerHero
       title={release.title}
+      titleLineClamp={1}
       subtitle={
         <>
           <EntityHoverLink
