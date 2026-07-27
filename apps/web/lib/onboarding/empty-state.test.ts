@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ONBOARDING_ENTRY_SUPPORT,
+  ONBOARDING_ENTRY_TITLE,
   ONBOARDING_STARTER_SUGGESTIONS,
-  ONBOARDING_WELCOME_MESSAGE,
 } from './empty-state';
 
 describe('onboarding empty state copy', () => {
-  it('includes memory disclosure, early-access disclosure, and one intake question', () => {
-    expect(ONBOARDING_WELCOME_MESSAGE).toMatch(/remember/i);
-    expect(ONBOARDING_WELCOME_MESSAGE).toMatch(/early access|waitlist/i);
-    expect(ONBOARDING_WELCOME_MESSAGE).toMatch(/what are you working on/i);
-    expect((ONBOARDING_WELCOME_MESSAGE.match(/\?/g) ?? []).length).toBe(1);
+  it('keeps the blank entry concise and artist-specific', () => {
+    expect(ONBOARDING_ENTRY_TITLE).toBe('What Are You Working On?');
+    expect(ONBOARDING_ENTRY_SUPPORT).toMatch(
+      /artist name, Spotify link, or next release/i
+    );
+    expect(`${ONBOARDING_ENTRY_TITLE} ${ONBOARDING_ENTRY_SUPPORT}`).not.toMatch(
+      /early access|waitlist|remember/i
+    );
   });
 
   it('exposes four starter suggestions with prompts', () => {

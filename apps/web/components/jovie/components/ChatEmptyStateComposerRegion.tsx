@@ -20,14 +20,16 @@ export function ChatEmptyStateComposerRegion({
   above,
   children,
   greetingName,
+  hideWelcomeHeader = false,
 }: {
   readonly above?: ReactNode;
   readonly children: ReactNode;
   readonly greetingName?: string | null;
+  readonly hideWelcomeHeader?: boolean;
 }) {
   const trimmedName = greetingName?.trim();
   const greeting = trimmedName ? `Hi, ${trimmedName}` : 'Hi there';
-  const showWelcomeHeader = !above;
+  const showWelcomeHeader = !above && !hideWelcomeHeader;
 
   if (above) {
     return (
