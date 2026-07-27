@@ -9,6 +9,7 @@ export const REQUIRED_MERGE_STATUSES = [
   'Migration Guard',
   'Fork PR Gate',
   'PR Size Guard',
+  'Visual Approval Guard',
 ];
 
 /** Canonical Graphite merge-queue policy (dashboard + repo guardrails). */
@@ -98,6 +99,7 @@ export const ALLOWED_REQUIRED_CHECK_CONTEXTS = Object.freeze([
   'PR Size Guard',
   'PR Ready',
   'Migration Guard',
+  'Visual Approval Guard',
 ]);
 
 /** Individual job names that must never appear as branch-protection required checks. */
@@ -132,6 +134,12 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Promptfoo Evals (deterministic)',
   'CI / Golden Eval Set (deterministic)',
   'Golden Eval Set (deterministic)',
+  'CI / Storybook Visual + A11y (combined)',
+  'Storybook Visual + A11y (combined)',
+  'CI / Chromatic Visual Regression (combined)',
+  'Chromatic Visual Regression (combined)',
+  'CI / UI Playwright Visual Smoke (combined)',
+  'UI Playwright Visual Smoke (combined)',
   // Harness evidence jobs (must stay aggregated under PR Ready / never pin solo)
   'CI / Lighthouse (public routes manual)',
   'Lighthouse (public routes manual)',
