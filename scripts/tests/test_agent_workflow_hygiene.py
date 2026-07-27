@@ -536,7 +536,7 @@ def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
                 printf '%s\\n' '{{"draft":true,"head":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","branch":"codex/race","labels":[],"mergeable":"MERGEABLE","state":"OPEN"}}'
               fi
             elif [[ "$1 $2" == "pr checks" ]]; then
-              printf '%s\\n' '[{{"bucket":"pass","state":"SUCCESS","name":"PR Ready"}},{{"bucket":"pass","state":"SUCCESS","name":"Migration Guard"}},{{"bucket":"pass","state":"SUCCESS","name":"Fork PR Gate"}},{{"bucket":"pass","state":"SUCCESS","name":"PR Size Guard"}}]'
+              printf '%s\\n' '[{{"bucket":"pass","state":"SUCCESS","name":"PR Ready"}},{{"bucket":"pass","state":"SUCCESS","name":"Migration Guard"}},{{"bucket":"pass","state":"SUCCESS","name":"Fork PR Gate"}},{{"bucket":"pass","state":"SUCCESS","name":"PR Size Guard"}},{{"bucket":"pass","state":"SUCCESS","name":"Visual Approval Guard"}}]'
             elif [[ "$1 $2" == "pr ready" ]]; then
               if [[ " $* " == *" --undo "* ]]; then
                 printf '%s\\n' restored > {state_file}
