@@ -24,7 +24,7 @@ export {
 export {
   ALLOWED_REQUIRED_CHECK_CONTEXTS,
   FORBIDDEN_PINNED_JOB_CONTEXTS,
-  GRAPHITE_QUEUE_POLICY,
+  MERGE_QUEUE_POLICY,
   parseRequiredStatusChecksFromYaml,
   preQueueFreshnessDecision,
   REQUIRED_MERGE_STATUSES,

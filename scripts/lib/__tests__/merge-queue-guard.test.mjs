@@ -504,39 +504,7 @@ describe('aggregate required checks', () => {
     });
   });
 
-  it('validates the legacy Graphite ruleset shape only when explicitly selected', () => {
-    const liveRuleset = {
-      bypass_actors: [
-        {
-          actor_id: 158384,
-          actor_type: 'Integration',
-          bypass_mode: 'always',
-        },
-      ],
-      rules: [
-        { type: 'pull_request' },
-        {
-          type: 'required_status_checks',
-          parameters: [
-            { context: 'PR Ready' },
-            { context: 'Migration Guard' },
-            { context: 'Fork PR Gate', integration_id: 2934433 },
-            { context: 'PR Size Guard' },
-          ],
-        },
-        { type: 'non_fast_forward' },
-        { type: 'required_linear_history' },
-      ],
-    };
-
-    const result = validateLiveMergeQueueRuleset(liveRuleset, {
-      backend: 'graphite',
-    });
-    expect(result.ok).toBe(true);
-    expect(result.hasGraphiteBypass).toBe(true);
-  });
-
-  it('fails closed when native source wiring omits the queue event and retains Graphite bypass', () => {
+  it('fails closed when native source wiring omits the queue event and retains a bypass actor', () => {
     const unsafe = validateMergeQueueRepoConfig({
       backend: 'native',
       branchProtectionYaml: `
@@ -558,7 +526,7 @@ describe('aggregate required checks', () => {
     );
   });
 
-  it('validates native live ruleset shape and rejects Graphite bypass residue', () => {
+  it('validates native live ruleset shape and rejects bypass residue', () => {
     const requiredStatusChecks = {
       type: 'required_status_checks',
       parameters: {
@@ -586,7 +554,7 @@ describe('aggregate required checks', () => {
 
     expect(result).toMatchObject({
       ok: true,
-      hasGraphiteBypass: false,
+      hasBypassActors: false,
       hasNativeMergeQueue: true,
     });
 
@@ -652,7 +620,7 @@ describe('aggregate required checks', () => {
     );
   });
 
-  it('rejects unknown backend names instead of falling back to Graphite', () => {
+  it('rejects retired or unknown backend names', () => {
     const result = validateLiveMergeQueueRuleset(
       { bypass_actors: [], rules: [] },
       { backend: 'other' }
