@@ -1,5 +1,6 @@
 export * from './analysis';
 export * from './beat-grid';
+export * from './capabilities';
 export * from './lyrics';
 export * from './performance';
 export * from './playback';
@@ -16,7 +17,6 @@ export const AUDIO_FORMAT_IDS = [
 
 export type AudioFormatId = (typeof AUDIO_FORMAT_IDS)[number];
 export type AudioUploadSurface = 'library' | 'chat' | 'promo_download';
-export type AudioPlatform = 'web' | 'desktop' | 'ios';
 
 export interface AudioFormatDefinition {
   readonly id: AudioFormatId;
@@ -27,7 +27,6 @@ export interface AudioFormatDefinition {
   readonly container: string;
   readonly expectedCodecs: readonly string[];
   readonly uploadSurfaces: readonly AudioUploadSurface[];
-  readonly platforms: Readonly<Record<AudioPlatform, boolean>>;
 }
 
 const ALL_UPLOAD_SURFACES = [
@@ -35,12 +34,6 @@ const ALL_UPLOAD_SURFACES = [
   'chat',
   'promo_download',
 ] as const satisfies readonly AudioUploadSurface[];
-
-const CURRENT_PLATFORMS = {
-  web: true,
-  desktop: true,
-  ios: false,
-} as const satisfies Readonly<Record<AudioPlatform, boolean>>;
 
 /**
  * Canonical contract for formats Jovie currently accepts.
@@ -59,7 +52,6 @@ export const AUDIO_FORMAT_REGISTRY = [
     container: 'mpeg-audio',
     expectedCodecs: ['mp3'],
     uploadSurfaces: ALL_UPLOAD_SURFACES,
-    platforms: CURRENT_PLATFORMS,
   },
   {
     id: 'wav',
@@ -70,7 +62,6 @@ export const AUDIO_FORMAT_REGISTRY = [
     container: 'wave',
     expectedCodecs: ['pcm', 'ieee-float'],
     uploadSurfaces: ALL_UPLOAD_SURFACES,
-    platforms: CURRENT_PLATFORMS,
   },
   {
     id: 'flac',
@@ -81,7 +72,6 @@ export const AUDIO_FORMAT_REGISTRY = [
     container: 'flac',
     expectedCodecs: ['flac'],
     uploadSurfaces: ALL_UPLOAD_SURFACES,
-    platforms: CURRENT_PLATFORMS,
   },
   {
     id: 'aiff',
@@ -92,7 +82,6 @@ export const AUDIO_FORMAT_REGISTRY = [
     container: 'aiff',
     expectedCodecs: ['pcm'],
     uploadSurfaces: ALL_UPLOAD_SURFACES,
-    platforms: CURRENT_PLATFORMS,
   },
   {
     id: 'aac',
@@ -103,7 +92,6 @@ export const AUDIO_FORMAT_REGISTRY = [
     container: 'adts',
     expectedCodecs: ['aac'],
     uploadSurfaces: ALL_UPLOAD_SURFACES,
-    platforms: CURRENT_PLATFORMS,
   },
   {
     id: 'm4a',
@@ -114,7 +102,6 @@ export const AUDIO_FORMAT_REGISTRY = [
     container: 'iso-base-media',
     expectedCodecs: ['aac', 'alac'],
     uploadSurfaces: ALL_UPLOAD_SURFACES,
-    platforms: CURRENT_PLATFORMS,
   },
 ] as const satisfies readonly AudioFormatDefinition[];
 
