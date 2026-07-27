@@ -2,25 +2,30 @@
 /**
  * Run the cheap CI cluster as labeled lanes with continue-on-failure semantics.
  *
- * Used by the `ci-fast` job in `.github/workflows/ci.yml` (JOV-3464):
- * checkout + install once, then run typecheck / biome / eslint / guardrails /
- * structural as independent lanes. Never aborts mid-suite — always reports every
- * lane, writes $GITHUB_STEP_SUMMARY, emits lane records for the harness, and
- * exits non-zero only after all lanes finish if any failed.
+ * Used by the dedicated `ci-fast-typecheck` and `ci-fast-remaining` jobs in
+ * `.github/workflows/ci.yml` (JOV-4477). Each hosted job checks out and installs
+ * once, invokes one value from LANE_GROUPS, and publishes an isolated lane
+ * artifact; the aggregate `ci-fast` job fails closed unless both child jobs
+ * pass. Never aborts mid-group — always reports every selected lane, writes
+ * $GITHUB_STEP_SUMMARY, emits lane records for the harness, and exits non-zero
+ * only after all selected lanes finish if any failed. Local callers may omit
+ * the selector to retain the historical all-lanes behavior.
  *
  * Usage:
- *   node scripts/ci-fast-lanes.mjs
+ *   node scripts/ci-fast-lanes.mjs [with CI_FAST_LANE_GROUP=<group>]
  *
  * Env:
  *   GITHUB_EVENT_NAME, GITHUB_BASE_REF, GITHUB_REF, GITHUB_STEP_SUMMARY
+ *   CI_FAST_LANE_GROUP — hosted group selector; omitted locally runs all lanes
  *   CI_FAST_LANES_OUT  — optional path for JSON lane results
  *   TURBO_SCM_BASE     — for typecheck --affected
- *   CI_FAST_SKIP_STRUCTURAL — "true" to skip structural lane (path-gated)
+ *   CI_FAST_SKIP_STRUCTURAL — "true" to skip the remaining group's structural lane
  */
 
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = process.cwd();
 
@@ -71,6 +76,87 @@ const LANES = [
     run: runStructural,
   },
 ];
+
+const LANE_IDS = Object.freeze(LANES.map(lane => lane.id));
+
+/**
+ * The hosted workflow selects exactly one of these bounded groups. Keeping the
+ * manifest here makes the split auditable and lets local callers omit the
+ * selector to retain the historical all-lanes behavior.
+ */
+export const LANE_GROUPS = Object.freeze({
+  typecheck: Object.freeze(['typecheck']),
+  remaining: Object.freeze([
+    'biome',
+    'eslint-server-boundaries',
+    'scripts-typecheck',
+    'guardrails',
+    'ios-fast',
+    'structural',
+  ]),
+});
+
+export const LANE_COMMANDS = Object.freeze(
+  Object.fromEntries(LANES.map(lane => [lane.id, lane.nextLocalCommand]))
+);
+
+export function validateLaneGroups(groups, laneIds = LANE_IDS) {
+  const knownLaneIds = new Set(laneIds);
+  const seenLaneIds = new Map();
+  const errors = [];
+
+  if (!groups || typeof groups !== 'object' || Array.isArray(groups)) {
+    throw new Error('CI fast lane groups must be an object');
+  }
+
+  for (const [groupId, selectedLaneIds] of Object.entries(groups)) {
+    if (!Array.isArray(selectedLaneIds) || selectedLaneIds.length === 0) {
+      errors.push(`${groupId}: group must contain at least one lane`);
+      continue;
+    }
+    for (const laneId of selectedLaneIds) {
+      if (!knownLaneIds.has(laneId)) {
+        errors.push(`${groupId}: unknown lane ${laneId}`);
+        continue;
+      }
+      const priorGroup = seenLaneIds.get(laneId);
+      if (priorGroup) {
+        errors.push(`${laneId}: duplicated in ${priorGroup} and ${groupId}`);
+      } else {
+        seenLaneIds.set(laneId, groupId);
+      }
+    }
+  }
+
+  for (const laneId of knownLaneIds) {
+    if (!seenLaneIds.has(laneId)) {
+      errors.push(`${laneId}: missing from lane groups`);
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(`Invalid CI fast lane groups: ${errors.join('; ')}`);
+  }
+  return true;
+}
+
+validateLaneGroups(LANE_GROUPS);
+
+export function selectLanes(groupId) {
+  // Local callers historically ran the complete cluster with no selector.
+  if (groupId === undefined) return LANES;
+  if (typeof groupId !== 'string' || groupId.trim() === '') {
+    throw new Error('CI_FAST_LANE_GROUP must be a non-empty known group');
+  }
+
+  const selectedLaneIds = LANE_GROUPS[groupId];
+  if (!selectedLaneIds) {
+    throw new Error(
+      `Unknown CI_FAST_LANE_GROUP ${JSON.stringify(groupId)}; expected one of ${Object.keys(LANE_GROUPS).join(', ')}`
+    );
+  }
+  return selectedLaneIds.map(laneId => LANES.find(lane => lane.id === laneId));
+}
 
 function shell(command, opts = {}) {
   const result = spawnSync(command, {
@@ -289,12 +375,12 @@ function annotateFailure(lane, logExcerpt) {
   }
 }
 
-function writeSummary(results) {
+function writeSummary(results, groupId) {
   const summaryPath = process.env.GITHUB_STEP_SUMMARY;
   if (!summaryPath) return;
 
   const lines = [
-    '### ci-fast lanes (JOV-3464)',
+    `### ci-fast lanes (${groupId || 'all'})`,
     '',
     '| Lane | Status | Next local command |',
     '| --- | --- | --- |',
@@ -320,10 +406,12 @@ function writeSummary(results) {
 }
 
 function main() {
+  const laneGroup = process.env.CI_FAST_LANE_GROUP;
+  const selectedLanes = selectLanes(laneGroup);
   /** @type {LaneResult[]} */
   const results = [];
 
-  for (const lane of LANES) {
+  for (const lane of selectedLanes) {
     console.log(`\n======== lane: ${lane.id} ========`);
     let outcome;
     try {
@@ -360,7 +448,7 @@ function main() {
     });
   }
 
-  writeSummary(results);
+  writeSummary(results, laneGroup);
 
   const outPath =
     process.env.CI_FAST_LANES_OUT || resolve(REPO_ROOT, 'ci-fast-lanes.json');
@@ -370,6 +458,7 @@ function main() {
       {
         schemaVersion: 1,
         job: 'ci-fast',
+        group: laneGroup || 'all',
         lanes: results,
         generatedAt: new Date().toISOString(),
       },
@@ -390,4 +479,9 @@ function main() {
   process.exit(0);
 }
 
-main();
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
+) {
+  main();
+}

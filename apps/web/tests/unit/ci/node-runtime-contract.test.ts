@@ -14,6 +14,20 @@ function read(path: string): string {
   return readFileSync(resolve(repoRoot, path), 'utf8');
 }
 
+function getJobBlock(workflow: string, jobKey: string): string {
+  const lines = workflow.split('\n');
+  const start = lines.findIndex(line => line === `  ${jobKey}:`);
+  expect(start, `Missing workflow job: ${jobKey}`).toBeGreaterThanOrEqual(0);
+
+  const block: string[] = [];
+  for (let index = start; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (index > start && /^  [a-zA-Z0-9_-]+:/.test(line)) break;
+    block.push(line);
+  }
+  return block.join('\n');
+}
+
 describe('Node runtime contract', () => {
   it('keeps canonical version files and workspace engines aligned', () => {
     expect(canonicalNodeVersion).toBe('22.23.1');
@@ -71,24 +85,36 @@ describe('Node runtime contract', () => {
     const pathDetection = workflow.indexOf(
       '- name: Detect path changes for all job types'
     );
-    const tsxProbe = workflow.indexOf(
-      '- name: Verify Node and tsx seed-loader compatibility'
-    );
-    const ciFastSetup = workflow.indexOf(
-      '- uses: ./.github/actions/setup-node-pnpm',
-      workflow.indexOf('  ci-fast:')
-    );
-
-    const firstCanonicalSetup = workflow.indexOf(
-      '- uses: ./.github/actions/setup-node-pnpm'
-    );
+    const ciFastTypecheck = getJobBlock(workflow, 'ci-fast-typecheck');
+    const ciFastRemaining = getJobBlock(workflow, 'ci-fast-remaining');
 
     expect(pathDetection).toBeGreaterThanOrEqual(0);
-    expect(firstCanonicalSetup).toBeGreaterThan(pathDetection);
-    expect(tsxProbe).toBeGreaterThan(ciFastSetup);
-    expect(workflow).toContain(
-      'node --import tsx --import ./apps/web/tests/eval/promptfoo/server-only-preload.mjs'
+    expect(workflow.indexOf('  ci-fast-typecheck:')).toBeGreaterThan(
+      pathDetection
     );
-    expect(workflow).toContain('title=Node/tsx runtime drift');
+
+    for (const [jobId, job] of [
+      ['ci-fast-typecheck', ciFastTypecheck],
+      ['ci-fast-remaining', ciFastRemaining],
+    ] as const) {
+      const canonicalSetup = job.indexOf(
+        '- uses: ./.github/actions/setup-node-pnpm'
+      );
+      const childTsxProbe = job.indexOf(
+        '- name: Verify Node and tsx seed-loader compatibility'
+      );
+
+      expect(
+        canonicalSetup,
+        `${jobId} missing canonical setup`
+      ).toBeGreaterThanOrEqual(0);
+      expect(childTsxProbe, `${jobId} missing Node/tsx probe`).toBeGreaterThan(
+        canonicalSetup
+      );
+      expect(job).toContain(
+        'node --import tsx --import ./apps/web/tests/eval/promptfoo/server-only-preload.mjs'
+      );
+      expect(job).toContain('title=Node/tsx runtime drift');
+    }
   });
 });
