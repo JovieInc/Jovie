@@ -155,13 +155,16 @@ describe('merge queue backend resolution', () => {
   it('defaults bare callers to the live native backend', () => {
     expect(DEFAULT_MERGE_QUEUE_BACKEND).toBe('native');
     expect(resolveMergeQueueBackend()).toBe('native');
-    expect(resolveMergeQueueBackend('graphite')).toBe('graphite');
+    expect(resolveMergeQueueBackend('native')).toBe('native');
   });
 
-  it('fails unknown backends before any command can run', async () => {
+  it.each([
+    'graphite',
+    'github',
+  ])('rejects retired or unknown backend %s before any command can run', async backend => {
     const runner = vi.fn();
     await expect(
-      preflightMergeQueue({ backend: 'github', repository: REPOSITORY, runner })
+      preflightMergeQueue({ backend, repository: REPOSITORY, runner })
     ).rejects.toMatchObject({ code: 'unknown_backend' });
     expect(runner).not.toHaveBeenCalled();
   });

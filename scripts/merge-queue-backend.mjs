@@ -8,7 +8,7 @@ import { NATIVE_QUEUE_POLICY } from './lib/merge-queue-guard.mjs';
 // Keep bare read-only/local callers aligned with that canon; mutations still
 // require the dedicated native authorization below.
 export const DEFAULT_MERGE_QUEUE_BACKEND = 'native';
-export const MERGE_QUEUE_BACKENDS = Object.freeze(['graphite', 'native']);
+export const MERGE_QUEUE_BACKENDS = Object.freeze(['native']);
 
 const DEFAULT_REPOSITORY = 'JovieInc/Jovie';
 const DEFAULT_RULESET_ID = '10512119';
@@ -58,14 +58,7 @@ export function resolveMergeQueueBackend(value) {
 }
 
 function requireNativeBackend(value) {
-  const backend = resolveMergeQueueBackend(value);
-  if (backend !== 'native') {
-    throw backendError(
-      'unsupported_transport',
-      'Legacy Graphite transport remains owned by drain-pr-queue.sh'
-    );
-  }
-  return backend;
+  return resolveMergeQueueBackend(value);
 }
 
 function parseRepositorySlug(repository) {
