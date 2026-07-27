@@ -212,6 +212,7 @@
     "hermes:worker": "pnpm --filter @jovie/web run hermes:worker",
     "hermes:codex-shipper": "tsx scripts/hermes/jobs/codex-issue-shipper.ts",
     "hermes:pipeline-scoreboard": "tsx scripts/hermes/jobs/pipeline-scoreboard.ts",
+    "hermes:delivery-trace": "tsx scripts/hermes/jobs/delivery-trace.ts",
     "ds:offscale": "node scripts/ds-offscale-report.mjs",
     "ds:llms-manifest": "node scripts/generate-llms-design-manifest.mjs",
     "ds:llms-manifest:check": "node scripts/generate-llms-design-manifest.mjs --check",

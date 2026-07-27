@@ -20,6 +20,7 @@ The Hermes gateway itself is managed by the installed Hermes CLI as `ai.hermes.g
 | `co.jovie.hermes.cron-ci-monitor.plist.template` | every 10 min | Detect CI failures on main |
 | `co.jovie.hermes.cron-codex-issue-shipper.plist.template` | every 15 min | Claim one open GitHub issue labeled `codex` and dispatch a coder-profile agent |
 | `co.jovie.hermes.cron-pipeline-scoreboard.plist.template` | every 60 min | Write daily pipeline scoreboard to local state + gbrain, and alert on 12h shipper stalls |
+| `co.jovie.hermes.cron-delivery-trace.plist.template` | every 60 min, at load | Record exact issue-to-production receipts; missing receipt/link is incomplete, never a ship |
 | `co.jovie.hermes.cron-gbrain-health-summary.plist.template` | 07:15 local daily | Probe the Tailscale HTTP endpoint, source freshness, and server count; write the latest health summary back to gbrain and notify ops |
 | `co.jovie.hermes.cron-agent-config-health.plist.template` | every 15 min | Detect invalid Hermes/OpenClaw agent config before gateway churn |
 | `co.jovie.hermes.cron-cost-monitor.plist.template` | every 60 min | Cost kill switch |
@@ -36,6 +37,9 @@ Coder/shipping loops run on Houston, not Hermes-Air. Pro-only templates live in 
 |---|---|---|
 | `pro/co.jovie.hermes.cron-codex-kanban-ship.plist.template` | every 15 min | Launch `scripts/hermes/ship-loop.sh` → `~/.hermes/scripts/codex-kanban-ship.py` (PAUSE + gbrain gated) |
 | `co.jovie.hermes.cron-codex-issue-shipper.plist.template` | every 15 min | `~/.hermes/scripts/shipper-gated-entrypoint.py` → fail-closed gbrain/grok/checkout gate → `codex-issue-shipper.ts` |
+| `pro/co.jovie.hermes.cron-ci-metrics.plist.template` | every 60 min, at load | Gem CI/queue KPI snapshot |
+| `pro/co.jovie.hermes.cron-pipeline-scoreboard.plist.template` | every 60 min, at load | Summer's fleet funnel and stall alarms |
+| `pro/co.jovie.hermes.cron-delivery-trace.plist.template` | every 60 min, at load | Exact issue-to-production receipt trace; incomplete is never shipped |
 
 Install on the Pro:
 

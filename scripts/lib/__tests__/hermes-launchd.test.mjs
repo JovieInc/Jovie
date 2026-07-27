@@ -285,6 +285,28 @@ describe('hermes launchd artifact installation', () => {
     expect(bootstrap).toContain('hermes_create_launchd_stage');
     expect(bootstrap).toContain('hermes_install_validated_launchd_artifacts');
   });
+
+  it('installs Gem telemetry timers on the Pro with a resolved tsx binary', () => {
+    const bootstrap = readFileSync(
+      join(REPO_ROOT, 'scripts/hermes/bootstrap-pro-launchd.sh'),
+      'utf8'
+    );
+    expect(bootstrap).toContain('TSX_BIN=');
+    expect(bootstrap).toContain('"{{TSX_BIN}}": os.environ["TSX_V"]');
+
+    for (const template of [
+      'co.jovie.hermes.cron-ci-metrics.plist.template',
+      'co.jovie.hermes.cron-pipeline-scoreboard.plist.template',
+      'co.jovie.hermes.cron-delivery-trace.plist.template',
+    ]) {
+      const source = readFileSync(
+        join(REPO_ROOT, 'scripts/hermes/launchd/pro', template),
+        'utf8'
+      );
+      expect(source).toContain('{{TSX_BIN}}');
+      expect(source).toContain('<integer>3600</integer>');
+    }
+  });
 });
 
 describe('ship-loop pause semantics', () => {

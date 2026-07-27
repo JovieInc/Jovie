@@ -44,7 +44,7 @@ require_cmd() {
 render_plist() {
   local tmpl="$1"
   local out="$2"
-  HOME_V="$HOME" REPO_V="$REPO_ROOT" NODE_BIN_V="$(dirname "$(command -v node)")" \
+  HOME_V="$HOME" REPO_V="$REPO_ROOT" NODE_BIN_V="$(dirname "$(command -v node)")" TSX_V="$TSX_BIN" \
   python3 - "$tmpl" "$out" <<'PYEOF'
 import os, sys
 src, dst = sys.argv[1], sys.argv[2]
@@ -52,6 +52,7 @@ mapping = {
     "{{HOME}}": os.environ["HOME_V"],
     "{{JOVIE_REPO}}": os.environ["REPO_V"],
     "{{NODE_BIN_DIR}}": os.environ["NODE_BIN_V"],
+    "{{TSX_BIN}}": os.environ["TSX_V"],
 }
 with open(src, "r", encoding="utf-8") as f:
     content = f.read()
@@ -87,6 +88,11 @@ require_cmd python3
 require_cmd launchctl
 require_cmd plutil
 require_cmd shasum
+TSX_BIN="$(command -v tsx || true)"
+if [[ -z "$TSX_BIN" ]]; then
+  TSX_BIN="${REPO_ROOT}/node_modules/.bin/tsx"
+fi
+[[ -x "$TSX_BIN" ]] || die "Missing required tool: tsx (run pnpm install or install tsx)"
 chmod +x "${REPO_ROOT}/scripts/hermes/ship-loop.sh"
 [[ -f "$SHIPPER_ENTRYPOINT_SRC" ]] || die "Missing shipper entrypoint: $SHIPPER_ENTRYPOINT_SRC"
 [[ -f "$CODEX_SHIPPER_PLIST_TEMPLATE" ]] || die "Missing codex shipper plist: $CODEX_SHIPPER_PLIST_TEMPLATE"

@@ -32,6 +32,7 @@ These are machine-local Hermes jobs, not Vercel production crons. They run from 
 | Unit | Schedule | Purpose | Source |
 |------|----------|---------|--------|
 | `co.jovie.hermes.cron-pipeline-scoreboard` | every 60 min | Computes the daily codex shipping funnel, writes `pipeline-scoreboard-latest.json` + gbrain `ops/pipeline-scoreboard/latest`, and alerts on 12h shipper stalls. | `scripts/hermes/jobs/pipeline-scoreboard.ts` |
+| `co.jovie.hermes.cron-delivery-trace` | every 60 min, at load | Records exact issue → PR → merge SHA → Production Controller → Production Verified receipts. Missing links or receipts remain incomplete and cannot count as delivery proof. | `scripts/hermes/jobs/delivery-trace.ts` |
 | `co.jovie.hermes.cron-gbrain-health-summary` | 07:15 local daily | Verifies the Tailscale-bound HTTP health endpoint, source freshness, and that exactly one server is running; retains `gbrain doctor` as an advisory diagnostic, writes `ops/gbrain-health/latest`, and posts the summary to Telegram/Slack. | `scripts/hermes/jobs/gbrain-health-summary.ts` |
 
 ## Production Schedule
