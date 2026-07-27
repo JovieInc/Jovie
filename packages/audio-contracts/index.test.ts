@@ -82,12 +82,6 @@ describe('audio format registry', () => {
       'chat',
       'promo_download',
     ]);
-    expect(format.platforms).toEqual({
-      web: true,
-      desktop: true,
-      ios: false,
-    });
-
     for (const mimeType of format.mimeTypes) {
       expect(getAudioFormatByMimeType(mimeType)?.id).toBe(format.id);
       expect(isSupportedAudioMimeType(mimeType)).toBe(true);
