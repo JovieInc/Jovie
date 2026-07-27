@@ -4,14 +4,14 @@ import * as React from 'react';
 
 import { cn } from '../lib/utils';
 
-type RoundedVariant = 'none' | 'sm' | 'md' | 'lg' | 'full';
+export type SkeletonRoundedVariant = 'none' | 'sm' | 'md' | 'lg' | 'full';
 
 export interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
   /**
    * Border radius variant
    * @default 'sm'
    */
-  readonly rounded?: RoundedVariant;
+  readonly rounded?: SkeletonRoundedVariant;
   /**
    * When true, applies the canonical shimmer animation and loading state attrs.
    * @default true
@@ -19,7 +19,7 @@ export interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
   readonly shimmer?: boolean;
 }
 
-const roundedClasses: Record<RoundedVariant, string> = {
+const roundedClasses: Record<SkeletonRoundedVariant, string> = {
   none: 'rounded-none',
   sm: 'rounded-sm',
   md: 'rounded-md',
@@ -65,6 +65,115 @@ export function Skeleton({
   );
 }
 
+export interface SkeletonBlockProps extends SkeletonProps {}
+
+export function SkeletonBlock({ className, ...props }: SkeletonBlockProps) {
+  return (
+    <Skeleton className={className} data-slot='skeleton-block' {...props} />
+  );
+}
+
+export interface SkeletonTextProps extends Omit<SkeletonProps, 'children'> {
+  readonly lines?: number;
+  readonly lineClassName?: string;
+  readonly lastLineClassName?: string;
+}
+
+export function SkeletonText({
+  className,
+  lines = 1,
+  lineClassName,
+  lastLineClassName = 'w-3/4',
+  ...props
+}: SkeletonTextProps) {
+  const lineCount = Math.max(1, lines);
+  const lineKeys = React.useMemo(
+    () =>
+      Array.from(
+        { length: lineCount },
+        (_, index) => `skeleton-text-line-${index}`
+      ),
+    [lineCount]
+  );
+
+  return (
+    <div
+      className={cn('space-y-2', className)}
+      data-slot='skeleton-text'
+      aria-hidden='true'
+    >
+      {lineKeys.map((key, index) => (
+        <Skeleton
+          key={key}
+          className={cn(
+            'h-3 w-full',
+            lineClassName,
+            lineCount > 1 && index === lineCount - 1 && lastLineClassName
+          )}
+          data-slot='skeleton-text-line'
+          {...props}
+        />
+      ))}
+    </div>
+  );
+}
+
+export type SkeletonAvatarSize = 'sm' | 'md' | 'lg';
+
+export interface SkeletonAvatarProps extends Omit<SkeletonProps, 'rounded'> {
+  readonly size?: SkeletonAvatarSize;
+}
+
+const avatarSizeClasses: Record<SkeletonAvatarSize, string> = {
+  sm: 'size-8',
+  md: 'size-10',
+  lg: 'size-12',
+};
+
+export function SkeletonAvatar({
+  className,
+  size = 'md',
+  ...props
+}: SkeletonAvatarProps) {
+  return (
+    <Skeleton
+      className={cn('shrink-0', avatarSizeClasses[size], className)}
+      data-slot='skeleton-avatar'
+      rounded='full'
+      {...props}
+    />
+  );
+}
+
+export type SkeletonMediaRatio = 'square' | 'video' | 'portrait' | 'banner';
+
+export interface SkeletonMediaProps extends SkeletonBlockProps {
+  readonly ratio?: SkeletonMediaRatio;
+}
+
+const mediaRatioClasses: Record<SkeletonMediaRatio, string> = {
+  square: 'aspect-square',
+  video: 'aspect-video',
+  portrait: 'aspect-[4/5]',
+  banner: 'aspect-[3/1]',
+};
+
+export function SkeletonMedia({
+  className,
+  ratio = 'video',
+  rounded = 'lg',
+  ...props
+}: SkeletonMediaProps) {
+  return (
+    <SkeletonBlock
+      className={cn('w-full', mediaRatioClasses[ratio], className)}
+      data-slot='skeleton-media'
+      rounded={rounded}
+      {...props}
+    />
+  );
+}
+
 export interface LoadingSkeletonProps {
   readonly className?: string;
   /**
@@ -86,7 +195,7 @@ export interface LoadingSkeletonProps {
    * Border radius variant
    * @default 'sm'
    */
-  readonly rounded?: RoundedVariant;
+  readonly rounded?: SkeletonRoundedVariant;
 }
 
 /**

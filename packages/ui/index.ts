@@ -245,11 +245,35 @@ export {
 export type { SimpleTooltipProps } from './atoms/simple-tooltip';
 export { SimpleTooltip } from './atoms/simple-tooltip';
 // Skeleton
-export type { LoadingSkeletonProps, SkeletonProps } from './atoms/skeleton';
-export { LoadingSkeleton, Skeleton } from './atoms/skeleton';
+export type {
+  LoadingSkeletonProps,
+  SkeletonAvatarProps,
+  SkeletonAvatarSize,
+  SkeletonBlockProps,
+  SkeletonMediaProps,
+  SkeletonMediaRatio,
+  SkeletonProps,
+  SkeletonRoundedVariant,
+  SkeletonTextProps,
+} from './atoms/skeleton';
+export {
+  LoadingSkeleton,
+  Skeleton,
+  SkeletonAvatar,
+  SkeletonBlock,
+  SkeletonMedia,
+  SkeletonText,
+} from './atoms/skeleton';
 // Spinner
-export type { SpinnerProps, SpinnerSize, SpinnerTone } from './atoms/spinner';
-export { Spinner } from './atoms/spinner';
+export type {
+  ProgressIndicatorProps,
+  ProgressIndicatorSize,
+  ProgressIndicatorTone,
+  SpinnerProps,
+  SpinnerSize,
+  SpinnerTone,
+} from './atoms/spinner';
+export { ProgressIndicator, Spinner } from './atoms/spinner';
 // Switch
 export { Switch } from './atoms/switch';
 // Textarea

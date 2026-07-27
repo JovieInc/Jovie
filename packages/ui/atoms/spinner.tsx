@@ -5,12 +5,17 @@ import { cn } from '../lib/utils';
 export type SpinnerSize = 'sm' | 'md' | 'lg';
 export type SpinnerTone = 'primary' | 'muted' | 'inverse';
 
-export interface SpinnerProps {
+export type ProgressIndicatorSize = SpinnerSize;
+export type ProgressIndicatorTone = SpinnerTone;
+
+export interface ProgressIndicatorProps {
   readonly size?: SpinnerSize;
   readonly tone?: SpinnerTone;
   readonly className?: string;
   readonly label?: string;
 }
+
+export type SpinnerProps = ProgressIndicatorProps;
 
 const sizeClasses: Record<SpinnerSize, string> = {
   sm: 'h-4 w-4',
@@ -25,19 +30,19 @@ const toneClasses: Record<SpinnerTone, string> = {
 };
 
 /**
- * Inline spinner for buttons and in-flight actions.
+ * Compact indeterminate progress for buttons and in-flight actions.
  * Never use inside a page/list skeleton — reserve Skeleton for layout loads.
  */
-export function Spinner({
+export function ProgressIndicator({
   size = 'md',
   tone = 'primary',
   className,
   label = 'Loading',
-}: SpinnerProps) {
+}: ProgressIndicatorProps) {
   return (
     <output
       aria-label={label}
-      data-testid='spinner'
+      data-slot='progress-indicator'
       data-size={size}
       data-tone={tone}
       className={cn(
@@ -58,11 +63,19 @@ export function Spinner({
         <span
           className={cn(
             'absolute inset-0 rounded-full border-2 border-current border-t-transparent',
-            'animate-spin motion-reduce:animate-[spin_1.2s_linear_infinite]',
-            'will-change-transform'
+            'animate-spin will-change-transform',
+            'motion-reduce:animate-none motion-reduce:will-change-auto'
           )}
         />
       </span>
     </output>
   );
+}
+
+/**
+ * @deprecated Use `ProgressIndicator`. Kept as a compatibility alias while
+ * action-local callers migrate without a behavior change.
+ */
+export function Spinner(props: SpinnerProps) {
+  return <ProgressIndicator {...props} />;
 }
