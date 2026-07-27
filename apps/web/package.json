@@ -306,7 +306,7 @@
     "@sentry/node": "^10.63.0",
     "@storybook/addon-a11y": "10.4.6",
     "@storybook/addon-docs": "10.4.6",
-    "@storybook/addon-vitest": "10.4.6",
+    "@storybook/addon-vitest": "10.5.4",
     "@storybook/nextjs-vite": "10.4.6",
     "@stryker-mutator/core": "9.6.1",
     "@stryker-mutator/vitest-runner": "9.6.1",
