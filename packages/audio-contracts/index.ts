@@ -1,3 +1,5 @@
+export * from './playback';
+
 export const AUDIO_FORMAT_IDS = [
   'mp3',
   'wav',

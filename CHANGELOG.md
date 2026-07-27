@@ -14,6 +14,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] **App shell loading skeleton** matches `DESIGN_V1` so flag-on users no longer flash the legacy sidebar/header on first `/app` paint.
 
 - [internal] **Post-deploy probes now identify CLI-built production deployments (JOV-4366):** exact immutable build identity replaces optional Vercel source metadata while preserving project, deployment, origin, environment, and main-ancestry proofs.
+- **[internal] Audio playback has one canonical transition contract (JOV-3689):** loading, audible playback, buffering, seeking, stalls, interruptions, completion, and errors are defined in a typed, mutation-tested state machine for playback surfaces to adopt.
 - **[internal] Canonical audio contract foundation (JOV-3685):** one typed package now defines Jovie's MP3, WAV, FLAC, AIFF, AAC, and M4A format registry, MIME aliases, extensions, upload policies, and branded time/BPM units with mutation-tested invariants.
 - **[internal] Staging Better Auth Google OAuth credentials now reach the Vercel build and runtime deploy (#14659):** the release workflow allowlists and forwards both Google client keys, failing closed when either is absent.
 
