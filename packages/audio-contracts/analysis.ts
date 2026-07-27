@@ -9,6 +9,133 @@ export const AUDIO_ANALYSIS_CAPABILITIES = [
 export type AudioAnalysisCapability =
   (typeof AUDIO_ANALYSIS_CAPABILITIES)[number];
 
+export const AUDIO_ANALYSIS_EXECUTION_TARGET = 'offline_worker' as const;
+
+export const AUDIO_ANALYSIS_PROVIDER_IDS = ['openkeyscan', 'essentia'] as const;
+
+export type AudioAnalysisProviderId =
+  (typeof AUDIO_ANALYSIS_PROVIDER_IDS)[number];
+
+export const AUDIO_ANALYSIS_PROVIDER_ADOPTION_STATUSES = [
+  'benchmark_candidate',
+  'license_review_required',
+  'approved',
+] as const;
+
+export type AudioAnalysisProviderAdoptionStatus =
+  (typeof AUDIO_ANALYSIS_PROVIDER_ADOPTION_STATUSES)[number];
+
+export const AUDIO_ANALYSIS_PROVIDER_ADAPTERS = [
+  'ndjson_subprocess',
+  'native_worker',
+] as const;
+
+export type AudioAnalysisProviderAdapter =
+  (typeof AUDIO_ANALYSIS_PROVIDER_ADAPTERS)[number];
+
+export const AUDIO_ANALYSIS_PROVIDER_LICENSES = [
+  'mit',
+  'agpl_or_commercial',
+] as const;
+
+export type AudioAnalysisProviderLicense =
+  (typeof AUDIO_ANALYSIS_PROVIDER_LICENSES)[number];
+
+export interface AudioAnalysisProviderDefinition {
+  readonly id: AudioAnalysisProviderId;
+  readonly label: string;
+  readonly capabilities: readonly AudioAnalysisCapability[];
+  readonly adoptionStatus: AudioAnalysisProviderAdoptionStatus;
+  readonly adapter: AudioAnalysisProviderAdapter;
+  readonly license: AudioAnalysisProviderLicense;
+  readonly executionTarget: typeof AUDIO_ANALYSIS_EXECUTION_TARGET;
+}
+
+/**
+ * Canonical analyzer candidates.
+ *
+ * Registry presence means Jovie can identify and evaluate a provider. It does
+ * not mean the provider may run in production. Only an explicit `approved`
+ * adoption status makes a provider production-selectable.
+ */
+export const AUDIO_ANALYSIS_PROVIDER_REGISTRY = [
+  {
+    id: 'openkeyscan',
+    label: 'OpenKeyScan',
+    capabilities: ['musical_key'],
+    adoptionStatus: 'benchmark_candidate',
+    adapter: 'ndjson_subprocess',
+    license: 'mit',
+    executionTarget: AUDIO_ANALYSIS_EXECUTION_TARGET,
+  },
+  {
+    id: 'essentia',
+    label: 'Essentia',
+    capabilities: ['tempo', 'beat_grid', 'musical_key'],
+    adoptionStatus: 'license_review_required',
+    adapter: 'native_worker',
+    license: 'agpl_or_commercial',
+    executionTarget: AUDIO_ANALYSIS_EXECUTION_TARGET,
+  },
+] as const satisfies readonly AudioAnalysisProviderDefinition[];
+
+export function getAudioAnalysisProvider(
+  providerId: string
+): AudioAnalysisProviderDefinition | null {
+  const normalized = providerId.trim().toLowerCase();
+  return (
+    AUDIO_ANALYSIS_PROVIDER_REGISTRY.find(
+      provider => provider.id === normalized
+    ) ?? null
+  );
+}
+
+export function getAudioAnalysisProviderCandidates(
+  capability: AudioAnalysisCapability
+): readonly AudioAnalysisProviderDefinition[] {
+  if (
+    !(AUDIO_ANALYSIS_CAPABILITIES as readonly string[]).includes(capability)
+  ) {
+    throw new RangeError('analysis capability is not canonical');
+  }
+
+  return AUDIO_ANALYSIS_PROVIDER_REGISTRY.filter(provider =>
+    (provider.capabilities as readonly AudioAnalysisCapability[]).includes(
+      capability
+    )
+  );
+}
+
+export function getApprovedAudioAnalysisProvider(
+  capability: AudioAnalysisCapability
+): AudioAnalysisProviderDefinition | null {
+  return findApprovedAudioAnalysisProvider(
+    AUDIO_ANALYSIS_PROVIDER_REGISTRY,
+    capability
+  );
+}
+
+export function findApprovedAudioAnalysisProvider(
+  providers: readonly AudioAnalysisProviderDefinition[],
+  capability: AudioAnalysisCapability
+): AudioAnalysisProviderDefinition | null {
+  if (
+    !(AUDIO_ANALYSIS_CAPABILITIES as readonly string[]).includes(capability)
+  ) {
+    throw new RangeError('analysis capability is not canonical');
+  }
+
+  return (
+    providers.find(
+      provider =>
+        provider.adoptionStatus === 'approved' &&
+        (provider.capabilities as readonly AudioAnalysisCapability[]).includes(
+          capability
+        )
+    ) ?? null
+  );
+}
+
 export const AUDIO_ANALYSIS_JOB_STATUSES = [
   'queued',
   'processing',
@@ -41,7 +168,6 @@ export const AUDIO_ANALYSIS_FAILURE_CODES = [
 export type AudioAnalysisFailureCode =
   (typeof AUDIO_ANALYSIS_FAILURE_CODES)[number];
 
-export const AUDIO_ANALYSIS_EXECUTION_TARGET = 'offline_worker' as const;
 export const AUDIO_ANALYSIS_MAX_TIMEOUT_MS = 1_800_000;
 export const AUDIO_ANALYSIS_MAX_MEMORY_MB = 4_096;
 export const AUDIO_ANALYSIS_MAX_ATTEMPTS = 3;
@@ -188,7 +314,7 @@ function requireNonEmpty(value: string, field: string): string {
 }
 
 export interface AudioAnalysisProvenance {
-  readonly analyzerId: string;
+  readonly analyzerId: AudioAnalysisProviderId;
   readonly analyzerVersion: string;
   readonly modelId: string | null;
   readonly confidence: AnalysisConfidence;
@@ -208,8 +334,13 @@ export interface AudioAnalysisProvenanceInput {
 export function createAudioAnalysisProvenance(
   input: AudioAnalysisProvenanceInput
 ): AudioAnalysisProvenance {
+  const provider = getAudioAnalysisProvider(input.analyzerId);
+  if (!provider) {
+    throw new TypeError('analyzer id is not canonical');
+  }
+
   return {
-    analyzerId: requireNonEmpty(input.analyzerId, 'analyzer id'),
+    analyzerId: provider.id,
     analyzerVersion: requireNonEmpty(input.analyzerVersion, 'analyzer version'),
     modelId:
       input.modelId == null ? null : requireNonEmpty(input.modelId, 'model id'),
