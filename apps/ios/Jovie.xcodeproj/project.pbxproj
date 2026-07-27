@@ -75,6 +75,7 @@
 		A0J0V25490000000000000006 /* MobileChatClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V25490000000000000005 /* MobileChatClient.swift */; };
 		A0J0V25490000000000000008 /* MobileChatModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V25490000000000000007 /* MobileChatModels.swift */; };
 		A0GH13008000000000000002 /* VoiceCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0GH13008000000000000001 /* VoiceCaptureService.swift */; };
+		A04392000000000000000002 /* AudioTranscriptionContract.generated.swift in Sources */ = {isa = PBXBuildFile; fileRef = A04392000000000000000001 /* AudioTranscriptionContract.generated.swift */; };
 		A0GH10380000000000000002 /* VoiceCaptureServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0GH10380000000000000001 /* VoiceCaptureServiceTests.swift */; };
 		A0J0V2549000000000000000A /* MobileChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V25490000000000000009 /* MobileChatView.swift */; };
 		687D02CF59BD4E45B18E1015 /* MobileChatMessageViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1798791CB4DC41E4A2599EEF /* MobileChatMessageViews.swift */; };
@@ -218,6 +219,7 @@
 		A0J0V25490000000000000005 /* MobileChatClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatClient.swift; sourceTree = "<group>"; };
 		A0J0V25490000000000000007 /* MobileChatModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatModels.swift; sourceTree = "<group>"; };
 		A0GH13008000000000000001 /* VoiceCaptureService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceCaptureService.swift; sourceTree = "<group>"; };
+		A04392000000000000000001 /* AudioTranscriptionContract.generated.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AudioTranscriptionContract.generated.swift; sourceTree = "<group>"; };
 		A0GH10380000000000000001 /* VoiceCaptureServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceCaptureServiceTests.swift; sourceTree = "<group>"; };
 		A0J0V25490000000000000009 /* MobileChatView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatView.swift; sourceTree = "<group>"; };
 		1798791CB4DC41E4A2599EEF /* MobileChatMessageViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatMessageViews.swift; sourceTree = "<group>"; };
@@ -496,6 +498,7 @@
 				B30DC37856B5444494C3FB5D /* MobileChatLabels.swift */,
 				D197F4CBEFF14BB7855D392F /* MobileChatProseTokenizer.swift */,
 				A0J0V25490000000000000007 /* MobileChatModels.swift */,
+				A04392000000000000000001 /* AudioTranscriptionContract.generated.swift */,
 				A0GH13008000000000000001 /* VoiceCaptureService.swift */,
 				3EC2367922F1F00AB0AF1164 /* MobileMeResponse.swift */,
 				A0J0V36380000000000000003 /* MobileAudienceHighlightsResponse.swift */,
@@ -818,6 +821,7 @@
 				8747690FEEF7BD069EBF7430 /* MeRepository.swift in Sources */,
 				A0J0V25490000000000000006 /* MobileChatClient.swift in Sources */,
 				A0J0V25490000000000000008 /* MobileChatModels.swift in Sources */,
+				A04392000000000000000002 /* AudioTranscriptionContract.generated.swift in Sources */,
 				A0GH13008000000000000002 /* VoiceCaptureService.swift in Sources */,
 				A0J0V36070000000000000002 /* MobileChatContentParser.swift in Sources */,
 				B2BC7DF78E734D30BFA781E5 /* MobileChatMerchParsing.swift in Sources */,
