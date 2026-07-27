@@ -228,7 +228,7 @@ importers:
     dependencies:
       '@vercel/analytics':
         specifier: ^2.0.1
-        version: 2.0.1(next@16.2.11(@opentelemetry/api@1.9.1)(@playwright/test@1.62.0)(@types/node@22.19.15)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
+        version: 2.0.1(next@16.2.11(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@22.19.15)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       next:
         specifier: 16.2.11
         version: 16.2.11(@babel/core@7.29.6)(@opentelemetry/api@1.9.1)(@playwright/test@1.62.0)(@types/node@22.19.15)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@19.1.0-rc.3)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -267,8 +267,8 @@ importers:
   apps/web:
     dependencies:
       '@ai-sdk/gateway':
-        specifier: ^3.0.79
-        version: 3.0.79(zod@4.3.6)
+        specifier: ^4.0.28
+        version: 4.0.28(zod@4.3.6)
       '@ai-sdk/react':
         specifier: ^3.0.176
         version: 3.0.176(react@19.2.7)(zod@4.3.6)
@@ -846,6 +846,12 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/gateway@4.0.28':
+    resolution: {integrity: sha512-ee9TsNO3mkgHDWmTmJ8Fvltr6PFh52zhrV2+FaKJY3F3iu7kWZi5tCRJCR1HVhhlpj6lHniUb28nLQdPHkA/1Q==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/openai-compatible@2.0.51':
     resolution: {integrity: sha512-A6qfyaVs4lxmRxRux6U3ViOa8mMbsSd0OaHghpei2MpiBT6791J4zFH5MN7kaW1tLfQ246rSC2DVTMOavsycjQ==}
     engines: {node: '>=18'}
@@ -870,6 +876,12 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/provider-utils@5.0.12':
+    resolution: {integrity: sha512-bbhlOgHeYwrIGheLkM6fhS8hVger8uFPmcOLg+kxc9EFh7y30XYorWhthlYAgpadO3SJhFZrIcEknN7qEqEVvA==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/provider@3.0.10':
     resolution: {integrity: sha512-Q3BZ27qfpYqnCYGvE3vt+Qi6LGOF9R5Nmzn+9JoM1lCRsD9mYaIhfJLkSunN48nfGXJ6n+XNV0J/XVpqGQl7Dw==}
     engines: {node: '>=18'}
@@ -877,6 +889,10 @@ packages:
   '@ai-sdk/provider@3.0.8':
     resolution: {integrity: sha512-oGMAgGoQdBXbZqNG0Ze56CHjDZ1IDYOwGYxYjO5KLSlz5HiNQ9udIXsPZ61VWaHGZ5XW/jyjmr6t2xz2jGVwbQ==}
     engines: {node: '>=18'}
+
+  '@ai-sdk/provider@4.0.3':
+    resolution: {integrity: sha512-e0CpNWJUY7OxAFAnCZkw+ri9QOHWwTs1tXP42782KFGCU07qt8NiXCrCVowyCB5dP2r5/Uls+g2oPd8kOJn9dw==}
+    engines: {node: '>=22'}
 
   '@ai-sdk/react@3.0.176':
     resolution: {integrity: sha512-8CKMdSJDAHHUYEJSsI+HGanP/75dOYtnLWQ5WtQMvdmsA4PUVy8Hv6Bn1npoZBcTh250ESsuSptvctxFuIJrYw==}
@@ -7410,6 +7426,9 @@ packages:
   '@vercel/cli-config@0.2.0':
     resolution: {integrity: sha512-fJRRRB7734BDuXZ89yBEaA2ncYhH7bWX30mk04W80J6VAfQc+4iB8lyzAdaGpFV3/vNlkt9VZt+/uoQoWX6UsQ==}
 
+  '@vercel/cli-config@0.2.1':
+    resolution: {integrity: sha512-RhfyXmRLHdbnry8RJqHDc+5rGxMZ0bu+fpysZjtv3bE+BubpuwxTancHOKiH5zKQREsdwFVr3mOI2kOvxlOyxA==}
+
   '@vercel/cli-exec@1.0.0':
     resolution: {integrity: sha512-kQF8LGie/Hbdq9/psJxLE7owRTcqMQMhgybU04gCeR7cbQAr5t8OrjefDNColJv1QSSucFt4pLwRiARVmlOnug==}
     engines: {node: '>= 18'}
@@ -7522,6 +7541,10 @@ packages:
 
   '@vercel/oidc@3.7.1':
     resolution: {integrity: sha512-RrSsVWbq3KLK5lJobyTPp3tSthNfUp+zWkXno5Wkko0oEW05rA4ngOrnVypP4+L8/Av89uPo2rWFmzL8iwnsmA==}
+    engines: {node: '>= 20'}
+
+  '@vercel/oidc@3.8.1':
+    resolution: {integrity: sha512-ufdalm2MWOYksyj8KVpWjoOFPJO6zoYpuyvIggIQ2bB0CFCjTCiTkGXHqAKwG77GVRjOaN3/8S5ITlZpXWmqOw==}
     engines: {node: '>= 20'}
 
   '@vercel/prepare-flags-definitions@0.3.0':
@@ -7788,6 +7811,9 @@ packages:
 
   '@workflow/rollup@4.0.4':
     resolution: {integrity: sha512-DqmSp89Y4WVoMkBWkiNll0b5mZ2WA9uwNsRuO4QOU0XHytuCnvTRGMf0ZV6fXAa3KyeXlgS1r0V8SHwt1ZQ7jg==}
+
+  '@workflow/serde@4.1.0':
+    resolution: {integrity: sha512-pav4F2BoirECWR7Nf1TKt+2eETcBj7jj4cBefQ8VXQCA6NPkaKeLfj/zMgi+3zYV5ZIBT4GuUiphsj0/b9hPQQ==}
 
   '@workflow/serde@4.1.0-beta.2':
     resolution: {integrity: sha512-8kkeoQKLDaKXefjV5dbhBj2aErfKp1Mc4pb6tj8144cF+Em5SPbyMbyLCHp+BVrFfFVCBluCtMx+jjvaFVZGww==}
@@ -16203,6 +16229,13 @@ snapshots:
       '@vercel/oidc': 3.1.0
       zod: 4.3.6
 
+  '@ai-sdk/gateway@4.0.28(zod@4.3.6)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.3
+      '@ai-sdk/provider-utils': 5.0.12(zod@4.3.6)
+      '@vercel/oidc': 3.2.0
+      zod: 4.3.6
+
   '@ai-sdk/openai-compatible@2.0.51(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 3.0.10
@@ -16230,11 +16263,23 @@ snapshots:
       eventsource-parser: 3.1.0
       zod: 4.3.6
 
+  '@ai-sdk/provider-utils@5.0.12(zod@4.3.6)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.3
+      '@standard-schema/spec': 1.1.0
+      '@workflow/serde': 4.1.0
+      eventsource-parser: 3.1.0
+      zod: 4.3.6
+
   '@ai-sdk/provider@3.0.10':
     dependencies:
       json-schema: 0.4.0
 
   '@ai-sdk/provider@3.0.8':
+    dependencies:
+      json-schema: 0.4.0
+
+  '@ai-sdk/provider@4.0.3':
     dependencies:
       json-schema: 0.4.0
 
@@ -23231,6 +23276,11 @@ snapshots:
       next: 16.2.11(@opentelemetry/api@1.9.1)(@playwright/test@1.62.0)(@types/node@22.19.15)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       react: 19.2.7
 
+  '@vercel/analytics@2.0.1(next@16.2.11(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@22.19.15)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)':
+    optionalDependencies:
+      next: 16.2.11(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@22.19.15)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      react: 19.2.7
+
   '@vercel/backends@0.8.25(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)(encoding@0.1.13)(rollup@4.62.2)':
     dependencies:
       '@vercel/build-utils': 13.34.0
@@ -23305,6 +23355,11 @@ snapshots:
   '@vercel/cli-config@0.2.0':
     dependencies:
       xdg-app-paths: 5.5.1
+      zod: 4.1.11
+
+  '@vercel/cli-config@0.2.1':
+    dependencies:
+      xdg-app-paths: 5.1.0
       zod: 4.1.11
 
   '@vercel/cli-exec@1.0.0':
@@ -23534,6 +23589,12 @@ snapshots:
       '@vercel/cli-exec': 1.0.0
       jose: 5.10.0
 
+  '@vercel/oidc@3.8.1':
+    dependencies:
+      '@vercel/cli-config': 0.2.1
+      '@vercel/cli-exec': 1.0.0
+      jose: 5.10.0
+
   '@vercel/prepare-flags-definitions@0.3.0': {}
 
   '@vercel/python-analysis@0.11.1':
@@ -23552,7 +23613,7 @@ snapshots:
 
   '@vercel/queue@0.1.4':
     dependencies:
-      '@vercel/oidc': 3.7.1
+      '@vercel/oidc': 3.8.1
       minimatch: 10.2.4
       mixpart: 0.0.5
       picocolors: 1.1.1
@@ -24196,6 +24257,8 @@ snapshots:
       - '@swc/helpers'
       - aws-crt
       - supports-color
+
+  '@workflow/serde@4.1.0': {}
 
   '@workflow/serde@4.1.0-beta.2': {}
 
@@ -26977,7 +27040,7 @@ snapshots:
 
   eventsource@3.0.7:
     dependencies:
-      eventsource-parser: 3.0.8
+      eventsource-parser: 3.1.0
 
   exceljs@4.4.0:
     dependencies:
@@ -30219,7 +30282,35 @@ snapshots:
       - '@types/node'
       - babel-plugin-macros
 
-  next@16.2.11(@opentelemetry/api@1.9.1)(@playwright/test@1.62.0)(@types/node@22.19.15)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+  next@16.2.11(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@22.19.15)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+    dependencies:
+      '@next/env': 16.2.11
+      '@swc/helpers': 0.5.15
+      baseline-browser-mapping: 2.11.0
+      caniuse-lite: 1.0.30001806
+      postcss: 8.5.15
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+      styled-jsx: 5.1.6(@babel/core@7.29.6)(babel-plugin-macros@3.1.0)(react@19.2.7)
+    optionalDependencies:
+      '@next/swc-darwin-arm64': 16.2.11
+      '@next/swc-darwin-x64': 16.2.11
+      '@next/swc-linux-arm64-gnu': 16.2.11
+      '@next/swc-linux-arm64-musl': 16.2.11
+      '@next/swc-linux-x64-gnu': 16.2.11
+      '@next/swc-linux-x64-musl': 16.2.11
+      '@next/swc-win32-arm64-msvc': 16.2.11
+      '@next/swc-win32-x64-msvc': 16.2.11
+      '@opentelemetry/api': 1.9.1
+      '@playwright/test': 1.60.0
+      sharp: 0.35.3(@types/node@22.19.15)
+    transitivePeerDependencies:
+      - '@babel/core'
+      - '@types/node'
+      - babel-plugin-macros
+    optional: true
+
+  next@16.2.11(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(@types/node@22.20.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
       '@next/env': 16.2.11
       '@swc/helpers': 0.5.15

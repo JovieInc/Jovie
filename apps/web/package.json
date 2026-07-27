@@ -202,7 +202,7 @@
     "qa:releases:loop": "tsx scripts/releases-dashboard-qa-loop.ts"
   },
   "dependencies": {
-    "@ai-sdk/gateway": "^3.0.79",
+    "@ai-sdk/gateway": "^4.0.28",
     "@ai-sdk/react": "^3.0.176",
     "@ai-sdk/xai": "^3.0.96",
     "@better-auth/oauth-provider": "1.7.0-rc.1",
