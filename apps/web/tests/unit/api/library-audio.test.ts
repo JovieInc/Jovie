@@ -20,6 +20,9 @@ const hoisted = vi.hoisted(() => {
   const updateWhereMock = vi.fn();
   const updateSetMock = vi.fn().mockReturnValue({ where: updateWhereMock });
   const updateMock = vi.fn().mockReturnValue({ set: updateSetMock });
+  const insertValuesMock = vi.fn();
+  const insertMock = vi.fn().mockReturnValue({ values: insertValuesMock });
+  const transactionMock = vi.fn();
 
   return {
     requireAuthMock: vi.fn(),
@@ -31,6 +34,9 @@ const hoisted = vi.hoisted(() => {
     updateMock,
     updateSetMock,
     updateWhereMock,
+    insertMock,
+    insertValuesMock,
+    transactionMock,
     revalidateTagMock: vi.fn(),
     captureErrorMock: vi.fn(),
   };
@@ -66,6 +72,7 @@ vi.mock('@/lib/db', () => ({
   db: {
     select: hoisted.selectMock,
     update: hoisted.updateMock,
+    transaction: hoisted.transactionMock,
   },
 }));
 
@@ -84,12 +91,20 @@ vi.mock('@/lib/db/schema/content', () => ({
     id: 'recording.id',
     creatorProfileId: 'recording.creatorProfileId',
     previewUrl: 'recording.previewUrl',
+    audioUrl: 'recording.audioUrl',
+    audioFormat: 'recording.audioFormat',
+    metadata: 'recording.metadata',
   },
+}));
+
+vi.mock('@/lib/db/schema/ingestion', () => ({
+  ingestionJobs: 'ingestionJobs',
 }));
 
 vi.mock('drizzle-orm', () => ({
   and: vi.fn(),
   eq: vi.fn(),
+  sql: vi.fn(),
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -99,6 +114,15 @@ vi.mock('@/lib/error-tracking', () => ({
 describe('library audio upload API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.updateMock.mockReturnValue({ set: hoisted.updateSetMock });
+    hoisted.updateSetMock.mockReturnValue({ where: hoisted.updateWhereMock });
+    hoisted.insertMock.mockReturnValue({ values: hoisted.insertValuesMock });
+    hoisted.transactionMock.mockImplementation(async callback =>
+      callback({
+        update: hoisted.updateMock,
+        insert: hoisted.insertMock,
+      })
+    );
     hoisted.requireAuthMock.mockResolvedValue({
       userId: 'clerk_user_123',
       error: null,
@@ -134,6 +158,7 @@ describe('library audio upload API', () => {
       recordingId: 'recording_123',
       previewUrl: null,
       audioUrl: null,
+      audioFormat: null,
       durationMs: null,
       metadata: {},
     });
@@ -165,6 +190,61 @@ describe('library audio upload API', () => {
     expect(hoisted.revalidateTagMock).toHaveBeenCalledWith(
       'releases:clerk_user_123:profile_123',
       'max'
+    );
+  });
+
+  it('preserves AIFF as the master and enqueues a typed playable derivative', async () => {
+    hoisted.resolvePrimaryRecordingForReleaseMock.mockResolvedValue({
+      recordingId: 'recording_123',
+      previewUrl: null,
+      audioUrl: null,
+      audioFormat: null,
+      durationMs: null,
+      metadata: {},
+    });
+    hoisted.updateWhereMock.mockResolvedValue({ rowCount: 1 });
+
+    const { POST } = await import('@/app/api/library/audio/confirm/route');
+    const response = await POST(
+      new Request('http://localhost/api/library/audio/confirm', {
+        method: 'POST',
+        body: JSON.stringify({
+          releaseId: '00000000-0000-4000-8000-000000000001',
+          blobUrl: 'https://cdn.example.com/take-me-over.aiff',
+          blobPathname: 'library/audio/take-me-over.aiff',
+          fileName: 'take-me-over.aiff',
+          fileMimeType: 'audio/aiff',
+          fileSizeBytes: 1024,
+        }),
+      }) as never
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      previewUrl: null,
+      hasAudioMaster: true,
+      playbackDerivative: {
+        status: 'pending',
+        generation: 1,
+        sourceFormatId: 'aiff',
+      },
+    });
+    expect(hoisted.updateSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previewUrl: null,
+        audioUrl: 'https://cdn.example.com/take-me-over.aiff',
+        audioFormat: 'audio/aiff',
+      })
+    );
+    expect(hoisted.insertValuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobType: 'audio_playback_derivative',
+        payload: expect.objectContaining({
+          formatId: 'aiff',
+          generation: 1,
+        }),
+      })
     );
   });
 

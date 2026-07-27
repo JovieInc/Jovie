@@ -9,6 +9,10 @@ import { revalidateTag } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
+  parseAudioPlaybackDerivative,
+  resolveRecordingPlayback,
+} from '@/lib/audio/playback-derivative';
+import {
   getSnippetFromRecording,
   resolvePrimaryRecordingForRelease,
 } from '@/lib/audio/resolve-release-recording';
@@ -71,13 +75,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const previewUrl = recording.previewUrl ?? recording.audioUrl;
+    const playback = resolveRecordingPlayback(recording);
     const snippet = getSnippetFromRecording(recording);
 
     return NextResponse.json(
       {
         recordingId: recording.recordingId,
-        previewUrl,
+        previewUrl: playback.url,
+        playbackStatus: playback.status,
+        playbackDerivative: parseAudioPlaybackDerivative(recording.metadata),
+        hasAudioMaster: Boolean(recording.audioUrl),
         durationMs: recording.durationMs,
         snippet,
       },
@@ -130,9 +137,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!recording.previewUrl && !recording.audioUrl) {
+    const playback = resolveRecordingPlayback(recording);
+    if (playback.status !== 'ready') {
       return NextResponse.json(
-        { error: 'Release has no uploaded audio' },
+        { error: 'Release audio preview is not ready' },
         { status: 409, headers: NO_STORE_HEADERS }
       );
     }

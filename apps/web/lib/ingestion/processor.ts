@@ -11,6 +11,7 @@
  * - Merge logic: import from './merge'
  */
 
+import { processAudioPlaybackDerivativeJob } from '@/lib/audio/jobs/playback-derivative';
 import type { DbOrTransaction } from '@/lib/db';
 import type { ingestionJobs } from '@/lib/db/schema/ingestion';
 import {
@@ -78,6 +79,8 @@ export async function processJob(
   job: typeof ingestionJobs.$inferSelect
 ) {
   switch (job.jobType) {
+    case 'audio_playback_derivative':
+      return processAudioPlaybackDerivativeJob(tx, job);
     case 'import_linktree':
       return processLinktreeJob(tx, job.payload);
     case 'import_laylo':
