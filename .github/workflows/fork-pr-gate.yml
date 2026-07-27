@@ -124,6 +124,7 @@ jobs:
     # through the API and sets a commit status; it never checks out head code.
     # It gives fork PRs the bot credential required to update the required gate.
     if: >-
+      (github.event_name == 'pull_request') ||
       (github.event_name == 'pull_request_target' && github.actor != 'dependabot[bot]') ||
       (github.event_name == 'pull_request_review' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == true)
     runs-on: ubuntu-latest
