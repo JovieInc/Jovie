@@ -24,6 +24,19 @@ describe('ArtworkPlayOverlay', () => {
       <ArtworkPlayOverlay isPlaying={false} onPlay={() => {}} visible={false} />
     );
     expect(b.getByLabelText('Play').getAttribute('tabIndex')).toBe('-1');
+    expect(b.getByLabelText('Play')).toBeDisabled();
+    expect(b.getByLabelText('Play')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('cannot reveal or invoke the hidden duplicate transport', () => {
+    const onPlay = vi.fn();
+    render(
+      <ArtworkPlayOverlay isPlaying={false} onPlay={onPlay} visible={false} />
+    );
+    const hidden = screen.getByLabelText('Play');
+    fireEvent.click(hidden);
+    expect(hidden).toHaveClass('pointer-events-none');
+    expect(onPlay).not.toHaveBeenCalled();
   });
 
   it('fires onPlay on click', () => {

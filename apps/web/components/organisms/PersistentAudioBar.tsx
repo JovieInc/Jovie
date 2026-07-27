@@ -1,5 +1,6 @@
 'use client';
 
+import type { AudioTimelineEdit } from '@jovie/audio-contracts';
 import { Pause, Play, X } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -50,6 +51,9 @@ export function PersistentAudioBar() {
     playPrevious,
     seek,
     jumpToCue,
+    editTimeline,
+    undoTimelineEdit,
+    redoTimelineEdit,
     stop,
     onError,
   } = useTrackAudioPlayer();
@@ -140,6 +144,18 @@ export function PersistentAudioBar() {
       )
     );
   }, [router, searchParams]);
+
+  const handleTimelineEdit = useCallback(
+    (edit: AudioTimelineEdit) => {
+      const updated = editTimeline(edit);
+      if (!updated) {
+        toast.error('Cue change unavailable', { id: 'audio-cue-edit-error' });
+        return false;
+      }
+      return true;
+    },
+    [editTimeline]
+  );
 
   const handleOpenLyrics = useCallback(() => {
     if (!playbackState.activeTrackId) return;
@@ -446,6 +462,12 @@ export function PersistentAudioBar() {
             onSeek={seek}
             cues={cueMarkers}
             onCueJump={jumpToCue}
+            timeline={barCollapsed ? null : playbackState.timeline}
+            canUndoTimelineEdit={playbackState.canUndoTimelineEdit}
+            canRedoTimelineEdit={playbackState.canRedoTimelineEdit}
+            onTimelineEdit={handleTimelineEdit}
+            onUndoTimelineEdit={undoTimelineEdit}
+            onRedoTimelineEdit={redoTimelineEdit}
             waveformOn={waveformOn}
             onToggleWaveform={() => setWaveformOn(current => !current)}
             lyricsActive={pathname === lyricsPath}

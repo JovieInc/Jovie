@@ -31,6 +31,9 @@ const playPrevious = vi.fn().mockResolvedValue(undefined);
 const stop = vi.fn();
 const seek = vi.fn();
 const jumpToCue = vi.fn();
+const editTimeline = vi.fn();
+const undoTimelineEdit = vi.fn();
+const redoTimelineEdit = vi.fn();
 const onError = vi.fn().mockReturnValue(() => {});
 const push = vi.fn();
 let pathname = '/app';
@@ -64,6 +67,8 @@ const basePlaybackState = {
   timeline: null as
     | import('@jovie/audio-contracts').AudioTimelineDocumentV1
     | null,
+  canUndoTimelineEdit: false,
+  canRedoTimelineEdit: false,
 };
 
 type MockPlaybackState = typeof basePlaybackState;
@@ -77,6 +82,9 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
     playPrevious,
     seek,
     jumpToCue,
+    editTimeline,
+    undoTimelineEdit,
+    redoTimelineEdit,
     stop,
     onError,
   }),
@@ -159,6 +167,9 @@ describe('PersistentAudioBar', () => {
     stop.mockClear();
     seek.mockClear();
     jumpToCue.mockClear();
+    editTimeline.mockReset();
+    undoTimelineEdit.mockClear();
+    redoTimelineEdit.mockClear();
     onError.mockClear().mockReturnValue(() => {});
     push.mockClear();
     pathname = '/app';
@@ -207,6 +218,82 @@ describe('PersistentAudioBar', () => {
 
     expect(jumpToCue).toHaveBeenCalledOnce();
     expect(jumpToCue).toHaveBeenCalledWith('cue_drop');
+  });
+
+  it('routes cue edits through the shared player while preserving one enabled transport', async () => {
+    const user = userEvent.setup();
+    const activeTimeline = createAudioTimelineDocument({
+      trackId: 'track-1',
+      revision: 0,
+      sampleRateHz: 48_000,
+      durationSamples: 1_440_000,
+      cues: [
+        {
+          id: 'cue_drop',
+          kind: 'drop',
+          label: 'Drop',
+          sampleOffset: 240_000,
+        },
+      ],
+      beatGrid: null,
+    });
+    editTimeline.mockReturnValue(activeTimeline);
+    setPlaying({ timeline: activeTimeline });
+
+    render(<PersistentAudioBar variant='shellChatV1' />);
+    await user.click(screen.getByRole('button', { name: 'Edit Cues' }));
+    await user.click(screen.getByRole('button', { name: 'Add at 0:10' }));
+
+    expect(editTimeline).toHaveBeenCalledWith({
+      type: 'add',
+      cue: expect.objectContaining({
+        id: expect.stringMatching(/^cue_[a-z0-9]+$/),
+        kind: 'custom',
+        label: 'Cue 2',
+        sampleOffset: 480_000,
+      }),
+    });
+    expect(
+      within(screen.getByTestId('audio-surface-expanded-shell')).getAllByRole(
+        'button',
+        { name: /^(Play|Pause)/ }
+      )
+    ).toHaveLength(1);
+  });
+
+  it('keeps the cue editor and playback authority stable across app-shell navigation', async () => {
+    const user = userEvent.setup();
+    const activeTimeline = createAudioTimelineDocument({
+      trackId: 'track-1',
+      revision: 4,
+      sampleRateHz: 48_000,
+      durationSamples: 1_440_000,
+      cues: [
+        {
+          id: 'cue_chorus',
+          kind: 'chorus',
+          label: 'Chorus',
+          sampleOffset: 480_000,
+        },
+      ],
+      beatGrid: null,
+    });
+    setPlaying({ timeline: activeTimeline });
+    pathname = '/app/chat/thread-1';
+
+    const { rerender } = render(<PersistentAudioBar variant='shellChatV1' />);
+    await user.click(screen.getByRole('button', { name: 'Edit Cues' }));
+
+    pathname = APP_ROUTES.RELEASES;
+    rerender(<PersistentAudioBar variant='shellChatV1' />);
+
+    expect(screen.getByTestId('cue-editor-popover')).toBeInTheDocument();
+    await user.click(
+      within(screen.getByTestId('cue-editor-popover')).getByRole('button', {
+        name: 'Jump to Chorus at 0:10',
+      })
+    );
+    expect(jumpToCue).toHaveBeenCalledWith('cue_chorus');
   });
 
   it('renders bar with track info when a track is active', () => {
@@ -582,6 +669,34 @@ describe('PersistentAudioBar', () => {
         { name: 'Pause' }
       )
     ).toBeNull();
+  });
+
+  it('closes the cue editor overlay before the full player becomes compact', async () => {
+    const user = userEvent.setup();
+    setPlaying({
+      timeline: createAudioTimelineDocument({
+        trackId: 'track-1',
+        revision: 0,
+        sampleRateHz: 48_000,
+        durationSamples: 1_440_000,
+        cues: [
+          {
+            id: 'cue_drop',
+            kind: 'drop',
+            label: 'Drop',
+            sampleOffset: 240_000,
+          },
+        ],
+        beatGrid: null,
+      }),
+    });
+
+    render(<PersistentAudioBar variant='shellChatV1' />);
+    await user.click(screen.getByRole('button', { name: 'Edit Cues' }));
+    expect(screen.getByTestId('cue-editor-popover')).toBeInTheDocument();
+
+    await user.click(getExpandedShellMinimizeButton());
+    expect(screen.queryByTestId('cue-editor-popover')).toBeNull();
   });
 
   it('swaps shell audio surfaces when the player is minimized', async () => {

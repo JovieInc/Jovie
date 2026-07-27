@@ -134,4 +134,21 @@ describe('AudioBar', () => {
       screen.getByRole('button', { name: 'Jump to Intro at 0:00' })
     ).toBeDisabled();
   });
+
+  it('removes hidden waveform controls from the keyboard interaction model', () => {
+    render(
+      <AudioBar
+        {...baseProps}
+        waveformOn={false}
+        onSeek={() => {}}
+        cues={[{ id: 'cue_intro', atSeconds: 0, label: 'Intro' }]}
+        onCueJump={() => {}}
+      />
+    );
+
+    expect(screen.queryByRole('slider')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Jump to Intro at 0:00' })
+    ).toBeNull();
+  });
 });
