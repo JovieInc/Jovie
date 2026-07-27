@@ -242,7 +242,7 @@ describe('PersistentAudioBar', () => {
 
     render(<PersistentAudioBar variant='shellChatV1' />);
     await user.click(screen.getByRole('button', { name: 'Edit Cues' }));
-    await user.click(screen.getByRole('button', { name: 'Add at 0:10' }));
+    await user.click(screen.getByRole('button', { name: 'Add At 0:10' }));
 
     expect(editTimeline).toHaveBeenCalledWith({
       type: 'add',

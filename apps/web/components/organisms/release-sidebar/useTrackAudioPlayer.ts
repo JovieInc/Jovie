@@ -87,6 +87,7 @@ let _pendingCueJump: {
   readonly latencyMark: InteractionLatencyMarkHandle | null;
   readonly targetSeconds: number;
 } | null = null;
+let _firstPlayheadPollOwner: symbol | null = null;
 let _cueEditLatencyMark: InteractionLatencyMarkHandle | null = null;
 let _timelineHistory: AudioTimelineHistory | null = null;
 /** ~4 Hz progress notify for cross-surface scrub without rAF thrash. */
@@ -117,6 +118,7 @@ function getAudio(): HTMLAudioElement | null {
  */
 function replaceAudioElement(): HTMLAudioElement | null {
   if (typeof Audio === 'undefined') return null;
+  _firstPlayheadPollOwner = null;
   finishCueJumpLatencyMark('superseded');
   const previousAudio = _audio;
   const nextAudio = createAudioElement();
@@ -358,6 +360,7 @@ function seekToTime(time: number): void {
   if (!audio || !Number.isFinite(time)) return;
   if (!Number.isFinite(audio.duration) || audio.duration === 0) return;
   const nextTime = Math.max(0, Math.min(time, audio.duration));
+  _firstPlayheadPollOwner = null;
   finishCueJumpLatencyMark('superseded');
   audio.currentTime = nextTime;
   setState({
@@ -475,6 +478,7 @@ function handlePlaybackFailure(
     audio.src = '';
   }
   _activeTrackIsrc = null;
+  _firstPlayheadPollOwner = null;
   finishCueJumpLatencyMark('failed');
   _timelineHistory = null;
   clearPlaybackQueue();
@@ -606,12 +610,17 @@ function bindAudioEvents(el: HTMLAudioElement): void {
       playbackStatus: getTransitionStatus('playing'),
       lastErrorReason: null,
     });
+    const pollOwner = Symbol('first-playhead-poll');
+    _firstPlayheadPollOwner = pollOwner;
     const startingTime = el.currentTime;
     let framesRemaining = FIRST_PLAYHEAD_MAX_FRAMES;
     const publishFirstAdvancingFrame = () => {
       requestAnimationFrame(() => {
-        if (_audio !== el || el.paused) return;
+        if (el.paused || _firstPlayheadPollOwner !== pollOwner) {
+          return;
+        }
         if (el.currentTime > startingTime || framesRemaining <= 1) {
+          _firstPlayheadPollOwner = null;
           setState({
             currentTime: el.currentTime,
             duration: Number.isFinite(el.duration) ? el.duration : 0,
@@ -624,36 +633,40 @@ function bindAudioEvents(el: HTMLAudioElement): void {
     };
     publishFirstAdvancingFrame();
   });
-  bindCurrentAudioEvent('pause', () =>
+  bindCurrentAudioEvent('pause', () => {
+    _firstPlayheadPollOwner = null;
     setState({
       isPlaying: false,
       playbackStatus: getTransitionStatus('pause'),
-    })
-  );
-  bindCurrentAudioEvent('waiting', () =>
+    });
+  });
+  bindCurrentAudioEvent('waiting', () => {
+    _firstPlayheadPollOwner = null;
     setState({
       isPlaying: !el.paused,
       playbackStatus: getTransitionStatus('waiting'),
-    })
-  );
+    });
+  });
   bindCurrentAudioEvent('canplay', () =>
     setState({
       isPlaying: !el.paused,
       playbackStatus: getTransitionStatus('canplay', el.paused),
     })
   );
-  bindCurrentAudioEvent('seeking', () =>
+  bindCurrentAudioEvent('seeking', () => {
+    _firstPlayheadPollOwner = null;
     setState({
       isPlaying: !el.paused,
       playbackStatus: getTransitionStatus('seeking'),
-    })
-  );
-  bindCurrentAudioEvent('stalled', () =>
+    });
+  });
+  bindCurrentAudioEvent('stalled', () => {
+    _firstPlayheadPollOwner = null;
     setState({
       isPlaying: !el.paused,
       playbackStatus: getTransitionStatus('stalled'),
-    })
-  );
+    });
+  });
   bindCurrentAudioEvent('ended', () => {
     const nextIndex = _queueIndex + 1;
     const nextTrack = getQueueTrackAt(nextIndex);
@@ -878,6 +891,7 @@ export function useTrackAudioPlayer() {
       audio.src = '';
     }
     _activeTrackIsrc = null;
+    _firstPlayheadPollOwner = null;
     clearPlaybackQueue();
     finishCueJumpLatencyMark('stopped');
     _timelineHistory = null;
