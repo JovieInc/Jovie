@@ -49,6 +49,7 @@ export function PersistentAudioBar() {
     playNext,
     playPrevious,
     seek,
+    jumpToCue,
     stop,
     onError,
   } = useTrackAudioPlayer();
@@ -161,6 +162,16 @@ export function PersistentAudioBar() {
   ]);
 
   const activeTrackId = playbackState.activeTrackId;
+  const cueMarkers = useMemo(() => {
+    const timeline = playbackState.timeline;
+    if (!timeline || timeline.trackId !== activeTrackId) return [];
+
+    return timeline.cues.map(cue => ({
+      id: cue.id,
+      label: cue.label,
+      atSeconds: cue.sampleOffset / timeline.sampleRateHz,
+    }));
+  }, [activeTrackId, playbackState.timeline]);
   const compactPlayerVisible = Boolean(activeTrackId) && barCollapsed;
 
   useEffect(() => {
@@ -433,6 +444,8 @@ export function PersistentAudioBar() {
             currentTime={playbackState.currentTime}
             duration={playbackState.duration}
             onSeek={seek}
+            cues={cueMarkers}
+            onCueJump={jumpToCue}
             waveformOn={waveformOn}
             onToggleWaveform={() => setWaveformOn(current => !current)}
             lyricsActive={pathname === lyricsPath}

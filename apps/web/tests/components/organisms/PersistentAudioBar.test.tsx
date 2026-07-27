@@ -1,4 +1,7 @@
-import type { AudioPlaybackStatus } from '@jovie/audio-contracts';
+import {
+  type AudioPlaybackStatus,
+  createAudioTimelineDocument,
+} from '@jovie/audio-contracts';
 import {
   act,
   fireEvent,
@@ -27,6 +30,7 @@ const playNext = vi.fn().mockResolvedValue(undefined);
 const playPrevious = vi.fn().mockResolvedValue(undefined);
 const stop = vi.fn();
 const seek = vi.fn();
+const jumpToCue = vi.fn();
 const onError = vi.fn().mockReturnValue(() => {});
 const push = vi.fn();
 let pathname = '/app';
@@ -57,6 +61,9 @@ const basePlaybackState = {
   queueIndex: -1,
   hasNext: false,
   hasPrevious: false,
+  timeline: null as
+    | import('@jovie/audio-contracts').AudioTimelineDocumentV1
+    | null,
 };
 
 type MockPlaybackState = typeof basePlaybackState;
@@ -69,6 +76,7 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
     playNext,
     playPrevious,
     seek,
+    jumpToCue,
     stop,
     onError,
   }),
@@ -150,6 +158,7 @@ describe('PersistentAudioBar', () => {
     playPrevious.mockClear();
     stop.mockClear();
     seek.mockClear();
+    jumpToCue.mockClear();
     onError.mockClear().mockReturnValue(() => {});
     push.mockClear();
     pathname = '/app';
@@ -170,6 +179,34 @@ describe('PersistentAudioBar', () => {
   it('renders nothing when no track is active', () => {
     const { container } = render(<PersistentAudioBar />);
     expect(container.innerHTML).toBe('');
+  });
+
+  it('converts canonical sample offsets and delegates cue jumps to the player authority', () => {
+    setPlaying({
+      timeline: createAudioTimelineDocument({
+        trackId: 'track-1',
+        revision: 0,
+        sampleRateHz: 48_000,
+        durationSamples: 1_440_000,
+        cues: [
+          {
+            id: 'cue_drop',
+            kind: 'drop',
+            label: 'Drop',
+            sampleOffset: 480_000,
+          },
+        ],
+        beatGrid: null,
+      }),
+    });
+
+    render(<PersistentAudioBar variant='shellChatV1' />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Jump to Drop at 0:10' })
+    );
+
+    expect(jumpToCue).toHaveBeenCalledOnce();
+    expect(jumpToCue).toHaveBeenCalledWith('cue_drop');
   });
 
   it('renders bar with track info when a track is active', () => {

@@ -22,6 +22,10 @@ export interface MalformedAudioFixture {
   readonly sha256: string;
 }
 
+export interface StressAudioFixture extends RealAudioFixture {
+  readonly scenarioId: 'long-vbr';
+}
+
 export const REAL_AUDIO_FIXTURES = [
   {
     formatId: 'mp3',
@@ -78,6 +82,19 @@ export const REAL_AUDIO_FIXTURES = [
     decodedDurationSeconds: { minimum: 0.99, maximum: 1.01 },
   },
 ] as const satisfies readonly RealAudioFixture[];
+
+export const STRESS_AUDIO_FIXTURES = [
+  {
+    scenarioId: 'long-vbr',
+    formatId: 'mp3',
+    fileName: 'long-vbr-tone.mp3',
+    mimeType: 'audio/mpeg',
+    sha256: 'e2c0f71ee0230b54a1b619b14c22242a46d7ae6a52f4a837648436cdfea280dc',
+    expectedChromiumCanPlayType: 'probably',
+    expectedChromiumDecode: 'supported',
+    decodedDurationSeconds: { minimum: 59.99, maximum: 60.01 },
+  },
+] as const satisfies readonly StressAudioFixture[];
 
 export const MALFORMED_AUDIO_FIXTURES = [
   {
