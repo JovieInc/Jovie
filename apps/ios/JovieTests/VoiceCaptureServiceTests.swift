@@ -50,11 +50,60 @@ struct VoiceCaptureServiceTests {
     let result = VoiceCaptureResult(
       transcript: "draft a drop",
       latencyMilliseconds: 120,
-      usedOnDeviceRecognition: true
+      provenance: AudioTranscriptionProvenance(
+        source: .speechRecognition,
+        provider: .appleSpeech,
+        execution: .onDevice,
+        locale: "en-US",
+        modelID: nil
+      )
     )
     #expect(result.transcript == "draft a drop")
     #expect(result.usedOnDeviceRecognition == true)
     #expect(result.latencyMilliseconds == 120)
+    #expect(result.provenance.provider == .appleSpeech)
+    #expect(result.provenance.execution == .onDevice)
+  }
+
+  @Test func transcriptionErrorsMapToCanonicalCodes() {
+    #expect(VoiceCaptureError.microphoneDenied.transcriptionCode == .permissionDenied)
+    #expect(VoiceCaptureError.speechDenied.transcriptionCode == .permissionDenied)
+    #expect(VoiceCaptureError.recognizerUnavailable.transcriptionCode == .unavailable)
+    #expect(VoiceCaptureError.emptyTranscript.transcriptionCode == .emptyTranscript)
+    #expect(VoiceCaptureError.notRecording.transcriptionCode == .aborted)
+  }
+
+  @Test func generatedTranscriptionRegistryHasExpectedCrossPlatformValues() {
+    #expect(AudioTranscriptionStatus.allCases.map(\.rawValue) == [
+      "idle", "requesting-permission", "listening", "partial", "processing",
+      "completed", "empty", "cancelled", "failed", "unsupported",
+    ])
+    #expect(AudioTranscriptionProviderID.allCases.map(\.rawValue) == [
+      "user", "youtube-captions", "web-speech", "apple-speech", "server-asr", "none",
+    ])
+    #expect(AudioTranscriptionExecution.allCases.map(\.rawValue) == [
+      "provided", "on-device", "network", "provider-managed", "unavailable",
+    ])
+    #expect(
+      nextAudioTranscriptionStatus(.idle, event: .permissionRequested)
+        == .requestingPermission
+    )
+    #expect(
+      nextAudioTranscriptionStatus(.requestingPermission, event: .captureStarted)
+        == .listening
+    )
+    #expect(
+      nextAudioTranscriptionStatus(.partial, event: .captureStopped)
+        == .processing
+    )
+    #expect(
+      nextAudioTranscriptionStatus(.processing, event: .finalResult)
+        == .completed
+    )
+    #expect(
+      nextAudioTranscriptionStatus(.completed, event: .captureStarted)
+        == .completed
+    )
   }
 
   @Test func emptyTranscriptErrorCopyIsUserFacing() {

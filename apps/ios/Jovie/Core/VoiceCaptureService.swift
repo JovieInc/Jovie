@@ -24,6 +24,19 @@ enum VoiceCaptureError: LocalizedError, Equatable {
       "Voice is not recording."
     }
   }
+
+  var transcriptionCode: AudioTranscriptionErrorCode {
+    switch self {
+    case .microphoneDenied, .speechDenied:
+      .permissionDenied
+    case .recognizerUnavailable:
+      .unavailable
+    case .emptyTranscript:
+      .emptyTranscript
+    case .notRecording:
+      .aborted
+    }
+  }
 }
 
 /// Shared transcript → editable action/task draft contract for iOS voice memo
@@ -59,8 +72,12 @@ enum VoiceMemoActionDraft: Equatable {
 struct VoiceCaptureResult: Equatable {
   let transcript: String
   let latencyMilliseconds: Int
-  /// True when recognition ran with `requiresOnDeviceRecognition`.
-  let usedOnDeviceRecognition: Bool
+  let provenance: AudioTranscriptionProvenance
+
+  /// Compatibility projection for existing UI; provenance is authoritative.
+  var usedOnDeviceRecognition: Bool {
+    provenance.execution == .onDevice
+  }
 }
 
 /// Pure helpers for Speech request configuration (testable without audio hardware).
@@ -86,6 +103,7 @@ enum VoiceCaptureRecognitionConfig {
 @Observable
 final class VoiceCaptureService {
   private let recognizer: SFSpeechRecognizer?
+  private let localeIdentifier: String
   private let audioEngine = AVAudioEngine()
   private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
   private var recognitionTask: SFSpeechRecognitionTask?
@@ -102,6 +120,7 @@ final class VoiceCaptureService {
   private(set) var audioLevel: Double = 0
   private(set) var transcriptPreview = ""
   private(set) var lastErrorMessage: String?
+  private(set) var transcriptionStatus: AudioTranscriptionStatus = .idle
   /// Whether the current/last session preferred on-device recognition.
   private(set) var isUsingOnDeviceRecognition = false
   /// Whether this device reports on-device Speech support.
@@ -111,17 +130,25 @@ final class VoiceCaptureService {
 
   init(locale: Locale = .current) {
     recognizer = SFSpeechRecognizer(locale: locale) ?? SFSpeechRecognizer()
+    localeIdentifier = locale.identifier
   }
 
   func start() async throws {
     guard !isRecording, !isFinishing else { return }
-    try await ensurePermissions()
+    reset()
+    applyTranscriptionEvent(.permissionRequested)
+    do {
+      try await ensurePermissions()
+    } catch {
+      applyTranscriptionEvent(.fail)
+      throw error
+    }
     guard !isRecording, !isFinishing else { return }
     guard recognizer?.isAvailable == true else {
+      applyTranscriptionEvent(.unsupported)
       throw VoiceCaptureError.recognizerUnavailable
     }
 
-    reset()
     sessionID &+= 1
     let captureSessionID = sessionID
 
@@ -161,10 +188,12 @@ final class VoiceCaptureService {
           let text = result.bestTranscription.formattedString
           self.latestTranscript = text
           self.transcriptPreview = text
+          self.applyTranscriptionEvent(.partialResult)
         }
 
         if let error {
           self.lastErrorMessage = error.localizedDescription
+          self.applyTranscriptionEvent(.fail)
         }
       }
     }
@@ -179,7 +208,23 @@ final class VoiceCaptureService {
     )
 
     audioEngine.prepare()
-    try audioEngine.start()
+    do {
+      try audioEngine.start()
+      applyTranscriptionEvent(.captureStarted)
+    } catch {
+      isRecording = false
+      audioEngine.inputNode.removeTap(onBus: 0)
+      recognitionRequest?.endAudio()
+      recognitionTask?.cancel()
+      recognitionTask = nil
+      recognitionRequest = nil
+      try? AVAudioSession.sharedInstance().setActive(
+        false,
+        options: .notifyOthersOnDeactivation
+      )
+      applyTranscriptionEvent(.fail)
+      throw error
+    }
   }
 
   func finish() async throws -> VoiceCaptureResult {
@@ -196,6 +241,7 @@ final class VoiceCaptureService {
     recognitionRequest?.endAudio()
     isRecording = false
     audioLevel = 0
+    applyTranscriptionEvent(.captureStopped)
 
     try? await Task.sleep(for: .milliseconds(180))
     // Only tear down if this session is still current (no re-start race).
@@ -212,8 +258,9 @@ final class VoiceCaptureService {
     clearTranscriptBuffers()
 
     guard VoiceMemoActionDraft.isReady(transcript) else {
+      applyTranscriptionEvent(.emptyResult)
       recordCompletion(
-        status: "empty",
+        status: transcriptionStatus,
         latencyMilliseconds: latencyMilliseconds(since: startedAt),
         onDevice: usedOnDevice
       )
@@ -221,11 +268,19 @@ final class VoiceCaptureService {
     }
 
     let latency = latencyMilliseconds(since: startedAt)
-    recordCompletion(status: "draft", latencyMilliseconds: latency, onDevice: usedOnDevice)
+    let provenance = AudioTranscriptionProvenance(
+      source: .speechRecognition,
+      provider: .appleSpeech,
+      execution: usedOnDevice ? .onDevice : .network,
+      locale: localeIdentifier,
+      modelID: nil
+    )
+    applyTranscriptionEvent(.finalResult)
+    recordCompletion(status: transcriptionStatus, latencyMilliseconds: latency, onDevice: usedOnDevice)
     return VoiceCaptureResult(
       transcript: transcript,
       latencyMilliseconds: latency,
-      usedOnDeviceRecognition: usedOnDevice
+      provenance: provenance
     )
   }
 
@@ -245,8 +300,9 @@ final class VoiceCaptureService {
     isRecording = false
     audioLevel = 0
     clearTranscriptBuffers()
+    applyTranscriptionEvent(.cancel)
     recordCompletion(
-      status: "cancelled",
+      status: transcriptionStatus,
       latencyMilliseconds: latencyMilliseconds(since: recordingStartedAt),
       onDevice: activeOnDevicePreference
     )
@@ -269,6 +325,7 @@ final class VoiceCaptureService {
     audioLevel = 0
     activeOnDevicePreference = false
     isUsingOnDeviceRecognition = false
+    applyTranscriptionEvent(.reset)
   }
 
   private func ensurePermissions() async throws {
@@ -293,14 +350,25 @@ final class VoiceCaptureService {
       + Int(duration.components.attoseconds / 1_000_000_000_000_000)
   }
 
-  private func recordCompletion(status: String, latencyMilliseconds: Int, onDevice: Bool) {
+  private func recordCompletion(
+    status: AudioTranscriptionStatus,
+    latencyMilliseconds: Int,
+    onDevice: Bool
+  ) {
     Observability.captureMessage(
       .voiceTranscriptionCompleted,
       context: [
         "latency_ms": latencyMilliseconds,
-        "status": status,
+        "status": status.rawValue,
         "on_device": onDevice,
       ]
+    )
+  }
+
+  private func applyTranscriptionEvent(_ event: AudioTranscriptionEvent) {
+    transcriptionStatus = nextAudioTranscriptionStatus(
+      transcriptionStatus,
+      event: event
     )
   }
 
