@@ -159,8 +159,18 @@ describe('merge_group workflow contract', () => {
     );
     expect(admission).not.toContain('secrets.');
 
+    for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
+      const job = getJobBlock(CI_WORKFLOW, jobId);
+      expect(job, jobId).toContain('ci-merge-group-admission');
+      expect(job, jobId).toMatch(/if: >-\s+!cancelled\(\) &&/);
+      expect(job, jobId).not.toContain('always()');
+      expect(job, jobId).toContain("github.event_name != 'merge_group'");
+      expect(job, jobId).toContain(
+        "needs.ci-merge-group-admission.result == 'success'"
+      );
+    }
+
     for (const jobId of [
-      'ci-fast',
       'ci-unit-tests',
       'ci-build-layout',
       'ci-ios',
@@ -177,7 +187,20 @@ describe('merge_group workflow contract', () => {
     }
 
     const ciFast = getJobBlock(CI_WORKFLOW, 'ci-fast');
+    expect(ciFast).toContain('ci-fast-typecheck');
+    expect(ciFast).toContain('ci-fast-remaining');
+    expect(ciFast).toContain('always()');
+    expect(ciFast).toContain("needs.ci-path-changes.result == 'success'");
     expect(ciFast).toContain("github.event_name != 'merge_group'");
+    expect(ciFast).toContain(
+      "needs.ci-merge-group-admission.result == 'success'"
+    );
+    expect(ciFast).toContain('TYPECHECK_RESULT');
+    expect(ciFast).toContain('REMAINING_RESULT');
+    expect(ciFast).toContain(
+      '[[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]'
+    );
+    expect(ciFast).toContain('exit 1');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     expect(units).not.toContain('ci-unit-runner-route');
     expect(units).toContain(
