@@ -16,7 +16,7 @@ const FOUNDER_FAST_TRACK_LABEL = 'founder-fast-track';
  * @param {object} classifications
  * @param {object} workstreams
  * @param {object} state - current shipping state
- * @returns {{ admit: Array, reason: string }}
+ * @returns {Promise<{ admit: Array, reason: string }>}
  */
 export async function selectNextToAdmit(
   classifications,

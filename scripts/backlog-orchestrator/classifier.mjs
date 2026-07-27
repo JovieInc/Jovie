@@ -6,11 +6,6 @@
  */
 
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Classification result for a single issue.
@@ -64,6 +59,7 @@ const LABEL_TO_AREA = {
   'area:design': 'design',
 };
 
+/** @type {Array<[RegExp, string]>} */
 const TITLE_AREA_PATTERNS = [
   [/^perf/i, 'performance'],
   [/^test/i, 'testing'],
@@ -98,6 +94,7 @@ const LABEL_TO_MRR = {
   'qa:perf': 'retention',
 };
 
+/** @type {Array<[RegExp, string]>} */
 const TITLE_MRR_PATTERNS = [
   [/sign.?up|register|onboard/i, 'activation'],
   [/login|auth|oauth|sign.?in/i, 'activation'],
@@ -158,7 +155,7 @@ function classifyEffort(issue) {
 /**
  * Detect exact duplicates by matching identifiers in issue relations.
  */
-function findExactDuplicates(issue, allIssues) {
+function findExactDuplicates(issue) {
   const dupes = [];
   for (const rel of issue.relations?.nodes || []) {
     if (rel.type === 'duplicate' || rel.type === 'duplicate_of') {
@@ -266,7 +263,7 @@ export function classifyDeterministic(issue, allIssues) {
   c.evidence.push(effort.evidence);
 
   // Duplicates
-  const dupes = findExactDuplicates(issue, allIssues);
+  const dupes = findExactDuplicates(issue);
   if (dupes.length > 0) {
     c.category = 'duplicate';
     c.relatedIssues.push(...dupes);
@@ -362,7 +359,7 @@ export function parseStoredClassification(issue) {
   );
   if (machineComments.length === 0) return null;
   const latest = machineComments.sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   )[0];
   try {
     const jsonPart = latest.body

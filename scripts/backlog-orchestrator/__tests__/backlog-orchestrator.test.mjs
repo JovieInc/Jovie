@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict';
+import { access, readFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ORCHESTRATOR_DIR = resolve(__dirname, '..');
 
 const classifier = await import('../classifier.mjs');
 const scorer = await import('../scorer.mjs');
@@ -127,5 +133,20 @@ describe('reporter', () => {
     });
     assert.ok(report.includes('JOV-1'));
     assert.ok(report.includes('CLASSIFICATION SUMMARY'));
+  });
+});
+
+describe('entrypoint contract', () => {
+  it('keeps the cron wrapper beside the executable and config', async () => {
+    const wrapper = resolve(ORCHESTRATOR_DIR, 'run-backlog.sh');
+    const executable = resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs');
+    const config = resolve(ORCHESTRATOR_DIR, 'config.json');
+
+    await Promise.all([access(wrapper), access(executable), access(config)]);
+    const wrapperSource = await readFile(wrapper, 'utf8');
+    assert.match(wrapperSource, /cd \"\$\(dirname \"\$0\"\)\"/);
+    assert.match(wrapperSource, /exec node backlog-orchestrator\.mjs \"\$@\"/);
+    assert.match(await readFile(executable, 'utf8'), /Deterministic-first/);
+    assert.equal(JSON.parse(await readFile(config, 'utf8')).version, 1);
   });
 });
