@@ -3,7 +3,8 @@
 `main` merges through GitHub's native merge queue. The live repository variable
 is `MERGE_QUEUE_BACKEND=native`, and ruleset `Main Branch Protection`
 (`10512119`) owns queue admission and combined-head validation. Graphite is a
-rollback transport only; never run both transports concurrently.
+stack-construction CLI only: use `gt` to create, restack, and submit dependent
+PRs, never to enroll, validate, or land them.
 
 ## How a PR lands
 
@@ -89,7 +90,7 @@ It fails closed if an open PR is missing from that authoritative snapshot.
   cancellation churn from becoming a dequeue/re-enroll loop.
 - Main movement triggers event-driven reconciliation and bounded mechanical
   update-branch/rebase repair for agent branches. There is no polling watchdog
-  or Graphite label-cycle loop in the native path.
+  or legacy vendor label-cycle loop in the native path.
 - Queue enrollment is serialized by `merge-queue-drain-mutex`; it does not
   race another controller instance.
 
@@ -135,9 +136,9 @@ and broad refactors fail closed out of this lane. The policy lives in
   combined head through production.
 - Queue controller refuses mutation: confirm the repository variable is exactly
   `native`; a missing/non-native value intentionally fails the workflow closed.
-- Emergency rollback: first drain native entries, explicitly set the backend to
-  `graphite`, restore the reviewed Graphite bypass/config, and prove a canary.
-  This is an incident procedure, not a normal throughput lever.
+- Emergency response: pause auto-enrollment, drain or dequeue native entries
+  through the controller, repair the native ruleset/workflow, and prove one
+  canary before resuming. Do not introduce a second landing transport.
 
 ## Signed commits
 

@@ -410,7 +410,7 @@ jobs:
 
   # ── Centralized deterministic path-change detection ────────────────────
   # Source and combined heads compute their own exact diff. The former
-  # Graphite reuse action is intentionally absent: native queue provenance
+  # Vendor queue reuse actions are intentionally absent: native queue provenance
   # cannot rely on an external source-branch skip decision.
   ci-path-changes:
     name: Path Changes

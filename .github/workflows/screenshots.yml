@@ -204,13 +204,13 @@ jobs:
 
           if [ -n "$EXISTING_PR" ]; then
             echo "Updated existing PR #$EXISTING_PR via force-push"
-            # Re-apply merge-queue label (idempotent; Graphite enqueues by label)
-            # Graphite enqueues by label; native auto-merge retired
+            # Re-apply native queue intent after the screenshot update.
+            # The native auto-enroll controller owns authoritative admission.
             gh pr edit --add-label "merge-queue" "$EXISTING_PR" || { echo "::error::Failed to add merge-queue label to $EXISTING_PR"; exit 1; }
           else
             PR_URL=$(gh pr create \
               --title "chore: update product screenshots" \
               --body "Auto-generated screenshot update triggered by ${GITHUB_SHA::8}.")
-            # Graphite enqueues by label; native auto-merge retired
+            # The label records intent; the native auto-enroll controller owns admission.
             gh pr edit --add-label "merge-queue" "$PR_URL" || { echo "::error::Failed to add merge-queue label to $PR_URL"; exit 1; }
           fi

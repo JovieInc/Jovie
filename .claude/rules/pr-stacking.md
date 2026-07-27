@@ -5,9 +5,9 @@
 > as one `big-pr` PR — **never** N base-on-base micro-PRs (that collapsed the queue
 > on 2026-06-22, #11689).
 
-Small, reviewable PRs that move through the Graphite merge queue fast. Big PRs
-clog the queue, recursively rebase, and can't be reviewed for taste — so we cap
-size and stack instead.
+Small, reviewable PRs that move through GitHub's native merge queue quickly.
+Big PRs clog the queue, recursively rebase, and can't be reviewed for taste —
+so we cap size and stack instead.
 
 ## Size cap (enforced — `.github/workflows/pr-size-guard.yml`)
 
@@ -26,21 +26,22 @@ few **sibling** PRs off `main` split by top-level domain. **Never** as a deep
 base-on-base stack of one-PR-per-file/component.
 
 Why: `ci.yml` only triggers on PRs to `main`/`integration/**`, so a stack of N
-agent PRs based on each other runs *no* heavy CI on the PR itself — then Graphite
-lands the stack bottom-up, rebasing each member onto main and running the **full**
-pipeline (build + 4× Lighthouse + tests) **per member**. A 63-deep token-drift
-stack = 63 sequential full-CI runs for one mechanical diff, and any one
-slow/failing/conflicted member stalls the whole chain. (This happened — June 2026,
-collapsed in #11689.) One `big-pr` PR = one CI run.
+agent PRs based on each other runs *no* heavy CI on the PR itself. Native queue
+landing still requires each child to be retargeted/rebased onto `main` after its
+parent lands, then to run the **full** source and combined-head pipeline. A
+63-deep token-drift stack = 63 sequential full-CI runs for one mechanical diff,
+and any one slow/failing/conflicted member stalls the whole chain. (This
+happened — June 2026, collapsed in #11689.) One `big-pr` PR = one CI run.
 
 Agents generating drift/token sweeps: emit a single PR per sweep. Do not call
 `gt create` once per component.
 
 ## Stack, don't pile
 
-- **Dependent work** (B needs A) → a **Graphite stack**: `gt create` per logical
-  step. The stack restacks once and lands bottom-up through the queue; children
-  auto-retarget to `main` as their base merges.
+- **Dependent work** (B needs A) → a **PR stack managed with the Graphite CLI**:
+  `gt create` per logical step, then `gt restack`/`gt submit`. Graphite manages
+  branch relationships and PR submission only; GitHub's native queue lands
+  each PR after its parent is on `main` and the child is retargeted/rebased.
 - **Independent work** in the same area → **sibling PRs** off `main`. They land
   in parallel and don't trigger each other's rebases.
 - **One PR = one logical change.** No drive-by refactors — pull them into their
@@ -61,5 +62,6 @@ gt create -m "feat(x): step 2"     # stacked on step 1
 gt submit --stack                  # opens/updates the whole stack
 ```
 
-Enroll each PR with the `merge-queue` label; Graphite merges the stack
-bottom-up. See also [`ci-branching.md`](ci-branching.md).
+After a parent lands, retarget/rebase the next child onto `main`, push its exact
+head, then apply `merge-queue`. The native controller owns enrollment and
+combined-head validation. See also [`ci-branching.md`](ci-branching.md).

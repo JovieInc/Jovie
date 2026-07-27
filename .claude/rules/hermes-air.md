@@ -66,7 +66,7 @@ The legacy `scripts/hermes/jobs/voice-memo-ingest.ts` watcher is not the activat
 2. Hermes-Air files a GitHub issue using the canonical follow-up shape from `.claude/rules/linear.md` (Source / Follow-up / Why it matters / Classification / Acceptance criteria). A voice-derived issue references only the sanitized private proposal receipt, never the raw memo or transcript.
 3. Optional: add the `agent-ready` label when the issue should enter the GitHub-native orchestrator immediately.
 4. The Pro codex issue shipper or `.github/workflows/github-ai-orchestrator.yml` discovers labeled/ready work — no Air-side `repository_dispatch`, no SSH.
-5. PR opens with `Fixes #N` in the body; merge to `main` closes the GitHub issue (Graphite queue-land safe). `linear-sync-on-merge.yml` still mirrors to Linear until `TRACKER_GITHUB_ONLY=1`.
+5. PR opens with `Fixes #N` in the body; GitHub native queue landing on `main` closes the GitHub issue. `linear-sync-on-merge.yml` still mirrors to Linear until `TRACKER_GITHUB_ONLY=1`.
 
 If the Air cannot file the GitHub issue (network down, `gh` outage), queue a Telegram-derived or already-sanitized intent in `~/.hermes/state/linear-queue.jsonl` for operator inspection. A voice-derived proposal remains only in the private voice store and may be retried after service recovery without copying its raw memo or transcript into shared gbrain or the queue.
 

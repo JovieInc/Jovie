@@ -1,7 +1,7 @@
 name: PR Size Guard
 
 # Forces small, reviewable PRs — which forces stacking. A change too big to
-# review as one PR must be split into a Graphite stack of dependent PRs
+# review as one PR must be split into dependent PRs managed with the `gt` CLI
 # (`gt create` per logical step) or independent sibling PRs. Opt out for
 # approved mechanical codemods (token sweeps, renames, generated output) with
 # the `big-pr` label. Thresholds tunable via repo vars PR_MAX_LINES / PR_MAX_FILES.
@@ -127,23 +127,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}
           MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}
         run: |
           set -euo pipefail
-
-          # Graphite merge-queue group drafts don't inherit member labels, so a
-          # `big-pr`-bypassed member would fail size guard on the synthetic draft and
-          # abort the whole merge group. Members were already size-checked individually.
-          # Exit 0 (not skip) so the required "PR Size Guard" context reports success.
-          title="$PR_TITLE"
-          case "$title" in
-            '[Graphite MQ]'*)
-              echo "✅ Graphite merge-queue group draft — size guard not applicable (members checked individually)"; exit 0;;
-          esac
 
           labels="$PR_LABELS"
           case ",$labels," in

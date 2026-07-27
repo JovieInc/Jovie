@@ -125,7 +125,7 @@ gh pr create \
 EOF
 )"
 
-# Add the PR to the Graphite merge queue (enqueues by label)
+# Request GitHub native merge-queue enrollment
 gh pr edit --add-label merge-queue
 
 # Return to develop for next batch
