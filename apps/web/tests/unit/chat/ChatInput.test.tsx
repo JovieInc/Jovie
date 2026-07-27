@@ -391,6 +391,80 @@ describe('ChatInput', () => {
     expect(inputRow.className).not.toContain('min-h-22');
   });
 
+  it('keeps the shared start composer as a single-row pill while drafting', () => {
+    fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value='Draft stays in the same composer'
+          onFileAttach={vi.fn()}
+          variant='start'
+        />
+      )
+    );
+
+    const surface = screen.getByTestId('chat-composer-surface');
+    expect(surface).toHaveAttribute('data-variant', 'start');
+    expect(surface.style.borderRadius).toBe('9999px');
+
+    const inputRow = screen.getByTestId('chat-composer-input-row');
+    expect(inputRow).toHaveClass('flex');
+    expect(inputRow).not.toHaveClass('grid');
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+    expect(textarea).toHaveAttribute('wrap', 'off');
+    expect(textarea).toHaveClass('overflow-y-hidden');
+    expect(textarea).toHaveClass('py-0.5');
+
+    expect(
+      screen.queryByRole('button', { name: /Attach Files/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /dictation/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /send message/i })
+    ).toBeInTheDocument();
+  });
+
+  it('preserves textarea identity, focus, and draft when the lifecycle variant changes', () => {
+    function LifecycleHarness({ active }: { readonly active: boolean }) {
+      const [value, setValue] = useState('');
+
+      return (
+        <ChatInput
+          {...baseProps}
+          value={value}
+          onChange={setValue}
+          variant={active ? 'default' : 'start'}
+        />
+      );
+    }
+
+    const { rerender } = fastRender(
+      withProviders(<LifecycleHarness active={false} />)
+    );
+
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+    textarea.focus();
+    fireEvent.change(textarea, { target: { value: 'Keep this draft' } });
+    rerender(withProviders(<LifecycleHarness active />));
+
+    expect(screen.getByRole('textbox', { name: /chat message input/i })).toBe(
+      textarea
+    );
+    expect(textarea).toHaveFocus();
+    expect(textarea).toHaveValue('Keep this draft');
+    expect(screen.getByTestId('chat-composer-surface')).toHaveAttribute(
+      'data-variant',
+      'default'
+    );
+  });
+
   it('keeps hero pill geometry when only external attachments are present', () => {
     const pendingFiles = [
       {

@@ -13,6 +13,7 @@ import {
   useState,
 } from 'react';
 import { useRegisterComposerFocus } from '@/components/features/chat/Composer';
+import { MAX_MESSAGE_LENGTH } from '@/components/jovie/chat-constants';
 import { DictationWaveform } from '@/components/shell/DictationWaveform';
 import {
   insertLargeTextAtCaret,
@@ -30,7 +31,6 @@ import {
   HIDDEN_DIV_STYLES,
   useTextareaAutosize,
 } from '../hooks/useTextareaAutosize';
-import { MAX_MESSAGE_LENGTH } from '../types';
 import {
   ComposerAttachButton,
   ComposerMicButton,
@@ -47,6 +47,8 @@ import {
 import { detectSlashTriggerAt } from './slash-trigger';
 import { useChatPicker } from './useChatPicker';
 
+const START_INPUT_HEIGHT_PX = 28;
+
 interface ChatQuickAction {
   readonly label: string;
   readonly prompt: string;
@@ -59,7 +61,7 @@ export interface ChatInputProps {
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
   readonly placeholder?: string;
-  readonly variant?: 'default' | 'compact' | 'hero';
+  readonly variant?: 'default' | 'compact' | 'hero' | 'start';
   readonly onFileAttach?: () => void;
   readonly isFileProcessing?: boolean;
   readonly pendingFiles?: import('../hooks/useChatFileAttachments').PendingFile[];
@@ -104,8 +106,9 @@ interface SurfaceGeometry {
 }
 
 /**
- * Composer radius: pill for single-line hero empty state; 3xl for every docked /
- * multiline / entity / stacked surface. Values come from SYSTEM_B_RADIUS_PX only.
+ * Composer radius: pill for single-line hero empty state and the persistent
+ * start presentation; 3xl for every docked / multiline / entity / stacked
+ * surface. Values come from SYSTEM_B_RADIUS_PX only.
  */
 function geometryFor(
   mode: SurfaceMode,
@@ -116,6 +119,9 @@ function geometryFor(
   const width = '100%';
   const maxWidth = `min(calc(100vw - 32px), ${CHAT_COMPOSER_MAX_WIDTH})`;
   // Radius values come only from SYSTEM_B_RADIUS_PX (JOV-3532).
+  if (variant === 'start' && usePillLayout) {
+    return { width, maxWidth, borderRadius: SYSTEM_B_RADIUS_PX.pill };
+  }
   if (stacked) {
     return { width, maxWidth, borderRadius: SYSTEM_B_RADIUS_PX['3xl'] };
   }
@@ -276,7 +282,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     }, []);
 
     const isCompact = variant === 'compact';
-    const isHero = variant === 'hero';
+    const isStart = variant === 'start';
+    const isHero = variant === 'hero' || isStart;
     const isStacked = isCompact || isViewportNarrow;
     const maxHeight = 168;
     const minHeight = 24;
@@ -655,7 +662,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       picker.state.status === 'root' &&
       value.trim().startsWith('/') &&
       !hasChips;
-    const useHeroPill = isHero && (!hasInlineContent || hasOnlyRootSlashQuery);
+    const useHeroPill =
+      isStart ||
+      (variant === 'hero' && (!hasInlineContent || hasOnlyRootSlashQuery));
     const geometry = geometryFor(surfaceMode, isStacked, variant, useHeroPill);
     const showInlinePicker = picker.state.status === 'root';
     const showEntitySurface = picker.state.status === 'entity';
@@ -861,6 +870,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       pickerActiveRowId={pickerActiveRowId}
                       attachDisabledForPicker={isPickerOpen}
                       isHero={isHero}
+                      isStart={isStart}
                     />
                   </div>
                 </div>
@@ -966,6 +976,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   pickerActiveRowId={pickerActiveRowId}
                   attachDisabledForPicker={isPickerOpen}
                   isHero={isHero}
+                  isStart={isStart}
                 />
               </>
             )}
@@ -1040,6 +1051,7 @@ interface InputRowProps {
   /** Disable the attach dropdown trigger while the picker owns the keyboard. */
   readonly attachDisabledForPicker: boolean;
   readonly isHero: boolean;
+  readonly isStart: boolean;
 }
 
 function InputRow({
@@ -1083,13 +1095,16 @@ function InputRow({
   pickerActiveRowId,
   attachDisabledForPicker,
   isHero,
+  isStart,
 }: InputRowProps) {
   const hasInlineContent = Boolean(value.trim()) || (chips?.length ?? 0) > 0;
   const hasOnlyRootSlashQuery =
     isRootPickerOpen &&
     value.trim().startsWith('/') &&
     (chips?.length ?? 0) === 0;
-  const useHeroPill = isHero && (!hasInlineContent || hasOnlyRootSlashQuery);
+  const useHeroPill =
+    isStart || (isHero && (!hasInlineContent || hasOnlyRootSlashQuery));
+  const renderedInputHeight = isStart ? START_INPUT_HEIGHT_PX : measuredHeight;
 
   return (
     <div className={cn(hasBorderTop && 'system-b-chat-composer-seam border-t')}>
@@ -1108,7 +1123,7 @@ function InputRow({
         )}
       >
         <div ref={hiddenDivRef} style={HIDDEN_DIV_STYLES} aria-hidden />
-        {useHeroPill && hasAttachButton ? (
+        {useHeroPill && hasAttachButton && !isStart ? (
           <ComposerAttachButton
             isFileProcessing={isFileProcessing}
             isLoading={isLoading}
@@ -1139,10 +1154,14 @@ function InputRow({
             onChange={e => onChange(e.target.value)}
             placeholder={placeholder}
             rows={1}
-            animate={reducedMotion ? undefined : { height: measuredHeight }}
+            wrap={isStart ? 'off' : undefined}
+            animate={
+              reducedMotion ? undefined : { height: renderedInputHeight }
+            }
             transition={reducedMotion ? undefined : SPRING_HEIGHT}
             className={cn(
-              'system-b-chat-composer-input min-w-[min(13rem,100%)] flex-1 resize-none bg-transparent px-1 py-1 placeholder:text-quaternary-token',
+              'system-b-chat-composer-input min-w-[min(13rem,100%)] flex-1 resize-none bg-transparent px-1 placeholder:text-quaternary-token',
+              isStart ? 'py-0.5' : 'py-1',
               isHero
                 ? 'min-h-7 text-mid font-book leading-6 text-primary-token sm:text-base'
                 : 'min-h-6 text-mid leading-6 text-primary-token',
@@ -1154,10 +1173,14 @@ function InputRow({
               // compound widget.
               'focus:outline-none! focus-visible:outline-none! focus-visible:ring-0! focus-visible:ring-0!',
               'focus:shadow-none! focus-visible:shadow-none! shadow-none [outline:none]',
-              isAtMaxHeight ? 'overflow-y-auto' : 'overflow-hidden'
+              isStart
+                ? 'overflow-x-auto overflow-y-hidden whitespace-nowrap'
+                : isAtMaxHeight
+                  ? 'overflow-y-auto'
+                  : 'overflow-hidden'
             )}
             style={{
-              ...(reducedMotion ? { height: measuredHeight } : null),
+              ...(reducedMotion ? { height: renderedInputHeight } : null),
               boxShadow: 'none',
               outline: 'none',
             }}
@@ -1212,16 +1235,18 @@ function InputRow({
           </div>
 
           <div className='flex shrink-0 items-center gap-2'>
-            <ComposerMicButton
-              isListening={isListening}
-              isLoading={isLoading}
-              isSubmitting={isSubmitting}
-              isSupported={isDictationSupported}
-              onPreserveFocus={handlePreserveFocus}
-              onPushStart={handleMicPushStart}
-              onPushEnd={handleMicPushEnd}
-              onToggle={handleMicToggle}
-            />
+            {isStart ? null : (
+              <ComposerMicButton
+                isListening={isListening}
+                isLoading={isLoading}
+                isSubmitting={isSubmitting}
+                isSupported={isDictationSupported}
+                onPreserveFocus={handlePreserveFocus}
+                onPushStart={handleMicPushStart}
+                onPushEnd={handleMicPushEnd}
+                onToggle={handleMicToggle}
+              />
+            )}
 
             <ComposerSendButton
               canSend={canSend}
