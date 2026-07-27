@@ -94,6 +94,8 @@
     "test:flaky": "tsx scripts/flaky-test-detector.ts",
     "test:e2e": "playwright test",
     "test:audio:real-media": "playwright test --config=playwright.audio.config.ts",
+    "audio:transcription:swift": "tsx scripts/generate-audio-transcription-swift.ts",
+    "audio:transcription:swift:check": "tsx scripts/generate-audio-transcription-swift.ts --check",
     "test:e2e:fast": "node scripts/run-playwright-fast.mjs",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:synthetic": "playwright test --config=playwright.synthetic.config.ts",
