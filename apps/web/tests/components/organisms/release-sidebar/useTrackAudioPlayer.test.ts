@@ -133,6 +133,161 @@ describe('useTrackAudioPlayer', () => {
     expect(audioInstances).toHaveLength(1);
   });
 
+  it('publishes the first advancing playhead on the frame after playing', async () => {
+    let frameCallback: FrameRequestCallback | null = null;
+    const frameSpy = vi
+      .spyOn(globalThis, 'requestAnimationFrame')
+      .mockImplementation(callback => {
+        frameCallback = callback;
+        return 1;
+      });
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+    act(() => {
+      mockAudio.paused = false;
+      mockAudio.duration = 60;
+      fireAudioEvent('playing');
+    });
+    expect(result.current.playbackState.currentTime).toBe(0);
+
+    act(() => {
+      mockAudio.currentTime = 0.02;
+      frameCallback?.(performance.now());
+    });
+    expect(result.current.playbackState).toMatchObject({
+      currentTime: 0.02,
+      duration: 60,
+      isPlaying: true,
+      playbackStatus: 'playing',
+    });
+
+    act(() => {
+      mockAudio.paused = true;
+      mockAudio.currentTime = 1;
+      fireAudioEvent('playing');
+      frameCallback?.(performance.now());
+    });
+    expect(result.current.playbackState.currentTime).toBe(0.02);
+    frameSpy.mockRestore();
+  });
+
+  it('waits across bounded frames for the first real playhead advance', async () => {
+    const frameCallbacks: FrameRequestCallback[] = [];
+    const frameSpy = vi
+      .spyOn(globalThis, 'requestAnimationFrame')
+      .mockImplementation(callback => {
+        frameCallbacks.push(callback);
+        return frameCallbacks.length;
+      });
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+    act(() => {
+      mockAudio.paused = false;
+      mockAudio.duration = 60;
+      fireAudioEvent('playing');
+      frameCallbacks.shift()?.(performance.now());
+    });
+    expect(result.current.playbackState.currentTime).toBe(0);
+    expect(frameCallbacks).toHaveLength(1);
+
+    act(() => {
+      mockAudio.currentTime = 0.02;
+      frameCallbacks.shift()?.(performance.now());
+    });
+    expect(result.current.playbackState.currentTime).toBe(0.02);
+    expect(frameCallbacks).toHaveLength(0);
+    frameSpy.mockRestore();
+  });
+
+  it('bounds first-playhead polling when media time does not advance', async () => {
+    const frameCallbacks: FrameRequestCallback[] = [];
+    const frameSpy = vi
+      .spyOn(globalThis, 'requestAnimationFrame')
+      .mockImplementation(callback => {
+        frameCallbacks.push(callback);
+        return frameCallbacks.length;
+      });
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+    act(() => {
+      mockAudio.paused = false;
+      mockAudio.duration = 60;
+      fireAudioEvent('playing');
+      for (let frame = 0; frame < 12; frame += 1) {
+        frameCallbacks.shift()?.(performance.now());
+      }
+    });
+
+    expect(frameSpy).toHaveBeenCalledTimes(12);
+    expect(frameCallbacks).toHaveLength(0);
+    expect(result.current.playbackState).toMatchObject({
+      currentTime: 0,
+      duration: 60,
+      playbackStatus: 'playing',
+    });
+    frameSpy.mockRestore();
+  });
+
+  it('gives only the latest playing event ownership of playhead polling', async () => {
+    const frameCallbacks: FrameRequestCallback[] = [];
+    const frameSpy = vi
+      .spyOn(globalThis, 'requestAnimationFrame')
+      .mockImplementation(callback => {
+        frameCallbacks.push(callback);
+        return frameCallbacks.length;
+      });
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+      });
+    });
+    act(() => {
+      mockAudio.paused = false;
+      mockAudio.duration = 60;
+      fireAudioEvent('playing');
+      fireAudioEvent('playing');
+      mockAudio.currentTime = 0.02;
+      frameCallbacks.shift()?.(performance.now());
+    });
+    expect(result.current.playbackState.currentTime).toBe(0);
+
+    act(() => {
+      frameCallbacks.shift()?.(performance.now());
+    });
+    expect(result.current.playbackState.currentTime).toBe(0.02);
+    expect(frameCallbacks).toHaveLength(0);
+    frameSpy.mockRestore();
+  });
+
   it('toggles pause/resume when called with the same track ID', async () => {
     const useTrackAudioPlayer = await importFresh();
     const { result } = renderHook(() => useTrackAudioPlayer());
@@ -216,6 +371,7 @@ describe('useTrackAudioPlayer', () => {
   });
 
   it('replaces equal track ids when typed source provenance changes', async () => {
+    const measureSpy = vi.spyOn(performance, 'measure');
     const useTrackAudioPlayer = await importFresh();
     const { result } = renderHook(() => useTrackAudioPlayer());
 
@@ -224,7 +380,14 @@ describe('useTrackAudioPlayer', () => {
         id: 'shared-id',
         title: 'Catalog Track',
         audioUrl: 'https://cdn.example.com/catalog.mp3',
+        timeline: timeline('shared-id'),
       });
+    });
+    act(() => {
+      mockAudio.duration = 10;
+      result.current.jumpToCue('cue_drop');
+    });
+    await act(async () => {
       await result.current.toggleTrack({
         id: 'shared-id',
         title: 'Uploaded Mix',
@@ -238,9 +401,21 @@ describe('useTrackAudioPlayer', () => {
     expect(audioInstances[1]?.src).toBe('blob:https://jov.ie/uploaded-mix');
     expect(result.current.playbackState.sourceKind).toBe('chat-upload-preview');
     expect(result.current.playbackState.trackTitle).toBe('Uploaded Mix');
+    expect(measureSpy).toHaveBeenCalledWith(
+      'audio-cue-jump:event-to-superseded',
+      expect.any(String),
+      expect.any(String)
+    );
   });
 
   it('ignores stale media events after another source takes authority', async () => {
+    let frameCallback: FrameRequestCallback | null = null;
+    const frameSpy = vi
+      .spyOn(globalThis, 'requestAnimationFrame')
+      .mockImplementation(callback => {
+        frameCallback = callback;
+        return 1;
+      });
     const useTrackAudioPlayer = await importFresh();
     const { result } = renderHook(() => useTrackAudioPlayer());
 
@@ -250,6 +425,13 @@ describe('useTrackAudioPlayer', () => {
         title: 'Catalog Track',
         audioUrl: 'https://cdn.example.com/catalog.mp3',
       });
+    });
+    act(() => {
+      mockAudio.paused = false;
+      mockAudio.currentTime = 1;
+      fireAudioEvent('playing', 0);
+    });
+    await act(async () => {
       await result.current.toggleTrack({
         id: 'shared-id',
         title: 'Uploaded Mix',
@@ -259,6 +441,8 @@ describe('useTrackAudioPlayer', () => {
     });
 
     act(() => {
+      audioInstances[0]!.currentTime = 9;
+      frameCallback?.(performance.now());
       fireAudioEvent('play', 0);
       fireAudioEvent('error', 0);
     });
@@ -269,7 +453,9 @@ describe('useTrackAudioPlayer', () => {
       trackTitle: 'Uploaded Mix',
       playbackStatus: 'loading',
       lastErrorReason: null,
+      currentTime: 0,
     });
+    frameSpy.mockRestore();
   });
 
   it('jumps to sample-indexed cues without pausing and measures settlement', async () => {
@@ -315,7 +501,78 @@ describe('useTrackAudioPlayer', () => {
     );
   });
 
-  it('fails cue jumps closed for missing duration and stale timelines', async () => {
+  it('keeps cue latency ownership across overlapping jumps and ordinary scrubs', async () => {
+    const measureSpy = vi.spyOn(performance, 'measure');
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'track-1',
+        title: 'Test Song',
+        audioUrl: 'https://cdn.example.com/song.mp3',
+        timeline: timeline(),
+      });
+    });
+    measureSpy.mockClear();
+
+    act(() => {
+      mockAudio.duration = 10;
+      result.current.jumpToCue('cue_drop');
+      result.current.jumpToCue('cue_drop');
+    });
+    expect(measureSpy).toHaveBeenCalledWith(
+      'audio-cue-jump:event-to-superseded',
+      expect.any(String),
+      expect.any(String)
+    );
+    act(() => {
+      mockAudio.currentTime = 5;
+      fireAudioEvent('seeked');
+    });
+
+    measureSpy.mockClear();
+    act(() => {
+      result.current.jumpToCue('cue_drop');
+      result.current.seek(2);
+      mockAudio.currentTime = 2;
+      fireAudioEvent('seeked');
+    });
+    expect(measureSpy).toHaveBeenCalledWith(
+      'audio-cue-jump:event-to-superseded',
+      expect.any(String),
+      expect.any(String)
+    );
+    expect(measureSpy).not.toHaveBeenCalledWith(
+      'audio-cue-jump:event-to-settled',
+      expect.any(String),
+      expect.any(String)
+    );
+
+    measureSpy.mockClear();
+    act(() => {
+      result.current.jumpToCue('cue_drop');
+      mockAudio.currentTime = 2;
+      fireAudioEvent('seeked');
+    });
+    expect(measureSpy).not.toHaveBeenCalledWith(
+      'audio-cue-jump:event-to-settled',
+      expect.any(String),
+      expect.any(String)
+    );
+
+    act(() => {
+      mockAudio.currentTime = 5;
+      fireAudioEvent('seeked');
+    });
+    expect(measureSpy).toHaveBeenCalledWith(
+      'audio-cue-jump:event-to-settled',
+      expect.any(String),
+      expect.any(String)
+    );
+  });
+
+  it('fails cue jumps closed for missing duration, stale ids, and stale timelines', async () => {
     const useTrackAudioPlayer = await importFresh();
     const { result } = renderHook(() => useTrackAudioPlayer());
 
@@ -335,6 +592,10 @@ describe('useTrackAudioPlayer', () => {
       mockAudio.duration = 0;
     });
     expect(result.current.jumpToCue('cue_drop')).toBeNull();
+    act(() => {
+      mockAudio.duration = 10;
+    });
+    expect(result.current.jumpToCue('cue_deleted')).toBeNull();
 
     await act(async () => {
       await result.current.toggleTrack({

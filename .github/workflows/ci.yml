@@ -1535,8 +1535,6 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
-      - name: Prove canonical audio containers in real Chromium
-        run: pnpm --filter=@jovie/web run test:audio:real-media
       - name: Build exact combined head
         run: pnpm turbo build --filter=@jovie/web
         env:
@@ -1565,6 +1563,29 @@ jobs:
           done
           cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
           cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+      - name: Prove canonical audio and shell continuity in production build
+        run: |
+          set -euo pipefail
+          cd apps/web
+          export HOSTNAME=localhost
+          export PORT=3231
+          export NEXT_PUBLIC_E2E_MODE=1
+          export E2E_USE_TEST_AUTH_BYPASS=1
+          node .next/standalone/apps/web/server.js &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for attempt in {1..60}; do
+            if curl --fail --silent --show-error \
+              http://localhost:3231/audio-proof/source >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent --show-error \
+            http://localhost:3231/audio-proof/source >/dev/null
+          AUDIO_PROOF_BASE_URL=http://localhost:3231 \
+            AUDIO_PROOF_EXTERNAL_SERVER=1 \
+            pnpm run test:audio:real-media
       - name: Run deterministic layout behavior guard
         run: |
           set -euo pipefail

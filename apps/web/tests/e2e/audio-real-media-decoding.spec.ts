@@ -61,92 +61,6 @@ function percentile95(values: readonly number[]) {
   );
 }
 
-async function measureRealPlaybackTransitions(
-  page: Page,
-  encodedBytes: string,
-  seekTargets: { readonly scrubSeconds: number; readonly cueSeconds: number }
-): Promise<RealPlaybackTransitionSample> {
-  return page.evaluate(
-    async ({ encoded, targets }) => {
-      const longTasks: number[] = [];
-      if (!PerformanceObserver.supportedEntryTypes.includes('longtask')) {
-        throw new Error('Chromium long-task observation is unavailable');
-      }
-      const observer = new PerformanceObserver(list => {
-        longTasks.push(...list.getEntries().map(entry => entry.duration));
-      });
-      observer.observe({ type: 'longtask' });
-
-      const audio = new Audio(`data:audio/mpeg;base64,${encoded}`);
-      audio.preload = 'auto';
-      audio.loop = true;
-
-      try {
-        await new Promise<void>((resolve, reject) => {
-          audio.addEventListener('canplaythrough', () => resolve(), {
-            once: true,
-          });
-          audio.addEventListener('error', () => reject(audio.error), {
-            once: true,
-          });
-          audio.load();
-        });
-
-        const playStart = performance.now();
-        const playing = new Promise<number>(resolve => {
-          audio.addEventListener(
-            'playing',
-            () => resolve(performance.now() - playStart),
-            { once: true }
-          );
-        });
-        await audio.play();
-        const playToAudibleMs = await playing;
-
-        const seek = (timeSec: number) => {
-          const start = performance.now();
-          const settled = new Promise<number>(resolve => {
-            audio.addEventListener(
-              'seeked',
-              () => resolve(performance.now() - start),
-              { once: true }
-            );
-          });
-          audio.currentTime = timeSec;
-          return settled;
-        };
-
-        const timelineScrubMs = await seek(targets.scrubSeconds);
-        const cueJumpMs = await seek(targets.cueSeconds);
-        const playheadBeforeShell = audio.currentTime;
-        const shellStart = performance.now();
-        const shell = document.querySelector('#audio-shell');
-        if (!shell) throw new Error('Missing audio shell transition target');
-        shell.replaceChildren(document.createTextNode('destination'));
-        await new Promise<void>(resolve => {
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-        });
-        const shellTransitionMs = performance.now() - shellStart;
-        await new Promise(resolve => setTimeout(resolve, 80));
-        longTasks.push(...observer.takeRecords().map(entry => entry.duration));
-
-        return {
-          cueJumpMs,
-          longTaskCount: longTasks.length,
-          playToAudibleMs,
-          playheadAdvanceAcrossShellSec:
-            audio.currentTime - playheadBeforeShell,
-          shellTransitionMs,
-          timelineScrubMs,
-        };
-      } finally {
-        audio.pause();
-        observer.disconnect();
-      }
-    },
-    { encoded: encodedBytes, targets: seekTargets }
-  );
-}
 test.describe('canonical real audio corpus', () => {
   for (const fixture of REAL_AUDIO_FIXTURES) {
     test(`${fixture.formatId} reports and decodes with the pinned Chromium capability`, async ({
@@ -262,24 +176,175 @@ test.describe('canonical real audio corpus', () => {
   test('meets playback, scrub, cue, and shell-continuity budgets without long tasks', async ({
     page,
   }, testInfo) => {
-    const fixture = STRESS_AUDIO_FIXTURES.find(
-      candidate => candidate.scenarioId === 'long-vbr'
-    );
-    if (!fixture) throw new Error('Missing long VBR MP3 fixture');
-    const encodedBytes = readFileSync(
-      resolve(process.cwd(), 'tests/fixtures/audio', fixture.fileName)
-    ).toString('base64');
-    await page.setContent('<main id="audio-shell">source</main>');
+    await page.goto('/audio-proof/source');
+    await expect(page.locator('[data-app-shell-frame="true"]')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Load Real Audio' })
+    ).toBeVisible();
 
-    const samples: RealPlaybackTransitionSample[] = [];
-    for (let runIndex = 0; runIndex < 15; runIndex += 1) {
-      samples.push(
-        await measureRealPlaybackTransitions(page, encodedBytes, {
-          scrubSeconds: 12.5,
-          cueSeconds: 48,
-        })
+    const samples = await page.evaluate(async () => {
+      const output = document.querySelector<HTMLOutputElement>(
+        '[data-testid="audio-proof-state"]'
       );
-    }
+      if (!output) throw new Error('Missing production audio proof state');
+      const button = (name: string) => {
+        const candidate = [...document.querySelectorAll('button')].find(
+          element => element.textContent?.trim() === name
+        );
+        if (!(candidate instanceof HTMLButtonElement)) {
+          throw new Error(`Missing audio proof action: ${name}`);
+        }
+        return candidate;
+      };
+      const transport = (name: 'Pause' | 'Play') => {
+        const candidates = [
+          ...document.querySelectorAll<HTMLButtonElement>(
+            `button[aria-label^="${name}"]`
+          ),
+        ].filter(element => {
+          return (
+            !element.disabled &&
+            element.getClientRects().length > 0 &&
+            !element.closest('[aria-hidden="true"]') &&
+            getComputedStyle(element).visibility !== 'hidden'
+          );
+        });
+        if (candidates.length !== 1) {
+          throw new Error(
+            `Expected one production ${name} transport, found ${candidates.length}`
+          );
+        }
+        return candidates[0]!;
+      };
+      const currentTime = () => Number(output.dataset.currentTime);
+      const status = () => output.dataset.playbackStatus;
+      const view = () => output.dataset.view;
+      const waitFor = async (
+        predicate: () => boolean,
+        description: string,
+        timeoutMs = 5_000
+      ) => {
+        const deadline = performance.now() + timeoutMs;
+        while (!predicate()) {
+          if (performance.now() >= deadline) {
+            throw new Error(`Timed out waiting for ${description}`);
+          }
+          await new Promise<void>(resolve =>
+            requestAnimationFrame(() => resolve())
+          );
+        }
+      };
+      const nextPaint = () =>
+        new Promise<void>(resolve =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        );
+
+      button('Load Real Audio').click();
+      await waitFor(
+        () => status() === 'playing' && currentTime() > 0,
+        'real production playback'
+      );
+      const visiblePlaybackControls = [
+        ...document.querySelectorAll<HTMLButtonElement>('button'),
+      ].filter(element => {
+        const label = element.getAttribute('aria-label') ?? '';
+        const text = element.textContent?.trim() ?? '';
+        return (
+          !element.disabled &&
+          element.getClientRects().length > 0 &&
+          !element.closest('[aria-hidden="true"]') &&
+          (label.startsWith('Play') ||
+            label.startsWith('Pause') ||
+            text === 'Load Real Audio' ||
+            text === 'Stop Audio')
+        );
+      });
+      if (visiblePlaybackControls.length !== 1) {
+        throw new Error(
+          `Expected one visible playback authority, found ${visiblePlaybackControls.length}`
+        );
+      }
+      button('Navigate Shell').click();
+      await waitFor(() => view() === 'destination', 'destination shell');
+      button('Navigate Shell').click();
+      await waitFor(() => view() === 'source', 'source shell');
+
+      if (!PerformanceObserver.supportedEntryTypes.includes('longtask')) {
+        throw new Error('Chromium long-task observation is unavailable');
+      }
+      const longTasks: number[] = [];
+      const observer = new PerformanceObserver(list => {
+        longTasks.push(...list.getEntries().map(entry => entry.duration));
+      });
+      observer.observe({ type: 'longtask' });
+
+      const measured: RealPlaybackTransitionSample[] = [];
+      try {
+        for (let runIndex = 0; runIndex < 15; runIndex += 1) {
+          transport('Pause').click();
+          await waitFor(() => status() === 'paused', 'paused transport state');
+          const playheadBeforePlay = currentTime();
+          const playStart = performance.now();
+          transport('Play').click();
+          await waitFor(
+            () => status() === 'playing' && currentTime() > playheadBeforePlay,
+            'audible playback with an advancing playhead'
+          );
+          const playToAudibleMs = performance.now() - playStart;
+
+          const scrubStart = performance.now();
+          button('Scrub 0:12').click();
+          await waitFor(
+            () =>
+              status() !== 'seeking' && Math.abs(currentTime() - 12.5) <= 0.1,
+            'settled production scrub'
+          );
+          const timelineScrubMs = performance.now() - scrubStart;
+
+          const cueStart = performance.now();
+          button('Jump To Proof Cue').click();
+          await waitFor(
+            () => status() !== 'seeking' && Math.abs(currentTime() - 48) <= 0.1,
+            'settled production cue jump'
+          );
+          const cueJumpMs = performance.now() - cueStart;
+
+          const playheadBeforeShell = currentTime();
+          const priorView = view();
+          const shellStart = performance.now();
+          button('Navigate Shell').click();
+          await waitFor(
+            () => view() !== priorView,
+            'production app-shell destination'
+          );
+          await nextPaint();
+          const shellTransitionMs = performance.now() - shellStart;
+          await waitFor(
+            () => currentTime() > playheadBeforeShell,
+            'playhead continuity across the app shell'
+          );
+
+          measured.push({
+            cueJumpMs,
+            longTaskCount: 0,
+            playToAudibleMs,
+            playheadAdvanceAcrossShellSec: currentTime() - playheadBeforeShell,
+            shellTransitionMs,
+            timelineScrubMs,
+          });
+        }
+        longTasks.push(...observer.takeRecords().map(entry => entry.duration));
+        return measured.map((sample, index) => ({
+          ...sample,
+          longTaskCount: index === 0 ? longTasks.length : 0,
+        }));
+      } finally {
+        observer.disconnect();
+        if (status() === 'playing') {
+          transport('Pause').click();
+        }
+      }
+    });
 
     const summary = {
       cueJumpP95Ms: percentile95(samples.map(sample => sample.cueJumpMs)),
