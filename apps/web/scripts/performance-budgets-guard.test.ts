@@ -12,7 +12,16 @@ vi.mock('@playwright/test', () => ({
   },
 }));
 
+import type {
+  GuardSample,
+  MetricResult,
+  PageResult,
+  ViolationResult,
+} from './performance-budgets-guard';
 import {
+  buildConfirmedPageResult,
+  confirmTimingViolations,
+  evaluateTimingConfirmation,
   loadGuardManifestRoutes,
   measureSameRouteInteraction,
   measureWarmNavigationRoute,
@@ -21,7 +30,148 @@ import {
   selectGuardRoutes,
   waitForWarmDestinationReady,
 } from './performance-budgets-guard';
-import type { PerfRouteDefinition } from './performance-route-manifest';
+import type {
+  PerfResourceMetricName,
+  PerfRouteDefinition,
+  PerfTimingMetricName,
+} from './performance-route-manifest';
+
+function createConfirmationSample(
+  metric: PerfTimingMetricName,
+  measured: number,
+  resourceMeasured = 0
+): GuardSample {
+  return {
+    finalUrl: 'http://127.0.0.1:4100/app/confirmed',
+    resolvedPath: '/app/confirmed',
+    resourceValues: {
+      font: 0,
+      image: 0,
+      script: resourceMeasured,
+      stylesheet: 0,
+      total: resourceMeasured,
+    } satisfies Record<PerfResourceMetricName, number>,
+    timingValues: {
+      'cumulative-layout-shift': 0,
+      'first-contentful-paint': 0,
+      'first-input-delay': 0,
+      'interactive-shell-ready': 0,
+      'largest-contentful-paint': 0,
+      'redirect-complete': 0,
+      'skeleton-to-content': 0,
+      'time-to-first-byte': 0,
+      'warm-shell-response': 0,
+      [metric]: measured,
+    } satisfies Record<PerfTimingMetricName, number>,
+  };
+}
+
+function createMetric(
+  name: string,
+  measured: number,
+  budget: number,
+  unit: 'KB' | 'ms' = 'ms'
+): MetricResult {
+  return {
+    budget,
+    measured,
+    name,
+    overshootPct: measured > budget ? ((measured - budget) / budget) * 100 : 0,
+    passed: measured <= budget,
+    unit,
+  };
+}
+
+function createTimingViolation(
+  routeId = 'creator-library',
+  metric = 'warm-shell-response' as PerfTimingMetricName
+): ViolationResult {
+  return {
+    ...createMetric(metric, 210, 100),
+    kind: 'timing',
+    routeId,
+  };
+}
+
+function createConfirmationPage(options: {
+  readonly id: string;
+  readonly metric?: PerfTimingMetricName;
+  readonly measured?: number;
+  readonly resourceMeasured?: number;
+  readonly includeMetric?: boolean;
+}) {
+  const metric = options.metric ?? 'warm-shell-response';
+  const measured = options.measured ?? 65;
+  const resourceMeasured = options.resourceMeasured ?? 0;
+  return {
+    id: options.id,
+    resourceSizes: [createMetric('script', resourceMeasured, 100, 'KB')],
+    samples: [createConfirmationSample(metric, measured, resourceMeasured)],
+    timings:
+      options.includeMetric === false
+        ? []
+        : [createMetric(metric, measured, 100)],
+  };
+}
+
+function createPageResultFixture(options: {
+  readonly id?: string;
+  readonly primaryMeasured?: number;
+  readonly primaryMetric?: PerfTimingMetricName;
+  readonly rawTimings?: Partial<Record<PerfTimingMetricName, number>>;
+  readonly samples?: readonly GuardSample[];
+  readonly timings?: readonly MetricResult[];
+  readonly violations?: readonly ViolationResult[];
+}): PageResult {
+  const id = options.id ?? 'creator-library';
+  const primaryMetric = options.primaryMetric ?? 'warm-shell-response';
+  const primaryMeasured = options.primaryMeasured ?? 65;
+  const samples = options.samples ?? [
+    createConfirmationSample(primaryMetric, primaryMeasured),
+  ];
+  const rawTimings = {
+    ...samples[0]!.timingValues,
+    ...options.rawTimings,
+  } satisfies Record<PerfTimingMetricName, number>;
+  const timings = options.timings ?? [
+    createMetric(primaryMetric, primaryMeasured, 100),
+  ];
+  const violations =
+    options.violations ??
+    timings
+      .filter(metric => !metric.passed)
+      .map(metric => ({
+        ...metric,
+        kind: 'timing' as const,
+        routeId: id,
+      }));
+
+  return {
+    auth: true,
+    configuredPath: '/app/library',
+    group: 'creator-shell',
+    id,
+    initialViolations: violations,
+    primaryMetric,
+    rawResourceSizes: {
+      font: 0,
+      image: 0,
+      script: 0,
+      stylesheet: 0,
+      total: 0,
+    },
+    rawTimings,
+    resolvedPath: '/app/library',
+    resourceSizes: [createMetric('script', 0, 100, 'KB')],
+    routeSurface: 'creator-app',
+    samples,
+    timingConfirmations: [],
+    timings,
+    terminalStatus: violations.length > 0 ? 'fail' : 'pass',
+    url: samples[0]!.finalUrl,
+    violations,
+  };
+}
 
 function createInteractivePage({
   contentSelector,
@@ -101,6 +251,196 @@ describe('performance budgets guard', () => {
     playwrightMocks.chromiumLaunch.mockResolvedValue({
       close: playwrightMocks.browserClose,
     });
+  });
+
+  it('passes an isolated timing outlier after a clean same-route confirmation', async () => {
+    const initialViolation = createTimingViolation();
+    const confirmationPage = createConfirmationPage({
+      id: 'creator-library',
+      measured: 65,
+    });
+    const measureConfirmation = vi.fn().mockResolvedValue(confirmationPage);
+
+    const confirmations = await confirmTimingViolations({
+      initialViolations: [initialViolation],
+      measureConfirmation,
+    });
+
+    expect(measureConfirmation).toHaveBeenCalledOnce();
+    expect(confirmations).toHaveLength(1);
+    expect(confirmations[0]).toMatchObject({
+      reason: 'clean-confirmation',
+      routeId: 'creator-library',
+      terminalStatus: 'pass',
+    });
+    expect(
+      confirmations[0]?.samples[0]?.timingValues['warm-shell-response']
+    ).toBe(65);
+  });
+
+  it('fails when the same route and metric remain over budget', async () => {
+    const confirmations = await confirmTimingViolations({
+      initialViolations: [createTimingViolation()],
+      measureConfirmation: async () =>
+        createConfirmationPage({
+          id: 'creator-library',
+          measured: 210,
+        }),
+    });
+
+    expect(confirmations[0]).toMatchObject({
+      reason: 'persistent-timing-violation',
+      terminalStatus: 'fail',
+    });
+  });
+
+  it('uses confirmation measurements for terminal fields and preserves initial evidence', async () => {
+    const initialPage = createPageResultFixture({ primaryMeasured: 210 });
+    const confirmationPage = createPageResultFixture({ primaryMeasured: 65 });
+    const timingConfirmations = await confirmTimingViolations({
+      initialViolations: initialPage.violations,
+      measureConfirmation: async () => confirmationPage,
+    });
+
+    const terminalPage = buildConfirmedPageResult(
+      initialPage,
+      confirmationPage,
+      timingConfirmations
+    );
+
+    expect(terminalPage.terminalStatus).toBe('pass');
+    expect(terminalPage.rawTimings['warm-shell-response']).toBe(65);
+    expect(terminalPage.timings[0]?.measured).toBe(65);
+    expect(terminalPage.samples[0]?.timingValues['warm-shell-response']).toBe(
+      65
+    );
+    expect(
+      terminalPage.initialMeasurement?.rawTimings['warm-shell-response']
+    ).toBe(210);
+    expect(terminalPage.initialMeasurement?.timings[0]?.measured).toBe(210);
+    expect(
+      terminalPage.initialMeasurement?.samples[0]?.timingValues[
+        'warm-shell-response'
+      ]
+    ).toBe(210);
+  });
+
+  it('keeps terminal failure when a different confirmation timing metric fails', async () => {
+    const initialPage = createPageResultFixture({ primaryMeasured: 210 });
+    const confirmationSample = createConfirmationSample(
+      'warm-shell-response',
+      65
+    );
+    const confirmationPage = createPageResultFixture({
+      rawTimings: {
+        'skeleton-to-content': 210,
+      },
+      samples: [
+        {
+          ...confirmationSample,
+          timingValues: {
+            ...confirmationSample.timingValues,
+            'skeleton-to-content': 210,
+          },
+        },
+      ],
+      timings: [
+        createMetric('warm-shell-response', 65, 100),
+        createMetric('skeleton-to-content', 210, 100),
+      ],
+    });
+    const timingConfirmations = await confirmTimingViolations({
+      initialViolations: initialPage.violations,
+      measureConfirmation: async () => confirmationPage,
+    });
+
+    const terminalPage = buildConfirmedPageResult(
+      initialPage,
+      confirmationPage,
+      timingConfirmations
+    );
+
+    expect(timingConfirmations[0]?.terminalStatus).toBe('pass');
+    expect(terminalPage.terminalStatus).toBe('fail');
+    expect(terminalPage.violations).toEqual(confirmationPage.violations);
+    expect(terminalPage.rawTimings['skeleton-to-content']).toBe(210);
+  });
+
+  it('fails on resource evidence and refuses to confirm an initial resource violation', async () => {
+    const confirmationPage = createConfirmationPage({
+      id: 'creator-library',
+      measured: 65,
+      resourceMeasured: 101,
+    });
+    const confirmations = await confirmTimingViolations({
+      initialViolations: [createTimingViolation()],
+      measureConfirmation: async () => confirmationPage,
+    });
+
+    expect(confirmations[0]).toMatchObject({
+      reason: 'resource-violation',
+      terminalStatus: 'fail',
+    });
+
+    await expect(
+      confirmTimingViolations({
+        initialViolations: [
+          {
+            ...createMetric('script', 101, 100, 'KB'),
+            kind: 'resource',
+            routeId: 'creator-library',
+          },
+        ],
+        measureConfirmation: async () => confirmationPage,
+      })
+    ).rejects.toThrow('cannot launder resource violations');
+  });
+
+  it('fails closed for thrown execution and missing metric inspection errors', async () => {
+    await expect(
+      confirmTimingViolations({
+        initialViolations: [createTimingViolation()],
+        measureConfirmation: async () => {
+          throw new Error('inspection failed');
+        },
+      })
+    ).rejects.toThrow('inspection failed');
+
+    await expect(
+      confirmTimingViolations({
+        initialViolations: [createTimingViolation()],
+        measureConfirmation: async () =>
+          createConfirmationPage({
+            id: 'creator-library',
+            includeMetric: false,
+          }),
+      })
+    ).rejects.toThrow('metric mismatch');
+  });
+
+  it('does not replace a route or metric violation with another route or metric success', () => {
+    const initialViolation = createTimingViolation();
+
+    expect(() =>
+      evaluateTimingConfirmation(
+        initialViolation,
+        createConfirmationPage({
+          id: 'creator-chat-nav',
+          measured: 65,
+        })
+      )
+    ).toThrow('route mismatch');
+
+    expect(() =>
+      evaluateTimingConfirmation(
+        initialViolation,
+        createConfirmationPage({
+          id: 'creator-library',
+          metric: 'skeleton-to-content',
+          measured: 65,
+        })
+      )
+    ).toThrow('metric mismatch');
   });
 
   it('parses group and route-id selectors from the CLI', () => {

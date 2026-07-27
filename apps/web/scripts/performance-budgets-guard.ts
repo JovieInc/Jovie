@@ -53,14 +53,14 @@ export interface GuardCliOptions {
   readonly runs: number;
 }
 
-interface GuardSample {
+export interface GuardSample {
   readonly finalUrl: string;
   readonly resolvedPath: string;
   readonly timingValues: Record<PerfTimingMetricName, number>;
   readonly resourceValues: Record<PerfResourceMetricName, number>;
 }
 
-interface MetricResult {
+export interface MetricResult {
   readonly name: string;
   readonly measured: number;
   readonly budget: number;
@@ -69,25 +69,47 @@ interface MetricResult {
   readonly overshootPct: number;
 }
 
-interface ViolationResult extends MetricResult {
+export interface ViolationResult extends MetricResult {
   readonly kind: 'timing' | 'resource';
+  readonly routeId: string;
 }
 
-export interface PageResult {
+export type TimingConfirmationReason =
+  | 'clean-confirmation'
+  | 'persistent-timing-violation'
+  | 'resource-violation';
+
+export interface TimingConfirmation {
+  readonly confirmation: MetricResult;
+  readonly initial: ViolationResult;
+  readonly reason: TimingConfirmationReason;
+  readonly routeId: string;
+  readonly samples: readonly GuardSample[];
+  readonly terminalStatus: 'fail' | 'pass';
+}
+
+export interface PageMeasurement {
+  readonly rawResourceSizes: Record<PerfResourceMetricName, number>;
+  readonly rawTimings: Record<PerfTimingMetricName, number>;
+  readonly resourceSizes: readonly MetricResult[];
+  readonly samples: readonly GuardSample[];
+  readonly timings: readonly MetricResult[];
+  readonly url: string;
+}
+
+export interface PageResult extends PageMeasurement {
   readonly auth: boolean;
   readonly configuredPath: string;
   readonly group: string;
   readonly id: string;
+  readonly initialMeasurement?: PageMeasurement;
+  readonly initialViolations: readonly ViolationResult[];
   readonly primaryMetric: PerfTimingMetricName;
   readonly resolvedPath: string;
-  readonly resourceSizes: readonly MetricResult[];
   readonly routeSurface: string;
-  readonly samples: readonly GuardSample[];
-  readonly timings: readonly MetricResult[];
-  readonly url: string;
+  readonly timingConfirmations: readonly TimingConfirmation[];
+  readonly terminalStatus: 'fail' | 'pass';
   readonly violations: readonly ViolationResult[];
-  readonly rawResourceSizes: Record<PerfResourceMetricName, number>;
-  readonly rawTimings: Record<PerfTimingMetricName, number>;
 }
 
 export interface GuardSummary {
@@ -118,6 +140,7 @@ const DEFAULT_AUTH_STATE_PATHS = [
   resolve(webRoot, '.auth', 'session.json'),
 ] as const;
 const DEFAULT_RUNS = 3;
+const TIMING_CONFIRMATION_RUNS = 3;
 const NAVIGATION_TIMEOUT_MS = 60_000;
 const READY_TIMEOUT_MS = 15_000;
 const PERF_INIT_SCRIPT = `
@@ -1118,10 +1141,18 @@ function createPageResult(
   const violations: ViolationResult[] = [
     ...timings
       .filter(metric => !metric.passed)
-      .map(metric => ({ ...metric, kind: 'timing' as const })),
+      .map(metric => ({
+        ...metric,
+        kind: 'timing' as const,
+        routeId: route.id,
+      })),
     ...resourceSizes
       .filter(metric => !metric.passed)
-      .map(metric => ({ ...metric, kind: 'resource' as const })),
+      .map(metric => ({
+        ...metric,
+        kind: 'resource' as const,
+        routeId: route.id,
+      })),
   ];
 
   return {
@@ -1129,6 +1160,7 @@ function createPageResult(
     configuredPath: route.path,
     group: route.group,
     id: route.id,
+    initialViolations: violations,
     primaryMetric,
     rawResourceSizes,
     rawTimings,
@@ -1137,9 +1169,108 @@ function createPageResult(
     routeSurface: route.surface,
     samples,
     timings,
+    timingConfirmations: [],
+    terminalStatus: violations.length > 0 ? 'fail' : 'pass',
     url: medianSample.finalUrl,
     violations,
   };
+}
+
+type TimingConfirmationPage = Pick<
+  PageResult,
+  'id' | 'resourceSizes' | 'samples' | 'timings'
+>;
+
+export function evaluateTimingConfirmation(
+  initialViolation: ViolationResult,
+  confirmationPage: TimingConfirmationPage
+): TimingConfirmation {
+  if (initialViolation.kind !== 'timing') {
+    throw new TypeError(
+      `Only timing violations may be confirmed; ${initialViolation.name} is ${initialViolation.kind}.`
+    );
+  }
+
+  if (confirmationPage.id !== initialViolation.routeId) {
+    throw new Error(
+      `Timing confirmation route mismatch: expected ${initialViolation.routeId}, received ${confirmationPage.id}.`
+    );
+  }
+
+  const confirmation = confirmationPage.timings.find(
+    metric => metric.name === initialViolation.name
+  );
+  if (!confirmation) {
+    throw new Error(
+      `Timing confirmation metric mismatch for ${initialViolation.routeId}: expected ${initialViolation.name}.`
+    );
+  }
+
+  const resourceViolations = confirmationPage.resourceSizes.filter(
+    metric => !metric.passed
+  );
+  const reason: TimingConfirmationReason =
+    resourceViolations.length > 0
+      ? 'resource-violation'
+      : confirmation.passed
+        ? 'clean-confirmation'
+        : 'persistent-timing-violation';
+
+  return {
+    confirmation,
+    initial: initialViolation,
+    reason,
+    routeId: initialViolation.routeId,
+    samples: confirmationPage.samples,
+    terminalStatus: reason === 'clean-confirmation' ? 'pass' : 'fail',
+  };
+}
+
+function pageMeasurement(page: PageResult): PageMeasurement {
+  return {
+    rawResourceSizes: page.rawResourceSizes,
+    rawTimings: page.rawTimings,
+    resourceSizes: page.resourceSizes,
+    samples: page.samples,
+    timings: page.timings,
+    url: page.url,
+  };
+}
+
+export function buildConfirmedPageResult(
+  initialPage: PageResult,
+  confirmationPage: PageResult,
+  timingConfirmations: readonly TimingConfirmation[]
+): PageResult {
+  return {
+    ...confirmationPage,
+    initialMeasurement: pageMeasurement(initialPage),
+    initialViolations: initialPage.initialViolations,
+    terminalStatus: confirmationPage.violations.length > 0 ? 'fail' : 'pass',
+    timingConfirmations,
+  };
+}
+
+export async function confirmTimingViolations(options: {
+  readonly initialViolations: readonly ViolationResult[];
+  readonly measureConfirmation: () => Promise<TimingConfirmationPage>;
+}) {
+  if (options.initialViolations.length === 0) {
+    throw new TypeError('Timing confirmation requires at least one violation.');
+  }
+
+  if (
+    options.initialViolations.some(violation => violation.kind !== 'timing')
+  ) {
+    throw new TypeError(
+      'Timing confirmation cannot launder resource violations or other terminal failures.'
+    );
+  }
+
+  const confirmationPage = await options.measureConfirmation();
+  return options.initialViolations.map(initialViolation =>
+    evaluateTimingConfirmation(initialViolation, confirmationPage)
+  );
 }
 
 function sortRoutesForExecution(routes: readonly PerfRouteDefinition[]) {
@@ -1303,7 +1434,64 @@ async function measureRoutesAgainstBudgets(
         );
       }
 
-      results.push(createPageResult(route, resolvedPath, samples, devMode));
+      const initialPage = createPageResult(
+        route,
+        resolvedPath,
+        samples,
+        devMode
+      );
+      const initialTimingViolations = initialPage.violations.filter(
+        violation => violation.kind === 'timing'
+      );
+      const hasResourceViolation = initialPage.violations.some(
+        violation => violation.kind === 'resource'
+      );
+
+      if (initialTimingViolations.length === 0 || hasResourceViolation) {
+        results.push(initialPage);
+        continue;
+      }
+
+      logInfo(
+        `  timing violation on ${route.id}; running ${TIMING_CONFIRMATION_RUNS}-sample same-route confirmation`,
+        options
+      );
+      const confirmationSamples: GuardSample[] = [];
+      for (let index = 0; index < TIMING_CONFIRMATION_RUNS; index += 1) {
+        const sample = await measureRouteSample(
+          browser,
+          route,
+          options.baseUrl,
+          url,
+          resolvedPath,
+          authCookies,
+          devMode
+        );
+        confirmationSamples.push(sample);
+        logInfo(
+          `  confirmation ${index + 1}/${TIMING_CONFIRMATION_RUNS}: ${formatMetric(sample.timingValues[getPrimaryTimingMetricName(route)], 'ms')}`,
+          options
+        );
+      }
+
+      const confirmationPage = createPageResult(
+        route,
+        resolvedPath,
+        confirmationSamples,
+        devMode
+      );
+      const timingConfirmations = await confirmTimingViolations({
+        initialViolations: initialTimingViolations,
+        measureConfirmation: async () => confirmationPage,
+      });
+
+      results.push(
+        buildConfirmedPageResult(
+          initialPage,
+          confirmationPage,
+          timingConfirmations
+        )
+      );
     }
 
     return results;
@@ -1320,13 +1508,26 @@ function printHumanSummary(summary: GuardSummary) {
       `${page.id} (${page.resolvedPath}) primary=${page.primaryMetric}=${formatMetric(
         page.rawTimings[page.primaryMetric],
         page.primaryMetric === 'cumulative-layout-shift' ? '' : 'ms'
-      )}`
+      )}${page.timingConfirmations.length > 0 ? ' (confirmation evidence)' : ''}`
     );
 
     for (const metric of [...page.timings, ...page.resourceSizes]) {
-      const status = metric.passed ? 'PASS' : 'FAIL';
+      const confirmation = page.timingConfirmations.find(
+        candidate => candidate.confirmation.name === metric.name
+      );
+      const status = metric.passed
+        ? 'PASS'
+        : confirmation?.terminalStatus === 'pass'
+          ? 'CONFIRMED'
+          : 'FAIL';
       console.log(
         `  ${status} ${metric.name}: ${formatMetric(metric.measured, metric.unit)} / ${formatMetric(metric.budget, metric.unit)}`
+      );
+    }
+
+    for (const confirmation of page.timingConfirmations) {
+      console.log(
+        `  ${confirmation.terminalStatus.toUpperCase()} confirmation ${confirmation.routeId}/${confirmation.confirmation.name}: ${formatMetric(confirmation.confirmation.measured, confirmation.confirmation.unit)} / ${formatMetric(confirmation.confirmation.budget, confirmation.confirmation.unit)} (${confirmation.reason})`
       );
     }
   }
