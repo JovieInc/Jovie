@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Map of event name -> listener callbacks registered on the mock Audio element
 let audioEventListeners: Record<string, Array<() => void>>;
+let audioEventListenerInstances: Array<Record<string, Array<() => void>>> = [];
 let mockAudio: {
   play: ReturnType<typeof vi.fn>;
   pause: ReturnType<typeof vi.fn>;
@@ -13,6 +14,7 @@ let mockAudio: {
   currentTime: number;
   duration: number;
 };
+let audioInstances: (typeof mockAudio)[] = [];
 let nextPlayMock: ReturnType<typeof vi.fn> | null = null;
 
 function createMockAudio() {
@@ -32,12 +34,18 @@ function createMockAudio() {
     currentTime: 0,
     duration: 0,
   };
+  audioEventListenerInstances.push(audioEventListeners);
+  audioInstances.push(mockAudio);
   nextPlayMock = null;
   return mockAudio;
 }
 
-function fireAudioEvent(event: string) {
-  const handlers = audioEventListeners[event];
+function fireAudioEvent(event: string, instanceIndex?: number) {
+  const listeners =
+    instanceIndex === undefined
+      ? audioEventListeners
+      : audioEventListenerInstances[instanceIndex];
+  const handlers = listeners?.[event];
   if (handlers) {
     for (const handler of handlers) {
       handler();
@@ -64,6 +72,8 @@ async function importFresh() {
 describe('useTrackAudioPlayer', () => {
   beforeEach(() => {
     vi.resetModules();
+    audioEventListenerInstances = [];
+    audioInstances = [];
     nextPlayMock = null;
   });
 
@@ -78,6 +88,7 @@ describe('useTrackAudioPlayer', () => {
       releaseTitle: 'Test Album',
       artistName: 'Test Artist',
       artworkUrl: 'https://cdn.example.com/art.jpg',
+      sourceKind: 'release-preview' as const,
     };
 
     await act(async () => {
@@ -90,6 +101,7 @@ describe('useTrackAudioPlayer', () => {
     });
 
     expect(result.current.playbackState.activeTrackId).toBe('track-1');
+    expect(result.current.playbackState.sourceKind).toBe('release-preview');
     expect(result.current.playbackState.trackTitle).toBe('Test Song');
     expect(result.current.playbackState.releaseTitle).toBe('Test Album');
     expect(result.current.playbackState.artistName).toBe('Test Artist');
@@ -121,17 +133,20 @@ describe('useTrackAudioPlayer', () => {
     });
 
     expect(result.current.playbackState.isPlaying).toBe(true);
+    expect(result.current.playbackState.sourceKind).toBe('catalog');
 
     // Toggle same track -> should pause
+    const pauseCountBeforeToggle = mockAudio.pause.mock.calls.length;
     await act(async () => {
       await result.current.toggleTrack(track);
     });
+    expect(mockAudio.pause).toHaveBeenCalledTimes(pauseCountBeforeToggle + 1);
     act(() => {
       mockAudio.paused = true;
       fireAudioEvent('pause');
     });
 
-    expect(mockAudio.pause).toHaveBeenCalled();
+    expect(audioInstances).toHaveLength(1);
     expect(result.current.playbackState.isPlaying).toBe(false);
     expect(result.current.playbackState.playbackStatus).toBe('paused');
 
@@ -148,6 +163,93 @@ describe('useTrackAudioPlayer', () => {
     expect(mockAudio.play).toHaveBeenCalledTimes(2);
     expect(result.current.playbackState.isPlaying).toBe(true);
     expect(result.current.playbackState.playbackStatus).toBe('playing');
+  });
+
+  it('fails closed when same-track resume is rejected', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+    const track = {
+      id: 'track-1',
+      title: 'Test Song',
+      audioUrl: 'https://cdn.example.com/song.mp3',
+    };
+
+    await act(async () => {
+      await result.current.toggleTrack(track);
+    });
+    mockAudio.paused = true;
+    mockAudio.play.mockRejectedValueOnce(new Error('Resume blocked'));
+
+    await act(async () => {
+      await expect(result.current.toggleTrack(track)).rejects.toThrow(
+        'Resume blocked'
+      );
+    });
+
+    expect(result.current.playbackState).toMatchObject({
+      activeTrackId: null,
+      isPlaying: false,
+      playbackStatus: 'error',
+      lastErrorReason: 'play_rejected',
+    });
+    expect(mockAudio.src).toBe('');
+  });
+
+  it('replaces equal track ids when typed source provenance changes', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'shared-id',
+        title: 'Catalog Track',
+        audioUrl: 'https://cdn.example.com/catalog.mp3',
+      });
+      await result.current.toggleTrack({
+        id: 'shared-id',
+        title: 'Uploaded Mix',
+        audioUrl: 'blob:https://jov.ie/uploaded-mix',
+        sourceKind: 'chat-upload-preview',
+      });
+    });
+
+    expect(audioInstances).toHaveLength(2);
+    expect(audioInstances[0]?.src).toBe('');
+    expect(audioInstances[1]?.src).toBe('blob:https://jov.ie/uploaded-mix');
+    expect(result.current.playbackState.sourceKind).toBe('chat-upload-preview');
+    expect(result.current.playbackState.trackTitle).toBe('Uploaded Mix');
+  });
+
+  it('ignores stale media events after another source takes authority', async () => {
+    const useTrackAudioPlayer = await importFresh();
+    const { result } = renderHook(() => useTrackAudioPlayer());
+
+    await act(async () => {
+      await result.current.toggleTrack({
+        id: 'shared-id',
+        title: 'Catalog Track',
+        audioUrl: 'https://cdn.example.com/catalog.mp3',
+      });
+      await result.current.toggleTrack({
+        id: 'shared-id',
+        title: 'Uploaded Mix',
+        audioUrl: 'blob:https://jov.ie/uploaded-mix',
+        sourceKind: 'chat-upload-preview',
+      });
+    });
+
+    act(() => {
+      fireAudioEvent('play', 0);
+      fireAudioEvent('error', 0);
+    });
+
+    expect(result.current.playbackState).toMatchObject({
+      activeTrackId: 'shared-id',
+      sourceKind: 'chat-upload-preview',
+      trackTitle: 'Uploaded Mix',
+      playbackStatus: 'loading',
+      lastErrorReason: null,
+    });
   });
 
   it('resets state and notifies error listeners on audio error', async () => {
@@ -181,6 +283,7 @@ describe('useTrackAudioPlayer', () => {
     });
 
     expect(result.current.playbackState.activeTrackId).toBeNull();
+    expect(result.current.playbackState.sourceKind).toBeNull();
     expect(result.current.playbackState.isPlaying).toBe(false);
     expect(result.current.playbackState.trackTitle).toBeNull();
     expect(result.current.playbackState.releaseTitle).toBeNull();
@@ -364,6 +467,7 @@ describe('useTrackAudioPlayer', () => {
     expect(mockAudio.src).toBe('');
     expect(firstMount.result.current.playbackState).toEqual({
       activeTrackId: null,
+      sourceKind: null,
       isPlaying: false,
       playbackStatus: 'idle',
       lastErrorReason: null,
@@ -963,20 +1067,12 @@ describe('useTrackAudioPlayer', () => {
     let resolveFirstPlay: (() => void) | undefined;
     let resolveSecondPlay: (() => void) | undefined;
 
-    nextPlayMock = vi
-      .fn()
-      .mockImplementationOnce(
-        () =>
-          new Promise<void>(resolve => {
-            resolveFirstPlay = resolve;
-          })
-      )
-      .mockImplementationOnce(
-        () =>
-          new Promise<void>(resolve => {
-            resolveSecondPlay = resolve;
-          })
-      );
+    nextPlayMock = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>(resolve => {
+          resolveFirstPlay = resolve;
+        })
+    );
 
     const useTrackAudioPlayer = await importFresh();
     const { result } = renderHook(() => useTrackAudioPlayer());
@@ -990,6 +1086,12 @@ describe('useTrackAudioPlayer', () => {
         title: 'First Song',
         audioUrl: 'https://cdn.example.com/first.mp3',
       });
+      nextPlayMock = vi.fn().mockImplementation(
+        () =>
+          new Promise<void>(resolve => {
+            resolveSecondPlay = resolve;
+          })
+      );
       secondToggle = result.current.toggleTrack({
         id: 'track-2',
         title: 'Second Song',
@@ -1002,8 +1104,10 @@ describe('useTrackAudioPlayer', () => {
       await firstToggle;
     });
 
-    expect(mockAudio.pause).toHaveBeenCalledTimes(2);
-    expect(mockAudio.src).toBe('https://cdn.example.com/second.mp3');
+    expect(audioInstances).toHaveLength(2);
+    expect(audioInstances[0]?.pause).toHaveBeenCalledTimes(2);
+    expect(audioInstances[0]?.src).toBe('');
+    expect(audioInstances[1]?.src).toBe('https://cdn.example.com/second.mp3');
     expect(result.current.playbackState.activeTrackId).toBe('track-2');
     expect(result.current.playbackState.trackTitle).toBe('Second Song');
   });

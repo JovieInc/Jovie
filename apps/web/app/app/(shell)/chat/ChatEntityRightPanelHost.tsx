@@ -42,6 +42,7 @@ import {
   entityCardArtStyle,
   KIND_PRESETS,
 } from '@/components/organisms/entity-card';
+import { GlobalAudioPreviewAction } from '@/components/organisms/GlobalAudioPreviewAction';
 import {
   type ContextMenuItemType,
   TableContextMenu,
@@ -741,13 +742,16 @@ function ChatReleaseEntityPanel({
                         <Music2 className='h-3.5 w-3.5 text-tertiary-token' />
                         Preview
                       </div>
-                      <audio
-                        controls
-                        src={release.previewUrl}
-                        className='h-8 w-full'
-                      >
-                        <track kind='captions' />
-                      </audio>
+                      <GlobalAudioPreviewAction
+                        id={release.id}
+                        title={release.title}
+                        audioUrl={release.previewUrl}
+                        sourceKind='release-preview'
+                        releaseTitle={release.title}
+                        artistName={release.artistNames?.[0]}
+                        artworkUrl={release.artworkUrl}
+                        className='mt-2 w-full justify-center'
+                      />
                     </div>
                   ) : null}
 

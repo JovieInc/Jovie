@@ -34,6 +34,11 @@ let searchParams = new URLSearchParams();
 
 const basePlaybackState = {
   activeTrackId: null as string | null,
+  sourceKind: null as
+    | 'catalog'
+    | 'release-preview'
+    | 'chat-upload-preview'
+    | null,
   isPlaying: false,
   playbackStatus: 'idle' as AudioPlaybackStatus,
   lastErrorReason: null as
@@ -122,6 +127,7 @@ function setPlaying(overrides: Partial<MockPlaybackState> = {}) {
   mockPlaybackState = {
     ...basePlaybackState,
     activeTrackId: 'track-1',
+    sourceKind: 'catalog',
     isPlaying: true,
     playbackStatus: 'playing',
     currentTime: 10,
@@ -215,6 +221,7 @@ describe('PersistentAudioBar', () => {
     expect(toggleTrack).toHaveBeenCalledWith({
       id: 'track-1',
       title: 'Midnight Drive',
+      sourceKind: 'catalog',
     });
   });
 
@@ -613,6 +620,7 @@ describe('PersistentAudioBar', () => {
     expect(toggleTrack).toHaveBeenCalledWith({
       id: 'track-1',
       title: 'Midnight Drive',
+      sourceKind: 'catalog',
     });
 
     fireEvent.keyDown(globalThis, { key: 'w' });

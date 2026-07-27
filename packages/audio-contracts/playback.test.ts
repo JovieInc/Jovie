@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   AUDIO_PLAYBACK_EVENTS,
+  AUDIO_PLAYBACK_SOURCE_KINDS,
   AUDIO_PLAYBACK_STATUSES,
+  AUDIO_PREVIEW_SURFACE_REGISTRY,
   type AudioPlaybackEvent,
   type AudioPlaybackStatus,
+  getAudioPreviewSurfaceState,
   getNextAudioPlaybackStatus,
 } from './playback';
 
@@ -28,6 +31,65 @@ describe('audio playback transition registry', () => {
     expect(new Set(AUDIO_PLAYBACK_EVENTS).size).toBe(
       AUDIO_PLAYBACK_EVENTS.length
     );
+    expect(AUDIO_PLAYBACK_SOURCE_KINDS).toEqual([
+      'catalog',
+      'release-preview',
+      'chat-upload-preview',
+    ]);
+    expect(new Set(AUDIO_PLAYBACK_SOURCE_KINDS).size).toBe(
+      AUDIO_PLAYBACK_SOURCE_KINDS.length
+    );
+    expect(AUDIO_PREVIEW_SURFACE_REGISTRY).toEqual([
+      { id: 'selectable', label: 'Preview in Player', pending: false },
+      { id: 'loading', label: 'Loading in Player', pending: true },
+      { id: 'buffering', label: 'Buffering in Player', pending: true },
+      { id: 'seeking', label: 'Seeking in Player', pending: true },
+      { id: 'playing', label: 'Playing in Player', pending: false },
+      { id: 'paused', label: 'Paused in Player', pending: false },
+    ]);
+  });
+
+  it.each([
+    ['loading', false, 'loading'],
+    ['buffering', false, 'buffering'],
+    ['stalled', false, 'buffering'],
+    ['seeking', false, 'seeking'],
+    ['paused', false, 'paused'],
+    ['playing', true, 'playing'],
+  ] as const)('maps active %s playback to the canonical preview surface', (playbackStatus, isPlaying, expected) => {
+    expect(
+      getAudioPreviewSurfaceState({
+        candidateId: 'track-1',
+        candidateSourceKind: 'release-preview',
+        activeTrackId: 'track-1',
+        activeSourceKind: 'release-preview',
+        playbackStatus,
+        isPlaying,
+      }).id
+    ).toBe(expected);
+  });
+
+  it('requires both source identity fields before exposing active status', () => {
+    const base = {
+      candidateId: 'track-1',
+      candidateSourceKind: 'release-preview' as const,
+      playbackStatus: 'playing' as const,
+      isPlaying: true,
+    };
+    expect(
+      getAudioPreviewSurfaceState({
+        ...base,
+        activeTrackId: 'track-2',
+        activeSourceKind: 'release-preview',
+      }).id
+    ).toBe('selectable');
+    expect(
+      getAudioPreviewSurfaceState({
+        ...base,
+        activeTrackId: 'track-1',
+        activeSourceKind: 'chat-upload-preview',
+      }).id
+    ).toBe('selectable');
   });
 
   it('handles terminal and source lifecycle events', () => {
