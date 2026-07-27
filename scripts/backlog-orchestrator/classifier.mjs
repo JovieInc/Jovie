@@ -361,7 +361,7 @@ export function parseStoredClassification(issue) {
   );
   if (machineComments.length === 0) return null;
   const latest = machineComments.sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   )[0];
   try {
     const jsonPart = latest.body
