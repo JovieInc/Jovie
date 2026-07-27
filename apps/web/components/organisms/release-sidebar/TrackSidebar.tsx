@@ -271,7 +271,7 @@ export function TrackSidebar({
     ];
   }, [track, isSmartLinkCopied, handleCopySmartLink, smartLinkUrl]);
 
-  const playableUrl = track?.audioUrl ?? track?.previewUrl ?? null;
+  const playableUrl = track?.previewUrl ?? null;
   const isThisTrack = playbackState.activeTrackId === track?.id;
   const isPlaying = isThisTrack && playbackState.isPlaying;
   const currentTime = isThisTrack ? playbackState.currentTime : 0;

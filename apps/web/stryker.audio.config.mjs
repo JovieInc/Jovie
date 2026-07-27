@@ -18,10 +18,25 @@ const config = {
     // forwards the complete typed source into the singleton.
     'components/organisms/GlobalAudioPreviewAction.tsx:56-65',
     'components/organisms/GlobalAudioPreviewAction.tsx:68-77',
+    // JOV-4393 keeps accepted masters separate from browser playback,
+    // streams the AIFF derivative, and fails closed through every transition.
+    'lib/audio/aiff-to-wav.ts',
+    'lib/audio/playback-derivative.ts',
+    'lib/audio/jobs/playback-derivative.ts:40-68',
+    'lib/audio/jobs/playback-derivative.ts:124-133',
+    'lib/audio/jobs/playback-derivative.ts:144-213',
+    'lib/audio/jobs/playback-derivative.ts:224-265',
+    'lib/discography/adapters.ts:79-112',
+    'components/features/release/ReleaseAudioAssetPanel.tsx:274-329',
   ],
   testFiles: [
     'tests/components/organisms/release-sidebar/useTrackAudioPlayer.test.ts',
     'tests/components/organisms/GlobalAudioPreviewAction.test.tsx',
+    'lib/audio/aiff-to-wav.test.ts',
+    'lib/audio/playback-derivative.test.ts',
+    'lib/audio/jobs/playback-derivative.test.ts',
+    'lib/discography/adapters.audio-capability.test.ts',
+    'tests/components/features/release/ReleaseAudioAssetPanel.test.tsx',
   ],
   ignorePatterns: [
     '.next',
