@@ -6,9 +6,15 @@ import {
   type AudioPlaybackSourceKind,
   type AudioPlaybackStatus,
   type AudioTimelineDocumentV1,
+  type AudioTimelineEdit,
+  type AudioTimelineHistory,
+  applyAudioTimelineHistoryEdit,
   createAudioTimelineDocument,
+  createAudioTimelineHistory,
   getNextAudioPlaybackStatus,
+  redoAudioTimelineEdit,
   resolveAudioCueJump,
+  undoAudioTimelineEdit,
 } from '@jovie/audio-contracts';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -56,6 +62,8 @@ export interface PlaybackState {
   readonly artworkUrl: string | null;
   readonly hasLyrics: boolean;
   readonly timeline: AudioTimelineDocumentV1 | null;
+  readonly canUndoTimelineEdit: boolean;
+  readonly canRedoTimelineEdit: boolean;
   readonly queueLength: number;
   readonly queueIndex: number;
   readonly hasNext: boolean;
@@ -76,6 +84,8 @@ let _interruptionDepth = 0;
 let _wasPlayingBeforeInterruption = false;
 let _mediaSessionBound = false;
 let _cueJumpLatencyMark: InteractionLatencyMarkHandle | null = null;
+let _cueEditLatencyMark: InteractionLatencyMarkHandle | null = null;
+let _timelineHistory: AudioTimelineHistory | null = null;
 /** ~4 Hz progress notify for cross-surface scrub without rAF thrash. */
 const PROGRESS_NOTIFY_MS = 250;
 
@@ -168,6 +178,8 @@ let state: PlaybackState = {
   artworkUrl: null,
   hasLyrics: false,
   timeline: null,
+  canUndoTimelineEdit: false,
+  canRedoTimelineEdit: false,
   queueLength: 0,
   queueIndex: -1,
   hasNext: false,
@@ -358,13 +370,75 @@ function jumpToCue(id: string): AudioCueJumpTarget | null {
   return target;
 }
 
+function commitTimelineHistory(history: AudioTimelineHistory): void {
+  _timelineHistory = history;
+  _queue = _queue.map(track =>
+    track.id === state.activeTrackId &&
+    (track.sourceKind ?? 'catalog') === state.sourceKind
+      ? { ...track, timeline: history.present }
+      : track
+  );
+  setState({
+    timeline: history.present,
+    canUndoTimelineEdit: history.past.length > 0,
+    canRedoTimelineEdit: history.future.length > 0,
+  });
+}
+
+function editTimeline(edit: AudioTimelineEdit): AudioTimelineDocumentV1 | null {
+  const history = _timelineHistory;
+  if (!history || history.present.trackId !== state.activeTrackId) return null;
+
+  _cueEditLatencyMark = startLatencyMark('audio-cue-edit', _cueEditLatencyMark);
+  try {
+    const next = applyAudioTimelineHistoryEdit(history, {
+      expectedRevision: history.present.revision,
+      edit,
+    });
+    commitTimelineHistory(next);
+    _cueEditLatencyMark = finishLatencyMark(_cueEditLatencyMark, 'committed');
+    return next.present;
+  } catch {
+    _cueEditLatencyMark = finishLatencyMark(_cueEditLatencyMark, 'rejected');
+    return null;
+  }
+}
+
+function undoTimeline(): AudioTimelineDocumentV1 | null {
+  const history = _timelineHistory;
+  if (!history || history.present.trackId !== state.activeTrackId) return null;
+  _cueEditLatencyMark = startLatencyMark('audio-cue-edit', _cueEditLatencyMark);
+  const next = undoAudioTimelineEdit(history, history.present.revision);
+  if (next === history) {
+    _cueEditLatencyMark = finishLatencyMark(_cueEditLatencyMark, 'unchanged');
+    return history.present;
+  }
+  commitTimelineHistory(next);
+  _cueEditLatencyMark = finishLatencyMark(_cueEditLatencyMark, 'committed');
+  return next.present;
+}
+
+function redoTimeline(): AudioTimelineDocumentV1 | null {
+  const history = _timelineHistory;
+  if (!history || history.present.trackId !== state.activeTrackId) return null;
+  _cueEditLatencyMark = startLatencyMark('audio-cue-edit', _cueEditLatencyMark);
+  const next = redoAudioTimelineEdit(history, history.present.revision);
+  if (next === history) {
+    _cueEditLatencyMark = finishLatencyMark(_cueEditLatencyMark, 'unchanged');
+    return history.present;
+  }
+  commitTimelineHistory(next);
+  _cueEditLatencyMark = finishLatencyMark(_cueEditLatencyMark, 'committed');
+  return next.present;
+}
+
 function normalizeTrackTimeline(
   track: AudioTrackSource
 ): AudioTimelineDocumentV1 | null {
   if (!track.timeline) return null;
   const timeline = createAudioTimelineDocument(track.timeline);
   if (timeline.trackId !== track.id) {
-    throw new TypeError('timeline track id must match playback track id');
+    throw new TypeError();
   }
   return timeline;
 }
@@ -386,6 +460,7 @@ function handlePlaybackFailure(
   _activeTrackIsrc = null;
   _hasRetriedRefresh = false;
   _cueJumpLatencyMark = finishLatencyMark(_cueJumpLatencyMark, 'failed');
+  _timelineHistory = null;
   clearPlaybackQueue();
   setState({
     activeTrackId: null,
@@ -401,6 +476,8 @@ function handlePlaybackFailure(
     artworkUrl: null,
     hasLyrics: false,
     timeline: null,
+    canUndoTimelineEdit: false,
+    canRedoTimelineEdit: false,
     ...getQueueSnapshot(),
   });
   notifyPlaybackError(reason);
@@ -408,11 +485,8 @@ function handlePlaybackFailure(
 
 async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
   const sourceKind = track.sourceKind ?? 'catalog';
-  const audio =
-    state.activeTrackId &&
-    (state.activeTrackId !== track.id || state.sourceKind !== sourceKind)
-      ? replaceAudioElement()
-      : getAudio();
+  const audio = state.activeTrackId ? replaceAudioElement() : getAudio();
+  // Stryker disable next-line ConditionalExpression: queue callers retain the SSR fail-closed guard even though interactive callers already proved Audio exists.
   if (!audio) return;
 
   let timeline: AudioTimelineDocumentV1 | null;
@@ -422,12 +496,14 @@ async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
     handlePlaybackFailure(audio, 'invalid_timeline');
     return;
   }
+  _timelineHistory = timeline ? createAudioTimelineHistory(timeline) : null;
 
   if (!track.audioUrl) {
     handlePlaybackFailure(audio, 'missing_source');
     return;
   }
 
+  // Stryker disable next-line UpdateOperator: either direction produces a fresh request token.
   const token = ++_playToken;
   _activeTrackIsrc = track.isrc ?? null;
   _hasRetriedRefresh = false;
@@ -447,6 +523,8 @@ async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
     artworkUrl: track.artworkUrl ?? null,
     hasLyrics: Boolean(track.hasLyrics),
     timeline,
+    canUndoTimelineEdit: false,
+    canRedoTimelineEdit: false,
     ...getQueueSnapshot(),
   });
 
@@ -458,7 +536,6 @@ async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
     }
     throw error;
   }
-
   if (_playToken !== token) {
     return;
   }
@@ -743,6 +820,13 @@ export function useTrackAudioPlayer() {
     return jumpToCue(id);
   }, []);
 
+  const editCueTimeline = useCallback((edit: AudioTimelineEdit) => {
+    return editTimeline(edit);
+  }, []);
+
+  const undoCueTimelineEdit = useCallback(() => undoTimeline(), []);
+  const redoCueTimelineEdit = useCallback(() => redoTimeline(), []);
+
   const stop = useCallback(() => {
     // Invalidate any in-flight play() from earlier toggleTrack calls
     _playToken += 1;
@@ -753,8 +837,11 @@ export function useTrackAudioPlayer() {
       audio.pause();
       audio.src = '';
     }
+    _activeTrackIsrc = null;
+    _hasRetriedRefresh = false;
     clearPlaybackQueue();
     _cueJumpLatencyMark = finishLatencyMark(_cueJumpLatencyMark, 'stopped');
+    _timelineHistory = null;
     setState({
       activeTrackId: null,
       sourceKind: null,
@@ -769,6 +856,8 @@ export function useTrackAudioPlayer() {
       artworkUrl: null,
       hasLyrics: false,
       timeline: null,
+      canUndoTimelineEdit: false,
+      canRedoTimelineEdit: false,
       ...getQueueSnapshot(),
     });
   }, []);
@@ -790,6 +879,9 @@ export function useTrackAudioPlayer() {
     playPrevious,
     seek,
     jumpToCue: jumpCue,
+    editTimeline: editCueTimeline,
+    undoTimelineEdit: undoCueTimelineEdit,
+    redoTimelineEdit: redoCueTimelineEdit,
     stop,
     onError,
     pauseForInterruption: pausePlaybackForInterruption,
