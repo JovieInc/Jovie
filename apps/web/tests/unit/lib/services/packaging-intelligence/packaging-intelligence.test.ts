@@ -174,6 +174,11 @@ describe('packaging intelligence', () => {
       promise: llmOutput.promise,
       first30sHookText: 'Mistake number one is spending before you save.',
       transcriptSource: 'captions',
+      transcriptProvenance: {
+        source: 'captions',
+        provider: 'youtube-captions',
+        execution: 'network',
+      },
       modelUsed: PACKAGING_INTELLIGENCE_MODEL,
       priors: { faceEffect: 'neutral', source: '1of10' },
     });
@@ -187,6 +192,11 @@ describe('packaging intelligence', () => {
       ],
     });
     expect(provided.transcriptSource).toBe('provided');
+    expect(provided.transcriptProvenance).toMatchObject({
+      source: 'provided',
+      provider: 'user',
+      execution: 'provided',
+    });
     expect(mockFetchVideoCaptions).not.toHaveBeenCalled();
 
     mockFetchVideoCaptions.mockResolvedValueOnce([]);
@@ -200,7 +210,40 @@ describe('packaging intelligence', () => {
       { asrProvider }
     );
     expect(asr.transcriptSource).toBe('asr');
+    expect(asr.transcriptProvenance).toMatchObject({
+      source: 'speech-recognition',
+      provider: 'server-asr',
+      execution: 'network',
+    });
     expect(asr.first30sHookText).toBe('ASR transcript hook');
+  });
+
+  it('preserves provider-neutral provenance from structured ASR results', async () => {
+    mockFetchVideoCaptions.mockResolvedValueOnce([]);
+    const asrProvider = vi.fn().mockResolvedValue({
+      segments: [
+        { startSeconds: 0, durationSeconds: 3, text: 'On-device hook' },
+      ],
+      provenance: {
+        source: 'speech-recognition',
+        provider: 'apple-speech',
+        execution: 'on-device',
+        locale: 'en-US',
+      },
+    });
+
+    const result = await analyzeVideoPackaging(
+      { videoId: 'demoVideo123' },
+      { asrProvider }
+    );
+
+    expect(result.transcriptSource).toBe('asr');
+    expect(result.transcriptProvenance).toEqual({
+      source: 'speech-recognition',
+      provider: 'apple-speech',
+      execution: 'on-device',
+      locale: 'en-US',
+    });
   });
 
   it('handles missing transcript sources without throwing', async () => {
@@ -232,6 +275,11 @@ describe('packaging intelligence', () => {
     });
 
     expect(result.transcriptSource).toBe('none');
+    expect(result.transcriptProvenance).toMatchObject({
+      source: 'none',
+      provider: 'none',
+      execution: 'unavailable',
+    });
     expect(result.first30sHookText).toBe('');
   });
 });

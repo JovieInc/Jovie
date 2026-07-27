@@ -28,6 +28,9 @@ const config = {
     'lib/audio/jobs/playback-derivative.ts:224-265',
     'lib/discography/adapters.ts:79-112',
     'components/features/release/ReleaseAudioAssetPanel.tsx:274-329',
+    // JOV-4392 keeps browser transcription lifecycle transitions typed,
+    // rejects callbacks from replaced sessions, and records latency once.
+    'lib/chat/transcriber.ts',
   ],
   testFiles: [
     'tests/components/organisms/release-sidebar/useTrackAudioPlayer.test.ts',
@@ -37,6 +40,7 @@ const config = {
     'lib/audio/jobs/playback-derivative.test.ts',
     'lib/discography/adapters.audio-capability.test.ts',
     'tests/components/features/release/ReleaseAudioAssetPanel.test.tsx',
+    'lib/chat/transcriber.test.ts',
   ],
   ignorePatterns: [
     '.next',

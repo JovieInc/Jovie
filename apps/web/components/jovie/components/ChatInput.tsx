@@ -147,7 +147,7 @@ function pickerKindArticle(
 
 function dictationErrorMessage(code: TranscriberErrorCode): string {
   switch (code) {
-    case 'not-allowed':
+    case 'permission-denied':
     case 'service-not-allowed':
     case 'audio-capture':
       return 'Microphone access was denied. You can keep typing your message.';
