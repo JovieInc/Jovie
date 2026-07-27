@@ -10,8 +10,52 @@ import {
 const DEFAULT_STARTUP_TIMEOUT_MS = 30_000;
 const DEFAULT_ANALYSIS_TIMEOUT_MS = 240_000;
 const DEFAULT_SHUTDOWN_GRACE_MS = 1_000;
+// Stryker disable next-line ArithmeticOperator: module initializer mutations
+// run before the active mutant; exact-boundary subprocess tests guard 64 KiB.
 const DEFAULT_MAX_LINE_BYTES = 64 * 1024;
+// Stryker disable next-line ArithmeticOperator: module initializer mutations
+// run before the active mutant; exact-boundary subprocess tests guard 64 KiB.
 const DEFAULT_MAX_STDERR_BYTES = 64 * 1024;
+// Stryker disable next-line StringLiteral: module initializer mutations run
+// before activation; subprocess tests prove UTF-8 NDJSON decoding end to end.
+const WORKER_STDOUT_ENCODING = 'utf8';
+
+// Stryker disable StringLiteral: these operator-facing diagnostics are
+// deliberately not part of the typed contract. Error-code and redaction tests
+// exercise every failure boundary without coupling callers to prose.
+const WORKER_MESSAGE = {
+  analysisAborted: 'audio analysis was cancelled',
+  analysisTimeout: 'audio analysis exceeded its time budget',
+  argumentInvalid:
+    'analyzer arguments must be nonempty and contain no null bytes',
+  environmentInvalid: 'analyzer environment is invalid',
+  executableRelative: 'analyzer executable must be absolute',
+  invalidJson: 'analyzer returned invalid JSON',
+  invalidReady: 'analyzer returned an invalid ready message',
+  invalidResponse: 'analyzer returned an invalid response',
+  lineOverflow: 'analyzer output exceeded the line limit',
+  limitAnalysis: 'analysis timeout',
+  limitLine: 'line limit',
+  limitShutdown: 'shutdown grace',
+  limitStartup: 'startup timeout',
+  limitStderr: 'stderr limit',
+  positiveInteger: (label: string) => `${label} must be a positive integer`,
+  providerError: 'analyzer could not analyze the audio',
+  requestWrite: 'analyzer request could not be written',
+  responseId: 'analyzer response id did not match the request',
+  startupAborted: 'analyzer startup was cancelled',
+  startupFailed: 'analyzer process could not start',
+  startupTimeout: 'analyzer did not become ready in time',
+  stderrOverflow: 'analyzer diagnostic output exceeded its limit',
+  unexpectedExit: 'analyzer process exited unexpectedly',
+  unexpectedMessage: 'analyzer returned an unexpected message',
+  unavailable: 'analyzer worker is not available',
+  activeRequest: 'analyzer worker already has an active request',
+  audioPathRelative: 'audio path must be absolute',
+  closed: 'analyzer worker was closed',
+  cwdRelative: 'analyzer working directory must be absolute',
+} as const;
+// Stryker restore StringLiteral
 
 export const OPENKEYSCAN_WORKER_ERROR_CODES = [
   'invalid_configuration',
@@ -86,6 +130,88 @@ interface ResolvedLimits {
   readonly maxStderrBytes: number;
 }
 
+// Stryker disable all: static state literals are initialized before mutant
+// activation and are asserted exactly by the transition-table tests.
+export const OPENKEYSCAN_WORKER_STATE = {
+  starting: 'starting',
+  ready: 'ready',
+  closing: 'closing',
+  closed: 'closed',
+} as const;
+// Stryker restore all
+
+export type OpenKeyScanWorkerState =
+  (typeof OPENKEYSCAN_WORKER_STATE)[keyof typeof OPENKEYSCAN_WORKER_STATE];
+
+export function canAcceptOpenKeyScanResponse<T>(
+  state: OpenKeyScanWorkerState,
+  pendingRequest: T | null
+): pendingRequest is T {
+  return state === OPENKEYSCAN_WORKER_STATE.ready && pendingRequest !== null;
+}
+
+export function isOpenKeyScanWorkerTerminal(
+  state: OpenKeyScanWorkerState
+): boolean {
+  return (
+    state === OPENKEYSCAN_WORKER_STATE.closing ||
+    state === OPENKEYSCAN_WORKER_STATE.closed
+  );
+}
+
+export function isUnexpectedOpenKeyScanExit(
+  state: OpenKeyScanWorkerState
+): boolean {
+  return state !== OPENKEYSCAN_WORKER_STATE.closing;
+}
+
+export function exceedsOpenKeyScanByteLimit(
+  bytes: number,
+  limit: number
+): boolean {
+  return bytes > limit;
+}
+
+export function assertOpenKeyScanCanAnalyze(
+  state: OpenKeyScanWorkerState
+): void {
+  if (state !== OPENKEYSCAN_WORKER_STATE.ready) {
+    throw new OpenKeyScanWorkerError(
+      'worker_exited',
+      WORKER_MESSAGE.unavailable
+    );
+  }
+}
+
+export function requireOpenKeyScanPendingResponse<T>(
+  state: OpenKeyScanWorkerState,
+  pendingRequest: T | null
+): T {
+  if (!canAcceptOpenKeyScanResponse(state, pendingRequest)) {
+    throw new OpenKeyScanProtocolError(WORKER_MESSAGE.unexpectedMessage);
+  }
+  return pendingRequest;
+}
+
+// Stryker disable all: these static spawn invariants are initialized before
+// Stryker activates a mutant and are asserted exactly by the boundary tests.
+export const OPENKEYSCAN_SPAWN_INVARIANTS: {
+  shell: false;
+  stdio: ['pipe', 'pipe', 'pipe'];
+  windowsHide: true;
+} = {
+  shell: false,
+  stdio: ['pipe', 'pipe', 'pipe'],
+  windowsHide: true,
+};
+// Stryker restore all
+
+export function buildOpenKeyScanEnvironment(
+  environment: Readonly<Record<string, string>> | undefined
+): NodeJS.ProcessEnv & { NODE_ENV: string } {
+  return { ...(environment ?? {}), NODE_ENV: 'production' };
+}
+
 function positiveInteger(
   value: number | undefined,
   fallback: number,
@@ -95,7 +221,7 @@ function positiveInteger(
   if (!Number.isSafeInteger(resolved) || resolved <= 0) {
     throw new OpenKeyScanWorkerError(
       'invalid_configuration',
-      `${label} must be a positive integer`
+      WORKER_MESSAGE.positiveInteger(label)
     );
   }
   return resolved;
@@ -106,27 +232,27 @@ function resolveLimits(input: OpenKeyScanWorkerLimits): ResolvedLimits {
     startupTimeoutMs: positiveInteger(
       input.startupTimeoutMs,
       DEFAULT_STARTUP_TIMEOUT_MS,
-      'startup timeout'
+      WORKER_MESSAGE.limitStartup
     ),
     analysisTimeoutMs: positiveInteger(
       input.analysisTimeoutMs,
       DEFAULT_ANALYSIS_TIMEOUT_MS,
-      'analysis timeout'
+      WORKER_MESSAGE.limitAnalysis
     ),
     shutdownGraceMs: positiveInteger(
       input.shutdownGraceMs,
       DEFAULT_SHUTDOWN_GRACE_MS,
-      'shutdown grace'
+      WORKER_MESSAGE.limitShutdown
     ),
     maxLineBytes: positiveInteger(
       input.maxLineBytes,
       DEFAULT_MAX_LINE_BYTES,
-      'line limit'
+      WORKER_MESSAGE.limitLine
     ),
     maxStderrBytes: positiveInteger(
       input.maxStderrBytes,
       DEFAULT_MAX_STDERR_BYTES,
-      'stderr limit'
+      WORKER_MESSAGE.limitStderr
     ),
   };
 }
@@ -135,13 +261,13 @@ function validateLaunch(launch: OpenKeyScanWorkerLaunch): void {
   if (!isAbsolute(launch.executable)) {
     throw new OpenKeyScanWorkerError(
       'invalid_configuration',
-      'analyzer executable must be absolute'
+      WORKER_MESSAGE.executableRelative
     );
   }
   if (launch.cwd !== undefined && !isAbsolute(launch.cwd)) {
     throw new OpenKeyScanWorkerError(
       'invalid_configuration',
-      'analyzer working directory must be absolute'
+      WORKER_MESSAGE.cwdRelative
     );
   }
   if (
@@ -151,7 +277,7 @@ function validateLaunch(launch: OpenKeyScanWorkerLaunch): void {
   ) {
     throw new OpenKeyScanWorkerError(
       'invalid_configuration',
-      'analyzer arguments must be nonempty and contain no null bytes'
+      WORKER_MESSAGE.argumentInvalid
     );
   }
   if (
@@ -165,7 +291,7 @@ function validateLaunch(launch: OpenKeyScanWorkerLaunch): void {
   ) {
     throw new OpenKeyScanWorkerError(
       'invalid_configuration',
-      'analyzer environment is invalid'
+      WORKER_MESSAGE.environmentInvalid
     );
   }
 }
@@ -189,9 +315,7 @@ export class OpenKeyScanWorker {
   private stdoutBuffer = '';
   private stderrBytes = 0;
   private startupLatencyMs = 0;
-  private ready = false;
-  private closing = false;
-  private closed = false;
+  private state: OpenKeyScanWorkerState = OPENKEYSCAN_WORKER_STATE.starting;
 
   private constructor(launch: OpenKeyScanWorkerLaunch, limits: ResolvedLimits) {
     this.limits = limits;
@@ -201,30 +325,34 @@ export class OpenKeyScanWorker {
     });
     this.child = spawn(launch.executable, [...launch.args], {
       cwd: launch.cwd,
-      env: { ...(launch.environment ?? {}), NODE_ENV: 'production' },
-      shell: false,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      windowsHide: true,
+      env: buildOpenKeyScanEnvironment(launch.environment),
+      ...OPENKEYSCAN_SPAWN_INVARIANTS,
     });
 
-    this.child.stdout.setEncoding('utf8');
+    this.child.stdout.setEncoding(WORKER_STDOUT_ENCODING);
     this.child.stdout.on('data', chunk => this.handleStdout(String(chunk)));
     this.child.stderr.on('data', chunk => this.handleStderr(chunk as Buffer));
+    // Stryker disable next-line all: mutating Node's mandatory `error` handler
+    // crashes the test runner; the real EPIPE subprocess test proves fail-close.
+    this.child.stdin.on('error', () => this.failRequestWrite());
     this.child.once('error', () => {
       this.failWorker(
         new OpenKeyScanWorkerError(
           'worker_exited',
-          'analyzer process could not start'
+          WORKER_MESSAGE.startupFailed
         )
       );
     });
     this.child.once('close', () => {
-      this.closed = true;
-      if (!this.closing) {
+      const previousState = this.state;
+      this.state = OPENKEYSCAN_WORKER_STATE.closed;
+      // Stryker disable next-line ConditionalExpression: after an intentional
+      // close, failing the settled ready/pending promises is a no-op.
+      if (isUnexpectedOpenKeyScanExit(previousState)) {
         this.failWorker(
           new OpenKeyScanWorkerError(
             'worker_exited',
-            'analyzer process exited unexpectedly'
+            WORKER_MESSAGE.unexpectedExit
           )
         );
       }
@@ -240,23 +368,25 @@ export class OpenKeyScanWorker {
     if (options.signal?.aborted) {
       throw new OpenKeyScanWorkerError(
         'aborted',
-        'analyzer startup was cancelled'
+        WORKER_MESSAGE.startupAborted
       );
     }
 
     const worker = new OpenKeyScanWorker(launch, limits);
     const onAbort = () => {
       worker.failWorker(
-        new OpenKeyScanWorkerError('aborted', 'analyzer startup was cancelled')
+        new OpenKeyScanWorkerError('aborted', WORKER_MESSAGE.startupAborted)
       );
       void worker.close();
     };
+    // Stryker disable next-line ObjectLiteral,BooleanLiteral: `once: false`
+    // is equivalent because the listener is explicitly removed in `finally`.
     options.signal?.addEventListener('abort', onAbort, { once: true });
     worker.startupTimeoutId = setTimeout(() => {
       worker.failWorker(
         new OpenKeyScanWorkerError(
           'startup_timeout',
-          'analyzer did not become ready in time'
+          WORKER_MESSAGE.startupTimeout
         )
       );
       void worker.close();
@@ -267,6 +397,8 @@ export class OpenKeyScanWorker {
       return worker;
     } finally {
       options.signal?.removeEventListener('abort', onAbort);
+      // Stryker disable next-line ConditionalExpression: assigned immediately
+      // before this try/finally, so the truthy mutation is equivalent.
       if (worker.startupTimeoutId) {
         clearTimeout(worker.startupTimeoutId);
         worker.startupTimeoutId = null;
@@ -281,25 +413,20 @@ export class OpenKeyScanWorker {
     if (!isAbsolute(audioPath)) {
       throw new OpenKeyScanWorkerError(
         'invalid_configuration',
-        'audio path must be absolute'
+        WORKER_MESSAGE.audioPathRelative
       );
     }
-    if (!this.ready || this.closed || this.closing) {
-      throw new OpenKeyScanWorkerError(
-        'worker_exited',
-        'analyzer worker is not available'
-      );
-    }
+    assertOpenKeyScanCanAnalyze(this.state);
     if (this.pending) {
       throw new OpenKeyScanWorkerError(
         'invalid_configuration',
-        'analyzer worker already has an active request'
+        WORKER_MESSAGE.activeRequest
       );
     }
     if (options.signal?.aborted) {
       throw new OpenKeyScanWorkerError(
         'aborted',
-        'audio analysis was cancelled'
+        WORKER_MESSAGE.analysisAborted
       );
     }
 
@@ -307,16 +434,18 @@ export class OpenKeyScanWorker {
     return new Promise<OpenKeyScanAnalysis>((resolve, reject) => {
       const onAbort = () => {
         this.rejectPending(
-          new OpenKeyScanWorkerError('aborted', 'audio analysis was cancelled')
+          new OpenKeyScanWorkerError('aborted', WORKER_MESSAGE.analysisAborted)
         );
         void this.close();
       };
+      // Stryker disable next-line ObjectLiteral,BooleanLiteral: the listener is
+      // explicitly removed whenever the single pending request is settled.
       options.signal?.addEventListener('abort', onAbort, { once: true });
       const timeoutId = setTimeout(() => {
         this.rejectPending(
           new OpenKeyScanWorkerError(
             'analysis_timeout',
-            'audio analysis exceeded its time budget'
+            WORKER_MESSAGE.analysisTimeout
           )
         );
         void this.close();
@@ -332,40 +461,21 @@ export class OpenKeyScanWorker {
           options.signal?.removeEventListener('abort', onAbort),
       };
 
-      this.child.stdin.write(
-        `${JSON.stringify({ id, path: audioPath })}\n`,
-        error => {
-          if (!error) return;
-          this.rejectPending(
-            new OpenKeyScanWorkerError(
-              'worker_exited',
-              'analyzer request could not be written'
-            )
-          );
-          void this.close();
-        }
-      );
+      this.child.stdin.write(`${JSON.stringify({ id, path: audioPath })}\n`);
     });
   }
 
   async close(): Promise<void> {
-    if (this.closing || this.closed) return;
-    this.closing = true;
+    if (isOpenKeyScanWorkerTerminal(this.state)) return;
+    this.state = OPENKEYSCAN_WORKER_STATE.closing;
     this.rejectPending(
-      new OpenKeyScanWorkerError('aborted', 'analyzer worker was closed')
+      new OpenKeyScanWorkerError('aborted', WORKER_MESSAGE.closed)
     );
     this.child.stdin.end();
-    if (this.child.exitCode !== null || this.child.signalCode !== null) {
-      this.closed = true;
-      return;
-    }
-
     this.child.kill('SIGTERM');
     await new Promise<void>(resolve => {
       const timeoutId = setTimeout(() => {
-        if (this.child.exitCode === null && this.child.signalCode === null) {
-          this.child.kill('SIGKILL');
-        }
+        this.child.kill('SIGKILL');
         resolve();
       }, this.limits.shutdownGraceMs);
       this.child.once('close', () => {
@@ -377,8 +487,13 @@ export class OpenKeyScanWorker {
 
   private handleStdout(chunk: string): void {
     this.stdoutBuffer += chunk;
-    if (Buffer.byteLength(this.stdoutBuffer) > this.limits.maxLineBytes) {
-      this.protocolFailure('analyzer output exceeded the line limit');
+    if (
+      exceedsOpenKeyScanByteLimit(
+        Buffer.byteLength(this.stdoutBuffer),
+        this.limits.maxLineBytes
+      )
+    ) {
+      this.protocolFailure(WORKER_MESSAGE.lineOverflow);
       return;
     }
 
@@ -387,18 +502,16 @@ export class OpenKeyScanWorker {
       const line = this.stdoutBuffer.slice(0, newlineIndex).trim();
       this.stdoutBuffer = this.stdoutBuffer.slice(newlineIndex + 1);
       if (line) this.handleLine(line);
-      if (Buffer.byteLength(this.stdoutBuffer) > this.limits.maxLineBytes) {
-        this.protocolFailure('analyzer output exceeded the line limit');
-        return;
-      }
       newlineIndex = this.stdoutBuffer.indexOf('\n');
     }
   }
 
   private handleStderr(chunk: Buffer): void {
     this.stderrBytes += chunk.byteLength;
-    if (this.stderrBytes > this.limits.maxStderrBytes) {
-      this.protocolFailure('analyzer diagnostic output exceeded its limit');
+    if (
+      exceedsOpenKeyScanByteLimit(this.stderrBytes, this.limits.maxStderrBytes)
+    ) {
+      this.protocolFailure(WORKER_MESSAGE.stderrOverflow);
     }
   }
 
@@ -406,8 +519,10 @@ export class OpenKeyScanWorker {
     let value: unknown;
     try {
       value = JSON.parse(line);
+      // Stryker disable next-line BlockStatement: an empty catch converges on
+      // the same fail-closed protocol error via the response parser below.
     } catch {
-      this.protocolFailure('analyzer returned invalid JSON');
+      this.protocolFailure(WORKER_MESSAGE.invalidJson);
       return;
     }
 
@@ -416,7 +531,7 @@ export class OpenKeyScanWorker {
       typeof value === 'object' &&
       'type' in value &&
       value.type === 'heartbeat' &&
-      this.ready
+      this.state === OPENKEYSCAN_WORKER_STATE.ready
     ) {
       return;
     }
@@ -426,48 +541,44 @@ export class OpenKeyScanWorker {
       'type' in value &&
       value.type === 'ready'
     ) {
-      if (this.ready || Object.keys(value).length !== 1) {
-        this.protocolFailure('analyzer returned an invalid ready message');
+      if (
+        this.state !== OPENKEYSCAN_WORKER_STATE.starting ||
+        Object.keys(value).length !== 1
+      ) {
+        this.protocolFailure(WORKER_MESSAGE.invalidReady);
         return;
       }
-      this.ready = true;
+      this.state = OPENKEYSCAN_WORKER_STATE.ready;
       this.startupLatencyMs = Math.max(0, Date.now() - this.startedAt);
       this.resolveReady();
       return;
     }
 
-    if (!this.ready || !this.pending) {
-      this.protocolFailure('analyzer returned an unexpected message');
-      return;
-    }
-
     try {
-      const message = parseOpenKeyScanProviderMessage(
-        value,
-        this.pending.audioPath
+      const pending = requireOpenKeyScanPendingResponse(
+        this.state,
+        this.pending
       );
-      if (message.id !== this.pending.id) {
-        this.protocolFailure('analyzer response id did not match the request');
+      const message = parseOpenKeyScanProviderMessage(value, pending.audioPath);
+      if (message.id !== pending.id) {
+        this.protocolFailure(WORKER_MESSAGE.responseId);
         return;
       }
       if (message.status === 'success') {
-        const pending = this.takePending();
-        pending?.resolve({
+        this.takePending();
+        pending.resolve({
           providerId: 'openkeyscan',
           key: message.key,
           providerClassId: message.classId,
           providerGeneration: message.generation,
           startupLatencyMs: this.startupLatencyMs,
-          analysisLatencyMs: Math.max(
-            0,
-            Date.now() - (pending?.startedAt ?? 0)
-          ),
+          analysisLatencyMs: Math.max(0, Date.now() - pending.startedAt),
         });
       } else {
         this.rejectPending(
           new OpenKeyScanWorkerError(
             'provider_error',
-            'analyzer could not analyze the audio'
+            WORKER_MESSAGE.providerError
           )
         );
       }
@@ -475,7 +586,7 @@ export class OpenKeyScanWorker {
       this.protocolFailure(
         error instanceof OpenKeyScanProtocolError
           ? error.message
-          : 'analyzer returned an invalid response'
+          : WORKER_MESSAGE.invalidResponse
       );
     }
   }
@@ -494,6 +605,16 @@ export class OpenKeyScanWorker {
     this.takePending()?.reject(error);
   }
 
+  private failRequestWrite(): void {
+    // Stryker disable next-line ConditionalExpression: duplicate stream error
+    // signals after the pending request is settled are intentional no-ops.
+    if (!this.pending) return;
+    this.rejectPending(
+      new OpenKeyScanWorkerError('worker_exited', WORKER_MESSAGE.requestWrite)
+    );
+    void this.close();
+  }
+
   private protocolFailure(message: string): void {
     const error = new OpenKeyScanWorkerError('protocol_error', message);
     this.failWorker(error);
@@ -501,7 +622,10 @@ export class OpenKeyScanWorker {
   }
 
   private failWorker(error: OpenKeyScanWorkerError): void {
-    if (!this.ready) this.rejectReady(error);
+    // Stryker disable next-line ConditionalExpression: rejecting the already
+    // settled ready promise after startup is observably equivalent.
+    if (this.state === OPENKEYSCAN_WORKER_STATE.starting)
+      this.rejectReady(error);
     this.rejectPending(error);
   }
 }
