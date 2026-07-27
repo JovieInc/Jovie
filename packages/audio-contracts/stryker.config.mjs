@@ -11,6 +11,7 @@ const config = {
   reporters: ['progress', 'clear-text', 'json'],
   mutate: [
     'index.ts',
+    'capabilities.ts',
     'units.ts',
     'analysis.ts',
     'beat-grid.ts',
@@ -21,6 +22,7 @@ const config = {
   ],
   testFiles: [
     'index.test.ts',
+    'capabilities.test.ts',
     'analysis.test.ts',
     'beat-grid.test.ts',
     'lyrics.test.ts',

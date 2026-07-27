@@ -10,7 +10,6 @@ export type {
   AudioFileDescriptor,
   AudioFormatDefinition,
   AudioFormatId,
-  AudioPlatform,
   AudioUploadSurface,
   Bpm,
   Milliseconds,

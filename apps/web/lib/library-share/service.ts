@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { BASE_URL } from '@/constants/app';
+import { resolveRecordingPlayback } from '@/lib/audio/playback-derivative';
 import { db } from '@/lib/db';
 import {
   discogRecordings,
@@ -56,6 +57,8 @@ async function loadDropAssets(
       releaseMetadata: discogReleases.metadata,
       previewUrl: discogRecordings.previewUrl,
       audioUrl: discogRecordings.audioUrl,
+      audioFormat: discogRecordings.audioFormat,
+      recordingMetadata: discogRecordings.metadata,
       recordingLyrics: discogRecordings.lyrics,
       slug: discogReleases.slug,
       artistName: creatorProfiles.displayName,
@@ -85,6 +88,12 @@ async function loadDropAssets(
     .orderBy(asc(libraryShareDropItems.position));
 
   return rows.map(row => {
+    const playback = resolveRecordingPlayback({
+      audioFormat: row.audioFormat,
+      audioUrl: row.audioUrl,
+      previewUrl: row.previewUrl,
+      metadata: row.recordingMetadata,
+    });
     const metadataLyrics = (
       row.releaseMetadata as Record<string, unknown> | null
     )?.lyrics;
@@ -99,7 +108,9 @@ async function loadDropAssets(
       title: row.title,
       artistName: row.artistName?.trim() || 'Unknown Artist',
       artworkUrl: normalizeHttpUrl(row.artworkUrl),
-      previewUrl: normalizeHttpUrl(row.previewUrl ?? row.audioUrl),
+      previewUrl: normalizeHttpUrl(
+        playback.status === 'ready' ? playback.url : null
+      ),
       lyrics: row.includeLyrics ? lyrics : null,
       releaseType: row.releaseType,
       releaseDate: row.releaseDate?.toISOString() ?? null,

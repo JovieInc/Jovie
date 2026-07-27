@@ -6,17 +6,26 @@
  * the catalog is missing audio.
  */
 
-import { and, eq } from 'drizzle-orm';
+import {
+  type AudioPlaybackDerivative,
+  getAudioCapability,
+  getAudioFormat,
+} from '@jovie/audio-contracts';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ALLOWED_AUDIO_MIME_TYPES } from '@/lib/audio/constants';
+import {
+  nextAudioDerivativeGeneration,
+  parseAudioPlaybackDerivative,
+} from '@/lib/audio/playback-derivative';
 import { resolvePrimaryRecordingForRelease } from '@/lib/audio/resolve-release-recording';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
 import { createSmartLinkContentTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { discogRecordings } from '@/lib/db/schema/content';
+import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
@@ -44,8 +53,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { releaseId, blobUrl, fileMimeType } = parsed.data;
-    if (!ALLOWED_AUDIO_MIME_TYPES.has(fileMimeType)) {
+    const { releaseId, blobUrl, fileMimeType, fileName } = parsed.data;
+    const format = getAudioFormat({ name: fileName, type: fileMimeType });
+    if (!format) {
       return NextResponse.json(
         { error: 'Unsupported audio file type' },
         { status: 400, headers: NO_STORE_HEADERS }
@@ -84,20 +94,77 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await db
-      .update(discogRecordings)
-      .set({
-        previewUrl: blobUrl,
-        audioUrl: blobUrl,
-        audioFormat: fileMimeType,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(discogRecordings.id, recording.recordingId),
-          eq(discogRecordings.creatorProfileId, profile.id)
-        )
-      );
+    const playbackCapability = getAudioCapability(
+      format.id,
+      'web_chromium',
+      'nativePlayback'
+    );
+    const now = new Date();
+    const generation = nextAudioDerivativeGeneration(recording.metadata);
+    const derivative: AudioPlaybackDerivative | null =
+      playbackCapability === 'derivative_required'
+        ? {
+            status: 'pending',
+            generation,
+            sourceFormatId: format.id,
+            requestedAt: now.toISOString(),
+          }
+        : null;
+    const previousDerivative = parseAudioPlaybackDerivative(recording.metadata);
+    const metadataDerivative: AudioPlaybackDerivative | null =
+      derivative ??
+      (previousDerivative &&
+      ['pending', 'retrying'].includes(previousDerivative.status)
+        ? {
+            status: 'superseded',
+            generation: previousDerivative.generation,
+            sourceFormatId: previousDerivative.sourceFormatId,
+            supersededAt: now.toISOString(),
+          }
+        : null);
+    const previewUrl = playbackCapability === 'direct' ? blobUrl : null;
+
+    await db.transaction(async tx => {
+      await tx
+        .update(discogRecordings)
+        .set({
+          previewUrl,
+          audioUrl: blobUrl,
+          audioFormat: format.canonicalMimeType,
+          ...(metadataDerivative
+            ? {
+                metadata: drizzleSql`jsonb_set(
+                  coalesce(${discogRecordings.metadata}, '{}'::jsonb),
+                  '{audioPlaybackDerivative}',
+                  ${JSON.stringify(metadataDerivative)}::jsonb,
+                  true
+                )`,
+              }
+            : {}),
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(discogRecordings.id, recording.recordingId),
+            eq(discogRecordings.creatorProfileId, profile.id)
+          )
+        );
+
+      if (derivative) {
+        await tx.insert(ingestionJobs).values({
+          jobType: 'audio_playback_derivative',
+          payload: {
+            recordingId: recording.recordingId,
+            creatorProfileId: profile.id,
+            formatId: format.id,
+            generation,
+          },
+          priority: -10,
+          maxAttempts: 3,
+          dedupKey: `audio_playback_derivative:${recording.recordingId}:${generation}`,
+        });
+      }
+    });
 
     revalidateTag(`releases:${clerkUserId}:${profile.id}`, 'max');
     revalidateTag(createSmartLinkContentTag(profile.id), 'max');
@@ -105,7 +172,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        previewUrl: blobUrl,
+        previewUrl,
+        hasAudioMaster: true,
+        playbackDerivative: derivative,
         recordingId: recording.recordingId,
       },
       { status: 200, headers: NO_STORE_HEADERS }

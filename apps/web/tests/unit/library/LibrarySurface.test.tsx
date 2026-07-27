@@ -910,7 +910,7 @@ describe('LibrarySurface', () => {
     });
   });
 
-  it('renders a right-rail audio dropzone when a release is missing audio', () => {
+  it('renders a right-rail audio dropzone after checking for a missing audio master', async () => {
     renderLibrary([
       buildAsset({
         previewUrl: null,
@@ -920,7 +920,9 @@ describe('LibrarySurface', () => {
 
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
 
-    expect(screen.getByTestId('library-audio-dropzone')).toBeInTheDocument();
+    expect(
+      await screen.findByTestId('library-audio-dropzone')
+    ).toBeInTheDocument();
     expect(
       screen.getByLabelText('Upload audio for Take Me Over')
     ).toHaveAttribute('accept', expect.stringContaining('audio/mpeg'));
