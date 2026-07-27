@@ -27,15 +27,15 @@ export const HOMEPAGE_LAUNCH_COPY = {
       'Jovie is the AI artist workspace that surfaces opportunities in your catalog — presaves, captures, pitches — and helps you ship the next one.',
   },
   hero: {
-    headline: 'Your catalog has untapped potential.',
-    subhead: 'Jovie finds it.',
-    lede: 'Drive streams. Capture fans. Get paid.',
+    headline: 'Jovie helps you move your music forward.',
+    subhead:
+      'It uses your catalog, audience, and artist presence to surface the one action most likely to pay off.',
     primaryCta: {
       ...HOMEPAGE_FRONT_DOOR_CTA.primary,
       label: 'Get started',
     },
     secondaryCta: {
-      label: 'See a live profile',
+      label: 'See a live artist profile',
       href: APP_ROUTES.ARTIST_PROFILES,
     },
   },

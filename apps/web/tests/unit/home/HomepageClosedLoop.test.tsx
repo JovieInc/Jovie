@@ -10,44 +10,39 @@ const homeCss = readFileSync(
 );
 
 describe('HomepageClosedLoop', () => {
-  it('renders one ordered, semantic five-step story', () => {
+  it('renders one ordered, semantic three-step story', () => {
     render(<HomepageClosedLoop />);
 
     expect(screen.getByTestId('homepage-closed-loop')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: 'Every release makes the next move clearer.',
+        name: 'All your music working while you sleep',
       })
     ).toBeInTheDocument();
     expect(screen.getByRole('list')).toHaveAttribute(
       'aria-label',
-      'The Jovie Closed Loop'
+      'How It Works'
     );
-    expect(screen.getAllByTestId('homepage-closed-loop-step')).toHaveLength(5);
+    expect(screen.getAllByTestId('homepage-closed-loop-step')).toHaveLength(3);
     expect(
       screen.getAllByRole('listitem').map(step => step.textContent)
     ).toEqual([
-      expect.stringContaining('Release'),
-      expect.stringContaining('Capture'),
-      expect.stringContaining('Route'),
-      expect.stringContaining('Learn'),
-      expect.stringContaining('Next Action'),
+      expect.stringContaining('Connect your music'),
+      expect.stringContaining('Jovie keeps watch'),
+      expect.stringContaining('Choose what ships'),
     ]);
   });
 
-  it('keeps one static currentColor loop visual and no interactive state', () => {
+  it('uses one static product screenshot and no interactive state', () => {
     const { container } = render(<HomepageClosedLoop />);
-    const visual = screen.getByTestId('homepage-closed-loop-visual');
 
-    expect(visual).toHaveAttribute('aria-hidden', 'true');
-    expect(container.querySelectorAll('svg')).toHaveLength(1);
     expect(
-      container.querySelectorAll('svg [stroke="currentColor"]')
-    ).not.toHaveLength(0);
-    expect(
-      container.querySelectorAll('svg [fill^="#"], svg [stroke^="#"]')
-    ).toHaveLength(0);
+      screen.getByRole('img', {
+        name: 'Jovie catalog workspace showing an artist release library',
+      })
+    ).toBeInTheDocument();
+    expect(container.querySelectorAll('svg')).toHaveLength(0);
     expect(container.querySelectorAll('button, input, a')).toHaveLength(0);
     expect(container.querySelector('style')).toBeNull();
   });
@@ -61,9 +56,7 @@ describe('HomepageClosedLoop', () => {
     expect(
       container.querySelector('.homepage-closed-loop-sequence')
     ).toBeTruthy();
-    expect(
-      container.querySelector('.homepage-closed-loop-visual')
-    ).toBeTruthy();
+    expect(container.querySelector('.homepage-closed-loop-proof')).toBeTruthy();
   });
 
   it('keeps the closed-loop label on a WCAG-readable text token', () => {

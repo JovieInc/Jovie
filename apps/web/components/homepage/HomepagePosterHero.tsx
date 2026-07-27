@@ -3,6 +3,9 @@ import Link from 'next/link';
 import type { ElementType, ReactNode } from 'react';
 import { HomepageCtaPendingLabel } from './HomepageCtaPendingLabel';
 
+const CTA_PRESS_CLASS =
+  'active:scale-[0.98] motion-reduce:active:scale-100 motion-reduce:transition-none';
+
 export interface HomepagePosterHeroCta {
   readonly label: ReactNode;
   readonly href: string;
@@ -57,7 +60,13 @@ export function HomepagePosterHero({
         <p className='homepage-poster-hero__subtitle'>{subtitle}</p>
         {lede ? <p className='homepage-poster-hero__lede'>{lede}</p> : null}
         <div className='homepage-poster-hero__actions'>
-          <Button asChild size='md' variant='primary'>
+          <Button
+            asChild
+            static
+            size='md'
+            variant='primary'
+            className={CTA_PRESS_CLASS}
+          >
             <LinkComponent
               href={primaryCta.href}
               prefetch={primaryCta.prefetch}
@@ -71,7 +80,13 @@ export function HomepagePosterHero({
             </LinkComponent>
           </Button>
           {secondaryCta ? (
-            <Button asChild size='md' variant='secondary'>
+            <Button
+              asChild
+              static
+              size='md'
+              variant='tertiary'
+              className={CTA_PRESS_CLASS}
+            >
               <LinkComponent
                 href={secondaryCta.href}
                 prefetch={secondaryCta.prefetch}

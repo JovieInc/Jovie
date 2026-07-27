@@ -1,94 +1,38 @@
-'use client';
-
-import { Button } from '@jovie/ui/atoms/button';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
-import type { HomepageMeetJovieCards } from './HomepageMeetJovie';
+import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
+import type { HomepageArtistProfileCards } from './HomepageArtistProfiles';
 
-const GAP_PX = 24;
-
-export function MeetJovieCarousel({
+export function ArtistProfileCardRow({
   cards,
-}: Readonly<{ cards: HomepageMeetJovieCards }>) {
-  const trackRef = useRef<HTMLUListElement>(null);
-  const [atStart, setAtStart] = useState(true);
-  const [atEnd, setAtEnd] = useState(false);
-  const prefersReducedMotion = useReducedMotion();
-
-  const updateEnds = useCallback(() => {
-    const track = trackRef.current;
-    if (!track) return;
-    setAtStart(track.scrollLeft <= 1);
-    setAtEnd(track.scrollLeft + track.clientWidth >= track.scrollWidth - 1);
-  }, []);
-
-  useEffect(() => {
-    updateEnds();
-  }, [updateEnds]);
-
-  const scrollByCard = useCallback(
-    (direction: 1 | -1) => {
-      const track = trackRef.current;
-      if (!track) return;
-      const card = track.querySelector('li');
-      const step = card
-        ? card.getBoundingClientRect().width + GAP_PX
-        : track.clientWidth;
-      track.scrollBy({
-        left: direction * step,
-        behavior: prefersReducedMotion ? 'auto' : 'smooth',
-      });
-    },
-    [prefersReducedMotion]
-  );
-
+}: Readonly<{ cards: HomepageArtistProfileCards }>) {
   return (
-    <div className='homepage-meet-jovie__carousel'>
-      <div className='homepage-meet-jovie__controls'>
-        <Button
-          aria-label='Previous Outcomes'
-          disabled={atStart}
-          onClick={() => scrollByCard(-1)}
-          size='sm'
-          variant='secondary'
-        >
-          <ArrowLeft aria-hidden='true' size={16} />
-        </Button>
-        <Button
-          aria-label='Next Outcomes'
-          disabled={atEnd}
-          onClick={() => scrollByCard(1)}
-          size='sm'
-          variant='secondary'
-        >
-          <ArrowRight aria-hidden='true' size={16} />
-        </Button>
-      </div>
+    <div className='homepage-artist-profiles__row'>
       <ul
-        aria-label='Outcomes Jovie Delivers'
-        className='homepage-meet-jovie__track'
-        onScroll={updateEnds}
-        ref={trackRef}
+        aria-label='Jovie Artist Profile Outcomes'
+        className='homepage-artist-profiles__track'
       >
         {cards.map(card => (
           <li
-            className='homepage-artist-outcome homepage-meet-jovie__card'
+            className='homepage-artist-outcome homepage-artist-profiles__card'
             key={card.id}
           >
+            <div className='homepage-artist-outcome__copy'>
+              <h3>{card.title}</h3>
+              <p>{card.body}</p>
+            </div>
             <figure className='homepage-artist-outcome__media'>
-              <Image
-                alt={card.image.alt}
-                height={card.image.height}
-                loading='lazy'
-                sizes='(min-width: 768px) 24rem, 78vw'
-                src={card.image.publicUrl}
-                width={card.image.width}
-              />
-              <figcaption className='homepage-artist-outcome__caption'>
-                <h3>{card.title}</h3>
-              </figcaption>
+              <ArtistProfilePhoneFrame className='homepage-artist-outcome__device'>
+                <Image
+                  alt={card.image.alt}
+                  className='homepage-artist-outcome__screen'
+                  height={card.image.height}
+                  loading='lazy'
+                  quality={100}
+                  sizes='(min-width: 1280px) 13rem, (min-width: 768px) 16vw, 44vw'
+                  src={card.image.publicUrl}
+                  width={card.image.width}
+                />
+              </ArtistProfilePhoneFrame>
             </figure>
           </li>
         ))}
