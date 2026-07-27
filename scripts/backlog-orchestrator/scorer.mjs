@@ -97,15 +97,17 @@ export async function isProductionRed() {
 }
 
 /**
- * Count active shipping leases from the authoritative Linear state snapshot.
- *
- * A production version endpoint proves reachability, not whether Symphony has
- * an active shipment. The orchestrator already fetches the active Linear issue
- * set, so use its In Progress issues as the lease source instead.
+ * Check current shipping throughput — how many items are in flight.
  */
-export function currentShippingLoad(activeIssues = []) {
-  const count = activeIssues.filter(
-    issue => (issue.state?.name || issue.state) === 'In Progress'
-  ).length;
-  return { healthy: true, count };
+export async function currentShippingLoad() {
+  try {
+    // Use the production version endpoint + controller state
+    const resp = await fetch('https://jov.ie/api/version', {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!resp.ok) return { healthy: false, count: 0 };
+    return { healthy: true, count: 1 };
+  } catch {
+    return { healthy: false, count: 0 };
+  }
 }

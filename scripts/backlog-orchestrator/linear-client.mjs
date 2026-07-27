@@ -125,52 +125,6 @@ export async function fetchTeamActiveIssues(teamId, maxResults = 1000) {
               children { nodes { id identifier title } }
               relations { nodes { type relatedIssue { id identifier title } } }
               state { id name type }
-              comments { nodes { id body createdAt } }
-            }
-            pageInfo { hasNextPage endCursor }
-          }
-        }
-      }
-    `,
-      { teamId, cursor }
-    );
-    const edge = data.team.issues;
-    issues.push(...edge.nodes);
-    if (!edge.pageInfo.hasNextPage) break;
-    cursor = edge.pageInfo.endCursor;
-  }
-  return issues;
-}
-
-/**
- * Fetch all unassigned-eligible candidates currently in In Progress, including
- * comments needed for terminal machine-agent evidence and recovery idempotency.
- */
-export async function fetchTeamInProgressIssues(teamId, maxResults = 1000) {
-  const issues = [];
-  let cursor = null;
-  while (issues.length < maxResults) {
-    const data = await graphql(
-      `
-      query($teamId: String!, $cursor: String) {
-        team(id: $teamId) {
-          issues(
-            first: 50,
-            after: $cursor,
-            filter: { state: { name: { eq: "In Progress" } } }
-          ) {
-            nodes {
-              id
-              identifier
-              title
-              description
-              url
-              createdAt
-              updatedAt
-              assignee { id name }
-              labels { nodes { id name } }
-              state { id name type }
-              comments { nodes { id body createdAt } }
             }
             pageInfo { hasNextPage endCursor }
           }
@@ -268,22 +222,6 @@ export async function transitionIssue(issueId, stateId) {
   `,
     { id: issueId, stateId }
   );
-}
-
-export async function fetchTeamLabel(teamId, name) {
-  const data = await graphql(
-    `
-    query($teamId: String!, $name: String!) {
-      team(id: $teamId) {
-        labels(filter: { name: { eq: $name } }, first: 1) {
-          nodes { id name }
-        }
-      }
-    }
-  `,
-    { teamId, name }
-  );
-  return data.team.labels.nodes[0] || null;
 }
 
 /**

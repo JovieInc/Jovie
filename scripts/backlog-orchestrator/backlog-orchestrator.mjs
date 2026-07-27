@@ -30,9 +30,6 @@ const scorer = await import(resolve(__dirname, 'scorer.mjs'));
 const workstreamer = await import(resolve(__dirname, 'workstreamer.mjs'));
 const admitter = await import(resolve(__dirname, 'admitter.mjs'));
 const reporter = await import(resolve(__dirname, 'reporter.mjs'));
-const staleLeaseGuard = await import(
-  resolve(__dirname, 'stale-lease-guard.mjs')
-);
 
 // ----- Config -----
 const CACHE_FILE = resolve(__dirname, '.orchestrator-cache.json');
@@ -193,43 +190,19 @@ async function runReconcile(cache, isDryRun, issueArg) {
 async function runAdmitNext(cache, isDryRun) {
   console.log('Checking admission eligibility...');
 
-  // Release only provably stale machine leases before ordinary admission. This
-  // is intentionally scoped to unassigned In Progress issues; it never touches
-  // Tim-assigned or otherwise ambiguous work.
-  const inProgressIssues = await linear.fetchTeamInProgressIssues(TEAM_ID);
-  if (isDryRun) {
-    const planned = inProgressIssues
-      .map(issue => ({
-        identifier: issue.identifier,
-        decision: staleLeaseGuard.classifyStaleLease(issue),
-      }))
-      .filter(entry => entry.decision.eligible);
-    console.log(`Stale-lease sweep (dry-run): ${planned.length} eligible`);
-  } else {
-    const staleLeaseResult = await staleLeaseGuard.sweepStaleLeases({
-      issues: inProgressIssues,
-      client: linear,
-    });
-    console.log(
-      `Stale-lease sweep: recovered ${staleLeaseResult.recovered.length}, ` +
-        `skipped ${staleLeaseResult.skipped.length}, failed ${staleLeaseResult.failed.length}`
-    );
-  }
-
   const allIssues = await linear.fetchTeamActiveIssues(TEAM_ID);
   const classifications = [];
   for (const issue of allIssues) {
     const stored = classifier.parseStoredClassification(issue);
     const c = classifier.classifyDeterministic(issue, allIssues);
     if (stored) c.preexisting = stored;
-    c.issue = issue;
     classifications.push(c);
   }
 
   const workstreams = workstreamer.bundleWorkstreams(classifications);
 
-  // Count live leases from the authoritative Linear active-issue snapshot.
-  const state = scorer.currentShippingLoad(allIssues);
+  // Check current shipping state
+  const state = await scorer.currentShippingLoad();
 
   const result = await admitter.selectNextToAdmit(
     classifications,
@@ -243,21 +216,30 @@ async function runAdmitNext(cache, isDryRun) {
 
   if (result.admit.length > 0 && !isDryRun) {
     const item = result.admit[0];
-    try {
-      const receipt = await admitter.admitIssue({
-        issue: item.issue,
-        classification: item,
-        client: linear,
-        teamId: TEAM_ID,
-        todoStateId: TODO_STATE_ID,
-      });
-      console.log(`  ${receipt.status}: ${item.identifier}`);
-    } catch (err) {
-      console.error(
-        `  Admission failed for ${item.identifier}: ${err.message}`
-      );
-      result.admit = [];
-      result.reason = `admission failed: ${err.message}`;
+    if (item.type === 'workstream') {
+      // Move all issues in the workstream to Todo
+      for (const id of item.items) {
+        const issue = allIssues.find(i => i.identifier === id);
+        if (issue && issue.state?.name === 'Triage') {
+          try {
+            await linear.transitionIssue(issue.id, TODO_STATE_ID);
+            console.log(`  → Moved ${id} to Todo`);
+          } catch (err) {
+            console.error(`  → Failed to move ${id}: ${err.message}`);
+          }
+        }
+      }
+    } else {
+      // Single issue
+      const issue = allIssues.find(i => i.identifier === item.id);
+      if (issue && issue.state?.name === 'Triage') {
+        try {
+          await linear.transitionIssue(issue.id, TODO_STATE_ID);
+          console.log(`  → Moved ${item.id} to Todo`);
+        } catch (err) {
+          console.error(`  → Failed to move ${item.id}: ${err.message}`);
+        }
+      }
     }
   } else if (result.admit.length > 0) {
     console.log('  (dry-run — no mutations performed)');
