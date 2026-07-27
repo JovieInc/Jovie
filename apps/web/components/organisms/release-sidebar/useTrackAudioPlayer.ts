@@ -83,11 +83,15 @@ let _queueIndex = -1;
 let _interruptionDepth = 0;
 let _wasPlayingBeforeInterruption = false;
 let _mediaSessionBound = false;
-let _cueJumpLatencyMark: InteractionLatencyMarkHandle | null = null;
+let _pendingCueJump: {
+  readonly latencyMark: InteractionLatencyMarkHandle | null;
+  readonly targetSeconds: number;
+} | null = null;
 let _cueEditLatencyMark: InteractionLatencyMarkHandle | null = null;
 let _timelineHistory: AudioTimelineHistory | null = null;
 /** ~4 Hz progress notify for cross-surface scrub without rAF thrash. */
 const PROGRESS_NOTIFY_MS = 250;
+const FIRST_PLAYHEAD_MAX_FRAMES = 12;
 
 function createAudioElement(): HTMLAudioElement {
   const audio = new Audio();
@@ -113,7 +117,7 @@ function getAudio(): HTMLAudioElement | null {
  */
 function replaceAudioElement(): HTMLAudioElement | null {
   if (typeof Audio === 'undefined') return null;
-  _cueJumpLatencyMark = finishLatencyMark(_cueJumpLatencyMark, 'superseded');
+  finishCueJumpLatencyMark('superseded');
   const previousAudio = _audio;
   const nextAudio = createAudioElement();
   _audio = nextAudio;
@@ -258,6 +262,11 @@ function startLatencyMark(
   return markInteractionStart(name);
 }
 
+function finishCueJumpLatencyMark(point: string): void {
+  finishLatencyMark(_pendingCueJump?.latencyMark ?? null, point);
+  _pendingCueJump = null;
+}
+
 function getMediaSession(): MediaSession | null {
   if (typeof navigator === 'undefined') return null;
   if (!('mediaSession' in navigator)) return null;
@@ -349,6 +358,7 @@ function seekToTime(time: number): void {
   if (!audio || !Number.isFinite(time)) return;
   if (!Number.isFinite(audio.duration) || audio.duration === 0) return;
   const nextTime = Math.max(0, Math.min(time, audio.duration));
+  finishCueJumpLatencyMark('superseded');
   audio.currentTime = nextTime;
   setState({
     playbackStatus: getTransitionStatus('seeking', audio.paused),
@@ -364,8 +374,15 @@ function jumpToCue(id: string): AudioCueJumpTarget | null {
   }
   if (!Number.isFinite(audio.duration) || audio.duration <= 0) return null;
 
-  const target = resolveAudioCueJump(timeline, id, audio.duration);
-  _cueJumpLatencyMark = startLatencyMark('audio-cue-jump', _cueJumpLatencyMark);
+  let target: AudioCueJumpTarget;
+  try {
+    target = resolveAudioCueJump(timeline, id, audio.duration);
+  } catch {
+    return null;
+  }
+  finishCueJumpLatencyMark('superseded');
+  const latencyMark = markInteractionStart('audio-cue-jump');
+  _pendingCueJump = { latencyMark, targetSeconds: target.targetSeconds };
   audio.currentTime = target.targetSeconds;
   return target;
 }
@@ -458,8 +475,7 @@ function handlePlaybackFailure(
     audio.src = '';
   }
   _activeTrackIsrc = null;
-  _hasRetriedRefresh = false;
-  _cueJumpLatencyMark = finishLatencyMark(_cueJumpLatencyMark, 'failed');
+  finishCueJumpLatencyMark('failed');
   _timelineHistory = null;
   clearPlaybackQueue();
   setState({
@@ -584,13 +600,30 @@ function bindAudioEvents(el: HTMLAudioElement): void {
       lastErrorReason: null,
     })
   );
-  bindCurrentAudioEvent('playing', () =>
+  bindCurrentAudioEvent('playing', () => {
     setState({
       isPlaying: true,
       playbackStatus: getTransitionStatus('playing'),
       lastErrorReason: null,
-    })
-  );
+    });
+    const startingTime = el.currentTime;
+    let framesRemaining = FIRST_PLAYHEAD_MAX_FRAMES;
+    const publishFirstAdvancingFrame = () => {
+      requestAnimationFrame(() => {
+        if (_audio !== el || el.paused) return;
+        if (el.currentTime > startingTime || framesRemaining <= 1) {
+          setState({
+            currentTime: el.currentTime,
+            duration: Number.isFinite(el.duration) ? el.duration : 0,
+          });
+          return;
+        }
+        framesRemaining -= 1;
+        publishFirstAdvancingFrame();
+      });
+    };
+    publishFirstAdvancingFrame();
+  });
   bindCurrentAudioEvent('pause', () =>
     setState({
       isPlaying: false,
@@ -643,7 +676,14 @@ function bindAudioEvents(el: HTMLAudioElement): void {
   });
   bindCurrentAudioEvent('seeked', () => {
     lastNotifiedAt = -Infinity; // invalidate throttle so next timeupdate fires
-    _cueJumpLatencyMark = finishLatencyMark(_cueJumpLatencyMark, 'settled');
+    if (
+      _pendingCueJump &&
+      Math.round(
+        Math.abs(el.currentTime - _pendingCueJump.targetSeconds) * 20
+      ) === 0
+    ) {
+      finishCueJumpLatencyMark('settled');
+    }
     setState({
       isPlaying: !el.paused,
       playbackStatus: getTransitionStatus('seeked', el.paused),
@@ -838,9 +878,8 @@ export function useTrackAudioPlayer() {
       audio.src = '';
     }
     _activeTrackIsrc = null;
-    _hasRetriedRefresh = false;
     clearPlaybackQueue();
-    _cueJumpLatencyMark = finishLatencyMark(_cueJumpLatencyMark, 'stopped');
+    finishCueJumpLatencyMark('stopped');
     _timelineHistory = null;
     setState({
       activeTrackId: null,
