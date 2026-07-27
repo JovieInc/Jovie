@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
-- [internal] **Bounded staged performance confirmation (JOV-4484):** an isolated timing outlier may receive one same-route confirmation batch while resource failures, persistent violations, and execution errors remain fail-closed with raw evidence preserved.
+- [internal] **Manual Full E2E shards now run concurrently (JOV-4483):** all four hosted Preview shards can start together while retaining fail-fast behavior, shared Neon setup, Playwright workers, and cleanup.
 - [internal] **Merge-group visual CI harness repair:** the filtered web workspace can resolve the repository Chromatic config again, DB-free mobile overflow excludes only explicitly database-backed redirects, and a forward-only Storybook audit now requires five clean runs before newly opened UI PRs can be gated.
 - [internal] **Bounded `ci-fast` lane groups (JOV-4477):** independent typecheck and remaining fast-gate checks now run in two hosted groups while preserving the single required `ci-fast` result and complete lane diagnostics.
 - **Unified app shell migration:** the authenticated app now uses one canonical customer/OV navigation model, header search, route-shaped loading states, chat home, Library filters, release/tour-date/profile rails, audio controls, and privacy-safe navigation telemetry. Better Auth production-artifact tests, route-specific readiness contracts, optimistic profile edit concurrency, and a 21-route performance matrix cover the migration end to end.
