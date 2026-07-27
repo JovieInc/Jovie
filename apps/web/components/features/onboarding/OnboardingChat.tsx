@@ -966,7 +966,7 @@ export function OnboardingChat({
   ).length;
   const hasConversationStarted = messages.length > 0 || hasSentFirst;
   const shouldDockComposer = userTurnCount > 1 || selectedArtist !== null;
-  const showEmptyIntro = !intentId && !starterPrompt;
+  const _showEmptyIntro = !intentId && !starterPrompt;
 
   useEffect(() => {
     if (shouldDockComposer) return;
