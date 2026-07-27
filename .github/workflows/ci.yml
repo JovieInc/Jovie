@@ -4054,8 +4054,8 @@ jobs:
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     strategy:
       fail-fast: true
-      # Cap E2E shard concurrency (preview env + Playwright is heavy).
-      max-parallel: 2
+      # Run all four E2E shards concurrently; each reuses the shared Neon artifact.
+      max-parallel: 4
       matrix:
         shard: [1, 2, 3, 4]
     steps:
