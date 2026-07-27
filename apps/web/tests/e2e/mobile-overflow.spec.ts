@@ -12,8 +12,8 @@ import {
   waitForPendingNextRedirect,
 } from './utils/mobile-overflow';
 import {
+  getPublicSurfaceManifestForRuntimeSync,
   type ResolvedPublicSurfaceSpec,
-  resolvePublicSurfaceManifestSync,
 } from './utils/public-surface-manifest';
 import {
   SMOKE_TIMEOUTS,
@@ -101,7 +101,9 @@ function getMobileWidthsFromEnv(value: string | undefined) {
   return widths && widths.length > 0 ? widths : null;
 }
 
-const RESOLVED_PUBLIC_SURFACES = resolvePublicSurfaceManifestSync();
+const RESOLVED_PUBLIC_SURFACES = getPublicSurfaceManifestForRuntimeSync({
+  database: HAS_DATABASE,
+});
 
 const PUBLIC_SURFACES_BY_ID = new Map(
   RESOLVED_PUBLIC_SURFACES.map(surface => [surface.id, surface])

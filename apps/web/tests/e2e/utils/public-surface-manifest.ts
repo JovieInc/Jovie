@@ -52,6 +52,7 @@ export interface PublicSurfaceSpec {
   readonly allowedFinalDocumentStatuses?: readonly number[];
   readonly allowMissingMain?: boolean;
   readonly allowMultipleH1?: boolean;
+  readonly requiresDatabase?: boolean;
   readonly lighthouse: boolean;
   readonly perfGroups: readonly string[];
   readonly interactions: readonly PublicInteractionSpec[];
@@ -647,6 +648,7 @@ const PROFILE_SURFACES = [
       /^\/\?utm_source=jovie&utm_medium=profile&utm_campaign=shop_click&utm_content=[a-z0-9][a-z0-9._-]*$/i,
     ],
     allowMissingMain: true,
+    requiresDatabase: true,
     lighthouse: false,
     perfGroups: ['public-profile-core'],
     interactions: PROFILE_INTERACTIONS,
@@ -707,6 +709,7 @@ const PROFILE_SURFACES = [
     minMainTextLength: 60,
     expectedRedirects: [/\/[^/?#]+\?claim=1$/],
     allowMissingMain: true,
+    requiresDatabase: true,
     lighthouse: false,
     perfGroups: ['public-profile-core'],
     interactions: PROFILE_INTERACTIONS,
@@ -1012,6 +1015,14 @@ export function resolvePublicSurfaceManifestSync() {
 
 export function resolvePublicSurfaceManifest() {
   return resolvePublicSurfaceManifestSync();
+}
+
+export function getPublicSurfaceManifestForRuntimeSync(capabilities: {
+  readonly database: boolean;
+}) {
+  return resolvePublicSurfaceManifestSync().filter(
+    surface => capabilities.database || !surface.requiresDatabase
+  );
 }
 
 export async function getPublicSurfaceById(surfaceId: string) {
