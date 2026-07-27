@@ -21,7 +21,7 @@ function configuredBackend() {
   if (backend !== 'native') {
     throw new Error(`Unknown MERGE_QUEUE_BACKEND: ${backend}`);
   }
-  return backend;
+  return /** @type {'native'} */ (backend);
 }
 
 function readRepoFile(relativePath) {
