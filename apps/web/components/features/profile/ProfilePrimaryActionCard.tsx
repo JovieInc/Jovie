@@ -678,7 +678,10 @@ export function ProfilePrimaryActionCard({
     viewerLocation === undefined &&
     !releaseVisibility?.show &&
     upcomingTourDates.length > 0;
-  const { location } = useUserLocation({ enabled: shouldResolveGeo });
+  const { location } = useUserLocation({
+    enabled: shouldResolveGeo,
+    permissionMode: 'granted-only',
+  });
   const effectiveLocation = viewerLocation ?? location;
   const { nearbyDates } = useTourDateProximity(
     upcomingTourDates,

@@ -221,7 +221,7 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
     const user = userEvent.setup();
     await screen.findByText('Get Updates');
 
-    await user.click(screen.getByRole('button', { name: 'Submit' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
 
     expect(handleSubscribe).toHaveBeenCalledTimes(1);
     expect(await screen.findByText('Enter the code')).toBeInTheDocument();
@@ -239,6 +239,10 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Please enter a valid email address'
     );
+    expect(screen.getByTestId('profile-capture-status-region')).toHaveClass(
+      'h-39'
+    );
+    expect(screen.getByRole('alert').parentElement).toHaveClass('min-h-10');
   });
 
   it('verifies OTP from the full-screen OTP step', async () => {
@@ -257,7 +261,7 @@ describe('ArtistNotificationsCTA full-screen alert flow states', () => {
 
     const user = userEvent.setup();
     await screen.findByText('Get Updates');
-    await user.click(screen.getByRole('button', { name: 'Submit' }));
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
     await screen.findByText('Enter the code');
     await user.click(screen.getByRole('button', { name: 'Verify' }));
 

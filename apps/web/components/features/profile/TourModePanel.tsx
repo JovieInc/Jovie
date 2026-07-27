@@ -5,7 +5,6 @@ import { Ticket } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
-import { ProfileEmptyBentoCard } from '@/features/profile/ProfileEmptyBentoCard';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import {
   type TourDateWithProximity,
@@ -210,15 +209,23 @@ function TourDatesContent({
       );
 
     return (
-      <div className='px-4 pb-4' data-testid='profile-primary-tab-events-empty'>
-        <ProfileEmptyBentoCard
-          accent='events'
-          icon={Ticket}
-          title='No Events'
-          body='Get alerted when shows are announced.'
-          layout='compact'
-          action={action}
-        />
+      <div
+        className='flex min-h-72 flex-1 items-center justify-center px-6 pb-8 text-center'
+        data-testid='profile-primary-tab-events-empty'
+      >
+        <div className='w-full max-w-64'>
+          <Ticket
+            className='mx-auto h-7 w-7 text-white/62'
+            aria-hidden='true'
+          />
+          <h2 className='mt-5 text-xl font-semibold tracking-[-0.03em] text-primary-token'>
+            No Events
+          </h2>
+          <p className='mt-2 text-sm leading-5 text-white/56'>
+            Get alerted when shows are announced.
+          </p>
+          <div className='mt-5'>{action}</div>
+        </div>
       </div>
     );
   }
@@ -279,7 +286,7 @@ export function TourDrawerContent({
   readonly renderMode?: ProfileRenderMode;
   readonly className?: string;
 }>) {
-  const { location } = useUserLocation();
+  const { location } = useUserLocation({ permissionMode: 'granted-only' });
   const { nearbyDates, allDates } = useTourDateProximity(tourDates, location);
   const resolvedEmptyStateSourceContext: NotificationSourceContext =
     emptyStateSourceContext ?? {

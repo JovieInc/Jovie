@@ -73,6 +73,7 @@ interface ProfilePacCardProps {
   readonly isSubscribed?: boolean;
   readonly renderMode?: ProfileRenderMode;
   readonly className?: string;
+  readonly layout?: 'portrait' | 'profile-landscape';
   /**
    * Priority-load the artwork image. Set by the surface when there is no
    * hero photo — then this card's art is the page LCP and must not lazy-load.
@@ -197,8 +198,10 @@ export function ProfilePacCard({
   renderMode = 'interactive',
   className,
   artPriority = false,
+  layout = 'portrait',
 }: Readonly<ProfilePacCardProps>) {
   const isInteractive = renderMode === 'interactive';
+  const isProfileLandscape = layout === 'profile-landscape';
   const previewUrl = release?.previewUrl ?? null;
   const pacTrackId = release ? `pac-${artist.id}-${release.slug}` : null;
 
@@ -762,29 +765,50 @@ export function ProfilePacCard({
       data-degraded={state.degraded ? 'true' : undefined}
       data-dismiss-affordance={assignment.dismissAffordance}
       className={cn(
-        'flex h-full w-full min-w-0 flex-col overflow-hidden rounded-(--profile-inner-radius) border border-(--profile-pearl-border) bg-(--profile-pearl-bg) shadow-(--profile-pearl-shadow) backdrop-blur-2xl',
+        'profile-pac-card flex h-full w-full min-w-0 overflow-hidden rounded-(--profile-inner-radius) border border-(--profile-pearl-border) bg-(--profile-pearl-bg) shadow-(--profile-pearl-shadow) backdrop-blur-2xl',
+        isProfileLandscape
+          ? cn('flex-row', isCaptureState ? 'p-0' : 'p-1.5')
+          : 'flex-col',
         className
       )}
     >
-      <div className='relative aspect-square w-full flex-none overflow-hidden border-b border-subtle bg-surface-2'>
-        {artImageUrl ? (
-          <ImageWithFallback
-            src={artImageUrl}
-            alt={artImageAlt}
-            fill
-            sizes='(max-width: 767px) 70vw, 300px'
-            className='object-cover'
-            fallbackVariant='release'
-            fallbackClassName='bg-transparent'
-          />
-        ) : (
-          <div className='flex h-full w-full items-center justify-center text-tertiary-token'>
-            <Play className='h-7 w-7 fill-current' aria-hidden='true' />
-          </div>
-        )}
-      </div>
+      {isProfileLandscape && isCaptureState ? null : (
+        <div
+          className={cn(
+            'profile-pac-art relative aspect-square flex-none overflow-hidden bg-surface-2',
+            isProfileLandscape
+              ? 'self-stretch w-auto rounded'
+              : 'w-full border-b border-subtle'
+          )}
+        >
+          {artImageUrl ? (
+            <ImageWithFallback
+              src={artImageUrl}
+              alt={artImageAlt}
+              fill
+              sizes={
+                isProfileLandscape
+                  ? '(max-width: 767px) 44vw, 180px'
+                  : '(max-width: 767px) 70vw, 300px'
+              }
+              className='object-cover'
+              fallbackVariant='release'
+              fallbackClassName='bg-transparent'
+            />
+          ) : (
+            <div className='flex h-full w-full items-center justify-center text-tertiary-token'>
+              <Play className='h-7 w-7 fill-current' aria-hidden='true' />
+            </div>
+          )}
+        </div>
+      )}
 
-      <div className='flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 px-3 py-1.5'>
+      <div
+        className={cn(
+          'profile-pac-content flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 px-3',
+          isProfileLandscape ? 'justify-center py-2 pl-3 pr-2' : 'py-1.5'
+        )}
+      >
         {/* Text zone — clips under tight card heights so the action footer
             below never moves and never clips (zero-CLS contract). */}
         <div className='flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-hidden'>

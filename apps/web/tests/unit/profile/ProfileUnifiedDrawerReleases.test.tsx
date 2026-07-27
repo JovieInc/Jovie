@@ -20,6 +20,7 @@ vi.mock('@/features/profile/ProfileDrawerShell', () => ({
     children,
     dataTestId,
     presentation,
+    heightMode,
   }: {
     readonly open: boolean;
     readonly onOpenChange: (open: boolean) => void;
@@ -28,10 +29,12 @@ vi.mock('@/features/profile/ProfileDrawerShell', () => ({
     readonly children: React.ReactNode;
     readonly dataTestId?: string;
     readonly presentation?: 'standalone' | 'embedded' | 'modal';
+    readonly heightMode?: 'bounded' | 'content';
   }) => (
     <div
       data-testid={dataTestId ?? 'profile-drawer-shell'}
       data-presentation={presentation ?? 'standalone'}
+      data-height-mode={heightMode ?? 'bounded'}
     >
       {open ? (
         <button
@@ -210,6 +213,23 @@ describe('ProfileUnifiedDrawer — Releases', () => {
     expect(screen.getByTestId('profile-menu-drawer')).toHaveAttribute(
       'data-presentation',
       'embedded'
+    );
+  });
+
+  it('content-sizes the root menu and keeps subviews bounded', () => {
+    const view = render(
+      <ProfileUnifiedDrawer {...defaultProps} view='menu' hasTip hasContacts />
+    );
+
+    expect(screen.getByTestId('profile-menu-drawer')).toHaveAttribute(
+      'data-height-mode',
+      'content'
+    );
+
+    view.rerender(<ProfileUnifiedDrawer {...defaultProps} view='releases' />);
+    expect(screen.getByTestId('profile-menu-drawer')).toHaveAttribute(
+      'data-height-mode',
+      'bounded'
     );
   });
 

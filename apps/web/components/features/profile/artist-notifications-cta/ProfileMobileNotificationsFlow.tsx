@@ -8,7 +8,6 @@ import {
   Mail,
   MessageCircle,
   Music2,
-  Send,
   Shirt,
   X,
 } from 'lucide-react';
@@ -350,10 +349,10 @@ function InlineCaptureField({
           type='button'
           onClick={onSubmit}
           disabled={isSubmitting}
-          className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-black transition-opacity duration-subtle hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-55 dark:bg-white dark:text-black'
-          aria-label='Submit'
+          className='inline-flex h-9 shrink-0 items-center justify-center rounded-full bg-white px-4 text-xs font-semibold text-black transition-[background-color,opacity,transform] duration-subtle hover:bg-white/92 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-55 motion-reduce:transform-none dark:bg-white dark:text-black'
+          aria-label='Continue'
         >
-          <Send className='size-4' />
+          {isSubmitting ? 'Sending...' : 'Continue'}
         </button>
       </div>
     </div>
@@ -508,16 +507,24 @@ export function ProfileMobileNotificationsFlow({
           title='Get Updates'
           body={`${artistName}: music, shows, merch.`}
           footer={
-            <div className='min-h-27 space-y-3'>
-              {error ? (
-                <p className='text-sm text-red-400' role='alert'>
-                  {error}
-                </p>
-              ) : null}
-              <p className='text-xs leading-4 text-tertiary-token'>
+            <div
+              className='grid h-39 grid-rows-[2.5rem_3rem_2.75rem] gap-3 overflow-hidden'
+              data-testid='profile-capture-status-region'
+            >
+              <div className='min-h-10' aria-live='polite'>
+                {error ? (
+                  <p
+                    className='line-clamp-2 text-sm leading-5 text-red-400'
+                    role='alert'
+                  >
+                    {error}
+                  </p>
+                ) : null}
+              </div>
+              <p className='line-clamp-3 text-xs leading-4 text-tertiary-token'>
                 {CAPTURE_CONSENT_COPY[isSms ? 'sms' : 'email']}
               </p>
-              <div className='flex items-center justify-between gap-3'>
+              <div className='flex h-11 items-center justify-between gap-3'>
                 <button
                   type='button'
                   onClick={() => onChannelChange(isSms ? 'email' : 'sms')}

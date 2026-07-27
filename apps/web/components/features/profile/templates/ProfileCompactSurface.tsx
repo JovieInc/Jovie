@@ -72,6 +72,12 @@ const DEFAULT_CONTENT_PREFS: Record<NotificationContentType, boolean> = {
   merch: true,
   general: true,
 };
+const PRIMARY_TAB_ORDER: readonly ProfilePrimaryTab[] = [
+  'profile',
+  'listen',
+  'tour',
+  'subscribe',
+];
 
 function mapPrimaryTabToAnalyticsTab(
   tab: ProfilePrimaryTab
@@ -297,6 +303,9 @@ export function ProfileCompactSurface({
   // hide the surface's own back chrome so only one back affordance renders.
   const [isNotificationsFlowOpen, setIsNotificationsFlowOpen] = useState(false);
   const [showRecentActivationRow, setShowRecentActivationRow] = useState(false);
+  const [tabTransitionDirection, setTabTransitionDirection] = useState<1 | -1>(
+    1
+  );
   const [notificationSourceContext, setNotificationSourceContext] =
     useState<NotificationSourceContext | null>(null);
   const notificationsRevealRef = useRef<(() => void) | null>(null);
@@ -427,6 +436,14 @@ export function ProfileCompactSurface({
     drawerOpen && drawerView === 'menu' && activeVisiblePrimaryTab !== 'tour';
   const topChromeButtonClassName =
     'profile-top-chrome-icon text-white dark:text-white';
+  const modeTitle =
+    activeVisiblePrimaryTab === 'listen'
+      ? 'Music'
+      : activeVisiblePrimaryTab === 'tour'
+        ? 'Events'
+        : activeVisiblePrimaryTab === 'subscribe'
+          ? 'Alerts'
+          : artist.name;
   // 28px visual glyph box with a 44×44 hit area: box-content + p-2 grows the
   // hit box to 44px while -m-2 cancels the layout footprint (no shift).
   const socialIconClassName =
@@ -492,6 +509,12 @@ export function ProfileCompactSurface({
   const handleTabSelect = useCallback(
     (tab: ProfilePrimaryTab) => {
       restoreTabBar();
+      setTabTransitionDirection(
+        PRIMARY_TAB_ORDER.indexOf(tab) >=
+          PRIMARY_TAB_ORDER.indexOf(activeVisiblePrimaryTab)
+          ? 1
+          : -1
+      );
       const nextTab = mapPrimaryTabToAnalyticsTab(tab);
       track('profile_tab_click', {
         artist_id: artist.id,
@@ -504,7 +527,14 @@ export function ProfileCompactSurface({
       });
       onModeSelect(tab);
     },
-    [artist.handle, artist.id, currentAnalyticsTab, onModeSelect, restoreTabBar]
+    [
+      activeVisiblePrimaryTab,
+      artist.handle,
+      artist.id,
+      currentAnalyticsTab,
+      onModeSelect,
+      restoreTabBar,
+    ]
   );
   const handleSocialClick = useCallback(
     (link: LegacySocialLink) => {
@@ -624,19 +654,16 @@ export function ProfileCompactSurface({
                 </CircleIconButton>
               )}
 
-              <p
-                className={cn(
-                  'profile-cover-mode-title absolute left-14 right-14 top-[max(env(safe-area-inset-top),14px)] truncate text-center text-sm font-semibold tracking-normal text-(--profile-status-pill-fg)',
-                  isHomeMode && 'hidden'
-                )}
-                data-testid={
-                  !isHomeMode && renderMode !== 'preview'
-                    ? 'profile-header'
-                    : undefined
-                }
-              >
-                {artist.name}
-              </p>
+              {!isHomeMode ? (
+                <h2
+                  className='profile-cover-mode-title absolute left-14 right-14 top-[max(env(safe-area-inset-top),14px)] truncate text-center text-sm font-semibold tracking-normal text-(--profile-status-pill-fg)'
+                  data-testid={
+                    renderMode !== 'preview' ? 'profile-mode-title' : undefined
+                  }
+                >
+                  {modeTitle}
+                </h2>
+              ) : null}
 
               {hideMoreMenu ? (
                 <div className='h-11 w-11 shrink-0' aria-hidden='true' />
@@ -801,54 +828,63 @@ export function ProfileCompactSurface({
             data-testid='profile-content-scroll'
             tabIndex={isHomeMode ? undefined : 0}
           >
-            {isHomeMode ? (
-              <ProfileHomeRail
-                artist={artist}
-                latestRelease={homeLatestRelease}
-                profileSettings={homeProfileSettings}
-                featuredPlaylistFallback={featuredPlaylistFallback}
-                tourDates={tourDates}
-                hasPlayableDestinations={mergedDSPs.length > 0}
-                renderMode={renderMode}
-                onPlayClick={onPlayClick}
-                onAlertsClick={openNotifications}
-                isSubscribed={homeAlertsSubscribed}
-                profilePacAssignment={profilePacAssignment}
-                viewerLocation={viewerLocation}
-                resolveNearbyTour={resolveNearbyTour}
-                merchCards={merchCards}
-                releases={releases}
-                hasTip={hasTip}
-                pacArtPriority={!resolvedHeroImageUrl}
-              />
-            ) : (
-              <ProfilePrimaryTabPanel
-                mode={activeVisiblePrimaryTab}
-                renderMode={renderMode}
-                artist={artist}
-                notificationsPortalContainer={
-                  notificationsPortalContainer ?? undefined
-                }
-                dsps={mergedDSPs}
-                enableDynamicEngagement={enableDynamicEngagement}
-                subscribeTwoStep={subscribeTwoStep}
-                alertOptInVariant={alertOptInVariant}
-                isSubscribed={isSubscribed}
-                contentPrefs={contentPrefs}
-                onTogglePref={onTogglePref}
-                onUnsubscribe={onUnsubscribe}
-                isUnsubscribing={isUnsubscribing}
-                genres={genres}
-                pressPhotos={pressPhotos}
-                allowPhotoDownloads={allowPhotoDownloads}
-                tourDates={tourDates}
-                releases={releases}
-                alertSourceContext={defaultNotificationSourceContext}
-                previewNotificationsState={previewNotificationsState}
-                onFlowClosed={returnToProfileAfterNotifications}
-                onSubscriptionActivated={handleSubscriptionActivated}
-              />
-            )}
+            <div
+              key={activeVisiblePrimaryTab}
+              className={cn(
+                'profile-primary-tab-transition',
+                isHomeMode ? 'flex min-h-0 flex-1 flex-col' : 'min-h-full'
+              )}
+              data-direction={tabTransitionDirection}
+            >
+              {isHomeMode ? (
+                <ProfileHomeRail
+                  artist={artist}
+                  latestRelease={homeLatestRelease}
+                  profileSettings={homeProfileSettings}
+                  featuredPlaylistFallback={featuredPlaylistFallback}
+                  tourDates={tourDates}
+                  hasPlayableDestinations={mergedDSPs.length > 0}
+                  renderMode={renderMode}
+                  onPlayClick={onPlayClick}
+                  onAlertsClick={openNotifications}
+                  isSubscribed={homeAlertsSubscribed}
+                  profilePacAssignment={profilePacAssignment}
+                  viewerLocation={viewerLocation}
+                  resolveNearbyTour={resolveNearbyTour}
+                  merchCards={merchCards}
+                  releases={releases}
+                  hasTip={hasTip}
+                  pacArtPriority={!resolvedHeroImageUrl}
+                />
+              ) : (
+                <ProfilePrimaryTabPanel
+                  mode={activeVisiblePrimaryTab}
+                  renderMode={renderMode}
+                  artist={artist}
+                  notificationsPortalContainer={
+                    notificationsPortalContainer ?? undefined
+                  }
+                  dsps={mergedDSPs}
+                  enableDynamicEngagement={enableDynamicEngagement}
+                  subscribeTwoStep={subscribeTwoStep}
+                  alertOptInVariant={alertOptInVariant}
+                  isSubscribed={isSubscribed}
+                  contentPrefs={contentPrefs}
+                  onTogglePref={onTogglePref}
+                  onUnsubscribe={onUnsubscribe}
+                  isUnsubscribing={isUnsubscribing}
+                  genres={genres}
+                  pressPhotos={pressPhotos}
+                  allowPhotoDownloads={allowPhotoDownloads}
+                  tourDates={tourDates}
+                  releases={releases}
+                  alertSourceContext={defaultNotificationSourceContext}
+                  previewNotificationsState={previewNotificationsState}
+                  onFlowClosed={returnToProfileAfterNotifications}
+                  onSubscriptionActivated={handleSubscriptionActivated}
+                />
+              )}
+            </div>
           </div>
 
           {showBottomNav ? (
