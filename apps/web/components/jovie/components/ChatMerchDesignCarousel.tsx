@@ -92,6 +92,11 @@ export function ChatMerchDesignCarousel({
             <h3 className='truncate text-app font-semibold text-primary-token'>
               {current.design_name}
             </h3>
+            {current.slots.source_label ? (
+              <p className='mt-0.5 text-2xs text-secondary-token'>
+                Using {current.slots.source_label}
+              </p>
+            ) : null}
             {current.concept ? (
               <p className='mt-0.5 line-clamp-1 text-2xs text-tertiary-token'>
                 {current.concept}

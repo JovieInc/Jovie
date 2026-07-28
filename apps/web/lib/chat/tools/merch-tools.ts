@@ -23,6 +23,12 @@ import { TOOL_SCHEMAS } from '@/lib/chat/tool-schemas';
 import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
 import { generateMerchDesigns } from '@/lib/merch/design-generation';
 import {
+  getMerchSourceCandidates,
+  isExplicitUserProvidedSource,
+  type MerchSource,
+  requiresAssetPreservingRender,
+} from '@/lib/merch/source-candidates';
+import {
   createAlternativeMerchFromCard,
   selectAndCreateMerchCard,
 } from '@/lib/services/merch/merch-generator';
@@ -30,6 +36,94 @@ import {
 // ---------------------------------------------------------------------------
 // Tool factory functions
 // ---------------------------------------------------------------------------
+
+function sourceSelectionResult(
+  candidates: Awaited<ReturnType<typeof getMerchSourceCandidates>>
+) {
+  return {
+    success: true as const,
+    state: 'source_selection_required' as const,
+    message:
+      candidates.length > 0
+        ? 'Choose a confirmed catalog phrase before Jovie generates any artwork.'
+        : 'Jovie could not find a confirmed catalog title. Add a title or provide a phrase you own before generating artwork.',
+    recommendation: candidates[0] ?? null,
+    candidates,
+    visualRule:
+      'No people, faces, portraits, models, human figures, or unverified artist likenesses.',
+  };
+}
+
+async function resolveVerifiedSource(params: {
+  readonly profileId: string;
+  readonly prompt: string;
+  readonly source?: MerchSource;
+}): Promise<
+  | { readonly source: MerchSource }
+  | { readonly sourceSelection: ReturnType<typeof sourceSelectionResult> }
+  | { readonly error: string }
+> {
+  if (!params.source) {
+    return {
+      sourceSelection: sourceSelectionResult(
+        await getMerchSourceCandidates(params.profileId)
+      ),
+    };
+  }
+
+  if (requiresAssetPreservingRender(params.source)) {
+    return {
+      error:
+        'Jovie will not recreate an uploaded logo from a prompt. This Library asset needs the asset-preserving render path before it can be used for merch.',
+    };
+  }
+
+  if (isExplicitUserProvidedSource(params.prompt, params.source)) {
+    return { source: params.source };
+  }
+
+  const candidates = await getMerchSourceCandidates(params.profileId);
+  const match = candidates.find(
+    candidate =>
+      candidate.sourceType === params.source?.sourceType &&
+      candidate.sourceText.localeCompare(
+        params.source?.sourceText ?? '',
+        undefined,
+        {
+          sensitivity: 'accent',
+        }
+      ) === 0
+  );
+  if (!match) {
+    return {
+      error:
+        'That merch source is not a confirmed title in this artist’s catalog. Choose a listed source or provide a phrase you own.',
+    };
+  }
+
+  return { source: match };
+}
+
+/**
+ * Returns source-backed title candidates before any image/model call. The chat
+ * model turns this compact payload into the phrase picker conversation.
+ */
+export function createMerchSourceTool(params: {
+  readonly profileId: string | null;
+}) {
+  return tool({
+    description: TOOL_SCHEMAS.findMerchSources.description,
+    inputSchema: TOOL_SCHEMAS.findMerchSources.inputSchema,
+    execute: async () => {
+      if (!params.profileId) {
+        return { success: false as const, error: 'Profile ID required' };
+      }
+      return sourceSelectionResult(
+        await getMerchSourceCandidates(params.profileId)
+      );
+    },
+  });
+}
 
 /**
  * Creates the generate merch options chat tool.
@@ -45,19 +139,33 @@ export function createMerchGenerateTool(params: {
   return tool({
     description: TOOL_SCHEMAS.createMerch.description,
     inputSchema: TOOL_SCHEMAS.createMerch.inputSchema,
-    execute: async ({ prompt, itemType, makeLive: _makeLive }) => {
+    execute: async ({ prompt, itemType, makeLive: _makeLive, source }) => {
       if (!params.profileId) {
         return { success: false as const, error: 'Profile ID required' };
+      }
+
+      const normalizedPrompt =
+        [prompt, itemType ? `Item type: ${itemType}` : '']
+          .filter(Boolean)
+          .join('\n')
+          .trim() || 'Premium illustrated merch for this artist.';
+      const sourceResolution = await resolveVerifiedSource({
+        profileId: params.profileId,
+        prompt: normalizedPrompt,
+        source,
+      });
+      if ('error' in sourceResolution) {
+        return { success: false as const, error: sourceResolution.error };
+      }
+      if ('sourceSelection' in sourceResolution) {
+        return sourceResolution.sourceSelection;
       }
 
       return generateMerchDesigns({
         profileId: params.profileId,
         clerkUserId: params.clerkUserId,
-        prompt:
-          [prompt, itemType ? `Item type: ${itemType}` : '']
-            .filter(Boolean)
-            .join('\n')
-            .trim() || 'Premium illustrated merch for this artist.',
+        prompt: normalizedPrompt,
+        source: sourceResolution.source,
         conversationId: params.conversationId ?? null,
         turnId: params.turnId ?? null,
       });
@@ -78,19 +186,33 @@ export function createMerchPreviewTool(params: {
   return tool({
     description: TOOL_SCHEMAS.previewMerchOptions.description,
     inputSchema: TOOL_SCHEMAS.previewMerchOptions.inputSchema,
-    execute: async ({ prompt, itemType }) => {
+    execute: async ({ prompt, itemType, source }) => {
       if (!params.profileId) {
         return { success: false as const, error: 'Profile ID required' };
+      }
+
+      const normalizedPrompt =
+        [prompt, itemType ? `Item type: ${itemType}` : '']
+          .filter(Boolean)
+          .join('\n')
+          .trim() || 'Premium illustrated merch concepts for this artist.';
+      const sourceResolution = await resolveVerifiedSource({
+        profileId: params.profileId,
+        prompt: normalizedPrompt,
+        source,
+      });
+      if ('error' in sourceResolution) {
+        return { success: false as const, error: sourceResolution.error };
+      }
+      if ('sourceSelection' in sourceResolution) {
+        return sourceResolution.sourceSelection;
       }
 
       return generateMerchDesigns({
         profileId: params.profileId,
         clerkUserId: params.clerkUserId,
-        prompt:
-          [prompt, itemType ? `Item type: ${itemType}` : '']
-            .filter(Boolean)
-            .join('\n')
-            .trim() || 'Premium illustrated merch concepts for this artist.',
+        prompt: normalizedPrompt,
+        source: sourceResolution.source,
         conversationId: params.conversationId ?? null,
         turnId: params.turnId ?? null,
       });

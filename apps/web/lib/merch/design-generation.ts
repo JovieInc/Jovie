@@ -39,6 +39,10 @@ import {
   MERCH_DEFAULT_MARGIN_PRESET,
   MERCH_DEFAULT_PRINTFUL_PRODUCT_COST_CENTS,
 } from './pricing';
+import {
+  type MerchSource,
+  requiresAssetPreservingRender,
+} from './source-candidates';
 import type { MerchDesignCarouselResult, MerchDesignPreview } from './types';
 
 const DEFAULT_DESIGN_COUNT = 3;
@@ -89,30 +93,47 @@ async function artistName(profileId: string): Promise<string> {
   return profile.displayName?.trim() || profile.username;
 }
 
-function minimalBrief(name: string, prompt: string): MerchArtistBrief {
+function minimalBrief(
+  name: string,
+  prompt: string,
+  source?: MerchSource
+): MerchArtistBrief {
   return {
     artist_myth: `${name} merch.`,
     fan_identity:
       'Fans want a wearable graphic that looks designed, not generic.',
     visual_language: ['illustrated graphic', 'band-merch energy'],
-    forbidden_cliches: ['fake tour dates', 'generic centered logo'],
+    forbidden_cliches: [
+      'fake tour dates',
+      'generic centered logo',
+      'no people, faces, portraits, models, or human figures',
+      'no unverified artist likeness',
+    ],
     campaign_context: `Artist request: ${prompt}`,
     best_merch_hypothesis: 'A strong illustrated graphic on a premium blank.',
     commercial_angle: 'Wearable artist graphic.',
     risk_level: 'safe',
+    ...(source ? { source } : {}),
   };
 }
 
-function buildImagePrompt(
+export function buildMerchImagePrompt(
   name: string,
   userPrompt: string,
-  style: string
+  style: string,
+  source?: MerchSource
 ): string {
+  const sourceLine = source
+    ? `Use this verified ${source.sourceType.replaceAll('_', ' ')} exactly as the textual source: "${source.sourceText}". Provenance: ${source.provenanceTitle}.`
+    : 'Use only the artist name and the supplied request; do not invent catalog details, lyrics, tour dates, or a fictional artist persona.';
+
   return [
     `${style}.`,
     `Concept: ${userPrompt}.`,
+    sourceLine,
     `Feature the artist name "${name}" as bold band-merch lettering.`,
     'Centered composition, print-ready artwork, no garment, no mockup.',
+    'Do not depict people, faces, portraits, models, bodies, or human figures. Do not invent, imitate, or imply the artist likeness. Do not recreate logos or trademarks from a textual description.',
   ].join(' ');
 }
 
@@ -268,9 +289,16 @@ export async function generateMerchDesigns(params: {
   readonly clerkUserId: string;
   readonly prompt: string;
   readonly count?: number;
+  readonly source?: MerchSource;
   readonly conversationId?: string | null;
   readonly turnId?: string | null;
 }): Promise<MerchDesignCarouselResult> {
+  if (params.source && requiresAssetPreservingRender(params.source)) {
+    throw new TypeError(
+      'This Library asset needs an asset-preserving render path. Jovie will not recreate an uploaded logo from a text prompt.'
+    );
+  }
+
   const name = await artistName(params.profileId);
   const generationId = randomUUID();
   const count = Math.min(Math.max(params.count ?? DEFAULT_DESIGN_COUNT, 1), 4);
@@ -287,7 +315,7 @@ export async function generateMerchDesigns(params: {
     chatTurnId: params.turnId ?? null,
     prompt: params.prompt,
     command: 'generate_merch_designs',
-    artistBrief: minimalBrief(name, params.prompt),
+    artistBrief: minimalBrief(name, params.prompt, params.source),
     status: 'generating',
   });
 
@@ -307,15 +335,25 @@ export async function generateMerchDesigns(params: {
         const optionId = randomUUID();
         try {
           const graphic = await generatePrintGraphic({
-            prompt: buildImagePrompt(name, params.prompt, direction.style),
+            prompt: buildMerchImagePrompt(
+              name,
+              params.prompt,
+              direction.style,
+              params.source
+            ),
             selection: { weights: modelWeights },
           });
           const previewUrl = await uploadAlphaPng(
             `merch/generated/${params.profileId}/${generationId}/${optionId}.png`,
             graphic.image
           );
-          const designName = `${name} ${direction.label}`;
-          const concept = `${direction.label} direction: ${params.prompt}`;
+          const sourceLabel = params.source
+            ? `${params.source.sourceType.replaceAll('_', ' ')}: ${params.source.provenanceTitle}`
+            : null;
+          const designName = params.source
+            ? `${params.source.sourceText} ${direction.label}`
+            : `${name} ${direction.label}`;
+          const concept = `${direction.label} direction: ${params.prompt}${sourceLabel ? ` · Source: ${sourceLabel}` : ''}`;
 
           await db.insert(merchDesignOptions).values({
             id: optionId,
@@ -343,7 +381,9 @@ export async function generateMerchDesigns(params: {
             jovieShareCents: pricing.jovieMarginPerUnitEstimateCents,
             pricing,
             concept,
-            whyItFits: 'Illustrated graphic generated for this artist.',
+            whyItFits: params.source
+              ? `Built from the verified ${params.source.sourceType.replaceAll('_', ' ')} “${params.source.sourceText}”.`
+              : 'Illustrated graphic generated for this artist without an invented likeness.',
             mockupUrls: [previewUrl],
             printFileUrls: [previewUrl],
             // Catalog warnings about unavailability stay; cost-source warnings
@@ -378,7 +418,16 @@ export async function generateMerchDesigns(params: {
             concept,
             status: 'ready',
             preview_url: previewUrl,
-            slots: { artist_name: name },
+            slots: {
+              artist_name: name,
+              ...(params.source
+                ? {
+                    short_text: params.source.sourceText,
+                    source_label: sourceLabel ?? undefined,
+                    source_type: params.source.sourceType,
+                  }
+                : {}),
+            },
           };
         } catch (error) {
           logger.warn('[merch-designs] generation failed for one design', {
