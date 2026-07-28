@@ -26,6 +26,10 @@ import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { buildSignatureInputFromProfile } from '@/lib/email-signature/profile-input';
 import {
+  beginPreviewPanelEdit,
+  endPreviewPanelEdit,
+} from '@/lib/profile/preview-panel-optimistic';
+import {
   FetchError,
   fetchWithTimeout,
   type ProfileUpdateInput,
@@ -298,6 +302,14 @@ export function ProfileContactSidebar() {
   const [mutationStatus, setMutationStatus] =
     useState<ProfileRailMutationStatus>(IDLE_MUTATION_STATUS);
 
+  const releaseOutstandingPreviewEdits = useCallback(() => {
+    const outstanding = pendingOperationCountRef.current;
+    pendingOperationCountRef.current = 0;
+    for (let i = 0; i < outstanding; i += 1) {
+      endPreviewPanelEdit();
+    }
+  }, []);
+
   useEffect(() => {
     const queuedFieldSaves = queuedFieldSavesRef.current;
     mountedRef.current = true;
@@ -305,6 +317,12 @@ export function ProfileContactSidebar() {
       mountedRef.current = false;
       operationEpochRef.current += 1;
       queuedFieldSaves.clear();
+      // Drop the global hydrate gate so unmount cannot pin hydrators forever.
+      const outstanding = pendingOperationCountRef.current;
+      pendingOperationCountRef.current = 0;
+      for (let i = 0; i < outstanding; i += 1) {
+        endPreviewPanelEdit();
+      }
     };
   }, []);
 
@@ -326,14 +344,25 @@ export function ProfileContactSidebar() {
     linkGenerationRef.current.clear();
     linkVersionByPlatformRef.current.clear();
     linkPlatformQueueRef.current.clear();
-    pendingOperationCountRef.current = 0;
+    releaseOutstandingPreviewEdits();
     activeMutationErrorRef.current = null;
     setMutationStatus(IDLE_MUTATION_STATUS);
-  }, [selectedProfile?.id, selectedProfile?.profileEditVersion]);
+  }, [
+    releaseOutstandingPreviewEdits,
+    selectedProfile?.id,
+    selectedProfile?.profileEditVersion,
+  ]);
 
   useEffect(() => {
-    profileVersionRef.current =
+    // CAS tokens only move forward for a given profile. Stale hydrations must
+    // not rewind the token mid-flight or concurrent saves will thrash on 409s.
+    const nextVersion =
       previewData?.profileEditVersion ?? selectedProfile?.profileEditVersion;
+    if (nextVersion === undefined) return;
+    const currentVersion = profileVersionRef.current;
+    if (currentVersion === undefined || nextVersion > currentVersion) {
+      profileVersionRef.current = nextVersion;
+    }
   }, [previewData?.profileEditVersion, selectedProfile?.profileEditVersion]);
 
   useEffect(() => {
@@ -359,6 +388,7 @@ export function ProfileContactSidebar() {
 
   const beginMutationStatus = useCallback(() => {
     pendingOperationCountRef.current += 1;
+    beginPreviewPanelEdit();
     activeMutationErrorRef.current = null;
     if (mountedRef.current) setMutationStatus({ state: 'saving' });
   }, []);
@@ -368,6 +398,7 @@ export function ProfileContactSidebar() {
       0,
       pendingOperationCountRef.current - 1
     );
+    endPreviewPanelEdit();
     if (!mountedRef.current) return;
     if (activeMutationErrorRef.current) {
       setMutationStatus(activeMutationErrorRef.current);
@@ -384,6 +415,7 @@ export function ProfileContactSidebar() {
         0,
         pendingOperationCountRef.current - 1
       );
+      endPreviewPanelEdit();
       if (!mountedRef.current) return;
       const errorStatus = { state: 'error', message, retry } as const;
       activeMutationErrorRef.current = errorStatus;

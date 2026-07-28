@@ -12,6 +12,7 @@ import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { ProfileContactSidebar } from '@/features/dashboard/organisms/profile-contact-sidebar';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AvailableDSP } from '@/lib/dsp';
+import { mergePreviewPanelHydration } from '@/lib/profile/preview-panel-optimistic';
 import { getHometownFromSettings } from '@/types/db';
 
 const VALID_PLATFORM_TYPES = new Set([
@@ -84,7 +85,7 @@ export function PreviewDataHydrator({
     if (!selectedProfile) return;
     const canonicalUsername =
       selectedProfile.usernameNormalized ?? selectedProfile.username;
-    setPreviewData({
+    const incoming = {
       username: canonicalUsername,
       displayName: selectedProfile.displayName ?? canonicalUsername,
       avatarUrl: selectedProfile.avatarUrl ?? null,
@@ -110,7 +111,10 @@ export function PreviewDataHydrator({
             : null,
         },
       },
-    });
+    };
+    // Functional merge keeps concurrent optimistic rail paints from snapping
+    // back to a stale dashboard snapshot when links/profile props refresh.
+    setPreviewData(current => mergePreviewPanelHydration(current, incoming));
   }, [selectedProfile, previewLinks, setPreviewData, connectedDSPs]);
 
   return null;

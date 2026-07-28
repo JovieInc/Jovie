@@ -446,7 +446,11 @@ describe('ChatPageClient', () => {
 
     expect(mockUseRegisterRightPanel).toHaveBeenCalled();
     expect(hasRegisteredRightPanel()).toBe(true);
-    expect(mockSetPreviewData).toHaveBeenCalledWith(
+    expect(mockSetPreviewData).toHaveBeenCalled();
+    const hydrate = mockSetPreviewData.mock.calls.at(-1)?.[0];
+    expect(typeof hydrate).toBe('function');
+    // Functional updater merges against current preview; null is first hydrate.
+    expect(hydrate?.(null)).toEqual(
       expect.objectContaining({
         username: 'testartist',
       })
