@@ -43,7 +43,9 @@ vi.mock('@/components/shell/TasksRouteSkeleton', () => ({
 vi.mock('./calendar/CalendarRouteSkeleton', () => ({
   CalendarRouteSkeleton: () => null,
 }));
-vi.mock('./chat/loading', () => ({ default: () => null }));
+vi.mock('./chat/loading', () => ({
+  default: () => <div data-testid='chat-route-skeleton' />,
+}));
 vi.mock('./dashboard/releases/loading', () => ({
   ReleaseTableSkeleton: () => null,
 }));
@@ -111,5 +113,17 @@ describe('ShellLoading', () => {
 
     expect(getByTestId('settings-route-skeleton')).toBeInTheDocument();
     expect(queryByTestId('dashboard-segment-skeleton')).toBeNull();
+  });
+
+  it('uses a neutral segment skeleton when loading headers are absent', async () => {
+    mockHeaders.mockResolvedValue(new Headers());
+
+    const { getByTestId, queryByTestId } = render(await ShellLoading());
+
+    expect(getByTestId('dashboard-segment-skeleton')).toHaveAttribute(
+      'data-skeleton-variant',
+      'default'
+    );
+    expect(queryByTestId('chat-route-skeleton')).toBeNull();
   });
 });

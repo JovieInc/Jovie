@@ -191,7 +191,7 @@ export function TaskWorkspaceHeaderBar({
       <PageToolbar
         start={toolbarStart}
         end={toolbarEnd}
-        className='h-(--linear-app-header-height-compact) min-h-(--linear-app-header-height-compact)'
+        className='h-(--linear-app-header-height-compact) min-h-(--linear-app-header-height-compact) max-sm:px-4'
         startClassName='overflow-visible'
         endClassName='gap-0.5'
       />
@@ -214,7 +214,7 @@ export function TaskSubviewTabs({
 }>) {
   if (subviews.length === 0) {
     return (
-      <div className={cn('flex h-full items-center pl-1.5', className)}>
+      <div className={cn('flex h-full items-center', className)}>
         {typeof taskCount === 'number' ? (
           <span className='text-3xs font-semibold text-tertiary-token'>
             {taskCount === 1 ? '1 Task' : `${taskCount} Tasks`}
@@ -231,7 +231,7 @@ export function TaskSubviewTabs({
       ariaLabel='Task subviews'
       overflowMode='collapse'
       variant='segment'
-      className={cn('pl-1.5', className)}
+      className={className}
       triggerClassName='gap-1.5 px-2 text-xs'
       options={subviews.map(subview => ({
         value: subview.id,

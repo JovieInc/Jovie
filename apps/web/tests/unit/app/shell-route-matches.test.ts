@@ -15,6 +15,7 @@ import {
   isTasksShellRoute,
   isThreadsShellRoute,
   isTouringShellRoute,
+  resolveAppShellLoadingPath,
   resolveAppShellRequestPath,
   resolveDashboardSegmentSkeletonVariant,
   shouldRedirectToOnboarding,
@@ -55,6 +56,10 @@ describe('resolveAppShellRequestPath', () => {
 
   it('falls back to the dashboard path when no path-like header is present', () => {
     expect(resolveAppShellRequestPath(null, null)).toBe(APP_ROUTES.DASHBOARD);
+  });
+
+  it('keeps loading route selection neutral when request headers are absent', () => {
+    expect(resolveAppShellLoadingPath(null, null)).toBeNull();
   });
 });
 

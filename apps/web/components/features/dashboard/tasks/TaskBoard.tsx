@@ -44,6 +44,7 @@ import {
   getTaskPriorityVisual,
   getTaskStageVisual,
   getTaskStatusVisual,
+  TASK_STATUS_LABEL_CLASSNAME,
 } from './task-presentation';
 
 interface TaskBoardProps {
@@ -52,6 +53,7 @@ interface TaskBoardProps {
   readonly isLoading: boolean;
   readonly artistName?: string | null;
   readonly selectedTaskId: string | null;
+  readonly compactColumnLabels?: boolean;
   readonly showAssigneeChip?: boolean;
   readonly onOpenTask: (task: TaskView) => void;
   readonly onCreateTask: () => void;
@@ -113,6 +115,7 @@ export function TaskBoard({
   isLoading,
   artistName,
   selectedTaskId,
+  compactColumnLabels = false,
   showAssigneeChip = true,
   onOpenTask,
   onCreateTask,
@@ -165,16 +168,11 @@ export function TaskBoard({
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveTaskId(null)}
     >
-      {/* gh-9799 HOT ZONE: task board column grid. Pragmatic Tailwind-only fix for horizontal overflow + clearer scroll affordance (snap) when needed.
-         Completeness (P1): covers edge content + responsive viewports.
-         Boil lakes (P2): strictly this file + direct styles.
-         DRY (P4) + explicit (P5): reuses min-w-0/overflow patterns + existing tokens; added comments.
-         Bias action (P6): small delta, no new components. */}
       <div
-        className='grid h-full min-h-0 min-w-full gap-3 overflow-x-auto overflow-y-hidden px-3 pb-3 pt-1.5 snap-x snap-mandatory'
+        className='grid h-full min-h-0 min-w-0 gap-3 overflow-hidden px-3 pb-3 pt-1.5'
         data-testid='tasks-board'
         style={{
-          gridTemplateColumns: `repeat(${Math.max(columns.length, 1)}, minmax(15.5rem, 1fr))`,
+          gridTemplateColumns: `repeat(${Math.max(columns.length, 1)}, minmax(0, 1fr))`,
         }}
       >
         {columns.map(column => (
@@ -183,6 +181,7 @@ export function TaskBoard({
             column={column}
             artistName={artistName}
             selectedTaskId={selectedTaskId}
+            compactColumnLabels={compactColumnLabels}
             showAssigneeChip={showAssigneeChip}
             onOpenTask={onOpenTask}
             onCreateTask={onCreateTask}
@@ -209,6 +208,7 @@ function TaskBoardColumn({
   column,
   artistName,
   selectedTaskId,
+  compactColumnLabels,
   showAssigneeChip,
   onOpenTask,
   onCreateTask,
@@ -217,6 +217,7 @@ function TaskBoardColumn({
   column: TaskBoardColumnResult;
   artistName?: string | null;
   selectedTaskId: string | null;
+  compactColumnLabels: boolean;
   showAssigneeChip: boolean;
   onOpenTask: (task: TaskView) => void;
   onCreateTask: () => void;
@@ -225,6 +226,10 @@ function TaskBoardColumn({
   const visual = getTaskStatusVisual(column.status);
   const accent = getAccentCssVars(visual.accent);
   const StatusIcon = visual.icon;
+  const columnLabel =
+    compactColumnLabels && column.status === 'in_progress'
+      ? 'Active'
+      : visual.label;
   const { setNodeRef, isOver } = useDroppable({
     id: getTaskBoardColumnDroppableId(column.status),
     data: { type: 'column', status: column.status },
@@ -236,13 +241,13 @@ function TaskBoardColumn({
       aria-label={`${visual.label} tasks`}
       data-testid={`tasks-board-column-${column.status}`}
       className={cn(
-        'flex h-full min-h-0 w-full min-w-0 flex-col rounded-xl border border-subtle bg-surface-0 snap-start',
+        'flex h-full min-h-0 w-full min-w-0 flex-col rounded-xl border border-subtle bg-surface-0',
         isOver &&
           'border-[color-mix(in_oklab,var(--linear-border-focus)_70%,transparent)] bg-[color-mix(in_oklab,var(--linear-row-hover)_36%,var(--linear-app-content-surface))]'
       )}
     >
-      <div className='sticky top-0 z-10 flex h-10 min-h-10 items-center justify-between gap-2 border-b border-subtle bg-surface-0 px-3'>
-        <div className='flex min-w-0 items-center gap-2'>
+      <div className='sticky top-0 z-10 flex h-10 min-h-10 items-center justify-between gap-1 border-b border-subtle bg-surface-0 px-2'>
+        <div className='flex min-w-0 items-center gap-1'>
           <StatusIcon
             className={cn(
               'h-3.5 w-3.5 shrink-0',
@@ -250,8 +255,14 @@ function TaskBoardColumn({
             )}
             style={{ color: accent.solid }}
           />
-          <h2 className='truncate text-xs font-semibold text-primary-token'>
-            {visual.label}
+          <h2
+            className={cn(
+              'min-w-0 truncate text-2xs font-semibold text-primary-token',
+              TASK_STATUS_LABEL_CLASSNAME
+            )}
+          >
+            <span className='sr-only'>{visual.label}</span>
+            <span aria-hidden='true'>{columnLabel}</span>
           </h2>
           <span className='text-3xs tabular-nums text-tertiary-token'>
             {column.totalCount}

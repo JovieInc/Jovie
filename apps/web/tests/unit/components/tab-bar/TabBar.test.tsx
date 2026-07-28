@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { forwardRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -112,5 +112,45 @@ describe('TabBar distribution', () => {
     for (const tab of screen.getAllByRole('tab')) {
       expect(tab.className).not.toContain('flex-1');
     }
+  });
+
+  it('uses the quiet segment selection treatment while preserving keyboard focus', () => {
+    const onValueChange = vi.fn();
+
+    render(
+      <TabBar
+        value='overview'
+        onValueChange={onValueChange}
+        options={OPTIONS}
+        ariaLabel='Segment tabs'
+        variant='segment'
+      />
+    );
+
+    const activeTab = screen.getByRole('tab', { name: 'Overview' });
+    const inactiveTab = screen.getByRole('tab', { name: 'Activity' });
+
+    expect(activeTab).toHaveAttribute('aria-selected', 'true');
+    expect(activeTab.className).toContain('bg-surface-0');
+    expect(activeTab.className).toContain('rounded-full');
+    expect(activeTab.className).toContain('font-semibold');
+    expect(activeTab.className).not.toContain('border-b-accent');
+    expect(activeTab.className).not.toContain('ring-(--color-accent)');
+    expect(inactiveTab.className).toContain('focus-visible:ring-2');
+
+    const canvas = document.createElement('button');
+    document.body.append(canvas);
+    activeTab.focus();
+    expect(document.activeElement).toBe(activeTab);
+
+    fireEvent.click(activeTab);
+    expect(onValueChange).toHaveBeenCalledWith('overview');
+
+    fireEvent.click(canvas);
+    fireEvent.keyDown(document, { key: 'Tab' });
+    activeTab.focus();
+    expect(document.activeElement).toBe(activeTab);
+    expect(activeTab).not.toHaveAttribute('data-focus-origin');
+    canvas.remove();
   });
 });

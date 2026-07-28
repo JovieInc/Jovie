@@ -20,7 +20,7 @@ import {
   isSettingsShellRoute,
   isTasksShellRoute,
   isTouringShellRoute,
-  resolveAppShellRequestPath,
+  resolveAppShellLoadingPath,
   resolveDashboardSegmentSkeletonVariant,
 } from './shell-route-matches';
 
@@ -54,7 +54,7 @@ function SettingsShellLoading() {
  */
 export default async function ShellLoading() {
   const headerStore = await headers();
-  const pathname = resolveAppShellRequestPath(
+  const pathname = resolveAppShellLoadingPath(
     headerStore.get('next-url'),
     headerStore.get('x-matched-path'),
     headerStore.get('x-invoke-path')
