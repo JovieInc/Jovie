@@ -1858,7 +1858,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-size: var(--text-lg);
   line-height: var(--ds-marketing-lede-leading);
   letter-spacing: var(--ds-marketing-lede-tracking);
-  text-wrap: balance;
+  text-wrap: pretty;
 }
 
 .homepage-poster-hero__actions {
@@ -5544,6 +5544,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .home-viewport [data-homepage-section-heading] {
+  /* Balanced wrapping; section titles are authored for ≤2 lines. */
   text-wrap: balance;
 }
 /* HOMEPAGE PROOF HANDOFF END */

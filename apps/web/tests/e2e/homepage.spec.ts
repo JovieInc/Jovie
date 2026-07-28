@@ -77,7 +77,7 @@ test.describe('Homepage', () => {
     ).toHaveAttribute('href', /\/start\?starter_prompt=/);
     await expect(
       hero.getByRole('link', {
-        name: 'See a live artist profile',
+        name: 'See a live profile',
         exact: true,
       })
     ).toHaveAttribute('href', '/artist-profiles');
