@@ -4,12 +4,13 @@ import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 import { DRAWER_OVERLAY_CLASS } from './drawer-overlay-styles';
 
 describe('drawer-overlay-styles', () => {
-  it('overlay includes 60% black opacity for sufficient backdrop coverage', () => {
-    expect(DRAWER_OVERLAY_CLASS).toContain('bg-black/60');
+  it('uses a light flat dim so the mobile drawer remains crisp', () => {
+    expect(DRAWER_OVERLAY_CLASS).toContain('bg-black/24');
   });
 
-  it('overlay includes backdrop blur', () => {
-    expect(DRAWER_OVERLAY_CLASS).toContain('backdrop-blur-sm');
+  it('does not blur the underlying profile', () => {
+    expect(DRAWER_OVERLAY_CLASS).not.toContain('backdrop-blur');
+    expect(DRAWER_OVERLAY_CLASS).toContain('bg-black/24');
   });
 
   it('overlay sits on the canonical drawer-backdrop layer below drawer content', () => {
