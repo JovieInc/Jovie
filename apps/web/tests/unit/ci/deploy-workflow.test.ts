@@ -1497,6 +1497,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     const runtimeKeys = [
       'VERCEL_AUTOMATION_BYPASS_SECRET',
       'NEXT_PUBLIC_BETTER_AUTH_URL',
+      'NEXT_PUBLIC_GOOGLE_CLIENT_ID',
       'BETTER_AUTH_SECRET',
       'BETTER_AUTH_URL',
       'AUTH_GOOGLE_CLIENT_ID',
@@ -1525,6 +1526,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       .split('\n')
       .find(line => line.includes('--only-secrets='));
     for (const key of [
+      'NEXT_PUBLIC_GOOGLE_CLIENT_ID',
       'AUTH_GOOGLE_CLIENT_ID',
       'AUTH_GOOGLE_CLIENT_SECRET',
       'AUTH_APPLE_CLIENT_ID',
@@ -1540,6 +1542,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'Build (preview target for staging verification)'
     );
     for (const key of [
+      'NEXT_PUBLIC_GOOGLE_CLIENT_ID',
       'AUTH_GOOGLE_CLIENT_ID',
       'AUTH_GOOGLE_CLIENT_SECRET',
       'AUTH_APPLE_CLIENT_ID',
