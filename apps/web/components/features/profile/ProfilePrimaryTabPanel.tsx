@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Bell, CheckCircle2, Music2 } from 'lucide-react';
+import { Bell, CheckCircle2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { AboutSection } from '@/features/profile/AboutSection';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
@@ -12,7 +12,7 @@ import type {
   ProfilePrimaryTab,
   ProfileRenderMode,
 } from '@/features/profile/contracts';
-import { ProfileEmptyBentoCard } from '@/features/profile/ProfileEmptyBentoCard';
+import { ProfileEmptyState } from '@/features/profile/ProfileEmptyState';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { TourDrawerContent } from '@/features/profile/TourModePanel';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
@@ -276,7 +276,7 @@ function ProfileMusicEmptyState({
         className='h-11 w-full rounded-full'
         disabled
       >
-        Turn On Alerts
+        Turn on music alerts
       </Button>
     ) : (
       <ArtistNotificationsCTA
@@ -286,24 +286,17 @@ function ProfileMusicEmptyState({
         hideListenFallback
         source={sourceContext.ctaLocation}
         sourceContext={sourceContext}
-        triggerLabel='Turn on alerts'
+        triggerLabel='Turn on music alerts'
       />
     );
 
   return (
-    <div
-      className='flex flex-1 items-center px-4 pb-4'
-      data-testid='profile-primary-tab-music-empty'
-    >
-      <ProfileEmptyBentoCard
-        accent='music'
-        icon={Music2}
-        title='No Music'
-        body='Get a note when the first release lands.'
-        layout='compact'
-        action={action}
-      />
-    </div>
+    <ProfileEmptyState
+      title='No Music'
+      description='Get a note when the first release lands.'
+      action={action}
+      dataTestId='profile-primary-tab-music-empty'
+    />
   );
 }
 
