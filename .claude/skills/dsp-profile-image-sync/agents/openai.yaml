@@ -1,0 +1,4 @@
+interface:
+  display_name: "DSP Profile Image Sync"
+  short_description: "Sync artist images to connected DSPs"
+  default_prompt: "Use $dsp-profile-image-sync to update my artist image across Beatport and Spotify."
