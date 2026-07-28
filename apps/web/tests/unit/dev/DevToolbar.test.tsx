@@ -560,30 +560,75 @@ describe('DevToolbar', () => {
     });
   });
 
-  // ─── Toggle Flash Feedback ─────────────────────────────────
+  // ─── Flag drawer collapse (JOV-4448) ────────────────────────
 
-  describe('toggle flash feedback', () => {
-    it('applies flash class when a non-override flag toggle creates a new override', () => {
-      // Toggling a flag that matches the server default to its non-default
-      // value creates a meaningful override. The new row in the Overrides
-      // section briefly flashes for visual confirmation. (When a flag is
-      // toggled BACK to the server default the row is removed instead —
-      // see auto-clear tests above; the row going away IS the feedback.)
+  describe('flag drawer collapse', () => {
+    it('auto-collapses after a flag selection and keeps the override badge', () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
-      // CLAIM_HANDLE server default is false. Click the row in the
-      // non-overrides list to toggle it to true (creates an override).
+      expect(screen.getByTestId('dev-toolbar-flag-drawer')).toBeInTheDocument();
+
       const flagLabel = screen.getByText('claim handle');
       const row = flagLabel.closest('[class*="rounded-sm"]');
       const flagSwitch = row?.querySelector('[role="switch"]');
       expect(flagSwitch).toBeTruthy();
       fireEvent.click(flagSwitch as Element);
 
-      // The flag now lives in the Overrides section — find its new row.
-      const newLabel = screen.getByText('claim handle');
-      const newRow = newLabel.closest('[class*="rounded-sm"]');
-      expect(newRow?.className).toContain('bg-accent/10');
+      // Drawer collapses after selection; badge count remains on the bar.
+      expect(
+        screen.queryByTestId('dev-toolbar-flag-drawer')
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Expand Dev Toolbar' })
+      ).toBeInTheDocument();
+      expect(screen.getByText('1 override')).toBeInTheDocument();
+      expect(localStorage.getItem(TOOLBAR_OPEN_KEY)).toBe('0');
+    });
+
+    it('auto-collapses after Clear All', () => {
+      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      fireEvent.click(screen.getByText('Clear All'));
+
+      expect(localStorage.getItem(FF_OVERRIDES_KEY)).toBeNull();
+      expect(
+        screen.queryByTestId('dev-toolbar-flag-drawer')
+      ).not.toBeInTheDocument();
+      expect(localStorage.getItem(TOOLBAR_OPEN_KEY)).toBe('0');
+    });
+
+    it('does not restore an expanded drawer on compact surfaces (chat)', () => {
+      // Prior session left the flag drawer open on another route.
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      localStorage.setItem(TOOLBAR_HIDDEN_KEY, '0');
+      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
+
+      renderToolbar({ defaultHidden: true });
+
+      // Compact surfaces force collapsed drawer; badge count still visible.
+      expect(
+        screen.queryByTestId('dev-toolbar-flag-drawer')
+      ).not.toBeInTheDocument();
+      expect(screen.getByText('1 override')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Expand Dev Toolbar' })
+      ).toBeInTheDocument();
+    });
+
+    it('expands on badge click even on compact surfaces', () => {
+      localStorage.setItem(TOOLBAR_HIDDEN_KEY, '0');
+      setLocalOverrides({ 'code:CLAIM_HANDLE': true });
+      renderToolbar({ defaultHidden: true });
+
+      fireEvent.click(screen.getByText('1 override'));
+
+      expect(screen.getByTestId('dev-toolbar-flag-drawer')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Collapse Dev Toolbar' })
+      ).toBeInTheDocument();
     });
   });
 
