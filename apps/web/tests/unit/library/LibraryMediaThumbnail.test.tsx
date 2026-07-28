@@ -67,6 +67,27 @@ describe('LibraryMediaThumbnail', () => {
     ).not.toBeInTheDocument();
   });
 
+  it.each([
+    ['row', 'rounded-[3%]'],
+    ['card', 'rounded-[7%]'],
+    ['drawer', 'rounded-[10%]'],
+  ] as const)('maps the %s fallback to the appropriate artwork corner radius', (size, expectedRadius) => {
+    const { container } = render(
+      <LibraryMediaThumbnail
+        asset={buildAsset({
+          artworkUrl: null,
+          previewUrl: null,
+          videoUrl: null,
+        })}
+        size={size}
+      />
+    );
+
+    expect(
+      container.querySelector('[data-artwork-fallback-sleeve="true"]')
+    ).toHaveClass(expectedRadius);
+  });
+
   it('reveals an audio waveform scrub overlay on hover', () => {
     render(<LibraryMediaThumbnail asset={buildAsset()} size='card' />);
 
