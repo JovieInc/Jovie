@@ -37,7 +37,8 @@ describe('root not-found System B source tokens', () => {
     expect(source).not.toMatch(rawVisualUtilityPattern);
     expect(source).not.toMatch(negativeTrackingPattern);
     expect(source).not.toContain('style={{');
-    expect(source).toContain("variant='minimal'");
+    expect(source).toContain('PublicPageShell');
+    expect(source).toContain("headerVariant='minimal'");
     expect(source).toContain('system-b-root-not-found-main');
     expect(source).toContain('NotFoundPageContent');
     expect(source).toContain("variant='generic'");
@@ -50,7 +51,7 @@ describe('root not-found System B source tokens', () => {
     )?.[0];
 
     expect(block).toBeTruthy();
-    expect(block).toContain('var(--system-b-header-height)');
+    expect(block).toContain('flex: 1;');
     expect(block).toContain('var(--system-b-text-primary)');
     expect(block).toContain('var(--system-b-primary-bg)');
     expect(block).toContain('var(--system-b-primary-fg)');

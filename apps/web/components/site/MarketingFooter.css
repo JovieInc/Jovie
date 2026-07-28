@@ -88,3 +88,39 @@
   max-width: 16rem;
   margin-top: 1.25rem;
 }
+
+/* The CTA is shared by public pages outside the homepage.  Its shape must be
+   complete here rather than depending on home-route CSS, otherwise it collapses
+   into the footer grid on routes such as the root 404. */
+.marketing-footer-premium .homepage-story-final-cta {
+  display: grid;
+  min-height: clamp(22rem, 34vw, 30rem);
+  place-items: center;
+  padding: clamp(3.5rem, 7vw, 6.5rem) clamp(1.25rem, 4vw, 3rem);
+}
+
+.marketing-footer-premium .homepage-final-cta-copy {
+  display: flex;
+  width: min(100%, 42rem);
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.marketing-footer-premium .homepage-final-cta-action {
+  min-height: var(--space-11);
+  margin-top: var(--space-7);
+  padding-inline: var(--space-6);
+}
+
+@media (max-width: 40rem) {
+  .marketing-footer-premium .homepage-story-final-cta {
+    min-height: 20rem;
+    padding-block: var(--space-12);
+  }
+
+  .marketing-footer-premium .homepage-final-cta-action {
+    width: 100%;
+    max-width: 20rem;
+  }
+}
