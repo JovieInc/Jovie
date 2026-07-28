@@ -8,7 +8,7 @@ const meta: Meta<typeof SidebarNavItem> = {
   parameters: { layout: 'centered' },
   decorators: [
     Story => (
-      <div className='w-60 bg-(--linear-app-content-surface) p-3'>
+      <div className='w-60 bg-sidebar p-3'>
         <Story />
       </div>
     ),
