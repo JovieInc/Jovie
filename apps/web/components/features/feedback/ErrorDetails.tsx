@@ -38,6 +38,10 @@ export function buildErrorDetails(
 interface ErrorDetailsProps {
   readonly error?: Error & { digest?: string };
   readonly extraContext?: Record<string, string>;
+  /** Keep diagnostic information out of the initial recovery view. */
+  readonly collapsible?: boolean;
+  /** Render a raw diagnostic only when it adds information beyond the recovery copy. */
+  readonly showMessage?: boolean;
 }
 
 /**
@@ -45,7 +49,12 @@ interface ErrorDetailsProps {
  * Used across PageErrorState, ErrorDialog, DashboardErrorFallback, and ErrorBoundary
  * to eliminate copy-pasted code.
  */
-export function ErrorDetails({ error, extraContext }: ErrorDetailsProps) {
+export function ErrorDetails({
+  error,
+  extraContext,
+  collapsible = false,
+  showMessage = false,
+}: ErrorDetailsProps) {
   const [timestamp] = useState(() => new Date());
   const [errorRef] = useState(() =>
     error?.digest ? undefined : generateErrorRef()
@@ -68,7 +77,7 @@ export function ErrorDetails({ error, extraContext }: ErrorDetailsProps) {
       });
   };
 
-  return (
+  const content = (
     <>
       <div className='space-y-2 border-t border-subtle pt-4'>
         {displayId && (
@@ -93,17 +102,41 @@ export function ErrorDetails({ error, extraContext }: ErrorDetailsProps) {
         </div>
       </div>
 
+      {collapsible && showMessage && error?.message ? (
+        <p className='text-center text-xs text-quaternary-token break-words'>
+          {error.message}
+        </p>
+      ) : null}
+
       {process.env.NODE_ENV === 'development' && error?.message && (
-        <details className='mt-4 rounded-md bg-surface-2 p-3'>
-          <summary className='cursor-pointer text-xs font-medium text-tertiary-token hover:text-primary-token'>
-            Developer Info (dev only)
-          </summary>
+        <div className='mt-4 rounded-md bg-surface-2 p-3'>
+          {collapsible ? (
+            <p className='text-xs font-medium text-tertiary-token'>
+              Developer info
+            </p>
+          ) : null}
           <pre className='mt-2 overflow-auto text-xs text-quaternary-token whitespace-pre-wrap break-words'>
             {error.message}
             {error.stack && `\n\n${error.stack}`}
           </pre>
-        </details>
+        </div>
       )}
     </>
+  );
+
+  if (!collapsible) {
+    return content;
+  }
+
+  return (
+    <details className='pt-1 text-left'>
+      <summary
+        data-focus-treatment='underline-only'
+        className='cursor-pointer list-none text-center text-xs text-quaternary-token transition-colors duration-normal ease-interactive hover:text-tertiary-token'
+      >
+        Error Details
+      </summary>
+      <div className='pt-3'>{content}</div>
+    </details>
   );
 }

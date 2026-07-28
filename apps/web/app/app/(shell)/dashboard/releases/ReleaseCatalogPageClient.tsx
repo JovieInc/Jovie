@@ -147,10 +147,6 @@ export function ReleaseCatalogPageClient({
         onRetry={() => {
           refetch();
         }}
-        secondaryAction={{
-          label: 'Refresh Page',
-          onClick: () => globalThis.location.reload(),
-        }}
         extraContext={{ Profile: profileId }}
       />
     );
