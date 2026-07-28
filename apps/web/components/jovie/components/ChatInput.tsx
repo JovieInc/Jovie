@@ -24,6 +24,11 @@ import { SYSTEM_B_RADIUS_PX } from '@/lib/design/system-b-radius';
 import { useEntityRecents } from '@/lib/queries/useEntityRecents';
 import { cn } from '@/lib/utils';
 
+import {
+  CHAT_COMPOSER_EMPTY_PLACEHOLDER,
+  CHAT_COMPOSER_FORM_ARIA_LABEL,
+  CHAT_COMPOSER_INPUT_ARIA_LABEL,
+} from '../chat-composer-copy';
 import { CHAT_COMPOSER_MAX_WIDTH } from '../chat-layout';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import {
@@ -214,7 +219,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onSubmit,
       isLoading,
       isSubmitting,
-      placeholder = 'What are you working on?',
+      placeholder = CHAT_COMPOSER_EMPTY_PLACEHOLDER,
       variant = 'default',
       onFileAttach,
       isFileProcessing = false,
@@ -549,16 +554,20 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const handleFormSubmit = useCallback(
       (e: React.FormEvent) => {
         e.preventDefault();
+        // Empty / blocked drafts must not submit — send is disabled, but native
+        // form events and programmatic submits can still reach this handler.
+        if (!canSend) return;
         onSubmit(e);
         scheduleTextareaRefocus();
       },
-      [onSubmit, scheduleTextareaRefocus]
+      [canSend, onSubmit, scheduleTextareaRefocus]
     );
 
     const handleSendClick = useCallback(() => {
+      if (!canSend) return;
       onSubmit();
       scheduleTextareaRefocus();
-    }, [onSubmit, scheduleTextareaRefocus]);
+    }, [canSend, onSubmit, scheduleTextareaRefocus]);
 
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -702,7 +711,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     return (
       <form
         onSubmit={handleFormSubmit}
-        aria-label='Compose A Message — Type / For Skills And References'
+        aria-label={CHAT_COMPOSER_FORM_ARIA_LABEL}
         className='relative z-10 w-full focus-within:outline-none'
       >
         <div className={dockClass}>
@@ -1172,7 +1181,7 @@ function InputRow({
               setComposerFocused(false);
             }}
             maxLength={MAX_MESSAGE_LENGTH + 100}
-            aria-label='Chat Message Input'
+            aria-label={CHAT_COMPOSER_INPUT_ARIA_LABEL}
             aria-describedby={isNearLimit ? 'char-limit-status' : undefined}
             // WAI-ARIA combobox pattern: the textarea is the input that
             // controls the listbox rendered by SlashCommandMenu. Focus stays
