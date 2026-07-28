@@ -75,6 +75,7 @@ export function PageErrorState({
           error={error}
           extraContext={mergedContext}
           collapsible={true}
+          showMessage={Boolean(error?.message && error.message !== message)}
         />
       </div>
     </div>

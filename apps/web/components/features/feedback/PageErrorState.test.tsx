@@ -55,22 +55,36 @@ describe('PageErrorState', () => {
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
-  it('contains long diagnostic content behind the details disclosure', () => {
+  it('keeps a repeated error message out of the diagnostic disclosure', () => {
     const longMessage =
       'Timed out while loading profile, audience, release, and analytics data.';
     render(
       <PageErrorState
         title='Unable to Load Dashboard'
-        message='Try again in a moment.'
+        message={longMessage}
         error={new Error(longMessage)}
       />
     );
 
     const details = screen.getByText('Error Details').closest('details');
     expect(details).not.toHaveAttribute('open');
-    expect(details).toHaveTextContent(longMessage);
+    expect(screen.getAllByText(longMessage)).toHaveLength(1);
+    expect(details).not.toHaveTextContent(longMessage);
     expect(
       details?.querySelector('[aria-label="Copy error details to clipboard"]')
     ).not.toBeNull();
+  });
+
+  it('keeps a distinct diagnostic message in the disclosure', () => {
+    render(
+      <PageErrorState
+        title='Unable to Load Dashboard'
+        message='Try again in a moment.'
+        error={new Error('Request timed out after 30 seconds.')}
+      />
+    );
+
+    const details = screen.getByText('Error Details').closest('details');
+    expect(details).toHaveTextContent('Request timed out after 30 seconds.');
   });
 });

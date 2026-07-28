@@ -40,6 +40,8 @@ interface ErrorDetailsProps {
   readonly extraContext?: Record<string, string>;
   /** Keep diagnostic information out of the initial recovery view. */
   readonly collapsible?: boolean;
+  /** Render a raw diagnostic only when it adds information beyond the recovery copy. */
+  readonly showMessage?: boolean;
 }
 
 /**
@@ -51,6 +53,7 @@ export function ErrorDetails({
   error,
   extraContext,
   collapsible = false,
+  showMessage = false,
 }: ErrorDetailsProps) {
   const [timestamp] = useState(() => new Date());
   const [errorRef] = useState(() =>
@@ -99,7 +102,7 @@ export function ErrorDetails({
         </div>
       </div>
 
-      {collapsible && error?.message ? (
+      {collapsible && showMessage && error?.message ? (
         <p className='text-center text-xs text-quaternary-token break-words'>
           {error.message}
         </p>
