@@ -178,13 +178,16 @@ describe('Sidebar row alignment', () => {
     expect(settingsRow).toContain('grid-cols-[minmax(0,1fr)]');
     expect(settingsRow).toContain('before:hidden');
     expect(settingsRow).toContain('after:hidden');
-    expect(settingsRow).not.toContain('grid-cols-[22px_minmax(0,1fr)_34px]');
+    expect(settingsRow).not.toContain(
+      'grid-cols-[22px_minmax(0,1fr)_minmax(34px,auto)]'
+    );
   });
 
   it('keeps nav-row chrome borderless in resting, hover, and active states', () => {
     // #13217: sidebar nav rows are borderless — active state is a filled
     // background only. No resting border, no hover border, no active border
     // or border-by-inset-ring shadow may reappear on the canonical row chrome.
+    // A left accent rail (inset 2px solid accent) is allowed for active clarity.
     for (const row of [
       getSidebarNavRowClassName({}),
       getSidebarNavRowClassName({ active: true }),
@@ -206,7 +209,9 @@ describe('Sidebar row alignment', () => {
     expect(rowClassName).toContain('h-7');
     expect(rowClassName).toContain('px-2.5');
     expect(rowClassName).toContain('gap-x-2.5');
-    expect(rowClassName).toContain('grid-cols-[22px_minmax(0,1fr)_34px]');
+    expect(rowClassName).toContain(
+      'grid-cols-[22px_minmax(0,1fr)_minmax(34px,auto)]'
+    );
     expect(rowClassName).toContain('before:left-6');
     expect(rowClassName).toContain('after:left-10');
     expect(rowClassName).toContain('text-xs');
@@ -220,6 +225,9 @@ describe('Sidebar row alignment', () => {
     expect(activeRowClassName).toContain('bg-sidebar-accent-active');
     expect(activeRowClassName).toContain('text-primary-token');
     expect(activeRowClassName).toContain('font-medium');
+    expect(activeRowClassName).toContain(
+      'shadow-[inset_2px_0_0_0_var(--color-accent)]'
+    );
     expect(iconClassName).toContain('h-3.5');
     expect(iconClassName).toContain('text-sidebar-muted/70');
     expect(getSidebarNavIconClassName({ active: true })).toContain(

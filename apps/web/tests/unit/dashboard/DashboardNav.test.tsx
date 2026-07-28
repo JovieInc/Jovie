@@ -307,7 +307,9 @@ describe('DashboardNav', () => {
     });
     const tasksLink = getByRole('link', { name: 'Tasks 7 active tasks' });
 
-    expect(tasksLink).toHaveClass('grid-cols-[22px_minmax(0,1fr)_34px]');
+    expect(tasksLink).toHaveClass(
+      'grid-cols-[22px_minmax(0,1fr)_minmax(34px,auto)]'
+    );
     expect(getByText('7')).toHaveAttribute('data-nav-badge', 'count');
     expect(getByText('7')).toHaveAttribute('aria-label', '7 active tasks');
   });
@@ -352,7 +354,7 @@ describe('DashboardNav', () => {
     });
 
     expect(getByRole('link', { name: 'Tasks' })).toHaveClass(
-      'grid-cols-[22px_minmax(0,1fr)_34px]'
+      'grid-cols-[22px_minmax(0,1fr)_minmax(34px,auto)]'
     );
     expect(
       container.querySelector('[data-nav-badge="count"]')
