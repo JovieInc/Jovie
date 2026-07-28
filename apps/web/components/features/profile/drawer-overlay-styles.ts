@@ -8,4 +8,4 @@ import { PROFILE_Z } from '@/lib/profile/z-index-constants';
  * Layered at `PROFILE_Z.DRAWER_BACKDROP` (z-40), below drawer content
  * which sits at `PROFILE_Z.DRAWER_CONTENT` (z-50).
  */
-export const DRAWER_OVERLAY_CLASS = `fixed inset-0 ${PROFILE_Z.DRAWER_BACKDROP} bg-black/60 backdrop-blur-sm`;
+export const DRAWER_OVERLAY_CLASS = `fixed inset-0 ${PROFILE_Z.DRAWER_BACKDROP} bg-black/24`;
