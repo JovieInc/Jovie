@@ -169,7 +169,7 @@ describe('Sidebar row alignment', () => {
 
     // Same active treatment as the shell sidebar.
     expect(settingsActiveRow).toContain('bg-sidebar-accent-active');
-    expect(settingsActiveRow).toContain('text-primary-token');
+    expect(settingsActiveRow).toContain('text-white');
     expect(settingsActiveRow).toContain('font-medium');
 
     // Allowed structural divergence: icon-less single-column grid with the
@@ -223,15 +223,14 @@ describe('Sidebar row alignment', () => {
       'text-sidebar-muted/65'
     );
     expect(activeRowClassName).toContain('bg-sidebar-accent-active');
-    expect(activeRowClassName).toContain('text-primary-token');
+    expect(activeRowClassName).toContain('text-white');
     expect(activeRowClassName).toContain('font-medium');
-    expect(activeRowClassName).toContain(
-      'shadow-[inset_2px_0_0_0_var(--color-accent)]'
-    );
+    expect(activeRowClassName).toContain('shadow-none');
+    expect(activeRowClassName).not.toContain('inset_2px_0');
     expect(iconClassName).toContain('h-3.5');
     expect(iconClassName).toContain('text-sidebar-muted/70');
     expect(getSidebarNavIconClassName({ active: true })).toContain(
-      'text-primary-token'
+      'text-accent-blue!'
     );
   });
 });

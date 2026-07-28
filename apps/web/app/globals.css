@@ -2699,6 +2699,8 @@ body {
   --color-warning-subtle: var(--color-warning-subtle);
   --color-info: var(--color-info);
   --color-info-subtle: var(--color-info-subtle);
+  /* Named accent utilities use the existing carbon palette runtime tokens. */
+  --color-accent-blue: var(--color-accent-blue);
   --color-error-subtle: var(--color-error-subtle);
   --color-error-foreground: var(--color-error-foreground);
   /* Accent token — enables bg-accent-subtle, text-accent, border-accent */

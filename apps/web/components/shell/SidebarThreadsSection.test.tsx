@@ -43,7 +43,10 @@ describe('SidebarThreadsSection', () => {
     expect(activeThread).toHaveAttribute('aria-current', 'page');
     expect(activeThread).toHaveClass('h-6');
     expect(activeThread).toHaveClass('bg-sidebar-accent-active');
-    expect(activeThread).toHaveClass('text-primary-token');
+    expect(activeThread).toHaveClass('text-white');
+    expect(activeThread).not.toHaveClass(
+      'shadow-[inset_2px_0_0_0_var(--color-accent)]'
+    );
     expect(inactiveThread).toHaveClass('text-secondary-token');
     expect(inactiveThread).toHaveClass('hover:bg-surface-1');
     expect(inactiveThread).toHaveClass('focus-visible:ring-2');

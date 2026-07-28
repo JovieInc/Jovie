@@ -37,10 +37,10 @@ interface SidebarNavChromeOptions {
 const SIDEBAR_PRIMARY_CHROME =
   'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)] text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_86%,white_14%)]';
 
-// Active: filled surface + left accent rail (not a full border — #13217) so
-// the current section is obvious at a glance on dark sidebar chrome.
+// Active state uses type and icon color only. Avoid a left rail so every shared
+// sidebar consumer keeps the same compact, decoration-free geometry.
 const SIDEBAR_ACTIVE_CHROME =
-  'bg-sidebar-accent-active text-primary-token font-medium shadow-[inset_2px_0_0_0_var(--color-accent)]';
+  'bg-sidebar-accent-active text-white font-medium shadow-none';
 
 const SIDEBAR_INACTIVE_CHROME =
   'text-sidebar-item-foreground hover:bg-sidebar-accent hover:text-sidebar-item-foreground';
@@ -104,7 +104,9 @@ export function getSidebarNavIconClassName({
   return cn(
     'shrink-0 justify-self-center',
     tight ? 'h-3 w-3' : 'h-3.5 w-3.5',
-    active ? 'text-primary-token' : inactiveIconColor,
+    // The active row deliberately owns white label text. Make the icon's
+    // semantic accent explicit so it cannot inherit that foreground color.
+    active ? 'text-accent-blue!' : inactiveIconColor,
     className
   );
 }
