@@ -1,6 +1,11 @@
 import { Skeleton } from '@jovie/ui';
 import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
+import {
+  CHAT_COMPOSER_ATTACH_ARIA_LABEL,
+  CHAT_COMPOSER_EMPTY_PLACEHOLDER,
+  CHAT_COMPOSER_SEND_ARIA_LABEL,
+} from '@/components/jovie/chat-composer-copy';
 import { CHAT_CONTENT_SHELL_CLASSNAME } from '@/components/jovie/chat-layout';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
@@ -32,30 +37,27 @@ export default function ChatLoading() {
             <div
               className={`${CHAT_CONTENT_SHELL_CLASSNAME} relative z-10 space-y-2`}
             >
-              <div className='system-b-shell-loading-composer'>
+              {/* Decorative only — parent is aria-busy; hide control stubs from AT. */}
+              <div
+                className='system-b-shell-loading-composer'
+                aria-hidden='true'
+              >
                 <div className='relative flex items-end gap-2 px-3 py-2.5'>
-                  <button
-                    type='button'
-                    disabled
-                    aria-label='Attachment Options'
-                    className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token opacity-80'
-                  >
-                    <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
-                  </button>
                   <div
-                    aria-hidden='true'
-                    className='min-w-0 flex-1 py-1.5 text-sm leading-6 text-tertiary-token'
-                  >
-                    What are you working on?
-                  </div>
-                  <button
-                    type='button'
-                    disabled
-                    aria-label='Send Message'
-                    className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-tertiary-token'
+                    className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token opacity-80'
+                    data-label={CHAT_COMPOSER_ATTACH_ARIA_LABEL}
                   >
                     <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
-                  </button>
+                  </div>
+                  <div className='min-w-0 flex-1 py-1.5 text-sm leading-6 text-tertiary-token'>
+                    {CHAT_COMPOSER_EMPTY_PLACEHOLDER}
+                  </div>
+                  <div
+                    className='system-b-chat-composer-primary-action flex h-9 w-9 shrink-0 cursor-not-allowed items-center justify-center rounded-full opacity-80'
+                    data-label={CHAT_COMPOSER_SEND_ARIA_LABEL}
+                  >
+                    <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
+                  </div>
                 </div>
               </div>
               <Skeleton className='mx-auto h-3 w-32' rounded='lg' />

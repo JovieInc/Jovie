@@ -73,10 +73,12 @@ describe('ChatLoading (chat home)', () => {
     render(<ChatLoading />);
 
     expect(screen.queryByRole('textbox')).toBeNull();
-    expect(screen.getByText('What are you working on?')).toHaveAttribute(
-      'aria-hidden',
-      'true'
+    expect(screen.queryByRole('button')).toBeNull();
+    // Product-voice placeholder is decorative under the busy shell.
+    const placeholder = screen.getByText(
+      'Ask Jovie to plan your next release...'
     );
+    expect(placeholder.closest('[aria-hidden="true"]')).not.toBeNull();
   });
 });
 
