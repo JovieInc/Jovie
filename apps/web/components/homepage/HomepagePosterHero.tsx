@@ -84,7 +84,7 @@ export function HomepagePosterHero({
               asChild
               static
               size='md'
-              variant='tertiary'
+              variant='ghost'
               className={CTA_PRESS_CLASS}
             >
               <LinkComponent

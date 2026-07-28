@@ -35,7 +35,8 @@ export const HOMEPAGE_LAUNCH_COPY = {
       label: 'Get started',
     },
     secondaryCta: {
-      label: 'See a live artist profile',
+      // Quiet proof path — not a peer conversion objective to Get started.
+      label: 'See a live profile',
       href: APP_ROUTES.ARTIST_PROFILES,
     },
   },
