@@ -275,6 +275,14 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Pitch ready',
     errorTitle: "Couldn't write your pitch",
   },
+  manageTasks: {
+    label: 'Tasks',
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: 'Opening Tasks…',
+    successTitle: 'Tasks ready',
+    errorTitle: "Couldn't open Tasks",
+  },
   searchSpotifyArtist: {
     label: 'Spotify artist',
     uiHint: 'artifact',

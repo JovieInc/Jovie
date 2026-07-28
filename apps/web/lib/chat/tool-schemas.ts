@@ -66,6 +66,29 @@ export const TOOL_SCHEMAS = {
     }),
   },
 
+  /**
+   * Tasks workspace entry point (JOV-3861). Free plans keep this tool visible
+   * as a locked stub so "create/list my tasks" returns an upgrade CTA instead
+   * of a dead-end or thrown entitlement error.
+   */
+  manageTasks: {
+    description:
+      'Create, list, or open the Tasks workspace for release and general work. Use when the artist asks to create tasks, list tasks, open Tasks, set up a release plan checklist, or manage their to-do list.',
+    inputSchema: chatToolSchema({
+      intent: z
+        .enum(['create', 'list', 'open', 'release_plan'])
+        .optional()
+        .describe(
+          'What the artist wants: create a task, list tasks, open the Tasks workspace, or set up a release plan checklist.'
+        ),
+      title: z
+        .string()
+        .max(200)
+        .optional()
+        .describe('Optional task title when creating a task'),
+    }),
+  },
+
   createMerch: {
     description:
       'Generate exactly three premium merch options for the artist. Use when the artist asks to make merch, create a tee/hoodie/item, or make something that would sell.',

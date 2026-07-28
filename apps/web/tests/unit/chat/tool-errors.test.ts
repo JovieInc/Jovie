@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildToolFailure,
   classifyThrownToolError,
+  isEntitlementDenialError,
   isRecoverableToolStreamError,
   normalizeToolFailureOutput,
   resolveToolFailurePresentation,
@@ -45,6 +46,23 @@ describe('tool-errors', () => {
 
     expect(failure.errorCode).toBe('PROVIDER_UNAVAILABLE');
     expect(failure.retryable).toBe(false);
+  });
+
+  it('classifies TasksUpgradeRequiredError as non-retryable PLAN_UNAVAILABLE', () => {
+    const error = Object.assign(new Error('Tasks requires a Pro plan.'), {
+      name: 'TasksUpgradeRequiredError',
+      code: 'TASKS_WORKSPACE_LOCKED',
+    });
+
+    expect(isEntitlementDenialError(error)).toBe(true);
+
+    const failure = classifyThrownToolError('manageTasks', error);
+    expect(failure).toMatchObject({
+      success: false,
+      errorCode: 'PLAN_UNAVAILABLE',
+      retryable: false,
+      error: 'Tasks requires a Pro plan.',
+    });
   });
 
   it('treats recoverable tool stream errors as soft failures', () => {
