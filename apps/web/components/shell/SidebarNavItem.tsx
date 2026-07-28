@@ -37,8 +37,10 @@ interface SidebarNavChromeOptions {
 const SIDEBAR_PRIMARY_CHROME =
   'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)] text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_86%,white_14%)]';
 
+// Active: filled surface + left accent rail (not a full border — #13217) so
+// the current section is obvious at a glance on dark sidebar chrome.
 const SIDEBAR_ACTIVE_CHROME =
-  'bg-sidebar-accent-active text-primary-token font-medium';
+  'bg-sidebar-accent-active text-primary-token font-medium shadow-[inset_2px_0_0_0_var(--color-accent)]';
 
 const SIDEBAR_INACTIVE_CHROME =
   'text-sidebar-item-foreground hover:bg-sidebar-accent hover:text-sidebar-item-foreground';
@@ -78,7 +80,9 @@ export function getSidebarNavRowClassName({
     collapsed
       ? 'h-7 w-10 mx-auto grid-cols-1 place-items-center before:hidden after:hidden'
       : cn(
-          'grid-cols-[22px_minmax(0,1fr)_34px]',
+          // Badge track: min 34px keeps empty rows aligned; auto grows so Pro /
+          // multi-digit count badges never overflow into the truncated label.
+          'grid-cols-[22px_minmax(0,1fr)_minmax(34px,auto)]',
           nonCollapsedSize,
           'group-data-[collapsible=icon]:grid-cols-1 group-data-[collapsible=icon]:place-items-center'
         ),
