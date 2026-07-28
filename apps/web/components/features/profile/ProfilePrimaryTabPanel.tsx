@@ -1,8 +1,9 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Bell, CheckCircle2, Music2 } from 'lucide-react';
+import { Bell, CheckCircle2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { AboutSection } from '@/features/profile/AboutSection';
 import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
 import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
@@ -12,7 +13,6 @@ import type {
   ProfilePrimaryTab,
   ProfileRenderMode,
 } from '@/features/profile/contracts';
-import { ProfileEmptyBentoCard } from '@/features/profile/ProfileEmptyBentoCard';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { TourDrawerContent } from '@/features/profile/TourModePanel';
 import { ReleasesView } from '@/features/profile/views/ReleasesView';
@@ -276,7 +276,7 @@ function ProfileMusicEmptyState({
         className='h-11 w-full rounded-full'
         disabled
       >
-        Turn On Alerts
+        Turn On Music Alerts
       </Button>
     ) : (
       <ArtistNotificationsCTA
@@ -286,24 +286,17 @@ function ProfileMusicEmptyState({
         hideListenFallback
         source={sourceContext.ctaLocation}
         sourceContext={sourceContext}
-        triggerLabel='Turn on alerts'
+        triggerLabel='Turn On Music Alerts'
       />
     );
 
   return (
-    <div
-      className='flex flex-1 items-center px-4 pb-4'
-      data-testid='profile-primary-tab-music-empty'
-    >
-      <ProfileEmptyBentoCard
-        accent='music'
-        icon={Music2}
-        title='No Music'
-        body='Get a note when the first release lands.'
-        layout='compact'
-        action={action}
-      />
-    </div>
+    <EmptyState
+      heading='No Music'
+      description='Get a note when the first release lands.'
+      actionSlot={<div className='w-full max-w-xs'>{action}</div>}
+      testId='profile-primary-tab-music-empty'
+    />
   );
 }
 

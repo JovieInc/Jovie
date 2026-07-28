@@ -1,11 +1,10 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Ticket } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
-import { ProfileEmptyBentoCard } from '@/features/profile/ProfileEmptyBentoCard';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import {
   type TourDateWithProximity,
@@ -193,7 +192,7 @@ function TourDatesContent({
           className='h-9 w-full rounded-full'
           disabled
         >
-          Event Alerts
+          Turn On Event Alerts
         </Button>
       ) : (
         <ArtistNotificationsCTA
@@ -202,7 +201,7 @@ function TourDatesContent({
           hideListenFallback
           source={emptyStateSourceContext.ctaLocation}
           sourceContext={emptyStateSourceContext}
-          triggerLabel='Event Alerts'
+          triggerLabel='Turn On Event Alerts'
           // Unified 36px CTA scale — matches the Listen CTA on home cards.
           triggerClassName={`${subscriptionPrimaryActionClassName} h-9! w-full justify-center gap-2 px-4 text-xs`}
           presentation='overlay'
@@ -210,16 +209,12 @@ function TourDatesContent({
       );
 
     return (
-      <div className='px-4 pb-4' data-testid='profile-primary-tab-events-empty'>
-        <ProfileEmptyBentoCard
-          accent='events'
-          icon={Ticket}
-          title='No Events'
-          body='Get alerted when shows are announced.'
-          layout='compact'
-          action={action}
-        />
-      </div>
+      <EmptyState
+        heading='No Events'
+        description='Get alerted when shows are announced.'
+        actionSlot={<div className='w-full max-w-xs'>{action}</div>}
+        testId='profile-primary-tab-events-empty'
+      />
     );
   }
 
