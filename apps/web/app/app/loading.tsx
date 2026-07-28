@@ -1,9 +1,14 @@
 import { headers } from 'next/headers';
 import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
+import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
 import {
   APP_SHELL_MODE_HEADER,
   parseTrustedAppShellMode,
 } from '@/lib/app-shell/mode';
+import {
+  isTasksShellRoute,
+  resolveAppShellLoadingPath,
+} from './(shell)/shell-route-matches';
 
 /**
  * App root loading screen
@@ -13,6 +18,16 @@ import {
 export default async function AppLoading() {
   const headerStore = await headers();
   const mode = parseTrustedAppShellMode(headerStore.get(APP_SHELL_MODE_HEADER));
+  const pathname = resolveAppShellLoadingPath(
+    headerStore.get('next-url'),
+    headerStore.get('x-matched-path'),
+    headerStore.get('x-invoke-path')
+  );
 
-  return <AppShellSkeleton brandVariant={mode === 'ov' ? 'ov' : 'jovie'} />;
+  return (
+    <AppShellSkeleton
+      main={isTasksShellRoute(pathname) ? <TasksRouteSkeleton /> : undefined}
+      brandVariant={mode === 'ov' ? 'ov' : 'jovie'}
+    />
+  );
 }
