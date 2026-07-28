@@ -10,13 +10,8 @@
  * Returns a numeric score between 0-100 and a breakdown.
  */
 export function scoreIssue(classification) {
-  const {
-    category,
-    mrrCategory,
-    effort,
-    mrrConfidence,
-    relatedIssues,
-  } = classification;
+  const { category, mrrCategory, effort, mrrConfidence, relatedIssues } =
+    classification;
 
   // Base score from category
   let base = 0;
