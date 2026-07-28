@@ -63,6 +63,7 @@ const LABEL_TO_AREA = {
   'area:design': 'design',
 };
 
+/** @type {Array<[RegExp, string]>} */
 const TITLE_AREA_PATTERNS = [
   [/^perf/i, 'performance'],
   [/^test/i, 'testing'],
@@ -97,6 +98,7 @@ const LABEL_TO_MRR = {
   'qa:perf': 'retention',
 };
 
+/** @type {Array<[RegExp, string]>} */
 const TITLE_MRR_PATTERNS = [
   [/sign.?up|register|onboard/i, 'activation'],
   [/login|auth|oauth|sign.?in/i, 'activation'],

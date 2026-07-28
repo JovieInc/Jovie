@@ -15,7 +15,6 @@ export function scoreIssue(classification) {
     mrrCategory,
     effort,
     mrrConfidence,
-    valueScore,
     relatedIssues,
   } = classification;
 
@@ -94,7 +93,7 @@ export async function isProductionRed() {
     const resp = await fetch('https://jov.ie/api/health', {
       signal: AbortSignal.timeout(5000),
     });
-    const data = await resp.json();
+    const data = /** @type {any} */ (await resp.json());
     return data.status !== 'ok';
   } catch {
     // If we can't check, assume safe (fail open for local)
