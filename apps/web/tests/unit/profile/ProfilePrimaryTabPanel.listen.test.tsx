@@ -139,9 +139,13 @@ describe('ProfilePrimaryTabPanel listen mode', () => {
     );
 
     expect(screen.getByTestId('profile-primary-tab-music-empty')).toBeVisible();
-    expect(screen.getByText('No Music')).toBeVisible();
+    const heading = screen.getByText('No Music');
+    expect(heading).toHaveClass('text-secondary-token');
+    expect(screen.getByTestId('profile-primary-tab-music-empty').tagName).toBe(
+      'OUTPUT'
+    );
     expect(
-      screen.getByRole('button', { name: 'Turn on music alerts' })
+      screen.getByRole('button', { name: 'Turn On Music Alerts' })
     ).toHaveAttribute('data-source', 'music_empty_state');
     expect(screen.queryByText('Latest release')).not.toBeInTheDocument();
     expect(screen.queryByText('Releases')).not.toBeInTheDocument();

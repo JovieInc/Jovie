@@ -151,8 +151,11 @@ describe('TourModePanel', () => {
     expect(
       screen.getByTestId('profile-primary-tab-events-empty')
     ).toBeInTheDocument();
+    expect(screen.getByTestId('profile-primary-tab-events-empty').tagName).toBe(
+      'OUTPUT'
+    );
     const heading = screen.getByText('No Events');
-    expect(heading).toHaveClass('text-primary-token');
+    expect(heading).toHaveClass('text-secondary-token');
     expect(
       screen.getByText('Get alerted when shows are announced.')
     ).toBeVisible();

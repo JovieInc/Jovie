@@ -60,18 +60,35 @@ type SecondaryAction =
       ariaLabel?: string;
     };
 
-export interface EmptyStateProps {
+interface EmptyStateBaseProps {
   readonly icon?: React.ReactNode;
   readonly heading: string;
   readonly description?: string;
-  readonly action?: PrimaryAction;
-  readonly secondaryAction?: SecondaryAction;
   readonly variant?: EmptyStateVariant;
   /** Button size - use 'sm' for less padding */
   readonly size?: 'default' | 'sm';
   readonly className?: string;
   readonly testId?: string;
 }
+
+type EmptyStateActionProps =
+  | {
+      readonly action?: PrimaryAction;
+      readonly actionSlot?: never;
+    }
+  | {
+      readonly action?: never;
+      /**
+       * A domain-owned CTA that cannot be represented by the standard action
+       * contract (for example, a consent-aware notification trigger).
+       */
+      readonly actionSlot?: React.ReactNode;
+    };
+
+export type EmptyStateProps = EmptyStateBaseProps &
+  EmptyStateActionProps & {
+    readonly secondaryAction?: SecondaryAction;
+  };
 
 const variantStyles: Record<
   EmptyStateVariant,
@@ -131,6 +148,7 @@ export function EmptyState({
   heading,
   description,
   action,
+  actionSlot,
   secondaryAction,
   variant = 'default',
   size = 'sm',
@@ -267,8 +285,9 @@ export function EmptyState({
         </p>
       )}
 
-      {(action || secondaryAction) && (
+      {(actionSlot || action || secondaryAction) && (
         <div className='flex flex-col items-center gap-2 sm:flex-row sm:gap-3'>
+          {actionSlot}
           {renderPrimaryAction()}
           {renderSecondaryAction()}
         </div>

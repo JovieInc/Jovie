@@ -3,8 +3,8 @@
 import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
-import { ProfileEmptyState } from '@/features/profile/ProfileEmptyState';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import {
   type TourDateWithProximity,
@@ -192,7 +192,7 @@ function TourDatesContent({
           className='h-9 w-full rounded-full'
           disabled
         >
-          Turn on event alerts
+          Turn On Event Alerts
         </Button>
       ) : (
         <ArtistNotificationsCTA
@@ -201,7 +201,7 @@ function TourDatesContent({
           hideListenFallback
           source={emptyStateSourceContext.ctaLocation}
           sourceContext={emptyStateSourceContext}
-          triggerLabel='Turn on event alerts'
+          triggerLabel='Turn On Event Alerts'
           // Unified 36px CTA scale — matches the Listen CTA on home cards.
           triggerClassName={`${subscriptionPrimaryActionClassName} h-9! w-full justify-center gap-2 px-4 text-xs`}
           presentation='overlay'
@@ -209,11 +209,11 @@ function TourDatesContent({
       );
 
     return (
-      <ProfileEmptyState
-        title='No Events'
+      <EmptyState
+        heading='No Events'
         description='Get alerted when shows are announced.'
-        action={action}
-        dataTestId='profile-primary-tab-events-empty'
+        actionSlot={<div className='w-full max-w-xs'>{action}</div>}
+        testId='profile-primary-tab-events-empty'
       />
     );
   }
