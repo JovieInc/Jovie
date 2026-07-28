@@ -8,6 +8,10 @@ vi.mock('@/lib/entitlements/server', () => ({
   getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
 }));
 
+vi.mock('@/lib/entitlements/demand-signal', () => ({
+  logEntitlementDenial: vi.fn(),
+}));
+
 describe('tasks entitlement gate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
