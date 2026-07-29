@@ -31,7 +31,9 @@ env:
 
 jobs:
   capture:
-    name: Capture changed UI (desktop + mobile)
+    # Failures remain visible in Actions, but the native queue treats this exact
+    # evidence check as advisory. Deterministic CI is the merge gate.
+    name: Capture changed UI (desktop + mobile) (advisory)
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
@@ -143,9 +145,12 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       PR_NUMBER: ${{ github.event.pull_request.number }}
-      VISUAL_REVIEW_API_KEY: ${{ secrets.VISUAL_REVIEW_API_KEY || secrets.AI_GATEWAY_API_KEY }}
-      VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL || 'https://ai-gateway.vercel.sh/v1' }}
-      VISUAL_REVIEW_MODEL: ${{ vars.VISUAL_REVIEW_MODEL || 'zai/glm-5.2' }}
+      GROK_VISUAL_REVIEW_API_KEY: ${{ secrets.GROK_VISUAL_REVIEW_API_KEY }}
+      GROK_VISUAL_REVIEW_BASE_URL: ${{ vars.GROK_VISUAL_REVIEW_BASE_URL || 'https://api.x.ai/v1' }}
+      GROK_VISUAL_REVIEW_MODEL: ${{ vars.GROK_VISUAL_REVIEW_MODEL || 'grok-4.5' }}
+      CODEX_VISUAL_REVIEW_API_KEY: ${{ secrets.CODEX_VISUAL_REVIEW_API_KEY }}
+      CODEX_VISUAL_REVIEW_BASE_URL: ${{ vars.CODEX_VISUAL_REVIEW_BASE_URL || 'https://api.openai.com/v1' }}
+      CODEX_VISUAL_REVIEW_MODEL: ${{ vars.CODEX_VISUAL_REVIEW_MODEL || 'gpt-5.2-codex' }}
     steps:
       - name: Checkout trusted base helpers
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -186,7 +191,7 @@ jobs:
           await writeFile('review-input.json', JSON.stringify({ artifactDir: 'pr-visual-artifacts', changedFiles: routing.files, diff, reviewStatus: routing.review_status, output: 'review-result.json' }));
           NODE
 
-      - name: Call configured GLM 5.2 / Kimi K3 backend
+      - name: Call Grok 4.5 with Codex fallback
         if: steps.routed.outputs.review == 'true'
         run: node .github/scripts/pr-visual-review.mjs review review-input.json
 

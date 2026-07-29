@@ -7,7 +7,11 @@ const UI_FILE =
   /^(apps\/web\/(app|components|features|lib|public|styles|tests\/visual-qa)|packages\/ui|apps\/console\/.*screenshot|apps\/ios\/.*(View|Screen|Snapshot)|.*\.(css|scss|tsx|jsx))\//;
 const SECRET =
   /(api[_-]?key|secret|password|token|private[_-]?key|database[_-]?url|authorization)\s*[:=]\s*[^\s,;]+/gi;
-const ALLOWED_MODELS = /(?:glm[-_ ]?5(?:\.2)?|kimi[-_ ]?k3)/i;
+const GROK_MODEL = /grok[-_ ]?4(?:[._ -]?5)?/i;
+const CODEX_MODEL =
+  /(?:gpt[-_ ]?5(?:[._ -]?\d+)?(?:[-_ ]?codex)?|codex[-_ ]?[\w.-]+)/i;
+
+/** @typedef {{ apiKey?: string, baseUrl?: string, model?: string }} ReviewBackend */
 
 export function sanitizeForPrompt(value) {
   return String(value ?? '')
@@ -87,17 +91,23 @@ export function buildReviewPrompt({ diff, changedFiles, screenshots }) {
   const safeDiff = sanitizeForPrompt(diff).slice(0, MAX_DIFF);
   const files = changedFiles.map(sanitizeForPrompt).slice(0, 80).join('\n');
   const images = screenshots.map(sanitizeForPrompt).join(', ');
-  return `You are reviewing a Jovie UI PR. Return ONLY JSON matching this shape: {"summary":string,"findings":[{"title":string,"category":"layout|accessibility|responsive|functional|taste|preference|brand|identity|composition|copy-tone","severity":"high|medium|low","kind":"objective|subjective","evidence":string,"recommendation":string}],"backend":"glm-5.2|kimi-k3"}.\n\nRules: objective means an observable defect (overflow, clipping, inaccessible contrast/focus, broken interaction, missing content, desktop/mobile regression). Subjective means taste, preference, brand, identity, composition, or copy tone. Never turn a subjective finding into an auto-fix. Mention only evidence visible in the screenshots or grounded in the diff. Do not repeat secrets or credentials.\n\nChanged files:\n${files}\n\nDiff context:\n${safeDiff}\n\nScreenshots (desktop and mobile are paired per route): ${images}`;
+  return `You are reviewing a Jovie UI PR. Return ONLY JSON matching this shape: {"summary":string,"findings":[{"title":string,"category":"layout|accessibility|responsive|functional|taste|preference|brand|identity|composition|copy-tone","severity":"high|medium|low","kind":"objective|subjective","evidence":string,"recommendation":string}],"backend":"grok-4.5|codex"}.\n\nRules: objective means an observable defect (overflow, clipping, inaccessible contrast/focus, broken interaction, missing content, desktop/mobile regression). Subjective means taste, preference, brand, identity, composition, or copy tone. Never turn a subjective finding into an auto-fix. Mention only evidence visible in the screenshots or grounded in the diff. Do not repeat secrets or credentials.\n\nChanged files:\n${files}\n\nDiff context:\n${safeDiff}\n\nScreenshots (desktop and mobile are paired per route): ${images}`;
 }
 
-function requireBackend({ apiKey, baseUrl, model }) {
+function requireBackend({ apiKey, baseUrl, model, provider }) {
+  const prefix = provider === 'grok' ? 'GROK' : 'CODEX';
   if (!apiKey)
-    throw new Error('backend_unconfigured: VISUAL_REVIEW_API_KEY is missing');
-  if (!baseUrl)
-    throw new Error('backend_unconfigured: VISUAL_REVIEW_BASE_URL is missing');
-  if (!ALLOWED_MODELS.test(model ?? ''))
     throw new Error(
-      'backend_unconfigured: VISUAL_REVIEW_MODEL must be GLM 5.2 or Kimi K3'
+      `backend_unconfigured: ${prefix}_VISUAL_REVIEW_API_KEY is missing`
+    );
+  if (!baseUrl)
+    throw new Error(
+      `backend_unconfigured: ${prefix}_VISUAL_REVIEW_BASE_URL is missing`
+    );
+  const allowed = provider === 'grok' ? GROK_MODEL : CODEX_MODEL;
+  if (!allowed.test(model ?? ''))
+    throw new Error(
+      `backend_unconfigured: ${prefix}_VISUAL_REVIEW_MODEL is invalid`
     );
 }
 
@@ -105,12 +115,13 @@ export async function reviewWithBackend({
   apiKey,
   baseUrl,
   model,
+  provider = 'grok',
   prompt,
   images,
   timeoutMs = 90_000,
   fetchImpl = fetch,
 }) {
-  requireBackend({ apiKey, baseUrl, model });
+  requireBackend({ apiKey, baseUrl, model, provider });
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -148,6 +159,51 @@ export async function reviewWithBackend({
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/**
+ * @param {{ prompt: string, images: string[], timeoutMs?: number, fetchImpl?: typeof fetch, grok?: ReviewBackend, codex?: ReviewBackend }} options
+ */
+export async function reviewWithConfiguredBackends({
+  prompt,
+  images,
+  timeoutMs = 90_000,
+  fetchImpl = fetch,
+  grok = {
+    apiKey: process.env.GROK_VISUAL_REVIEW_API_KEY,
+    baseUrl: process.env.GROK_VISUAL_REVIEW_BASE_URL,
+    model: process.env.GROK_VISUAL_REVIEW_MODEL,
+  },
+  codex = {
+    apiKey: process.env.CODEX_VISUAL_REVIEW_API_KEY,
+    baseUrl: process.env.CODEX_VISUAL_REVIEW_BASE_URL,
+    model: process.env.CODEX_VISUAL_REVIEW_MODEL,
+  },
+}) {
+  /** @type {Array<['grok' | 'codex', ReviewBackend]>} */
+  const attempts = [
+    ['grok', grok],
+    ['codex', codex],
+  ];
+  const errors = [];
+  for (const [provider, backend] of attempts) {
+    try {
+      const review = await reviewWithBackend({
+        apiKey: backend.apiKey ?? '',
+        baseUrl: backend.baseUrl ?? '',
+        model: backend.model ?? '',
+        provider,
+        prompt,
+        images,
+        timeoutMs,
+        fetchImpl,
+      });
+      return { review: { ...review, backend: provider }, provider };
+    } catch (error) {
+      errors.push(`${provider}: ${String(error.message ?? error)}`);
+    }
+  }
+  throw new Error(`backend_unavailable: ${errors.join('; ')}`);
 }
 
 export function normalizeFindings(review) {
@@ -229,10 +285,7 @@ async function main() {
           .map(c => c.path) ?? [],
     });
     try {
-      const review = await reviewWithBackend({
-        apiKey: process.env.VISUAL_REVIEW_API_KEY,
-        baseUrl: process.env.VISUAL_REVIEW_BASE_URL,
-        model: process.env.VISUAL_REVIEW_MODEL,
+      const { review, provider } = await reviewWithConfiguredBackends({
         prompt,
         images: screenshots,
       });
@@ -243,6 +296,7 @@ async function main() {
             status: 'completed',
             review_status: 'advisory',
             review,
+            provider,
             promptLength: prompt.length,
           },
           null,

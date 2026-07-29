@@ -85,6 +85,9 @@ describe('pr-check-failures', () => {
     expect(ADVISORY_CHECK_NAMES).toContain('Classify PR taste');
     expect(ADVISORY_CHECK_NAMES).toContain('Claude Review');
     expect(ADVISORY_CHECK_NAMES).toContain(
+      'Capture changed UI (desktop + mobile) (advisory)'
+    );
+    expect(ADVISORY_CHECK_NAMES).toContain(
       'Review screenshots and post advisory review'
     );
     expect(ADVISORY_CHECK_NAMES).toContain('SonarCloud Code Analysis');
@@ -100,6 +103,10 @@ describe('pr-check-failures', () => {
         { bucket: 'fail', name: 'E2E Smoke (PR Fast Feedback)' },
         { bucket: 'fail', name: 'Extended Smoke (Preview)' },
         { bucket: 'fail', name: 'A11y (authenticated, informational)' },
+        {
+          bucket: 'fail',
+          name: 'Capture changed UI (desktop + mobile) (advisory)',
+        },
         { bucket: 'fail', name: 'Review screenshots and post advisory review' },
         { bucket: 'fail', name: 'SonarCloud Code Analysis' },
         { bucket: 'fail', name: 'Vercel Agent Review' },
