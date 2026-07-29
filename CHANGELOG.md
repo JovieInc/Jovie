@@ -7,6 +7,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 - [internal] **macOS desktop packaging accepts the secured XML parser:** Electron Builder's property-list dependency now supplies the MIME type required by the repository's security-patched xmldom floor, so signed and notarized desktop releases can reach artifact creation again.
+- **Desktop recovery stays quiet and actionable (JOV-4539):** the renderer-failure fallback now keeps just the recovery action and browser escape hatch on a calm System B canvas, without diagnostic runtime chrome or a heavy error card.
 - **macOS sign-in cancellation returns to Jovie:** if a native auth redirect leaves the hidden desktop window blank, canceling sign-in now restores the canonical sign-in shell instead of showing a black window.
 - [internal] **Desktop memory baseline evidence (JOV-2712):** the Electron shell can now capture bounded main/renderer RSS and macOS physical-footprint samples, record clean shutdown evidence, and classify growth regressions without claiming native leak proof when the platform tool is unavailable.
 - [internal] **Desktop packaging toolchain updated:** Electron Builder now uses 26.15.3 for current signing, notarization, and installer support.
