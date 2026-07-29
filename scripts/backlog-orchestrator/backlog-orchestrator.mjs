@@ -222,6 +222,7 @@ async function runAdmitNext(cache, isDryRun) {
     const stored = classifier.parseStoredClassification(issue);
     const c = classifier.classifyDeterministic(issue, allIssues);
     if (stored) c.preexisting = stored;
+    c.issue = issue;
     classifications.push(c);
   }
 
@@ -242,30 +243,21 @@ async function runAdmitNext(cache, isDryRun) {
 
   if (result.admit.length > 0 && !isDryRun) {
     const item = result.admit[0];
-    if (item.type === 'workstream') {
-      // Move all issues in the workstream to Todo
-      for (const id of item.items) {
-        const issue = allIssues.find(i => i.identifier === id);
-        if (issue && issue.state?.name === 'Triage') {
-          try {
-            await linear.transitionIssue(issue.id, TODO_STATE_ID);
-            console.log(`  → Moved ${id} to Todo`);
-          } catch (err) {
-            console.error(`  → Failed to move ${id}: ${err.message}`);
-          }
-        }
-      }
-    } else {
-      // Single issue
-      const issue = allIssues.find(i => i.identifier === item.id);
-      if (issue && issue.state?.name === 'Triage') {
-        try {
-          await linear.transitionIssue(issue.id, TODO_STATE_ID);
-          console.log(`  → Moved ${item.id} to Todo`);
-        } catch (err) {
-          console.error(`  → Failed to move ${item.id}: ${err.message}`);
-        }
-      }
+    try {
+      const receipt = await admitter.admitIssue({
+        issue: item.issue,
+        classification: item,
+        client: linear,
+        teamId: TEAM_ID,
+        todoStateId: TODO_STATE_ID,
+      });
+      console.log(`  ${receipt.status}: ${item.identifier}`);
+    } catch (err) {
+      console.error(
+        `  Admission failed for ${item.identifier}: ${err.message}`
+      );
+      result.admit = [];
+      result.reason = `admission failed: ${err.message}`;
     }
   } else if (result.admit.length > 0) {
     console.log('  (dry-run — no mutations performed)');

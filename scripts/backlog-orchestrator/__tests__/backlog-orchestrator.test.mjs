@@ -12,6 +12,7 @@ const scorer = await import('../scorer.mjs');
 const workstreamer = await import('../workstreamer.mjs');
 const reporter = await import('../reporter.mjs');
 const staleLease = await import('../stale-lease-guard.mjs');
+const admitter = await import('../admitter.mjs');
 
 function makeIssue(overrides = {}) {
   return {
@@ -363,5 +364,182 @@ describe('entrypoint contract', () => {
     assert.match(wrapperSource, /exec node backlog-orchestrator\.mjs \"\$@\"/);
     assert.match(await readFile(executable, 'utf8'), /Deterministic-first/);
     assert.equal(JSON.parse(await readFile(config, 'utf8')).version, 1);
+  });
+});
+
+describe('deterministic Symphony admission boundary', () => {
+  function admissionIssue(overrides = {}) {
+    return makeIssue({
+      id: overrides.id || `${overrides.identifier || 'JOV-900'}-id`,
+      identifier: overrides.identifier || 'JOV-900',
+      title: overrides.title || 'Fix the real thing',
+      state: overrides.state || 'Triage',
+      labels: overrides.labels || ['plan-approved', 'admission-approved'],
+      assignee: overrides.assignee || null,
+      comments: overrides.comments || [],
+      ...overrides,
+    });
+  }
+
+  function classification(issue) {
+    return {
+      identifier: issue.identifier,
+      title: issue.title,
+      category: 'triageable',
+      mrrCategory: 'reliability',
+      mrrConfidence: 'high',
+      effort: 'small',
+      relatedIssues: [],
+      labels: issue.labels.nodes.map(label => label.name),
+      issue,
+    };
+  }
+
+  function fakeClient(issue, rereads = []) {
+    const reads = [...rereads];
+    const calls = { transitions: [], labels: [], comments: [], rereads: 0 };
+    return {
+      calls,
+      async fetchIssue() {
+        calls.rereads += 1;
+        return reads.shift() || issue;
+      },
+      async transitionIssue(id, stateId) {
+        calls.transitions.push({ id, stateId });
+        return { issueUpdate: { success: true } };
+      },
+      async fetchTeamLabel() {
+        return { id: 'symphony-label-id', name: 'symphony' };
+      },
+      async setIssueLabels(id, labelIds) {
+        calls.labels.push({ id, labelIds });
+        return { issueUpdate: { success: true } };
+      },
+      async addComment(id, body) {
+        calls.comments.push({ id, body });
+        return { commentCreate: { success: true } };
+      },
+    };
+  }
+
+  it('rejects synthetic workstream bundles and admits no member', async () => {
+    const real = admissionIssue({ identifier: 'JOV-4513' });
+    const result = await admitter.selectNextToAdmit(
+      [classification(real)],
+      [
+        {
+          id: 'unknown-bundle-931',
+          name: 'unknown cleanup bundle',
+          issueIds: ['JOV-4513'],
+        },
+      ],
+      { currentlyShipping: 0, productionRed: false }
+    );
+    assert.equal(result.admit.length, 0);
+    assert.match(result.reason, /synthetic|no eligible/i);
+  });
+
+  it('selects exactly one concrete eligible JOV issue deterministically', async () => {
+    const first = admissionIssue({
+      identifier: 'JOV-4513',
+      title: 'Fix crash',
+    });
+    const second = admissionIssue({
+      identifier: 'JOV-4396',
+      title: 'Fix typo',
+    });
+    const result = await admitter.selectNextToAdmit(
+      [classification(first), classification(second)],
+      [],
+      { currentlyShipping: 0, productionRed: false }
+    );
+    assert.equal(result.admit.length, 1);
+    assert.equal(result.admit[0].identifier, 'JOV-4396');
+    assert.equal(result.admit[0].type, 'issue');
+  });
+
+  it('excludes protected and Tim-owned issues', async () => {
+    const protectedIssue = admissionIssue({
+      identifier: 'JOV-4513',
+      labels: ['plan-approved', 'admission-approved', 'needs-human'],
+    });
+    const timOwned = admissionIssue({
+      identifier: 'JOV-4396',
+      assignee: { id: 'tim', name: 'Tim White' },
+    });
+    const result = await admitter.selectNextToAdmit(
+      [classification(protectedIssue), classification(timOwned)],
+      [],
+      { currentlyShipping: 0, productionRed: false }
+    );
+    assert.equal(result.admit.length, 0);
+  });
+
+  it('records an idempotent lease receipt without duplicate mutations', async () => {
+    const issue = admissionIssue({
+      state: 'Todo',
+      labels: ['plan-approved', 'admission-approved', 'symphony'],
+    });
+    issue.comments.nodes.push({
+      body: admitter.buildAdmissionReceipt(issue, {
+        now: '2026-07-29T00:00:00.000Z',
+      }),
+      createdAt: '2026-07-29T00:00:00.000Z',
+    });
+    const client = fakeClient(issue);
+    const result = await admitter.admitIssue({
+      issue,
+      classification: classification(issue),
+      client,
+      now: '2026-07-29T00:00:00.000Z',
+    });
+    assert.equal(result.status, 'already-admitted');
+    assert.deepEqual(client.calls.transitions, []);
+    assert.deepEqual(client.calls.labels, []);
+    assert.deepEqual(client.calls.comments, []);
+  });
+
+  it('verifies state, labels, and receipt by reread after mutation', async () => {
+    const issue = admissionIssue({
+      state: 'Triage',
+      labels: ['plan-approved', 'admission-approved'],
+    });
+    const afterTransition = admissionIssue({
+      state: 'Todo',
+      labels: ['plan-approved', 'admission-approved'],
+    });
+    const afterLabel = admissionIssue({
+      state: 'Todo',
+      labels: ['plan-approved', 'admission-approved', 'symphony'],
+    });
+    const afterReceipt = admissionIssue({
+      state: 'Todo',
+      labels: ['plan-approved', 'admission-approved', 'symphony'],
+      comments: [
+        {
+          body: admitter.buildAdmissionReceipt(issue, {
+            now: '2026-07-29T00:00:00.000Z',
+          }),
+          createdAt: '2026-07-29T00:00:00.000Z',
+        },
+      ],
+    });
+    const client = fakeClient(issue, [
+      afterTransition,
+      afterLabel,
+      afterReceipt,
+      afterReceipt,
+    ]);
+    const result = await admitter.admitIssue({
+      issue,
+      classification: classification(issue),
+      client,
+      now: '2026-07-29T00:00:00.000Z',
+    });
+    assert.equal(result.status, 'admitted');
+    assert.equal(client.calls.transitions.length, 1);
+    assert.equal(client.calls.labels.length, 1);
+    assert.equal(client.calls.comments.length, 1);
+    assert.equal(client.calls.rereads, 4);
   });
 });

@@ -125,6 +125,7 @@ export async function fetchTeamActiveIssues(teamId, maxResults = 1000) {
               children { nodes { id identifier title } }
               relations { nodes { type relatedIssue { id identifier title } } }
               state { id name type }
+              comments { nodes { id body createdAt } }
             }
             pageInfo { hasNextPage endCursor }
           }
@@ -267,6 +268,22 @@ export async function transitionIssue(issueId, stateId) {
   `,
     { id: issueId, stateId }
   );
+}
+
+export async function fetchTeamLabel(teamId, name) {
+  const data = await graphql(
+    `
+    query($teamId: String!, $name: String!) {
+      team(id: $teamId) {
+        labels(filter: { name: { eq: $name } }, first: 1) {
+          nodes { id name }
+        }
+      }
+    }
+  `,
+    { teamId, name }
+  );
+  return data.team.labels.nodes[0] || null;
 }
 
 /**
