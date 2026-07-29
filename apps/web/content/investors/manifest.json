@@ -5,6 +5,12 @@
       "file": "investor-memo.md",
       "title": "Investor Memo",
       "nav": true
+    },
+    {
+      "slug": "closed-loop-creator",
+      "file": "closed-loop-creator.md",
+      "title": "The Closed-Loop Creator",
+      "nav": true
     }
   ],
   "deck": {
