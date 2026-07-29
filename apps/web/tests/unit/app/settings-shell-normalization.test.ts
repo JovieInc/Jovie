@@ -19,24 +19,10 @@ const RETARGETING_ROUTE_FILES = [
       'apps/web/app/app/(shell)/settings/retargeting-ads/page.tsx'
     )
   ),
-  findSourceFile(
-    resolve(
-      process.cwd(),
-      'app/app/(shell)/settings/retargeting-ads/loading.tsx'
-    ),
-    resolve(
-      process.cwd(),
-      'apps/web/app/app/(shell)/settings/retargeting-ads/loading.tsx'
-    )
-  ),
 ] as const;
 
 const RETARGETING_ROUTE_CANDIDATES = [
   resolve(process.cwd(), 'app/app/(shell)/settings/retargeting-ads/page.tsx'),
-  resolve(
-    process.cwd(),
-    'app/app/(shell)/settings/retargeting-ads/loading.tsx'
-  ),
 ] as const;
 
 const RETARGETING_LAYOUT = findSourceFile(

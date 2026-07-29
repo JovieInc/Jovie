@@ -17,7 +17,7 @@ import { canAccessAppShell } from '@/lib/auth/access-route-redirect';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { resolveUserState } from '@/lib/auth/gate';
-import ChatLoading from './chat/loading';
+import ChatLoading from './chat/ChatLoadingState';
 import { DashboardShellContent } from './DashboardShellContent';
 import { ReleaseTableSkeleton } from './dashboard/releases/loading';
 import { LibraryLoadingState } from './library/LibrarySurface';
@@ -127,9 +127,11 @@ export default async function AppShellLayout({
       routeMain = <TasksRouteSkeleton />;
     }
 
-    // The authenticated shell must remain visible while route data streams.
-    // Route-specific main slots keep the final workspace geometry, avoiding a
-    // separate composer/logo composition or a route-dependent flash.
+    // This fallback is for the first authenticated shell boot. The shell
+    // segment intentionally has no loading.tsx: App Router then keeps the
+    // current authenticated route visible for warm navigation instead of
+    // replacing it with a route-shaped skeleton. Route-specific main slots
+    // keep the first-boot geometry stable without creating a second layout.
     const shellFallback = (
       <AppShellSkeleton
         main={routeMain}
@@ -143,8 +145,8 @@ export default async function AppShellLayout({
     // is not worth adding a blocking DB query to the critical path of every
     // dashboard page load for every user.
 
-    // Stream the shell: the route-aware skeleton renders at first byte while
-    // DashboardShellContent resolves dashboard data + feature flags.
+    // Stream the first shell boot while DashboardShellContent resolves
+    // dashboard data + feature flags.
     // Mount NuqsProvider at the shell layer so every client component under
     // /app/(shell)/* (e.g. DashboardAudienceClient) has a NuqsAdapter context
     // during SSR and hydration, regardless of how CoreProviders resolves above.

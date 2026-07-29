@@ -5,8 +5,7 @@ import { describe, expect, it } from 'vitest';
 const webRoot = path.resolve(__dirname, '../../..');
 
 const guardedRoutes = [
-  'app/app/(shell)/chat/loading.tsx',
-  'app/app/(shell)/chat/[id]/loading.tsx',
+  'app/app/(shell)/chat/ChatLoadingState.tsx',
   'app/app/(shell)/dashboard/profile/loading.tsx',
 ];
 
