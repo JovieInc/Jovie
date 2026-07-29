@@ -161,10 +161,21 @@ export function isQueryTimeoutError(
  */
 export function isPostgresTimeoutError(error: unknown): boolean {
   if (error instanceof Error) {
-    // PostgreSQL timeout error code
-    return error.message.includes(
-      'canceling statement due to statement timeout'
-    );
+    // PostgreSQL statement timeout
+    if (
+      error.message.includes('canceling statement due to statement timeout')
+    ) {
+      return true;
+    }
+    // PostgreSQL idle-in-transaction timeout (occurs on cold starts when a
+    // connection idles out before the first query, e.g. set_config)
+    if (error.message.includes('idle-in-transaction timeout')) {
+      return true;
+    }
+    // Also check error.cause for wrapped errors
+    if (error.cause instanceof Error) {
+      return isPostgresTimeoutError(error.cause);
+    }
   }
   return false;
 }
