@@ -497,6 +497,7 @@ const ALWAYS_PAID_TOOL_NAMES = [
   'writeWorldClassBio',
   'generateCanvasPlan',
   'createPromoStrategy',
+  'manageTasks',
   'markCanvasUploaded',
   'formatLyrics',
   'proposeVideoRecording',
