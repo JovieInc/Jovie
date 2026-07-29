@@ -23,6 +23,7 @@ import {
 import { useChatThreadContextMenu } from '@/components/shell/useChatThreadContextMenu';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { shouldShowInboxNavigation } from '@/lib/inbox/navigation-availability';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { usePlanGate } from '@/lib/queries';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
@@ -127,7 +128,7 @@ function formatTaskBadge(
 }
 
 export function DashboardNav(_: DashboardNavProps) {
-  const { selectedProfile } = useDashboardData();
+  const { inboxNavigation, selectedProfile } = useDashboardData();
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
@@ -156,6 +157,18 @@ export function DashboardNav(_: DashboardNavProps) {
     seenAt: tasksSeenAt,
   });
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
+  const visiblePrimaryNavigation = useMemo(
+    () =>
+      primaryNavigation.filter(
+        item =>
+          item.id !== 'inbox' ||
+          shouldShowInboxNavigation(
+            inboxNavigation,
+            isItemActive(pathname, item)
+          )
+      ),
+    [inboxNavigation, pathname]
+  );
   const threadsVisible =
     !isDemo &&
     !isInSettings &&
@@ -197,11 +210,20 @@ export function DashboardNav(_: DashboardNavProps) {
   useEffect(() => {
     if (isDemo || isMobile) return;
     trackNavigationImpressions(
-      isInSettings ? ['settings'] : primaryNavigation.map(item => item.id),
+      isInSettings
+        ? ['settings']
+        : visiblePrimaryNavigation.map(item => item.id),
       pathname,
       telemetryContext
     );
-  }, [isDemo, isInSettings, isMobile, pathname, telemetryContext]);
+  }, [
+    isDemo,
+    isInSettings,
+    isMobile,
+    pathname,
+    telemetryContext,
+    visiblePrimaryNavigation,
+  ]);
 
   const artistSettingsLabel = 'Artist';
 
@@ -237,10 +259,16 @@ export function DashboardNav(_: DashboardNavProps) {
     return [
       {
         key: 'primary',
-        items: primaryNavigation.map(decorateItem),
+        items: visiblePrimaryNavigation.map(decorateItem),
       },
     ];
-  }, [canAccessTasksWorkspace, isPlanGateLoading, taskStats, tasksSeenAt]);
+  }, [
+    canAccessTasksWorkspace,
+    isPlanGateLoading,
+    taskStats,
+    tasksSeenAt,
+    visiblePrimaryNavigation,
+  ]);
 
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

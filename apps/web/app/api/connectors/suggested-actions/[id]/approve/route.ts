@@ -14,8 +14,10 @@
  */
 
 import { and, eq } from 'drizzle-orm';
+import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/require-auth';
+import { CACHE_TAGS } from '@/lib/cache/tags';
 import { recordInboxDecision } from '@/lib/connectors/inbox-decision';
 import {
   enqueueApprovedActionWorkflow,
@@ -71,6 +73,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
       });
 
       if (recovery === 'enqueued' || recovery === 'already-queued') {
+        revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
         return NextResponse.json(
           {
             ok: true,
@@ -122,6 +125,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
       cardKind: updated[0]?.kind ?? null,
       surface: 'opportunity-inbox',
     });
+    revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
 
     return NextResponse.json(
       { ok: true, approvalId: id },

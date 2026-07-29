@@ -27,12 +27,14 @@ import {
 } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { userSettings, users } from '@/lib/db/schema/auth';
+import { suggestedActions } from '@/lib/db/schema/connectors';
 import { socialLinks } from '@/lib/db/schema/links';
 import {
   type CreatorProfile,
   creatorDistributionEvents,
   creatorProfiles,
 } from '@/lib/db/schema/profiles';
+import { tourDates } from '@/lib/db/schema/tour';
 import {
   createEmptyTippingStats,
   profileIsPublishable,
@@ -49,6 +51,11 @@ import {
 } from '@/lib/distribution/instagram-activation';
 import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import {
+  type InboxNavigationAvailability,
+  resolveInboxNavigationAvailability,
+  UNKNOWN_INBOX_NAVIGATION_AVAILABILITY,
+} from '@/lib/inbox/navigation-availability';
 import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
 import {
   type AvatarQuality,
@@ -144,6 +151,8 @@ export interface DashboardData {
   bioLinkActivation?: BioLinkActivation | null;
   /** Whether the user appears to be in their first chat session window */
   isFirstSession?: boolean;
+  /** Settled server-derived Inbox availability for conditional shell navigation. */
+  inboxNavigation?: InboxNavigationAvailability;
 }
 
 export interface ProfileCompletionStep {
@@ -467,6 +476,58 @@ function buildProfileCompletion(
  */
 type CoreData = Omit<DashboardData, 'isAdmin'>;
 
+async function loadInboxNavigationAvailability(
+  tx: DbOrTransaction,
+  userId: string,
+  profileId: string | null
+): Promise<InboxNavigationAvailability> {
+  if (!profileId) return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
+
+  try {
+    const [pendingSuggestedActions, pendingTourDates] = await Promise.all([
+      dashboardQuery(
+        () =>
+          tx
+            .select({ count: drizzleSql<number>`count(*)` })
+            .from(suggestedActions)
+            .where(
+              and(
+                eq(suggestedActions.userId, userId),
+                eq(suggestedActions.status, 'pending')
+              )
+            ),
+        'Inbox navigation suggested actions count query',
+        { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
+      ),
+      dashboardQuery(
+        () =>
+          tx
+            .select({ count: drizzleSql<number>`count(*)` })
+            .from(tourDates)
+            .where(
+              and(
+                eq(tourDates.profileId, profileId),
+                eq(tourDates.confirmationStatus, 'pending')
+              )
+            ),
+        'Inbox navigation tour dates count query',
+        { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
+      ),
+    ]);
+
+    return resolveInboxNavigationAvailability(
+      Number(pendingSuggestedActions[0]?.count ?? 0),
+      Number(pendingTourDates[0]?.count ?? 0)
+    );
+  } catch (error) {
+    Sentry.captureException(error, {
+      level: 'warning',
+      tags: { context: 'inbox_navigation_availability' },
+    });
+    return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
+  }
+}
+
 function shouldBypassDashboardCache(): boolean {
   return isE2EFastOnboardingEnabled();
 }
@@ -753,6 +814,12 @@ async function fetchDashboardBaseWithSession(
             return undefined;
           });
 
+  const inboxNavigation = await loadInboxNavigationAvailability(
+    tx,
+    userData.id,
+    selected.id
+  );
+
   return {
     user: userData,
     creatorProfiles: creatorData,
@@ -765,6 +832,7 @@ async function fetchDashboardBaseWithSession(
     tippingStats: createEmptyTippingStats(),
     profileCompletion: buildProfileCompletion(selected, userData.email, false),
     bioLinkActivation: null,
+    inboxNavigation,
     dashboardLoadError: undefined,
     isFirstSession: deriveIsFirstSession(selected),
   };
