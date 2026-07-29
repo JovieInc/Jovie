@@ -126,15 +126,18 @@ function resolveLocalBetterAuthUrl(): URL | undefined {
  * session lookup's host check doesn't 500 public routes. Loopback-only and
  * never applied to Vercel preview/production deployments.
  */
-function resolveServingPortHost(): string | undefined {
+function resolveServingPortHosts(): string[] {
   if (env.VERCEL_ENV === 'preview' || env.VERCEL_ENV === 'production') {
-    return undefined;
+    return [];
   }
   const port = process.env.PORT?.trim();
   if (!port || !/^\d{2,5}$/.test(port)) {
-    return undefined;
+    return [];
   }
-  return `localhost:${port}`;
+  // Local visual QA and Playwright often use 127.0.0.1 while the dev server
+  // advertises localhost. They are both loopback, but Better Auth validates
+  // the request host exactly; allow both forms for this process port only.
+  return [`localhost:${port}`, `127.0.0.1:${port}`];
 }
 
 function resolveBaseUrl(): NonNullable<BetterAuthOptions['baseURL']> {
@@ -149,7 +152,7 @@ function resolveBaseUrl(): NonNullable<BetterAuthOptions['baseURL']> {
           'staging.jov.ie',
           'localhost:3100',
           localBetterAuthUrl?.host,
-          resolveServingPortHost(),
+          ...resolveServingPortHosts(),
           env.VERCEL_URL,
           env.VERCEL_BRANCH_URL,
         ].filter((host): host is string => Boolean(host))
