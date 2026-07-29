@@ -54,6 +54,7 @@ export function ChatFileChips({ files, onRemove }: ChatFileChipsProps) {
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ duration: 0.15 }}
             className='system-b-chat-file-chip'
+            data-upload-state={f.status}
           >
             <span className='system-b-chat-file-chip-icon'>
               {f.previewUrl ? (
@@ -67,9 +68,7 @@ export function ChatFileChips({ files, onRemove }: ChatFileChipsProps) {
                 fileKindIcon(f.kind, 'h-3 w-3')
               )}
             </span>
-            <span className='max-w-30 truncate text-xs text-secondary-token'>
-              {f.name}
-            </span>
+            <span className='system-b-chat-file-chip-label'>{f.name}</span>
             <Check
               className='h-3 w-3 shrink-0 text-accent-green'
               strokeWidth={2.5}
@@ -79,10 +78,10 @@ export function ChatFileChips({ files, onRemove }: ChatFileChipsProps) {
               variant='ghost'
               size='icon'
               onClick={() => onRemove(f.id)}
-              className='ml-0.5 h-4 w-4 rounded-full'
+              className='system-b-chat-file-chip-remove'
               aria-label={`Remove ${f.name}`}
             >
-              <X className='h-3 w-3 text-tertiary-token' />
+              <X className='h-3 w-3' />
             </Button>
           </motion.span>
         ))}
