@@ -52,16 +52,15 @@ describe('AuthReturnPage (legacy desktop auth bounce)', () => {
     setLocationOrigin('https://jov.ie');
   });
 
-  it('renders an Open Jovie button pointing at the production deep link', () => {
+  it('renders a Return to Jovie button pointing at the production deep link', () => {
     const hrefWrites = setLocationOrigin('https://jov.ie');
     setSearchParams('route=%2Fapp%2Fsettings');
     render(<AuthReturnPage />);
 
     const expectedDeepLink = 'jovie://auth-return?route=%2Fapp%2Fsettings';
-    expect(screen.getByRole('link', { name: 'Open Jovie' })).toHaveAttribute(
-      'href',
-      expectedDeepLink
-    );
+    expect(
+      screen.getByRole('link', { name: 'Return to Jovie' })
+    ).toHaveAttribute('href', expectedDeepLink);
     expect(hrefWrites).toEqual([expectedDeepLink]);
     expect(
       screen.getByRole('heading', { name: 'Return to Jovie' })
@@ -79,10 +78,9 @@ describe('AuthReturnPage (legacy desktop auth bounce)', () => {
 
     const expectedDeepLink =
       'jovie-staging://auth-return?route=%2Fapp%2Fsettings';
-    expect(screen.getByRole('link', { name: 'Open Jovie' })).toHaveAttribute(
-      'href',
-      expectedDeepLink
-    );
+    expect(
+      screen.getByRole('link', { name: 'Return to Jovie' })
+    ).toHaveAttribute('href', expectedDeepLink);
     expect(hrefWrites).toEqual([expectedDeepLink]);
   });
 
@@ -93,10 +91,9 @@ describe('AuthReturnPage (legacy desktop auth bounce)', () => {
 
     const expectedDeepLink =
       'jovie-local://auth-return?route=%2Fapp%2Fsettings';
-    expect(screen.getByRole('link', { name: 'Open Jovie' })).toHaveAttribute(
-      'href',
-      expectedDeepLink
-    );
+    expect(
+      screen.getByRole('link', { name: 'Return to Jovie' })
+    ).toHaveAttribute('href', expectedDeepLink);
     expect(hrefWrites).toEqual([expectedDeepLink]);
   });
 
@@ -105,6 +102,6 @@ describe('AuthReturnPage (legacy desktop auth bounce)', () => {
     setSearchParams('route=%2Fapp%2Fsettings');
 
     expect(() => render(<AuthReturnPage />)).not.toThrow();
-    expect(screen.queryByRole('link', { name: 'Open Jovie' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Return to Jovie' })).toBeNull();
   });
 });

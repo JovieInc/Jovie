@@ -51,7 +51,7 @@ function AuthReturnContent() {
             href={deepLink}
             className='focus-ring-transparent-offset mt-6 inline-flex h-10 w-full items-center justify-center rounded-full bg-btn-primary px-4 text-sm font-medium text-btn-primary-foreground transition-opacity duration-subtle hover:opacity-95'
           >
-            Open Jovie
+            Return to Jovie
           </Link>
         ) : null}
       </section>

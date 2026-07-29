@@ -57,13 +57,13 @@ describe('NativeReturnPage (desktop auth bounce)', () => {
     setLocationOrigin('https://jov.ie');
   });
 
-  it('renders an Open Jovie button pointing at the jovie:// deep link', () => {
+  it('renders a Return to Jovie button pointing at the jovie:// deep link', () => {
     const hrefWrites = setLocationOrigin('https://jov.ie');
     setSearchParams(`code=${CODE}&state=${STATE}&desktop_flow=${FLOW}`);
     render(<NativeReturnPage />);
 
     const expectedDeepLink = `jovie://auth/complete?code=${CODE}&state=${STATE}&desktop_flow=${FLOW}`;
-    const link = screen.getByRole('link', { name: 'Open Jovie' });
+    const link = screen.getByRole('link', { name: 'Return to Jovie' });
     expect(link).toHaveAttribute('href', expectedDeepLink);
     expect(hrefWrites).toEqual([expectedDeepLink]);
     expect(
@@ -79,7 +79,9 @@ describe('NativeReturnPage (desktop auth bounce)', () => {
     setSearchParams(`code=${CODE}&state=${STATE}`);
     render(<NativeReturnPage />);
 
-    expect(screen.getByRole('link', { name: 'Open Jovie' })).toHaveAttribute(
+    expect(
+      screen.getByRole('link', { name: 'Return to Jovie' })
+    ).toHaveAttribute(
       'href',
       `jovie://auth/complete?code=${CODE}&state=${STATE}`
     );
@@ -91,10 +93,9 @@ describe('NativeReturnPage (desktop auth bounce)', () => {
     render(<NativeReturnPage />);
 
     const expectedDeepLink = `jovie-staging://auth/complete?code=${CODE}&state=${STATE}`;
-    expect(screen.getByRole('link', { name: 'Open Jovie' })).toHaveAttribute(
-      'href',
-      expectedDeepLink
-    );
+    expect(
+      screen.getByRole('link', { name: 'Return to Jovie' })
+    ).toHaveAttribute('href', expectedDeepLink);
     expect(hrefWrites).toEqual([expectedDeepLink]);
   });
 
@@ -104,10 +105,9 @@ describe('NativeReturnPage (desktop auth bounce)', () => {
     render(<NativeReturnPage />);
 
     const expectedDeepLink = `jovie-local://auth/complete?code=${CODE}&state=${STATE}`;
-    expect(screen.getByRole('link', { name: 'Open Jovie' })).toHaveAttribute(
-      'href',
-      expectedDeepLink
-    );
+    expect(
+      screen.getByRole('link', { name: 'Return to Jovie' })
+    ).toHaveAttribute('href', expectedDeepLink);
     expect(hrefWrites).toEqual([expectedDeepLink]);
   });
 
@@ -116,14 +116,14 @@ describe('NativeReturnPage (desktop auth bounce)', () => {
     setSearchParams(`code=${CODE}&state=${STATE}`);
 
     expect(() => render(<NativeReturnPage />)).not.toThrow();
-    expect(screen.queryByRole('link', { name: 'Open Jovie' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Return to Jovie' })).toBeNull();
   });
 
   it('shows a recovery message and no deep link when required params are missing', () => {
     setSearchParams(`state=${STATE}`);
     render(<NativeReturnPage />);
 
-    expect(screen.queryByRole('link', { name: 'Open Jovie' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Return to Jovie' })).toBeNull();
     expect(
       screen.getByText(/missing required information/i)
     ).toBeInTheDocument();
@@ -133,6 +133,6 @@ describe('NativeReturnPage (desktop auth bounce)', () => {
     setSearchParams(`code=jovie%3A%2F%2Fevil&state=${STATE}`);
     render(<NativeReturnPage />);
 
-    expect(screen.queryByRole('link', { name: 'Open Jovie' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Return to Jovie' })).toBeNull();
   });
 });

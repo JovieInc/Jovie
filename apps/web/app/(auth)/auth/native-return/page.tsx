@@ -15,8 +15,8 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 // (shell.openExternal), not inside an ASWebAuthenticationSession. A raw
 // server 302 to `jovie://auth/complete` is NOT reliably handed off to the app
 // by modern browsers without a user gesture, so users would sign in on the web
-// and never bounce back to the Mac app. This page fires the deep link
-// automatically AND exposes an "Open Jovie" button (guaranteed user gesture),
+// and never bounce back to the Mac client. This page fires the deep link
+// automatically AND exposes a "Return to Jovie" button (guaranteed user gesture),
 // mirroring the proven legacy `/auth-return` page.
 
 const DESKTOP_FLOW_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
@@ -82,7 +82,7 @@ function NativeReturnContent() {
             href={deepLink}
             className='focus-ring-transparent-offset mt-6 inline-flex h-10 w-full items-center justify-center rounded-full bg-btn-primary px-4 text-sm font-medium text-btn-primary-foreground transition-opacity duration-subtle hover:opacity-95'
           >
-            Open Jovie
+            Return to Jovie
           </Link>
         ) : null}
       </section>
