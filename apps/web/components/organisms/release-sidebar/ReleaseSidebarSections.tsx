@@ -285,6 +285,7 @@ export function ReleaseEntityHeader({
                   <DrawerMediaThumb
                     src={release.artworkUrl}
                     alt={artworkAlt}
+                    dimension={68}
                     sizeClassName='h-17 w-17 rounded-xl'
                     sizes='68px'
                     fallback={

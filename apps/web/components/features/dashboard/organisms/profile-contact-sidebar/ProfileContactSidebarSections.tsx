@@ -234,6 +234,7 @@ export function ProfileSidebarHeaderCard({
             <DrawerMediaThumb
               src={previewData.avatarUrl}
               alt={primaryLabel}
+              dimension={60}
               sizeClassName='h-15 w-15 rounded-xl'
               sizes='60px'
               fallback={
