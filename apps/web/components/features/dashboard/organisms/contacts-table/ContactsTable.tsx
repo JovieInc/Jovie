@@ -109,8 +109,7 @@ export const ContactsTable = memo(function ContactsTable({
           ariaLabel='Add contact'
           onClick={() => onAddContactRef.current()}
           icon={<Plus className='h-3.5 w-3.5' />}
-          iconOnly
-          tooltipLabel='Add contact'
+          label='Add contact'
         />
       </DashboardHeaderActionGroup>
     ),
@@ -217,14 +216,10 @@ export const ContactsTable = memo(function ContactsTable({
             <EmptyState
               icon={<UserPlus className='h-6 w-6' aria-hidden='true' />}
               heading='No Contacts Yet'
-              description='Add bookings, management, and press contacts so fans and industry know who to reach.'
+              description='Add a contact to keep your team connected.'
               action={{
-                label: 'Add Bookings Contact',
-                onClick: () => onAddContact('bookings'),
-              }}
-              secondaryAction={{
-                label: 'Add Management Contact',
-                onClick: () => onAddContact('management'),
+                label: 'Add contact',
+                onClick: () => onAddContact(),
               }}
             />
           ) : (
