@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import test from 'node:test';
+import {
+  expectedDesktopAssetNames,
+  validateReleaseAssets,
+} from './desktop-release-assets.mjs';
 import { evaluateDesktopReleaseGuard } from './desktop-release-guard.mjs';
 
 const desktopRequire = createRequire(
@@ -10,6 +15,10 @@ const desktopRequire = createRequire(
 );
 const desktopWorkflow = readFileSync(
   new URL('../.github/workflows/desktop-release.yml', import.meta.url),
+  'utf8'
+);
+const desktopReleaseAssets = readFileSync(
+  new URL('./desktop-release-assets.mjs', import.meta.url),
   'utf8'
 );
 
@@ -38,6 +47,57 @@ function step(workflow, stepName) {
 
 function assertPatterns(source, patterns) {
   patterns.forEach(pattern => assert.match(source, pattern));
+}
+
+function hash(buffer, algorithm, encoding) {
+  return createHash(algorithm).update(buffer).digest(encoding);
+}
+
+function desktopReleaseFixture() {
+  const version = '26.7.1';
+  const releaseSha = 'a'.repeat(40);
+  const dmgName = `Jovie-${version}-universal.dmg`;
+  const zipName = `Jovie-${version}-universal.zip`;
+  const buffers = new Map([
+    [dmgName, Buffer.from('signed dmg bytes')],
+    [`${dmgName}.blockmap`, Buffer.from('dmg blockmap')],
+    [zipName, Buffer.from('signed zip bytes')],
+    [`${zipName}.blockmap`, Buffer.from('zip blockmap')],
+  ]);
+  const updater = [
+    `version: ${version}`,
+    'files:',
+    `  - url: ${zipName}`,
+    `    sha512: ${hash(buffers.get(zipName), 'sha512', 'base64')}`,
+    `    size: ${buffers.get(zipName).length}`,
+    `  - url: ${dmgName}`,
+    `    sha512: ${hash(buffers.get(dmgName), 'sha512', 'base64')}`,
+    `    size: ${buffers.get(dmgName).length}`,
+    `path: ${zipName}`,
+    `sha512: ${hash(buffers.get(zipName), 'sha512', 'base64')}`,
+    'releaseDate: 2026-07-29T00:00:00.000Z',
+    '',
+  ].join('\n');
+  buffers.set('latest-mac.yml', Buffer.from(updater));
+
+  const release = {
+    id: 123,
+    tag_name: `v${version}`,
+    target_commitish: releaseSha,
+    name: version,
+    draft: true,
+    prerelease: false,
+    published_at: null,
+    assets: expectedDesktopAssetNames(version).map((name, index) => ({
+      id: index + 1,
+      name,
+      state: 'uploaded',
+      size: buffers.get(name).length,
+      digest: `sha256:${hash(buffers.get(name), 'sha256', 'hex')}`,
+      url: `https://api.github.com/assets/${index + 1}`,
+    })),
+  };
+  return { buffers, release, releaseSha, version };
 }
 
 test('desktop builder can parse Electron macOS property lists', () => {
@@ -196,7 +256,8 @@ test('desktop dedup cross-proves an actual-publish-only marker', () => {
     /publish_marker_presence_count="\$\(jq '\.artifacts \| length'/,
     /publish_marker_presence_count.*-gt 0/s,
     /status=completed&per_page=25/,
-    /Recovered exact desktop publish/,
+    /Recovered exact asset-proven desktop publish/,
+    /Verify exact published release assets/,
     /desktop-release\.yml\/runs\?branch=main&event=push&status=success&per_page=100/,
     /No proven desktop baseline exists/,
     /already_released=true/,
@@ -329,12 +390,13 @@ test('desktop staging is a bounded artifact and production is separately proven'
     /ref: \$\{\{ needs\.authorize-release\.outputs\.release_sha \}\}/,
     /package:staging/,
     /package:production/,
-    /electron-builder publish/,
+    /desktop-release-assets\.mjs upload-and-publish/,
     /dist\/latest-mac\.yml/,
   ]);
   assertPatterns(publish, [
     /repos\/\$\{\{ github\.repository \}\}\/commits\/main/,
-    /electron-builder publish/,
+    /desktop-release-assets\.mjs upload-and-publish/,
+    /--dist "apps\/desktop\/dist"/,
   ]);
   assertPatterns(stagingUpload, [
     /if: env\.ENVIRONMENT == 'staging'/,
@@ -347,7 +409,11 @@ test('desktop staging is a bounded artifact and production is separately proven'
   assert.doesNotMatch(stagingUpload, /desktop-production-published|GH_TOKEN/);
   assert.ok(
     publish.indexOf('commits/main') <
-      publish.indexOf('electron-builder publish')
+      publish.indexOf('desktop-release-assets.mjs upload-and-publish')
+  );
+  assert.ok(
+    build.indexOf('Prepare private production draft') <
+      build.indexOf('Package production desktop app')
   );
   assert.doesNotMatch(build, /Upload production desktop publish marker/);
   assertPatterns(marker, [
@@ -355,22 +421,46 @@ test('desktop staging is a bounded artifact and production is separately proven'
     /runs-on: ubuntu-latest/,
     /actions: read/,
     /contents: read/,
+    /Verify exact published release assets/,
     /Cross-prove exact production publisher/,
     /publisherJobId/,
     /Upload production desktop publish marker/,
     /overwrite: true/,
     /retention-days: 90/,
   ]);
+  assert.ok(
+    marker.indexOf('Verify exact published release assets') <
+      marker.indexOf('Cross-prove exact production publisher')
+  );
   assert.doesNotMatch(marker, /contents: write|electron-builder publish/);
-  assert.doesNotMatch(desktopWorkflow, /--publish always/);
+  assert.doesNotMatch(
+    desktopWorkflow,
+    /electron-builder publish|--publish always/
+  );
+  assert.match(desktopReleaseAssets, /releases\?per_page=100/);
 });
 
-test('desktop publisher passes the release version as an equals-form option', () => {
-  const publish = step(
-    job(desktopWorkflow, 'build'),
-    'Publish production desktop release'
+test('desktop release proof rejects zero-asset and mismatched-digest releases', () => {
+  const valid = desktopReleaseFixture();
+  assert.doesNotThrow(() => validateReleaseAssets({ ...valid, draft: true }));
+
+  const empty = desktopReleaseFixture();
+  empty.release.assets = [];
+  assert.throws(
+    () => validateReleaseAssets({ ...empty, draft: true }),
+    /exactly five/
   );
 
-  assert.match(publish, /--version="\$release_version"/);
-  assert.doesNotMatch(publish, /--version\s+"\$release_version"/);
+  const mismatched = desktopReleaseFixture();
+  mismatched.release.assets[0].digest = `sha256:${'0'.repeat(64)}`;
+  assert.throws(
+    () => validateReleaseAssets({ ...mismatched, draft: true }),
+    /Server SHA-256/
+  );
+  const wrongTarget = desktopReleaseFixture();
+  wrongTarget.release.target_commitish = 'b'.repeat(40);
+  assert.throws(
+    () => validateReleaseAssets({ ...wrongTarget, draft: true }),
+    /authorized commit/
+  );
 });
