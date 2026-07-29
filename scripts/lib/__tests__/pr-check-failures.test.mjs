@@ -84,6 +84,11 @@ describe('pr-check-failures', () => {
     expect(ADVISORY_CHECK_NAMES).toContain('Extended Smoke (Preview)');
     expect(ADVISORY_CHECK_NAMES).toContain('Classify PR taste');
     expect(ADVISORY_CHECK_NAMES).toContain('Claude Review');
+    expect(ADVISORY_CHECK_NAMES).toContain(
+      'Review screenshots and post advisory review'
+    );
+    expect(ADVISORY_CHECK_NAMES).toContain('SonarCloud Code Analysis');
+    expect(ADVISORY_CHECK_NAMES).toContain('Vercel Agent Review');
     expect(ADVISORY_CHECK_NAMES).not.toContain('Brand Scrub');
     expect(
       extractTerminalFailures([
@@ -95,6 +100,9 @@ describe('pr-check-failures', () => {
         { bucket: 'fail', name: 'E2E Smoke (PR Fast Feedback)' },
         { bucket: 'fail', name: 'Extended Smoke (Preview)' },
         { bucket: 'fail', name: 'A11y (authenticated, informational)' },
+        { bucket: 'fail', name: 'Review screenshots and post advisory review' },
+        { bucket: 'fail', name: 'SonarCloud Code Analysis' },
+        { bucket: 'fail', name: 'Vercel Agent Review' },
       ])
     ).toEqual(['Gitleaks Secret Scanning', 'Security Advisory Enforcement']);
   });
