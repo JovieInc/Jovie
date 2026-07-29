@@ -128,6 +128,7 @@ import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
 import {
   formatLibraryDuration,
   formatLibraryReleaseDate,
+  formatLibraryReleaseDateTitle,
   getLibraryAspectRatioClass,
   getLibraryAssetAspectRatio,
   getLibraryDrawerHeroClass,
@@ -511,7 +512,7 @@ const StatusCell = memo(function StatusCell({
     <span
       role='status'
       className={cn(
-        'system-b-library-status-pill inline-flex h-6 w-fit items-center whitespace-nowrap border px-2 leading-4',
+        'system-b-library-status-pill inline-flex h-6 w-fit max-w-full items-center truncate rounded-full border px-2 leading-4',
         releaseStatusClasses(asset.status)
       )}
       data-testid={`library-release-status-${asset.id}`}
@@ -531,13 +532,30 @@ const ApprovalStatusCell = memo(function ApprovalStatusCell({
     <span
       role='status'
       className={cn(
-        'system-b-library-status-pill inline-flex h-6 w-fit items-center whitespace-nowrap border px-2 leading-4',
+        'system-b-library-status-pill inline-flex h-6 w-fit max-w-full items-center truncate rounded-full border px-2 leading-4',
         libraryApprovalStatusClasses(asset.approvalStatus)
       )}
       data-testid={`library-approval-status-${asset.id}`}
       aria-label={`Approval Status: ${formatLibraryApprovalStatus(asset.approvalStatus)}`}
     >
       {formatLibraryApprovalStatus(asset.approvalStatus)}
+    </span>
+  );
+});
+
+const ReleaseDateCell = memo(function ReleaseDateCell({
+  asset,
+}: {
+  readonly asset: LibraryReleaseAsset;
+}) {
+  return (
+    <span
+      className='system-b-library-meta-text block whitespace-nowrap text-right tabular-nums text-tertiary-token'
+      title={formatLibraryReleaseDateTitle(asset.releaseDate)}
+    >
+      {asset.releaseDate
+        ? formatLibraryReleaseDate(asset.releaseDate)
+        : 'No date'}
     </span>
   );
 });
@@ -660,13 +678,7 @@ const LIBRARY_CATALOG_COLUMNS = [
   libraryColumnHelper.display({
     id: 'releaseDate',
     header: 'Release Date',
-    cell: ({ row }) => (
-      <span className='system-b-library-meta-text block whitespace-nowrap text-right tabular-nums text-tertiary-token'>
-        {row.original.releaseDate
-          ? formatLibraryReleaseDate(row.original.releaseDate)
-          : 'No date'}
-      </span>
-    ),
+    cell: ({ row }) => <ReleaseDateCell asset={row.original} />,
     size: 112,
     minSize: 96,
     meta: { className: 'pl-2 pr-3' },
@@ -700,13 +712,7 @@ const LIBRARY_TABLE_COLUMNS = [
   libraryColumnHelper.display({
     id: 'releaseDate',
     header: 'Release Date',
-    cell: ({ row }) => (
-      <span className='system-b-library-meta-text block whitespace-nowrap text-right tabular-nums text-tertiary-token'>
-        {row.original.releaseDate
-          ? formatLibraryReleaseDate(row.original.releaseDate)
-          : 'No date'}
-      </span>
-    ),
+    cell: ({ row }) => <ReleaseDateCell asset={row.original} />,
     size: 112,
     minSize: 96,
     meta: { className: 'pl-2 pr-3' },
@@ -1512,7 +1518,7 @@ const AssetCard = memo(function AssetCard({
               <span
                 role='status'
                 className={cn(
-                  'system-b-library-card-status border px-1.5 py-0.5 leading-4',
+                  'system-b-library-card-status inline-flex max-w-full truncate rounded-full border px-1.5 py-0.5 leading-4',
                   releaseStatusClasses(asset.status)
                 )}
                 data-testid={`library-release-status-${asset.id}`}
@@ -1523,7 +1529,7 @@ const AssetCard = memo(function AssetCard({
               <span
                 role='status'
                 className={cn(
-                  'system-b-library-card-status border px-1.5 py-0.5 leading-4',
+                  'system-b-library-card-status inline-flex max-w-full truncate rounded-full border px-1.5 py-0.5 leading-4',
                   libraryApprovalStatusClasses(asset.approvalStatus)
                 )}
                 data-testid={`library-approval-status-${asset.id}`}
@@ -1973,7 +1979,7 @@ function ApprovalStatusEditor({
           aria-label='Approval Status'
           data-testid={`library-approval-status-select-${asset.id}`}
           className={cn(
-            'system-b-library-status-pill inline-flex h-6 items-center gap-1 whitespace-nowrap border px-2',
+            'system-b-library-status-pill inline-flex h-6 max-w-full items-center gap-1 truncate rounded-full border px-2',
             libraryApprovalStatusClasses(asset.approvalStatus),
             LIBRARY_BUTTON_FOCUS_CLASS
           )}
@@ -2197,7 +2203,7 @@ function AssetDrawer({
                     <span
                       role='status'
                       className={cn(
-                        'system-b-library-status-pill inline-flex h-6 items-center whitespace-nowrap border px-2',
+                        'system-b-library-status-pill inline-flex h-6 max-w-full items-center truncate rounded-full border px-2',
                         releaseStatusClasses(current.status)
                       )}
                       data-testid={`library-release-status-${current.id}`}
@@ -2310,7 +2316,15 @@ function AssetDrawer({
                       />
                       <MetadataRow
                         label={isMerch ? 'Updated' : 'Release Date'}
-                        value={formatLibraryReleaseDate(current.releaseDate)}
+                        value={
+                          <span
+                            title={formatLibraryReleaseDateTitle(
+                              current.releaseDate
+                            )}
+                          >
+                            {formatLibraryReleaseDate(current.releaseDate)}
+                          </span>
+                        }
                       />
                       <MetadataRow
                         label='Type'
