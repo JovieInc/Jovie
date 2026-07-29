@@ -2,7 +2,7 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import { CommonDropdown } from '@jovie/ui';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { cn } from '@/lib/utils';
@@ -11,6 +11,42 @@ import { cn } from '@/lib/utils';
  * Lock body scroll when a mobile drawer is open to prevent
  * background page from scrolling behind the overlay.
  */
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'area[href]',
+  'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  'iframe',
+  'object',
+  'embed',
+  '[contenteditable="true"]',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
+function getFocusableElements(container: HTMLElement) {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+  ).filter(element => !element.hasAttribute('inert'));
+}
+
+function getDrawerBackgroundElements(drawer: HTMLElement) {
+  const background: HTMLElement[] = [];
+  let current: HTMLElement | null = drawer;
+
+  while (current?.parentElement) {
+    for (const sibling of Array.from(current.parentElement.children)) {
+      if (sibling !== current && sibling instanceof HTMLElement) {
+        background.push(sibling);
+      }
+    }
+    current = current.parentElement;
+  }
+
+  return background;
+}
+
 function useBodyScrollLock(isOpen: boolean, isMobile: boolean) {
   useEffect(() => {
     if (!isMobile || !isOpen) return;
@@ -20,6 +56,147 @@ function useBodyScrollLock(isOpen: boolean, isMobile: boolean) {
       document.body.style.overflow = prev;
     };
   }, [isMobile, isOpen]);
+}
+
+/**
+ * Mobile rails behave as one modal surface. The last opened rail wins focus
+ * ownership, while any previously mounted rail is made inert and visually
+ * closed without requiring each route to duplicate coordination logic.
+ */
+function useActiveMobileDrawer(
+  isOpen: boolean,
+  isMobile: boolean,
+  drawerId: string
+) {
+  const [isActive, setIsActive] = useState(isOpen && isMobile);
+
+  useEffect(() => {
+    const handleDrawerOpen = (event: Event) => {
+      const openedDrawerId = (event as CustomEvent<string>).detail;
+      if (openedDrawerId !== drawerId) {
+        setIsActive(false);
+      }
+    };
+
+    document.addEventListener('jovie:right-drawer-open', handleDrawerOpen);
+    return () =>
+      document.removeEventListener('jovie:right-drawer-open', handleDrawerOpen);
+  }, [drawerId]);
+
+  useEffect(() => {
+    if (!isOpen || !isMobile) {
+      setIsActive(false);
+      return;
+    }
+
+    setIsActive(true);
+    document.dispatchEvent(
+      new CustomEvent<string>('jovie:right-drawer-open', {
+        detail: drawerId,
+      })
+    );
+  }, [drawerId, isMobile, isOpen]);
+
+  return isActive;
+}
+
+function useMobileDrawerFocus(
+  drawerRef: React.RefObject<HTMLElement | null>,
+  isOpen: boolean,
+  isMobile: boolean,
+  isActive: boolean
+) {
+  const triggerRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
+
+  useEffect(() => {
+    const drawer = drawerRef.current;
+    if (!drawer || !isMobile || !isOpen || !isActive) return;
+
+    const activeElement = document.activeElement;
+    triggerRef.current =
+      activeElement instanceof HTMLElement && !drawer.contains(activeElement)
+        ? activeElement
+        : null;
+
+    const initialFocusTarget =
+      drawer.querySelector<HTMLElement>('[data-drawer-initial-focus]') ??
+      getFocusableElements(drawer)[0] ??
+      drawer;
+    initialFocusTarget.focus();
+    wasOpenRef.current = true;
+  }, [drawerRef, isActive, isMobile, isOpen]);
+
+  useEffect(() => {
+    if (isOpen && !isActive) {
+      // A newer mobile rail owns focus now. Do not pull focus back to this
+      // rail's trigger when its route later unmounts.
+      wasOpenRef.current = false;
+      triggerRef.current = null;
+    }
+  }, [isActive, isOpen]);
+
+  useEffect(() => {
+    if (isOpen || !wasOpenRef.current) return;
+
+    wasOpenRef.current = false;
+    const trigger = triggerRef.current;
+    triggerRef.current = null;
+    if (trigger?.isConnected) {
+      trigger.focus();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const drawer = drawerRef.current;
+    if (!drawer || !isMobile || !isOpen || !isActive) return;
+
+    const background = getDrawerBackgroundElements(drawer);
+    const priorInertStates = background.map(element => ({
+      element,
+      wasInert: element.inert,
+    }));
+    for (const { element } of priorInertStates) {
+      element.inert = true;
+    }
+
+    return () => {
+      for (const { element, wasInert } of priorInertStates) {
+        element.inert = wasInert;
+      }
+    };
+  }, [drawerRef, isActive, isMobile, isOpen]);
+
+  useEffect(() => {
+    const drawer = drawerRef.current;
+    if (!drawer || !isMobile || !isOpen || !isActive) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+
+      const focusable = getFocusableElements(drawer);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        drawer.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!last) return;
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [drawerRef, isActive, isMobile, isOpen]);
 }
 
 function hasOpenModalDialog() {
@@ -62,7 +239,13 @@ export function RightDrawer({
   ...rest
 }: RightDrawerProps) {
   const asideRef = useRef<HTMLElement>(null);
+  const drawerId = useId();
   const isMobile = useBreakpointDown('lg');
+  const isActiveMobileDrawer = useActiveMobileDrawer(
+    isOpen,
+    isMobile,
+    drawerId
+  );
   const [hasAnimated, setHasAnimated] = useState(false);
 
   // Suppress the width/opacity transition on first paint so the panel appears
@@ -76,11 +259,12 @@ export function RightDrawer({
   }, []);
 
   // Prevent background scroll when mobile drawer is open
-  useBodyScrollLock(isOpen, isMobile);
+  useBodyScrollLock(isOpen && isActiveMobileDrawer, isMobile);
+  useMobileDrawerFocus(asideRef, isOpen, isMobile, isActiveMobileDrawer);
 
   // Handle keyboard events at the document level when drawer is open
   useEffect(() => {
-    if (!isOpen || !onKeyDown) return;
+    if (!isOpen || !onKeyDown || (isMobile && !isActiveMobileDrawer)) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -103,7 +287,7 @@ export function RightDrawer({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onKeyDown]);
+  }, [isActiveMobileDrawer, isMobile, isOpen, onKeyDown]);
 
   const hasContextMenu =
     contextMenuItems != null && contextMenuItems.length > 0;
@@ -124,8 +308,11 @@ export function RightDrawer({
       <aside
         {...rest}
         ref={asideRef}
-        aria-hidden={!isOpen}
+        aria-hidden={!isOpen || !isActiveMobileDrawer}
+        aria-modal={isOpen && isActiveMobileDrawer ? true : undefined}
         aria-label={ariaLabel}
+        role='dialog'
+        inert={!isOpen || !isActiveMobileDrawer ? true : undefined}
         tabIndex={isOpen ? -1 : undefined}
         className={cn(
           'fixed inset-0 z-50 flex flex-col',
@@ -134,8 +321,10 @@ export function RightDrawer({
           'border-l border-(--app-shell-frame-seam) bg-(--app-shell-content-surface)',
           'shadow-(--linear-app-drawer-shadow)',
           'pb-[env(safe-area-inset-bottom)]',
-          'transition-transform duration-cinematic ease-cinematic',
-          isOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none',
+          'transition-transform duration-cinematic ease-cinematic motion-reduce:transition-none',
+          isOpen && isActiveMobileDrawer
+            ? 'translate-x-0'
+            : 'translate-x-full pointer-events-none',
           className
         )}
       >
@@ -157,7 +346,7 @@ export function RightDrawer({
         'z-10 shrink-0 h-full min-h-0 flex flex-col',
         'outline-none focus:outline-none focus-visible:ring-0',
         'overflow-hidden',
-        'transition-[width,opacity] duration-cinematic ease-cinematic',
+        'transition-[width,opacity] duration-cinematic ease-cinematic motion-reduce:transition-none',
         isOpen
           ? 'visible opacity-100'
           : 'opacity-0 pointer-events-none invisible',

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockUseBreakpointDown = vi.fn();
@@ -148,7 +148,8 @@ describe('RightDrawer', () => {
       'inset-0',
       'translate-x-full',
       'bg-(--app-shell-content-surface)',
-      'outline-none'
+      'outline-none',
+      'motion-reduce:transition-none'
     );
 
     rerender(
@@ -251,5 +252,125 @@ describe('RightDrawer', () => {
 
     expect(drawer).toHaveStyle({ width: '280px' });
     expect(drawer).toHaveAttribute('aria-hidden', 'false');
+  });
+
+  it('moves initial focus into the active mobile drawer and restores its trigger on close', async () => {
+    mockUseBreakpointDown.mockReturnValue(true);
+
+    const { rerender } = render(
+      <>
+        <button type='button'>Open details</button>
+        <RightDrawer isOpen={false} width={360} ariaLabel='Mobile drawer'>
+          <button type='button' data-drawer-initial-focus>
+            Close details
+          </button>
+          <button type='button'>Secondary action</button>
+        </RightDrawer>
+      </>
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Open details' });
+    trigger.focus();
+
+    rerender(
+      <>
+        <button type='button'>Open details</button>
+        <RightDrawer isOpen width={360} ariaLabel='Mobile drawer'>
+          <button type='button' data-drawer-initial-focus>
+            Close details
+          </button>
+          <button type='button'>Secondary action</button>
+        </RightDrawer>
+      </>
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Close details' })
+      ).toHaveFocus();
+    });
+    expect(screen.getByLabelText('Mobile drawer')).toHaveAttribute(
+      'aria-modal',
+      'true'
+    );
+
+    rerender(
+      <>
+        <button type='button'>Open details</button>
+        <RightDrawer isOpen={false} width={360} ariaLabel='Mobile drawer'>
+          <button type='button'>Close details</button>
+        </RightDrawer>
+      </>
+    );
+
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it('keeps mobile focus within the drawer and locks background interaction', async () => {
+    mockUseBreakpointDown.mockReturnValue(true);
+
+    const { rerender } = render(
+      <>
+        <button type='button'>Background action</button>
+        <RightDrawer isOpen width={360} ariaLabel='Focus trap drawer'>
+          <button type='button'>First action</button>
+          <button type='button'>Last action</button>
+        </RightDrawer>
+      </>
+    );
+
+    const background = screen.getByRole('button', {
+      name: 'Background action',
+    });
+    const first = screen.getByRole('button', { name: 'First action' });
+    const last = screen.getByRole('button', { name: 'Last action' });
+
+    await waitFor(() => expect(background.inert).toBe(true));
+    expect(document.body.style.overflow).toBe('hidden');
+
+    last.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(first).toHaveFocus();
+
+    first.focus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(last).toHaveFocus();
+
+    rerender(
+      <>
+        <button type='button'>Background action</button>
+        <RightDrawer isOpen={false} width={360} ariaLabel='Focus trap drawer'>
+          <button type='button'>First action</button>
+        </RightDrawer>
+      </>
+    );
+
+    await waitFor(() => expect(background.inert).toBeFalsy());
+    expect(document.body.style.overflow).toBe('');
+  });
+
+  it('exposes only the last opened mobile rail as the active modal surface', async () => {
+    mockUseBreakpointDown.mockReturnValue(true);
+
+    render(
+      <>
+        <RightDrawer isOpen width={320} ariaLabel='First rail'>
+          <button type='button'>First rail action</button>
+        </RightDrawer>
+        <RightDrawer isOpen width={320} ariaLabel='Second rail'>
+          <button type='button'>Second rail action</button>
+        </RightDrawer>
+      </>
+    );
+
+    const firstRail = screen.getByLabelText('First rail');
+    const secondRail = screen.getByLabelText('Second rail');
+
+    await waitFor(() => {
+      expect(firstRail).toHaveAttribute('aria-hidden', 'true');
+      expect(secondRail).toHaveAttribute('aria-modal', 'true');
+    });
+    expect(firstRail.inert).toBe(true);
+    expect(secondRail.inert).toBeFalsy();
   });
 });
