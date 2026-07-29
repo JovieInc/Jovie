@@ -145,6 +145,9 @@ describe('CalendarPageClient', () => {
     expect(mocks.useReleasesQuery).toHaveBeenCalledWith('profile-1');
     expect(screen.getByText('May Release')).toBeInTheDocument();
     expect(screen.getByText('Movement Festival')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Releases and events at a glance.')
+    ).not.toBeInTheDocument();
   });
 
   it('keeps event review filtering backed by the event query', () => {
