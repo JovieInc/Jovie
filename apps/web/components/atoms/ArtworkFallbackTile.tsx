@@ -27,6 +27,8 @@ export function ArtworkFallbackTile({
   iconClassName = 'h-[42%] w-[42%]',
   accentClassName = 'h-1',
 }: ArtworkFallbackTileProps) {
+  const isThumbnail = size === 'thumbnail';
+
   return (
     <div
       className={cn(
@@ -34,34 +36,36 @@ export function ArtworkFallbackTile({
         className
       )}
       data-artwork-fallback='true'
+      data-artwork-fallback-compact={isThumbnail || undefined}
       style={getArtworkFallbackSurfaceStyle(seed)}
     >
-      <span
-        aria-hidden='true'
-        className={cn(
-          'absolute inset-[8%] bg-[linear-gradient(135deg,rgba(255,255,255,0.09),rgba(255,255,255,0.012)_52%,rgba(0,0,0,0.13))] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-24px_48px_rgba(0,0,0,0.14)]',
-          size === 'thumbnail'
-            ? 'rounded-[3%]'
-            : size === 'hero'
-              ? 'rounded-[10%]'
-              : 'rounded-[7%]'
-        )}
-        data-artwork-fallback-sleeve='true'
-      />
+      {!isThumbnail ? (
+        <span
+          aria-hidden='true'
+          className={cn(
+            'absolute inset-[8%] bg-[linear-gradient(135deg,rgba(255,255,255,0.09),rgba(255,255,255,0.012)_52%,rgba(0,0,0,0.13))] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),inset_0_-24px_48px_rgba(0,0,0,0.14)]',
+            size === 'hero' ? 'rounded-[10%]' : 'rounded-[7%]'
+          )}
+          data-artwork-fallback-sleeve='true'
+        />
+      ) : null}
       <Disc3
         aria-hidden='true'
         className={cn(
-          'relative z-10 drop-shadow-[0_8px_28px_rgba(0,0,0,0.28)]',
+          'relative z-10',
+          !isThumbnail && 'drop-shadow-[0_8px_28px_rgba(0,0,0,0.28)]',
           iconClassName
         )}
         data-artwork-fallback-icon='true'
         strokeWidth={2.1}
       />
-      <span
-        aria-hidden='true'
-        className={cn('absolute inset-x-0 bottom-0 z-10', accentClassName)}
-        style={getArtworkFallbackAccentStyle(seed)}
-      />
+      {!isThumbnail ? (
+        <span
+          aria-hidden='true'
+          className={cn('absolute inset-x-0 bottom-0 z-10', accentClassName)}
+          style={getArtworkFallbackAccentStyle(seed)}
+        />
+      ) : null}
       {label ? <span className='sr-only'>{label}</span> : null}
     </div>
   );

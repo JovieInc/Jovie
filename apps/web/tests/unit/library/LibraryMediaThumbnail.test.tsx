@@ -68,7 +68,6 @@ describe('LibraryMediaThumbnail', () => {
   });
 
   it.each([
-    ['row', 'rounded-[3%]'],
     ['card', 'rounded-[7%]'],
     ['drawer', 'rounded-[10%]'],
   ] as const)('maps the %s fallback to the appropriate artwork corner radius', (size, expectedRadius) => {
@@ -86,6 +85,47 @@ describe('LibraryMediaThumbnail', () => {
     expect(
       container.querySelector('[data-artwork-fallback-sleeve="true"]')
     ).toHaveClass(expectedRadius);
+  });
+
+  it('uses a flat, subtly rounded fallback for row thumbnails', () => {
+    render(
+      <LibraryMediaThumbnail
+        asset={buildAsset({
+          artworkUrl: null,
+          previewUrl: null,
+          videoUrl: null,
+        })}
+        size='row'
+      />
+    );
+
+    const thumbnail = screen.getByTestId('library-media-thumbnail-release-1');
+    expect(thumbnail).toHaveClass('rounded-sm');
+    expect(
+      thumbnail.querySelector('[data-artwork-fallback="true"]')
+    ).toHaveAttribute('data-artwork-fallback-compact', 'true');
+    expect(
+      thumbnail.querySelector('[data-artwork-fallback-sleeve="true"]')
+    ).toBeNull();
+  });
+
+  it('preserves the real artwork image for row thumbnails', () => {
+    const { container } = render(
+      <LibraryMediaThumbnail
+        asset={buildAsset({ previewUrl: null, videoUrl: null })}
+        size='row'
+      />
+    );
+
+    expect(container.querySelector('img')).toHaveAttribute(
+      'src',
+      'https://cdn.example.com/artwork.jpg'
+    );
+    expect(
+      screen
+        .queryByTestId('library-media-thumbnail-release-1')
+        ?.querySelector('[data-artwork-fallback="true"]')
+    ).toBeNull();
   });
 
   it('reveals an audio waveform scrub overlay on hover', () => {
