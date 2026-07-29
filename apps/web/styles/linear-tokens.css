@@ -68,7 +68,6 @@
      ============================================ */
   --linear-border-subtle: rgba(0, 0, 0, 0.06);
   /* Low-emphasis separators inside shell chrome must stay quieter than a frame seam. */
-  --linear-border-divider-subtle: rgba(0, 0, 0, 0.03);
   --linear-border-default: rgba(0, 0, 0, 0.1);
   --linear-border-strong: rgba(0, 0, 0, 0.15);
   --linear-border-focus: rgba(0, 0, 0, 0.28);
@@ -416,7 +415,6 @@
      edge-less in dark mode). */
   --linear-border-subtle: rgba(255, 255, 255, 0.07);
   /* Low-emphasis separators inside shell chrome must stay quieter than a frame seam. */
-  --linear-border-divider-subtle: rgba(255, 255, 255, 0.05);
   --linear-border-default: rgba(255, 255, 255, 0.11);
   --linear-border-strong: rgba(255, 255, 255, 0.18);
   --linear-border-focus: rgba(255, 255, 255, 0.32);

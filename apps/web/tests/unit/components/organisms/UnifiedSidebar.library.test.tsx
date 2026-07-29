@@ -175,28 +175,29 @@ describe('UnifiedSidebar library route', () => {
     ).toHaveClass(
       'min-h-(--app-shell-footer-row-height)',
       'border-t',
-      'border-(--linear-border-divider-subtle)'
+      'border-(--linear-border-subtle)'
     );
   });
 
-  it('uses a divider token softer than the app frame seam in both themes', () => {
+  it('uses existing subtle border token without growing --linear-* namespace', () => {
     const linearTokens = readFileSync(
       join(__dirname, '../../../..', 'styles/linear-tokens.css'),
       'utf8'
     );
 
     expect(linearTokens).toMatch(
-      /--linear-border-divider-subtle:\s*rgba\(0, 0, 0, 0\.03\);/
+      /--linear-border-subtle:\s*rgba\(0, 0, 0, 0\.06\);/
     );
     expect(linearTokens).toMatch(
       /--linear-app-frame-seam:\s*rgba\(0, 0, 0, 0\.045\);/
     );
     expect(linearTokens).toMatch(
-      /:root\.dark[\s\S]*--linear-border-divider-subtle:\s*rgba\(255, 255, 255, 0\.05\);/
+      /:root\.dark[\s\S]*--linear-border-subtle:\s*rgba\(255, 255, 255, 0\.07\);/
     );
     expect(linearTokens).toMatch(
       /:root\.dark[\s\S]*--linear-app-frame-seam:\s*rgba\(255, 255, 255, 0\.07\);/
     );
+    expect(linearTokens).not.toMatch(/--linear-border-divider-subtle/);
   });
 
   it('preserves the generic route-override contract for legitimate consumers', async () => {
