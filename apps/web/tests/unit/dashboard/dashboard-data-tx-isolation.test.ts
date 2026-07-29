@@ -355,6 +355,8 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       ok([userRow]),
       ok([dashboardProfile]),
       ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]), // settled Inbox suggested-actions count
+      ok([{ count: 0 }]), // settled Inbox tour-dates count
       fail(realLinksError), // social links existence read fails
       ok([{ width: 1024, height: 1024 }]), // avatar quality read
       ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
@@ -399,6 +401,8 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       ok([userRow]),
       ok([dashboardProfile]),
       ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]), // settled Inbox suggested-actions count
+      ok([{ count: 0 }]), // settled Inbox tour-dates count
       ok([{ hasLinks: true, hasMusicLinks: true }]),
       fail(realAvatarError), // avatar quality read fails
       ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
@@ -440,6 +444,8 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       ok([userRow]),
       ok([dashboardProfile]),
       ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]), // settled Inbox suggested-actions count
+      ok([{ count: 0 }]), // settled Inbox tour-dates count
       ok([{ hasLinks: true, hasMusicLinks: true }]),
       ok([{ width: 1024, height: 1024 }]),
       fail(realTippingError), // tipping aggregate read fails
@@ -474,6 +480,8 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       ok([userRow]),
       ok([dashboardProfile]),
       ok([{ sidebarCollapsed: true }]),
+      ok([{ count: 0 }]), // settled Inbox suggested-actions count
+      ok([{ count: 0 }]), // settled Inbox tour-dates count
       ok([{ hasLinks: true, hasMusicLinks: true }]),
       ok([{ width: 256, height: 256 }]),
       ok([{ totalReceived: 250, monthReceived: 125, tipsSubmitted: 4 }]),
