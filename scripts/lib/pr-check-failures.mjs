@@ -59,6 +59,7 @@ export const ADVISORY_CHECK_NAMES = Object.freeze(
     'Seer Code Review',
     // PR Visual Review is explicitly advisory (workflow header + job name).
     // Terminal red must not dequeue green native-MQ members.
+    'Capture changed UI (desktop + mobile) (advisory)',
     'Review screenshots and post advisory review',
     'PR Visual Review',
     // Hosted quality signals — not branch-protection required contexts.

@@ -4,6 +4,7 @@ import {
   buildReviewPrompt,
   classifyFinding,
   classifyReviewOutcome,
+  reviewWithConfiguredBackends,
   routeChangedFiles,
   sanitizeForPrompt,
 } from '../../../.github/scripts/pr-visual-review.mjs';
@@ -77,6 +78,44 @@ describe('bounded PR visual review contract', () => {
       '[redacted-secret]'
     );
     expect(prompt).not.toContain('secret-value');
+    expect(prompt).toContain('grok-4.5|codex');
+    expect(prompt.toLowerCase()).not.toContain('kimi');
+  });
+
+  it('uses Grok 4.5 first and independently falls back to Codex', async () => {
+    const calls = [];
+    const fetchImpl = async url => {
+      calls.push(url);
+      if (String(url).startsWith('https://grok.example'))
+        return new Response(null, { status: 503 });
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: '{"summary":"ok","findings":[]}' } }],
+        }),
+        { status: 200 }
+      );
+    };
+    const result = await reviewWithConfiguredBackends({
+      prompt: 'review',
+      images: [],
+      fetchImpl,
+      grok: {
+        apiKey: 'grok-key',
+        baseUrl: 'https://grok.example/v1',
+        model: 'grok-4.5',
+      },
+      codex: {
+        apiKey: 'codex-key',
+        baseUrl: 'https://codex.example/v1',
+        model: 'gpt-5.2-codex',
+      },
+    });
+    expect(result.provider).toBe('codex');
+    expect(result.review.backend).toBe('codex');
+    expect(calls).toEqual([
+      'https://grok.example/v1/chat/completions',
+      'https://codex.example/v1/chat/completions',
+    ]);
   });
 
   it('separates objective findings from taste and never auto-fixes taste', () => {
@@ -110,6 +149,13 @@ describe('bounded PR visual review contract', () => {
     );
     expect(workflow).toContain('Do not alter subjective/taste findings.');
     expect(workflow).toContain('review_status');
+    expect(workflow).toContain(
+      'Capture changed UI (desktop + mobile) (advisory)'
+    );
+    expect(workflow).toContain('GROK_VISUAL_REVIEW_API_KEY');
+    expect(workflow).toContain('CODEX_VISUAL_REVIEW_API_KEY');
+    expect(workflow).toContain('Call Grok 4.5 with Codex fallback');
+    expect(workflow).not.toContain('Kimi');
     expect(workflow).toContain("'unavailable'");
     expect(workflow).toContain("'skipped'");
     expect(workflow).not.toContain('pr-visual-review-capture.mjs || true');
