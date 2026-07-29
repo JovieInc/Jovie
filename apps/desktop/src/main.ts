@@ -49,6 +49,7 @@ import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
 import {
   decideRendererRecovery,
   RENDERER_BOOT_WATCHDOG_MS,
+  shouldRecoverAuthHandoffToCanonicalShell,
   shouldArmRendererBootWatchdog,
 } from './renderer-recovery';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
@@ -616,6 +617,14 @@ function restoreMainWindowAfterAuthHandoff(): void {
   if (!mainWindowHiddenForAuthHandoff) return;
   mainWindowHiddenForAuthHandoff = false;
   if (mainWindow && !mainWindow.isDestroyed()) {
+    if (
+      shouldRecoverAuthHandoffToCanonicalShell(
+        mainWindow.webContents.getURL()
+      )
+    ) {
+      const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
+      void mainWindow.loadURL(buildDesktopAuthHandoffUrl(authUrl));
+    }
     showWindow(mainWindow);
   }
 }

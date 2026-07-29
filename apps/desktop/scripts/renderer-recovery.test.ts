@@ -3,6 +3,7 @@ import {
   decideRendererRecovery,
   RENDERER_BOOT_WATCHDOG_MS,
   shouldArmRendererBootWatchdog,
+  shouldRecoverAuthHandoffToCanonicalShell,
 } from '../src/renderer-recovery.ts';
 
 const MAX = 2;
@@ -15,6 +16,17 @@ test('clean-exit is normal teardown, never recovered', () => {
       maxReloads: MAX,
     })
   ).toBe('ignore');
+});
+
+test('canceling auth recovers an intercepted blank main window to the canonical shell', () => {
+  expect(shouldRecoverAuthHandoffToCanonicalShell('about:blank')).toBe(true);
+  expect(shouldRecoverAuthHandoffToCanonicalShell('')).toBe(true);
+  expect(
+    shouldRecoverAuthHandoffToCanonicalShell('https://jov.ie/app/chat')
+  ).toBe(false);
+  expect(
+    shouldRecoverAuthHandoffToCanonicalShell('data:text/html,recovery')
+  ).toBe(false);
 });
 
 test('a crash reloads while within the budget', () => {
