@@ -997,8 +997,7 @@ async function fetchTippingStatsWithSession(
     // The dashboard degrades gracefully by showing empty tipping stats.
     const level =
       error instanceof Error &&
-      (error.name === 'QueryTimeoutError' ||
-        isPostgresTimeoutError(error))
+      (error.name === 'QueryTimeoutError' || isPostgresTimeoutError(error))
         ? 'warning'
         : 'error';
     Sentry.captureException(error, {
