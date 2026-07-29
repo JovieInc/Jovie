@@ -28,7 +28,6 @@ concurrency:
 
 env:
   PR_VISUAL_OUT: pr-visual-artifacts
-  PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
 
 jobs:
   capture:
