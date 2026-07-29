@@ -43,6 +43,26 @@ describe('ErrorBanner', () => {
     expect(link).toHaveAttribute('href', '/support');
   });
 
+  it('uses shared button variants to keep secondary exits quiet', () => {
+    render(
+      <ErrorBanner
+        title='Action hierarchy'
+        actions={[
+          { label: 'Retry', onClick: vi.fn(), variant: 'primary' },
+          { label: 'Return to Jovie', href: '/', variant: 'secondary' },
+        ]}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Retry' })).toHaveAttribute(
+      'data-variant',
+      'primary'
+    );
+    expect(
+      screen.getByRole('link', { name: 'Return to Jovie' })
+    ).toHaveAttribute('data-variant', 'secondary');
+  });
+
   describe('dismiss functionality', () => {
     it('renders close button when onDismiss is provided', () => {
       const onDismiss = vi.fn();
