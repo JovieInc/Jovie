@@ -57,6 +57,13 @@ export const ADVISORY_CHECK_NAMES = Object.freeze(
     'Taste Label Guard',
     'Claude Review',
     'Seer Code Review',
+    // PR Visual Review is explicitly advisory (workflow header + job name).
+    // Terminal red must not dequeue green native-MQ members.
+    'Review screenshots and post advisory review',
+    'PR Visual Review',
+    // Hosted quality signals — not branch-protection required contexts.
+    'SonarCloud Code Analysis',
+    'Vercel Agent Review',
     'scope-judge',
     'Scope Alignment Check',
     // Folded into ci-fast's Structural Contract; retained for old PR heads
