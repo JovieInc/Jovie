@@ -72,7 +72,7 @@ vi.mock('@/lib/flags/server', () => ({
   getAppFlagValue: getAppFlagValueMock,
 }));
 
-vi.mock('./chat/loading', () => ({
+vi.mock('./chat/ChatLoadingState', () => ({
   default: () => <div data-testid='chat-route-skeleton' />,
 }));
 vi.mock('./dashboard/releases/loading', () => ({
@@ -152,7 +152,7 @@ describe('AppShellLayout OV mode', () => {
     ).toHaveAttribute('data-shell-mode', 'customer');
   });
 
-  it('keeps every app-shell route on the stable shell fallback while content streams', async () => {
+  it('keeps the first authenticated shell boot on the stable shell fallback while content streams', async () => {
     headersMock.mockResolvedValue(
       new Headers({
         'next-url': APP_ROUTES.TASKS,
