@@ -143,8 +143,7 @@ describe('stale lease guard', () => {
   const terminalComment = {
     id: 'agent-1',
     createdAt: '2026-07-25T12:00:00.000Z',
-    body:
-      'Jovie agent (codex issue shipper) released this issue for retry.\n\nAgent exited 0 but no open PR exists - releasing claim for retry.',
+    body: 'Jovie agent (codex issue shipper) released this issue for retry.\n\nAgent exited 0 but no open PR exists - releasing claim for retry.',
   };
 
   function staleIssue(overrides = {}) {
@@ -173,7 +172,8 @@ describe('stale lease guard', () => {
       },
       async transitionIssue(id, stateId) {
         calls.transitions.push({ id, stateId });
-        if (transitionError === 'transition') throw new Error('transition failed');
+        if (transitionError === 'transition')
+          throw new Error('transition failed');
         return { success: true };
       },
     };
@@ -192,9 +192,15 @@ describe('stale lease guard', () => {
   });
 
   it('does not recover issues with an active PR', async () => {
-    const issue = staleIssue({ pullRequestUrl: 'https://github.com/JovieInc/Jovie/pull/123' });
+    const issue = staleIssue({
+      pullRequestUrl: 'https://github.com/JovieInc/Jovie/pull/123',
+    });
     const client = fakeClient(issue);
-    const result = await staleLease.sweepStaleLeases({ issues: [issue], client, now });
+    const result = await staleLease.sweepStaleLeases({
+      issues: [issue],
+      client,
+      now,
+    });
     assert.equal(result.recovered.length, 0);
     assert.equal(client.calls.comments.length, 0);
     assert.equal(result.skipped[0].reason, 'active-pr');
@@ -214,12 +220,19 @@ describe('stale lease guard', () => {
       now,
     });
     assert.equal(assignedResult.skipped[0].reason, 'assigned');
-    assert.equal(unknownResult.skipped[0].reason, 'latest-agent-evidence-not-terminal');
+    assert.equal(
+      unknownResult.skipped[0].reason,
+      'latest-agent-evidence-not-terminal'
+    );
   });
   it('does not recover a fresh lease', async () => {
     const issue = staleIssue({ updatedAt: '2026-07-27T12:01:00.000Z' });
     const client = fakeClient(issue);
-    const result = await staleLease.sweepStaleLeases({ issues: [issue], client, now });
+    const result = await staleLease.sweepStaleLeases({
+      issues: [issue],
+      client,
+      now,
+    });
     assert.equal(result.recovered.length, 0);
     assert.equal(result.skipped[0].reason, 'lease-too-fresh');
   });
@@ -236,25 +249,55 @@ describe('stale lease guard', () => {
       ],
     });
     const client = fakeClient(issue);
-    const result = await staleLease.sweepStaleLeases({ issues: [issue], client, now });
+    const result = await staleLease.sweepStaleLeases({
+      issues: [issue],
+      client,
+      now,
+    });
     assert.equal(result.recovered.length, 0);
-    assert.equal(result.skipped[0].reason, 'latest-agent-evidence-not-terminal');
+    assert.equal(
+      result.skipped[0].reason,
+      'latest-agent-evidence-not-terminal'
+    );
   });
 
   it('recovers a safe stale lease with exactly one stable comment and verified mutations', async () => {
     const issue = staleIssue();
     const rereadAfterComment = staleIssue({
-      comments: [terminalComment, { id: 'recovery', createdAt: now, body: staleLease.STALE_LEASE_RECOVERY_COMMENT }],
+      comments: [
+        terminalComment,
+        {
+          id: 'recovery',
+          createdAt: now,
+          body: staleLease.STALE_LEASE_RECOVERY_COMMENT,
+        },
+      ],
     });
     const rereadAfterTransition = staleIssue({
       state: 'Todo',
-      comments: [terminalComment, { id: 'recovery', createdAt: now, body: staleLease.STALE_LEASE_RECOVERY_COMMENT }],
+      comments: [
+        terminalComment,
+        {
+          id: 'recovery',
+          createdAt: now,
+          body: staleLease.STALE_LEASE_RECOVERY_COMMENT,
+        },
+      ],
     });
-    const client = fakeClient(issue, { rereads: [rereadAfterComment, rereadAfterTransition] });
-    const result = await staleLease.sweepStaleLeases({ issues: [issue], client, now });
+    const client = fakeClient(issue, {
+      rereads: [rereadAfterComment, rereadAfterTransition],
+    });
+    const result = await staleLease.sweepStaleLeases({
+      issues: [issue],
+      client,
+      now,
+    });
     assert.equal(result.recovered.length, 1);
     assert.equal(client.calls.comments.length, 1);
-    assert.equal(client.calls.comments[0].body, staleLease.STALE_LEASE_RECOVERY_COMMENT);
+    assert.equal(
+      client.calls.comments[0].body,
+      staleLease.STALE_LEASE_RECOVERY_COMMENT
+    );
     assert.equal(client.calls.transitions.length, 1);
     assert.equal(client.calls.rereads, 3);
   });
@@ -262,10 +305,21 @@ describe('stale lease guard', () => {
   it('is idempotent when the recovery comment already exists and issue is Todo', async () => {
     const issue = staleIssue({
       state: 'Todo',
-      comments: [terminalComment, { id: 'recovery', createdAt: now, body: staleLease.STALE_LEASE_RECOVERY_COMMENT }],
+      comments: [
+        terminalComment,
+        {
+          id: 'recovery',
+          createdAt: now,
+          body: staleLease.STALE_LEASE_RECOVERY_COMMENT,
+        },
+      ],
     });
     const client = fakeClient(issue);
-    const result = await staleLease.sweepStaleLeases({ issues: [issue], client, now });
+    const result = await staleLease.sweepStaleLeases({
+      issues: [issue],
+      client,
+      now,
+    });
     assert.equal(result.recovered.length, 0);
     assert.equal(client.calls.comments.length, 0);
     assert.equal(client.calls.transitions.length, 0);
@@ -274,14 +328,28 @@ describe('stale lease guard', () => {
 
   it('fails closed when a mutation reread does not prove the requested state', async () => {
     const issue = staleIssue();
-    const rereadAfterComment = staleIssue({ comments: [terminalComment, { id: 'recovery', body: staleLease.STALE_LEASE_RECOVERY_COMMENT, createdAt: now }] });
-    const client = fakeClient(issue, { rereads: [rereadAfterComment, staleIssue()] });
-    const result = await staleLease.sweepStaleLeases({ issues: [issue], client, now });
+    const rereadAfterComment = staleIssue({
+      comments: [
+        terminalComment,
+        {
+          id: 'recovery',
+          body: staleLease.STALE_LEASE_RECOVERY_COMMENT,
+          createdAt: now,
+        },
+      ],
+    });
+    const client = fakeClient(issue, {
+      rereads: [rereadAfterComment, staleIssue()],
+    });
+    const result = await staleLease.sweepStaleLeases({
+      issues: [issue],
+      client,
+      now,
+    });
     assert.equal(result.recovered.length, 0);
     assert.equal(result.failed[0].reason, 'transition-verification-failed');
   });
 });
-
 
 describe('entrypoint contract', () => {
   it('keeps the cron wrapper beside the executable and config', async () => {

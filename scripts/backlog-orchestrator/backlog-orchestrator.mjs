@@ -30,7 +30,9 @@ const scorer = await import(resolve(__dirname, 'scorer.mjs'));
 const workstreamer = await import(resolve(__dirname, 'workstreamer.mjs'));
 const admitter = await import(resolve(__dirname, 'admitter.mjs'));
 const reporter = await import(resolve(__dirname, 'reporter.mjs'));
-const staleLeaseGuard = await import(resolve(__dirname, 'stale-lease-guard.mjs'));
+const staleLeaseGuard = await import(
+  resolve(__dirname, 'stale-lease-guard.mjs')
+);
 
 // ----- Config -----
 const CACHE_FILE = resolve(__dirname, '.orchestrator-cache.json');

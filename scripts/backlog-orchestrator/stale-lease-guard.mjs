@@ -66,7 +66,9 @@ function hasOpenPullRequest(issue) {
     issue?.githubPrUrl,
     issue?.activePullRequestUrl,
   ];
-  if (directReferences.some(value => typeof value === 'string' && value.trim())) {
+  if (
+    directReferences.some(value => typeof value === 'string' && value.trim())
+  ) {
     return true;
   }
 
@@ -77,7 +79,10 @@ function hasOpenPullRequest(issue) {
   }
 
   const latestEvidence = latestMachineAgentEvidence(issue)?.body || '';
-  return PR_URL_PATTERN.test(latestEvidence) && !NEGATED_OPEN_PR_PATTERN.test(latestEvidence);
+  return (
+    PR_URL_PATTERN.test(latestEvidence) &&
+    !NEGATED_OPEN_PR_PATTERN.test(latestEvidence)
+  );
 }
 
 function ageHours(issue, now) {
@@ -138,7 +143,11 @@ export function classifyStaleLease(
   if (commentCount > 1) {
     return { eligible: false, reason: 'duplicate-recovery-comments' };
   }
-  return { eligible: true, ageHours: age, hasRecoveryComment: commentCount === 1 };
+  return {
+    eligible: true,
+    ageHours: age,
+    hasRecoveryComment: commentCount === 1,
+  };
 }
 
 function mutationSucceeded(result) {
@@ -179,7 +188,10 @@ export async function sweepStaleLeases({
 
     const decision = classifyStaleLease(issue, { now, ...policy });
     if (!decision.eligible) {
-      result.skipped.push({ identifier: issue.identifier, reason: decision.reason });
+      result.skipped.push({
+        identifier: issue.identifier,
+        reason: decision.reason,
+      });
       continue;
     }
 
@@ -207,7 +219,10 @@ export async function sweepStaleLeases({
         issue = afterComment;
       }
 
-      const transitionResult = await client.transitionIssue(issue.id, todoStateId);
+      const transitionResult = await client.transitionIssue(
+        issue.id,
+        todoStateId
+      );
       if (!mutationSucceeded(transitionResult)) {
         throw new Error('transition mutation returned success=false');
       }
@@ -222,7 +237,10 @@ export async function sweepStaleLeases({
         });
         continue;
       }
-      result.recovered.push({ identifier: issue.identifier, ageHours: decision.ageHours });
+      result.recovered.push({
+        identifier: issue.identifier,
+        ageHours: decision.ageHours,
+      });
     } catch (error) {
       result.failed.push({
         identifier: issue.identifier,
