@@ -10,6 +10,9 @@ import { APP_ROUTES } from '@/constants/routes';
 
 const appRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const componentPath = join(appRoot, 'components/site/NotFoundPageContent.tsx');
+const rootRoutePath = join(appRoot, 'app/not-found.tsx');
+const marketingLayoutPath = join(appRoot, 'app/(marketing)/layout.tsx');
+const marketingRoutePath = join(appRoot, 'app/(marketing)/not-found.tsx');
 
 const hashMark = String.fromCharCode(35);
 const hardcodedHashColorPattern = new RegExp(`${hashMark}[\\da-fA-F]{3,8}\\b`);
@@ -66,5 +69,26 @@ describe('NotFoundPageContent', () => {
     expect(source).toContain('`${prefix}-actions`');
     expect(source).toContain('`${prefix}-action-secondary`');
     expect(source).not.toContain('style={{');
+  });
+
+  it('keeps generic root and marketing 404s on the same public recovery system', async () => {
+    const [rootRoute, marketingLayout, marketingRoute] = await Promise.all([
+      readFile(rootRoutePath, 'utf8'),
+      readFile(marketingLayoutPath, 'utf8'),
+      readFile(marketingRoutePath, 'utf8'),
+    ]);
+
+    for (const route of [rootRoute, marketingRoute]) {
+      expect(route).toContain(
+        "<NotFoundPageContent variant='generic' surface='root' />"
+      );
+      expect(route).toContain('system-b-root-not-found-content');
+      expect(route).not.toContain("from 'next/link'");
+    }
+
+    expect(rootRoute).toContain('<PublicPageShell');
+    expect(rootRoute).not.toContain('<MarketingHeader');
+    expect(rootRoute).not.toContain('<MarketingFooter');
+    expect(marketingLayout).toContain('<PublicPageShell');
   });
 });
