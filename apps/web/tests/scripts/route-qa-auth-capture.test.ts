@@ -163,7 +163,7 @@ describe('route-qa authenticated capture', () => {
       status: 'fail',
       finalUrl: 'http://localhost:3220/app',
       failure: {
-        stage: 'test-auth-redirect-persisted',
+        stage: 'page-created',
         message: 'Authenticated destination navigation timed out after 5ms.',
       },
       teardown: {
@@ -261,6 +261,15 @@ describe('route-qa authenticated capture', () => {
       'http://localhost:3220/app/contacts',
       expect.objectContaining({ waitUntil: 'commit' })
     );
+    expect(
+      persisted
+        .find(value =>
+          value.checkpoints.some(
+            checkpoint => checkpoint.stage === 'test-auth-redirect-persisted'
+          )
+        )
+        ?.checkpoints.map(checkpoint => checkpoint.stage)
+    ).not.toContain('page-created');
   });
 
   it.each([

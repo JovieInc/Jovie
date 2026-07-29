@@ -1187,6 +1187,27 @@ export async function runAuthenticatedRouteCapture(
     );
     await checkpoint('context-created');
 
+    await checkpoint('page-bootstrap-pending');
+    await checkpoint('navigation-started');
+    const bootstrapResponse = await runBounded(
+      'Test-auth bootstrap request',
+      context.request.get(targetUrl, { maxRedirects: 0 })
+    );
+    receipt.testAuthRedirect.status = bootstrapResponse.status();
+    receipt.testAuthRedirect.location =
+      bootstrapResponse.headers().location ?? null;
+    if (receipt.testAuthRedirect.status !== 303)
+      throw new Error(
+        `Test-auth returned HTTP ${receipt.testAuthRedirect.status}; expected HTTP 303.`
+      );
+    if (!receipt.testAuthRedirect.location)
+      throw new Error('Test-auth 303 did not include a redirect location.');
+    const destinationUrl = new URL(
+      receipt.testAuthRedirect.location,
+      baseUrl
+    ).toString();
+    await checkpoint('test-auth-redirect-persisted');
+
     page = await runBounded('Page creation', context.newPage());
     page.setDefaultNavigationTimeout(timeoutMs);
     page.setDefaultTimeout(Math.min(timeoutMs, 15_000));
@@ -1206,28 +1227,6 @@ export async function runAuthenticatedRouteCapture(
       });
     });
     await checkpoint('page-created');
-
-    await checkpoint('navigation-started');
-    const bootstrapResponse = await runBounded(
-      'Test-auth bootstrap request',
-      context.request.get(targetUrl, { maxRedirects: 0 })
-    );
-    receipt.testAuthRedirect.status = bootstrapResponse.status();
-    receipt.testAuthRedirect.location =
-      bootstrapResponse.headers().location ?? null;
-    if (receipt.testAuthRedirect.status !== 303) {
-      throw new Error(
-        `Test-auth returned HTTP ${receipt.testAuthRedirect.status}; expected HTTP 303.`
-      );
-    }
-    if (!receipt.testAuthRedirect.location) {
-      throw new Error('Test-auth 303 did not include a redirect location.');
-    }
-    const destinationUrl = new URL(
-      receipt.testAuthRedirect.location,
-      baseUrl
-    ).toString();
-    await checkpoint('test-auth-redirect-persisted');
     await runBounded(
       'Authenticated destination navigation',
       page.goto(destinationUrl, {
