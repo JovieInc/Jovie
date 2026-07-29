@@ -73,6 +73,71 @@ interface TestAuthAvailability {
   readonly reason: string | null;
 }
 
+type AuthenticatedCapturePersona = 'creator-ready' | 'creator' | 'admin';
+type CaptureStatus = 'running' | 'pass' | 'fail';
+type TeardownStatus = 'not-created' | 'closed' | 'timed-out' | 'failed';
+
+interface CaptureCheckpoint {
+  readonly stage: string;
+  readonly at: string;
+}
+
+interface CaptureFailedRequest {
+  readonly method: string;
+  readonly url: string;
+  readonly errorText: string;
+}
+
+interface CaptureFailure {
+  readonly stage: string;
+  readonly message: string;
+}
+
+interface CaptureTeardown {
+  page: TeardownStatus;
+  context: TeardownStatus;
+  browser: TeardownStatus;
+}
+
+export interface AuthenticatedRouteCaptureReceipt {
+  readonly schemaVersion: 1;
+  status: CaptureStatus;
+  readonly baseUrl: string;
+  readonly requestedPath: string;
+  readonly persona: AuthenticatedCapturePersona;
+  readonly targetUrl: string;
+  finalUrl: string;
+  title: string;
+  readonly startedAt: string;
+  finishedAt: string | null;
+  readonly checkpoints: CaptureCheckpoint[];
+  readonly consoleErrors: string[];
+  readonly pageErrors: string[];
+  readonly failedRequests: CaptureFailedRequest[];
+  screenshotPath: string | null;
+  screenshotError: string | null;
+  failure: CaptureFailure | null;
+  readonly teardown: CaptureTeardown;
+}
+
+interface AuthenticatedRouteCaptureOptions {
+  readonly requestedPath: string;
+  readonly persona?: AuthenticatedCapturePersona;
+  readonly baseUrl?: string;
+  readonly outputRoot?: string;
+  readonly timeoutMs?: number;
+  readonly closeTimeoutMs?: number;
+  readonly signal?: AbortSignal;
+}
+
+interface AuthenticatedRouteCaptureDependencies {
+  readonly launchBrowser?: () => Promise<Browser>;
+  readonly now?: () => string;
+  readonly persistReceipt?: (
+    receipt: Readonly<AuthenticatedRouteCaptureReceipt>
+  ) => Promise<void>;
+}
+
 const APP_DIR = resolveAppPath('app');
 const OUTPUT_SEGMENT = process.env.ROUTE_QA_OUTPUT_DIR?.trim() || 'latest';
 const OUTPUT_BASE = resolveAppPath('test-results', 'route-qa');
@@ -84,6 +149,10 @@ const OUTPUT_ROOT = resolveOwnedOutputDirectory(
 const SCREENSHOT_DIR = path.join(OUTPUT_ROOT, 'screenshots');
 const BASE_URL =
   process.env.ROUTE_QA_BASE_URL?.trim() || 'http://localhost:3000';
+const AUTH_CAPTURE_PATH =
+  process.env.ROUTE_QA_AUTH_CAPTURE_PATH?.trim() || null;
+const AUTH_CAPTURE_PERSONA =
+  process.env.ROUTE_QA_AUTH_CAPTURE_PERSONA?.trim() || 'creator-ready';
 const ROUTE_FILTER = process.env.ROUTE_QA_FILTER?.trim().toLowerCase() || null;
 const ROUTE_LIMIT = Number.parseInt(process.env.ROUTE_QA_LIMIT || '', 10);
 const CANONICAL_RELEASE_TASKS_ROUTE = `${APP_ROUTES.RELEASES}/[releaseId]/tasks`;
@@ -864,6 +933,356 @@ export async function settleWithTimeout<T>(
   }
 }
 
+function validateCapturePersona(
+  persona: string
+): asserts persona is AuthenticatedCapturePersona {
+  if (!['creator-ready', 'creator', 'admin'].includes(persona)) {
+    throw new Error(
+      'ROUTE_QA_AUTH_CAPTURE_PERSONA must be creator-ready, creator, or admin.'
+    );
+  }
+}
+
+function buildAuthenticatedCaptureTargetUrl(
+  baseUrl: string,
+  requestedPath: string,
+  persona: AuthenticatedCapturePersona
+) {
+  if (!requestedPath.startsWith('/') || requestedPath.startsWith('//')) {
+    throw new Error(
+      'ROUTE_QA_AUTH_CAPTURE_PATH must be an absolute application path.'
+    );
+  }
+
+  const resolvedBaseUrl = new URL(baseUrl);
+  const requestedUrl = new URL(requestedPath, resolvedBaseUrl);
+  if (requestedUrl.origin !== resolvedBaseUrl.origin) {
+    throw new Error(
+      'ROUTE_QA_AUTH_CAPTURE_PATH must stay on ROUTE_QA_BASE_URL.'
+    );
+  }
+
+  const bootstrapUrl = new URL('/api/dev/test-auth/enter', resolvedBaseUrl);
+  bootstrapUrl.searchParams.set('persona', persona);
+  bootstrapUrl.searchParams.set(
+    'redirect',
+    `${requestedUrl.pathname}${requestedUrl.search}${requestedUrl.hash}`
+  );
+  return bootstrapUrl.toString();
+}
+
+function cloneCaptureReceipt(
+  receipt: Readonly<AuthenticatedRouteCaptureReceipt>
+) {
+  return JSON.parse(
+    JSON.stringify(receipt)
+  ) as AuthenticatedRouteCaptureReceipt;
+}
+
+async function writeCaptureReceiptAtomically(
+  outputRoot: string,
+  receipt: Readonly<AuthenticatedRouteCaptureReceipt>
+) {
+  await fs.mkdir(outputRoot, { recursive: true });
+  const receiptPath = path.join(outputRoot, 'authenticated-route-capture.json');
+  const temporaryPath = `${receiptPath}.tmp`;
+  await fs.writeFile(
+    temporaryPath,
+    `${JSON.stringify(receipt, null, 2)}\n`,
+    'utf8'
+  );
+  await fs.rename(temporaryPath, receiptPath);
+}
+
+function withAbortSignal<T>(
+  operation: Promise<T>,
+  signal: AbortSignal | undefined
+): Promise<T> {
+  if (!signal) return operation;
+  if (signal.aborted) {
+    return Promise.reject(
+      signal.reason instanceof Error
+        ? signal.reason
+        : new Error('Authenticated route capture aborted.')
+    );
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      reject(
+        signal.reason instanceof Error
+          ? signal.reason
+          : new Error('Authenticated route capture aborted.')
+      );
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+    operation.then(
+      result => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(result);
+      },
+      error => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      }
+    );
+  });
+}
+
+export async function runAuthenticatedRouteCapture(
+  options: Readonly<AuthenticatedRouteCaptureOptions>,
+  dependencies: Readonly<AuthenticatedRouteCaptureDependencies> = {}
+): Promise<AuthenticatedRouteCaptureReceipt> {
+  const baseUrl = options.baseUrl ?? BASE_URL;
+  const persona = options.persona ?? 'creator-ready';
+  const outputRoot = options.outputRoot ?? OUTPUT_ROOT;
+  const timeoutMs = options.timeoutMs ?? resolveRouteCaseTimeoutMs();
+  const closeTimeoutMs = options.closeTimeoutMs ?? 5_000;
+  const now = dependencies.now ?? (() => new Date().toISOString());
+  const launchBrowser =
+    dependencies.launchBrowser ?? (() => chromium.launch({ headless: true }));
+  const persistReceipt =
+    dependencies.persistReceipt ??
+    (receipt => writeCaptureReceiptAtomically(outputRoot, receipt));
+  validateCapturePersona(persona);
+  const targetUrl = buildAuthenticatedCaptureTargetUrl(
+    baseUrl,
+    options.requestedPath,
+    persona
+  );
+  const screenshotPath = path.join(
+    outputRoot,
+    'authenticated-route-capture.png'
+  );
+  const receipt: AuthenticatedRouteCaptureReceipt = {
+    schemaVersion: 1,
+    status: 'running',
+    baseUrl,
+    requestedPath: options.requestedPath,
+    persona,
+    targetUrl,
+    finalUrl: targetUrl,
+    title: '',
+    startedAt: now(),
+    finishedAt: null,
+    checkpoints: [],
+    consoleErrors: [],
+    pageErrors: [],
+    failedRequests: [],
+    screenshotPath: null,
+    screenshotError: null,
+    failure: null,
+    teardown: {
+      page: 'not-created',
+      context: 'not-created',
+      browser: 'not-created',
+    },
+  };
+  let activeStage = 'initializing';
+  let browser: Browser | null = null;
+  let context: BrowserContext | null = null;
+  let page: Page | null = null;
+
+  const persist = async () => {
+    await persistReceipt(cloneCaptureReceipt(receipt));
+  };
+  const checkpoint = async (stage: string) => {
+    activeStage = stage;
+    receipt.checkpoints.push({ stage, at: now() });
+    await persist();
+  };
+  const markCaptureFailure = (stage: string, message: string) => {
+    receipt.status = 'fail';
+    receipt.failure ??= { stage, message };
+  };
+  const bestEffortCheckpoint = async (stage: string) => {
+    try {
+      await checkpoint(stage);
+    } catch (error) {
+      const message = `Receipt checkpoint ${stage} failed: ${(error as Error).message}`;
+      receipt.pageErrors.push(message);
+      markCaptureFailure(stage, message);
+    }
+  };
+  const readPageTitle = async (currentPage: Page, titleTimeoutMs: number) => {
+    try {
+      const settledTitle = await settleWithTimeout(
+        currentPage.title(),
+        titleTimeoutMs
+      );
+      return settledTitle.timedOut ? receipt.title : settledTitle.result;
+    } catch {
+      return receipt.title;
+    }
+  };
+  const runBounded = async <T>(
+    label: string,
+    operation: Promise<T>,
+    operationTimeoutMs = timeoutMs
+  ) => {
+    const settled = await settleWithTimeout(
+      withAbortSignal(operation, options.signal),
+      operationTimeoutMs
+    );
+    if (settled.timedOut) {
+      throw new Error(`${label} timed out after ${operationTimeoutMs}ms.`);
+    }
+    return settled.result;
+  };
+  const closeResource = async (
+    resource: keyof CaptureTeardown,
+    close: (() => Promise<unknown>) | null
+  ) => {
+    if (!close) return;
+    await bestEffortCheckpoint(`${resource}-close-started`);
+    try {
+      const settledClose = await settleWithTimeout(
+        Promise.resolve().then(close),
+        closeTimeoutMs
+      );
+      receipt.teardown[resource] = settledClose.timedOut
+        ? 'timed-out'
+        : 'closed';
+      if (settledClose.timedOut) {
+        markCaptureFailure(
+          `${resource}-close-started`,
+          `${resource} teardown timed out after ${closeTimeoutMs}ms.`
+        );
+      }
+    } catch (error) {
+      receipt.teardown[resource] = 'failed';
+      const message = `${resource} teardown failed: ${(error as Error).message}`;
+      receipt.pageErrors.push(message);
+      markCaptureFailure(`${resource}-close-started`, message);
+    }
+    await bestEffortCheckpoint(
+      `${resource}-close-${receipt.teardown[resource]}`
+    );
+  };
+
+  try {
+    await checkpoint('browser-launch-started');
+    const launchedBrowser = await runBounded('Browser launch', launchBrowser());
+    browser = launchedBrowser;
+    await checkpoint('browser-launched');
+
+    context = await runBounded(
+      'Browser context creation',
+      browser.newContext({
+        viewport: { width: 1440, height: 960 },
+        colorScheme: 'dark',
+      })
+    );
+    await checkpoint('context-created');
+
+    page = await runBounded('Page creation', context.newPage());
+    page.setDefaultNavigationTimeout(timeoutMs);
+    page.setDefaultTimeout(Math.min(timeoutMs, 15_000));
+    page.on('console', message => {
+      if (message.type() === 'error') {
+        receipt.consoleErrors.push(message.text());
+      }
+    });
+    page.on('pageerror', error => {
+      receipt.pageErrors.push(error.message);
+    });
+    page.on('requestfailed', request => {
+      receipt.failedRequests.push({
+        method: request.method(),
+        url: request.url(),
+        errorText: request.failure()?.errorText ?? 'unknown request failure',
+      });
+    });
+    await checkpoint('page-created');
+
+    await checkpoint('navigation-started');
+    await runBounded(
+      'Authenticated route navigation',
+      page.goto(targetUrl, {
+        waitUntil: 'commit',
+        timeout: Math.min(timeoutMs, 45_000),
+      })
+    );
+    await checkpoint('navigation-committed');
+
+    await checkpoint('stability-wait-started');
+    await runBounded(
+      'Authenticated route stability wait',
+      waitForStablePage(page)
+    );
+    receipt.finalUrl = page.url();
+    receipt.title = await readPageTitle(page, Math.min(timeoutMs, 15_000));
+    receipt.pageErrors.push(
+      ...(await runBounded(
+        'Page error collection',
+        collectPageErrors(page),
+        Math.min(timeoutMs, 15_000)
+      ))
+    );
+    await checkpoint('stability-wait-completed');
+
+    const mainVisible = await page
+      .locator('main')
+      .first()
+      .isVisible()
+      .catch(() => false);
+    if (!mainVisible) {
+      throw new Error(
+        'Authenticated route did not render visible main content.'
+      );
+    }
+    if (
+      receipt.consoleErrors.length > 0 ||
+      receipt.pageErrors.length > 0 ||
+      receipt.failedRequests.length > 0
+    ) {
+      throw new Error(
+        'Authenticated route emitted console, page, or failed-request evidence.'
+      );
+    }
+    receipt.status = 'pass';
+    await checkpoint('capture-passed');
+  } catch (error) {
+    markCaptureFailure(activeStage, (error as Error).message);
+    await checkpoint('capture-failed').catch(() => undefined);
+  } finally {
+    if (page) {
+      receipt.finalUrl = page.url() || receipt.finalUrl;
+      receipt.title = await readPageTitle(page, closeTimeoutMs);
+      await bestEffortCheckpoint('screenshot-started');
+      try {
+        await fs.mkdir(outputRoot, { recursive: true });
+        const screenshot = await settleWithTimeout(
+          page.screenshot({ path: screenshotPath, fullPage: true }),
+          closeTimeoutMs
+        );
+        if (screenshot.timedOut) {
+          const message = `Screenshot timed out after ${closeTimeoutMs}ms.`;
+          receipt.screenshotError = message;
+          markCaptureFailure('screenshot-started', message);
+          await bestEffortCheckpoint('screenshot-timed-out');
+        } else {
+          receipt.screenshotPath = screenshotPath;
+          await bestEffortCheckpoint('screenshot-written');
+        }
+      } catch (error) {
+        receipt.screenshotError = (error as Error).message;
+        markCaptureFailure('screenshot-started', receipt.screenshotError);
+        await bestEffortCheckpoint('screenshot-failed');
+      }
+    }
+
+    await closeResource('page', page ? () => page.close() : null);
+    await closeResource('context', context ? () => context.close() : null);
+    await closeResource('browser', browser ? () => browser.close() : null);
+    receipt.finishedAt = now();
+    await bestEffortCheckpoint('receipt-finalized');
+    await persist();
+  }
+
+  return cloneCaptureReceipt(receipt);
+}
+
 async function runRouteCase(
   context: BrowserContext,
   routeCase: RouteCase
@@ -1135,6 +1554,38 @@ async function main() {
     OUTPUT_SEGMENT,
     'ROUTE_QA_OUTPUT_DIR'
   );
+  if (AUTH_CAPTURE_PATH) {
+    validateCapturePersona(AUTH_CAPTURE_PERSONA);
+    const abortController = new AbortController();
+    const handleSignal = (signal: NodeJS.Signals) => {
+      abortController.abort(
+        new Error(`Authenticated route capture received ${signal}.`)
+      );
+    };
+    const handleInterrupt = () => handleSignal('SIGINT');
+    const handleTermination = () => handleSignal('SIGTERM');
+    process.once('SIGINT', handleInterrupt);
+    process.once('SIGTERM', handleTermination);
+
+    let receipt: AuthenticatedRouteCaptureReceipt;
+    try {
+      receipt = await runAuthenticatedRouteCapture({
+        requestedPath: AUTH_CAPTURE_PATH,
+        persona: AUTH_CAPTURE_PERSONA,
+        signal: abortController.signal,
+      });
+    } finally {
+      process.removeListener('SIGINT', handleInterrupt);
+      process.removeListener('SIGTERM', handleTermination);
+    }
+    console.log(
+      `Authenticated route capture ${receipt.status}: ${receipt.finalUrl}`
+    );
+    console.log(`Artifacts: ${OUTPUT_ROOT}`);
+    await flushStandardStreams();
+    process.exit(receipt.status === 'pass' ? 0 : 1);
+  }
+
   const authAvailability = await getTestAuthAvailability();
   const routeCases = applyAuthAvailability(
     await buildRouteMatrix(),
