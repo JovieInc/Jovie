@@ -1,5 +1,5 @@
-import Link from 'next/link';
-import { MarketingContainer } from '@/components/marketing';
+import { Container } from '@/components/site/Container';
+import { NotFoundPageContent } from '@/components/site/NotFoundPageContent';
 
 export const revalidate = false;
 
@@ -11,37 +11,15 @@ export const revalidate = false;
  */
 export default function NotFound() {
   return (
-    <MarketingContainer
-      width='page'
-      className='system-b-marketing-not-found flex items-center justify-center'
-    >
-      <div className='w-full max-w-md mx-auto text-center px-4 py-16'>
-        {/* Error code — oversized, muted */}
-        <div className='mb-8 select-none'>
-          <span
-            className='system-b-marketing-not-found-code'
-            aria-hidden='true'
-          >
-            404
-          </span>
+    <section className='system-b-root-not-found-page flex flex-1'>
+      <Container className='system-b-root-not-found-container'>
+        <div
+          data-testid='not-found'
+          className='system-b-root-not-found-content'
+        >
+          <NotFoundPageContent variant='generic' surface='root' />
         </div>
-
-        {/* Content */}
-        <div className='-mt-16 relative'>
-          {/* ui-casing-allow: marketing display headline */}
-          <h1 className='text-xl font-semibold text-primary-token tracking-tight mb-2'>
-            Page not found
-          </h1>
-          <p className='text-app text-tertiary-token leading-relaxed mb-8'>
-            The link you followed may be broken, or the page may have been
-            removed.
-          </p>
-
-          <Link href='/' className='public-action-primary'>
-            Return home
-          </Link>
-        </div>
-      </div>
-    </MarketingContainer>
+      </Container>
+    </section>
   );
 }
