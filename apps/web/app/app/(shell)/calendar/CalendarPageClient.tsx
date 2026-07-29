@@ -26,10 +26,7 @@ import {
 } from '@/app/app/(shell)/dashboard/tour-dates/events-actions';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
-import {
-  PAGE_TOOLBAR_META_TEXT_CLASS,
-  PageToolbar,
-} from '@/components/organisms/table';
+import { PageToolbar } from '@/components/organisms/table';
 import { getEventLocalDateKey } from '@/lib/events/date';
 import { normalizeTicketUrl } from '@/lib/events/ticket-url';
 import { queryKeys } from '@/lib/queries';
@@ -425,11 +422,6 @@ export function CalendarPageClient() {
       data-testid='calendar-workspace'
       toolbar={
         <PageToolbar
-          start={
-            <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
-              Releases and events at a glance.
-            </span>
-          }
           end={
             <div className='flex flex-wrap items-center justify-end gap-1'>
               <FilterPill
