@@ -1,5 +1,6 @@
 export * from './analysis';
 export * from './beat-grid';
+export * from './performance';
 export * from './playback';
 export * from './units';
 
