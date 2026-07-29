@@ -22,9 +22,9 @@ export default function ChatLoading() {
         aria-live='polite'
         data-testid='chat-loading'
       >
-        <div className='flex flex-1 flex-col items-center justify-center px-4 py-6 sm:px-6 sm:py-8'>
+        <div className='flex flex-1 flex-col px-4 py-6 sm:px-6 sm:py-8'>
           <div
-            className={`${CHAT_CONTENT_SHELL_CLASSNAME} relative flex min-h-full flex-1 flex-col items-center justify-center px-1 py-8`}
+            className={`${CHAT_CONTENT_SHELL_CLASSNAME} relative flex min-h-0 flex-1 flex-col items-center justify-center px-1 py-8`}
           >
             <div
               className='pointer-events-none absolute left-1/2 top-1/2 h-[min(46vw,28rem)] w-[min(46vw,28rem)] -translate-x-1/2 -translate-y-[60%] opacity-45 max-sm:h-[min(72vw,18rem)] max-sm:w-[min(72vw,18rem)]'
@@ -32,36 +32,33 @@ export default function ChatLoading() {
             >
               <JovieMarkElectric className='h-full w-full' />
             </div>
+          </div>
 
-            {/* Input area skeleton */}
-            <div
-              className={`${CHAT_CONTENT_SHELL_CLASSNAME} relative z-10 space-y-2`}
-            >
-              {/* Decorative only — parent is aria-busy; hide control stubs from AT. */}
-              <div
-                className='system-b-shell-loading-composer'
-                aria-hidden='true'
-              >
-                <div className='relative flex items-end gap-2 px-3 py-2.5'>
-                  <div
-                    className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token opacity-80'
-                    data-label={CHAT_COMPOSER_ATTACH_ARIA_LABEL}
-                  >
-                    <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
-                  </div>
-                  <div className='min-w-0 flex-1 py-1.5 text-sm leading-6 text-tertiary-token'>
-                    {CHAT_COMPOSER_EMPTY_PLACEHOLDER}
-                  </div>
-                  <div
-                    className='system-b-chat-composer-primary-action flex h-9 w-9 shrink-0 cursor-not-allowed items-center justify-center rounded-full opacity-80'
-                    data-label={CHAT_COMPOSER_SEND_ARIA_LABEL}
-                  >
-                    <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
-                  </div>
+          {/* Reserve the loaded route's bottom composer allocation. */}
+          <div
+            className={`${CHAT_CONTENT_SHELL_CLASSNAME} relative z-10 space-y-2`}
+          >
+            {/* Decorative only — parent is aria-busy; hide control stubs from AT. */}
+            <div className='system-b-shell-loading-composer' aria-hidden='true'>
+              <div className='relative flex items-end gap-2 px-3 py-2.5'>
+                <div
+                  className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token opacity-80'
+                  data-label={CHAT_COMPOSER_ATTACH_ARIA_LABEL}
+                >
+                  <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
+                </div>
+                <div className='min-w-0 flex-1 py-1.5 text-sm leading-6 text-tertiary-token'>
+                  {CHAT_COMPOSER_EMPTY_PLACEHOLDER}
+                </div>
+                <div
+                  className='system-b-chat-composer-primary-action flex h-9 w-9 shrink-0 cursor-not-allowed items-center justify-center rounded-full opacity-80'
+                  data-label={CHAT_COMPOSER_SEND_ARIA_LABEL}
+                >
+                  <LoadingSkeleton height='h-4' width='w-4' rounded='full' />
                 </div>
               </div>
-              <Skeleton className='mx-auto h-3 w-32' rounded='lg' />
             </div>
+            <Skeleton className='mx-auto h-3 w-32' rounded='lg' />
           </div>
         </div>
       </div>
