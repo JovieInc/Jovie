@@ -543,6 +543,23 @@ const ApprovalStatusCell = memo(function ApprovalStatusCell({
   );
 });
 
+const ReleaseDateCell = memo(function ReleaseDateCell({
+  asset,
+}: {
+  readonly asset: LibraryReleaseAsset;
+}) {
+  return (
+    <span
+      className='system-b-library-meta-text block whitespace-nowrap text-right tabular-nums text-tertiary-token'
+      title={formatLibraryReleaseDateTitle(asset.releaseDate)}
+    >
+      {asset.releaseDate
+        ? formatLibraryReleaseDate(asset.releaseDate)
+        : 'No date'}
+    </span>
+  );
+});
+
 /**
  * Neutral fallback avatar color for provider keys missing from
  * `PROVIDER_CONFIG`. Points at a System B text token — no raw hex here.
@@ -661,16 +678,7 @@ const LIBRARY_CATALOG_COLUMNS = [
   libraryColumnHelper.display({
     id: 'releaseDate',
     header: 'Release Date',
-    cell: ({ row }) => (
-      <span
-        className='system-b-library-meta-text block whitespace-nowrap text-right tabular-nums text-tertiary-token'
-        title={formatLibraryReleaseDateTitle(row.original.releaseDate)}
-      >
-        {row.original.releaseDate
-          ? formatLibraryReleaseDate(row.original.releaseDate)
-          : 'No date'}
-      </span>
-    ),
+    cell: ({ row }) => <ReleaseDateCell asset={row.original} />,
     size: 112,
     minSize: 96,
     meta: { className: 'pl-2 pr-3' },
@@ -704,16 +712,7 @@ const LIBRARY_TABLE_COLUMNS = [
   libraryColumnHelper.display({
     id: 'releaseDate',
     header: 'Release Date',
-    cell: ({ row }) => (
-      <span
-        className='system-b-library-meta-text block whitespace-nowrap text-right tabular-nums text-tertiary-token'
-        title={formatLibraryReleaseDateTitle(row.original.releaseDate)}
-      >
-        {row.original.releaseDate
-          ? formatLibraryReleaseDate(row.original.releaseDate)
-          : 'No date'}
-      </span>
-    ),
+    cell: ({ row }) => <ReleaseDateCell asset={row.original} />,
     size: 112,
     minSize: 96,
     meta: { className: 'pl-2 pr-3' },
