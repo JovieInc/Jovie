@@ -23,7 +23,12 @@ export function routeChangedFiles(files) {
     file => UI_FILE.test(file) || /(^|\/)DESIGN\.md$/.test(file)
   );
   if (changed.length === 0)
-    return { shouldReview: false, routes: [], reason: 'no-ui-change' };
+    return {
+      shouldReview: false,
+      routes: [],
+      reason: 'no-ui-change',
+      review_status: 'skipped',
+    };
   const routes = new Set();
   for (const file of changed) {
     if (/admin|console|ops/i.test(file)) routes.add('/demo/admin');
@@ -49,7 +54,20 @@ export function routeChangedFiles(files) {
               : a.localeCompare(b)
     ),
     reason: 'ui-change',
+    review_status: 'advisory',
   };
+}
+
+export function classifyReviewOutcome({
+  shouldReview,
+  mergeBaseAvailable = true,
+  backendAvailable = true,
+  timedOut = false,
+}) {
+  if (!shouldReview) return 'skipped';
+  if (!mergeBaseAvailable || !backendAvailable || timedOut)
+    return 'unavailable';
+  return 'advisory';
 }
 
 export function classifyFinding(finding) {
@@ -176,6 +194,25 @@ async function main() {
     const manifest = JSON.parse(
       await readFile(join(artifactDir, 'manifest.json'), 'utf8')
     );
+    const reviewStatus = input.reviewStatus ?? 'advisory';
+    if (reviewStatus === 'skipped' || reviewStatus === 'unavailable') {
+      await writeFile(
+        input.output,
+        JSON.stringify(
+          {
+            status: reviewStatus,
+            review_status: reviewStatus,
+            error:
+              reviewStatus === 'skipped'
+                ? 'No UI surface changed; visual review skipped.'
+                : 'Merge base unavailable; visual review evidence is unavailable.',
+          },
+          null,
+          2
+        )
+      );
+      return;
+    }
     const screenshots = [];
     for (const capture of manifest.captures ?? []) {
       if (capture.status !== 'captured') continue;
@@ -202,7 +239,12 @@ async function main() {
       await writeFile(
         input.output,
         JSON.stringify(
-          { status: 'completed', review, promptLength: prompt.length },
+          {
+            status: 'completed',
+            review_status: 'advisory',
+            review,
+            promptLength: prompt.length,
+          },
           null,
           2
         )
@@ -212,7 +254,8 @@ async function main() {
         input.output,
         JSON.stringify(
           {
-            status: error.name === 'AbortError' ? 'timed_out' : 'blocked',
+            status: 'unavailable',
+            review_status: 'unavailable',
             error: String(error.message ?? error),
           },
           null,

@@ -56,16 +56,32 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          git diff --name-only "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/changed-files.txt"
+          merge_base_available=true
+          if ! git diff --name-only "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/changed-files.txt" 2> "$RUNNER_TEMP/merge-base-error.txt"; then
+            merge_base_available=false
+            # Divergent/stacked history is unavailable evidence, not a UI defect.
+            git diff --name-only "$BASE_SHA" "$HEAD_SHA" > "$RUNNER_TEMP/changed-files.txt" || :
+          fi
+          export MERGE_BASE_AVAILABLE="$merge_base_available"
           mkdir -p "$PR_VISUAL_OUT"
           node --input-type=module - <<'NODE'
           import { readFile, writeFile } from 'node:fs/promises';
           import { routeChangedFiles } from './.github/scripts/pr-visual-review.mjs';
           const files = (await readFile(process.env.RUNNER_TEMP + '/changed-files.txt', 'utf8')).split('\n').filter(Boolean);
           const route = routeChangedFiles(files);
-          await writeFile(process.env.PR_VISUAL_OUT + '/routing.json', JSON.stringify({ ...route, files }, null, 2));
-          await writeFile(process.env.GITHUB_OUTPUT, `should_review=${route.shouldReview}\nroutes<<ROUTES\n${JSON.stringify(route.routes)}\nROUTES\n`, { flag: 'a' });
-          console.log(JSON.stringify(route));
+          const output = {
+            ...route,
+            review_status: route.shouldReview
+              ? process.env.MERGE_BASE_AVAILABLE === 'true'
+                ? route.review_status
+                : 'unavailable'
+              : 'skipped',
+            merge_base_available: process.env.MERGE_BASE_AVAILABLE === 'true',
+            files,
+          };
+          await writeFile(process.env.PR_VISUAL_OUT + '/routing.json', JSON.stringify(output, null, 2));
+          await writeFile(process.env.GITHUB_OUTPUT, `should_review=${route.shouldReview}\nreview_status=${output.review_status}\nroutes<<ROUTES\n${JSON.stringify(route.routes)}\nROUTES\n`, { flag: 'a' });
+          console.log(JSON.stringify(output));
           NODE
 
       - name: Build web app for deterministic capture
@@ -97,7 +113,7 @@ jobs:
           PR_VISUAL_ROUTES: ${{ steps.route.outputs.routes }}
         run: |
           set -euo pipefail
-          PR_VISUAL_ROUTES="$(node -p "JSON.stringify(require('./pr-visual-artifacts/routing.json').routes)")" node .github/scripts/pr-visual-review-capture.mjs || true
+          PR_VISUAL_ROUTES="$(node -p "JSON.stringify(require('./pr-visual-artifacts/routing.json').routes)")" node .github/scripts/pr-visual-review-capture.mjs
           test -f pr-visual-artifacts/manifest.json
 
       - name: Stop server
@@ -153,6 +169,7 @@ jobs:
           else
             echo "review=true" >> "$GITHUB_OUTPUT"
           fi
+          echo "review_status=$(node -p "require('./pr-visual-artifacts/routing.json').review_status")" >> "$GITHUB_OUTPUT"
 
       - name: Prepare bounded diff context
         if: steps.routed.outputs.review == 'true'
@@ -161,12 +178,12 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           git fetch --no-tags --depth=2 origin "$BASE_SHA" "$HEAD_SHA"
-          git diff --no-ext-diff "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/pr.diff"
+          git diff --no-ext-diff "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/pr.diff" 2>/dev/null || git diff --no-ext-diff "$BASE_SHA" "$HEAD_SHA" > "$RUNNER_TEMP/pr.diff" || :
           node --input-type=module - <<'NODE'
           import { readFile, writeFile } from 'node:fs/promises';
           const routing = JSON.parse(await readFile('pr-visual-artifacts/routing.json', 'utf8'));
           const diff = await readFile(process.env.RUNNER_TEMP + '/pr.diff', 'utf8');
-          await writeFile('review-input.json', JSON.stringify({ artifactDir: 'pr-visual-artifacts', changedFiles: routing.files, diff, output: 'review-result.json' }));
+          await writeFile('review-input.json', JSON.stringify({ artifactDir: 'pr-visual-artifacts', changedFiles: routing.files, diff, reviewStatus: routing.review_status, output: 'review-result.json' }));
           NODE
 
       - name: Call configured GLM 5.2 / Kimi K3 backend
@@ -184,7 +201,7 @@ jobs:
           const run = process.env.GITHUB_RUN_ID;
           const body = result.status === 'completed'
             ? formatReviewBody({ review: result.review, runId: run, artifactUrl: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${run}` })
-            : `## Visual review (${run})\n\n**Status: ${result.status}**\n\n${result.error}\n\nNo findings were generated; rerun after configuring a GLM 5.2 or Kimi K3 backend.`;
+            : `## Visual review (${run})\n\n**review_status: ${result.review_status}**\n\n${result.error}\n\nNo findings were generated and this advisory lane does not block merging.`;
           process.stdout.write(body);
           NODE
           )

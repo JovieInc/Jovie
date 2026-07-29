@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildReviewPrompt,
   classifyFinding,
+  classifyReviewOutcome,
   routeChangedFiles,
   sanitizeForPrompt,
 } from '../../../.github/scripts/pr-visual-review.mjs';
@@ -19,6 +20,7 @@ describe('bounded PR visual review contract', () => {
       shouldReview: true,
       routes: ['/', '/demo'],
       reason: 'ui-change',
+      review_status: 'advisory',
     });
   });
 
@@ -29,12 +31,28 @@ describe('bounded PR visual review contract', () => {
       shouldReview: true,
       routes: ['/demo', '/demo/profile'],
       reason: 'ui-change',
+      review_status: 'advisory',
     });
     expect(routeChangedFiles(['scripts/format.mjs'])).toEqual({
       shouldReview: false,
       routes: [],
       reason: 'no-ui-change',
+      review_status: 'skipped',
     });
+  });
+
+  it('classifies unavailable evidence and model output as successful advisory states', () => {
+    expect(classifyReviewOutcome({ shouldReview: false })).toBe('skipped');
+    expect(
+      classifyReviewOutcome({ shouldReview: true, mergeBaseAvailable: false })
+    ).toBe('unavailable');
+    expect(
+      classifyReviewOutcome({ shouldReview: true, backendAvailable: false })
+    ).toBe('unavailable');
+    expect(classifyReviewOutcome({ shouldReview: true, timedOut: true })).toBe(
+      'unavailable'
+    );
+    expect(classifyReviewOutcome({ shouldReview: true })).toBe('advisory');
   });
 
   it('routes chat and shell changes through the seeded authenticated surface', () => {
@@ -44,6 +62,7 @@ describe('bounded PR visual review contract', () => {
       shouldReview: true,
       routes: ['/demo', '/app/chat'],
       reason: 'ui-change',
+      review_status: 'advisory',
     });
   });
 
@@ -90,6 +109,11 @@ describe('bounded PR visual review contract', () => {
       'Existing visual review found; idempotent no-op.'
     );
     expect(workflow).toContain('Do not alter subjective/taste findings.');
+    expect(workflow).toContain('review_status');
+    expect(workflow).toContain("'unavailable'");
+    expect(workflow).toContain("'skipped'");
+    expect(workflow).not.toContain('pr-visual-review-capture.mjs || true');
+    expect(workflow).not.toContain('requested_reviewers');
   });
 
   it('fails visual capture closed on runtime console, page, and server errors', () => {
