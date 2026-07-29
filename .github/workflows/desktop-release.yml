@@ -613,9 +613,29 @@ jobs:
                     )] | length) == 1
                   )
               ] | length' <<<"$recovery_jobs")"
-              if [ "$recovery_publisher_count" = "1" ]; then
+              recovery_asset_proof_count="$(jq --arg sha "$recovery_sha" '[
+                .[].jobs[]?
+                | select(
+                    .name == "Record production desktop publish" and
+                    .head_sha == $sha and
+                    .status == "completed" and
+                    .conclusion == "success" and
+                    ([.steps[]? | select(
+                      .name == "Verify exact published release assets" and
+                      .status == "completed" and
+                      .conclusion == "success"
+                    )] | length) == 1 and
+                    ([.steps[]? | select(
+                      .name == "Cross-prove exact production publisher" and
+                      .status == "completed" and
+                      .conclusion == "success"
+                    )] | length) == 1
+                  )
+              ] | length' <<<"$recovery_jobs")"
+              if [ "$recovery_publisher_count" = "1" ] &&
+                [ "$recovery_asset_proof_count" = "1" ]; then
                 baseline_sha="$recovery_sha"
-                echo "Recovered exact desktop publish from run $recovery_run_id attempt $recovery_attempt."
+                echo "Recovered exact asset-proven desktop publish from run $recovery_run_id attempt $recovery_attempt."
                 break
               fi
             done <<<"$recovery_candidates"
@@ -828,6 +848,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare private production draft
+        if: env.ENVIRONMENT == 'production'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/desktop-release-assets.mjs prepare \
+            --sha "$RELEASE_SHA"
+
       - name: Generate staging icon
         if: env.ENVIRONMENT == 'staging'
         run: node apps/desktop/scripts/gen-staging-icon.mjs
@@ -1000,15 +1030,18 @@ jobs:
             echo "::error::Desktop generation $RELEASE_SHA was superseded by $current_main_sha before publication."
             exit 1
           }
-          pnpm --filter @jovie/desktop exec electron-builder publish \
-            --config electron-builder.yml \
-            --version="$release_version" \
-            --files "${publish_files[@]}"
+          node scripts/desktop-release-assets.mjs upload-and-publish \
+            --sha "$RELEASE_SHA" \
+            --dist "apps/desktop/dist"
 
       - name: Capture production publisher identity
         id: publisher-identity
         if: env.ENVIRONMENT == 'production'
         run: |
+          [ "${{ steps.publish-production.outputs.release_sha }}" = "$RELEASE_SHA" ] || {
+            echo "::error::Published release proof does not match the authorized commit."
+            exit 1
+          }
           echo "published_sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
           echo "publisher_attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
 
@@ -1036,6 +1069,26 @@ jobs:
       actions: read
       contents: read
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.build.outputs.published_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+
+      - name: Verify exact published release assets
+        id: release-proof
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/desktop-release-assets.mjs verify-published \
+            --sha "${{ needs.build.outputs.published_sha }}"
+
       - name: Cross-prove exact production publisher
         id: prove-publisher
         env:
