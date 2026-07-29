@@ -258,12 +258,14 @@ function isRecoverableLock(lock) {
     return lockFileAgeMs() > Math.min(staleMs, 5000);
   }
 
-  const ageMs = Date.now() - Number(lock.startedAtMs ?? 0);
-  if (Number.isFinite(ageMs) && ageMs > staleMs) {
-    return true;
+  // A live owner is authoritative. Long typechecks routinely exceed the stale
+  // threshold under host pressure; age alone must never permit a second owner.
+  if (typeof lock.pid === 'number') {
+    return !isProcessAlive(lock.pid);
   }
 
-  return typeof lock.pid === 'number' && !isProcessAlive(lock.pid);
+  const ageMs = Date.now() - Number(lock.startedAtMs ?? 0);
+  return Number.isFinite(ageMs) && ageMs > staleMs;
 }
 
 function lockFileAgeMs() {
