@@ -175,7 +175,7 @@ export const TaskListRow = memo(function TaskListRow({
       isSelected={isSelected}
       interaction='task-row-group'
       className={cn(
-        'group/row flex h-full items-center gap-2.5 px-3 py-1 transition-[opacity] duration-subtle ease-subtle',
+        'group/row flex h-full w-full items-center gap-2.5 px-3 py-1 transition-[opacity] duration-subtle ease-subtle',
         isDone && !isSelected && 'opacity-75',
         isCancelled && !isSelected && 'opacity-60'
       )}
