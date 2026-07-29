@@ -37,6 +37,16 @@ describe('bounded PR visual review contract', () => {
     });
   });
 
+  it('routes chat and shell changes through the seeded authenticated surface', () => {
+    expect(
+      routeChangedFiles(['apps/web/components/organisms/AppShellFrame.tsx'])
+    ).toEqual({
+      shouldReview: true,
+      routes: ['/demo', '/app/chat'],
+      reason: 'ui-change',
+    });
+  });
+
   it('keeps prompt input bounded and removes credential-shaped values', () => {
     const prompt = buildReviewPrompt({
       diff: 'const x = process.env.API_KEY;\n'.repeat(10000),
