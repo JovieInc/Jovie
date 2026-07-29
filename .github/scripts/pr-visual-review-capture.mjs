@@ -48,9 +48,17 @@ try {
         const pageText = (await page.locator('body').innerText()).trim();
         if (!pageText || /\b404\b|content not found/i.test(pageText))
           throw new Error('Captured route did not render a meaningful surface');
-        if (route.startsWith('/app/') && !/Inbox|Library|New Chat/.test(pageText))
-          throw new Error('Captured app route did not render authenticated shell');
-        if (route.startsWith('/app/') && /Welcome back|Continue with Google/.test(pageText))
+        if (
+          route.startsWith('/app/') &&
+          !/Inbox|Library|New Chat/.test(pageText)
+        )
+          throw new Error(
+            'Captured app route did not render authenticated shell'
+          );
+        if (
+          route.startsWith('/app/') &&
+          /Welcome back|Continue with Google/.test(pageText)
+        )
           throw new Error('Captured app route rendered sign-in shell');
         await page.screenshot({ path, fullPage: true });
         manifest.push({
