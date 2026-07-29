@@ -271,7 +271,7 @@ export function PersistentAudioBar() {
         aria-label='Playback Controls'
         inert={idleTrayOpen ? undefined : true}
         className={cn(
-          'shrink-0 overflow-hidden border-t border-(--app-shell-border) bg-(--linear-bg-page)',
+          'shrink-0 overflow-hidden border-t border-(--app-shell-border) bg-(--app-shell-content-surface)',
           SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME,
           className
         )}
@@ -372,7 +372,7 @@ export function PersistentAudioBar() {
     <section
       aria-label='Audio Player'
       className={cn(
-        'animate-in fade-in slide-in-from-bottom-2 duration-cinematic shrink-0 border-t border-subtle bg-(--linear-bg-page) backdrop-blur-xl px-3 py-2 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]',
+        'animate-in fade-in slide-in-from-bottom-2 duration-cinematic shrink-0 border-t border-subtle bg-(--app-shell-content-surface) backdrop-blur-xl px-3 py-2 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]',
         className
       )}
     >
@@ -483,7 +483,7 @@ export function PersistentAudioBar() {
         data-shell-audio-surface='persistent-expanded'
         aria-hidden={barCollapsed}
         className={cn(
-          'hidden shrink-0 overflow-hidden border-t border-(--app-shell-border) bg-(--linear-bg-page) lg:block',
+          'hidden shrink-0 overflow-hidden border-t border-(--app-shell-border) bg-(--app-shell-content-surface) lg:block',
           SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME
         )}
         style={{
