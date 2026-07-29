@@ -23,8 +23,8 @@ vi.mock('@/lib/queries/prefetch-dashboard', () => ({
 }));
 
 const PRIMARY_LABELS = [
+  'New Chat',
   'Inbox',
-  'Chat',
   'Library',
   'Contacts',
   'Calendar',
@@ -174,8 +174,8 @@ describe('DashboardNav interactions', () => {
       renderFn: render,
     });
 
-    expect(screen.getAllByRole('link', { name: 'Chat' })).toHaveLength(1);
-    expect(screen.queryByRole('button', { name: 'Chat' })).toBeNull();
+    expect(screen.getAllByRole('link', { name: 'New Chat' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'New Chat' })).toBeNull();
   });
 
   it('marks an active thread read without changing primary navigation', async () => {
@@ -203,7 +203,7 @@ describe('DashboardNav interactions', () => {
         JSON.parse(localStorage.getItem('jovie:sidebar-thread-read-at')!)
       ).toMatchObject({ 'thread-1': '2026-05-12T00:00:00.000Z' });
     });
-    expect(screen.getByRole('link', { name: 'Chat' })).not.toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'New Chat' })).not.toHaveAttribute(
       'aria-current'
     );
   });
