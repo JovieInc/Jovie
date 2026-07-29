@@ -1,6 +1,7 @@
 'use client';
 
-import { Pause, Play, X } from 'lucide-react';
+import { Button } from '@jovie/ui';
+import { AudioLines, Pause, Play, X } from 'lucide-react';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -9,6 +10,7 @@ import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { toast } from '@/components/feedback';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { AudioBar, type AudioBarTrack } from '@/components/shell/AudioBar';
+import { IconBtn } from '@/components/shell/IconBtn';
 import { SidebarNowPlaying } from '@/components/shell/SidebarNowPlaying';
 import {
   APP_ROUTES,
@@ -55,6 +57,10 @@ export function PersistentAudioBar() {
   const prefersReducedMotion = useReducedMotion();
   const [imgError, setImgError] = useState(false);
   const [barCollapsed, setBarCollapsed] = useState(false);
+  // The player shell is a global affordance even before a track is selected.
+  // Keep its idle slot mounted at zero height; the tray itself only opens on an
+  // explicit player shortcut so route content never gains surprise chrome.
+  const [idleTrayOpen, setIdleTrayOpen] = useState(false);
   const [waveformOn, setWaveformOn] = useState(true);
   // Cinematic reveal (JOV-3487): the shell bar lands into place from the
   // bottom on first play. Starts un-revealed so the CSS transition has an
@@ -159,11 +165,10 @@ export function PersistentAudioBar() {
   ]);
 
   const activeTrackId = playbackState.activeTrackId;
+  const hasActiveTrack = Boolean(activeTrackId);
   const compactPlayerVisible = Boolean(activeTrackId) && barCollapsed;
 
   useEffect(() => {
-    if (!activeTrackId) return;
-
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented || isFormElement(event.target)) return;
 
@@ -176,6 +181,39 @@ export function PersistentAudioBar() {
         handleCloseLyrics();
         return;
       }
+
+      if (event.key === 'Escape' && !hasActiveTrack && idleTrayOpen) {
+        event.preventDefault();
+        setIdleTrayOpen(false);
+        return;
+      }
+
+      if (event.key === '`' && plainKey) {
+        event.preventDefault();
+        if (hasActiveTrack) {
+          setBarCollapsed(value => !value);
+        } else {
+          setIdleTrayOpen(value => !value);
+        }
+        return;
+      }
+
+      if (
+        event.key === '\\' &&
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        !event.shiftKey
+      ) {
+        event.preventDefault();
+        if (hasActiveTrack) {
+          setBarCollapsed(value => !value);
+        } else {
+          setIdleTrayOpen(value => !value);
+        }
+        return;
+      }
+
+      if (!hasActiveTrack) return;
 
       if (event.key === ' ' && plainKey) {
         event.preventDefault();
@@ -194,31 +232,16 @@ export function PersistentAudioBar() {
         handleOpenLyrics();
         return;
       }
-
-      if (event.key === '`' && plainKey) {
-        event.preventDefault();
-        setBarCollapsed(value => !value);
-        return;
-      }
-
-      if (
-        event.key === '\\' &&
-        (event.metaKey || event.ctrlKey) &&
-        !event.altKey &&
-        !event.shiftKey
-      ) {
-        event.preventDefault();
-        setBarCollapsed(value => !value);
-      }
     }
 
     globalThis.addEventListener('keydown', handleKeyDown);
     return () => globalThis.removeEventListener('keydown', handleKeyDown);
   }, [
-    activeTrackId,
     handleCloseLyrics,
     handleOpenLyrics,
     handleToggle,
+    hasActiveTrack,
+    idleTrayOpen,
     pathname,
     playbackState.hasLyrics,
   ]);
@@ -240,7 +263,90 @@ export function PersistentAudioBar() {
     return resetAudioChromeSnapshot;
   }, []);
 
-  if (!activeTrackId) return null;
+  if (!activeTrackId) {
+    const isLibraryRoute = pathname === APP_ROUTES.LIBRARY;
+    const idleTray = (testId: string, className?: string) => (
+      <section
+        aria-hidden={!idleTrayOpen}
+        aria-label='Playback Controls'
+        inert={idleTrayOpen ? undefined : true}
+        className={cn(
+          'overflow-hidden border-t border-(--app-shell-border) bg-(--app-shell-content-surface)',
+          SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME,
+          className
+        )}
+        data-testid={testId}
+        style={{
+          maxHeight: idleTrayOpen ? 'var(--app-shell-audio-bar-max-height)' : 0,
+          opacity: idleTrayOpen ? 1 : 0,
+          transform: prefersReducedMotion
+            ? 'translateY(0)'
+            : idleTrayOpen
+              ? 'translateY(0)'
+              : 'translateY(10px)',
+          pointerEvents: idleTrayOpen ? 'auto' : 'none',
+          transition: prefersReducedMotion
+            ? 'none'
+            : SHELL_AUDIO_BAR_TRANSITION,
+        }}
+      >
+        <div
+          className='flex items-center justify-between gap-4 px-4 py-3 lg:px-6'
+          style={{ minHeight: 'var(--app-shell-audio-bar-max-height)' }}
+        >
+          <div className='flex min-w-0 items-center gap-3'>
+            <AudioLines
+              aria-hidden='true'
+              className='h-4 w-4 shrink-0 text-quaternary-token opacity-50'
+              strokeWidth={1.5}
+            />
+            <div className='min-w-0'>
+              <p className='text-sm font-medium text-secondary-token'>
+                Nothing playing
+              </p>
+              <p className='truncate text-xs text-tertiary-token'>
+                {isLibraryRoute
+                  ? 'Choose a track to start playback.'
+                  : 'Choose a track from Library to start playback.'}
+              </p>
+            </div>
+          </div>
+          <div className='flex shrink-0 items-center gap-1'>
+            {!isLibraryRoute ? (
+              <Button
+                size='sm'
+                variant='link'
+                onClick={() => router.push(APP_ROUTES.LIBRARY)}
+              >
+                Open Library
+              </Button>
+            ) : null}
+            <IconBtn
+              label='Close Playback Controls'
+              tooltipSide='top'
+              tone='ghost'
+              onClick={() => setIdleTrayOpen(false)}
+            >
+              <X aria-hidden='true' className='h-3.5 w-3.5' />
+            </IconBtn>
+          </div>
+        </div>
+      </section>
+    );
+
+    return (
+      <>
+        {idleTray(
+          'audio-surface-idle-shell-desktop',
+          'absolute inset-x-0 bottom-0 z-30 hidden lg:block'
+        )}
+        {idleTray(
+          'audio-surface-idle-shell-mobile',
+          'absolute inset-x-0 z-30 max-lg:bottom-[calc(3.5rem+env(safe-area-inset-bottom))] lg:hidden'
+        )}
+      </>
+    );
+  }
 
   const isLoading = playbackState.playbackStatus === 'loading';
 
