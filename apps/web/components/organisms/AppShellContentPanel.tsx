@@ -49,7 +49,11 @@ export function AppShellContentPanel({
   ...sectionProps
 }: Readonly<AppShellContentPanelProps>) {
   const panelScrollClassName =
-    scroll === 'panel' ? 'min-h-0 overflow-hidden' : 'overflow-visible';
+    scroll === 'panel'
+      ? 'min-h-0 overflow-hidden'
+      : 'min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain';
+  const panelContentConstraintClassName =
+    scroll === 'panel' ? 'min-h-0 overflow-hidden' : 'min-h-0';
   const isTableSurface = surfaceMode === 'table';
 
   return (
@@ -70,7 +74,7 @@ export function AppShellContentPanel({
           isTableSurface
             ? PANEL_TABLE_SURFACE_CLASSNAME
             : PANEL_OUTER_INSET_CLASSNAME,
-          panelScrollClassName,
+          panelContentConstraintClassName,
           surfaceClassName
         )}
       >
@@ -87,7 +91,7 @@ export function AppShellContentPanel({
           <div
             className={cn(
               'flex min-h-0 min-w-0 flex-1 flex-col',
-              panelScrollClassName,
+              panelContentConstraintClassName,
               PANEL_CONTENT_PADDING_CLASSNAME[contentPadding],
               contentClassName
             )}
