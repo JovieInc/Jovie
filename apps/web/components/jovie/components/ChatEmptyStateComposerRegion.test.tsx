@@ -108,4 +108,17 @@ describe('ChatEmptyStateComposerRegion', () => {
     expect(composer.className).toContain('shrink-0');
     expect(screen.getByTestId('composer-child')).toBeTruthy();
   });
+
+  it('keeps a stable dock while an empty-state affordance is temporarily hidden', () => {
+    render(
+      <ChatEmptyStateComposerRegion stableDocked>
+        <div data-testid='composer-child' />
+      </ChatEmptyStateComposerRegion>
+    );
+
+    expect(
+      screen.getByTestId('chat-empty-state-composer-region')
+    ).toHaveAttribute('data-layout', 'docked');
+    expect(screen.getByTestId('chat-empty-state-above-scroll')).toBeTruthy();
+  });
 });

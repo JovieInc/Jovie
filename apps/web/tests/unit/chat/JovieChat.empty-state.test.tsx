@@ -179,7 +179,7 @@ describe('JovieChat empty state', () => {
     mockChatState.chipTray.chips = [];
   });
 
-  it('renders logo, composer, and prompt rail scaffolding when empty (JOV-3547)', () => {
+  it('renders a stable docked composer with prompt-pill fallback when empty', () => {
     const {
       container,
       getByTestId,
@@ -195,9 +195,13 @@ describe('JovieChat empty state', () => {
     expect(queryByText("Hey, I'm Jovie.")).toBeNull();
     const emptyViewport = getByTestId('chat-empty-state-viewport');
     expect(emptyViewport.className).toContain('flex-1');
-    expect(emptyViewport.className).toContain('justify-center');
+    expect(emptyViewport).toHaveAttribute(
+      'data-empty-affordance',
+      'suggestion-pills'
+    );
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
-    expect(getByTestId('chat-empty-state-logo')).toBeTruthy();
+    expect(queryByTestId('chat-empty-state-logo')).toBeNull();
+    expect(queryByTestId('chat-empty-state-greeting')).toBeNull();
     expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();
     // No actionCards prop → no action-card slot, but prompt rail is wired.
     expect(queryByTestId('chat-empty-state-action-card-slot')).toBeNull();
@@ -223,7 +227,7 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Release link')).toBeNull();
   });
 
-  it('renders typed actionCards above the composer when provided (JOV-3547)', () => {
+  it('renders the canonical starter-actions rail without the legacy card map', () => {
     renderWithQueryClient(
       <JovieChat
         profileId='profile-1'
@@ -258,6 +262,11 @@ describe('JovieChat empty state', () => {
     expect(
       screen.getByTestId('chat-empty-state-action-card-slot')
     ).toBeTruthy();
+    expect(screen.getByTestId('chat-starter-actions-rail')).toBeTruthy();
+    expect(screen.getByTestId('chat-empty-state-viewport')).toHaveAttribute(
+      'data-empty-affordance',
+      'starter-actions'
+    );
     expect(
       screen.getByTestId('chat-empty-state-centered-composer')
     ).toBeTruthy();
@@ -270,12 +279,14 @@ describe('JovieChat empty state', () => {
         .getByTestId('chat-empty-state-centered-composer')
         .getAttribute('data-dock')
     ).toBe('bottom');
-    expect(screen.getByTestId('suggested-prompts-rail')).toBeTruthy();
-    expect(screen.getAllByTestId('chat-action-card')).toHaveLength(3);
-    // Cards own these intents — rail must not re-advertise conflicting chips.
-    const rail = within(screen.getByTestId('suggested-prompts-rail'));
-    expect(rail.queryByLabelText('Plan a Release')).toBeNull();
-    expect(rail.queryByLabelText('Review Signals')).toBeNull();
+    expect(screen.queryByTestId('suggested-prompts-rail')).toBeNull();
+    expect(screen.getAllByTestId('chat-action-card')).toHaveLength(1);
+    expect(
+      within(screen.getByTestId('chat-starter-actions-rail')).getAllByRole(
+        'button',
+        { name: /Show Starter Action/ }
+      )
+    ).toHaveLength(3);
   });
 
   it('does not resurrect dismissed primary actions as chips or recenter the composer', () => {
@@ -328,8 +339,15 @@ describe('JovieChat empty state', () => {
 
     expect(screen.queryAllByTestId('chat-action-card')).toHaveLength(0);
     expect(
-      screen.getByTestId('chat-empty-state-action-card-slot')
+      screen.queryByTestId('chat-empty-state-action-card-slot')
+    ).toBeNull();
+    expect(
+      screen.getByTestId('chat-empty-state-soft-suggestions-slot')
     ).toBeTruthy();
+    expect(screen.getByTestId('chat-empty-state-viewport')).toHaveAttribute(
+      'data-empty-affordance',
+      'suggestion-pills'
+    );
     expect(
       screen.getByTestId('chat-empty-state-composer-region')
     ).toHaveAttribute('data-layout', 'docked');
