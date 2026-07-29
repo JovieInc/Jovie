@@ -11,8 +11,8 @@ import { oauthProviderErrorReturn } from './oauth-provider-error-return';
 const ORIGIN = 'https://auth.test';
 const AUTH_BASE = `${ORIGIN}/api/auth`;
 const CLIENT_ID = 'logyourbody-ios';
-const REDIRECT_URI = 'ie.jov.jovie://auth/complete';
-const CALLER_ERROR_REDIRECT = 'ie.jov.jovie://auth/caller-controlled-error';
+const REDIRECT_URI = 'logyourbody://oauth';
+const CALLER_ERROR_REDIRECT = 'logyourbody://oauth';
 const OUTER_STATE = 'ios-outer-state';
 const CODE_VERIFIER = 'v'.repeat(64);
 const CODE_CHALLENGE = createHash('sha256')
@@ -203,9 +203,9 @@ async function expectNoSessionOrAuthorizationCode(harness: Harness) {
 function expectSafeNativeError(response: Response, error: string) {
   expect(response.status).toBe(302);
   const location = locationFrom(response);
-  expect(location.protocol).toBe('ie.jov.jovie:');
-  expect(location.host).toBe('auth');
-  expect(location.pathname).toBe('/complete');
+  expect(location.protocol).toBe('logyourbody:');
+  expect(location.host).toBe('oauth');
+  expect(location.pathname).toBe('');
   expect(location.searchParams.get('error')).toBe(error);
   expect(location.searchParams.get('state')).toBe(OUTER_STATE);
   expect(location.searchParams.get('iss')).toBe(AUTH_BASE);
@@ -218,7 +218,7 @@ afterEach(() => {
 });
 
 describe('oauthProviderErrorReturn', () => {
-  it('preserves the real OAuth-provider success flow and PKCE exchange', async () => {
+  it('serves the registered LogYourBody iOS authorize route and preserves PKCE exchange', async () => {
     const harness = await createHarness();
     const flow = await beginAuthorization(harness);
 
@@ -226,7 +226,7 @@ describe('oauthProviderErrorReturn', () => {
       code: 'valid-apple-code',
     });
     const redirect = locationFrom(success);
-    expect(redirect.protocol, redirect.toString()).toBe('ie.jov.jovie:');
+    expect(redirect.protocol, redirect.toString()).toBe('logyourbody:');
     expect(redirect.searchParams.get('state')).toBe(OUTER_STATE);
     expect(redirect.searchParams.get('iss')).toBe(AUTH_BASE);
     expect(redirect.searchParams.has('error')).toBe(false);
