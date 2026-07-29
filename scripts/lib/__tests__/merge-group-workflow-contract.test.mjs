@@ -833,6 +833,27 @@ describe('merge_group workflow contract', () => {
     }
   });
 
+  it('keeps workflow execution posture reporting post-merge and advisory', () => {
+    const workflowHeader = SECURITY_WORKFLOW.slice(
+      0,
+      SECURITY_WORKFLOW.indexOf('\njobs:')
+    );
+    const posture = getJobBlock(
+      SECURITY_WORKFLOW,
+      'workflow-execution-posture'
+    );
+
+    expect(workflowHeader).not.toMatch(/^  pull_request:\s*$/m);
+    expect(workflowHeader).not.toMatch(/^  merge_group:\s*$/m);
+    expect(posture).toContain('continue-on-error: true');
+    expect(posture).toContain('contents: read');
+    expect(posture).toContain('persist-credentials: false');
+    expect(posture).toContain(
+      'node scripts/security/audit-workflow-execution.mjs'
+    );
+    expect(posture).not.toContain('secrets.');
+  });
+
   it('reserves each exact required context for its active event producer', () => {
     const mergeReady = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
     const sourceReady = getJobBlock(CI_WORKFLOW, 'ci-pr-ready');
