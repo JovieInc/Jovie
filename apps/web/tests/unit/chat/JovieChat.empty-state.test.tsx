@@ -270,6 +270,10 @@ describe('JovieChat empty state', () => {
     expect(
       screen.getByTestId('chat-empty-state-centered-composer')
     ).toBeTruthy();
+    expect(screen.getByTestId('chat-empty-state-action-card-slot')).toHaveClass(
+      'items-start',
+      'sm:items-center'
+    );
     // Docked layout: cards scroll above, composer at bottom of usable area.
     const region = screen.getByTestId('chat-empty-state-composer-region');
     expect(region.getAttribute('data-layout')).toBe('docked');
@@ -281,6 +285,12 @@ describe('JovieChat empty state', () => {
     ).toBe('bottom');
     expect(screen.queryByTestId('suggested-prompts-rail')).toBeNull();
     expect(screen.getAllByTestId('chat-action-card')).toHaveLength(1);
+    expect(
+      within(screen.getByTestId('chat-starter-actions-rail')).getByRole(
+        'button',
+        { name: 'Show More Starter Actions' }
+      )
+    ).toBeInTheDocument();
     expect(
       within(screen.getByTestId('chat-starter-actions-rail')).getAllByRole(
         'button',

@@ -39,6 +39,11 @@ export interface LiquidGlassMenuProps {
   readonly navigationLabel?: string;
   readonly expandedNavigationLabel?: string;
   readonly className?: string;
+  /**
+   * Render inside the authenticated shell's shared bottom surface instead of
+   * creating a second fixed/elevated layer.
+   */
+  readonly inFlow?: boolean;
   readonly onItemActivate?: (
     item: LiquidGlassMenuItem,
     inputMethod: NavigationInputMethod
@@ -244,6 +249,7 @@ export function LiquidGlassMenu({
   navigationLabel = 'Dashboard Tabs',
   expandedNavigationLabel = 'Expanded Navigation Menu',
   className,
+  inFlow = false,
   onItemActivate,
   onExpandedItemsVisible,
   isItemActive,
@@ -301,8 +307,13 @@ export function LiquidGlassMenu({
     <div
       ref={menuRef}
       data-mobile-navigation='true'
-      data-layout='overlay'
-      className={cn('fixed bottom-0 inset-x-0 z-40 lg:hidden', className)}
+      data-layout={inFlow ? 'in-flow' : 'overlay'}
+      className={cn(
+        inFlow
+          ? 'relative z-0 shrink-0 lg:hidden'
+          : 'fixed bottom-0 inset-x-0 z-40 lg:hidden',
+        className
+      )}
     >
       {/* Closed menu content is unmounted so hidden links cannot receive focus. */}
       {isExpanded ? (
@@ -408,9 +419,12 @@ export function LiquidGlassMenu({
         aria-label={navigationLabel}
         className='relative z-50'
         style={{
-          background: 'var(--liquid-glass-bg-solid)',
-          boxShadow: isExpanded ? 'none' : 'var(--liquid-glass-shadow)',
-          borderTop: '1px solid var(--liquid-glass-border)',
+          background: inFlow ? 'transparent' : 'var(--liquid-glass-bg-solid)',
+          boxShadow:
+            inFlow || isExpanded ? 'none' : 'var(--liquid-glass-shadow)',
+          borderTop: inFlow
+            ? '1px solid transparent'
+            : '1px solid var(--liquid-glass-border)',
         }}
       >
         <GlassHighlight subtle rounded={false} />

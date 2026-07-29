@@ -166,4 +166,25 @@ describe('AppShellFrame', () => {
     );
     expect(tray).toHaveClass('shrink-0');
   });
+
+  it('mounts mobile navigation in the shared in-flow bottom surface', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        main={<div>Main Content</div>}
+        mobileBottomNav={<nav aria-label='Mobile Navigation'>Nav</nav>}
+      />
+    );
+
+    const surface = screen.getByTestId('app-shell-mobile-bottom-surface');
+    expect(surface).toHaveClass(
+      'system-b-app-mobile-bottom-surface',
+      'shrink-0',
+      'lg:hidden'
+    );
+    expect(surface).toContainElement(
+      screen.getByRole('navigation', { name: 'Mobile Navigation' })
+    );
+    expect(surface).not.toHaveClass('fixed', 'absolute');
+  });
 });

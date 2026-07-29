@@ -39,7 +39,7 @@ export interface AuthShellProps {
 
 function getContentClassName(showMobileTabs: boolean, isTableRoute: boolean) {
   if (!showMobileTabs) return undefined;
-  return isTableRoute ? 'pb-20 lg:pb-0' : 'pb-20 lg:pb-6';
+  return isTableRoute ? undefined : 'lg:pb-6';
 }
 
 function AuthShellInner({
