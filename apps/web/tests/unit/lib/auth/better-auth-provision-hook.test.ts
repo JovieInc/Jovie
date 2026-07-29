@@ -175,6 +175,46 @@ describe('Better Auth base URL', () => {
       )
     ).toBe('http://127.0.0.1:3260/api/auth');
   });
+
+  it('allows both loopback host spellings for the active local dev port', async () => {
+    const originalPort = process.env.PORT;
+    mocks.env.VERCEL_ENV = undefined;
+    mocks.env.NODE_ENV = 'development';
+    mocks.env.VERCEL_URL = undefined;
+    mocks.env.VERCEL_BRANCH_URL = undefined;
+    mocks.env.BETTER_AUTH_URL = 'http://localhost:3100';
+    process.env.PORT = '3257';
+    mocks.betterAuth.mockClear();
+    vi.resetModules();
+
+    try {
+      await import('@/lib/auth/better-auth');
+
+      expect(getOptions().baseURL).toEqual({
+        allowedHosts: [
+          'jov.ie',
+          'www.jov.ie',
+          'staging.jov.ie',
+          'localhost:3100',
+          'localhost:3257',
+          '127.0.0.1:3257',
+        ],
+        protocol: 'http',
+      });
+
+      expect(
+        resolveBaseURL(
+          getOptions().baseURL,
+          '/api/auth',
+          new Request('http://127.0.0.1:3257/identity'),
+          false
+        )
+      ).toBe('http://127.0.0.1:3257/api/auth');
+    } finally {
+      if (originalPort === undefined) delete process.env.PORT;
+      else process.env.PORT = originalPort;
+    }
+  });
 });
 
 describe('Better Auth app-user provisioning hook', () => {
