@@ -173,7 +173,7 @@ describe('UnifiedSidebar library route', () => {
     ).toHaveClass(
       'min-h-(--app-shell-footer-row-height)',
       'border-t',
-      'border-(--app-shell-frame-seam)'
+      'border-subtle'
     );
   });
 

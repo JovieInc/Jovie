@@ -522,7 +522,7 @@ export function UnifiedSidebar({
           {/* Bottom Settings button opens the existing user menu via UserButton.
               Uses Sidebar atoms for native feel (icon + label, tooltip in icon mode).
               Placed above Now Playing / audio area. */}
-          <div className='min-h-(--app-shell-footer-row-height) border-t border-(--app-shell-frame-seam) px-2.5 py-0.5'>
+          <div className='min-h-(--app-shell-footer-row-height) border-t border-subtle px-2.5 py-0.5'>
             <SidebarMenu>
               <SidebarMenuItem>
                 <UserButton
