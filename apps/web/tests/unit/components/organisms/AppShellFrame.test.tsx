@@ -143,7 +143,7 @@ describe('AppShellFrame', () => {
     expect(screen.queryByTestId('chat-ambient-gradient')).toBeNull();
   });
 
-  it('renders the shared audio player slot inside the shell frame', () => {
+  it('reserves an in-flow shell tray below main for the shared audio player', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}
@@ -153,9 +153,17 @@ describe('AppShellFrame', () => {
       />
     );
 
-    expect(screen.getByTestId('audio-player')).toBeInTheDocument();
-    expect(screen.getByRole('main')).toContainElement(
-      screen.getByTestId('audio-player')
+    const main = screen.getByRole('main');
+    const audioPlayer = screen.getByTestId('audio-player');
+    const tray = screen.getByTestId('app-shell-audio-tray');
+
+    expect(audioPlayer).toBeInTheDocument();
+    expect(main).not.toContainElement(audioPlayer);
+    expect(tray).toContainElement(audioPlayer);
+    expect(tray.parentElement).toHaveAttribute(
+      'data-app-shell-content-column',
+      'true'
     );
+    expect(tray).toHaveClass('shrink-0');
   });
 });
