@@ -121,7 +121,7 @@ export async function reviewWithBackend({
     );
     if (!response.ok)
       throw new Error(`backend_failed: HTTP ${response.status}`);
-    const payload = await response.json();
+    const payload = JSON.parse(JSON.stringify(await response.json()));
     const text = payload?.choices?.[0]?.message?.content;
     if (typeof text !== 'string' || text.length === 0)
       throw new Error('backend_failed: empty response');
