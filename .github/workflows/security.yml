@@ -244,3 +244,20 @@ jobs:
             printf '⚠️ Unsigned commit merged to main (reason: %s)\n' "$reason"
             echo "::warning title=Unsigned commit::SHA ${COMMIT_SHA} reached main without a cryptographic signature (reason: ${reason}). Enable branch-protection \"Require signed commits\" to block unsigned merges — see https://github.com/${REPO}/settings/branches"
           fi
+
+  workflow-execution-posture:
+    name: Workflow Execution Trust-Boundary Audit
+    # Keep this report post-merge/nightly and advisory so it cannot slow source
+    # PRs or the queue. Configure GitHub Actions policy in Evaluate mode before enforcement.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Report privileged workflow trust boundaries
+        run: node scripts/security/audit-workflow-execution.mjs
