@@ -205,11 +205,6 @@
   background: var(--system-b-bg-surface-2);
 }
 
-:where(.system-b-chat-file-chip:focus-within) {
-  border-color: var(--color-focus-ring);
-  box-shadow: 0 0 0 var(--focus-ring-width) var(--color-focus-ring);
-}
-
 :where(.system-b-chat-file-chip-icon) {
   width: 24px;
   height: 24px;

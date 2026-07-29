@@ -6,9 +6,14 @@ const readSource = (path: string) =>
   readFileSync(resolve(process.cwd(), path), 'utf8');
 
 describe('chat file-drop image chip contrast guard (JOV-4557)', () => {
-  it('keeps the completed chip on canonical surfaces with a visible keyboard state', () => {
+  it('keeps the completed chip on canonical surfaces and leaves keyboard focus to its Button primitive', () => {
     const chip = readSource('components/jovie/components/ChatFileChips.tsx');
     const styles = readSource('styles/chat-file-upload.css');
+    const contrastPairs = JSON.parse(
+      readSource('contrast-pairs.config.json')
+    ) as {
+      pairs: Array<{ fg: string; bg: string; minRatio: number }>;
+    };
 
     expect(chip).toContain('data-upload-state={f.status}');
     expect(chip).toContain('system-b-chat-file-chip-label');
@@ -19,10 +24,16 @@ describe('chat file-drop image chip contrast guard (JOV-4557)', () => {
     );
     expect(styles).toContain('background: var(--system-b-bg-surface-1);');
     expect(styles).toContain('color: var(--color-text-primary-token);');
-    expect(styles).toContain(':where(.system-b-chat-file-chip:focus-within)');
-    expect(styles).toContain('border-color: var(--color-focus-ring);');
+    expect(styles).not.toContain('.system-b-chat-file-chip:focus-within');
     expect(styles).toContain(
       ':where(.system-b-chat-file-chip-remove:focus-visible)'
+    );
+    expect(contrastPairs.pairs).toContainEqual(
+      expect.objectContaining({
+        fg: '--color-text-primary-token',
+        bg: '--color-bg-surface-1',
+        minRatio: 4.5,
+      })
     );
   });
 });
