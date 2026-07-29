@@ -15,8 +15,8 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 // (shell.openExternal), not inside an ASWebAuthenticationSession. A raw
 // server 302 to `jovie://auth/complete` is NOT reliably handed off to the app
 // by modern browsers without a user gesture, so users would sign in on the web
-// and never bounce back to the Mac app. This page fires the deep link
-// automatically AND exposes an "Open Jovie" button (guaranteed user gesture),
+// and never bounce back to the Mac client. This page fires the deep link
+// automatically AND exposes a "Return to Jovie" button (guaranteed user gesture),
 // mirroring the proven legacy `/auth-return` page.
 
 const DESKTOP_FLOW_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
@@ -70,13 +70,11 @@ function NativeReturnContent() {
   return (
     <main className='grid min-h-dvh place-items-center bg-base px-6 text-primary-token'>
       <section className='w-full max-w-sm rounded-2xl border border-subtle bg-surface-1 px-6 py-7 text-center shadow-card'>
-        <p className='text-sm leading-5 text-tertiary-token'>Jovie Desktop</p>
-        <h1 className='mt-2 text-xl font-semibold leading-7'>
-          Return To The App
-        </h1>
+        {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- Approved conversational return phrase. */}
+        <h1 className='text-xl font-semibold leading-7'>Return to Jovie</h1>
         <p className='mt-3 text-sm leading-5 text-secondary-token'>
           {deepLink || nativeReturnParams
-            ? 'Authentication is complete. Continue in the Jovie desktop app.'
+            ? 'Authentication is complete. Return to Jovie.'
             : 'This sign-in link is missing required information. Start sign-in again from Jovie.'}
         </p>
         {deepLink ? (
@@ -84,7 +82,7 @@ function NativeReturnContent() {
             href={deepLink}
             className='focus-ring-transparent-offset mt-6 inline-flex h-10 w-full items-center justify-center rounded-full bg-btn-primary px-4 text-sm font-medium text-btn-primary-foreground transition-opacity duration-subtle hover:opacity-95'
           >
-            Open Jovie
+            Return to Jovie
           </Link>
         ) : null}
       </section>
