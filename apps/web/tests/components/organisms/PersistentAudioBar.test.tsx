@@ -160,9 +160,95 @@ describe('PersistentAudioBar', () => {
     });
   }
 
-  it('renders nothing when no track is active', () => {
-    const { container } = render(<PersistentAudioBar />);
-    expect(container.innerHTML).toBe('');
+  it('keeps a closed, zero-height idle playback slot when no track is active', () => {
+    render(<PersistentAudioBar />);
+
+    const idleSurfaces = [
+      screen.getByTestId('audio-surface-idle-shell-desktop'),
+      screen.getByTestId('audio-surface-idle-shell-mobile'),
+    ];
+    expect(idleSurfaces).toHaveLength(2);
+    for (const surface of idleSurfaces) {
+      expect(surface).toHaveAttribute('aria-hidden', 'true');
+      expect(surface).toHaveAttribute('inert');
+      expect(surface.style.maxHeight).toBe('0');
+      expect(surface.style.pointerEvents).toBe('none');
+    }
+    expect(idleSurfaces[0]).toHaveClass('absolute');
+  });
+
+  it('opens and closes the idle playback tray with the global toggle shortcuts', () => {
+    render(<PersistentAudioBar />);
+
+    fireEvent.keyDown(globalThis, { key: '`' });
+
+    const idleSurface = screen.getByTestId('audio-surface-idle-shell-desktop');
+    expect(idleSurface).toHaveAttribute('aria-hidden', 'false');
+    expect(idleSurface).not.toHaveAttribute('inert');
+    expect(idleSurface).toHaveTextContent('Nothing playing');
+    expect(idleSurface).toHaveTextContent(
+      'Choose a track from Library to start playback.'
+    );
+    expect(
+      screen.getAllByRole('button', { name: 'Open Library' })
+    ).toHaveLength(2);
+
+    fireEvent.keyDown(globalThis, { key: 'Escape' });
+    expect(idleSurface).toHaveAttribute('aria-hidden', 'true');
+
+    fireEvent.keyDown(globalThis, { key: '\\', metaKey: true });
+    expect(idleSurface).toHaveAttribute('aria-hidden', 'false');
+  });
+
+  it('does not toggle the idle tray while typing in a form control', () => {
+    render(<PersistentAudioBar />);
+    const input = document.createElement('input');
+    document.body.append(input);
+
+    fireEvent.keyDown(input, { key: '`' });
+
+    expect(
+      screen.getByTestId('audio-surface-idle-shell-desktop')
+    ).toHaveAttribute('aria-hidden', 'true');
+    input.remove();
+  });
+
+  it('does not toggle the idle tray from contenteditable text', () => {
+    render(<PersistentAudioBar />);
+    const editor = document.createElement('div');
+    editor.contentEditable = 'true';
+    document.body.append(editor);
+
+    fireEvent.keyDown(editor, { key: '\\', metaKey: true });
+
+    expect(
+      screen.getByTestId('audio-surface-idle-shell-desktop')
+    ).toHaveAttribute('aria-hidden', 'true');
+    editor.remove();
+  });
+
+  it('does not repeat the Library destination when the tray opens on Library', () => {
+    pathname = APP_ROUTES.LIBRARY;
+    render(<PersistentAudioBar />);
+
+    fireEvent.keyDown(globalThis, { key: '`' });
+
+    const idleSurface = screen.getByTestId('audio-surface-idle-shell-desktop');
+    expect(idleSurface).toHaveTextContent('Choose a track to start playback.');
+    expect(
+      screen.queryByRole('button', { name: 'Open Library' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('snaps the idle tray without translation or transition under reduced motion', () => {
+    mockPrefersReducedMotion = true;
+    render(<PersistentAudioBar />);
+
+    fireEvent.keyDown(globalThis, { key: '`' });
+
+    const idleSurface = screen.getByTestId('audio-surface-idle-shell-desktop');
+    expect(idleSurface.style.transform).toBe('translateY(0)');
+    expect(idleSurface.style.transition).toBe('none');
   });
 
   it('renders bar with track info when a track is active', () => {
