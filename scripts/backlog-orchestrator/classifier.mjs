@@ -44,7 +44,6 @@ export class IssueClassification {
         ?.map(l => l.name)
         .sort()
         .join(',') || '',
-      issue.updatedAt,
     ].join('|');
     return createHash('sha256').update(canonical).digest('hex').slice(0, 16);
   }

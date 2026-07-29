@@ -8,6 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ORCHESTRATOR_DIR = resolve(__dirname, '..');
 
 const classifier = await import('../classifier.mjs');
+const { reconcileIssues } = await import('../reconcile.mjs');
 const scorer = await import('../scorer.mjs');
 const workstreamer = await import('../workstreamer.mjs');
 const reporter = await import('../reporter.mjs');
@@ -91,6 +92,31 @@ describe('classifier', () => {
     const c = new classifier.IssueClassification(makeIssue());
     c.category = 'duplicate';
     assert.equal(scorer.scoreIssue(c).score, 0);
+  });
+});
+
+describe('reconciliation idempotency', () => {
+  it('does not repost a classification when only the persisted comment changes updatedAt', async () => {
+    const issue = makeIssue({ identifier: 'JOV-4530' });
+    let nextUpdatedAt = issue.updatedAt;
+    const calls = { comments: [] };
+    const client = {
+      async addComment(issueId, body) {
+        calls.comments.push({ issueId, body });
+        issue.comments.nodes.push({
+          id: `comment-${calls.comments.length}`,
+          body,
+          createdAt: `2026-07-01T12:0${calls.comments.length}:00Z`,
+        });
+        nextUpdatedAt = `2026-07-01T12:0${calls.comments.length}:30Z`;
+      },
+    };
+
+    const reread = () => ({ ...issue, updatedAt: nextUpdatedAt });
+    await reconcileIssues({ issues: [reread()], client });
+    await reconcileIssues({ issues: [reread()], client });
+
+    assert.equal(calls.comments.length, 1);
   });
 });
 
