@@ -7,6 +7,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 - [internal] **Desktop memory baseline evidence (JOV-2712):** the Electron shell can now capture bounded main/renderer RSS and macOS physical-footprint samples, record clean shutdown evidence, and classify growth regressions without claiming native leak proof when the platform tool is unavailable.
+- [internal] **Desktop packaging toolchain updated:** Electron Builder now uses 26.15.3 for current signing, notarization, and installer support.
 - **Profile rail edits no longer flicker back to stale data (JOV-4450):** concurrent optimistic bio/link changes keep the newest paint while dashboard/chat hydrations merge by CAS version and skip clobbering mid-save.
 - **Homepage hero focuses the next-move promise (JOV-4475):** approved music-forward headline and supporting line stay primary, Get started remains the sole conversion action, and See a live profile is quiet secondary proof on a truthful product screenshot.
 - [internal] **Manual Full E2E shards now run concurrently (JOV-4483):** all four hosted Preview shards can start together while retaining fail-fast behavior, shared Neon setup, Playwright workers, and cleanup.
