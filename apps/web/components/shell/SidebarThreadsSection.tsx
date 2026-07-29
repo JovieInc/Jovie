@@ -232,7 +232,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
       />
       <span
         className={cn(
-          'min-w-0 truncate text-left justify-self-start',
+          'min-w-0 justify-self-stretch overflow-hidden whitespace-nowrap text-clip text-left [mask-image:linear-gradient(to_right,black_calc(100%_-_1rem),transparent)]',
           'text-xs',
           unread && 'font-medium'
         )}
