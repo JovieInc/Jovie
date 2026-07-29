@@ -178,6 +178,13 @@ describe('PersistentAudioBar', () => {
     // instead of covering the main canvas or right rail.
     expect(idleSurfaces[0]).not.toHaveClass('absolute');
     expect(idleSurfaces[0]).toHaveClass('shrink-0');
+    expect(idleSurfaces[1]).toHaveAttribute(
+      'data-mobile-audio-surface',
+      'true'
+    );
+    expect(idleSurfaces[1]).not.toHaveClass(
+      'max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]'
+    );
   });
 
   it('opens and closes the idle playback tray with the global toggle shortcuts', () => {
@@ -192,6 +199,17 @@ describe('PersistentAudioBar', () => {
     expect(idleSurface).toHaveTextContent(
       'Choose a track from Library to start playback.'
     );
+    const mobileSurface = screen.getByTestId('audio-surface-idle-shell-mobile');
+    expect(
+      within(mobileSurface).getByText(
+        'Choose a track from Library to start playback.'
+      )
+    ).toHaveClass('text-pretty', 'leading-4');
+    expect(
+      within(mobileSurface).getByText(
+        'Choose a track from Library to start playback.'
+      )
+    ).not.toHaveClass('truncate');
     expect(
       screen.getAllByRole('button', { name: 'Open Library' })
     ).toHaveLength(2);
@@ -395,6 +413,13 @@ describe('PersistentAudioBar', () => {
     expect(
       screen.getAllByRole('region', { name: 'Audio Player' })
     ).toHaveLength(2);
+    const mobileSurface = screen.getAllByRole('region', {
+      name: 'Audio Player',
+    })[1];
+    expect(mobileSurface).toHaveAttribute('data-mobile-audio-surface', 'true');
+    expect(mobileSurface).not.toHaveClass(
+      'max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]'
+    );
   });
 
   it('renders the extracted canonical audio bar when requested', () => {

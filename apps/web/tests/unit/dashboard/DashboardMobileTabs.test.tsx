@@ -59,6 +59,8 @@ describe('DashboardMobileTabs', () => {
     render(<DashboardMobileTabs />);
 
     const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
+    expect(tabs.parentElement).toHaveAttribute('data-layout', 'in-flow');
+    expect(tabs.parentElement).not.toHaveClass('fixed');
     const directLinks = within(tabs).getAllByRole('link');
 
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([

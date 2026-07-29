@@ -7955,6 +7955,29 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   box-shadow: none;
 }
 
+/* Mobile shell chrome is one in-flow bottom plane: the nav owns the quiet
+   elevation when playback is closed; an open player takes over the same seam
+   without introducing an internal border or overlaying route content. */
+:where(.system-b-app-mobile-bottom-surface) {
+  position: relative;
+  z-index: 40;
+  border-top: 1px solid var(--liquid-glass-border);
+  background: var(--liquid-glass-bg-solid);
+  box-shadow: var(--liquid-glass-shadow);
+}
+
+@media (max-width: 1023px) {
+  :where(
+    [data-app-shell-frame]:has(
+        [data-mobile-audio-surface="true"][aria-hidden="false"]
+      )
+      .system-b-app-mobile-bottom-surface
+  ) {
+    border-top-color: transparent;
+    box-shadow: none;
+  }
+}
+
 @media (min-width: 640px) {
   :where(.system-b-chat-action-card) {
     min-height: var(--system-b-chat-action-card-min-height-compact);

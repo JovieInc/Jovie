@@ -27,6 +27,7 @@ export function OperatorMobileNavigation(): React.JSX.Element {
       isItemActive={(item, pathname) =>
         isOperatorNavigationHrefActive(pathname, item.href)
       }
+      inFlow
       className='lg:hidden'
     />
   );
