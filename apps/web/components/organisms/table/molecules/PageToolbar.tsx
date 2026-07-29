@@ -207,6 +207,7 @@ export function PageToolbarActionButton({
       label={tooltipLabel}
       shortcut={tooltipShortcut}
       side='bottom'
+      contentVariant='compact'
     >
       {button}
     </TooltipShortcut>
