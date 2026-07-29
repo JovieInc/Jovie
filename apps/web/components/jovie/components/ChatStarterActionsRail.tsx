@@ -48,10 +48,10 @@ export function ChatStarterActionsRail({
   const handlePaginationKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
-      setActiveIndex(current => (current <= 0 ? lastIndex : current - 1));
+      setActiveIndex(current => Math.max(current - 1, 0));
     } else if (event.key === 'ArrowRight') {
       event.preventDefault();
-      setActiveIndex(current => (current >= lastIndex ? 0 : current + 1));
+      setActiveIndex(current => Math.min(current + 1, lastIndex));
     } else if (event.key === 'Home') {
       event.preventDefault();
       setActiveIndex(0);
@@ -82,34 +82,30 @@ export function ChatStarterActionsRail({
           onDismiss={() => onDismiss(activeCard)}
         />
       </fieldset>
-      {boundedIndex > 0 ? (
-        <button
-          type='button'
-          aria-label='Show Previous Starter Action'
-          onClick={() => setActiveIndex(current => current - 1)}
-          className='absolute -left-12 top-20 hidden size-11 -translate-y-1/2 cursor-pointer place-items-center rounded-full text-secondary-token opacity-0 transition-[opacity,transform,color] duration-subtle ease-out group-hover/carousel:opacity-100 hover:text-primary-token focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none sm:grid'
-        >
-          <ChevronLeft
-            className='size-7'
-            strokeWidth={2.75}
-            aria-hidden='true'
-          />
-        </button>
-      ) : null}
-      {boundedIndex < lastIndex ? (
-        <button
-          type='button'
-          aria-label='Show Next Starter Action'
-          onClick={() => setActiveIndex(current => current + 1)}
-          className='absolute -right-12 top-20 hidden size-11 -translate-y-1/2 cursor-pointer place-items-center rounded-full text-secondary-token opacity-0 transition-[opacity,transform,color] duration-subtle ease-out group-hover/carousel:opacity-100 hover:text-primary-token focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus motion-reduce:transition-none sm:grid'
-        >
-          <ChevronRight
-            className='size-7'
-            strokeWidth={2.75}
-            aria-hidden='true'
-          />
-        </button>
-      ) : null}
+      <button
+        type='button'
+        aria-label='Show Previous Starter Action'
+        disabled={boundedIndex === 0}
+        onClick={() => setActiveIndex(current => Math.max(current - 1, 0))}
+        className='absolute -left-12 top-20 hidden size-11 -translate-y-1/2 cursor-pointer place-items-center rounded-full text-secondary-token opacity-0 transition-[opacity,transform,color] duration-subtle ease-out group-hover/carousel:opacity-100 hover:text-primary-token focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-default disabled:opacity-0 motion-reduce:transition-none sm:grid'
+      >
+        <ChevronLeft className='size-7' strokeWidth={2.75} aria-hidden='true' />
+      </button>
+      <button
+        type='button'
+        aria-label='Show Next Starter Action'
+        disabled={boundedIndex === lastIndex}
+        onClick={() =>
+          setActiveIndex(current => Math.min(current + 1, lastIndex))
+        }
+        className='absolute -right-12 top-20 hidden size-11 -translate-y-1/2 cursor-pointer place-items-center rounded-full text-secondary-token opacity-0 transition-[opacity,transform,color] duration-subtle ease-out group-hover/carousel:opacity-100 hover:text-primary-token focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-default disabled:opacity-0 motion-reduce:transition-none sm:grid'
+      >
+        <ChevronRight
+          className='size-7'
+          strokeWidth={2.75}
+          aria-hidden='true'
+        />
+      </button>
       {cards.length > 1 ? (
         <fieldset className='mt-2 flex min-h-5 items-center justify-center border-0 p-0'>
           <legend className='sr-only'>Choose Starter Action</legend>

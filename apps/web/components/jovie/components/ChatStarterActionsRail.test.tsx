@@ -72,4 +72,35 @@ describe('ChatStarterActionsRail', () => {
       screen.getAllByRole('button', { name: /Show Starter Action/ })
     ).toHaveLength(3);
   });
+
+  it('keeps endpoint controls mounted and retains dot focus at the boundary', async () => {
+    const user = userEvent.setup();
+    render(
+      <ChatStarterActionsRail
+        cards={cards}
+        onAct={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    );
+
+    const next = screen.getByRole('button', {
+      name: 'Show Next Starter Action',
+    });
+    await user.click(next);
+    await user.click(next);
+
+    expect(next).toBeDisabled();
+    expect(next).toBeInTheDocument();
+
+    const finalDot = screen.getByRole('button', {
+      name: 'Show Starter Action 3 Of 3: Generate Art',
+    });
+    finalDot.focus();
+    fireEvent.keyDown(finalDot, { key: 'ArrowRight' });
+
+    expect(finalDot).toHaveFocus();
+    expect(
+      screen.getByRole('group', { name: '3 of 3: Generate Art' })
+    ).toBeInTheDocument();
+  });
 });
