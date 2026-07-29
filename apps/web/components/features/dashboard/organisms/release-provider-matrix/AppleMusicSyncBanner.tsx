@@ -35,6 +35,9 @@ interface AppleMusicSyncBannerProps {
   readonly profileId: string;
   readonly spotifyConnected: boolean;
   readonly releases: ReleaseViewModel[];
+  /** Shared eligibility query result from the release shell, when available. */
+  readonly matches?: DspMatch[];
+  readonly isLoading?: boolean;
   readonly className?: string;
   readonly compact?: boolean;
   readonly onMatchStatusChange?: (
@@ -65,14 +68,20 @@ export function AppleMusicSyncBanner({
   profileId,
   spotifyConnected,
   releases,
+  matches: providedMatches,
+  isLoading: providedIsLoading,
   className,
   compact = false,
   onMatchStatusChange,
 }: AppleMusicSyncBannerProps) {
-  const { data: matches = [] as DspMatch[], isLoading } = useDspMatchesQuery({
-    profileId,
-    enabled: spotifyConnected && !!profileId,
-  });
+  const { data: queriedMatches, isLoading: isQueryLoading } =
+    useDspMatchesQuery({
+      profileId,
+      enabled:
+        providedIsLoading === undefined && spotifyConnected && !!profileId,
+    });
+  const matches = providedMatches ?? queriedMatches ?? ([] as DspMatch[]);
+  const isLoading = providedIsLoading ?? isQueryLoading;
 
   const confirmMutation = useConfirmDspMatchMutation();
   const rejectMutation = useRejectDspMatchMutation();
