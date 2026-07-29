@@ -63,6 +63,13 @@ describe('AuthReturnPage (legacy desktop auth bounce)', () => {
       expectedDeepLink
     );
     expect(hrefWrites).toEqual([expectedDeepLink]);
+    expect(
+      screen.getByRole('heading', { name: 'Return to Jovie' })
+    ).toBeVisible();
+    expect(
+      screen.getByText('Authentication is complete. Return to Jovie.')
+    ).toBeVisible();
+    expect(screen.queryByText('Jovie Desktop')).toBeNull();
   });
 
   it('uses the staging app scheme on staging origin', () => {

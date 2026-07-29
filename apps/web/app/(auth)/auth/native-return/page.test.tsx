@@ -66,6 +66,13 @@ describe('NativeReturnPage (desktop auth bounce)', () => {
     const link = screen.getByRole('link', { name: 'Open Jovie' });
     expect(link).toHaveAttribute('href', expectedDeepLink);
     expect(hrefWrites).toEqual([expectedDeepLink]);
+    expect(
+      screen.getByRole('heading', { name: 'Return to Jovie' })
+    ).toBeVisible();
+    expect(
+      screen.getByText('Authentication is complete. Return to Jovie.')
+    ).toBeVisible();
+    expect(screen.queryByText('Jovie Desktop')).toBeNull();
   });
 
   it('preserves the deep link without desktop_flow when absent', () => {
