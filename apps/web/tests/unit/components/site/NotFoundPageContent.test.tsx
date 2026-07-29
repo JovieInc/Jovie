@@ -71,24 +71,21 @@ describe('NotFoundPageContent', () => {
     expect(source).not.toContain('style={{');
   });
 
-  it('keeps generic root and marketing 404s on the same public recovery system', async () => {
+  it('keeps root and marketing 404s on their canonical public shells', async () => {
     const [rootRoute, marketingLayout, marketingRoute] = await Promise.all([
       readFile(rootRoutePath, 'utf8'),
       readFile(marketingLayoutPath, 'utf8'),
       readFile(marketingRoutePath, 'utf8'),
     ]);
 
-    for (const route of [rootRoute, marketingRoute]) {
-      expect(route).toContain(
-        "<NotFoundPageContent variant='generic' surface='root' />"
-      );
-      expect(route).toContain('system-b-root-not-found-content');
-      expect(route).not.toContain("from 'next/link'");
-    }
-
-    expect(rootRoute).toContain('<PublicPageShell');
-    expect(rootRoute).not.toContain('<MarketingHeader');
-    expect(rootRoute).not.toContain('<MarketingFooter');
+    expect(rootRoute).toContain("variant='minimal'");
+    expect(rootRoute).toContain('system-b-root-not-found-main');
+    expect(rootRoute).toContain(
+      "<NotFoundPageContent variant='generic' surface='root' />"
+    );
+    expect(marketingRoute).toContain('MarketingContainer');
+    expect(marketingRoute).toContain('system-b-marketing-not-found');
+    expect(marketingRoute).toContain('system-b-marketing-not-found-code');
     expect(marketingLayout).toContain('<PublicPageShell');
   });
 });
