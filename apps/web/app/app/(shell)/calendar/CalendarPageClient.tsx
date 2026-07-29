@@ -422,6 +422,7 @@ export function CalendarPageClient() {
       data-testid='calendar-workspace'
       toolbar={
         <PageToolbar
+          start={null}
           end={
             <div className='flex flex-wrap items-center justify-end gap-1'>
               <FilterPill
