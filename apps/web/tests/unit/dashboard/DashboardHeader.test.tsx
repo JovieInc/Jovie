@@ -116,6 +116,28 @@ describe('DashboardHeader', () => {
     ).toBeInTheDocument();
   });
 
+  it('reserves only the compact control width for mobile search beside a chat title', () => {
+    const longTitle =
+      'Release planning for the summer residency announcement and launch';
+    const { container } = render(
+      <DashboardHeader
+        breadcrumbs={[{ label: 'New Chat', href: '/app/chat/conv-123' }]}
+        breadcrumbSuffix={<span title={longTitle}>{longTitle}</span>}
+        searchSurface={<button type='button'>Search chats</button>}
+        action={<button type='button'>Thread options</button>}
+      />
+    );
+
+    const title = screen.getByRole('heading', { name: longTitle, level: 1 });
+    const searchButton = screen.getByRole('button', { name: 'Search chats' });
+
+    expect(title).toHaveClass('min-w-0', 'truncate');
+    expect(searchButton.parentElement).toHaveClass('max-sm:w-app-control-sm');
+    expect(
+      container.querySelectorAll('[data-testid="dashboard-header"] h1')
+    ).toHaveLength(1);
+  });
+
   it('prefers the breadcrumb suffix for the mobile title when present', () => {
     const { container } = render(
       <DashboardHeader

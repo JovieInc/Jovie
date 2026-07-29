@@ -125,7 +125,7 @@ export function DashboardHeader({
             breadcrumbSuffix={breadcrumbSuffix}
           />
           {showInlineSearch ? (
-            <div className='ml-auto flex min-w-0 shrink-0 items-center justify-start sm:ml-1.5'>
+            <div className='ml-auto flex min-w-0 shrink-0 items-center justify-start max-sm:w-app-control-sm sm:ml-1.5'>
               {searchSurface}
             </div>
           ) : null}
