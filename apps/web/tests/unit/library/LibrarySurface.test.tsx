@@ -279,7 +279,8 @@ describe('LibrarySurface', () => {
 
     expect(statusPillClasses).toHaveLength(4);
     for (const className of statusPillClasses ?? []) {
-      expect(className).toContain('whitespace-nowrap');
+      expect(className).toContain('truncate');
+      expect(className).toContain('rounded-full');
     }
   });
 
@@ -320,7 +321,7 @@ describe('LibrarySurface', () => {
     renderLibrary([buildAsset()]);
 
     expect(screen.getByRole('table')).toBeInTheDocument();
-    expect(screen.getByText('Apr 28, 2026')).toBeInTheDocument();
+    expect(screen.getByText('Apr 28')).toHaveAttribute('title', 'Apr 28, 2026');
     expect(
       screen.getByTestId('library-release-row-release-1')
     ).toBeInTheDocument();
@@ -666,7 +667,7 @@ describe('LibrarySurface', () => {
       }).length
     ).toBeGreaterThan(0);
     fireEvent.click(drawer.getByRole('button', { name: 'Details' }));
-    expect(drawer.getByText('Apr 28, 2026')).toBeDefined();
+    expect(drawer.getByText('Apr 28')).toHaveAttribute('title', 'Apr 28, 2026');
     expect(drawer.getByText('68/100')).toBeDefined();
     expect(drawer.getByText('Progressive House')).toBeDefined();
 
