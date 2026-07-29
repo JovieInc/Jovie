@@ -21,7 +21,7 @@ describe('AudioPreviewStrip', () => {
     expect(screen.getByText('Uploading audio…')).toBeTruthy();
   });
 
-  it('renders ready state with player', () => {
+  it('routes ready audio to the shell player without a native transport', () => {
     render(
       <AudioPreviewStrip
         audio={{
@@ -43,7 +43,12 @@ describe('AudioPreviewStrip', () => {
       />
     );
 
-    expect(screen.getByTestId('chat-audio-preview-player')).toBeTruthy();
+    expect(
+      screen.getByRole('button', {
+        name: 'Preview Take Me Over.wav in player',
+      })
+    ).toBeTruthy();
+    expect(document.querySelector('audio')).toBeNull();
     expect(
       screen.getByText('Matched Take Me Over · attaching audio')
     ).toBeTruthy();

@@ -690,6 +690,51 @@ describe('ChatEntityRightPanelHost', () => {
     expect(screen.getByTestId('chat-release-entity-panel')).toBeInTheDocument();
   });
 
+  it('routes release previews to the persistent player without a native transport', async () => {
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+    mockUseReleaseEntityQuery.mockReturnValue({
+      data: {
+        id: 'release-1',
+        title: 'Lost In The Light',
+        releaseType: 'single',
+        status: 'released',
+        slug: 'lost-in-the-light',
+        profileId: 'profile-1',
+        totalTracks: 1,
+        artistNames: ['Tim White'],
+        artworkUrl: 'https://cdn.example.com/art.jpg',
+        previewUrl: 'https://cdn.example.com/preview.mp3',
+        providers: [],
+      },
+      isLoading: false,
+    });
+
+    render(
+      <ChatEntityPanelProvider>
+        <OpenReleaseTarget />
+        <ChatEntityRightPanelHost
+          enablePreviewPanel={false}
+          enableChatEntityPanels
+          profileId='profile-1'
+        />
+      </ChatEntityPanelProvider>
+    );
+
+    await waitFor(() => {
+      expect(mockUseRegisterRightPanel.mock.calls.at(-1)?.[0]).not.toBeNull();
+    });
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    const { container } = render(registeredPanel as React.ReactElement);
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Preview Lost In The Light in player',
+      })
+    ).toBeInTheDocument();
+    expect(container.querySelector('audio')).toBeNull();
+  });
+
   it('dismisses context cards without clearing the full entity target', async () => {
     render(
       <ChatEntityPanelProvider>
