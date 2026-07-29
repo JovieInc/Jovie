@@ -92,22 +92,10 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
     /const APP_BACKGROUND_COLOR = SYSTEM_B_DESKTOP_TOKENS\.backgroundColor;/
   );
   assert.match(mainSource, /function buildDesktopLoadFailureUrl\(\): string/);
-  assert.match(mainSource, /Jovie Desktop/);
-  assert.match(mainSource, /Built for artists/);
-  assert.match(mainSource, /const DESKTOP_RUNTIME_LABEL_BY_PLATFORM/);
-  assert.match(mainSource, /darwin: 'Mac OS'/);
-  assert.match(mainSource, /linux: 'Linux'/);
-  assert.match(mainSource, /win32: 'Windows'/);
-  assert.match(
-    mainSource,
-    /function getDesktopRuntimeLabel\(\s*platform: NodeJS\.Platform = process\.platform\s*\): string/
-  );
-  assert.match(
-    mainSource,
-    /const runtimeLabel = escapeHtmlAttribute\(getDesktopRuntimeLabel\(\)\);/
-  );
-  assert.match(mainSource, /Desktop shell runtime: \$\{runtimeLabel\}/);
-  assert.doesNotMatch(mainSource, /Desktop shell runtime: Mac OS/);
+  assert.match(mainSource, /Jovie couldn’t load/);
+  assert.match(mainSource, /Check your connection, then try again\./);
+  assert.doesNotMatch(mainSource, /Desktop shell runtime:/);
+  assert.doesNotMatch(mainSource, /Built for artists/);
   assert.match(mainSource, /data:text\/html;charset=utf-8/);
   assert.match(
     mainSource,
@@ -116,6 +104,18 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(
     mainSource,
     /<a class="primary" href="\$\{retryUrl\}">Retry<\/a>/
+  );
+  assert.match(
+    mainSource,
+    /<a class="secondary" href="\$\{appOrigin\}">Open Jovie<\/a>/
+  );
+  assert.doesNotMatch(
+    mainSource,
+    /box-shadow: var\(--system-b-shadow-popover\)/
+  );
+  assert.doesNotMatch(
+    mainSource,
+    /border: 1px solid var\(--system-b-border-subtle\)/
   );
   assert.doesNotMatch(mainSource, /onclick="window\.location\.href/);
   assert.match(mainSource, /did-fail-load/);
@@ -172,11 +172,10 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.doesNotMatch(mainSource, /M31 10A20 20 0 0 0 11 30H31V10Z/);
   assert.doesNotMatch(mainSource, /M11 31L30 31M14 36L31 36M18 41L32 41/);
   assert.match(mainSource, /--system-b-bg-base:/);
-  assert.match(mainSource, /--system-b-shadow-popover:/);
   assert.match(mainSource, /min-height: 100vh/);
   assert.match(mainSource, /background: var\(--system-b-bg-base\)/);
-  assert.match(mainSource, /background: var\(--system-b-surface-1\)/);
   assert.match(mainSource, /border-radius: var\(--system-b-radius-pill\)/);
+  assert.match(mainSource, /opacity: 0\.035/);
   assert.doesNotMatch(
     mainSource,
     /background: linear-gradient\(145deg, rgba\(15,16,17,0\.94\), rgba\(8,9,10,0\.98\)\)/
