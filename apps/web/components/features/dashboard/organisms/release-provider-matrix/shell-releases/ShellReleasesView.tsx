@@ -39,7 +39,7 @@ import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { useAppFlag } from '@/lib/flags/client';
-import { usePlanGate } from '@/lib/queries';
+import { useDspMatchesQuery, usePlanGate } from '@/lib/queries';
 import { buildReleasePitchChatPrompt } from '@/lib/services/pitch/targets';
 import { cn } from '@/lib/utils';
 import {
@@ -943,6 +943,15 @@ export function ShellReleasesView({
   const showEmptyState = !isConnected && !isImporting && rows.length === 0;
   const showConnectedEmptyState =
     isConnected && rows.length === 0 && !isImporting;
+  const shouldResolveAppleMusicEligibility =
+    isConnected && rows.length > 0 && !isAmConnected && !isImporting;
+  const { data: appleMusicMatches, isLoading: isAppleMusicEligibilityLoading } =
+    useDspMatchesQuery({
+      profileId: rows[0]?.profileId ?? '',
+      enabled: shouldResolveAppleMusicEligibility,
+    });
+  const shouldGateListPaint =
+    shouldResolveAppleMusicEligibility && isAppleMusicEligibilityLoading;
 
   return (
     <>
@@ -957,6 +966,8 @@ export function ShellReleasesView({
       >
         <ReleaseStateBanners
           rows={rows}
+          appleMusicMatches={appleMusicMatches}
+          isAppleMusicEligibilityLoading={isAppleMusicEligibilityLoading}
           showImportProgress={showImportProgress}
           showReleasesTable={rows.length > 0}
           artistName={artistName}
@@ -973,26 +984,28 @@ export function ShellReleasesView({
         />
 
         <div className='flex-1 min-h-0 overflow-y-auto'>
-          <ReleasesListContent
-            showEmptyState={showEmptyState}
-            showConnectedEmptyState={showConnectedEmptyState}
-            visibleReleases={visibleReleases}
-            selectedReleaseId={selectedReleaseId}
-            pills={pills}
-            canCreateManualReleases={canCreateManualReleases}
-            isSyncing={isSyncing}
-            actionMenusByReleaseId={actionMenusByReleaseId}
-            contextMenuItemsByReleaseId={contextMenuItemsByReleaseId}
-            isSmartLinkLocked={isSmartLinkLocked}
-            getSmartLinkLockReason={getSmartLinkLockReason}
-            getSyncStatus={getSyncStatus}
-            onConnectSpotify={() => setSpotifySearchOpen(true)}
-            onNewRelease={handleNewRelease}
-            onSync={handleSync}
-            onSelect={handleSelect}
-            onClearFilters={handleClearFilters}
-            listboxRef={listboxRef}
-          />
+          {!shouldGateListPaint && (
+            <ReleasesListContent
+              showEmptyState={showEmptyState}
+              showConnectedEmptyState={showConnectedEmptyState}
+              visibleReleases={visibleReleases}
+              selectedReleaseId={selectedReleaseId}
+              pills={pills}
+              canCreateManualReleases={canCreateManualReleases}
+              isSyncing={isSyncing}
+              actionMenusByReleaseId={actionMenusByReleaseId}
+              contextMenuItemsByReleaseId={contextMenuItemsByReleaseId}
+              isSmartLinkLocked={isSmartLinkLocked}
+              getSmartLinkLockReason={getSmartLinkLockReason}
+              getSyncStatus={getSyncStatus}
+              onConnectSpotify={() => setSpotifySearchOpen(true)}
+              onNewRelease={handleNewRelease}
+              onSync={handleSync}
+              onSelect={handleSelect}
+              onClearFilters={handleClearFilters}
+              listboxRef={listboxRef}
+            />
+          )}
         </div>
       </PageShell>
 

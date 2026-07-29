@@ -13,16 +13,19 @@ import {
 } from '@/contexts/RightPanelContext';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
-const mockUsePlanGate = vi.fn(() => ({
-  isLoading: false,
-  isError: false,
-  smartLinksLimit: null as number | null,
-  isPro: true,
-  canCreateManualReleases: true,
-  canGenerateAlbumArt: false,
-  canGenerateReleasePlans: true,
-  canEditSmartLinks: true,
-  canAccessFutureReleases: true,
+const { mockUseDspMatchesQuery, mockUsePlanGate } = vi.hoisted(() => ({
+  mockUseDspMatchesQuery: vi.fn(() => ({ data: [], isLoading: false })),
+  mockUsePlanGate: vi.fn(() => ({
+    isLoading: false,
+    isError: false,
+    smartLinksLimit: null as number | null,
+    isPro: true,
+    canCreateManualReleases: true,
+    canGenerateAlbumArt: false,
+    canGenerateReleasePlans: true,
+    canEditSmartLinks: true,
+    canAccessFutureReleases: true,
+  })),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -100,7 +103,17 @@ vi.mock(
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/AppleMusicSyncBanner',
   () => ({
-    AppleMusicSyncBanner: () => <div data-testid='apple-music-sync-banner' />,
+    AppleMusicSyncBanner: ({
+      isLoading,
+      matches,
+    }: {
+      readonly isLoading?: boolean;
+      readonly matches?: Array<{ readonly status: string }>;
+    }) =>
+      isLoading ||
+      matches?.some(match => match.status === 'confirmed') ? null : (
+        <div data-testid='apple-music-sync-banner' />
+      ),
   })
 );
 
@@ -203,6 +216,7 @@ vi.mock('@/lib/queries', () => {
     useSaveReleaseStatusMutation: () => mutation,
     useSaveReleaseTargetPlaylistsMutation: () => mutation,
     useSyncReleasesFromSpotifyMutation: () => mutation,
+    useDspMatchesQuery: () => mockUseDspMatchesQuery(),
     usePlanGate: () => mockUsePlanGate(),
   };
 });
@@ -351,6 +365,7 @@ function renderShell(
 }
 
 beforeEach(() => {
+  mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: false });
   mockUsePlanGate.mockReturnValue({
     isLoading: false,
     isError: false,
@@ -365,6 +380,65 @@ beforeEach(() => {
 });
 
 describe('ShellReleasesView', () => {
+  it('waits to mount the list until Apple eligibility resolves, then commits banner and rows together', () => {
+    mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: true });
+    const rendered = renderShell(
+      [fakeRelease({ id: 'release-1', title: 'Wait for eligibility' })],
+      { spotifyConnected: true }
+    );
+
+    expect(
+      screen.queryByRole('option', { name: /Wait for eligibility/ })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('apple-music-sync-banner')
+    ).not.toBeInTheDocument();
+
+    mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: false });
+    rendered.rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <HeaderActionsProvider>
+          <RightPanelProvider>
+            <ShellReleasesView
+              releases={[
+                fakeRelease({ id: 'release-1', title: 'Wait for eligibility' }),
+              ]}
+              providerConfig={providerConfig}
+              primaryProviders={primaryProviders}
+              artistName='Bahamas'
+              spotifyConnected
+            />
+            <HeaderActionsProbe />
+            <RightPanelProbe />
+          </RightPanelProvider>
+        </HeaderActionsProvider>
+      </QueryClientProvider>
+    );
+
+    expect(
+      screen.getByRole('option', { name: /Wait for eligibility/ })
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('apple-music-sync-banner')).toBeInTheDocument();
+  });
+
+  it('keeps the settled no-banner release list mounted', () => {
+    mockUseDspMatchesQuery.mockReturnValue({
+      data: [{ status: 'confirmed' }],
+      isLoading: false,
+    });
+
+    renderShell([fakeRelease({ id: 'release-2', title: 'Already linked' })], {
+      spotifyConnected: true,
+    });
+
+    expect(
+      screen.getByRole('option', { name: /Already linked/ })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('apple-music-sync-banner')
+    ).not.toBeInTheDocument();
+  });
+
   it('renders one row per release with title + artist', () => {
     renderShell([
       fakeRelease({ id: '1', title: 'Lost in the Light' }),
