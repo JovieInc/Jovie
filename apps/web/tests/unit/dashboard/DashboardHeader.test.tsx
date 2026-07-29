@@ -132,9 +132,7 @@ describe('DashboardHeader', () => {
     const searchButton = screen.getByRole('button', { name: 'Search chats' });
 
     expect(title).toHaveClass('min-w-0', 'truncate');
-    expect(searchButton.parentElement).toHaveClass(
-      'max-sm:w-(--linear-app-control-height-sm)'
-    );
+    expect(searchButton.parentElement).toHaveClass('max-sm:w-app-control-sm');
     expect(
       container.querySelectorAll('[data-testid="dashboard-header"] h1')
     ).toHaveLength(1);
