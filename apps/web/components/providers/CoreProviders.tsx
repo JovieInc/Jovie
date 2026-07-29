@@ -2,7 +2,6 @@
 
 import { TooltipProvider } from '@jovie/ui';
 import { PacerProvider } from '@tanstack/react-pacer';
-import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { ThemeProvider } from 'next-themes';
 import React, { useEffect, useMemo } from 'react';
@@ -12,17 +11,9 @@ import { PACER_TIMING } from '@/lib/pacer/hooks';
 import { isFormElement } from '@/lib/utils/keyboard';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
-import type { LazyProvidersProps } from './LazyProviders';
+import { LazyProviders } from './LazyProviders';
 import { NuqsProvider } from './NuqsProvider';
 import { QueryProvider } from './QueryProvider';
-
-type LazyProvidersLoadingProps = LazyProvidersProps &
-  DynamicOptionsLoadingProps;
-
-function LazyProvidersSkeleton(props: DynamicOptionsLoadingProps) {
-  const { children } = props as LazyProvidersLoadingProps;
-  return <>{children}</>;
-}
 
 // Deferral delay shared by the keyboard-shortcut listeners and the monitoring
 // chunk imports. 300ms gives the first-paint burst of work room to finish
@@ -89,17 +80,6 @@ function SearchKeyboardShortcut() {
 
   return null;
 }
-
-// Lazy load non-critical providers to reduce initial bundle size
-// SSR enabled to allow page content to render server-side for SEO
-// Analytics components inside LazyProviders remain client-only
-const LazyProviders = dynamic<LazyProvidersProps>(
-  () => import('./LazyProviders').then(mod => ({ default: mod.LazyProviders })),
-  {
-    ssr: true,
-    loading: LazyProvidersSkeleton,
-  }
-);
 
 export interface CoreProvidersProps {
   readonly children: React.ReactNode;
