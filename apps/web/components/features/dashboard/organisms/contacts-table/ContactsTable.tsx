@@ -109,7 +109,7 @@ export const ContactsTable = memo(function ContactsTable({
           ariaLabel='Add contact'
           onClick={() => onAddContactRef.current()}
           icon={<Plus className='h-3.5 w-3.5' />}
-          label='Add contact'
+          label='Add Contact'
         />
       </DashboardHeaderActionGroup>
     ),
@@ -215,12 +215,8 @@ export const ContactsTable = memo(function ContactsTable({
           {isEmpty ? (
             <EmptyState
               icon={<UserPlus className='h-6 w-6' aria-hidden='true' />}
-              heading='No Contacts Yet'
-              description='Add a contact to keep your team connected.'
-              action={{
-                label: 'Add contact',
-                onClick: () => onAddContact(),
-              }}
+              heading='No Contacts'
+              description='Add a contact to manage bookings, management, and press.'
             />
           ) : (
             <UnifiedTable

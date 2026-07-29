@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { rowState } from '@/components/organisms/table/table.styles';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
 import { ContactsTable } from '@/features/dashboard/organisms/contacts-table/ContactsTable';
@@ -16,8 +16,11 @@ vi.mock('@/contexts/HeaderActionsContext', () => ({
 
 vi.mock('@/contexts/TableMetaContext', () => ({
   useTableMeta: () => ({
+    tableMeta: {
+      rightPanelWidth: 0,
+      toggle: null,
+    },
     setTableMeta,
-    tableMeta: { rightPanelWidth: 0 },
   }),
 }));
 
@@ -113,11 +116,6 @@ const contacts: EditableContact[] = [
 ];
 
 describe('ContactsTable', () => {
-  beforeEach(() => {
-    setHeaderActions.mockClear();
-    setTableMeta.mockClear();
-  });
-
   it('uses shell-selected row chrome and keeps the detail surface flat', () => {
     render(
       <ContactsTable
@@ -177,7 +175,7 @@ describe('ContactsTable', () => {
     expect(screen.queryByText('No Contacts Yet')).not.toBeInTheDocument();
   });
 
-  it('uses one concise add-contact action in the empty state and header', () => {
+  it('keeps the empty state informational and exposes the only add action in the header', async () => {
     const onAddContact = vi.fn();
 
     render(
@@ -191,29 +189,27 @@ describe('ContactsTable', () => {
       />
     );
 
-    expect(screen.getByText('No Contacts Yet')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'No Contacts' })).toBeVisible();
     expect(
-      screen.getByText('Add a contact to keep your team connected.')
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Add contact' })
-    ).toBeInTheDocument();
-    expect(screen.queryByText('Add Bookings Contact')).not.toBeInTheDocument();
-    expect(
-      screen.queryByText('Add Management Contact')
-    ).not.toBeInTheDocument();
+      screen.getByText(
+        'Add a contact to manage bookings, management, and press.'
+      )
+    ).toBeVisible();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add contact' }));
-    expect(onAddContact).toHaveBeenCalledWith();
+    await waitFor(() => {
+      expect(setHeaderActions).toHaveBeenCalledWith(expect.anything());
+    });
 
-    const headerActions = setHeaderActions.mock.calls.find(
-      ([actions]) => actions
-    )?.[0];
-    expect(headerActions).toBeTruthy();
+    const headerActions = setHeaderActions.mock.calls.at(-1)?.[0];
     render(headerActions);
 
-    expect(screen.getAllByRole('button', { name: 'Add contact' })).toHaveLength(
-      2
-    );
+    const addContactButton = screen.getByRole('button', {
+      name: 'Add contact',
+    });
+    expect(addContactButton).toHaveTextContent('Add Contact');
+
+    fireEvent.click(addContactButton);
+    expect(onAddContact).toHaveBeenCalledTimes(1);
   });
 });
