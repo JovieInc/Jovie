@@ -64,3 +64,13 @@ export function shouldArmRendererBootWatchdog(
     return false;
   }
 }
+
+/**
+ * The main window is hidden while the dedicated desktop auth handoff is open.
+ * If its initial auth redirect was intercepted, Electron can leave that hidden
+ * renderer at about:blank. Revealing it after cancellation would look like a
+ * black app window, so return it to the canonical auth shell instead.
+ */
+export function shouldRecoverAuthHandoffToCanonicalShell(url: string): boolean {
+  return url === '' || url === 'about:blank';
+}
