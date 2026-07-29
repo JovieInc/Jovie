@@ -36,6 +36,9 @@ try {
         });
         if (!response || !response.ok())
           throw new Error(`HTTP ${response?.status() ?? 'unknown'}`);
+        const pageText = (await page.locator('body').innerText()).trim();
+        if (!pageText || /\b404\b|content not found/i.test(pageText))
+          throw new Error('Captured route did not render a meaningful surface');
         await page.screenshot({ path, fullPage: true });
         manifest.push({
           route,

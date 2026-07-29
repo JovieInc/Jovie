@@ -29,10 +29,11 @@ export function routeChangedFiles(files) {
     if (/admin|console|ops/i.test(file)) routes.add('/demo/admin');
     else if (/dynamic|profile|username|artist/i.test(file))
       routes.add('/demo/profile');
-    else if (/chat|shell/i.test(file)) routes.add('/demo/chat');
+    else if (/chat|shell/i.test(file)) routes.add('/app/chat');
     else routes.add('/');
   }
-  // Demo routes are deterministic and do not require user data or credentials.
+  // Demo routes are deterministic; chat/shell routes use the seeded test-auth
+  // app surface above so captures show the changed authenticated chrome.
   routes.add('/demo');
   return {
     shouldReview: true,
