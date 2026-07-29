@@ -24,6 +24,34 @@ const threads: SidebarThread[] = [
 ];
 
 describe('SidebarThreadsSection', () => {
+  it('anchors a long thread title fade to the row track instead of shrink-wrapping it', () => {
+    const title =
+      'Reply with exactly one short sentence confirming the artist release plan';
+
+    render(
+      <SidebarThreadsSection
+        threads={[
+          {
+            id: 'thread-long-title',
+            href: '/app/chat/thread-long-title',
+            title,
+            status: 'complete',
+            updatedAt: '2026-05-12T00:00:00.000Z',
+          },
+        ]}
+        activeThreadId={null}
+        tight
+        collapsed={false}
+      />
+    );
+
+    const label = screen.getByText(title);
+
+    expect(label).toHaveClass('justify-self-stretch', 'overflow-hidden');
+    expect(label).not.toHaveClass('justify-self-start', 'truncate');
+    expect(label.className).toContain('mask-image:linear-gradient');
+  });
+
   it('renders dense thread links with canonical shell row state', () => {
     render(
       <SidebarThreadsSection
