@@ -3,6 +3,10 @@
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import * as React from 'react';
 
+import {
+  OVERLAY_CONTENT_RADIUS,
+  OVERLAY_SURFACE_BASE,
+} from '../lib/dropdown-styles';
 import { cn } from '../lib/utils';
 
 /**
@@ -48,6 +52,12 @@ TooltipTrigger.displayName = TooltipPrimitive.Trigger.displayName;
 interface TooltipContentProps
   extends React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content> {
   /**
+   * `compact` is reserved for an author-confirmed, single-line label. It keeps
+   * the tooltip on one line and applies the compact pill shape. `rich` is the
+   * default for any content that may wrap or contain structured children.
+   */
+  readonly contentVariant?: 'compact' | 'rich';
+  /**
    * Whether to show the arrow pointer. Defaults to false for cleaner Linear-style appearance.
    */
   readonly showArrow?: boolean;
@@ -79,6 +89,7 @@ const TooltipContent = React.forwardRef<
       sideOffset = 4,
       collisionPadding = 8,
       showArrow = false,
+      contentVariant = 'rich',
       children,
       testId = 'tooltip-content',
       ...props
@@ -92,14 +103,15 @@ const TooltipContent = React.forwardRef<
         collisionPadding={collisionPadding}
         data-testid={testId}
         className={cn(
-          // Base layout + spacing. Radius is --radius-default (4px, System B
-          // scale) — compact Linear-style tooltip, not a pill. No
-          // overflow-hidden: long labels wrap/ellipsize (consumers control
-          // clamping); they must never hard-clip mid-glyph.
-          'z-[150] rounded-(--radius-default) border border-subtle',
-          'bg-surface-0 px-2 py-1 text-xs font-normal tracking-tight',
-          'text-primary-token shadow-popover',
-          'max-w-56 break-words',
+          // Every overlay shares the same tokenized surface. The content
+          // contract, not runtime line measurement, chooses the shape: a
+          // compact label is provably one line; all other content is a shared
+          // rounded rectangle that may wrap without clipping.
+          'z-[150] px-2 py-1 text-xs font-normal tracking-tight',
+          OVERLAY_SURFACE_BASE,
+          contentVariant === 'compact'
+            ? 'rounded-full whitespace-nowrap'
+            : `${OVERLAY_CONTENT_RADIUS} max-w-56 break-words`,
           // Pure opacity reveal (fade only) — subtract decorative zoom + slide-ins.
           // Matches parallel support work on shell Tooltip / Dsp for visual parity.
           // No layout shift; cursor-near friendly.

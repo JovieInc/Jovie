@@ -17,9 +17,13 @@ vi.mock('@jovie/ui', () => ({
       {children}
     </button>
   ),
-  TooltipShortcut: ({ children }: { readonly children: ReactNode }) => (
-    <>{children}</>
-  ),
+  TooltipShortcut: ({
+    children,
+    contentVariant,
+  }: {
+    readonly children: ReactNode;
+    readonly contentVariant?: 'compact' | 'rich';
+  }) => <span data-tooltip-content-variant={contentVariant}>{children}</span>,
 }));
 
 describe('PageToolbar buttons', () => {
@@ -75,6 +79,10 @@ describe('PageToolbar buttons', () => {
     const button = screen.getByRole('button', { name: 'Toggle preview' });
     expect(button).toBeInTheDocument();
     expect(button).toBeEnabled();
+    expect(button.parentElement).toHaveAttribute(
+      'data-tooltip-content-variant',
+      'compact'
+    );
   });
 });
 

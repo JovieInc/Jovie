@@ -31,7 +31,8 @@
  */
 export const DROPDOWN_TRANSITIONS =
   'data-[state=open]:animate-in data-[state=closed]:animate-out ' +
-  'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0';
+  'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ' +
+  'motion-reduce:animate-none motion-reduce:data-[state=closed]:animate-none';
 
 /**
  * @deprecated Positional slide/zoom motion is intentionally disabled.
@@ -48,8 +49,15 @@ export const DROPDOWN_SLIDE_ANIMATIONS = '';
  *
  * Border uses --color-border-default (slightly more opaque than --color-border-subtle used by separators)
  */
-export const DROPDOWN_CONTENT_BASE =
-  'z-50 min-w-48 overflow-hidden rounded-xl border border-default bg-surface-0 p-1 text-primary-token shadow-popover';
+export const OVERLAY_SURFACE_BASE =
+  'border border-default bg-surface-0 text-primary-token shadow-popover';
+
+/**
+ * The shared rounded rectangle used by wrapped overlay content.
+ */
+export const OVERLAY_CONTENT_RADIUS = 'rounded-xl';
+
+export const DROPDOWN_CONTENT_BASE = `z-50 min-w-48 overflow-hidden ${OVERLAY_CONTENT_RADIUS} ${OVERLAY_SURFACE_BASE} p-1`;
 
 /**
  * Shadow effect for elevated appearance

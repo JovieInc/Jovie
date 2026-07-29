@@ -45,6 +45,18 @@ describe('TooltipShortcut', () => {
     });
   });
 
+  it('forwards the explicit compact contract for a toolbar label', () => {
+    render(
+      <TooltipProvider delayDuration={0}>
+        <TooltipShortcut label='Display' contentVariant='compact'>
+          <button type='button'>Display</button>
+        </TooltipShortcut>
+      </TooltipProvider>
+    );
+
+    expect(screen.getByRole('button', { name: 'Display' })).toBeInTheDocument();
+  });
+
   describe('Props', () => {
     it('accepts label prop', () => {
       renderWithProvider(
