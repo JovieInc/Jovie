@@ -67,6 +67,7 @@ describe('TaskListRow', () => {
     );
 
     expect(getByTestId('task-list-row-task-1').className).toContain('py-1');
+    expect(getByTestId('task-list-row-task-1').className).toContain('w-full');
   });
 
   it('keeps the release link clickable and marks the selected state on the row shell', () => {

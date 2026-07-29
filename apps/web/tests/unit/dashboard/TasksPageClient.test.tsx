@@ -816,7 +816,7 @@ describe('TasksPageClient', () => {
 
     expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
     expect(screen.getByTestId('task-list-pane').parentElement).toHaveClass(
-      'lg:grid-cols-[minmax(20rem,0.9fr)_minmax(0,1.1fr)]'
+      'lg:grid-cols-[minmax(24rem,28rem)_minmax(0,1fr)]'
     );
   });
 

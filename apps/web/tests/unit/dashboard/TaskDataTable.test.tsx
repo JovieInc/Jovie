@@ -70,6 +70,9 @@ describe('TaskDataTable', () => {
     expect(TASK_DATA_TABLE_ROW_CLASSNAME).not.toContain(
       'focus-visible:!ring-0'
     );
+    expect(TASK_DATA_TABLE_ROW_CLASSNAME).toContain(
+      'focus-visible:!shadow-none'
+    );
   });
 
   it('allows callers to extend task table chrome without losing row defaults', () => {
