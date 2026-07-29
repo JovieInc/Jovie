@@ -138,7 +138,7 @@ describe('DashboardHeader', () => {
     ).toBeNull();
   });
 
-  it('collapses the breadcrumb when the search surface takes over', () => {
+  it('keeps the breadcrumb in its slot when search activates', () => {
     const { container } = render(
       <DashboardHeader
         breadcrumbs={[{ label: 'Releases', href: '/app/dashboard/releases' }]}
@@ -153,7 +153,7 @@ describe('DashboardHeader', () => {
       '[data-search-active="true"]'
     ) as HTMLElement | null;
     expect(desktopRow).not.toBeNull();
-    expect(within(desktopRow!).queryByText('Releases')).not.toBeInTheDocument();
+    expect(within(desktopRow!).getByText('Releases')).toBeInTheDocument();
     expect(
       within(desktopRow!).getByRole('searchbox', { name: 'Filter releases' })
     ).toBeInTheDocument();

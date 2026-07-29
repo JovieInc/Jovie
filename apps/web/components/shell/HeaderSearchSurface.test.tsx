@@ -68,6 +68,9 @@ describe('HeaderSearchSurface', () => {
     expect(surface?.className).toContain('items-center');
     expect(surface?.className).toContain('justify-start');
     expect(surface?.className).toContain('text-left');
+    expect(surface?.className).toContain('w-[13.5rem]');
+    expect(surface?.className).toContain('sm:w-55');
+    expect(surface?.className).toContain('lg:w-65');
     expect(
       screen.getByRole('combobox', { name: 'Search Jovie' })
     ).toBeVisible();
@@ -75,6 +78,29 @@ describe('HeaderSearchSurface', () => {
     expect(
       screen.getByRole('button', { name: 'Filter Current View' })
     ).toBeVisible();
+  });
+
+  it('reserves the same width before and after activation', () => {
+    const props = {
+      adapter: createAdapter(),
+      onOpen: vi.fn(),
+      onClose: vi.fn(),
+    };
+    const { rerender } = render(
+      <HeaderSearchSurface {...props} isOpen={false} />
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Search' });
+    expect(trigger).toHaveClass('w-[13.5rem]', 'sm:w-55', 'lg:w-65');
+
+    rerender(<HeaderSearchSurface {...props} isOpen />);
+
+    const field = screen.getByRole('combobox', { name: 'Search Jovie' });
+    expect(field.parentElement?.parentElement?.parentElement).toHaveClass(
+      'w-[13.5rem]',
+      'sm:w-55',
+      'lg:w-65'
+    );
   });
 
   it('focuses the search field inside a tokenized focus-within ring', async () => {
