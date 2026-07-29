@@ -998,7 +998,7 @@ async function fetchTippingStatsWithSession(
     const level =
       error instanceof Error &&
       (error.name === 'QueryTimeoutError' ||
-        error.message.includes('statement timeout'))
+        isPostgresTimeoutError(error))
         ? 'warning'
         : 'error';
     Sentry.captureException(error, {
