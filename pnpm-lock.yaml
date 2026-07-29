@@ -13659,10 +13659,6 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  plist@3.1.0:
-    resolution: {integrity: sha512-uysumyrvkUX0rX/dEVqt8gC3sTBzd4zoWfLeS29nb53imdaXVvLINYXTI2GNqzaMuvacNx4uJQ8+b3zXR0pkgQ==}
-    engines: {node: '>=10.4.0'}
-
   plist@3.1.1:
     resolution: {integrity: sha512-ZIfcLJC+7E7FBFnDxm9MPmt7D+DidyQ26lewieO75AdhA2ayMtsJSES0iWzqJQbcVRSrTufQoy0DR94xHue0oA==}
     engines: {node: '>=10.4.0'}
@@ -24797,7 +24793,7 @@ snapshots:
       lazy-val: 1.0.5
       minimatch: 10.2.4
       pkijs: 3.4.0
-      plist: 3.1.0
+      plist: 3.1.1
       proper-lockfile: 4.1.2
       resedit: 1.7.2
       semver: 7.7.4
@@ -31501,12 +31497,6 @@ snapshots:
       playwright-core: 1.60.0
     optionalDependencies:
       fsevents: 2.3.2
-
-  plist@3.1.0:
-    dependencies:
-      '@xmldom/xmldom': 0.9.10
-      base64-js: 1.5.1
-      xmlbuilder: 15.1.1
 
   plist@3.1.1:
     dependencies:
