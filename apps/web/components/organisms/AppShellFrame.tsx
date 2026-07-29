@@ -80,17 +80,21 @@ export const AppShellFrame = memo(function AppShellFrame({
           {sidebar}
         </div>
 
-        <main
-          id='main-content'
-          className={cn(
-            // `isolate` gives <main> its own stacking context so the negative-z
-            // chat ambient layer below paints above main's background but
-            // beneath the in-flow header/content (#13386).
-            'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--color-bg-surface-0)/90',
-            'lg:rounded-(--app-shell-radius) lg:border lg:border-(--app-shell-border) lg:bg-(--app-shell-content-surface) lg:shadow-(--linear-app-shell-shadow)'
-          )}
+        <div
+          data-app-shell-content-column='true'
+          className='flex min-h-0 min-w-0 flex-1 flex-col'
         >
-          {/* Full-bleed ambient wash on chat routes — spans the whole content
+          <main
+            id='main-content'
+            className={cn(
+              // `isolate` gives <main> its own stacking context so the negative-z
+              // chat ambient layer below paints above main's background but
+              // beneath the in-flow header/content (#13386).
+              'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--color-bg-surface-0)/90',
+              'lg:rounded-(--app-shell-radius) lg:border lg:border-(--app-shell-border) lg:bg-(--app-shell-content-surface) lg:shadow-(--linear-app-shell-shadow)'
+            )}
+          >
+            {/* Full-bleed ambient wash on chat routes — spans the whole content
               panel so its top edge is above the (transparent) header band.
               Negative z-index is load-bearing: an absolute sibling with z-auto
               would paint ON TOP of the in-flow static header; `-z-10` inside
@@ -99,38 +103,46 @@ export const AppShellFrame = memo(function AppShellFrame({
               previous chat canvas tone on all breakpoints. Pure background:
               pointer-events-none, no layout impact (#13386, preserves the
               full-viewport guarantee from #12135 / JOV-3614). */}
-          {chatAmbientGradient ? (
+            {chatAmbientGradient ? (
+              <div
+                aria-hidden='true'
+                data-testid='chat-ambient-gradient'
+                className='pointer-events-none absolute inset-0 -z-10 bg-(--app-shell-content-surface)'
+                style={{ backgroundImage: CHAT_AMBIENT_GRADIENT_IMAGE }}
+              />
+            ) : null}
+            {isCodeFlagEnabled('CANVAS_GRAIN') && <CanvasGrain />}
+            {header}
             <div
-              aria-hidden='true'
-              data-testid='chat-ambient-gradient'
-              className='pointer-events-none absolute inset-0 -z-10 bg-(--app-shell-content-surface)'
-              style={{ backgroundImage: CHAT_AMBIENT_GRADIENT_IMAGE }}
-            />
-          ) : null}
-          {isCodeFlagEnabled('CANVAS_GRAIN') && <CanvasGrain />}
-          {header}
-          <div
-            className={cn(
-              'flex flex-1 min-h-0 min-w-0 overflow-hidden lg:gap-(--app-shell-gap)'
-            )}
-          >
-            <div
-              data-testid='app-shell-scroll'
               className={cn(
-                // Shell-level pane never owns vertical scroll — routes and table
-                // surfaces scroll inside this clip so the right rail stays fixed.
-                'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden overflow-x-auto overscroll-contain pb-[var(--dev-toolbar-height,0px)]',
-                contentClassName
+                'flex flex-1 min-h-0 min-w-0 overflow-hidden lg:gap-(--app-shell-gap)'
               )}
             >
-              {main}
+              <div
+                data-testid='app-shell-scroll'
+                className={cn(
+                  // Shell-level pane never owns vertical scroll — routes and table
+                  // surfaces scroll inside this clip so the right rail stays fixed.
+                  'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden overflow-x-auto overscroll-contain pb-[var(--dev-toolbar-height,0px)]',
+                  contentClassName
+                )}
+              >
+                {main}
+              </div>
+              {rightPanel ? (
+                <AppShellRightRail>{rightPanel}</AppShellRightRail>
+              ) : null}
             </div>
-            {rightPanel ? (
-              <AppShellRightRail>{rightPanel}</AppShellRightRail>
-            ) : null}
-          </div>
-          {audioPlayer}
-        </main>
+          </main>
+          {/* The player is shell chrome, not content-card chrome. Keeping it as
+              an in-flow sibling reserves its own tray below <main>, matching
+              the sidebar's canvas elevation without obscuring routes or rails. */}
+          {audioPlayer ? (
+            <div data-testid='app-shell-audio-tray' className='shrink-0'>
+              {audioPlayer}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {mobileBottomNav}
