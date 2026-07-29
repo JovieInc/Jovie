@@ -271,7 +271,7 @@ export function PersistentAudioBar() {
         aria-label='Playback Controls'
         inert={idleTrayOpen ? undefined : true}
         className={cn(
-          'overflow-hidden border-t border-(--app-shell-border) bg-(--app-shell-content-surface)',
+          'shrink-0 overflow-hidden border-t border-(--app-shell-border) bg-(--app-shell-content-surface)',
           SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME,
           className
         )}
@@ -336,13 +336,10 @@ export function PersistentAudioBar() {
 
     return (
       <>
-        {idleTray(
-          'audio-surface-idle-shell-desktop',
-          'absolute inset-x-0 bottom-0 z-30 hidden lg:block'
-        )}
+        {idleTray('audio-surface-idle-shell-desktop', 'hidden lg:block')}
         {idleTray(
           'audio-surface-idle-shell-mobile',
-          'absolute inset-x-0 z-30 max-lg:bottom-[calc(3.5rem+env(safe-area-inset-bottom))] lg:hidden'
+          'max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:hidden'
         )}
       </>
     );

@@ -174,7 +174,10 @@ describe('PersistentAudioBar', () => {
       expect(surface.style.maxHeight).toBe('0');
       expect(surface.style.pointerEvents).toBe('none');
     }
-    expect(idleSurfaces[0]).toHaveClass('absolute');
+    // The idle tray stays in document flow so opening it reserves shell space
+    // instead of covering the main canvas or right rail.
+    expect(idleSurfaces[0]).not.toHaveClass('absolute');
+    expect(idleSurfaces[0]).toHaveClass('shrink-0');
   });
 
   it('opens and closes the idle playback tray with the global toggle shortcuts', () => {
