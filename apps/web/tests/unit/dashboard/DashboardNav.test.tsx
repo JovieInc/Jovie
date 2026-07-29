@@ -78,6 +78,44 @@ describe('DashboardNav', () => {
     ).toEqual(CANONICAL_NAV);
   });
 
+  it('hides a settled-empty Inbox away from its active destination', () => {
+    const { getByRole, queryByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      overrides: {
+        inboxNavigation: { state: 'empty', pendingCount: 0 },
+      },
+    });
+
+    expect(queryByRole('link', { name: 'Inbox' })).toBeNull();
+    expect(getByRole('link', { name: 'Chat' })).toBeInTheDocument();
+  });
+
+  it('keeps a settled-empty Inbox visible while its root destination is active', () => {
+    mockUsePathname.mockReturnValueOnce(APP_ROUTES.DASHBOARD);
+    const { getByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      overrides: {
+        inboxNavigation: { state: 'empty', pendingCount: 0 },
+      },
+    });
+
+    expect(getByRole('link', { name: 'Inbox' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+  });
+
+  it('keeps Inbox visible when availability is unknown', () => {
+    const { getByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      overrides: {
+        inboxNavigation: { state: 'unknown', pendingCount: null },
+      },
+    });
+
+    expect(getByRole('link', { name: 'Inbox' })).toBeInTheDocument();
+  });
+
   it('keeps the exact customer IA invariant for admin users', () => {
     const standard = renderDashboardNav({ renderFn: fastRender });
     const standardContract = primaryLinks(standard.container).map(link => [

@@ -170,6 +170,7 @@ describe('event moderation server actions', () => {
       'tour-dates:user_123:prof_123',
       'max'
     );
+    expect(mockRevalidateTag).toHaveBeenCalledWith('dashboard-data', 'max');
     expect(mockTrackServerEvent).not.toHaveBeenCalled();
   });
 
@@ -192,6 +193,7 @@ describe('event moderation server actions', () => {
       'tour-dates:user_123:prof_123',
       'max'
     );
+    expect(mockRevalidateTag).toHaveBeenCalledWith('dashboard-data', 'max');
   });
 
   it('undoRejectEvent stays scoped to profileId and only matches rejected rows', async () => {
