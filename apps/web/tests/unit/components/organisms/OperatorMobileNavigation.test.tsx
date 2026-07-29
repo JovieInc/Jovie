@@ -83,14 +83,14 @@ describe('OperatorMobileNavigation', () => {
     }
   });
 
-  it('opens without moving content and keeps the canonical sign-out action keyboard reachable', async () => {
+  it('uses the shared in-flow bottom surface and keeps the canonical sign-out action keyboard reachable', async () => {
     const user = userEvent.setup();
     render(<OperatorMobileNavigation />);
 
     const mobileNavigation = screen
       .getByRole('navigation', { name: 'OV Mobile Navigation' })
       .closest('[data-mobile-navigation]');
-    expect(mobileNavigation).toHaveAttribute('data-layout', 'overlay');
+    expect(mobileNavigation).toHaveAttribute('data-layout', 'in-flow');
 
     const more = screen.getByRole('button', { name: 'More options' });
     more.focus();
