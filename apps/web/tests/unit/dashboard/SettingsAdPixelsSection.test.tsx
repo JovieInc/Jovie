@@ -84,6 +84,16 @@ const { usePixelSettingsQueryMock } = vi.hoisted(() => {
   };
 });
 
+const { SettingsToggleRowMock } = vi.hoisted(() => ({
+  SettingsToggleRowMock: ({ title }: { title: string }) => (
+    <div data-testid='shared-settings-toggle'>{title}</div>
+  ),
+}));
+
+vi.mock('@/features/dashboard/molecules/SettingsToggleRow', () => ({
+  SettingsToggleRow: SettingsToggleRowMock,
+}));
+
 vi.mock('@/lib/queries', () => ({
   usePixelSettingsMutation: () => ({
     mutate: vi.fn(),
@@ -125,5 +135,13 @@ describe('SettingsAdPixelsSection', () => {
     fastRender(<SettingsAdPixelsSection isPro />);
 
     expect(usePixelSettingsQueryMock).toHaveBeenCalled();
+  });
+
+  it('uses the shared settings toggle row for the pixel enable control', () => {
+    const { getByTestId } = fastRender(<SettingsAdPixelsSection isPro />);
+
+    expect(getByTestId('shared-settings-toggle')).toHaveTextContent(
+      'Enable pixel tracking'
+    );
   });
 });
