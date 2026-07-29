@@ -9,6 +9,10 @@ function createFakeRuntime(options?: {
   readonly consoleError?: string;
   readonly pageError?: string;
   readonly failedRequest?: string;
+  readonly testAuthStatus?: number;
+  readonly testAuthLocation?: string;
+  readonly currentUrl?: string;
+  readonly delayedTestAuthResponse?: boolean;
 }) {
   const listeners = new Map<string, (value: never) => void>();
   const page = {
@@ -17,7 +21,7 @@ function createFakeRuntime(options?: {
     on: vi.fn((event: string, listener: (value: never) => void) => {
       listeners.set(event, listener);
     }),
-    goto: vi.fn(async () => {
+    goto: vi.fn(async (url: string) => {
       if (options?.consoleError) {
         listeners.get('console')?.({
           type: () => 'error',
@@ -39,7 +43,7 @@ function createFakeRuntime(options?: {
       return options?.navigation;
     }),
     waitForLoadState: vi.fn().mockResolvedValue(undefined),
-    url: vi.fn(() => 'http://localhost:3220/app'),
+    url: vi.fn(() => options?.currentUrl ?? 'http://localhost:3220/app'),
     title: vi.fn().mockResolvedValue('Jovie'),
     locator: vi.fn((selector: string) => ({
       first: () => ({
@@ -51,6 +55,15 @@ function createFakeRuntime(options?: {
     close: vi.fn().mockResolvedValue(undefined),
   };
   const context = {
+    request: {
+      get: vi.fn(async () => {
+        if (options?.delayedTestAuthResponse) await Promise.resolve();
+        return {
+          status: () => options?.testAuthStatus ?? 303,
+          headers: () => ({ location: options?.testAuthLocation ?? '/app' }),
+        };
+      }),
+    },
     newPage: vi.fn().mockResolvedValue(page),
     close: vi.fn().mockResolvedValue(undefined),
   };
@@ -90,6 +103,11 @@ describe('route-qa authenticated capture', () => {
       screenshotPath:
         '/tmp/route-qa-auth-capture-success/authenticated-route-capture.png',
       failure: null,
+      testAuthRedirect: {
+        status: 303,
+        location: '/app',
+        currentUrl: 'http://localhost:3220/app',
+      },
       teardown: {
         page: 'closed',
         context: 'closed',
@@ -145,8 +163,8 @@ describe('route-qa authenticated capture', () => {
       status: 'fail',
       finalUrl: 'http://localhost:3220/app',
       failure: {
-        stage: 'navigation-started',
-        message: 'Authenticated route navigation timed out after 5ms.',
+        stage: 'page-created',
+        message: 'Authenticated destination navigation timed out after 5ms.',
       },
       teardown: {
         page: 'closed',
@@ -195,6 +213,143 @@ describe('route-qa authenticated capture', () => {
         errorText: 'net::ERR_FAILED',
       },
     ]);
+  });
+
+  it('persists a delayed test-auth 303 before waiting for app readiness', async () => {
+    const runtime = createFakeRuntime({
+      testAuthLocation: '/app/contacts',
+      currentUrl: 'http://localhost:3220/app/contacts',
+      delayedTestAuthResponse: true,
+    });
+    const persisted: AuthenticatedRouteCaptureReceipt[] = [];
+
+    const receipt = await runAuthenticatedRouteCapture(
+      {
+        requestedPath: '/app/contacts',
+        baseUrl: 'http://localhost:3220',
+        outputRoot: '/tmp/route-qa-auth-capture-delayed-303',
+        timeoutMs: 50,
+        closeTimeoutMs: 50,
+      },
+      {
+        launchBrowser: vi.fn().mockResolvedValue(runtime.browser as never),
+        now: () => '2026-07-29T00:00:00.000Z',
+        persistReceipt: async value => {
+          persisted.push(structuredClone(value));
+        },
+      }
+    );
+
+    expect(receipt.status).toBe('pass');
+    expect(
+      persisted.find(value =>
+        value.checkpoints.some(
+          checkpoint => checkpoint.stage === 'navigation-committed'
+        )
+      )?.testAuthRedirect
+    ).toEqual({
+      status: 303,
+      location: '/app/contacts',
+      currentUrl: 'http://localhost:3220/app/contacts',
+    });
+    expect(runtime.page.waitForLoadState).toHaveBeenCalled();
+    expect(runtime.context.request.get).toHaveBeenCalledWith(
+      expect.stringContaining('/api/dev/test-auth/enter'),
+      { maxRedirects: 0 }
+    );
+    expect(runtime.page.goto).toHaveBeenCalledWith(
+      'http://localhost:3220/app/contacts',
+      expect.objectContaining({ waitUntil: 'commit' })
+    );
+    expect(
+      persisted
+        .find(value =>
+          value.checkpoints.some(
+            checkpoint => checkpoint.stage === 'test-auth-redirect-persisted'
+          )
+        )
+        ?.checkpoints.map(checkpoint => checkpoint.stage)
+    ).not.toContain('page-created');
+  });
+
+  it.each([
+    [
+      'non-303',
+      { testAuthStatus: 200 },
+      'Test-auth returned HTTP 200; expected HTTP 303.',
+    ],
+    [
+      'missing Location',
+      { testAuthLocation: '' },
+      'Test-auth 303 did not include a redirect location.',
+    ],
+  ])('persists a %s bootstrap failure without navigating the page', async (_name, options, message) => {
+    const runtime = createFakeRuntime(options);
+    const receipt = await runAuthenticatedRouteCapture(
+      {
+        requestedPath: '/app',
+        baseUrl: 'http://localhost:3220',
+        outputRoot: '/tmp/route-qa-invalid-redirect',
+        timeoutMs: 50,
+        closeTimeoutMs: 50,
+      },
+      {
+        launchBrowser: vi.fn().mockResolvedValue(runtime.browser as never),
+        persistReceipt: vi.fn().mockResolvedValue(undefined),
+      }
+    );
+    expect(receipt.failure?.message).toBe(message);
+    expect(runtime.page.goto).not.toHaveBeenCalled();
+  });
+
+  it('turns an aborted destination ending at about:blank into a persisted redirect failure', async () => {
+    const runtime = createFakeRuntime({
+      testAuthLocation: '/app/contacts',
+      currentUrl: 'about:blank',
+      failedRequest: 'http://localhost:3220/app/contacts',
+    });
+    const persisted: AuthenticatedRouteCaptureReceipt[] = [];
+
+    const receipt = await runAuthenticatedRouteCapture(
+      {
+        requestedPath: '/app/contacts',
+        baseUrl: 'http://localhost:3220',
+        outputRoot: '/tmp/route-qa-auth-capture-aborted-destination',
+        timeoutMs: 50,
+        closeTimeoutMs: 50,
+      },
+      {
+        launchBrowser: vi.fn().mockResolvedValue(runtime.browser as never),
+        now: () => '2026-07-29T00:00:00.000Z',
+        persistReceipt: async value => {
+          persisted.push(structuredClone(value));
+        },
+      }
+    );
+
+    expect(receipt).toMatchObject({
+      status: 'fail',
+      finalUrl: 'about:blank',
+      testAuthRedirect: {
+        status: 303,
+        location: '/app/contacts',
+        currentUrl: 'about:blank',
+      },
+      failure: {
+        stage: 'navigation-committed',
+        message:
+          'Test-auth redirected to /app/contacts, but navigation ended at about:blank before readiness.',
+      },
+    });
+    expect(receipt.failedRequests).toEqual([
+      {
+        method: 'GET',
+        url: 'http://localhost:3220/app/contacts',
+        errorText: 'net::ERR_FAILED',
+      },
+    ]);
+    expect(persisted.at(-1)).toEqual(receipt);
+    expect(runtime.page.waitForLoadState).not.toHaveBeenCalled();
   });
 
   it('does not skip teardown when persisting a cleanup checkpoint fails', async () => {

@@ -93,6 +93,12 @@ interface CaptureFailure {
   readonly message: string;
 }
 
+interface CaptureTestAuthRedirect {
+  status: number | null;
+  location: string | null;
+  currentUrl: string;
+}
+
 interface CaptureTeardown {
   page: TeardownStatus;
   context: TeardownStatus;
@@ -106,6 +112,7 @@ export interface AuthenticatedRouteCaptureReceipt {
   readonly requestedPath: string;
   readonly persona: AuthenticatedCapturePersona;
   readonly targetUrl: string;
+  readonly testAuthRedirect: CaptureTestAuthRedirect;
   finalUrl: string;
   title: string;
   readonly startedAt: string;
@@ -1061,6 +1068,11 @@ export async function runAuthenticatedRouteCapture(
     requestedPath: options.requestedPath,
     persona,
     targetUrl,
+    testAuthRedirect: {
+      status: null,
+      location: null,
+      currentUrl: targetUrl,
+    },
     finalUrl: targetUrl,
     title: '',
     startedAt: now(),
@@ -1175,6 +1187,27 @@ export async function runAuthenticatedRouteCapture(
     );
     await checkpoint('context-created');
 
+    await checkpoint('page-bootstrap-pending');
+    await checkpoint('navigation-started');
+    const bootstrapResponse = await runBounded(
+      'Test-auth bootstrap request',
+      context.request.get(targetUrl, { maxRedirects: 0 })
+    );
+    receipt.testAuthRedirect.status = bootstrapResponse.status();
+    receipt.testAuthRedirect.location =
+      bootstrapResponse.headers().location ?? null;
+    if (receipt.testAuthRedirect.status !== 303)
+      throw new Error(
+        `Test-auth returned HTTP ${receipt.testAuthRedirect.status}; expected HTTP 303.`
+      );
+    if (!receipt.testAuthRedirect.location)
+      throw new Error('Test-auth 303 did not include a redirect location.');
+    const destinationUrl = new URL(
+      receipt.testAuthRedirect.location,
+      baseUrl
+    ).toString();
+    await checkpoint('test-auth-redirect-persisted');
+
     page = await runBounded('Page creation', context.newPage());
     page.setDefaultNavigationTimeout(timeoutMs);
     page.setDefaultTimeout(Math.min(timeoutMs, 15_000));
@@ -1194,16 +1227,21 @@ export async function runAuthenticatedRouteCapture(
       });
     });
     await checkpoint('page-created');
-
-    await checkpoint('navigation-started');
     await runBounded(
-      'Authenticated route navigation',
-      page.goto(targetUrl, {
+      'Authenticated destination navigation',
+      page.goto(destinationUrl, {
         waitUntil: 'commit',
         timeout: Math.min(timeoutMs, 45_000),
       })
     );
+    receipt.testAuthRedirect.currentUrl = page.url() || receipt.finalUrl;
+    receipt.finalUrl = receipt.testAuthRedirect.currentUrl;
     await checkpoint('navigation-committed');
+    if (receipt.finalUrl === 'about:blank') {
+      throw new Error(
+        `Test-auth redirected to ${receipt.testAuthRedirect.location}, but navigation ended at about:blank before readiness.`
+      );
+    }
 
     await checkpoint('stability-wait-started');
     await runBounded(
