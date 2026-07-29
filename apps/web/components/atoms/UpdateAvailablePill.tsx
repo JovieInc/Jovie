@@ -56,7 +56,7 @@ export function UpdateAvailablePillView({
       className={cn(
         'inline-flex h-6 w-24 items-center justify-center gap-1 rounded-full border px-1.5 text-2xs font-caption tracking-tight',
         'transition-[background-color,border-color,color,opacity] duration-subtle',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-bg-page)',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/30 focus-visible:ring-offset-1 focus-visible:ring-offset-surface-page',
         isDownloading
           ? 'border-subtle bg-surface-1 text-secondary-token'
           : 'border-transparent bg-primary-token text-surface-1 hover:opacity-90',
