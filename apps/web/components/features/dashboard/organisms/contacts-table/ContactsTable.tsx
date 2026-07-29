@@ -7,7 +7,6 @@ import {
   convertToCommonDropdownItems,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbar,
-  rowState,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
@@ -181,13 +180,6 @@ export const ContactsTable = memo(function ContactsTable({
     [selectedContactId, contacts]
   );
 
-  const getRowClassName = useCallback(
-    (contact: EditableContact) => {
-      return selectedContactId === contact.id ? rowState.selected : '';
-    },
-    [selectedContactId]
-  );
-
   const isEmpty = !isLoading && contacts.length === 0;
 
   return (
@@ -226,7 +218,7 @@ export const ContactsTable = memo(function ContactsTable({
               getRowId={contact => contact.id}
               minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
               className='text-app'
-              getRowClassName={getRowClassName}
+              isRowSelected={contact => selectedContactId === contact.id}
               onRowClick={handleRowClick}
               onFocusedRowChange={handleFocusedRowChange}
               getContextMenuItems={getContextMenuItems}

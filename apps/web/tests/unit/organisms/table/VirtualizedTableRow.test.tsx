@@ -145,4 +145,34 @@ describe('VirtualizedTableRow', () => {
     expect(onFocusChange).toHaveBeenCalledWith(0);
     matches.mockRestore();
   });
+
+  it('keeps only the roving row in the tab order', () => {
+    render(
+      <table>
+        <tbody>
+          <VirtualizedTableRow
+            {...baseProps}
+            shouldEnableKeyboardNav
+            focusedIndex={1}
+          />
+        </tbody>
+      </table>
+    );
+
+    expect(screen.getByRole('row')).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('accepts consumer-owned selection when TanStack selection is unavailable', () => {
+    render(
+      <table>
+        <tbody>
+          <VirtualizedTableRow {...baseProps} isSelected />
+        </tbody>
+      </table>
+    );
+
+    const row = screen.getByRole('row');
+    expect(row).toHaveAttribute('aria-selected', 'true');
+    expect(row).toHaveClass('system-b-table-row-selected');
+  });
 });
