@@ -54,6 +54,8 @@ const MIN_REMOTE_QUERY_LENGTH = 2;
 
 const headerSearchSurfaceChrome =
   'rounded-xl border border-subtle bg-surface-0 shadow-[0_0_0_1px_color-mix(in_oklab,var(--color-border-subtle)_18%,transparent)]';
+const headerSearchSurfaceWidth =
+  'w-[13.5rem] max-w-[calc(100vw-2rem)] sm:w-55 lg:w-65';
 
 function flattenGroups(groups: readonly HeaderSearchResultGroup[]) {
   return groups.flatMap(group => group.items);
@@ -492,6 +494,7 @@ export function HeaderSearchSurface({
         onClick={onOpen}
         className={cn(
           headerSearchSurfaceChrome,
+          headerSearchSurfaceWidth,
           'inline-flex h-7 min-h-7 min-w-0 items-center justify-start gap-1.5 px-2.5 text-left text-xs text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle ease-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-ring-themed',
           className
         )}
@@ -508,7 +511,8 @@ export function HeaderSearchSurface({
     <div
       className={cn(
         headerSearchSurfaceChrome,
-        'relative flex h-7 min-h-7 w-full max-w-[min(560px,calc(100vw-2rem))] items-center justify-start px-2 py-0 text-left shadow-popover transition-[border-color,box-shadow,background-color] duration-subtle focus-within:border-focus focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-ring/14 sm:w-110 lg:w-130',
+        headerSearchSurfaceWidth,
+        'relative flex h-7 min-h-7 min-w-0 items-center justify-start px-2 py-0 text-left shadow-popover transition-[border-color,box-shadow,background-color] duration-subtle focus-within:border-focus focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-ring/14',
         className
       )}
     >

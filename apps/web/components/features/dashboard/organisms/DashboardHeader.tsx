@@ -12,11 +12,7 @@ export interface DashboardHeaderProps {
   readonly breadcrumbSuffix?: ReactNode;
   /** Content shown on right side */
   readonly action?: ReactNode;
-  /**
-   * Shell-owned search surface. When set, the closed trigger renders inline
-   * beside the breadcrumb; when `isSearchActive` is true, the breadcrumb
-   * collapses and the search takes over the leading area to avoid layout shift.
-   */
+  /** Shell-owned search surface with a persistent header slot. */
   readonly searchSurface?: ReactNode;
   readonly isSearchActive?: boolean;
   /** Profile button slot shown on the far right of the mobile header */
@@ -85,7 +81,6 @@ export function DashboardHeader({
     breadcrumbs.length > 1 ? (breadcrumbs[0]?.label ?? 'Jovie') : 'Jovie';
   const usesSectionTitleLayout = breadcrumbs.length === 1 && !breadcrumbSuffix;
   const showInlineSearch = Boolean(searchSurface);
-  const searchTakesOver = showInlineSearch && isSearchActive;
 
   return (
     <header
@@ -121,33 +116,24 @@ export function DashboardHeader({
         ) : null}
         <div
           className='flex min-w-0 flex-1 items-center gap-2 tracking-[-0.012em]'
-          data-search-active={searchTakesOver ? 'true' : 'false'}
+          data-search-active={isSearchActive ? 'true' : 'false'}
         >
-          {searchTakesOver ? (
-            <div className='flex min-w-0 flex-1 items-center justify-start'>
+          <HeaderTitle
+            usesSectionTitleLayout={usesSectionTitleLayout}
+            currentLabel={currentLabel}
+            rootLabel={rootLabel}
+            breadcrumbSuffix={breadcrumbSuffix}
+          />
+          {showInlineSearch ? (
+            <div className='ml-auto flex min-w-0 shrink-0 items-center justify-start sm:ml-1.5'>
               {searchSurface}
             </div>
-          ) : (
-            <>
-              <HeaderTitle
-                usesSectionTitleLayout={usesSectionTitleLayout}
-                currentLabel={currentLabel}
-                rootLabel={rootLabel}
-                breadcrumbSuffix={breadcrumbSuffix}
-              />
-              {showInlineSearch ? (
-                <div className='ml-auto flex min-w-0 items-center justify-start sm:ml-1.5'>
-                  {searchSurface}
-                </div>
-              ) : null}
-            </>
-          )}
+          ) : null}
         </div>
         {action ? (
           <div
             className={cn(
               'ml-auto flex items-center gap-1',
-              searchTakesOver && 'max-sm:hidden',
               'max-sm:[&_button]:h-8 max-sm:[&_button]:rounded-full max-sm:[&_button]:shadow-none max-sm:[&_button>svg]:h-4 max-sm:[&_button>svg]:w-4'
             )}
           >

@@ -93,7 +93,7 @@ function AuthShellInner({
   );
   const searchSurface = useMemo(() => {
     return headerActionsState ? (
-      <HeaderSearchSurfaceFromContext className='w-full sm:w-auto' />
+      <HeaderSearchSurfaceFromContext className='w-full sm:w-55 lg:w-65' />
     ) : null;
   }, [headerActionsState]);
   const audioPlayer = useMemo(() => <PersistentAudioBar />, []);
