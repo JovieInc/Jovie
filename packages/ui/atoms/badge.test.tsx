@@ -141,6 +141,7 @@ describe('Badge', () => {
       expect(badge.className).toContain('inline-flex');
       expect(badge.className).toContain('items-center');
       expect(badge.className).toContain('rounded-full');
+      expect(badge.className).toContain('whitespace-nowrap');
       expect(badge.className).toContain('font-[510]');
     });
 

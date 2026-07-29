@@ -16,6 +16,10 @@ interface ReleaseArtworkThumbProps {
   readonly fallbackIconClass?: string;
 }
 
+function getArtworkRadiusClassName(size: number): string {
+  return size >= 64 ? 'rounded-lg' : 'rounded-xs';
+}
+
 /**
  * Square artwork thumbnail with rounded corners.
  * Shows a Disc3 fallback icon when:
@@ -38,7 +42,8 @@ export function ReleaseArtworkThumb({
   return (
     <div
       className={cn(
-        'relative shrink-0 overflow-hidden rounded bg-surface-2 shadow-sm outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10',
+        'relative shrink-0 overflow-hidden bg-surface-2 shadow-sm',
+        getArtworkRadiusClassName(size),
         className
       )}
       style={{ width: size, height: size }}
