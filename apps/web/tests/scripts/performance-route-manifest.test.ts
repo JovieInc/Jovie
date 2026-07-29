@@ -112,14 +112,14 @@ const RELEASE_BUDGET_CREATOR_SHELL_ROUTE_IDS = [
 
 const CANONICAL_SHELL_PERF_PAIRS = [
   {
-    itemId: 'inbox',
-    coldRouteId: 'creator-app-home',
-    warmRouteId: 'creator-inbox-nav',
-  },
-  {
     itemId: 'chat',
     coldRouteId: 'creator-chat',
     warmRouteId: 'creator-chat-nav',
+  },
+  {
+    itemId: 'inbox',
+    coldRouteId: 'creator-app-home',
+    warmRouteId: 'creator-inbox-nav',
   },
   {
     itemId: 'library',
