@@ -25,6 +25,27 @@ try {
         deviceScaleFactor: 1,
       });
       const page = await context.newPage();
+      const runtimeFailures = [];
+      page.on('console', message => {
+        if (message.type() === 'error') {
+          runtimeFailures.push({
+            type: 'console-error',
+            message: message.text(),
+          });
+        }
+      });
+      page.on('pageerror', error => {
+        runtimeFailures.push({ type: 'page-error', message: error.message });
+      });
+      page.on('response', response => {
+        if (response.status() >= 500) {
+          runtimeFailures.push({
+            type: 'http-5xx',
+            status: response.status(),
+            url: response.url(),
+          });
+        }
+      });
       const url = new URL(route, baseUrl).toString();
       if (route.startsWith('/app/')) {
         await page.goto(
@@ -60,6 +81,11 @@ try {
           /Welcome back|Continue with Google/.test(pageText)
         )
           throw new Error('Captured app route rendered sign-in shell');
+        if (runtimeFailures.length > 0) {
+          throw new Error(
+            `Captured route emitted runtime failures: ${JSON.stringify(runtimeFailures)}`
+          );
+        }
         await page.screenshot({ path, fullPage: true });
         manifest.push({
           route,

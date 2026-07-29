@@ -91,4 +91,15 @@ describe('bounded PR visual review contract', () => {
     );
     expect(workflow).toContain('Do not alter subjective/taste findings.');
   });
+
+  it('fails visual capture closed on runtime console, page, and server errors', () => {
+    const capture = readFileSync(
+      '.github/scripts/pr-visual-review-capture.mjs',
+      'utf8'
+    );
+    expect(capture).toContain("message.type() === 'error'");
+    expect(capture).toContain("type: 'page-error'");
+    expect(capture).toContain('response.status() >= 500');
+    expect(capture).toContain('Captured route emitted runtime failures');
+  });
 });
