@@ -46,16 +46,17 @@ export function ReleaseStateBanners({
 
   return (
     <>
-      {showImportProgress && (
-        <div className='mx-3 lg:mx-4 mt-3'>
-          <ImportProgressBanner
-            artistName={artistName}
-            importedCount={importedCount}
-            totalCount={totalCount}
-            visible={showImportProgress}
-          />
-        </div>
-      )}
+      <div
+        className='mx-3 lg:mx-4 mt-3 min-h-15'
+        data-testid='release-import-progress-slot'
+      >
+        <ImportProgressBanner
+          artistName={artistName}
+          importedCount={importedCount}
+          totalCount={totalCount}
+          visible={showImportProgress}
+        />
+      </div>
 
       {showReleasesTable &&
         firstProfileId &&
