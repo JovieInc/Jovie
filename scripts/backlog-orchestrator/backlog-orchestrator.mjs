@@ -30,6 +30,9 @@ const scorer = await import(resolve(__dirname, 'scorer.mjs'));
 const workstreamer = await import(resolve(__dirname, 'workstreamer.mjs'));
 const admitter = await import(resolve(__dirname, 'admitter.mjs'));
 const reporter = await import(resolve(__dirname, 'reporter.mjs'));
+const staleLeaseGuard = await import(
+  resolve(__dirname, 'stale-lease-guard.mjs')
+);
 
 // ----- Config -----
 const CACHE_FILE = resolve(__dirname, '.orchestrator-cache.json');
@@ -189,6 +192,29 @@ async function runReconcile(cache, isDryRun, issueArg) {
 
 async function runAdmitNext(cache, isDryRun) {
   console.log('Checking admission eligibility...');
+
+  // Release only provably stale machine leases before ordinary admission. This
+  // is intentionally scoped to unassigned In Progress issues; it never touches
+  // Tim-assigned or otherwise ambiguous work.
+  const inProgressIssues = await linear.fetchTeamInProgressIssues(TEAM_ID);
+  if (isDryRun) {
+    const planned = inProgressIssues
+      .map(issue => ({
+        identifier: issue.identifier,
+        decision: staleLeaseGuard.classifyStaleLease(issue),
+      }))
+      .filter(entry => entry.decision.eligible);
+    console.log(`Stale-lease sweep (dry-run): ${planned.length} eligible`);
+  } else {
+    const staleLeaseResult = await staleLeaseGuard.sweepStaleLeases({
+      issues: inProgressIssues,
+      client: linear,
+    });
+    console.log(
+      `Stale-lease sweep: recovered ${staleLeaseResult.recovered.length}, ` +
+        `skipped ${staleLeaseResult.skipped.length}, failed ${staleLeaseResult.failed.length}`
+    );
+  }
 
   const allIssues = await linear.fetchTeamActiveIssues(TEAM_ID);
   const classifications = [];
