@@ -1,0 +1,213 @@
+name: PR Visual Review
+
+# Bounded, advisory UI evidence lane. Capture runs on PR code without secrets;
+# the review step uses only the trusted base script and a configured backend.
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - 'apps/web/app/**'
+      - 'apps/web/components/**'
+      - 'apps/web/features/**'
+      - 'apps/web/lib/**'
+      - 'apps/web/public/**'
+      - 'apps/web/styles/**'
+      - 'apps/console/**'
+      - 'apps/ios/**'
+      - 'packages/ui/**'
+      - '**/*.css'
+      - '**/*.scss'
+      - 'DESIGN.md'
+      - 'canon/DESIGN.md'
+
+permissions: {}
+
+concurrency:
+  group: pr-visual-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PR_VISUAL_OUT: pr-visual-artifacts
+  PLAYWRIGHT_BROWSERS_PATH: ~/.cache/ms-playwright
+
+jobs:
+  capture:
+    name: Capture changed UI (desktop + mobile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout PR code (no secrets)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @jovie/web exec playwright install --with-deps chromium
+
+      - name: Route changed files
+        id: route
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/changed-files.txt"
+          mkdir -p "$PR_VISUAL_OUT"
+          node --input-type=module - <<'NODE'
+          import { readFile, writeFile } from 'node:fs/promises';
+          import { routeChangedFiles } from './.github/scripts/pr-visual-review.mjs';
+          const files = (await readFile(process.env.RUNNER_TEMP + '/changed-files.txt', 'utf8')).split('\n').filter(Boolean);
+          const route = routeChangedFiles(files);
+          await writeFile(process.env.PR_VISUAL_OUT + '/routing.json', JSON.stringify({ ...route, files }, null, 2));
+          await writeFile(process.env.GITHUB_OUTPUT, `should_review=${route.shouldReview}\nroutes<<ROUTES\n${JSON.stringify(route.routes)}\nROUTES\n`, { flag: 'a' });
+          console.log(JSON.stringify(route));
+          NODE
+
+      - name: Build web app for deterministic capture
+        if: steps.route.outputs.should_review == 'true'
+        run: pnpm turbo build --filter=@jovie/web
+        env:
+          DATABASE_URL: postgresql://localhost/noop
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_mock
+          CLERK_SECRET_KEY: sk_test_mock
+          NEXT_DISABLE_TOOLBAR: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_CLERK_USER_ID: user_test
+
+      - name: Start production server
+        if: steps.route.outputs.should_review == 'true'
+        run: |
+          set -euo pipefail
+          (cd apps/web && PORT=3100 DATABASE_URL=postgresql://localhost/noop NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_mock CLERK_SECRET_KEY=sk_test_mock NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 E2E_USE_TEST_AUTH_BYPASS=1 pnpm run start) > "$RUNNER_TEMP/pr-visual-server.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/pr-visual-server.pid"
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:3100 >/dev/null 2>&1 && exit 0; sleep 2; done
+          cat "$RUNNER_TEMP/pr-visual-server.log"
+          exit 1
+
+      - name: Capture routed surfaces
+        if: steps.route.outputs.should_review == 'true'
+        env:
+          BASE_URL: http://127.0.0.1:3100
+          PR_VISUAL_ROUTES: ${{ steps.route.outputs.routes }}
+        run: |
+          set -euo pipefail
+          PR_VISUAL_ROUTES="$(node -p "JSON.stringify(require('./pr-visual-artifacts/routing.json').routes)")" node .github/scripts/pr-visual-review-capture.mjs || true
+          test -f pr-visual-artifacts/manifest.json
+
+      - name: Stop server
+        if: always()
+        run: kill "$(cat "$RUNNER_TEMP/pr-visual-server.pid" 2>/dev/null)" 2>/dev/null || true
+
+      - name: Upload visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-visual-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: pr-visual-artifacts/
+          if-no-files-found: error
+          retention-days: 14
+
+  review:
+    name: Review screenshots and post advisory review
+    needs: capture
+    if: ${{ always() && needs.capture.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      VISUAL_REVIEW_API_KEY: ${{ secrets.VISUAL_REVIEW_API_KEY || secrets.AI_GATEWAY_API_KEY }}
+      VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL || 'https://ai-gateway.vercel.sh/v1' }}
+      VISUAL_REVIEW_MODEL: ${{ vars.VISUAL_REVIEW_MODEL || 'zai/glm-5.2' }}
+    steps:
+      - name: Checkout trusted base helpers
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          sparse-checkout: .github/scripts/pr-visual-review.mjs
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: pr-visual-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          path: pr-visual-artifacts
+
+      - name: Skip non-UI changes
+        id: routed
+        run: |
+          if [ "$(node -p "require('./pr-visual-artifacts/routing.json').shouldReview")" != "true" ]; then
+            echo "No UI surface changed; review is a deliberate no-op."
+            echo "review=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "review=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Prepare bounded diff context
+        if: steps.routed.outputs.review == 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git fetch --no-tags --depth=2 origin "$BASE_SHA" "$HEAD_SHA"
+          git diff --no-ext-diff "$BASE_SHA...$HEAD_SHA" > "$RUNNER_TEMP/pr.diff"
+          node --input-type=module - <<'NODE'
+          import { readFile, writeFile } from 'node:fs/promises';
+          const routing = JSON.parse(await readFile('pr-visual-artifacts/routing.json', 'utf8'));
+          const diff = await readFile(process.env.RUNNER_TEMP + '/pr.diff', 'utf8');
+          await writeFile('review-input.json', JSON.stringify({ artifactDir: 'pr-visual-artifacts', changedFiles: routing.files, diff, output: 'review-result.json' }));
+          NODE
+
+      - name: Call configured GLM 5.2 / Kimi K3 backend
+        if: steps.routed.outputs.review == 'true'
+        run: node .github/scripts/pr-visual-review.mjs review review-input.json
+
+      - name: Post structured PR review (idempotent)
+        if: steps.routed.outputs.review == 'true'
+        run: |
+          set -euo pipefail
+          BODY=$(node --input-type=module - <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { formatReviewBody } from './.github/scripts/pr-visual-review.mjs';
+          const result = JSON.parse(await readFile('review-result.json', 'utf8'));
+          const run = process.env.GITHUB_RUN_ID;
+          const body = result.status === 'completed'
+            ? formatReviewBody({ review: result.review, runId: run, artifactUrl: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${run}` })
+            : `## Visual review (${run})\n\n**Status: ${result.status}**\n\n${result.error}\n\nNo findings were generated; rerun after configuring a GLM 5.2 or Kimi K3 backend.`;
+          process.stdout.write(body);
+          NODE
+          )
+          EXISTING=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews?per_page=100" --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | contains("Visual review ("))) ] | length')
+          if [ "$EXISTING" -gt 0 ]; then echo "Existing visual review found; idempotent no-op."; exit 0; fi
+          jq -n --arg body "$BODY" '{body:$body,event:"COMMENT"}' > review-payload.json
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --method POST --input review-payload.json >/dev/null
+
+      - name: Bounded objective follow-up through coder path (opt-in)
+        if: steps.routed.outputs.review == 'true' && vars.VISUAL_REVIEW_AUTOFIX_ENABLED == 'true'
+        run: |
+          set -euo pipefail
+          ELIGIBLE=$(node --input-type=module - <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          const result = JSON.parse(await readFile('review-result.json', 'utf8'));
+          const findings = result.status === 'completed' ? (result.review?.findings ?? []) : [];
+          const ok = findings.length > 0 && findings.length <= 1 && findings.every(f => !/^(taste|preference|brand|identity|composition|copy-tone)$/i.test(f.category) && ['high','medium'].includes(String(f.severity).toLowerCase()));
+          process.stdout.write(ok ? 'true' : 'false');
+          NODE
+          )
+          [ "$ELIGIBLE" = true ] || { echo "No bounded objective finding eligible for follow-up."; exit 0; }
+          if gh issue list --state open --search "visual-review-pr:${PR_NUMBER}" --json number --jq 'length' | grep -qv '^0$'; then echo "Follow-up already exists; idempotent no-op."; exit 0; fi
+          BODY="visual-review-pr:${PR_NUMBER}\n\nBounded objective UI finding from PR #${PR_NUMBER}. Use the canonical GitHub AI coder path. Do not alter subjective/taste findings.\n\n$(jq -r '.review.findings[0] | "Title: \(.title)\nEvidence: \(.evidence)\nRecommendation: \(.recommendation)"' review-result.json)"
+          ISSUE=$(gh issue create --title "fix: objective UI finding from PR #${PR_NUMBER}" --body "$BODY" --label agent-ready)
+          gh workflow run github-ai-orchestrator.yml --ref main -f issue_number="${ISSUE##*/}"
