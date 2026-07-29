@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import test from 'node:test';
 import { evaluateDesktopReleaseGuard } from './desktop-release-guard.mjs';
 
+const desktopRequire = createRequire(
+  new URL('../apps/desktop/package.json', import.meta.url)
+);
 const desktopWorkflow = readFileSync(
   new URL('../.github/workflows/desktop-release.yml', import.meta.url),
   'utf8'
@@ -35,6 +39,27 @@ function step(workflow, stepName) {
 function assertPatterns(source, patterns) {
   patterns.forEach(pattern => assert.match(source, pattern));
 }
+
+test('desktop builder can parse Electron macOS property lists', () => {
+  const electronBuilderPackage = desktopRequire.resolve(
+    'electron-builder/package.json'
+  );
+  const electronBuilderRequire = createRequire(electronBuilderPackage);
+  const appBuilderPackage = electronBuilderRequire.resolve(
+    'app-builder-lib/package.json'
+  );
+  const appBuilderRequire = createRequire(appBuilderPackage);
+  const plist = appBuilderRequire('plist');
+
+  const parsed = plist.parse(
+    '<?xml version="1.0" encoding="UTF-8"?>' +
+      '<plist version="1.0"><dict>' +
+      '<key>CFBundleName</key><string>Jovie</string>' +
+      '</dict></plist>'
+  );
+
+  assert.deepEqual(parsed, { CFBundleName: 'Jovie' });
+});
 
 test('passes when no desktop files changed', () => {
   const result = evaluateDesktopReleaseGuard([
