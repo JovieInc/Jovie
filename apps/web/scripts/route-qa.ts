@@ -1205,29 +1205,16 @@ export async function runAuthenticatedRouteCapture(
         errorText: request.failure()?.errorText ?? 'unknown request failure',
       });
     });
-    page.on('response', response => {
-      if (response.url() !== targetUrl) return;
-      receipt.testAuthRedirect.status = response.status();
-      receipt.testAuthRedirect.location = response.headers().location ?? null;
-    });
     await checkpoint('page-created');
 
     await checkpoint('navigation-started');
-    await runBounded(
-      'Authenticated route navigation',
-      page.goto(targetUrl, {
-        waitUntil: 'commit',
-        timeout: Math.min(timeoutMs, 45_000),
-      })
+    const bootstrapResponse = await runBounded(
+      'Test-auth bootstrap request',
+      context.request.get(targetUrl, { maxRedirects: 0 })
     );
-    receipt.testAuthRedirect.currentUrl = page.url() || receipt.finalUrl;
-    receipt.finalUrl = receipt.testAuthRedirect.currentUrl;
-    await checkpoint('navigation-committed');
-    if (receipt.testAuthRedirect.status === null) {
-      throw new Error(
-        'Test-auth response was not observed before the authenticated route readiness wait.'
-      );
-    }
+    receipt.testAuthRedirect.status = bootstrapResponse.status();
+    receipt.testAuthRedirect.location =
+      bootstrapResponse.headers().location ?? null;
     if (receipt.testAuthRedirect.status !== 303) {
       throw new Error(
         `Test-auth returned HTTP ${receipt.testAuthRedirect.status}; expected HTTP 303.`
@@ -1236,6 +1223,21 @@ export async function runAuthenticatedRouteCapture(
     if (!receipt.testAuthRedirect.location) {
       throw new Error('Test-auth 303 did not include a redirect location.');
     }
+    const destinationUrl = new URL(
+      receipt.testAuthRedirect.location,
+      baseUrl
+    ).toString();
+    await checkpoint('test-auth-redirect-persisted');
+    await runBounded(
+      'Authenticated destination navigation',
+      page.goto(destinationUrl, {
+        waitUntil: 'commit',
+        timeout: Math.min(timeoutMs, 45_000),
+      })
+    );
+    receipt.testAuthRedirect.currentUrl = page.url() || receipt.finalUrl;
+    receipt.finalUrl = receipt.testAuthRedirect.currentUrl;
+    await checkpoint('navigation-committed');
     if (receipt.finalUrl === 'about:blank') {
       throw new Error(
         `Test-auth redirected to ${receipt.testAuthRedirect.location}, but navigation ended at about:blank before readiness.`
