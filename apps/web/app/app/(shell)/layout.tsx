@@ -170,20 +170,20 @@ export default async function AppShellLayout({
     // as it would break context provider expectations (DashboardDataProvider, etc.)
     return (
       <div className='min-h-screen bg-base flex items-center justify-center px-6'>
-        <div className='w-full max-w-lg space-y-4'>
+        <div className='w-full max-w-md'>
           <ErrorBanner
             title='Dashboard failed to load'
-            description='We could not load your workspace data; refresh to try again or return to your profile.'
+            description='We could not load your workspace data. Try again, or return to Jovie.'
             actions={[
-              { label: 'Retry', href: APP_ROUTES.DASHBOARD },
-              { label: 'Go To My Profile', href: '/' },
+              {
+                label: 'Retry',
+                href: APP_ROUTES.DASHBOARD,
+                variant: 'primary',
+              },
+              { label: 'Return to Jovie', href: '/', variant: 'secondary' },
             ]}
             testId='dashboard-error'
           />
-          <p className='text-sm text-secondary-token text-center'>
-            If this keeps happening, please reach out to support so we can help
-            restore access.
-          </p>
         </div>
       </div>
     );
