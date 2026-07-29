@@ -273,7 +273,7 @@ export function NavMenuItem({
     : undefined;
   const shellNavClassName = getSidebarNavRowClassName({
     active: isActive,
-    tone: 'default',
+    tone: item.tone,
     className:
       'group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0',
   });

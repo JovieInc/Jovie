@@ -7,8 +7,8 @@ import {
 } from './config';
 
 const CANONICAL_SIX = [
+  ['chat', 'New Chat', APP_ROUTES.CHAT],
   ['inbox', 'Inbox', APP_ROUTES.DASHBOARD],
-  ['chat', 'Chat', APP_ROUTES.CHAT],
   ['library', 'Library', APP_ROUTES.LIBRARY],
   ['contacts', 'Contacts', APP_ROUTES.CONTACTS],
   ['calendar', 'Calendar', APP_ROUTES.CALENDAR],
@@ -20,8 +20,9 @@ function toContract(items: readonly (typeof primaryNavigation)[number][]) {
 }
 
 describe('canonical customer shell navigation', () => {
-  it('keeps the founder-approved six destinations in exact order', () => {
+  it('keeps New Chat as the elevated first action in the exact customer order', () => {
     expect(toContract(primaryNavigation)).toEqual(CANONICAL_SIX);
+    expect(primaryNavigation[0].tone).toBe('primary');
   });
 
   it('detects missing and reordered canonical destinations', () => {
