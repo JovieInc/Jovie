@@ -68,8 +68,8 @@ describe('ci-fast bounded parallel workflow', () => {
       const selector = block.match(/CI_FAST_LANE_GROUP:\s*([^\s]+)/)?.[1];
       expect(selector, `missing hosted selector in ${jobId}`).toBeDefined();
       expect(block).toContain(`name: ci-fast (${selector})`);
-      expect(block).toContain(
-        'needs: [ci-path-changes, ci-merge-group-admission]'
+      expect(block).toMatch(
+        /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
       );
       expect(block).toMatch(/if: >-\s+!cancelled\(\) &&/);
       expect(block).not.toContain('always()');
@@ -119,6 +119,24 @@ describe('ci-fast bounded parallel workflow', () => {
       structural:
         'pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm doc:freshness:check && pnpm test:reliability-detectors',
     });
+  });
+
+  it('runs the lockfile specifier preflight before expensive fast lanes', () => {
+    const preflight = jobBlock('ci-lockfile-preflight', 'ci-path-changes');
+    expect(preflight).toContain('name: Lockfile Specifier Preflight');
+    expect(preflight).toContain(
+      'run: pnpm exec node scripts/lockfile-specifier-preflight.mjs'
+    );
+    for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
+      expect(
+        jobBlock(
+          jobId,
+          jobId === 'ci-fast-typecheck' ? 'ci-fast-remaining' : 'ci-fast'
+        )
+      ).toMatch(
+        /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
+      );
+    }
   });
 
   it('keeps workflow contracts in the bounded CI control suite', () => {

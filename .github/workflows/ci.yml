@@ -408,6 +408,19 @@ jobs:
           echo "runner_class=$runner_class" >> "$GITHUB_OUTPUT"
           echo "::notice::Unit runner route: $runner_label — $HEARTBEAT_EVIDENCE"
 
+  ci-lockfile-preflight:
+    name: Lockfile Specifier Preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Compare workspace manifest and lockfile specifiers
+        run: pnpm exec node scripts/lockfile-specifier-preflight.mjs
+
   # ── Centralized deterministic path-change detection ────────────────────
   # Source and combined heads compute their own exact diff. The former
   # Vendor queue reuse actions are intentionally absent: native queue provenance
@@ -982,11 +995,12 @@ jobs:
     name: ci-fast (typecheck)
     # JOV-4477: dedicated jobs keep structural Docker/Python action setup out of
     # the typecheck path while preserving parallel hosted fan-out.
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     if: >-
       !cancelled() &&
+      needs.ci-lockfile-preflight.result == 'success' &&
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
@@ -1039,11 +1053,12 @@ jobs:
     name: ci-fast (remaining)
     # JOV-4477: the structural Docker/Python actions stay isolated to the
     # remaining group, where their path-gated lane can actually run.
-    needs: [ci-path-changes, ci-merge-group-admission]
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     if: >-
       !cancelled() &&
+      needs.ci-lockfile-preflight.result == 'success' &&
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
