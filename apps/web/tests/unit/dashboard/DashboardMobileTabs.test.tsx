@@ -38,8 +38,8 @@ vi.mock('@/lib/tracking/navigation-telemetry', () => ({
 }));
 
 const CANONICAL_LABELS = [
+  'New Chat',
   'Inbox',
-  'Chat',
   'Library',
   'Contacts',
   'Calendar',
@@ -64,8 +64,8 @@ describe('DashboardMobileTabs', () => {
     const directLinks = within(tabs).getAllByRole('link');
 
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
+      'New Chat',
       'Inbox',
-      'Chat',
       'Library',
     ]);
     expect(
@@ -81,7 +81,7 @@ describe('DashboardMobileTabs', () => {
     render(<DashboardMobileTabs />);
 
     expect(mockTrackNavigationImpressions).toHaveBeenCalledWith(
-      ['inbox', 'chat', 'library'],
+      ['chat', 'inbox', 'library'],
       APP_ROUTES.CHAT,
       expect.objectContaining({
         isMobile: true,
@@ -118,8 +118,8 @@ describe('DashboardMobileTabs', () => {
       CANONICAL_LABELS
     );
     expect(links.slice(0, 6).map(link => link.getAttribute('href'))).toEqual([
-      APP_ROUTES.DASHBOARD,
       APP_ROUTES.CHAT,
+      APP_ROUTES.DASHBOARD,
       APP_ROUTES.LIBRARY,
       APP_ROUTES.CONTACTS,
       APP_ROUTES.CALENDAR,
@@ -168,7 +168,7 @@ describe('DashboardMobileTabs', () => {
       within(chatTabs).getByRole('link', { name: 'Inbox' })
     ).not.toHaveAttribute('aria-current');
     expect(
-      within(chatTabs).getByRole('link', { name: 'Chat' })
+      within(chatTabs).getByRole('link', { name: 'New Chat' })
     ).toHaveAttribute('aria-current', 'page');
     chat.unmount();
 
