@@ -135,7 +135,7 @@ export function SidebarNavItem({
         strokeWidth={2.25}
       />
       {!collapsed && (
-        <span className='min-w-0 overflow-hidden whitespace-nowrap text-clip text-left justify-self-start [mask-image:linear-gradient(to_right,black_calc(100%_-_1rem),transparent)]'>
+        <span className='min-w-0 justify-self-stretch overflow-hidden whitespace-nowrap text-clip text-left [mask-image:linear-gradient(to_right,black_calc(100%_-_1rem),transparent)]'>
           {item.label}
         </span>
       )}

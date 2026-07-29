@@ -40,6 +40,8 @@ describe('SidebarNavItem active chrome', () => {
     expect(row.className).toContain('focus-visible:ring-2');
     expect(label.className).toContain('overflow-hidden');
     expect(label.className).toContain('text-clip');
+    expect(label.className).toContain('justify-self-stretch');
+    expect(label.className).not.toContain('justify-self-start');
     expect(label.className).toContain('mask-image:linear-gradient');
   });
 });

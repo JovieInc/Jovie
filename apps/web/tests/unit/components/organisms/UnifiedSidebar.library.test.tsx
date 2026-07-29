@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
@@ -173,7 +175,27 @@ describe('UnifiedSidebar library route', () => {
     ).toHaveClass(
       'min-h-(--app-shell-footer-row-height)',
       'border-t',
-      'border-subtle'
+      'border-(--linear-border-divider-subtle)'
+    );
+  });
+
+  it('uses a divider token softer than the app frame seam in both themes', () => {
+    const linearTokens = readFileSync(
+      join(__dirname, '../../../..', 'styles/linear-tokens.css'),
+      'utf8'
+    );
+
+    expect(linearTokens).toMatch(
+      /--linear-border-divider-subtle:\s*rgba\(0, 0, 0, 0\.03\);/
+    );
+    expect(linearTokens).toMatch(
+      /--linear-app-frame-seam:\s*rgba\(0, 0, 0, 0\.045\);/
+    );
+    expect(linearTokens).toMatch(
+      /:root\.dark[\s\S]*--linear-border-divider-subtle:\s*rgba\(255, 255, 255, 0\.05\);/
+    );
+    expect(linearTokens).toMatch(
+      /:root\.dark[\s\S]*--linear-app-frame-seam:\s*rgba\(255, 255, 255, 0\.07\);/
     );
   });
 
