@@ -110,6 +110,7 @@ export function DashboardMobileTabs({
           currentPathname.startsWith(`${item.href}/`)
         );
       }}
+      inFlow
       className={cn('lg:hidden', className)}
     />
   );

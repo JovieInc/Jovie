@@ -271,11 +271,17 @@ export function PersistentAudioBar() {
         aria-label='Playback Controls'
         inert={idleTrayOpen ? undefined : true}
         className={cn(
-          'shrink-0 overflow-hidden border-t border-(--app-shell-border) bg-(--app-shell-content-surface)',
+          'shrink-0 overflow-hidden bg-(--app-shell-content-surface)',
+          idleTrayOpen
+            ? 'border-t border-(--app-shell-border)'
+            : 'border-t border-transparent',
           SHELL_AUDIO_CHROME_TRANSITION_CLASSNAME,
           className
         )}
         data-testid={testId}
+        data-mobile-audio-surface={
+          testId === 'audio-surface-idle-shell-mobile' ? 'true' : undefined
+        }
         style={{
           maxHeight: idleTrayOpen ? 'var(--app-shell-audio-bar-max-height)' : 0,
           opacity: idleTrayOpen ? 1 : 0,
@@ -304,7 +310,7 @@ export function PersistentAudioBar() {
               <p className='text-sm font-medium text-secondary-token'>
                 Nothing playing
               </p>
-              <p className='truncate text-xs text-tertiary-token'>
+              <p className='text-pretty text-xs leading-4 text-tertiary-token'>
                 {isLibraryRoute
                   ? 'Choose a track to start playback.'
                   : 'Choose a track from Library to start playback.'}
@@ -337,10 +343,7 @@ export function PersistentAudioBar() {
     return (
       <>
         {idleTray('audio-surface-idle-shell-desktop', 'hidden lg:block')}
-        {idleTray(
-          'audio-surface-idle-shell-mobile',
-          'max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:hidden'
-        )}
+        {idleTray('audio-surface-idle-shell-mobile', 'lg:hidden')}
       </>
     );
   }
@@ -371,8 +374,10 @@ export function PersistentAudioBar() {
   const mobileBar = (className?: string) => (
     <section
       aria-label='Audio Player'
+      aria-hidden='false'
+      data-mobile-audio-surface='true'
       className={cn(
-        'animate-in fade-in slide-in-from-bottom-2 duration-cinematic shrink-0 border-t border-subtle bg-(--app-shell-content-surface) backdrop-blur-xl px-3 py-2 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]',
+        'animate-in fade-in slide-in-from-bottom-2 duration-cinematic shrink-0 border-t border-subtle bg-(--app-shell-content-surface) backdrop-blur-xl px-3 py-2',
         className
       )}
     >

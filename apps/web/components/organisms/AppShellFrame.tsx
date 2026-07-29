@@ -145,7 +145,14 @@ export const AppShellFrame = memo(function AppShellFrame({
         </div>
       </div>
 
-      {mobileBottomNav}
+      {mobileBottomNav ? (
+        <div
+          className='system-b-app-mobile-bottom-surface shrink-0 lg:hidden'
+          data-testid='app-shell-mobile-bottom-surface'
+        >
+          {mobileBottomNav}
+        </div>
+      ) : null}
     </div>
   );
 });

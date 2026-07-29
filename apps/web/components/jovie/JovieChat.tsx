@@ -755,7 +755,7 @@ export function JovieChat({
                       />
                     ) : showEmptyActionCards ? (
                       <div
-                        className='mx-auto flex min-h-full w-full max-w-[46rem] items-center py-3'
+                        className='mx-auto flex min-h-full w-full max-w-[46rem] items-start py-2 sm:items-center sm:py-3'
                         data-testid='chat-empty-state-action-card-slot'
                       >
                         <ChatStarterActionsRail

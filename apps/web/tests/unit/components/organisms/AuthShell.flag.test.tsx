@@ -145,10 +145,7 @@ describe('AuthShell canonical wiring', () => {
     ).not.toBeInTheDocument();
 
     const customerRender = screen.getByTestId('app-shell-frame');
-    expect(customerRender).toHaveAttribute(
-      'data-content-class',
-      'pb-20 lg:pb-6'
-    );
+    expect(customerRender).toHaveAttribute('data-content-class', 'lg:pb-6');
 
     unmount();
     renderOvAuthShell();
@@ -161,7 +158,7 @@ describe('AuthShell canonical wiring', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByTestId('app-shell-frame')).toHaveAttribute(
       'data-content-class',
-      'pb-20 lg:pb-6'
+      'lg:pb-6'
     );
   });
 

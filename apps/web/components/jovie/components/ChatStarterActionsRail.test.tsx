@@ -73,6 +73,32 @@ describe('ChatStarterActionsRail', () => {
     ).toHaveLength(3);
   });
 
+  it('shows one complete mobile card with an explicit More control', async () => {
+    const user = userEvent.setup();
+    render(
+      <ChatStarterActionsRail
+        cards={cards}
+        onAct={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    );
+
+    expect(screen.getAllByTestId('chat-action-card')).toHaveLength(1);
+    const more = screen.getByRole('button', {
+      name: 'Show More Starter Actions',
+    });
+    expect(more).toHaveClass('focus-visible:ring-2');
+    expect(more.parentElement).toHaveClass('sm:hidden', 'min-h-11');
+    expect(screen.getByText('1 of 3')).toHaveClass('tabular-nums');
+
+    await user.click(more);
+
+    expect(
+      screen.getByRole('group', { name: '2 of 3: Review Signals' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('2 of 3')).toBeInTheDocument();
+  });
+
   it('keeps endpoint controls mounted and retains dot focus at the boundary', async () => {
     const user = userEvent.setup();
     render(
