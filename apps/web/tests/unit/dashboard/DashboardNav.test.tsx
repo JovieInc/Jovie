@@ -36,7 +36,7 @@ const FORBIDDEN_PRIMARY_LABELS = [
 ] as const;
 
 const DASHBOARD_NAV_SOURCE =
-  'apps/web/components/features/dashboard/dashboard-nav/DashboardNav.tsx';
+  'components/features/dashboard/dashboard-nav/DashboardNav.tsx';
 
 function primaryLinks(container: HTMLElement) {
   const section = container.querySelector('[data-nav-section]');
