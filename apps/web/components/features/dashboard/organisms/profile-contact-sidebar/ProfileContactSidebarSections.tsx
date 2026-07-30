@@ -132,6 +132,9 @@ export function ProfileBentoView({
             <CommonDropdown
               items={menuItems}
               align='end'
+              // The UTM action opens a Dialog. Keeping this transient menu
+              // non-modal avoids competing Radix body pointer-event layers.
+              modal={false}
               aria-label='Profile Actions'
               trigger={
                 <Button

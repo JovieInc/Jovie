@@ -105,6 +105,12 @@ describe('CommonDropdown', () => {
       await user.click(screen.getByRole('button', { name: 'More actions' }));
       expect(onOpenChange).toHaveBeenCalledWith(true);
     });
+
+    it('keeps the document body interactive when modal is disabled', () => {
+      render(<CommonDropdown items={basicItems} open={true} modal={false} />);
+
+      expect(document.body.style.pointerEvents).not.toBe('none');
+    });
   });
 
   describe('Action Items', () => {
