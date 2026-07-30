@@ -1461,6 +1461,9 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
 
     expect(deployStep).not.toContain('VERCEL_FORCE_SOURCE_DEPLOY');
     expect(deployStep).toContain("VERCEL_ENABLE_SOURCE_FALLBACK: 'false'");
+    expect(deployStep).toContain(
+      '--meta "githubCommitSha=${VERCEL_GIT_COMMIT_SHA}"'
+    );
     expect(stagingJob).not.toContain('download_vercel_build');
     expect(stagingJob).not.toContain('restore_vercel_build');
     expect(buildStep).toContain('jovie-generated-public-files');
@@ -2216,6 +2219,19 @@ describe('canary health gate workflow', () => {
     expect(canary).not.toContain('staging.jov.ie');
     expect(aliasStep).toContain(
       'vercel alias set "$deployment_url" staging.jov.ie'
+    );
+    const aliasProofStep = getStepBlock(
+      aliasJob,
+      'Prove staging alias owns the exact deployment and full SHA'
+    );
+    expect(aliasProofStep).toContain(
+      'alias_commit_sha="$(jq -r \'.meta.githubCommitSha // ""\' <<<"$alias_json")"'
+    );
+    expect(aliasProofStep).toContain(
+      '[[ "$alias_commit_sha" =~ ^[0-9a-f]{40}$ ]]'
+    );
+    expect(aliasProofStep).toContain(
+      '[ "$alias_commit_sha" = "$EXPECTED_COMMIT_SHA" ]'
     );
     expect(oauthStep).toContain('BASE_URL: https://staging.jov.ie');
     expect(oauthStep).toContain(
