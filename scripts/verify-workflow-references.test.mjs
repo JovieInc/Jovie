@@ -41,6 +41,28 @@ jobs:
   ]);
 });
 
+test('reports a missing TestFlight validator before release', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workflow-refs-'));
+  temporaryRoots.push(root);
+  fs.mkdirSync(path.join(root, '.github', 'workflows'), { recursive: true });
+  fs.mkdirSync(path.join(root, 'apps', 'ios', 'scripts'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, '.github', 'workflows', 'ios-testflight.yml'),
+    `
+name: iOS TestFlight
+jobs:
+  upload:
+    runs-on: macos-latest
+    steps:
+      - run: bash apps/ios/scripts/validate-testflight-env.sh
+`
+  );
+
+  assert.deepEqual(validateWorkflowReferences(root), [
+    '.github/workflows/ios-testflight.yml:7: command path does not resolve: apps/ios/scripts/validate-testflight-env.sh',
+  ]);
+});
+
 test('passes when workflow references resolve', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workflow-refs-'));
   temporaryRoots.push(root);
