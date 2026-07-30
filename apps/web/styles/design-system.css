@@ -6410,6 +6410,13 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   transition-timing-function: var(--system-b-ease);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  :where(.system-b-table-row-base),
+  :where(.system-b-table-selection-unchecked) {
+    transition-duration: 0s;
+  }
+}
+
 :where(.system-b-table-row-hover):hover,
 :where(.system-b-table-row-focus-within):focus-within,
 :where(.system-b-table-row-focus-visible):focus-visible,

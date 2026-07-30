@@ -1,7 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { rowState } from '@/components/organisms/table/table.styles';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
 import { ContactsTable } from '@/features/dashboard/organisms/contacts-table/ContactsTable';
 
@@ -37,25 +36,22 @@ vi.mock('@/components/organisms/table', async importOriginal => {
     convertToCommonDropdownItems: vi.fn(() => []),
     UnifiedTable: ({
       data,
-      getRowClassName,
+      isRowSelected,
       isLoading,
       onRowClick,
     }: {
       readonly data: EditableContact[];
-      readonly getRowClassName?: (
-        row: EditableContact,
-        index: number
-      ) => string;
+      readonly isRowSelected?: (row: EditableContact, index: number) => boolean;
       readonly isLoading?: boolean;
       readonly onRowClick?: (row: EditableContact) => void;
     }) => {
-      const firstRowClassName = data[0]
-        ? (getRowClassName?.(data[0], 0) ?? '')
-        : '';
+      const firstRowSelected = data[0]
+        ? String(isRowSelected?.(data[0], 0) ?? false)
+        : 'false';
 
       return (
         <div
-          data-first-row-class={firstRowClassName}
+          data-first-row-selected={firstRowSelected}
           data-loading={String(isLoading)}
           data-testid='contacts-unified-table'
         >
@@ -116,7 +112,7 @@ const contacts: EditableContact[] = [
 ];
 
 describe('ContactsTable', () => {
-  it('uses shell-selected row chrome and keeps the detail surface flat', () => {
+  it('persists drawer selection through the shared table selection contract', () => {
     render(
       <ContactsTable
         contacts={contacts}
@@ -130,8 +126,8 @@ describe('ContactsTable', () => {
 
     expect(screen.getByText('1 contact')).toBeInTheDocument();
     expect(screen.getByTestId('contacts-unified-table')).toHaveAttribute(
-      'data-first-row-class',
-      ''
+      'data-first-row-selected',
+      'false'
     );
 
     fireEvent.click(
@@ -147,8 +143,8 @@ describe('ContactsTable', () => {
       'contact-1'
     );
     expect(screen.getByTestId('contacts-unified-table')).toHaveAttribute(
-      'data-first-row-class',
-      rowState.selected
+      'data-first-row-selected',
+      'true'
     );
     expect(setHeaderActions).toHaveBeenCalled();
     expect(setTableMeta).toHaveBeenCalled();
