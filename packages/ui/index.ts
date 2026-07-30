@@ -250,6 +250,13 @@ export { LoadingSkeleton, Skeleton } from './atoms/skeleton';
 // Spinner
 export type { SpinnerProps, SpinnerSize, SpinnerTone } from './atoms/spinner';
 export { Spinner } from './atoms/spinner';
+// Stackable Badge Group
+export type {
+  StackableBadgeGroupProps,
+  StackableBadgeItem,
+  StackableBadgeTone,
+} from './atoms/stackable-badge-group';
+export { StackableBadgeGroup } from './atoms/stackable-badge-group';
 // Switch
 export { Switch } from './atoms/switch';
 // Textarea
