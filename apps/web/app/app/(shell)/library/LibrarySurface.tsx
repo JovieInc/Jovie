@@ -2488,9 +2488,10 @@ export function LibrarySurface({
   const [preset, setPreset] = useState<LibraryPresetId>(() =>
     parseLibraryViewParam(searchParams.get('view'))
   );
-  const [savedView, setSavedView] = useState<LibrarySavedViewId>(() =>
-    readPersistedLibrarySavedView()
-  );
+  // Keep the server render and the browser's first hydration render identical.
+  // A persisted view belongs to the post-hydration enhancement path; reading it
+  // here would make a returning user's first client render differ from SSR.
+  const [savedView, setSavedView] = useState<LibrarySavedViewId>('all');
   const [filters, setFilters] = useState<LibraryFilters>(() => emptyFilters());
   const [sort, setSort] = useState<LibrarySortKey>('releaseDate');
   const { view, setView } = useLibraryViewMode();
@@ -2510,6 +2511,10 @@ export function LibrarySurface({
   useEffect(() => {
     setPreset(parseLibraryViewParam(searchParams.get('view')));
   }, [searchParams]);
+
+  useEffect(() => {
+    setSavedView(readPersistedLibrarySavedView());
+  }, []);
 
   // Version-stack duplicate ingests so each release renders as one row
   // (JOV-3089); overrides then layer on top of the surviving canonical row.

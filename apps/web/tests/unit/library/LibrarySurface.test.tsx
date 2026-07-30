@@ -302,6 +302,21 @@ describe('LibrarySurface', () => {
     expect(source).not.toMatch(/grid gap-2\.5/u);
   });
 
+  it('defers persisted saved-view reads until after hydration', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), LIBRARY_SURFACE_SOURCE),
+      'utf8'
+    );
+
+    expect(source).toContain(
+      "const [savedView, setSavedView] = useState<LibrarySavedViewId>('all');"
+    );
+    expect(source).toContain('setSavedView(readPersistedLibrarySavedView());');
+    expect(source).not.toContain(
+      'useState<LibrarySavedViewId>(() =>\n    readPersistedLibrarySavedView()'
+    );
+  });
+
   it('renders an empty read-only library state with a releases escape hatch', () => {
     renderLibrary([]);
 
