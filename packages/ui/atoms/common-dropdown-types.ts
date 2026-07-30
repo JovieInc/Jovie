@@ -244,6 +244,15 @@ export interface CommonDropdownProps {
   readonly onOpenChange?: (open: boolean) => void;
 
   /**
+   * Whether the menu should block interaction outside its content.
+   *
+   * Keep the default for standalone menus. Set this to false when an action
+   * opens another modal layer so Radix can release the menu before the dialog
+   * takes over body interaction.
+   */
+  readonly modal?: boolean;
+
+  /**
    * Disable portal rendering (render in DOM position)
    */
   readonly disablePortal?: boolean;

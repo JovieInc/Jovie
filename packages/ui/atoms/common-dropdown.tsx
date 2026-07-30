@@ -46,6 +46,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
     sideOffset = 4,
     open,
     onOpenChange,
+    modal = true,
     disablePortal = false,
     portalProps,
     contentClassName,
@@ -151,7 +152,11 @@ export function CommonDropdown(props: CommonDropdownProps) {
   }
 
   return (
-    <DropdownMenuPrimitive.Root open={open} onOpenChange={handleOpenChange}>
+    <DropdownMenuPrimitive.Root
+      open={open}
+      onOpenChange={handleOpenChange}
+      modal={modal}
+    >
       <DropdownMenuPrimitive.Trigger
         asChild
         disabled={disabled}

@@ -210,4 +210,30 @@ test.describe('right-rail × composer interaction', () => {
     await textarea.fill('rapid toggles completed');
     await expect(textarea).toHaveValue('rapid toggles completed');
   });
+
+  test('F: profile-menu dialog transition releases the composer', async ({
+    page,
+  }) => {
+    await page.locator(RAIL_TOGGLE).click();
+    await expect(page.locator(RIGHT_RAIL)).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole('button', { name: 'Profile Actions' }).click();
+    await page.getByRole('menuitem', { name: 'UTM Builder' }).click();
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10_000 });
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 10_000 });
+
+    const pointerEvents = await page.evaluate(
+      () => getComputedStyle(document.body).pointerEvents
+    );
+    expect(pointerEvents).not.toBe('none');
+
+    const textarea = page.locator(COMPOSER_TEXTAREA);
+    await textarea.click();
+    await textarea.fill('composer remains available after UTM dialog');
+    await expect(textarea).toHaveValue(
+      'composer remains available after UTM dialog'
+    );
+  });
 });
