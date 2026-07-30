@@ -1077,6 +1077,43 @@ describe('origin-bound Vercel protection bypass', () => {
     }
   });
 
+  it('returns the validated exact SHA only when an explicit caller requests it', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      status: 200,
+      text: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          deployments: [
+            {
+              uid: 'dpl_exact',
+              url: DEPLOYMENT_URL,
+              projectId: 'prj_jovie',
+              readyState: 'READY',
+              meta: { githubCommitSha: EXPECTED_SHA },
+            },
+          ],
+          pagination: { next: null },
+        })
+      ),
+    });
+
+    await expect(
+      resolveAuthorizedVercelDeployment({
+        fetchImpl,
+        token: 'sentinel-vercel-token',
+        orgId: 'team_jovie',
+        projectId: 'prj_jovie',
+        commitSha: EXPECTED_SHA,
+        candidateUrl: DEPLOYMENT_URL,
+        candidateId: 'dpl_exact',
+        includeCommitSha: true,
+      })
+    ).resolves.toEqual({
+      id: 'dpl_exact',
+      url: DEPLOYMENT_URL.slice(0, -1),
+      commitSha: EXPECTED_SHA,
+    });
+  });
+
   it('treats an exact deployment ID with a not-yet-indexed URL as transient', async () => {
     const apiResponse = (deployments: unknown[]) => ({
       status: 200,

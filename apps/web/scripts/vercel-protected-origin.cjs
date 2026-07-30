@@ -1155,6 +1155,7 @@ async function resolveAuthorizedVercelDeployment({
   commitSha = process.env.EXPECTED_COMMIT_SHA ?? process.env.COMMIT_SHA,
   candidateUrl = process.env.VERCEL_CANDIDATE_DEPLOYMENT_URL,
   candidateId = process.env.VERCEL_CANDIDATE_DEPLOYMENT_ID,
+  includeCommitSha = process.env.VERCEL_INCLUDE_COMMIT_SHA === 'true',
   allowMissingCommitSha = process.env.VERCEL_ALLOW_MISSING_COMMIT_SHA ===
     'true',
   maxPages = process.env.VERCEL_DEPLOYMENT_MAX_PAGES ??
@@ -1377,9 +1378,10 @@ async function resolveAuthorizedVercelDeployment({
           if (state === 'READY') {
             matchingReady.set(id, { id, url: urlOrigin });
             if (exactCandidateId || exactCandidateUrl) {
-              return allowMissingCommitSha
-                ? { id, url: urlOrigin, commitSha: observedSha }
-                : { id, url: urlOrigin };
+              if (allowMissingCommitSha || includeCommitSha) {
+                return { id, url: urlOrigin, commitSha: observedSha };
+              }
+              return { id, url: urlOrigin };
             }
           } else {
             matchingTransient = true;

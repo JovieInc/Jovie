@@ -517,6 +517,7 @@ jobs:
           exact_json="$(
             VERCEL_CANDIDATE_DEPLOYMENT_URL="$deployment_url" \
             VERCEL_CANDIDATE_DEPLOYMENT_ID="$EXPECTED_DEPLOYMENT_ID" \
+            VERCEL_INCLUDE_COMMIT_SHA=true \
             VERCEL_DEPLOYMENT_MAX_PAGES=5 \
             VERCEL_API_TIMEOUT_MS=120000 \
             VERCEL_DEPLOYMENT_POLL_INTERVAL_MS=3000 \
@@ -526,6 +527,12 @@ jobs:
             echo "::error::Exact staging deployment identity did not converge."
             exit 1
           }
+          candidate_commit_sha="$(jq -r '.commitSha // ""' <<<"$exact_json")"
+          [[ "$candidate_commit_sha" =~ ^[0-9a-f]{40}$ ]] &&
+            [ "$candidate_commit_sha" = "$EXPECTED_COMMIT_SHA" ] || {
+              echo "::error::Exact staging deployment did not expose the expected full commit SHA."
+              exit 1
+            }
 
           for attempt in $(seq 1 15); do
             alias_json="$(./node_modules/.bin/vercel inspect staging.jov.ie \
@@ -534,12 +541,9 @@ jobs:
               >/dev/null 2>&1 <<<"$alias_json"; then
               alias_id="$(jq -r '.id' <<<"$alias_json")"
               alias_state="$(jq -r '.readyState | ascii_upcase' <<<"$alias_json")"
-              alias_commit_sha="$(jq -r '.meta.githubCommitSha // ""' <<<"$alias_json")"
               if [ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ] &&
-                [ "$alias_state" = "READY" ] &&
-                [[ "$alias_commit_sha" =~ ^[0-9a-f]{40}$ ]] &&
-                [ "$alias_commit_sha" = "$EXPECTED_COMMIT_SHA" ]; then
-                echo "staging.jov.ie owns exact READY deployment $alias_id at $alias_commit_sha."
+                [ "$alias_state" = "READY" ]; then
+                echo "staging.jov.ie owns exact READY deployment $alias_id at $candidate_commit_sha."
                 break
               fi
             fi
