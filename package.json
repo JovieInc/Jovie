@@ -94,6 +94,8 @@
     "dev:web:local": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run dev:local",
     "dev:web:browse": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run dev:local:browse",
     "dev:web:fast": "bash scripts/dev-web-fast.sh",
+    "verify:workflow-references": "node scripts/verify-workflow-references.mjs",
+    "test:workflow-references": "node --test scripts/verify-workflow-references.test.mjs",
     "dev:console": "pnpm --filter @jovie/console run dev",
     "sweep:taste-inbox": "doppler run --project jovie-web --config dev -- pnpm --filter @jovie/console run sweep",
     "ios:open": "open apps/ios/Jovie.xcodeproj",

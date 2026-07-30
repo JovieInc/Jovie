@@ -52,10 +52,10 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter web exec playwright install chromium --with-deps
+      - run: pnpm --filter @jovie/web exec playwright install chromium --with-deps
       - name: Run Storybook A11y Tests
         id: a11y-test
-        run: pnpm --filter web test:a11y
+        run: pnpm --filter @jovie/web test:a11y
       - name: A11y Results Summary
         if: always()
         run: |
@@ -64,7 +64,7 @@ jobs:
             echo "" >> "$GITHUB_STEP_SUMMARY"
             echo "FAIL: Accessibility violations detected - blocking this PR." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "To run locally: pnpm --filter web test:a11y" >> "$GITHUB_STEP_SUMMARY"
+            echo "To run locally: pnpm --filter @jovie/web test:a11y" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "## A11y Check Results" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"

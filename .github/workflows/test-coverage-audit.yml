@@ -55,7 +55,7 @@ jobs:
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
           CLERK_SECRET_KEY: sk_test_dummy_secret_for_coverage_run_only
-        run: pnpm --filter web test:coverage
+        run: pnpm --filter @jovie/web test:coverage
 
       - name: Generate heatmap
         run: pnpm exec tsx scripts/audit-test-coverage.ts
