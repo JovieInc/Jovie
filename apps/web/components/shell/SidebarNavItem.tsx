@@ -30,8 +30,8 @@ interface SidebarNavChromeOptions {
   readonly collapsed?: boolean;
   readonly nested?: boolean;
   readonly tight?: boolean;
-  /** Use a fixed 20px action slot instead of the variable badge track. */
-  readonly compactActionSlot?: boolean;
+  /** An absolute trailing action layers over the label's faded edge. */
+  readonly trailingOverlay?: boolean;
   readonly tone?: 'default' | 'primary';
   readonly className?: string;
 }
@@ -68,7 +68,7 @@ export function getSidebarNavRowClassName({
   collapsed,
   nested,
   tight,
-  compactActionSlot,
+  trailingOverlay,
   tone = 'default',
   className,
 }: SidebarNavChromeOptions) {
@@ -81,11 +81,8 @@ export function getSidebarNavRowClassName({
     collapsed
       ? 'h-7 w-10 mx-auto grid-cols-1 place-items-center'
       : cn(
-          // Most rows reserve a variable badge track. Thread rows with a
-          // single icon action opt into the exact target width instead, so
-          // their label gets the remaining grid space deterministically.
-          compactActionSlot
-            ? 'grid-cols-[22px_minmax(0,1fr)_20px]'
+          trailingOverlay
+            ? 'grid-cols-[22px_minmax(0,1fr)]'
             : 'grid-cols-[22px_minmax(0,1fr)_minmax(34px,auto)]',
           nonCollapsedSize,
           'group-data-[collapsible=icon]:grid-cols-1 group-data-[collapsible=icon]:place-items-center'
