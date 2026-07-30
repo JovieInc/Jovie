@@ -62,6 +62,14 @@ describe('JovieLogo', () => {
     expect(svg).toHaveClass('h-4');
   });
 
+  it('uses the canonical focus token instead of a one-off color', () => {
+    render(<JovieLogo />);
+    const link = screen.getByRole('link');
+
+    expect(link).toHaveClass('focus-visible:ring-focus');
+    expect(link).not.toHaveClass('focus-visible:ring-indigo-500');
+  });
+
   it('has no a11y violations', async () => {
     const { container } = render(<JovieLogo />);
     await expectNoA11yViolations(container);
