@@ -161,6 +161,38 @@ describe('CalendarPageClient', () => {
     expect(screen.getByText('Movement Festival')).toBeInTheDocument();
   });
 
+  it('uses canonical Button variants for filters and event-review actions', () => {
+    mocks.useEventsQuery.mockReturnValue({
+      data: [pendingEvent, confirmedEvent, rejectedEvent],
+      isLoading: false,
+    });
+    renderCalendar();
+
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute(
+      'data-variant',
+      'ghost'
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /18 Movement Festival Warehouse Set Old Listing/,
+      })
+    );
+
+    expect(screen.getByRole('button', { name: 'Confirm' })).toHaveAttribute(
+      'data-variant',
+      'secondary'
+    );
+    expect(
+      screen
+        .getAllByRole('button', { name: 'Reject' })
+        .some(button => button.getAttribute('data-variant') === 'tertiary')
+    ).toBe(true);
+    expect(
+      screen.getByRole('button', { name: 'Show rejected · 1' })
+    ).toHaveAttribute('data-variant', 'ghost');
+  });
+
   it('does not fetch scoped release or event data without a selected profile', () => {
     mocks.useDashboardData.mockReturnValue({
       selectedProfile: null,
@@ -216,12 +248,12 @@ describe('CalendarPageClient', () => {
     );
 
     expect(bulkSlot).toHaveAttribute('data-active', 'true');
-    expect(screen.getByText('Confirm selected (1)')).toHaveClass(
-      'system-b-calendar-action-confirm'
-    );
-    expect(screen.getByText('Reject selected (1)')).toHaveClass(
-      'system-b-calendar-action-reject'
-    );
+    expect(
+      screen.getByRole('button', { name: 'Confirm Selected (1)' })
+    ).toHaveClass('system-b-calendar-action-confirm');
+    expect(
+      screen.getByRole('button', { name: 'Reject Selected (1)' })
+    ).toHaveClass('system-b-calendar-action-reject');
 
     const rejectedToggle = screen.getByRole('button', {
       name: 'Show rejected · 1',
@@ -230,7 +262,7 @@ describe('CalendarPageClient', () => {
     fireEvent.click(rejectedToggle);
 
     expect(screen.getAllByText('Old Listing')).toHaveLength(2);
-    expect(screen.getByRole('button', { name: 'Undo reject' })).toHaveClass(
+    expect(screen.getByRole('button', { name: 'Undo Reject' })).toHaveClass(
       'system-b-calendar-action-secondary'
     );
   });
