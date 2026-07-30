@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- **Public profiles now surface Latest as compact, cinematic rows (JOV-4617):** music, merchandise, shows, and alerts keep their native media, essential context, and primary action visible in one stable swipeable footprint, with richer release detail one selection away.
 - [internal] **Native Gmail brand-deal qualification is fail-closed (JOV-4578):** Jovie now surfaces only the highest-ranked current brief with explicit buyer, company, budget, deposit, rights, and revision terms; provenance comes from the connected Gmail record, Calendar is optional, and pending or approved sponsor work blocks another campaign.
 - **Verified brand deals can enter Jovie's Inbox for one explicit decision (JOV-4578):** provenance-checked opportunities now appear as Brand Deals with budget, source, and ranking evidence; rejecting moves on, while approving authorizes preparation only and never sends outreach or creates a campaign without a separate commercial approval and deposit.
 - [internal] **Brand-deal execution is governed by a tested Jovie skill (JOV-4578):** connector identity with a Composio Gmail fallback, primary-source personal deal receipts, A7X3/Backstage separation, one-campaign capacity, bounded rights, sponsor-first tracking, LYB monetization proof, and the two approval gates are enforced by deterministic fixtures.

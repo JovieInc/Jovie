@@ -286,6 +286,8 @@ export function EntityCard({
     isUnified && model.price
       ? [model.meta, model.price.display].filter(Boolean).join(' · ')
       : model.meta;
+  const preserveLandscapeMedia =
+    isProfileLandscape && (model.kind === 'video' || model.kind === 'merch');
 
   return (
     <CardShell
@@ -337,11 +339,13 @@ export function EntityCard({
                     : '(max-width: 767px) 70vw, 300px'
               }
               className={
-                // Unified anatomy: square art in a square zone — cover crops
-                // non-square art instead of letterboxing it.
-                isUnified || model.kind !== 'music'
-                  ? 'object-cover'
-                  : 'object-contain'
+                // Compact profile rows keep non-square video and product
+                // photography intact inside the stable media footprint.
+                preserveLandscapeMedia
+                  ? 'object-contain'
+                  : isUnified || model.kind !== 'music'
+                    ? 'object-cover'
+                    : 'object-contain'
               }
               fallbackVariant={preset.fallbackVariant}
               fallbackClassName='bg-transparent'
@@ -390,12 +394,7 @@ export function EntityCard({
             isUnified ? 'gap-1' : 'gap-1.5'
           )}
         >
-          <div
-            className={cn(
-              'flex min-w-0 items-center justify-between gap-2',
-              isProfileLandscape && 'hidden'
-            )}
-          >
+          <div className='flex min-w-0 items-center justify-between gap-2'>
             <span
               className={cn(
                 'inline-flex min-w-0 items-center gap-1.5 text-3xs font-semibold leading-none text-tertiary-token',
@@ -407,7 +406,16 @@ export function EntityCard({
                 {model.eyebrow ?? preset.eyebrow}
               </span>
             </span>
-            {size.showStatus && !isUnified && model.status ? (
+            {isProfileLandscape && model.status ? (
+              <span className='inline-flex shrink-0 items-center gap-1.5 text-3xs font-medium text-tertiary-token'>
+                <span
+                  className='h-1.5 w-1.5 shrink-0 rounded-full'
+                  style={{ background: statusDotVar(model.status.tone) }}
+                  aria-hidden='true'
+                />
+                {model.status.label}
+              </span>
+            ) : size.showStatus && !isUnified && model.status ? (
               <span className='inline-flex shrink-0 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-3xs font-medium text-secondary-token'>
                 <span
                   className='h-1.5 w-1.5 shrink-0 rounded-full'

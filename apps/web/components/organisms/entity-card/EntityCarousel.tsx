@@ -1,6 +1,13 @@
 'use client';
 
-import { type ReactNode, useEffect, useRef } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { EntityCard } from './EntityCard';
@@ -55,6 +62,48 @@ export function EntityCarousel({
   const itemRefs = useRef<Array<HTMLLIElement | null>>([]);
   const trackedImpressionKeys = useRef<Set<string>>(new Set());
   const prefersReducedMotion = useReducedMotion();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const slotCount = items.length + (leading ? 1 : 0) + (trailing ? 1 : 0);
+  const showsDesktopControls = layout === 'profile-landscape' && slotCount > 1;
+
+  useEffect(() => {
+    setCurrentIndex(index => Math.min(index, Math.max(slotCount - 1, 0)));
+  }, [slotCount]);
+
+  const scrollToIndex = useCallback(
+    (nextIndex: number) => {
+      const track = trackRef.current;
+      if (!track) return;
+      const boundedIndex = Math.max(0, Math.min(nextIndex, slotCount - 1));
+      const target = track.children.item(boundedIndex) as HTMLElement | null;
+      if (!target) return;
+      const firstTarget = track.children.item(0) as HTMLElement | null;
+      track.scrollTo({
+        left: target.offsetLeft - (firstTarget?.offsetLeft ?? 0),
+        behavior: prefersReducedMotion ? 'auto' : 'smooth',
+      });
+      setCurrentIndex(boundedIndex);
+    },
+    [prefersReducedMotion, slotCount]
+  );
+
+  const handleScroll = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const trackLeft = track.getBoundingClientRect().left;
+    let nearestIndex = 0;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const [index, child] of Array.from(track.children).entries()) {
+      const distance = Math.abs(
+        (child as HTMLElement).getBoundingClientRect().left - trackLeft
+      );
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = index;
+      }
+    }
+    setCurrentIndex(nearestIndex);
+  }, []);
 
   useEffect(() => {
     if (!onCardImpression || items.length === 0) {
@@ -151,61 +200,92 @@ export function EntityCarousel({
   );
 
   return (
-    <ul
-      ref={trackRef}
-      className={cn(
-        'profile-horizontal-rail flex h-full snap-x snap-mandatory list-none items-stretch gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain',
-        className
-      )}
-      data-testid={dataTestId ?? 'entity-carousel'}
-      data-layout={layout}
-    >
-      {leading ? (
-        <li
-          data-carousel-slot='leading'
-          data-layout={layout}
-          className={cardItemClassName}
-        >
-          {leading}
-        </li>
-      ) : null}
-      {items.map((model, index) => {
-        return (
+    <div className='group/carousel relative h-full min-h-0'>
+      <ul
+        ref={trackRef}
+        className={cn(
+          'profile-horizontal-rail flex h-full snap-x snap-mandatory list-none items-stretch gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain',
+          className
+        )}
+        data-testid={dataTestId ?? 'entity-carousel'}
+        data-layout={layout}
+        onScroll={showsDesktopControls ? handleScroll : undefined}
+      >
+        {leading ? (
           <li
-            key={`${model.kind}-${model.id}`}
-            ref={node => {
-              itemRefs.current[index] = node;
-            }}
-            data-carousel-index={index}
+            data-carousel-slot='leading'
             data-layout={layout}
             className={cardItemClassName}
           >
-            <EntityCard
-              model={model}
-              treatment='detailed'
-              // The hero keeps image priority; carousel art stays lazy so the
-              // LCP image never competes with the cover photo.
-              surface={surface}
-              anatomy={
-                layout === 'profile-landscape' ? 'profile-landscape' : 'unified'
-              }
-              className='h-full w-full overflow-hidden'
-              onClick={
-                onCardClick ? () => onCardClick(index, model) : undefined
-              }
-            />
+            {leading}
           </li>
-        );
-      })}
-      {trailing ? (
-        <li
-          data-carousel-slot='trailing'
-          data-layout={layout}
-          className={cardItemClassName}
-        >
-          {trailing}
-        </li>
+        ) : null}
+        {items.map((model, index) => {
+          return (
+            <li
+              key={`${model.kind}-${model.id}`}
+              ref={node => {
+                itemRefs.current[index] = node;
+              }}
+              data-carousel-index={index}
+              data-layout={layout}
+              className={cardItemClassName}
+            >
+              <EntityCard
+                model={model}
+                treatment='detailed'
+                // The hero keeps image priority; carousel art stays lazy so the
+                // LCP image never competes with the cover photo.
+                surface={surface}
+                anatomy={
+                  layout === 'profile-landscape'
+                    ? 'profile-landscape'
+                    : 'unified'
+                }
+                className='h-full w-full overflow-hidden'
+                onClick={
+                  onCardClick ? () => onCardClick(index, model) : undefined
+                }
+              />
+            </li>
+          );
+        })}
+        {trailing ? (
+          <li
+            data-carousel-slot='trailing'
+            data-layout={layout}
+            className={cardItemClassName}
+          >
+            {trailing}
+          </li>
+        ) : null}
+      </ul>
+
+      {showsDesktopControls ? (
+        <>
+          <button
+            type='button'
+            aria-label='Previous Item'
+            disabled={currentIndex === 0}
+            onClick={() => scrollToIndex(currentIndex - 1)}
+            className='absolute left-1 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-(--profile-pearl-border) bg-(--profile-pearl-bg) text-secondary-token opacity-0 shadow-(--profile-pearl-shadow) backdrop-blur-xl transition-opacity duration-subtle hover:text-primary-token focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:pointer-events-none disabled:invisible group-focus-within/carousel:opacity-100 group-hover/carousel:opacity-100 md:inline-flex'
+          >
+            <ChevronLeft className='h-4 w-4' aria-hidden='true' />
+          </button>
+          <button
+            type='button'
+            aria-label='Next Item'
+            disabled={currentIndex === slotCount - 1}
+            onClick={() => scrollToIndex(currentIndex + 1)}
+            className='absolute right-1 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-(--profile-pearl-border) bg-(--profile-pearl-bg) text-secondary-token opacity-0 shadow-(--profile-pearl-shadow) backdrop-blur-xl transition-opacity duration-subtle hover:text-primary-token focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:pointer-events-none disabled:invisible group-focus-within/carousel:opacity-100 group-hover/carousel:opacity-100 md:inline-flex'
+          >
+            <ChevronRight className='h-4 w-4' aria-hidden='true' />
+          </button>
+          <span className='sr-only' aria-live='polite'>
+            Item {currentIndex + 1} of {slotCount}
+          </span>
+        </>
       ) : null}
-    </ul>
+    </div>
   );
 }

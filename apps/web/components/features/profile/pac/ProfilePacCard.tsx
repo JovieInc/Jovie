@@ -1,6 +1,15 @@
 'use client';
 
-import { Pause, Play, X } from 'lucide-react';
+import {
+  Bell,
+  HandHeart,
+  Music2,
+  Pause,
+  Play,
+  ShoppingBag,
+  Ticket,
+  X,
+} from 'lucide-react';
 import Link from 'next/link';
 import {
   type FormEvent,
@@ -14,6 +23,7 @@ import {
 } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SeekBar } from '@/components/atoms/SeekBar';
+import type { EntityCarouselLayout } from '@/components/organisms/entity-card';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
 import type {
@@ -50,10 +60,10 @@ import {
  * below (context label / subject / action / status). The prompt state swaps
  * the content zone to the capture form INSIDE the same fixed card box.
  *
- * Zero-CLS contract: the card lives inside the carousel's reserved 3:4
- * geometry (`.profile-entity-card`), so state transitions never move any
- * element outside the card — no height animation, no ResizeObserver, content
- * below the carousel never shifts.
+ * Zero-CLS contract: the card lives inside the carousel's reserved geometry
+ * (`.profile-entity-card`, portrait or compact landscape), so state transitions
+ * never move any element outside the card — no height animation, no
+ * ResizeObserver, content below the carousel never shifts.
  */
 
 export interface ProfilePacRelease {
@@ -73,6 +83,7 @@ interface ProfilePacCardProps {
   readonly isSubscribed?: boolean;
   readonly renderMode?: ProfileRenderMode;
   readonly className?: string;
+  readonly layout?: EntityCarouselLayout;
   /**
    * Priority-load the artwork image. Set by the surface when there is no
    * hero photo — then this card's art is the page LCP and must not lazy-load.
@@ -196,8 +207,10 @@ export function ProfilePacCard({
   isSubscribed = false,
   renderMode = 'interactive',
   className,
+  layout = 'portrait',
   artPriority = false,
 }: Readonly<ProfilePacCardProps>) {
+  const isProfileLandscape = layout === 'profile-landscape';
   const isInteractive = renderMode === 'interactive';
   const previewUrl = release?.previewUrl ?? null;
   const pacTrackId = release ? `pac-${artist.id}-${release.slug}` : null;
@@ -490,11 +503,12 @@ export function ProfilePacCard({
     ? `/${artist.handle}/${release.slug}`
     : `/${artist.handle}/listen`;
 
-  let contextLabel = 'Latest Release';
+  let contextLabel = 'Latest';
   let subject: ReactNode = null;
   let action: ReactNode = null;
   let status: ReactNode = null;
   let contextAside: ReactNode = null;
+  let ContextIcon = Music2;
 
   const releaseSubject = (
     <SubjectText title={release?.title ?? artist.name} meta={artist.name} />
@@ -504,8 +518,7 @@ export function ProfilePacCard({
     case 'idle':
     case 'dismissed':
     case 'playing': {
-      contextLabel =
-        state.kind === 'playing' ? 'Now Playing' : 'Latest Release';
+      contextLabel = state.kind === 'playing' ? 'Now Playing' : 'Latest';
       subject = releaseSubject;
       if (ctx.inventory.hasPreview) {
         action = (
@@ -532,12 +545,12 @@ export function ProfilePacCard({
       }
       if (isPacTrackActive && playbackState.duration > 0) {
         status = (
-          <div className='flex items-center gap-2'>
+          <div className='flex min-w-0 items-center gap-2'>
             <SeekBar
               currentTime={playbackState.currentTime}
               duration={playbackState.duration}
               onSeek={seek}
-              className='h-1.5 flex-1'
+              className='h-1.5 min-w-0 flex-1'
             />
             <span className='shrink-0 text-xs tabular-nums text-tertiary-token'>
               {formatDuration(playbackState.currentTime * 1000)}
@@ -552,6 +565,7 @@ export function ProfilePacCard({
     case 'submitting':
     case 'error': {
       contextLabel = 'Stay In The Loop';
+      ContextIcon = Bell;
       // JOV-3908: text "Not now" (control) vs borderless icon-X (candidate).
       // One control element keeps the raw-button ratchet flat; min-h/w-11 keeps
       // the icon arm at the 44px WCAG touch-target floor.
@@ -621,6 +635,7 @@ export function ProfilePacCard({
 
     case 'success': {
       contextLabel = 'Stay In The Loop';
+      ContextIcon = Bell;
       subject = (
         <SubjectText
           title={"You're in"}
@@ -633,6 +648,7 @@ export function ProfilePacCard({
 
     case 'merch': {
       contextLabel = 'Merch';
+      ContextIcon = ShoppingBag;
       subject = (
         <SubjectText
           title={merchCard?.title ?? `${artist.name} merch`}
@@ -654,6 +670,7 @@ export function ProfilePacCard({
 
     case 'tip': {
       contextLabel = 'Support';
+      ContextIcon = HandHeart;
       subject = (
         <SubjectText
           title={`Support ${artist.name}`}
@@ -674,6 +691,7 @@ export function ProfilePacCard({
     case 'tickets':
     case 'rsvp': {
       contextLabel = 'On Tour';
+      ContextIcon = Ticket;
       const showMeta = [nextShow?.venueName, nextShow?.city]
         .filter(Boolean)
         .join(' · ');
@@ -705,6 +723,7 @@ export function ProfilePacCard({
 
     case 'following': {
       contextLabel = 'Following';
+      ContextIcon = Bell;
       subject = (
         <SubjectText
           title={`You follow ${artist.name}`}
@@ -761,18 +780,31 @@ export function ProfilePacCard({
       data-stage={state.stage}
       data-degraded={state.degraded ? 'true' : undefined}
       data-dismiss-affordance={assignment.dismissAffordance}
+      data-layout={layout}
       className={cn(
-        'flex h-full w-full min-w-0 flex-col overflow-hidden rounded-(--profile-inner-radius) border border-(--profile-pearl-border) bg-(--profile-pearl-bg) shadow-(--profile-pearl-shadow) backdrop-blur-2xl',
+        'flex h-full w-full min-w-0 overflow-hidden rounded-(--profile-inner-radius) border border-(--profile-pearl-border) bg-(--profile-pearl-bg) shadow-(--profile-pearl-shadow) backdrop-blur-2xl',
+        isProfileLandscape ? 'flex-row p-1.5' : 'flex-col',
         className
       )}
     >
-      <div className='relative aspect-square w-full flex-none overflow-hidden border-b border-subtle bg-surface-2'>
+      <div
+        className={cn(
+          'relative aspect-square flex-none overflow-hidden bg-surface-2',
+          isProfileLandscape
+            ? cn('self-stretch w-auto rounded', isCaptureState && 'hidden')
+            : 'w-full border-b border-subtle'
+        )}
+      >
         {artImageUrl ? (
           <ImageWithFallback
             src={artImageUrl}
             alt={artImageAlt}
             fill
-            sizes='(max-width: 767px) 70vw, 300px'
+            sizes={
+              isProfileLandscape
+                ? '(max-width: 767px) 44vw, 180px'
+                : '(max-width: 767px) 70vw, 300px'
+            }
             className='object-cover'
             fallbackVariant='release'
             fallbackClassName='bg-transparent'
@@ -784,13 +816,19 @@ export function ProfilePacCard({
         )}
       </div>
 
-      <div className='flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 px-3 py-1.5'>
+      <div
+        className={cn(
+          'flex min-h-0 min-w-0 flex-1 flex-col gap-1.5',
+          isProfileLandscape ? 'justify-center py-2 pl-3 pr-2' : 'px-3 py-1.5'
+        )}
+      >
         {/* Text zone — clips under tight card heights so the action footer
             below never moves and never clips (zero-CLS contract). */}
         <div className='flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-hidden'>
           <div className='flex items-center justify-between gap-2'>
-            <p className='entity-card-eyebrow truncate text-3xs font-semibold leading-none text-tertiary-token'>
-              {contextLabel}
+            <p className='entity-card-eyebrow inline-flex min-w-0 items-center gap-1.5 truncate text-3xs font-semibold leading-none text-tertiary-token'>
+              <ContextIcon className='h-3 w-3 shrink-0' aria-hidden='true' />
+              <span className='truncate'>{contextLabel}</span>
             </p>
             {contextAside}
           </div>
@@ -798,9 +836,18 @@ export function ProfilePacCard({
           {subject}
         </div>
 
-        <div className='flex min-w-0 flex-none flex-col gap-1.5'>
-          {isCaptureState ? <div className='min-w-0'>{action}</div> : action}
-          <div aria-live='polite' className='min-w-0 empty:hidden'>
+        <div
+          className={cn(
+            'flex min-w-0 flex-none flex-col gap-1.5',
+            isProfileLandscape && 'items-start'
+          )}
+        >
+          {isCaptureState ? (
+            <div className='min-w-0 self-stretch'>{action}</div>
+          ) : (
+            action
+          )}
+          <div aria-live='polite' className='min-w-0 self-stretch empty:hidden'>
             {status}
           </div>
         </div>

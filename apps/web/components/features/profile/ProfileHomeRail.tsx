@@ -104,9 +104,9 @@ function HomeAlertsCard({
       }
     : undefined;
 
-  // The alerts card is a standard unified-anatomy card — icon art zone,
-  // context eyebrow, "Alerts" title, one-line body, full-width CTA — the
-  // same design as every other card in the home carousel.
+  // Alerts use the same compact row anatomy as every other item in Latest.
+  // The icon is carried by the kind label, so this non-media row spends its
+  // full footprint on the message and action.
   const model: EntityCardModel = {
     id: `alerts-${artist.id}`,
     kind: 'alerts',
@@ -127,7 +127,7 @@ function HomeAlertsCard({
       model={model}
       treatment='detailed'
       surface='pearl'
-      anatomy='unified'
+      anatomy='profile-landscape'
       className='h-full w-full overflow-hidden'
       dataTestId='profile-home-alerts-fallback-card'
       onClick={handleClick}
@@ -380,6 +380,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
             assignment={profilePacAssignment}
             isSubscribed={isSubscribed}
             renderMode={renderMode}
+            layout='profile-landscape'
           />
         }
         trailing={alertsCard}

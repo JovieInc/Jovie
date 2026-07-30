@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { EntityCarousel } from './EntityCarousel';
@@ -163,6 +163,7 @@ describe('EntityCarousel profile geometry', () => {
       {
         ...items[0],
         meta: 'Single · 2026',
+        status: { label: 'Out Now', tone: 'live' },
         cta: { label: 'Listen', href: '/tim/release-1' },
       },
     ];
@@ -194,6 +195,8 @@ describe('EntityCarousel profile geometry', () => {
     expect(cta.className).toContain('h-8');
     expect(cta.className).toContain('w-fit');
     expect(cta.className).not.toContain('w-full');
+    expect(screen.getByText('Music')).toBeInTheDocument();
+    expect(screen.getByText('Out Now')).toBeInTheDocument();
   });
 
   it('keeps landscape leading and trailing slots in identical full-width footprints', () => {
@@ -216,6 +219,62 @@ describe('EntityCarousel profile geometry', () => {
           footprint.getAttribute('data-layout') === 'profile-landscape'
       )
     ).toBe(true);
+  });
+
+  it('reveals restrained desktop controls for full-width landscape discovery', () => {
+    render(<EntityCarousel items={items} layout='profile-landscape' />);
+
+    const carousel = screen.getByTestId('entity-carousel');
+    const scrollTo = vi.fn();
+    carousel.scrollTo = scrollTo;
+    const footprints = carousel.querySelectorAll(':scope > li');
+    Object.defineProperty(footprints[0], 'offsetLeft', {
+      configurable: true,
+      value: 0,
+    });
+    Object.defineProperty(footprints[1], 'offsetLeft', {
+      configurable: true,
+      value: 320,
+    });
+
+    const previous = screen.getByRole('button', { name: 'Previous Item' });
+    const next = screen.getByRole('button', { name: 'Next Item' });
+    expect(previous).toBeDisabled();
+    expect(next).toBeEnabled();
+    expect(previous.className).toContain('group-hover/carousel:opacity-100');
+    expect(next.className).toContain('md:inline-flex');
+    expect(screen.getByText('Item 1 of 2')).toBeInTheDocument();
+
+    fireEvent.click(next);
+
+    expect(scrollTo).toHaveBeenCalledWith({
+      left: 320,
+      behavior: 'smooth',
+    });
+    expect(previous).toBeEnabled();
+    expect(next).toBeDisabled();
+    expect(screen.getByText('Item 2 of 2')).toBeInTheDocument();
+  });
+
+  it('clamps desktop navigation when the available rows shrink', () => {
+    const { rerender } = render(
+      <EntityCarousel
+        items={items}
+        layout='profile-landscape'
+        trailing={<section />}
+      />
+    );
+
+    const carousel = screen.getByTestId('entity-carousel');
+    carousel.scrollTo = vi.fn();
+    fireEvent.click(screen.getByRole('button', { name: 'Next Item' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next Item' }));
+    expect(screen.getByText('Item 3 of 3')).toBeInTheDocument();
+
+    rerender(<EntityCarousel items={items} layout='profile-landscape' />);
+
+    expect(screen.getByText('Item 2 of 2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next Item' })).toBeDisabled();
   });
 
   it('keeps missing artwork in the same square, subtly rounded media slot', () => {
@@ -247,5 +306,36 @@ describe('EntityCarousel profile geometry', () => {
         name: 'A Very Long Release Title Without Artwork',
       })
     ).toHaveClass('line-clamp-1');
+  });
+
+  it('keeps video and product photography uncropped in landscape rows', () => {
+    render(
+      <EntityCarousel
+        layout='profile-landscape'
+        items={[
+          {
+            id: 'video-1',
+            kind: 'video',
+            imageUrl: '/video.jpg',
+            imageAlt: 'Video still',
+            title: 'Live Session',
+          },
+          {
+            id: 'merch-1',
+            kind: 'merch',
+            imageUrl: '/shirt.jpg',
+            imageAlt: 'Tour shirt',
+            title: 'Tour Shirt',
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByRole('img', { name: 'Video still' })).toHaveClass(
+      'object-contain'
+    );
+    expect(screen.getByRole('img', { name: 'Tour shirt' })).toHaveClass(
+      'object-contain'
+    );
   });
 });
