@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
@@ -171,7 +171,7 @@ describe('ContactsTable', () => {
     expect(screen.queryByText('No Contacts Yet')).not.toBeInTheDocument();
   });
 
-  it('keeps the empty state informational and exposes the only add action in the header', async () => {
+  it('offers the canonical add contact action from the empty state', () => {
     const onAddContact = vi.fn();
 
     render(
@@ -191,17 +191,8 @@ describe('ContactsTable', () => {
         'Add a contact to manage bookings, management, and press.'
       )
     ).toBeVisible();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(setHeaderActions).toHaveBeenCalledWith(expect.anything());
-    });
-
-    const headerActions = setHeaderActions.mock.calls.at(-1)?.[0];
-    render(headerActions);
-
     const addContactButton = screen.getByRole('button', {
-      name: 'Add contact',
+      name: 'Add Contact',
     });
     expect(addContactButton).toHaveTextContent('Add Contact');
 

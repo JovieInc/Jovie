@@ -209,6 +209,10 @@ export const ContactsTable = memo(function ContactsTable({
               icon={<UserPlus className='h-6 w-6' aria-hidden='true' />}
               heading='No Contacts'
               description='Add a contact to manage bookings, management, and press.'
+              action={{
+                label: 'Add Contact',
+                onClick: () => onAddContact(),
+              }}
             />
           ) : (
             <UnifiedTable
