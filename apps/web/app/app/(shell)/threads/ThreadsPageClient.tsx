@@ -204,7 +204,6 @@ export function ChatsPageClient() {
                   thread={thread}
                   active={false}
                   unread={!!thread.unread}
-                  hasThreadActions
                   onThreadContextMenu={onThreadContextMenu}
                 />
               ))}
