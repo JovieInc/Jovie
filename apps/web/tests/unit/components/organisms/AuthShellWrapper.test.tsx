@@ -97,8 +97,17 @@ vi.mock('@/hooks/useAuthRouteConfig', () => ({
 }));
 
 vi.mock('@/components/organisms/AuthShell', () => ({
-  AuthShell: ({ children }: { children: ReactNode }) => (
-    <div data-testid='auth-shell'>{children}</div>
+  AuthShell: ({
+    children,
+    headerAction,
+  }: {
+    children: ReactNode;
+    headerAction?: ReactNode;
+  }) => (
+    <div data-testid='auth-shell'>
+      <div data-testid='shell-header-actions'>{headerAction}</div>
+      {children}
+    </div>
   ),
 }));
 
@@ -112,6 +121,18 @@ vi.mock('@/features/dashboard/atoms/HeaderProfileProgress', () => ({
 
 vi.mock('@/features/dashboard/atoms/DrawerToggleButton', () => ({
   DrawerToggleButton: () => null,
+}));
+
+vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
+  UpdateAvailablePill: () => null,
+}));
+
+vi.mock('@/components/shell/ArtistProfileRailToggle', () => ({
+  ArtistProfileRailToggle: () => null,
+}));
+
+vi.mock('@/features/dashboard/atoms/HeaderChatUsageIndicator', () => ({
+  HeaderChatUsageIndicator: () => null,
 }));
 
 // Static import is safe here: vi.mock() declarations are hoisted above imports
@@ -168,6 +189,18 @@ describe('AuthShellWrapper', () => {
     );
 
     expect(screen.getByText('child content')).toBeInTheDocument();
+  });
+
+  it('keeps routine usage out of the dashboard header', () => {
+    render(
+      <AuthShellWrapper>
+        <div>dashboard content</div>
+      </AuthShellWrapper>
+    );
+
+    expect(
+      screen.queryByLabelText(/Jovie usage: .* remaining/i)
+    ).not.toBeInTheDocument();
   });
 
   it('passes the server-resolved mode into route configuration', () => {
