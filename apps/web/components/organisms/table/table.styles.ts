@@ -19,8 +19,8 @@ export const alignment = {
   checkboxCell: 'flex items-center justify-center', // Center checkbox
   numberCell: 'flex items-center justify-end tabular-nums', // Right-align numbers
   rowHeight: 'system-b-table-row-height', // Comfortable density with room for two-line cells
-  cellPadding: 'px-3 py-1', // Balanced padding for cells
-  headerPadding: 'px-3 py-1.5', // Slightly more header breathing room
+  cellPadding: 'px-3 py-1', // Shared page seam
+  headerPadding: 'px-3 py-1.5', // Shared page seam
   checkboxSize: 'h-3.5 w-3.5', // 14px checkbox
 } as const;
 
@@ -87,6 +87,7 @@ export const layoutStability = {
 // Border Styles
 export const borders = {
   cell: 'border-b border-subtle',
+  // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Tailwind class map, not UI copy.
   header: 'border-b border-subtle',
   groupHeader: 'border-b-2 border-subtle',
   subtle: 'border-subtle',
