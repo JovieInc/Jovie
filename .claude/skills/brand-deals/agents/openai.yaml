@@ -1,0 +1,4 @@
+interface:
+  display_name: "Brand Deals"
+  short_description: "Run one verified creator partnership end to end."
+  default_prompt: "Use $brand-deals to verify and advance one provenance-backed creator brand opportunity through Jovie Inbox."

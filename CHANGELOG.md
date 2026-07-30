@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- [internal] **Brand-deal execution is governed by a tested Jovie skill (JOV-4578):** connector identity with a Composio Gmail fallback, primary-source personal deal receipts, A7X3/Backstage separation, one-campaign capacity, bounded rights, sponsor-first tracking, LYB monetization proof, and the two approval gates are enforced by deterministic fixtures.
 - **New Chat is the first shared navigation action (JOV-4510):** desktop and mobile now lead with one elevated New Chat row while preserving Inbox and the rest of the canonical customer order.
 - [internal] **Privileged workflow trust-boundary reporting:** post-merge and nightly security scans now inventory `pull_request_target` and `workflow_run` workflows, warn when a privileged pull-request workflow checks out contributor code, and remain advisory while GitHub policy is evaluated.
 - [internal] **macOS desktop packaging accepts the secured XML parser:** Electron Builder's property-list dependency now supplies the MIME type required by the repository's security-patched xmldom floor, so signed and notarized desktop releases can reach artifact creation again.
