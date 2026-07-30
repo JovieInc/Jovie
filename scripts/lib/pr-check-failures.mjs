@@ -249,7 +249,7 @@ export function collapseNewestCheckAttempts(checks) {
         collapsed.push(successes[0]);
         continue;
       }
-      if (!group.every(isAdvisoryCheck)) ambiguousNames.push(name);
+      ambiguousNames.push(name);
       continue;
     }
     for (const attempt of ranked) {
