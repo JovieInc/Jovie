@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -172,9 +173,14 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     });
   });
 
-  it('renders nothing when the visitor is already signed in', () => {
+  it('keeps the signed-in first render deterministic, then hides after hydration', async () => {
     authState.isSignedIn = true;
+
+    const serverMarkup = renderToStaticMarkup(<AuthShell mode='sign-in' />);
+    expect(serverMarkup).toContain('data-auth-shell-ready="true"');
+    expect(serverMarkup).toContain('Email me a Code');
+
     const { container } = render(<AuthShell mode='sign-in' />);
-    expect(container).toBeEmptyDOMElement();
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
 });
