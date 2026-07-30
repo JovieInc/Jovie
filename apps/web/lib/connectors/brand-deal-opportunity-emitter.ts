@@ -1,15 +1,18 @@
 import 'server-only';
 
 import { createHash } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import {
   BRAND_DEAL_OPPORTUNITY_KIND,
-  parseBrandDealOpportunity,
+  buildVerifiedPersonalEmailOpportunity,
+  collectBrandDealEvidenceObjectIds,
 } from '@/lib/connectors/brand-deal-opportunity';
+import { extractGmailBrandDealCandidate } from '@/lib/connectors/gmail/extract-brand-deal-candidate';
 import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
 import { db } from '@/lib/db';
 import {
   connectorAccounts,
+  externalObjects,
   suggestedActions,
 } from '@/lib/db/schema/connectors';
 
@@ -20,9 +23,11 @@ export type EmitBrandDealOpportunityResult =
       readonly actionId: string | null;
       readonly reason:
         | 'invalid-opportunity'
+        | 'evidence-object-not-found'
+        | 'evidence-object-unsupported'
         | 'connector-account-not-connected'
-        | 'connector-account-mismatch'
         | 'connector-provider-unsupported'
+        | 'evidence-already-decided'
         | 'decision-slot-occupied'
         | 'duplicate';
     };
@@ -41,21 +46,68 @@ function deterministicActionId(input: string): string {
   ].join('-');
 }
 
+function normalizedStringField(
+  payload: unknown,
+  field: 'subject' | 'from' | 'date' | 'snippet'
+): string | undefined {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return undefined;
+  }
+  const value = (payload as Record<string, unknown>)[field];
+  return typeof value === 'string' ? value : undefined;
+}
+
 export async function emitBrandDealOpportunity(input: {
   readonly userId: string;
-  readonly connectorAccountId: string;
-  readonly payload: unknown;
-  readonly rationale: string;
+  readonly evidenceObjectId: string;
 }): Promise<EmitBrandDealOpportunityResult> {
-  const parsed = parseBrandDealOpportunity(
-    BRAND_DEAL_OPPORTUNITY_KIND,
-    input.payload
-  );
-  if (!parsed) {
+  const [evidenceObject] = await db
+    .select({
+      id: externalObjects.id,
+      connectorAccountId: externalObjects.connectorAccountId,
+      provider: externalObjects.provider,
+      kind: externalObjects.kind,
+      providerId: externalObjects.providerId,
+      payload: externalObjects.payload,
+      fetchedAt: externalObjects.fetchedAt,
+    })
+    .from(externalObjects)
+    .where(eq(externalObjects.id, input.evidenceObjectId))
+    .limit(1);
+
+  if (!evidenceObject) {
+    return {
+      created: false,
+      actionId: null,
+      reason: 'evidence-object-not-found',
+    };
+  }
+
+  const persistedCandidate = extractGmailBrandDealCandidate({
+    externalObjectId: evidenceObject.id,
+    payload: {
+      subject: normalizedStringField(evidenceObject.payload, 'subject'),
+      from: normalizedStringField(evidenceObject.payload, 'from'),
+      date: normalizedStringField(evidenceObject.payload, 'date'),
+      snippet: normalizedStringField(evidenceObject.payload, 'snippet'),
+    },
+  });
+  if (!persistedCandidate) {
     return {
       created: false,
       actionId: null,
       reason: 'invalid-opportunity',
+    };
+  }
+
+  if (
+    evidenceObject.provider !== CONNECTOR_PROVIDERS.gmail ||
+    evidenceObject.kind !== 'gmail_message'
+  ) {
+    return {
+      created: false,
+      actionId: null,
+      reason: 'evidence-object-unsupported',
     };
   }
 
@@ -68,7 +120,7 @@ export async function emitBrandDealOpportunity(input: {
     .from(connectorAccounts)
     .where(
       and(
-        eq(connectorAccounts.id, input.connectorAccountId),
+        eq(connectorAccounts.id, evidenceObject.connectorAccountId),
         eq(connectorAccounts.userId, input.userId),
         eq(connectorAccounts.status, 'connected')
       )
@@ -91,42 +143,81 @@ export async function emitBrandDealOpportunity(input: {
     };
   }
 
-  const authenticatedAccount = connectorAccount.providerAccountId
-    .trim()
-    .toLowerCase();
-  if (
-    authenticatedAccount !== parsed.sourceAccount.trim().toLowerCase() ||
-    authenticatedAccount !== parsed.requiredSourceAccount.trim().toLowerCase()
-  ) {
+  const parsed = buildVerifiedPersonalEmailOpportunity({
+    candidate: persistedCandidate.candidate,
+    sourceAccount: connectorAccount.providerAccountId,
+    sourceReference: `gmail:message:${evidenceObject.providerId}`,
+    observedAt: evidenceObject.fetchedAt.toISOString(),
+  });
+  if (!parsed) {
     return {
       created: false,
       actionId: null,
-      reason: 'connector-account-mismatch',
+      reason: 'invalid-opportunity',
     };
   }
 
-  const [pendingDecision] = await db
+  const priorEvidence = await db
+    .select({ sourceRefs: suggestedActions.sourceRefs })
+    .from(suggestedActions)
+    .where(
+      and(
+        eq(suggestedActions.userId, input.userId),
+        eq(suggestedActions.kind, BRAND_DEAL_OPPORTUNITY_KIND)
+      )
+    );
+  if (collectBrandDealEvidenceObjectIds(priorEvidence).has(evidenceObject.id)) {
+    return {
+      created: false,
+      actionId: null,
+      reason: 'evidence-already-decided',
+    };
+  }
+
+  const [activeDecision] = await db
+    .select({
+      id: suggestedActions.id,
+      status: suggestedActions.status,
+    })
+    .from(suggestedActions)
+    .where(
+      and(
+        eq(suggestedActions.userId, input.userId),
+        eq(suggestedActions.kind, BRAND_DEAL_OPPORTUNITY_KIND),
+        inArray(suggestedActions.status, ['pending', 'approved'])
+      )
+    )
+    .orderBy(desc(suggestedActions.createdAt))
+    .limit(1);
+
+  if (activeDecision) {
+    return {
+      created: false,
+      actionId: activeDecision.id,
+      reason: 'decision-slot-occupied',
+    };
+  }
+
+  const [latestDecision] = await db
     .select({ id: suggestedActions.id })
     .from(suggestedActions)
     .where(
       and(
         eq(suggestedActions.userId, input.userId),
         eq(suggestedActions.kind, BRAND_DEAL_OPPORTUNITY_KIND),
-        eq(suggestedActions.status, 'pending')
+        inArray(suggestedActions.status, [
+          'executed',
+          'rejected',
+          'failed',
+          'expired',
+        ])
       )
     )
+    .orderBy(desc(suggestedActions.createdAt))
     .limit(1);
 
-  if (pendingDecision) {
-    return {
-      created: false,
-      actionId: pendingDecision.id,
-      reason: 'decision-slot-occupied',
-    };
-  }
-
   const actionId = deterministicActionId(
-    `${input.userId}:${connectorAccount.id}:${parsed.sourceReference}`
+    `${input.userId}:brand-deal-slot:${latestDecision?.id ?? 'initial'}`
   );
   const idempotencyKey = `brand-deal:${actionId}`;
   const inserted = await db
@@ -142,13 +233,15 @@ export async function emitBrandDealOpportunity(input: {
       sourceRefs: [
         {
           connectorAccountId: connectorAccount.id,
+          externalObjectId: evidenceObject.id,
           sourceType: parsed.sourceType,
           sourceReference: parsed.sourceReference,
           observedAt: parsed.observedAt,
           confidence: parsed.confidence,
         },
       ],
-      rationale: input.rationale.trim() || 'Verified brand-deal opportunity.',
+      rationale:
+        'Complete current commercial terms found in authenticated Gmail.',
       idempotencyKey,
       sideEffects: [],
     })
