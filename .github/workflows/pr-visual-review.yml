@@ -221,7 +221,10 @@ jobs:
           process.stdout.write(visualReviewIdentity({ prNumber: process.env.PR_NUMBER, headSha: process.env.PR_HEAD_SHA, runId: process.env.GITHUB_RUN_ID }));
           NODE
           )
-          EXISTING=$(gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews?per_page=100" --jq --arg marker "$MARKER" '((add // []) | any(.[]; .user.login == "github-actions[bot]" and (.body | contains($marker))))')
+          # `gh api` cannot combine --slurp with --jq, and --jq does not accept
+          # jq's --arg flags. Fetch the paginated JSON with gh, then evaluate
+          # the exact marker with the standalone jq binary.
+          EXISTING=$(gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews?per_page=100" | jq -r --arg marker "$MARKER" '((add // []) | any(.[]; .user.login == "github-actions[bot]" and (.body | contains($marker))))')
           if [ "$EXISTING" = "true" ]; then echo "Exact visual review already exists; idempotent no-op."; exit 0; fi
           jq -n --arg body "$BODY" '{body:$body,event:"COMMENT"}' > review-payload.json
           gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --method POST --input review-payload.json >/dev/null

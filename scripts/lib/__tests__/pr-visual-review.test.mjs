@@ -242,6 +242,12 @@ describe('bounded PR visual review contract', () => {
     expect(workflow).toContain('PR_HEAD_SHA');
     expect(workflow).toContain('visualReviewIdentity');
     expect(workflow).toContain('--paginate --slurp');
+    expect(workflow).toContain('| jq -r --arg marker "$MARKER"');
+    expect(workflow).toContain('contains($marker)');
+    expect(workflow).not.toContain('--jq --arg marker');
+    expect(workflow).not.toContain(
+      '--slurp "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews?per_page=100" --jq'
+    );
     expect(workflow).toContain(
       'Exact visual review already exists; idempotent no-op.'
     );

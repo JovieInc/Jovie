@@ -21,4 +21,13 @@ describe('PR visual review workflow', () => {
       /PLAYWRIGHT_BROWSERS_PATH:\s*~\/\.cache\/ms-playwright/
     );
   });
+
+  it('checks exact prior review markers with standalone jq after paginating', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+
+    expect(workflow).toContain('--paginate --slurp');
+    expect(workflow).toContain('| jq -r --arg marker "$MARKER"');
+    expect(workflow).toContain('contains($marker)');
+    expect(workflow).not.toContain('--jq --arg marker');
+  });
 });
