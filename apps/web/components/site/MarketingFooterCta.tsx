@@ -1,11 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useId } from 'react';
-import { MarketingContainer } from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
 import { HOMEPAGE_V2_COPY } from '@/data/homepageV2Copy';
-import { cn } from '@/lib/utils';
+import { MarketingTerminalCta } from './MarketingTerminalCta';
 
 const FOOTER_CTA_ARCS = [
   { radiusX: 70, radiusY: 245 },
@@ -42,83 +40,82 @@ export function MarketingFooterCta({
   const secondaryGradientId = `marketing-footer-cta-secondary-${instanceId}`;
 
   return (
-    <section
-      data-testid='marketing-footer-cta'
-      className={cn(
-        'homepage-story-final-cta relative isolate overflow-hidden bg-black dark:bg-black',
-        className
-      )}
-    >
-      <div
-        aria-hidden='true'
-        className='homepage-final-cta-glow pointer-events-none absolute inset-0 z-[1]'
-      />
-      <svg
-        className='homepage-final-cta-rays pointer-events-none absolute inset-x-0 bottom-0 z-[2] w-full'
-        viewBox='0 0 1200 540'
-        preserveAspectRatio='xMidYMax slice'
-        aria-hidden='true'
-      >
-        <defs>
-          <linearGradient id={primaryGradientId} x1='0' x2='0' y1='0' y2='1'>
-            <stop offset='0%' stopColor='#0070f3' stopOpacity='0' />
-            <stop offset='55%' stopColor='#0070f3' stopOpacity='0.35' />
-            <stop offset='92%' stopColor='#ffffff' stopOpacity='0.95' />
-            <stop offset='100%' stopColor='#ffffff' stopOpacity='0.6' />
-          </linearGradient>
-          <linearGradient id={secondaryGradientId} x1='0' x2='0' y1='0' y2='1'>
-            <stop offset='0%' stopColor='#0070f3' stopOpacity='0' />
-            <stop offset='70%' stopColor='#0070f3' stopOpacity='0.55' />
-            <stop offset='100%' stopColor='#dbeaff' stopOpacity='0.85' />
-          </linearGradient>
-        </defs>
-        <ellipse
-          cx='600'
-          cy='600'
-          rx='22'
-          ry='260'
-          stroke={`url(#${secondaryGradientId})`}
-          strokeWidth='2.2'
-          fill='none'
-        />
-        {FOOTER_CTA_ARCS.map((arc, index) => (
-          <ellipse
-            key={`${arc.radiusX}-${arc.radiusY}`}
-            cx='600'
-            cy='600'
-            rx={arc.radiusX}
-            ry={arc.radiusY}
-            stroke={
-              index % 2 === 0
-                ? `url(#${primaryGradientId})`
-                : `url(#${secondaryGradientId})`
-            }
-            strokeWidth={index < 4 ? 1.5 : 1.2}
-            fill='none'
-            opacity={1 - index * 0.05}
+    <MarketingTerminalCta
+      variant='cinematic'
+      testId='marketing-footer-cta'
+      title={title}
+      body={body}
+      ctaLabel={ctaLabel}
+      ctaHref={ctaHref}
+      ctaAnalyticsEvent={ctaAnalyticsEvent}
+      ctaAnalyticsSource={ctaAnalyticsSource}
+      className={className}
+      decoration={
+        <>
+          <div
+            aria-hidden='true'
+            className='homepage-final-cta-glow pointer-events-none absolute inset-0 z-[1]'
           />
-        ))}
-      </svg>
-      <MarketingContainer width='page' className='relative z-10'>
-        <div className='homepage-final-cta-copy mx-auto'>
-          <h2 className='text-balance text-[clamp(2rem,3.4vw,3rem)] font-bold leading-[1.05] tracking-[-0.025em] text-(--color-text-tooltip)'>
-            {title}
-          </h2>
-          {body ? (
-            <p className='mx-auto mt-3 max-w-[36rem] text-balance text-lg leading-[1.45] text-white/[0.58]'>
-              {body}
-            </p>
-          ) : null}
-          <Link
-            href={ctaHref}
-            className='homepage-final-cta-action public-action-primary focus-ring-themed'
-            data-analytics-event={ctaAnalyticsEvent}
-            data-analytics-source={ctaAnalyticsSource}
+          <svg
+            className='homepage-final-cta-rays pointer-events-none absolute inset-x-0 bottom-0 z-[2] w-full'
+            viewBox='0 0 1200 540'
+            preserveAspectRatio='xMidYMax slice'
+            aria-hidden='true'
           >
-            {ctaLabel}
-          </Link>
-        </div>
-      </MarketingContainer>
-    </section>
+            <defs>
+              <linearGradient
+                id={primaryGradientId}
+                x1='0'
+                x2='0'
+                y1='0'
+                y2='1'
+              >
+                <stop offset='0%' stopColor='#0070f3' stopOpacity='0' />
+                <stop offset='55%' stopColor='#0070f3' stopOpacity='0.35' />
+                <stop offset='92%' stopColor='#ffffff' stopOpacity='0.95' />
+                <stop offset='100%' stopColor='#ffffff' stopOpacity='0.6' />
+              </linearGradient>
+              <linearGradient
+                id={secondaryGradientId}
+                x1='0'
+                x2='0'
+                y1='0'
+                y2='1'
+              >
+                <stop offset='0%' stopColor='#0070f3' stopOpacity='0' />
+                <stop offset='70%' stopColor='#0070f3' stopOpacity='0.55' />
+                <stop offset='100%' stopColor='#dbeaff' stopOpacity='0.85' />
+              </linearGradient>
+            </defs>
+            <ellipse
+              cx='600'
+              cy='600'
+              rx='22'
+              ry='260'
+              stroke={`url(#${secondaryGradientId})`}
+              strokeWidth='2.2'
+              fill='none'
+            />
+            {FOOTER_CTA_ARCS.map((arc, index) => (
+              <ellipse
+                key={`${arc.radiusX}-${arc.radiusY}`}
+                cx='600'
+                cy='600'
+                rx={arc.radiusX}
+                ry={arc.radiusY}
+                stroke={
+                  index % 2 === 0
+                    ? `url(#${primaryGradientId})`
+                    : `url(#${secondaryGradientId})`
+                }
+                strokeWidth={index < 4 ? 1.5 : 1.2}
+                fill='none'
+                opacity={1 - index * 0.05}
+              />
+            ))}
+          </svg>
+        </>
+      }
+    />
   );
 }

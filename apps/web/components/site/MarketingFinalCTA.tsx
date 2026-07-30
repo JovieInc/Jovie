@@ -1,6 +1,5 @@
-import Link from 'next/link';
 import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
-import { cn } from '@/lib/utils';
+import { MarketingTerminalCta } from './MarketingTerminalCta';
 
 export interface MarketingFinalCTAProps {
   /** Override headline copy. Defaults to the standard private launch request line. */
@@ -33,42 +32,16 @@ export function MarketingFinalCTA({
   testId = 'marketing-final-cta',
 }: Readonly<MarketingFinalCTAProps>) {
   return (
-    <section
-      data-testid={testId}
-      className={cn(
-        'relative isolate overflow-hidden bg-black px-[clamp(1.25rem,2.2vw,2rem)] py-[clamp(5rem,9vw,8rem)] text-(--color-text-tooltip) dark:bg-black',
-        className
-      )}
-    >
-      <div className='relative z-[2] mx-auto flex w-full max-w-[var(--homepage-section-max,80rem)] flex-col items-center text-center'>
-        <h2 className='font-display max-w-[20ch] text-balance text-[clamp(2rem,3.4vw,3rem)] font-bold leading-[1.05] tracking-[-0.025em] text-(--color-text-tooltip)'>
-          {title}
-        </h2>
-        {body ? (
-          <p className='mt-3 max-w-[44rem] text-balance text-lg leading-[1.45] text-white/[0.5]'>
-            {body}
-          </p>
-        ) : null}
-        <div className='mt-7 flex flex-wrap items-center justify-center gap-3'>
-          <Link
-            href={ctaHref}
-            prefetch={false}
-            className='inline-flex h-10 items-center rounded-full bg-(--color-text-tooltip) px-6 text-sm font-semibold tracking-wide text-black transition-opacity duration-subtle ease-subtle hover:opacity-92 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black dark:text-black'
-          >
-            {ctaLabel}
-          </Link>
-          {secondaryLabel && secondaryHref ? (
-            <Link
-              href={secondaryHref}
-              prefetch={false}
-              className='inline-flex h-10 items-center gap-1 rounded-full px-6 text-sm font-semibold tracking-wide text-white/92 transition-colors duration-subtle ease-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-black'
-            >
-              {secondaryLabel}
-              <span aria-hidden='true'>→</span>
-            </Link>
-          ) : null}
-        </div>
-      </div>
-    </section>
+    <MarketingTerminalCta
+      title={title}
+      body={body}
+      ctaLabel={ctaLabel}
+      ctaHref={ctaHref}
+      secondaryLabel={secondaryLabel}
+      secondaryHref={secondaryHref}
+      prefetch={false}
+      className={className}
+      testId={testId}
+    />
   );
 }
