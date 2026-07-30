@@ -59,7 +59,7 @@ describe('mapSuggestedActionToInboxCard', () => {
       signalType: 'brand_deal',
       typeLabel: 'Brand Deal',
       title: 'Example Brand creator-performance pilot',
-      why: '$7.5k-$12.5k · Alex Buyer @ Example Brand · Backstage · verified · score 75.0 · 90-day organic usage, no exclusivity',
+      why: '$7.5k-$12.5k · Alex Buyer @ Example Brand · Backstage (t@timwhite.co) · verified · score 75.0 · 90-day organic usage, no exclusivity',
       primaryActionLabel: 'Approve buyer',
       status: 'pending',
       category: 'brand_deal',

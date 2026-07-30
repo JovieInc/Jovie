@@ -17,8 +17,19 @@ const GMAIL_LIB_DIR = path.resolve(__dirname, '../../../lib/connectors/gmail');
 
 // Use the actual resolved path relative to the test file
 const GMAIL_DIR = path.resolve(__dirname, '../gmail');
+const NATIVE_GMAIL_SURFACES = [
+  path.resolve(__dirname, '../extract-and-propose.ts'),
+  path.resolve(__dirname, '../enrichment/pipelines/gmail.ts'),
+  path.resolve(__dirname, '../brand-deal-opportunity-emitter.ts'),
+];
 
-describe('Gmail connector: no send export', () => {
+const FORBIDDEN_GMAIL_MUTATION_NAME =
+  /(?:send|draft|forward|reply|archive|trash|delete|modify|label)/i;
+const FORBIDDEN_GMAIL_MUTATION_ENDPOINT =
+  /\/(?:drafts|send|trash|untrash|modify|batchModify|labels)(?:[/?'"]|$)/i;
+const NON_GET_METHOD = /\bmethod\s*:\s*['"](?:POST|PUT|PATCH|DELETE)['"]/i;
+
+describe('Gmail connector: read-only surface', () => {
   it('gmail connector directory exists or is absent (C-PR-2 not yet merged)', () => {
     // This test always passes — it documents the expected state.
     // If the directory exists, the next test will scan it.
@@ -59,6 +70,57 @@ describe('Gmail connector: no send export', () => {
           `${file} appears to export 'send' or re-export its surface — Jovie must NEVER send email on behalf of artists.`
         );
       }
+    }
+  });
+
+  it('exports no Gmail mutation capability and makes no Gmail write request', () => {
+    const dirToCheck = existsSync(GMAIL_DIR)
+      ? GMAIL_DIR
+      : existsSync(GMAIL_LIB_DIR)
+        ? GMAIL_LIB_DIR
+        : null;
+    if (!dirToCheck) return;
+
+    const tsFiles = readdirSync(dirToCheck, { recursive: true }).filter(
+      (file): file is string =>
+        typeof file === 'string' &&
+        file.endsWith('.ts') &&
+        !file.endsWith('.test.ts')
+    );
+
+    for (const file of tsFiles) {
+      const source = readFileSync(path.join(dirToCheck, file), 'utf-8');
+      const exportedNames = [
+        ...source.matchAll(
+          /export\s+(?:async\s+)?(?:function|const)\s+([A-Za-z_$][\w$]*)/g
+        ),
+      ].map(match => match[1] ?? '');
+      expect(
+        exportedNames.filter(name => FORBIDDEN_GMAIL_MUTATION_NAME.test(name)),
+        `${file} exports a Gmail mutation-shaped capability`
+      ).toEqual([]);
+      expect(
+        FORBIDDEN_GMAIL_MUTATION_ENDPOINT.test(source),
+        `${file} references a Gmail mutation endpoint`
+      ).toBe(false);
+      expect(
+        NON_GET_METHOD.test(source),
+        `${file} contains a non-GET request method`
+      ).toBe(false);
+    }
+  });
+
+  it('keeps every native Gmail producer surface free of write requests', () => {
+    for (const filePath of NATIVE_GMAIL_SURFACES) {
+      const source = readFileSync(filePath, 'utf-8');
+      expect(
+        FORBIDDEN_GMAIL_MUTATION_ENDPOINT.test(source),
+        `${path.basename(filePath)} references a Gmail mutation endpoint`
+      ).toBe(false);
+      expect(
+        NON_GET_METHOD.test(source),
+        `${path.basename(filePath)} contains a non-GET request method`
+      ).toBe(false);
     }
   });
 });

@@ -70,6 +70,19 @@ describe('parseBrandDealOpportunity', () => {
       { ...verifiedPayload, sourceAccount: 'tim@jov.ie' },
     ],
     [
+      'wrong personal mailbox self-attestation',
+      BRAND_DEAL_OPPORTUNITY_KIND,
+      {
+        ...verifiedPayload,
+        sourceLabel: 'Authenticated Gmail',
+        sourceType: 'personal_email',
+        sourceAccount: 'tim@jov.ie',
+        requiredSourceAccount: 'tim@jov.ie',
+        sourceReference: 'gmail:message:181696d593400f5c',
+        relationshipType: 'personal_inbound',
+      },
+    ],
+    [
       'rejects a non-Gmail personal source reference',
       BRAND_DEAL_OPPORTUNITY_KIND,
       {
@@ -117,7 +130,7 @@ describe('parseBrandDealOpportunity', () => {
     );
     expect(deal).not.toBeNull();
     expect(formatBrandDealOpportunityMetadata(deal!)).toBe(
-      '$7.5k-$12.5k · Alex Buyer @ Example Brand · Backstage · verified · score 75.0 · 90-day organic usage, no exclusivity'
+      '$7.5k-$12.5k · Alex Buyer @ Example Brand · Backstage (t@timwhite.co) · verified · score 75.0 · 90-day organic usage, no exclusivity'
     );
   });
 });
