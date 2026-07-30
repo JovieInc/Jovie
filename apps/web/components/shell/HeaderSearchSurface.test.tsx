@@ -103,7 +103,7 @@ describe('HeaderSearchSurface', () => {
     );
   });
 
-  it('focuses the search field inside a tokenized focus-within ring', async () => {
+  it('keeps search feedback on focus but reserves the ring for keyboard focus', async () => {
     const { container } = render(
       <HeaderSearchSurface isOpen onOpen={vi.fn()} onClose={vi.fn()} />
     );
@@ -113,8 +113,12 @@ describe('HeaderSearchSurface', () => {
 
     expect(container.firstElementChild).toHaveClass(
       'focus-within:border-focus',
-      'focus-within:ring-2',
-      'focus-within:ring-ring/14'
+      'focus-within:bg-surface-0',
+      'has-[:focus-visible]:ring-2',
+      'has-[:focus-visible]:ring-ring/14'
+    );
+    expect(container.firstElementChild?.className).not.toContain(
+      'focus-within:ring-'
     );
   });
 
