@@ -15,6 +15,12 @@ describe('library share action System B styling', () => {
   const gateSource = readSource(
     'components/features/library-share/LibrarySharePassphraseGate.tsx'
   );
+  const assetShareUrlCellSource = readSource(
+    'components/features/library-asset-share/LibraryAssetShareUrlCell.tsx'
+  );
+  const assetSharePanelSource = readSource(
+    'components/features/library-asset-share/LibraryAssetSharePanel.tsx'
+  );
 
   it('keeps central share actions on neutral primary button tokens', () => {
     for (const source of [creatorSource, gateSource]) {
@@ -27,6 +33,17 @@ describe('library share action System B styling', () => {
       expect(source).toContain('bg-btn-primary');
       expect(source).toContain('text-btn-primary-foreground');
       expect(source).toContain('hover:bg-btn-primary-hover');
+    }
+  });
+
+  it('uses canonical secondary buttons for the live Library copy and revoke actions', () => {
+    for (const source of [
+      creatorSource,
+      assetShareUrlCellSource,
+      assetSharePanelSource,
+    ]) {
+      expect(source).not.toContain("variant='outline'");
+      expect(source).toContain("variant='secondary'");
     }
   });
 });
