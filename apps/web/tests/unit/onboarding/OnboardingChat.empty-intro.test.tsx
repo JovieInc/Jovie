@@ -115,10 +115,10 @@ describe('OnboardingChat empty intro', () => {
 
     expect(screen.getByTestId('onboarding-empty-intro')).toBeTruthy();
     expect(screen.getByText(ONBOARDING_ENTRY_TITLE)).toBeTruthy();
-    expect(screen.getByTestId('onboarding-sign-in-skip')).toHaveAttribute(
-      'href',
-      '/signin'
-    );
+    expect(screen.queryByTestId('onboarding-sign-in-skip')).toBeNull();
+    expect(
+      screen.getByTestId('onboarding-starter-suggestions').parentElement
+    ).toHaveClass('min-h-[7.5rem]');
   });
 
   it('shows a compact processing state for a validated starter handoff', () => {

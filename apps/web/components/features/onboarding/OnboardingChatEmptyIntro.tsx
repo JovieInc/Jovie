@@ -1,12 +1,10 @@
 'use client';
 
 import { Camera, Disc3, Eye, Link2, LoaderCircle, Music } from 'lucide-react';
-import Link from 'next/link';
 import type { ComponentType, ReactNode, SVGProps } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { getChatPromptPillClass } from '@/components/jovie/components/chat-prompt-styles';
 import type { ChatSuggestion } from '@/components/jovie/types';
-import { APP_ROUTES } from '@/constants/routes';
 import {
   ONBOARDING_ENTRY_SUPPORT,
   ONBOARDING_ENTRY_TITLE,
@@ -165,17 +163,6 @@ export function OnboardingChatEmptyIntro({
                 />
               ))}
             </div>
-
-            <p className='text-center text-xs leading-5 text-secondary-token'>
-              Already have an account?{' '}
-              <Link
-                href={APP_ROUTES.SIGNIN}
-                className='inline-flex min-h-11 items-center font-medium text-primary-token underline-offset-2 transition-colors duration-fast hover:underline focus-visible:underline focus-visible:outline-none'
-                data-testid='onboarding-sign-in-skip'
-              >
-                Sign in
-              </Link>
-            </p>
           </div>
         ) : (
           <div

@@ -3,6 +3,7 @@
 import { Skeleton } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
+import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { track } from '@/lib/analytics';
 import { publicEnv } from '@/lib/env-public';
@@ -169,6 +170,12 @@ export function OnboardingShell({
             className='relative flex min-h-0 flex-1'
             data-onboarding-session={sessionLabel}
           >
+            <div
+              className='absolute right-3 top-3 z-30 sm:right-4 sm:top-4'
+              data-testid='onboarding-sign-in-header'
+            >
+              <MarketingSignInLink variant='ghost' />
+            </div>
             <OnboardingChat
               intentId={intentId}
               onConversationActivity={handleConversationActivity}
