@@ -7,6 +7,8 @@ import {
   reviewWithConfiguredBackends,
   routeChangedFiles,
   sanitizeForPrompt,
+  validateCaptureManifest,
+  visualReviewIdentity,
 } from '../../../.github/scripts/pr-visual-review.mjs';
 
 describe('bounded PR visual review contract', () => {
@@ -19,7 +21,7 @@ describe('bounded PR visual review contract', () => {
       ])
     ).toEqual({
       shouldReview: true,
-      routes: ['/', '/demo'],
+      routes: ['/', '/demo', '/app/chat'],
       reason: 'ui-change',
       review_status: 'advisory',
     });
@@ -30,7 +32,7 @@ describe('bounded PR visual review contract', () => {
       routeChangedFiles(['apps/web/app/(dynamic)/[username]/page.tsx'])
     ).toEqual({
       shouldReview: true,
-      routes: ['/demo', '/demo/profile'],
+      routes: ['/demo', '/app/chat', '/demo/profile'],
       reason: 'ui-change',
       review_status: 'advisory',
     });
@@ -80,6 +82,58 @@ describe('bounded PR visual review contract', () => {
     expect(prompt).not.toContain('secret-value');
     expect(prompt).toContain('grok-4.5|codex');
     expect(prompt.toLowerCase()).not.toContain('kimi');
+  });
+
+  it('requires every requested route and viewport in a capture manifest', () => {
+    const complete = validateCaptureManifest({
+      routes: ['/app/chat'],
+      viewports: { desktop: {}, mobile: {} },
+      captures: [
+        {
+          route: '/app/chat',
+          viewport: 'desktop',
+          status: 'captured',
+          path: 'chat-desktop.png',
+        },
+        {
+          route: '/app/chat',
+          viewport: 'mobile',
+          status: 'captured',
+          path: 'chat-mobile.png',
+        },
+      ],
+    });
+    expect(complete).toEqual({ ok: true, failures: [] });
+
+    const incomplete = validateCaptureManifest({
+      routes: ['/app/chat'],
+      viewports: { desktop: {}, mobile: {} },
+      captures: [
+        {
+          route: '/app/chat',
+          viewport: 'desktop',
+          status: 'captured',
+          path: 'chat-desktop.png',
+        },
+      ],
+    });
+    expect(incomplete.ok).toBe(false);
+    expect(incomplete.failures).toContain('missing capture /app/chat::mobile');
+  });
+
+  it('keys visual review idempotency to the exact PR, head, and run', () => {
+    expect(
+      visualReviewIdentity({
+        prNumber: '15199',
+        headSha: 'a'.repeat(40),
+        runId: '12345',
+      })
+    ).toBe(
+      '<!-- visual-review:pr=15199;head=' + 'a'.repeat(40) + ';run=12345 -->'
+    );
+    expect(() =>
+      visualReviewIdentity({ prNumber: '15199', headSha: 'short', runId: '1' })
+    ).toThrow('40-character head SHA');
   });
 
   it('uses Grok 4.5 first and independently falls back to Codex', async () => {
@@ -144,9 +198,6 @@ describe('bounded PR visual review contract', () => {
     expect(workflow).toContain('cancel-in-progress: true');
     expect(workflow).toContain('retention-days: 14');
     expect(workflow).toContain('VISUAL_REVIEW_AUTOFIX_ENABLED');
-    expect(workflow).toContain(
-      'Existing visual review found; idempotent no-op.'
-    );
     expect(workflow).toContain('Do not alter subjective/taste findings.');
     expect(workflow).toContain('review_status');
     expect(workflow).toContain(
@@ -159,6 +210,12 @@ describe('bounded PR visual review contract', () => {
     expect(workflow).toContain("'unavailable'");
     expect(workflow).toContain("'skipped'");
     expect(workflow).not.toContain('pr-visual-review-capture.mjs || true');
+    expect(workflow).toContain('PR_HEAD_SHA');
+    expect(workflow).toContain('visualReviewIdentity');
+    expect(workflow).toContain('--paginate --slurp');
+    expect(workflow).toContain(
+      'Exact visual review already exists; idempotent no-op.'
+    );
     expect(workflow).not.toContain('requested_reviewers');
   });
 
@@ -171,5 +228,7 @@ describe('bounded PR visual review contract', () => {
     expect(capture).toContain("type: 'page-error'");
     expect(capture).toContain('response.status() >= 500');
     expect(capture).toContain('Captured route emitted runtime failures');
+    expect(capture).toContain('validateCaptureManifest');
+    expect(capture).toContain('capture-validation.json');
   });
 });
