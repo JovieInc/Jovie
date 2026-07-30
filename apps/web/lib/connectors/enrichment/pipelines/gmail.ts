@@ -1,6 +1,12 @@
 import 'server-only';
 
 import { and, desc, eq } from 'drizzle-orm';
+import {
+  BRAND_DEAL_OPPORTUNITY_KIND,
+  collectBrandDealEvidenceObjectIds,
+} from '@/lib/connectors/brand-deal-opportunity';
+import { emitBrandDealOpportunity } from '@/lib/connectors/brand-deal-opportunity-emitter';
+import { selectHighestRankedGmailBrandDealCandidate } from '@/lib/connectors/gmail/extract-brand-deal-candidate';
 import { extractEventSignal } from '@/lib/connectors/gmail/extract-event-signal';
 import {
   hasOverlappingEvent,
@@ -10,7 +16,7 @@ import {
 import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
 import { loadDecryptedToken } from '@/lib/connectors/token-vault';
 import { db } from '@/lib/db';
-import { externalObjects } from '@/lib/db/schema/connectors';
+import { externalObjects, suggestedActions } from '@/lib/db/schema/connectors';
 import { logger } from '@/lib/utils/logger';
 import {
   persistEntityMentionFacts,
@@ -91,6 +97,7 @@ export const gmailEnrichmentPipeline: ConnectorEnrichmentPipeline = {
     let contextFactsCreated = 0;
     let memoryObservationsCreated = 0;
     let memoryEntitiesCreated = 0;
+    let suggestionsCreated = 0;
 
     for (const object of objects) {
       const payload = object.payload as GmailObjectPayload;
@@ -125,6 +132,33 @@ export const gmailEnrichmentPipeline: ConnectorEnrichmentPipeline = {
       });
       memoryObservationsCreated += memoryResult.observationsCreated;
       memoryEntitiesCreated += memoryResult.entitiesCreated;
+    }
+
+    const priorBrandDealActions = await db
+      .select({ sourceRefs: suggestedActions.sourceRefs })
+      .from(suggestedActions)
+      .where(
+        and(
+          eq(suggestedActions.userId, context.scope.userId),
+          eq(suggestedActions.kind, BRAND_DEAL_OPPORTUNITY_KIND)
+        )
+      );
+    const previouslyConsideredEvidenceIds = collectBrandDealEvidenceObjectIds(
+      priorBrandDealActions
+    );
+    const brandDealCandidate = selectHighestRankedGmailBrandDealCandidate(
+      objects.map(object => ({
+        externalObjectId: object.id,
+        payload: object.payload as GmailObjectPayload,
+      })),
+      previouslyConsideredEvidenceIds
+    );
+    if (brandDealCandidate) {
+      const emitted = await emitBrandDealOpportunity({
+        userId: context.scope.userId,
+        evidenceObjectId: brandDealCandidate.evidenceObjectId,
+      });
+      if (emitted.created) suggestionsCreated += 1;
     }
 
     const extractorInput = objects.map(object => {
@@ -169,7 +203,6 @@ export const gmailEnrichmentPipeline: ConnectorEnrichmentPipeline = {
       }
     }
 
-    let suggestionsCreated = 0;
     if (eventFacts.length > 0 && context.calendarAccountId) {
       const calendarTokens = await loadDecryptedToken(
         context.calendarAccountId
@@ -188,7 +221,7 @@ export const gmailEnrichmentPipeline: ConnectorEnrichmentPipeline = {
           }
         }
 
-        suggestionsCreated = await emitCalendarCreateSuggestions({
+        suggestionsCreated += await emitCalendarCreateSuggestions({
           userId: context.scope.userId,
           calendarAccountId: context.calendarAccountId,
           events: eventFacts,
