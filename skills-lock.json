@@ -2,6 +2,7 @@
   "version": 1,
   "codexSkills": [
     "ai-sdk",
+    "brand-deals",
     "find-skills",
     "gstack",
     "nightly-test-agent",
@@ -13,6 +14,7 @@
     "autoplan",
     "benchmark",
     "benchmark-models",
+    "brand-deals",
     "browse",
     "canary",
     "careful",
