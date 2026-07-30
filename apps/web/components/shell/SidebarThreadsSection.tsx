@@ -230,7 +230,10 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
       />
       <span
         className={cn(
-          'min-w-0 justify-self-stretch overflow-hidden whitespace-nowrap text-clip text-left [mask-image:linear-gradient(to_right,black_calc(100%_-_1rem),transparent)]',
+          // The label owns the complete middle grid track. A fixed terminal
+          // fade (with the WebKit property for every supported shell) makes
+          // truncation read as intentional rather than a hard crop.
+          'min-w-0 w-full justify-self-stretch overflow-hidden whitespace-nowrap text-clip text-left [-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)] [mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]',
           'text-xs',
           unread && 'font-medium'
         )}

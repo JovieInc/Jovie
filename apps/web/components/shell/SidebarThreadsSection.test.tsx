@@ -24,7 +24,7 @@ const threads: SidebarThread[] = [
 ];
 
 describe('SidebarThreadsSection', () => {
-  it('uses the full middle track at rest and layers chat actions over its faded edge', () => {
+  it('uses the full middle track at rest and layers chat actions over a visible cross-engine faded edge', () => {
     const title =
       'Reply with exactly one short sentence confirming the artist release plan';
 
@@ -48,9 +48,18 @@ describe('SidebarThreadsSection', () => {
 
     const label = screen.getByText(title);
 
-    expect(label).toHaveClass('justify-self-stretch', 'overflow-hidden');
+    expect(label).toHaveClass(
+      'w-full',
+      'justify-self-stretch',
+      'overflow-hidden'
+    );
     expect(label).not.toHaveClass('justify-self-start', 'truncate');
-    expect(label.className).toContain('mask-image:linear-gradient');
+    expect(label.className).toContain(
+      'mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)'
+    );
+    expect(label.className).toContain(
+      '-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)'
+    );
     const row = screen.getByRole('link', { name: title });
     const action = screen.getByRole('button', {
       name: `Chat Actions for ${title}`,
