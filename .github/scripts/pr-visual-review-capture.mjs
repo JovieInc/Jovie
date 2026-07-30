@@ -48,25 +48,59 @@ try {
         }
       });
       const url = new URL(route, baseUrl).toString();
-      if (route.startsWith('/app/')) {
-        await page.goto(
-          new URL(
-            '/api/dev/test-auth/enter?persona=creator-ready&redirect=/app/chat',
-            baseUrl
-          ).toString(),
-          { waitUntil: 'commit', timeout: 45_000 }
-        );
-      }
       const safeRoute =
         route.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'home';
       const path = join(outDir, `${safeRoute}-${viewportName}.png`);
       try {
+        if (route.startsWith('/app/')) {
+          const authEntryUrl = new URL(
+            `/api/dev/test-auth/enter?persona=creator-ready&redirect=${encodeURIComponent(route)}`,
+            baseUrl
+          );
+          const authResponse = await context.request.get(
+            authEntryUrl.toString(),
+            {
+              maxRedirects: 0,
+              timeout: 45_000,
+            }
+          );
+          if (authResponse.status() !== 303) {
+            throw new Error(
+              `Test-auth returned HTTP ${authResponse.status()}; expected HTTP 303.`
+            );
+          }
+          const location = authResponse.headers().location;
+          if (!location)
+            throw new Error(
+              'Test-auth 303 did not include a redirect location.'
+            );
+          const destination = new URL(location, baseUrl);
+          const expected = new URL(url);
+          if (destination.origin !== expected.origin)
+            throw new Error('Test-auth redirected outside capture origin.');
+          if (destination.pathname !== expected.pathname) {
+            throw new Error(
+              `Test-auth redirect target ${destination.pathname} did not match requested route ${expected.pathname}.`
+            );
+          }
+        }
         const response = await page.goto(url, {
           waitUntil: 'networkidle',
           timeout: 45_000,
         });
         if (!response || !response.ok())
           throw new Error(`HTTP ${response?.status() ?? 'unknown'}`);
+        if (route.startsWith('/app/')) {
+          const expected = new URL(url);
+          const final = new URL(page.url());
+          if (
+            final.origin !== expected.origin ||
+            final.pathname !== expected.pathname
+          )
+            throw new Error(
+              `Test-auth handoff ended at ${page.url()}, expected ${expected.toString()}.`
+            );
+        }
         const pageText = (await page.locator('body').innerText()).trim();
         if (!pageText || /\b404\b|content not found/i.test(pageText))
           throw new Error('Captured route did not render a meaningful surface');

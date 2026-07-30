@@ -12,6 +12,9 @@ const CODEX_MODEL =
   /(?:gpt[-_ ]?5(?:[._ -]?\d+)?(?:[-_ ]?codex)?|codex[-_ ]?[\w.-]+)/i;
 
 export const REQUIRED_CAPTURE_VIEWPORTS = ['desktop', 'mobile'];
+const PUBLIC_HOME_CAPTURE_ROUTE = '/';
+const PUBLIC_PROFILE_CAPTURE_ROUTE = '/demo/showcase/public-profile';
+const AUTHENTICATED_CHAT_CAPTURE_ROUTE = '/app/chat';
 
 /** @typedef {{ apiKey?: string, baseUrl?: string, model?: string }} ReviewBackend */
 
@@ -37,31 +40,20 @@ export function routeChangedFiles(files) {
     };
   const routes = new Set();
   for (const file of changed) {
-    if (/admin|console|ops/i.test(file)) routes.add('/demo/admin');
+    // Route only to fixtures that are present in the production build. Generic
+    // UI changes belong on the public home surface; `/demo` and `/demo/admin`
+    // require data/authentication that the capture runner intentionally does
+    // not invent.
+    if (/admin|console|ops/i.test(file)) routes.add(PUBLIC_HOME_CAPTURE_ROUTE);
     else if (/dynamic|profile|username|artist/i.test(file))
-      routes.add('/demo/profile');
-    else if (/chat|shell/i.test(file)) routes.add('/app/chat');
-    else routes.add('/');
+      routes.add(PUBLIC_PROFILE_CAPTURE_ROUTE);
+    else if (/chat|shell/i.test(file))
+      routes.add(AUTHENTICATED_CHAT_CAPTURE_ROUTE);
+    else routes.add(PUBLIC_HOME_CAPTURE_ROUTE);
   }
-  // Every UI change gets one deterministic authenticated shell capture. Public
-  // or demo surfaces alone are not evidence that app-shell changes render.
-  routes.add('/app/chat');
-  // Demo routes remain supplemental coverage; the authenticated shell capture
-  // above is required evidence.
-  routes.add('/demo');
   return {
     shouldReview: true,
-    routes: [...routes].sort((a, b) =>
-      a === '/'
-        ? -1
-        : b === '/'
-          ? 1
-          : a === '/demo'
-            ? -1
-            : b === '/demo'
-              ? 1
-              : a.localeCompare(b)
-    ),
+    routes: [...routes].sort((a, b) => a.localeCompare(b)),
     reason: 'ui-change',
     review_status: 'advisory',
   };

@@ -12,7 +12,7 @@ import {
 } from '../../../.github/scripts/pr-visual-review.mjs';
 
 describe('bounded PR visual review contract', () => {
-  it('routes UI changes to the changed surface and always captures desktop/mobile', () => {
+  it('routes UI changes only to deterministic public surfaces', () => {
     expect(
       routeChangedFiles([
         'apps/web/app/(home)/page.tsx',
@@ -21,21 +21,24 @@ describe('bounded PR visual review contract', () => {
       ])
     ).toEqual({
       shouldReview: true,
-      routes: ['/', '/demo', '/app/chat'],
+      routes: ['/'],
       reason: 'ui-change',
       review_status: 'advisory',
     });
   });
 
-  it('routes known profile and admin surfaces without broadening to the whole app', () => {
+  it('routes known profiles to the real fixture and never invents demo routes', () => {
     expect(
       routeChangedFiles(['apps/web/app/(dynamic)/[username]/page.tsx'])
     ).toEqual({
       shouldReview: true,
-      routes: ['/demo', '/app/chat', '/demo/profile'],
+      routes: ['/demo/showcase/public-profile'],
       reason: 'ui-change',
       review_status: 'advisory',
     });
+    expect(routeChangedFiles(['apps/web/app/(admin)/page.tsx']).routes).toEqual(
+      ['/']
+    );
     expect(routeChangedFiles(['scripts/format.mjs'])).toEqual({
       shouldReview: false,
       routes: [],
@@ -63,10 +66,36 @@ describe('bounded PR visual review contract', () => {
       routeChangedFiles(['apps/web/components/organisms/AppShellFrame.tsx'])
     ).toEqual({
       shouldReview: true,
-      routes: ['/demo', '/app/chat'],
+      routes: ['/app/chat'],
       reason: 'ui-change',
       review_status: 'advisory',
     });
+  });
+
+  it('validates authenticated capture handoff before loading an app route', () => {
+    const capture = readFileSync(
+      '.github/scripts/pr-visual-review-capture.mjs',
+      'utf8'
+    );
+    expect(capture).toContain('context.request.get(');
+    expect(capture).toContain('authEntryUrl.toString()');
+    expect(capture).toContain('maxRedirects: 0');
+    expect(capture).toContain('Test-auth returned HTTP');
+    expect(capture).toContain(
+      'Test-auth 303 did not include a redirect location.'
+    );
+    expect(capture).toContain('Test-auth handoff ended at');
+  });
+
+  it('uses the canonical test-auth environment in the capture workflow', () => {
+    const workflow = readFileSync(
+      '.github/workflows/pr-visual-review.yml',
+      'utf8'
+    );
+    expect(workflow).toContain('VERCEL_ENV: development');
+    expect(workflow).toContain("NEXT_PUBLIC_E2E_MODE: '1'");
+    expect(workflow).toContain('E2E_TEST_AUTH_PERSONA: creator-ready');
+    expect(workflow).toContain('HOSTNAME=localhost');
   });
 
   it('keeps prompt input bounded and removes credential-shaped values', () => {
