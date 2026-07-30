@@ -76,6 +76,10 @@ const SIGNAL_TYPE_FILTERS: readonly {
     value: 'new_profile_match',
     label: OPPORTUNITY_SIGNAL_TYPE_META.new_profile_match.filterLabel,
   },
+  {
+    value: 'brand_deal',
+    label: OPPORTUNITY_SIGNAL_TYPE_META.brand_deal.filterLabel,
+  },
 ];
 
 function sortByStartDate(
