@@ -441,10 +441,14 @@ describe('entrypoint contract', () => {
           LINEAR_API_KEY: '',
         },
       }),
-      error =>
-        /LINEAR_API_KEY is not set and credential file is unavailable/.test(
-          `${error.stderr}`
-        )
+      error => {
+        const err = /** @type {{ stderr?: unknown; message?: unknown }} */ (
+          error
+        );
+        return /LINEAR_API_KEY is not set and credential file is unavailable/.test(
+          `${err.stderr ?? err.message ?? error}`
+        );
+      }
     );
   });
 });
