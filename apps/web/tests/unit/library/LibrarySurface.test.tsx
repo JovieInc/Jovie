@@ -18,6 +18,10 @@ import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchS
 import { APP_ROUTES } from '@/constants/routes';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import {
+  RightPanelProvider,
+  useRightPanel,
+} from '@/contexts/RightPanelContext';
+import {
   ShellSidebarOverrideProvider,
   useShellSidebarOverride,
 } from '@/contexts/ShellSidebarOverrideContext';
@@ -156,13 +160,20 @@ function buildAsset(
   };
 }
 
+function RightPanelOutlet() {
+  return useRightPanel();
+}
+
 function renderLibraryWithHeader(assets: readonly LibraryReleaseAsset[]) {
   return render(
     <TooltipProvider>
-      <HeaderActionsProvider>
-        <HeaderSearchSurfaceFromContext />
-        <LibrarySurface assets={assets} />
-      </HeaderActionsProvider>
+      <RightPanelProvider>
+        <HeaderActionsProvider>
+          <HeaderSearchSurfaceFromContext />
+          <LibrarySurface assets={assets} />
+          <RightPanelOutlet />
+        </HeaderActionsProvider>
+      </RightPanelProvider>
     </TooltipProvider>
   );
 }
@@ -170,7 +181,10 @@ function renderLibraryWithHeader(assets: readonly LibraryReleaseAsset[]) {
 function renderLibrary(assets: readonly LibraryReleaseAsset[]) {
   return render(
     <TooltipProvider>
-      <LibrarySurface assets={assets} />
+      <RightPanelProvider>
+        <LibrarySurface assets={assets} />
+        <RightPanelOutlet />
+      </RightPanelProvider>
     </TooltipProvider>
   );
 }
@@ -194,10 +208,13 @@ function SidebarOverrideProbe() {
 function renderLibraryWithSidebarProbe(assets: readonly LibraryReleaseAsset[]) {
   return render(
     <TooltipProvider>
-      <ShellSidebarOverrideProvider>
-        <LibrarySurface assets={assets} />
-        <SidebarOverrideProbe />
-      </ShellSidebarOverrideProvider>
+      <RightPanelProvider>
+        <ShellSidebarOverrideProvider>
+          <LibrarySurface assets={assets} />
+          <SidebarOverrideProbe />
+          <RightPanelOutlet />
+        </ShellSidebarOverrideProvider>
+      </RightPanelProvider>
     </TooltipProvider>
   );
 }
@@ -262,6 +279,8 @@ describe('LibrarySurface', () => {
     expect(source).toContain('function LibraryFilterPanel');
     expect(source).toContain("data-testid='library-filter-active-indicator'");
     expect(source).toContain("surfaceMode='table'");
+    expect(source).toContain('useRegisterRightPanel(assetDrawerPanel)');
+    expect(source).not.toContain('libraryGridTemplateColumns');
     expect(source).not.toContain('Search library by title');
     expect(source).not.toContain('useRegisterShellSidebarOverride');
     expect(source).not.toContain('max-h-[45svh]');
@@ -686,7 +705,7 @@ describe('LibrarySurface', () => {
     expect(drawer.getByText('68/100')).toBeDefined();
     expect(drawer.getByText('Progressive House')).toBeDefined();
 
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
 
     expect(screen.getByTestId('library-asset-drawer')).toHaveAttribute(
       'aria-hidden',

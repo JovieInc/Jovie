@@ -48,7 +48,6 @@ import {
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  type CSSProperties,
   createContext,
   type MouseEvent,
   memo,
@@ -83,6 +82,7 @@ import {
   ToolbarMenuChoiceItem,
 } from '@/components/molecules/menus/ToolbarMenuPrimitives';
 import { PageShell } from '@/components/organisms/PageShell';
+import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
   PAGE_TOOLBAR_END_GROUP_CLASS,
@@ -107,6 +107,7 @@ import type { FilterPill } from '@/components/shell/pill-search.types';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
@@ -2082,7 +2083,6 @@ function AssetDrawer({
   onClose,
   activePreviewId,
   playingPreviewId,
-  isDesktopLayout,
   onTogglePreview,
   onAudioUploaded,
   getContextMenuItems,
@@ -2097,7 +2097,6 @@ function AssetDrawer({
   readonly onClose: () => void;
   readonly activePreviewId: string | null;
   readonly playingPreviewId: string | null;
-  readonly isDesktopLayout: boolean;
   readonly onTogglePreview: LibraryPreviewToggle;
   readonly onAudioUploaded: (assetId: string, previewUrl: string) => void;
   readonly getContextMenuItems: LibraryContextMenuBuilder;
@@ -2130,9 +2129,13 @@ function AssetDrawer({
     currentId !== null &&
     currentId === playingPreviewId &&
     currentId === activePreviewId;
-  const closedDrawerClassName = cn(
-    'pointer-events-none opacity-0',
-    isDesktopLayout ? null : 'translate-y-2 hidden'
+  const handleDrawerKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      onClose();
+    },
+    [onClose]
   );
   const drawerHeaderActions = current ? (
     <DrawerHeaderActions
@@ -2147,16 +2150,12 @@ function AssetDrawer({
   ) : null;
 
   return (
-    <aside
-      aria-hidden={!open}
-      inert={open ? undefined : true}
-      className={cn(
-        'system-b-library-drawer h-full min-h-0 overflow-hidden border-l border-subtle transition-[opacity,transform] duration-cinematic ease-cinematic',
-        isDesktopLayout
-          ? 'static z-auto rounded-none border-y-0 border-r-0 shadow-none'
-          : 'system-b-library-drawer--mobile fixed inset-x-3 bottom-20 top-16 z-40 border',
-        open ? 'translate-y-0 opacity-100' : closedDrawerClassName
-      )}
+    <RightDrawer
+      isOpen={open}
+      width={360}
+      ariaLabel='Library asset details'
+      onKeyDown={handleDrawerKeyDown}
+      className='system-b-library-drawer border-l border-(--app-shell-frame-seam)'
       data-testid='library-asset-drawer'
     >
       {current ? (
@@ -2437,7 +2436,7 @@ function AssetDrawer({
           </div>
         </TableContextMenu>
       ) : null}
-    </aside>
+    </RightDrawer>
   );
 }
 
@@ -2642,22 +2641,6 @@ export function LibrarySurface({
     }
   }, [selectedId, visibleAssets]);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented) return;
-      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
-        return;
-      }
-      if (event.key === 'Escape' && drawerOpen) {
-        event.preventDefault();
-        setDrawerOpen(false);
-      }
-    }
-
-    globalThis.addEventListener('keydown', onKeyDown);
-    return () => globalThis.removeEventListener('keydown', onKeyDown);
-  }, [drawerOpen]);
-
   const handlePresetChange = useCallback(
     (next: LibraryPresetId) => {
       setPreset(next);
@@ -2840,10 +2823,43 @@ export function LibrarySurface({
     [router]
   );
 
-  const drawerColumnWidth = drawerOpen ? '360px' : '0px';
-  const libraryGridTemplateColumns = isDesktopLayout
-    ? `minmax(0,1fr) ${drawerColumnWidth}`
-    : 'minmax(0, 1fr)';
+  const assetDrawerPanel = useMemo(
+    () => (
+      <AssetDrawer
+        asset={selectedAsset}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        activePreviewId={activePreviewId}
+        playingPreviewId={playingPreviewId}
+        onTogglePreview={handleTogglePreview}
+        onAudioUploaded={handleAudioUploaded}
+        getContextMenuItems={getContextMenuItems}
+        profileId={profileId}
+        artistHandle={artistHandle}
+        pressKitCandidates={effectiveAssets.filter(
+          item => getLibraryItemKind(item) === 'release'
+        )}
+        onApprovalStatusChange={handleApprovalStatusChange}
+        onShareChange={handleShareChange}
+      />
+    ),
+    [
+      activePreviewId,
+      artistHandle,
+      drawerOpen,
+      effectiveAssets,
+      getContextMenuItems,
+      handleApprovalStatusChange,
+      handleAudioUploaded,
+      handleShareChange,
+      handleTogglePreview,
+      playingPreviewId,
+      profileId,
+      selectedAsset,
+    ]
+  );
+
+  useRegisterRightPanel(assetDrawerPanel);
 
   if (effectiveAssets.length === 0) {
     return <EmptyCatalog />;
@@ -2880,16 +2896,9 @@ export function LibrarySurface({
       <NavigationDestinationReady destination='library' />
       <div
         data-testid='library-content-frame'
-        className='grid h-full min-h-0 flex-1 overflow-hidden'
-        style={
-          {
-            gridTemplateColumns: libraryGridTemplateColumns,
-            transition:
-              'grid-template-columns var(--duration-cinematic) var(--ease-cinematic)',
-          } as CSSProperties
-        }
+        className='flex h-full min-h-0 flex-1 overflow-hidden'
       >
-        <div className='flex min-h-0 min-w-0 flex-col overflow-hidden'>
+        <div className='flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
           <div className='min-h-0 flex-1 overflow-y-auto pb-20 lg:pb-0'>
             {visibleAssets.length === 0 ? (
               <NoResults onReset={resetView} />
@@ -2933,24 +2942,6 @@ export function LibrarySurface({
             activePreviewTitle={activePreviewTitle}
           />
         </div>
-        <AssetDrawer
-          asset={selectedAsset}
-          open={drawerOpen}
-          onClose={() => setDrawerOpen(false)}
-          activePreviewId={activePreviewId}
-          playingPreviewId={playingPreviewId}
-          isDesktopLayout={isDesktopLayout}
-          onTogglePreview={handleTogglePreview}
-          onAudioUploaded={handleAudioUploaded}
-          getContextMenuItems={getContextMenuItems}
-          profileId={profileId}
-          artistHandle={artistHandle}
-          pressKitCandidates={effectiveAssets.filter(
-            item => getLibraryItemKind(item) === 'release'
-          )}
-          onApprovalStatusChange={handleApprovalStatusChange}
-          onShareChange={handleShareChange}
-        />
       </div>
     </PageShell>
   );
