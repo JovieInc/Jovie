@@ -1,6 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import {
+  RightPanelProvider,
+  useRightPanel,
+} from '@/contexts/RightPanelContext';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
 import { ContactsTable } from '@/features/dashboard/organisms/contacts-table/ContactsTable';
 
@@ -111,18 +115,39 @@ const contacts: EditableContact[] = [
   },
 ];
 
+function RightPanelOutlet() {
+  return <output data-testid='contacts-right-panel'>{useRightPanel()}</output>;
+}
+
+function renderContactsTable(props: ComponentProps<typeof ContactsTable>) {
+  return render(
+    <RightPanelProvider>
+      <ContactsTable {...props} />
+      <RightPanelOutlet />
+    </RightPanelProvider>
+  );
+}
+
 describe('ContactsTable', () => {
-  it('persists drawer selection through the shared table selection contract', () => {
-    render(
-      <ContactsTable
-        contacts={contacts}
-        artistName='Tim White'
-        onUpdate={() => undefined}
-        onSave={async () => undefined}
-        onDelete={() => undefined}
-        onAddContact={() => undefined}
-      />
-    );
+  it('registers details in the shared right rail instead of mounting them beside the table', async () => {
+    renderContactsTable({
+      contacts,
+      artistName: 'Tim White',
+      onUpdate: () => undefined,
+      onSave: async () => undefined,
+      onDelete: () => undefined,
+      onAddContact: () => undefined,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('contact-detail-sidebar')).toHaveAttribute(
+        'data-open',
+        'false'
+      );
+    });
+
+    const sidebar = screen.getByTestId('contact-detail-sidebar');
+    expect(screen.getByTestId('contacts-table')).not.toContainElement(sidebar);
 
     expect(screen.getByText('1 contact')).toBeInTheDocument();
     expect(screen.getByTestId('contacts-unified-table')).toHaveAttribute(
@@ -134,14 +159,16 @@ describe('ContactsTable', () => {
       screen.getByRole('button', { name: 'Select first contact' })
     );
 
-    expect(screen.getByTestId('contact-detail-sidebar')).toHaveAttribute(
-      'data-open',
-      'true'
-    );
-    expect(screen.getByTestId('contact-detail-sidebar')).toHaveAttribute(
-      'data-contact-id',
-      'contact-1'
-    );
+    await waitFor(() => {
+      expect(screen.getByTestId('contact-detail-sidebar')).toHaveAttribute(
+        'data-open',
+        'true'
+      );
+      expect(screen.getByTestId('contact-detail-sidebar')).toHaveAttribute(
+        'data-contact-id',
+        'contact-1'
+      );
+    });
     expect(screen.getByTestId('contacts-unified-table')).toHaveAttribute(
       'data-first-row-selected',
       'true'
@@ -151,17 +178,15 @@ describe('ContactsTable', () => {
   });
 
   it('forwards loading state to the table instead of showing a false empty state', () => {
-    render(
-      <ContactsTable
-        contacts={[]}
-        artistName='Tim White'
-        isLoading
-        onUpdate={() => undefined}
-        onSave={async () => undefined}
-        onDelete={() => undefined}
-        onAddContact={() => undefined}
-      />
-    );
+    renderContactsTable({
+      contacts: [],
+      artistName: 'Tim White',
+      isLoading: true,
+      onUpdate: () => undefined,
+      onSave: async () => undefined,
+      onDelete: () => undefined,
+      onAddContact: () => undefined,
+    });
 
     expect(screen.getByTestId('contacts-table')).toBeInTheDocument();
     expect(screen.getByTestId('contacts-unified-table')).toHaveAttribute(
@@ -174,16 +199,14 @@ describe('ContactsTable', () => {
   it('offers the canonical add contact action from the empty state', () => {
     const onAddContact = vi.fn();
 
-    render(
-      <ContactsTable
-        contacts={[]}
-        artistName='Tim White'
-        onUpdate={() => undefined}
-        onSave={async () => undefined}
-        onDelete={() => undefined}
-        onAddContact={onAddContact}
-      />
-    );
+    renderContactsTable({
+      contacts: [],
+      artistName: 'Tim White',
+      onUpdate: () => undefined,
+      onSave: async () => undefined,
+      onDelete: () => undefined,
+      onAddContact,
+    });
 
     expect(screen.getByRole('heading', { name: 'No Contacts' })).toBeVisible();
     expect(
