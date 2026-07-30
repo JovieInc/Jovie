@@ -9,7 +9,7 @@ function readSource(path: string): string {
 }
 
 describe('command palette search shell guard', () => {
-  it('keeps AuthShellWrapper out of the header search surface path', () => {
+  it('swaps the active route for the main-plane command surface', () => {
     const source = readSource('components/organisms/AuthShellWrapper.tsx');
 
     expect(source).not.toMatch(/import\s+\{\s*HeaderSearchSurface\s*\}\s+from/);
@@ -17,9 +17,11 @@ describe('command palette search shell guard', () => {
     expect(source).not.toContain('stopImmediatePropagation');
     expect(source).not.toContain('headerSearchSurface=');
     expect(source).not.toContain('isHeaderSearchActive=');
+    expect(source).toContain('CommandPaletteMainSurface');
+    expect(source).toContain('isCommandPaletteOpen');
   });
 
-  it('keeps the shared search surface in the canonical sidebar only', () => {
+  it('keeps the compact Search trigger in the canonical sidebar only', () => {
     const authShell = readSource('components/organisms/AuthShell.tsx');
     const sidebar = readSource('components/organisms/UnifiedSidebar.tsx');
     const navigation = readSource(
@@ -35,6 +37,7 @@ describe('command palette search shell guard', () => {
       /<DashboardNav>[\s\S]*?<HeaderSearchSurfaceFromContext[\s\S]*?<\/DashboardNav>/
     );
     expect(navigation).toContain("data-sidebar-search-slot='true'");
+    expect(authShell).toContain('commandPaletteHeader');
   });
 
   it('keeps Search out of duplicate navigation rows', () => {
@@ -52,7 +55,7 @@ describe('command palette search shell guard', () => {
     );
   });
 
-  it('keeps header search off the full release matrix transport', () => {
+  it('keeps the sidebar trigger local while cmdk owns debounced remote search', () => {
     const connectorSource = readSource(
       'components/shell/HeaderSearchSurfaceFromContext.tsx'
     );
@@ -60,7 +63,11 @@ describe('command palette search shell guard', () => {
 
     expect(connectorSource).not.toContain('useReleasesQuery');
     expect(connectorSource).not.toContain('loadReleaseMatrix');
+    expect(connectorSource).toContain('openCommandPalette');
     expect(clientSource).toContain('/api/search/header');
     expect(clientSource).toContain('signal');
+    expect(readSource('components/organisms/CmdKPalette.tsx')).toContain(
+      "presentation === 'main'"
+    );
   });
 });

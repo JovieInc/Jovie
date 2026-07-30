@@ -21,6 +21,7 @@ export interface AuthShellProps {
   readonly breadcrumbs: DashboardBreadcrumbItem[];
   readonly headerBadge?: ReactNode;
   readonly headerAction?: ReactNode;
+  readonly commandPaletteHeader?: ReactNode;
   readonly showMobileTabs?: boolean;
   readonly isTableRoute?: boolean;
   readonly isLyricsRoute?: boolean;
@@ -45,6 +46,7 @@ function AuthShellInner({
   breadcrumbs,
   headerBadge,
   headerAction,
+  commandPaletteHeader,
   showMobileTabs = false,
   isTableRoute = false,
   isLyricsRoute = false,
@@ -100,6 +102,7 @@ function AuthShellInner({
             sidebarTrigger={sidebarTrigger}
             breadcrumbSuffix={headerBadge}
             action={headerAction}
+            commandPaletteHeader={commandPaletteHeader}
             mobileProfileSlot={
               section === 'ov' || section === 'admin' ? null : (
                 <MobileProfileDrawer onOpen={previewPanelState.toggle} />

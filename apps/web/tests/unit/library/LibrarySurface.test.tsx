@@ -1060,7 +1060,7 @@ describe('LibrarySurface', () => {
     ).toBeInTheDocument();
   });
 
-  it('filters release assets from the shell header search contract', () => {
+  it('does not render route filtering as a second shell search surface', () => {
     renderLibraryWithHeader([
       buildAsset(),
       buildAsset({
@@ -1077,23 +1077,15 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Filter Current View' })
-    );
-    fireEvent.change(screen.getByLabelText('Filter library assets'), {
-      target: { value: 'Never' },
-    });
-    fireEvent.mouseDown(
-      screen.getByRole('option', { name: /Never Say A Word/u })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
 
+    expect(screen.queryByLabelText('Filter library assets')).toBeNull();
+    expect(
+      screen.getByTestId('library-release-row-release-1')
+    ).toBeInTheDocument();
     expect(
       screen.getByTestId('library-release-row-release-2')
     ).toBeInTheDocument();
-    expect(
-      screen.queryByTestId('library-release-row-release-1')
-    ).not.toBeInTheDocument();
   });
 
   it('filters library assets from sidebar smart filter views', async () => {
@@ -1167,11 +1159,13 @@ describe('LibrarySurface', () => {
     ]);
 
     expect(screen.queryByLabelText('Search library by title')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
     expect(
-      screen.getAllByRole('combobox', { name: 'Search Jovie' })
-    ).toHaveLength(1);
+      screen.getByRole('button', { name: 'Search Jovie' })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    expect(
+      screen.queryByRole('searchbox', { name: 'Command Palette Search' })
+    ).toBeNull();
   });
 
   it('labels the grid-card provider count badge', () => {

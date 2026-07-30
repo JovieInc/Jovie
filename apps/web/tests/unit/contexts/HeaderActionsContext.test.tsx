@@ -51,12 +51,12 @@ function ToggleRouteActions() {
 }
 
 function SearchProbe() {
-  const { closeSearch, isSearchOpen } = useHeaderActions();
+  const { closeCommandPalette, isCommandPaletteOpen } = useHeaderActions();
 
   return (
     <>
-      <output>{isSearchOpen ? 'open' : 'closed'}</output>
-      <button type='button' onClick={closeSearch}>
+      <output>{isCommandPaletteOpen ? 'open' : 'closed'}</output>
+      <button type='button' onClick={closeCommandPalette}>
         Close search
       </button>
     </>
@@ -121,7 +121,7 @@ describe('HeaderActionsContext', () => {
     expect(screen.queryByRole('button', { name: 'Base Action' })).toBeNull();
   });
 
-  it('opens from the shell search event and restores the exact prior focus on close', async () => {
+  it('opens the main command surface from the shell search event and restores focus on close', async () => {
     const user = userEvent.setup();
     render(
       <HeaderActionsProvider>

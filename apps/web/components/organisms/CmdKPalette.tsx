@@ -17,7 +17,15 @@ import { Dialog, DialogContent } from '@jovie/ui';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { filterSkillsHidingBrokenAlbumArt } from '@/lib/chat/album-art-capability';
 import { type EntityRef } from '@/lib/commands/entities';
@@ -59,6 +67,49 @@ interface CmdKPaletteProps {
   readonly additionalSectionsAfter?: PaletteSection[];
   /** Caller-handled commit for `additionalSectionsAfter` items. */
   readonly onAdditionalSelect?: (id: string) => void;
+  /** `main` renders inside the existing shell plane; `dialog` preserves legacy embedding. */
+  readonly presentation?: 'dialog' | 'main';
+  /** Supplies the live query field to the breadcrumb/header seam in main mode. */
+  readonly onHeaderChange?: (header: ReactNode | null) => void;
+}
+
+function MainPlaneSearchInput({
+  onQueryChange,
+}: {
+  readonly onQueryChange: (query: string) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useLayoutEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  return (
+    <div className='flex h-full min-w-0 flex-1 items-center gap-2'>
+      <Search
+        className='size-4 shrink-0 text-tertiary-token'
+        aria-hidden='true'
+      />
+      <input
+        ref={inputRef}
+        type='search'
+        value={query}
+        onChange={event => {
+          const nextQuery = event.target.value;
+          setQuery(nextQuery);
+          onQueryChange(nextQuery);
+        }}
+        placeholder='Search Jovie or run a command…'
+        className='min-w-0 flex-1 appearance-none bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus-visible:outline-none'
+        aria-label='Command Palette Search'
+        data-testid='command-palette-header-input'
+      />
+      <span className='hidden shrink-0 text-2xs font-medium text-quaternary-token sm:inline'>
+        Esc
+      </span>
+    </div>
+  );
 }
 
 function useCmdkData(profileId: string, query: string, open: boolean) {
@@ -129,10 +180,13 @@ export function CmdKPalette({
   onOpenChange,
   additionalSectionsAfter,
   onAdditionalSelect,
+  presentation = 'dialog',
+  onHeaderChange,
 }: CmdKPaletteProps) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Reset when closing so the next open starts clean.
   useEffect(() => {
@@ -141,6 +195,10 @@ export function CmdKPalette({
       setSelectedIndex(0);
     }
   }, [open]);
+
+  useLayoutEffect(() => {
+    if (presentation === 'dialog' && open) inputRef.current?.focus();
+  }, [open, presentation]);
 
   const registrySections = useCmdkData(profileId, query, open);
   const filteredAdditional = useMemo(
@@ -249,6 +307,74 @@ export function CmdKPalette({
     return () => globalThis.removeEventListener('keydown', onKey, true);
   }, [open, flatItems.length, commitIndex, selectedIndex, handleClose]);
 
+  const dialogInput = (
+    <div className='flex h-full min-w-0 flex-1 items-center gap-2'>
+      <Search
+        className='size-4 shrink-0 text-tertiary-token'
+        aria-hidden='true'
+      />
+      <input
+        ref={inputRef}
+        type='search'
+        value={query}
+        onChange={e => {
+          setQuery(e.target.value);
+          setSelectedIndex(0);
+        }}
+        placeholder='Search Jovie or run a command…'
+        className='min-w-0 flex-1 appearance-none bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus-visible:outline-none'
+        aria-label='Command Palette Search'
+        data-testid='command-palette-header-input'
+      />
+      <span className='hidden shrink-0 text-2xs font-medium text-quaternary-token sm:inline'>
+        Esc
+      </span>
+    </div>
+  );
+
+  useEffect(() => {
+    if (presentation !== 'main') return undefined;
+    onHeaderChange?.(
+      <MainPlaneSearchInput
+        onQueryChange={nextQuery => {
+          setQuery(nextQuery);
+          setSelectedIndex(0);
+        }}
+      />
+    );
+    return () => onHeaderChange?.(null);
+  }, [onHeaderChange, presentation]);
+
+  const results = (
+    <div
+      className='min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1.5'
+      role='listbox'
+      aria-label='Command Palette Results'
+    >
+      <PaletteList
+        sections={allSections}
+        selectedIndex={selectedIndex}
+        setSelectedIndex={setSelectedIndex}
+        commitIndex={commitIndex}
+        emptyHint='No matches.'
+        variant='cmdk'
+        showIndexedShortcuts
+      />
+    </div>
+  );
+
+  if (presentation === 'main') {
+    return open ? (
+      <section
+        className='flex h-full min-h-0 w-full flex-col bg-(--app-shell-content-surface)'
+        data-testid='cmdk-main-plane'
+        data-surface='cmdk'
+      >
+        {results}
+      </section>
+    ) : null;
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -279,42 +405,10 @@ export function CmdKPalette({
           data-testid='shared-command-palette'
           data-surface='cmdk'
         >
-          <div className='flex shrink-0 items-center gap-2 border-b border-(--app-shell-frame-seam) px-3.5 py-2.5'>
-            <Search
-              className='size-4 shrink-0 text-tertiary-token'
-              aria-hidden='true'
-            />
-            <input
-              autoFocus
-              type='text'
-              value={query}
-              onChange={e => {
-                setQuery(e.target.value);
-                setSelectedIndex(0);
-              }}
-              placeholder='Jump to a page, skill, release, or conversation...'
-              className='flex-1 appearance-none bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus-visible:outline-none focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]'
-              aria-label='Command Palette Search'
-            />
-            <span className='hidden shrink-0 px-1 text-2xs font-medium text-quaternary-token sm:inline'>
-              Esc
-            </span>
+          <div className='flex shrink-0 items-center border-b border-(--app-shell-frame-seam) px-3.5 py-2.5'>
+            {dialogInput}
           </div>
-          <div
-            className='min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1.5'
-            role='listbox'
-            aria-label='Command Palette Results'
-          >
-            <PaletteList
-              sections={allSections}
-              selectedIndex={selectedIndex}
-              setSelectedIndex={setSelectedIndex}
-              commitIndex={commitIndex}
-              emptyHint='No matches.'
-              variant='cmdk'
-              showIndexedShortcuts
-            />
-          </div>
+          {results}
         </div>
       </DialogContent>
     </Dialog>

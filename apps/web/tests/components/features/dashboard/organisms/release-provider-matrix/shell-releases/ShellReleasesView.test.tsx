@@ -540,26 +540,25 @@ describe('ShellReleasesView', () => {
     expect(probe).toBeInTheDocument();
     expect(probe).toHaveAttribute('data-search-total', '2');
     const searchTrigger = await screen.findByRole('button', {
-      name: 'Search',
+      name: 'Search Jovie',
     });
     expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
   });
 
-  it('opens the releases filter through the shell-owned trigger', async () => {
+  it('does not open a second route-filter popup from the shell trigger', async () => {
     renderShell([fakeRelease({ id: '1', title: 'Alpha' })]);
 
     expect(
       screen.queryByRole('combobox', { name: 'Filter releases' })
     ).not.toBeInTheDocument();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Search' }));
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Filter Current View' })
+      await screen.findByRole('button', { name: 'Search Jovie' })
     );
 
     expect(
-      await screen.findByRole('combobox', { name: 'Filter releases' })
-    ).toBeInTheDocument();
+      screen.queryByRole('combobox', { name: 'Filter releases' })
+    ).not.toBeInTheDocument();
   });
 
   describe('entitlement gating', () => {

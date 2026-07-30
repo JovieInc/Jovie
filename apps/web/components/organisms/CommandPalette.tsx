@@ -12,11 +12,22 @@
  */
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+} from 'react';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { CmdKPalette } from '@/components/organisms/CmdKPalette';
 import { type PaletteSection } from '@/components/organisms/SharedCommandPalette';
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  useHeaderActions,
+  useOptionalHeaderActions,
+} from '@/contexts/HeaderActionsContext';
 import {
   APP_SHELL_WORKSPACES,
   getCurrentAppShellWorkspace,
@@ -38,13 +49,32 @@ export function CommandPalette() {
   // (e.g., when AuthShellWrapper renders without its inner providers) it
   // should be a no-op instead of crashing.
   const dashboardData = useContext(DashboardDataContext);
-  if (!dashboardData) {
+  const headerActions = useOptionalHeaderActions();
+  if (!dashboardData || !headerActions) {
     return null;
   }
+  return <CommandPaletteController />;
+}
+
+/**
+ * Main content-plane slot. AuthShellWrapper swaps this in for the active route
+ * so Cmd+K never floats over a second, independently interactive page.
+ */
+export function CommandPaletteMainSurface() {
+  const dashboardData = useContext(DashboardDataContext);
+  const { closeCommandPalette, isCommandPaletteOpen, setCommandPaletteHeader } =
+    useHeaderActions();
+  if (!dashboardData || !isCommandPaletteOpen) return null;
   return (
     <CommandPaletteInner
       profileId={dashboardData.selectedProfile?.id}
       isAdmin={dashboardData.isAdmin}
+      open={isCommandPaletteOpen}
+      onOpenChange={next => {
+        if (!next) closeCommandPalette();
+      }}
+      presentation='main'
+      onHeaderChange={setCommandPaletteHeader}
     />
   );
 }
@@ -52,41 +82,51 @@ export function CommandPalette() {
 interface CommandPaletteInnerProps {
   readonly profileId: string | undefined;
   readonly isAdmin: boolean;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly presentation: 'main' | 'dialog';
+  readonly onHeaderChange?: (header: ReactNode | null) => void;
 }
 
-function CommandPaletteInner({ profileId, isAdmin }: CommandPaletteInnerProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+function CommandPaletteController() {
+  const { closeCommandPalette, isCommandPaletteOpen, openCommandPalette } =
+    useHeaderActions();
+  const isOpenRef = useRef(false);
+  isOpenRef.current = isCommandPaletteOpen;
 
-  // Global ⌘K / Ctrl+K trigger.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const isK = event.key === 'k' || event.key === 'K';
-      if (!isK) return;
-      if (!(event.metaKey || event.ctrlKey)) return;
-      if (event.shiftKey || event.altKey) return;
-      const target = event.target as Element | null;
-      if (isFormElement(target)) return;
+      if (!isK || !(event.metaKey || event.ctrlKey)) return;
+      if (event.shiftKey || event.altKey || isFormElement(event.target)) return;
       event.preventDefault();
-      setOpen(prev => !prev);
-    }
-    function onOpenCommandPalette() {
-      setOpen(true);
+      if (isOpenRef.current) closeCommandPalette();
+      else openCommandPalette();
     }
     globalThis.addEventListener('keydown', onKeyDown);
-    globalThis.addEventListener(
-      OPEN_COMMAND_PALETTE_EVENT,
-      onOpenCommandPalette
-    );
+    globalThis.addEventListener(OPEN_COMMAND_PALETTE_EVENT, openCommandPalette);
     return () => {
       globalThis.removeEventListener('keydown', onKeyDown);
       globalThis.removeEventListener(
         OPEN_COMMAND_PALETTE_EVENT,
-        onOpenCommandPalette
+        openCommandPalette
       );
     };
-  }, []);
+  }, [closeCommandPalette, openCommandPalette]);
+
+  return null;
+}
+
+function CommandPaletteInner({
+  profileId,
+  isAdmin,
+  open,
+  onOpenChange,
+  presentation,
+  onHeaderChange,
+}: CommandPaletteInnerProps) {
+  const router = useRouter();
+  const pathname = usePathname();
 
   const { data: conversations } = useChatConversationsQuery({
     limit: RECENT_CHAT_LIMIT,
@@ -167,9 +207,11 @@ function CommandPaletteInner({ profileId, isAdmin }: CommandPaletteInnerProps) {
     <CmdKPalette
       profileId={profileId ?? ''}
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={onOpenChange}
       additionalSectionsAfter={additionalSections}
       onAdditionalSelect={handleAdditionalSelect}
+      presentation={presentation}
+      onHeaderChange={onHeaderChange}
     />
   );
 }
