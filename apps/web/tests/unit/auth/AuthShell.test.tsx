@@ -178,7 +178,7 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
 
     const serverMarkup = renderToStaticMarkup(<AuthShell mode='sign-in' />);
     expect(serverMarkup).toContain('data-auth-shell-ready="true"');
-    expect(serverMarkup).toContain('Email me a code');
+    expect(serverMarkup).toContain('Email me a Code');
 
     const { container } = render(<AuthShell mode='sign-in' />);
     await waitFor(() => expect(container).toBeEmptyDOMElement());
