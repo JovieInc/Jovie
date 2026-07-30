@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
@@ -33,6 +35,9 @@ const FORBIDDEN_PRIMARY_LABELS = [
   'Releases',
 ] as const;
 
+const DASHBOARD_NAV_SOURCE =
+  'apps/web/components/features/dashboard/dashboard-nav/DashboardNav.tsx';
+
 function primaryLinks(container: HTMLElement) {
   const section = container.querySelector('[data-nav-section]');
   expect(section).toBeInTheDocument();
@@ -42,6 +47,29 @@ function primaryLinks(container: HTMLElement) {
 describe('DashboardNav', () => {
   afterEach(() => {
     resetDashboardNavTestMocks();
+  });
+
+  it('defers persisted navigation badges until after hydration', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), DASHBOARD_NAV_SOURCE),
+      'utf8'
+    );
+
+    expect(source).toContain(
+      'const [threadReadAtById, setThreadReadAtById] = useState<'
+    );
+    expect(source).toContain('>({});');
+    expect(source).toContain(
+      'const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(null);'
+    );
+    expect(source).toContain('setThreadReadAtById(readThreadReadState());');
+    expect(source).toContain('setTasksSeenAt(readTasksSeenAt());');
+    expect(source).not.toContain(
+      'useState<Record<string, string>>(readThreadReadState)'
+    );
+    expect(source).not.toContain(
+      'useState<string | null>(\n    readTasksSeenAt'
+    );
   });
 
   it('renders the canonical navigation in exact order and no forbidden primary rows', () => {
