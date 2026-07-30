@@ -72,7 +72,7 @@ describe('DevToolbarGate production + path gating', () => {
     ).toBe(false);
   });
 
-  it('renders for non-production (dev/preview) on normal app routes', () => {
+  it('renders only for local development on normal app routes', () => {
     expect(
       shouldRenderDevToolbar({
         env: 'development',
@@ -86,7 +86,14 @@ describe('DevToolbarGate production + path gating', () => {
         pathname: '/app/dashboard',
         nodeEnv: 'production',
       })
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      shouldRenderDevToolbar({
+        env: 'preview',
+        pathname: '/app/dashboard',
+        nodeEnv: 'development',
+      })
+    ).toBe(false);
   });
 
   it('respects disabled / demo / electron / dev-chrome-disabled flags', () => {
