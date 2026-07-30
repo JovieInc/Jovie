@@ -169,9 +169,9 @@ describe('OpportunityInboxPageClient', () => {
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
     expect(screen.getByText('Your Inbox Is Clear')).toBeInTheDocument();
-    expect(screen.getByTestId('opportunity-inbox-empty-cta')).toHaveTextContent(
-      'Connect catalog'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Connect catalog' })
+    ).toHaveAttribute('href', '/app/settings/artist-profile');
   });
 
   it('filters cards by signal type and restores them on All', () => {
