@@ -36,6 +36,7 @@ const electronRuntimeMock = vi.hoisted(() => ({
 }));
 
 const signOutMock = vi.hoisted(() => vi.fn());
+const userButtonPropsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/desktop/electron-bridge', () => ({
   useIsElectronRuntime: () => electronRuntimeMock.isElectronRuntime,
@@ -58,7 +59,10 @@ vi.mock('@/components/shell/HeaderSearchSurfaceFromContext', () => ({
 }));
 
 vi.mock('@/components/organisms/user-button', () => ({
-  UserButton: () => <div data-testid='user-button' />,
+  UserButton: (props: { readonly showUserInfo?: boolean }) => {
+    userButtonPropsMock(props);
+    return <div data-testid='user-button' />;
+  },
 }));
 
 vi.mock('@/features/feedback/SidebarUpgradeBanner', () => ({
@@ -163,6 +167,7 @@ describe('UnifiedSidebar library route', () => {
   afterEach(() => {
     electronRuntimeMock.isElectronRuntime = true;
     signOutMock.mockReset();
+    userButtonPropsMock.mockReset();
     resetDashboardNavTestMocks();
     unifiedPathnameMock.mockReset();
     unifiedPathnameMock.mockReturnValue(APP_ROUTES.CHAT);
@@ -180,6 +185,9 @@ describe('UnifiedSidebar library route', () => {
       screen.queryByRole('link', { name: 'Back to App' })
     ).not.toBeInTheDocument();
     expect(screen.getByTestId('user-button')).toBeInTheDocument();
+    expect(userButtonPropsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ showUserInfo: true })
+    );
     expect(
       screen.getByTestId('user-button').parentElement?.parentElement
         ?.parentElement

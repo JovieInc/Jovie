@@ -67,6 +67,14 @@ export const contactsNavItem: NavItem = {
   description: 'Manage artist contacts',
 };
 
+export const profilesNavItem: NavItem = {
+  name: 'Profiles',
+  href: APP_ROUTES.PROFILES,
+  id: 'profiles',
+  icon: UserCircle,
+  description: 'Manage artist profiles and connected identities',
+};
+
 export const calendarNavItem: NavItem = {
   name: 'Calendar',
   href: APP_ROUTES.CALENDAR,
@@ -92,6 +100,7 @@ export const primaryNavigation = [
   inboxNavItem,
   libraryNavItem,
   contactsNavItem,
+  profilesNavItem,
   calendarNavItem,
   tasksNavItem,
 ] as const satisfies readonly NavItem[];

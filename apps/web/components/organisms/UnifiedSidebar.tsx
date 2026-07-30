@@ -6,7 +6,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@jovie/ui';
-import { ArrowLeft, Copy, LogOut, RefreshCw, Settings } from 'lucide-react';
+import { ArrowLeft, Copy, LogOut, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -525,23 +525,15 @@ export function UnifiedSidebar({
         // (sidebar peer + shell mount both h-full), SidebarContent's flex-1
         // absorbs free space so Settings + Now Playing + banners pin bottom.
         <SidebarFooter className='mt-auto gap-0 px-0 py-0'>
-          {/* Bottom Settings button opens the existing user menu via UserButton.
-              Uses Sidebar atoms for native feel (icon + label, tooltip in icon mode).
-              Placed above Now Playing / audio area. */}
+          {/* The footer is the shell's single identity entry. UserButton owns both
+              the avatar/name trigger and its existing settings menu. */}
           <div className='min-h-(--app-shell-footer-row-height) border-t border-(--linear-border-subtle) px-2.5 py-0.5'>
             <SidebarMenu>
               <SidebarMenuItem>
                 <UserButton
                   profileHref={profileHref}
                   settingsHref={APP_ROUTES.SETTINGS}
-                  trigger={
-                    <SidebarMenuButton tooltip='Settings'>
-                      <Settings className='size-3.5' />
-                      <span className='truncate group-data-[collapsible=icon]:hidden'>
-                        Settings
-                      </span>
-                    </SidebarMenuButton>
-                  }
+                  showUserInfo
                 />
               </SidebarMenuItem>
             </SidebarMenu>

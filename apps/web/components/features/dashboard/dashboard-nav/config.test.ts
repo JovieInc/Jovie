@@ -6,11 +6,12 @@ import {
   primaryNavigation,
 } from './config';
 
-const CANONICAL_SIX = [
+const CANONICAL_NAVIGATION = [
   ['chat', 'New Chat', APP_ROUTES.CHAT],
   ['inbox', 'Inbox', APP_ROUTES.DASHBOARD],
   ['library', 'Library', APP_ROUTES.LIBRARY],
   ['contacts', 'Contacts', APP_ROUTES.CONTACTS],
+  ['profiles', 'Profiles', APP_ROUTES.PROFILES],
   ['calendar', 'Calendar', APP_ROUTES.CALENDAR],
   ['tasks', 'Tasks', APP_ROUTES.TASKS],
 ] as const;
@@ -20,17 +21,17 @@ function toContract(items: readonly (typeof primaryNavigation)[number][]) {
 }
 
 describe('canonical customer shell navigation', () => {
-  it('keeps New Chat as the elevated first action in the exact customer order', () => {
-    expect(toContract(primaryNavigation)).toEqual(CANONICAL_SIX);
+  it('keeps New Chat as the elevated first action and Profiles in the canonical order', () => {
+    expect(toContract(primaryNavigation)).toEqual(CANONICAL_NAVIGATION);
     expect(primaryNavigation[0].tone).toBe('primary');
   });
 
   it('detects missing and reordered canonical destinations', () => {
     expect(toContract(primaryNavigation.slice(0, -1))).not.toEqual(
-      CANONICAL_SIX
+      CANONICAL_NAVIGATION
     );
     expect(toContract([...primaryNavigation].reverse())).not.toEqual(
-      CANONICAL_SIX
+      CANONICAL_NAVIGATION
     );
   });
 
@@ -49,27 +50,15 @@ describe('canonical customer shell navigation', () => {
     }
   });
 
-  it('excludes retired primary destinations while preserving route constants', () => {
+  it('excludes retired primary destinations while preserving the Profiles route', () => {
     const ids = primaryNavigation.map(item => item.id);
     const labels = primaryNavigation.map(item => item.name);
 
     expect(ids).not.toEqual(
-      expect.arrayContaining([
-        'search',
-        'touring',
-        'audience',
-        'profiles',
-        'releases',
-      ])
+      expect.arrayContaining(['search', 'touring', 'audience', 'releases'])
     );
     expect(labels).not.toEqual(
-      expect.arrayContaining([
-        'Search',
-        'Touring',
-        'Audience',
-        'Profiles',
-        'Releases',
-      ])
+      expect.arrayContaining(['Search', 'Touring', 'Audience', 'Releases'])
     );
     expect(APP_ROUTES.TOUR_DATES).toBe('/app/tour-dates');
     expect(APP_ROUTES.AUDIENCE).toBe('/app/audience');

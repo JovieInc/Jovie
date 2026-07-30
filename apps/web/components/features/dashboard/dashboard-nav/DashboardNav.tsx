@@ -40,7 +40,6 @@ import {
 } from './config';
 import { NavMenuItem } from './NavMenuItem';
 import { isLibraryNavigationRoute } from './navigation-state';
-import { SidebarProfileButton } from './SidebarProfileButton';
 import type { DashboardNavProps, NavItem } from './types';
 
 type DashboardNavSection = {
@@ -139,7 +138,6 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(
     readTasksSeenAt
   );
-  const artistName = selectedProfile?.displayName?.trim();
   const profileId = selectedProfile?.id ?? '';
   const isDemo = isDemoRoutePath(pathname);
   const telemetryContext = useMemo<NavigationTelemetryContext>(
@@ -507,15 +505,6 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                   )}
                 </div>
               ))}
-              <div className='my-1.5' aria-hidden='true' />
-              <div data-nav-section='artist'>
-                <SidebarMenu className='gap-px'>
-                  <SidebarProfileButton
-                    displayName={artistName || 'Artist'}
-                    avatarUrl={selectedProfile?.avatarUrl}
-                  />
-                </SidebarMenu>
-              </div>
             </SidebarGroupContent>
           </SidebarGroup>
         )}

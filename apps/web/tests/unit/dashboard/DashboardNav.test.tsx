@@ -21,6 +21,7 @@ const CANONICAL_NAV = [
   ['Inbox', APP_ROUTES.DASHBOARD],
   ['Library', APP_ROUTES.LIBRARY],
   ['Contacts', APP_ROUTES.CONTACTS],
+  ['Profiles', APP_ROUTES.PROFILES],
   ['Calendar', APP_ROUTES.CALENDAR],
   ['Tasks', APP_ROUTES.TASKS],
 ] as const;
@@ -29,7 +30,6 @@ const FORBIDDEN_PRIMARY_LABELS = [
   'Search',
   'Touring',
   'Audience',
-  'Profiles',
   'Releases',
 ] as const;
 
@@ -44,7 +44,7 @@ describe('DashboardNav', () => {
     resetDashboardNavTestMocks();
   });
 
-  it('renders the canonical six in exact order and no forbidden primary rows', () => {
+  it('renders the canonical navigation in exact order and no forbidden primary rows', () => {
     const { container, getByRole, queryByRole } = renderDashboardNav({
       renderFn: fastRender,
     });
@@ -61,7 +61,11 @@ describe('DashboardNav', () => {
       expect(queryByRole('button', { name: label })).toBeNull();
     }
 
-    expect(getByRole('button', { name: 'Open Artist profile' })).toBeDefined();
+    expect(getByRole('link', { name: 'Profiles' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.PROFILES
+    );
+    expect(queryByRole('button', { name: 'Open Artist profile' })).toBeNull();
     expect(queryByRole('link', { name: 'Settings' })).toBeNull();
   });
 
@@ -84,7 +88,7 @@ describe('DashboardNav', () => {
     expect(search.parentElement).toHaveClass('h-7', 'shrink-0');
   });
 
-  it('keeps the canonical six visible without rollout state', () => {
+  it('keeps the canonical navigation visible without rollout state', () => {
     const { container } = renderDashboardNav({
       renderFn: fastRender,
     });
@@ -158,8 +162,8 @@ describe('DashboardNav', () => {
     expect(admin.queryByRole('link', { name: 'People' })).toBeNull();
   });
 
-  it('renders the artist row separately from primary navigation', () => {
-    const { container, getByRole } = renderDashboardNav({
+  it('does not render a duplicate artist avatar row', () => {
+    const { container, queryByRole } = renderDashboardNav({
       renderFn: fastRender,
       overrides: {
         selectedProfile: {
@@ -172,16 +176,11 @@ describe('DashboardNav', () => {
     });
 
     const primarySection = container.querySelector('[data-nav-section]');
-    const artistSection = container.querySelector(
-      '[data-nav-section="artist"]'
-    );
-    const artistButton = getByRole('button', {
-      name: 'Open Tim White profile',
-    });
-
-    expect(primarySection).not.toContainElement(artistButton);
-    expect(artistSection).toContainElement(artistButton);
-    expect(artistSection?.textContent).toContain('Tim White');
+    expect(primarySection).toBeInTheDocument();
+    expect(container.querySelector('[data-nav-section="artist"]')).toBeNull();
+    expect(
+      queryByRole('button', { name: 'Open Tim White profile' })
+    ).toBeNull();
   });
 
   it('applies active state to the canonical library route and legacy aliases', () => {
@@ -306,7 +305,7 @@ describe('DashboardNav', () => {
       sidebarProps: { defaultOpen: false },
     });
 
-    expect(primaryLinks(container)).toHaveLength(6);
+    expect(primaryLinks(container)).toHaveLength(7);
     expect(getByRole('link', { name: 'New Chat' }).className).toContain(
       'group-data-[collapsible=icon]:justify-center'
     );
