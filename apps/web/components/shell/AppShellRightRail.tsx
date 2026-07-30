@@ -10,11 +10,12 @@ export interface AppShellRightRailProps {
 /**
  * Shared AppShell right-rail frame slot.
  *
- * Owns the sticky structural container that sits beside the main scroll clip in
- * AppShellFrame. Card elevation, borders, and drawer width animation live in
- * RightDrawer / EntitySidebarShell / DrawerSurfaceCard — this primitive only
- * pins the rail outside route-owned scroll so list and grid surfaces do not
- * drag the context panel along with them.
+ * Owns the sticky structural container that sits beside the entire main plane
+ * in AppShellFrame. On desktop it is a sibling of the main card, so a drawer
+ * width is layout allocation that narrows the header and route surface rather
+ * than an overlay on top of either. Card elevation, borders, and drawer width
+ * animation live in RightDrawer / EntitySidebarShell / DrawerSurfaceCard.
+ * Mobile continues to be owned by RightDrawer's fixed sheet adapter.
  *
  * Usage (normally composed by AppShellFrame):
  *   <AppShellRightRail>
@@ -36,7 +37,7 @@ export function AppShellRightRail({
         // self-stretch (not self-start): the rail sits beside the non-scrolling
         // shell clip and must fill the content-row height so open drawers clip
         // inside the rail instead of floating over the transcript (JOV-3958).
-        'sticky top-0 z-30 lg:z-10 flex h-full min-h-0 shrink-0 flex-col self-stretch overflow-hidden',
+        'sticky top-0 z-30 flex h-full min-h-0 w-0 shrink-0 flex-col self-stretch overflow-hidden lg:z-10 lg:w-fit',
         // Mirror the left sidebar mount language so inner drawer width changes
         // reclaim canvas space with the same cinematic timing.
         'transition-[flex-basis,width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none',

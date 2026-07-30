@@ -29,7 +29,7 @@ describe('AppShellFrame', () => {
     // #main-content keeps its full rounded shell radius — no Electron override
     // strips the top corners now that the header lives inside the card.
     expect(mainContent).toHaveClass('lg:rounded-(--app-shell-radius)');
-    expect(mainContent.querySelector('div.flex.flex-1')).toHaveClass(
+    expect(mainContent.closest('[data-app-shell-main-plane]')).toHaveClass(
       'lg:gap-(--app-shell-gap)'
     );
     expect(screen.getByText('Sidebar')).toBeInTheDocument();
@@ -40,7 +40,7 @@ describe('AppShellFrame', () => {
     expect(mainContent).toContainElement(headers[0] as HTMLElement);
   });
 
-  it('keeps the right rail outside the non-scrolling shell clip', () => {
+  it('allocates the right rail beside the complete main plane instead of overlaying route content', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}
@@ -56,11 +56,23 @@ describe('AppShellFrame', () => {
     expect(scrollPane).toHaveClass('overflow-hidden');
     expect(scrollPane).not.toHaveClass('overflow-y-auto');
     expect(scrollPane).toContainElement(screen.getByText('Main Content'));
+    const mainPlane = screen.getByTestId('app-shell-right-rail').parentElement;
+
+    expect(mainPlane).toHaveAttribute('data-app-shell-main-plane', 'true');
+    expect(mainPlane).toContainElement(screen.getByRole('main'));
+    expect(mainPlane).toContainElement(rightRail);
+    expect(screen.getByRole('main')).not.toContainElement(rightRail);
     expect(scrollPane).not.toContainElement(rightRail);
     expect(rightRail).toContainElement(
       screen.getByTestId('fixture-right-rail')
     );
     expect(rightRail).toHaveClass('sticky', 'top-0');
+    expect(mainPlane).toHaveClass(
+      'transition-[gap,flex-basis,width]',
+      'duration-cinematic',
+      'motion-reduce:transition-none',
+      'lg:gap-(--app-shell-gap)'
+    );
   });
 
   it('reserves dev-toolbar height inside the shell scroll pane', () => {
@@ -125,8 +137,10 @@ describe('AppShellFrame', () => {
       />
     );
 
-    expect(screen.getByTestId('app-shell-scroll').parentElement).toHaveClass(
-      'transition-[gap]',
+    const mainPlane = screen.getByTestId('app-shell-right-rail').parentElement;
+
+    expect(mainPlane).toHaveClass(
+      'transition-[gap,flex-basis,width]',
       'duration-cinematic',
       'motion-reduce:transition-none'
     );
