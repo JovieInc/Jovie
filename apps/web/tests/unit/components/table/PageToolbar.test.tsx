@@ -5,6 +5,9 @@ import { Search } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  PAGE_TOOLBAR_TAB_ACTIVE_CLASS,
+  PAGE_TOOLBAR_TAB_BUTTON_CLASS,
   PageToolbar,
   PageToolbarActionButton,
   PageToolbarTabButton,
@@ -63,6 +66,22 @@ describe('PageToolbar buttons', () => {
 
     const button = screen.getByRole('button', { name: 'Releases' });
     expect(button).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('keeps inactive view tabs quiet and gives the active view a surface, not a ring', () => {
+    expect(PAGE_TOOLBAR_TAB_BUTTON_CLASS).toContain('text-tertiary-token');
+    expect(PAGE_TOOLBAR_TAB_ACTIVE_CLASS).toContain('bg-surface-1');
+    expect(PAGE_TOOLBAR_TAB_ACTIVE_CLASS).not.toContain('ring-');
+  });
+
+  it('keeps toolbar actions borderless and transparent until hover or keyboard focus', () => {
+    expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain('rounded-full');
+    expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain('border-0');
+    expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain('bg-transparent');
+    expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain('hover:bg-surface-1');
+    expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain(
+      'focus-visible:bg-surface-1'
+    );
   });
 
   it('keeps icon-only actions accessible', () => {

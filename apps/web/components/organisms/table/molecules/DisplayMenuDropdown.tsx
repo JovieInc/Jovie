@@ -5,6 +5,7 @@ import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { LayoutGrid, LayoutList, Settings2, X } from 'lucide-react';
 import { memo, type ReactNode, useCallback } from 'react';
 import { cn } from '@/lib/utils';
+import { PAGE_TOOLBAR_ACTION_BUTTON_CLASS } from './PageToolbar';
 
 export type ViewMode = 'list' | 'board';
 export type Density = 'compact' | 'normal' | 'comfortable';
@@ -141,7 +142,10 @@ export function DisplayMenuDropdown({
   const defaultTrigger = (
     <button
       type='button'
-      className='inline-flex items-center gap-1.5 rounded-full border border-transparent px-2 py-1 text-app font-caption text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
+      className={cn(
+        PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+        'px-2 text-app text-secondary-token'
+      )}
     >
       <Settings2 className='h-4 w-4' />
       Display
@@ -159,7 +163,7 @@ export function DisplayMenuDropdown({
           </span>
           <PopoverPrimitive.Close
             aria-label='Close'
-            className='rounded-full border border-transparent p-0.5 text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-subtle hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1'
+            className='rounded-full border-0 bg-transparent p-1 text-tertiary-token shadow-none transition-[background-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none'
           >
             <X className='h-4 w-4' />
           </PopoverPrimitive.Close>

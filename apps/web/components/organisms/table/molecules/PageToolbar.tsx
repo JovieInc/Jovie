@@ -21,14 +21,13 @@ export const PAGE_TOOLBAR_META_TEXT_CLASS =
   'text-xs text-tertiary-token tabular-nums';
 
 export const PAGE_TOOLBAR_TAB_BUTTON_CLASS =
-  'inline-flex h-7.5 items-center justify-center gap-1.5 rounded-pill bg-transparent px-2.5 text-2xs font-caption font-[540] tracking-tight text-secondary-token shadow-none transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 disabled:pointer-events-none disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5';
+  'inline-flex h-7.5 items-center justify-center gap-1.5 rounded-pill bg-transparent px-2.5 text-2xs font-caption font-[540] tracking-tight text-tertiary-token shadow-none transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 disabled:pointer-events-none disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5';
 
-export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS =
-  'ring-2 ring-(--color-accent) text-primary-token';
+export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS = 'bg-surface-1 text-primary-token';
 
 export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(
   ACTION_BAR_BUTTON_CLASS,
-  'h-7 rounded-full border-0 bg-transparent px-2 text-2xs font-[540] text-tertiary-token shadow-none hover:border-0 hover:bg-(--linear-row-hover) hover:text-primary-token hover:shadow-none focus-visible:border-0 focus-visible:bg-(--linear-row-hover) focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-0 active:border-0 active:bg-(--linear-row-hover) active:text-primary-token active:shadow-none disabled:pointer-events-none disabled:bg-transparent disabled:opacity-35 [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-7 rounded-full border-0 bg-transparent px-2 text-2xs font-[540] text-tertiary-token shadow-none hover:border-0 hover:bg-surface-1 hover:text-primary-token hover:shadow-none focus-visible:border-0 focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-0 active:border-0 active:bg-surface-1 active:text-primary-token active:shadow-none disabled:pointer-events-none disabled:bg-transparent disabled:opacity-35 [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS =
