@@ -120,6 +120,10 @@ export function EmailCodeAuthForm({
 }: EmailCodeAuthFormProps) {
   const searchParams = useSearchParams();
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuthSafe();
+  // Match SSR on the first client pass. Better Auth can expose a cached
+  // session before hydration, but returning null here would replace the form
+  // that the server rendered and trigger a hydration mismatch.
+  const [hasHydrated, setHasHydrated] = useState(false);
   const [step, setStep] = useState<EmailCodeStep>('email');
   const [emailAddress, setEmailAddress] = useState(initialEmailAddress ?? '');
   const [code, setCode] = useState('');
@@ -134,6 +138,10 @@ export function EmailCodeAuthForm({
     const destination = getClientAuthenticatedAuthEntryRedirect(searchParams);
     globalThis.location?.assign(destination);
   }, [searchParams]);
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
   // Notify the parent when the OTP code-entry/lockout step is active so One
   // Tap can be suppressed (plan design row 20). `'email'` = inactive; `'code'`
@@ -298,7 +306,7 @@ export function EmailCodeAuthForm({
     }
   }, []);
 
-  if (isAuthLoaded && isSignedIn) {
+  if (hasHydrated && isAuthLoaded && isSignedIn) {
     return null;
   }
 
