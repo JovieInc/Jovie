@@ -1,4 +1,5 @@
 import { render, waitFor } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { replaceMock, searchParamsState, authState } = vi.hoisted(() => ({
@@ -113,5 +114,31 @@ describe('AuthenticatedAuthEntryGuard', () => {
       expect(getByText('Sign-in form')).toBeInTheDocument();
       expect(replaceMock).not.toHaveBeenCalled();
     });
+  });
+
+  it('keeps the server auth markup stable when a browser session cookie exists', () => {
+    document.cookie = '__client_uat=1700000000';
+    authState.isLoaded = false;
+
+    const originalDocument = globalThis.document;
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: undefined,
+    });
+
+    try {
+      const markup = renderToStaticMarkup(
+        <AuthenticatedAuthEntryGuard>
+          <div>Sign-in form</div>
+        </AuthenticatedAuthEntryGuard>
+      );
+
+      expect(markup).toContain('Sign-in form');
+    } finally {
+      Object.defineProperty(globalThis, 'document', {
+        configurable: true,
+        value: originalDocument,
+      });
+    }
   });
 });

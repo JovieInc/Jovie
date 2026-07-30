@@ -23,10 +23,15 @@ export function AuthenticatedAuthEntryGuard({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isLoaded, isSignedIn } = useAuthSafe();
-  const [isRedirecting, setIsRedirecting] = useState(
-    () =>
-      typeof document !== 'undefined' && hasClientAuthSession(document.cookie)
-  );
+  // The initial render must be identical on the server and client. Reading
+  // `document.cookie` from a lazy initializer made an existing session render
+  // `null` during browser hydration while the server had rendered the auth
+  // form, which triggers React hydration error #418 on `/signin`.
+  //
+  // Cookie-based fast redirect remains useful, but it belongs in the effect
+  // after hydration. The server-side auth route already handles the normal
+  // authenticated request path before this client guard mounts.
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     const cookieSignedIn =
