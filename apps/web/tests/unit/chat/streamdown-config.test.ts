@@ -26,6 +26,15 @@ describe('getChatMarkdownStreamdownConfig', () => {
     );
   });
 
+  it('uses an inline paragraph renderer only for entity-adjacent prose', () => {
+    const config = getChatMarkdownStreamdownConfig(false, undefined, true);
+
+    expect(config.components?.p).toBeDefined();
+    expect(config.components?.p).not.toBe(
+      CHAT_MARKDOWN_STATIC_CONFIG.components?.p
+    );
+  });
+
   it('allows GFM table elements (regression: gh-11948 silent table stripping)', () => {
     const config = getChatMarkdownStreamdownConfig(false);
 
