@@ -3,7 +3,12 @@ import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
+import {
+  RightPanelProvider,
+  useRightPanel,
+} from '@/contexts/RightPanelContext';
 import { TableMetaProvider } from '@/contexts/TableMetaContext';
+import { AdminPeopleRightPanelProvider } from '@/features/admin/AdminPeopleRightPanelProvider';
 import { AdminUsersTableUnified } from '@/features/admin/admin-users-table/AdminUsersTableUnified';
 
 const mockUseBreakpointDown = vi.fn<
@@ -111,6 +116,34 @@ const userRow = {
   suppressionFailedAt: null,
 };
 
+function RightPanelOutlet() {
+  return <div data-testid='global-right-rail'>{useRightPanel()}</div>;
+}
+
+function renderUsersTable() {
+  return render(
+    <TooltipProvider>
+      <RightPanelProvider>
+        <AdminPeopleRightPanelProvider>
+          <HeaderActionsProvider>
+            <TableMetaProvider>
+              <AdminUsersTableUnified
+                users={[userRow]}
+                page={1}
+                pageSize={20}
+                total={1}
+                search=''
+                sort='created_desc'
+              />
+            </TableMetaProvider>
+          </HeaderActionsProvider>
+        </AdminPeopleRightPanelProvider>
+        <RightPanelOutlet />
+      </RightPanelProvider>
+    </TooltipProvider>
+  );
+}
+
 describe('AdminUsersTableUnified', () => {
   it('renders mobile cards on small screens', () => {
     mockUseBreakpointDown.mockReturnValue(true);
@@ -129,22 +162,7 @@ describe('AdminUsersTableUnified', () => {
       clearSelection: vi.fn(),
     });
 
-    render(
-      <TooltipProvider>
-        <HeaderActionsProvider>
-          <TableMetaProvider>
-            <AdminUsersTableUnified
-              users={[userRow]}
-              page={1}
-              pageSize={20}
-              total={1}
-              search=''
-              sort='created_desc'
-            />
-          </TableMetaProvider>
-        </HeaderActionsProvider>
-      </TooltipProvider>
-    );
+    renderUsersTable();
 
     expect(screen.getByText('Ari Lane')).toBeInTheDocument();
     expect(screen.getByLabelText('Select Ari Lane')).toBeInTheDocument();
@@ -168,22 +186,7 @@ describe('AdminUsersTableUnified', () => {
       clearSelection: vi.fn(),
     });
 
-    render(
-      <TooltipProvider>
-        <HeaderActionsProvider>
-          <TableMetaProvider>
-            <AdminUsersTableUnified
-              users={[userRow]}
-              page={1}
-              pageSize={20}
-              total={1}
-              search=''
-              sort='created_desc'
-            />
-          </TableMetaProvider>
-        </HeaderActionsProvider>
-      </TooltipProvider>
-    );
+    renderUsersTable();
 
     expect(screen.getByTestId('desktop-table')).toBeInTheDocument();
   });

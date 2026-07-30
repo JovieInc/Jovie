@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import type { SearchParams } from 'nuqs/server';
+import { AdminPeopleRightPanelProvider } from '@/components/features/admin/AdminPeopleRightPanelProvider';
 import { AdminCreatorsPageWrapper } from '@/components/features/admin/admin-creator-profiles/AdminCreatorsPageWrapper';
 import { AdminReleasesPageWrapper } from '@/components/features/admin/admin-releases-table';
 import { AdminUsersTableUnified } from '@/components/features/admin/admin-users-table/AdminUsersTableUnified';
@@ -219,7 +220,7 @@ export default async function AdminPeoplePage({
       testId='admin-people-page'
       viewTestId={`admin-people-view-${view}`}
     >
-      {content}
+      <AdminPeopleRightPanelProvider>{content}</AdminPeopleRightPanelProvider>
     </AdminPage>
   );
 }
