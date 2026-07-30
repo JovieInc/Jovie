@@ -502,7 +502,7 @@ jobs:
           ./node_modules/.bin/vercel alias set "$deployment_url" staging.jov.ie \
             --scope "$VERCEL_ORG_ID"
 
-      - name: Prove staging alias owns the exact deployment and full SHA
+      - name: Prove staging alias owns the SHA-attested exact deployment
         if: ${{ steps.head.outputs.is_current == 'true' }}
         env:
           DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
@@ -534,12 +534,12 @@ jobs:
               >/dev/null 2>&1 <<<"$alias_json"; then
               alias_id="$(jq -r '.id' <<<"$alias_json")"
               alias_state="$(jq -r '.readyState | ascii_upcase' <<<"$alias_json")"
-              alias_commit_sha="$(jq -r '.meta.githubCommitSha // ""' <<<"$alias_json")"
               if [ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ] &&
-                [ "$alias_state" = "READY" ] &&
-                [[ "$alias_commit_sha" =~ ^[0-9a-f]{40}$ ]] &&
-                [ "$alias_commit_sha" = "$EXPECTED_COMMIT_SHA" ]; then
-                echo "staging.jov.ie owns exact READY deployment $alias_id at $alias_commit_sha."
+                [ "$alias_state" = "READY" ]; then
+                # resolve-deployment has already bound this ID to the full
+                # EXPECTED_COMMIT_SHA via Vercel's deployment API. The alias
+                # inspect shape does not consistently expose deployment meta.
+                echo "staging.jov.ie owns SHA-attested exact READY deployment $alias_id at $EXPECTED_COMMIT_SHA."
                 break
               fi
             fi
