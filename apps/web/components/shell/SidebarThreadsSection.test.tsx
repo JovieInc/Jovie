@@ -24,7 +24,7 @@ const threads: SidebarThread[] = [
 ];
 
 describe('SidebarThreadsSection', () => {
-  it('anchors a long thread title fade to the row track instead of shrink-wrapping it', () => {
+  it('keeps a long thread title on the full middle track when chat actions are present', () => {
     const title =
       'Reply with exactly one short sentence confirming the artist release plan';
 
@@ -40,6 +40,7 @@ describe('SidebarThreadsSection', () => {
           },
         ]}
         activeThreadId={null}
+        onThreadContextMenu={vi.fn()}
         tight
         collapsed={false}
       />
@@ -50,6 +51,13 @@ describe('SidebarThreadsSection', () => {
     expect(label).toHaveClass('justify-self-stretch', 'overflow-hidden');
     expect(label).not.toHaveClass('justify-self-start', 'truncate');
     expect(label.className).toContain('mask-image:linear-gradient');
+    expect(screen.getByRole('link', { name: title })).toHaveClass(
+      'grid-cols-[22px_minmax(0,1fr)_20px]'
+    );
+    expect(screen.getByRole('link', { name: title })).not.toHaveClass('pr-8');
+    expect(
+      screen.getByRole('button', { name: `Chat Actions for ${title}` })
+    ).toHaveClass('right-2.5');
   });
 
   it('renders dense thread links with canonical shell row state', () => {
