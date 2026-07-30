@@ -10,6 +10,7 @@ import {
   Globe2,
   LockKeyhole,
   RefreshCw,
+  UserRound,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -21,6 +22,7 @@ import {
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   PageToolbar,
@@ -354,9 +356,16 @@ export function ProfilesWorkspace({
   if (!data) {
     return (
       <PageShell data-testid='profiles-workspace'>
-        <TableEmptyState
-          title='No artist profile selected'
-          description='Select or claim an artist profile to monitor its presence.'
+        <EmptyState
+          icon={<UserRound className='h-5 w-5' aria-hidden />}
+          heading='No Artist Profile Selected'
+          description='Set up an artist profile to monitor its presence.'
+          action={{
+            label: 'Set Up Artist Profile',
+            href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+          }}
+          testId='profiles-workspace-empty-state'
+          className='min-h-75'
         />
       </PageShell>
     );
