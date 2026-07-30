@@ -10,6 +10,7 @@ const {
   mockEnsureDevTestAuthActor,
   mockEnsureExistingDevTestAuthActor,
   mockEnsureLiveDevTestAuthActor,
+  mockGetSyntheticDevTestAuthActor,
   mockGetCachedDevTestAuthSession,
   mockGetDevTestAuthAvailability,
   mockIsTrustedTestBypassRequest,
@@ -26,6 +27,7 @@ const {
   mockEnsureDevTestAuthActor: vi.fn(),
   mockEnsureExistingDevTestAuthActor: vi.fn(),
   mockEnsureLiveDevTestAuthActor: vi.fn(),
+  mockGetSyntheticDevTestAuthActor: vi.fn(),
   mockGetCachedDevTestAuthSession: vi.fn(),
   mockGetDevTestAuthAvailability: vi.fn(),
   mockIsTrustedTestBypassRequest: vi.fn(),
@@ -53,6 +55,7 @@ vi.mock('@/lib/auth/dev-test-auth.server', () => ({
   ensureDevTestAuthActor: mockEnsureDevTestAuthActor,
   ensureExistingDevTestAuthActor: mockEnsureExistingDevTestAuthActor,
   ensureLiveDevTestAuthActor: mockEnsureLiveDevTestAuthActor,
+  getSyntheticDevTestAuthActor: mockGetSyntheticDevTestAuthActor,
   getCachedDevTestAuthSession: mockGetCachedDevTestAuthSession,
   getDevTestAuthAvailability: mockGetDevTestAuthAvailability,
   parseDevTestAuthPersona: mockParseDevTestAuthPersona,
@@ -510,6 +513,51 @@ describe('dev test-auth routes', () => {
     expect(response.headers.get('set-cookie')).not.toContain(
       'better-auth.session_token'
     );
+  });
+
+  it('uses a synthetic test-mode actor only for the database-free visual capture lane', async () => {
+    vi.stubEnv('E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH', '1');
+    mockEnsureDevTestAuthActor.mockRejectedValueOnce(
+      new Error('database unavailable')
+    );
+    mockGetSyntheticDevTestAuthActor.mockReturnValueOnce({
+      persona: 'creator-ready',
+      clerkUserId: 'synthetic_creator_ready',
+      email: 'browse-ready+clerk_test@jov.ie',
+      username: 'browse-ready-user',
+      fullName: 'Browse Ready User',
+      isAdmin: false,
+      profilePath: '/browse-ready-user',
+    });
+
+    const { GET } = await import('@/app/api/dev/test-auth/enter/route');
+    const response = await GET(
+      new NextRequest(
+        'http://localhost:3000/api/dev/test-auth/enter?persona=creator-ready&redirect=/app/chat'
+      )
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toBe('/app/chat');
+    expect(mockGetSyntheticDevTestAuthActor).toHaveBeenCalledWith(
+      'creator-ready'
+    );
+  });
+
+  it('does not synthesize an actor outside the explicit visual capture lane', async () => {
+    mockEnsureDevTestAuthActor.mockRejectedValueOnce(
+      new Error('database unavailable')
+    );
+    const { GET } = await import('@/app/api/dev/test-auth/enter/route');
+
+    await expect(
+      GET(
+        new NextRequest(
+          'http://localhost:3000/api/dev/test-auth/enter?persona=creator-ready&redirect=/app/chat'
+        )
+      )
+    ).rejects.toThrow('database unavailable');
+    expect(mockGetSyntheticDevTestAuthActor).not.toHaveBeenCalled();
   });
 
   it('adds a genuine Better Auth cookie only for explicit performance mode', async () => {
