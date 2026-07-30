@@ -286,7 +286,8 @@ jobs:
                 --env SESSION_SECRET \
                 --env AI_GATEWAY_API_KEY \
                 --env NEXT_PUBLIC_TURNSTILE_SITE_KEY \
-                --env TURNSTILE_SECRET_KEY; then
+                --env TURNSTILE_SECRET_KEY \
+                --meta "githubCommitSha=${VERCEL_GIT_COMMIT_SHA}"; then
                 break
               fi
               echo "Vercel deploy attempt $i failed, retrying in 10s..."
@@ -533,8 +534,12 @@ jobs:
               >/dev/null 2>&1 <<<"$alias_json"; then
               alias_id="$(jq -r '.id' <<<"$alias_json")"
               alias_state="$(jq -r '.readyState | ascii_upcase' <<<"$alias_json")"
-              if [ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ] && [ "$alias_state" = "READY" ]; then
-                echo "staging.jov.ie owns exact READY deployment $alias_id at $EXPECTED_COMMIT_SHA."
+              alias_commit_sha="$(jq -r '.meta.githubCommitSha // ""' <<<"$alias_json")"
+              if [ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ] &&
+                [ "$alias_state" = "READY" ] &&
+                [[ "$alias_commit_sha" =~ ^[0-9a-f]{40}$ ]] &&
+                [ "$alias_commit_sha" = "$EXPECTED_COMMIT_SHA" ]; then
+                echo "staging.jov.ie owns exact READY deployment $alias_id at $alias_commit_sha."
                 break
               fi
             fi
