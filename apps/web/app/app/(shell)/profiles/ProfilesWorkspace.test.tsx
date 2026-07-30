@@ -73,6 +73,20 @@ const data: ProfilesWorkspaceData = {
 };
 
 describe('ProfilesWorkspace', () => {
+  it('uses the canonical empty state with a direct artist-profile action', () => {
+    render(<ProfilesWorkspace data={null} />);
+
+    expect(
+      screen.getByTestId('profiles-workspace-empty-state')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'No Artist Profile Selected' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Set Up Artist Profile' })
+    ).toHaveAttribute('href', '/app/settings/artist-profile');
+  });
+
   it('filters the unified table without exposing locked rank values', () => {
     render(<ProfilesWorkspace data={data} />);
 
