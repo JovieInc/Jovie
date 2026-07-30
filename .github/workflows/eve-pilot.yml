@@ -38,7 +38,10 @@ jobs:
           node-version: '24'
           cache: pnpm
           cache-dependency-path: apps/eve-pilot/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
+      # The pilot is intentionally excluded from the root workspace and owns its
+      # own lockfile. Ignore the parent workspace so pnpm installs this unit's
+      # dependencies instead of the monorepo root graph.
+      - run: pnpm install --ignore-workspace --frozen-lockfile
       - run: pnpm run typecheck
       - run: pnpm run test
       - run: pnpm run build
