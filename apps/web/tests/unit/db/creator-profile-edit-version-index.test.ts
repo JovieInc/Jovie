@@ -42,8 +42,12 @@ describe('creator profile edit-version index', () => {
     const journal = JSON.parse(
       fs.readFileSync(JOURNAL_PATH, 'utf8')
     ) as Journal;
-    const previous = journal.entries.at(-2);
-    const current = journal.entries.at(-1);
+    const currentIndex = journal.entries.findIndex(
+      entry => entry.tag === '0083_first_molly_hayes'
+    );
+    expect(currentIndex).toBeGreaterThan(0);
+    const previous = journal.entries[currentIndex - 1];
+    const current = journal.entries[currentIndex];
 
     expect(previous).toMatchObject({
       idx: 82,
