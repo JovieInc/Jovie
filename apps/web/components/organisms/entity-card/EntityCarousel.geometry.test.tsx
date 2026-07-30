@@ -239,10 +239,14 @@ describe('EntityCarousel profile geometry', () => {
 
     const previous = screen.getByRole('button', { name: 'Previous Item' });
     const next = screen.getByRole('button', { name: 'Next Item' });
+    expect(carousel.parentElement).toHaveClass('h-fit');
     expect(previous).toBeDisabled();
     expect(next).toBeEnabled();
+    expect(previous.className).toContain(
+      '[@media(min-width:768px)_and_(hover:hover)_and_(pointer:fine)]:inline-flex'
+    );
+    expect(next.className).not.toContain('md:inline-flex');
     expect(previous.className).toContain('group-hover/carousel:opacity-100');
-    expect(next.className).toContain('md:inline-flex');
     expect(screen.getByText('Item 1 of 2')).toBeInTheDocument();
 
     fireEvent.click(next);

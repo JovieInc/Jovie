@@ -92,6 +92,9 @@ describe('ProfilePacCard landscape states', () => {
       screen.getByRole('textbox', { name: /email address/i })
     ).toBeVisible();
     expect(screen.getByRole('button', { name: 'Get Updates' })).toBeVisible();
-    expect(card.querySelector('.aspect-square')).toHaveClass('hidden');
+    expect(card.querySelector('.aspect-square')).toHaveClass('invisible');
+    expect(screen.getByRole('textbox').closest('.absolute')).toHaveClass(
+      'inset-1.5'
+    );
   });
 });
