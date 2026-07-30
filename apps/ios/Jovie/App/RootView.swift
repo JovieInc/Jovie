@@ -17,6 +17,8 @@ private struct AppContentView: View {
   @State private var inboxResponse: MobileActionLoopInboxResponse?
   @State private var isLoadingCalendar = false
   @State private var isLoadingInbox = false
+  @State private var showWhatsNew = false
+  @AppStorage("jovie.whatsNew.lastPresentedVersion") private var lastPresentedWhatsNewVersion: String?
 
   init(
     appState: AppState,
@@ -195,8 +197,16 @@ private struct AppContentView: View {
     // content paint feels intentional rather than a hard cut. Opacity-only, so
     // no layout shift and no decorative spatial motion.
     .animation(JovieMotion.easeOut(duration: JovieMotion.slowDuration), value: appState.route)
+    .sheet(isPresented: $showWhatsNew, onDismiss: markWhatsNewPresented) {
+      JovieWhatsNewView(version: currentAppVersion)
+    }
     .task(id: "\(appState.route)-\(appState.launchMode)") {
       guard appState.route == .ready else { return }
+      showWhatsNew = WhatsNewPresentationPolicy.shouldPresent(
+        currentVersion: currentAppVersion,
+        lastPresentedVersion: lastPresentedWhatsNewVersion,
+        isEligible: appState.activeUserID != nil
+      )
       await reloadAudienceHighlights(for: appState.activeUserID)
       await reloadActionLoops(for: appState.activeUserID)
     }
@@ -242,6 +252,14 @@ private struct AppContentView: View {
 
       await reloadAudienceHighlights(for: activeUserID)
     }
+  }
+
+  private var currentAppVersion: String {
+    Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+  }
+
+  private func markWhatsNewPresented() {
+    lastPresentedWhatsNewVersion = currentAppVersion
   }
 
   private func handleAutoSendMessage(_ text: String) {
@@ -390,6 +408,63 @@ struct RootView: View {
 
         await appState.handleSignedInUserChange(liveUserID)
       }
+  }
+}
+
+struct WhatsNewPresentationPolicy {
+  static func shouldPresent(
+    currentVersion: String,
+    lastPresentedVersion: String?,
+    isEligible: Bool
+  ) -> Bool {
+    isEligible && currentVersion != lastPresentedVersion
+  }
+}
+
+private struct JovieWhatsNewView: View {
+  let version: String
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: JovieSpacing.large) {
+      HStack {
+        VStack(alignment: .leading, spacing: JovieSpacing.xSmall) {
+          Text("What’s New")
+            .font(JovieFont.display(size: 24))
+            .foregroundStyle(JovieColor.textPrimary)
+          Text("Version \(version)")
+            .font(JovieFont.body(size: 14))
+            .foregroundStyle(JovieColor.textTertiary)
+        }
+        Spacer()
+        Image(systemName: "sparkles")
+          .font(.title2)
+          .foregroundStyle(JovieColor.accent)
+          .accessibilityHidden(true)
+      }
+
+      VStack(alignment: .leading, spacing: JovieSpacing.medium) {
+        Label("This update is shown once for this app version.", systemImage: "checkmark.circle")
+        Label("Dismiss it anytime with Done.", systemImage: "hand.tap")
+      }
+      .font(JovieFont.body(size: 16))
+      .foregroundStyle(JovieColor.textSecondary)
+
+      Spacer(minLength: 0)
+
+      Button("Done") {
+        dismiss()
+      }
+        .buttonStyle(JoviePillButtonStyle(filled: true))
+        .accessibilityIdentifier("whats-new-done")
+    }
+    .padding(JovieSpacing.large)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .background(JovieColor.backgroundBase)
+    .presentationDetents([.medium])
+    .presentationDragIndicator(.visible)
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("What’s New, version \(version)")
   }
 }
 
