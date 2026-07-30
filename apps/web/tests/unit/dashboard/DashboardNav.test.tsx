@@ -17,8 +17,8 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
 }));
 
 const CANONICAL_NAV = [
+  ['New Chat', APP_ROUTES.CHAT],
   ['Inbox', APP_ROUTES.DASHBOARD],
-  ['Chat', APP_ROUTES.CHAT],
   ['Library', APP_ROUTES.LIBRARY],
   ['Contacts', APP_ROUTES.CONTACTS],
   ['Calendar', APP_ROUTES.CALENDAR],
@@ -87,7 +87,7 @@ describe('DashboardNav', () => {
     });
 
     expect(queryByRole('link', { name: 'Inbox' })).toBeNull();
-    expect(getByRole('link', { name: 'Chat' })).toBeInTheDocument();
+    expect(getByRole('link', { name: 'New Chat' })).toBeInTheDocument();
   });
 
   it('keeps a settled-empty Inbox visible while its root destination is active', () => {
@@ -186,7 +186,7 @@ describe('DashboardNav', () => {
     }
   });
 
-  it('uses Chat as the nav label while preserving the New Chat page title', async () => {
+  it('uses New Chat consistently for the elevated nav action and page title', async () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.CHAT);
     const { generateMetadata } = await import('@/app/app/(shell)/chat/page');
     const metadata = await generateMetadata();
@@ -202,7 +202,7 @@ describe('DashboardNav', () => {
     });
 
     expect(title).toBe('New Chat');
-    expect(getByRole('link', { name: 'Chat' })).toHaveAttribute(
+    expect(getByRole('link', { name: 'New Chat' })).toHaveAttribute(
       'aria-current',
       'page'
     );
@@ -212,23 +212,26 @@ describe('DashboardNav', () => {
     expect(getAllByRole('heading', { name: title, level: 1 })).toHaveLength(1);
   });
 
-  it('does not mark Chat active on a chat thread', () => {
+  it('does not mark New Chat active on a chat thread', () => {
     mockUsePathname.mockReturnValueOnce(`${APP_ROUTES.CHAT}/thread-123`);
     const { getByRole } = renderDashboardNav({ renderFn: fastRender });
 
     expect(
-      getByRole('link', { name: 'Chat' }).getAttribute('aria-current')
+      getByRole('link', { name: 'New Chat' }).getAttribute('aria-current')
     ).toBeNull();
   });
 
-  it('keeps inactive Chat on the default shell tone', () => {
+  it('keeps inactive New Chat on the shared primary shell tone', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.CALENDAR);
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
     });
 
-    const chatLink = getByRole('link', { name: 'Chat' });
-    expect(chatLink).toHaveClass('text-sidebar-item-foreground');
+    const chatLink = getByRole('link', { name: 'New Chat' });
+    expect(chatLink).toHaveClass('text-primary-token');
+    expect(chatLink).toHaveClass(
+      'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)]'
+    );
     expect(chatLink).not.toHaveAttribute('aria-current');
   });
 
@@ -285,7 +288,7 @@ describe('DashboardNav', () => {
     });
 
     expect(primaryLinks(container)).toHaveLength(6);
-    expect(getByRole('link', { name: 'Chat' }).className).toContain(
+    expect(getByRole('link', { name: 'New Chat' }).className).toContain(
       'group-data-[collapsible=icon]:justify-center'
     );
     expect(mockUseChatConversationsQuery).toHaveBeenCalledWith({

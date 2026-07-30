@@ -43,10 +43,11 @@ export const inboxNavItem: NavItem = {
 };
 
 export const chatNavItem: NavItem = {
-  name: 'Chat',
+  name: 'New Chat',
   href: APP_ROUTES.CHAT,
   id: 'chat',
   icon: SquarePen,
+  tone: 'primary',
   description: 'Start a new conversation',
 };
 
@@ -87,8 +88,8 @@ export const tasksNavItem: NavItem = {
  * consumed by desktop and mobile navigation (JOV-3763).
  */
 export const primaryNavigation = [
-  inboxNavItem,
   chatNavItem,
+  inboxNavItem,
   libraryNavItem,
   contactsNavItem,
   calendarNavItem,

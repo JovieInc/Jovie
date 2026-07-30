@@ -37,20 +37,20 @@ const CREATOR_SHELL_SLICE_ROUTES = [
     resolvesDynamicPath: true,
   },
   {
-    id: 'creator-inbox-nav',
-    path: APP_ROUTES.DASHBOARD,
-    measureMode: 'warm-navigation',
-    warmupStrategy: 'authenticated-shell',
-    primaryMetric: 'warm-shell-response',
-    navTrigger: `a[href="${APP_ROUTES.DASHBOARD}"]`,
-  },
-  {
     id: 'creator-chat-nav',
     path: APP_ROUTES.CHAT,
     measureMode: 'warm-navigation',
     warmupStrategy: 'authenticated-shell',
     primaryMetric: 'warm-shell-response',
     navTrigger: `a[href="${APP_ROUTES.CHAT}"]`,
+  },
+  {
+    id: 'creator-inbox-nav',
+    path: APP_ROUTES.DASHBOARD,
+    measureMode: 'warm-navigation',
+    warmupStrategy: 'authenticated-shell',
+    primaryMetric: 'warm-shell-response',
+    navTrigger: `a[href="${APP_ROUTES.DASHBOARD}"]`,
   },
   {
     id: 'creator-library',
@@ -112,14 +112,14 @@ const RELEASE_BUDGET_CREATOR_SHELL_ROUTE_IDS = [
 
 const CANONICAL_SHELL_PERF_PAIRS = [
   {
-    itemId: 'inbox',
-    coldRouteId: 'creator-app-home',
-    warmRouteId: 'creator-inbox-nav',
-  },
-  {
     itemId: 'chat',
     coldRouteId: 'creator-chat',
     warmRouteId: 'creator-chat-nav',
+  },
+  {
+    itemId: 'inbox',
+    coldRouteId: 'creator-app-home',
+    warmRouteId: 'creator-inbox-nav',
   },
   {
     itemId: 'library',
