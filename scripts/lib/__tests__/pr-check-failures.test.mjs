@@ -7,6 +7,7 @@ import {
   classifyQueueCheckBlockers,
   collapseNewestCheckAttempts,
   extractTerminalFailures,
+  isAdvisoryCheck,
   isAgentBranch,
   isTerminalFailure,
   MERGE_GATE_CHECK_NAMES,
@@ -50,6 +51,34 @@ describe('pr-check-failures', () => {
         { bucket: 'fail', name: 'Typecheck' },
       ])
     ).toEqual(['Typecheck']);
+  });
+
+  it('keeps failed merge-queue controller receipts out of product gate classification', () => {
+    const required = [
+      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
+    ];
+    const controllerFailure = {
+      bucket: 'fail',
+      state: 'FAILURE',
+      name: 'enroll',
+      workflow: 'Merge Queue Auto-Enroll',
+    };
+
+    expect(isAdvisoryCheck(controllerFailure)).toBe(true);
+    expect(
+      classifyQueueCheckBlockers([...required, controllerFailure])
+    ).toEqual([]);
+    // A generic job name is not an allow-list escape hatch for a new safety
+    // check in another workflow.
+    expect(
+      classifyQueueCheckBlockers([
+        ...required,
+        { ...controllerFailure, workflow: 'Real Safety Workflow' },
+      ])
+    ).toEqual(['enroll']);
   });
 
   it('derives staged advisory evidence from the manifest and preserves safety gates', () => {

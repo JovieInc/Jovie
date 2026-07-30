@@ -86,6 +86,17 @@ export const ADVISORY_CHECK_NAMES = Object.freeze(
   ].filter((name, index, names) => names.indexOf(name) === index)
 );
 
+// Controller runs are orchestration receipts, never product-quality gates.
+// In particular, a failed controller attempt can be the *effect* of a stale
+// label or transient queue mutation. Treating its `enroll` job as a source-CI
+// failure creates a feedback loop: the next controller run sees its own red
+// receipt, dequeues an otherwise green PR, and keeps it stranded. Scope this
+// by workflow identity rather than by the generic job names so an unrelated
+// `enroll` safety check still fails closed.
+export const ADVISORY_CHECK_WORKFLOWS = Object.freeze([
+  'Merge Queue Auto-Enroll',
+]);
+
 export const REQUIRED_CHECK_NAMES = Object.freeze(
   parseRequiredStatusChecksFromYaml(branchProtectionYaml).map(name => ({
     context: name,
@@ -109,6 +120,13 @@ export function isAdvisoryCheckName(name) {
   return ADVISORY_CHECK_NAMES.includes(name ?? '');
 }
 
+export function isAdvisoryCheck(check) {
+  return (
+    isAdvisoryCheckName(normalizeCheckName(check)) ||
+    ADVISORY_CHECK_WORKFLOWS.includes(check?.workflow ?? '')
+  );
+}
+
 /**
  * Terminal failures only — mirrors scripts/drain-pr-queue.sh check_failures_for_pr.
  * Pending/queued/cancelled runs are not failures.
@@ -127,7 +145,7 @@ export function extractTerminalFailures(checks) {
   for (const check of checks ?? []) {
     if (!isTerminalFailure(check)) continue;
     const name = normalizeCheckName(check);
-    if (isAdvisoryCheckName(name)) continue;
+    if (isAdvisoryCheck(check)) continue;
     names.add(name);
   }
   return [...names].sort();
