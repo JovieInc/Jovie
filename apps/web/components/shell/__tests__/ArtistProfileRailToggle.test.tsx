@@ -33,6 +33,9 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
 }));
 
 vi.mock('@jovie/ui', () => ({
+  Button: ({ children, ...props }: React.ComponentProps<'button'>) => (
+    <button {...props}>{children}</button>
+  ),
   TooltipShortcut: ({ children }: { children: React.ReactNode }) => children,
 }));
 

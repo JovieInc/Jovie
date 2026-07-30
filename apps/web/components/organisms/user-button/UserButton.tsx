@@ -493,10 +493,13 @@ export function UserButton({
     return showUserInfo ? (
       <div
         data-testid='user-button-loading'
-        className='flex w-full items-center gap-2 rounded-md px-2 py-1'
+        className='flex w-full items-center gap-2 rounded-md px-2 py-1 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0'
       >
         <div className='h-6 w-6 shrink-0 rounded-full bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
-        <div className='flex-1'>
+        <div
+          data-user-button-loading-copy
+          className='flex-1 group-data-[collapsible=icon]:hidden'
+        >
           <div className='h-3 w-20 rounded-sm bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
         </div>
       </div>
@@ -582,7 +585,7 @@ export function UserButton({
         variant='dropdown'
         items={dropdownItems}
         trigger={triggerElement}
-        align={trigger ? 'start' : 'end'}
+        align={trigger || showUserInfo ? 'start' : 'end'}
         open={isMenuOpen}
         onOpenChange={setIsMenuOpen}
         contentClassName='w-60 max-w-[calc(100vw-1rem)]'
