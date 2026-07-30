@@ -2,6 +2,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
+import { validateCaptureManifest } from './pr-visual-review.mjs';
 
 const baseUrl = process.env.BASE_URL ?? 'http://127.0.0.1:3100';
 const routes = JSON.parse(process.env.PR_VISUAL_ROUTES ?? '[]');
@@ -112,4 +113,14 @@ await writeFile(
   join(outDir, 'manifest.json'),
   JSON.stringify({ baseUrl, routes, viewports, captures: manifest }, null, 2)
 );
-if (manifest.some(item => item.status === 'failed')) process.exitCode = 1;
+const validation = validateCaptureManifest(
+  { routes, viewports, captures: manifest },
+  { routes, viewportNames: Object.keys(viewports) }
+);
+if (!validation.ok) {
+  await writeFile(
+    join(outDir, 'capture-validation.json'),
+    JSON.stringify(validation, null, 2)
+  );
+  process.exitCode = 1;
+}

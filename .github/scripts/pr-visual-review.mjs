@@ -11,6 +11,8 @@ const GROK_MODEL = /grok[-_ ]?4(?:[._ -]?5)?/i;
 const CODEX_MODEL =
   /(?:gpt[-_ ]?5(?:[._ -]?\d+)?(?:[-_ ]?codex)?|codex[-_ ]?[\w.-]+)/i;
 
+export const REQUIRED_CAPTURE_VIEWPORTS = ['desktop', 'mobile'];
+
 /** @typedef {{ apiKey?: string, baseUrl?: string, model?: string }} ReviewBackend */
 
 export function sanitizeForPrompt(value) {
@@ -41,8 +43,11 @@ export function routeChangedFiles(files) {
     else if (/chat|shell/i.test(file)) routes.add('/app/chat');
     else routes.add('/');
   }
-  // Demo routes are deterministic; chat/shell routes use the seeded test-auth
-  // app surface above so captures show the changed authenticated chrome.
+  // Every UI change gets one deterministic authenticated shell capture. Public
+  // or demo surfaces alone are not evidence that app-shell changes render.
+  routes.add('/app/chat');
+  // Demo routes remain supplemental coverage; the authenticated shell capture
+  // above is required evidence.
   routes.add('/demo');
   return {
     shouldReview: true,
@@ -60,6 +65,55 @@ export function routeChangedFiles(files) {
     reason: 'ui-change',
     review_status: 'advisory',
   };
+}
+
+/**
+ * Validate that a capture manifest proves every requested route at every
+ * required viewport. A partial manifest is evidence of a failed capture, not
+ * a successful run with fewer screenshots.
+ *
+ * @param {{ routes?: unknown, viewports?: unknown, captures?: unknown }} manifest
+ * @param {{ routes?: string[], viewportNames?: string[] }} [expected]
+ */
+export function validateCaptureManifest(manifest, expected = {}) {
+  const routes = expected.routes ?? manifest?.routes;
+  const viewportNames =
+    expected.viewportNames ??
+    (manifest?.viewports && typeof manifest.viewports === 'object'
+      ? Object.keys(manifest.viewports)
+      : REQUIRED_CAPTURE_VIEWPORTS);
+  const captures = Array.isArray(manifest?.captures) ? manifest.captures : [];
+  const failures = [];
+
+  if (!Array.isArray(routes) || routes.length === 0)
+    failures.push('no required routes');
+  if (!Array.isArray(viewportNames) || viewportNames.length === 0)
+    failures.push('no required viewports');
+
+  const byTarget = new Map();
+  for (const capture of captures) {
+    if (!capture || typeof capture !== 'object') continue;
+    const key = `${capture.route ?? ''}::${capture.viewport ?? ''}`;
+    if (byTarget.has(key)) failures.push(`duplicate capture ${key}`);
+    byTarget.set(key, capture);
+  }
+
+  for (const route of Array.isArray(routes) ? routes : []) {
+    for (const viewport of Array.isArray(viewportNames) ? viewportNames : []) {
+      const key = `${route}::${viewport}`;
+      const capture = byTarget.get(key);
+      if (!capture) {
+        failures.push(`missing capture ${key}`);
+        continue;
+      }
+      if (capture.status !== 'captured')
+        failures.push(`failed capture ${key}: ${capture.error ?? 'unknown'}`);
+      if (typeof capture.path !== 'string' || capture.path.length === 0)
+        failures.push(`missing artifact path ${key}`);
+    }
+  }
+
+  return { ok: failures.length === 0, failures };
 }
 
 export function classifyReviewOutcome({
@@ -215,6 +269,8 @@ export function formatReviewBody({
   review,
   runId,
   artifactUrl,
+  prNumber,
+  headSha,
   followUp = null,
 }) {
   const findings = normalizeFindings(review);
@@ -229,7 +285,22 @@ export function formatReviewBody({
           )
           .join('\n')
       : '- None';
-  return `## Visual review (${runId})\n\n${review?.summary ?? 'No summary returned.'}\n\n### Objective findings\n${render(objective)}\n\n### Subjective / taste findings (review-only)\n${render(subjective)}\n\nArtifacts: ${artifactUrl}\n\nFollow-up: ${followUp ?? 'No automatic follow-up created. Subjective findings never create follow-up PRs.'}`;
+  return `${visualReviewIdentity({ prNumber, headSha, runId })}\n## Visual review (${runId})\n\n${review?.summary ?? 'No summary returned.'}\n\n### Objective findings\n${render(objective)}\n\n### Subjective / taste findings (review-only)\n${render(subjective)}\n\nArtifacts: ${artifactUrl}\n\nFollow-up: ${followUp ?? 'No automatic follow-up created. Subjective findings never create follow-up PRs.'}`;
+}
+
+/**
+ * Stable provenance marker for an advisory review. Idempotence is scoped to an
+ * exact PR, head SHA, and Actions run; a stale review must never suppress a
+ * result for a new head or run.
+ */
+export function visualReviewIdentity({ prNumber, headSha, runId }) {
+  if (!/^\d+$/.test(String(prNumber ?? '')))
+    throw new Error('visual review identity requires a PR number');
+  if (!/^[0-9a-f]{40}$/i.test(String(headSha ?? '')))
+    throw new Error('visual review identity requires a 40-character head SHA');
+  if (!/^\d+$/.test(String(runId ?? '')))
+    throw new Error('visual review identity requires an Actions run ID');
+  return `<!-- visual-review:pr=${prNumber};head=${headSha};run=${runId} -->`;
 }
 
 async function main() {

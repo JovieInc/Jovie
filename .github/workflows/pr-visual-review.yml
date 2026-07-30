@@ -151,6 +151,7 @@ jobs:
       CODEX_VISUAL_REVIEW_API_KEY: ${{ secrets.CODEX_VISUAL_REVIEW_API_KEY }}
       CODEX_VISUAL_REVIEW_BASE_URL: ${{ vars.CODEX_VISUAL_REVIEW_BASE_URL || 'https://api.openai.com/v1' }}
       CODEX_VISUAL_REVIEW_MODEL: ${{ vars.CODEX_VISUAL_REVIEW_MODEL || 'gpt-5.2-codex' }}
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
     steps:
       - name: Checkout trusted base helpers
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -201,17 +202,22 @@ jobs:
           set -euo pipefail
           BODY=$(node --input-type=module - <<'NODE'
           import { readFile } from 'node:fs/promises';
-          import { formatReviewBody } from './.github/scripts/pr-visual-review.mjs';
+          import { formatReviewBody, visualReviewIdentity } from './.github/scripts/pr-visual-review.mjs';
           const result = JSON.parse(await readFile('review-result.json', 'utf8'));
           const run = process.env.GITHUB_RUN_ID;
           const body = result.status === 'completed'
-            ? formatReviewBody({ review: result.review, runId: run, artifactUrl: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${run}` })
-            : `## Visual review (${run})\n\n**review_status: ${result.review_status}**\n\n${result.error}\n\nNo findings were generated and this advisory lane does not block merging.`;
+            ? formatReviewBody({ review: result.review, runId: run, artifactUrl: `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${run}`, prNumber: process.env.PR_NUMBER, headSha: process.env.PR_HEAD_SHA })
+            : `${visualReviewIdentity({ prNumber: process.env.PR_NUMBER, headSha: process.env.PR_HEAD_SHA, runId: run })}\n## Visual review (${run})\n\n**review_status: ${result.review_status}**\n\n${result.error}\n\nNo findings were generated and this advisory lane does not block merging.`;
           process.stdout.write(body);
           NODE
           )
-          EXISTING=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews?per_page=100" --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | contains("Visual review ("))) ] | length')
-          if [ "$EXISTING" -gt 0 ]; then echo "Existing visual review found; idempotent no-op."; exit 0; fi
+          MARKER=$(node --input-type=module - <<'NODE'
+          import { visualReviewIdentity } from './.github/scripts/pr-visual-review.mjs';
+          process.stdout.write(visualReviewIdentity({ prNumber: process.env.PR_NUMBER, headSha: process.env.PR_HEAD_SHA, runId: process.env.GITHUB_RUN_ID }));
+          NODE
+          )
+          EXISTING=$(gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews?per_page=100" --jq --arg marker "$MARKER" '((add // []) | any(.[]; .user.login == "github-actions[bot]" and (.body | contains($marker))))')
+          if [ "$EXISTING" = "true" ]; then echo "Exact visual review already exists; idempotent no-op."; exit 0; fi
           jq -n --arg body "$BODY" '{body:$body,event:"COMMENT"}' > review-payload.json
           gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --method POST --input review-payload.json >/dev/null
 
