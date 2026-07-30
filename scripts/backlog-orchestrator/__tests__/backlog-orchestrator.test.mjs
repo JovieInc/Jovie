@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
-import { access, readFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { access, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ORCHESTRATOR_DIR = resolve(__dirname, '..');
+const execFileAsync = promisify(execFile);
 
 const classifier = await import('../classifier.mjs');
 const scorer = await import('../scorer.mjs');
@@ -91,6 +94,20 @@ describe('classifier', () => {
     const c = new classifier.IssueClassification(makeIssue());
     c.category = 'duplicate';
     assert.equal(scorer.scoreIssue(c).score, 0);
+  });
+
+  it('counts only Linear In Progress issues as active shipping leases', () => {
+    assert.deepEqual(
+      scorer.currentShippingLoad([
+        makeIssue({ state: 'Todo' }),
+        makeIssue({ state: 'In Progress' }),
+      ]),
+      { healthy: true, count: 1 }
+    );
+    assert.deepEqual(scorer.currentShippingLoad([]), {
+      healthy: true,
+      count: 0,
+    });
   });
 });
 
@@ -365,6 +382,71 @@ describe('entrypoint contract', () => {
     assert.match(await readFile(executable, 'utf8'), /Deterministic-first/);
     assert.equal(JSON.parse(await readFile(config, 'utf8')).version, 1);
   });
+
+  it('preserves an injected key and falls back to the configured file', async () => {
+    const tempDir = await mkdtemp('/tmp/backlog-wrapper-');
+    const fakeBin = resolve(tempDir, 'bin');
+    await mkdir(fakeBin, { recursive: true });
+    const fakeNode = resolve(fakeBin, 'node');
+    await writeFile(
+      fakeNode,
+      '#!/usr/bin/env bash\nprintf \'%s\\n\' "${LINEAR_API_KEY:-}" > "$WRAPPER_KEY_OUTPUT"\nprintf \'%s\\n\' "$*" > "$WRAPPER_ARGS_OUTPUT"\n'
+    );
+    await execFileAsync('chmod', ['+x', fakeNode]);
+
+    const run = env =>
+      execFileAsync(resolve(ORCHESTRATOR_DIR, 'run-backlog.sh'), ['dry-run'], {
+        env: {
+          ...process.env,
+          ...env,
+          PATH: `${fakeBin}:${process.env.PATH}`,
+        },
+      });
+
+    const keyOutput = resolve(tempDir, 'key');
+    const argsOutput = resolve(tempDir, 'args');
+    await run({
+      HOME: resolve(tempDir, 'missing-home'),
+      LINEAR_API_KEY: 'injected-key',
+      WRAPPER_KEY_OUTPUT: keyOutput,
+      WRAPPER_ARGS_OUTPUT: argsOutput,
+    });
+    assert.equal(await readFile(keyOutput, 'utf8'), 'injected-key\n');
+    assert.equal(
+      await readFile(argsOutput, 'utf8'),
+      'backlog-orchestrator.mjs dry-run\n'
+    );
+
+    const fileHome = resolve(tempDir, 'file-home');
+    await mkdir(resolve(fileHome, '.config/symphony'), { recursive: true });
+    await writeFile(
+      resolve(fileHome, '.config/symphony/linear.env'),
+      'file-key\n'
+    );
+    await run({
+      HOME: fileHome,
+      LINEAR_API_KEY: '',
+      WRAPPER_KEY_OUTPUT: keyOutput,
+      WRAPPER_ARGS_OUTPUT: argsOutput,
+    });
+    assert.equal(await readFile(keyOutput, 'utf8'), 'file-key\n');
+  });
+
+  it('fails clearly when neither credential source exists', async () => {
+    await assert.rejects(
+      execFileAsync(resolve(ORCHESTRATOR_DIR, 'run-backlog.sh'), ['dry-run'], {
+        env: {
+          ...process.env,
+          HOME: '/tmp/no-backlog-credentials',
+          LINEAR_API_KEY: '',
+        },
+      }),
+      error =>
+        /LINEAR_API_KEY is not set and credential file is unavailable/.test(
+          `${error.stderr}`
+        )
+    );
+  });
 });
 
 describe('deterministic Symphony admission boundary', () => {
@@ -437,6 +519,23 @@ describe('deterministic Symphony admission boundary', () => {
     );
     assert.equal(result.admit.length, 0);
     assert.match(result.reason, /synthetic|no eligible/i);
+  });
+
+  it('admits with zero active leases and blocks with one active lease', async () => {
+    const issue = admissionIssue({ identifier: 'JOV-4580' });
+    const noLeases = await admitter.selectNextToAdmit(
+      [classification(issue)],
+      [],
+      { currentlyShipping: 0, productionRed: false }
+    );
+    const oneLease = await admitter.selectNextToAdmit(
+      [classification(issue)],
+      [],
+      { currentlyShipping: 1, productionRed: false }
+    );
+    assert.equal(noLeases.admit.length, 1);
+    assert.equal(oneLease.admit.length, 0);
+    assert.equal(oneLease.reason, 'at capacity (1/1)');
   });
 
   it('selects exactly one concrete eligible JOV issue deterministically', async () => {
