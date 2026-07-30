@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
@@ -33,6 +35,9 @@ const FORBIDDEN_PRIMARY_LABELS = [
   'Releases',
 ] as const;
 
+const DASHBOARD_NAV_SOURCE =
+  'components/features/dashboard/dashboard-nav/DashboardNav.tsx';
+
 function primaryLinks(container: HTMLElement) {
   const section = container.querySelector('[data-nav-section]');
   expect(section).toBeInTheDocument();
@@ -42,6 +47,29 @@ function primaryLinks(container: HTMLElement) {
 describe('DashboardNav', () => {
   afterEach(() => {
     resetDashboardNavTestMocks();
+  });
+
+  it('defers persisted navigation badges until after hydration', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), DASHBOARD_NAV_SOURCE),
+      'utf8'
+    );
+
+    expect(source).toContain(
+      'const [threadReadAtById, setThreadReadAtById] = useState<'
+    );
+    expect(source).toContain('>({});');
+    expect(source).toContain(
+      'const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(null);'
+    );
+    expect(source).toContain('setThreadReadAtById(readThreadReadState());');
+    expect(source).toContain('setTasksSeenAt(readTasksSeenAt());');
+    expect(source).not.toContain(
+      'useState<Record<string, string>>(readThreadReadState)'
+    );
+    expect(source).not.toContain(
+      'useState<string | null>(\n    readTasksSeenAt'
+    );
   });
 
   it('renders the canonical navigation in exact order and no forbidden primary rows', () => {
@@ -114,7 +142,7 @@ describe('DashboardNav', () => {
   });
 
   it('keeps a settled-empty Inbox visible while its root destination is active', () => {
-    mockUsePathname.mockReturnValueOnce(APP_ROUTES.DASHBOARD);
+    mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
       overrides: {
@@ -190,7 +218,7 @@ describe('DashboardNav', () => {
       APP_ROUTES.DASHBOARD_RELEASES,
       APP_ROUTES.RELEASES,
     ]) {
-      mockUsePathname.mockReturnValueOnce(route);
+      mockUsePathname.mockReturnValue(route);
       const view = renderDashboardNav({ renderFn: fastRender });
       expect(view.getByRole('link', { name: 'Library' })).toHaveAttribute(
         'aria-current',
@@ -205,7 +233,7 @@ describe('DashboardNav', () => {
   });
 
   it('uses New Chat consistently for the elevated nav action and page title', async () => {
-    mockUsePathname.mockReturnValueOnce(APP_ROUTES.CHAT);
+    mockUsePathname.mockReturnValue(APP_ROUTES.CHAT);
     const { generateMetadata } = await import('@/app/app/(shell)/chat/page');
     const metadata = await generateMetadata();
     const title = String(metadata.title);
@@ -231,7 +259,7 @@ describe('DashboardNav', () => {
   });
 
   it('does not mark New Chat active on a chat thread', () => {
-    mockUsePathname.mockReturnValueOnce(`${APP_ROUTES.CHAT}/thread-123`);
+    mockUsePathname.mockReturnValue(`${APP_ROUTES.CHAT}/thread-123`);
     const { getByRole } = renderDashboardNav({ renderFn: fastRender });
 
     expect(
@@ -240,7 +268,7 @@ describe('DashboardNav', () => {
   });
 
   it('keeps inactive New Chat on the shared primary shell tone', () => {
-    mockUsePathname.mockReturnValueOnce(APP_ROUTES.CALENDAR);
+    mockUsePathname.mockReturnValue(APP_ROUTES.CALENDAR);
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
     });
@@ -316,7 +344,7 @@ describe('DashboardNav', () => {
   });
 
   it('renders settings groups only while inside Settings', () => {
-    mockUsePathname.mockReturnValueOnce(APP_ROUTES.SETTINGS_ACCOUNT);
+    mockUsePathname.mockReturnValue(APP_ROUTES.SETTINGS_ACCOUNT);
     const { getAllByText, getByRole, queryByText } = renderDashboardNav({
       renderFn: fastRender,
     });
@@ -330,7 +358,7 @@ describe('DashboardNav', () => {
   });
 
   it('disables task stats query on nested demo routes', () => {
-    mockUsePathname.mockReturnValueOnce('/demo/showcase/settings');
+    mockUsePathname.mockReturnValue('/demo/showcase/settings');
     renderDashboardNav({
       renderFn: fastRender,
       overrides: {
@@ -350,7 +378,7 @@ describe('DashboardNav', () => {
   });
 
   it('renders stable task count geometry and accessible metadata', () => {
-    mockUseTaskStatsQuery.mockReturnValueOnce({
+    mockUseTaskStatsQuery.mockReturnValue({
       data: {
         backlog: 1,
         todo: 2,
@@ -375,7 +403,7 @@ describe('DashboardNav', () => {
 
   it('uses the new task count after Tasks has been opened', () => {
     localStorage.setItem('jovie:tasks-seen-at', '2026-05-24T00:00:00.000Z');
-    mockUseTaskStatsQuery.mockReturnValueOnce({
+    mockUseTaskStatsQuery.mockReturnValue({
       data: {
         backlog: 1,
         todo: 2,
@@ -421,7 +449,7 @@ describe('DashboardNav', () => {
   });
 
   it('renders the Pro badge only after task entitlements resolve as locked', () => {
-    mockUsePlanGate.mockReturnValueOnce({
+    mockUsePlanGate.mockReturnValue({
       canAccessTasksWorkspace: false,
       isLoading: false,
     });
@@ -429,7 +457,7 @@ describe('DashboardNav', () => {
     expect(locked.getByText('Pro')).toHaveAttribute('data-nav-badge', 'pro');
     locked.unmount();
 
-    mockUsePlanGate.mockReturnValueOnce({
+    mockUsePlanGate.mockReturnValue({
       canAccessTasksWorkspace: false,
       isLoading: true,
     });

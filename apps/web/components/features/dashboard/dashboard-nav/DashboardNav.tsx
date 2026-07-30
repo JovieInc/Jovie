@@ -133,11 +133,15 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const isElectron = useIsElectronRuntime();
-  const [threadReadAtById, setThreadReadAtById] =
-    useState<Record<string, string>>(readThreadReadState);
-  const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(
-    readTasksSeenAt
-  );
+  // Persisted navigation state is a client-only enhancement. Reading it during
+  // the first render would make a returning browser render different badges
+  // from the server markup and can force React to abandon hydration.
+  const [threadReadAtById, setThreadReadAtById] = useState<
+    Record<string, string>
+  >({});
+  const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(null);
+  const [hasHydratedPersistedState, setHasHydratedPersistedState] =
+    useState(false);
   const profileId = selectedProfile?.id ?? '';
   const isDemo = isDemoRoutePath(pathname);
   const telemetryContext = useMemo<NavigationTelemetryContext>(
@@ -182,7 +186,19 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   });
 
   useEffect(() => {
-    if (!conversations || conversations.length === 0) return;
+    setThreadReadAtById(readThreadReadState());
+    setTasksSeenAt(readTasksSeenAt());
+    setHasHydratedPersistedState(true);
+  }, []);
+
+  useEffect(() => {
+    if (
+      !hasHydratedPersistedState ||
+      !conversations ||
+      conversations.length === 0
+    ) {
+      return;
+    }
 
     setThreadReadAtById(previous => {
       if (Object.keys(previous).length > 0) return previous;
@@ -196,7 +212,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
       writeThreadReadState(baseline);
       return baseline;
     });
-  }, [conversations]);
+  }, [conversations, hasHydratedPersistedState]);
 
   useEffect(() => {
     if (normalizeTrailingSlash(pathname) !== APP_ROUTES.TASKS) return;
