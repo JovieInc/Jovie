@@ -25,26 +25,33 @@ Preferred routing:
 1. Use a Codex Gmail connector only if its profile is `t@timwhite.co`.
 2. Otherwise, inspect Composio:
 
-   ```bash
-   composio connections list
-   composio proxy \
-     https://gmail.googleapis.com/gmail/v1/users/me/profile \
-     --toolkit gmail
-   ```
+   - List the available Gmail connection through the installed Composio tool
+     surface.
+   - Invoke the `GMAIL_GET_PROFILE` action through that same surface.
+   - If only a CLI is available, inspect that installed version's help before
+     choosing a verb. Do not assume current or legacy CLI syntax.
 
 3. Require `emailAddress` to equal `t@timwhite.co` case-insensitively.
 4. Search with `GMAIL_FETCH_EMAILS` using metadata-only, small-result queries.
 5. Hydrate only shortlisted evidence with
    `GMAIL_FETCH_MESSAGE_BY_THREAD_ID`.
 
-If the `composio` command is an older incompatible client, locate the current
-binary reported by the official installer before concluding that the connector
-is unavailable. Never print or persist a Composio API key.
+Never run `composio whoami`. Installed legacy clients can print the Composio API
+key in command output. Never print or persist a Composio API key. If the
+`composio` command is an older incompatible client, locate the current binary
+reported by the official installer before concluding that the connector is
+unavailable.
 
 Composio's CLI is an agent research and bootstrap surface, not Jovie's
 production runtime contract. A verified agent may use it to source evidence,
 but Inbox writes still go through Jovie's tested
 `emitBrandDealOpportunity` server boundary.
+
+The native producer must derive the source identity from the connected Gmail
+account. It must never label `tim@jov.ie` as Tim's personal mailbox or substitute
+it for `t@timwhite.co`. If Jovie has no user-approved personal-mailbox preference,
+show the exact authenticated account as provenance and fail closed on any
+Tim-specific identity claim.
 
 ## Minimum-safe Gmail behavior
 

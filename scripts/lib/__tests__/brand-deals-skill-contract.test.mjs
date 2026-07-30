@@ -86,9 +86,11 @@ describe('brand-deals skill contract', () => {
   });
 
   it('polls a Composio fallback and verifies the personal Gmail profile', () => {
-    expect(connectorRouting).toContain('composio connections list');
+    expect(connectorRouting).toContain('GMAIL_GET_PROFILE');
+    expect(connectorRouting).toContain('Never run `composio whoami`');
+    expect(connectorRouting).toContain("inspect that installed version's help");
     expect(connectorRouting).toContain(
-      'https://gmail.googleapis.com/gmail/v1/users/me/profile'
+      "never label `tim@jov.ie` as Tim's personal mailbox"
     );
     expect(connectorRouting).toContain('t@timwhite.co');
     expect(connectorRouting).toContain('case-insensitively');

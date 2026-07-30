@@ -1,4 +1,5 @@
 export const BRAND_DEAL_OPPORTUNITY_KIND = 'brand_deal.opportunity';
+export const TIM_BRAND_DEAL_SOURCE_ACCOUNT = 't@timwhite.co';
 
 export interface BrandDealOpportunityData {
   readonly title: string;
@@ -42,6 +43,40 @@ export interface BrandDealOpportunityData {
   readonly repeatPotential: number;
   readonly creatorMinutes: number;
   readonly rankingScore: number;
+}
+
+export interface BrandDealCommercialCandidate {
+  readonly buyerName: string;
+  readonly buyerCompany: string;
+  readonly budgetMinCents: number;
+  readonly budgetMaxCents: number;
+  readonly depositPercent: number;
+  readonly includedRevisions: 0 | 1;
+  readonly usageTermDays: number;
+  readonly exclusivity: 'none' | 'narrow_paid';
+  readonly closeProbability: number;
+  readonly repeatPotential: number;
+  readonly creatorMinutes: number;
+}
+
+export function collectBrandDealEvidenceObjectIds(
+  rows: readonly { readonly sourceRefs: unknown }[]
+): Set<string> {
+  const ids = new Set<string>();
+  for (const row of rows) {
+    if (!Array.isArray(row.sourceRefs)) continue;
+    for (const sourceRef of row.sourceRefs) {
+      if (
+        sourceRef &&
+        typeof sourceRef === 'object' &&
+        'externalObjectId' in sourceRef &&
+        typeof sourceRef.externalObjectId === 'string'
+      ) {
+        ids.add(sourceRef.externalObjectId);
+      }
+    }
+  }
+  return ids;
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -129,6 +164,9 @@ export function parseBrandDealOpportunity(
     !isNonEmptyString(candidate.requiredSourceAccount) ||
     candidate.sourceAccount.trim().toLowerCase() !==
       candidate.requiredSourceAccount.trim().toLowerCase() ||
+    (candidate.sourceType === 'personal_email' &&
+      candidate.requiredSourceAccount.trim().toLowerCase() !==
+        TIM_BRAND_DEAL_SOURCE_ACCOUNT) ||
     !isNonEmptyString(candidate.sourceReference) ||
     !isValidObservedAt(candidate.observedAt) ||
     !isFiniteNonNegativeNumber(candidate.confidence) ||
@@ -182,6 +220,50 @@ export function parseBrandDealOpportunity(
   };
 }
 
+export function buildVerifiedPersonalEmailOpportunity(input: {
+  readonly candidate: BrandDealCommercialCandidate;
+  readonly sourceAccount: string;
+  readonly sourceReference: string;
+  readonly observedAt: string;
+}): BrandDealOpportunityData | null {
+  if (
+    input.sourceAccount.trim().toLowerCase() !== TIM_BRAND_DEAL_SOURCE_ACCOUNT
+  ) {
+    return null;
+  }
+
+  return parseBrandDealOpportunity(BRAND_DEAL_OPPORTUNITY_KIND, {
+    ...input.candidate,
+    title: `${input.candidate.buyerCompany} creator-performance campaign`,
+    rightsSummary: `${input.candidate.usageTermDays}-day usage, ${
+      input.candidate.exclusivity === 'none'
+        ? 'no exclusivity'
+        : 'narrow paid exclusivity'
+    }`,
+    expectedUpfrontCashCents: Math.round(
+      (input.candidate.budgetMinCents * input.candidate.depositPercent) / 100
+    ),
+    confidence: 1,
+    currency: 'USD',
+    sourceLabel: 'Authenticated Gmail',
+    sourceType: 'personal_email',
+    sourceAccount: input.sourceAccount,
+    requiredSourceAccount: TIM_BRAND_DEAL_SOURCE_ACCOUNT,
+    sourceReference: input.sourceReference,
+    observedAt: input.observedAt,
+    evidenceStatus: 'verified',
+    identityMatched: true,
+    ownershipVerified: true,
+    personalDealVerified: true,
+    relationshipType: 'personal_inbound',
+    activeSponsorCampaignCount: 0,
+    routeToLyb: false,
+    lybPaidFlowVerified: false,
+    externalSendApproved: false,
+    commercialApprovalId: null,
+  });
+}
+
 function formatCompactMoney(cents: number, currency: string): string {
   const amount = cents / 100;
   const formatted =
@@ -204,5 +286,5 @@ export function formatBrandDealOpportunityMetadata(
     deal.budgetMinCents === deal.budgetMaxCents
       ? formatCompactMoney(deal.budgetMinCents, deal.currency)
       : `${formatCompactMoney(deal.budgetMinCents, deal.currency)}-${formatCompactMoney(deal.budgetMaxCents, deal.currency)}`;
-  return `${budget} · ${deal.buyerName} @ ${deal.buyerCompany} · ${deal.sourceLabel} · verified · score ${deal.rankingScore.toFixed(1)} · ${deal.rightsSummary}`;
+  return `${budget} · ${deal.buyerName} @ ${deal.buyerCompany} · ${deal.sourceLabel} (${deal.sourceAccount}) · verified · score ${deal.rankingScore.toFixed(1)} · ${deal.rightsSummary}`;
 }
