@@ -19,6 +19,7 @@ class MockIntersectionObserver {
       [
         {
           isIntersecting: true,
+          intersectionRatio: 1,
           target,
         } as IntersectionObserverEntry,
       ],
@@ -130,6 +131,10 @@ describe('ReleaseCatalogCarousel', () => {
         artist_handle: 'tim',
         is_featured: true,
       })
+    );
+    expect(screen.getByTestId('profile-home-carousel')).toHaveAttribute(
+      'data-layout',
+      'profile-landscape'
     );
     expect(trackMock).toHaveBeenCalledWith(
       'catalog_carousel_card_impression',

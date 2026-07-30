@@ -141,14 +141,21 @@ describe('ProfileHomeRail', () => {
     expect(carousel.contains(alertsCard)).toBe(true);
 
     const footprints = [...carousel.querySelectorAll(':scope > li')];
+    expect(carousel).toHaveAttribute('data-layout', 'profile-landscape');
     expect(footprints[0]?.contains(pacCard)).toBe(true);
     expect(footprints[footprints.length - 1]?.contains(alertsCard)).toBe(true);
+    expect(pacCard).toHaveAttribute('data-layout', 'profile-landscape');
+    expect(pacCard.className).toContain('flex-row');
+    expect(pacCard).toHaveTextContent('Latest');
+    const pacMedia = pacCard.querySelector('.aspect-square');
+    expect(pacMedia?.className).toContain('self-stretch');
+    expect(pacMedia?.className).toContain('w-auto');
     // The featured release renders once, inside the PAC card (not as a
     // duplicate plain catalog card).
     expect(screen.getAllByText('Never Say A Word')).toHaveLength(1);
   });
 
-  it('renders the alerts card as a standard unified-anatomy card (no gradient)', () => {
+  it('renders alerts as the same compact landscape row (no gradient)', () => {
     render(
       <ProfileHomeRail
         artist={makeArtist()}
@@ -163,14 +170,14 @@ describe('ProfileHomeRail', () => {
     );
 
     const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
-    // Standard card: pearl surface, no accent gradient, unified anatomy
-    // (square icon art zone + full-width "Get Updates" CTA).
+    // Standard row: pearl surface, no accent gradient or redundant media
+    // panel, with the same compact action geometry as other Latest items.
     expect(alertsCard.style.background).toBe('');
     expect(alertsCard.className).toContain('bg-(--profile-pearl-bg)');
     expect(alertsCard).toHaveTextContent('Alerts');
     const cta = screen.getByText('Get Updates');
-    expect(cta.className).toContain('h-9');
-    expect(cta.className).toContain('w-full');
+    expect(cta.className).toContain('h-8');
+    expect(cta.className).toContain('w-auto');
   });
 
   it('keeps the carousel shell with PAC and alerts cards even when the catalog is empty', () => {
@@ -190,8 +197,7 @@ describe('ProfileHomeRail', () => {
     const carousel = screen.getByTestId('profile-home-carousel');
     const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
     expect(alertsCard).toBeInTheDocument();
-    // The alerts card shares the unified entity-card anatomy (full-bleed
-    // square art zone, full-width CTA).
+    // The alerts card shares the compact row anatomy and omits redundant art.
     expect(alertsCard.className).toContain('p-0');
     expect(screen.getByText('Get Updates')).toBeInTheDocument();
     // No entity items → the carousel still hosts the slot cards.
