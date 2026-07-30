@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   afterAll,
@@ -803,5 +803,41 @@ describe('UserButton billing actions', () => {
       'data-align',
       'start'
     );
+  });
+
+  it('uses distinct semantic icons for the Learn More menu items', async () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+    const user = userEvent.setup();
+
+    render(<UserButton showUserInfo />);
+
+    await user.click(screen.getByRole('button', { name: /Adele Adkins/i }));
+    await user.hover(screen.getByRole('menuitem', { name: 'Learn More' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('menuitem', { name: 'Privacy Policy' })
+      ).toBeVisible();
+    });
+
+    expect(
+      screen
+        .getByRole('menuitem', { name: 'Privacy Policy' })
+        .querySelector('svg')?.className.baseVal
+    ).toContain('lucide-shield');
+    expect(
+      screen
+        .getByRole('menuitem', { name: 'Terms Of Service' })
+        .querySelector('svg')?.className.baseVal
+    ).toContain('lucide-file-check-corner');
+    expect(
+      screen
+        .getByRole('menuitem', { name: 'Cookie Policy' })
+        .querySelector('svg')?.className.baseVal
+    ).toContain('lucide-cookie');
   });
 });
