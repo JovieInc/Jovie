@@ -69,20 +69,24 @@ export const AppShellFrame = memo(function AppShellFrame({
       <DesktopTitlebar />
       <div
         data-app-shell-body='true'
+        data-shell-rail-motion='coordinated'
         className={cn(
-          'flex min-h-0 min-w-0 flex-1 overflow-hidden lg:gap-(--app-shell-gap) lg:p-(--app-shell-gap)'
+          // Allocation belongs to the shell, not individual routes. Keeping the
+          // side slots and main plane on the same motion contract means a rail
+          // can yield canvas without its content or adjacent route snapping.
+          'flex min-h-0 min-w-0 flex-1 overflow-hidden transition-[gap,padding] duration-cinematic ease-cinematic motion-reduce:transition-none lg:gap-(--app-shell-gap) lg:p-(--app-shell-gap)'
         )}
       >
         <div
           data-testid='app-shell-sidebar-mount'
-          className='flex h-full min-h-0 shrink-0 flex-col transition-opacity duration-cinematic ease-cinematic motion-reduce:transition-none'
+          className='flex h-full min-h-0 shrink-0 flex-col transition-[flex-basis,width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none'
         >
           {sidebar}
         </div>
 
         <div
           data-app-shell-content-column='true'
-          className='flex min-h-0 min-w-0 flex-1 flex-col'
+          className='flex min-h-0 min-w-0 flex-1 flex-col transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none'
         >
           <main
             id='main-content'
@@ -115,7 +119,7 @@ export const AppShellFrame = memo(function AppShellFrame({
             {header}
             <div
               className={cn(
-                'flex flex-1 min-h-0 min-w-0 overflow-hidden lg:gap-(--app-shell-gap)'
+                'flex flex-1 min-h-0 min-w-0 overflow-hidden transition-[gap] duration-cinematic ease-cinematic motion-reduce:transition-none lg:gap-(--app-shell-gap)'
               )}
             >
               <div
@@ -123,7 +127,7 @@ export const AppShellFrame = memo(function AppShellFrame({
                 className={cn(
                   // Shell-level pane never owns vertical scroll — routes and table
                   // surfaces scroll inside this clip so the right rail stays fixed.
-                  'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden overflow-x-auto overscroll-contain pb-[var(--dev-toolbar-height,0px)]',
+                  'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden overflow-x-auto overscroll-contain transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none pb-[var(--dev-toolbar-height,0px)]',
                   contentClassName
                 )}
               >

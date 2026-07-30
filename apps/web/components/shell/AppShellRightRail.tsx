@@ -28,6 +28,7 @@ export function AppShellRightRail({
   return (
     <aside
       data-testid='app-shell-right-rail'
+      data-shell-rail-motion='right'
       aria-label='Context Panel'
       className={cn(
         // Mobile drawers are fixed descendants of this stacking context, so the
@@ -38,7 +39,7 @@ export function AppShellRightRail({
         'sticky top-0 z-30 lg:z-10 flex h-full min-h-0 shrink-0 flex-col self-stretch overflow-hidden',
         // Mirror the left sidebar mount language so inner drawer width changes
         // reclaim canvas space with the same cinematic timing.
-        'transition-[width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none',
+        'transition-[flex-basis,width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none',
         'lg:rounded-(--linear-app-shell-radius)',
         className
       )}
