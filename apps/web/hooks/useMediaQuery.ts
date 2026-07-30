@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect';
+import { useCallback, useSyncExternalStore } from 'react';
 
 interface UseMediaQueryOptions {
   defaultValue?: boolean;
@@ -12,38 +11,35 @@ export function useMediaQuery(
   options: UseMediaQueryOptions = {}
 ): boolean {
   const { defaultValue = false } = options;
-  const [matches, setMatches] = useState<boolean>(() => {
-    if (
-      typeof globalThis !== 'undefined' &&
-      typeof globalThis.matchMedia === 'function'
-    ) {
-      return globalThis.matchMedia(query).matches;
+
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => {
+      if (typeof globalThis.matchMedia !== 'function') {
+        return () => {};
+      }
+
+      const mediaQueryList = globalThis.matchMedia(query);
+      mediaQueryList.addEventListener('change', onStoreChange);
+
+      return () => {
+        mediaQueryList.removeEventListener('change', onStoreChange);
+      };
+    },
+    [query]
+  );
+
+  const getSnapshot = useCallback(() => {
+    if (typeof globalThis.matchMedia !== 'function') {
+      return defaultValue;
     }
 
-    return defaultValue;
-  });
+    return globalThis.matchMedia(query).matches;
+  }, [defaultValue, query]);
 
-  useIsomorphicLayoutEffect(() => {
-    if (
-      typeof window === 'undefined' ||
-      typeof globalThis.matchMedia !== 'function'
-    ) {
-      return undefined;
-    }
+  // React uses this snapshot for SSR and its first hydration render. Reading
+  // matchMedia during that render lets a mobile client choose a different
+  // shell tree than the server, which causes recoverable hydration failures.
+  const getServerSnapshot = useCallback(() => defaultValue, [defaultValue]);
 
-    const mediaQueryList = globalThis.matchMedia(query);
-    setMatches(mediaQueryList.matches);
-
-    const handleChange = (event: MediaQueryListEvent) => {
-      setMatches(event.matches);
-    };
-
-    mediaQueryList.addEventListener('change', handleChange);
-
-    return () => {
-      mediaQueryList.removeEventListener('change', handleChange);
-    };
-  }, [query]);
-
-  return matches;
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
