@@ -122,6 +122,25 @@ describe('demo recording helpers', () => {
     });
   });
 
+  it('never mounts developer chrome in preview or production builds', async () => {
+    const { getRootLayoutChromeState } = await loadModule();
+
+    expect(
+      getRootLayoutChromeState({
+        devEnv: 'preview',
+        isDemoRecording: false,
+        isE2EClientRuntime: false,
+      }).shouldRenderDevChrome
+    ).toBe(false);
+    expect(
+      getRootLayoutChromeState({
+        devEnv: 'production',
+        isDemoRecording: false,
+        isE2EClientRuntime: false,
+      }).shouldRenderDevChrome
+    ).toBe(false);
+  });
+
   it('suppresses dev chrome when NEXT_PUBLIC_E2E_MODE is set', async () => {
     process.env.NEXT_PUBLIC_E2E_MODE = '1';
     const { getRootLayoutChromeState } = await loadModule();

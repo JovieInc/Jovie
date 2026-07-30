@@ -57,6 +57,15 @@ export function isDevChromeDisabledClient(): boolean {
   );
 }
 
+/**
+ * Developer chrome is a local-development aid, never a staging or production
+ * surface. Treating any non-production deployment as safe would expose
+ * internal session controls to ordinary preview users.
+ */
+export function isLocalDevelopmentDevChrome(devEnv: string): boolean {
+  return devEnv === 'development';
+}
+
 interface RootLayoutChromeStateInput {
   readonly devEnv: string;
   readonly isDemoRecording?: boolean;
@@ -80,7 +89,7 @@ export function getRootLayoutChromeState({
     isDemoRecording ||
     isDevChromeDisabled ||
     isE2EClientRuntime ||
-    devEnv === 'production'
+    !isLocalDevelopmentDevChrome(devEnv)
   );
 
   return {

@@ -7,6 +7,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   isDemoRecordingClient,
   isDevChromeDisabledClient,
+  isLocalDevelopmentDevChrome,
 } from '@/lib/demo-recording';
 
 const DevToolbar = dynamic(
@@ -55,7 +56,9 @@ export function shouldDefaultDevToolbarHidden(pathname: string): boolean {
 }
 
 /**
- * Production customer sessions never render development controls.
+ * Customer-facing deployments never render development controls. The toolbar
+ * is intentionally limited to a local `next dev` runtime; staging is a real
+ * customer review surface, not an internal control plane.
  */
 export function shouldRenderDevToolbar({
   env,
@@ -76,12 +79,14 @@ export function shouldRenderDevToolbar({
   readonly isElectron?: boolean;
   readonly nodeEnv?: string | undefined;
 }): boolean {
+  // Kept in the public contract for existing test callers; environment itself
+  // is the source of truth because Vercel previews compile with production.
+  void nodeEnv;
   if (disabled) return false;
   if (isDemoRecording || isDevChromeDisabled || isElectron) return false;
   if (isDevToolbarSuppressedPath(pathname)) return false;
 
-  const isProduction = nodeEnv === 'production' && env === 'production';
-  if (isProduction) return false;
+  if (!isLocalDevelopmentDevChrome(env)) return false;
 
   return true;
 }
