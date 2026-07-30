@@ -228,8 +228,8 @@ async function runAdmitNext(cache, isDryRun) {
 
   const workstreams = workstreamer.bundleWorkstreams(classifications);
 
-  // Check current shipping state
-  const state = await scorer.currentShippingLoad();
+  // Count live leases from the authoritative Linear active-issue snapshot.
+  const state = scorer.currentShippingLoad(allIssues);
 
   const result = await admitter.selectNextToAdmit(
     classifications,
