@@ -737,4 +737,29 @@ describe('UserButton billing actions', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
   });
+
+  it('collapses the sidebar identity trigger to a centered avatar-only control', () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    render(<UserButton showUserInfo />);
+
+    const trigger = screen.getByRole('button', { name: /Adele Adkins/i });
+
+    expect(trigger).toHaveClass(
+      'group-data-[collapsible=icon]:size-7',
+      'group-data-[collapsible=icon]:justify-center',
+      'group-data-[collapsible=icon]:gap-0',
+      'group-data-[collapsible=icon]:p-0'
+    );
+    expect(
+      trigger.querySelector('[data-user-button-display-name]')
+    ).toHaveClass('group-data-[collapsible=icon]:hidden');
+    expect(trigger.querySelector('[data-user-button-chevron]')).toHaveClass(
+      'group-data-[collapsible=icon]:hidden'
+    );
+  });
 });
