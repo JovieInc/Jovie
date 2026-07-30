@@ -333,6 +333,87 @@ JSON
         assert "#456" in result.stdout
         assert "#789" in result.stdout
 
+    def test_main_push_releases_only_current_green_auto_merge_deferrals(
+        self, tmp_path: Path
+    ) -> None:
+        """A temporary pressure hold cannot strand a current auto-merge head."""
+        head = "a" * 40
+        main = "b" * 40
+        stale_base = "c" * 40
+        list_calls = tmp_path / "list-calls"
+        list_calls.write_text("0", encoding="utf-8")
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "api repos/JovieInc/Jovie/git/ref/heads/main" ]]; then
+                  echo "{main}"
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr list" ]]; then
+                  count=$(<"{list_calls}")
+                  count=$((count + 1))
+                  echo "$count" >"{list_calls}"
+                  if [[ "$count" == 1 ]]; then
+                    cat <<'JSON'
+                [{{"n":700,"head":"{head}","base":"{main}"}},{{"n":701,"head":"{head}","base":"{stale_base}"}},{{"n":702,"head":"{head}","base":"{main}"}}]
+JSON
+                  else
+                    cat <<'JSON'
+                [{{"n":700,"t":"Current deferred","draft":false,"m":"MERGEABLE","head":"codex/current-deferred","L":["queue-deferred"],"fail":[]}},{{"n":701,"t":"Stale deferred","draft":false,"m":"MERGEABLE","head":"codex/stale-deferred","L":["queue-deferred"],"fail":[]}},{{"n":702,"t":"Manual deferred","draft":false,"m":"MERGEABLE","head":"codex/manual-deferred","L":["queue-deferred"],"fail":[]}}]
+JSON
+                  fi
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  if [[ "$3" == "700" ]]; then
+                    cat <<'JSON'
+                {{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefOid":"{head}","baseRefOid":"{main}","labels":[{{"name":"queue-deferred"}}],"autoMergeRequest":{{"enabledAt":"2026-07-30T00:00:00Z"}}}}
+JSON
+                  elif [[ "$3" == "701" ]]; then
+                    cat <<'JSON'
+                {{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefOid":"{head}","baseRefOid":"{stale_base}","labels":[{{"name":"queue-deferred"}}],"autoMergeRequest":{{"enabledAt":"2026-07-30T00:00:00Z"}}}}
+JSON
+                  else
+                    cat <<'JSON'
+                {{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefOid":"{head}","baseRefOid":"{main}","labels":[{{"name":"queue-deferred"}}],"autoMergeRequest":null}}
+JSON
+                  fi
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  [[ "$3" == "700" ]]
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env="DRY_RUN=1 DRAIN_RECONCILE_QUEUE_DEFERRED=1",
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert "[dry-run] would -queue-deferred on #700" in result.stdout
+        assert "#701" in result.stdout
+        assert "not based on current main; preserving deferral" in result.stdout
+        assert "[dry-run] would -queue-deferred on #701" not in result.stdout
+        assert "#702" in result.stdout
+        assert "live state is not a current, clean auto-merge defer; preserving" in result.stdout
+        assert "[dry-run] would -queue-deferred on #702" not in result.stdout
+
 
 class TestGraphiteEventAuthorizationGuard:
     def test_workflow_covers_synthetic_and_source_events_with_minimum_permissions(self) -> None:
