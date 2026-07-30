@@ -31,9 +31,11 @@ env:
 
 jobs:
   capture:
-    # Failures remain visible in Actions, but the native queue treats this exact
-    # evidence check as advisory. Deterministic CI is the merge gate.
+    # Failures remain visible in Actions and its uploaded evidence, but the
+    # check itself cannot become a native merge-queue gate. Deterministic CI
+    # remains fail-closed and is the merge gate.
     name: Capture changed UI (desktop + mobile) (advisory)
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
@@ -138,6 +140,8 @@ jobs:
 
   review:
     name: Review screenshots and post advisory review
+    # The review is useful steering information, never a production gate.
+    continue-on-error: true
     needs: capture
     if: ${{ always() && needs.capture.result == 'success' }}
     runs-on: ubuntu-latest
