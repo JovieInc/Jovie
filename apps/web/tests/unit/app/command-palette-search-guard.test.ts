@@ -19,20 +19,25 @@ describe('command palette search shell guard', () => {
     expect(source).not.toContain('isHeaderSearchActive=');
   });
 
-  it('keeps AuthShell owning the shared header search surface', () => {
-    const source = readSource('components/organisms/AuthShell.tsx');
-
-    expect(source).not.toContain('headerSearchSurface');
-    expect(source).not.toContain('isHeaderSearchActive');
-    expect(source).toContain('HeaderSearchSurfaceFromContext');
-    expect(source).toContain('useOptionalHeaderActions');
-    expect(source).toContain('searchSurface={searchSurface}');
-    expect(source).toContain(
-      'isSearchActive={headerActionsState?.isSearchOpen ?? false}'
+  it('keeps the shared search surface in the canonical sidebar only', () => {
+    const authShell = readSource('components/organisms/AuthShell.tsx');
+    const sidebar = readSource('components/organisms/UnifiedSidebar.tsx');
+    const navigation = readSource(
+      'components/features/dashboard/dashboard-nav/DashboardNav.tsx'
     );
+
+    expect(authShell).not.toContain('HeaderSearchSurfaceFromContext');
+    expect(authShell).not.toContain('useOptionalHeaderActions');
+    expect(authShell).not.toContain('searchSurface=');
+    expect(authShell).not.toContain('isSearchActive=');
+    expect(sidebar).toContain('HeaderSearchSurfaceFromContext');
+    expect(sidebar).toMatch(
+      /<DashboardNav>[\s\S]*?<HeaderSearchSurfaceFromContext[\s\S]*?<\/DashboardNav>/
+    );
+    expect(navigation).toContain("data-sidebar-search-slot='true'");
   });
 
-  it('keeps Search exclusively in the shared header surface', () => {
+  it('keeps Search out of duplicate navigation rows', () => {
     const source = readSource(
       'components/features/dashboard/dashboard-nav/DashboardNav.tsx'
     );

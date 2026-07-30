@@ -7,8 +7,6 @@ import { useComposerFocus } from '@/components/features/chat/Composer';
 import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-button/SidebarCollapseButton';
 import { SidebarProvider, useSidebar } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
-import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
-import { useOptionalHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
@@ -57,7 +55,6 @@ function AuthShellInner({
   const { isComposerFocused } = useComposerFocus();
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
-  const headerActionsState = useOptionalHeaderActions();
   const sidebarTrigger = isMobile ? null : sidebarState === 'closed' ? (
     <SidebarCollapseButton />
   ) : null;
@@ -91,11 +88,6 @@ function AuthShellInner({
       ) : null,
     [section, showCustomerMobileTabs]
   );
-  const searchSurface = useMemo(() => {
-    return headerActionsState ? (
-      <HeaderSearchSurfaceFromContext className='w-full sm:w-55 lg:w-65' />
-    ) : null;
-  }, [headerActionsState]);
   const audioPlayer = useMemo(() => <PersistentAudioBar />, []);
 
   return (
@@ -108,8 +100,6 @@ function AuthShellInner({
             sidebarTrigger={sidebarTrigger}
             breadcrumbSuffix={headerBadge}
             action={headerAction}
-            searchSurface={searchSurface}
-            isSearchActive={headerActionsState?.isSearchOpen ?? false}
             mobileProfileSlot={
               section === 'ov' || section === 'admin' ? null : (
                 <MobileProfileDrawer onOpen={previewPanelState.toggle} />

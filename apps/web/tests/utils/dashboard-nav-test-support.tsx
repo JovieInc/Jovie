@@ -199,12 +199,14 @@ export function renderDashboardNav({
   overrides = {},
   sidebarProps = {},
   appFlags = {},
+  navChildren = null,
   children = null,
 }: Readonly<{
   renderFn?: RenderDashboardNavFn;
   overrides?: Partial<DashboardData>;
   sidebarProps?: ComponentProps<typeof SidebarProvider>;
   appFlags?: Partial<AppFlagSnapshot>;
+  navChildren?: ReactNode;
   children?: ReactNode;
 }>) {
   const value: DashboardData = { ...baseDashboardData, ...overrides };
@@ -218,7 +220,7 @@ export function renderDashboardNav({
       <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, ...appFlags }}>
         <DashboardDataProvider value={value}>
           <SidebarProvider {...sidebarProps}>
-            <DashboardNav />
+            <DashboardNav>{navChildren}</DashboardNav>
             {children}
           </SidebarProvider>
         </DashboardDataProvider>

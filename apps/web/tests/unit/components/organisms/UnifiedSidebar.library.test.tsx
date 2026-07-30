@@ -46,7 +46,15 @@ vi.mock('@/hooks/useClerkSafe', () => ({
 }));
 
 vi.mock('@/features/dashboard/dashboard-nav', () => ({
-  DashboardNav: () => <div data-testid='dashboard-nav' />,
+  DashboardNav: ({ children }: { readonly children?: ReactNode }) => (
+    <div data-testid='dashboard-nav'>{children}</div>
+  ),
+}));
+
+vi.mock('@/components/shell/HeaderSearchSurfaceFromContext', () => ({
+  HeaderSearchSurfaceFromContext: () => (
+    <button type='button'>Search Sidebar</button>
+  ),
 }));
 
 vi.mock('@/components/organisms/user-button', () => ({
@@ -166,6 +174,9 @@ describe('UnifiedSidebar library route', () => {
     expect(screen.queryByText('Loading Library')).not.toBeInTheDocument();
     expect(screen.getByTestId('dashboard-nav')).toBeInTheDocument();
     expect(
+      screen.getByRole('button', { name: 'Search Sidebar' })
+    ).toBeInTheDocument();
+    expect(
       screen.queryByRole('link', { name: 'Back to App' })
     ).not.toBeInTheDocument();
     expect(screen.getByTestId('user-button')).toBeInTheDocument();
@@ -219,6 +230,9 @@ describe('UnifiedSidebar library route', () => {
       'href',
       APP_ROUTES.CHAT
     );
+    expect(
+      screen.queryByRole('button', { name: 'Search Sidebar' })
+    ).not.toBeInTheDocument();
   });
 
   it('omits header New Conversation and the web collapse control in Electron dashboard mode', () => {
@@ -317,6 +331,9 @@ describe('UnifiedSidebar library route', () => {
       }))
     );
     expect(screen.queryByTestId('dashboard-nav')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Search Sidebar' })
+    ).not.toBeInTheDocument();
     expect(screen.queryByTestId('user-button')).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Sign Out' })
