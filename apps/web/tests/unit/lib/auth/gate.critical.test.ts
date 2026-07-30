@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * Better Auth critical gate coverage.
@@ -162,6 +162,21 @@ function chainLimit(rows: unknown[]) {
   };
 }
 
+function chainLimitRejecting(error: Error) {
+  return {
+    from: vi.fn().mockReturnValue({
+      leftJoin: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockRejectedValue(error),
+        }),
+      }),
+      where: vi.fn().mockReturnValue({
+        limit: vi.fn().mockRejectedValue(error),
+      }),
+    }),
+  };
+}
+
 function activeDbUser(overrides: Record<string, unknown> = {}) {
   return {
     id: 'db_user_1',
@@ -185,6 +200,10 @@ function activeDbUser(overrides: Record<string, unknown> = {}) {
 }
 
 describe('@critical gate.ts (Better Auth)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetCachedDevTestAuthSession.mockResolvedValue(null);
@@ -310,6 +329,40 @@ describe('@critical gate.ts (Better Auth)', () => {
     expect(mockGetSession).not.toHaveBeenCalled();
     expect(result.state).toBe(CanonicalUserState.ACTIVE);
     expect(result.dbUserId).toBe('db_user_1');
+  });
+
+  it('keeps a synthetic creator-ready test session on its Better Auth identity when the shell passes its cached id', async () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+    vi.stubEnv('VERCEL_ENV', 'development');
+    mockGetCachedDevTestAuthSession.mockResolvedValue({
+      // Secretless capture has no app users row. `cached.ts` therefore
+      // exposes the BA id here while the auth gate must select its synthetic
+      // ACTIVE fallback below.
+      dbUserId: 'ba_creator_ready',
+      clerkUserId: 'ba_creator_ready',
+      email: 'browse-ready+clerk_test@jov.ie',
+      persona: 'creator-ready',
+    });
+    mockDbSelect.mockReturnValue(
+      chainLimitRejecting(new Error('database unavailable in visual capture'))
+    );
+
+    const result = await resolveUserState({
+      knownClerkUserId: 'ba_creator_ready',
+    });
+
+    expect(result).toMatchObject({
+      state: CanonicalUserState.ACTIVE,
+      clerkUserId: 'ba_creator_ready',
+      dbUserId: '00000000-0000-4000-8000-000000000101',
+    });
+    expect(mockEq).toHaveBeenCalledWith(
+      'users.betterAuthUserId',
+      'ba_creator_ready'
+    );
+    expect(mockEq).not.toHaveBeenCalledWith('users.id', 'ba_creator_ready');
+    expect(mockGetSession).not.toHaveBeenCalled();
   });
 
   it('creates a DB user when waitlist gate is disabled and no waitlist entry exists', async () => {
