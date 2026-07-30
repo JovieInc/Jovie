@@ -15,7 +15,7 @@
  *   Content padding: p-0.5, Item: px-2.5 py-1 text-xs leading-4
  *
  * Design tokens used:
- * - Border radius: rounded-xl surfaces, rounded-lg rows, rounded-full triggers
+ * - Border radius: concentric overlay surfaces/rows, rounded-full triggers
  * - Background: bg-surface-0 (elevated)
  * - Border: border-default (uses design token for both modes)
  * - Shadow: consistent across all variants
@@ -55,7 +55,13 @@ export const OVERLAY_SURFACE_BASE =
 /**
  * The shared rounded rectangle used by wrapped overlay content.
  */
-export const OVERLAY_CONTENT_RADIUS = 'rounded-xl';
+export const OVERLAY_CONTENT_RADIUS = 'rounded-(--system-b-radius-overlay)';
+
+/**
+ * Rows inset by the overlay's `p-1` use the matching inner radius so their
+ * corner arc shares the overlay's center.
+ */
+export const OVERLAY_ITEM_RADIUS = 'rounded-(--system-b-radius-overlay-inner)';
 
 export const DROPDOWN_CONTENT_BASE = `z-50 min-w-48 overflow-hidden ${OVERLAY_CONTENT_RADIUS} ${OVERLAY_SURFACE_BASE} p-1`;
 
@@ -164,7 +170,7 @@ export const selectContentClasses = [
  * Used by: DropdownMenuItem, ContextMenuItem, SelectItem
  */
 export const MENU_ITEM_BASE =
-  'relative flex min-h-8 cursor-default select-none items-center gap-2 rounded-lg px-2.5 py-1.5 text-app font-normal leading-5 outline-none ' +
+  `relative flex min-h-8 cursor-default select-none items-center gap-2 ${OVERLAY_ITEM_RADIUS} px-2.5 py-1.5 text-app font-normal leading-5 outline-none ` +
   'transition-colors duration-fast ease-interactive ' +
   'text-secondary-token hover:bg-surface-1 hover:text-primary-token ' +
   'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
@@ -192,7 +198,7 @@ export const MENU_ITEM_SELECTED =
  * Checkbox and radio item styles (with left indicator space)
  */
 export const CHECKBOX_RADIO_ITEM_BASE =
-  'relative flex cursor-default select-none items-center rounded-lg py-1 pl-7 pr-2 text-xs font-normal leading-4 outline-none ' +
+  `relative flex cursor-default select-none items-center ${OVERLAY_ITEM_RADIUS} py-1 pl-7 pr-2 text-xs font-normal leading-4 outline-none ` +
   'transition-colors duration-fast ease-interactive ' +
   'text-secondary-token hover:bg-surface-1 hover:text-primary-token ' +
   'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
@@ -203,7 +209,7 @@ export const CHECKBOX_RADIO_ITEM_BASE =
  * Select item base — unified with MENU_ITEM_BASE hover/focus behavior
  */
 export const SELECT_ITEM_BASE =
-  'relative flex w-full cursor-default select-none items-center rounded-lg py-1.5 pl-8 pr-2 text-app font-normal leading-5 outline-none ' +
+  `relative flex w-full cursor-default select-none items-center ${OVERLAY_ITEM_RADIUS} py-1.5 pl-8 pr-2 text-app font-normal leading-5 outline-none ` +
   'transition-colors duration-fast ease-interactive ' +
   'text-secondary-token ' +
   'focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:ring-1 focus-visible:ring-focus/35 ' +
@@ -218,7 +224,7 @@ export const SELECT_ITEM_BASE =
  * Compact menu item — smaller padding & font for dense UIs (tables, sidebars)
  */
 export const MENU_ITEM_COMPACT =
-  'relative flex min-h-8 cursor-default select-none items-center gap-2 rounded-lg px-2.5 py-1 text-xs font-normal leading-4 outline-none ' +
+  `relative flex min-h-8 cursor-default select-none items-center gap-2 ${OVERLAY_ITEM_RADIUS} px-2.5 py-1 text-xs font-normal leading-4 outline-none ` +
   'transition-colors duration-fast ease-interactive ' +
   'text-secondary-token hover:bg-surface-1 hover:text-primary-token ' +
   'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
@@ -367,7 +373,7 @@ export const searchableSubMenuContentClasses = [
  * Compact base — currently equivalent to DROPDOWN_CONTENT_BASE; retained for future divergence
  */
 export const DROPDOWN_CONTENT_COMPACT_BASE =
-  'z-50 min-w-48 overflow-hidden rounded-xl border border-default bg-surface-0 p-0.5 text-primary-token shadow-popover';
+  'z-50 min-w-48 overflow-hidden rounded-(--system-b-radius-overlay) border border-default bg-surface-0 p-0.5 text-primary-token shadow-popover';
 
 /**
  * Complete compact DropdownMenu content classes
