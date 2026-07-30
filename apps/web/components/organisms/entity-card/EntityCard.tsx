@@ -512,7 +512,7 @@ export function EntityCard({
               ) : (
                 <span
                   className={cn(
-                    'inline-flex shrink-0 items-center justify-center rounded-full bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-[background-color,transform] duration-subtle group-hover:bg-btn-primary-hover group-active:scale-[0.96] motion-reduce:transform-none',
+                    'inline-flex shrink-0 items-center justify-center rounded-full bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-[background-color,transform] duration-subtle group-hover:bg-btn-primary-hover group-active:scale-[var(--scale-press)] motion-reduce:transform-none',
                     isProfileLandscape ? 'h-8 w-fit' : 'h-9 w-full'
                   )}
                 >

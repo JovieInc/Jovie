@@ -128,14 +128,20 @@ describe('Button', () => {
     expect(btn.className).not.toContain('text-accent-foreground');
   });
 
-  it('uses tactile press feedback with a static opt-out', () => {
+  it('keeps tactile press feedback opt-in with a static override', () => {
     render(
       <>
-        <Button>Press</Button>
-        <Button static>Static</Button>
+        <Button>Default</Button>
+        <Button pressFeedback>Press</Button>
+        <Button pressFeedback static>
+          Static
+        </Button>
       </>
     );
 
+    expect(
+      screen.getByRole('button', { name: 'Default' }).className
+    ).not.toContain('active:scale-[var(--scale-press)]');
     expect(screen.getByRole('button', { name: 'Press' }).className).toContain(
       'active:scale-[var(--scale-press)]'
     );
@@ -145,6 +151,10 @@ describe('Button', () => {
     expect(
       screen.getByRole('button', { name: 'Static' }).className
     ).not.toContain('active:scale-[var(--scale-press)]');
+    expect(screen.getByRole('button', { name: 'Press' })).toHaveAttribute(
+      'data-press-feedback',
+      'true'
+    );
   });
 
   it('uses the Jovie focus token', () => {

@@ -738,13 +738,12 @@ body {
   }
   /* Tactile press — transform only; never transition:all (DESIGN.md / JOV-3368) */
   .interactive-press {
-    @apply transition-transform duration-subtle ease-subtle active:scale-[0.96];
+    @apply transition-transform duration-subtle ease-subtle active:scale-[var(--scale-press)] motion-reduce:active:scale-100;
   }
   /* Button component styles */
   .btn {
-    @apply inline-flex items-center justify-center rounded-full text-app font-medium transition-[background-color,transform] duration-normal ease-subtle disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center rounded-full text-app font-medium transition-[background-color,border-color,color] duration-normal ease-subtle disabled:opacity-50 disabled:pointer-events-none;
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-(--linear-bg-page);
-    @apply active:scale-[0.96];
   }
   .btn-primary {
     background-color: var(--color-btn-primary-bg);
@@ -2036,23 +2035,6 @@ body {
   h6 {
     @apply text-base lg:text-lg;
   }
-  /* Interactive controls — tactile press via transform only (no transition:all) */
-  :where(
-    button:not(:disabled):not([data-static="true"]),
-    [role="button"]:not([aria-disabled="true"]):not([data-static="true"]),
-    summary
-  ) {
-    transition: transform var(--duration-subtle) var(--ease-subtle);
-  }
-  @media (prefers-reduced-motion: no-preference) {
-    :where(
-        button:not(:disabled):not([data-static="true"]),
-        [role="button"]:not([aria-disabled="true"]):not([data-static="true"]),
-        summary
-      ):active {
-      transform: scale(0.96);
-    }
-  }
 }
 
 /* ============================================
@@ -2174,7 +2156,7 @@ body {
     );
   }
   .btn-press {
-    @apply transition-transform duration-subtle ease-subtle active:scale-[0.96];
+    @apply transition-transform duration-subtle ease-subtle active:scale-[var(--scale-press)] motion-reduce:active:scale-100;
   }
   /* Chat empty state — refined depth & motion */
   .chat-logo-mark {

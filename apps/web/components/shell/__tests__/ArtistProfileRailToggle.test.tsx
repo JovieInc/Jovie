@@ -33,9 +33,15 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
 }));
 
 vi.mock('@jovie/ui', () => ({
-  Button: ({ children, ...props }: React.ComponentProps<'button'>) => (
-    <button {...props}>{children}</button>
-  ),
+  Button: ({
+    children,
+    pressFeedback: _pressFeedback,
+    static: _static,
+    ...props
+  }: React.ComponentProps<'button'> & {
+    readonly pressFeedback?: boolean;
+    readonly static?: boolean;
+  }) => <button {...props}>{children}</button>,
   TooltipShortcut: ({ children }: { children: React.ReactNode }) => children,
 }));
 
@@ -53,6 +59,8 @@ describe('ArtistProfileRailToggle', () => {
 
     const button = screen.getByTestId('artist-profile-rail-toggle');
     expect(button).toHaveAttribute('aria-pressed', 'false');
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(button).toHaveAttribute('data-rail-toggle', 'right');
     expect(button).toHaveAttribute('aria-label', 'Show Tim White profile');
     expect(screen.getByTestId('artist-profile-rail-icon')).toHaveAttribute(
       'aria-hidden',
