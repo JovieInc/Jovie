@@ -34,7 +34,6 @@ import {
   useTableMeta,
 } from '@/contexts/TableMetaContext';
 import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatUsageIndicator';
-import { HeaderUsagePill } from '@/features/dashboard/atoms/HeaderUsagePill';
 import { RightRailKeyboardHandler } from '@/hooks/RightRailKeyboardHandler';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
@@ -119,17 +118,12 @@ function AuthShellWrapperInner({
     !config.isDemoRoute &&
     (config.isChatRoute || pathname === APP_ROUTES.DASHBOARD);
 
-  // Home/inbox glanceable usage pill (top-right, quiet chrome).
-  const showUsagePill =
-    !config.isDemoRoute && pathname === APP_ROUTES.DASHBOARD;
-
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
   const defaultHeaderAction = useMemo(
     () => (
       <>
         {showArtistProfileRailToggle ? <ArtistProfileRailToggle /> : null}
-        {showUsagePill ? <HeaderUsagePill /> : null}
         {config.showChatUsageIndicator && !config.isDemoRoute ? (
           <HeaderChatUsageIndicator />
         ) : null}
@@ -141,7 +135,6 @@ function AuthShellWrapperInner({
       config.showChatUsageIndicator,
       isElectron,
       showArtistProfileRailToggle,
-      showUsagePill,
     ]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
