@@ -21,7 +21,7 @@ test.describe('Opportunity Inbox', () => {
     await expect(page.getByTestId('opportunity-inbox-page')).toBeVisible({
       timeout: 30_000,
     });
-    await expect(page.getByText('Home — the inbox')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Inbox' })).toBeVisible();
 
     const feed = page.getByTestId('opportunity-inbox-feed');
     const emptyState = page.getByTestId('opportunity-inbox-empty-state');

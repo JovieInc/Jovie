@@ -144,7 +144,10 @@ describe('OpportunityInboxPageClient', () => {
     );
 
     expect(screen.getByTestId('opportunity-inbox-feed')).toBeInTheDocument();
-    expect(screen.getByText('Home — the inbox')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Inbox' })).toBeInTheDocument();
+    expect(
+      screen.getByText('Pending opportunities, ready to accept or dismiss.')
+    ).toBeInTheDocument();
   });
 
   it('renders and filters a verified brand-deal decision', () => {

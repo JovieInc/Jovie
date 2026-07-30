@@ -291,14 +291,9 @@ export function OpportunityInboxPageClient({
         initialLinks={initialLinks}
       />
       <header className='system-b-opportunity-inbox-page-header'>
-        {/* ui-casing-allow: design-locked inbox copy */}
-        <h1 className='system-b-opportunity-inbox-page-title'>
-          {inboxHomeEnabled ? 'Inbox' : 'Home — the inbox'}
-        </h1>
+        <h1 className='system-b-opportunity-inbox-page-title'>Inbox</h1>
         <p className='system-b-opportunity-inbox-page-subtitle'>
-          {inboxHomeEnabled
-            ? 'Pending opportunities, ready to accept or dismiss.'
-            : 'One feed, mixed card types — suggestion, new song, tour date, profile match. One interaction grammar. Empty is never blank; accents are reserved for state.'}
+          Pending opportunities, ready to accept or dismiss.
         </p>
       </header>
 
