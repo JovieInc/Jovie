@@ -8,7 +8,7 @@ import {
 } from '@/lib/onboarding/empty-state';
 
 describe('OnboardingChatEmptyIntro', () => {
-  it('renders concise entry copy, composer, starters, and sign-in', () => {
+  it('renders concise entry copy, composer, and stable starters', () => {
     const onSelectSuggestion = vi.fn();
 
     render(
@@ -24,10 +24,10 @@ describe('OnboardingChatEmptyIntro', () => {
     expect(screen.getByText(ONBOARDING_ENTRY_SUPPORT)).toBeTruthy();
     expect(screen.getByTestId('test-composer')).toBeTruthy();
     expect(screen.getByTestId('onboarding-starter-suggestions')).toBeTruthy();
-    expect(screen.getByTestId('onboarding-sign-in-skip')).toHaveAttribute(
-      'href',
-      '/signin'
-    );
+    expect(screen.queryByTestId('onboarding-sign-in-skip')).toBeNull();
+    expect(
+      screen.getByTestId('onboarding-starter-suggestions').parentElement
+    ).toHaveClass('min-h-[7.5rem]');
 
     for (const suggestion of ONBOARDING_STARTER_SUGGESTIONS) {
       expect(
