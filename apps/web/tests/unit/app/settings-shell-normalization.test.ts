@@ -11,6 +11,11 @@ const SETTINGS_LAYOUT = findSourceFile(
   resolve(process.cwd(), 'apps/web/app/app/(shell)/settings/layout.tsx')
 );
 
+const UNIFIED_SIDEBAR = findSourceFile(
+  resolve(process.cwd(), 'components/organisms/UnifiedSidebar.tsx'),
+  resolve(process.cwd(), 'apps/web/components/organisms/UnifiedSidebar.tsx')
+);
+
 const RETARGETING_ROUTE_FILES = [
   findSourceFile(
     resolve(process.cwd(), 'app/app/(shell)/settings/retargeting-ads/page.tsx'),
@@ -170,6 +175,36 @@ describe('settings shell normalization', () => {
     const layoutSource = readFileSync(SETTINGS_LAYOUT, 'utf8');
     expect(layoutSource).toContain('<PageShell');
     expect(layoutSource).toContain("data-testid='settings-shell-content'");
+  });
+
+  it('uses the global shell settings navigation instead of mounting a second in-content sidebar', () => {
+    expect(SETTINGS_LAYOUT).toBeDefined();
+
+    if (!SETTINGS_LAYOUT) {
+      throw new Error('Could not find settings layout source');
+    }
+
+    const layoutSource = readFileSync(SETTINGS_LAYOUT, 'utf8');
+    expect(layoutSource).not.toContain('@/features/settings/SettingsSidebar');
+    expect(layoutSource).not.toContain('<SettingsSidebar');
+    expect(layoutSource).toContain('{children}');
+  });
+
+  it('keeps global settings navigation and deep links independent of the content layout on every viewport', () => {
+    expect(UNIFIED_SIDEBAR).toBeDefined();
+
+    if (!UNIFIED_SIDEBAR) {
+      throw new Error('Could not find UnifiedSidebar source');
+    }
+
+    const sidebarSource = readFileSync(UNIFIED_SIDEBAR, 'utf8');
+    expect(sidebarSource).toContain(
+      "const isInSettings = section === 'settings';"
+    );
+    expect(sidebarSource).toContain(
+      '<SettingsNavigation pathname={pathname} section={section} />'
+    );
+    expect(sidebarSource).toContain('function SettingsNavigation');
   });
 
   it('keeps focused settings subroutes inside the parent shell', () => {
