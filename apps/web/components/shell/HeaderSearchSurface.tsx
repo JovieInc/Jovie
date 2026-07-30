@@ -512,7 +512,7 @@ export function HeaderSearchSurface({
       className={cn(
         headerSearchSurfaceChrome,
         headerSearchSurfaceWidth,
-        'relative flex h-7 min-h-7 min-w-0 items-center justify-start px-2 py-0 text-left shadow-popover transition-[border-color,box-shadow,background-color] duration-subtle focus-within:border-focus focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-ring/14',
+        'relative flex h-7 min-h-7 min-w-0 items-center justify-start px-2 py-0 text-left shadow-popover transition-[border-color,box-shadow,background-color] duration-subtle focus-within:border-focus focus-within:bg-surface-0 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring/14',
         className
       )}
     >
