@@ -219,7 +219,7 @@ describe('DashboardNav interactions', () => {
 
   it('keeps demo-disabled rows as links while intercepting unavailable content', async () => {
     const user = userEvent.setup();
-    mockUsePathname.mockReturnValueOnce('/demo/showcase/settings');
+    mockUsePathname.mockReturnValue('/demo/showcase/settings');
     renderDashboardNav({ renderFn: render });
 
     const tasksLink = screen.getByRole('link', { name: 'Tasks' });
