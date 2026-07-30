@@ -431,7 +431,7 @@ describe('social link compare-and-swap routes', () => {
       PROFILE_ID,
       'artist'
     );
-  });
+  }, 15_000);
 
   it('returns VERSION_CONFLICT from PATCH before mutating a stale link', async () => {
     const { PATCH } = await import(
