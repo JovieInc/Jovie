@@ -27,6 +27,9 @@ export function ProfileLiveCelebration({
   onComplete,
   autoAdvanceMs = 4000,
 }: ProfileLiveCelebrationProps) {
+  const [celebrationState, setCelebrationState] = useState<
+    'checking' | 'fresh' | 'celebrated'
+  >('checking');
   const [isVisible, setIsVisible] = useState(false);
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -37,26 +40,36 @@ export function ProfileLiveCelebration({
   const onCompleteRef = useRef(onComplete);
   const profileUrl = `jov.ie/${username}`;
 
-  // Check localStorage to prevent re-firing celebration
+  // Storage is a client-only concern. Resolve it after hydration so a browser
+  // storage restriction can never affect render purity or hydration.
   const celebrationKey = profileId ? `celebrated_${profileId}` : null;
-  const alreadyCelebrated = celebrationKey
-    ? globalThis.window !== undefined &&
-      globalThis.localStorage.getItem(celebrationKey) !== null
-    : false;
-
-  // Mark as celebrated on first render
   useEffect(() => {
-    if (celebrationKey && !alreadyCelebrated) {
-      globalThis.localStorage.setItem(celebrationKey, String(Date.now()));
+    if (!celebrationKey) {
+      setCelebrationState('fresh');
+      return;
     }
-  }, [celebrationKey, alreadyCelebrated]);
 
-  // If already celebrated, auto-complete immediately
+    try {
+      if (globalThis.localStorage.getItem(celebrationKey) !== null) {
+        setCelebrationState('celebrated');
+        return;
+      }
+
+      globalThis.localStorage.setItem(celebrationKey, String(Date.now()));
+    } catch {
+      // Private browsing and embedded webviews can deny storage. The
+      // celebration remains usable; it simply cannot be persisted there.
+    }
+
+    setCelebrationState('fresh');
+  }, [celebrationKey]);
+
+  // If already celebrated, auto-complete once storage has resolved.
   useEffect(() => {
-    if (alreadyCelebrated) {
+    if (celebrationState === 'celebrated') {
       onCompleteRef.current();
     }
-  }, [alreadyCelebrated]);
+  }, [celebrationState]);
 
   useEffect(() => {
     onCompleteRef.current = onComplete;
@@ -87,6 +100,10 @@ export function ProfileLiveCelebration({
   }, []);
 
   useEffect(() => {
+    if (celebrationState !== 'fresh') {
+      return;
+    }
+
     hasCompletedRef.current = false;
 
     const dialog = dialogRef.current;
@@ -174,7 +191,7 @@ export function ProfileLiveCelebration({
       }
       previousFocusRef.current?.focus();
     };
-  }, [autoAdvanceMs, completeCelebration, username]);
+  }, [autoAdvanceMs, celebrationState, completeCelebration, username]);
 
   return (
     <dialog
