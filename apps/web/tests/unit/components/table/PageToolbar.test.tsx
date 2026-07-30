@@ -78,9 +78,7 @@ describe('PageToolbar buttons', () => {
     expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain('rounded-full');
     expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain('border-0');
     expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain('bg-transparent');
-    expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain(
-      'hover:bg-surface-1'
-    );
+    expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain('hover:bg-surface-1');
     expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain(
       'focus-visible:bg-surface-1'
     );

@@ -23,8 +23,7 @@ export const PAGE_TOOLBAR_META_TEXT_CLASS =
 export const PAGE_TOOLBAR_TAB_BUTTON_CLASS =
   'inline-flex h-7.5 items-center justify-center gap-1.5 rounded-pill bg-transparent px-2.5 text-2xs font-caption font-[540] tracking-tight text-tertiary-token shadow-none transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 disabled:pointer-events-none disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5';
 
-export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS =
-  'bg-surface-1 text-primary-token';
+export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS = 'bg-surface-1 text-primary-token';
 
 export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(
   ACTION_BAR_BUTTON_CLASS,
