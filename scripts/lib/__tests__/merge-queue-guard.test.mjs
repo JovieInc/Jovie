@@ -456,7 +456,7 @@ describe('aggregate required checks', () => {
     // The duplicate manual ci-storybook-a11y job was removed (JOV-4326); the
     // scheduled visual-a11y.yml storybook-a11y lane is the single owner.
     expect(ciWorkflowYaml).not.toContain('ci-storybook-a11y:');
-    expect(storybookBlock).toMatch(/pnpm --filter web test:a11y/);
+    expect(storybookBlock).toMatch(/pnpm --filter @jovie\/web test:a11y/);
     expect(prReadyBlock).not.toMatch(/ci-storybook-a11y|STORYBOOK_A11Y_RESULT/);
     expect(visualWorkflowYaml).not.toMatch(/^\s+pull_request:/m);
     expect(visualWorkflowYaml).not.toMatch(/^\s+push:/m);
