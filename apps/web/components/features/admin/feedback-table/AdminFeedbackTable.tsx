@@ -5,6 +5,7 @@ import { ClipboardCopy, MessageSquareText, XCircle } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import { useAdminPeopleRightPanel } from '@/components/features/admin/AdminPeopleRightPanelProvider';
 import { toast } from '@/components/feedback';
 import {
   DrawerCardActionBar,
@@ -183,6 +184,140 @@ function formatDismissedLabel(dismissedAtIso: string | null): string {
   return `Dismissed ${new Date(dismissedAtIso).toLocaleString()}`;
 }
 
+function AdminFeedbackDetailPanel({
+  selected,
+  isDismissPending,
+  dismissRow,
+  copyRowAsMarkdown,
+  onClose,
+}: {
+  readonly selected: FeedbackRow | null;
+  readonly isDismissPending: (id: string) => boolean;
+  readonly dismissRow: (item: FeedbackRow) => Promise<void>;
+  readonly copyRowAsMarkdown: (item: FeedbackRow) => Promise<void>;
+  readonly onClose: () => void;
+}) {
+  return (
+    <EntitySidebarShell
+      isOpen={Boolean(selected)}
+      width={560}
+      ariaLabel='Feedback details'
+      scrollStrategy='shell'
+      onClose={onClose}
+      headerMode='minimal'
+      hideMinimalHeaderBar
+      isEmpty={!selected}
+      emptyMessage='Select a feedback row to view details.'
+      entityHeader={
+        selected ? (
+          <DrawerSurfaceCard variant='card' className='overflow-hidden p-3.5'>
+            <EntityHeaderCard
+              eyebrow='Feedback'
+              title={getFeedbackUserLabel(selected.user)}
+              subtitle={selected.user.email ?? 'No email available'}
+              meta={
+                <div className='space-y-1 text-xs leading-4 text-secondary-token'>
+                  <p>
+                    Source: {selected.source} ·{' '}
+                    {new Date(selected.createdAtIso).toLocaleString()}
+                  </p>
+                  <p className='text-tertiary-token'>
+                    {selected.status === 'dismissed'
+                      ? formatDismissedLabel(selected.dismissedAtIso)
+                      : 'Marked as pending'}
+                  </p>
+                </div>
+              }
+              actions={
+                <DrawerCardActionBar
+                  primaryActions={
+                    [
+                      ...(selected.status === 'dismissed'
+                        ? []
+                        : [
+                            {
+                              id: 'dismiss-feedback',
+                              label: 'Dismiss',
+                              icon: XCircle,
+                              disabled: isDismissPending(selected.id),
+                              onClick: () => {
+                                dismissRow(selected);
+                              },
+                            } satisfies DrawerHeaderAction,
+                          ]),
+                      {
+                        id: 'copy-feedback-markdown',
+                        label: 'Copy As Markdown',
+                        icon: ClipboardCopy,
+                        onClick: () => {
+                          copyRowAsMarkdown(selected);
+                        },
+                      } satisfies DrawerHeaderAction,
+                    ] satisfies readonly DrawerHeaderAction[]
+                  }
+                  onClose={onClose}
+                  overflowTriggerPlacement='card-top-right'
+                  overflowTriggerIcon='vertical'
+                  className='border-0 bg-transparent px-0 py-0'
+                />
+              }
+              bodyClassName='pr-9'
+            />
+          </DrawerSurfaceCard>
+        ) : undefined
+      }
+    >
+      {selected ? (
+        <>
+          <DrawerSection title='User' className='space-y-1.5' surface='card'>
+            <div className='space-y-1'>
+              <DrawerPropertyRow
+                label='User'
+                labelWidth={84}
+                value={getFeedbackUserLabel(selected.user)}
+              />
+              <DrawerPropertyRow
+                label='Email'
+                labelWidth={84}
+                value={selected.user.email ?? 'No email available'}
+              />
+              <DrawerPropertyRow
+                label='Clerk ID'
+                labelWidth={84}
+                value={selected.user.clerkId ?? 'N/A'}
+              />
+            </div>
+          </DrawerSection>
+
+          <DrawerSection
+            title='Feedback'
+            collapsible={false}
+            className='space-y-1.5'
+            surface='card'
+          >
+            <div className='rounded-md bg-surface-0 px-2.5 py-2 text-xs leading-[19px] whitespace-pre-wrap text-primary-token'>
+              {selected.message}
+            </div>
+          </DrawerSection>
+
+          <DrawerSection
+            title='Context'
+            collapsible={false}
+            className='space-y-1.5'
+            surface='card'
+          >
+            <div className='overflow-auto rounded-md bg-surface-0 p-0'>
+              <pre className='p-2.5 text-3xs leading-4 text-secondary-token'>
+                {JSON.stringify(selected.context, null, 2)}
+              </pre>
+            </div>
+          </DrawerSection>
+        </>
+      ) : null}
+    </EntitySidebarShell>
+  );
+}
+
 export function AdminFeedbackTable({
   items,
   loadError = null,
@@ -295,179 +430,71 @@ export function AdminFeedbackTable({
     [selectedId]
   );
 
-  return (
-    <div className='flex h-full min-h-155 overflow-hidden'>
-      <div className='h-full w-full border-r border-subtle bg-(--app-shell-content-surface) lg:w-[58%]'>
-        <AdminTableHeader
-          title='Feedback'
-          subtitle='Triage product feedback and close the loop with clear status.'
-        />
-        <AdminTableSubheader
-          start={
-            <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
-              {rows.length} item{rows.length === 1 ? '' : 's'}
-            </span>
-          }
-          end={
-            <PageToolbarActionButton
-              label='Copy All As Markdown'
-              ariaLabel='Copy all feedback as Markdown'
-              tooltipLabel='Copy all as Markdown'
-              iconOnly
-              disabled={rows.length === 0}
-              onClick={copyAllAsMarkdown}
-              icon={<ClipboardCopy className='h-3.5 w-3.5' />}
-            />
-          }
-        />
-        <AdminTableShell testId='admin-feedback-table'>
-          {() => (
-            <AdminDataTable
-              data={rows}
-              columns={columns}
-              getRowId={row => row.id}
-              getRowClassName={getRowClassName}
-              onRowClick={row => setSelectedId(row.id)}
-              onFocusedRowChange={handleFocusedRowChange}
-              getContextMenuItems={getContextMenuItems}
-              emptyState={
-                <TableEmptyState
-                  icon={
-                    <MessageSquareText className='h-5 w-5' aria-hidden='true' />
-                  }
-                  title={
-                    loadError ? 'Feedback unavailable' : 'No feedback found'
-                  }
-                  description={
-                    loadError
-                      ? 'The feedback table could not load. Check the server logs before treating this as zero feedback.'
-                      : 'New feedback will appear here once users submit it.'
-                  }
-                  className='min-h-55 rounded-none border-x-0 border-b-0 shadow-none'
-                />
-              }
-            />
-          )}
-        </AdminTableShell>
-      </div>
-
-      <EntitySidebarShell
-        isOpen={Boolean(selected)}
-        width={560}
-        ariaLabel='Feedback details'
-        scrollStrategy='shell'
+  const detailPanel = useMemo(
+    () => (
+      <AdminFeedbackDetailPanel
+        selected={selected}
+        isDismissPending={isDismissPending}
+        dismissRow={dismissRow}
+        copyRowAsMarkdown={copyRowAsMarkdown}
         onClose={() => setSelectedId(null)}
-        headerMode='minimal'
-        hideMinimalHeaderBar
-        isEmpty={!selected}
-        emptyMessage='Select a feedback row to view details.'
-        entityHeader={
-          selected ? (
-            <DrawerSurfaceCard variant='card' className='overflow-hidden p-3.5'>
-              <EntityHeaderCard
-                eyebrow='Feedback'
-                title={getFeedbackUserLabel(selected.user)}
-                subtitle={selected.user.email ?? 'No email available'}
-                meta={
-                  <div className='space-y-1 text-xs leading-4 text-secondary-token'>
-                    <p>
-                      Source: {selected.source} ·{' '}
-                      {new Date(selected.createdAtIso).toLocaleString()}
-                    </p>
-                    <p className='text-tertiary-token'>
-                      {selected.status === 'dismissed'
-                        ? formatDismissedLabel(selected.dismissedAtIso)
-                        : 'Marked as pending'}
-                    </p>
-                  </div>
-                }
-                actions={
-                  <DrawerCardActionBar
-                    primaryActions={
-                      [
-                        ...(selected.status === 'dismissed'
-                          ? []
-                          : [
-                              {
-                                id: 'dismiss-feedback',
-                                label: 'Dismiss',
-                                icon: XCircle,
-                                disabled: isDismissPending(selected.id),
-                                onClick: () => {
-                                  dismissRow(selected);
-                                },
-                              } satisfies DrawerHeaderAction,
-                            ]),
-                        {
-                          id: 'copy-feedback-markdown',
-                          label: 'Copy As Markdown',
-                          icon: ClipboardCopy,
-                          onClick: () => {
-                            copyRowAsMarkdown(selected);
-                          },
-                        } satisfies DrawerHeaderAction,
-                      ] satisfies readonly DrawerHeaderAction[]
-                    }
-                    onClose={() => setSelectedId(null)}
-                    overflowTriggerPlacement='card-top-right'
-                    overflowTriggerIcon='vertical'
-                    className='border-0 bg-transparent px-0 py-0'
-                  />
-                }
-                bodyClassName='pr-9'
-              />
-            </DrawerSurfaceCard>
-          ) : undefined
+      />
+    ),
+    [copyRowAsMarkdown, dismissRow, isDismissPending, selected]
+  );
+  useAdminPeopleRightPanel(detailPanel);
+
+  return (
+    <div className='h-full min-h-155 overflow-hidden bg-(--app-shell-content-surface)'>
+      <AdminTableHeader
+        title='Feedback'
+        subtitle='Triage product feedback and close the loop with clear status.'
+      />
+      <AdminTableSubheader
+        start={
+          <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+            {rows.length} item{rows.length === 1 ? '' : 's'}
+          </span>
         }
-      >
-        {selected ? (
-          <>
-            <DrawerSection title='User' className='space-y-1.5' surface='card'>
-              <div className='space-y-1'>
-                <DrawerPropertyRow
-                  label='User'
-                  labelWidth={84}
-                  value={getFeedbackUserLabel(selected.user)}
-                />
-                <DrawerPropertyRow
-                  label='Email'
-                  labelWidth={84}
-                  value={selected.user.email ?? 'No email available'}
-                />
-                <DrawerPropertyRow
-                  label='Clerk ID'
-                  labelWidth={84}
-                  value={selected.user.clerkId ?? 'N/A'}
-                />
-              </div>
-            </DrawerSection>
-
-            <DrawerSection
-              title='Feedback'
-              collapsible={false}
-              className='space-y-1.5'
-              surface='card'
-            >
-              <div className='rounded-md bg-surface-0 px-2.5 py-2 text-xs leading-[19px] whitespace-pre-wrap text-primary-token'>
-                {selected.message}
-              </div>
-            </DrawerSection>
-
-            <DrawerSection
-              title='Context'
-              collapsible={false}
-              className='space-y-1.5'
-              surface='card'
-            >
-              <div className='overflow-auto rounded-md bg-surface-0 p-0'>
-                <pre className='p-2.5 text-3xs leading-4 text-secondary-token'>
-                  {JSON.stringify(selected.context, null, 2)}
-                </pre>
-              </div>
-            </DrawerSection>
-          </>
-        ) : null}
-      </EntitySidebarShell>
+        end={
+          <PageToolbarActionButton
+            label='Copy All As Markdown'
+            ariaLabel='Copy all feedback as Markdown'
+            tooltipLabel='Copy all as Markdown'
+            iconOnly
+            disabled={rows.length === 0}
+            onClick={copyAllAsMarkdown}
+            icon={<ClipboardCopy className='h-3.5 w-3.5' />}
+          />
+        }
+      />
+      <AdminTableShell testId='admin-feedback-table'>
+        {() => (
+          <AdminDataTable
+            data={rows}
+            columns={columns}
+            getRowId={row => row.id}
+            getRowClassName={getRowClassName}
+            onRowClick={row => setSelectedId(row.id)}
+            onFocusedRowChange={handleFocusedRowChange}
+            getContextMenuItems={getContextMenuItems}
+            emptyState={
+              <TableEmptyState
+                icon={
+                  <MessageSquareText className='h-5 w-5' aria-hidden='true' />
+                }
+                title={loadError ? 'Feedback unavailable' : 'No feedback found'}
+                description={
+                  loadError
+                    ? 'The feedback table could not load. Check the server logs before treating this as zero feedback.'
+                    : 'New feedback will appear here once users submit it.'
+                }
+                className='min-h-55 rounded-none border-x-0 border-b-0 shadow-none'
+              />
+            }
+          />
+        )}
+      </AdminTableShell>
     </div>
   );
 }
