@@ -72,6 +72,24 @@ describe('bounded PR visual review contract', () => {
     });
   });
 
+  it('routes the authenticated session boundary through chat instead of masking it with a public capture', () => {
+    expect(
+      routeChangedFiles([
+        'apps/web/lib/auth/gate.ts',
+        'apps/web/lib/auth/session.ts',
+        'apps/web/lib/auth/auth-session-cookies.ts',
+        'apps/web/proxy.ts',
+        'apps/web/app/app/layout.tsx',
+        'apps/web/app/app/(shell)/layout.tsx',
+      ])
+    ).toEqual({
+      shouldReview: true,
+      routes: ['/app/chat'],
+      reason: 'ui-change',
+      review_status: 'advisory',
+    });
+  });
+
   it('validates authenticated capture handoff before loading an app route', () => {
     const capture = readFileSync(
       '.github/scripts/pr-visual-review-capture.mjs',
