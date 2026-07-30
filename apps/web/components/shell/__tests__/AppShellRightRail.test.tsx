@@ -19,6 +19,8 @@ describe('AppShellRightRail', () => {
       'top-0',
       'z-30',
       'lg:z-10',
+      'w-0',
+      'lg:w-fit',
       'h-full',
       'min-h-0',
       'self-stretch',
@@ -42,6 +44,24 @@ describe('AppShellRightRail', () => {
     const rail = screen.getByTestId('app-shell-right-rail');
 
     expect(rail).toHaveClass('lg:rounded-(--linear-app-shell-radius)');
+  });
+
+  it('has no desktop overlay positioning and only allocates the width of its drawer child', () => {
+    render(
+      <AppShellRightRail>
+        <div>Panel</div>
+      </AppShellRightRail>
+    );
+
+    const rail = screen.getByTestId('app-shell-right-rail');
+
+    expect(rail).toHaveClass('lg:w-fit', 'shrink-0');
+    expect(rail).not.toHaveClass(
+      'fixed',
+      'absolute',
+      'lg:fixed',
+      'lg:absolute'
+    );
   });
 
   it('merges custom className without replacing base sticky layout', () => {
