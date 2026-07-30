@@ -171,6 +171,22 @@
   --system-b-duration-fast: var(--ds-motion-subtle-duration);
   --system-b-ease: var(--ds-motion-subtle-easing);
   --system-b-radius-pill: var(--radius-full);
+  /* Concentric nested surfaces: outer radius = inner radius + inset. */
+  --system-b-radius-card: var(--radius-xl);
+  --system-b-radius-card-inner: calc(
+    var(--system-b-radius-card) -
+    var(--space-1)
+  );
+  --system-b-radius-overlay: var(--radius-xl);
+  --system-b-radius-overlay-inner: calc(
+    var(--system-b-radius-overlay) -
+    var(--space-1)
+  );
+  --system-b-radius-panel: var(--radius-3xl);
+  --system-b-radius-panel-inner: calc(
+    var(--system-b-radius-panel) -
+    var(--space-1)
+  );
   --system-b-onboarding-step-handle: var(--geist-purple-solid);
   --system-b-onboarding-step-spotify: var(--color-brand-spotify);
   --system-b-onboarding-step-upgrade: var(--geist-amber-solid);
