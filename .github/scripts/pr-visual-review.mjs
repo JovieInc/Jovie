@@ -15,6 +15,12 @@ export const REQUIRED_CAPTURE_VIEWPORTS = ['desktop', 'mobile'];
 const PUBLIC_HOME_CAPTURE_ROUTE = '/';
 const PUBLIC_PROFILE_CAPTURE_ROUTE = '/demo/showcase/public-profile';
 const AUTHENTICATED_CHAT_CAPTURE_ROUTE = '/app/chat';
+// Changes to the session boundary can leave a public route perfectly healthy
+// while making every authenticated surface unusable. Keep this deliberately
+// narrow: these are the files that establish the app-shell session and route
+// guard, not every page under the auth route group.
+const AUTHENTICATED_SHELL_CAPTURE_FILE =
+  /^(?:apps\/web\/(?:proxy|middleware)\.[cm]?[jt]s|apps\/web\/lib\/auth\/(?:gate|session|auth-session-cookies)\.[cm]?[jt]sx?|apps\/web\/app\/app(?:\/\(shell\))?\/layout\.[cm]?[jt]sx?)$/i;
 
 /** @typedef {{ apiKey?: string, baseUrl?: string, model?: string }} ReviewBackend */
 
@@ -29,7 +35,10 @@ export function sanitizeForPrompt(value) {
 
 export function routeChangedFiles(files) {
   const changed = files.filter(
-    file => UI_FILE.test(file) || /(^|\/)DESIGN\.md$/.test(file)
+    file =>
+      UI_FILE.test(file) ||
+      AUTHENTICATED_SHELL_CAPTURE_FILE.test(file) ||
+      /(^|\/)DESIGN\.md$/.test(file)
   );
   if (changed.length === 0)
     return {
@@ -44,7 +53,10 @@ export function routeChangedFiles(files) {
     // UI changes belong on the public home surface; `/demo` and `/demo/admin`
     // require data/authentication that the capture runner intentionally does
     // not invent.
-    if (/admin|console|ops/i.test(file)) routes.add(PUBLIC_HOME_CAPTURE_ROUTE);
+    if (AUTHENTICATED_SHELL_CAPTURE_FILE.test(file))
+      routes.add(AUTHENTICATED_CHAT_CAPTURE_ROUTE);
+    else if (/admin|console|ops/i.test(file))
+      routes.add(PUBLIC_HOME_CAPTURE_ROUTE);
     else if (/dynamic|profile|username|artist/i.test(file))
       routes.add(PUBLIC_PROFILE_CAPTURE_ROUTE);
     else if (/chat|shell/i.test(file))
