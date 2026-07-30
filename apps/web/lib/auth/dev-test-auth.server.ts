@@ -5,7 +5,10 @@ import { eq, or } from 'drizzle-orm';
 import { cookies, headers } from 'next/headers';
 import { cache } from 'react';
 import { auth } from '@/lib/auth/better-auth';
-import { DEFAULT_DEV_TEST_AUTH_EMAILS } from '@/lib/auth/dev-test-auth-identity';
+import {
+  DEFAULT_DEV_TEST_AUTH_EMAILS,
+  getDeterministicTestBetterAuthUserId,
+} from '@/lib/auth/dev-test-auth-identity';
 import type {
   ClientAuthBootstrap,
   DevTestAuthActor,
@@ -210,21 +213,30 @@ export function getDevTestAuthAvailability(
   };
 }
 
-function getFallbackActorFromPersona(
-  clerkUserId: string,
+export function getSyntheticDevTestAuthActor(
   persona: DevTestAuthPersona
-): DevTestAuthSession {
+): DevTestAuthActor {
   const config = resolvePersonaSeedConfig(persona);
 
   return {
-    dbUserId: clerkUserId,
     persona,
-    clerkUserId,
+    clerkUserId: getDeterministicTestBetterAuthUserId(config.email),
     email: config.email,
     username: config.username,
     fullName: config.fullName,
     isAdmin: config.isAdmin,
     profilePath: config.profilePath,
+  };
+}
+
+function getFallbackActorFromPersona(
+  clerkUserId: string,
+  persona: DevTestAuthPersona
+): DevTestAuthSession {
+  return {
+    ...getSyntheticDevTestAuthActor(persona),
+    dbUserId: clerkUserId,
+    clerkUserId,
   };
 }
 

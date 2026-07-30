@@ -99,6 +99,7 @@ jobs:
           NEXT_PUBLIC_E2E_MODE: '1'
           VERCEL_ENV: development
           E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH: '1'
           E2E_TEST_AUTH_PERSONA: creator-ready
           E2E_CLERK_USER_ID: user_test
 
@@ -106,7 +107,7 @@ jobs:
         if: steps.route.outputs.should_review == 'true'
         run: |
           set -euo pipefail
-          (cd apps/web && PORT=3100 DATABASE_URL=postgresql://localhost/noop NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_mock CLERK_SECRET_KEY=sk_test_mock NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_E2E_MODE=1 VERCEL_ENV=development E2E_USE_TEST_AUTH_BYPASS=1 E2E_TEST_AUTH_PERSONA=creator-ready E2E_CLERK_USER_ID=user_test HOSTNAME=localhost NEXT_PUBLIC_APP_URL=http://127.0.0.1:3100 BETTER_AUTH_URL=http://127.0.0.1:3100 NEXT_PUBLIC_BETTER_AUTH_URL=http://127.0.0.1:3100 pnpm run start) > "$RUNNER_TEMP/pr-visual-server.log" 2>&1 &
+          (cd apps/web && PORT=3100 DATABASE_URL=postgresql://localhost/noop NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_mock CLERK_SECRET_KEY=sk_test_mock NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_E2E_MODE=1 VERCEL_ENV=development E2E_USE_TEST_AUTH_BYPASS=1 E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH=1 E2E_TEST_AUTH_PERSONA=creator-ready E2E_CLERK_USER_ID=user_test HOSTNAME=localhost NEXT_PUBLIC_APP_URL=http://127.0.0.1:3100 BETTER_AUTH_URL=http://127.0.0.1:3100 NEXT_PUBLIC_BETTER_AUTH_URL=http://127.0.0.1:3100 pnpm run start) > "$RUNNER_TEMP/pr-visual-server.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/pr-visual-server.pid"
           for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:3100 >/dev/null 2>&1 && exit 0; sleep 2; done
           cat "$RUNNER_TEMP/pr-visual-server.log"
