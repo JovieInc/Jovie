@@ -1,7 +1,7 @@
 'use client';
 
 import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
-import { Button, buttonVariants, CommonDropdown } from '@jovie/ui';
+import { Button, CommonDropdown } from '@jovie/ui';
 import {
   Cookie,
   CreditCard,
@@ -108,15 +108,14 @@ function buildDropdownItems({
     {
       type: 'action-row',
       id: 'profile-help',
-      className:
-        'grid min-h-12 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-1 px-1',
+      className: 'grid w-full grid-cols-1 px-1',
       items: [
         {
           type: 'action',
           id: 'profile-card',
           label: `Open profile for ${displayName}`,
           onClick: handleProfile,
-          className: 'min-w-0 gap-2.5 px-1.5 py-1.5',
+          className: 'min-w-0 min-h-12 gap-2.5 px-1.5 py-1.5',
           content: (
             <>
               <Avatar
@@ -160,11 +159,7 @@ function buildDropdownItems({
           label: 'Help',
           icon: HelpCircle,
           onClick: handleHelp,
-          className: buttonVariants({
-            variant: 'secondary',
-            size: 'sm',
-            className: 'shrink-0 gap-1 px-2',
-          }),
+          className: 'min-h-8',
         },
       ],
     },
@@ -485,7 +480,7 @@ export function UserButton({
             open={isMenuOpen}
             onOpenChange={setIsMenuOpen}
             disabled
-            contentClassName='w-60'
+            contentClassName='w-72 max-w-[calc(100vw-1rem)]'
           />
         </div>
       );
@@ -589,7 +584,7 @@ export function UserButton({
         align={trigger || showUserInfo ? 'start' : 'end'}
         open={isMenuOpen}
         onOpenChange={setIsMenuOpen}
-        contentClassName='w-60 max-w-[calc(100vw-1rem)]'
+        contentClassName='w-72 max-w-[calc(100vw-1rem)]'
       />
       <DashboardFeedbackModal
         isOpen={isFeedbackOpen}

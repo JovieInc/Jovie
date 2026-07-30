@@ -267,7 +267,7 @@ describe('DashboardNav', () => {
     ).toBeNull();
   });
 
-  it('keeps inactive New Chat on the shared primary shell tone', () => {
+  it('keeps inactive New Chat distinct from a selected navigation row', () => {
     mockUsePathname.mockReturnValue(APP_ROUTES.CALENDAR);
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
@@ -275,9 +275,12 @@ describe('DashboardNav', () => {
 
     const chatLink = getByRole('link', { name: 'New Chat' });
     expect(chatLink).toHaveClass('text-primary-token');
-    expect(chatLink).toHaveClass(
-      'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)]'
+    expect(chatLink).toHaveClass('font-medium');
+    expect(chatLink).not.toHaveClass('bg-sidebar-accent-active');
+    expect(chatLink).not.toHaveClass(
+      'shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
     );
+    expect(chatLink.querySelector('svg')).toHaveClass('text-accent-blue');
     expect(chatLink).not.toHaveAttribute('aria-current');
   });
 
