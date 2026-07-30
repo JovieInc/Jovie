@@ -15,6 +15,7 @@ import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/Dashboar
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { ContactRole } from '@/types/contacts';
 import { ContactDetailSidebar } from './ContactDetailSidebar';
@@ -170,6 +171,38 @@ export const ContactsTable = memo(function ContactsTable({
     onDelete(selectedContact);
   }, [selectedContact, onDelete]);
 
+  const sidebarPanel = useMemo(
+    () => (
+      <ContactDetailSidebar
+        contact={selectedContact}
+        isOpen={isSidebarOpen}
+        onClose={handleClose}
+        onUpdate={handleUpdate}
+        onSave={handleSave}
+        onDelete={handleDelete}
+        contextMenuItems={
+          selectedContact
+            ? convertToCommonDropdownItems(getContextMenuItems(selectedContact))
+            : undefined
+        }
+      />
+    ),
+    [
+      getContextMenuItems,
+      handleClose,
+      handleDelete,
+      handleSave,
+      handleUpdate,
+      isSidebarOpen,
+      selectedContact,
+    ]
+  );
+
+  // The shell owns desktop rail allocation, so Contacts registers its detail
+  // surface there instead of mounting a route-local sibling beside the table.
+  // RightDrawer preserves the existing mobile sheet behavior.
+  useRegisterRightPanel(sidebarPanel);
+
   // Arrow keys update sidebar when it's already open
   const handleFocusedRowChange = useCallback(
     (index: number) => {
@@ -230,21 +263,6 @@ export const ContactsTable = memo(function ContactsTable({
           )}
         </div>
       </div>
-
-      {/* Right sidebar */}
-      <ContactDetailSidebar
-        contact={selectedContact}
-        isOpen={isSidebarOpen}
-        onClose={handleClose}
-        onUpdate={handleUpdate}
-        onSave={handleSave}
-        onDelete={handleDelete}
-        contextMenuItems={
-          selectedContact
-            ? convertToCommonDropdownItems(getContextMenuItems(selectedContact))
-            : undefined
-        }
-      />
     </div>
   );
 });
