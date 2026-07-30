@@ -65,6 +65,25 @@ describe('DashboardNav', () => {
     expect(queryByRole('link', { name: 'Settings' })).toBeNull();
   });
 
+  it('places the shell search slot after New Chat and before remaining navigation', () => {
+    const { getByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      navChildren: <button type='button'>Search</button>,
+    });
+
+    const newChat = getByRole('link', { name: 'New Chat' });
+    const search = getByRole('button', { name: 'Search' });
+    const inbox = getByRole('link', { name: 'Inbox' });
+
+    expect(
+      newChat.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      search.compareDocumentPosition(inbox) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(search.parentElement).toHaveClass('h-7', 'shrink-0');
+  });
+
   it('keeps the canonical six visible without rollout state', () => {
     const { container } = renderDashboardNav({
       renderFn: fastRender,

@@ -28,6 +28,7 @@ import {
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
 import { getVersionUpdateTitle } from '@/components/shell/getVersionUpdateTitle';
+import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import { InstallBanner } from '@/components/shell/InstallBanner';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
@@ -507,7 +508,9 @@ export function UnifiedSidebar({
             ) : sidebarOverride ? (
               sidebarOverride.content
             ) : (
-              <DashboardNav />
+              <DashboardNav>
+                <HeaderSearchSurfaceFromContext className='w-full max-w-none sm:w-full lg:w-full' />
+              </DashboardNav>
             )}
           </SidebarGroupContent>
         </SidebarGroup>

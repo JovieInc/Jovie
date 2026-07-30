@@ -127,7 +127,7 @@ function formatTaskBadge(
   return count > 99 ? '99+' : count;
 }
 
-export function DashboardNav(_: DashboardNavProps) {
+export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   const { inboxNavigation, selectedProfile } = useDashboardData();
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
@@ -492,7 +492,18 @@ export function DashboardNav(_: DashboardNavProps) {
                       {renderSection(section.items)}
                     </SidebarCollapsibleGroup>
                   ) : (
-                    renderSection(section.items)
+                    <>
+                      {renderSection(section.items.slice(0, 1))}
+                      {index === 0 && searchSurface ? (
+                        <div
+                          data-sidebar-search-slot='true'
+                          className='my-1.5 h-7 shrink-0 group-data-[collapsible=icon]:hidden'
+                        >
+                          {searchSurface}
+                        </div>
+                      ) : null}
+                      {renderSection(section.items.slice(1))}
+                    </>
                   )}
                 </div>
               ))}
