@@ -50,7 +50,25 @@ describe('PR visual review workflow', () => {
       'name: Capture changed UI (desktop + mobile) (advisory)'
     );
     expect(capture).toContain('continue-on-error: true');
+    expect(capture).toMatch(
+      /id: build\n        if: steps\.route\.outputs\.should_review == 'true'\n        continue-on-error: true/
+    );
+    expect(capture).toMatch(
+      /id: server\n        if: steps\.route\.outputs\.should_review == 'true' && steps\.build\.outcome == 'success'\n        continue-on-error: true/
+    );
+    expect(capture).toMatch(
+      /id: routed_capture\n        if: steps\.route\.outputs\.should_review == 'true' && steps\.build\.outcome == 'success' && steps\.server\.outcome == 'success'\n        continue-on-error: true/
+    );
+    expect(capture).toContain('name: Record advisory capture outcome');
+    expect(capture).toContain('advisory-outcome.json');
+    expect(capture).toContain(
+      "status: failedStages.length ? 'unavailable' : 'completed'"
+    );
     expect(capture).toContain('name: Upload visual evidence');
+    expect(capture).toMatch(
+      /id: upload\n        if: always\(\)\n        continue-on-error: true/
+    );
+    expect(capture).toContain('name: Report artifact upload advisory outcome');
     expect(capture).toContain('if: always()');
     expect(review).toContain('continue-on-error: true');
   });

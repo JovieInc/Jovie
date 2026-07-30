@@ -89,7 +89,9 @@ jobs:
           NODE
 
       - name: Build web app for deterministic capture
+        id: build
         if: steps.route.outputs.should_review == 'true'
+        continue-on-error: true
         run: pnpm turbo build --filter=@jovie/web
         env:
           DATABASE_URL: postgresql://localhost/noop
@@ -106,7 +108,9 @@ jobs:
           E2E_CLERK_USER_ID: user_test
 
       - name: Start production server
-        if: steps.route.outputs.should_review == 'true'
+        id: server
+        if: steps.route.outputs.should_review == 'true' && steps.build.outcome == 'success'
+        continue-on-error: true
         run: |
           set -euo pipefail
           (cd apps/web && PORT=3100 DATABASE_URL=postgresql://localhost/noop NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_mock CLERK_SECRET_KEY=sk_test_mock NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_E2E_MODE=1 VERCEL_ENV=development E2E_USE_TEST_AUTH_BYPASS=1 E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH=1 E2E_TEST_AUTH_PERSONA=creator-ready E2E_CLERK_USER_ID=user_test HOSTNAME=localhost NEXT_PUBLIC_APP_URL=http://127.0.0.1:3100 BETTER_AUTH_URL=http://127.0.0.1:3100 NEXT_PUBLIC_BETTER_AUTH_URL=http://127.0.0.1:3100 pnpm run start) > "$RUNNER_TEMP/pr-visual-server.log" 2>&1 &
@@ -116,7 +120,9 @@ jobs:
           exit 1
 
       - name: Capture routed surfaces
-        if: steps.route.outputs.should_review == 'true'
+        id: routed_capture
+        if: steps.route.outputs.should_review == 'true' && steps.build.outcome == 'success' && steps.server.outcome == 'success'
+        continue-on-error: true
         env:
           BASE_URL: http://127.0.0.1:3100
           PR_VISUAL_ROUTES: ${{ steps.route.outputs.routes }}
@@ -129,14 +135,64 @@ jobs:
         if: always()
         run: kill "$(cat "$RUNNER_TEMP/pr-visual-server.pid" 2>/dev/null)" 2>/dev/null || true
 
-      - name: Upload visual evidence
+      - name: Record advisory capture outcome
         if: always()
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          SERVER_OUTCOME: ${{ steps.server.outcome }}
+          CAPTURE_OUTCOME: ${{ steps.routed_capture.outcome }}
+        run: |
+          mkdir -p "$PR_VISUAL_OUT"
+          node --input-type=module - <<'NODE'
+          import { writeFile } from 'node:fs/promises';
+
+          const stages = {
+            build: process.env.BUILD_OUTCOME || 'skipped',
+            server: process.env.SERVER_OUTCOME || 'skipped',
+            capture: process.env.CAPTURE_OUTCOME || 'skipped',
+          };
+          const failedStages = Object.entries(stages)
+            .filter(([, outcome]) => outcome === 'failure')
+            .map(([stage]) => stage);
+          await writeFile(
+            `${process.env.PR_VISUAL_OUT}/advisory-outcome.json`,
+            JSON.stringify(
+              {
+                status: failedStages.length ? 'unavailable' : 'completed',
+                advisory: true,
+                stages,
+                failedStages,
+              },
+              null,
+              2
+            )
+          );
+          if (failedStages.length) {
+            console.log(
+              `::warning::Visual capture evidence is unavailable at: ${failedStages.join(', ')}. This advisory lane does not block merging.`
+            );
+          }
+          NODE
+
+      - name: Upload visual evidence
+        id: upload
+        if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: pr-visual-review-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           path: pr-visual-artifacts/
           if-no-files-found: error
           retention-days: 14
+
+      - name: Report artifact upload advisory outcome
+        if: always()
+        env:
+          UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
+        run: |
+          if [ "$UPLOAD_OUTCOME" = failure ]; then
+            echo "::warning::Visual evidence upload failed. The capture outcome above remains advisory and does not block merging."
+          fi
 
   review:
     name: Review screenshots and post advisory review
