@@ -1,9 +1,8 @@
 'use client';
 
-import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
+import { RailToggleButton } from '@/components/atoms/RailToggleButton';
 import { RIGHT_RAIL_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useRightRailKeyboardShortcut';
 
 /**
@@ -20,29 +19,18 @@ export function ArtistProfileRailToggle() {
 
   const primaryName = selectedProfile?.displayName?.trim() || 'Artist profile';
 
-  const label = isOpen
-    ? `Hide ${primaryName} profile`
-    : `Show ${primaryName} profile`;
-
   if (!selectedProfile) return null;
 
-  const RailIcon = isOpen ? PanelRightClose : PanelRightOpen;
-
   return (
-    <DashboardHeaderActionButton
-      ariaLabel={label}
-      pressed={isOpen}
-      onClick={toggle}
+    <RailToggleButton
+      side='right'
+      open={isOpen}
+      openLabel={`Hide ${primaryName} profile`}
+      closedLabel={`Show ${primaryName} profile`}
+      onToggle={toggle}
+      shortcut={RIGHT_RAIL_KEYBOARD_SHORTCUT_BARE}
       dataTestId='artist-profile-rail-toggle'
-      tooltipLabel={label}
-      tooltipShortcut={RIGHT_RAIL_KEYBOARD_SHORTCUT_BARE}
-      icon={
-        <RailIcon
-          data-testid='artist-profile-rail-icon'
-          className='size-3.5'
-          aria-hidden='true'
-        />
-      }
+      iconTestId='artist-profile-rail-icon'
     />
   );
 }

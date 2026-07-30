@@ -541,8 +541,11 @@ These are surface-side aliases of `--ds-motion-*` tokens (DS_FOUNDATION_V1).
 
 - Press feedback uses the shared `--scale-press` token. The canonical value is
   `0.98`: enough tactile response to register without visible shrink or jump.
-- Shared interactive primitives, including Button, apply the token once.
-  Feature code must not add its own `whileTap` scale or hardcoded active scale.
+- Press compression is opt-in. Use it only when an action has no immediate
+  visible response; dropdowns, accordions, tabs, toggles, and rail controls
+  already communicate their state change and must stay geometrically static.
+- Shared interactive primitives apply the token once when opted in. Feature
+  code must not add its own `whileTap` scale or hardcoded active scale.
 - Hover and focus feedback do not scale controls. Use semantic surface, text,
   border, opacity, or shadow changes that preserve geometry.
 - `prefers-reduced-motion: reduce` disables press transforms. Components that

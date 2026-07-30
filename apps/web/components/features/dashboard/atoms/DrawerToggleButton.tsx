@@ -2,9 +2,9 @@
 
 import { PanelRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { RailToggleButton } from '@/components/atoms/RailToggleButton';
 import { PageToolbarActionButton } from '@/components/organisms/table';
 import { useTableMeta } from '@/contexts/TableMetaContext';
-import { DashboardHeaderActionButton } from './DashboardHeaderActionButton';
 
 export function DrawerToggleButton({
   className,
@@ -47,12 +47,13 @@ export function DrawerToggleButton({
   }
 
   return (
-    <DashboardHeaderActionButton
-      ariaLabel={ariaLabel}
-      pressed={isOpen}
+    <RailToggleButton
+      side='right'
+      open={isOpen}
+      openLabel={ariaLabel}
+      closedLabel={ariaLabel}
       disabled={!tableMeta.toggle}
-      onClick={() => tableMeta.toggle?.()}
-      icon={<Icon className='h-4 w-4' />}
+      onToggle={() => tableMeta.toggle?.()}
       className={className}
     />
   );

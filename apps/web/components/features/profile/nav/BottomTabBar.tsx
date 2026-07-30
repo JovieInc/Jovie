@@ -133,7 +133,7 @@ export function BottomTabBar({
                 type='button'
                 onClick={() => onTabSelect(tab.mode)}
                 className={cn(
-                  'relative flex h-full min-w-0 touch-manipulation items-center justify-center rounded-full text-center transition-[color,transform] duration-subtle ease-subtle active:scale-[0.94] motion-reduce:transform-none',
+                  'relative flex h-full min-w-0 touch-manipulation items-center justify-center rounded-full text-center transition-colors duration-subtle ease-subtle',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                   isActive
                     ? 'text-white dark:text-white'
