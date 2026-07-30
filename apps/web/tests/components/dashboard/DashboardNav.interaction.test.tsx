@@ -27,6 +27,7 @@ const PRIMARY_LABELS = [
   'Inbox',
   'Library',
   'Contacts',
+  'Profiles',
   'Calendar',
   'Tasks',
 ] as const;
@@ -72,20 +73,13 @@ describe('DashboardNav interactions', () => {
   it('does not duplicate sidebar Search or removed primary destinations', () => {
     renderDashboardNav({ renderFn: render });
 
-    for (const label of [
-      'Search',
-      'Touring',
-      'Audience',
-      'Profiles',
-      'Releases',
-    ]) {
+    for (const label of ['Search', 'Touring', 'Audience', 'Releases']) {
       expect(screen.queryByRole('link', { name: label })).toBeNull();
       expect(screen.queryByRole('button', { name: label })).toBeNull();
     }
   });
 
-  it('opens the artist profile rail directly from chat', async () => {
-    const user = userEvent.setup();
+  it('routes Profiles through the canonical navigation row without a duplicate avatar button', () => {
     renderDashboardNav({
       renderFn: render,
       overrides: {
@@ -98,24 +92,14 @@ describe('DashboardNav interactions', () => {
       },
     });
 
-    await user.click(
-      screen.getByRole('button', { name: 'Open Tim White profile' })
+    expect(screen.getByRole('link', { name: 'Profiles' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.PROFILES
     );
-
+    expect(
+      screen.queryByRole('button', { name: 'Open Tim White profile' })
+    ).toBeNull();
     expect(mockRouterPush).not.toHaveBeenCalled();
-    expect(mockOpenPreviewPanel).toHaveBeenCalledTimes(1);
-  });
-
-  it('routes directly to the Chat profile panel from other shells', async () => {
-    const user = userEvent.setup();
-    mockUsePathname.mockReturnValue(APP_ROUTES.CALENDAR);
-    renderDashboardNav({ renderFn: render });
-
-    await user.click(
-      screen.getByRole('button', { name: 'Open Artist profile' })
-    );
-
-    expect(mockRouterPush).toHaveBeenCalledWith(APP_ROUTES.CHAT_PROFILE_PANEL);
     expect(mockOpenPreviewPanel).not.toHaveBeenCalled();
   });
 

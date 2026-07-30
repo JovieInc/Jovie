@@ -65,7 +65,7 @@ describe('performance route manifest', () => {
     ]);
   });
 
-  it('keeps the canonical six-item navigation in warm-measurement parity', () => {
+  it('keeps canonical navigation in warm-measurement parity', () => {
     const routes = getEndUserPerfRouteManifest();
     const warmRoutesByNavigationItem = new Map(
       routes

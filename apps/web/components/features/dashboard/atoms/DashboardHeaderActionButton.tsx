@@ -34,6 +34,7 @@ export interface DashboardHeaderActionButtonProps {
   readonly tooltipLabel?: string;
   readonly tooltipShortcut?: string;
   readonly className?: string;
+  readonly dataTestId?: string;
 }
 
 export function DashboardHeaderActionButton({
@@ -48,6 +49,7 @@ export function DashboardHeaderActionButton({
   tooltipLabel,
   tooltipShortcut,
   className,
+  dataTestId,
 }: DashboardHeaderActionButtonProps) {
   if (label && !iconOnly) {
     return (
@@ -81,6 +83,7 @@ export function DashboardHeaderActionButton({
       disabled={disabled}
       tooltipLabel={tooltipLabel}
       tooltipShortcut={tooltipShortcut}
+      data-testid={dataTestId}
       className={cn(
         DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS,
         pressed && DASHBOARD_HEADER_ACTION_ICON_BUTTON_ACTIVE_CLASS,

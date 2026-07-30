@@ -622,6 +622,31 @@ describe('UserButton billing actions', () => {
     expect(document.querySelector('.animate-pulse')).toBeNull();
   });
 
+  it('keeps the loading sidebar identity footprint collapse-safe', () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: null,
+    } as any);
+    mockUseUserSafe.mockReturnValue({
+      isLoaded: false,
+      isSignedIn: false,
+      user: null,
+    } as any);
+
+    render(<UserButton showUserInfo />);
+
+    const loading = screen.getByTestId('user-button-loading');
+    expect(loading).toHaveClass(
+      'group-data-[collapsible=icon]:size-7',
+      'group-data-[collapsible=icon]:justify-center',
+      'group-data-[collapsible=icon]:p-0'
+    );
+    expect(
+      loading.querySelector('[data-user-button-loading-copy]')
+    ).toHaveClass('group-data-[collapsible=icon]:hidden');
+  });
+
   it('shows an inline usage remaining row in the user menu', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: false, plan: null, hasStripeCustomer: false },
@@ -736,5 +761,47 @@ describe('UserButton billing actions', () => {
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
+  });
+
+  it('collapses the sidebar identity trigger to a centered avatar-only control', () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    render(<UserButton showUserInfo />);
+
+    const trigger = screen.getByRole('button', { name: /Adele Adkins/i });
+
+    expect(trigger).toHaveClass(
+      'group-data-[collapsible=icon]:size-7',
+      'group-data-[collapsible=icon]:justify-center',
+      'group-data-[collapsible=icon]:gap-0',
+      'group-data-[collapsible=icon]:p-0'
+    );
+    expect(
+      trigger.querySelector('[data-user-button-display-name]')
+    ).toHaveClass('group-data-[collapsible=icon]:hidden');
+    expect(trigger.querySelector('[data-user-button-chevron]')).toHaveClass(
+      'group-data-[collapsible=icon]:hidden'
+    );
+  });
+
+  it('anchors the sidebar identity menu to the start edge', async () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+    const user = userEvent.setup();
+
+    render(<UserButton showUserInfo />);
+    await user.click(screen.getByRole('button', { name: /Adele Adkins/i }));
+
+    expect(await screen.findByRole('menu')).toHaveAttribute(
+      'data-align',
+      'start'
+    );
   });
 });

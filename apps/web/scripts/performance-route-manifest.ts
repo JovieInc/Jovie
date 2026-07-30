@@ -1382,6 +1382,32 @@ const CREATOR_SHELL_ROUTES = [
     seedProfile: 'active-user',
   },
   {
+    id: 'creator-profiles',
+    group: 'creator-shell',
+    surface: 'creator-app',
+    path: APP_ROUTES.PROFILES,
+    navigationItemId: 'profiles',
+    warmNavigationStartPath: APP_ROUTES.DASHBOARD,
+    requiresAuth: true,
+    warmupStrategy: 'authenticated-shell',
+    measureMode: 'warm-navigation',
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"]'],
+      content: ['[data-testid="profiles-workspace"]'],
+      navTrigger: [
+        `a[href="${APP_ROUTES.PROFILES}"]`,
+        `a[href^="${APP_ROUTES.PROFILES}?"]`,
+      ],
+    },
+    timings: [
+      { metric: 'warm-shell-response', budget: 100 },
+      { metric: 'skeleton-to-content', budget: 1000 },
+    ],
+    resourceSizes: ACCOUNT_BILLING_RESOURCE_BUDGETS,
+    priority: 12,
+    seedProfile: 'active-user',
+  },
+  {
     id: 'creator-calendar-cold',
     group: 'creator-shell',
     surface: 'creator-app',
