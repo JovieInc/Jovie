@@ -44,6 +44,16 @@ describe('OpportunityRow', () => {
     expect(onPrimaryAction).toHaveBeenCalledWith('row-1');
   });
 
+  it('keeps an explicit buyer-approval action visible and labeled', () => {
+    render(
+      <OpportunityRow {...baseProps} primaryActionLabel='Approve buyer' />
+    );
+
+    const button = screen.getByRole('button', { name: 'Approve buyer' });
+    expect(button).toHaveTextContent('Approve buyer');
+    expect(button.parentElement).toHaveClass('opacity-100');
+  });
+
   it('fires dismiss on x click', () => {
     const onDismiss = vi.fn();
     render(<OpportunityRow {...{ ...baseProps, onDismiss }} />);

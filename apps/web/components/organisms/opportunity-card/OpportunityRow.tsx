@@ -67,6 +67,7 @@ export function OpportunityRow({
   metadata,
   hideDot = false,
   onPrimaryAction,
+  primaryActionLabel,
   onDismiss,
   isBusy = false,
   className,
@@ -77,6 +78,7 @@ export function OpportunityRow({
   const dotColor = DOT_COLOR[state];
   const actionAccent = ACTION_ACCENT[state];
   const persistentAction = hasPersistentAction(state);
+  const namedPrimaryAction = primaryActionLabel?.trim() || null;
   const showCheckmark = isCheckmarkState(state);
   const rowHasAction = hasActionChrome(state);
 
@@ -175,7 +177,9 @@ export function OpportunityRow({
               'transition-opacity duration-subtle',
               persistentAction
                 ? 'opacity-100'
-                : 'opacity-0 pointer-events-none group-hover/row:opacity-100 group-hover/row:pointer-events-auto group-focus-within/row:opacity-100 group-focus-within/row:pointer-events-auto'
+                : namedPrimaryAction
+                  ? 'opacity-100'
+                  : 'opacity-0 pointer-events-none group-hover/row:opacity-100 group-hover/row:pointer-events-auto group-focus-within/row:opacity-100 group-focus-within/row:pointer-events-auto'
             )}
           >
             {/* Ghost accent ring pill — 2px border, no fill */}
@@ -197,9 +201,22 @@ export function OpportunityRow({
               }}
               onClick={handlePrimaryAction}
               disabled={isBusy || !rowHasAction}
-              aria-label={showCheckmark ? 'Planned' : 'Plan Opportunity'}
+              aria-label={
+                showCheckmark
+                  ? 'Planned'
+                  : (namedPrimaryAction ?? 'Plan Opportunity')
+              }
             >
-              {showCheckmark ? '✓' : '→'}
+              {showCheckmark ? (
+                '✓'
+              ) : namedPrimaryAction ? (
+                <>
+                  {namedPrimaryAction}
+                  <span aria-hidden='true'>→</span>
+                </>
+              ) : (
+                '→'
+              )}
             </button>
 
             {/* Dismiss button — faint x, secondary to the primary.

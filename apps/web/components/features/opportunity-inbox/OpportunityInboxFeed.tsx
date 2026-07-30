@@ -90,6 +90,11 @@ export function OpportunityInboxFeed({
               title={card.title}
               metadata={card.why}
               hideDot={false}
+              primaryActionLabel={
+                card.category === 'brand_deal'
+                  ? card.primaryActionLabel
+                  : undefined
+              }
               onPrimaryAction={id => onApprove(id)}
               onDismiss={id => onDismiss(id)}
               isBusy={pendingActionId === card.id}

@@ -46,6 +46,8 @@ export interface OpportunityRowProps {
   readonly hideDot?: boolean;
   /** Callback when primary action (→/✓) is triggered */
   readonly onPrimaryAction?: (id: string) => void;
+  /** Optional visible label for decisions that need an explicit commitment verb. */
+  readonly primaryActionLabel?: string;
   /** Callback when dismiss (x) is triggered */
   readonly onDismiss?: (id: string) => void;
   /** When true, action buttons are disabled (loading state) */

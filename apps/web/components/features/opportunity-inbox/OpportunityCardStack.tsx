@@ -146,6 +146,11 @@ export function OpportunityCardStack({
                 title={topCard.title}
                 metadata={topCard.why}
                 hideDot={false}
+                primaryActionLabel={
+                  topCard.category === 'brand_deal'
+                    ? topCard.primaryActionLabel
+                    : undefined
+                }
                 onPrimaryAction={id => {
                   // Primary pill accepts; open is Enter/tap via stack focus.
                   onAccept(id);

@@ -147,6 +147,54 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.getByText('Home — the inbox')).toBeInTheDocument();
   });
 
+  it('renders and filters a verified brand-deal decision', () => {
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [
+            {
+              id: 'brand-deal-1',
+              signalType: 'brand_deal',
+              typeLabel: 'Brand Deal',
+              createdAt: '2026-07-29T10:00:00.000Z',
+              title: 'Example Brand creator-performance pilot',
+              why: '$7.5k-$12.5k · Backstage · verified · score 82.4',
+              primaryActionLabel: 'Approve buyer',
+              status: 'pending',
+              category: 'brand_deal',
+            },
+            {
+              id: 'song-1',
+              signalType: 'new_song',
+              typeLabel: 'New Song',
+              createdAt: '2026-07-29T09:00:00.000Z',
+              title: 'New single detected',
+              why: 'Native Spotify signal.',
+              primaryActionLabel: 'Set up release',
+              status: 'pending',
+              category: 'suggestion',
+            },
+          ],
+          emptyActionCards: [],
+        }}
+      />
+    );
+
+    expect(
+      screen.getByText('Example Brand creator-performance pilot')
+    ).toBeVisible();
+    expect(
+      screen.getByText('$7.5k-$12.5k · Backstage · verified · score 82.4')
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Approve buyer' })).toBeVisible();
+
+    fireEvent.click(screen.getByTestId('opportunity-inbox-filter-brand_deal'));
+    expect(
+      screen.getByText('Example Brand creator-performance pilot')
+    ).toBeVisible();
+    expect(screen.queryByText('New single detected')).not.toBeInTheDocument();
+  });
+
   it('renders the empty state when there are no cards', () => {
     render(
       <OpportunityInboxPageClient
