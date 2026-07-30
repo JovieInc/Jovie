@@ -3,8 +3,9 @@
 import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
 import { Button, buttonVariants, CommonDropdown } from '@jovie/ui';
 import {
+  Cookie,
   CreditCard,
-  FileText,
+  FileCheck2,
   HelpCircle,
   Keyboard,
   LogOut,
@@ -244,7 +245,7 @@ function buildDropdownItems({
       type: 'action',
       id: 'terms-of-service',
       label: 'Terms Of Service',
-      icon: FileText,
+      icon: FileCheck2,
       onClick: () =>
         window.open(APP_ROUTES.LEGAL_TERMS, '_blank', 'noopener,noreferrer'),
     },
@@ -252,7 +253,7 @@ function buildDropdownItems({
       type: 'action',
       id: 'cookie-policy',
       label: 'Cookie Policy',
-      icon: FileText,
+      icon: Cookie,
       onClick: () =>
         window.open(APP_ROUTES.LEGAL_COOKIES, '_blank', 'noopener,noreferrer'),
     }
