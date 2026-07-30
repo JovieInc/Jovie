@@ -163,7 +163,7 @@ export function DisplayMenuDropdown({
           </span>
           <PopoverPrimitive.Close
             aria-label='Close'
-            className='rounded-full border-0 bg-transparent p-1 text-tertiary-token shadow-none transition-[background-color,color] duration-subtle hover:bg-(--linear-row-hover) hover:text-primary-token focus-visible:bg-(--linear-row-hover) focus-visible:text-primary-token focus-visible:outline-none'
+            className='rounded-full border-0 bg-transparent p-1 text-tertiary-token shadow-none transition-[background-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:text-primary-token focus-visible:outline-none'
           >
             <X className='h-4 w-4' />
           </PopoverPrimitive.Close>

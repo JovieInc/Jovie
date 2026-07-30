@@ -70,7 +70,7 @@ describe('PageToolbar buttons', () => {
 
   it('keeps inactive view tabs quiet and gives the active view a surface, not a ring', () => {
     expect(PAGE_TOOLBAR_TAB_BUTTON_CLASS).toContain('text-tertiary-token');
-    expect(PAGE_TOOLBAR_TAB_ACTIVE_CLASS).toContain('bg-(--linear-row-hover)');
+    expect(PAGE_TOOLBAR_TAB_ACTIVE_CLASS).toContain('bg-surface-1');
     expect(PAGE_TOOLBAR_TAB_ACTIVE_CLASS).not.toContain('ring-');
   });
 
@@ -79,10 +79,10 @@ describe('PageToolbar buttons', () => {
     expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain('border-0');
     expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain('bg-transparent');
     expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain(
-      'hover:bg-(--linear-row-hover)'
+      'hover:bg-surface-1'
     );
     expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain(
-      'focus-visible:bg-(--linear-row-hover)'
+      'focus-visible:bg-surface-1'
     );
   });
 
