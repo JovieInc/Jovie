@@ -2222,17 +2222,21 @@ describe('canary health gate workflow', () => {
     );
     const aliasProofStep = getStepBlock(
       aliasJob,
-      'Prove staging alias owns the exact deployment and full SHA'
+      'Prove staging alias owns the SHA-attested exact deployment'
+    );
+    expect(aliasProofStep).toContain('resolve-deployment');
+    expect(aliasProofStep).toContain(
+      'VERCEL_CANDIDATE_DEPLOYMENT_ID="$EXPECTED_DEPLOYMENT_ID"'
     );
     expect(aliasProofStep).toContain(
-      'alias_commit_sha="$(jq -r \'.meta.githubCommitSha // ""\' <<<"$alias_json")"'
+      'EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}'
     );
     expect(aliasProofStep).toContain(
-      '[[ "$alias_commit_sha" =~ ^[0-9a-f]{40}$ ]]'
+      '[ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ]'
     );
-    expect(aliasProofStep).toContain(
-      '[ "$alias_commit_sha" = "$EXPECTED_COMMIT_SHA" ]'
-    );
+    expect(aliasProofStep).toContain('[ "$alias_state" = "READY" ]');
+    expect(aliasProofStep).not.toContain('alias_commit_sha=');
+    expect(aliasProofStep).not.toContain('.meta.githubCommitSha');
     expect(oauthStep).toContain('BASE_URL: https://staging.jov.ie');
     expect(oauthStep).toContain(
       'EXPECTED_VERCEL_ALIAS_ORIGIN: https://staging.jov.ie'
