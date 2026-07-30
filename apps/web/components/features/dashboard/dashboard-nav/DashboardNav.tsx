@@ -142,7 +142,6 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(null);
   const [hasHydratedPersistedState, setHasHydratedPersistedState] =
     useState(false);
-  const artistName = selectedProfile?.displayName?.trim();
   const profileId = selectedProfile?.id ?? '';
   const isDemo = isDemoRoutePath(pathname);
   const telemetryContext = useMemo<NavigationTelemetryContext>(
