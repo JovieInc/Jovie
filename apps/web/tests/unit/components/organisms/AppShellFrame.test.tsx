@@ -17,6 +17,14 @@ describe('AppShellFrame', () => {
     expect(mainContent).toHaveAttribute('id', 'main-content');
     expect(mainContent).not.toHaveAttribute('tabindex');
     expect(mainContent.closest('[data-app-shell-frame]')).toBeInTheDocument();
+    const shellBody = mainContent.closest('[data-app-shell-body]');
+    expect(shellBody).toHaveAttribute('data-shell-rail-motion', 'coordinated');
+    expect(shellBody).toHaveClass(
+      'transition-[gap,padding]',
+      'duration-cinematic',
+      'ease-cinematic',
+      'motion-reduce:transition-none'
+    );
     expect(mainContent).toHaveClass('lg:shadow-(--linear-app-shell-shadow)');
     // #main-content keeps its full rounded shell radius — no Electron override
     // strips the top corners now that the header lives inside the card.
@@ -98,7 +106,44 @@ describe('AppShellFrame', () => {
 
     const mount = screen.getByTestId('app-shell-sidebar-mount');
     expect(mount).toHaveClass('h-full', 'min-h-0', 'flex', 'flex-col');
+    expect(mount).toHaveClass(
+      'transition-[flex-basis,width,opacity,transform]',
+      'duration-cinematic',
+      'ease-cinematic',
+      'motion-reduce:transition-none'
+    );
     expect(mount).toContainElement(screen.getByTestId('fixture-sidebar'));
+  });
+
+  it('keeps main-plane geometry on the same reduced-motion-safe rail contract', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        header={<header>Header</header>}
+        main={<div>Main Content</div>}
+        rightPanel={<div>Right rail</div>}
+      />
+    );
+
+    expect(screen.getByTestId('app-shell-scroll').parentElement).toHaveClass(
+      'transition-[gap]',
+      'duration-cinematic',
+      'motion-reduce:transition-none'
+    );
+    expect(screen.getByTestId('app-shell-scroll')).toHaveClass(
+      'transition-[flex-basis,width]',
+      'duration-cinematic',
+      'motion-reduce:transition-none'
+    );
+    expect(
+      screen
+        .getByTestId('app-shell-scroll')
+        .closest('[data-app-shell-content-column]')
+    ).toHaveClass(
+      'transition-[flex-basis,width]',
+      'duration-cinematic',
+      'motion-reduce:transition-none'
+    );
   });
 
   it('renders the chat ambient gradient full-bleed behind the header on chat routes', () => {

@@ -465,11 +465,14 @@ export function UnifiedSidebar({
   return (
     <Sidebar
       variant='sidebar'
+      data-shell-rail-motion='left'
       collapsible='offcanvas'
       className={cn(
         'bg-base',
         '[--sidebar-width:var(--app-shell-sidebar-width)]',
-        'transition-[width,transform] duration-cinematic ease-cinematic',
+        // The left rail owns its internal label/icon staging while
+        // AppShellFrame owns the adjacent main-plane allocation (#4522).
+        'transition-[flex-basis,width,transform,opacity] duration-cinematic ease-cinematic motion-reduce:transition-none',
         // OV brand skin: class-based token override, same mechanism as `.dark`
         // (see design-system.css → OV MODE). Zero layout impact.
         variant === 'ov' && 'ov-mode'
