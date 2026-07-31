@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
-- [internal] **Admin Overview is a health dashboard only (JOV-2098):** one linked signal each for Business, Growth, Ops, and People; funnel, outreach, and reliability detail stay on their home screens with matching nav copy.
+- [internal] **Public skill registry is an explicit partial catalog (JOV-3013):** `PUBLIC_SKILL_REGISTRY` names the admin/playbook/postbuild product-skill catalog (alias `SKILL_REGISTRY`); docs and drift tests make clear live chat tools are assembled and gated elsewhere, so `skills_catalog` is never mistaken for “what the model can call.”
 - [internal] **Noir Ion D workspace surfaces (JOV-4648):** shell-scoped table hover/selected/focus, PageToolbar, drawer/popover/tooltip elevation, and skeleton colors now resolve to the Noir Ion contract without global bleed; compact specimen + focused tests included.
 - [internal] **Better Auth OAuth token tables cover the pinned provider schema (JOV-4587):** client, access-token, refresh-token, and consent columns now include fields such as `authorizationCodeId`, with a contract test that fails on mapping drift so LYB Apple sign-in can complete `/oauth2/token` exchange.
 - [internal] **Native Gmail brand-deal qualification is fail-closed (JOV-4578):** Jovie now surfaces only the highest-ranked current brief with explicit buyer, company, budget, deposit, rights, and revision terms; provenance comes from the connected Gmail record, Calendar is optional, and pending or approved sponsor work blocks another campaign.

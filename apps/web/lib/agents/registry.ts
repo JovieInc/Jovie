@@ -1,23 +1,44 @@
 /**
- * Agent Skill Registry
+ * Public Skill Registry (partial catalog by design — JOV-3013)
  *
- * Code-side source of truth for all deployed skills. The DB mirror
- * (skills_catalog) is kept in sync at deploy time by
- * scripts/sync-skills-catalog.ts via the postbuild hook.
+ * Code-side source of truth for **cataloged product skills** that are
+ * mirrored into `skills_catalog` / `tools_catalog` at deploy time by
+ * `scripts/sync-skills-catalog.ts` (postbuild). Admin system map, playbook
+ * compile resolution, and skill lifecycle tooling read this registry.
  *
- * To add a new skill:
- * 1. Add an entry here.
+ * ## Partial catalog intent
+ *
+ * This registry is **NOT** the exhaustive list of tools the chat model can
+ * call. Live chat tools are assembled in `app/api/chat/route.ts`
+ * (`buildFreeChatTools` / `buildChatTools`), gated by plan + entitlements
+ * (`lib/chat/tool-access.ts`, `lib/chat/locked-tools.ts`), and UI-labeled in
+ * `lib/chat/tool-ui-registry.ts` (`TOOL_UI_REGISTRY`).
+ *
+ * Do **not** treat `skills_catalog` / this registry as "what the model has."
+ * Only product skills that need admin visibility, playbook compile
+ * resolution, or DB lifecycle tracking belong here.
+ *
+ * To add a **cataloged** skill:
+ * 1. Add an entry here (`PUBLIC_SKILL_REGISTRY`).
  * 2. Add the corresponding entitlement to lib/entitlements/registry.ts.
  * 3. Create the style/prompt markdown at promptPath (if applicable).
  * 4. Run `pnpm --filter web drizzle:generate` if new enum values are needed.
  * 5. The postbuild hook will sync the catalog on next deploy.
+ *
+ * To add a **live chat tool** only: register it in the chat route builders +
+ * `TOOL_UI_REGISTRY` (+ `TOOL_SCHEMAS` when eval coverage is needed). Catalog
+ * it here only when it is a product skill surface.
  */
 
 import type { SkillDefinition, ToolDefinition } from './types';
 
 type RegistryDefinition = SkillDefinition | ToolDefinition;
 
-export const SKILL_REGISTRY = {
+/**
+ * Cataloged product skills/tools for admin, playbook compile, and postbuild
+ * DB sync. Intentionally a **partial** subset of live chat capabilities.
+ */
+export const PUBLIC_SKILL_REGISTRY = {
   generateReleasePitch: {
     id: 'generateReleasePitch',
     name: 'Generate pitch',
@@ -107,8 +128,28 @@ export const SKILL_REGISTRY = {
       surface: 'image',
       action: 'retouch_image',
       style: 'white-space',
+      /** Live chat tool name when this skill is exposed on chat (id may differ). */
+      chatToolId: 'retouchImage',
     },
   },
 } as const satisfies Record<string, RegistryDefinition>;
 
-export type SkillId = keyof typeof SKILL_REGISTRY;
+/**
+ * Back-compat alias for `PUBLIC_SKILL_REGISTRY`. Prefer the public name in
+ * new code so partial-catalog intent stays obvious (JOV-3013).
+ */
+export const SKILL_REGISTRY = PUBLIC_SKILL_REGISTRY;
+
+export type SkillId = keyof typeof PUBLIC_SKILL_REGISTRY;
+
+/**
+ * Catalog skill id → live chat tool name when the skill is (or maps onto) a
+ * chat tool. Skills without a chat mapping are catalog/playbook-only.
+ *
+ * Used by drift tests: catalog entries that claim a chat surface must stay
+ * aligned with `TOOL_UI_REGISTRY`.
+ */
+export const PUBLIC_SKILL_CHAT_TOOL_IDS = {
+  generateReleasePitch: 'generateReleasePitch',
+  retouch: 'retouchImage',
+} as const satisfies Partial<Record<SkillId, string>>;
