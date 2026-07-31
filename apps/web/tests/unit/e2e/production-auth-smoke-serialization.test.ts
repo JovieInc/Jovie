@@ -32,6 +32,8 @@ describe('production auth smoke session contract', () => {
     );
     expect(source).toContain('/api/auth/oauth2/userinfo');
     expect(source).toContain('/api/auth/oauth2/revoke');
+    expect(source).toContain('best-effort cleanup must never fail');
+    expect(source).not.toContain('revocation should succeed');
     expect(source).toContain('recordPlaywrightSensitiveValues(');
     const tabNavigation = source.split('const tabs = ')[1];
     expect(tabNavigation).toBeDefined();
