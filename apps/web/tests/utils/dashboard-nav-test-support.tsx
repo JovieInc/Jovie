@@ -12,13 +12,8 @@ import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS, type AppFlagSnapshot } from '@/lib/flags/contracts';
 
 export const mockUsePathname = vi.fn<() => string>(() => APP_ROUTES.CHAT);
-export const mockUseTaskStatsQuery = vi.fn(() => ({ data: undefined }));
 export const mockUseChatConversationsQuery = vi.fn(() => ({
   data: undefined,
-}));
-export const mockUsePlanGate = vi.fn(() => ({
-  canAccessTasksWorkspace: true,
-  isLoading: false,
 }));
 export const mockToastInfo = vi.fn();
 export const mockShowPendingShell = vi.fn();
@@ -109,24 +104,6 @@ vi.mock('@/lib/queries/useReleasesQuery', () => ({
   useReleasesQuery: () => ({ data: undefined, isLoading: false }),
 }));
 
-vi.mock('@/lib/queries/useTasksQuery', () => ({
-  useTaskStatsQuery: (...args: unknown[]) => mockUseTaskStatsQuery(...args),
-}));
-
-vi.mock('@/lib/queries', async () => {
-  const actual =
-    await vi.importActual<typeof import('@/lib/queries')>('@/lib/queries');
-
-  return {
-    ...actual,
-    usePlanGate: (...args: unknown[]) => mockUsePlanGate(...args),
-    useDeleteConversationMutation: () => ({
-      mutateAsync: vi.fn(),
-      isPending: false,
-    }),
-  };
-});
-
 vi.mock('@jovie/ui', async () => {
   const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
 
@@ -175,15 +152,8 @@ export function resetDashboardNavTestMocks() {
   localStorage.clear();
   mockUsePathname.mockReset();
   mockUsePathname.mockReturnValue(APP_ROUTES.CHAT);
-  mockUseTaskStatsQuery.mockReset();
-  mockUseTaskStatsQuery.mockReturnValue({ data: undefined });
   mockUseChatConversationsQuery.mockReset();
   mockUseChatConversationsQuery.mockReturnValue({ data: undefined });
-  mockUsePlanGate.mockReset();
-  mockUsePlanGate.mockReturnValue({
-    canAccessTasksWorkspace: true,
-    isLoading: false,
-  });
   mockToastInfo.mockReset();
   mockShowPendingShell.mockReset();
   mockClearPendingShell.mockReset();

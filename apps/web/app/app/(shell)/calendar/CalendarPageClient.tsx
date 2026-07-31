@@ -4,6 +4,7 @@ import { Button } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   useCallback,
   useEffect,
@@ -27,6 +28,7 @@ import {
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import { PageToolbar } from '@/components/organisms/table';
+import { buildReleaseTasksRoute } from '@/constants/routes';
 import { getEventLocalDateKey } from '@/lib/events/date';
 import { normalizeTicketUrl } from '@/lib/events/ticket-url';
 import { queryKeys } from '@/lib/queries';
@@ -654,8 +656,16 @@ export function CalendarPageClient() {
                           )}
                         </div>
                         <div className='min-w-0 flex-1'>
-                          <div className='system-b-calendar-row-title truncate font-caption'>
-                            {r.title}
+                          <div className='flex min-w-0 items-center gap-2'>
+                            <div className='system-b-calendar-row-title truncate font-caption'>
+                              {r.title}
+                            </div>
+                            <Link
+                              href={buildReleaseTasksRoute(r.id)}
+                              className='system-b-calendar-context-link shrink-0 font-medium'
+                            >
+                              Tasks
+                            </Link>
                           </div>
                           <div className='system-b-calendar-row-meta capitalize'>
                             {r.status}

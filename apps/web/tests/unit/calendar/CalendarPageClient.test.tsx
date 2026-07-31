@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CalendarPageClient } from '@/app/app/(shell)/calendar/CalendarPageClient';
+import { buildReleaseTasksRoute } from '@/constants/routes';
 import type { EventRecord } from '@/lib/queries/useEventsQuery';
 
 const mocks = vi.hoisted(() => ({
@@ -148,6 +149,11 @@ describe('CalendarPageClient', () => {
     expect(
       screen.queryByText('Releases and events at a glance.')
     ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /17 May Release/ }));
+    expect(screen.getByRole('link', { name: 'Tasks' })).toHaveAttribute(
+      'href',
+      buildReleaseTasksRoute(release.id)
+    );
   });
 
   it('keeps event review filtering backed by the event query', () => {

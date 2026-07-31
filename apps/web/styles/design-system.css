@@ -7289,7 +7289,8 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 :where(.system-b-calendar-action-reject),
 :where(.system-b-calendar-action-ghost),
 :where(.system-b-calendar-action-danger-ghost),
-:where(.system-b-calendar-action-secondary) {
+:where(.system-b-calendar-action-secondary),
+:where(.system-b-calendar-context-link) {
   font-size: var(--text-2xs);
 }
 
@@ -7508,6 +7509,21 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 :where(.system-b-calendar-action-ghost:hover) {
   background: var(--system-b-bg-surface-1);
   color: var(--color-text-primary-token);
+}
+
+:where(.system-b-calendar-context-link) {
+  color: var(--color-accent-blue);
+}
+
+:where(.system-b-calendar-context-link:hover) {
+  color: var(--color-text-primary-token);
+}
+
+:where(.system-b-calendar-context-link:focus-visible) {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--color-focus),
+    0 0 0 4px var(--system-b-bg-surface-1);
 }
 
 :where(.system-b-calendar-rejected-toggle) {

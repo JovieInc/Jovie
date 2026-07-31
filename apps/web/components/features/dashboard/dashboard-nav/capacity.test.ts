@@ -57,7 +57,6 @@ describe('partitionCustomerNavigation', () => {
       'contacts',
       'profiles',
       'calendar',
-      'tasks',
     ]);
     expect(partition.visible).toEqual(mobilePrimaryNavigation);
     expect(partition.more).toEqual(mobileExpandedNavigation);
@@ -85,10 +84,11 @@ describe('partitionCustomerNavigation', () => {
       visibleCap: CUSTOMER_NAV_CAPACITY.desktopPrimaryVisible,
     });
 
-    expect(partition.visible.map(item => item.id)).toEqual(
-      primaryNavigation.map(item => item.id)
-    );
-    expect(partition.more.map(item => item.id)).toEqual(['labs', 'signals']);
+    expect(partition.visible.map(item => item.id)).toEqual([
+      ...primaryNavigation.map(item => item.id),
+      'labs',
+    ]);
+    expect(partition.more.map(item => item.id)).toEqual(['signals']);
     expect(partition.more.every(item => item.tier === 'experimental')).toBe(
       true
     );
@@ -114,22 +114,19 @@ describe('partitionCustomerNavigation', () => {
     expect(partition.more).toEqual([]);
   });
 
-  it('never hides the active route — promotes active overflow into visible', () => {
+  it('keeps the stable three-item mobile strip when a contextual route is active', () => {
     const partition = partitionCustomerNavigation(primaryNavigation, {
       visibleCap: CUSTOMER_NAV_CAPACITY.mobilePrimaryVisible,
-      activeItemId: 'tasks',
+      activeItemId: null,
     });
 
-    expect(partition.visible.map(item => item.id)).toContain('tasks');
     expect(partition.visible).toHaveLength(
       CUSTOMER_NAV_CAPACITY.mobilePrimaryVisible
     );
-    expect(partition.more.map(item => item.id)).not.toContain('tasks');
-    // Prefer displacing the last non-promoted slot while preserving order.
     expect(partition.visible.map(item => item.id)).toEqual([
       'chat',
       'inbox',
-      'tasks',
+      'library',
     ]);
   });
 

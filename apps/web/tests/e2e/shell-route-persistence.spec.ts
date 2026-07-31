@@ -450,11 +450,6 @@ test('app shell persists across core app routes without duplicate request bursts
     'library back route'
   );
 
-  await clickFirstVisibleAppLink(page, [APP_ROUTES.TASKS], [APP_ROUTES.TASKS]);
-  await expectRouteContent(page, 'tasks');
-  await assertPersistentShellFrame(page, 'tasks route');
-  await assertNoDocumentReloadSince(page, baselineLoadCount, 'tasks route');
-
   const openedThreadLink = await clickOptionalFirstVisibleAppLink(
     page,
     [chatThreadPath],

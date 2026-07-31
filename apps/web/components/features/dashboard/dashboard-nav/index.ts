@@ -22,7 +22,6 @@ export {
   primaryNavigation,
   settingsNavItem,
   settingsNavigation,
-  tasksNavItem,
   userSettingsNavigation,
 } from './config';
 export { DashboardNav } from './DashboardNav';

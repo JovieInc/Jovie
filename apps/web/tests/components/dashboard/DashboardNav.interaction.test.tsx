@@ -29,7 +29,6 @@ const PRIMARY_LABELS = [
   'Contacts',
   'Connections',
   'Calendar',
-  'Tasks',
 ] as const;
 
 describe('DashboardNav interactions', () => {
@@ -235,12 +234,12 @@ describe('DashboardNav interactions', () => {
       },
     });
 
-    fireEvent.mouseEnter(screen.getByRole('link', { name: 'Tasks' }));
+    fireEvent.mouseEnter(screen.getByRole('link', { name: 'Calendar' }));
     expect(prefetchForRouteMock).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(150);
 
     expect(prefetchForRouteMock).toHaveBeenCalledWith(
-      'tasks',
+      'calendar',
       expect.anything(),
       'profile_123'
     );
@@ -251,12 +250,12 @@ describe('DashboardNav interactions', () => {
     mockUsePathname.mockReturnValue('/demo/showcase/settings');
     renderDashboardNav({ renderFn: render });
 
-    const tasksLink = screen.getByRole('link', { name: 'Tasks' });
-    expect(tasksLink).toHaveAttribute('href', APP_ROUTES.TASKS);
-    await user.click(tasksLink);
+    const calendarLink = screen.getByRole('link', { name: 'Calendar' });
+    expect(calendarLink).toHaveAttribute('href', APP_ROUTES.CALENDAR);
+    await user.click(calendarLink);
 
     expect(mockToastInfo).toHaveBeenCalledWith(
-      'Tasks is not available in demo mode'
+      'Calendar is not available in demo mode'
     );
   });
 });
