@@ -27,6 +27,9 @@ describe('production auth smoke session contract', () => {
     ).toHaveLength(1);
     expect(source).toContain("grant_type: 'authorization_code'");
     expect(source).toContain("grant_type: 'refresh_token'");
+    expect(source.match(/headers: \{ origin: expectedOrigin \}/g)).toHaveLength(
+      3
+    );
     expect(source).toContain('/api/auth/oauth2/userinfo');
     expect(source).toContain('/api/auth/oauth2/revoke');
     expect(source).toContain('recordPlaywrightSensitiveValues(');

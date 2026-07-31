@@ -210,6 +210,10 @@ async function verifyProductionIosOAuthTokenFlow(
     const initialTokens = await readOAuthTokenSet(
       await request.post(`${expectedOrigin}/api/auth/oauth2/token`, {
         failOnStatusCode: false,
+        // The exact Vercel deployment is protected by an origin-bound bypass
+        // cookie. Better Auth therefore requires a trusted Origin on POST even
+        // though the real native client has no cookies.
+        headers: { origin: expectedOrigin },
         form: {
           grant_type: 'authorization_code',
           client_id: IOS_OAUTH_CLIENT_ID,
@@ -232,6 +236,7 @@ async function verifyProductionIosOAuthTokenFlow(
     const refreshedTokens = await readOAuthTokenSet(
       await request.post(`${expectedOrigin}/api/auth/oauth2/token`, {
         failOnStatusCode: false,
+        headers: { origin: expectedOrigin },
         form: {
           grant_type: 'refresh_token',
           client_id: IOS_OAUTH_CLIENT_ID,
@@ -253,6 +258,7 @@ async function verifyProductionIosOAuthTokenFlow(
         `${expectedOrigin}/api/auth/oauth2/revoke`,
         {
           failOnStatusCode: false,
+          headers: { origin: expectedOrigin },
           form: {
             client_id: IOS_OAUTH_CLIENT_ID,
             token: value,
