@@ -9,19 +9,22 @@ import {
 } from 'drizzle-orm/pg-core';
 
 /**
- * Better Auth core tables (better-auth@1.6.23).
+ * Better Auth core + OAuth-provider tables (better-auth@1.7.0-rc.1).
  *
- * These four tables are owned by Better Auth via its Drizzle adapter
+ * Core tables are owned by Better Auth via its Drizzle adapter
  * (`modelName` mapping: user→ba_users, session→ba_sessions,
  * account→ba_accounts, verification→ba_verifications). They are intentionally
  * separate from the app `users` table; the link column is
  * `users.better_auth_user_id` (nullable, unique).
  *
+ * OAuth-provider tables (`oauthClient` / `oauthRefreshToken` /
+ * `oauthAccessToken` / `oauthConsent`) must cover every field declared by the
+ * pinned `@better-auth/oauth-provider` schema. Contract:
+ * `tests/unit/auth/oauth-provider-schema-contract.test.ts`.
+ *
  * Field keys are camelCase to match Better Auth's default `fieldName`s — the
  * Drizzle adapter resolves columns by TS property name — while SQL column
- * names stay snake_case per repo convention. Shapes mirror the core schema in
- * `@better-auth/core/db` `getAuthTables` at the pinned version; verify against
- * the installed package before changing.
+ * names stay snake_case per repo convention.
  */
 
 export const baUsers = pgTable('ba_users', {
@@ -96,12 +99,19 @@ export const baOauthClients = pgTable(
     postLogoutRedirectUris: jsonb('post_logout_redirect_uris').$type<
       string[]
     >(),
+    backchannelLogoutUri: text('backchannel_logout_uri'),
+    backchannelLogoutSessionRequired: boolean(
+      'backchannel_logout_session_required'
+    ),
     tokenEndpointAuthMethod: text('token_endpoint_auth_method'),
+    jwks: text('jwks'),
+    jwksUri: text('jwks_uri'),
     grantTypes: jsonb('grant_types').$type<string[]>(),
     responseTypes: jsonb('response_types').$type<string[]>(),
     public: boolean('public'),
     type: text('type'),
     requirePKCE: boolean('require_pkce'),
+    dpopBoundAccessTokens: boolean('dpop_bound_access_tokens').default(false),
     referenceId: text('reference_id'),
     metadata: jsonb('metadata').$type<Record<string, unknown>>(),
   },
@@ -125,10 +135,19 @@ export const baOauthRefreshTokens = pgTable(
       .notNull()
       .references(() => baUsers.id, { onDelete: 'cascade' }),
     referenceId: text('reference_id'),
+    authorizationCodeId: text('authorization_code_id'),
+    resources: jsonb('resources').$type<string[]>(),
+    requestedUserInfoClaims: jsonb('requested_user_info_claims').$type<
+      string[]
+    >(),
     expiresAt: timestamp('expires_at').notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     revoked: timestamp('revoked'),
+    rotatedAt: timestamp('rotated_at'),
+    rotationReplayResponse: text('rotation_replay_response'),
+    rotationReplayExpiresAt: timestamp('rotation_replay_expires_at'),
     authTime: timestamp('auth_time'),
+    confirmation: jsonb('confirmation').$type<Record<string, unknown>>(),
     scopes: jsonb('scopes').$type<string[]>().notNull(),
   },
   table => ({
@@ -139,6 +158,9 @@ export const baOauthRefreshTokens = pgTable(
       table.sessionId
     ),
     userIdIdx: index('idx_ba_oauth_refresh_tokens_user_id').on(table.userId),
+    authorizationCodeIdIdx: index(
+      'idx_ba_oauth_refresh_tokens_authorization_code_id'
+    ).on(table.authorizationCodeId),
   })
 );
 
@@ -157,11 +179,18 @@ export const baOauthAccessTokens = pgTable(
       onDelete: 'cascade',
     }),
     referenceId: text('reference_id'),
+    authorizationCodeId: text('authorization_code_id'),
+    resources: jsonb('resources').$type<string[]>(),
+    requestedUserInfoClaims: jsonb('requested_user_info_claims').$type<
+      string[]
+    >(),
     refreshId: text('refresh_id').references(() => baOauthRefreshTokens.id, {
       onDelete: 'set null',
     }),
     expiresAt: timestamp('expires_at').notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
+    revoked: timestamp('revoked'),
+    confirmation: jsonb('confirmation').$type<Record<string, unknown>>(),
     scopes: jsonb('scopes').$type<string[]>().notNull(),
   },
   table => ({
@@ -175,6 +204,9 @@ export const baOauthAccessTokens = pgTable(
     refreshIdIdx: index('idx_ba_oauth_access_tokens_refresh_id').on(
       table.refreshId
     ),
+    authorizationCodeIdIdx: index(
+      'idx_ba_oauth_access_tokens_authorization_code_id'
+    ).on(table.authorizationCodeId),
   })
 );
 
@@ -189,6 +221,10 @@ export const baOauthConsents = pgTable(
       onDelete: 'cascade',
     }),
     referenceId: text('reference_id'),
+    resources: jsonb('resources').$type<string[]>(),
+    requestedUserInfoClaims: jsonb('requested_user_info_claims').$type<
+      string[]
+    >(),
     scopes: jsonb('scopes').$type<string[]>().notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
