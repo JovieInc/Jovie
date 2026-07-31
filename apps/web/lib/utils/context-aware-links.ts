@@ -1,4 +1,5 @@
 import { MAX_HEADER_SOCIAL_LINKS } from '@/lib/profile/social-link-limits';
+import { sanitizePublicHref } from '@/lib/utils/public-url';
 import type { LegacySocialLink } from '@/types/db';
 
 /**
@@ -200,6 +201,11 @@ export function getHeaderSocialLinks(
       }
 
       if (!priorityIndexMap.has(platform)) {
+        return false;
+      }
+
+      // Suppress malformed hrefs before they reach the hero social row.
+      if (!sanitizePublicHref(link.url)) {
         return false;
       }
 

@@ -38,8 +38,10 @@ describe('DesktopQrOverlay', () => {
 
   it('starts as icon on desktop (hidden by default)', () => {
     render(<DesktopQrOverlay handle='tim' />);
-    expect(screen.getByLabelText('View on mobile')).toBeInTheDocument();
-    expect(screen.queryByAltText('Scan to view on mobile')).toBeNull();
+    expect(screen.getByLabelText('Open On Phone')).toBeInTheDocument();
+    expect(
+      screen.queryByAltText('Scan To Open This Profile On Your Phone')
+    ).toBeNull();
   });
 
   it('preloads the QR image URL on mount', () => {
@@ -53,17 +55,19 @@ describe('DesktopQrOverlay', () => {
 
   it('opens QR code when icon is clicked', async () => {
     render(<DesktopQrOverlay handle='tim' />);
-    fireEvent.click(screen.getByLabelText('View on mobile'));
+    fireEvent.click(screen.getByLabelText('Open On Phone'));
     expect(
-      await screen.findByAltText('Scan to view on mobile')
+      await screen.findByAltText('Scan To Open This Profile On Your Phone')
     ).toBeInTheDocument();
   });
 
   it('closes back to icon when dismiss is clicked', async () => {
     render(<DesktopQrOverlay handle='tim' />);
-    fireEvent.click(screen.getByLabelText('View on mobile'));
+    fireEvent.click(screen.getByLabelText('Open On Phone'));
     fireEvent.click(await screen.findByLabelText('Close'));
-    expect(screen.queryByAltText('Scan to view on mobile')).toBeNull();
-    expect(screen.getByLabelText('View on mobile')).toBeInTheDocument();
+    expect(
+      screen.queryByAltText('Scan To Open This Profile On Your Phone')
+    ).toBeNull();
+    expect(screen.getByLabelText('Open On Phone')).toBeInTheDocument();
   });
 });

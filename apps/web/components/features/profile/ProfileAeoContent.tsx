@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ProfileAboutShare } from '@/features/profile/ProfileAboutShare';
 import type { ProfileAeoContent as ProfileAeoContentModel } from '@/lib/profile/aeo-content';
+import { publicLinkAriaLabel } from '@/lib/utils/public-url';
 import { EntityMentionText } from './EntityMentionText';
 
 interface ProfileAeoContentProps {
@@ -92,7 +93,11 @@ export function ProfileAeoContent({
                       target='_blank'
                       rel='noopener noreferrer'
                       className='profile-aeo-content__link inline-flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--profile-aeo-text)'
-                      aria-label={`Follow ${content.artistName} on ${link.label}`}
+                      aria-label={publicLinkAriaLabel(
+                        content.artistName,
+                        link.platform,
+                        link.label
+                      )}
                     >
                       <SocialIcon
                         platform={link.platform}

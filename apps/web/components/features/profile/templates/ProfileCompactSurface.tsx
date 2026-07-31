@@ -46,6 +46,10 @@ import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import { isDefaultAvatarUrl } from '@/lib/utils/dsp-images';
+import {
+  publicLinkAriaLabel,
+  sanitizePublicHref,
+} from '@/lib/utils/public-url';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
@@ -441,7 +445,9 @@ export function ProfileCompactSurface({
     : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))]';
   const homeContentColumnClassName = 'min-h-0 flex-1';
   const homeContentScrollClassName = 'min-h-0 flex-1';
-  const locationLabel = artist.location?.trim() || artist.hometown?.trim();
+  // Prefer current/based location for the hero pin; hometown lives in About.
+  const locationLabel = artist.location?.trim() || null;
+
   const registerNotificationsReveal = useCallback(
     (reveal: () => void) => {
       notificationsRevealRef.current = reveal;
@@ -573,7 +579,7 @@ export function ProfileCompactSurface({
                 {resolvedHeroImageUrl ? (
                   <ImageWithFallback
                     src={resolvedHeroImageUrl}
-                    alt={artist.name}
+                    alt=''
                     fill
                     priority
                     sizes='(max-width: 767px) 100vw, 430px'
@@ -683,13 +689,18 @@ export function ProfileCompactSurface({
                       {artist.name}
                     </span>
                     {artist.is_verified ? (
-                      <BadgeCheck
-                        className='h-4.5 w-4.5 shrink-0 [@media(max-height:820px)]:h-4 [@media(max-height:820px)]:w-4'
-                        fill='white'
-                        stroke='black'
-                        strokeWidth={2}
-                        aria-label='Verified'
-                      />
+                      <span
+                        className='inline-flex shrink-0'
+                        title='Verified Artist'
+                      >
+                        <BadgeCheck
+                          className='h-5 w-5 shrink-0 [@media(max-height:820px)]:h-4.5 [@media(max-height:820px)]:w-4.5'
+                          fill='white'
+                          stroke='black'
+                          strokeWidth={2}
+                          aria-label='Verified Artist'
+                        />
+                      </span>
                     ) : null}
                   </Link>
                 </IdentityHeading>
@@ -713,24 +724,34 @@ export function ProfileCompactSurface({
                       className='flex shrink-0 items-center gap-1'
                       data-testid='profile-hero-social-row'
                     >
-                      {visibleSocialLinks.map(link =>
-                        link.platform && link.url ? (
+                      {visibleSocialLinks.map(link => {
+                        if (!link.platform) return null;
+                        const href = sanitizePublicHref(link.url);
+                        if (!href) return null;
+                        const platformLabel =
+                          link.platform.charAt(0).toUpperCase() +
+                          link.platform.slice(1);
+                        return (
                           <a
                             key={link.id}
-                            href={link.url}
+                            href={href}
                             target='_blank'
                             rel='noopener noreferrer'
                             onClick={() => handleSocialClick(link)}
                             className={socialIconClassName}
-                            aria-label={link.platform}
+                            aria-label={publicLinkAriaLabel(
+                              artist.name,
+                              link.platform,
+                              platformLabel
+                            )}
                           >
                             <SocialIcon
                               platform={link.platform}
                               className='h-5 w-5'
                             />
                           </a>
-                        ) : null
-                      )}
+                        );
+                      })}
                     </div>
                   ) : null}
                 </div>
