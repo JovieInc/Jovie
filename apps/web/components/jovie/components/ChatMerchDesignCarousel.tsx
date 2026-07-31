@@ -190,6 +190,10 @@ export function ChatMerchDesignCarousel({
       {
         onSuccess: response => {
           setPendingAction(null);
+          if (!('status' in response)) {
+            setErrorMessage('Unable to publish this item. Try again.');
+            return;
+          }
           setSelected(previous =>
             previous
               ? {
@@ -233,7 +237,7 @@ export function ChatMerchDesignCarousel({
           <div className='relative aspect-square bg-surface-2'>
             <Image
               src={product.mockupUrl}
-              alt={`${selected.title} product mockup`}
+              alt={`${current.design_name} product mockup`}
               fill
               sizes='(max-width: 768px) 100vw, 640px'
               className='object-cover'
