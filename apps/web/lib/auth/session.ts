@@ -1,11 +1,13 @@
 import 'server-only';
 
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
 import {
   applyRlsSessionUser,
+  applyRlsTransactionUser,
   type DbOrTransaction,
   db,
+  getRlsTransactionSessionSetSql,
   resetRlsSession,
 } from '@/lib/db';
 import { logDbError, logDbInfo, withRetry } from '@/lib/db/client';
@@ -81,31 +83,27 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
 
 /**
  * Gets the SQL statement for setting up RLS session variables.
- * This allows the session setup to be batched with other queries.
+ * Thin auth-layer wrapper: validation + canonical transaction-local SQL from
+ * `lib/db/client/session` (sole owner of set_config for app.clerk_user_id).
  *
  * @param userId - The Clerk user ID (already validated)
  * @returns SQL statement that sets RLS session variable(s)
  */
 export function getSessionSetupSql(userId: string) {
   validateClerkUserId(userId);
-
-  // Set the Clerk session variable for RLS using transaction-local scope.
-  // is_local=true ensures the variable is scoped to the current transaction,
-  // preventing cross-request RLS session bleed in pooled connections.
-  return drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, true)`;
+  return getRlsTransactionSessionSetSql(userId);
 }
 
+/**
+ * Apply transaction-scoped RLS identity via the canonical helper.
+ * Failures are reported under fingerprint `auth_rls_set_config_failed`.
+ */
 export async function setTransactionSessionUserId(
   tx: DbOrTransaction,
   userId: string,
   context: string
 ): Promise<void> {
-  try {
-    await tx.execute(getSessionSetupSql(userId));
-  } catch (error) {
-    logDbError(context, error, { userId });
-    throw error;
-  }
+  await applyRlsTransactionUser(tx, userId, context);
 }
 
 async function applySessionUserId(userId: string): Promise<void> {

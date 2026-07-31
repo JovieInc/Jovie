@@ -23,8 +23,10 @@ export type {
 
 // Re-export all client functionality from the modular client directory
 export {
+  AUTH_RLS_SET_CONFIG_FAILED,
   // Session helpers
   applyRlsSessionUser,
+  applyRlsTransactionUser,
   // Health checks
   checkDbHealth,
   checkDbPerformance,
@@ -39,6 +41,7 @@ export {
   getPoolMetrics,
   getRlsSessionResetSql,
   getRlsSessionSetSql,
+  getRlsTransactionSessionSetSql,
   initializeDb,
   invalidateColumnExistenceCache,
   isRetryableError,

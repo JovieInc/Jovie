@@ -140,6 +140,18 @@ function sendToSentry(params: {
           : String(context.route);
     }
 
+    // Named error classes (e.g. auth_rls_set_config_failed) for Sentry filtering.
+    if (typeof context?.error_class === 'string' && context.error_class) {
+      tags.error_class = context.error_class;
+    }
+
+    // Stable fingerprint overrides default grouping so distinct failure classes
+    // (e.g. RLS set_config) never merge into generic "Failed query" issues.
+    const fingerprint =
+      typeof context?.fingerprint === 'string' && context.fingerprint
+        ? [context.fingerprint]
+        : undefined;
+
     Sentry.captureException(errorInstance, {
       extra: {
         message,
@@ -148,6 +160,7 @@ function sendToSentry(params: {
       },
       level: severity === 'critical' ? 'fatal' : severity,
       tags,
+      ...(fingerprint ? { fingerprint } : {}),
     });
   } catch (sentryError) {
     console.warn('[Error Tracking] Failed to send to Sentry:', sentryError);
