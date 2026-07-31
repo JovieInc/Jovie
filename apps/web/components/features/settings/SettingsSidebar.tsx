@@ -48,10 +48,10 @@ export function SettingsSidebar({ className }: SettingsSidebarProps) {
           value={query}
           onChange={event => setQuery(event.target.value)}
           placeholder='Search settings'
-          aria-label='Search settings'
+          aria-label='Search Settings'
           data-testid='settings-sidebar-search'
         />
-        <nav aria-label='Settings navigation' className='space-y-4'>
+        <nav aria-label='Settings Navigation' className='space-y-4'>
           {groups.map(group => {
             const groupActive = group.items.some(item =>
               isSettingsItemActive(pathname, item.href)
@@ -75,6 +75,7 @@ export function SettingsSidebar({ className }: SettingsSidebarProps) {
                       <li key={item.id}>
                         <Link
                           href={item.href}
+                          title={item.title}
                           aria-current={active ? 'page' : undefined}
                           className={getSidebarNavRowClassName({
                             active,

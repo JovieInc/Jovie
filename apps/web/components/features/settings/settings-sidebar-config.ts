@@ -28,6 +28,11 @@ export interface SettingsSidebarItem {
   readonly icon: LucideIcon;
   /** Only rendered when the current user is an admin. */
   readonly adminOnly?: boolean;
+  /**
+   * Optional native tooltip. Used for discovery rows that leave Settings
+   * (e.g. Ops controls) so admins know why the item exists.
+   */
+  readonly title?: string;
 }
 
 export interface SettingsSidebarGroup {
@@ -43,7 +48,7 @@ export const SETTINGS_SIDEBAR_GROUPS: readonly SettingsSidebarGroup[] = [
     items: [
       {
         id: 'artist-profile',
-        label: 'Artist profile',
+        label: 'Artist Profile',
         href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
         icon: UserRound,
       },
@@ -73,13 +78,13 @@ export const SETTINGS_SIDEBAR_GROUPS: readonly SettingsSidebarGroup[] = [
       },
       {
         id: 'data-privacy',
-        label: 'Data & privacy',
+        label: 'Data & Privacy',
         href: APP_ROUTES.SETTINGS_DATA_PRIVACY,
         icon: Lock,
       },
       {
         id: 'delete-account',
-        label: 'Delete account',
+        label: 'Delete Account',
         href: APP_ROUTES.SETTINGS_DELETE_ACCOUNT,
         icon: Trash2,
       },
@@ -97,16 +102,21 @@ export const SETTINGS_SIDEBAR_GROUPS: readonly SettingsSidebarGroup[] = [
       },
       {
         id: 'retargeting-ads',
-        label: 'Retargeting ads',
+        label: 'Retargeting Ads',
         href: APP_ROUTES.SETTINGS_RETARGETING_ADS,
         icon: Target,
       },
       {
         id: 'admin',
-        label: 'Admin',
+        // Live operational toggles (waitlist gate, growth defaults, dev
+        // toolbar) live on Ops — this row is a discovery pointer only.
+        // `/app/settings/admin` redirects to ADMIN_OPS (JOV-2103).
+        label: 'Ops Controls',
         href: APP_ROUTES.SETTINGS_ADMIN,
         icon: Wrench,
         adminOnly: true,
+        title:
+          'Live operational toggles live on the Ops control panel — waitlist, growth defaults, and environment helpers.',
       },
     ],
   },
