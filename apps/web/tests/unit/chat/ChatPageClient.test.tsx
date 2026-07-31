@@ -427,16 +427,11 @@ describe('ChatPageClient', () => {
     );
   });
 
-  it('registers the artist profile rail toggle on the new-chat route', () => {
+  it('leaves the new-chat header action slot clear for the shell-owned rail toggle', () => {
     renderChatPage();
 
     const headerActions = mockSetHeaderActions.mock.calls.at(-1)?.[0];
-    expect(headerActions).not.toBeNull();
-    expect(headerActions).toEqual(
-      expect.objectContaining({
-        type: expect.anything(),
-      })
-    );
+    expect(headerActions).toBeNull();
   });
 
   it('hydrates preview data on chat and registers the live profile panel when preview is open', () => {
