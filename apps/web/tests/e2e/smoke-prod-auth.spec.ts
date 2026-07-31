@@ -1,8 +1,9 @@
 import { createHash, randomBytes } from 'node:crypto';
 import {
+  type APIRequest,
   type APIRequestContext,
   expect,
-  Page,
+  type Page,
   type TestInfo,
   test,
 } from '@playwright/test';
@@ -85,13 +86,30 @@ function requiredResponseString(
   return value;
 }
 
+function safeOAuthErrorBody(raw: string): string {
+  const collapsed = raw.replace(/\s+/g, ' ').trim();
+  if (!collapsed) return '';
+  // Never echo token-shaped values into CI logs.
+  const redacted = collapsed.replace(
+    /(["']?(?:access_token|refresh_token|id_token|code|code_verifier)["']?\s*[:=]\s*)["'][^"']{8,}["']/gi,
+    '$1"[redacted]"'
+  );
+  return redacted.slice(0, 240);
+}
+
 async function readOAuthTokenSet(
   response: Awaited<ReturnType<APIRequestContext['post']>>,
   label: string,
   rememberToken: (value: string, hint: 'access_token' | 'refresh_token') => void
 ): Promise<OAuthTokenSet> {
   if (response.status() !== 200) {
-    throw new Error(`${label} returned HTTP ${response.status()}.`);
+    const raw = await response.text().catch(() => '');
+    const detail = safeOAuthErrorBody(raw);
+    throw new Error(
+      detail
+        ? `${label} returned HTTP ${response.status()}: ${detail}`
+        : `${label} returned HTTP ${response.status()}.`
+    );
   }
   const body = (await response.json().catch(() => null)) as unknown;
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -144,8 +162,21 @@ async function verifyOAuthUserInfo(
   }
 }
 
+function vercelAutomationBypassHeaders(): Record<string, string> {
+  const secret = (
+    process.env.PLAYWRIGHT_VERCEL_BYPASS_SECRET ??
+    process.env.VERCEL_AUTOMATION_BYPASS_SECRET ??
+    ''
+  ).trim();
+  if (!secret) return {};
+  // Header-only bypass keeps the native public-client exchange cookie-free.
+  // Any Cookie header trips Better Auth CSRF origin validation on POST.
+  return { 'x-vercel-protection-bypass': secret };
+}
+
 async function verifyProductionIosOAuthTokenFlow(
-  request: APIRequestContext,
+  browserRequest: APIRequestContext,
+  playwrightRequest: APIRequest,
   expectedOrigin: string
 ): Promise<void> {
   const codeVerifier = randomBytes(48).toString('base64url');
@@ -164,7 +195,9 @@ async function verifyProductionIosOAuthTokenFlow(
   authorizeUrl.searchParams.set('code_challenge', codeChallenge);
   authorizeUrl.searchParams.set('code_challenge_method', 'S256');
 
-  const authorizeResponse = await request.get(authorizeUrl.href, {
+  // Authorize uses the signed-in browser session (ASWebAuthenticationSession
+  // equivalent). Token/refresh/revoke must stay cookie-free like iOS URLSession.
+  const authorizeResponse = await browserRequest.get(authorizeUrl.href, {
     failOnStatusCode: false,
     maxRedirects: 0,
   });
@@ -206,9 +239,13 @@ async function verifyProductionIosOAuthTokenFlow(
   ) => {
     issuedTokens.set(`${hint}:${value}`, { value, hint });
   };
+
+  const nativeRequest = await playwrightRequest.newContext({
+    extraHTTPHeaders: vercelAutomationBypassHeaders(),
+  });
   try {
     const initialTokens = await readOAuthTokenSet(
-      await request.post(`${expectedOrigin}/api/auth/oauth2/token`, {
+      await nativeRequest.post(`${expectedOrigin}/api/auth/oauth2/token`, {
         failOnStatusCode: false,
         form: {
           grant_type: 'authorization_code',
@@ -223,14 +260,14 @@ async function verifyProductionIosOAuthTokenFlow(
     );
 
     await verifyOAuthUserInfo(
-      request,
+      nativeRequest,
       expectedOrigin,
       initialTokens.accessToken,
       'Initial iOS OAuth access token'
     );
 
     const refreshedTokens = await readOAuthTokenSet(
-      await request.post(`${expectedOrigin}/api/auth/oauth2/token`, {
+      await nativeRequest.post(`${expectedOrigin}/api/auth/oauth2/token`, {
         failOnStatusCode: false,
         form: {
           grant_type: 'refresh_token',
@@ -242,30 +279,34 @@ async function verifyProductionIosOAuthTokenFlow(
       rememberToken
     );
     await verifyOAuthUserInfo(
-      request,
+      nativeRequest,
       expectedOrigin,
       refreshedTokens.accessToken,
       'Refreshed iOS OAuth access token'
     );
   } finally {
-    for (const { value, hint } of issuedTokens.values()) {
-      const revokeResponse = await request.post(
-        `${expectedOrigin}/api/auth/oauth2/revoke`,
-        {
-          failOnStatusCode: false,
-          form: {
-            client_id: IOS_OAUTH_CLIENT_ID,
-            token: value,
-            token_type_hint: hint,
-          },
-        }
-      );
-      expect
-        .soft(
-          revokeResponse.status(),
-          `iOS OAuth ${hint} revocation should succeed`
-        )
-        .toBe(200);
+    try {
+      for (const { value, hint } of issuedTokens.values()) {
+        const revokeResponse = await nativeRequest.post(
+          `${expectedOrigin}/api/auth/oauth2/revoke`,
+          {
+            failOnStatusCode: false,
+            form: {
+              client_id: IOS_OAUTH_CLIENT_ID,
+              token: value,
+              token_type_hint: hint,
+            },
+          }
+        );
+        expect
+          .soft(
+            revokeResponse.status(),
+            `iOS OAuth ${hint} revocation should succeed`
+          )
+          .toBe(200);
+      }
+    } finally {
+      await nativeRequest.dispose();
     }
   }
 }
@@ -414,7 +455,10 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     await primeOriginBoundVercelBypass(context, baseUrl);
   });
 
-  test('sign-in works and dashboard loads', async ({ page }, testInfo) => {
+  test('sign-in works and dashboard loads', async ({
+    page,
+    playwright,
+  }, testInfo) => {
     const credentials = getProdCredentials();
     const expectedOrigin = exactOriginForTest(testInfo);
 
@@ -466,6 +510,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
 
     await verifyProductionIosOAuthTokenFlow(
       page.context().request,
+      playwright.request,
       expectedOrigin
     );
 

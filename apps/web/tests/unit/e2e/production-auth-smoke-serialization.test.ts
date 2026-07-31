@@ -28,6 +28,12 @@ describe('production auth smoke session contract', () => {
     expect(source).toContain("grant_type: 'authorization_code'");
     expect(source).toContain("grant_type: 'refresh_token'");
     expect(source).toContain('/api/auth/oauth2/userinfo');
+    // Native public-client token POSTs must stay cookie-free. Browser session
+    // cookies without Origin trip Better Auth CSRF (HTTP 403) before OAuth.
+    expect(source).toContain('playwrightRequest.newContext');
+    expect(source).toContain('x-vercel-protection-bypass');
+    expect(source).toContain('nativeRequest.dispose');
+    expect(source).toContain('safeOAuthErrorBody');
     expect(source).toContain('/api/auth/oauth2/revoke');
     expect(source).toContain('recordPlaywrightSensitiveValues(');
     const tabNavigation = source.split('const tabs = ')[1];
