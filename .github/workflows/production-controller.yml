@@ -757,13 +757,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
+          DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}
+          AUTH_SMOKE_STATUS: ${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}
         shell: bash
         run: |
           set -euo pipefail
           echo "verified=false" >> "$GITHUB_OUTPUT"
 
           # API uncertainty fails before finalization; a newer main SHA exits
-          # neutral. The marker written after this step is production truth.
+          # neutral. Marker write-through happens in this same step so a
+          # successful verification cannot complete without local marker bytes
+          # (upload is the only remaining durable step). JOV-4442.
           boundary_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
           if [[ ! "$boundary_sha" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::Could not resolve exact main at the finalization boundary."
@@ -776,32 +780,33 @@ jobs:
 
           if [ "${{ steps.verify.outcome }}" = "success" ] &&
             [ "${{ steps.verify.outputs.canonical_verified }}" = "true" ] &&
-            [ "${{ steps.verify.outputs.canonical_deployment_id }}" = "${{ needs.production-release.outputs.production_deployment_id }}" ] &&
+            [ "${{ steps.verify.outputs.canonical_deployment_id }}" = "$DEPLOYMENT_ID" ] &&
             [ "${{ steps.verify.outputs.canonical_sha }}" = "$EXPECTED_SHA" ] &&
             [ "${{ needs.production-release.outputs.sentry_gate_status }}" = "passed" ] &&
             [ "${{ needs.production-release.outputs.oauth_gate_status }}" = "passed" ]; then
+            test -n "$DEPLOYMENT_ID" || {
+              echo "::error::Cannot write verified marker without an exact deployment ID."
+              exit 1
+            }
+            # Write-through: marker payload is produced only on verified success
+            # in the same step that sets verified=true (no separate skippable write).
+            jq -n \
+              --arg sha "$EXPECTED_SHA" \
+              --arg deployment_id "$DEPLOYMENT_ID" \
+              --arg controller_run "${{ github.run_id }}" \
+              --arg controller_attempt "${{ github.run_attempt }}" \
+              --arg auth_smoke "$AUTH_SMOKE_STATUS" \
+              '{sha: $sha, deploymentId: $deployment_id, controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke}' \
+              > "$RUNNER_TEMP/production-generation-verified.json"
+            test -s "$RUNNER_TEMP/production-generation-verified.json" || {
+              echo "::error::Verified marker write-through produced an empty file."
+              exit 1
+            }
             echo "verified=true" >> "$GITHUB_OUTPUT"
           else
             echo "::error::Release generation lacks exact passing gate, canonical deployment, or SHA evidence."
             exit 1
           fi
-
-      - name: Write exact verified-generation marker
-        if: ${{ steps.finalize.outputs.verified == 'true' }}
-        env:
-          AUTH_SMOKE_STATUS: ${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}
-          EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
-          DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}
-        run: |
-          set -euo pipefail
-          jq -n \
-            --arg sha "$EXPECTED_SHA" \
-            --arg deployment_id "$DEPLOYMENT_ID" \
-            --arg controller_run "${{ github.run_id }}" \
-            --arg controller_attempt "${{ github.run_attempt }}" \
-            --arg auth_smoke "$AUTH_SMOKE_STATUS" \
-            '{sha: $sha, deploymentId: $deployment_id, controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke}' \
-            > "$RUNNER_TEMP/production-generation-verified.json"
 
       - name: Preserve exact verified-generation marker
         if: ${{ steps.finalize.outputs.verified == 'true' }}

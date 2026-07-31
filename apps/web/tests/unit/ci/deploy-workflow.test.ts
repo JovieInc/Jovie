@@ -3962,6 +3962,15 @@ describe('production promotion exact-artifact contract', () => {
     expect(verified).toContain('Finalize exact current release generation');
     expect(verified).toContain('Notify exact verified production generation');
     expect(verified.match(/commits\/main/g)).toHaveLength(3);
+    // JOV-4442: marker payload is write-through in finalize (no separate write step).
+    const finalizeStep = getStepBlock(
+      verified,
+      'Finalize exact current release generation'
+    );
+    expect(finalizeStep).toContain('production-generation-verified.json');
+    expect(finalizeStep).toContain('verified=true');
+    expect(verified).not.toContain('Write exact verified-generation marker');
+    expect(verified).toContain('Preserve exact verified-generation marker');
   });
 
   it('requires canonical deployment ID and SHA convergence only in the leased final tail', () => {
