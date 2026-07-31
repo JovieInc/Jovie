@@ -1,17 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Hoist mocks before module resolution
-const { mockCachedAuth, mockDbExecute, mockDbSelect, mockDbTransaction } =
-  vi.hoisted(() => ({
-    mockCachedAuth: vi.fn(),
-    mockDbExecute: vi.fn(),
-    mockDbSelect: vi.fn(),
-    mockDbTransaction: vi.fn(),
-  }));
+const {
+  mockCachedAuth,
+  mockCaptureError,
+  mockDbExecute,
+  mockDbSelect,
+  mockDbTransaction,
+} = vi.hoisted(() => ({
+  mockCachedAuth: vi.fn(),
+  mockCaptureError: vi.fn(),
+  mockDbExecute: vi.fn(),
+  mockDbSelect: vi.fn(),
+  mockDbTransaction: vi.fn(),
+}));
 
 // Mock cached auth
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockCachedAuth,
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: mockCaptureError,
 }));
 
 // Mock database while preserving real RLS session helpers
@@ -37,6 +47,7 @@ describe('@critical session.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDbExecute.mockResolvedValue(undefined);
+    mockCaptureError.mockResolvedValue(undefined);
     // Mock transaction to invoke the callback with a mock tx object
     mockDbTransaction.mockImplementation(
       async (callback: (tx: unknown) => Promise<unknown>) => {
@@ -242,6 +253,7 @@ describe('@critical session.ts', () => {
 
     it('fails closed when transaction-scoped set_config fails', async () => {
       const { withDbSessionTx } = await import('@/lib/auth/session');
+      const { AUTH_RLS_SET_CONFIG_FAILED } = await import('@/lib/db');
 
       const operation = vi.fn();
       mockDbExecute.mockRejectedValueOnce(new Error('set_config unavailable'));
@@ -255,6 +267,16 @@ describe('@critical session.ts', () => {
       const queryText = JSON.stringify(mockDbExecute.mock.calls[0]?.[0]);
       expect(queryText).toContain("set_config('app.clerk_user_id'");
       expect(queryText).not.toContain('SET LOCAL');
+      expect(mockCaptureError).toHaveBeenCalledWith(
+        'RLS set_config failed',
+        expect.any(Error),
+        expect.objectContaining({
+          fingerprint: AUTH_RLS_SET_CONFIG_FAILED,
+          error_class: AUTH_RLS_SET_CONFIG_FAILED,
+          context: 'withDbSessionTx_set_config_failed',
+          userId: 'user_123',
+        })
+      );
     });
   });
 

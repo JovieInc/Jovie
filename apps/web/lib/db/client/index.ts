@@ -35,9 +35,12 @@ export { DB_CONFIG, isRetryableError, withRetry } from './retry';
 
 // Session Helpers
 export {
+  AUTH_RLS_SET_CONFIG_FAILED,
   applyRlsSessionUser,
+  applyRlsTransactionUser,
   getRlsSessionResetSql,
   getRlsSessionSetSql,
+  getRlsTransactionSessionSetSql,
   resetRlsSession,
   setSessionUser,
   withDb,

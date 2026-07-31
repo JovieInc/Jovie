@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockDbExecute } = vi.hoisted(() => ({
+const { mockDbExecute, mockCaptureError } = vi.hoisted(() => ({
   mockDbExecute: vi.fn(),
+  mockCaptureError: vi.fn(),
 }));
 
 vi.mock('@/lib/db/client/connection', () => ({
@@ -20,11 +21,16 @@ vi.mock('@/lib/db/client/retry', () => ({
   withRetry: vi.fn(async (operation: () => Promise<unknown>) => operation()),
 }));
 
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: mockCaptureError,
+}));
+
 describe('lib/db/client/session RLS helpers', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.resetModules();
     mockDbExecute.mockResolvedValue(undefined);
+    mockCaptureError.mockResolvedValue(undefined);
   });
 
   it('getRlsSessionResetSql clears app.clerk_user_id', async () => {
@@ -47,6 +53,19 @@ describe('lib/db/client/session RLS helpers', () => {
     );
   });
 
+  it('getRlsTransactionSessionSetSql uses transaction-local is_local=true', async () => {
+    const { getRlsTransactionSessionSetSql } = await import(
+      '@/lib/db/client/session'
+    );
+
+    const sql = getRlsTransactionSessionSetSql('user_tx_123');
+    const queryText = JSON.stringify(sql);
+
+    expect(queryText).toContain('user_tx_123');
+    expect(queryText).toContain("set_config('app.clerk_user_id'");
+    expect(queryText).toMatch(/true/);
+  });
+
   it('applyRlsSessionUser clears stale identity before setting user', async () => {
     const { applyRlsSessionUser } = await import('@/lib/db/client/session');
     const db = { execute: mockDbExecute };
@@ -62,8 +81,9 @@ describe('lib/db/client/session RLS helpers', () => {
   });
 
   it('applyRlsSessionUser falls back to parameterized set_config when the primary statement fails', async () => {
-    const { applyRlsSessionUser } = await import('@/lib/db/client/session');
-    const { logDbError } = await import('@/lib/db/client/logging');
+    const { applyRlsSessionUser, AUTH_RLS_SET_CONFIG_FAILED } = await import(
+      '@/lib/db/client/session'
+    );
     const db = { execute: mockDbExecute };
     const primaryError = new Error('connection terminated unexpectedly');
 
@@ -75,10 +95,15 @@ describe('lib/db/client/session RLS helpers', () => {
     await applyRlsSessionUser(db, 'user_fallback_123');
 
     expect(mockDbExecute).toHaveBeenCalledTimes(3);
-    expect(logDbError).toHaveBeenCalledWith(
-      'applyRlsSessionUser_set_config_failed',
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'RLS set_config failed',
       primaryError,
-      { userId: 'user_fallback_123' }
+      expect.objectContaining({
+        fingerprint: AUTH_RLS_SET_CONFIG_FAILED,
+        error_class: AUTH_RLS_SET_CONFIG_FAILED,
+        context: 'applyRlsSessionUser_set_config_failed',
+        userId: 'user_fallback_123',
+      })
     );
 
     // PostgreSQL rejects bind parameters on SET (see setStatementTimeout in
@@ -91,7 +116,9 @@ describe('lib/db/client/session RLS helpers', () => {
   });
 
   it('applyRlsSessionUser propagates the fallback failure instead of hiding it', async () => {
-    const { applyRlsSessionUser } = await import('@/lib/db/client/session');
+    const { applyRlsSessionUser, AUTH_RLS_SET_CONFIG_FAILED } = await import(
+      '@/lib/db/client/session'
+    );
     const db = { execute: mockDbExecute };
     const fallbackError = new Error('fallback set_config failed');
 
@@ -103,6 +130,58 @@ describe('lib/db/client/session RLS helpers', () => {
     await expect(applyRlsSessionUser(db, 'user_fallback_123')).rejects.toBe(
       fallbackError
     );
+
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'RLS set_config failed',
+      fallbackError,
+      expect.objectContaining({
+        fingerprint: AUTH_RLS_SET_CONFIG_FAILED,
+        context: 'applyRlsSessionUser_set_config_fallback_failed',
+        userId: 'user_fallback_123',
+      })
+    );
+  });
+
+  it('applyRlsTransactionUser reports named fingerprint when set_config fails', async () => {
+    const { applyRlsTransactionUser, AUTH_RLS_SET_CONFIG_FAILED } =
+      await import('@/lib/db/client/session');
+    const db = { execute: mockDbExecute };
+    const setConfigError = new Error('set_config unavailable');
+
+    mockDbExecute.mockRejectedValueOnce(setConfigError);
+
+    await expect(
+      applyRlsTransactionUser(
+        db,
+        'user_tx_fail',
+        'withDbSessionTx_set_config_failed'
+      )
+    ).rejects.toThrow('set_config unavailable');
+
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'RLS set_config failed',
+      setConfigError,
+      expect.objectContaining({
+        fingerprint: AUTH_RLS_SET_CONFIG_FAILED,
+        error_class: AUTH_RLS_SET_CONFIG_FAILED,
+        context: 'withDbSessionTx_set_config_failed',
+        userId: 'user_tx_fail',
+      })
+    );
+    expect(mockCaptureError).toHaveBeenCalledTimes(1);
+  });
+
+  it('applyRlsTransactionUser uses transaction-local SQL on success', async () => {
+    const { applyRlsTransactionUser } = await import('@/lib/db/client/session');
+    const db = { execute: mockDbExecute };
+
+    await applyRlsTransactionUser(db, 'user_tx_ok');
+
+    expect(mockDbExecute).toHaveBeenCalledTimes(1);
+    const queryText = JSON.stringify(mockDbExecute.mock.calls[0]?.[0]);
+    expect(queryText).toContain("set_config('app.clerk_user_id'");
+    expect(queryText).toContain('user_tx_ok');
+    expect(mockCaptureError).not.toHaveBeenCalled();
   });
 
   it('resetRlsSession clears app.clerk_user_id on pooled reuse', async () => {
