@@ -71,7 +71,7 @@ describe('EntityHoverLink', () => {
     advanceTimers(200);
 
     const tooltip = screen.getByRole('tooltip');
-    expect(tooltip).toHaveClass('rounded-xl', 'bg-surface-1', 'p-0');
+    expect(tooltip).toHaveClass('rounded-xl', 'bg-surface-elevated', 'p-0');
     expect(tooltip.className).not.toContain('bg-(--linear-bg-surface-0)');
     expect(tooltip.className).not.toContain(
       'rounded-(--linear-app-radius-menu)'

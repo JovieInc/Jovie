@@ -27,9 +27,10 @@ export const LINEAR_SURFACE = {
   bannerCard: 'rounded-xl border border-subtle bg-surface-1 shadow-card',
   dialogCard: 'rounded-xl border border-subtle bg-surface-1 shadow-card',
 
-  // Tier 3 — floating UI (popovers, dropdowns)
+  // Tier 3 — floating UI (popovers, dropdowns). Elevated token lifts above
+  // content/card; shell remaps --color-bg-elevated for Noir Ion D.
   popover:
-    'rounded-xl border border-subtle bg-surface-1 p-0 shadow-(--shadow-popover)',
+    'rounded-xl border border-subtle bg-surface-elevated p-0 shadow-(--shadow-popover)',
 } as const;
 
 export const LINEAR_SURFACE_TIER = {

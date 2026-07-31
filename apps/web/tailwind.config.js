@@ -143,6 +143,7 @@ module.exports = {
           input: 'var(--color-bg-input)',
           active: 'var(--color-bg-active)',
           button: 'var(--color-bg-button)',
+          tooltip: 'var(--color-bg-tooltip)',
         },
 
         // Base colors
