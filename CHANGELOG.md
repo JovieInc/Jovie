@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- [internal] **Typecheck singleflight no longer replaces live owners by age (JOV-4524):** locks are reclaimed only for dead owners, missing-pid age expiry, or bounded corrupt-lock recovery; live owners past the 30m window stay authoritative, with structured recovery logs and regression coverage.
 - [internal] **Machine-access revenue-share compliance package (JOV-3831):** draft decision set (70/30 artist-majority, opt-in default OFF, monthly $10 Connect fiat floor, platform stablecoin off-ramp), consent/ToS language, tax reporting path, and Pay Per Crawl public-docs verification — Tim sign-off still required before P1 build.
 - [internal] **Profile redesign proposal loop (JOV-1951):** Design Lab can generate pending mockup proposals for owned profiles and selected competitor handles; output stays gated by D2 approval before any production or design-system rollout.
 - [internal] **Shared organisms layer is server-import-free (JOV-3506):** ProfileSwitcher switches active profiles via `POST /api/dashboard/profile/switch` instead of importing a dashboard server action, driving the server-imports ratchet baseline to 0.
