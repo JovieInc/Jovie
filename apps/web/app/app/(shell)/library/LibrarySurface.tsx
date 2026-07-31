@@ -117,12 +117,17 @@ import {
   libraryApprovalStatusDotClasses,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import { updateLibraryProfileVisibility } from '@/lib/library/profile-visibility/client-mutations';
 import {
   releaseStatusClasses,
   releaseStatusDotClasses,
 } from '@/lib/library/release-status';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
+import {
+  archiveLibraryRelease,
+  restoreRelease,
+} from '../dashboard/releases/actions';
 import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
 import {
   formatLibraryDuration,
@@ -2446,6 +2451,21 @@ export function LibrarySurface({
   const [approvalSavingIds, setApprovalSavingIds] = useState<
     ReadonlySet<string>
   >(() => new Set());
+  const [profileVisibilityOverrides, setProfileVisibilityOverrides] = useState<
+    Record<string, LibraryReleaseAsset['profileVisibility']>
+  >({});
+  const [profileVisibilitySavingIds, setProfileVisibilitySavingIds] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
+  const [lifecycleStatusOverrides, setLifecycleStatusOverrides] = useState<
+    Record<string, NonNullable<LibraryReleaseAsset['lifecycleStatus']>>
+  >({});
+  const [lifecycleSavingIds, setLifecycleSavingIds] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
+  const [locallyArchivedIds, setLocallyArchivedIds] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
   const [shareOverrides, setShareOverrides] = useState<
     Record<string, LibraryAssetShareViewModel>
   >({});
@@ -2488,6 +2508,12 @@ export function LibrarySurface({
         const previewUrl = audioOverrides[asset.id];
         const approvalStatus =
           approvalStatusOverrides[asset.id] ?? asset.approvalStatus;
+        const profileVisibility =
+          profileVisibilityOverrides[asset.id] ?? asset.profileVisibility;
+        const lifecycleStatus =
+          lifecycleStatusOverrides[asset.id] ??
+          asset.lifecycleStatus ??
+          'active';
         const share = shareOverrides[asset.id] ?? asset.share ?? null;
         const assetKinds: readonly LibraryAssetKind[] =
           previewUrl && !asset.assetKinds.includes('preview')
@@ -2497,6 +2523,8 @@ export function LibrarySurface({
         if (
           !previewUrl &&
           approvalStatus === asset.approvalStatus &&
+          profileVisibility === asset.profileVisibility &&
+          lifecycleStatus === (asset.lifecycleStatus ?? 'active') &&
           share === (asset.share ?? null)
         ) {
           return asset;
@@ -2506,11 +2534,20 @@ export function LibrarySurface({
           ...asset,
           ...(previewUrl ? { previewUrl } : {}),
           approvalStatus,
+          profileVisibility,
+          lifecycleStatus,
           share,
           assetKinds,
         };
       }),
-    [approvalStatusOverrides, assets, audioOverrides, shareOverrides]
+    [
+      approvalStatusOverrides,
+      assets,
+      audioOverrides,
+      lifecycleStatusOverrides,
+      profileVisibilityOverrides,
+      shareOverrides,
+    ]
   );
 
   const visibleAssets = useMemo(() => {
@@ -2520,6 +2557,7 @@ export function LibrarySurface({
     const savedViewPredicate = getLibrarySavedViewPredicate(deferredSavedView);
 
     return effectiveAssets
+      .filter(asset => !locallyArchivedIds.has(asset.id))
       .filter(presetPredicate)
       .filter(savedViewPredicate)
       .filter(asset => assetMatchesFilters(asset, deferredFilters))
@@ -2532,6 +2570,7 @@ export function LibrarySurface({
     deferredSavedView,
     deferredSort,
     effectiveAssets,
+    locallyArchivedIds,
   ]);
 
   const artistOptions = useMemo(
@@ -2688,6 +2727,101 @@ export function LibrarySurface({
     [profileId]
   );
 
+  const handleProfileVisibilityChange = useCallback(
+    async (
+      asset: LibraryReleaseAsset,
+      profileVisibility: LibraryReleaseAsset['profileVisibility']
+    ) => {
+      if (!profileId || profileVisibility === asset.profileVisibility) {
+        return;
+      }
+
+      setProfileVisibilitySavingIds(previous =>
+        new Set(previous).add(asset.id)
+      );
+      setProfileVisibilityOverrides(previous => ({
+        ...previous,
+        [asset.id]: profileVisibility,
+      }));
+
+      try {
+        await updateLibraryProfileVisibility({
+          profileId,
+          assetId: asset.id,
+          itemKind: getLibraryItemKind(asset),
+          profileVisibility,
+        });
+      } catch {
+        toast.error('Unable to update profile visibility right now');
+        setProfileVisibilityOverrides(previous => ({
+          ...previous,
+          [asset.id]: asset.profileVisibility,
+        }));
+      } finally {
+        setProfileVisibilitySavingIds(previous => {
+          const next = new Set(previous);
+          next.delete(asset.id);
+          return next;
+        });
+      }
+    },
+    [profileId]
+  );
+
+  const handleLifecycleChange = useCallback(
+    async (
+      asset: LibraryReleaseAsset,
+      lifecycleStatus: NonNullable<LibraryReleaseAsset['lifecycleStatus']>
+    ) => {
+      if (
+        !profileId ||
+        getLibraryItemKind(asset) !== 'release' ||
+        lifecycleStatus === (asset.lifecycleStatus ?? 'active')
+      ) {
+        return;
+      }
+
+      setLifecycleSavingIds(previous => new Set(previous).add(asset.id));
+      setLifecycleStatusOverrides(previous => ({
+        ...previous,
+        [asset.id]: lifecycleStatus,
+      }));
+      if (lifecycleStatus === 'archived') {
+        setLocallyArchivedIds(previous => new Set(previous).add(asset.id));
+      }
+
+      try {
+        if (lifecycleStatus === 'archived') {
+          await archiveLibraryRelease({ releaseId: asset.id });
+        } else {
+          await restoreRelease({ releaseId: asset.id });
+        }
+      } catch {
+        toast.error(
+          lifecycleStatus === 'archived'
+            ? 'Unable to archive release right now'
+            : 'Unable to restore release right now'
+        );
+        setLifecycleStatusOverrides(previous => ({
+          ...previous,
+          [asset.id]: asset.lifecycleStatus ?? 'active',
+        }));
+        setLocallyArchivedIds(previous => {
+          const next = new Set(previous);
+          next.delete(asset.id);
+          return next;
+        });
+      } finally {
+        setLifecycleSavingIds(previous => {
+          const next = new Set(previous);
+          next.delete(asset.id);
+          return next;
+        });
+      }
+    },
+    [profileId]
+  );
+
   const getContextMenuItems = useCallback<LibraryContextMenuBuilder>(
     asset =>
       libraryEntityActionsToContextMenuItems(
@@ -2696,6 +2830,19 @@ export function LibrarySurface({
           profileId,
           isPreviewPlaying: playingPreviewId === asset.id,
           isApprovalSaving: approvalSavingIds.has(asset.id),
+          profileVisibility: {
+            value: asset.profileVisibility,
+            isSaving: profileVisibilitySavingIds.has(asset.id),
+            onChange: handleProfileVisibilityChange,
+          },
+          lifecycle:
+            getLibraryItemKind(asset) === 'release'
+              ? {
+                  value: asset.lifecycleStatus ?? 'active',
+                  isSaving: lifecycleSavingIds.has(asset.id),
+                  onChange: handleLifecycleChange,
+                }
+              : undefined,
           onTogglePreview: handleTogglePreview,
           onApprovalStatusChange: handleApprovalStatusChange,
         })
@@ -2703,9 +2850,13 @@ export function LibrarySurface({
     [
       approvalSavingIds,
       handleApprovalStatusChange,
+      handleLifecycleChange,
+      handleProfileVisibilityChange,
       handleTogglePreview,
+      lifecycleSavingIds,
       playingPreviewId,
       profileId,
+      profileVisibilitySavingIds,
     ]
   );
 

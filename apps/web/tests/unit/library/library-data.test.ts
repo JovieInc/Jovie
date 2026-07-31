@@ -71,6 +71,7 @@ describe('library data', () => {
         status: 'released',
         approvalStatus: 'draft',
         profileVisibility: 'visible',
+        lifecycleStatus: 'active',
         trackCount: 1,
         providerCount: 1,
         providers: [

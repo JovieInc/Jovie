@@ -209,7 +209,11 @@ vi.mock('@/lib/utils/redirect-error', () => ({
 }));
 
 vi.mock('@/constants/routes', () => ({
-  APP_ROUTES: { RELEASES: '/dashboard/releases', START: '/start' },
+  APP_ROUTES: {
+    LIBRARY: '/app/library',
+    RELEASES: '/dashboard/releases',
+    START: '/start',
+  },
 }));
 
 vi.mock('@/lib/env-public', () => ({
@@ -777,6 +781,27 @@ describe('@critical releases/actions.ts — update/edit operations', () => {
       });
       expect(mockRevalidateTag).toHaveBeenCalled();
       expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard/releases');
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/library');
+    });
+  });
+
+  describe('archiveLibraryRelease', () => {
+    it('always soft-archives the owned release through canonical lifecycle state', async () => {
+      mockGetReleaseById.mockResolvedValue(makeRelease());
+
+      const { archiveLibraryRelease } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await archiveLibraryRelease({ releaseId: 'rel_001' });
+
+      expect(result).toEqual({ success: true });
+      expect(mockArchiveRelease).toHaveBeenCalledWith({
+        releaseId: 'rel_001',
+        creatorProfileId: MOCK_PROFILE.id,
+      });
+      expect(mockDbDelete).not.toHaveBeenCalled();
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard/releases');
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/library');
     });
   });
 

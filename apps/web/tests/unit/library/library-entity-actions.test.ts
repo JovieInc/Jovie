@@ -21,6 +21,8 @@ function buildAsset(
     releaseType: 'single',
     status: 'released',
     approvalStatus: 'draft',
+    profileVisibility: 'visible',
+    lifecycleStatus: 'active',
     trackCount: 1,
     providerCount: 0,
     providers: [],
@@ -152,6 +154,115 @@ describe('library entity actions', () => {
 
     await visibility?.onExecute?.();
     expect(onChange).toHaveBeenCalledWith(asset, 'hidden');
+  });
+
+  it('keeps visibility and release lifecycle actions in the canonical order', () => {
+    const actions = buildActions(buildAsset(), {
+      profileVisibility: {
+        value: 'visible',
+        isSaving: false,
+        onChange: vi.fn().mockResolvedValue(undefined),
+      },
+      lifecycle: {
+        value: 'active',
+        isSaving: false,
+        onChange: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+
+    expect(actions.map(action => action.id)).toEqual([
+      'approval-status',
+      'profile-visibility',
+      'play-preview',
+      'open-video',
+      'open-artwork',
+      'open-primary',
+      'archive',
+      'copy-share-link',
+      'copy-title',
+    ]);
+  });
+
+  it('exposes reversible release lifecycle actions with owner authority', async () => {
+    const asset = buildAsset();
+    const onChange = vi.fn().mockResolvedValue(undefined);
+    const archive = buildActions(asset, {
+      lifecycle: {
+        value: 'active',
+        isSaving: false,
+        onChange,
+      },
+    }).find(action => action.id === 'archive');
+    const restore = buildActions(buildAsset({ lifecycleStatus: 'archived' }), {
+      lifecycle: {
+        value: 'archived',
+        isSaving: false,
+        onChange,
+      },
+    }).find(action => action.id === 'restore');
+
+    expect(archive).toMatchObject({
+      label: 'Archive',
+      authority: 'profile-owner',
+      disabled: false,
+      destructive: true,
+    });
+    expect(restore).toMatchObject({
+      label: 'Restore',
+      authority: 'profile-owner',
+      disabled: false,
+      destructive: false,
+    });
+
+    await archive?.onExecute?.();
+    await restore?.onExecute?.();
+    expect(onChange).toHaveBeenNthCalledWith(1, asset, 'archived');
+    expect(onChange).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ lifecycleStatus: 'archived' }),
+      'active'
+    );
+  });
+
+  it('does not invent lifecycle actions for merch', () => {
+    const actions = buildActions(
+      buildAsset({
+        itemKind: 'merch',
+        previewUrl: null,
+        videoUrl: null,
+      })
+    );
+
+    expect(actions.some(action => action.id === 'archive')).toBe(false);
+    expect(actions.some(action => action.id === 'restore')).toBe(false);
+  });
+
+  it('disables lifecycle changes without authority or while saving', () => {
+    const onChange = vi.fn().mockResolvedValue(undefined);
+    const withoutOwner = buildActions(buildAsset(), {
+      profileId: null,
+      lifecycle: {
+        value: 'active',
+        isSaving: false,
+        onChange,
+      },
+    }).find(action => action.id === 'archive');
+    const whileSaving = buildActions(buildAsset(), {
+      lifecycle: {
+        value: 'archived',
+        isSaving: true,
+        onChange,
+      },
+    }).find(action => action.id === 'restore');
+
+    expect(withoutOwner).toMatchObject({
+      disabled: true,
+      disabledReason: 'Requires an owned creator profile',
+    });
+    expect(whileSaving).toMatchObject({
+      disabled: true,
+      disabledReason: 'Restoring release',
+    });
   });
 
   it('disables profile visibility without owner authority or while saving', () => {

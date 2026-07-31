@@ -1,4 +1,6 @@
 import {
+  Archive,
+  ArchiveRestore,
   Check,
   Circle,
   Copy,
@@ -29,6 +31,8 @@ export const LIBRARY_ENTITY_ACTION_ORDER = [
   'open-video',
   'open-artwork',
   'open-primary',
+  'archive',
+  'restore',
   'copy-share-link',
   'copy-title',
 ] as const;
@@ -39,6 +43,7 @@ export type LibraryEntityActionId =
 
 export type LibraryEntityActionAuthority = 'none' | 'profile-owner';
 export type LibraryEntityProfileVisibility = 'visible' | 'hidden';
+export type LibraryEntityLifecycleStatus = 'active' | 'archived';
 
 export interface LibraryEntityAction {
   readonly id: LibraryEntityActionId;
@@ -65,6 +70,14 @@ export interface BuildLibraryEntityActionsOptions {
       visibility: LibraryEntityProfileVisibility
     ) => Promise<void>;
   };
+  readonly lifecycle?: {
+    readonly value: LibraryEntityLifecycleStatus;
+    readonly isSaving: boolean;
+    readonly onChange: (
+      asset: LibraryReleaseAsset,
+      status: LibraryEntityLifecycleStatus
+    ) => Promise<void>;
+  };
   readonly onTogglePreview: (asset: LibraryReleaseAsset) => void;
   readonly onApprovalStatusChange: (
     asset: LibraryReleaseAsset,
@@ -72,6 +85,40 @@ export interface BuildLibraryEntityActionsOptions {
   ) => Promise<void>;
   readonly openUrl?: (url: string) => void;
   readonly copyText?: (value: string) => void | Promise<void>;
+}
+
+function buildLifecycleAction({
+  asset,
+  profileId,
+  lifecycle,
+}: Pick<
+  BuildLibraryEntityActionsOptions,
+  'asset' | 'profileId' | 'lifecycle'
+>): LibraryEntityAction | null {
+  if (!lifecycle) return null;
+
+  const isArchived = lifecycle.value === 'archived';
+  const nextStatus: LibraryEntityLifecycleStatus = isArchived
+    ? 'active'
+    : 'archived';
+  const unavailableReason = !profileId
+    ? 'Requires an owned creator profile'
+    : lifecycle.isSaving
+      ? isArchived
+        ? 'Restoring release'
+        : 'Archiving release'
+      : undefined;
+
+  return {
+    id: isArchived ? 'restore' : 'archive',
+    label: isArchived ? 'Restore' : 'Archive',
+    icon: isArchived ? ArchiveRestore : Archive,
+    authority: 'profile-owner',
+    disabled: Boolean(unavailableReason),
+    disabledReason: unavailableReason,
+    destructive: !isArchived,
+    onExecute: () => lifecycle.onChange(asset, nextStatus),
+  };
 }
 
 function buildProfileVisibilityAction({
@@ -159,6 +206,7 @@ export function buildLibraryEntityActions({
   isPreviewPlaying,
   isApprovalSaving,
   profileVisibility,
+  lifecycle,
   onTogglePreview,
   onApprovalStatusChange,
   openUrl = defaultOpenUrl,
@@ -229,6 +277,15 @@ export function buildLibraryEntityActions({
     destructive: false,
     onExecute: () => openUrl(primaryHref),
   });
+
+  const lifecycleAction = buildLifecycleAction({
+    asset,
+    profileId,
+    lifecycle,
+  });
+  if (lifecycleAction) {
+    actions.push(lifecycleAction);
+  }
 
   const shareUrl = asset.share?.shareUrl;
   if (shareUrl) {

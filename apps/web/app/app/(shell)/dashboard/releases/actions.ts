@@ -1980,6 +1980,46 @@ export async function deleteRelease(params: DeleteReleaseParams): Promise<{
 }
 
 /**
+ * Archive a release from the Library lifecycle menu without invoking the
+ * delete-or-archive retention decision. The Library's explicit Archive action
+ * is always reversible and must never hard-delete a draft.
+ */
+export async function archiveLibraryRelease(
+  params: DeleteReleaseParams
+): Promise<{ success: true }> {
+  noStore();
+
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+  const release = await getReleaseById(params.releaseId);
+  if (release?.creatorProfileId !== profile.id) {
+    throw new TypeError('Release not found');
+  }
+
+  await archiveRelease({
+    releaseId: params.releaseId,
+    creatorProfileId: profile.id,
+  });
+
+  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  revalidatePath(APP_ROUTES.RELEASES);
+  revalidatePath(APP_ROUTES.LIBRARY);
+
+  void trackServerEvent('release_archived', {
+    profileId: profile.id,
+    releaseId: params.releaseId,
+    releaseTitle: release.title,
+  });
+
+  return { success: true };
+}
+
+/**
  * Restore a soft-archived release to default Library/profile eligibility.
  * Approval and publication gates remain independent and are not changed here.
  */
@@ -2007,6 +2047,7 @@ export async function restoreRelease(params: DeleteReleaseParams): Promise<{
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
   revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   revalidatePath(APP_ROUTES.RELEASES);
+  revalidatePath(APP_ROUTES.LIBRARY);
 
   void trackServerEvent('release_restored', {
     profileId: profile.id,

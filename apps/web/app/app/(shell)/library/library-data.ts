@@ -58,6 +58,7 @@ export interface LibraryReleaseAsset {
   readonly status: ReleaseViewModel['status'];
   readonly approvalStatus: LibraryApprovalStatus;
   readonly profileVisibility: LibraryProfileVisibility;
+  readonly lifecycleStatus?: 'active' | 'archived';
   readonly trackCount: number;
   readonly providerCount: number;
   readonly providers: readonly LibraryProviderLink[];
@@ -212,6 +213,7 @@ export function buildLibraryReleaseAssets(
         release.id,
         profileVisibilityByAssetId
       ),
+      lifecycleStatus: release.deletedAt ? 'archived' : 'active',
       trackCount: release.totalTracks,
       providerCount: providers.length,
       providers,
@@ -287,6 +289,7 @@ export function buildLibraryMerchAssets(
         assetId,
         profileVisibilityByAssetId
       ),
+      lifecycleStatus: card.status === 'archived' ? 'archived' : 'active',
       trackCount: 0,
       providerCount: 0,
       providers: [],
