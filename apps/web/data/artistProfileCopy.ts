@@ -427,7 +427,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     eyebrow: '',
     headline: 'The link your music deserves.',
     subhead:
-      'One adaptive home for music, merch, social links, fan capture, and conversion — distinct from the broader Jovie product story.',
+      'One adaptive home for music, merch, social links, and fan capture — free to start.',
     ctaLabel: 'Claim your profile',
     signature: 'jov.ie/you',
     proofWhisper: 'Used by artists on',
@@ -442,7 +442,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       'One link, tuned to what matters right now.',
       'The same link, different job.',
     ],
-    body: 'Link once. Capture the fan. Learn what they do. Convert the moment. Before a drop, the profile becomes a countdown. On release day, fans route to the right service. On tour, nearby dates lead. At the merch table, one scan becomes support and capture.',
+    body: 'Link once. Capture the fan. Learn what converts. Close the moment. Before a drop, the profile becomes a countdown. On release day, fans route to the right service. On tour, nearby dates lead. At the merch table, one scan becomes support and capture.',
     contextCues: [
       'Release-aware',
       'Location-aware',

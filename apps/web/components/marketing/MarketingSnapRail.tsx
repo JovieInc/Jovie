@@ -65,6 +65,33 @@ export function MarketingSnapRail({
     [reducedMotion]
   );
 
+  const navButtons = (
+    <>
+      <button
+        type='button'
+        aria-controls={railId}
+        aria-label={previousLabel}
+        onClick={() => {
+          scrollByDirection('prev');
+        }}
+        className='marketing-snap-rail__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors'
+      >
+        <ChevronLeft className='h-4 w-4' aria-hidden='true' />
+      </button>
+      <button
+        type='button'
+        aria-controls={railId}
+        aria-label={nextLabel}
+        onClick={() => {
+          scrollByDirection('next');
+        }}
+        className='marketing-snap-rail__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors'
+      >
+        <ChevronRight className='h-4 w-4' aria-hidden='true' />
+      </button>
+    </>
+  );
+
   return (
     <div className={cn('marketing-snap-rail', className)} data-testid={testId}>
       {instructions ? (
@@ -74,35 +101,16 @@ export function MarketingSnapRail({
       ) : null}
 
       <div className='marketing-snap-rail__frame relative w-full overflow-x-hidden'>
-        <div
-          className={cn(
-            'marketing-snap-rail__controls pointer-events-none absolute right-[max(1.25rem,calc((100vw-var(--public-content-max-page))/2))] top-4 z-20 hidden items-center gap-2 lg:flex',
-            overlayControlsOnDesktop && 'marketing-snap-rail__controls--overlay'
-          )}
-        >
-          <button
-            type='button'
-            aria-controls={railId}
-            aria-label={previousLabel}
-            onClick={() => {
-              scrollByDirection('prev');
-            }}
-            className='marketing-snap-rail__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors'
-          >
-            <ChevronLeft className='h-4 w-4' aria-hidden='true' />
-          </button>
-          <button
-            type='button'
-            aria-controls={railId}
-            aria-label={nextLabel}
-            onClick={() => {
-              scrollByDirection('next');
-            }}
-            className='marketing-snap-rail__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors'
-          >
-            <ChevronRight className='h-4 w-4' aria-hidden='true' />
-          </button>
-        </div>
+        {/* Desktop: default controls sit in-flow and push the rail down (no card overlay). */}
+        {!overlayControlsOnDesktop ? (
+          <div className='marketing-snap-rail__controls pointer-events-none mb-4 hidden items-center justify-end gap-2 pr-5 sm:pr-6 lg:flex lg:pr-[max(1.5rem,calc((100vw-var(--public-content-max-page))/2))]'>
+            {navButtons}
+          </div>
+        ) : (
+          <div className='marketing-snap-rail__controls marketing-snap-rail__controls--overlay pointer-events-none absolute right-[max(1.25rem,calc((100vw-var(--public-content-max-page))/2))] top-4 z-20 hidden items-center gap-2 lg:flex'>
+            {navButtons}
+          </div>
+        )}
 
         <div className='hidden sm:block lg:hidden'>
           <div className='sr-only focus-within:not-sr-only focus-within:absolute focus-within:left-6 focus-within:top-4 focus-within:z-20 focus-within:flex focus-within:gap-2'>
