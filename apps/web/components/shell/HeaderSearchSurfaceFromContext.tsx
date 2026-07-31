@@ -1,98 +1,36 @@
 'use client';
 
-import { QueryClientContext } from '@tanstack/react-query';
-import { type ContextType, useContext, useMemo } from 'react';
-import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import {
-  type HeaderSearchAdapter,
-  useHeaderActions,
-} from '@/contexts/HeaderActionsContext';
-import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
-import { HeaderSearchSurface } from './HeaderSearchSurface';
-import { searchHeaderLibraryAssets } from './header-search-client';
-import type { HeaderSearchCatalog } from './header-search-results';
+import { Search } from 'lucide-react';
+import { useHeaderActions } from '@/contexts/HeaderActionsContext';
+import { cn } from '@/lib/utils';
 
-/** Pulls the global catalogs and route adapter into the single shell surface. */
+/**
+ * Sidebar entry for the one shell-owned search/command surface.
+ *
+ * Its former popover duplicated command search and competed with the main
+ * plane. The trigger stays in the rail for fast discovery; the active input
+ * is rendered in the breadcrumb seam by the command surface itself.
+ */
 export function HeaderSearchSurfaceFromContext({
   className,
 }: {
   readonly className?: string;
 }) {
-  const dashboardData = useContext(DashboardDataContext);
-  const queryClient = useContext(QueryClientContext);
-  const { headerSearchAdapter, isSearchOpen, openSearch, closeSearch } =
-    useHeaderActions();
-
-  if (!queryClient) {
-    return (
-      <HeaderSearchSurface
-        adapter={headerSearchAdapter}
-        catalog={{
-          conversations: [],
-          profiles: dashboardData?.creatorProfiles ?? [],
-          releases: [],
-        }}
-        isOpen={isSearchOpen}
-        onOpen={openSearch}
-        onClose={closeSearch}
-        searchLibraryAssets={searchHeaderLibraryAssets}
-        remoteSearchScopeKey={dashboardData?.selectedProfile?.id}
-        className={className}
-      />
-    );
-  }
-
+  const { openCommandPalette } = useHeaderActions();
   return (
-    <HeaderSearchSurfaceWithQueries
-      adapter={headerSearchAdapter}
-      dashboardData={dashboardData}
-      isOpen={isSearchOpen}
-      onOpen={openSearch}
-      onClose={closeSearch}
-      className={className}
-    />
-  );
-}
-
-function HeaderSearchSurfaceWithQueries({
-  adapter,
-  dashboardData,
-  isOpen,
-  onOpen,
-  onClose,
-  className,
-}: {
-  readonly adapter: HeaderSearchAdapter | null;
-  readonly dashboardData: ContextType<typeof DashboardDataContext>;
-  readonly isOpen: boolean;
-  readonly onOpen: () => void;
-  readonly onClose: () => void;
-  readonly className?: string;
-}) {
-  const conversationsQuery = useChatConversationsQuery({
-    limit: 50,
-    enabled: isOpen,
-  });
-  const catalog = useMemo<HeaderSearchCatalog>(
-    () => ({
-      conversations: conversationsQuery.data ?? [],
-      profiles: dashboardData?.creatorProfiles ?? [],
-      releases: [],
-    }),
-    [conversationsQuery.data, dashboardData?.creatorProfiles]
-  );
-
-  return (
-    <HeaderSearchSurface
-      adapter={adapter}
-      catalog={catalog}
-      isLoading={conversationsQuery.isLoading}
-      isOpen={isOpen}
-      onOpen={onOpen}
-      onClose={onClose}
-      searchLibraryAssets={searchHeaderLibraryAssets}
-      remoteSearchScopeKey={dashboardData?.selectedProfile?.id}
-      className={className}
-    />
+    <button
+      type='button'
+      data-app-search-trigger='true'
+      onClick={openCommandPalette}
+      className={cn(
+        'inline-flex h-9 min-h-9 w-full min-w-0 items-center justify-start gap-2 rounded-xl border border-subtle bg-surface-0 px-3 text-left text-xs text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle ease-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-ring-themed',
+        className
+      )}
+      aria-label='Search Jovie'
+    >
+      <Search className='size-4 shrink-0' aria-hidden='true' />
+      <span className='min-w-0 flex-1 truncate'>Search</span>
+      <kbd className='shrink-0 text-2xs text-tertiary-token'>⌘K</kbd>
+    </button>
   );
 }

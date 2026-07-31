@@ -59,6 +59,10 @@ interface HeaderActionsState {
   headerBadge: ReactNode;
   headerSearchAdapter: HeaderSearchAdapter | null;
   isSearchOpen: boolean;
+  /** Main-plane command/search takeover state (JOV-3940). */
+  isCommandPaletteOpen: boolean;
+  /** Replaces the breadcrumb slot while the command surface is active. */
+  commandPaletteHeader: ReactNode;
 }
 
 interface HeaderActionsDispatch {
@@ -67,6 +71,9 @@ interface HeaderActionsDispatch {
   setHeaderSearchAdapter: (adapter: HeaderSearchAdapter | null) => void;
   openSearch: () => void;
   closeSearch: () => void;
+  openCommandPalette: () => void;
+  closeCommandPalette: () => void;
+  setCommandPaletteHeader: (header: ReactNode) => void;
 }
 
 /** Full context value – kept for backward-compat of `useHeaderActions()`. */
@@ -118,6 +125,9 @@ export function HeaderActionsProvider({
   const [headerSearchAdapter, setHeaderSearchAdapter] =
     useState<HeaderSearchAdapter | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [commandPaletteHeader, setCommandPaletteHeader] =
+    useState<ReactNode>(null);
   const priorFocusRef = useRef<HTMLElement | null>(null);
   const focusRestoreFrameRef = useRef<number | null>(null);
 
@@ -144,6 +154,33 @@ export function HeaderActionsProvider({
     });
   }, []);
 
+  const openCommandPalette = useCallback(() => {
+    if (focusRestoreFrameRef.current !== null) {
+      cancelAnimationFrame(focusRestoreFrameRef.current);
+      focusRestoreFrameRef.current = null;
+    }
+    const activeElement = document.activeElement;
+    priorFocusRef.current =
+      activeElement instanceof HTMLElement ? activeElement : null;
+    // The former sidebar popover must never compete with the main-plane surface.
+    setIsSearchOpen(false);
+    setIsCommandPaletteOpen(true);
+  }, []);
+
+  const closeCommandPalette = useCallback(() => {
+    if (focusRestoreFrameRef.current !== null) {
+      cancelAnimationFrame(focusRestoreFrameRef.current);
+    }
+    setIsCommandPaletteOpen(false);
+    setCommandPaletteHeader(null);
+    const priorFocus = priorFocusRef.current;
+    priorFocusRef.current = null;
+    focusRestoreFrameRef.current = requestAnimationFrame(() => {
+      focusRestoreFrameRef.current = null;
+      if (priorFocus?.isConnected) priorFocus.focus();
+    });
+  }, []);
+
   useEffect(
     () => () => {
       if (focusRestoreFrameRef.current !== null) {
@@ -155,7 +192,7 @@ export function HeaderActionsProvider({
 
   useEffect(() => {
     function onOpenSearch() {
-      openSearch();
+      openCommandPalette();
     }
 
     function onKeyDown(event: KeyboardEvent) {
@@ -172,7 +209,7 @@ export function HeaderActionsProvider({
         return;
       }
       event.preventDefault();
-      openSearch();
+      openCommandPalette();
     }
 
     globalThis.addEventListener(OPEN_HEADER_SEARCH_EVENT, onOpenSearch);
@@ -181,11 +218,25 @@ export function HeaderActionsProvider({
       globalThis.removeEventListener(OPEN_HEADER_SEARCH_EVENT, onOpenSearch);
       globalThis.removeEventListener('keydown', onKeyDown);
     };
-  }, [openSearch]);
+  }, [openCommandPalette]);
 
   const state = useMemo(
-    () => ({ headerActions, headerBadge, headerSearchAdapter, isSearchOpen }),
-    [headerActions, headerBadge, headerSearchAdapter, isSearchOpen]
+    () => ({
+      headerActions,
+      headerBadge,
+      headerSearchAdapter,
+      isSearchOpen,
+      isCommandPaletteOpen,
+      commandPaletteHeader,
+    }),
+    [
+      commandPaletteHeader,
+      headerActions,
+      headerBadge,
+      headerSearchAdapter,
+      isCommandPaletteOpen,
+      isSearchOpen,
+    ]
   );
 
   // useState setters are referentially stable, so this memo never recomputes.
@@ -196,8 +247,11 @@ export function HeaderActionsProvider({
       setHeaderSearchAdapter,
       openSearch,
       closeSearch,
+      openCommandPalette,
+      closeCommandPalette,
+      setCommandPaletteHeader,
     }),
-    [closeSearch, openSearch]
+    [closeCommandPalette, closeSearch, openCommandPalette, openSearch]
   );
 
   return (

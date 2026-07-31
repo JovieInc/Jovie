@@ -625,16 +625,6 @@ function getLatestTableProps() {
     | undefined;
 }
 
-function openDesktopTaskSearch() {
-  fireEvent.click(
-    within(screen.getByTestId('header-actions-host')).getByRole('button', {
-      name: 'Search',
-    })
-  );
-  fireEvent.click(screen.getByRole('button', { name: 'Filter Current View' }));
-  return screen.getByRole('combobox', { name: 'Filter Tasks' });
-}
-
 describe('TasksPageClient', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -1288,7 +1278,7 @@ describe('TasksPageClient', () => {
     expect(latestHeaderSearchAdapter?.totalCount).toBe(2);
     const searchTrigger = within(
       screen.getByTestId('header-actions-host')
-    ).getByRole('button', { name: 'Search' });
+    ).getByRole('button', { name: 'Search Jovie' });
     expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
     expect(
       within(screen.getByTestId('header-actions-host')).getByRole('button', {
@@ -1297,18 +1287,22 @@ describe('TasksPageClient', () => {
     ).toBeInTheDocument();
   }, 10000);
 
-  it('opens the tasks filter through the shell-owned trigger', () => {
+  it('does not open a second route-filter popup from the shell trigger', () => {
     renderPage();
 
     expect(
       screen.queryByRole('combobox', { name: 'Filter Tasks' })
     ).not.toBeInTheDocument();
 
-    openDesktopTaskSearch();
+    fireEvent.click(
+      within(screen.getByTestId('header-actions-host')).getByRole('button', {
+        name: 'Search Jovie',
+      })
+    );
 
     expect(
-      screen.getByRole('combobox', { name: 'Filter Tasks' })
-    ).toBeInTheDocument();
+      screen.queryByRole('combobox', { name: 'Filter Tasks' })
+    ).not.toBeInTheDocument();
   });
 
   it('keeps task title search wired into list filters', () => {

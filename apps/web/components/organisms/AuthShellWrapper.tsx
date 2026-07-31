@@ -41,7 +41,7 @@ import { useGlobalShortcutActions } from '@/hooks/useGlobalShortcutActions';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import type { AppShellMode } from '@/types/app-shell';
 import { AuthShell } from './AuthShell';
-import { CommandPalette } from './CommandPalette';
+import { CommandPalette, CommandPaletteMainSurface } from './CommandPalette';
 import { KeyboardShortcutsSheet } from './keyboard-shortcuts-sheet';
 import {
   PendingShellContext,
@@ -218,7 +218,11 @@ function AuthShellWrapperInner({
   );
   const shellChildren = (
     <div className='relative flex h-full min-h-0 flex-col'>
-      {children}
+      {headerActions.isCommandPaletteOpen ? (
+        <CommandPaletteMainSurface />
+      ) : (
+        children
+      )}
       {pendingShellRoute === 'releases' ? (
         <div
           aria-live='polite'
@@ -265,6 +269,7 @@ function AuthShellWrapperInner({
                 breadcrumbs={config.breadcrumbs}
                 headerBadge={headerBadge}
                 headerAction={headerAction}
+                commandPaletteHeader={headerActions.commandPaletteHeader}
                 showMobileTabs={config.showMobileTabs}
                 isTableRoute={config.isTableRoute}
                 isLyricsRoute={config.isLyricsRoute}

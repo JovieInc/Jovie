@@ -6,12 +6,20 @@
  * query, and renders the autofocused search input.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { CommandPalette } from '@/components/organisms/CommandPalette';
+import {
+  CommandPalette,
+  CommandPaletteMainSurface,
+} from '@/components/organisms/CommandPalette';
+import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
+import {
+  HeaderActionsProvider,
+  useHeaderActions,
+} from '@/contexts/HeaderActionsContext';
 
 const pushMock = vi.fn();
 const pathnameMock = vi.hoisted(() => vi.fn(() => '/app'));
@@ -110,10 +118,19 @@ function makeDashboard(isAdmin = false): DashboardData {
   };
 }
 
+function CommandPaletteHeaderHarness() {
+  const { commandPaletteHeader } = useHeaderActions();
+  return <div>{commandPaletteHeader}</div>;
+}
+
 function withDashboard(node: ReactNode, isAdmin = false) {
   return (
     <DashboardDataContext.Provider value={makeDashboard(isAdmin)}>
-      {node}
+      <HeaderActionsProvider>
+        {node}
+        <CommandPaletteMainSurface />
+        <CommandPaletteHeaderHarness />
+      </HeaderActionsProvider>
     </DashboardDataContext.Provider>
   );
 }
@@ -124,7 +141,7 @@ describe('CommandPalette', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('opens on Cmd+K and shows the autofocused search input', () => {
+  it('opens on Cmd+K in the main plane and focuses the breadcrumb input', () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
     const input = screen.getByLabelText('Command Palette Search');
@@ -132,11 +149,29 @@ describe('CommandPalette', () => {
     // React applies autofocus by calling .focus() on mount, not by emitting
     // the deprecated HTML attribute — assert focus state instead.
     expect(input).toHaveFocus();
+    expect(screen.getByTestId('cmdk-main-plane')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('continues to open on Ctrl+K independently of sidebar Search', () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', ctrlKey: true });
+    expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
+  });
+
+  it('opens the same main plane from the sidebar Search trigger', () => {
+    render(
+      withDashboard(
+        <>
+          <CommandPalette />
+          <HeaderSearchSurfaceFromContext />
+        </>
+      )
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+
+    expect(screen.getByTestId('cmdk-main-plane')).toBeInTheDocument();
     expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
   });
 
@@ -218,5 +253,23 @@ describe('CommandPalette', () => {
     expect(
       screen.queryByLabelText('Command Palette Search')
     ).not.toBeInTheDocument();
+  });
+
+  it('escapes back to the prior focus target', async () => {
+    render(
+      withDashboard(
+        <>
+          <button type='button'>Return target</button>
+          <CommandPalette />
+        </>
+      )
+    );
+    const origin = screen.getByRole('button', { name: 'Return target' });
+    origin.focus();
+    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
+    fireEvent.keyDown(globalThis, { key: 'Escape' });
+    expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
+    await waitFor(() => expect(origin).toHaveFocus());
   });
 });

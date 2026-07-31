@@ -14,6 +14,12 @@ export interface DashboardHeaderProps {
   readonly action?: ReactNode;
   /** Shell-owned search surface with a persistent header slot. */
   readonly searchSurface?: ReactNode;
+  /**
+   * Main-plane command/search takes over the breadcrumb seam while active.
+   * This deliberately changes the existing header rather than layering a
+   * second search control over route content.
+   */
+  readonly commandPaletteHeader?: ReactNode;
   readonly isSearchActive?: boolean;
   /** Profile button slot shown on the far right of the mobile header */
   readonly mobileProfileSlot?: ReactNode;
@@ -70,6 +76,7 @@ export function DashboardHeader({
   breadcrumbSuffix,
   action,
   searchSurface,
+  commandPaletteHeader,
   isSearchActive = false,
   mobileProfileSlot,
   showDivider = false,
@@ -118,12 +125,21 @@ export function DashboardHeader({
           className='flex min-w-0 flex-1 items-center gap-2 tracking-[-0.012em]'
           data-search-active={isSearchActive ? 'true' : 'false'}
         >
-          <HeaderTitle
-            usesSectionTitleLayout={usesSectionTitleLayout}
-            currentLabel={currentLabel}
-            rootLabel={rootLabel}
-            breadcrumbSuffix={breadcrumbSuffix}
-          />
+          {commandPaletteHeader ? (
+            <div
+              className='flex h-full min-w-0 flex-1 items-center'
+              data-testid='dashboard-command-palette-header'
+            >
+              {commandPaletteHeader}
+            </div>
+          ) : (
+            <HeaderTitle
+              usesSectionTitleLayout={usesSectionTitleLayout}
+              currentLabel={currentLabel}
+              rootLabel={rootLabel}
+              breadcrumbSuffix={breadcrumbSuffix}
+            />
+          )}
           {showInlineSearch ? (
             <div className='ml-auto flex min-w-0 shrink-0 items-center justify-start max-sm:w-app-control-sm sm:ml-1.5'>
               {searchSurface}
