@@ -43,23 +43,25 @@ export function UnifiedTableHeader<TData>({
   }
 
   return (
-    <thead>
+    <>
       {caption && <caption className='sr-only'>{caption}</caption>}
-      {headerGroups.map(headerGroup => (
-        <tr key={headerGroup.id}>
-          {headerGroup.headers.map(header => (
-            <TableHeaderCell
-              key={header.id}
-              header={header}
-              canSort={header.column.getCanSort()}
-              sortDirection={header.column.getIsSorted()}
-              stickyHeaderClass={presets.stickyHeader}
-              tableHeaderClass={presets.tableHeader}
-              onToggleSort={header.column.getToggleSortingHandler()}
-            />
-          ))}
-        </tr>
-      ))}
-    </thead>
+      <thead>
+        {headerGroups.map(headerGroup => (
+          <tr key={headerGroup.id}>
+            {headerGroup.headers.map(header => (
+              <TableHeaderCell
+                key={header.id}
+                header={header}
+                canSort={header.column.getCanSort()}
+                sortDirection={header.column.getIsSorted()}
+                stickyHeaderClass={presets.stickyHeader}
+                tableHeaderClass={presets.tableHeader}
+                onToggleSort={header.column.getToggleSortingHandler()}
+              />
+            ))}
+          </tr>
+        ))}
+      </thead>
+    </>
   );
 }

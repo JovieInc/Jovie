@@ -42,6 +42,16 @@ export const rowState = {
   checked: 'system-b-table-row-checked',
 } as const;
 
+/**
+ * Action geometry stays mounted in every row. Visibility changes only through
+ * opacity so hover, keyboard focus, selection, and menu-open states cannot
+ * shift adjacent columns.
+ */
+export const contextualAction = {
+  cell: 'system-b-table-contextual-action-cell',
+  slot: 'system-b-table-contextual-action',
+} as const;
+
 // Icon Colors (use CSS variables where possible)
 export const iconColors = {
   // Sort indicator - matches tertiary-token but slightly more visible

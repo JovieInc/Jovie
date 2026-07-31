@@ -3,6 +3,7 @@
 import type { Header } from '@tanstack/react-table';
 import { flexRender } from '@tanstack/react-table';
 import { Icon } from '@/components/atoms/Icon';
+import '../table.types';
 import { cn, iconColors } from '../table.styles';
 
 interface TableHeaderCellProps<TData>
@@ -43,9 +44,17 @@ export function TableHeaderCell<TData>({
     ariaSort = 'none';
   }
 
-  const metaClassName = (
-    header.column.columnDef.meta as { className?: string } | undefined
-  )?.className;
+  const meta = header.column.columnDef.meta;
+  const metaClassName = meta?.className;
+  const isSemanticOnlyHeader = meta?.headerVisibility === 'sr-only';
+
+  const headerContent = isSemanticOnlyHeader ? (
+    <span className='sr-only'>
+      {flexRender(header.column.columnDef.header, header.getContext())}
+    </span>
+  ) : (
+    flexRender(header.column.columnDef.header, header.getContext())
+  );
 
   return (
     <th
@@ -74,7 +83,7 @@ export function TableHeaderCell<TData>({
                 'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-2 focus-visible:ring-ring/20'
               )}
             >
-              {flexRender(header.column.columnDef.header, header.getContext())}
+              {headerContent}
               {sortDirection && (
                 <Icon
                   name={sortDirection === 'asc' ? 'ArrowUp' : 'ArrowDown'}
@@ -86,11 +95,7 @@ export function TableHeaderCell<TData>({
             </button>
           );
         }
-        return (
-          <div className={cn(tableHeaderClass)}>
-            {flexRender(header.column.columnDef.header, header.getContext())}
-          </div>
-        );
+        return <div className={cn(tableHeaderClass)}>{headerContent}</div>;
       })()}
     </th>
   );

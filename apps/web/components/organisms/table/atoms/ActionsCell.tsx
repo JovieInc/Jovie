@@ -4,14 +4,10 @@ import { cn } from '../table.styles';
 
 interface ActionsCellProps
   extends Readonly<{
-    /**
-     * Action buttons (always visible on hover)
-     */
+    /** Action buttons revealed by the canonical row-context state. */
     readonly actions?: React.ReactNode;
 
-    /**
-     * Overflow menu (always visible on hover)
-     */
+    /** Overflow menu revealed by the canonical row-context state. */
     readonly menu?: React.ReactNode;
 
     /**
@@ -67,11 +63,10 @@ export function ActionsCell({
       {actions && (
         <div
           className={cn(
-            'opacity-0 pointer-events-none transition-opacity',
-            'group-hover:opacity-100 group-hover:pointer-events-auto',
-            'focus-within:opacity-100 focus-within:pointer-events-auto',
+            'system-b-table-contextual-action',
             isMenuOpen && 'opacity-100 pointer-events-auto'
           )}
+          data-menu-open={isMenuOpen || undefined}
         >
           {actions}
         </div>
@@ -81,11 +76,10 @@ export function ActionsCell({
       {menu && (
         <div
           className={cn(
-            'opacity-0 pointer-events-none transition-opacity',
-            'group-hover:opacity-100 group-hover:pointer-events-auto',
-            'focus-within:opacity-100 focus-within:pointer-events-auto',
+            'system-b-table-contextual-action',
             isMenuOpen && 'opacity-100 pointer-events-auto'
           )}
+          data-menu-open={isMenuOpen || undefined}
         >
           {menu}
         </div>

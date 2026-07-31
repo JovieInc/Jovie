@@ -3,6 +3,7 @@
 import type { Row } from '@tanstack/react-table';
 import { flexRender } from '@tanstack/react-table';
 import React, { memo, useCallback, useEffect, useRef } from 'react';
+import '../table.types';
 import { cn, presets, rowState } from '../table.styles';
 
 /**
@@ -188,13 +189,17 @@ function VirtualizedTableRowComponent<TData>({
       }
     >
       {row.getVisibleCells().map(cell => {
-        const metaClassName = (
-          cell.column.columnDef.meta as { className?: string } | undefined
-        )?.className;
+        const meta = cell.column.columnDef.meta;
+        const metaClassName = meta?.className;
         return (
           <td
             key={cell.id}
-            className={cn(presets.tableCell, metaClassName)}
+            className={cn(
+              presets.tableCell,
+              meta?.actionVisibility === 'contextual' &&
+                'system-b-table-contextual-action-cell',
+              metaClassName
+            )}
             style={{
               width:
                 cell.column.getSize() === 150
