@@ -77,28 +77,31 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     id: 'overview',
     label: 'Overview',
     href: APP_ROUTES.ADMIN,
-    description: 'Operator launchpad for business, people, and system health',
+    description:
+      'Health dashboard — one signal per area linking to detail screens',
     section: 'workspaces',
   },
   {
     id: 'ops',
     label: 'Ops',
     href: APP_ROUTES.ADMIN_OPS,
-    description: 'Live operations: deploys, AI ops, runway, blockers',
+    description:
+      'Live operational state, canaries, control panel, and incidents',
     section: 'workspaces',
   },
   {
     id: 'people',
     label: 'People',
     href: APP_ROUTES.ADMIN_PEOPLE,
-    description: 'Waitlist, creators, users, releases, and feedback',
+    description:
+      'User table, roles, waitlist, creators, and individual actions',
     section: 'workspaces',
   },
   {
     id: 'growth',
     label: 'Growth',
     href: APP_ROUTES.ADMIN_GROWTH,
-    description: 'Leads, outreach, campaigns, and ingest workflows',
+    description: 'Acquisition funnel, referral, outreach, and conversion',
     section: 'workspaces',
   },
   {

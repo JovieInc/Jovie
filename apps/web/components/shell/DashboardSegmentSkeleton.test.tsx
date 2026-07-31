@@ -52,22 +52,19 @@ describe('DashboardSegmentSkeleton route variants', () => {
     expect(skeleton).toHaveClass('min-h-full', 'w-full');
   });
 
-  it('reserves the admin KPI, scoreboard, and panel geometry', () => {
+  it('reserves the admin health dashboard geometry (JOV-2098)', () => {
     const { container } = render(<DashboardSegmentSkeleton variant='admin' />);
 
-    const kpis = container.querySelector('[data-skeleton-slot="admin-kpis"]');
-    const scoreboard = container.querySelector(
-      '[data-skeleton-slot="admin-scoreboard"]'
-    );
-    const panels = container.querySelector(
-      '[data-skeleton-slot="admin-panels"]'
+    const health = container.querySelector(
+      '[data-skeleton-slot="admin-health"]'
     );
 
-    expect(kpis).toHaveClass('grid-cols-1', 'sm:grid-cols-2', 'xl:grid-cols-4');
-    expect(kpis?.querySelectorAll('.h-43')).toHaveLength(4);
-    expect(scoreboard).toHaveClass('h-40', 'shrink-0');
-    expect(panels).toHaveClass('min-h-72', 'lg:grid-cols-3');
-    expect(panels?.children).toHaveLength(2);
+    expect(health).toHaveClass(
+      'grid-cols-1',
+      'sm:grid-cols-2',
+      'xl:grid-cols-4'
+    );
+    expect(health?.querySelectorAll('.min-h-28')).toHaveLength(4);
   });
 
   it('reserves fixed filter and result-card dimensions for insights', () => {

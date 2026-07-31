@@ -71,10 +71,10 @@ test.describe('Admin Dashboard', () => {
       'Admin dashboard content container missing — page did not render'
     ).toBeVisible({ timeout: 30_000 });
 
-    // KPI section must render — proves DB queries succeeded
+    // Health dashboard must render — proves overview queries succeeded (JOV-2098)
     await expect(
-      page.locator('[data-testid="admin-kpi-section"]'),
-      'Admin KPI section missing — Suspense errored or DB query failed'
+      page.locator('[data-testid="admin-health-dashboard"]'),
+      'Admin health dashboard missing — Suspense errored or DB query failed'
     ).toBeVisible({ timeout: 30_000 });
 
     const bodyText =
