@@ -71,6 +71,35 @@ export interface ProfilePacRelease {
   readonly slug: string;
   readonly artworkUrl: string | null;
   readonly previewUrl: string | null;
+  readonly releaseType?: string | null;
+  readonly releaseDate?: Date | string | null;
+}
+
+function formatPacReleaseMeta(
+  release: ProfilePacRelease | null | undefined,
+  fallback: string
+): string {
+  if (!release) return fallback;
+  const typeRaw = release.releaseType?.replaceAll('_', ' ').trim();
+  const typeLabel = typeRaw
+    ? typeRaw === 'ep'
+      ? 'EP'
+      : typeRaw.charAt(0).toUpperCase() + typeRaw.slice(1)
+    : null;
+  let year: number | null = null;
+  if (release.releaseDate) {
+    const date =
+      release.releaseDate instanceof Date
+        ? release.releaseDate
+        : new Date(release.releaseDate);
+    if (!Number.isNaN(date.getTime())) {
+      year = date.getUTCFullYear();
+    }
+  }
+  const meta = [typeLabel, year ? String(year) : null]
+    .filter(Boolean)
+    .join(' · ');
+  return meta || fallback;
 }
 
 interface ProfilePacCardProps {
@@ -511,7 +540,10 @@ export function ProfilePacCard({
   let ContextIcon = Music2;
 
   const releaseSubject = (
-    <SubjectText title={release?.title ?? artist.name} meta={artist.name} />
+    <SubjectText
+      title={release?.title ?? artist.name}
+      meta={formatPacReleaseMeta(release, artist.name)}
+    />
   );
 
   switch (state.kind) {

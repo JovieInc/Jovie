@@ -256,10 +256,24 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
     }
 
     // Back catalog: include non-featured releases in the same carousel.
+    // Dedupe accidental same-title/year/type clones so the rail stays legible.
+    const seenCatalogKeys = new Set<string>();
     for (const release of releases) {
       if (release.slug === '' || release.slug === featuredReleaseSlug) {
         continue;
       }
+      const year = release.releaseDate
+        ? new Date(release.releaseDate).getUTCFullYear()
+        : 'unknown';
+      const catalogKey = [
+        release.title.trim().toLowerCase(),
+        release.releaseType ?? '',
+        year,
+      ].join('|');
+      if (seenCatalogKeys.has(catalogKey)) {
+        continue;
+      }
+      seenCatalogKeys.add(catalogKey);
       releaseItems.push(
         releaseToEntityCard(release, { handle: artist.handle, now })
       );
@@ -323,6 +337,8 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
         slug: latestRelease.slug,
         artworkUrl: latestRelease.artworkUrl,
         previewUrl: catalogMatch?.previewUrl ?? null,
+        releaseType: latestRelease.releaseType,
+        releaseDate: latestRelease.releaseDate,
       };
     }
     const newest = releases.find(release => release.slug !== '');
@@ -332,6 +348,8 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
       slug: newest.slug,
       artworkUrl: newest.artworkUrl,
       previewUrl: newest.previewUrl ?? null,
+      releaseType: newest.releaseType,
+      releaseDate: newest.releaseDate,
     };
   }, [latestRelease, releases, releaseVisibility?.show]);
 

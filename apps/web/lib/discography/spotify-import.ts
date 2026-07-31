@@ -835,15 +835,6 @@ async function importSingleRelease(
     )
     .limit(1);
 
-  const slug =
-    existingRelease?.slug ??
-    (await generateUniqueSlug(
-      creatorProfileId,
-      metadata.sanitizedTitle,
-      'release',
-      existingRelease?.id
-    ));
-
   const effectiveAlbumType = fullAlbum?.album_type ?? album.album_type;
   const effectiveTotalTracks = fullAlbum?.total_tracks ?? album.total_tracks;
 
@@ -855,6 +846,17 @@ async function importSingleRelease(
     fullAlbum?.release_date ?? album.release_date,
     fullAlbum?.release_date_precision ?? album.release_date_precision
   );
+  const releaseYear = releaseDate?.getUTCFullYear() ?? null;
+
+  const slug =
+    existingRelease?.slug ??
+    (await generateUniqueSlug(
+      creatorProfileId,
+      metadata.sanitizedTitle,
+      'release',
+      existingRelease?.id,
+      { year: releaseYear }
+    ));
 
   // Upsert the release with sanitized data
   const release = await upsertRelease({

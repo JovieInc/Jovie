@@ -368,9 +368,11 @@ describe('ProfileCompactTemplate', () => {
     expect(socialRow).toBeInTheDocument();
 
     const instagram = within(socialRow).getByRole('link', {
-      name: 'instagram',
+      name: `Follow ${mockArtist.name} on Instagram`,
     });
-    const twitter = within(socialRow).getByRole('link', { name: 'twitter' });
+    const twitter = within(socialRow).getByRole('link', {
+      name: `Follow ${mockArtist.name} on Twitter`,
+    });
     expect(instagram).toHaveAttribute(
       'href',
       'https://instagram.com/test-artist'
@@ -407,19 +409,16 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    const artistPhoto = screen
-      .getAllByRole('img', { name: mockArtist.name })
-      .find(img => img.closest('header'));
-    expect(artistPhoto).toBeDefined();
-    expect(artistPhoto).toHaveAttribute(
-      'src',
-      'https://example.com/artist.jpg'
+    // Hero photo is decorative (empty alt) so the H1 name is not duplicated.
+    const cover = screen.getByTestId('profile-cover');
+    const artistPhoto = cover.querySelector(
+      'img[src="https://example.com/artist.jpg"]'
     );
-    expect(artistPhoto.className).not.toContain('grayscale');
+    expect(artistPhoto).not.toBeNull();
+    expect(artistPhoto?.getAttribute('alt') ?? '').toBe('');
+    expect(artistPhoto?.className).not.toContain('grayscale');
     expect(
-      artistPhoto
-        .closest('header')
-        ?.querySelector('[data-testid="profile-hero-identity-block"]')
+      cover.querySelector('[data-testid="profile-hero-identity-block"]')
     ).not.toBeNull();
   });
 

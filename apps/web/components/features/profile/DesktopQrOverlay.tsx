@@ -145,9 +145,13 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
             <X className='h-4 w-4' />
           </button>
           {url && (
-            <QRCode data={url} size={120} label='Scan to view on mobile' />
+            <QRCode
+              data={url}
+              size={120}
+              label='Scan To Open This Profile On Your Phone'
+            />
           )}
-          <p className='mt-2 text-xs text-secondary-token'>View on mobile</p>
+          <p className='mt-2 text-xs text-secondary-token'>Open On Phone</p>
         </motion.div>
       )}
 
@@ -169,7 +173,7 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
             size='md'
             variant='surface'
             onClick={reopen}
-            ariaLabel='View on mobile'
+            ariaLabel='Open On Phone'
             className='group backdrop-blur-sm'
           >
             <span className='pointer-events-none absolute inset-0 rounded-full opacity-0 transition-opacity duration-slower group-hover:opacity-100 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,255,255,0.35),transparent_60%)]' />
