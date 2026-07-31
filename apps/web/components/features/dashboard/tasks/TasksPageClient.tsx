@@ -1542,9 +1542,19 @@ export function TasksPageClient() {
     statusFilter !== 'all' ||
     priorityFilter !== 'all' ||
     assigneeFilter !== 'human';
-  const isResolvingProfile = !profileId || !isTaskLayoutReady;
-  const isActiveBoardLoading = isResolvingProfile || isBoardLoading;
-  const isActiveListLoading = isResolvingProfile || isLoading;
+  const isResolvingProfile = !profileId;
+  const hasActiveTaskData = isBoardMode
+    ? boardData !== undefined
+    : data !== undefined;
+  const isResolvingTaskLayout = !isTaskLayoutReady && !hasActiveTaskData;
+  const isActiveBoardLoading =
+    isResolvingProfile ||
+    isResolvingTaskLayout ||
+    (isBoardLoading && boardData === undefined);
+  const isActiveListLoading =
+    isResolvingProfile ||
+    isResolvingTaskLayout ||
+    (isLoading && data === undefined);
   const showTaskListPane =
     isBoardMode ||
     isDesktopTaskLayout ||
