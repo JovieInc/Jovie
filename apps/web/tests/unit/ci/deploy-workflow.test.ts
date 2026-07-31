@@ -1772,7 +1772,11 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(lighthouse).toContain(
       'VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}'
     );
-    expect(lighthouse).toContain('lhci collect');
+    expect(lighthouse).toContain('Establish Lighthouse job deadline');
+    expect(lighthouse).toContain('LIGHTHOUSE_JOB_DEADLINE_EPOCH_MS=');
+    expect(lighthouse).toContain(
+      'lighthouse-production-collect.mjs --config="$RUNNER_TEMP/lighthouse-production-exact.json"'
+    );
     expect(lighthouse).toContain('lhci assert');
     expect(lighthouse).toContain('lighthouse-exact-target-guard.ts');
     expect(lighthouse).toContain('LIGHTHOUSE_SENSITIVE_VALUES_FILE');
@@ -1790,9 +1794,9 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     );
     expect(lighthouse).not.toContain('lhci autorun');
     expect(lighthouse).not.toContain('extraHeaders');
-    expect(lighthouse.indexOf('lhci collect')).toBeLessThan(
-      lighthouse.indexOf('lhci assert')
-    );
+    expect(
+      lighthouse.indexOf('lighthouse-production-collect.mjs')
+    ).toBeLessThan(lighthouse.indexOf('lhci assert'));
     expect(lighthouse.indexOf('lhci assert')).toBeLessThan(
       lighthouse.lastIndexOf('lighthouse-exact-target-guard.ts')
     );

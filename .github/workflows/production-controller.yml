@@ -530,6 +530,16 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Establish Lighthouse job deadline
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Job timeout-minutes: 20. Reserve 210s for assert/upload/cleanup + SIGTERM grace
+          # so per-route retries cannot run into a silent GitHub cancel without a receipt.
+          now_s="$(date +%s)"
+          deadline_s=$(( now_s + 20 * 60 - 210 ))
+          echo "LIGHTHOUSE_JOB_DEADLINE_EPOCH_MS=$(( deadline_s * 1000 ))" >> "$GITHUB_ENV"
+          echo "Lighthouse collect hard deadline epoch ms: $(( deadline_s * 1000 ))"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.authorize-production.outputs.expected_sha }}
@@ -583,7 +593,7 @@ jobs:
           EXPECTED_COMMIT_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           LIGHTHOUSE_SENSITIVE_VALUES_FILE: ${{ runner.temp }}/lighthouse-sensitive-values
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: node scripts/lighthouse-retry.mjs -- pnpm --filter @jovie/web exec lhci collect --config="$RUNNER_TEMP/lighthouse-production-exact.json"
+        run: node scripts/lighthouse-production-collect.mjs --config="$RUNNER_TEMP/lighthouse-production-exact.json"
       - name: Assert Lighthouse production budgets
         run: pnpm --filter @jovie/web exec lhci assert --config="$RUNNER_TEMP/lighthouse-production-exact.json"
       - name: Validate and upload hash-sealed Lighthouse evidence
