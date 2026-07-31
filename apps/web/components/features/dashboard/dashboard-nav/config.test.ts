@@ -11,7 +11,7 @@ const CANONICAL_NAVIGATION = [
   ['inbox', 'Inbox', APP_ROUTES.DASHBOARD],
   ['library', 'Library', APP_ROUTES.LIBRARY],
   ['contacts', 'Contacts', APP_ROUTES.CONTACTS],
-  ['profiles', 'Profiles', APP_ROUTES.PROFILES],
+  ['profiles', 'Connections', APP_ROUTES.PROFILES],
   ['calendar', 'Calendar', APP_ROUTES.CALENDAR],
   ['tasks', 'Tasks', APP_ROUTES.TASKS],
 ] as const;
@@ -21,7 +21,7 @@ function toContract(items: readonly (typeof primaryNavigation)[number][]) {
 }
 
 describe('canonical customer shell navigation', () => {
-  it('keeps New Chat as the elevated first action and Profiles in the canonical order', () => {
+  it('keeps New Chat as the elevated first action and Connections in the canonical order', () => {
     expect(toContract(primaryNavigation)).toEqual(CANONICAL_NAVIGATION);
     expect(primaryNavigation[0].tone).toBe('primary');
   });
@@ -50,7 +50,7 @@ describe('canonical customer shell navigation', () => {
     }
   });
 
-  it('excludes retired primary destinations while preserving the Profiles route', () => {
+  it('excludes retired primary destinations while preserving the Connections route', () => {
     const ids = primaryNavigation.map(item => item.id);
     const labels = primaryNavigation.map(item => item.name);
 

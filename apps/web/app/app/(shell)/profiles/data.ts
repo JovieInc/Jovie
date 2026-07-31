@@ -34,6 +34,8 @@ export type ProfilesWorkspaceFilter =
   | 'dsp'
   | 'social'
   | 'source'
+  | 'website'
+  | 'jovie'
   | 'connector';
 
 export interface ProfileWorkspaceSurfaceRow {
@@ -64,6 +66,7 @@ export interface ProfileWorkspaceConnectorRow {
   readonly handle: string | null;
   readonly url: string;
   readonly status: SettingsConnectorState['status'];
+  readonly monitoringState: 'active' | 'paused' | 'unavailable';
   readonly primaryIssue: string;
   readonly primaryAction: 'connect' | 'reconnect' | 'open';
 }
@@ -201,11 +204,16 @@ function connectorRow(
     handle: state.email ?? null,
     url: APP_ROUTES.SETTINGS_CONNECTORS,
     status: state.status,
-    primaryIssue: connected
-      ? 'Connected'
+    monitoringState: connected
+      ? 'active'
       : needsReconnect
-        ? 'Reconnect required'
-        : 'Not connected',
+        ? 'paused'
+        : 'unavailable',
+    primaryIssue: connected
+      ? 'Active'
+      : needsReconnect
+        ? 'Reconnect Required'
+        : 'Not Connected',
     primaryAction: connected
       ? 'open'
       : needsReconnect
@@ -343,20 +351,32 @@ export async function loadProfilesWorkspaceData(input: {
     const rank = rankFor(surface.id, latestRun?.id);
     const preference = preferenceBySurface.get(surface.id);
     const locked = surface.kind !== 'jovie' && !preference;
+    const monitoringState =
+      surface.availability !== 'eligible'
+        ? 'unavailable'
+        : surface.kind === 'jovie' || preference === 'active'
+          ? 'active'
+          : preference === 'paused'
+            ? 'paused'
+            : 'locked';
     const qualificationStatus =
       surface.qualificationStatus as ProfileQualificationStatus;
     const primaryIssue =
       qualificationStatus === 'conflicting'
-        ? 'Identity conflict'
+        ? 'Needs Review'
         : qualificationStatus === 'suggested'
-          ? 'Qualification required'
+          ? 'Needs Qualification'
           : locked
-            ? 'Monitoring limit'
-            : rank === null
-              ? latestRun
-                ? 'Not on page one'
-                : 'Not measured'
-              : 'No issues';
+            ? 'Limit Reached'
+            : monitoringState === 'unavailable'
+              ? 'Unavailable'
+              : monitoringState === 'paused'
+                ? 'Paused'
+                : rank === null
+                  ? latestRun
+                    ? 'Not Found'
+                    : 'Not Measured'
+                  : 'Active';
     const trackedUrl =
       socialSourceIds.has(surface.id) &&
       resolveSocialShortcutPlatforms(surface.platform) &&
@@ -377,14 +397,7 @@ export async function loadProfilesWorkspaceData(input: {
       trackedUrl,
       qualificationStatus,
       isOfficial: surface.isOfficial,
-      monitoringState:
-        surface.availability !== 'eligible'
-          ? 'unavailable'
-          : surface.kind === 'jovie' || preference === 'active'
-            ? 'active'
-            : preference === 'paused'
-              ? 'paused'
-              : 'locked',
+      monitoringState,
       rank: redactLockedRank(locked, rank),
       previousRank: redactLockedRank(
         locked,
