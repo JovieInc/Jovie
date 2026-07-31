@@ -200,3 +200,154 @@ export async function updateDesignLabLinearIssueStatus(
     return false;
   }
 }
+
+export interface DesignLabLinearArtifactLink {
+  readonly issueIdentifier: string;
+  readonly dispatchId: string;
+  readonly surfaceId: string;
+  readonly surfaceName: string;
+  readonly proposalId: string;
+  readonly proposalText: string;
+  readonly amendmentNotes: string | null;
+  readonly artifactRelativePath: string;
+  readonly dispatchRelativePath: string;
+  /**
+   * Optional HTTPS URL for Linear attachment unfurl (e.g. GitHub blob/tree URL
+   * once the artifact is committed, or an operator UI deep link). When omitted,
+   * only a durable comment is written.
+   */
+  readonly artifactUrl: string | null;
+}
+
+function buildDispatchLinkCommentBody(
+  params: DesignLabLinearArtifactLink
+): string {
+  const notesLine = params.amendmentNotes?.trim()
+    ? `- Amendment notes: ${params.amendmentNotes.trim()}`
+    : null;
+  const proposalPreview = params.proposalText.trim().slice(0, 500);
+  const proposalEllipsis = params.proposalText.trim().length > 500 ? '…' : '';
+
+  return [
+    '## Design HTML builder dispatched',
+    '',
+    'Approved Design Lab proposal routed to `/design-html`.',
+    '',
+    `- Surface: **${params.surfaceName}** (\`${params.surfaceId}\`)`,
+    `- Proposal: \`${params.proposalId}\``,
+    `- Dispatch: \`${params.dispatchId}\``,
+    `- Dispatch manifest: \`${params.dispatchRelativePath}\``,
+    `- Artifact directory: \`${params.artifactRelativePath}\``,
+    notesLine,
+    '',
+    '### Approved proposal',
+    '',
+    proposalPreview + proposalEllipsis,
+    '',
+    'The HTML artifact will be written under the artifact directory. When complete, attach the resulting HTML file path back to this issue.',
+  ]
+    .filter((part): part is string => part !== null)
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n');
+}
+
+/**
+ * Links a design-html builder dispatch (and optional public artifact URL) back
+ * to the originating Linear issue. Always best-effort: returns false on any
+ * failure so dispatch success is not blocked by Linear availability.
+ */
+export async function linkDesignLabDispatchToLinearIssue(
+  params: DesignLabLinearArtifactLink
+): Promise<boolean> {
+  if (!env.LINEAR_API_KEY) {
+    logger.warn('[design-lab/linear] LINEAR_API_KEY not configured');
+    return false;
+  }
+
+  try {
+    const issue = await resolveLinearIssue(params.issueIdentifier);
+    if (!issue) {
+      logger.warn('[design-lab/linear] Issue not found for artifact link', {
+        issueIdentifier: params.issueIdentifier,
+        dispatchId: params.dispatchId,
+      });
+      return false;
+    }
+
+    const commentMutation = `
+      mutation CreateDesignLabComment($issueId: String!, $body: String!) {
+        commentCreate(input: { issueId: $issueId, body: $body }) {
+          success
+        }
+      }
+    `;
+
+    const commentResult = await linearGraphql<{
+      commentCreate: { success: boolean };
+    }>(commentMutation, {
+      issueId: issue.id,
+      body: buildDispatchLinkCommentBody(params),
+    });
+
+    if (!commentResult.commentCreate.success) {
+      logger.warn('[design-lab/linear] Comment create returned success=false', {
+        issueIdentifier: params.issueIdentifier,
+        dispatchId: params.dispatchId,
+      });
+      return false;
+    }
+
+    const artifactUrl = params.artifactUrl?.trim() ?? '';
+    if (artifactUrl.length === 0) {
+      return true;
+    }
+
+    const attachmentMutation = `
+      mutation LinkDesignLabArtifact(
+        $issueId: String!
+        $url: String!
+        $title: String!
+        $subtitle: String
+      ) {
+        attachmentLinkURL(
+          issueId: $issueId
+          url: $url
+          title: $title
+          subtitle: $subtitle
+        ) {
+          success
+        }
+      }
+    `;
+
+    const attachmentResult = await linearGraphql<{
+      attachmentLinkURL: { success: boolean };
+    }>(attachmentMutation, {
+      issueId: issue.id,
+      url: artifactUrl,
+      title: `Design HTML: ${params.surfaceName}`,
+      subtitle: `dispatch ${params.dispatchId}`,
+    });
+
+    if (!attachmentResult.attachmentLinkURL.success) {
+      logger.warn(
+        '[design-lab/linear] attachmentLinkURL returned success=false',
+        {
+          issueIdentifier: params.issueIdentifier,
+          dispatchId: params.dispatchId,
+        }
+      );
+      // Comment already persisted; treat partial success as true for operators.
+      return true;
+    }
+
+    return true;
+  } catch (error) {
+    logger.error('[design-lab/linear] Failed to link design-html dispatch', {
+      issueIdentifier: params.issueIdentifier,
+      dispatchId: params.dispatchId,
+      error,
+    });
+    return false;
+  }
+}
