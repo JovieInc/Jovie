@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  copyFileSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -9,6 +10,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { afterEach, describe, expect, it } from 'vitest';
 import { diagnoseCiFailure } from '../../../../../scripts/hermes/jobs/ci-failure-diagnosis';
 
@@ -16,6 +18,37 @@ const repoRoot = resolve(import.meta.dirname, '../../../../..');
 const readHostFile = (name: string) =>
   readFileSync(resolve(repoRoot, '.github/runner-host', name), 'utf8');
 const temporaryDirectories: string[] = [];
+const HARNESS_PROCESS_BUDGET_MS = 10_000;
+const fakeSystemctlFunction = `
+systemctl() {
+  printf '%s\\n' "$$" >> "\${FAKE_PROCESSES}"
+  if [[ -n "\${FAKE_EVENTS:-}" ]]; then
+    printf 'systemctl %s\\n' "$*" >> "\${FAKE_EVENTS}"
+  fi
+  if [[ "$1" == "show" && "$2" == "ci-runner-autoscaler.service" ]]; then
+    echo "\${FAKE_AUTOSCALER_ENVIRONMENT:-AUTOSCALER_MAX_RUNNERS=\${FAKE_MAX_RUNNERS} AUTOSCALER_RUNNER_CPUS=2}"
+  elif [[ "$1" == "show" && "$2" == "ci-runners.slice" && "$4" == "TasksMax" ]]; then
+    cat "\${FAKE_TASKS_MAX_STATE}"
+  elif [[ "$1" == "show" && "$2" == "ci-runners.slice" && "$4" == "TasksCurrent" ]]; then
+    echo "\${FAKE_TASKS_CURRENT}"
+  elif [[ "$1" == "set-property" && "$2" == "ci-runners.slice" ]]; then
+    if [[ -n "\${FAKE_MUTATIONS:-}" ]]; then
+      printf '%s\\n' "$3" >> "\${FAKE_MUTATIONS}"
+    fi
+    printf '%s\\n' "\${3#TasksMax=}" > "\${FAKE_TASKS_MAX_STATE}"
+  elif [[ "$1" == "daemon-reload" ]]; then
+    return 0
+  elif [[ "$1" == "enable" && "$2" == "ci-runner-capacity-reconcile.timer" ]]; then
+    return 0
+  elif [[ "$1" == "start" && "$2" == "ci-runner-capacity-reconcile.timer" ]]; then
+    return 0
+  else
+    printf 'unexpected systemctl call: %s\\n' "$*" >&2
+    return 91
+  fi
+}
+export -f systemctl
+`;
 
 afterEach(() => {
   for (const directory of temporaryDirectories.splice(0)) {
@@ -34,48 +67,41 @@ const runReconciler = ({
 }) => {
   const directory = mkdtempSync(resolve(tmpdir(), 'runner-capacity-'));
   temporaryDirectories.push(directory);
-  const systemctl = resolve(directory, 'systemctl');
   const state = resolve(directory, 'tasks-max');
   const mutations = resolve(directory, 'mutations');
+  const processes = resolve(directory, 'processes');
   writeFileSync(state, `${maximum}\n`);
-  writeFileSync(
-    systemctl,
-    `#!/usr/bin/env bash
-set -euo pipefail
-if [[ "$1" == "show" && "$2" == "ci-runner-autoscaler.service" ]]; then
-  echo "AUTOSCALER_MAX_RUNNERS=\${FAKE_MAX_RUNNERS} AUTOSCALER_RUNNER_CPUS=2"
-elif [[ "$1" == "show" && "$2" == "ci-runners.slice" && "$4" == "TasksMax" ]]; then
-  cat "\${FAKE_TASKS_MAX_STATE}"
-elif [[ "$1" == "show" && "$2" == "ci-runners.slice" && "$4" == "TasksCurrent" ]]; then
-  echo "\${FAKE_TASKS_CURRENT}"
-elif [[ "$1" == "set-property" && "$2" == "ci-runners.slice" ]]; then
-  printf '%s\\n' "$3" >> "\${FAKE_MUTATIONS}"
-  printf '%s\\n' "\${3#TasksMax=}" > "\${FAKE_TASKS_MAX_STATE}"
-else
-  printf 'unexpected systemctl call: %s\\n' "$*" >&2
-  exit 91
-fi
-`
-  );
-  chmodSync(systemctl, 0o755);
+  writeFileSync(processes, '');
+  const startedAt = performance.now();
   const result = spawnSync(
-    resolve(repoRoot, '.github/runner-host/reconcile-capacity.sh'),
-    [],
+    '/bin/bash',
+    [
+      '-c',
+      `${fakeSystemctlFunction}
+exec "$1"
+`,
+      'runner-capacity-test',
+      resolve(repoRoot, '.github/runner-host/reconcile-capacity.sh'),
+    ],
     {
       encoding: 'utf8',
       env: {
         ...process.env,
         FAKE_MAX_RUNNERS: maxRunners,
         FAKE_MUTATIONS: mutations,
+        FAKE_PROCESSES: processes,
         FAKE_TASKS_CURRENT: current,
         FAKE_TASKS_MAX_STATE: state,
-        PATH: `${directory}:${process.env.PATH ?? ''}`,
       },
     }
   );
   return {
     ...result,
+    durationMs: performance.now() - startedAt,
     effectiveMaximum: readFileSync(state, 'utf8').trim(),
+    mockProcessIds: [
+      ...new Set(readFileSync(processes, 'utf8').trim().split('\n')),
+    ].filter(Boolean),
     mutations: readFileSync(mutations, { encoding: 'utf8', flag: 'a+' }),
   };
 };
@@ -93,78 +119,63 @@ const runInstaller = ({
 }) => {
   const directory = mkdtempSync(resolve(tmpdir(), 'runner-installer-'));
   temporaryDirectories.push(directory);
-  const binDirectory = resolve(directory, 'bin');
   const installRoot = resolve(directory, 'root');
   const events = resolve(directory, 'events');
+  const processes = resolve(directory, 'processes');
   const state = resolve(directory, 'tasks-max');
-  mkdirSync(binDirectory, { recursive: true });
   mkdirSync(resolve(installRoot, 'etc/systemd/system'), { recursive: true });
   writeFileSync(events, '');
+  writeFileSync(processes, '');
   writeFileSync(state, `${maximum}\n`);
-
-  const install = resolve(binDirectory, 'install');
-  writeFileSync(
-    install,
-    `#!/usr/bin/env bash
-set -euo pipefail
-printf 'install %s\\n' "$*" >> "\${FAKE_EVENTS}"
-exec /usr/bin/install "$@"
-`
-  );
-  chmodSync(install, 0o755);
-
-  const systemctl = resolve(binDirectory, 'systemctl');
-  writeFileSync(
-    systemctl,
-    `#!/usr/bin/env bash
-set -euo pipefail
-printf 'systemctl %s\\n' "$*" >> "\${FAKE_EVENTS}"
-if [[ "$1" == "show" && "$2" == "ci-runner-autoscaler.service" ]]; then
-  echo "\${FAKE_AUTOSCALER_ENVIRONMENT}"
-elif [[ "$1" == "show" && "$2" == "ci-runners.slice" && "$4" == "TasksMax" ]]; then
-  cat "\${FAKE_TASKS_MAX_STATE}"
-elif [[ "$1" == "show" && "$2" == "ci-runners.slice" && "$4" == "TasksCurrent" ]]; then
-  echo "\${FAKE_TASKS_CURRENT}"
-elif [[ "$1" == "set-property" && "$2" == "ci-runners.slice" ]]; then
-  printf '%s\\n' "\${3#TasksMax=}" > "\${FAKE_TASKS_MAX_STATE}"
-elif [[ "$1" == "daemon-reload" ]]; then
-  exit 0
-elif [[ "$1" == "enable" && "$2" == "ci-runner-capacity-reconcile.timer" ]]; then
-  exit 0
-elif [[ "$1" == "start" && "$2" == "ci-runner-capacity-reconcile.timer" ]]; then
-  exit 0
-else
-  printf 'unexpected systemctl call: %s\\n' "$*" >&2
-  exit 91
-fi
-`
-  );
-  chmodSync(systemctl, 0o755);
 
   const installer = resolve(
     repoRoot,
     '.github/runner-host/install-capacity-contract.sh'
   );
+  const installedScripts = resolve(
+    installRoot,
+    'usr/local/libexec/jovie-runner-host'
+  );
+  mkdirSync(installedScripts, { recursive: true });
+  for (const script of ['diagnose-capacity.sh', 'reconcile-capacity.sh']) {
+    copyFileSync(
+      resolve(repoRoot, '.github/runner-host', script),
+      resolve(installedScripts, script)
+    );
+    chmodSync(resolve(installedScripts, script), 0o755);
+  }
+  const startedAt = performance.now();
   const result = spawnSync(
-    mode === 'stage' ? installer : '/bin/bash',
-    mode === 'stage'
-      ? ['--apply']
-      : [
-          '-c',
-          'source "$1"; apply_live_contract "$2"',
-          'runner-installer-test',
-          installer,
-          installRoot,
-        ],
+    '/bin/bash',
+    [
+      '-c',
+      `${fakeSystemctlFunction}
+install() {
+  printf '%s\\n' "$$" >> "\${FAKE_PROCESSES}"
+  printf 'install %s\\n' "$*" >> "\${FAKE_EVENTS}"
+}
+export -f install
+source "$1"
+if [[ "$2" == "stage" ]]; then
+  main --apply
+else
+  apply_live_contract "$3"
+fi
+`,
+      'runner-installer-test',
+      installer,
+      mode,
+      installRoot,
+    ],
     {
       encoding: 'utf8',
       env: {
         ...process.env,
         FAKE_AUTOSCALER_ENVIRONMENT: autoscalerEnvironment,
         FAKE_EVENTS: events,
+        FAKE_PROCESSES: processes,
         FAKE_TASKS_CURRENT: current,
         FAKE_TASKS_MAX_STATE: state,
-        PATH: `${binDirectory}:${process.env.PATH ?? ''}`,
         ...(mode === 'stage' ? { RUNNER_HOST_INSTALL_ROOT: installRoot } : {}),
       },
     }
@@ -172,7 +183,11 @@ fi
 
   return {
     ...result,
+    durationMs: performance.now() - startedAt,
     events: readFileSync(events, 'utf8').trim().split('\n').filter(Boolean),
+    mockProcessIds: [
+      ...new Set(readFileSync(processes, 'utf8').trim().split('\n')),
+    ].filter(Boolean),
   };
 };
 
@@ -286,6 +301,11 @@ describe('Gem runner process-capacity contract', () => {
   it('starts the timer and preserves a saturated reconciliation failure', () => {
     const result = runInstaller({ current: '1700', maximum: '2048' });
 
+    expect(
+      result.durationMs,
+      `installer saturation harness took ${result.durationMs.toFixed(0)}ms`
+    ).toBeLessThan(HARNESS_PROCESS_BUDGET_MS);
+    expect(result.mockProcessIds).toHaveLength(3);
     expect(result.status).toBe(1);
     expect(result.stdout).toContain('runner_tasks_status=warning');
     expect(result.events).toContain(
@@ -361,6 +381,11 @@ describe('Gem runner process-capacity contract', () => {
   it('alerts without mutation on genuine saturation at the reviewed ceiling', () => {
     const result = runReconciler({ current: '1700', maximum: '2048' });
 
+    expect(
+      result.durationMs,
+      `reconciler saturation harness took ${result.durationMs.toFixed(0)}ms`
+    ).toBeLessThan(HARNESS_PROCESS_BUDGET_MS);
+    expect(result.mockProcessIds).toHaveLength(1);
     expect(result.status).toBe(1);
     expect(result.stdout).toContain('runner_capacity_reconciliation=no-op');
     expect(result.stdout).toContain('runner_tasks_status=warning');
