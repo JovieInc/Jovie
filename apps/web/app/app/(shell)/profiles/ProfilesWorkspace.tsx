@@ -244,6 +244,7 @@ function ConnectionRail({
       isOpen={row !== null}
       ariaLabel='Connection details'
       scrollStrategy='shell'
+      workspaceSurface='raised'
       headerMode='minimal'
       hideMinimalHeaderBar
       isEmpty={!row}
@@ -287,7 +288,11 @@ function ConnectionRail({
     >
       {row ? (
         <div className='space-y-2'>
-          <DrawerSection title='Connection' className='space-y-2'>
+          <DrawerSection
+            title='Connection'
+            sectionKind='facts'
+            className='space-y-2'
+          >
             <RailMetric label='Type' value={kindLabel(row)} />
             <RailMetric label='Status' value={getConnectionStatus(row).label} />
             <RailMetric
@@ -305,54 +310,56 @@ function ConnectionRail({
             <RailMetric label='Change' value={rankChange} />
           </DrawerSection>
           {row.rowType === 'surface' && row.trackedUrl ? (
-            <DrawerSection title='Tracked Redirect'>
+            <DrawerSection title='Tracked Redirect' sectionKind='links'>
               <div className='break-all rounded-md bg-surface-0 px-2.5 py-2 text-xs text-secondary-token'>
                 {row.trackedUrl}
               </div>
             </DrawerSection>
           ) : null}
-          <DrawerSection title='Next Best Action'>
+          <DrawerSection title='Next Best Action' sectionKind='status'>
             <p className='text-xs leading-5 text-secondary-token'>
               {getConnectionStatus(row).nextAction}
             </p>
           </DrawerSection>
-          <div
-            className={cn(
-              'grid gap-2 px-1',
-              primaryAction === 'open' ? 'grid-cols-1' : 'grid-cols-2'
-            )}
-          >
-            <Button asChild variant='secondary' size='sm'>
-              <Link
-                href={row.url}
-                target={row.url.startsWith('http') ? '_blank' : undefined}
-                rel={row.url.startsWith('http') ? 'noreferrer' : undefined}
-              >
-                <ExternalLink className='h-3.5 w-3.5' /> Open
-              </Link>
-            </Button>
-            {primaryAction !== 'open' ? (
-              <Button asChild size='sm'>
+          <DrawerSection sectionKind='details'>
+            <div
+              className={cn(
+                'grid gap-2 px-1',
+                primaryAction === 'open' ? 'grid-cols-1' : 'grid-cols-2'
+              )}
+            >
+              <Button asChild variant='secondary' size='sm'>
                 <Link
-                  href={
-                    primaryAction === 'upgrade'
-                      ? APP_ROUTES.SETTINGS_BILLING
-                      : row.rowType === 'connector'
-                        ? APP_ROUTES.SETTINGS_CONNECTORS
-                        : APP_ROUTES.SETTINGS_ARTIST_PROFILE
-                  }
+                  href={row.url}
+                  target={row.url.startsWith('http') ? '_blank' : undefined}
+                  rel={row.url.startsWith('http') ? 'noreferrer' : undefined}
                 >
-                  {primaryAction === 'upgrade'
-                    ? 'Upgrade'
-                    : primaryAction === 'connect'
-                      ? 'Connect'
-                      : primaryAction === 'reconnect'
-                        ? 'Reconnect'
-                        : 'Review'}
+                  <ExternalLink className='h-3.5 w-3.5' /> Open
                 </Link>
               </Button>
-            ) : null}
-          </div>
+              {primaryAction !== 'open' ? (
+                <Button asChild size='sm'>
+                  <Link
+                    href={
+                      primaryAction === 'upgrade'
+                        ? APP_ROUTES.SETTINGS_BILLING
+                        : row.rowType === 'connector'
+                          ? APP_ROUTES.SETTINGS_CONNECTORS
+                          : APP_ROUTES.SETTINGS_ARTIST_PROFILE
+                    }
+                  >
+                    {primaryAction === 'upgrade'
+                      ? 'Upgrade'
+                      : primaryAction === 'connect'
+                        ? 'Connect'
+                        : primaryAction === 'reconnect'
+                          ? 'Reconnect'
+                          : 'Review'}
+                  </Link>
+                </Button>
+              ) : null}
+            </div>
+          </DrawerSection>
         </div>
       ) : null}
     </EntitySidebarShell>

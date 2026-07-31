@@ -40,6 +40,8 @@ export interface EntitySidebarShellProps {
    * their content insets when enabled.
    */
   readonly contentBleed?: boolean;
+  /** A shared, border-free elevation treatment for entity inspector workspaces. */
+  readonly workspaceSurface?: 'flat' | 'raised';
 
   /**
    * Persistent pre-tab region — pinned above tabs in standard mode and above the
@@ -117,6 +119,7 @@ export function EntitySidebarShell({
   headerMode = 'standard',
   hideMinimalHeaderBar = false,
   contentBleed = false,
+  workspaceSurface = 'flat',
   entityHeader,
   entityHeaderSurface = 'card',
   actionsInEntityHeader = false,
@@ -206,8 +209,11 @@ export function EntitySidebarShell({
       data-testid={testId}
     >
       <div
+        data-right-rail-workspace
+        data-surface-variant={workspaceSurface}
         className={cn(
           'flex h-full min-h-0 flex-col gap-1.5',
+          workspaceSurface === 'raised' && 'bg-surface-1 shadow-card',
           !contentBleed && 'px-1.5 py-1.5 lg:px-0 lg:py-0'
         )}
       >
@@ -265,7 +271,9 @@ export function EntitySidebarShell({
               </DrawerSurfaceCard>
             ) : null}
 
-            {minimalEntityHeaderContent}
+            <div data-right-rail-section='identity'>
+              {minimalEntityHeaderContent}
+            </div>
           </div>
         ) : null}
 
@@ -281,7 +289,12 @@ export function EntitySidebarShell({
               className={bodyClassName}
               data-scroll-strategy={scrollStrategy}
             >
-              <div className={bodyChildrenClassName}>{children}</div>
+              <div
+                className={bodyChildrenClassName}
+                data-right-rail-section-stack
+              >
+                {children}
+              </div>
             </div>
 
             {footerNode}

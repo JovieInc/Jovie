@@ -53,6 +53,7 @@ export function AudienceMemberSidebar({
     <EntitySidebarShell
       isOpen={isOpen}
       ariaLabel='Audience member details'
+      workspaceSurface='raised'
       contextMenuItems={contextMenuItems}
       data-testid='audience-member-sidebar'
       onClose={onClose}
@@ -96,6 +97,13 @@ export function AudienceMemberSidebar({
       {member && (
         <DrawerTabbedCard
           testId='audience-member-tabbed-card'
+          sectionKind={
+            activeTab === 'details'
+              ? 'facts'
+              : activeTab === 'activity'
+                ? 'status'
+                : 'details'
+          }
           className='pt-0.5'
           tabs={
             <DrawerTabs

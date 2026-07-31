@@ -44,6 +44,7 @@ export function DspPresenceSidebar({ item, onClose }: DspPresenceSidebarProps) {
       isOpen={isOpen}
       ariaLabel={`${label} profile details`}
       scrollStrategy='shell'
+      workspaceSurface='raised'
       onClose={onClose}
       headerMode='minimal'
       hideMinimalHeaderBar
@@ -150,7 +151,11 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
 
   return (
     <div className='space-y-2'>
-      <DrawerSection title='Match Status' className='space-y-1.5'>
+      <DrawerSection
+        title='Match Status'
+        sectionKind='facts'
+        className='space-y-1.5'
+      >
         <div className='space-y-2'>
           <div className='flex items-center justify-between'>
             <span className='text-xs text-tertiary-token'>Status</span>
@@ -183,29 +188,35 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
         </div>
       </DrawerSection>
 
+      {item.externalArtistUrl ? (
+        <DrawerSection
+          title='Links'
+          sectionKind='links'
+          className='space-y-1.5'
+        >
+          <a
+            href={item.externalArtistUrl}
+            target='_blank'
+            rel='noopener noreferrer'
+            className='flex w-full'
+          >
+            <Button
+              variant='ghost'
+              size='sm'
+              className='h-8 w-full justify-start rounded-full border-subtle bg-surface-0 px-3 text-xs font-caption'
+            >
+              <Icon name='ExternalLink' className='mr-1.5 h-3.5 w-3.5' />
+              View On {label}
+            </Button>
+          </a>
+        </DrawerSection>
+      ) : null}
       <DrawerSection
         title='Actions'
-        className='space-y-1.5 border-t border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] pt-2.5'
+        sectionKind='details'
+        className='space-y-1.5 pt-2.5'
       >
         <div className='space-y-2'>
-          {item.externalArtistUrl && (
-            <a
-              href={item.externalArtistUrl}
-              target='_blank'
-              rel='noopener noreferrer'
-              className='flex w-full'
-            >
-              <Button
-                variant='ghost'
-                size='sm'
-                className='h-8 w-full justify-start rounded-full border-subtle bg-surface-0 px-3 text-xs font-caption'
-              >
-                <Icon name='ExternalLink' className='mr-1.5 h-3.5 w-3.5' />
-                View On {label}
-              </Button>
-            </a>
-          )}
-
           {isSuggested && <SuggestedMatchActions matchId={item.matchId} />}
           {isLinked && !isSuggested && profileId ? (
             <RemovePlatformAction
