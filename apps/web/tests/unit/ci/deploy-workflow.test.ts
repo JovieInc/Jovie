@@ -4297,6 +4297,21 @@ describe('production promotion exact-artifact contract', () => {
     expect(healthEvaluation).toContain(
       'has exact verified production evidence after recheck'
     );
+    // JOV-4442: after success without a marker, wait 30m for artifact lag and
+    // self-verify jov.ie before paging a false manual-recovery incident.
+    expect(healthEvaluation).toContain(
+      'waiting for marker visibility (30m grace)'
+    );
+    expect(healthEvaluation).toContain(
+      'controller_success_prod_current_without_marker'
+    );
+    expect(healthEvaluation).toContain('https://jov.ie/api/version');
+    expect(healthEvaluation).toContain(
+      '(.updated_at | type == "string" and length > 0)'
+    );
+    expect(
+      (healthEvaluation.match(/production-marker-state\.mjs/g) ?? []).length
+    ).toBeGreaterThanOrEqual(2);
     expect(healthEvaluation).toContain(
       'incident controller_completed_without_marker'
     );
@@ -4382,6 +4397,7 @@ describe('production promotion exact-artifact contract', () => {
       'display_title',
       'status',
       'created_at',
+      'updated_at',
     ]) {
       const malformedRun = structuredClone(liveFixture.run);
       delete malformedRun[missingField];
