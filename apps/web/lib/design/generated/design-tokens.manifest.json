@@ -4,9 +4,9 @@
   "divergences": {
     "$description": "Known same-concept/different-value pairs across legacy namespaces, tracked for the namespace-collapse wave. Do NOT silently unify these — each is a visual change requiring its own migration slice.",
     "accent-blue": {
-      "canonical-dark": "#4d7dff",
+      "canonical-dark": "#11afff",
       "linear-marketing": "#2563ff",
-      "note": "--color-accent-blue (dark carbon palette) vs --linear-accent-blue (System A marketing). Unification tracked under the namespace-collapse wave of #12009."
+      "note": "--color-accent-blue dark is Noir Ion electric blue (JOV-4635). --linear-accent-blue remains marketing System A until namespace-collapse."
     }
   },
   "tokens": [
@@ -211,98 +211,98 @@
     {
       "cssVar": "--color-accent-blue",
       "mode": "dark",
-      "value": "#4d7dff",
+      "value": "#11afff",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-blue-subtle",
       "mode": "dark",
-      "value": "rgb(37 99 255 / 0.18)",
+      "value": "rgba(17, 175, 255, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-purple",
       "mode": "dark",
-      "value": "#9b4dff",
+      "value": "#a982ff",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-purple-subtle",
       "mode": "dark",
-      "value": "rgb(139 30 255 / 0.18)",
+      "value": "rgba(169, 130, 255, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-pink",
       "mode": "dark",
-      "value": "#ea4a9c",
+      "value": "#ff48d2",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-pink-subtle",
       "mode": "dark",
-      "value": "rgb(214 26 127 / 0.18)",
+      "value": "rgba(255, 72, 210, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-red",
       "mode": "dark",
-      "value": "#ff4d5f",
+      "value": "#ff677d",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-red-subtle",
       "mode": "dark",
-      "value": "rgb(243 18 45 / 0.18)",
+      "value": "rgba(255, 103, 125, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-orange",
       "mode": "dark",
-      "value": "#ffab2e",
+      "value": "#ffc857",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-orange-subtle",
       "mode": "dark",
-      "value": "rgb(255 152 0 / 0.18)",
+      "value": "rgba(255, 200, 87, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-green",
       "mode": "dark",
-      "value": "#43b85c",
+      "value": "#39e58c",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-green-subtle",
       "mode": "dark",
-      "value": "rgb(47 158 68 / 0.18)",
+      "value": "rgba(57, 229, 140, 0.12)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-teal",
       "mode": "dark",
-      "value": "#22b8a7",
+      "value": "#24f6d2",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },
     {
       "cssVar": "--color-accent-teal-subtle",
       "mode": "dark",
-      "value": "rgb(15 155 142 / 0.18)",
+      "value": "rgba(36, 246, 210, 0.1)",
       "status": "canonical",
       "emittedBy": "styles/design-system.css"
     },

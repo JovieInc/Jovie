@@ -204,7 +204,7 @@ Defined primarily in `apps/web/styles/linear-tokens.css` and consumed through cl
 - `--linear-app-shell-gap: 8px`
 - `--linear-app-shell-radius: 12px`
 - `--linear-app-content-surface: var(--linear-bg-surface-0)` in light mode,
-  `#0a0c0f` in dark mode
+  `#0a0d16` (Noir Ion panel) in dark mode
 - `--linear-app-audio-bar-max-height: 120px`
 - `--linear-app-audio-compact-height: 64px`
 
