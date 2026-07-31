@@ -11,6 +11,10 @@ describe('getBreadcrumbLabel', () => {
     expect(getBreadcrumbLabel('dashboard')).toBe('Dashboard');
   });
 
+  it('returns "Connections" for the internal profiles route', () => {
+    expect(getBreadcrumbLabel('profiles')).toBe('Connections');
+  });
+
   it('returns "New Chat" for the app root segment', () => {
     expect(getBreadcrumbLabel('app')).toBe('New Chat');
   });

@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   SquarePen,
   UserCircle,
+  Waypoints,
 } from 'lucide-react';
 
 import { APP_ROUTES } from '@/constants/routes';
@@ -68,11 +69,11 @@ export const contactsNavItem: NavItem = {
 };
 
 export const profilesNavItem: NavItem = {
-  name: 'Profiles',
+  name: 'Connections',
   href: APP_ROUTES.PROFILES,
   id: 'profiles',
-  icon: UserCircle,
-  description: 'Manage artist profiles and connected identities',
+  icon: Waypoints,
+  description: 'Monitor artist identities and connected services',
 };
 
 export const calendarNavItem: NavItem = {

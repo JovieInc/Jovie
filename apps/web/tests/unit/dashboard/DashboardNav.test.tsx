@@ -23,7 +23,7 @@ const CANONICAL_NAV = [
   ['Inbox', APP_ROUTES.DASHBOARD],
   ['Library', APP_ROUTES.LIBRARY],
   ['Contacts', APP_ROUTES.CONTACTS],
-  ['Profiles', APP_ROUTES.PROFILES],
+  ['Connections', APP_ROUTES.PROFILES],
   ['Calendar', APP_ROUTES.CALENDAR],
   ['Tasks', APP_ROUTES.TASKS],
 ] as const;
@@ -89,7 +89,7 @@ describe('DashboardNav', () => {
       expect(queryByRole('button', { name: label })).toBeNull();
     }
 
-    expect(getByRole('link', { name: 'Profiles' })).toHaveAttribute(
+    expect(getByRole('link', { name: 'Connections' })).toHaveAttribute(
       'href',
       APP_ROUTES.PROFILES
     );

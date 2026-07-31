@@ -1,4 +1,6 @@
+import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ProfilesWorkspaceData } from './data';
@@ -30,8 +32,6 @@ const data: ProfilesWorkspaceData = {
       rank: 2,
       previousRank: 4,
       lastObservedAt: '2026-07-16T00:00:00.000Z',
-      primaryIssue: 'No issues',
-      primaryAction: 'open',
     },
     {
       id: 'spotify',
@@ -48,8 +48,6 @@ const data: ProfilesWorkspaceData = {
       rank: 7,
       previousRank: 9,
       lastObservedAt: '2026-07-16T00:00:00.000Z',
-      primaryIssue: 'Monitoring limit',
-      primaryAction: 'upgrade',
     },
     {
       id: 'gmail',
@@ -60,8 +58,7 @@ const data: ProfilesWorkspaceData = {
       handle: 'tim@example.com',
       url: '/app/settings/connectors',
       status: 'connected',
-      primaryIssue: 'Connected',
-      primaryAction: 'open',
+      monitoringState: 'active',
     },
   ],
   monitoringLimit: 5,
@@ -72,9 +69,17 @@ const data: ProfilesWorkspaceData = {
   providerAvailable: true,
 };
 
+function renderWorkspace(workspaceData: ProfilesWorkspaceData | null) {
+  return render(
+    <TooltipProvider>
+      <ProfilesWorkspace data={workspaceData} />
+    </TooltipProvider>
+  );
+}
+
 describe('ProfilesWorkspace', () => {
   it('uses the canonical empty state with a direct artist-profile action', () => {
-    render(<ProfilesWorkspace data={null} />);
+    renderWorkspace(null);
 
     expect(
       screen.getByTestId('profiles-workspace-empty-state')
@@ -87,21 +92,93 @@ describe('ProfilesWorkspace', () => {
     ).toHaveAttribute('href', '/app/settings/artist-profile');
   });
 
-  it('filters the unified table without exposing locked rank values', () => {
-    render(<ProfilesWorkspace data={data} />);
+  it('renders a connection summary and filters without exposing locked ranks', async () => {
+    renderWorkspace(data);
 
     expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
     expect(screen.getByText('Jovie Profile')).toBeInTheDocument();
     expect(screen.getByText('Spotify')).toBeInTheDocument();
     expect(screen.queryByText('7')).not.toBeInTheDocument();
-    expect(screen.getByText('1 of 5 monitored')).toBeInTheDocument();
+    expect(screen.getByText('3 Connections')).toBeInTheDocument();
+    expect(screen.getByText('Monitored 1/5')).toBeInTheDocument();
+    expect(screen.getByText('Needs Attention 1')).toBeInTheDocument();
+    expect(screen.getByText('Monitoring Active')).toBeInTheDocument();
+    const typeTrigger = screen.getByRole('button', {
+      name: 'DSP connection type',
+    });
+    expect(typeTrigger).toBeInTheDocument();
+    fireEvent.focus(typeTrigger);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'DSP connection'
+    );
+    expect(screen.getByText('Requires Upgrade')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'DSP' }));
+    fireEvent.click(screen.getByRole('button', { name: 'DSPs' }));
     expect(screen.getByText('Spotify')).toBeInTheDocument();
     expect(screen.queryByText('Jovie Profile')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Connectors' }));
     expect(screen.getByText('Gmail')).toBeInTheDocument();
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('opens connection-specific details from the row action', () => {
+    renderWorkspace(data);
+
+    const action = screen.getByRole('button', {
+      name: 'Actions for Spotify',
+    });
+    expect(action.parentElement).toHaveClass('sm:opacity-0');
+
+    fireEvent.click(action);
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    expect(panel).not.toBeNull();
+
+    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+    expect(
+      screen.getByRole('complementary', { name: 'Connection details' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Next Best Action')).toBeInTheDocument();
+    expect(
+      screen.getByText('Upgrade the monitoring limit to track this connection.')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Upgrade' })).toHaveAttribute(
+      'href',
+      '/app/settings/billing'
+    );
+  });
+
+  it('clears connection details when the table filter changes', () => {
+    renderWorkspace(data);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Actions for Spotify' })
+    );
+    expect(
+      vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0]
+    ).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Connectors' }));
+    expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
+  });
+
+  it('preserves the compact mobile table contract', () => {
+    renderWorkspace(data);
+
+    expect(screen.getByRole('columnheader', { name: 'Rank' })).toHaveClass(
+      'max-md:hidden'
+    );
+    expect(screen.getByRole('columnheader', { name: 'Change' })).toHaveClass(
+      'max-lg:hidden'
+    );
+    expect(
+      screen.getByRole('columnheader', { name: 'Monitoring' })
+    ).toHaveClass('max-xl:hidden');
+    expect(screen.getByText('tim@example.com')).toHaveClass('max-sm:hidden');
+
+    const summary = screen.getByTestId('connections-summary');
+    expect(summary.parentElement).toHaveClass('overflow-x-auto');
+    expect(screen.getByText('Best Rank #2')).toHaveClass('max-sm:hidden');
+    expect(screen.getByText('Monitoring Active')).toHaveClass('max-sm:hidden');
   });
 });
