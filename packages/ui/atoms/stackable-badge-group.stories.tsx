@@ -81,11 +81,7 @@ export const LongPrimaryLabel: Story = {
 
 export const WithDisabledItem: Story = {
   args: {
-    items: [
-      ITEMS[0],
-      { ...ITEMS[1], disabled: true },
-      ITEMS[2],
-    ],
+    items: [ITEMS[0], { ...ITEMS[1], disabled: true }, ITEMS[2]],
     maxVisible: 3,
   },
 };

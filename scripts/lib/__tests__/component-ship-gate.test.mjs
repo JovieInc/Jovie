@@ -1,7 +1,8 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { checkChangedComponents } from '../../component-ship-gate.mjs';
 import {
   checkStoryMatchesComponent,
   extractRequiredPropNames,
@@ -9,7 +10,6 @@ import {
   listComponentsInRoot,
   measureRootCoverage,
 } from '../../component-ship-policy.mjs';
-import { checkChangedComponents } from '../../component-ship-gate.mjs';
 import {
   compareCoverage,
   compareRootCoverage,
@@ -39,13 +39,15 @@ function fixtureRepo(tree) {
 describe('component-ship-policy scope', () => {
   it('includes shippable surfaces and excludes tests/stories/utils', () => {
     expect(isUnderShipScope('packages/ui/atoms/button.tsx')).toBe(true);
-    expect(isUnderShipScope('apps/web/components/molecules/ArtistCard.tsx')).toBe(
-      true
+    expect(
+      isUnderShipScope('apps/web/components/molecules/ArtistCard.tsx')
+    ).toBe(true);
+    expect(
+      isUnderShipScope('apps/web/components/marketing/MarketingHero.tsx')
+    ).toBe(true);
+    expect(isUnderShipScope('packages/ui/atoms/button.stories.tsx')).toBe(
+      false
     );
-    expect(isUnderShipScope('apps/web/components/marketing/MarketingHero.tsx')).toBe(
-      true
-    );
-    expect(isUnderShipScope('packages/ui/atoms/button.stories.tsx')).toBe(false);
     expect(isUnderShipScope('packages/ui/atoms/button.test.tsx')).toBe(false);
     expect(isUnderShipScope('packages/ui/hooks/useX.tsx')).toBe(false);
     expect(isUnderShipScope('apps/web/app/(marketing)/page.tsx')).toBe(false);
@@ -59,7 +61,8 @@ describe('component-ship-policy scope', () => {
         "import { Button } from './button';\nexport default { component: Button };\n",
       'packages/ui/atoms/button.test.tsx':
         "import { Button } from './button';\n",
-      'packages/ui/atoms/orphan.tsx': 'export function Orphan() { return null }\n',
+      'packages/ui/atoms/orphan.tsx':
+        'export function Orphan() { return null }\n',
     });
     const list = listComponentsInRoot('packages/ui/atoms', root);
     expect(list.map(c => c.component).sort()).toEqual(['button', 'orphan']);
@@ -97,9 +100,9 @@ describe('story match checks', () => {
       storyRel: 'apps/web/components/atoms/Widget.stories.tsx',
     });
     expect(bad.ok).toBe(false);
-    expect(bad.findings.some(f => f.rule === 'story-must-cover-required-props')).toBe(
-      true
-    );
+    expect(
+      bad.findings.some(f => f.rule === 'story-must-cover-required-props')
+    ).toBe(true);
 
     const goodStory = `
       import { Widget } from './Widget';
@@ -150,7 +153,9 @@ describe('diff gate', () => {
     // check using relative paths by writing into repo-shaped tree and invoking
     // the exported checker with mocked read via process.cwd isolation is heavy.
     // Instead re-run match + scope which are the pure contract.
-    expect(isUnderShipScope('apps/web/components/atoms/NewThing.tsx')).toBe(true);
+    expect(isUnderShipScope('apps/web/components/atoms/NewThing.tsx')).toBe(
+      true
+    );
     const m = measureRootCoverage('apps/web/components/atoms', root);
     expect(m.total).toBe(1);
     expect(m.covered).toBe(0);
@@ -159,14 +164,15 @@ describe('diff gate', () => {
 
   it('reports missing test/story for changed components in a fixture root', () => {
     const root = fixtureRepo({
-      'packages/ui/atoms/Bare.tsx':
-        'export function Bare() { return null }\n',
+      'packages/ui/atoms/Bare.tsx': 'export function Bare() { return null }\n',
       'packages/ui/atoms/Bare.stories.tsx':
         "import { Bare } from './Bare';\nexport default { component: Bare };\nexport const Default = {};\n",
     });
     // Direct path existence checks via list
     const list = listComponentsInRoot('packages/ui/atoms', root);
-    const bare = list.find(c => c.component === 'Bare' || c.component === 'bare');
+    const bare = list.find(
+      c => c.component === 'Bare' || c.component === 'bare'
+    );
     // basename preserves case from file Bare.tsx
     expect(list.some(c => !c.tested)).toBe(true);
     expect(list.some(c => c.covered)).toBe(true);
@@ -191,7 +197,13 @@ describe('multi-root ratchet', () => {
     const rootBaseline = { percent: 0, covered: 0, total: 5, uncovered: 5 };
     expect(
       compareRootCoverage(
-        { percent: 0, covered: 0, total: 6, uncovered: 6, uncoveredComponents: [] },
+        {
+          percent: 0,
+          covered: 0,
+          total: 6,
+          uncovered: 6,
+          uncoveredComponents: [],
+        },
         rootBaseline,
         'apps/web/components/marketing'
       ).ok
@@ -199,7 +211,13 @@ describe('multi-root ratchet', () => {
 
     expect(
       compareRootCoverage(
-        { percent: 0, covered: 0, total: 5, uncovered: 5, uncoveredComponents: [] },
+        {
+          percent: 0,
+          covered: 0,
+          total: 5,
+          uncovered: 5,
+          uncoveredComponents: [],
+        },
         rootBaseline,
         'apps/web/components/marketing'
       ).ok

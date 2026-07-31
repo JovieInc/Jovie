@@ -23,13 +23,11 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   checkStoryMatchesComponent,
-  isStoryFile,
-  isTestFile,
   isUnderShipScope,
   normalizeRepoPath,
   parseCoverageVia,
-  readText,
   REPO_ROOT,
+  readText,
   resolveCoverageViaPath,
   verifyCoverageVia,
 } from './component-ship-policy.mjs';
@@ -49,7 +47,8 @@ function parseArgs(argv) {
     json: false,
   };
   for (const arg of argv) {
-    if (arg.startsWith('--diff-base=')) flags.diffBase = arg.slice('--diff-base='.length);
+    if (arg.startsWith('--diff-base='))
+      flags.diffBase = arg.slice('--diff-base='.length);
     else if (arg === '--skip-quality') flags.skipQuality = true;
     else if (arg === '--skip-ratchet') flags.skipRatchet = true;
     else if (arg === '--json') flags.json = true;
@@ -99,7 +98,10 @@ function changedFiles(diffBase) {
 
 function findAdjacentArtifacts(sourceRel) {
   const dir = dirname(sourceRel);
-  const base = sourceRel.split('/').pop().replace(/\.tsx$/i, '');
+  const base = sourceRel
+    .split('/')
+    .pop()
+    .replace(/\.tsx$/i, '');
   const storyCandidates = [
     `${dir}/${base}.stories.tsx`,
     `${dir}/${base}.stories.ts`,
@@ -325,7 +327,9 @@ function printReport(report) {
       `[component-ship-gate] changed components: ${diff.changedComponents.length}`
     );
     for (const issue of diff.issues ?? []) {
-      console.error(`::error file=${issue.path}::[${issue.rule}] ${issue.detail}`);
+      console.error(
+        `::error file=${issue.path}::[${issue.rule}] ${issue.detail}`
+      );
       console.error(`- ${issue.path}: [${issue.rule}] ${issue.detail}`);
     }
     if (diff.ok) {

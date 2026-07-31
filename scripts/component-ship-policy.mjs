@@ -73,9 +73,7 @@ const EXCLUDE_BASENAME_SUFFIXES = [
 
 const EXCLUDE_BASENAME_PATTERNS = [
   /^use[A-Z]/, // hooks colocated as .tsx are rare; still exclude use*
-  /Lazy$/,
-  /Loader$/,
-  /Fallback$/,
+  /Lazy$/, // dynamic import wrappers, not product compositions
 ];
 
 export function normalizeRepoPath(filePath) {
@@ -128,7 +126,10 @@ export function isUnderShipScope(relPath) {
 export function coverageRootForPath(relPath) {
   const p = normalizeRepoPath(relPath);
   if (p.startsWith('packages/ui/atoms/')) return 'packages/ui/atoms';
-  if (p.startsWith('packages/ui/') && !p.slice('packages/ui/'.length).includes('/')) {
+  if (
+    p.startsWith('packages/ui/') &&
+    !p.slice('packages/ui/'.length).includes('/')
+  ) {
     return 'packages/ui';
   }
   for (const root of COVERAGE_ROOTS) {
@@ -201,10 +202,16 @@ export function listComponentsInRoot(rootRel, repoRoot = REPO_ROOT) {
       const testAbs = bucket.tests.get(src.base.toLowerCase()) ?? null;
       const sourceRel = normalizeRepoPath(relative(repoRoot, src.abs));
       // For packages/ui root, skip anything that slipped under atoms via misconfig
-      if (rootRel === 'packages/ui' && sourceRel.startsWith('packages/ui/atoms/')) {
+      if (
+        rootRel === 'packages/ui' &&
+        sourceRel.startsWith('packages/ui/atoms/')
+      ) {
         continue;
       }
-      if (rootRel !== 'packages/ui' && rootRel !== coverageRootForPath(sourceRel)) {
+      if (
+        rootRel !== 'packages/ui' &&
+        rootRel !== coverageRootForPath(sourceRel)
+      ) {
         // When walking organisms/, keep nested paths under that root only
         if (!sourceRel.startsWith(`${rootRel}/`) && sourceRel !== rootRel) {
           continue;
@@ -236,7 +243,8 @@ export function measureRootCoverage(rootRel, repoRoot = REPO_ROOT) {
   const total = components.length;
   const covered = components.filter(c => c.covered).length;
   const tested = components.filter(c => c.tested).length;
-  const percent = total === 0 ? 100 : Math.round((covered / total) * 10000) / 100;
+  const percent =
+    total === 0 ? 100 : Math.round((covered / total) * 10000) / 100;
   return {
     root: rootRel,
     total,
@@ -244,7 +252,9 @@ export function measureRootCoverage(rootRel, repoRoot = REPO_ROOT) {
     tested,
     uncovered: total - covered,
     percent,
-    uncoveredComponents: components.filter(c => !c.covered).map(c => c.sourceRel),
+    uncoveredComponents: components
+      .filter(c => !c.covered)
+      .map(c => c.sourceRel),
     untestedComponents: components.filter(c => !c.tested).map(c => c.sourceRel),
     components,
   };
@@ -269,8 +279,7 @@ export function measureAllRoots(repoRoot = REPO_ROOT) {
 export function extractRequiredPropNames(sourceText) {
   const props = new Set();
   // Match interface/type blocks that look like *Props
-  const blockRe =
-    /(?:interface|type)\s+\w*Props\w*\s*(?:=\s*)?\{([\s\S]*?)\}/g;
+  const blockRe = /(?:interface|type)\s+\w*Props\w*\s*(?:=\s*)?\{([\s\S]*?)\}/g;
   let block;
   while ((block = blockRe.exec(sourceText)) !== null) {
     const body = block[1];
@@ -279,7 +288,8 @@ export function extractRequiredPropNames(sourceText) {
       if (!m) continue;
       const [, name, optional] = m;
       if (optional === '?') continue;
-      if (name === 'children' || name === 'className' || name === 'key') continue;
+      if (name === 'children' || name === 'className' || name === 'key')
+        continue;
       props.add(name);
     }
   }
@@ -298,9 +308,7 @@ export function extractExportedComponentNames(sourceText) {
     names.push(m[1]);
   }
   // export { Foo as Bar }
-  const named = sourceText.matchAll(
-    /export\s*\{([^}]+)\}/g
-  );
+  const named = sourceText.matchAll(/export\s*\{([^}]+)\}/g);
   for (const block of named) {
     for (const part of block[1].split(',')) {
       const bit = part.trim();
@@ -319,8 +327,7 @@ export function extractExportedComponentNames(sourceText) {
 export function extractUncoveredPropsAllowlist(storyText) {
   const out = new Set();
   // parameters: { jovie: { uncoveredProps: ['a', "b"] } }
-  const re =
-    /uncoveredProps\s*:\s*\[([^\]]*)\]/g;
+  const re = /uncoveredProps\s*:\s*\[([^\]]*)\]/g;
   let m;
   while ((m = re.exec(storyText)) !== null) {
     for (const raw of m[1].split(',')) {
@@ -351,18 +358,16 @@ export function checkStoryMatchesComponent({
 
   // Import must reference the component module (not a hand-rolled fork).
   const importOk =
-    new RegExp(
-      `from\\s+['"][^'"]*${escapeRegExp(componentBase)}['"]`
-    ).test(storySource) ||
+    new RegExp(`from\\s+['"][^'"]*${escapeRegExp(componentBase)}['"]`).test(
+      storySource
+    ) ||
     primaryNames.some(name =>
       new RegExp(
         `import\\s*\\{[^}]*\\b${escapeRegExp(name)}\\b[^}]*\\}\\s*from`
       ).test(storySource)
     ) ||
     primaryNames.some(name =>
-      new RegExp(
-        `import\\s+${escapeRegExp(name)}\\s+from`
-      ).test(storySource)
+      new RegExp(`import\\s+${escapeRegExp(name)}\\s+from`).test(storySource)
     );
 
   if (!importOk) {
@@ -411,8 +416,9 @@ export function checkStoryMatchesComponent({
     const hasProp =
       new RegExp(`\\b${hint.prop}\\??\\s*:`).test(componentSource) ||
       new RegExp(`\\b${hint.prop}\\b`).test(
-        componentSource.match(/interface[\s\S]*?Props[\s\S]*?\{[\s\S]*?\}/)?.[0] ??
-          ''
+        componentSource.match(
+          /interface[\s\S]*?Props[\s\S]*?\{[\s\S]*?\}/
+        )?.[0] ?? ''
       );
     if (!hasProp) continue;
     if (allowlist.has(hint.prop)) continue;
@@ -436,13 +442,15 @@ function escapeRegExp(s) {
  * Format: // @coverage-via path/relative/to/repo/or/colocated
  */
 export function parseCoverageVia(componentSource) {
-  const m = componentSource.match(
-    /@coverage-via\s+([^\s*]+)/
-  );
+  const m = componentSource.match(/@coverage-via\s+([^\s*]+)/);
   return m ? m[1].trim() : null;
 }
 
-export function resolveCoverageViaPath(via, componentRel, repoRoot = REPO_ROOT) {
+export function resolveCoverageViaPath(
+  via,
+  componentRel,
+  repoRoot = REPO_ROOT
+) {
   if (!via) return null;
   if (via.startsWith('.')) {
     return normalizeRepoPath(join(dirname(componentRel), via));

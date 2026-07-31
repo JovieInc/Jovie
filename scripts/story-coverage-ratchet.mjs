@@ -98,7 +98,11 @@ export function loadBaseline(path = BASELINE_PATH) {
  */
 export function normalizeBaseline(baseline) {
   if (!baseline || typeof baseline !== 'object') {
-    return { ok: false, errors: ['baseline must be an object'], baseline: null };
+    return {
+      ok: false,
+      errors: ['baseline must be an object'],
+      baseline: null,
+    };
   }
   if (baseline.schemaVersion === 2 && baseline.roots) {
     return { ok: true, errors: [], baseline };
@@ -113,7 +117,10 @@ export function normalizeBaseline(baseline) {
           percent: baseline.percent,
           covered: baseline.covered,
           total: baseline.total,
-          uncovered: Math.max(0, (baseline.total ?? 0) - (baseline.covered ?? 0)),
+          uncovered: Math.max(
+            0,
+            (baseline.total ?? 0) - (baseline.covered ?? 0)
+          ),
         };
       } else {
         roots[root] = { percent: 0, covered: 0, total: 0, uncovered: 0 };
@@ -152,7 +159,11 @@ export function validateBaseline(baseline) {
     errors.push('roots must be an object');
   } else {
     for (const [root, entry] of Object.entries(b.roots)) {
-      if (typeof entry.percent !== 'number' || entry.percent < 0 || entry.percent > 100) {
+      if (
+        typeof entry.percent !== 'number' ||
+        entry.percent < 0 ||
+        entry.percent > 100
+      ) {
         errors.push(`${root}: percent must be in [0, 100]`);
       }
       if (!Number.isInteger(entry.covered) || entry.covered < 0) {
@@ -176,17 +187,22 @@ export function compareRootCoverage(measurement, baselineEntry, root) {
     baselineEntry?.uncovered ??
     Math.max(0, (baselineEntry?.total ?? 0) - (baselineEntry?.covered ?? 0));
 
+  const measuredUncovered =
+    typeof measurement.uncovered === 'number'
+      ? measurement.uncovered
+      : Math.max(0, (measurement.total ?? 0) - (measurement.covered ?? 0));
+
   const percentOk = measurement.percent + 1e-9 >= baselinePercent;
-  const uncoveredOk = measurement.uncovered <= baselineUncovered + 1e-9;
+  const uncoveredOk = measuredUncovered <= baselineUncovered + 1e-9;
   const ok = percentOk && uncoveredOk;
 
   let message;
   if (ok) {
-    message = `${root}: ${measurement.percent}% >= ${baselinePercent}% (${measurement.covered}/${measurement.total}, uncovered ${measurement.uncovered} <= ${baselineUncovered})`;
+    message = `${root}: ${measurement.percent}% >= ${baselinePercent}% (${measurement.covered}/${measurement.total}, uncovered ${measuredUncovered} <= ${baselineUncovered})`;
   } else if (!percentOk) {
     message = `${root}: story coverage regressed ${measurement.percent}% < baseline ${baselinePercent}% (${measurement.covered}/${measurement.total})`;
   } else {
-    message = `${root}: uncovered count rose ${measurement.uncovered} > baseline ${baselineUncovered} (new components need stories)`;
+    message = `${root}: uncovered count rose ${measuredUncovered} > baseline ${baselineUncovered} (new components need stories)`;
   }
 
   return {
@@ -194,7 +210,7 @@ export function compareRootCoverage(measurement, baselineEntry, root) {
     root,
     measuredPercent: measurement.percent,
     baselinePercent,
-    measuredUncovered: measurement.uncovered,
+    measuredUncovered,
     baselineUncovered,
     measuredCovered: measurement.covered,
     measuredTotal: measurement.total,
@@ -214,14 +230,17 @@ export function compareCoverage(measurement, baseline) {
     if (!validation.ok) {
       throw new Error(`Invalid baseline: ${validation.errors.join('; ')}`);
     }
-    const atomBaseline =
-      validation.baseline.roots?.['packages/ui/atoms'] ?? {
-        percent: baseline.percent,
-        covered: baseline.covered,
-        total: baseline.total,
-        uncovered: Math.max(0, (baseline.total ?? 0) - (baseline.covered ?? 0)),
-      };
-    const result = compareRootCoverage(measurement, atomBaseline, 'packages/ui/atoms');
+    const atomBaseline = validation.baseline.roots?.['packages/ui/atoms'] ?? {
+      percent: baseline.percent,
+      covered: baseline.covered,
+      total: baseline.total,
+      uncovered: Math.max(0, (baseline.total ?? 0) - (baseline.covered ?? 0)),
+    };
+    const result = compareRootCoverage(
+      measurement,
+      atomBaseline,
+      'packages/ui/atoms'
+    );
     return {
       ok: result.ok,
       measuredPercent: result.measuredPercent,
@@ -354,8 +373,8 @@ if (isMain) {
 }
 
 export {
+  COVERAGE_ROOTS,
   listComponentsInRoot,
   measureAllRoots,
   measureRootCoverage,
-  COVERAGE_ROOTS,
 };

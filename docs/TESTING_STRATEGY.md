@@ -287,7 +287,7 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | Job | Gate stage | Tier | Local remediation command |
 | --- | --- | --- | --- |
 | `Path Changes` | both | fast-gate | `git diff --name-only origin/main...HEAD` |
-| `ci-fast` | both | fast-gate | `pnpm run typecheck && pnpm run biome:check` |
+| `ci-fast` | both | fast-gate | `pnpm run typecheck && pnpm run biome:check && pnpm component-ship-gate` |
 | `CI Risk Classifier` | both | structural-contract | `pnpm ci:harness:check` |
 | `Secret Scan (gitleaks + trufflehog)` | both | fast-gate | `./scripts/security/scan-secrets.sh ci-pr origin/main` |
 | `Migration Guard` | both | fast-gate | `cd apps/web && ./scripts/check-migrations.sh && ./scripts/validate-migrations.sh` |
