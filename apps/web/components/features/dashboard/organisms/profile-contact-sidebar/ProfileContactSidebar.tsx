@@ -1132,6 +1132,7 @@ export function ProfileContactSidebar() {
         isOpen={isOpen}
         ariaLabel='Profile Contact'
         data-testid='profile-contact-sidebar-skeleton'
+        workspaceSurface='raised'
         headerMode='minimal'
         hideMinimalHeaderBar
         contentBleed
@@ -1198,6 +1199,7 @@ export function ProfileContactSidebar() {
         isOpen={isOpen}
         ariaLabel='Profile Preview'
         data-testid='profile-contact-sidebar'
+        workspaceSurface='raised'
         headerMode='minimal'
         hideMinimalHeaderBar
         contentBleed
@@ -1218,6 +1220,7 @@ export function ProfileContactSidebar() {
       isOpen={isOpen}
       ariaLabel='Profile Contact'
       data-testid='profile-contact-sidebar'
+      workspaceSurface='raised'
       headerMode='minimal'
       hideMinimalHeaderBar
       entityHeaderSurface='flat'
@@ -1234,6 +1237,7 @@ export function ProfileContactSidebar() {
       {emailSignatureModal}
       <DrawerTabbedCard
         testId='profile-contact-tabbed-card'
+        sectionKind='details'
         className='mt-2.5'
         tabs={
           <DrawerTabs

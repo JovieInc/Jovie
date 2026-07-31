@@ -304,6 +304,7 @@ export function TrackSidebar({
       width={width}
       ariaLabel='Track details'
       data-testid='track-sidebar'
+      workspaceSurface='raised'
       onClose={onClose}
       headerMode='minimal'
       hideMinimalHeaderBar={Boolean(track)}
@@ -322,9 +323,12 @@ export function TrackSidebar({
                 onClick={handleBackToRelease}
               />
             ) : null}
-            <DrawerSurfaceCard variant='card' className='overflow-hidden p-3.5'>
+            <DrawerSurfaceCard
+              variant='card'
+              className='overflow-hidden p-3'
+              testId='track-header-card'
+            >
               <EntityHeaderCard
-                eyebrow='Track'
                 title={track.title}
                 stableLayout
                 titleLineClamp={1}
@@ -348,11 +352,11 @@ export function TrackSidebar({
                   <DrawerMediaThumb
                     src={track.releaseArtworkUrl}
                     alt={`${track.releaseTitle} artwork`}
-                    dimension={72}
-                    sizeClassName='h-18 w-18 rounded-xl'
-                    sizes='72px'
+                    dimension={44}
+                    sizeClassName='h-11 w-11 rounded-lg'
+                    sizes='44px'
                     fallback={
-                      <div className='h-18 w-18 rounded-xl bg-surface-1' />
+                      <div className='h-11 w-11 rounded-lg bg-surface-0' />
                     }
                   />
                 }
@@ -407,6 +411,7 @@ export function TrackSidebar({
       {track ? (
         <DrawerTabbedCard
           testId='track-tabbed-card'
+          sectionKind='details'
           tabs={
             <DrawerTabs
               value={activeTab}

@@ -111,6 +111,11 @@ describe('AudienceMemberSidebar', () => {
     expect(
       screen.getByRole('button', { name: 'More actions' })
     ).toBeInTheDocument();
+    expect(
+      screen
+        .getByTestId('audience-member-header-card')
+        .querySelector('.size-12')
+    ).toBeInTheDocument();
   });
 
   it('renders location and visit count in meta slot', () => {

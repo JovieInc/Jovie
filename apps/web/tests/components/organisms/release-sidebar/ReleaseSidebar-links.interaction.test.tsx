@@ -616,7 +616,7 @@ describe('ReleaseSidebar inspector cards', () => {
     const header = screen.getByTestId('release-header-card');
     expect(
       within(header).getByRole('heading', { name: mockRelease.title })
-    ).toHaveClass('line-clamp-2', 'min-h-11');
+    ).toHaveClass('text-sm', 'line-clamp-1', 'min-h-6');
     expect(
       screen.getByTestId('drawer-hero-meta-slot').firstElementChild
     ).toHaveClass('overflow-x-auto', 'whitespace-nowrap');
@@ -712,6 +712,14 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(
       screen.queryByTestId('release-credits-card-stack')
     ).not.toBeInTheDocument();
+
+    const header = screen.getByTestId('release-header-card');
+    const analytics = screen.getByTestId('analytics');
+    const details = screen.getByTestId('release-tabbed-card');
+    expect(header).toContainElement(analytics);
+    expect(
+      header.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 
   it('switches between Overview, Links, and Tasks tabs', async () => {

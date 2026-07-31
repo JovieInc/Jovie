@@ -17,11 +17,13 @@ type DrawerHeroMetaOverflow = 'wrap' | 'scroll';
 export interface DrawerHeroProps {
   /** Title row (release title, track title, contact name, etc.). */
   readonly title: string;
+  /** Compact rail density keeps identity subordinate to the summary and tabs. */
+  readonly density?: 'hero' | 'rail';
   /** Optional subtitle line — typical pattern is "Artist · Album" or similar. */
   readonly subtitle?: ReactNode;
   /**
-   * Square artwork. Pass a 64–88px image as a ReactNode so callers can use
-   * their preferred image primitive (`next/image`, `<ReleaseArtworkThumb>`, etc.).
+   * Square artwork. Rail density expects a 40–48px image; hero density accepts
+   * 64–88px media. Callers can use their preferred image primitive.
    */
   readonly artwork?: ReactNode;
   /** Status pill (typically `<StatusBadge>` from `@/components/shell/StatusBadge`). */
@@ -217,6 +219,7 @@ function DrawerHeroTrailingSlot({
  */
 export function DrawerHero({
   title,
+  density = 'hero',
   subtitle,
   artwork,
   statusBadge,
@@ -241,6 +244,7 @@ export function DrawerHero({
   testId,
 }: DrawerHeroProps) {
   const hasTopRight = Boolean(statusBadge || onMenu);
+  const isRailDensity = density === 'rail';
   const resolvedTitleLineClamp =
     titleLineClamp ?? (stableLayout ? 2 : undefined);
   const shouldReserveSubtitle = reserveSubtitleSlot ?? stableLayout;
@@ -252,10 +256,13 @@ export function DrawerHero({
     metaOverflow ?? (stableLayout ? 'scroll' : 'wrap');
   return (
     <section
-      className={cn('group/drawer px-3 pt-3 pb-3', className)}
+      className={cn('group/drawer p-3', className)}
+      data-density={density}
       data-testid={testId}
     >
-      <div className='flex items-start gap-3'>
+      <div
+        className={cn('flex items-start', isRailDensity ? 'gap-2.5' : 'gap-3')}
+      >
         <DrawerHeroArtworkSlot
           artwork={artwork}
           onPlay={onPlay}
@@ -263,12 +270,15 @@ export function DrawerHero({
           title={title}
         />
 
-        <div className='flex-1 min-w-0 pt-1'>
+        <div className={cn('min-w-0 flex-1', !isRailDensity && 'pt-1')}>
           <div className='flex items-start gap-2'>
             <h2
               title={title}
               className={cn(
-                'flex-1 min-w-0 text-base font-semibold text-primary-token leading-tight',
+                'min-w-0 flex-1 font-semibold text-primary-token',
+                isRailDensity
+                  ? 'text-sm leading-tight tracking-tight'
+                  : 'text-base leading-tight',
                 resolvedTitleLineClamp &&
                   STABLE_HEADER_LINE_CLAMP_CLASSNAME[resolvedTitleLineClamp],
                 stableLayout &&

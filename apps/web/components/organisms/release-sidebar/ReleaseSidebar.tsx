@@ -598,6 +598,7 @@ export function ReleaseSidebar({
       onKeyDown={handleKeyDown}
       contextMenuItems={contextMenuItems}
       data-testid='release-sidebar'
+      workspaceSurface='raised'
       headerMode='minimal'
       hideMinimalHeaderBar
       entityHeaderSurface='flat'
@@ -643,6 +644,7 @@ export function ReleaseSidebar({
         <div className='space-y-2.5'>
           <DrawerTabbedCard
             testId='release-tabbed-card'
+            sectionKind='details'
             tabs={
               <DrawerTabs
                 value={activeTab}
