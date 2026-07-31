@@ -99,6 +99,28 @@ describe('filterSettingsGroups', () => {
     const ids = groups.flatMap(group => group.items.map(item => item.id));
     expect(ids).not.toContain('admin');
   });
+
+  it('surfaces Ops controls for admins searching operational keywords', () => {
+    const groups = filterSettingsGroups(SETTINGS_SIDEBAR_GROUPS, 'ops', {
+      isAdmin: true,
+    });
+    const ids = groups.flatMap(group => group.items.map(item => item.id));
+    expect(ids).toContain('admin');
+  });
+});
+
+describe('settings Ops controls discovery (JOV-2103)', () => {
+  it('points the admin-only row at the legacy settings admin redirect', () => {
+    const adminItem = SETTINGS_SIDEBAR_GROUPS.flatMap(
+      group => group.items
+    ).find(item => item.id === 'admin');
+
+    expect(adminItem).toBeDefined();
+    expect(adminItem?.label).toBe('Ops Controls');
+    expect(adminItem?.href).toBe(APP_ROUTES.SETTINGS_ADMIN);
+    expect(adminItem?.adminOnly).toBe(true);
+    expect(adminItem?.title).toMatch(/Ops control panel/i);
+  });
 });
 
 describe('isSettingsItemActive', () => {

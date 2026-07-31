@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- **Admin operational toggles live only on Ops (JOV-2103):** waitlist, growth defaults, and environment helpers stay on the Ops control panel; Settings keeps a short “Ops Controls” pointer (with tooltip) that redirects admins to Ops instead of hosting live toggles.
 - [internal] **Merge-group CI event handling hardened (JOV-4446):** Path Changes and Risk Classifier resolve diffs from exact `merge_group` SHAs only (no push/PR field fall-through), empty combined-head diffs fail closed, and `ci-fast` always writes `ci-fast-lanes.json` so the upload step never fails on a missing artifact.
 - [internal] **Customer nav capacity guard with one canonical More menu (JOV-4515):** documented desktop/mobile caps keep approved core destinations on the primary rail, overflow only experimental extras into a single More surface, and promote the active route so it is never hidden.
 - [internal] **Better Auth OAuth token tables cover the pinned provider schema (JOV-4587):** client, access-token, refresh-token, and consent columns now include fields such as `authorizationCodeId`, with a contract test that fails on mapping drift so LYB Apple sign-in can complete `/oauth2/token` exchange.
