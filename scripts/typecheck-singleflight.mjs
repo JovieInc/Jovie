@@ -15,6 +15,10 @@ import {
 } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
+import {
+  evaluateLockRecovery as evaluateLockRecoveryDecision,
+  formatRecoveryLogLine,
+} from './lib/typecheck-singleflight-lock.mjs';
 
 const DEFAULT_POLL_MS = 500;
 const DEFAULT_REUSE_WINDOW_MS = 30_000;
@@ -84,15 +88,14 @@ async function main() {
     }
 
     const existingLock = readJson(lockPath);
-    if (isRecoverableLock(existingLock)) {
-      removeStaleLock(existingLock);
+    const recovery = evaluateLockRecovery(existingLock);
+    if (recovery.recoverable) {
+      removeStaleLock(recovery);
       continue;
     }
 
     if (!announcedWait) {
-      const owner = existingLock?.pid
-        ? `pid ${existingLock.pid}`
-        : 'another process';
+      const owner = recovery.pid ? `pid ${recovery.pid}` : 'another process';
       console.error(
         `[typecheck-singleflight] waiting for ${owner} to finish ${formatCommand(existingLock?.command ?? command)}.`
       );
@@ -239,11 +242,8 @@ function releaseLock() {
   rmSync(lockPath, { force: true });
 }
 
-function removeStaleLock(lock) {
-  const owner = lock?.pid ? `pid ${lock.pid}` : 'unknown pid';
-  console.error(
-    `[typecheck-singleflight] removing stale typecheck lock held by ${owner}.`
-  );
+function removeStaleLock(recovery) {
+  console.error(formatRecoveryLogLine(recovery, formatCommand));
   try {
     unlinkSync(lockPath);
   } catch (error) {
@@ -253,24 +253,18 @@ function removeStaleLock(lock) {
   }
 }
 
-function isRecoverableLock(lock) {
-  if (!lock) {
-    return lockFileAgeMs() > Math.min(staleMs, 5000);
-  }
-
-  // A live owner is authoritative. Long typechecks routinely exceed the stale
-  // threshold under host pressure; age alone must never permit a second owner.
-  if (typeof lock.pid === 'number') {
-    return !isProcessAlive(lock.pid);
-  }
-
-  const ageMs = Date.now() - Number(lock.startedAtMs ?? 0);
-  return Number.isFinite(ageMs) && ageMs > staleMs;
+function evaluateLockRecovery(lock, nowMs = Date.now()) {
+  return evaluateLockRecoveryDecision(lock, {
+    nowMs,
+    staleMs,
+    lockFileAgeMs: readLockFileAgeMs(nowMs),
+    isProcessAlive,
+  });
 }
 
-function lockFileAgeMs() {
+function readLockFileAgeMs(nowMs = Date.now()) {
   try {
-    return Date.now() - statSync(lockPath).mtimeMs;
+    return Math.max(0, nowMs - statSync(lockPath).mtimeMs);
   } catch {
     return 0;
   }
@@ -284,6 +278,8 @@ function isProcessAlive(pid) {
     process.kill(pid, 0);
     return true;
   } catch (error) {
+    // EPERM means the pid exists but we cannot signal it — treat as alive so
+    // we never spawn a duplicate owner for a protected live process.
     return error?.code === 'EPERM';
   }
 }
