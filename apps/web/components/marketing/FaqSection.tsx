@@ -33,7 +33,8 @@ export function FaqSection({
       <h2
         className={cn(
           'faq-section__heading',
-          headingClassName ?? 'marketing-h2-linear text-primary-token'
+          headingClassName ??
+            'system-b-marketing-section-heading text-primary-token'
         )}
       >
         {heading}

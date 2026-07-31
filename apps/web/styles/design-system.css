@@ -11564,6 +11564,77 @@ body:has(.system-b-launch-page) .marketing-glass-header__cta:focus-visible {
 }
 
 /* ============================================
+   SYSTEM B SHARED MARKETING PRIMITIVES
+   ============================================ */
+:where(.system-b-marketing-section-heading) {
+  color: var(--system-b-text-primary);
+  font-family: var(--font-display);
+  font-size: var(--ds-marketing-title-size);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--ds-marketing-title-tracking);
+  line-height: var(--ds-marketing-title-leading);
+  text-wrap: balance;
+}
+
+:where(.system-b-voice-demo) {
+  max-width: calc((var(--space-24) * 4) + var(--space-8) + var(--space-1));
+  background: var(--system-b-bg-surface-1);
+}
+
+:where(.system-b-voice-demo-wave) {
+  background: var(--system-b-bg-surface-0);
+}
+
+:where(.system-b-voice-demo-wave-bar) {
+  height: var(--space-3);
+  background: var(--system-b-text-primary);
+}
+
+:where(.system-b-voice-demo-wave--active .system-b-voice-demo-wave-bar) {
+  animation: system-b-voice-wave 900ms infinite ease-in-out;
+}
+
+:where(
+  .system-b-voice-demo-wave--active .system-b-voice-demo-wave-bar:nth-child(2)
+) {
+  animation-delay: 80ms;
+}
+
+:where(
+  .system-b-voice-demo-wave--active .system-b-voice-demo-wave-bar:nth-child(3)
+) {
+  animation-delay: 160ms;
+}
+
+:where(
+  .system-b-voice-demo-wave--active .system-b-voice-demo-wave-bar:nth-child(4)
+) {
+  animation-delay: 240ms;
+}
+
+:where(
+  .system-b-voice-demo-wave--active .system-b-voice-demo-wave-bar:nth-child(5)
+) {
+  animation-delay: 320ms;
+}
+
+@keyframes system-b-voice-wave {
+  0%,
+  100% {
+    height: calc(var(--space-1) + var(--space-0-5));
+  }
+  50% {
+    height: calc(var(--space-12) + var(--space-1));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.system-b-voice-demo-wave--active .system-b-voice-demo-wave-bar) {
+    animation: none;
+  }
+}
+
+/* ============================================
    SYSTEM B MARKETING HERO PRIMITIVES
    Canonical marketing hero: one hero, dual CTA,
    distributor logo-bar proof. Intentionally no
