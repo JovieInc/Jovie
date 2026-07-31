@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  CUSTOMER_NAV_CAPACITY,
+  desktopMoreNavigation,
+  desktopPrimaryNavigation,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
+  partitionCustomerNavigation,
   primaryNavigation,
 } from './config';
 
@@ -24,6 +28,7 @@ describe('canonical customer shell navigation', () => {
   it('keeps New Chat as the elevated first action and Connections in the canonical order', () => {
     expect(toContract(primaryNavigation)).toEqual(CANONICAL_NAVIGATION);
     expect(primaryNavigation[0].tone).toBe('primary');
+    expect(primaryNavigation.every(item => item.tier === 'core')).toBe(true);
   });
 
   it('detects missing and reordered canonical destinations', () => {
@@ -35,9 +40,13 @@ describe('canonical customer shell navigation', () => {
     );
   });
 
-  it('derives mobile primary + More destinations from the same object identities', () => {
-    expect(mobilePrimaryNavigation).toEqual(primaryNavigation.slice(0, 3));
-    expect(mobileExpandedNavigation).toEqual(primaryNavigation.slice(3));
+  it('derives mobile primary + More destinations from the capacity partition', () => {
+    const partition = partitionCustomerNavigation(primaryNavigation, {
+      visibleCap: CUSTOMER_NAV_CAPACITY.mobilePrimaryVisible,
+    });
+
+    expect(mobilePrimaryNavigation).toEqual(partition.visible);
+    expect(mobileExpandedNavigation).toEqual(partition.more);
     expect([...mobilePrimaryNavigation, ...mobileExpandedNavigation]).toEqual(
       primaryNavigation
     );
@@ -48,6 +57,16 @@ describe('canonical customer shell navigation', () => {
     ].entries()) {
       expect(item).toBe(primaryNavigation[index]);
     }
+  });
+
+  it('keeps the full approved core set on desktop with no More overflow', () => {
+    expect(desktopPrimaryNavigation.map(item => item.id)).toEqual(
+      primaryNavigation.map(item => item.id)
+    );
+    expect(desktopMoreNavigation).toEqual([]);
+    expect(primaryNavigation.length).toBeLessThanOrEqual(
+      CUSTOMER_NAV_CAPACITY.desktopPrimaryVisible
+    );
   });
 
   it('excludes retired primary destinations while preserving the Connections route', () => {

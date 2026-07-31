@@ -1,13 +1,24 @@
+export { CustomerNavMoreMenu } from './CustomerNavMoreMenu';
+export type {
+  CustomerNavCapacityBreakpoint,
+  CustomerNavPartition,
+  PartitionCustomerNavigationOptions,
+} from './config';
 export {
   artistSettingsNavigation,
+  CUSTOMER_NAV_CAPACITY,
   calendarNavItem,
   chatNavItem,
   contactsNavItem,
+  customerNavVisibleCap,
   dashboardHome,
+  desktopMoreNavigation,
+  desktopPrimaryNavigation,
   inboxNavItem,
   libraryNavItem,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
+  partitionCustomerNavigation,
   primaryNavigation,
   settingsNavItem,
   settingsNavigation,
@@ -16,5 +27,9 @@ export {
 } from './config';
 export { DashboardNav } from './DashboardNav';
 export { isLibraryNavigationRoute } from './navigation-state';
-export type { DashboardNavProps, NavItem } from './types';
+export type {
+  CustomerNavTier,
+  DashboardNavProps,
+  NavItem,
+} from './types';
 export { copyToClipboard, fallbackCopy } from './utils';

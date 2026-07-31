@@ -4,9 +4,10 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  CUSTOMER_NAV_CAPACITY,
   isLibraryNavigationRoute,
-  mobileExpandedNavigation,
-  mobilePrimaryNavigation,
+  partitionCustomerNavigation,
+  primaryNavigation,
   settingsNavItem,
 } from '@/features/dashboard/dashboard-nav';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
@@ -26,9 +27,23 @@ function toMenuItem(item: NavItem): LiquidGlassMenuItem {
   return { id: item.id, label: item.name, href: item.href, icon: item.icon };
 }
 
-const PRIMARY_ITEMS = mobilePrimaryNavigation.map(toMenuItem);
-const EXPANDED_ITEMS = mobileExpandedNavigation.map(toMenuItem);
 const UTILITY_ITEMS = [settingsNavItem].map(toMenuItem);
+
+function isMobileNavItemActive(
+  item: Pick<NavItem, 'id' | 'href'>,
+  pathname: string
+): boolean {
+  if (item.id === 'library') {
+    return isLibraryNavigationRoute(pathname);
+  }
+  if (item.href === APP_ROUTES.DASHBOARD) {
+    return pathname === item.href;
+  }
+  if (item.id === 'chat' && item.href === APP_ROUTES.CHAT) {
+    return pathname === APP_ROUTES.CHAT;
+  }
+  return pathname === item.href || pathname.startsWith(`${item.href}/`);
+}
 
 export interface DashboardMobileTabsProps {
   readonly className?: string;
@@ -50,14 +65,32 @@ export function DashboardMobileTabs({
     [isElectron]
   );
 
+  const activeItemId = useMemo(() => {
+    const active = primaryNavigation.find(item =>
+      isMobileNavItemActive(item, pathname)
+    );
+    return active?.id ?? null;
+  }, [pathname]);
+
+  const { primaryItems, expandedItems } = useMemo(() => {
+    const partition = partitionCustomerNavigation(primaryNavigation, {
+      visibleCap: CUSTOMER_NAV_CAPACITY.mobilePrimaryVisible,
+      activeItemId,
+    });
+    return {
+      primaryItems: partition.visible.map(toMenuItem),
+      expandedItems: partition.more.map(toMenuItem),
+    };
+  }, [activeItemId]);
+
   useEffect(() => {
     if (!isMobile) return;
     trackNavigationImpressions(
-      PRIMARY_ITEMS.map(item => item.id),
+      primaryItems.map(item => item.id),
       pathname,
       telemetryContext
     );
-  }, [isMobile, pathname, telemetryContext]);
+  }, [isMobile, pathname, primaryItems, telemetryContext]);
 
   const handleItemActivate = useCallback(
     (
@@ -92,24 +125,15 @@ export function DashboardMobileTabs({
 
   return (
     <LiquidGlassMenu
-      primaryItems={PRIMARY_ITEMS}
-      expandedItems={EXPANDED_ITEMS}
+      primaryItems={primaryItems}
+      expandedItems={expandedItems}
       utilityItems={UTILITY_ITEMS}
       onItemActivate={handleItemActivate}
       onExpandedItemsVisible={handleExpandedItemsVisible}
       onSignOut={handleSignOut}
-      isItemActive={(item, currentPathname) => {
-        if (item.id === 'library') {
-          return isLibraryNavigationRoute(currentPathname);
-        }
-        if (item.href === APP_ROUTES.DASHBOARD) {
-          return currentPathname === item.href;
-        }
-        return (
-          currentPathname === item.href ||
-          currentPathname.startsWith(`${item.href}/`)
-        );
-      }}
+      isItemActive={(item, currentPathname) =>
+        isMobileNavItemActive(item, currentPathname)
+      }
       inFlow
       className={cn('lg:hidden', className)}
     />
