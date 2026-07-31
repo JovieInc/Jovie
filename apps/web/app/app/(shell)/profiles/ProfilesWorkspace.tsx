@@ -393,6 +393,7 @@ export function ProfilesWorkspace({
         header: 'Connection',
         size: 220,
         minSize: 160,
+        meta: { className: 'px-2 sm:px-3' },
         cell: context => {
           const row = context.row.original;
           return (
@@ -414,12 +415,14 @@ export function ProfilesWorkspace({
         id: 'type',
         header: 'Type',
         size: 48,
+        meta: { className: 'px-1 sm:px-3' },
         cell: context => <TypeCell row={context.row.original} />,
       }),
       columnHelper.accessor(row => getConnectionStatus(row).label, {
         id: 'status',
         header: 'Status / Issue',
         size: 140,
+        meta: { className: 'px-1 sm:px-3' },
         cell: context => <StatusCell row={context.row.original} />,
       }),
       columnHelper.display({
@@ -475,6 +478,7 @@ export function ProfilesWorkspace({
         id: 'actions',
         header: () => <span className='sr-only'>Actions</span>,
         size: 44,
+        meta: { className: 'px-1 sm:px-3' },
         cell: context => {
           const row = context.row.original;
           return (
