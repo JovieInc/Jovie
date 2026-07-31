@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, Gauge } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
@@ -72,8 +72,11 @@ export function UsageMenuItem({
         variant='ghost'
         onClick={toggleExpanded}
         aria-expanded={expanded}
-        className='h-auto w-full justify-start gap-2 rounded-none px-2.5 py-2 text-left text-app font-normal text-secondary-token hover:text-secondary-token focus-visible:bg-interactive-hover'
+        className='min-h-8 w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-left text-app font-normal text-secondary-token hover:text-secondary-token focus-visible:bg-interactive-hover'
       >
+        <span className='flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token'>
+          <Gauge className='h-4 w-4' aria-hidden />
+        </span>
         <span className='min-w-0 flex-1'>Usage remaining</span>
         <span className='shrink-0 tabular-nums text-tertiary-token'>
           {isLoading ? (

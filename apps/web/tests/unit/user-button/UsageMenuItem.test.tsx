@@ -41,6 +41,11 @@ describe('UsageMenuItem', () => {
       />
     );
 
+    const usageButton = screen.getByRole('button', {
+      name: /usage remaining/i,
+    });
+    expect(usageButton).toHaveClass('min-h-8');
+    expect(usageButton.querySelector('svg.lucide-gauge')).toBeInTheDocument();
     expect(screen.getByText('Usage remaining')).toBeInTheDocument();
     expect(screen.getByText('10%')).toBeInTheDocument();
   });

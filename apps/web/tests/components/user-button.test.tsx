@@ -664,7 +664,7 @@ describe('UserButton billing actions', () => {
     expect(screen.queryByText('Usage Stats')).not.toBeInTheDocument();
   });
 
-  it('gives narrow identity content its own full-width row and preserves menu focus order', async () => {
+  it('gives identity and help enough width while preserving menu focus order', async () => {
     const longDisplayName =
       'Adele Adkins and the Very Long International Touring Ensemble';
     mockUseUserSafe.mockReturnValue({
@@ -696,10 +696,15 @@ describe('UserButton billing actions', () => {
     );
     expect(identityRow).not.toBeNull();
     expect(screen.getByRole('menu')).toHaveClass(
-      'w-72',
+      'w-80',
       'max-w-[calc(100vw-1rem)]'
     );
-    expect(identityRow).toHaveClass('grid', 'grid-cols-1', 'w-full');
+    expect(identityRow).toHaveClass(
+      'grid',
+      'grid-cols-[minmax(0,1fr)_auto]',
+      'min-h-12',
+      'w-full'
+    );
     expect(identityRow?.querySelectorAll('[role="menuitem"]')).toHaveLength(2);
     expect(identityRow?.querySelector('button, a')).toBeNull();
 
@@ -718,14 +723,14 @@ describe('UserButton billing actions', () => {
       longDisplayName
     );
 
-    // The dropdown's max width protects the full row contract on 390px
-    // screens, while the title keeps the complete identity discoverable.
+    // The responsive max width protects the row contract on 390px screens,
+    // while the wider default keeps ordinary names from clipping.
     expect(screen.getByRole('menu')).toHaveClass('max-w-[calc(100vw-1rem)]');
 
     const helpItem = within(identityRow as HTMLElement).getByRole('menuitem', {
       name: 'Help',
     });
-    expect(helpItem).toHaveClass('min-h-8');
+    expect(helpItem).toHaveClass('min-h-8', 'shrink-0');
     await user.keyboard('{ArrowDown}');
     expect(profileItem).toHaveFocus();
     await user.keyboard('{ArrowDown}');
@@ -741,6 +746,32 @@ describe('UserButton billing actions', () => {
       'noopener,noreferrer'
     );
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('uses spacing instead of visible rules to group account actions', async () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: true, plan: 'pro', hasStripeCustomer: true },
+      isLoading: false,
+      error: null,
+    } as any);
+    const user = userEvent.setup();
+
+    render(<UserButton showUserInfo />);
+    await user.click(screen.getByRole('button', { name: /Adele Adkins/i }));
+
+    const separators = screen.getAllByRole('separator');
+    expect(separators).toHaveLength(4);
+    for (const separator of separators) {
+      expect(separator).toHaveClass('h-2', 'border-0');
+    }
+
+    for (const menuItem of screen.getAllByRole('menuitem')) {
+      if (menuItem.getAttribute('aria-label')?.startsWith('Open profile for')) {
+        expect(menuItem).toHaveClass('min-h-12');
+      } else {
+        expect(menuItem).toHaveClass('min-h-8');
+      }
+    }
   });
 
   it('preserves trigger keyboard and escape-to-close menu semantics', async () => {
