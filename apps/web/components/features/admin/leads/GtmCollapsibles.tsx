@@ -50,6 +50,14 @@ const LeadPipelineControls = dynamic(
   { ssr: false }
 );
 
+const CampaignSettingsPanel = dynamic(
+  () =>
+    import('@/components/features/admin/campaigns/CampaignSettingsPanel').then(
+      m => m.CampaignSettingsPanel
+    ),
+  { ssr: false }
+);
+
 interface AccordionSectionProps {
   readonly title: string;
   readonly isOpen: boolean;
@@ -177,8 +185,9 @@ export function GtmCollapsibles({ initialOpen }: GtmCollapsiblesProps) {
         onToggle={() => toggle(1)}
       >
         {everOpened.has(1) && (
-          <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+          <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
             <LeadPipelineControls hideMainSwitch embedded />
+            <CampaignSettingsPanel />
           </div>
         )}
       </AccordionSection>
