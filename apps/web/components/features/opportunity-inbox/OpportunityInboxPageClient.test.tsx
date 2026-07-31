@@ -144,10 +144,10 @@ describe('OpportunityInboxPageClient', () => {
     );
 
     expect(screen.getByTestId('opportunity-inbox-feed')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Inbox' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Inbox' })).toBeNull();
     expect(
-      screen.getByText('Pending opportunities, ready to accept or dismiss.')
-    ).toBeInTheDocument();
+      screen.queryByText('Pending opportunities, ready to accept or dismiss.')
+    ).toBeNull();
   });
 
   it('renders and filters a verified brand-deal decision', () => {
@@ -219,6 +219,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Inbox' })).toBeNull();
     expect(screen.getByText('Your Inbox Is Clear')).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Connect catalog' })

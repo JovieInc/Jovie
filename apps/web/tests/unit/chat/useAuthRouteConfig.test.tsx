@@ -32,6 +32,16 @@ describe('useAuthRouteConfig', () => {
     expect(result.current.isChatRoute).toBe(true);
   });
 
+  it('uses Inbox as the single shell title for the root opportunity surface', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+
+    const { result } = renderHook(() => useAuthRouteConfig());
+
+    expect(result.current.breadcrumbs).toEqual([
+      { label: 'Inbox', href: APP_ROUTES.DASHBOARD },
+    ]);
+  });
+
   it('preserves non-chat dynamic-style segments as their own label', () => {
     mockUsePathname.mockReturnValue('/app/library/thread-123');
 

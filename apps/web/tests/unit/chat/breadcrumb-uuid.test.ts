@@ -15,8 +15,8 @@ describe('getBreadcrumbLabel', () => {
     expect(getBreadcrumbLabel('profiles')).toBe('Connections');
   });
 
-  it('returns "New Chat" for the app root segment', () => {
-    expect(getBreadcrumbLabel('app')).toBe('New Chat');
+  it('returns "Inbox" for the app root segment', () => {
+    expect(getBreadcrumbLabel('app')).toBe('Inbox');
   });
 
   it('converts unknown kebab-case to sentence case', () => {

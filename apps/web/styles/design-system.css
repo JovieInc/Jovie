@@ -8213,28 +8213,6 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   padding: var(--space-5) var(--space-4) var(--space-8);
 }
 
-:where(.system-b-opportunity-inbox-page-header) {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-:where(.system-b-opportunity-inbox-page-title) {
-  color: var(--color-text-primary-token);
-  font-size: var(--text-lg);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: -0.012em;
-  line-height: 1.2;
-}
-
-:where(.system-b-opportunity-inbox-page-subtitle) {
-  max-width: 62ch;
-  color: var(--color-text-tertiary-token);
-  font-size: var(--text-xs);
-  line-height: 1.55;
-  text-wrap: pretty;
-}
-
 :where(.system-b-opportunity-inbox-feed) {
   display: flex;
   flex-direction: column;
