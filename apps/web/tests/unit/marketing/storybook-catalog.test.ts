@@ -114,10 +114,11 @@ describe('marketing Storybook catalog inventory (JOV-4420)', () => {
     expect(recipesSource).toContain("tags: ['stub']");
   });
 
-  it('story files use the Marketing/* title roots', () => {
-    expect(recipesSource).toContain('title: MARKETING_RECIPE_STORY_ROOT');
-    expect(sectionsSource).toContain('title: MARKETING_SECTION_STORY_ROOT');
-    expect(shellsSource).toContain('title: MARKETING_SHELL_STORY_ROOT');
+  it('story files use the Marketing/* title roots as string literals', () => {
+    // Storybook's CSF indexer requires static string titles (not imported consts).
+    expect(recipesSource).toContain("title: 'Marketing/Recipes'");
+    expect(sectionsSource).toContain("title: 'Marketing/Sections'");
+    expect(shellsSource).toContain("title: 'Marketing/Shells'");
   });
 
   it('inventory receipt counts are stable and non-empty', () => {
