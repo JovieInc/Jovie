@@ -1,17 +1,27 @@
 /**
  * OAuth provider availability guard.
  *
- * Source of truth for which social/OAuth providers are allowed to render in
- * the Clerk auth UI. Providers default to disabled — they only appear when an
- * explicit `NEXT_PUBLIC_CLERK_OAUTH_<PROVIDER>_ENABLED=1` flag is set AND we
- * have evidence credentials are valid (e.g. Clerk dashboard configured).
+ * Source of truth for which social/OAuth providers may render in the auth UI.
+ * Providers default to disabled and only appear when listed in the hardcoded
+ * allowlist below. This is intentional and permanent (JOV-2131 / JOV-2062):
  *
- * Why: Apple OAuth has been shipping broken in production ("invalid client")
- * because nothing stopped the provider button from rendering when credentials
- * were missing. This guard is the single chokepoint for AuthShell, so a
- * provider cannot silently re-appear.
+ * 1. Fail-closed auth UI. An env-var kill-switch that silently evaluates to
+ *    false empties the entire sign-in surface for every user.
+ * 2. Provider enablement is a product + credentials decision (Clerk/Better Auth
+ *    dashboard config, Google/Apple console redirect URIs). Code review is the
+ *    correct control plane — not a Vercel dashboard toggle.
+ * 3. We already tried `NEXT_PUBLIC_CLERK_OAUTH_<PROVIDER>_ENABLED=1` gating
+ *    (PR #8458 dynamic bracket access, then PR #8497 static process.env
+ *    lookups). Production kept every provider hidden even when the vars were
+ *    present in Vercel. Investigation (JOV-2131) showed turbo correctly hashes
+ *    `NEXT_PUBLIC_*` and Next correctly collects them when set at build time —
+ *    the env-gate pattern itself is the wrong chokepoint for this surface.
  *
- * See JOV-2062.
+ * To remove a provider: delete its allowlist case and the corresponding
+ * dashboard config. To add one: add a case only after end-to-end credential
+ * verification (redirect URIs, client secrets, production smoke).
+ *
+ * See JOV-2062, JOV-2131, docs/auth/next-public-oauth-flags.md.
  */
 
 export type ClerkOAuthProvider =
@@ -53,27 +63,12 @@ export function getEnabledAuthOAuthProviders(): readonly PrimaryAuthOAuthProvide
 /**
  * Per-provider enablement check.
  *
- * Reads `NEXT_PUBLIC_CLERK_OAUTH_<PROVIDER>_ENABLED` (must be the literal `'1'`).
- * Anything else — undefined, empty string, `'0'`, `'true'` — keeps the provider
- * off. This is intentional: we fail closed, not open.
- *
- * The flag is `NEXT_PUBLIC_` so it can be read in both server components and
- * client components without an extra round-trip.
- *
- * IMPORTANT: each provider must use a *statically-referenced* `process.env.X`
- * expression. Next.js / webpack DefinePlugin only inlines `NEXT_PUBLIC_*` env
- * vars when the key is referenced as a literal property access. Dynamic
- * `process.env[envKey]` lookups always resolve to `undefined` in client
- * bundles because `process.env` is replaced at build time, not at runtime.
+ * Hardcoded allowlist — do not reintroduce `process.env.NEXT_PUBLIC_*` reads
+ * here. Env-based gates for this surface already failed in production twice
+ * (dynamic access never inlines; static access still left sign-in empty when
+ * build-time truth diverged from dashboard state). See JOV-2131.
  */
 export function isOAuthProviderEnabled(provider: ClerkOAuthProvider): boolean {
-  // Allowlist enabled providers explicitly. We tried env-var gating
-  // (NEXT_PUBLIC_CLERK_OAUTH_<PROVIDER>_ENABLED=1) and the values did not get
-  // inlined into the production build despite being set in Vercel — keeping
-  // the gate as code is the only reliable single chokepoint right now.
-  // JOV-2062 prevention: if a provider needs to be removed in prod, remove
-  // its line here (and the corresponding Clerk dashboard config); do not
-  // re-enable a provider here without verified credentials end-to-end.
   switch (provider) {
     case 'apple':
     case 'google':
