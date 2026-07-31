@@ -4317,6 +4317,27 @@ describe('production promotion exact-artifact contract', () => {
       health.indexOf('gh run rerun "$run_id"')
     );
     expect(health).toContain('incident duplicate_controller_generation');
+    // JOV-4442: concurrency queue:max uses pending/waiting; only completed
+    // controllers may fail closed without a marker. Active statuses wait.
+    expect(healthEvaluation).toContain(
+      '[ "$controller_status" != "completed" ]'
+    );
+    expect(healthEvaluation).not.toContain(
+      '[ "$controller_status" = "queued" ] || [ "$controller_status" = "in_progress" ]'
+    );
+    expect(healthEvaluation).toContain(
+      'waiting for marker visibility (30m grace)'
+    );
+    expect(healthEvaluation).toContain(
+      'controller_success_prod_current_without_marker'
+    );
+    expect(healthEvaluation).toContain('https://jov.ie/api/version');
+    expect(healthEvaluation).toContain('(.updated_at | type == "string")');
+    // Marker is re-classified after a completed controller is observed without
+    // one, so artifact lag cannot false-page.
+    expect(
+      (healthEvaluation.match(/production-marker-state\.mjs/g) ?? []).length
+    ).toBeGreaterThanOrEqual(2);
     expect(healthEvaluation).toContain(
       'policy_state="$(policy_generation_state "$checked_out_sha" "$current_sha")"'
     );
@@ -4382,6 +4403,7 @@ describe('production promotion exact-artifact contract', () => {
       'display_title',
       'status',
       'created_at',
+      'updated_at',
     ]) {
       const malformedRun = structuredClone(liveFixture.run);
       delete malformedRun[missingField];
