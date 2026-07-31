@@ -88,6 +88,18 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/app/chat',
 }));
 
+vi.mock('@tanstack/react-query', async () => {
+  const actual = await vi.importActual<typeof import('@tanstack/react-query')>(
+    '@tanstack/react-query'
+  );
+  return {
+    ...actual,
+    useQueryClient: () => ({
+      invalidateQueries: vi.fn().mockResolvedValue(undefined),
+    }),
+  };
+});
+
 vi.mock('@/lib/sentry/client-lite', () => ({
   addBreadcrumb: mockSentryAddBreadcrumb,
   captureMessage: mockSentryCaptureMessage,
