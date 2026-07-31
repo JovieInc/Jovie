@@ -710,6 +710,48 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       />
     );
     const showDictationBanner = isListening || Boolean(dictationError);
+    const inputRowProps = {
+      containerRef,
+      hiddenDivRef,
+      internalTextareaRef,
+      value,
+      onChange: handleChange,
+      handleKeyDown,
+      onPaste: handlePaste,
+      placeholder,
+      isAtMaxHeight,
+      measuredHeight,
+      reducedMotion,
+      isNearLimit,
+      hasAttachButton,
+      onFileAttach,
+      isFileProcessing,
+      isLoading,
+      isSubmitting,
+      plusMenuOpen,
+      setPlusMenuOpen,
+      handlePreserveFocus,
+      dictationEnabled,
+      isDictationSupported: dictationEnabled && isDictationSupported,
+      isListening,
+      handleMicPushStart,
+      handleMicPushEnd,
+      handleMicToggle,
+      canSend,
+      isStreaming,
+      onSend: handleSendClick,
+      onStop,
+      setIsFocused,
+      setComposerFocused,
+      chips,
+      onRemoveChipAt,
+      isPickerOpen,
+      isRootPickerOpen,
+      pickerListId,
+      pickerActiveRowId,
+      attachDisabledForPicker: isPickerOpen,
+      isHero,
+    } satisfies Omit<InputRowProps, 'hasBorderTop'>;
 
     return (
       <form
@@ -833,50 +875,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     </div>
                   ) : null}
                   <div className='system-b-chat-composer-seam border-t'>
-                    <InputRow
-                      containerRef={containerRef}
-                      hiddenDivRef={hiddenDivRef}
-                      internalTextareaRef={internalTextareaRef}
-                      value={value}
-                      onChange={handleChange}
-                      handleKeyDown={handleKeyDown}
-                      onPaste={handlePaste}
-                      placeholder={placeholder}
-                      isAtMaxHeight={isAtMaxHeight}
-                      measuredHeight={measuredHeight}
-                      reducedMotion={reducedMotion}
-                      isNearLimit={isNearLimit}
-                      hasAttachButton={hasAttachButton}
-                      onFileAttach={onFileAttach}
-                      isFileProcessing={isFileProcessing}
-                      isLoading={isLoading}
-                      isSubmitting={isSubmitting}
-                      plusMenuOpen={plusMenuOpen}
-                      setPlusMenuOpen={setPlusMenuOpen}
-                      handlePreserveFocus={handlePreserveFocus}
-                      dictationEnabled={dictationEnabled}
-                      isDictationSupported={
-                        dictationEnabled && isDictationSupported
-                      }
-                      isListening={isListening}
-                      handleMicPushStart={handleMicPushStart}
-                      handleMicPushEnd={handleMicPushEnd}
-                      handleMicToggle={handleMicToggle}
-                      canSend={canSend}
-                      isStreaming={isStreaming}
-                      onSend={handleSendClick}
-                      onStop={onStop}
-                      setIsFocused={setIsFocused}
-                      setComposerFocused={setComposerFocused}
-                      chips={chips}
-                      onRemoveChipAt={onRemoveChipAt}
-                      isPickerOpen={isPickerOpen}
-                      isRootPickerOpen={isRootPickerOpen}
-                      pickerListId={pickerListId}
-                      pickerActiveRowId={pickerActiveRowId}
-                      attachDisabledForPicker={isPickerOpen}
-                      isHero={isHero}
-                    />
+                    <InputRow {...inputRowProps} />
                   </div>
                 </div>
               </div>
@@ -934,42 +933,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 ) : null}
 
                 <InputRow
-                  containerRef={containerRef}
-                  hiddenDivRef={hiddenDivRef}
-                  internalTextareaRef={internalTextareaRef}
-                  value={value}
-                  onChange={handleChange}
-                  handleKeyDown={handleKeyDown}
-                  onPaste={handlePaste}
-                  placeholder={placeholder}
-                  isAtMaxHeight={isAtMaxHeight}
-                  measuredHeight={measuredHeight}
-                  reducedMotion={reducedMotion}
-                  isNearLimit={isNearLimit}
-                  hasAttachButton={hasAttachButton}
-                  onFileAttach={onFileAttach}
-                  isFileProcessing={isFileProcessing}
-                  isLoading={isLoading}
-                  isSubmitting={isSubmitting}
-                  plusMenuOpen={plusMenuOpen}
-                  setPlusMenuOpen={setPlusMenuOpen}
-                  handlePreserveFocus={handlePreserveFocus}
-                  dictationEnabled={dictationEnabled}
-                  isDictationSupported={
-                    dictationEnabled && isDictationSupported
-                  }
-                  isListening={isListening}
-                  handleMicPushStart={handleMicPushStart}
-                  handleMicPushEnd={handleMicPushEnd}
-                  handleMicToggle={handleMicToggle}
-                  canSend={canSend}
-                  isStreaming={isStreaming}
-                  onSend={handleSendClick}
-                  onStop={onStop}
-                  setIsFocused={setIsFocused}
-                  setComposerFocused={setComposerFocused}
-                  chips={chips}
-                  onRemoveChipAt={onRemoveChipAt}
+                  {...inputRowProps}
                   hasBorderTop={
                     // Add a top separator only when there is surface content
                     // *inside* the surface above the InputRow (entity mode).
@@ -978,12 +942,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     // composer vertically.
                     showEntitySurface
                   }
-                  isPickerOpen={isPickerOpen}
-                  isRootPickerOpen={isRootPickerOpen}
-                  pickerListId={pickerListId}
-                  pickerActiveRowId={pickerActiveRowId}
-                  attachDisabledForPicker={isPickerOpen}
-                  isHero={isHero}
                 />
               </>
             )}
