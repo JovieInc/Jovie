@@ -1030,12 +1030,14 @@ describe('LibrarySurface', () => {
       })
     );
     expect(navigationMock.refresh).toHaveBeenCalledTimes(1);
-    expect(
-      within(screen.getByTestId('library-asset-drawer')).getAllByRole(
-        'button',
-        { name: /Play Preview for Take Me Over/u }
-      ).length
-    ).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(
+        within(screen.getByTestId('library-asset-drawer')).getAllByRole(
+          'button',
+          { name: /Play Preview for Take Me Over/u }
+        ).length
+      ).toBeGreaterThan(0);
+    });
   });
 
   it('opens the read-only asset drawer from list rows', () => {

@@ -36,8 +36,11 @@ interface SidebarNavChromeOptions {
   readonly className?: string;
 }
 
+// Create actions are deliberately not a second selected-nav treatment. Their
+// blue icon and stronger label distinguish creation without competing with the
+// route's neutral active state.
 const SIDEBAR_PRIMARY_CHROME =
-  'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,white_8%)] text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] hover:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_86%,white_14%)]';
+  'text-primary-token font-medium hover:bg-sidebar-accent';
 
 // Active state uses a quiet neutral fill with white type and a Jovie teal icon.
 // Avoid a left rail or guide decoration so every shared sidebar consumer keeps
@@ -96,6 +99,7 @@ export function getSidebarNavIconClassName({
   active,
   nested,
   tight,
+  tone,
   className,
 }: SidebarNavChromeOptions) {
   const inactiveIconColor = nested
@@ -107,7 +111,11 @@ export function getSidebarNavIconClassName({
     tight ? 'h-3 w-3' : 'h-3.5 w-3.5',
     // The selected row deliberately owns white label text. Keep its icon on
     // the canonical Jovie teal token so the active signal remains quiet.
-    active ? 'text-accent-teal!' : inactiveIconColor,
+    active
+      ? 'text-accent-teal!'
+      : tone === 'primary'
+        ? 'text-accent-blue'
+        : inactiveIconColor,
     className
   );
 }

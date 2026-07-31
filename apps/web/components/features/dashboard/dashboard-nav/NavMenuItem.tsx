@@ -280,7 +280,10 @@ export function NavMenuItem({
   const shellInnerContent = (
     <>
       <item.icon
-        className={getSidebarNavIconClassName({ active: isActive })}
+        className={getSidebarNavIconClassName({
+          active: isActive,
+          tone: item.tone,
+        })}
         strokeWidth={2.25}
         aria-hidden='true'
       />

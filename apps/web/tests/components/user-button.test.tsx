@@ -664,7 +664,7 @@ describe('UserButton billing actions', () => {
     expect(screen.queryByText('Usage Stats')).not.toBeInTheDocument();
   });
 
-  it('keeps identity and Help inline as sibling roving-focus menu actions', async () => {
+  it('gives narrow identity content its own full-width row and preserves menu focus order', async () => {
     const longDisplayName =
       'Adele Adkins and the Very Long International Touring Ensemble';
     mockUseUserSafe.mockReturnValue({
@@ -696,15 +696,10 @@ describe('UserButton billing actions', () => {
     );
     expect(identityRow).not.toBeNull();
     expect(screen.getByRole('menu')).toHaveClass(
-      'w-60',
+      'w-72',
       'max-w-[calc(100vw-1rem)]'
     );
-    expect(identityRow).toHaveClass(
-      'grid',
-      'grid-cols-[minmax(0,1fr)_auto]',
-      'min-h-12',
-      'w-full'
-    );
+    expect(identityRow).toHaveClass('grid', 'grid-cols-1', 'w-full');
     expect(identityRow?.querySelectorAll('[role="menuitem"]')).toHaveLength(2);
     expect(identityRow?.querySelector('button, a')).toBeNull();
 
@@ -723,10 +718,14 @@ describe('UserButton billing actions', () => {
       longDisplayName
     );
 
+    // The dropdown's max width protects the full row contract on 390px
+    // screens, while the title keeps the complete identity discoverable.
+    expect(screen.getByRole('menu')).toHaveClass('max-w-[calc(100vw-1rem)]');
+
     const helpItem = within(identityRow as HTMLElement).getByRole('menuitem', {
       name: 'Help',
     });
-    expect(helpItem).toHaveClass('shrink-0');
+    expect(helpItem).toHaveClass('min-h-8');
     await user.keyboard('{ArrowDown}');
     expect(profileItem).toHaveFocus();
     await user.keyboard('{ArrowDown}');
