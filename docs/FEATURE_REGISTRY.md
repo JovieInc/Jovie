@@ -54,7 +54,7 @@ This document is the canonical feature list for Jovie. It is designed for onboar
 | Analytics | AI-powered insights | Shipped | Pro+ | None | Insights dashboard (city growth, markets, momentum) |
 | Analytics | AI crawler intelligence | Shipped | Free teaser / Pro detail | None | Audience dashboard card + detail panel; Cloudflare edge analytics synced daily; Pro unlocks named crawlers and trends (GitHub #12747 P0) |
 | Analytics | Ad pixel tracking | Shipped | Pro+ | None | Entitlement-backed (`canAccessAdPixels`) |
-| Monetization (Planned) | Machine-access revenue share (Pay Per Crawl) | Planned | Pro+ | None | Gated on Cloudflare Pay Per Crawl beta — attribution ledger + Stripe Connect payouts (#12749) |
+| Monetization (Planned) | Machine-access revenue share (Pay Per Crawl) | Planned | Pro+ | None | Gated on Cloudflare Pay Per Crawl beta — attribution ledger + Stripe Connect payouts (#12749). Consent/tax/payout decision package: [machine-access-revenue-share-compliance.md](product/machine-access-revenue-share-compliance.md) (JOV-3831); policy constants `apps/web/lib/monetization/machine-access-payout-policy.ts` |
 | Monetization (Planned) | x402-paid artist datasets / MCP tools | Planned | Pro+ | None | Gated on Cloudflare Monetization Gateway access — spike #12750 |
 | Growth | Contact / subscriber capture | Shipped | Free+ | None | Contact limit varies by plan (100 / unlimited) |
 | Growth | Contact export | Shipped | Pro+ | None | Entitlement-backed (`canExportContacts`) |
