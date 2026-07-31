@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
-- [internal] **Production build-info cannot cache a stale commit after promote (JOV-1958):** `/api/health/*` identity headers now force browser and Vercel CDN no-store after the general API cache rule, and promote still proves the public `jov.ie` alias before release success.
+- [internal] **Machine-access revenue-share compliance package (JOV-3831):** draft decision set (70/30 artist-majority, opt-in default OFF, monthly $10 Connect fiat floor, platform stablecoin off-ramp), consent/ToS language, tax reporting path, and Pay Per Crawl public-docs verification — Tim sign-off still required before P1 build.
 - [internal] **Profile redesign proposal loop (JOV-1951):** Design Lab can generate pending mockup proposals for owned profiles and selected competitor handles; output stays gated by D2 approval before any production or design-system rollout.
 - [internal] **Shared organisms layer is server-import-free (JOV-3506):** ProfileSwitcher switches active profiles via `POST /api/dashboard/profile/switch` instead of importing a dashboard server action, driving the server-imports ratchet baseline to 0.
 - **Authenticated shell adopts Jovie Noir Ion dark color system (JOV-4635):** stepped near-black surfaces, cool graphite borders, and electric-blue (Ion) focus/selection replace the prior carbon dark palette; agent, creative, system, and status accents keep their approved meanings.

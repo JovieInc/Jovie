@@ -28,6 +28,7 @@ Worker template in front of a test asset (press-kit share drop or per-artist MCP
 | Cloudflare x402-proxy template | README + live demo (`/__x402/protected` → 402) |
 | x402 protocol (V2 headers) | [Cloudflare x402 docs](https://developers.cloudflare.com/agents/tools/payments/x402/) |
 | Pay Per Crawl (zone pricing) | [Cloudflare docs](https://developers.cloudflare.com/ai-crawl-control/features/pay-per-crawl/what-is-pay-per-crawl/) — closed beta, one-price-per-zone |
+| Consent / payout policy (JOV-3831) | [machine-access-revenue-share-compliance.md](../product/machine-access-revenue-share-compliance.md) — D4 freezes fiat-only artist settlement |
 | Monetization Gateway | [CF blog 2026-07-01](https://blog.cloudflare.com/monetization-gateway/) — waitlist, rules API |
 | Web Bot Auth | [CF Web Bot Auth](https://developers.cloudflare.com/bots/reference/bot-verification/web-bot-auth/) — RFC 9421 HTTP message signatures |
 | Unit economics | `apps/web/lib/x402-spike/unit-economics.ts` (unit-tested) |
