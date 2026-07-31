@@ -207,6 +207,8 @@
 | `/api/dashboard/pixels/health` | GET | `auth` | Pixel health check |
 | `/api/dashboard/pixels/test-event` | POST | `auth` | Send test pixel event |
 | `/api/dashboard/profile` | GET, PUT | `auth` | GET returns `{ profile }` (the web query adapter also accepts the legacy raw-profile response and normalizes its cache); PUT requires canonical `profileId` with no active-profile fallback, accepts optional integer `expectedVersion`, returns `profile.profileEditVersion`, and returns 409 `VERSION_CONFLICT` for stale writes |
+| `/api/dashboard/profile/create` | POST | `auth` | Create an additional artist profile (displayName + username); wraps `createAdditionalProfile` |
+| `/api/dashboard/profile/switch` | POST | `auth` | Switch the active artist profile by `profileId`; wraps `switchActiveProfile` |
 | `/api/dashboard/releases/artwork-downloads` | POST | `auth` | Toggle allow-artwork-downloads for the active profile |
 | `/api/dashboard/releases/[releaseId]/analytics` | GET | `auth` | Release analytics |
 | `/api/dashboard/releases/[releaseId]/pitch` | POST | `auth` | Generate release pitch |

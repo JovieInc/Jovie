@@ -10,12 +10,16 @@ import {
 import { Check, ChevronDown, Loader2, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
-import { switchActiveProfile } from '@/app/app/(shell)/dashboard/actions/switch-profile';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { toast } from '@/components/feedback';
 import { Avatar } from '@/components/molecules/Avatar';
 import { cn } from '@/lib/utils';
 import { CreateProfileDialog } from './CreateProfileDialog';
+
+interface SwitchProfileResult {
+  success: boolean;
+  error?: string;
+}
 
 export function ProfileSwitcher() {
   const { creatorProfiles, selectedProfile } = useDashboardData();
@@ -34,7 +38,20 @@ export function ProfileSwitcher() {
     if (profileId === selectedProfile?.id) return;
     setSwitchingProfileId(profileId);
     startTransition(async () => {
-      const result = await switchActiveProfile(profileId);
+      let result: SwitchProfileResult;
+      try {
+        const response = await fetch('/api/dashboard/profile/switch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profileId }),
+        });
+        result = (await response.json()) as SwitchProfileResult;
+      } catch {
+        setSwitchingProfileId(null);
+        toast.error("Couldn't switch profile. Try again.");
+        return;
+      }
+
       setSwitchingProfileId(null);
       if (!result.success) {
         toast.error(result.error ?? "Couldn't switch profile. Try again.");

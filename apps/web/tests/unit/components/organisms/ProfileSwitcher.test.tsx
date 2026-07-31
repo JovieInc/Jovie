@@ -4,28 +4,20 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfileSwitcher } from '@/components/organisms/ProfileSwitcher';
 
-const {
-  mockRefresh,
-  mockSwitchActiveProfile,
-  mockToastError,
-  mockUseDashboardData,
-} = vi.hoisted(() => ({
-  mockRefresh: vi.fn(),
-  mockSwitchActiveProfile: vi.fn(),
-  mockToastError: vi.fn(),
-  mockUseDashboardData: vi.fn(),
-}));
+const { mockRefresh, mockToastError, mockUseDashboardData } = vi.hoisted(
+  () => ({
+    mockRefresh: vi.fn(),
+    mockToastError: vi.fn(),
+    mockUseDashboardData: vi.fn(),
+  })
+);
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: mockRefresh }),
 }));
 
-vi.mock('sonner', () => ({
+vi.mock('@/components/feedback', () => ({
   toast: { error: mockToastError },
-}));
-
-vi.mock('@/app/app/(shell)/dashboard/actions/switch-profile', () => ({
-  switchActiveProfile: mockSwitchActiveProfile,
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
@@ -69,6 +61,7 @@ vi.mock('@jovie/ui', () => ({
 describe('ProfileSwitcher sidebar workspace selection', () => {
   const originalLocation = globalThis.location;
   const mockReload = vi.fn();
+  const fetchMock = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -80,7 +73,10 @@ describe('ProfileSwitcher sidebar workspace selection', () => {
       writable: true,
       configurable: true,
     });
-    mockSwitchActiveProfile.mockResolvedValue({ success: true });
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockResolvedValue({
+      json: async () => ({ success: true }),
+    });
     mockUseDashboardData.mockReturnValue({
       creatorProfiles: [
         {
@@ -106,6 +102,7 @@ describe('ProfileSwitcher sidebar workspace selection', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     Object.defineProperty(globalThis, 'location', {
       value: originalLocation,
       writable: true,
@@ -121,8 +118,15 @@ describe('ProfileSwitcher sidebar workspace selection', () => {
     await user.click(screen.getByRole('button', { name: /Beta Artist/ }));
 
     await waitFor(() => {
-      expect(mockSwitchActiveProfile).toHaveBeenCalledWith(
-        '22222222-2222-4222-8222-222222222222'
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/dashboard/profile/switch',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            profileId: '22222222-2222-4222-8222-222222222222',
+          }),
+        })
       );
       expect(mockRefresh).toHaveBeenCalledTimes(1);
     });
@@ -132,9 +136,11 @@ describe('ProfileSwitcher sidebar workspace selection', () => {
 
   it('keeps the shell in place when profile switching fails', async () => {
     const user = userEvent.setup();
-    mockSwitchActiveProfile.mockResolvedValue({
-      error: "Couldn't switch profile. Try again.",
-      success: false,
+    fetchMock.mockResolvedValue({
+      json: async () => ({
+        error: "Couldn't switch profile. Try again.",
+        success: false,
+      }),
     });
 
     render(<ProfileSwitcher />);
@@ -142,9 +148,32 @@ describe('ProfileSwitcher sidebar workspace selection', () => {
     await user.click(screen.getByRole('button', { name: /Beta Artist/ }));
 
     await waitFor(() => {
-      expect(mockSwitchActiveProfile).toHaveBeenCalledWith(
-        '22222222-2222-4222-8222-222222222222'
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/dashboard/profile/switch',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            profileId: '22222222-2222-4222-8222-222222222222',
+          }),
+        })
       );
+      expect(mockToastError).toHaveBeenCalledWith(
+        "Couldn't switch profile. Try again."
+      );
+    });
+    expect(mockRefresh).not.toHaveBeenCalled();
+    expect(mockReload).not.toHaveBeenCalled();
+  });
+
+  it('toasts on network failure without reloading the shell', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockRejectedValue(new Error('network down'));
+
+    render(<ProfileSwitcher />);
+
+    await user.click(screen.getByRole('button', { name: /Beta Artist/ }));
+
+    await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith(
         "Couldn't switch profile. Try again."
       );
