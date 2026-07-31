@@ -6741,7 +6741,10 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
 }
 
 :where(.group\/task-row:focus-visible)
-  :where(.system-b-shell-list-task-row-hover, .system-b-shell-list-task-row-selected) {
+  :where(
+    .system-b-shell-list-task-row-hover,
+    .system-b-shell-list-task-row-selected
+  ) {
   box-shadow: inset 0 0 0 1px
     color-mix(in oklab, var(--color-focus-ring) 45%, transparent);
 }
