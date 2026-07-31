@@ -1,6 +1,6 @@
 'use client';
 
-import { SmartLinkRow } from '@/components/shell/SmartLinkRow';
+import { ShareableLinkRow } from '@/components/molecules/drawer';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 interface ReleaseSmartLinkSectionProps {
@@ -14,11 +14,11 @@ export function ReleaseSmartLinkSection({
   const smartLinkLabel = smartLinkUrl.replace(/^https?:\/\//u, '');
 
   return (
-    <SmartLinkRow
-      url={smartLinkLabel}
-      onCopy={() => {
-        navigator.clipboard?.writeText(smartLinkUrl).catch(() => undefined);
-      }}
+    <ShareableLinkRow
+      url={smartLinkUrl}
+      displayValue={smartLinkLabel}
+      density='rail'
+      onCopy={() => navigator.clipboard.writeText(smartLinkUrl)}
       onOpen={() => {
         globalThis.open(smartLinkUrl, '_blank', 'noopener,noreferrer');
       }}

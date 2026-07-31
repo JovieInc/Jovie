@@ -124,4 +124,8 @@ export {
   type EntitySidebarShellProps,
 } from './EntitySidebarShell';
 export { SidebarLinkRow, type SidebarLinkRowProps } from './SidebarLinkRow';
+export {
+  ShareableLinkRow,
+  type ShareableLinkRowProps,
+} from './ShareableLinkRow';
 export { StatTile, type StatTileProps } from './StatTile';

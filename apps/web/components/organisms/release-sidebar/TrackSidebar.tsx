@@ -4,7 +4,6 @@ import { Check, Copy, ExternalLink, Pause, Play, VolumeX } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import { toast } from '@/components/feedback';
-import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import {
   DrawerBackButton,
   DrawerCardActionBar,
@@ -13,6 +12,7 @@ import {
   DrawerTabbedCard,
   DrawerTabs,
   EntitySidebarShell,
+  ShareableLinkRow,
 } from '@/components/molecules/drawer';
 import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -382,9 +382,9 @@ export function TrackSidebar({
                 }
                 footer={
                   smartLinkUrl ? (
-                    <CopyableUrlRow
+                    <ShareableLinkRow
                       url={smartLinkUrl}
-                      size='sm'
+                      density='compact'
                       surface='boxed'
                       copyButtonTitle='Copy Track Link'
                       openButtonTitle='Open Track Link'

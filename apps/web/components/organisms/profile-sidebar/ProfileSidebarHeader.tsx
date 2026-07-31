@@ -27,6 +27,8 @@ interface UseProfileHeaderPartsProps {
   readonly displayName: string;
   readonly profilePath: string;
   readonly onClose?: () => void;
+  /** Omit when a visible ShareableLinkRow already owns the same destination. */
+  readonly showOpenAction?: boolean;
 }
 
 function escapeVCardText(value: string): string {
@@ -57,6 +59,7 @@ export function useProfileHeaderParts({
   displayName,
   profilePath,
   onClose,
+  showOpenAction = true,
 }: Readonly<UseProfileHeaderPartsProps>): UseProfileHeaderResult {
   const appleWalletEnabled = useAppFlag('APPLE_WALLET_PROFILE_PASS');
   const [supportsAppleWallet, setSupportsAppleWallet] = useState(false);
@@ -103,12 +106,6 @@ export function useProfileHeaderParts({
 
   const overflowActions: DrawerHeaderAction[] = [
     {
-      id: 'open',
-      label: 'Open Profile',
-      icon: ExternalLink,
-      onClick: handleOpenProfile,
-    },
-    {
       id: 'vcard',
       label: 'Download vCard',
       icon: Contact,
@@ -123,6 +120,15 @@ export function useProfileHeaderParts({
       },
     },
   ];
+
+  if (showOpenAction) {
+    overflowActions.unshift({
+      id: 'open',
+      label: 'Open Profile',
+      icon: ExternalLink,
+      onClick: handleOpenProfile,
+    });
+  }
 
   if (appleWalletEnabled && supportsAppleWallet) {
     overflowActions.push({

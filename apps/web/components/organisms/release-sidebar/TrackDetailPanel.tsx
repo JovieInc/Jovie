@@ -3,11 +3,11 @@
 import { Copy } from 'lucide-react';
 import { useCallback } from 'react';
 import { toast } from '@/components/feedback';
-import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import {
   DrawerActionRow,
   DrawerBackButton,
   DrawerSurfaceCard,
+  ShareableLinkRow,
 } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ProviderKey } from '@/lib/discography/types';
@@ -86,9 +86,9 @@ export function TrackDetailPanel({
           </p>
         </div>
         <div className='p-2.5'>
-          <CopyableUrlRow
+          <ShareableLinkRow
             url={smartLinkUrl}
-            size='md'
+            density='rail'
             className='rounded-lg'
             surface='boxed'
             copyButtonTitle='Copy smart link'

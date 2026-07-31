@@ -7,8 +7,8 @@ import { toast } from '@/components/feedback';
 import {
   DrawerAnalyticsSummaryCard,
   DrawerInlineIconButton,
+  ShareableLinkRow,
 } from '@/components/molecules/drawer';
-import { SmartLinkRow } from '@/components/shell/SmartLinkRow';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import {
   TEST_AUTH_BYPASS_MODE,
@@ -168,18 +168,18 @@ function ReleaseSmartLinkControl({
         className='flex items-center gap-1.5'
         data-testid='release-smart-link-control'
       >
-        <SmartLinkRow
-          url={smartLinkLabel}
+        <ShareableLinkRow
+          url={smartLinkUrl}
+          displayValue={smartLinkLabel}
+          density='rail'
           className='min-w-0 flex-1'
-          onCopy={() => {
-            void copyToClipboard(smartLinkUrl).then(copied => {
-              if (copied) {
-                toast.success('Smart link copied');
-                return;
-              }
-              toast.error('Failed to copy link');
-            });
+          onCopy={async () => {
+            if (!(await copyToClipboard(smartLinkUrl))) {
+              throw new Error('Could not copy smart link');
+            }
           }}
+          onCopySuccess={() => toast.success('Smart link copied')}
+          onCopyError={() => toast.error('Failed to copy link')}
           onOpen={() => {
             globalThis.open(smartLinkUrl, '_blank', 'noopener,noreferrer');
           }}

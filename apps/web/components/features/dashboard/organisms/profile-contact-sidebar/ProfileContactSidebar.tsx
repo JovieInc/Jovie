@@ -1096,6 +1096,7 @@ export function ProfileContactSidebar() {
     displayName: previewData?.displayName ?? '',
     profilePath: previewData?.profilePath ?? '',
     onClose: close,
+    showOpenAction: false,
   });
 
   const emailSignatureInput = useMemo(
