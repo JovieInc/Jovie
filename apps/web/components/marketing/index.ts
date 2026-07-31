@@ -42,6 +42,8 @@ export type {
   MarketingSectionIntroProps,
 } from './MarketingSectionIntro';
 export { MarketingSectionIntro } from './MarketingSectionIntro';
+export type { MarketingSnapRailProps } from './MarketingSnapRail';
+export { MarketingSnapRail } from './MarketingSnapRail';
 export type {
   MarketingGlowTone,
   MarketingSurfaceCardProps,

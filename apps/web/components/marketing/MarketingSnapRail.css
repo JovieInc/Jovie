@@ -1,0 +1,47 @@
+/*
+ * MarketingSnapRail — shared horizontal snap horizon for marketing card rails.
+ * Tokens only; effects utilities cannot express live here.
+ */
+
+.marketing-snap-rail__nav-btn {
+  border: 1px solid
+    color-mix(in oklab, var(--color-text-primary-token) 10%, transparent);
+  background: color-mix(
+    in oklab,
+    var(--system-b-cinematic-black) 62%,
+    transparent
+  );
+  color: var(--color-text-primary-token);
+  box-shadow: 0 18px 44px
+    color-mix(in oklab, var(--system-b-cinematic-black) 28%, transparent);
+}
+
+.marketing-snap-rail__nav-btn:hover {
+  background: var(--color-bg-surface-1);
+  color: var(--color-text-primary-token);
+}
+
+.marketing-snap-rail__nav-btn:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--system-b-cinematic-black),
+    0 0 0 4px
+    color-mix(in oklab, var(--color-text-primary-token) 30%, transparent);
+}
+
+.marketing-snap-rail__rail-btn {
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-cinematic-black) 12%, transparent);
+  color: var(--color-text-primary-token);
+  box-shadow: 0 18px 42px
+    color-mix(in oklab, var(--system-b-cinematic-black) 16%, transparent);
+}
+
+.marketing-snap-rail__rail-btn:focus-visible {
+  outline: none;
+  box-shadow:
+    0 18px 42px
+    color-mix(in oklab, var(--system-b-cinematic-black) 16%, transparent),
+    0 0 0 2px
+    color-mix(in oklab, var(--system-b-cinematic-black) 15%, transparent);
+}

@@ -153,13 +153,8 @@ export function ArtistProfileModeSwitcher({
       >
         {showIntroHeading ? (
           <>
-            <p className='text-xs font-medium tracking-wide text-secondary-token'>
-              {adaptive.eyebrow}
-            </p>
             {/* ui-casing-allow: marketing display headline */}
-            <h2
-              className={cn(SHELL_H2_CLASS, 'ap-mode-switcher__headline mt-5')}
-            >
+            <h2 className={cn(SHELL_H2_CLASS, 'ap-mode-switcher__headline')}>
               {adaptive.headline}
             </h2>
             <p className={cn(SHELL_LEAD_CLASS, 'mt-6 max-w-xl')}>
