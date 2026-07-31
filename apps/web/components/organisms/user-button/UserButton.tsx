@@ -73,6 +73,9 @@ interface BuildDropdownItemsParams {
   isElectronRuntime: boolean;
 }
 
+const USER_MENU_CONTENT_CLASS = 'w-80 max-w-[calc(100vw-1rem)]';
+const USER_MENU_GROUP_SPACER_CLASS = '-mx-1 my-0 h-2 border-0';
+
 function sanitizeInstallUrl(value: unknown): string | null {
   if (typeof value !== 'string') return null;
 
@@ -108,14 +111,15 @@ function buildDropdownItems({
     {
       type: 'action-row',
       id: 'profile-help',
-      className: 'grid w-full grid-cols-1 px-1',
+      className:
+        'grid min-h-12 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-1 px-1',
       items: [
         {
           type: 'action',
           id: 'profile-card',
           label: `Open profile for ${displayName}`,
           onClick: handleProfile,
-          className: 'min-w-0 min-h-12 gap-2.5 px-1.5 py-1.5',
+          className: 'min-h-12 min-w-0 gap-2.5 px-1.5 py-1.5',
           content: (
             <>
               <Avatar
@@ -159,11 +163,15 @@ function buildDropdownItems({
           label: 'Help',
           icon: HelpCircle,
           onClick: handleHelp,
-          className: 'min-h-8',
+          className: 'min-h-8 shrink-0 px-2',
         },
       ],
     },
-    { type: 'separator', id: 'sep-1' },
+    {
+      type: 'separator',
+      id: 'sep-1',
+      className: USER_MENU_GROUP_SPACER_CLASS,
+    },
     {
       type: 'action',
       id: 'settings',
@@ -320,7 +328,11 @@ function buildDropdownItems({
   // Add feedback, version info, and sign out.
   // Version is now shown to all users (moved from admin-only sidebar footer).
   items.push(
-    { type: 'separator', id: 'sep-support' },
+    {
+      type: 'separator',
+      id: 'sep-support',
+      className: USER_MENU_GROUP_SPACER_CLASS,
+    },
     {
       type: 'action',
       id: 'feedback',
@@ -328,12 +340,16 @@ function buildDropdownItems({
       icon: MessageSquare,
       onClick: () => setIsFeedbackOpen(true),
     },
-    { type: 'separator', id: 'sep-2' },
+    {
+      type: 'separator',
+      id: 'sep-2',
+      className: USER_MENU_GROUP_SPACER_CLASS,
+    },
     {
       type: 'custom',
       id: 'version',
       render: () => (
-        <div className='px-2.5 py-1.5 text-2xs leading-4 text-tertiary-token select-none'>
+        <div className='flex min-h-8 items-center px-2.5 py-1.5 text-2xs leading-4 text-tertiary-token select-none'>
           Version {process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
           {process.env.NEXT_PUBLIC_BUILD_SHA
             ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
@@ -341,7 +357,11 @@ function buildDropdownItems({
         </div>
       ),
     },
-    { type: 'separator', id: 'sep-signout' },
+    {
+      type: 'separator',
+      id: 'sep-signout',
+      className: USER_MENU_GROUP_SPACER_CLASS,
+    },
     {
       type: 'action',
       id: 'sign-out',
@@ -480,7 +500,7 @@ export function UserButton({
             open={isMenuOpen}
             onOpenChange={setIsMenuOpen}
             disabled
-            contentClassName='w-72 max-w-[calc(100vw-1rem)]'
+            contentClassName={USER_MENU_CONTENT_CLASS}
           />
         </div>
       );
@@ -534,7 +554,7 @@ export function UserButton({
     (showUserInfo ? (
       <button
         type='button'
-        className='flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0'
+        className='flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0'
       >
         <Avatar
           src={userImageUrl}
@@ -547,7 +567,10 @@ export function UserButton({
           data-user-button-display-name
           className='min-w-0 flex-1 group-data-[collapsible=icon]:hidden'
         >
-          <p className='text-app font-normal text-sidebar-item-foreground truncate'>
+          <p
+            title={displayName}
+            className='truncate text-app font-normal text-sidebar-item-foreground'
+          >
             {displayName}
           </p>
         </div>
@@ -584,7 +607,7 @@ export function UserButton({
         align={trigger || showUserInfo ? 'start' : 'end'}
         open={isMenuOpen}
         onOpenChange={setIsMenuOpen}
-        contentClassName='w-72 max-w-[calc(100vw-1rem)]'
+        contentClassName={USER_MENU_CONTENT_CLASS}
       />
       <DashboardFeedbackModal
         isOpen={isFeedbackOpen}
