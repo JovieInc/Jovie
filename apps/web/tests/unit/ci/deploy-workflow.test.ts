@@ -4285,6 +4285,21 @@ describe('production promotion exact-artifact contract', () => {
       '(.conclusion | IN("cancelled", "failure", "startup_failure", "timed_out"))'
     );
     expect(health).toContain('recovery_lease_already_exists');
+    // production-mutation concurrency parks newer generations in pending /
+    // waiting / requested; do not treat those as completed-without-marker.
+    expect(healthEvaluation).toContain(
+      'queued|in_progress|pending|requested|waiting)'
+    );
+    expect(healthEvaluation).toContain(
+      'gh api "repos/$REPOSITORY/actions/runs/$controller_id"'
+    );
+    expect(healthEvaluation).toContain('changed_controller_run');
+    expect(healthEvaluation).toContain(
+      'has exact verified production evidence after recheck'
+    );
+    expect(healthEvaluation).toContain(
+      'incident controller_completed_without_marker'
+    );
     expect(health).toContain(
       "always() && steps.evaluate.outputs.needs_manual == 'true'"
     );
