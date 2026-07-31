@@ -58,6 +58,28 @@ The resolver is deterministic. Same Brief → same Composition, every time
 (tested by the golden-fixture determinism gate on every PR). The `trace`
 field shows every decision step — use it to debug.
 
+### 2b. Open the visual catalog (Storybook)
+
+After `resolveComposition`, browse the product compositions in Storybook before
+hand-rolling chrome. Titles are the visual entry for recipes, sections, and shells:
+
+| Catalog | Storybook path | Source |
+| --- | --- | --- |
+| Proven recipes | `Marketing/Recipes/<recipeId>` | `components/marketing/storybook/Recipes.stories.tsx` |
+| Sections (all 17) | `Marketing/Sections/<sectionId>` | `components/marketing/storybook/Sections.stories.tsx` |
+| Shells / chrome | `Marketing/Shells/*` | `components/marketing/storybook/Shells.stories.tsx` |
+
+Inventory (CI): `apps/web/components/marketing/storybook/catalog.ts` +
+`apps/web/tests/unit/marketing/storybook-catalog.test.ts` assert proven recipes
+and section ids stay covered. Stub recipes are tagged `stub`; TBD/zero-proof
+sections are tagged `wip` (never silently omitted).
+
+```bash
+pnpm --filter web run storybook          # interactive
+pnpm --filter web run build-storybook    # static build receipt
+pnpm --filter web run test:a11y          # story a11y (vitest + addon-a11y)
+```
+
 ### 3. Render the sections
 
 Each `sections[i]` gives you `{sectionId, variantId, ctaPosition, proofVerified,
