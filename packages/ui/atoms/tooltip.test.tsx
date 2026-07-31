@@ -194,14 +194,16 @@ describe('Tooltip', () => {
       render(<TestTooltip open={true} />);
       const content = screen.getByTestId('tooltip-content');
       expect(content.className).toContain('z-[150]');
-      expect(content.className).toContain('rounded-xl');
+      expect(content.className).toContain(
+        'rounded-(--system-b-radius-overlay)'
+      );
       expect(content.className).toContain('text-xs');
     });
 
     it('applies theme-aware surface classes', () => {
       render(<TestTooltip open={true} />);
       const content = screen.getByTestId('tooltip-content');
-      expect(content.className).toContain('bg-surface-0');
+      expect(content.className).toContain('bg-surface-tooltip');
       expect(content.className).toContain('text-primary-token');
       expect(content.className).toContain('border-default');
       expect(content.className).toContain('shadow-popover');
@@ -226,7 +228,9 @@ describe('Tooltip', () => {
         </TestTooltip>
       );
       const content = screen.getByTestId('tooltip-content');
-      expect(content.className).toContain('rounded-xl');
+      expect(content.className).toContain(
+        'rounded-(--system-b-radius-overlay)'
+      );
       expect(content.className).toContain('max-w-56');
       expect(content.className).toContain('break-words');
     });

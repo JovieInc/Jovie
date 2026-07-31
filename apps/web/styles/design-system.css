@@ -6394,6 +6394,81 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   z-index: 150;
 }
 
+/* ============================================
+   NOIR ION D — workspace state surfaces (shell-scoped)
+   JOV-4648 / LogYourBody#582
+
+   Color/elevation only inside the authenticated shell frame.
+   Tables, PageToolbar, drawers/popovers/tooltips, and skeletons
+   resolve through existing semantic aliases — no global bleed.
+   Geometry (row height, toolbar seam padding, tooltip radius,
+   skeleton min dimensions, rail allocation) is unchanged.
+   ============================================ */
+
+[data-app-shell-frame="true"] {
+  /* Surfaces — stepped Noir Ion elevation */
+  --linear-bg-surface-0: #0a0d16; /* panel / recessed wells */
+  --linear-bg-surface-1: #0f1420; /* card */
+  --linear-bg-surface-2: #151b2a; /* elevated */
+  --linear-app-content-surface: #0a0d16; /* panel canvas */
+  --linear-app-frame-seam: rgba(168, 176, 195, 0.1);
+  --linear-app-shell-border: rgba(168, 176, 195, 0.16);
+  --linear-app-drawer-shadow:
+    0 0 0 1px rgba(168, 176, 195, 0.1), 0 18px 42px rgba(0, 0, 0, 0.42);
+
+  --app-shell-content-surface: var(--linear-app-content-surface);
+  --app-shell-frame-seam: var(--linear-app-frame-seam);
+  --app-shell-border: var(--linear-app-shell-border);
+  --system-b-app-content-surface: var(--app-shell-content-surface);
+  --system-b-app-frame-seam: var(--app-shell-frame-seam);
+  --system-b-app-shell-border: var(--app-shell-border);
+  --system-b-bg-surface-0: var(--linear-bg-surface-0);
+  --system-b-bg-surface-1: var(--linear-bg-surface-1);
+  --system-b-bg-surface-2: var(--linear-bg-surface-2);
+
+  --color-bg-surface-0: var(--linear-bg-surface-0);
+  --color-bg-surface-1: var(--linear-bg-surface-1);
+  --color-bg-surface-2: var(--linear-bg-surface-2);
+  --color-bg-surface-3: #1b2436; /* floating */
+  --color-bg-elevated: #151b2a;
+  --color-bg-tooltip: #1b2436;
+  --color-bg-hover: rgba(17, 175, 255, 0.06);
+  --color-bg-active: rgba(17, 175, 255, 0.1);
+  --color-bg-input: var(--linear-bg-surface-1);
+  --color-surface-0: var(--color-bg-surface-0);
+  --color-surface-1: var(--color-bg-surface-1);
+  --color-surface-2: var(--color-bg-surface-2);
+  --color-surface-3: var(--color-bg-surface-3);
+  --color-surface-hover: var(--color-bg-hover);
+  --color-surface-elevated: var(--color-bg-elevated);
+  --color-surface-tooltip: var(--color-bg-tooltip);
+  --color-surface-input: var(--color-bg-input);
+  --color-surface-active: var(--color-bg-active);
+
+  /* Selection / focus — electric ion (tables, lists, keyboard focus) */
+  --linear-row-hover: rgba(17, 175, 255, 0.06);
+  --linear-row-selected: rgba(17, 175, 255, 0.1);
+  --linear-border-focus: rgba(17, 175, 255, 0.72);
+  --linear-border-subtle: rgba(168, 176, 195, 0.1);
+  --linear-border-default: rgba(168, 176, 195, 0.16);
+  --linear-border-strong: rgba(199, 237, 255, 0.26);
+  --color-border-subtle: var(--linear-border-subtle);
+  --color-border-default: var(--linear-border-default);
+  --color-border-strong: var(--linear-border-strong);
+  --color-border-focus: var(--linear-border-focus);
+  --color-focus-ring: var(--linear-border-focus);
+
+  /* Overlay elevation (popovers / tooltips / drawers) */
+  --shadow-popover:
+    0 0 0 1px rgba(168, 176, 195, 0.16), 0 12px 32px rgba(0, 0, 0, 0.5);
+  --linear-shadow-card-elevated:
+    0 0 0 1px rgba(168, 176, 195, 0.16), 0 8px 40px rgba(0, 0, 0, 0.55);
+
+  /* Skeleton / loading — reserved geometry; color only */
+  --color-skeleton-base: #151b2a;
+  --color-skeleton-shimmer: rgba(168, 176, 195, 0.14);
+}
+
 :where(.system-b-table-row-height) {
   height: 40px;
 }

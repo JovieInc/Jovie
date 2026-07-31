@@ -62,15 +62,17 @@ describe('dropdown-styles', () => {
     it('DROPDOWN_CONTENT_BASE includes z-index, border, and background', () => {
       expect(DROPDOWN_CONTENT_BASE).toContain('z-50');
       expect(DROPDOWN_CONTENT_BASE).toContain('border');
-      expect(DROPDOWN_CONTENT_BASE).toContain('bg-surface-0');
-      expect(DROPDOWN_CONTENT_BASE).toContain('rounded-xl');
+      expect(DROPDOWN_CONTENT_BASE).toContain('bg-surface-elevated');
+      expect(DROPDOWN_CONTENT_BASE).toContain(OVERLAY_CONTENT_RADIUS);
     });
 
     it('shares the tokenized overlay surface and rounded rectangle contract', () => {
       expect(OVERLAY_SURFACE_BASE).toContain('border-default');
-      expect(OVERLAY_SURFACE_BASE).toContain('bg-surface-0');
+      expect(OVERLAY_SURFACE_BASE).toContain('bg-surface-elevated');
       expect(OVERLAY_SURFACE_BASE).toContain('shadow-popover');
-      expect(OVERLAY_CONTENT_RADIUS).toBe('rounded-xl');
+      expect(OVERLAY_CONTENT_RADIUS).toBe(
+        'rounded-(--system-b-radius-overlay)'
+      );
       expect(DROPDOWN_CONTENT_BASE).toContain(OVERLAY_SURFACE_BASE);
     });
 

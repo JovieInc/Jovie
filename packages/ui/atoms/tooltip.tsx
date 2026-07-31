@@ -5,7 +5,7 @@ import * as React from 'react';
 
 import {
   OVERLAY_CONTENT_RADIUS,
-  OVERLAY_SURFACE_BASE,
+  TOOLTIP_SURFACE_BASE,
 } from '../lib/dropdown-styles';
 import { cn } from '../lib/utils';
 
@@ -108,7 +108,7 @@ const TooltipContent = React.forwardRef<
           // compact label is provably one line; all other content is a shared
           // rounded rectangle that may wrap without clipping.
           'z-[150] px-2 py-1 text-xs font-normal tracking-tight',
-          OVERLAY_SURFACE_BASE,
+          TOOLTIP_SURFACE_BASE,
           contentVariant === 'compact'
             ? 'rounded-full whitespace-nowrap'
             : `${OVERLAY_CONTENT_RADIUS} max-w-56 break-words`,
@@ -133,7 +133,7 @@ const TooltipContent = React.forwardRef<
         {children}
         {showArrow && (
           <TooltipPrimitive.Arrow
-            className='fill-surface-0'
+            className='fill-surface-tooltip'
             data-testid='tooltip-arrow'
           />
         )}
