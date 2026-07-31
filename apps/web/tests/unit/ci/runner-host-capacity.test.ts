@@ -272,31 +272,40 @@ describe('Gem runner process-capacity contract', () => {
     ).toBe(false);
   });
 
-  it('preflights before installation and starts the enabled timer last', () => {
-    const result = runInstaller({});
+  it(
+    'preflights before installation and starts the enabled timer last',
+    () => {
+      const result = runInstaller({});
 
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('runner_capacity_preflight=passed');
-    expect(result.events.slice(0, 4)).toEqual([
-      'systemctl show ci-runner-autoscaler.service --property Environment --value',
-      'systemctl show ci-runners.slice --property TasksMax --value',
-      'systemctl show ci-runners.slice --property TasksCurrent --value',
-      expect.stringMatching(/^install /u),
-    ]);
-    const reconciliation = result.events.findIndex(event =>
-      event.startsWith('systemctl set-property ci-runners.slice')
-    );
-    const timerEnable = result.events.indexOf(
-      'systemctl enable ci-runner-capacity-reconcile.timer'
-    );
-    const timerStart = result.events.indexOf(
-      'systemctl start ci-runner-capacity-reconcile.timer'
-    );
-    expect(reconciliation).toBeGreaterThan(3);
-    expect(timerEnable).toBeLessThan(reconciliation);
-    expect(timerStart).toBeGreaterThan(reconciliation);
-    expect(timerStart).toBe(result.events.length - 1);
-  });
+      expect(
+        result.durationMs,
+        `installer success harness took ${result.durationMs.toFixed(0)}ms`
+      ).toBeLessThan(HARNESS_PROCESS_BUDGET_MS);
+      expect(result.mockProcessIds).toHaveLength(3);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('runner_capacity_preflight=passed');
+      expect(result.events.slice(0, 4)).toEqual([
+        'systemctl show ci-runner-autoscaler.service --property Environment --value',
+        'systemctl show ci-runners.slice --property TasksMax --value',
+        'systemctl show ci-runners.slice --property TasksCurrent --value',
+        expect.stringMatching(/^install /u),
+      ]);
+      const reconciliation = result.events.findIndex(event =>
+        event.startsWith('systemctl set-property ci-runners.slice')
+      );
+      const timerEnable = result.events.indexOf(
+        'systemctl enable ci-runner-capacity-reconcile.timer'
+      );
+      const timerStart = result.events.indexOf(
+        'systemctl start ci-runner-capacity-reconcile.timer'
+      );
+      expect(reconciliation).toBeGreaterThan(3);
+      expect(timerEnable).toBeLessThan(reconciliation);
+      expect(timerStart).toBeGreaterThan(reconciliation);
+      expect(timerStart).toBe(result.events.length - 1);
+    },
+    HARNESS_PROCESS_BUDGET_MS
+  );
 
   it('starts the timer and preserves a saturated reconciliation failure', () => {
     const result = runInstaller({ current: '1700', maximum: '2048' });

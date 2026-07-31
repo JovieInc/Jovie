@@ -6,6 +6,10 @@ import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { track } from '@/lib/analytics';
 import { getSocialDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
 import { useTrackingMutation } from '@/lib/queries';
+import {
+  publicLinkAriaLabel,
+  sanitizePublicHref,
+} from '@/lib/utils/public-url';
 import type { LegacySocialLink as SocialLinkType } from '@/types/db';
 
 interface SocialLinkProps {
@@ -19,10 +23,18 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
     endpoint: '/api/track',
   });
 
-  // Guard against incomplete link data
-  if (!link.platform || !link.url) {
+  const href = sanitizePublicHref(link.url);
+  // Guard against incomplete or malformed link data
+  if (!link.platform || !href) {
     return null;
   }
+  const platformLabel =
+    link.platform.charAt(0).toUpperCase() + link.platform.slice(1);
+  const accessibleName = publicLinkAriaLabel(
+    artistName,
+    link.platform,
+    platformLabel
+  );
   const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     // Track analytics first
@@ -30,7 +42,7 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
       handle,
       artist: artistName,
       platform: link.platform,
-      url: link.url,
+      url: href,
     });
 
     // Fire-and-forget server tracking
@@ -46,7 +58,7 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
 
     if (deepLinkConfig) {
       try {
-        await openDeepLink(link.url, deepLinkConfig, {
+        await openDeepLink(href, deepLinkConfig, {
           onNativeAttempt: () => {
             // Optional: could add loading state here
           },
@@ -56,11 +68,11 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
         });
       } catch (error) {
         console.debug('Deep link failed, using fallback:', error);
-        globalThis.open(link.url, '_blank', 'noopener,noreferrer');
+        globalThis.open(href, '_blank', 'noopener,noreferrer');
       }
     } else {
       // No deep link config, use original URL
-      globalThis.open(link.url, '_blank', 'noopener,noreferrer');
+      globalThis.open(href, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -69,15 +81,15 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
       asChild
       size='md'
       variant='pearl'
-      ariaLabel={`Follow ${artistName} on ${link.platform}`}
+      ariaLabel={accessibleName}
       className='text-primary-token/72 shadow-none hover:text-primary-token'
     >
       <a
-        href={link.url}
+        href={href}
         target='_blank'
         rel='noopener noreferrer'
         onClick={handleClick}
-        title={`Follow on ${link.platform}`}
+        title={accessibleName}
       >
         <SocialIcon platform={link.platform} className='h-4 w-4' />
       </a>

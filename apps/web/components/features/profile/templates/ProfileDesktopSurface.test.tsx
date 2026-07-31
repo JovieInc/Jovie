@@ -250,13 +250,11 @@ describe('ProfileDesktopSurface', () => {
       />
     );
 
-    expect(screen.getByRole('link', { name: 'instagram' })).toHaveAttribute(
-      'href',
-      'https://instagram.com/timwhite'
-    );
-    expect(screen.getByRole('link', { name: 'twitter' })).toHaveAttribute(
-      'href',
-      'https://x.com/timwhite'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Follow Tim White on Instagram' })
+    ).toHaveAttribute('href', 'https://instagram.com/timwhite');
+    expect(
+      screen.getByRole('link', { name: 'Follow Tim White on Twitter' })
+    ).toHaveAttribute('href', 'https://x.com/timwhite');
   });
 });

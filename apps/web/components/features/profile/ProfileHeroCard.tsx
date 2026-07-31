@@ -123,7 +123,7 @@ export function ArtistHero({
       <div className='absolute inset-0'>
         <ImageWithFallback
           src={resolvedHeroImageUrl}
-          alt={artist.name}
+          alt=''
           fill
           priority={true}
           sizes='(max-width: 767px) 100vw, 620px'
