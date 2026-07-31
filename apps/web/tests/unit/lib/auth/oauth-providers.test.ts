@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   AUTH_OAUTH_PROVIDER_LABELS,
@@ -6,6 +8,11 @@ import {
   getEnabledAuthOAuthProviders,
   isOAuthProviderEnabled,
 } from '@/lib/auth/oauth-providers';
+
+const OAUTH_PROVIDERS_SOURCE = readFileSync(
+  path.join(process.cwd(), 'lib/auth/oauth-providers.ts'),
+  'utf8'
+);
 
 describe('OAuth provider guard', () => {
   describe('isOAuthProviderEnabled', () => {
@@ -28,6 +35,8 @@ describe('OAuth provider guard', () => {
         'NEXT_PUBLIC_CLERK_OAUTH_GITHUB_ENABLED',
         'NEXT_PUBLIC_CLERK_OAUTH_SPOTIFY_ENABLED',
         'NEXT_PUBLIC_CLERK_OAUTH_TIKTOK_ENABLED',
+        'NEXT_PUBLIC_CLERK_OAUTH_APPLE_ENABLED',
+        'NEXT_PUBLIC_CLERK_OAUTH_GOOGLE_ENABLED',
       ];
       const saved: Record<string, string | undefined> = {};
       for (const f of flags) {
@@ -39,12 +48,33 @@ describe('OAuth provider guard', () => {
         expect(isOAuthProviderEnabled('github')).toBe(false);
         expect(isOAuthProviderEnabled('spotify')).toBe(false);
         expect(isOAuthProviderEnabled('tiktok')).toBe(false);
+        // Allowlisted providers stay on even if env is cleared.
+        delete process.env.NEXT_PUBLIC_CLERK_OAUTH_APPLE_ENABLED;
+        delete process.env.NEXT_PUBLIC_CLERK_OAUTH_GOOGLE_ENABLED;
+        expect(isOAuthProviderEnabled('apple')).toBe(true);
+        expect(isOAuthProviderEnabled('google')).toBe(true);
       } finally {
         for (const f of flags) {
           if (saved[f] === undefined) delete process.env[f];
           else process.env[f] = saved[f];
         }
       }
+    });
+  });
+
+  describe('JOV-2131 allowlist source contract', () => {
+    it('does not reintroduce process.env.NEXT_PUBLIC_CLERK_OAUTH_* enablement reads', () => {
+      // PR #8458/#8497 env gates silently emptied production sign-in. The
+      // allowlist is the only approved chokepoint for provider buttons.
+      expect(OAUTH_PROVIDERS_SOURCE).not.toMatch(
+        /process\.env\.NEXT_PUBLIC_CLERK_OAUTH_/
+      );
+      expect(OAUTH_PROVIDERS_SOURCE).not.toMatch(
+        /process\.env\[[^\]]*CLERK_OAUTH/
+      );
+      expect(OAUTH_PROVIDERS_SOURCE).toMatch(/case 'apple':/);
+      expect(OAUTH_PROVIDERS_SOURCE).toMatch(/case 'google':/);
+      expect(OAUTH_PROVIDERS_SOURCE).toMatch(/return true;/);
     });
   });
 
