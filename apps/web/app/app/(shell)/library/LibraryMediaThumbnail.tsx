@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react';
 import { ArtworkFallbackTile } from '@/components/atoms/ArtworkFallbackTile';
+import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
 import { cn } from '@/lib/utils';
 import { LibraryArtworkHoverZoom } from './LibraryArtworkHoverZoom';
 import { LibraryAudioWaveformThumbnail } from './LibraryAudioWaveformThumbnail';
@@ -78,6 +79,8 @@ export function LibraryMediaThumbnail({
     Boolean(asset.artworkUrl) &&
     (itemKind === 'image' || itemKind === 'merch') &&
     size !== 'row';
+  const artworkFrameSize =
+    size === 'row' ? 'thumbnail' : size === 'drawer' ? 'hero' : 'default';
 
   const updateScrub = useCallback((event: ReactMouseEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -85,10 +88,10 @@ export function LibraryMediaThumbnail({
   }, []);
 
   return (
-    <div
+    <ArtworkFrame
+      size={artworkFrameSize}
       className={cn(
-        'system-b-library-media-thumbnail relative h-full w-full overflow-hidden',
-        size === 'row' && 'rounded-sm',
+        'system-b-library-media-thumbnail h-full w-full',
         className
       )}
       data-testid={`library-media-thumbnail-${asset.id}`}
@@ -151,6 +154,6 @@ export function LibraryMediaThumbnail({
           compact={compact}
         />
       ) : null}
-    </div>
+    </ArtworkFrame>
   );
 }

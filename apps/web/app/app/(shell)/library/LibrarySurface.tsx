@@ -58,6 +58,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
@@ -481,7 +482,10 @@ const ReleaseCell = memo(function ReleaseCell({
 
   return (
     <div className='flex min-w-0 items-center gap-2.5'>
-      <span className='system-b-library-artwork-shell group/artwork relative h-10 w-10 shrink-0 overflow-hidden'>
+      <ArtworkFrame
+        size='thumbnail'
+        className='system-b-library-artwork-shell group/artwork h-10 w-10'
+      >
         <LibraryMediaThumbnail asset={asset} size='row' />
         {hasPreview ? (
           <button
@@ -509,7 +513,7 @@ const ReleaseCell = memo(function ReleaseCell({
             )}
           </button>
         ) : null}
-      </span>
+      </ArtworkFrame>
       <span className='min-w-0'>
         <span className='system-b-library-release-title block truncate'>
           {asset.title}
@@ -634,9 +638,12 @@ const CatalogArtworkCell = memo(function CatalogArtworkCell({
   readonly asset: LibraryReleaseAsset;
 }) {
   return (
-    <span className='system-b-library-artwork-shell relative block h-9 w-9 overflow-hidden'>
+    <ArtworkFrame
+      size='thumbnail'
+      className='system-b-library-artwork-shell block h-9 w-9'
+    >
       <LibraryMediaThumbnail asset={asset} size='row' />
-    </span>
+    </ArtworkFrame>
   );
 });
 

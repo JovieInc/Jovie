@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { ArtworkFallbackTile } from '@/components/atoms/ArtworkFallbackTile';
+import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
 import { cn } from '@/lib/utils';
 
 interface ReleaseArtworkThumbProps {
@@ -14,10 +15,6 @@ interface ReleaseArtworkThumbProps {
   readonly className?: string;
   /** Icon size class for the fallback Disc3 icon */
   readonly fallbackIconClass?: string;
-}
-
-function getArtworkRadiusClassName(size: number): string {
-  return size >= 64 ? 'rounded-lg' : 'rounded-xs';
 }
 
 /**
@@ -40,12 +37,9 @@ export function ReleaseArtworkThumb({
   }, [src]);
 
   return (
-    <div
-      className={cn(
-        'relative shrink-0 overflow-hidden bg-surface-2 shadow-sm',
-        getArtworkRadiusClassName(size),
-        className
-      )}
+    <ArtworkFrame
+      size={size}
+      className={cn('bg-surface-2', className)}
       style={{ width: size, height: size }}
     >
       {src && !imgError ? (
@@ -64,6 +58,6 @@ export function ReleaseArtworkThumb({
           iconClassName={fallbackIconClass}
         />
       )}
-    </div>
+    </ArtworkFrame>
   );
 }

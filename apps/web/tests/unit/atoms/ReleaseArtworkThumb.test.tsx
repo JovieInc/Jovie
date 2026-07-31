@@ -88,6 +88,7 @@ describe('ReleaseArtworkThumb', () => {
     const wrapper = container.firstChild as HTMLElement;
     expect(wrapper).toHaveStyle({ width: '40px', height: '40px' });
     expect(wrapper).toHaveClass('rounded-xs');
+    expect(wrapper).toHaveClass('border-0', 'outline-none', 'shadow-none');
     expect(wrapper).not.toHaveClass('outline');
   });
 

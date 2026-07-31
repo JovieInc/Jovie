@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { memo } from 'react';
+import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
 import type { EntityKind } from '@/lib/chat/tokens';
 import type { EntityRef } from '@/lib/commands/entities';
 import type { NavCommand, SkillCommand } from '@/lib/commands/registry';
@@ -106,7 +107,10 @@ export const ReleaseArt = memo(function ReleaseArt({
 }) {
   if (entity.thumbnail) {
     return (
-      <div className='system-b-picker-art system-b-picker-art-image'>
+      <ArtworkFrame
+        size='thumbnail'
+        className='system-b-picker-art system-b-picker-art-image'
+      >
         <Image
           src={entity.thumbnail}
           alt=''
@@ -115,11 +119,14 @@ export const ReleaseArt = memo(function ReleaseArt({
           className='object-cover'
           unoptimized
         />
-      </div>
+      </ArtworkFrame>
     );
   }
   return (
-    <div className='system-b-picker-art system-b-picker-art-release-fallback' />
+    <ArtworkFrame
+      size='thumbnail'
+      className='system-b-picker-art system-b-picker-art-release-fallback'
+    />
   );
 });
 
