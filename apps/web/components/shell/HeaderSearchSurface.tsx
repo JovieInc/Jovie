@@ -19,8 +19,11 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  getPlatformIconMetadata,
+  SocialIcon,
+} from '@/components/atoms/SocialIcon';
 import { type HeaderSearchAdapter } from '@/contexts/HeaderActionsContext';
-import { getPlatformIconMetadata, SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 import {
   buildHeaderSearchGroups,
@@ -80,11 +83,7 @@ function HeaderSearchResultIcon({
 
   if (provider && getPlatformIconMetadata(provider)) {
     return (
-      <SocialIcon
-        platform={provider}
-        className='h-3.5 w-3.5'
-        aria-hidden='true'
-      />
+      <SocialIcon platform={provider} className='h-3.5 w-3.5' aria-hidden />
     );
   }
 
