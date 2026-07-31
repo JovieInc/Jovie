@@ -93,8 +93,25 @@ describe('story-coverage-ratchet', () => {
 
   it('rejects invalid baseline', () => {
     expect(
-      validateBaseline({ schemaVersion: 2, percent: 10, covered: 1, total: 1 })
+      validateBaseline({ schemaVersion: 3, percent: 10, covered: 1, total: 1 })
         .ok
     ).toBe(false);
+  });
+
+  it('accepts multi-root schema v2 baseline', () => {
+    expect(
+      validateBaseline({
+        schemaVersion: 2,
+        direction: 'lock_up',
+        roots: {
+          'packages/ui/atoms': {
+            percent: 100,
+            covered: 36,
+            total: 36,
+            uncovered: 0,
+          },
+        },
+      }).ok
+    ).toBe(true);
   });
 });

@@ -72,8 +72,8 @@
       "tier": "fast-gate",
       "mergeGate": true,
       "gateStage": "both",
-      "nextLocalCommand": "pnpm run typecheck && pnpm run biome:check",
-      "remediation": "Fix TypeScript, Biome, ESLint server-boundary, or proxy guard failures before expanding the change."
+      "nextLocalCommand": "pnpm run typecheck && pnpm run biome:check && pnpm component-ship-gate",
+      "remediation": "Fix TypeScript, Biome, ESLint server-boundary, proxy guard, or component-ship-gate failures (tests + matching stories for shippable UI) before expanding the change."
     },
     {
       "id": "ci-risk-classifier",
@@ -148,12 +148,20 @@
       "remediation": "Repair the model-free golden semantic regression before the combined head can leave the queue."
     },
     {
+      "id": "component-ship-gate",
+      "name": "Component Ship Gate (via ci-fast structural)",
+      "tier": "fast-gate",
+      "mergeGate": false,
+      "nextLocalCommand": "pnpm component-ship-gate",
+      "remediation": "Shippable UI under packages/ui and apps/web/components/{atoms,molecules,organisms,marketing,site} requires a colocated test, a matching Storybook story, and green story quality. Enforced inside the ci-fast structural lane (required on PR + merge_group). Raise floors with pnpm story-coverage:update only after adding real coverage."
+    },
+    {
       "id": "ui-story-coverage-audit",
       "name": "UI Story Coverage Audit (shadow)",
       "tier": "risk-triggered-smoke",
       "mergeGate": false,
-      "nextLocalCommand": "pnpm story-coverage:check && pnpm storybook:quality",
-      "remediation": "Add an adjacent Storybook story or explicit Playwright visual evidence. During the five-run observation phase, findings remain visible but do not authorize or block production."
+      "nextLocalCommand": "pnpm story-coverage:check && pnpm storybook:quality && pnpm component-ship-gate",
+      "remediation": "Add an adjacent Storybook story or explicit Playwright visual evidence. The hard component-ship-gate also runs inside ci-fast structural (JOV-4421)."
     },
     {
       "id": "ci-lighthouse-pr",

@@ -94,6 +94,8 @@ function harnessIssues(root) {
     'apps/web/.storybook/preview.tsx',
     'scripts/story-coverage-baseline.json',
     'scripts/storybook-story-quality-guard.mjs',
+    'scripts/component-ship-gate.mjs',
+    'scripts/component-ship-policy.mjs',
   ];
   const missing = required
     .filter(path => !existsSync(resolve(root, path)))

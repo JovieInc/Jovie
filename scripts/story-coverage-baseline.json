@@ -1,10 +1,50 @@
 {
-  "schemaVersion": 1,
-  "dimension": "packages-ui-atom-story-coverage-percent",
+  "schemaVersion": 2,
   "direction": "lock_up",
-  "percent": 100,
-  "covered": 35,
-  "total": 35,
-  "updatedAt": "2026-07-26T21:45:00.000Z",
-  "note": "Coverage may only increase. Audit broader UI surfaces before graduating the forward-only gate."
+  "updatedAt": "2026-07-31T21:07:04.852Z",
+  "note": "Coverage % and uncovered floors may only improve. Run `pnpm story-coverage:update` after adding stories. New components without stories fail even if % holds.",
+  "roots": {
+    "packages/ui/atoms": {
+      "percent": 100,
+      "covered": 36,
+      "total": 36,
+      "uncovered": 0
+    },
+    "packages/ui": {
+      "percent": 0,
+      "covered": 0,
+      "total": 1,
+      "uncovered": 1
+    },
+    "apps/web/components/atoms": {
+      "percent": 4.29,
+      "covered": 3,
+      "total": 70,
+      "uncovered": 67
+    },
+    "apps/web/components/molecules": {
+      "percent": 18.75,
+      "covered": 21,
+      "total": 112,
+      "uncovered": 91
+    },
+    "apps/web/components/organisms": {
+      "percent": 6.36,
+      "covered": 11,
+      "total": 173,
+      "uncovered": 162
+    },
+    "apps/web/components/marketing": {
+      "percent": 0,
+      "covered": 0,
+      "total": 51,
+      "uncovered": 51
+    },
+    "apps/web/components/site": {
+      "percent": 0,
+      "covered": 0,
+      "total": 13,
+      "uncovered": 13
+    }
+  }
 }
