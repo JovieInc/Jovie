@@ -1,6 +1,5 @@
 import { HomeHeroCTA } from '@/components/features/home/HomeHeroCTA';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
-import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { MarketingContainer } from '../MarketingContainer';
 import './ArtistProfileHero.css';
 
@@ -9,8 +8,6 @@ interface ArtistProfileHeroProps {
 }
 
 export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
-  const claimIntent = getClaimProfileIntent();
-
   return (
     <section
       data-testid='homepage-hero'
@@ -42,7 +39,6 @@ export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
           <p className='mt-4 font-mono text-xs tracking-tight text-tertiary-token'>
             {hero.signature}
           </p>
-          <p className='sr-only'>{claimIntent.support}</p>
         </div>
       </MarketingContainer>
     </section>
