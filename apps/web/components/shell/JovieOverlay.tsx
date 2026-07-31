@@ -1,4 +1,7 @@
+'use client';
+
 import { Mic } from 'lucide-react';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 
 const MOTION_CINEMATIC =
@@ -31,6 +34,8 @@ export function JovieOverlay({
   listening: boolean;
   className?: string;
 }) {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
     <>
       {/* Backdrop dim — fades the entire shell when dictating so
@@ -55,9 +60,13 @@ export function JovieOverlay({
         style={{
           opacity: listening ? 1 : 0,
           transform: listening
-            ? 'translateY(0) scale(1)'
-            : 'translateY(16px) scale(0.96)',
-          transition: `opacity ${MOTION_CINEMATIC}, transform ${MOTION_CINEMATIC}`,
+            ? 'translateY(0)'
+            : prefersReducedMotion
+              ? 'translateY(0)'
+              : 'translateY(16px)',
+          transition: prefersReducedMotion
+            ? `opacity ${MOTION_CINEMATIC}`
+            : `opacity ${MOTION_CINEMATIC}, transform ${MOTION_CINEMATIC}`,
         }}
       >
         <div

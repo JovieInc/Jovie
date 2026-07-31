@@ -113,9 +113,9 @@ export function CaptureActionPill({
 
             <span
               className={cn(
-                'ap-capture-tracking rounded-full px-4 py-2.5 text-xs font-semibold transition-[background-color,color,transform] duration-subtle',
+                'ap-capture-tracking rounded-full px-4 py-2.5 text-xs font-semibold transition-[background-color,color] duration-subtle',
                 isSubmitting
-                  ? 'ap-capture-action__cta--submitting scale-[0.96] text-primary-token'
+                  ? 'ap-capture-action__cta--submitting text-primary-token'
                   : 'bg-surface-1 text-primary-token'
               )}
             >

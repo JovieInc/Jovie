@@ -56,13 +56,12 @@ describe('HomepagePosterHero', () => {
     expect(primaryLink).toHaveAttribute('href', '/signup');
     expect(primaryLink).toHaveAttribute('data-size', 'md');
     expect(primaryLink).toHaveAttribute('data-variant', 'primary');
-    expect(primaryLink).toHaveClass('active:scale-[0.98]');
-    expect(primaryLink).toHaveClass('motion-reduce:active:scale-100');
+    expect(primaryLink).not.toHaveClass('active:scale-[0.98]');
 
     const secondaryLink = screen.getByRole('link', { name: 'See proof' });
     expect(secondaryLink).toHaveAttribute('href', '/artist-profiles');
     expect(secondaryLink).toHaveAttribute('data-variant', 'ghost');
-    expect(secondaryLink).toHaveClass('active:scale-[0.98]');
+    expect(secondaryLink).not.toHaveClass('active:scale-[0.98]');
     // Secondary must stay quieter than the primary conversion control.
     expect(secondaryLink.getAttribute('data-variant')).not.toBe('primary');
   });

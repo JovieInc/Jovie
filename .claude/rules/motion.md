@@ -77,7 +77,11 @@ Rules:
 
 ### Press feedback
 
-Every pressable element scales down on `:active`. Jovie's canonical press scale is **`var(--scale-press)` (0.96)** — per ui.md, not the source's 0.97.
+Press feedback is opt-in, not a default. Do not compress controls when the
+action already supplies immediate state feedback: play/pause, toggles,
+accordions, menus, navigation, and submitting controls remain static. When a
+standalone action has no other immediate cue and tactile compression materially
+helps, use the shared **`var(--scale-press)` (0.98)** token.
 
 ```css
 .button {
@@ -88,7 +92,9 @@ Every pressable element scales down on `:active`. Jovie's canonical press scale 
 }
 ```
 
-Press feedback must be tactile and interruptible; provide a static opt-out when motion would distract (ui.md).
+Press feedback must be tactile and interruptible; the shared Button defaults to
+`pressFeedback={false}`. Use that default for self-evident controls, and never
+hardcode a scale value or apply press scale to every pressable element.
 
 ### Never animate from `scale(0)`
 
@@ -147,6 +153,7 @@ When reviewing animation code, output a single markdown table with `| Before | A
 | UI duration > 300ms outside CINEMATIC intent | `--duration-subtle`/`--duration-slow` |
 | Hover animation without media query | `@media (hover: hover) and (pointer: fine)` |
 | Keyframes on rapidly-triggered element | CSS transitions |
-| No `:active` press feedback on pressable | `scale(var(--scale-press))` |
+| Press scale on a self-evident state change | Remove it; state change is the feedback |
+| Tactile press feedback needed without another cue | Opt in with `scale(var(--scale-press))` |
 | Same enter/exit speed on hold patterns | Exit faster than enter |
 | List items all appear at once | 30–80ms stagger |
