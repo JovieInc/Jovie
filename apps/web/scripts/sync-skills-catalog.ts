@@ -1,8 +1,9 @@
 /**
  * sync-skills-catalog.ts
  *
- * Idempotent upsert script. Walks SKILL_REGISTRY and upserts into
- * skills_catalog + tools_catalog (for kind='tool' entries — empty in v1).
+ * Idempotent upsert script. Walks PUBLIC_SKILL_REGISTRY (SKILL_REGISTRY alias)
+ * and upserts into skills_catalog + tools_catalog for cataloged product
+ * skills only (partial catalog by design — JOV-3013; not live chat tools).
  *
  * Wired into package.json postbuild so it runs on every deploy.
  * Safe to re-run: second run produces no diff (upsert on PK with onConflictDoUpdate).

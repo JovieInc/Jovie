@@ -1,9 +1,13 @@
 /**
  * Agent Registry Types
  *
- * Shared contract for skill and tool definitions. Used by SKILL_REGISTRY,
- * TOOL_REGISTRY, and the DB sync script. Keep this file free of runtime
- * dependencies — it is imported by both server code and the sync script.
+ * Shared contract for skill and tool definitions. Used by
+ * PUBLIC_SKILL_REGISTRY (alias SKILL_REGISTRY — partial product-skill catalog)
+ * and the DB sync script. Keep this file free of runtime dependencies — it is
+ * imported by both server code and the sync script.
+ *
+ * Live chat tools are a separate surface (`TOOL_UI_REGISTRY` + chat route
+ * builders); they are not required to appear in the public skill catalog.
  */
 
 import type { BooleanEntitlement } from '@/lib/entitlements/registry';

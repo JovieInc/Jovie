@@ -12,7 +12,9 @@ All schema files live in `apps/web/lib/db/schema/`. Import tables and types from
 |-------------|--------|---------------|
 | `agents.ts` | `skills_catalog`, `skills_catalog_versions`, `skill_run_events`, `tools_catalog`, `retouch_jobs` | `skills_catalog.id` is the slug PK (e.g. `retouch`) with `lifecycle` + `active_version`; version history in `skills_catalog_versions (skill_id, version)`; per-invocation telemetry in `skill_run_events.invocation_id` (unique); `tools_catalog.id` same shape; `retouch_jobs.userId` → `users` cascade |
 
-**Sync:** `skills_catalog` and `tools_catalog` are upserted from `SKILL_REGISTRY` at deploy time by `apps/web/scripts/sync-skills-catalog.ts` (wired into `postbuild`). Do not hand-edit these rows.
+**Sync:** `skills_catalog` and `tools_catalog` are upserted from `PUBLIC_SKILL_REGISTRY` (`SKILL_REGISTRY` alias) at deploy time by `apps/web/scripts/sync-skills-catalog.ts` (wired into `postbuild`). Do not hand-edit these rows.
+
+**Partial catalog (JOV-3013):** `PUBLIC_SKILL_REGISTRY` is intentionally **not** the exhaustive live chat tool list. Chat tools are assembled in `app/api/chat/route.ts` and gated by plan/entitlements (`lib/chat/tool-access.ts`). Treat `skills_catalog` as admin/playbook/lifecycle source of truth only — not "what the model can call."
 
 **Enums:** `skillKindEnum` (`vertical_agent`, `tool`, `style`); `retouchJobStatusEnum` (`queued`, `running`, `identity_check_failed`, `identity_check_retrying`, `completed`, `failed`, `rejected_by_user`, `accepted_by_user`).
 
