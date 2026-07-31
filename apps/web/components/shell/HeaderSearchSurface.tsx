@@ -1,7 +1,15 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Search, SlidersHorizontal, X } from 'lucide-react';
+import {
+  CircleHelp,
+  Disc3,
+  MessageCircle,
+  Search,
+  SlidersHorizontal,
+  UserRound,
+  X,
+} from 'lucide-react';
 import Link from 'next/link';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -12,11 +20,13 @@ import {
   useState,
 } from 'react';
 import { type HeaderSearchAdapter } from '@/contexts/HeaderActionsContext';
+import { getPlatformIconMetadata, SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 import {
   buildHeaderSearchGroups,
   type HeaderSearchCatalog,
   type HeaderSearchResultGroup,
+  type HeaderSearchResultItem,
   type SearchableRelease,
 } from './header-search-results';
 import { PillSearch } from './PillSearch';
@@ -59,6 +69,38 @@ const headerSearchSurfaceWidth =
 
 function flattenGroups(groups: readonly HeaderSearchResultGroup[]) {
   return groups.flatMap(group => group.items);
+}
+
+function HeaderSearchResultIcon({
+  item,
+}: {
+  readonly item: HeaderSearchResultItem;
+}) {
+  const provider = item.provider?.trim();
+
+  if (provider && getPlatformIconMetadata(provider)) {
+    return (
+      <SocialIcon
+        platform={provider}
+        className='h-3.5 w-3.5'
+        aria-hidden='true'
+      />
+    );
+  }
+
+  if (item.kind === 'threads') {
+    return <MessageCircle className='h-3.5 w-3.5' aria-hidden='true' />;
+  }
+
+  if (item.kind === 'entities') {
+    return <UserRound className='h-3.5 w-3.5' aria-hidden='true' />;
+  }
+
+  if (provider) {
+    return <CircleHelp className='h-3.5 w-3.5' aria-hidden='true' />;
+  }
+
+  return <Disc3 className='h-3.5 w-3.5' aria-hidden='true' />;
 }
 
 interface SearchSelectableResult {
@@ -422,12 +464,15 @@ function HeaderGlobalSearch({
                     onMouseEnter={() => selectResultAtIndex(index)}
                     onClick={onClose}
                     className={cn(
-                      'flex min-h-9 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-subtle ease-subtle',
+                      'flex min-h-8 items-center gap-2 rounded-lg px-2 py-1 text-left transition-colors duration-subtle ease-subtle',
                       activeIndex === index
                         ? 'bg-surface-1 text-primary-token'
                         : 'text-secondary-token hover:bg-surface-0 hover:text-primary-token'
                     )}
                   >
+                    <span className='inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-surface-1 text-tertiary-token'>
+                      <HeaderSearchResultIcon item={item} />
+                    </span>
                     <span className='min-w-0 flex-1'>
                       <span className='block truncate text-xs font-medium'>
                         {item.label}

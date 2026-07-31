@@ -5,9 +5,12 @@ export type HeaderSearchGroupKind = 'threads' | 'entities' | 'library-assets';
 
 export interface HeaderSearchResultItem {
   readonly id: string;
+  readonly kind: HeaderSearchGroupKind;
   readonly label: string;
   readonly description: string;
   readonly href: string;
+  /** A known social or DSP provider key for a canonical result icon. */
+  readonly provider?: string;
 }
 
 export interface HeaderSearchResultGroup {
@@ -21,6 +24,7 @@ interface SearchableProfile {
   readonly displayName: string | null;
   readonly username: string;
   readonly usernameNormalized: string;
+  readonly provider?: string;
 }
 
 export interface SearchableRelease {
@@ -28,6 +32,7 @@ export interface SearchableRelease {
   readonly title: string;
   readonly artistNames?: readonly string[];
   readonly smartLinkPath: string;
+  readonly provider?: string;
 }
 
 export interface HeaderSearchCatalog {
@@ -60,6 +65,7 @@ export function buildHeaderSearchGroups(
     .slice(0, RESULT_LIMIT_PER_GROUP)
     .map(conversation => ({
       id: `thread:${conversation.id}`,
+      kind: 'threads' as const,
       label: conversation.title?.trim() || 'Untitled chat',
       description: 'Chat thread',
       href: `${APP_ROUTES.CHAT}/${encodeURIComponent(conversation.id)}`,
@@ -80,9 +86,11 @@ export function buildHeaderSearchGroups(
     .slice(0, RESULT_LIMIT_PER_GROUP)
     .map(profile => ({
       id: `profile:${profile.id}`,
+      kind: 'entities' as const,
       label: profile.displayName?.trim() || profile.username,
       description: `@${profile.usernameNormalized}`,
       href: `/${encodeURIComponent(profile.usernameNormalized)}`,
+      provider: profile.provider,
     }));
   if (entities.length > 0) {
     groups.push({ kind: 'entities', label: 'Entities', items: entities });
@@ -95,9 +103,11 @@ export function buildHeaderSearchGroups(
     .slice(0, RESULT_LIMIT_PER_GROUP)
     .map(release => ({
       id: `library:${release.id}`,
+      kind: 'library-assets' as const,
       label: release.title,
       description: release.artistNames?.join(', ') || 'Library release',
       href: release.smartLinkPath,
+      provider: release.provider,
     }));
   if (libraryAssets.length > 0) {
     groups.push({

@@ -162,6 +162,7 @@ describe('HeaderSearchSurface', () => {
               displayName: 'Midnight Artist',
               username: 'midnight-artist',
               usernameNormalized: 'midnight-artist',
+              provider: 'spotify',
             },
           ],
           releases: [
@@ -170,6 +171,7 @@ describe('HeaderSearchSurface', () => {
               title: 'Midnight Drive',
               artistNames: ['Midnight Artist'],
               smartLinkPath: '/midnight-artist/midnight-drive',
+              provider: 'spotify',
             },
           ],
         }}
@@ -210,6 +212,8 @@ describe('HeaderSearchSurface', () => {
       '/midnight-artist/midnight-drive',
     ]);
     expect(options[0]).toHaveAttribute('aria-selected', 'true');
+    expect(options[2]).toHaveClass('min-h-8', 'py-1');
+    expect(options[2]?.firstElementChild).toHaveClass('h-6', 'w-6');
 
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     expect(options[1]).toHaveAttribute('aria-selected', 'true');
