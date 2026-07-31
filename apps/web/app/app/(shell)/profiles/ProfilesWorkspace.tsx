@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import {
@@ -40,6 +41,7 @@ import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
   filterProfileWorkspaceRows,
   formatProfileRankChange,
+  getConnectionPrimaryAction,
   getConnectionStatus,
   sortProfileWorkspaceRows,
   summarizeProfileWorkspaceRows,
@@ -117,7 +119,13 @@ function ConnectionBrandIcon({
   }
   if (row.kind === 'jovie') {
     return (
-      <ConnectionTypeGlyph row={row} className={cn('text-accent', className)} />
+      <BrandLogo
+        size={20}
+        tone='color'
+        rounded={false}
+        aria-hidden
+        className={cn('[&_svg]:h-full [&_svg]:w-full', className)}
+      />
     );
   }
   return (
@@ -129,18 +137,18 @@ function TypeCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
   const label = kindLabel(row);
   return (
     <SimpleTooltip content={`${label} connection`}>
-      <span
-        role='img'
+      <button
+        type='button'
         aria-label={`${label} connection type`}
         className={cn(
-          'inline-flex h-7 w-7 items-center justify-center rounded-full',
+          'inline-flex h-7 w-7 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16',
           row.kind === 'jovie'
             ? 'text-accent'
             : 'text-tertiary-token hover:text-secondary-token'
         )}
       >
         <ConnectionTypeGlyph row={row} />
-      </span>
+      </button>
     </SimpleTooltip>
   );
 }
@@ -226,6 +234,7 @@ function ConnectionRail({
   row: ProfileWorkspaceRow | null;
   onClose: () => void;
 }>) {
+  const primaryAction = row ? getConnectionPrimaryAction(row) : null;
   const rankChange =
     row?.rowType === 'surface'
       ? formatProfileRankChange(row.rank, row.previousRank)
@@ -303,7 +312,12 @@ function ConnectionRail({
               {getConnectionStatus(row).nextAction}
             </p>
           </DrawerSection>
-          <div className='grid grid-cols-2 gap-2 px-1'>
+          <div
+            className={cn(
+              'grid gap-2 px-1',
+              primaryAction === 'open' ? 'grid-cols-1' : 'grid-cols-2'
+            )}
+          >
             <Button asChild variant='secondary' size='sm'>
               <Link
                 href={row.url}
@@ -313,25 +327,27 @@ function ConnectionRail({
                 <ExternalLink className='h-3.5 w-3.5' /> Open
               </Link>
             </Button>
-            <Button asChild size='sm'>
-              <Link
-                href={
-                  row.rowType === 'surface' && row.primaryAction === 'upgrade'
-                    ? APP_ROUTES.SETTINGS_BILLING
-                    : row.rowType === 'connector'
-                      ? APP_ROUTES.SETTINGS_CONNECTORS
-                      : APP_ROUTES.SETTINGS_ARTIST_PROFILE
-                }
-              >
-                {row.primaryAction === 'upgrade'
-                  ? 'Upgrade'
-                  : row.primaryAction === 'connect'
-                    ? 'Connect'
-                    : row.primaryAction === 'reconnect'
-                      ? 'Reconnect'
-                      : 'Review'}
-              </Link>
-            </Button>
+            {primaryAction !== 'open' ? (
+              <Button asChild size='sm'>
+                <Link
+                  href={
+                    primaryAction === 'upgrade'
+                      ? APP_ROUTES.SETTINGS_BILLING
+                      : row.rowType === 'connector'
+                        ? APP_ROUTES.SETTINGS_CONNECTORS
+                        : APP_ROUTES.SETTINGS_ARTIST_PROFILE
+                  }
+                >
+                  {primaryAction === 'upgrade'
+                    ? 'Upgrade'
+                    : primaryAction === 'connect'
+                      ? 'Connect'
+                      : primaryAction === 'reconnect'
+                        ? 'Reconnect'
+                        : 'Review'}
+                </Link>
+              </Button>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -364,15 +380,19 @@ export function ProfilesWorkspace({
     [data?.rows, filter]
   );
   const summary = useMemo(
-    () => summarizeProfileWorkspaceRows(data?.rows ?? []),
-    [data?.rows]
+    () =>
+      summarizeProfileWorkspaceRows(
+        data?.rows ?? [],
+        data?.providerAvailable ?? false
+      ),
+    [data?.providerAvailable, data?.rows]
   );
   const columns = useMemo(
     () => [
       columnHelper.accessor('label', {
         header: 'Connection',
-        size: 260,
-        minSize: 210,
+        size: 220,
+        minSize: 160,
         cell: context => {
           const row = context.row.original;
           return (
@@ -393,13 +413,13 @@ export function ProfilesWorkspace({
       columnHelper.display({
         id: 'type',
         header: 'Type',
-        size: 52,
+        size: 48,
         cell: context => <TypeCell row={context.row.original} />,
       }),
       columnHelper.accessor(row => getConnectionStatus(row).label, {
         id: 'status',
         header: 'Status / Issue',
-        size: 156,
+        size: 140,
         cell: context => <StatusCell row={context.row.original} />,
       }),
       columnHelper.display({
@@ -464,7 +484,7 @@ export function ProfilesWorkspace({
                 onClick={() => setSelected(row)}
                 ariaLabel={`Actions for ${row.label}`}
                 tooltip='View connection details'
-                className='h-7 w-7'
+                className='h-11 w-11 sm:h-7 sm:w-7'
               />
             </div>
           );
@@ -520,7 +540,10 @@ export function ProfilesWorkspace({
               key={option.id}
               label={option.label}
               active={filter === option.id}
-              onClick={() => setFilter(option.id)}
+              onClick={() => {
+                setFilter(option.id);
+                setSelected(null);
+              }}
             />
           ))}
           end={
@@ -557,7 +580,7 @@ export function ProfilesWorkspace({
         getRowId={row => row.id}
         onRowClick={setSelected}
         rowHeight={56}
-        minWidth='460px'
+        minWidth='390px'
         isRowSelected={row => selected?.id === row.id}
         emptyState={
           <TableEmptyState

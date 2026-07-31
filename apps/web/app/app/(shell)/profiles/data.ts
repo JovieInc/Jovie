@@ -53,8 +53,6 @@ export interface ProfileWorkspaceSurfaceRow {
   readonly rank: number | null;
   readonly previousRank: number | null;
   readonly lastObservedAt: string | null;
-  readonly primaryIssue: string;
-  readonly primaryAction: 'open' | 'review' | 'upgrade';
 }
 
 export interface ProfileWorkspaceConnectorRow {
@@ -67,8 +65,6 @@ export interface ProfileWorkspaceConnectorRow {
   readonly url: string;
   readonly status: SettingsConnectorState['status'];
   readonly monitoringState: 'active' | 'paused' | 'unavailable';
-  readonly primaryIssue: string;
-  readonly primaryAction: 'connect' | 'reconnect' | 'open';
 }
 
 export type ProfileWorkspaceRow =
@@ -209,16 +205,6 @@ function connectorRow(
       : needsReconnect
         ? 'paused'
         : 'unavailable',
-    primaryIssue: connected
-      ? 'Active'
-      : needsReconnect
-        ? 'Reconnect Required'
-        : 'Not Connected',
-    primaryAction: connected
-      ? 'open'
-      : needsReconnect
-        ? 'reconnect'
-        : 'connect',
   };
 }
 
@@ -361,22 +347,6 @@ export async function loadProfilesWorkspaceData(input: {
             : 'locked';
     const qualificationStatus =
       surface.qualificationStatus as ProfileQualificationStatus;
-    const primaryIssue =
-      qualificationStatus === 'conflicting'
-        ? 'Needs Review'
-        : qualificationStatus === 'suggested'
-          ? 'Needs Qualification'
-          : locked
-            ? 'Limit Reached'
-            : monitoringState === 'unavailable'
-              ? 'Unavailable'
-              : monitoringState === 'paused'
-                ? 'Paused'
-                : rank === null
-                  ? latestRun
-                    ? 'Not Found'
-                    : 'Not Measured'
-                  : 'Active';
     const trackedUrl =
       socialSourceIds.has(surface.id) &&
       resolveSocialShortcutPlatforms(surface.platform) &&
@@ -404,13 +374,6 @@ export async function loadProfilesWorkspaceData(input: {
         rankFor(surface.id, previousRun?.id)
       ),
       lastObservedAt: surface.lastObservedAt?.toISOString() ?? null,
-      primaryIssue,
-      primaryAction:
-        qualificationStatus === 'suggested'
-          ? 'review'
-          : locked
-            ? 'upgrade'
-            : 'open',
     };
   });
   const connectors = connectorData

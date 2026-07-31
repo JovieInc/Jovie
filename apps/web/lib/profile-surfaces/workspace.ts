@@ -20,6 +20,13 @@ export interface ConnectionsWorkspaceSummary {
   readonly monitoringLabel: 'Active' | 'Paused' | 'Limited' | 'Unavailable';
 }
 
+export type ConnectionPrimaryAction =
+  | 'connect'
+  | 'reconnect'
+  | 'open'
+  | 'review'
+  | 'upgrade';
+
 const PLATFORM_PRIORITY: Readonly<Record<string, number>> = {
   jovie: 0,
   spotify: 1,
@@ -52,7 +59,7 @@ export function getConnectionStatus(
         label: row.status === 'syncing' ? 'Syncing' : 'Active',
         tone: 'success',
         needsAttention: false,
-        sortPriority: 5,
+        sortPriority: 2,
         nextAction:
           row.status === 'syncing'
             ? 'Let the current sync finish.'
@@ -64,7 +71,7 @@ export function getConnectionStatus(
         label: 'Reconnect Required',
         tone: 'warning',
         needsAttention: true,
-        sortPriority: 1,
+        sortPriority: 0,
         nextAction: 'Reconnect this account to resume syncing.',
       };
     }
@@ -81,7 +88,7 @@ export function getConnectionStatus(
       label: 'Not Connected',
       tone: 'neutral',
       needsAttention: true,
-      sortPriority: 2,
+      sortPriority: 0,
       nextAction: 'Connect this account to enable syncing.',
     };
   }
@@ -101,7 +108,7 @@ export function getConnectionStatus(
       label: 'Needs Qualification',
       tone: 'warning',
       needsAttention: true,
-      sortPriority: 1,
+      sortPriority: 0,
       nextAction: 'Confirm whether this connection belongs to the artist.',
     };
   }
@@ -119,7 +126,7 @@ export function getConnectionStatus(
       label: 'Unavailable',
       tone: 'neutral',
       needsAttention: true,
-      sortPriority: 2,
+      sortPriority: 0,
       nextAction: 'Review the source URL before monitoring this connection.',
     };
   }
@@ -128,8 +135,8 @@ export function getConnectionStatus(
       label: 'Paused',
       tone: 'neutral',
       needsAttention: false,
-      sortPriority: 3,
-      nextAction: 'Resume monitoring when you want new rank measurements.',
+      sortPriority: 4,
+      nextAction: 'Review monitoring settings before resuming this connection.',
     };
   }
   if (row.rank === null) {
@@ -137,7 +144,7 @@ export function getConnectionStatus(
       label: row.lastObservedAt ? 'Not Found' : 'Not Measured',
       tone: 'neutral',
       needsAttention: false,
-      sortPriority: 4,
+      sortPriority: 3,
       nextAction: row.lastObservedAt
         ? 'Review the connection if it should appear in search.'
         : 'No action needed until the first monitoring run completes.',
@@ -147,9 +154,34 @@ export function getConnectionStatus(
     label: 'Active',
     tone: 'success',
     needsAttention: false,
-    sortPriority: 5,
+    sortPriority: 2,
     nextAction: 'No action needed.',
   };
+}
+
+export function getConnectionPrimaryAction(
+  row: ProfileWorkspaceRow
+): ConnectionPrimaryAction {
+  if (row.rowType === 'connector') {
+    if (row.status === 'needs_reauth' || row.status === 'error') {
+      return 'reconnect';
+    }
+    if (row.status === 'not_connected' || row.status === 'disabled') {
+      return 'connect';
+    }
+    return 'open';
+  }
+
+  if (row.monitoringState === 'locked') return 'upgrade';
+  if (
+    row.monitoringState === 'unavailable' ||
+    row.monitoringState === 'paused' ||
+    row.qualificationStatus === 'conflicting' ||
+    row.qualificationStatus === 'suggested'
+  ) {
+    return 'review';
+  }
+  return 'open';
 }
 
 function statusPriority(row: ProfileWorkspaceRow): number {
@@ -175,7 +207,8 @@ export function sortProfileWorkspaceRows(
 }
 
 export function summarizeProfileWorkspaceRows(
-  rows: readonly ProfileWorkspaceRow[]
+  rows: readonly ProfileWorkspaceRow[],
+  providerAvailable = true
 ): ConnectionsWorkspaceSummary {
   const surfaceRows = rows.filter(row => row.rowType === 'surface');
   const activeCount = surfaceRows.filter(
@@ -197,8 +230,9 @@ export function summarizeProfileWorkspaceRows(
       row => getConnectionStatus(row).needsAttention
     ).length,
     bestRank: measuredRanks.length > 0 ? Math.min(...measuredRanks) : null,
-    monitoringLabel:
-      activeCount > 0
+    monitoringLabel: !providerAvailable
+      ? 'Unavailable'
+      : activeCount > 0
         ? 'Active'
         : pausedCount > 0
           ? 'Paused'

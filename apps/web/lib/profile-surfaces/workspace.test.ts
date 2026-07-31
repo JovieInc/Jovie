@@ -5,6 +5,7 @@ import type {
 } from '@/app/app/(shell)/profiles/data';
 import {
   filterProfileWorkspaceRows,
+  getConnectionPrimaryAction,
   getConnectionStatus,
   sortProfileWorkspaceRows,
   summarizeProfileWorkspaceRows,
@@ -28,8 +29,6 @@ function surface(
     rank: 4,
     previousRank: 6,
     lastObservedAt: '2026-07-30T00:00:00.000Z',
-    primaryIssue: 'Active',
-    primaryAction: 'open',
     ...overrides,
   };
 }
@@ -47,8 +46,6 @@ function connector(
     url: '/app/settings/connectors',
     status: 'connected',
     monitoringState: 'active',
-    primaryIssue: 'Active',
-    primaryAction: 'open',
     ...overrides,
   };
 }
@@ -107,6 +104,47 @@ describe('connections workspace helpers', () => {
     expect(getConnectionStatus(locked).label).toBe('Limit Reached');
   });
 
+  it('orders broken, limited, measured, then unmeasured connections', () => {
+    const notConnected = connector({ status: 'not_connected' });
+    const limited = surface({
+      id: 'limited',
+      monitoringState: 'locked',
+      rank: null,
+      previousRank: null,
+    });
+    const measured = surface({ id: 'measured', rank: 4 });
+    const unmeasured = surface({
+      id: 'unmeasured',
+      rank: null,
+      previousRank: null,
+      lastObservedAt: null,
+    });
+
+    expect(
+      sortProfileWorkspaceRows([
+        unmeasured,
+        measured,
+        limited,
+        notConnected,
+      ]).map(row => row.id)
+    ).toEqual(['gmail', 'limited', 'measured', 'unmeasured']);
+  });
+
+  it('derives actions from the resolved connection state', () => {
+    expect(getConnectionPrimaryAction(connector({ status: 'error' }))).toBe(
+      'reconnect'
+    );
+    expect(
+      getConnectionPrimaryAction(surface({ monitoringState: 'unavailable' }))
+    ).toBe('review');
+    expect(
+      getConnectionPrimaryAction(surface({ monitoringState: 'paused' }))
+    ).toBe('review');
+    expect(
+      getConnectionPrimaryAction(surface({ monitoringState: 'locked' }))
+    ).toBe('upgrade');
+  });
+
   it('keeps duplicate connection labels as distinct URL-backed rows', () => {
     const first = surface({
       id: 'first',
@@ -136,7 +174,6 @@ describe('connections workspace helpers', () => {
       connector({
         status: 'needs_reauth',
         monitoringState: 'paused',
-        primaryAction: 'reconnect',
       }),
     ];
 
@@ -146,5 +183,11 @@ describe('connections workspace helpers', () => {
       bestRank: 4,
       monitoringLabel: 'Active',
     });
+  });
+
+  it('reports monitoring unavailable when the search provider is disabled', () => {
+    expect(
+      summarizeProfileWorkspaceRows([surface()], false).monitoringLabel
+    ).toBe('Unavailable');
   });
 });

@@ -32,8 +32,6 @@ const data: ProfilesWorkspaceData = {
       rank: 2,
       previousRank: 4,
       lastObservedAt: '2026-07-16T00:00:00.000Z',
-      primaryIssue: 'No issues',
-      primaryAction: 'open',
     },
     {
       id: 'spotify',
@@ -50,8 +48,6 @@ const data: ProfilesWorkspaceData = {
       rank: 7,
       previousRank: 9,
       lastObservedAt: '2026-07-16T00:00:00.000Z',
-      primaryIssue: 'Monitoring limit',
-      primaryAction: 'upgrade',
     },
     {
       id: 'gmail',
@@ -63,8 +59,6 @@ const data: ProfilesWorkspaceData = {
       url: '/app/settings/connectors',
       status: 'connected',
       monitoringState: 'active',
-      primaryIssue: 'Active',
-      primaryAction: 'open',
     },
   ],
   monitoringLimit: 5,
@@ -98,7 +92,7 @@ describe('ProfilesWorkspace', () => {
     ).toHaveAttribute('href', '/app/settings/artist-profile');
   });
 
-  it('renders a connection summary and filters without exposing locked ranks', () => {
+  it('renders a connection summary and filters without exposing locked ranks', async () => {
     renderWorkspace(data);
 
     expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
@@ -109,9 +103,14 @@ describe('ProfilesWorkspace', () => {
     expect(screen.getByText('Monitored 1/5')).toBeInTheDocument();
     expect(screen.getByText('Needs Attention 1')).toBeInTheDocument();
     expect(screen.getByText('Monitoring Active')).toBeInTheDocument();
-    expect(
-      screen.getByRole('img', { name: 'DSP connection type' })
-    ).toBeInTheDocument();
+    const typeTrigger = screen.getByRole('button', {
+      name: 'DSP connection type',
+    });
+    expect(typeTrigger).toBeInTheDocument();
+    fireEvent.focus(typeTrigger);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'DSP connection'
+    );
     expect(screen.getByText('Requires Upgrade')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'DSPs' }));
@@ -147,6 +146,20 @@ describe('ProfilesWorkspace', () => {
       'href',
       '/app/settings/billing'
     );
+  });
+
+  it('clears connection details when the table filter changes', () => {
+    renderWorkspace(data);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Actions for Spotify' })
+    );
+    expect(
+      vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0]
+    ).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Connectors' }));
+    expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
   });
 
   it('preserves the compact mobile table contract', () => {
