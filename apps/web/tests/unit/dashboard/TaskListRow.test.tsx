@@ -53,8 +53,8 @@ describe('TaskListRow', () => {
     const meta = getByTestId('task-list-row-meta-task-1');
     expect(meta.className).toContain('flex-wrap');
     expect(meta.className).not.toContain('grid-cols-');
-    expect(meta.className).toContain('gap-x-2');
-    expect(meta.className).toContain('gap-y-0.5');
+    expect(meta).toHaveClass('gap-x-1.5');
+    expect(meta).toHaveClass('gap-y-0');
   });
 
   it('keeps row controls at the shared compact hit-area density', () => {
@@ -89,7 +89,7 @@ describe('TaskListRow', () => {
       'true'
     );
     expect(getByTestId('task-list-row-task-1').className).toContain(
-      'system-b-table-row-selected'
+      'system-b-shell-list-task-row-selected'
     );
     expect(getByText(mockTask.title)).toBeVisible();
   });

@@ -175,7 +175,7 @@ export const TaskListRow = memo(function TaskListRow({
       isSelected={isSelected}
       interaction='task-row-group'
       className={cn(
-        'group/row flex h-full w-full items-center gap-2.5 px-3 py-1 transition-[opacity] duration-subtle ease-subtle',
+        'group/row flex h-full w-full items-center gap-2 px-3 py-1 transition-[opacity] duration-subtle ease-subtle',
         isDone && !isSelected && 'opacity-75',
         isCancelled && !isSelected && 'opacity-60'
       )}
@@ -203,7 +203,7 @@ export const TaskListRow = memo(function TaskListRow({
         <div
           data-testid={`task-list-row-meta-${task.id}`}
           className={cn(
-            'flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 overflow-hidden text-3xs leading-none text-secondary-token',
+            'flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0 overflow-hidden text-3xs leading-4 text-secondary-token',
             !hideTitle && 'mt-px'
           )}
         >

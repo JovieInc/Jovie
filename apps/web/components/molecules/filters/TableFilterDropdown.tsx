@@ -86,7 +86,7 @@ function TableFilterSection<T extends string>({
   }, [category.options, search]);
 
   return (
-    <div className='flex max-h-80 min-h-55 min-w-65 flex-col overflow-hidden'>
+    <div className='flex max-h-80 min-w-65 flex-col overflow-hidden'>
       <div
         data-menu-header
         className='border-b border-[color-mix(in_oklab,var(--app-shell-frame-seam)_44%,transparent)]'

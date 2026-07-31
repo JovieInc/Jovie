@@ -699,7 +699,7 @@ function TaskDocumentPanel({
           className='min-h-0 flex-1 overflow-y-auto overscroll-contain'
           data-testid='task-document-scroll-region'
         >
-          <div className='mx-auto flex w-full max-w-[40rem] flex-col gap-3 px-4 pb-5 pt-4 sm:px-5 sm:pb-6 sm:pt-5'>
+          <div className='mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pb-6 pt-5 sm:px-5 sm:pb-7 sm:pt-6'>
             <TaskTitleEditor value={title} onChange={onTitleChange} />
 
             <div
@@ -854,7 +854,9 @@ function TaskDocumentPanel({
                 value={description}
                 onFocus={handleDescriptionFocus}
                 onChange={event => onDescriptionChange(event.target.value)}
-                placeholder='Start writing...'
+                placeholder={
+                  showDescriptionHelper ? undefined : 'Start writing...'
+                }
                 className='min-h-130 w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-mid leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)] transition-colors duration-fast focus:outline-none! focus-visible:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
                 style={{ boxShadow: 'none' }}
               />
