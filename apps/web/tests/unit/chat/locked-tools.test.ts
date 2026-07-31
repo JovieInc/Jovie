@@ -6,7 +6,12 @@
  * payload sourced from the entitlement registry — never an error.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/lib/entitlements/demand-signal', () => ({
+  logEntitlementDenial: vi.fn(),
+}));
+
 import {
   buildLockedToolPromptInfo,
   buildLockedToolResult,
@@ -92,6 +97,7 @@ describe('resolveLockedChatTools', () => {
         'retouchImage',
         'createMerch',
         'previewMerchOptions',
+        'manageTasks',
       ])
     );
     expect(locked).toHaveLength(LOCKABLE_NAMES.length);

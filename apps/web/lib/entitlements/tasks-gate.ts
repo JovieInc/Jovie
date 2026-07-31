@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { logEntitlementDenial } from './demand-signal';
 import { getCurrentUserEntitlements } from './server';
 
 export type TasksUpgradeRequiredCode =
@@ -26,14 +27,33 @@ export async function canGenerateReleasePlans(): Promise<boolean> {
   return entitlements.canGenerateReleasePlans;
 }
 
+function throwTasksUpgradeRequired(
+  code: TasksUpgradeRequiredCode,
+  message: string,
+  gate: 'canAccessTasksWorkspace' | 'canGenerateReleasePlans'
+): never {
+  // Demand signal for server-action callers (chat panel, mutations).
+  // Chat tools already log via locked stubs / fail-soft boundary.
+  logEntitlementDenial({
+    gate,
+    source: 'server-action',
+    code,
+    planRequired: 'Pro',
+    message,
+  });
+
+  throw new TasksUpgradeRequiredError(code, message);
+}
+
 export async function requireTasksWorkspaceAccess(): Promise<void> {
   if (await canAccessTasksWorkspace()) {
     return;
   }
 
-  throw new TasksUpgradeRequiredError(
+  throwTasksUpgradeRequired(
     'TASKS_WORKSPACE_LOCKED',
-    'Tasks requires a Pro plan.'
+    'Tasks requires a Pro plan.',
+    'canAccessTasksWorkspace'
   );
 }
 
@@ -42,8 +62,9 @@ export async function requireReleasePlanGenerationAccess(): Promise<void> {
     return;
   }
 
-  throw new TasksUpgradeRequiredError(
+  throwTasksUpgradeRequired(
     'RELEASE_PLAN_LOCKED',
-    'Release plans require a Pro plan.'
+    'Release plans require a Pro plan.',
+    'canGenerateReleasePlans'
   );
 }

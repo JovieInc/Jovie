@@ -1,5 +1,5 @@
 /**
- * Entitlement-locked chat tool stubs (GH #13304).
+ * Entitlement-locked chat tool stubs (GH #13304 / JOV-3861).
  *
  * When a plan denies a gated chat capability, the tool stays VISIBLE to the
  * model but its execute is swapped for a stub returning
@@ -13,6 +13,7 @@
  */
 
 import { tool } from 'ai';
+import { logEntitlementDenial } from '@/lib/entitlements/demand-signal';
 import {
   type BooleanEntitlement,
   ENTITLEMENT_REGISTRY,
@@ -26,12 +27,16 @@ import { getToolUiConfig } from './tool-ui-registry';
  * controls them. Merch is represented by its two generative entry points —
  * the management tools (publish/pause/reorder/…) are meaningless without a
  * generation, so they stay hidden when the plan denies merch.
+ *
+ * `manageTasks` is the Tasks workspace paywall entry (JOV-3861) so free users
+ * who ask chat to create/list tasks get an upgrade CTA instead of a 500.
  */
 export const LOCKABLE_CHAT_TOOL_GATES = {
   generateAlbumArt: 'canGenerateAlbumArt',
   retouchImage: 'canAccessAiRetouching',
   createMerch: 'canAccessMerchCreation',
   previewMerchOptions: 'canAccessMerchCreation',
+  manageTasks: 'canAccessTasksWorkspace',
 } as const satisfies Partial<
   Record<keyof typeof TOOL_SCHEMAS, BooleanEntitlement>
 >;
@@ -105,6 +110,55 @@ export function buildLockedToolResult(
 }
 
 /**
+ * Build a locked payload for any tool name when an entitlement denial is
+ * caught at the tool boundary (JOV-3861). Prefer the registry-backed result
+ * for lockable tools; otherwise fall back to a Pro CTA using the tool UI label.
+ */
+export function buildLockedToolResultForTool(
+  toolName: string,
+  options?: {
+    readonly gate?: BooleanEntitlement;
+    readonly message?: string;
+  }
+): LockedToolResult {
+  if (isLockableChatToolName(toolName)) {
+    const result = buildLockedToolResult(toolName);
+    if (options?.message && options.message.trim().length > 0) {
+      return {
+        ...result,
+        reason: options.message.trim(),
+        summary: options.message.trim(),
+      };
+    }
+    return result;
+  }
+
+  const gate = options?.gate ?? 'canAccessTasksWorkspace';
+  const plan = resolveRequiredPlanForGate(gate);
+  const label = getToolUiConfig(toolName).label;
+  const message =
+    options?.message && options.message.trim().length > 0
+      ? options.message.trim()
+      : `${label} requires the ${plan.displayName} plan.`;
+
+  return {
+    success: true,
+    locked: true,
+    gate,
+    reason: message,
+    plan_required: plan.displayName,
+    upgrade_cta: `Upgrade to ${plan.displayName} to unlock ${label.toLowerCase()}.`,
+    summary: message,
+  };
+}
+
+export function isLockableChatToolName(
+  toolName: string
+): toolName is LockableChatToolName {
+  return Object.hasOwn(LOCKABLE_CHAT_TOOL_GATES, toolName);
+}
+
+/**
  * Locked stub: same description + input schema as the real tool (so the
  * model can call it naturally), but execute returns the locked payload
  * instead of doing the work.
@@ -114,7 +168,17 @@ export function createLockedToolStub(toolName: LockableChatToolName) {
   return tool({
     description: schema.description,
     inputSchema: schema.inputSchema,
-    execute: async () => buildLockedToolResult(toolName),
+    execute: async () => {
+      const result = buildLockedToolResult(toolName);
+      logEntitlementDenial({
+        gate: result.gate,
+        source: 'chat-tool-locked-stub',
+        toolName,
+        planRequired: result.plan_required,
+        message: result.summary,
+      });
+      return result;
+    },
   } as never);
 }
 

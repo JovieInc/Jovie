@@ -41,6 +41,8 @@ export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
   generateCanvasPlan: 'Pro-only; surfaced via the release detail surface.',
   importBioFromUrl:
     'Triggered conversationally from an explicit URL import request before profile-edit preview.',
+  manageTasks:
+    'Tasks has a dedicated workspace; chat invokes it conversationally so it can return the correct entitlement CTA without exposing a root slash command.',
   markCanvasUploaded:
     'CRUD-style follow-up; surfaced inside the checkCanvasStatus card.',
   openBillingPortal:

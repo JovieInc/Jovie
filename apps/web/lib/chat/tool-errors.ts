@@ -10,6 +10,15 @@ export const TOOL_ERROR_CODES = {
   TOOL_EXECUTION_FAILED: 'TOOL_EXECUTION_FAILED',
 } as const;
 
+/** Entitlement gate codes thrown by tasks-gate and similar plan locks. */
+export const ENTITLEMENT_DENIAL_CODES = {
+  TASKS_WORKSPACE_LOCKED: 'TASKS_WORKSPACE_LOCKED',
+  RELEASE_PLAN_LOCKED: 'RELEASE_PLAN_LOCKED',
+} as const;
+
+export type EntitlementDenialCode =
+  (typeof ENTITLEMENT_DENIAL_CODES)[keyof typeof ENTITLEMENT_DENIAL_CODES];
+
 export type ToolErrorCode =
   (typeof TOOL_ERROR_CODES)[keyof typeof TOOL_ERROR_CODES];
 
@@ -104,6 +113,46 @@ function asToolErrorCode(value: unknown): ToolErrorCode | undefined {
     : undefined;
 }
 
+function asEntitlementDenialCode(
+  value: unknown
+): EntitlementDenialCode | undefined {
+  if (typeof value !== 'string') return undefined;
+  return Object.values(ENTITLEMENT_DENIAL_CODES).includes(
+    value as EntitlementDenialCode
+  )
+    ? (value as EntitlementDenialCode)
+    : undefined;
+}
+
+/**
+ * True when the thrown value is an expected plan/entitlement gate denial
+ * (e.g. TasksUpgradeRequiredError) — never a Sentry-worthy failure.
+ */
+export function isEntitlementDenialError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    if (error !== null && typeof error === 'object' && 'code' in error) {
+      return (
+        asEntitlementDenialCode((error as { code?: unknown }).code) != null
+      );
+    }
+    return false;
+  }
+
+  if (error.name === 'TasksUpgradeRequiredError') {
+    return true;
+  }
+
+  if (asEntitlementDenialCode((error as { code?: unknown }).code) != null) {
+    return true;
+  }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('requires a pro plan') ||
+    message.includes('requires the pro plan')
+  );
+}
+
 function inferErrorCodeFromMessage(message: string): ToolErrorCode {
   const normalized = message.toLowerCase();
 
@@ -115,6 +164,7 @@ function inferErrorCodeFromMessage(message: string): ToolErrorCode {
   }
   if (
     normalized.includes('requires a pro plan') ||
+    normalized.includes('requires the pro plan') ||
     normalized.includes('paid plan') ||
     normalized.includes('upgrade')
   ) {
@@ -152,7 +202,11 @@ export function classifyThrownToolError(
   error: unknown
 ): ToolFailurePayload {
   const thrownCode =
-    error instanceof Error ? (error as { code?: unknown }).code : undefined;
+    error instanceof Error
+      ? (error as { code?: unknown }).code
+      : error !== null && typeof error === 'object' && 'code' in error
+        ? (error as { code?: unknown }).code
+        : undefined;
   const errorCodeFromThrown = asToolErrorCode(thrownCode);
 
   if (
@@ -173,15 +227,28 @@ export function classifyThrownToolError(
       : typeof error === 'string'
         ? error
         : 'Tool execution failed.';
-  const code =
-    error instanceof Error
-      ? asToolErrorCode((error as { code?: unknown }).code)
-      : undefined;
+
+  // TasksUpgradeRequiredError and sibling gate codes are expected plan denials
+  // (JOV-3861) — never retry, never treat as generic execution failure.
+  if (
+    isEntitlementDenialError(error) ||
+    asEntitlementDenialCode(thrownCode) != null
+  ) {
+    return buildToolFailure({
+      errorCode: TOOL_ERROR_CODES.PLAN_UNAVAILABLE,
+      error: message,
+      retryable: false,
+      toolName,
+    });
+  }
+
+  const code = asToolErrorCode(thrownCode);
+  const errorCode = code ?? inferErrorCodeFromMessage(message);
 
   return buildToolFailure({
-    errorCode: code ?? inferErrorCodeFromMessage(message),
+    errorCode,
     error: message,
-    retryable: code !== TOOL_ERROR_CODES.PLAN_UNAVAILABLE,
+    retryable: errorCode !== TOOL_ERROR_CODES.PLAN_UNAVAILABLE,
     toolName,
   });
 }

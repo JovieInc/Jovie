@@ -57,6 +57,11 @@ import {
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
 import {
+  buildLockedToolPromptInfo,
+  buildLockedToolSet,
+  resolveLockedChatTools,
+} from '@/lib/chat/locked-tools';
+import {
   extractLastUserImageUrl,
   extractLastUserText,
 } from '@/lib/chat/message-text';
@@ -2853,31 +2858,45 @@ export async function POST(req: Request) {
       accountContext
     );
     // Advanced tools gated behind paid plans
-    const tools = canUsePaidChatTools(accountContext)
-      ? {
-          ...freeTools,
-          ...buildChatTools(
-            artistContext,
-            resolvedProfileId,
-            releases,
-            insightsEnabled,
-            userId,
-            albumArtCapability.availability === 'available',
-            albumArtEnabled,
-            planLimits.booleans.canAccessMerchCreation,
-            planLimits.booleans.canAccessAiRetouching,
-            teleprompterRecordingEnabled,
-            currentUserEntitlements,
-            reservedTurn,
-            {
-              sourceImageUrl: extractLastUserImageUrl(uiMessages),
-              conversationId:
-                reservedTurn?.conversationId ?? resolvedConversationId,
-            },
-            userText
-          ),
-        }
-      : freeTools;
+    const paidTools = canUsePaidChatTools(accountContext)
+      ? buildChatTools(
+          artistContext,
+          resolvedProfileId,
+          releases,
+          insightsEnabled,
+          userId,
+          albumArtCapability.availability === 'available',
+          albumArtEnabled,
+          planLimits.booleans.canAccessMerchCreation,
+          planLimits.booleans.canAccessAiRetouching,
+          teleprompterRecordingEnabled,
+          currentUserEntitlements,
+          reservedTurn,
+          {
+            sourceImageUrl: extractLastUserImageUrl(uiMessages),
+            conversationId:
+              reservedTurn?.conversationId ?? resolvedConversationId,
+          },
+          userText
+        )
+      : {};
+    // Plan-locked stubs stay VISIBLE to the model so free users who ask for
+    // Tasks / album art / merch get an upgrade CTA instead of a missing-tool
+    // dead-end or a thrown entitlement error (GH #13304 / JOV-3861).
+    const activeToolNames = new Set([
+      ...Object.keys(freeTools),
+      ...Object.keys(paidTools),
+    ]);
+    const lockedToolNames = resolveLockedChatTools(planLimits.booleans).filter(
+      name => !activeToolNames.has(name)
+    );
+    const lockedToolSet = buildLockedToolSet(lockedToolNames);
+    const lockedToolPromptInfo = buildLockedToolPromptInfo(lockedToolNames);
+    const tools = {
+      ...freeTools,
+      ...paidTools,
+      ...lockedToolSet,
+    };
 
     // Telemetry hooks bind Sentry into `executeChatTurn` without coupling
     // the pure pipeline to Sentry. Eval scripts pass a no-op telemetry.
@@ -2950,6 +2969,7 @@ export async function POST(req: Request) {
       forceLightModel,
       modelRotationStep,
       lastUserText: userText,
+      lockedTools: lockedToolPromptInfo,
       pinnedOpportunity,
       tools: wrapToolSetFailSoft(tools),
       signal: req.signal,

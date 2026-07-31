@@ -15,6 +15,32 @@ const TASK_STATS_CACHE = {
   gcTime: 5 * 60 * 1000,
 };
 
+/** Never auto-retry expected plan gates (JOV-3861 retry-loop fix). */
+function shouldRetryTaskQuery(failureCount: number, error: unknown): boolean {
+  if (isTasksUpgradeQueryError(error)) {
+    return false;
+  }
+  return failureCount < 3;
+}
+
+function isTasksUpgradeQueryError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  if (error.name === 'TasksUpgradeRequiredError') {
+    return true;
+  }
+  const code = (error as { code?: unknown }).code;
+  if (code === 'TASKS_WORKSPACE_LOCKED' || code === 'RELEASE_PLAN_LOCKED') {
+    return true;
+  }
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('requires a pro plan') ||
+    message.includes('require a pro plan')
+  );
+}
+
 export function useTasksQuery(
   profileId?: string,
   filters?: TaskFilters,
@@ -29,6 +55,7 @@ export function useTasksQuery(
     ...STANDARD_CACHE,
     placeholderData: keepPreviousData,
     enabled: Boolean(profileId) && (options?.enabled ?? true),
+    retry: shouldRetryTaskQuery,
   });
 }
 
@@ -46,6 +73,7 @@ export function useTaskBoardQuery(
     ...STANDARD_CACHE,
     placeholderData: keepPreviousData,
     enabled: Boolean(profileId) && (options?.enabled ?? true),
+    retry: shouldRetryTaskQuery,
   });
 }
 
@@ -56,6 +84,7 @@ export function useTaskQuery(taskId: string | null, profileId?: string) {
     queryFn: () => getTask(taskId!),
     ...STANDARD_CACHE,
     enabled: Boolean(taskId && profileId),
+    retry: shouldRetryTaskQuery,
   });
 }
 
@@ -69,5 +98,6 @@ export function useTaskStatsQuery(
     queryFn: () => getTaskStats({ newerThan: options?.seenAt ?? null }),
     ...TASK_STATS_CACHE,
     enabled: Boolean(profileId) && (options?.enabled ?? true),
+    retry: shouldRetryTaskQuery,
   });
 }

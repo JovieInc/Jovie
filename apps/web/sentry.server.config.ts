@@ -77,6 +77,12 @@ Sentry.init({
     // is not authenticated. These are handled by the client error boundary
     // and are not bugs (JOV-1065).
     /^Unauthorized$/,
+    // Expected entitlement paywalls (Tasks / release plans). Client surfaces
+    // an upgrade CTA; chat tools return locked results. Not application bugs
+    // (JOV-3861 / JOVIE-WEB-JW).
+    /^TasksUpgradeRequiredError/,
+    /Tasks requires a Pro plan/,
+    /Release plans require a Pro plan/,
     /TimeoutError: page\.waitForFunction/i,
     /TimeoutError: locator\.waitFor/i,
     /toHaveURL/,
