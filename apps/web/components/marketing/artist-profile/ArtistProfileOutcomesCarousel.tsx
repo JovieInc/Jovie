@@ -1,8 +1,7 @@
 'use client';
 
-import { Check, ChevronLeft, ChevronRight, Mail } from 'lucide-react';
+import { Check, Mail } from 'lucide-react';
 import Image from 'next/image';
-import { useId, useRef } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import {
   HOMEPAGE_PROFILE_PREVIEW_ARTIST,
@@ -10,8 +9,8 @@ import {
   HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES,
 } from '@/features/home/homepage-profile-preview-fixture';
 import { ProfilePrimaryActionCard } from '@/features/profile/ProfilePrimaryActionCard';
-import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
+import { MarketingSnapRail } from '../MarketingSnapRail';
 import './ArtistProfileOutcomesCarousel.css';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
@@ -43,25 +42,6 @@ const SHOWCASE_VIEWER_LOCATION = {
 export function ArtistProfileOutcomesCarousel({
   outcomes,
 }: Readonly<ArtistProfileOutcomesCarouselProps>) {
-  const railId = useId();
-  const scrollerRef = useRef<HTMLElement | null>(null);
-  const reducedMotion = useReducedMotion();
-
-  const scrollByDirection = (direction: 'prev' | 'next') => {
-    const rail = scrollerRef.current;
-    if (!rail) {
-      return;
-    }
-
-    const scrollStep = Math.max(rail.clientWidth * 0.8, 240);
-    const nextLeft = direction === 'next' ? scrollStep : -scrollStep;
-
-    rail.scrollBy({
-      left: nextLeft,
-      behavior: reducedMotion ? 'auto' : 'smooth',
-    });
-  };
-
   return (
     <ArtistProfileSectionShell
       className='ap-outcomes'
@@ -79,85 +59,27 @@ export function ArtistProfileOutcomesCarousel({
           />
         </div>
 
+        {/* Compatibility stub: historical e2e asserts the legacy scroller node stays hidden. */}
         <div
           data-testid='artist-profile-outcomes-scroller'
           className='hidden'
           aria-hidden='true'
         />
 
-        <p id='artist-profile-outcomes-instructions' className='sr-only'>
-          Browse the five outcome cards. Previous and next controls are
-          available when the cards form a horizontal rail.
-        </p>
-
-        <div className='relative mt-10 w-full overflow-x-hidden'>
-          <div className='pointer-events-none absolute right-[max(1.25rem,calc((100vw-var(--public-content-max-page))/2))] top-4 z-20 hidden items-center gap-2 lg:flex'>
-            <button
-              type='button'
-              aria-controls={railId}
-              aria-label='Scroll Outcomes Left'
-              onClick={() => {
-                scrollByDirection('prev');
-              }}
-              className='ap-outcomes__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors'
-            >
-              <ChevronLeft className='h-4 w-4' aria-hidden='true' />
-            </button>
-            <button
-              type='button'
-              aria-controls={railId}
-              aria-label='Scroll Outcomes Right'
-              onClick={() => {
-                scrollByDirection('next');
-              }}
-              className='ap-outcomes__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors'
-            >
-              <ChevronRight className='h-4 w-4' aria-hidden='true' />
-            </button>
-          </div>
-
-          <div className='hidden sm:block lg:hidden'>
-            <div className='sr-only focus-within:not-sr-only focus-within:absolute focus-within:left-6 focus-within:top-4 focus-within:z-20 focus-within:flex focus-within:gap-2'>
-              <button
-                type='button'
-                aria-controls={railId}
-                aria-label='Scroll Outcomes Left'
-                onClick={() => {
-                  scrollByDirection('prev');
-                }}
-                className='ap-outcomes__rail-btn min-h-11 min-w-11 rounded-full bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold'
-              >
-                Prev
-              </button>
-              <button
-                type='button'
-                aria-controls={railId}
-                aria-label='Scroll Outcomes Right'
-                onClick={() => {
-                  scrollByDirection('next');
-                }}
-                className='ap-outcomes__rail-btn min-h-11 min-w-11 rounded-full bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold'
-              >
-                Next
-              </button>
-            </div>
-          </div>
-
-          <section
-            ref={scrollerRef}
-            id={railId}
-            data-testid='artist-profile-outcomes-grid'
-            aria-label='Outcome Showcase'
-            aria-describedby='artist-profile-outcomes-instructions'
-            className={cn(
-              'relative grid grid-cols-1 gap-3 overflow-visible pb-3 pl-5 pr-5 sm:flex sm:gap-3.5 sm:overflow-x-auto sm:overflow-y-hidden sm:overscroll-x-contain sm:snap-x sm:snap-mandatory sm:pl-6 sm:pr-[12vw] sm:scroll-pl-6 lg:pl-[max(1.5rem,calc((100vw-var(--public-content-max-page))/2))] lg:pr-[14vw] lg:scroll-pl-[max(1.5rem,calc((100vw-var(--public-content-max-page))/2))] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-              !reducedMotion && 'sm:scroll-smooth'
-            )}
+        <div className='mt-10'>
+          <MarketingSnapRail
+            ariaLabel='Outcome Showcase'
+            instructionsId='artist-profile-outcomes-instructions'
+            instructions='Browse the five outcome cards. Previous and next controls are available when the cards form a horizontal rail.'
+            scrollerTestId='artist-profile-outcomes-grid'
+            previousLabel='Scroll Outcomes Left'
+            nextLabel='Scroll Outcomes Right'
+            testId='artist-profile-outcomes-rail'
           >
             {outcomes.landingCards.map(card => (
               <OutcomeCard key={card.id} card={card} outcomes={outcomes} />
             ))}
-          </section>
+          </MarketingSnapRail>
         </div>
       </div>
     </ArtistProfileSectionShell>

@@ -98,6 +98,37 @@ describe('artist profile landing family System B source contract', () => {
       'utf8'
     );
     expect(sectionHeader).toContain('text-primary-token');
+
+    const outcomes = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/marketing/artist-profile/ArtistProfileOutcomesCarousel.tsx'
+      ),
+      'utf8'
+    );
+    expect(outcomes).toContain('MarketingSnapRail');
+    expect(outcomes).not.toContain('scrollByDirection');
+
+    const hero = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/marketing/artist-profile/ArtistProfileHero.tsx'
+      ),
+      'utf8'
+    );
+    expect(hero).toContain('showSupport');
+    expect(hero).not.toContain('hero.eyebrow');
+
+    const finalCta = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/marketing/artist-profile/ArtistProfileFinalCta.tsx'
+      ),
+      'utf8'
+    );
+    expect(finalCta).toContain('getClaimProfileIntent');
+    expect(finalCta).toContain('public-action-primary');
+    expect(finalCta).not.toContain('APP_ROUTES.SIGNUP');
     expect(sectionHeader).toContain('text-secondary-token');
   });
 });

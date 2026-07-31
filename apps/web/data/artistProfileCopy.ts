@@ -424,10 +424,10 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
   },
   hero: {
-    eyebrow: 'Built for artists',
+    eyebrow: '',
     headline: 'The link your music deserves.',
     subhead:
-      'Streams, drops, support, bookings, and fan capture in a single page.',
+      'One adaptive home for music, merch, social links, and fan capture — free to start.',
     ctaLabel: 'Claim your profile',
     signature: 'jov.ie/you',
     proofWhisper: 'Used by artists on',
@@ -435,14 +435,14 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     phoneSubcaption: 'Adapts to every fan.',
   },
   adaptive: {
-    eyebrow: 'Adaptive by default',
+    eyebrow: '',
     headline: 'One profile that adapts to every fan.',
     alternateHeadlines: [
       'One profile for every release moment.',
       'One link, tuned to what matters right now.',
       'The same link, different job.',
     ],
-    body: 'Before a drop, it becomes a countdown. On release day, it routes fans straight to the right service. On tour, nearby dates come first. At the merch table, one scan can become support and fan capture.',
+    body: 'Link once. Capture the fan. Learn what converts. Close the moment. Before a drop, the profile becomes a countdown. On release day, fans route to the right service. On tour, nearby dates lead. At the merch table, one scan becomes support and capture.',
     contextCues: [
       'Release-aware',
       'Location-aware',
@@ -617,7 +617,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   outcomes: {
     headline: 'Built around fan outcomes.',
-    body: 'Every state of the profile is designed to reduce friction and move the fan to the next right action.',
+    body: 'Link, capture, learn, convert — each profile state reduces friction and moves the fan to the next right action.',
     cards: [
       {
         id: 'drive-streams',

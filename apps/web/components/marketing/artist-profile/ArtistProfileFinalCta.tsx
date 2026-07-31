@@ -1,7 +1,6 @@
-import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import { APP_ROUTES } from '@/constants/routes';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { cn } from '@/lib/utils';
 import { SHELL_H2_CLASS, SHELL_LEAD_CLASS } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
@@ -16,10 +15,14 @@ interface ArtistProfileFinalCtaProps {
 
 export function ArtistProfileFinalCta({
   finalCta,
-  ctaHref = APP_ROUTES.SIGNUP,
+  ctaHref,
   roomy = false,
   showSignature = false,
 }: Readonly<ArtistProfileFinalCtaProps>) {
+  const claimIntent = getClaimProfileIntent();
+  const href = ctaHref ?? claimIntent.href;
+  const label = finalCta.ctaLabel || claimIntent.label;
+
   return (
     <ArtistProfileSectionShell
       className={cn('ap-final-cta relative', roomy && 'flex items-center')}
@@ -48,12 +51,20 @@ export function ArtistProfileFinalCta({
           {finalCta.signature}
         </p>
       ) : null}
-      <div className='mt-8'>
-        <Button asChild variant='primary' size='lg'>
-          <Link href={ctaHref} data-testid='final-cta-action'>
-            {finalCta.ctaLabel}
-          </Link>
-        </Button>
+      <div className='mt-8 flex flex-col items-center gap-3'>
+        {/* Navigating control: no press-scale — public-action-primary is color/opacity only. */}
+        <Link
+          href={href}
+          data-testid='final-cta-action'
+          data-analytics-event={claimIntent.eventName}
+          data-analytics-source='artist-profiles-final-cta'
+          className='public-action-primary'
+        >
+          {label}
+        </Link>
+        <p className='text-xs font-medium tracking-wide text-tertiary-token'>
+          {claimIntent.support}
+        </p>
       </div>
     </ArtistProfileSectionShell>
   );

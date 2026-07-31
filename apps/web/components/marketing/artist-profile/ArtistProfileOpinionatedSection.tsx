@@ -22,11 +22,8 @@ export function ArtistProfileOpinionatedSection({
     <ArtistProfileSectionShell>
       <div className='grid items-start gap-12 lg:grid-cols-[minmax(0,0.8fr)_minmax(30rem,1.2fr)] lg:gap-20'>
         <div className='max-w-xl lg:sticky lg:top-32'>
-          <p className='text-xs font-medium tracking-wide text-secondary-token'>
-            {opinionated.eyebrow}
-          </p>
           {/* ui-casing-allow: marketing display headline */}
-          <h2 className={cn(SHELL_H2_CLASS, 'ap-opinionated__headline mt-5')}>
+          <h2 className={cn(SHELL_H2_CLASS, 'ap-opinionated__headline')}>
             {opinionated.headline}
           </h2>
           <p className={cn(SHELL_LEAD_CLASS, 'mt-6')}>{opinionated.body}</p>
