@@ -46,7 +46,9 @@ export async function runAdd(opts) {
 
   let parentId = null;
   if (typeof flags.parent === 'string' && flags.parent.trim()) {
-    const parent = await opts.client.fetchIssueByIdentifier(flags.parent.trim());
+    const parent = await opts.client.fetchIssueByIdentifier(
+      flags.parent.trim()
+    );
     if (!parent) {
       return { ok: false, error: `Parent issue not found: ${flags.parent}` };
     }

@@ -29,7 +29,10 @@ export async function runApproved(opts) {
     (await loadBacklog({
       cwd: opts.cwd ?? process.cwd(),
       readFileImpl: opts.readFileImpl ?? readFile,
-      path: typeof flags.backlog === 'string' ? flags.backlog : DEFAULT_BACKLOG_PATH,
+      path:
+        typeof flags.backlog === 'string'
+          ? flags.backlog
+          : DEFAULT_BACKLOG_PATH,
     }));
 
   if (!backlog?.issues) {

@@ -57,10 +57,7 @@ export function buildAgentBriefFromIssue(input) {
   const siblings = (backlog?.issues ?? [])
     .filter(
       /** @param {{id:string,projectId?:string|null}} i */
-      i =>
-        i.projectId &&
-        i.projectId === issue.projectId &&
-        i.id !== issue.id
+      i => i.projectId && i.projectId === issue.projectId && i.id !== issue.id
     )
     .slice(0, 20)
     .map(
@@ -147,7 +144,10 @@ export async function runAgentBrief(opts) {
     (await loadBacklog({
       cwd: opts.cwd ?? process.cwd(),
       readFileImpl: opts.readFileImpl ?? readFile,
-      path: typeof flags.backlog === 'string' ? flags.backlog : DEFAULT_BACKLOG_PATH,
+      path:
+        typeof flags.backlog === 'string'
+          ? flags.backlog
+          : DEFAULT_BACKLOG_PATH,
     }));
 
   /** @type {object|null} */
@@ -276,13 +276,17 @@ function extractSuccessCriteria(description) {
   let inSection = false;
   for (const raw of lines) {
     const line = raw.trim();
-    if (/^#{1,3}\s*(acceptance criteria|success criteria|done when)\b/i.test(line)) {
+    if (
+      /^#{1,3}\s*(acceptance criteria|success criteria|done when)\b/i.test(line)
+    ) {
       inSection = true;
       continue;
     }
     if (inSection && /^#{1,3}\s+\S/.test(line)) break;
     if (!inSection) continue;
-    const m = line.match(/^[-*]\s+(?:\[[ xX]\]\s+)?(.+)$/) || line.match(/^\d+[.)]\s+(.+)$/);
+    const m =
+      line.match(/^[-*]\s+(?:\[[ xX]\]\s+)?(.+)$/) ||
+      line.match(/^\d+[.)]\s+(.+)$/);
     if (m?.[1]) out.push(m[1].trim());
   }
   return out;

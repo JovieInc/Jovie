@@ -243,7 +243,10 @@ export function createLinearClient(opts = {}) {
     );
     const byName = new Map(
       (data?.team?.labels?.nodes ?? []).map(
-        /** @param {{id:string,name:string}} n */ n => [n.name.toLowerCase(), n.id]
+        /** @param {{id:string,name:string}} n */ n => [
+          n.name.toLowerCase(),
+          n.id,
+        ]
       )
     );
     /** @type {string[]} */

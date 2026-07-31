@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * /roadmap CLI — Linear ops for AgentOS (JOV-1932).
  *
@@ -8,14 +9,14 @@
  * Each subcommand is an isolated pure-ish module under commands/.
  */
 
-import { createLinearClient } from './linear-client.mjs';
-import { formatHelp, parseRoadmapArgs } from './parse-args.mjs';
 import { runAdd } from './commands/add.mjs';
 import { runAgentBrief } from './commands/agent-brief.mjs';
 import { runApproved } from './commands/approved.mjs';
 import { runExpand } from './commands/expand.mjs';
 import { runSync } from './commands/sync.mjs';
 import { runToday } from './commands/today.mjs';
+import { createLinearClient } from './linear-client.mjs';
+import { formatHelp, parseRoadmapArgs } from './parse-args.mjs';
 
 /**
  * Programmatic entry for tests.
@@ -112,7 +113,11 @@ export async function runRoadmap(argv, deps = {}) {
       return { exitCode: 1, result };
     }
 
-    if (parsed.command === 'sync' && parsed.flags.check === true && result?.drifted) {
+    if (
+      parsed.command === 'sync' &&
+      parsed.flags.check === true &&
+      result?.drifted
+    ) {
       stdout(JSON.stringify(result, null, 2));
       return { exitCode: 1, result };
     }

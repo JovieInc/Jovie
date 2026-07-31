@@ -30,7 +30,10 @@ export async function runToday(opts) {
     (await loadBacklog({
       cwd: opts.cwd ?? process.cwd(),
       readFileImpl: opts.readFileImpl ?? readFile,
-      path: typeof flags.backlog === 'string' ? flags.backlog : DEFAULT_BACKLOG_PATH,
+      path:
+        typeof flags.backlog === 'string'
+          ? flags.backlog
+          : DEFAULT_BACKLOG_PATH,
     }));
 
   if (!backlog?.issues) {
@@ -56,7 +59,11 @@ export async function runToday(opts) {
       ok: true,
       count: briefs.length,
       backlogSyncedAt: backlog.syncedAt ?? null,
-      issues: selected.map(i => ({ id: i.id, title: i.title, state: i.state?.name })),
+      issues: selected.map(i => ({
+        id: i.id,
+        title: i.title,
+        state: i.state?.name,
+      })),
       briefs,
     };
   }

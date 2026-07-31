@@ -6,10 +6,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
-import {
-  AGENTOS_INITIATIVE_NAME,
-  DEFAULT_BACKLOG_PATH,
-} from '../config.mjs';
+import { AGENTOS_INITIATIVE_NAME, DEFAULT_BACKLOG_PATH } from '../config.mjs';
 import {
   detectBacklogDrift,
   mapLinearIssueToRoadmap,
@@ -27,9 +24,11 @@ import {
  */
 export function buildBacklogSnapshot(input) {
   const syncedAt = input.syncedAt ?? new Date().toISOString();
-  const projects = (input.initiative.projects?.nodes ?? input.initiative.projects ?? []).map(
-    /** @param {object} p */ p => mapLinearProjectToRoadmap(p)
-  );
+  const projects = (
+    input.initiative.projects?.nodes ??
+    input.initiative.projects ??
+    []
+  ).map(/** @param {object} p */ p => mapLinearProjectToRoadmap(p));
   const issues = input.issues.map(
     /** @param {object} n */ n => mapLinearIssueToRoadmap(n, syncedAt)
   );
@@ -102,7 +101,11 @@ export async function runSync(opts) {
   const shouldWrite = force || drift.drifted || !disk;
   if (shouldWrite) {
     await mkdirImpl(dirname(outPath), { recursive: true });
-    await writeFileImpl(`${outPath}`, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+    await writeFileImpl(
+      `${outPath}`,
+      `${JSON.stringify(next, null, 2)}\n`,
+      'utf8'
+    );
   }
 
   return {

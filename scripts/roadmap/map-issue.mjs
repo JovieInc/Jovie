@@ -3,10 +3,7 @@
  * No network, no fs — unit-testable in isolation.
  */
 
-import {
-  LABEL_AGENTOS,
-  LABEL_HUMAN_REVIEW,
-} from './config.mjs';
+import { LABEL_AGENTOS, LABEL_HUMAN_REVIEW } from './config.mjs';
 
 /**
  * @param {string} name
@@ -133,13 +130,19 @@ export function normalizePriority(priority) {
  * @param {object} node  Linear issue GraphQL node
  * @param {string} [syncedAt]
  */
-export function mapLinearIssueToRoadmap(node, syncedAt = new Date().toISOString()) {
+export function mapLinearIssueToRoadmap(
+  node,
+  syncedAt = new Date().toISOString()
+) {
   const labels = (node.labels?.nodes ?? node.labels ?? []).map(
     /** @param {{name?: string}|string} l */ l =>
       typeof l === 'string' ? l : String(l?.name ?? '')
   );
   const assignee = node.assignee
-    ? { id: node.assignee.id, name: node.assignee.name ?? node.assignee.displayName ?? '' }
+    ? {
+        id: node.assignee.id,
+        name: node.assignee.name ?? node.assignee.displayName ?? '',
+      }
     : null;
   // Linear GraphQL does not always expose "delegate"; accept optional field
   // or agentOS metadata when present.
@@ -219,7 +222,10 @@ function extractPullRequestUrl(node) {
  * @param {object} node  Linear project node
  * @param {string} [repoRootRelativePrefix]
  */
-export function mapLinearProjectToRoadmap(node, repoRootRelativePrefix = 'agentos/roadmap') {
+export function mapLinearProjectToRoadmap(
+  node,
+  repoRootRelativePrefix = 'agentos/roadmap'
+) {
   const slug = toSlug(node.name ?? node.slug ?? node.id);
   return {
     id: node.id,
@@ -296,11 +302,18 @@ export function detectBacklogDrift(disk, next) {
   /** @type {string[]} */
   const details = [];
   if (!disk || !Array.isArray(disk.issues)) {
-    return { drifted: true, details: ['on-disk backlog missing or has no issues array'] };
+    return {
+      drifted: true,
+      details: ['on-disk backlog missing or has no issues array'],
+    };
   }
 
-  const diskById = new Map(disk.issues.map(/** @param {{id:string}} i */ i => [i.id, i]));
-  const nextById = new Map(next.issues.map(/** @param {{id:string}} i */ i => [i.id, i]));
+  const diskById = new Map(
+    disk.issues.map(/** @param {{id:string}} i */ i => [i.id, i])
+  );
+  const nextById = new Map(
+    next.issues.map(/** @param {{id:string}} i */ i => [i.id, i])
+  );
 
   for (const id of new Set([...diskById.keys(), ...nextById.keys()])) {
     const a = diskById.get(id);
@@ -318,15 +331,29 @@ export function detectBacklogDrift(disk, next) {
       ['priority', a.priority, b.priority],
       ['assignee', a.assignee?.id ?? null, b.assignee?.id ?? null],
       ['delegate', a.delegate?.id ?? null, b.delegate?.id ?? null],
-      ['labels', (a.labels ?? []).slice().sort().join(','), (b.labels ?? []).slice().sort().join(',')],
+      [
+        'labels',
+        (a.labels ?? []).slice().sort().join(','),
+        (b.labels ?? []).slice().sort().join(','),
+      ],
       ['projectId', a.projectId, b.projectId],
       ['parentId', a.parentId, b.parentId],
-      ['blockedBy', (a.blockedBy ?? []).slice().sort().join(','), (b.blockedBy ?? []).slice().sort().join(',')],
-      ['blocks', (a.blocks ?? []).slice().sort().join(','), (b.blocks ?? []).slice().sort().join(',')],
+      [
+        'blockedBy',
+        (a.blockedBy ?? []).slice().sort().join(','),
+        (b.blockedBy ?? []).slice().sort().join(','),
+      ],
+      [
+        'blocks',
+        (a.blocks ?? []).slice().sort().join(','),
+        (b.blocks ?? []).slice().sort().join(','),
+      ],
     ];
     for (const [name, av, bv] of fields) {
       if (av !== bv) {
-        details.push(`${id}.${name}: ${JSON.stringify(av)} → ${JSON.stringify(bv)}`);
+        details.push(
+          `${id}.${name}: ${JSON.stringify(av)} → ${JSON.stringify(bv)}`
+        );
       }
     }
   }
