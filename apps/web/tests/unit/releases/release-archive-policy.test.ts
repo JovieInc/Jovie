@@ -35,26 +35,53 @@ describe('release-archive-policy (JOV-3885)', () => {
     ).toBe(false);
   });
 
-  it('archives only provider-ingested published releases', () => {
+  it('archives provider-ingested releases even before publication', () => {
     expect(
       shouldArchiveOnlyRelease({
-        status: 'released',
+        status: 'draft',
         sourceType: 'ingested',
-        releaseDate: '2020-01-01T00:00:00.000Z',
+        releaseDate: '2099-01-01T00:00:00.000Z',
       })
     ).toBe(true);
+  });
+
+  it('archives every published release regardless of source', () => {
     expect(
       shouldArchiveOnlyRelease({
         status: 'released',
         sourceType: 'manual',
         releaseDate: '2020-01-01T00:00:00.000Z',
       })
-    ).toBe(false);
+    ).toBe(true);
+  });
+
+  it('archives ISRC- or analytics-bearing unpublished releases', () => {
     expect(
       shouldArchiveOnlyRelease({
         status: 'draft',
-        sourceType: 'ingested',
+        sourceType: 'manual',
         releaseDate: '2099-01-01T00:00:00.000Z',
+        primaryIsrc: 'USABC1234567',
+      })
+    ).toBe(true);
+    expect(
+      shouldArchiveOnlyRelease({
+        status: 'draft',
+        sourceType: 'manual',
+        releaseDate: null,
+        hasAnalytics: true,
+      })
+    ).toBe(true);
+  });
+
+  it('allows only a manual never-published release without evidence to delete', () => {
+    expect(
+      shouldArchiveOnlyRelease({
+        status: 'draft',
+        sourceType: 'manual',
+        releaseDate: null,
+        primaryIsrc: null,
+        hasAnalytics: false,
       })
     ).toBe(false);
   });

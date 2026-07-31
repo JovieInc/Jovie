@@ -12,6 +12,7 @@ import { getCachedAuth } from '@/lib/auth/cached';
 import { createSmartLinkContentTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
+import { hasReleaseClickAnalytics } from '@/lib/db/queries/analytics';
 import {
   discogRecordings,
   discogReleases,
@@ -25,6 +26,7 @@ import {
   getProviderLink,
   getReleaseById,
   getReleasesForProfile as getReleasesFromDb,
+  getReleaseTrackSummariesForReleases,
   getReleaseTracksForReleaseWithProviders,
   getTracksForRelease,
   resetProviderLink as resetProviderLinkDb,
@@ -67,6 +69,10 @@ import {
   formatTimeRemaining,
 } from '@/lib/rate-limit';
 import { shouldArchiveOnlyRelease } from '@/lib/releases/release-archive-policy';
+import {
+  archiveRelease,
+  restoreRelease as restoreReleaseLifecycle,
+} from '@/lib/releases/release-lifecycle.server';
 import {
   loadReleaseEntity as loadReleaseEntityFromLoader,
   loadReleaseMatrixForProfile as loadReleaseMatrixForProfileFromLoader,
@@ -1878,11 +1884,11 @@ interface DeleteReleaseParams {
 }
 
 /**
- * Delete or archive a release (JOV-3885).
+ * Delete or archive a release (JOV-3374).
  *
- * - Provider-ingested + already released → archive only (soft-hide via deleted_at).
- *   Provider data is the canonical source; we never hard-delete it.
- * - Jovie-created / manual (or not-yet-released) → hard delete the row.
+ * Hard deletion is allowed only for a never-published release with no provider
+ * origin, ISRC, or analytics evidence. Evidence lookup failures fail closed to
+ * archive so durable catalog or engagement data cannot be destroyed.
  */
 export async function deleteRelease(params: DeleteReleaseParams): Promise<{
   success: boolean;
@@ -1904,17 +1910,48 @@ export async function deleteRelease(params: DeleteReleaseParams): Promise<{
     throw new TypeError('Release not found');
   }
 
-  const archiveOnly = shouldArchiveOnlyRelease({
+  const basePolicyInput = {
     status: (release.status as ReleaseViewModel['status']) ?? 'released',
     sourceType: release.sourceType,
     releaseDate: release.releaseDate,
-  });
+  };
+  let primaryIsrc: string | null = null;
+  let hasAnalytics = false;
+  let evidenceLookupFailed = false;
+
+  // Published/provider records are already archive-only, so avoid two extra
+  // retention-evidence queries unless hard deletion is otherwise possible.
+  if (!shouldArchiveOnlyRelease(basePolicyInput)) {
+    try {
+      const [trackSummaries, releaseHasAnalytics] = await Promise.all([
+        getReleaseTrackSummariesForReleases([params.releaseId]),
+        hasReleaseClickAnalytics(profile.id, params.releaseId),
+      ]);
+      primaryIsrc =
+        trackSummaries.get(params.releaseId)?.primaryIsrc?.trim() || null;
+      hasAnalytics = releaseHasAnalytics;
+    } catch (error) {
+      evidenceLookupFailed = true;
+      await captureError('Release retention evidence lookup failed', error, {
+        profileId: profile.id,
+        releaseId: params.releaseId,
+      });
+    }
+  }
+
+  const archiveOnly =
+    evidenceLookupFailed ||
+    shouldArchiveOnlyRelease({
+      ...basePolicyInput,
+      primaryIsrc,
+      hasAnalytics,
+    });
 
   if (archiveOnly) {
-    await db
-      .update(discogReleases)
-      .set({ deletedAt: new Date() })
-      .where(eq(discogReleases.id, params.releaseId));
+    await archiveRelease({
+      releaseId: params.releaseId,
+      creatorProfileId: profile.id,
+    });
   } else {
     await db
       .delete(discogReleases)
@@ -1937,9 +1974,47 @@ export async function deleteRelease(params: DeleteReleaseParams): Promise<{
     success: true,
     mode: archiveOnly ? 'archive' : 'delete',
     message: archiveOnly
-      ? 'Release archived. Provider-ingested catalog is soft-hidden only.'
+      ? 'Release archived. Catalog and analytics history were preserved.'
       : undefined,
   };
+}
+
+/**
+ * Restore a soft-archived release to default Library/profile eligibility.
+ * Approval and publication gates remain independent and are not changed here.
+ */
+export async function restoreRelease(params: DeleteReleaseParams): Promise<{
+  success: true;
+}> {
+  noStore();
+
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+  const release = await getReleaseById(params.releaseId);
+  if (release?.creatorProfileId !== profile.id) {
+    throw new TypeError('Release not found');
+  }
+
+  await restoreReleaseLifecycle({
+    releaseId: params.releaseId,
+    creatorProfileId: profile.id,
+  });
+
+  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  revalidatePath(APP_ROUTES.RELEASES);
+
+  void trackServerEvent('release_restored', {
+    profileId: profile.id,
+    releaseId: params.releaseId,
+    releaseTitle: release.title,
+  });
+
+  return { success: true };
 }
 
 /**
