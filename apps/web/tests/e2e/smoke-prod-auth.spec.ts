@@ -1,8 +1,16 @@
-import { expect, Page, type TestInfo, test } from '@playwright/test';
+import { createHash, randomBytes } from 'node:crypto';
+import {
+  type APIRequestContext,
+  expect,
+  Page,
+  type TestInfo,
+  test,
+} from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   assertExactNavigationUrl,
   isExactNavigationUrl,
+  recordPlaywrightSensitiveValues,
   requireExactNavigationOrigin,
 } from '../helpers/vercel-preview';
 import { primeOriginBoundVercelBypass } from './utils/prime-vercel-bypass';
@@ -23,9 +31,11 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
  * These tests verify:
  * 1. Sign-in flow works with real credentials
  * 2. Dashboard loads with real data (not empty state)
- * 3. Navigation between key tabs works
+ * 3. The LogYourBody iOS public client completes a real PKCE token exchange
+ * 4. Userinfo, refresh-token rotation, and token revocation work
+ * 5. Navigation between key tabs works
  *
- * Max ~2min total. No golden path, no content gate, no admin tests.
+ * Max ~3min total. No golden path, no content gate, no admin tests.
  *
  * @production-smoke
  */
@@ -53,6 +63,212 @@ type SignInResult =
   | 'unknown';
 
 type SignInNextStep = 'redirected' | 'password' | 'email_code' | 'unknown';
+
+const IOS_OAUTH_CLIENT_ID = 'logyourbody-ios';
+const IOS_OAUTH_REDIRECT_URI = 'logyourbody://oauth';
+const IOS_OAUTH_SCOPE = 'openid profile email offline_access';
+
+interface OAuthTokenSet {
+  readonly accessToken: string;
+  readonly refreshToken: string;
+  readonly idToken?: string;
+}
+
+function requiredResponseString(
+  body: Record<string, unknown>,
+  field: string
+): string {
+  const value = body[field];
+  if (typeof value !== 'string' || value.length < 20) {
+    throw new Error(`OAuth token response is missing a valid ${field}.`);
+  }
+  return value;
+}
+
+async function readOAuthTokenSet(
+  response: Awaited<ReturnType<APIRequestContext['post']>>,
+  label: string,
+  rememberToken: (value: string, hint: 'access_token' | 'refresh_token') => void
+): Promise<OAuthTokenSet> {
+  if (response.status() !== 200) {
+    throw new Error(`${label} returned HTTP ${response.status()}.`);
+  }
+  const body = (await response.json().catch(() => null)) as unknown;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new Error(`${label} returned a malformed token response.`);
+  }
+  const record = body as Record<string, unknown>;
+  const sensitiveValues = ['access_token', 'refresh_token', 'id_token']
+    .map(field => record[field])
+    .filter((value): value is string => typeof value === 'string');
+  if (sensitiveValues.length > 0) {
+    recordPlaywrightSensitiveValues(sensitiveValues);
+  }
+  const accessToken = requiredResponseString(record, 'access_token');
+  const refreshToken = requiredResponseString(record, 'refresh_token');
+  rememberToken(accessToken, 'access_token');
+  rememberToken(refreshToken, 'refresh_token');
+  const idToken =
+    typeof record.id_token === 'string' && record.id_token.length >= 20
+      ? record.id_token
+      : undefined;
+  return { accessToken, refreshToken, idToken };
+}
+
+async function verifyOAuthUserInfo(
+  request: APIRequestContext,
+  expectedOrigin: string,
+  accessToken: string,
+  label: string
+): Promise<void> {
+  const response = await request.get(
+    `${expectedOrigin}/api/auth/oauth2/userinfo`,
+    {
+      failOnStatusCode: false,
+      headers: { authorization: `Bearer ${accessToken}` },
+    }
+  );
+  if (response.status() !== 200) {
+    throw new Error(`${label} userinfo returned HTTP ${response.status()}.`);
+  }
+  const userInfo = (await response.json().catch(() => null)) as Record<
+    string,
+    unknown
+  > | null;
+  if (
+    !userInfo ||
+    typeof userInfo.sub !== 'string' ||
+    userInfo.sub.length === 0
+  ) {
+    throw new Error(`${label} userinfo returned an invalid subject.`);
+  }
+}
+
+async function verifyProductionIosOAuthTokenFlow(
+  request: APIRequestContext,
+  expectedOrigin: string
+): Promise<void> {
+  const codeVerifier = randomBytes(48).toString('base64url');
+  const codeChallenge = createHash('sha256')
+    .update(codeVerifier)
+    .digest('base64url');
+  const state = randomBytes(32).toString('base64url');
+  recordPlaywrightSensitiveValues([codeVerifier]);
+
+  const authorizeUrl = new URL('/api/auth/oauth2/authorize', expectedOrigin);
+  authorizeUrl.searchParams.set('response_type', 'code');
+  authorizeUrl.searchParams.set('client_id', IOS_OAUTH_CLIENT_ID);
+  authorizeUrl.searchParams.set('redirect_uri', IOS_OAUTH_REDIRECT_URI);
+  authorizeUrl.searchParams.set('scope', IOS_OAUTH_SCOPE);
+  authorizeUrl.searchParams.set('state', state);
+  authorizeUrl.searchParams.set('code_challenge', codeChallenge);
+  authorizeUrl.searchParams.set('code_challenge_method', 'S256');
+
+  const authorizeResponse = await request.get(authorizeUrl.href, {
+    failOnStatusCode: false,
+    maxRedirects: 0,
+  });
+  if (![302, 303].includes(authorizeResponse.status())) {
+    throw new Error(
+      `iOS OAuth authorization returned HTTP ${authorizeResponse.status()}.`
+    );
+  }
+  const location = authorizeResponse.headers().location;
+  if (!location) {
+    throw new Error('iOS OAuth authorization did not return a redirect.');
+  }
+  const callbackUrl = new URL(location);
+  const authorizationCode = callbackUrl.searchParams.get('code');
+  if (authorizationCode) {
+    recordPlaywrightSensitiveValues([authorizationCode]);
+  }
+  if (
+    callbackUrl.protocol !== 'logyourbody:' ||
+    callbackUrl.host !== 'oauth' ||
+    callbackUrl.pathname !== '' ||
+    callbackUrl.searchParams.get('state') !== state ||
+    callbackUrl.searchParams.has('error') ||
+    !authorizationCode
+  ) {
+    throw new Error('iOS OAuth authorization returned an invalid callback.');
+  }
+
+  const issuedTokens = new Map<
+    string,
+    {
+      readonly value: string;
+      readonly hint: 'access_token' | 'refresh_token';
+    }
+  >();
+  const rememberToken = (
+    value: string,
+    hint: 'access_token' | 'refresh_token'
+  ) => {
+    issuedTokens.set(`${hint}:${value}`, { value, hint });
+  };
+  try {
+    const initialTokens = await readOAuthTokenSet(
+      await request.post(`${expectedOrigin}/api/auth/oauth2/token`, {
+        failOnStatusCode: false,
+        form: {
+          grant_type: 'authorization_code',
+          client_id: IOS_OAUTH_CLIENT_ID,
+          code: authorizationCode,
+          code_verifier: codeVerifier,
+          redirect_uri: IOS_OAUTH_REDIRECT_URI,
+        },
+      }),
+      'iOS OAuth authorization-code exchange',
+      rememberToken
+    );
+
+    await verifyOAuthUserInfo(
+      request,
+      expectedOrigin,
+      initialTokens.accessToken,
+      'Initial iOS OAuth access token'
+    );
+
+    const refreshedTokens = await readOAuthTokenSet(
+      await request.post(`${expectedOrigin}/api/auth/oauth2/token`, {
+        failOnStatusCode: false,
+        form: {
+          grant_type: 'refresh_token',
+          client_id: IOS_OAUTH_CLIENT_ID,
+          refresh_token: initialTokens.refreshToken,
+        },
+      }),
+      'iOS OAuth refresh-token exchange',
+      rememberToken
+    );
+    await verifyOAuthUserInfo(
+      request,
+      expectedOrigin,
+      refreshedTokens.accessToken,
+      'Refreshed iOS OAuth access token'
+    );
+  } finally {
+    for (const { value, hint } of issuedTokens.values()) {
+      const revokeResponse = await request.post(
+        `${expectedOrigin}/api/auth/oauth2/revoke`,
+        {
+          failOnStatusCode: false,
+          form: {
+            client_id: IOS_OAUTH_CLIENT_ID,
+            token: value,
+            token_type_hint: hint,
+          },
+        }
+      );
+      expect
+        .soft(
+          revokeResponse.status(),
+          `iOS OAuth ${hint} revocation should succeed`
+        )
+        .toBe(200);
+    }
+  }
+}
 
 function exactOriginForTest(testInfo: TestInfo): string {
   const baseUrl = testInfo.project.use.baseURL;
@@ -183,7 +399,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
   // another Better Auth OTP can invalidate the prior code, so future checks must
   // extend this flow instead of creating a second authenticated test.
   test.describe.configure({ mode: 'serial' });
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
 
   test.beforeEach(async ({ context }, testInfo) => {
     if (!hasProdAuthCredentials()) {
@@ -247,6 +463,11 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     const lower = mainText.toLowerCase();
     expect(lower).not.toContain('application error');
     expect(lower).not.toContain('something went wrong');
+
+    await verifyProductionIosOAuthTokenFlow(
+      page.context().request,
+      expectedOrigin
+    );
 
     const tabs = [
       {

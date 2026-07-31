@@ -1,9 +1,13 @@
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   assertExactNavigationUrl,
   captureOutgoingCookieHeader,
   isExactNavigationUrl,
   isSafePreviewBaseUrl,
+  recordPlaywrightSensitiveValues,
   requireExactNavigationOrigin,
 } from '../../helpers/vercel-preview';
 
@@ -40,6 +44,22 @@ describe('vercel preview helpers', () => {
         exactOrigin
       ).pathname
     ).toBe('/app/profile');
+  });
+
+  it('registers generated OAuth values with the dynamic artifact guard', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'jovie-oauth-receipt-'));
+    const receiptPath = join(directory, 'dynamic-secrets');
+    try {
+      recordPlaywrightSensitiveValues(
+        ['authorization-code', 'access-token-value'],
+        receiptPath
+      );
+      expect(readFileSync(receiptPath, 'utf8')).toBe(
+        'authorization-code\naccess-token-value\n'
+      );
+    } finally {
+      rmSync(directory, { force: true, recursive: true });
+    }
   });
 
   it.each([

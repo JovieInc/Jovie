@@ -101,6 +101,15 @@ const validateCookieOriginBoundaryHeaders = (
   }
 ).validateCookieOriginBoundaryHeaders;
 
+const recordSensitiveValues = (
+  primeLighthouseVercelBypassModule as {
+    readonly recordSensitiveValues: (
+      path: string | undefined,
+      values: readonly string[]
+    ) => void;
+  }
+).recordSensitiveValues;
+
 const primeLighthouseVercelAliasBypass = (
   primeLighthouseVercelBypassModule as {
     readonly primeLighthouseVercelAliasBypass: (
@@ -138,6 +147,13 @@ export function isSafePreviewBaseUrl(baseURL?: string): baseURL is string {
       parsed.hostname
     )
   );
+}
+
+export function recordPlaywrightSensitiveValues(
+  values: readonly string[],
+  path = process.env.PLAYWRIGHT_DYNAMIC_SECRETS_FILE
+): void {
+  recordSensitiveValues(path, values);
 }
 
 export async function captureOutgoingCookieHeader(
