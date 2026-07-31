@@ -26,13 +26,13 @@ export function VoiceDemoVisual({ className }: Readonly<VoiceDemoVisualProps>) {
   return (
     <div
       className={cn(
-        'relative flex w-full max-w-105 flex-col items-center rounded-3xl border border-subtle bg-surface-1/60 p-6 backdrop-blur',
+        'system-b-voice-demo relative flex w-full flex-col items-center rounded-3xl border border-subtle p-6',
         className
       )}
       data-testid='voice-demo-visual'
     >
       <div className='mb-4 text-center'>
-        <p className='text-xs font-medium uppercase tracking-[2px] text-tertiary-token'>
+        <p className='text-xs font-medium uppercase tracking-widest text-tertiary-token'>
           Live demo
         </p>
         <p className='mt-1 text-sm text-secondary-token'>
@@ -43,21 +43,15 @@ export function VoiceDemoVisual({ className }: Readonly<VoiceDemoVisualProps>) {
       {/* CSS Waveform (explicit, no external deps, responsive) */}
       <div
         className={cn(
-          'flex h-16 w-full items-end justify-center gap-1.5 rounded-xl bg-black/40 px-6 py-3',
-          isPlaying && 'voice-wave-active'
+          'system-b-voice-demo-wave flex h-16 w-full items-end justify-center gap-1.5 rounded-xl px-6 py-3',
+          isPlaying && 'system-b-voice-demo-wave--active'
         )}
         aria-hidden='true'
       >
         {[0, 1, 2, 3, 4].map(i => (
           <div
             key={i}
-            className={cn(
-              'w-1.5 rounded-full bg-(--color-primary)',
-              isPlaying ? 'voice-bar-animate' : 'h-3'
-            )}
-            style={{
-              animationDelay: isPlaying ? `${i * 80}ms` : undefined,
-            }}
+            className='system-b-voice-demo-wave-bar w-1.5 rounded-full'
           />
         ))}
       </div>
@@ -65,13 +59,13 @@ export function VoiceDemoVisual({ className }: Readonly<VoiceDemoVisualProps>) {
       <button
         type='button'
         onClick={toggleDemo}
-        className='mt-5 inline-flex items-center gap-2 rounded-full border border-subtle bg-panel px-5 py-2 text-sm font-medium text-primary-token transition hover:bg-surface-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-(--color-primary)'
+        className='focus-ring-themed mt-5 inline-flex items-center gap-2 rounded-full border border-subtle bg-panel px-5 py-2 text-sm font-medium text-primary-token transition-colors hover:bg-surface-1'
         data-testid='voice-demo-play-btn'
         aria-label={isPlaying ? 'Stop voice sample' : 'Play voice sample demo'}
       >
         {isPlaying ? (
           <>
-            <span className='inline-block h-2 w-2 animate-pulse rounded-full bg-(--color-primary)' />
+            <span className='inline-block h-2 w-2 animate-pulse rounded-full bg-primary-token motion-reduce:animate-none' />
             Playing sample…
           </>
         ) : (
@@ -79,7 +73,7 @@ export function VoiceDemoVisual({ className }: Readonly<VoiceDemoVisualProps>) {
         )}
       </button>
 
-      <div className='mt-4 min-h-[2.5rem] text-center text-xs text-secondary-token'>
+      <div className='mt-4 min-h-10 text-center text-xs text-secondary-token'>
         {isPlaying ? (
           <span data-testid='voice-demo-transcript'>
             “Hey fans — this drop is powered by my Jovie voice clone.”
@@ -93,22 +87,18 @@ export function VoiceDemoVisual({ className }: Readonly<VoiceDemoVisualProps>) {
         )}
       </div>
 
-      <div className='mt-3 text-3xs text-tertiary-token'>
-        Powered by ElevenLabs • Consent-first • 1-click train
-      </div>
-
-      <style jsx>{`
-        .voice-bar-animate {
-          animation: voiceWave 900ms infinite ease-in-out;
-        }
-        @keyframes voiceWave {
-          0%, 100% { height: 6px; }
-          50% { height: 52px; }
-        }
-        .voice-wave-active > div {
-          animation: voiceWave 900ms infinite ease-in-out;
-        }
-      `}</style>
+      <ul className='mt-3 flex flex-wrap justify-center text-3xs text-tertiary-token'>
+        {['Powered by ElevenLabs', 'Consent-first', '1-click train'].map(
+          (item, index) => (
+            <li
+              key={item}
+              className={cn(index > 0 && 'ml-2 border-l border-subtle pl-2')}
+            >
+              {item}
+            </li>
+          )
+        )}
+      </ul>
     </div>
   );
 }
