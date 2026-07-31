@@ -2189,7 +2189,7 @@ function AssetDrawer({
           <DrawerSectionGroup
             defaultOpenSectionId={isMerch ? 'merch' : 'details'}
           >
-            <div className='space-y-2.5'>
+            <div className='space-y-2.5 overflow-visible px-3'>
               {isMerch ? (
                 <DrawerSection
                   sectionId='merch'
