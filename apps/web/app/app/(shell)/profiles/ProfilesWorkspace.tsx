@@ -23,7 +23,7 @@ import { EmptyCell } from '@/components/atoms/EmptyCell';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import {
   DrawerSection,
-  DrawerSurfaceCard,
+  EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -250,34 +250,38 @@ function ConnectionRail({
       emptyMessage='Select a connection to view details.'
       entityHeader={
         row ? (
-          <DrawerSurfaceCard variant='flat' className='overflow-hidden'>
-            <div className='relative border-b border-subtle px-3 py-3'>
-              <div className='absolute right-2.5 top-2.5'>
-                <DrawerHeaderActions
-                  primaryActions={[]}
-                  overflowActions={[]}
-                  onClose={onClose}
-                />
+          <EntityHeaderCard
+            image={
+              <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0'>
+                <ConnectionBrandIcon row={row} className='h-6 w-6' />
               </div>
-              <div className='flex items-center gap-2.5 pr-8'>
-                <ConnectionBrandIcon row={row} className='h-7 w-7' />
-                <div className='min-w-0'>
-                  <div className='truncate text-sm font-semibold text-primary-token'>
-                    {row.label}
-                  </div>
-                  <div className='mt-0.5 flex items-center gap-1.5 text-xs text-tertiary-token'>
-                    <ConnectionTypeGlyph row={row} className='h-3 w-3' />
-                    <span>
-                      {kindLabel(row)} · {data.artist.name}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className='mt-3 truncate text-xs text-tertiary-token'>
-                {row.handle ?? row.url}
-              </div>
-            </div>
-          </DrawerSurfaceCard>
+            }
+            title={row.label}
+            subtitle={
+              <span className='flex min-w-0 items-center gap-1.5'>
+                <ConnectionTypeGlyph row={row} className='h-3 w-3' />
+                <span className='truncate'>
+                  {kindLabel(row)} · {data.artist.name}
+                </span>
+              </span>
+            }
+            meta={row.handle ?? row.url}
+            stableLayout
+            titleLineClamp={1}
+            subtitleLineClamp={1}
+            reserveSubtitleSlot
+            reserveMetaSlot
+            metaOverflow='scroll'
+            actions={
+              <DrawerHeaderActions
+                primaryActions={[]}
+                overflowActions={[]}
+                onClose={onClose}
+              />
+            }
+            bodyClassName='pr-8'
+            data-testid='profiles-rail-entity-header'
+          />
         ) : undefined
       }
     >

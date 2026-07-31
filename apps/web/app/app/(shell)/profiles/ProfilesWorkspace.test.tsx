@@ -138,6 +138,10 @@ describe('ProfilesWorkspace', () => {
     expect(
       screen.getByRole('complementary', { name: 'Connection details' })
     ).toBeInTheDocument();
+    expect(screen.getByTestId('profiles-rail-entity-header')).toHaveClass(
+      'relative',
+      'flex'
+    );
     expect(screen.getByText('Next Best Action')).toBeInTheDocument();
     expect(
       screen.getByText('Upgrade the monitoring limit to track this connection.')
