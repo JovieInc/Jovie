@@ -188,4 +188,21 @@ describe('DashboardMobileTabs', () => {
       'page'
     );
   });
+
+  it('promotes an active overflow destination into the primary tab strip', () => {
+    mockPathname.mockReturnValue(APP_ROUTES.TASKS);
+    render(<DashboardMobileTabs />);
+
+    const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
+    const directLinks = within(tabs).getAllByRole('link');
+    expect(directLinks.map(link => link.textContent?.trim())).toEqual([
+      'New Chat',
+      'Inbox',
+      'Tasks',
+    ]);
+    expect(within(tabs).getByRole('link', { name: 'Tasks' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+  });
 });

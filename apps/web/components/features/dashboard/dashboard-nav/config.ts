@@ -20,6 +20,7 @@ import {
 
 import { APP_ROUTES } from '@/constants/routes';
 
+import { CUSTOMER_NAV_CAPACITY, partitionCustomerNavigation } from './capacity';
 import type { NavItem } from './types';
 
 // ---------------------------------------------------------------------------
@@ -31,6 +32,7 @@ export const dashboardHome: NavItem = {
   href: APP_ROUTES.CHAT,
   id: 'overview',
   icon: Home,
+  tier: 'core',
   description: 'Start a new chat',
 };
 
@@ -40,6 +42,7 @@ export const inboxNavItem: NavItem = {
   href: APP_ROUTES.DASHBOARD,
   id: 'inbox',
   icon: Inbox,
+  tier: 'core',
   description: 'Review pending opportunities',
 };
 
@@ -49,6 +52,7 @@ export const chatNavItem: NavItem = {
   id: 'chat',
   icon: SquarePen,
   tone: 'primary',
+  tier: 'core',
   description: 'Start a new conversation',
 };
 
@@ -57,6 +61,7 @@ export const libraryNavItem: NavItem = {
   href: APP_ROUTES.LIBRARY,
   id: 'library',
   icon: Music,
+  tier: 'core',
   description: 'Browse releases, audio, video, images, and files',
 };
 
@@ -65,6 +70,7 @@ export const contactsNavItem: NavItem = {
   href: APP_ROUTES.CONTACTS,
   id: 'contacts',
   icon: IdCard,
+  tier: 'core',
   description: 'Manage artist contacts',
 };
 
@@ -73,6 +79,7 @@ export const profilesNavItem: NavItem = {
   href: APP_ROUTES.PROFILES,
   id: 'profiles',
   icon: Waypoints,
+  tier: 'core',
   description: 'Monitor artist identities and connected services',
 };
 
@@ -81,6 +88,7 @@ export const calendarNavItem: NavItem = {
   href: APP_ROUTES.CALENDAR,
   id: 'calendar',
   icon: CalendarDays,
+  tier: 'core',
   description: 'See release dates, events, and calendar moments',
 };
 
@@ -89,12 +97,18 @@ export const tasksNavItem: NavItem = {
   href: APP_ROUTES.TASKS,
   id: 'tasks',
   icon: CheckSquare,
+  tier: 'core',
   description: 'Track release work and general artist operations',
 };
 
 /**
  * Founder-approved customer shell IA. This ordered tuple is the only source
  * consumed by desktop and mobile navigation (JOV-3763).
+ *
+ * Capacity (JOV-4515): every entry here is `core` and must fit the desktop
+ * primary rail. Mark new trial destinations `experimental` so they overflow
+ * into the single shared More menu after the documented cap — do not grow
+ * permanent IA without an explicit product decision.
  */
 export const primaryNavigation = [
   chatNavItem,
@@ -190,17 +204,51 @@ export const settingsNavigation: NavItem[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Mobile bottom-bar groupings (derived from shared items above)
+// Capacity-derived primary / More groupings (desktop + mobile)
 // ---------------------------------------------------------------------------
 
+const desktopDefaultPartition = partitionCustomerNavigation(primaryNavigation, {
+  visibleCap: CUSTOMER_NAV_CAPACITY.desktopPrimaryVisible,
+});
+
+const mobileDefaultPartition = partitionCustomerNavigation(primaryNavigation, {
+  visibleCap: CUSTOMER_NAV_CAPACITY.mobilePrimaryVisible,
+});
+
 /**
- * Items shown as icons in the bottom tab bar (max 3).
- *
- * Picked by id from the canonical `primaryNavigation` — never redefine a
- * NavItem here. A mobile-only nav item is a third source of truth that
- * drifts from desktop.
+ * Desktop direct rows when no route is active for promotion. Experimental
+ * extras beyond the desktop cap land in {@link desktopMoreNavigation}.
  */
-export const mobilePrimaryNavigation: NavItem[] = primaryNavigation.slice(0, 3);
+export const desktopPrimaryNavigation: readonly NavItem[] =
+  desktopDefaultPartition.visible;
+
+/** Desktop destinations that share the single canonical More menu. */
+export const desktopMoreNavigation: readonly NavItem[] =
+  desktopDefaultPartition.more;
+
+/**
+ * Items shown as icons in the bottom tab bar (capacity-capped).
+ *
+ * Derived from `primaryNavigation` via {@link partitionCustomerNavigation} —
+ * never redefine a NavItem here. Runtime mobile rendering re-partitions with
+ * the active route so the current destination is never hidden.
+ */
+export const mobilePrimaryNavigation: NavItem[] = [
+  ...mobileDefaultPartition.visible,
+];
 
 /** Items shown in the expanded "more" menu on mobile. */
-export const mobileExpandedNavigation: NavItem[] = primaryNavigation.slice(3);
+export const mobileExpandedNavigation: NavItem[] = [
+  ...mobileDefaultPartition.more,
+];
+
+export type {
+  CustomerNavCapacityBreakpoint,
+  CustomerNavPartition,
+  PartitionCustomerNavigationOptions,
+} from './capacity';
+export {
+  CUSTOMER_NAV_CAPACITY,
+  customerNavVisibleCap,
+  partitionCustomerNavigation,
+} from './capacity';

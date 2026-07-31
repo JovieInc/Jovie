@@ -33,8 +33,11 @@ import {
   startNavigationTelemetry,
   trackNavigationImpressions,
 } from '@/lib/tracking/navigation-telemetry';
+import { CustomerNavMoreMenu } from './CustomerNavMoreMenu';
 import {
   artistSettingsNavigation,
+  CUSTOMER_NAV_CAPACITY,
+  partitionCustomerNavigation,
   primaryNavigation,
   userSettingsNavigation,
 } from './config';
@@ -159,7 +162,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     seenAt: tasksSeenAt,
   });
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
-  const visiblePrimaryNavigation = useMemo(
+  const eligiblePrimaryNavigation = useMemo(
     () =>
       primaryNavigation.filter(
         item =>
@@ -171,6 +174,24 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
       ),
     [inboxNavigation, pathname]
   );
+  const activePrimaryItemId = useMemo(() => {
+    const active = eligiblePrimaryNavigation.find(item => {
+      if (item.id === 'chat' && item.href === APP_ROUTES.CHAT) {
+        return normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT;
+      }
+      return isItemActive(pathname, item);
+    });
+    return active?.id ?? null;
+  }, [eligiblePrimaryNavigation, pathname]);
+  const { visible: visiblePrimaryNavigation, more: morePrimaryNavigation } =
+    useMemo(
+      () =>
+        partitionCustomerNavigation(eligiblePrimaryNavigation, {
+          visibleCap: CUSTOMER_NAV_CAPACITY.desktopPrimaryVisible,
+          activeItemId: activePrimaryItemId,
+        }),
+      [activePrimaryItemId, eligiblePrimaryNavigation]
+    );
   const threadsVisible =
     !isDemo &&
     !isInSettings &&
@@ -241,9 +262,8 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
 
   const artistSettingsLabel = 'Artist';
 
-  // Memoize nav sections for dashboard (non-settings) mode
-  const navSections = useMemo<readonly DashboardNavSection[]>(() => {
-    const decorateItem = (item: NavItem): NavItem => {
+  const decorateItem = useCallback(
+    (item: NavItem): NavItem => {
       if (item.id === 'tasks') {
         const taskCount = canAccessTasksWorkspace
           ? formatTaskBadge(taskStats, tasksSeenAt)
@@ -268,21 +288,24 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
       }
 
       return item;
-    };
+    },
+    [canAccessTasksWorkspace, isPlanGateLoading, taskStats, tasksSeenAt]
+  );
 
-    return [
+  // Memoize nav sections for dashboard (non-settings) mode
+  const navSections = useMemo<readonly DashboardNavSection[]>(
+    () => [
       {
         key: 'primary',
         items: visiblePrimaryNavigation.map(decorateItem),
       },
-    ];
-  }, [
-    canAccessTasksWorkspace,
-    isPlanGateLoading,
-    taskStats,
-    tasksSeenAt,
-    visiblePrimaryNavigation,
-  ]);
+    ],
+    [decorateItem, visiblePrimaryNavigation]
+  );
+  const moreNavItems = useMemo(
+    () => morePrimaryNavigation.map(decorateItem),
+    [decorateItem, morePrimaryNavigation]
+  );
 
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -462,12 +485,33 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
 
   // Memoize renderSection to prevent creating new functions on every render
   const renderSection = useCallback(
-    (items: readonly NavItem[]) => (
+    (items: readonly NavItem[], options?: { includeMore?: boolean }) => (
       <SidebarMenu className='gap-px'>
         {items.map((item, index) => renderNavItem(item, index))}
+        {options?.includeMore && moreNavItems.length > 0 ? (
+          <CustomerNavMoreMenu
+            items={moreNavItems}
+            isItemActive={item => {
+              if (item.id === 'chat' && item.href === APP_ROUTES.CHAT) {
+                return normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT;
+              }
+              return isItemActive(pathname, item);
+            }}
+            onActivate={(item, inputMethod) =>
+              startNavigationTelemetry({
+                itemId: item.id,
+                sourcePathname: pathname,
+                destinationHref: item.href,
+                inputMethod,
+                context: telemetryContext,
+              })
+            }
+            onPrefetch={handlePrefetch}
+          />
+        ) : null}
       </SidebarMenu>
     ),
-    [renderNavItem]
+    [handlePrefetch, moreNavItems, pathname, renderNavItem, telemetryContext]
   );
 
   return (
@@ -503,7 +547,9 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                       defaultOpen
                       storageKey={`dashboard.${section.key}`}
                     >
-                      {renderSection(section.items)}
+                      {renderSection(section.items, {
+                        includeMore: index === 0,
+                      })}
                     </SidebarCollapsibleGroup>
                   ) : (
                     <>
@@ -516,7 +562,9 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                           {searchSurface}
                         </div>
                       ) : null}
-                      {renderSection(section.items.slice(1))}
+                      {renderSection(section.items.slice(1), {
+                        includeMore: index === 0,
+                      })}
                     </>
                   )}
                 </div>
