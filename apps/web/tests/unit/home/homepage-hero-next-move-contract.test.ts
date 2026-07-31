@@ -38,8 +38,7 @@ describe('homepage hero next-move contract (JOV-4475)', () => {
     expect(heroSource).not.toMatch(
       /secondaryCta[\s\S]*?variant=['"]tertiary['"]/
     );
-    expect(heroSource).toContain('active:scale-[0.98]');
-    expect(heroSource).toContain('motion-reduce:active:scale-100');
+    expect(heroSource).not.toContain('active:scale');
   });
 
   it('uses a 100ms opacity-only ready reveal with reduced-motion parity', () => {

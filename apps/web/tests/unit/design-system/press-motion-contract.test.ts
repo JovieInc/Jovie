@@ -47,11 +47,32 @@ describe('shared press-motion contract', () => {
     const entityCard = readWeb(
       'components/organisms/entity-card/EntityCard.tsx'
     );
+    const smartLinkAudioPreview = readWeb(
+      'components/features/release/SmartLinkAudioPreview.tsx'
+    );
+    const homepagePosterHero = readWeb(
+      'components/homepage/HomepagePosterHero.tsx'
+    );
+    const captureShared = readWeb(
+      'components/marketing/artist-profile/captureShared.tsx'
+    );
+    const jovieOverlay = readWeb('components/shell/JovieOverlay.tsx');
 
     expect(bottomTabs).not.toContain('active:scale');
     expect(bottomTabs).not.toContain('transition-[color,transform]');
     expect(entityCard).toContain('group-active:scale-[var(--scale-press)]');
     expect(entityCard).not.toContain('group-active:scale-[0.96]');
+    expect(smartLinkAudioPreview).not.toContain('active:scale');
+    expect(homepagePosterHero).not.toContain('active:scale');
+    expect(captureShared).not.toContain('scale-[0.96]');
+    expect(captureShared).not.toContain(
+      'transition-[background-color,color,transform]'
+    );
+    expect(jovieOverlay).not.toContain('scale(0.96)');
+    expect(jovieOverlay).toContain('useReducedMotion');
+    expect(jovieOverlay).toMatch(
+      /prefersReducedMotion\s*\?\s*'translateY\(0\)'/
+    );
   });
 
   it.each([
