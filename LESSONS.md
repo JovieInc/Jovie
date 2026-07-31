@@ -5,6 +5,15 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ---
 
+## Auth / Env
+
+### OAuth provider buttons use a code allowlist, not NEXT_PUBLIC kill-switches
+**Mistake:** Gating Apple/Google buttons on `NEXT_PUBLIC_CLERK_OAUTH_*_ENABLED` (first via dynamic `process.env[key]`, then via static `process.env.NEXT_PUBLIC_*` lookups) emptied production sign-in even when Vercel env vars were set (PR #8458, #8497). The hardcode allowlist (PR #8499) fixed it.
+
+**Rule:** Keep `isOAuthProviderEnabled` as a hardcoded allowlist in `apps/web/lib/auth/oauth-providers.ts`. Never reintroduce env-var gates for auth-provider UI. Other `NEXT_PUBLIC_*` flags remain valid when accessed statically; dynamic bracket access never inlines. Turbo already hashes `NEXT_PUBLIC_*` on the build task — the framework path is fine; the control plane for OAuth enablement is code review. See `docs/auth/next-public-oauth-flags.md` (JOV-2131).
+
+---
+
 ## DSP / Provider Keys
 
 ### YouTube vs YouTube Music are distinct ProviderKeys

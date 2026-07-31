@@ -51,6 +51,13 @@ The publishable key for Clerk authentication.
 
 The secret key for Clerk authentication.
 
+### OAuth provider buttons — no `NEXT_PUBLIC_CLERK_OAUTH_*` flags
+
+Do **not** add `NEXT_PUBLIC_CLERK_OAUTH_<PROVIDER>_ENABLED` (or similar) to
+control which OAuth buttons render on sign-in. Provider enablement is a
+hardcoded allowlist in `apps/web/lib/auth/oauth-providers.ts`. See
+`docs/auth/next-public-oauth-flags.md` (JOV-2131).
+
 ## Application Configuration
 
 ### `NEXT_PUBLIC_APP_URL`

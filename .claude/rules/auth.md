@@ -37,6 +37,10 @@ The proxy path is `/__clerk`. ClerkProvider sets `proxyUrl="/__clerk"`. All Cler
 3. Check CSP allows the decoded FAPI host in `connect-src`, `script-src`, `frame-src`
 4. If staging auth is broken, do not let `staging.jov.ie` fall back to production Clerk keys; fail closed to the auth-unavailable state instead
 
+## OAuth Provider Button Enablement (Allowlist, Not Env)
+
+**Canonical:** `apps/web/lib/auth/oauth-providers.ts` — hardcoded allowlist (`apple` + `google`). Do **not** reintroduce `NEXT_PUBLIC_CLERK_OAUTH_*_ENABLED` (or any env) gates for which provider buttons render. JOV-2131 investigated the 2026-05-10 incident: dynamic bracket access never inlines; static env lookups still left production sign-in empty when build-time truth diverged from dashboard state. Turbo + Next `NEXT_PUBLIC_*` inlining still works for normal public config — auth-provider enablement is a code-review control plane, not a Vercel toggle. Details: `docs/auth/next-public-oauth-flags.md`.
+
 ## OAuth Console Redirect URIs (Google + Apple)
 
 Clerk hands Google/Apple a `redirect_uri` of `https://<fapi-host>/v1/oauth_callback`,

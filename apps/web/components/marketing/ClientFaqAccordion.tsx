@@ -71,12 +71,11 @@ export function ClientFaqAccordion({
               id={panelId}
               aria-labelledby={triggerId}
               aria-hidden={!isOpen}
-              style={{ visibility: isOpen ? 'visible' : 'hidden' }}
               className={cn(
                 'faq-accordion__panel grid overflow-hidden transition-[grid-template-rows,opacity,margin] duration-subtle ease-subtle motion-reduce:transition-none',
                 isOpen
-                  ? 'mt-1 grid-rows-[1fr] opacity-100'
-                  : 'mt-0 grid-rows-[0fr] opacity-0'
+                  ? 'visible mt-1 grid-rows-[1fr] opacity-100'
+                  : 'invisible mt-0 grid-rows-[0fr] opacity-0'
               )}
             >
               <div className='min-h-0 overflow-hidden'>
