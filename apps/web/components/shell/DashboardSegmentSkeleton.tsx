@@ -69,23 +69,12 @@ function AdminSkeleton() {
       data-skeleton-layout='admin'
     >
       <div
-        className='grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4'
-        data-skeleton-slot='admin-kpis'
+        className='grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4'
+        data-skeleton-slot='admin-health'
       >
         {ADMIN_KPI_CARDS.map(card => (
-          <Skeleton key={card} className='h-43 w-full rounded-xl' />
+          <Skeleton key={card} className='min-h-28 w-full rounded-xl' />
         ))}
-      </div>
-      <Skeleton
-        className='h-40 w-full shrink-0 rounded-xl'
-        data-skeleton-slot='admin-scoreboard'
-      />
-      <div
-        className='grid min-h-72 flex-1 grid-cols-1 gap-4 lg:grid-cols-3'
-        data-skeleton-slot='admin-panels'
-      >
-        <Skeleton className='h-full min-h-72 w-full rounded-xl lg:col-span-2' />
-        <Skeleton className='h-full min-h-72 w-full rounded-xl' />
       </div>
     </div>
   );

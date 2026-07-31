@@ -31,7 +31,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'Ops',
-  description: 'Live operations: deploys, AI ops, runway, blockers.',
+  description:
+    'Live operational state, canaries, control panel, and incidents.',
   robots: NOINDEX_ROBOTS,
 };
 
@@ -208,7 +209,7 @@ export default async function AdminOpsPage({
   return (
     <AdminPage
       title='Ops'
-      description='Live operations: deploys, AI ops, runway, blockers.'
+      description='Live operational state, canaries, control panel, and incidents.'
       testId='admin-ops-page'
       actions={
         <Button asChild variant='secondary' size='sm'>

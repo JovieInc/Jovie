@@ -41,7 +41,8 @@ interface AdminPeoplePageProps {
 }
 
 export const metadata: Metadata = {
-  title: 'Admin people',
+  title: 'Admin People',
+  description: 'User table, roles, waitlist, creators, and individual actions.',
 };
 
 export const runtime = 'nodejs';
@@ -211,7 +212,7 @@ export default async function AdminPeoplePage({
   return (
     <AdminPage
       title='People'
-      description='Waitlist, creators, users, releases, and feedback.'
+      description='User table, roles, waitlist, creators, and individual actions.'
       tabs={{
         param: 'view',
         value: view,

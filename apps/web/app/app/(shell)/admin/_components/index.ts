@@ -11,6 +11,10 @@ export {
   AdminFounderHudSectionSkeleton,
 } from './AdminFounderHudSection';
 export {
+  AdminHealthDashboard,
+  AdminHealthDashboardSkeleton,
+} from './AdminHealthDashboard';
+export {
   AdminKpiSection,
   AdminKpiSectionSkeleton,
 } from './AdminKpiSection';

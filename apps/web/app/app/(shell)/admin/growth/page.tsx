@@ -18,7 +18,8 @@ interface AdminGrowthPageProps {
 }
 
 export const metadata: Metadata = {
-  title: 'Admin growth',
+  title: 'Admin Growth',
+  description: 'Acquisition funnel, referral, outreach, and conversion.',
 };
 
 export const runtime = 'nodejs';
@@ -34,12 +35,7 @@ export default async function AdminGrowthPage({
   return (
     <AdminPage
       title='Growth'
-      description='Self-driving artist discovery and outreach pipeline.'
-      tabs={{
-        param: 'view',
-        value: 'growth',
-        options: [],
-      }}
+      description='Acquisition funnel, referral, outreach, and conversion.'
       testId='admin-growth-page'
       viewTestId='admin-growth-view-leads'
     >
