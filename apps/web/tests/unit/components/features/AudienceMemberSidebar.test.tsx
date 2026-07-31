@@ -66,7 +66,7 @@ const member: AudienceMember = {
 };
 
 describe('AudienceMemberSidebar', () => {
-  it('renders DrawerHero with member title when member is provided', () => {
+  it('renders the canonical audience header with the member title', () => {
     render(
       <AudienceMemberSidebar member={member} isOpen onClose={() => undefined} />
     );
@@ -92,10 +92,25 @@ describe('AudienceMemberSidebar', () => {
     );
 
     expect(screen.getByText('Jordan Reyes')).toBeInTheDocument();
-    expect(screen.getByTestId('drawer-hero-subtitle-slot')).toHaveClass(
-      'invisible',
-      'min-h-4'
+    expect(
+      screen
+        .getByTestId('audience-member-header-card')
+        .querySelector('.invisible.min-h-4')
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the canonical entity-header geometry around the close action', () => {
+    render(
+      <AudienceMemberSidebar member={member} isOpen onClose={() => undefined} />
     );
+
+    expect(screen.getByTestId('audience-member-header-card')).toHaveClass(
+      'relative',
+      'flex'
+    );
+    expect(
+      screen.getByRole('button', { name: 'More actions' })
+    ).toBeInTheDocument();
   });
 
   it('renders location and visit count in meta slot', () => {
