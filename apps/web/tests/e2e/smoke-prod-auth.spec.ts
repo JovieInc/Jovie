@@ -87,8 +87,7 @@ function requiredResponseString(
 
 async function readOAuthTokenSet(
   response: Awaited<ReturnType<APIRequestContext['post']>>,
-  label: string,
-  rememberToken: (value: string, hint: 'access_token' | 'refresh_token') => void
+  label: string
 ): Promise<OAuthTokenSet> {
   if (response.status() !== 200) {
     throw new Error(`${label} returned HTTP ${response.status()}.`);
@@ -106,8 +105,6 @@ async function readOAuthTokenSet(
   }
   const accessToken = requiredResponseString(record, 'access_token');
   const refreshToken = requiredResponseString(record, 'refresh_token');
-  rememberToken(accessToken, 'access_token');
-  rememberToken(refreshToken, 'refresh_token');
   const idToken =
     typeof record.id_token === 'string' && record.id_token.length >= 20
       ? record.id_token
@@ -193,19 +190,8 @@ async function verifyProductionIosOAuthTokenFlow(
     throw new Error('iOS OAuth authorization returned an invalid callback.');
   }
 
-  const issuedTokens = new Map<
-    string,
-    {
-      readonly value: string;
-      readonly hint: 'access_token' | 'refresh_token';
-    }
-  >();
-  const rememberToken = (
-    value: string,
-    hint: 'access_token' | 'refresh_token'
-  ) => {
-    issuedTokens.set(`${hint}:${value}`, { value, hint });
-  };
+  let activeAccessToken: string | undefined;
+  let activeRefreshToken: string | undefined;
   try {
     const initialTokens = await readOAuthTokenSet(
       await request.post(`${expectedOrigin}/api/auth/oauth2/token`, {
@@ -222,9 +208,10 @@ async function verifyProductionIosOAuthTokenFlow(
           redirect_uri: IOS_OAUTH_REDIRECT_URI,
         },
       }),
-      'iOS OAuth authorization-code exchange',
-      rememberToken
+      'iOS OAuth authorization-code exchange'
     );
+    activeAccessToken = initialTokens.accessToken;
+    activeRefreshToken = initialTokens.refreshToken;
 
     await verifyOAuthUserInfo(
       request,
@@ -243,9 +230,10 @@ async function verifyProductionIosOAuthTokenFlow(
           refresh_token: initialTokens.refreshToken,
         },
       }),
-      'iOS OAuth refresh-token exchange',
-      rememberToken
+      'iOS OAuth refresh-token exchange'
     );
+    activeAccessToken = refreshedTokens.accessToken;
+    activeRefreshToken = refreshedTokens.refreshToken;
     await verifyOAuthUserInfo(
       request,
       expectedOrigin,
@@ -253,24 +241,40 @@ async function verifyProductionIosOAuthTokenFlow(
       'Refreshed iOS OAuth access token'
     );
   } finally {
-    // Cleanup only. After refresh-token rotation, revoking earlier tokens can
-    // legitimately return 400; soft expects still fail the test and would
-    // block Production promote even when exchange/userinfo/refresh passed.
-    for (const { value, hint } of issuedTokens.values()) {
-      try {
-        await request.post(`${expectedOrigin}/api/auth/oauth2/revoke`, {
+    if (activeRefreshToken) {
+      const revokeResponse = await request.post(
+        `${expectedOrigin}/api/auth/oauth2/revoke`,
+        {
           failOnStatusCode: false,
           headers: { origin: expectedOrigin },
           form: {
             client_id: IOS_OAUTH_CLIENT_ID,
-            token: value,
-            token_type_hint: hint,
+            token: activeRefreshToken,
+            token_type_hint: 'refresh_token',
           },
-        });
-      } catch {
-        // best-effort cleanup must never fail the auth smoke
+        }
+      );
+      expect
+        .soft(
+          revokeResponse.status(),
+          'Latest iOS OAuth refresh token revocation should succeed'
+        )
+        .toBe(200);
+      if (revokeResponse.status() === 200 && activeAccessToken) {
+        const revokedUserInfoResponse = await request.get(
+          `${expectedOrigin}/api/auth/oauth2/userinfo`,
+          {
+            failOnStatusCode: false,
+            headers: { authorization: `Bearer ${activeAccessToken}` },
+          }
+        );
+        expect
+          .soft(
+            revokedUserInfoResponse.status(),
+            'Revoked iOS OAuth token family should reject userinfo'
+          )
+          .toBe(401);
       }
-      void hint;
     }
   }
 }
@@ -322,21 +326,36 @@ async function signInViaRenderedFlow(
   expectedOrigin: string
 ): Promise<SignInResult> {
   assertExactNavigationUrl(page.url(), expectedOrigin, 'Rendered sign-in flow');
-  const emailForm = page
+  let emailForm = page
     .locator('form[data-auth-email-code-step="email"]')
     .first();
-  const hasIdentifierInput = await emailForm
-    .isVisible({ timeout: 15_000 })
-    .catch(() => false);
-
-  if (!hasIdentifierInput) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const hasIdentifierInput = await emailForm
+      .isVisible({ timeout: 15_000 })
+      .catch(() => false);
+    if (hasIdentifierInput) break;
     if (
       isExactNavigationUrl(page.url(), expectedOrigin) &&
       new URL(page.url()).pathname.startsWith('/app')
     ) {
       return 'authenticated';
     }
-    return 'signin-form-unavailable';
+    if (attempt === 0) {
+      await page.reload({
+        waitUntil: 'domcontentloaded',
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      });
+      assertExactNavigationUrl(
+        page.url(),
+        expectedOrigin,
+        'Rendered sign-in reload'
+      );
+      emailForm = page
+        .locator('form[data-auth-email-code-step="email"]')
+        .first();
+    } else {
+      return 'signin-form-unavailable';
+    }
   }
 
   const { submitButton } = await prepareProductionAuthEmailForm(

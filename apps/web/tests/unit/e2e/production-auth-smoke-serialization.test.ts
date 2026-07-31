@@ -21,19 +21,25 @@ describe('production auth smoke session contract', () => {
     expect(source).toContain("readyTestId: 'library-surface'");
     expect(source).toContain("readyView: 'releases'");
     expect(source).toContain('await page.waitForURL(');
+    expect(source.match(/await page.reload\(\{/gu)).toHaveLength(1);
+    expect(source).toContain("'Rendered sign-in reload'");
     expect(source).toContain('await waitForProductionDashboardContent(');
     expect(
       source.match(/await verifyProductionIosOAuthTokenFlow\(/gu)
     ).toHaveLength(1);
     expect(source).toContain("grant_type: 'authorization_code'");
     expect(source).toContain("grant_type: 'refresh_token'");
+    expect(source.match(/token_type_hint: 'refresh_token'/g)).toHaveLength(1);
+    expect(source).not.toContain('issuedTokens');
+    expect(source).not.toContain('token_type_hint: hint');
+    expect(source).toContain(
+      'Revoked iOS OAuth token family should reject userinfo'
+    );
     expect(source.match(/headers: \{ origin: expectedOrigin \}/g)).toHaveLength(
       3
     );
     expect(source).toContain('/api/auth/oauth2/userinfo');
     expect(source).toContain('/api/auth/oauth2/revoke');
-    expect(source).toContain('best-effort cleanup must never fail');
-    expect(source).not.toContain('revocation should succeed');
     expect(source).toContain('recordPlaywrightSensitiveValues(');
     const tabNavigation = source.split('const tabs = ')[1];
     expect(tabNavigation).toBeDefined();
