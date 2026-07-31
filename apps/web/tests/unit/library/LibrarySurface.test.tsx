@@ -978,26 +978,21 @@ describe('LibrarySurface', () => {
     expect(screen.queryByTestId('library-audio-dropzone')).toBeNull();
   });
 
-  it('renders the library right rail as a sticky carded panel', () => {
+  it('renders the library right rail with the shared compact entity anatomy', () => {
     renderLibrary([buildAsset()]);
     clickGridView();
 
     fireEvent.click(screen.getByRole('button', { name: /View Take Me Over/u }));
 
     const drawer = screen.getByTestId('library-asset-drawer');
-    const stickyRail = screen.getByTestId('library-asset-drawer-sticky-rail');
-    const stickyCard = stickyRail.querySelector('[data-variant="card"]');
+    const entityHeader = screen.getByTestId('library-asset-entity-header');
 
-    expect(stickyCard).toBeInTheDocument();
-    expect(stickyCard).toContainElement(
+    expect(entityHeader).toContainElement(
       screen.getByRole('button', { name: 'More actions' })
     );
-    expect(
-      within(stickyRail).getByRole('heading', { name: 'Take Me Over' })
-    ).toBeInTheDocument();
-    expect(
-      drawer.querySelectorAll('[data-variant="card"]').length
-    ).toBeGreaterThan(1);
+    expect(within(entityHeader).getByText('Take Me Over')).toBeInTheDocument();
+    const workspace = drawer.querySelector('[data-right-rail-workspace]');
+    expect(workspace).toHaveAttribute('data-surface-variant', 'raised');
     expect(drawer.textContent).toContain('Details');
     expect(drawer.textContent).toContain('Providers');
   });
