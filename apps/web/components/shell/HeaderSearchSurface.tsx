@@ -61,6 +61,10 @@ function flattenGroups(groups: readonly HeaderSearchResultGroup[]) {
   return groups.flatMap(group => group.items);
 }
 
+interface SearchSelectableResult {
+  readonly id: string;
+}
+
 interface ContextualSuggestion {
   readonly field: FilterField;
   readonly value: string;
@@ -115,7 +119,7 @@ function HeaderGlobalSearch({
   readonly onOpenFilters?: () => void;
 }) {
   const [query, setQuery] = useState('');
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
   const [remoteSearch, setRemoteSearch] = useState<{
     readonly scopeKey: string;
     readonly query: string;
@@ -171,11 +175,23 @@ function HeaderGlobalSearch({
     () => contextualFilterSuggestions(query, adapter),
     [adapter, query]
   );
-  const resultCount = items.length + contextualSuggestions.length;
+  const selectableResults = useMemo<readonly SearchSelectableResult[]>(
+    () => [
+      ...items,
+      ...contextualSuggestions.map(suggestion => ({
+        id: `current-view:${suggestion.field}:${suggestion.value}`,
+      })),
+    ],
+    [contextualSuggestions, items]
+  );
   const hasQuery = query.trim().length > 0;
-  const activeIndex = resultCount
-    ? Math.max(0, Math.min(selectedIndex, resultCount - 1))
-    : null;
+  const activeIndex = useMemo(() => {
+    if (selectableResults.length === 0) return null;
+    const selectedIndex = selectableResults.findIndex(
+      result => result.id === selectedResultId
+    );
+    return selectedIndex === -1 ? 0 : selectedIndex;
+  }, [selectableResults, selectedResultId]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => inputRef.current?.focus());
@@ -183,8 +199,20 @@ function HeaderGlobalSearch({
   }, []);
 
   useEffect(() => {
-    setSelectedIndex(0);
+    setSelectedResultId(null);
   }, [query]);
+
+  // Result groups can resolve at different times. Keep selection on the same
+  // option identity as the list grows, falling back only if that item vanished.
+  useEffect(() => {
+    setSelectedResultId(currentId => {
+      if (selectableResults.length === 0) return null;
+      if (currentId && selectableResults.some(item => item.id === currentId)) {
+        return currentId;
+      }
+      return selectableResults[0]?.id ?? null;
+    });
+  }, [selectableResults]);
 
   useEffect(() => {
     if (!searchLibraryAssets || !canSearchRemotely) {
@@ -246,20 +274,30 @@ function HeaderGlobalSearch({
     }
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      setSelectedIndex(index =>
-        resultCount === 0 ? 0 : Math.min(index + 1, resultCount - 1)
+      if (activeIndex === null) return;
+      setSelectedResultId(
+        selectableResults[
+          Math.min(activeIndex + 1, selectableResults.length - 1)
+        ]?.id ?? null
       );
       return;
     }
     if (event.key === 'ArrowUp') {
       event.preventDefault();
-      setSelectedIndex(index => Math.max(index - 1, 0));
+      if (activeIndex === null) return;
+      setSelectedResultId(
+        selectableResults[Math.max(activeIndex - 1, 0)]?.id ?? null
+      );
       return;
     }
     if (event.key === 'Enter' && activeIndex !== null) {
       event.preventDefault();
       document.getElementById(`${listboxId}-option-${activeIndex}`)?.click();
     }
+  }
+
+  function selectResultAtIndex(index: number) {
+    setSelectedResultId(selectableResults[index]?.id ?? null);
   }
 
   function commitContextualSuggestion(suggestion: ContextualSuggestion) {
@@ -381,7 +419,7 @@ function HeaderGlobalSearch({
                     href={item.href}
                     role='option'
                     aria-selected={activeIndex === index}
-                    onMouseEnter={() => setSelectedIndex(index)}
+                    onMouseEnter={() => selectResultAtIndex(index)}
                     onClick={onClose}
                     className={cn(
                       'flex min-h-9 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-subtle ease-subtle',
@@ -425,7 +463,7 @@ function HeaderGlobalSearch({
                     variant='ghost'
                     role='option'
                     aria-selected={activeIndex === index}
-                    onMouseEnter={() => setSelectedIndex(index)}
+                    onMouseEnter={() => selectResultAtIndex(index)}
                     onClick={() => commitContextualSuggestion(suggestion)}
                     className={cn(
                       'flex min-h-9 w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-subtle ease-subtle',

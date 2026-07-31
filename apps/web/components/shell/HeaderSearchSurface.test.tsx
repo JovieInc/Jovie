@@ -236,6 +236,86 @@ describe('HeaderSearchSurface', () => {
     ]);
   });
 
+  it('keeps the active result identity stable as slower groups arrive and falls back only when it disappears', () => {
+    const onClose = vi.fn();
+    const props = {
+      isOpen: true,
+      onOpen: vi.fn(),
+      onClose,
+    };
+    const soberRelease = {
+      id: 'release-sober',
+      title: 'Sober',
+      artistNames: ['Frank Ocean'],
+      smartLinkPath: '/frank-ocean/sober',
+    };
+    const { rerender } = render(
+      <HeaderSearchSurface
+        {...props}
+        catalog={{ conversations: [], profiles: [], releases: [soberRelease] }}
+      />
+    );
+
+    const input = screen.getByRole('combobox', { name: 'Search Jovie' });
+    fireEvent.change(input, { target: { value: 'sober' } });
+    const releaseOption = screen.getByRole('option', {
+      name: 'Sober Frank Ocean',
+    });
+    expect(releaseOption).toHaveAttribute('aria-selected', 'true');
+
+    rerender(
+      <HeaderSearchSurface
+        {...props}
+        catalog={{
+          conversations: [],
+          profiles: [
+            {
+              id: 'gracia-soberana',
+              displayName: 'Gracia Soberana Música',
+              username: 'gracia-soberana',
+              usernameNormalized: 'gracia-soberana',
+            },
+          ],
+          releases: [soberRelease],
+        }}
+      />
+    );
+
+    const stableReleaseOption = screen.getByRole('option', {
+      name: 'Sober Frank Ocean',
+    });
+    expect(stableReleaseOption).toHaveAttribute('aria-selected', 'true');
+    const activateRelease = vi
+      .spyOn(stableReleaseOption as HTMLAnchorElement, 'click')
+      .mockImplementation(() => {});
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(activateRelease).toHaveBeenCalledTimes(1);
+    activateRelease.mockRestore();
+
+    rerender(
+      <HeaderSearchSurface
+        {...props}
+        catalog={{
+          conversations: [],
+          profiles: [
+            {
+              id: 'gracia-soberana',
+              displayName: 'Gracia Soberana Música',
+              username: 'gracia-soberana',
+              usernameNormalized: 'gracia-soberana',
+            },
+          ],
+          releases: [],
+        }}
+      />
+    );
+
+    expect(
+      screen.getByRole('option', { name: /Gracia Soberana Música/ })
+    ).toHaveAttribute('aria-selected', 'true');
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('closes from Escape without rendering a modal surface', () => {
     const onClose = vi.fn();
     render(<HeaderSearchSurface isOpen onOpen={vi.fn()} onClose={onClose} />);
