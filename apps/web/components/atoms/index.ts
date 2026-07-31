@@ -5,6 +5,11 @@
 export { AmountSelector } from './AmountSelector';
 export { ArtistName } from './ArtistName';
 export { ArtworkFallbackTile } from './ArtworkFallbackTile';
+export {
+  ArtworkFrame,
+  type ArtworkFrameSize,
+  getArtworkRadiusClassName,
+} from './ArtworkFrame';
 export type { Assignee } from './AssigneeAvatar';
 export { AssigneeAvatar } from './AssigneeAvatar';
 export type {

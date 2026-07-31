@@ -85,6 +85,12 @@ describe('LibraryMediaThumbnail', () => {
     expect(
       container.querySelector('[data-artwork-fallback-sleeve="true"]')
     ).toHaveClass(expectedRadius);
+    expect(
+      screen.getByTestId('library-media-thumbnail-release-1')
+    ).toHaveAttribute(
+      'data-artwork-frame',
+      size === 'drawer' ? 'hero' : 'default'
+    );
   });
 
   it('uses a flat, subtly rounded fallback for row thumbnails', () => {
@@ -100,7 +106,13 @@ describe('LibraryMediaThumbnail', () => {
     );
 
     const thumbnail = screen.getByTestId('library-media-thumbnail-release-1');
-    expect(thumbnail).toHaveClass('rounded-sm');
+    expect(thumbnail).toHaveAttribute('data-artwork-frame', 'thumbnail');
+    expect(thumbnail).toHaveClass(
+      'rounded-xs',
+      'border-0',
+      'outline-none',
+      'shadow-none'
+    );
     expect(
       thumbnail.querySelector('[data-artwork-fallback="true"]')
     ).toHaveAttribute('data-artwork-fallback-compact', 'true');

@@ -31,5 +31,21 @@ describe('ArtworkThumb', () => {
     const tile = container.firstElementChild as HTMLElement;
     expect(tile.style.width).toBe('88px');
     expect(tile.style.height).toBe('88px');
+    expect(tile).toHaveClass('rounded-lg', 'border-0', 'shadow-none');
+  });
+
+  it('keeps tiny shell artwork nearly square without decoration', () => {
+    const { container } = render(
+      <ArtworkThumb src='' title='Tiny' size={28} />
+    );
+    const tile = container.firstElementChild as HTMLElement;
+
+    expect(tile).toHaveAttribute('data-artwork-frame', 'thumbnail');
+    expect(tile).toHaveClass(
+      'rounded-xs',
+      'border-0',
+      'outline-none',
+      'shadow-none'
+    );
   });
 });

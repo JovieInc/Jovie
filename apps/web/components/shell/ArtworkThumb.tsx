@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ArtworkFallbackTile } from '@/components/atoms/ArtworkFallbackTile';
+import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
 import { cn } from '@/lib/utils';
 
 /**
@@ -56,11 +57,9 @@ export function ArtworkThumb({
   const isLoaded = loaded && !errored;
 
   return (
-    <div
-      className={cn(
-        'relative rounded-sm overflow-hidden shrink-0 bg-surface-1',
-        className
-      )}
+    <ArtworkFrame
+      size={size}
+      className={cn('bg-surface-1', className)}
       data-artwork-state={isLoaded ? 'image' : 'fallback'}
       style={{ height: size, width: size }}
     >
@@ -73,6 +72,6 @@ export function ArtworkThumb({
       ) : (
         <ArtworkFallbackTile seed={title} />
       )}
-    </div>
+    </ArtworkFrame>
   );
 }
