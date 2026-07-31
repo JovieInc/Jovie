@@ -20,6 +20,26 @@ vi.mock('@/components/organisms/RightDrawer', () => ({
 }));
 
 describe('EntitySidebarShell', () => {
+  it('defaults entity workspaces to the shared raised surface', () => {
+    render(
+      <EntitySidebarShell isOpen ariaLabel='Entity details'>
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    const workspace = screen
+      .getByTestId('right-drawer')
+      .querySelector('[data-right-rail-workspace]');
+
+    expect(workspace).toHaveAttribute('data-surface-variant', 'raised');
+    expect(workspace).toHaveClass(
+      'overflow-hidden',
+      'rounded-(--linear-app-shell-radius)',
+      'bg-surface-1',
+      'shadow-card'
+    );
+  });
+
   it('keeps the entity header pinned and leaves minimal-mode tab composition to the body', () => {
     render(
       <EntitySidebarShell
@@ -214,5 +234,39 @@ describe('EntitySidebarShell', () => {
       'overflow-x-hidden',
       'overscroll-contain'
     );
+  });
+
+  it('renders raised identity before the ordered section stack', () => {
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Raised entity rail'
+        workspaceSurface='raised'
+        headerMode='minimal'
+        hideMinimalHeaderBar
+        entityHeaderSurface='flat'
+        entityHeader={<div>Compact entity identity</div>}
+      >
+        <div>Tabbed details</div>
+      </EntitySidebarShell>
+    );
+
+    const drawer = screen.getByTestId('right-drawer');
+    const workspace = drawer.querySelector('[data-right-rail-workspace]');
+    const identity = drawer.querySelector(
+      '[data-right-rail-section="identity"]'
+    );
+    const sectionStack = drawer.querySelector(
+      '[data-right-rail-section-stack]'
+    );
+
+    expect(workspace).toHaveAttribute('data-surface-variant', 'raised');
+    expect(workspace).toHaveClass('bg-surface-1', 'shadow-card');
+    expect(identity).toHaveTextContent('Compact entity identity');
+    expect(sectionStack).toHaveTextContent('Tabbed details');
+    expect(
+      (identity?.compareDocumentPosition(sectionStack as Node) ?? 0) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 });

@@ -104,6 +104,20 @@ describe('AdminProfileSidebar', () => {
     expect(screen.getByRole('tab', { name: 'Algorithm' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'About' })).toBeInTheDocument();
     expect(screen.getAllByText('@alice').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('admin-creator-entity-header')).toHaveAttribute(
+      'data-density',
+      'rail'
+    );
+    expect(screen.getByTestId('admin-creator-summary')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('drawer-analytics-metric-value-linked-destinations')
+    ).toHaveTextContent('2');
+    expect(
+      screen.getByTestId('drawer-analytics-metric-value-profile-state')
+    ).toHaveTextContent('Claimed');
+    expect(screen.getByTestId('admin-creator-profile-link')).toHaveTextContent(
+      'jov.ie/alice'
+    );
   });
 
   it('shows about tab content', async () => {

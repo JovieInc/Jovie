@@ -249,9 +249,10 @@ export function ReleaseEntityHeader({
         ) : null}
         <DrawerHero
           title={release.title}
+          density='rail'
           stableLayout
-          titleLineClamp={2}
-          subtitleLineClamp={2}
+          titleLineClamp={1}
+          subtitleLineClamp={1}
           reserveSubtitleSlot
           reserveMetaSlot
           metaOverflow='scroll'
@@ -275,7 +276,7 @@ export function ReleaseEntityHeader({
                     src={release.artworkUrl}
                     alt={artworkAlt}
                     name={release.title}
-                    size='2xl'
+                    size='md'
                     rounded='md'
                     uploadable={canUploadArtwork}
                     onUpload={onArtworkUpload}
@@ -285,13 +286,13 @@ export function ReleaseEntityHeader({
                   <DrawerMediaThumb
                     src={release.artworkUrl}
                     alt={artworkAlt}
-                    dimension={68}
-                    sizeClassName='h-17 w-17 rounded-xl'
-                    sizes='68px'
+                    dimension={48}
+                    sizeClassName='h-12 w-12 rounded-lg'
+                    sizes='48px'
                     fallback={
                       <Icon
                         name='Disc3'
-                        className='h-10 w-10 text-tertiary-token'
+                        className='h-6 w-6 text-tertiary-token'
                         aria-hidden='true'
                       />
                     }
@@ -305,7 +306,7 @@ export function ReleaseEntityHeader({
                 disabled={!previewUrl}
                 aria-pressed={isPlaying}
                 className={cn(
-                  'absolute inset-0 flex items-center justify-center rounded-xl transition-[background-color,opacity] duration-subtle',
+                  'absolute inset-0 flex items-center justify-center rounded-lg transition-[background-color,opacity] duration-subtle',
                   'bg-black/0 opacity-0',
                   'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
                   'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
@@ -314,9 +315,9 @@ export function ReleaseEntityHeader({
                 aria-label={getPreviewAriaLabel(Boolean(previewUrl), isPlaying)}
               >
                 {isPlaying ? (
-                  <Pause className='h-5 w-5 text-white dark:text-white drop-shadow-sm' />
+                  <Pause className='h-4 w-4 text-white dark:text-white drop-shadow-sm' />
                 ) : (
-                  <Play className='h-5 w-5 translate-x-px text-white dark:text-white drop-shadow-sm' />
+                  <Play className='h-4 w-4 translate-x-px text-white dark:text-white drop-shadow-sm' />
                 )}
               </button>
             </div>

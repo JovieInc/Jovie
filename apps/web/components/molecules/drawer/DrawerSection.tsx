@@ -8,6 +8,8 @@ import { DrawerSectionHeading } from './DrawerSectionHeading';
 import { DrawerSurfaceCard } from './DrawerSurfaceCard';
 
 export interface DrawerSectionProps {
+  /** Semantic entity-inspector order; styling remains shared and non-cardy. */
+  readonly sectionKind?: 'facts' | 'links' | 'status' | 'details';
   readonly title?: string;
   readonly children: ReactNode;
   readonly actions?: ReactNode;
@@ -125,6 +127,7 @@ function DrawerSectionContent({
 }
 
 export function DrawerSection({
+  sectionKind,
   title,
   children,
   actions,
@@ -177,7 +180,10 @@ export function DrawerSection({
 
   if (surface === 'card') {
     return (
-      <div className={cn('space-y-2', className)}>
+      <div
+        data-right-rail-section={sectionKind}
+        className={cn('space-y-2', className)}
+      >
         <DrawerSurfaceCard
           variant='card'
           testId={testId}
@@ -204,7 +210,11 @@ export function DrawerSection({
   }
 
   return (
-    <div data-testid={testId} className={cn('space-y-2', className)}>
+    <div
+      data-testid={testId}
+      data-right-rail-section={sectionKind}
+      className={cn('space-y-2', className)}
+    >
       <DrawerSectionHeader
         title={title}
         heading={heading}

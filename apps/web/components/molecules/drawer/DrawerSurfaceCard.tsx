@@ -13,6 +13,7 @@ export interface DrawerSurfaceCardProps {
   readonly id?: string;
   readonly hidden?: boolean;
   readonly 'aria-busy'?: boolean;
+  readonly 'data-right-rail-section'?: string;
 }
 
 export function DrawerSurfaceCard({
@@ -24,6 +25,7 @@ export function DrawerSurfaceCard({
   id,
   hidden,
   'aria-busy': ariaBusy,
+  'data-right-rail-section': rightRailSection,
 }: DrawerSurfaceCardProps) {
   return (
     <Component
@@ -33,6 +35,7 @@ export function DrawerSurfaceCard({
       data-testid={testId}
       data-variant={variant}
       data-surface-variant={variant}
+      data-right-rail-section={rightRailSection}
       className={cn(
         variant === 'card'
           ? DRAWER_SURFACE_CARD_CLASSNAME

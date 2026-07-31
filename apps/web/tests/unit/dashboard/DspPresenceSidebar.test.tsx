@@ -141,6 +141,10 @@ describe('DspPresenceSidebar', () => {
     expect(
       screen.getByRole('button', { name: 'Confirm Match' })
     ).toBeInTheDocument();
+    expect(screen.getByTestId('dsp-presence-entity-header')).toHaveClass(
+      'relative',
+      'flex'
+    );
     expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument();
     expect(screen.getByText('View On Spotify')).toBeInTheDocument();
   });

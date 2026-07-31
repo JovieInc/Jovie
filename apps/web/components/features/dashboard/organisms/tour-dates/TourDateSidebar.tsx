@@ -21,16 +21,17 @@ import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import {
+  DrawerAnalyticsSummaryCard,
   DrawerCardActionBar,
+  DrawerMediaThumb,
   DrawerSection,
-  DrawerStatGrid,
   DrawerSurfaceCard,
-  EntityHeaderCard,
   EntitySidebarShell,
-  StatTile,
+  ShareableLinkRow,
 } from '@/components/molecules/drawer';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { convertToCommonDropdownItems } from '@/components/organisms/table';
+import { DrawerHero } from '@/components/shell/DrawerHero';
 import { CANONICAL_METRICS } from '@/lib/analytics/metrics';
 import {
   useDeleteTourDateMutation,
@@ -255,39 +256,19 @@ export function TourDateSidebar({
         onClose={onClose}
         headerMode='minimal'
         hideMinimalHeaderBar
+        workspaceSurface='raised'
+        entityHeaderSurface='flat'
         isEmpty={!tourDate}
         emptyMessage='Select a tour date to edit'
         contextMenuItems={contextMenuItems}
         entityHeader={
           tourDate ? (
-            <DrawerSurfaceCard variant='card' className='overflow-hidden p-3.5'>
-              <EntityHeaderCard
-                eyebrow='Tour Date'
-                title={tourDate.title?.trim() || tourDate.venueName}
-                stableLayout
-                titleLineClamp={1}
-                subtitleLineClamp={1}
-                reserveSubtitleSlot
-                reserveMetaSlot
-                reserveFooterSlot
-                metaOverflow='scroll'
-                subtitle={
-                  <>
-                    {formatISODate(tourDate.startDate)} · {tourDate.city}
-                    {tourDate.region ? `, ${tourDate.region}` : ''} ·{' '}
-                    {tourDate.country}
-                  </>
-                }
-                meta={
-                  tourDate.provider === 'bandsintown' ? (
-                    <div className='flex items-center gap-2 rounded-full border border-[color:color-mix(in_oklab,var(--color-success)_18%,var(--linear-app-frame-seam))] bg-[color:color-mix(in_oklab,var(--color-success)_10%,transparent)] px-3 py-1.5 text-xs text-(--color-success)'>
-                      <Icon name='Link' className='h-3.5 w-3.5' />
-                      <span>Synced from Bandsintown</span>
-                    </div>
-                  ) : null
-                }
-                footer={actionRow}
-                actions={
+            <>
+              <DrawerSurfaceCard
+                variant='card'
+                className='relative overflow-hidden'
+              >
+                <div className='absolute right-2 top-2 z-10'>
                   <DrawerCardActionBar
                     primaryActions={[]}
                     menuItems={contextMenuItems}
@@ -296,12 +277,93 @@ export function TourDateSidebar({
                     overflowTriggerIcon='vertical'
                     className='border-0 bg-transparent px-0 py-0'
                   />
+                </div>
+                <DrawerHero
+                  title={tourDate.title?.trim() || tourDate.venueName}
+                  density='rail'
+                  artwork={
+                    <DrawerMediaThumb
+                      alt=''
+                      fallback={
+                        <CalendarIcon
+                          className='h-4 w-4 text-tertiary-token'
+                          aria-hidden='true'
+                        />
+                      }
+                      dimension={44}
+                      sizeClassName='h-11 w-11'
+                      sizes='44px'
+                      className='rounded-md border-0 bg-surface-0 outline-none'
+                    />
+                  }
+                  subtitle={
+                    <>
+                      {formatISODate(tourDate.startDate)} · {tourDate.city}
+                      {tourDate.region ? `, ${tourDate.region}` : ''} ·{' '}
+                      {tourDate.country}
+                    </>
+                  }
+                  stableLayout
+                  titleLineClamp={1}
+                  subtitleLineClamp={1}
+                  reserveSubtitleSlot
+                  reserveMetaSlot
+                  metaOverflow='scroll'
+                  meta={
+                    tourDate.provider === 'bandsintown' ? (
+                      <span className='inline-flex items-center gap-1.5 text-2xs text-secondary-token'>
+                        <Icon name='Link' className='h-3 w-3' />
+                        Synced from Bandsintown
+                      </span>
+                    ) : null
+                  }
+                  className='[&_h2]:pr-9'
+                  testId='tour-date-entity-header'
+                />
+              </DrawerSurfaceCard>
+              <DrawerAnalyticsSummaryCard
+                testId='tour-date-summary'
+                stableLayout
+                reserveFooterSlot
+                metricSlotCount={2}
+                state={
+                  analyticsLoading
+                    ? 'loading'
+                    : analyticsError
+                      ? 'error'
+                      : 'ready'
                 }
-                bodyClassName='pr-9'
+                metrics={[
+                  {
+                    id: 'ticket-clicks',
+                    label: CANONICAL_METRICS.ticket_clicks.label,
+                    value: numberFormatter.format(
+                      analyticsData?.ticketClicks ?? 0
+                    ),
+                  },
+                  {
+                    id: 'top-cities',
+                    label: 'Top Cities',
+                    value: String(analyticsData?.topCities?.length ?? 0),
+                  },
+                ]}
+                footer={
+                  formData.ticketUrl ? (
+                    <ShareableLinkRow
+                      url={formData.ticketUrl}
+                      displayValue='Ticket Link'
+                      density='rail'
+                      surface='flat'
+                      testId='tour-date-ticket-link'
+                    />
+                  ) : null
+                }
               />
-            </DrawerSurfaceCard>
+            </>
           ) : undefined
         }
+        footer={actionRow}
+        footerSurface='flat'
       >
         {tourDate && (
           <div className='space-y-3'>
@@ -525,19 +587,6 @@ export function TourDateSidebar({
               )}
               {!analyticsLoading && !analyticsError && (
                 <div className='space-y-2'>
-                  <DrawerStatGrid>
-                    <StatTile
-                      label={CANONICAL_METRICS.ticket_clicks.label}
-                      value={numberFormatter.format(
-                        analyticsData?.ticketClicks ?? 0
-                      )}
-                    />
-                    <StatTile
-                      label='Top Cities'
-                      value={String(analyticsData?.topCities?.length ?? 0)}
-                    />
-                  </DrawerStatGrid>
-
                   {(analyticsData?.topCities?.length ?? 0) > 0 && (
                     <DrawerSurfaceCard className='p-2'>
                       <MiniRankedList

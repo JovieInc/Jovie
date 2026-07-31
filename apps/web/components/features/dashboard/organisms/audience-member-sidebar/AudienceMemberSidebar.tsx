@@ -16,7 +16,7 @@ import {
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
-import { DrawerHero } from '@/components/shell/DrawerHero';
+import { AudienceMemberHeader } from '@/features/dashboard/atoms/AudienceMemberHeader';
 import { AudienceMemberActivityFeed } from './AudienceMemberActivityFeed';
 import { AudienceMemberDetails } from './AudienceMemberDetails';
 import { AudienceMemberReferrers } from './AudienceMemberReferrers';
@@ -53,6 +53,7 @@ export function AudienceMemberSidebar({
     <EntitySidebarShell
       isOpen={isOpen}
       ariaLabel='Audience member details'
+      workspaceSurface='raised'
       contextMenuItems={contextMenuItems}
       data-testid='audience-member-sidebar'
       onClose={onClose}
@@ -60,46 +61,34 @@ export function AudienceMemberSidebar({
       hideMinimalHeaderBar
       entityHeader={
         member ? (
-          <div className='relative' data-testid='audience-member-header-card'>
-            <div className='absolute right-2.5 top-2.5 z-10'>
+          <AudienceMemberHeader
+            title={primaryLabel}
+            subtitle={secondaryLabel}
+            avatarName={primaryLabel}
+            meta={
+              member.locationLabel || member.visits > 0 ? (
+                <div className='flex items-center gap-2 text-2xs text-tertiary-token'>
+                  {member.locationLabel ? (
+                    <span className='inline-flex items-center gap-1'>
+                      <MapPin className='h-3 w-3' />
+                      {member.locationLabel}
+                    </span>
+                  ) : null}
+                  <span>
+                    {member.visits} visit{member.visits === 1 ? '' : 's'}
+                  </span>
+                </div>
+              ) : undefined
+            }
+            actions={
               <DrawerHeaderActions
                 primaryActions={[]}
                 overflowActions={[]}
                 onClose={onClose}
               />
-            </div>
-            <DrawerHero
-              title={primaryLabel}
-              subtitle={secondaryLabel}
-              stableLayout
-              titleLineClamp={1}
-              subtitleLineClamp={1}
-              reserveSubtitleSlot
-              reserveMetaSlot
-              metaOverflow='scroll'
-              artwork={
-                <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-subtle bg-surface-0 text-sm font-semibold text-secondary-token'>
-                  {primaryLabel.charAt(0).toUpperCase()}
-                </div>
-              }
-              meta={
-                member.locationLabel || member.visits > 0 ? (
-                  <div className='flex items-center gap-2 pr-8 text-2xs text-tertiary-token'>
-                    {member.locationLabel ? (
-                      <span className='inline-flex items-center gap-1'>
-                        <MapPin className='h-3 w-3' />
-                        {member.locationLabel}
-                      </span>
-                    ) : null}
-                    <span>
-                      {member.visits} visit{member.visits === 1 ? '' : 's'}
-                    </span>
-                  </div>
-                ) : undefined
-              }
-              className='[&_h2]:pr-9'
-            />
-          </div>
+            }
+            data-testid='audience-member-header-card'
+          />
         ) : undefined
       }
       isEmpty={!member}
@@ -108,6 +97,13 @@ export function AudienceMemberSidebar({
       {member && (
         <DrawerTabbedCard
           testId='audience-member-tabbed-card'
+          sectionKind={
+            activeTab === 'details'
+              ? 'facts'
+              : activeTab === 'activity'
+                ? 'status'
+                : 'details'
+          }
           className='pt-0.5'
           tabs={
             <DrawerTabs

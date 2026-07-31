@@ -32,6 +32,29 @@ vi.mock(
 
 // Mock drawer components to simplify test
 vi.mock('@/components/molecules/drawer', () => ({
+  DrawerAnalyticsSummaryCard: ({
+    metrics,
+    state,
+  }: {
+    metrics: ReadonlyArray<{ label: string; value: string }>;
+    state: 'loading' | 'error' | 'ready';
+  }) => (
+    <div data-testid='analytics-summary'>
+      {state === 'loading' ? (
+        <div data-testid='loading-skeleton' />
+      ) : (
+        metrics.map(metric => (
+          <div key={metric.label} data-testid={`stat-${metric.label}`}>
+            <span>{metric.label}</span>
+            <span>{metric.value}</span>
+          </div>
+        ))
+      )}
+    </div>
+  ),
+  DrawerMediaThumb: ({ fallback }: { fallback: React.ReactNode }) => (
+    <div data-testid='drawer-media-thumb'>{fallback}</div>
+  ),
   DrawerSection: ({
     title,
     children,
@@ -76,14 +99,29 @@ vi.mock('@/components/molecules/drawer', () => ({
   ),
   EntitySidebarShell: ({
     children,
+    entityHeader,
+    footer,
+    workspaceSurface,
   }: {
     children: React.ReactNode;
+    entityHeader?: React.ReactNode;
+    footer?: React.ReactNode;
+    workspaceSurface?: string;
     open?: boolean;
     onClose?: () => void;
     title?: string;
     actions?: unknown[];
     onAction?: () => void;
-  }) => <div data-testid='sidebar-shell'>{children}</div>,
+  }) => (
+    <div data-testid='sidebar-shell' data-workspace-surface={workspaceSurface}>
+      {entityHeader}
+      {children}
+      {footer}
+    </div>
+  ),
+  ShareableLinkRow: ({ displayValue }: { displayValue?: string }) => (
+    <div>{displayValue}</div>
+  ),
   StatTile: ({ label, value }: { label: string; value: string }) => (
     <div data-testid={`stat-${label}`}>
       <span>{label}</span>
@@ -233,6 +271,15 @@ describe('TourDateSidebar analytics section', () => {
     });
 
     renderSidebar();
+
+    expect(screen.getByTestId('sidebar-shell')).toHaveAttribute(
+      'data-workspace-surface',
+      'raised'
+    );
+    expect(screen.getByTestId('tour-date-entity-header')).toHaveAttribute(
+      'data-density',
+      'rail'
+    );
 
     // Check stat tiles
     const ticketStat = screen.getByTestId('stat-Ticket Clicks');

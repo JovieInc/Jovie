@@ -298,6 +298,7 @@ function TaskReleasePanelStatus({
       title='Release'
       onClose={onClose}
       scrollStrategy='shell'
+      workspaceSurface='flat'
       data-testid='task-release-panel-status'
     >
       <div

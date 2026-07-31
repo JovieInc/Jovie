@@ -43,6 +43,17 @@ function HeaderHarness() {
   return <>{actions}</>;
 }
 
+function HeaderWithoutOpenHarness() {
+  const { actions } = useProfileHeaderParts({
+    username: 'timwhite',
+    displayName: 'Tim White',
+    profilePath: '/timwhite',
+    showOpenAction: false,
+  });
+
+  return <>{actions}</>;
+}
+
 describe('ProfileSidebarHeader QR download', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -80,6 +91,15 @@ describe('ProfileSidebarHeader QR download', () => {
     expect(toast.success).toHaveBeenCalledWith('QR code downloaded');
 
     openSpy.mockRestore();
+  });
+
+  it('omits the duplicate header open action when a shareable row is visible', () => {
+    render(<HeaderWithoutOpenHarness />);
+
+    expect(screen.queryByRole('button', { name: 'Open Profile' })).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Download QR Code' })
+    ).toBeInTheDocument();
   });
 
   it('shows an error toast when QR fetch fails', async () => {

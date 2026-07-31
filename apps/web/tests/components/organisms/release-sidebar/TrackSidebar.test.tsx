@@ -98,10 +98,32 @@ describe('TrackSidebar', () => {
     expect(screen.getAllByText('Midnight Echo').length).toBeGreaterThan(0);
     expect(screen.getByTitle('Copy Track Link')).toBeInTheDocument();
     expect(screen.getByText(/Preview Unverified/i)).toBeInTheDocument();
+    const header = screen.getByTestId('track-header-card');
+    const details = screen.getByTestId('track-tabbed-card');
+    expect(header).toContainElement(screen.getByTitle('Copy Track Link'));
+    expect(
+      header.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
     expect(screen.getByTestId('track-tabbed-card')).toHaveAttribute(
       'data-surface-variant',
       'card'
     );
+  });
+
+  it('uses a compact 44px artwork thumbnail in the entity header', () => {
+    render(
+      <TrackSidebar
+        track={buildTrack({
+          releaseArtworkUrl: 'https://example.com/release-artwork.jpg',
+        })}
+        isOpen={true}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByRole('img', { name: 'Midnight Echo (EP) artwork' })
+    ).toHaveAttribute('width', '44');
   });
 
   it('treats missing preview verification as not checked and keeps unknown-confidence links out of canonical DSPs', async () => {

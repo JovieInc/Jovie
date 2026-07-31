@@ -10,7 +10,7 @@ import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
-import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
+import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
 import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarShell';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import {
@@ -44,6 +44,7 @@ export function DspPresenceSidebar({ item, onClose }: DspPresenceSidebarProps) {
       isOpen={isOpen}
       ariaLabel={`${label} profile details`}
       scrollStrategy='shell'
+      workspaceSurface='raised'
       onClose={onClose}
       headerMode='minimal'
       hideMinimalHeaderBar
@@ -68,54 +69,58 @@ function SidebarEntityHeader({
   const label = PROVIDER_LABELS[item.providerId];
 
   return (
-    <DrawerSurfaceCard variant='flat' className='overflow-hidden'>
-      <div className='relative border-b border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-3 py-2.5'>
-        <div className='absolute right-2.5 top-2.5'>
-          <DrawerHeaderActions
-            primaryActions={[]}
-            overflowActions={[]}
-            onClose={onClose}
-          />
-        </div>
-        <div className='flex items-center gap-2 pr-8'>
-          {item.externalArtistImageUrl ? (
-            <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-subtle bg-surface-0'>
-              <Image
-                src={item.externalArtistImageUrl}
-                alt={item.externalArtistName ?? label}
-                fill
-                sizes='40px'
-                className='object-cover'
-                unoptimized={isExternalDspImage(item.externalArtistImageUrl)}
+    <EntityHeaderCard
+      image={
+        item.externalArtistImageUrl ? (
+          <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-subtle bg-surface-0'>
+            <Image
+              src={item.externalArtistImageUrl}
+              alt={item.externalArtistName ?? label}
+              fill
+              sizes='40px'
+              className='object-cover'
+              unoptimized={isExternalDspImage(item.externalArtistImageUrl)}
+            />
+          </div>
+        ) : (
+          <div className='relative flex h-10 w-10 items-center justify-center rounded-full border border-subtle bg-surface-0'>
+            <DspProviderIcon provider={item.providerId} size='lg' />
+            <div
+              className='absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/60'
+              role='img'
+              aria-label='Profile Image Missing'
+            >
+              <Icon
+                name='Camera'
+                className='h-4 w-4 text-amber-600 dark:text-amber-400'
               />
             </div>
-          ) : (
-            <div className='relative flex h-10 w-10 items-center justify-center rounded-full border border-subtle bg-surface-0'>
-              <DspProviderIcon provider={item.providerId} size='lg' />
-              <div
-                className='absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/60'
-                role='img'
-                aria-label='Profile Image Missing'
-              >
-                <Icon
-                  name='Camera'
-                  className='h-4 w-4 text-amber-600 dark:text-amber-400'
-                />
-              </div>
-            </div>
-          )}
-          <div className='min-w-0 flex-1'>
-            <div className='truncate text-sm font-semibold text-primary-token'>
-              {item.externalArtistName ?? 'Unknown Artist'}
-            </div>
-            <div className='mt-0.5 flex items-center gap-1.5 text-xs text-tertiary-token'>
-              <DspProviderIcon provider={item.providerId} size='sm' />
-              <span>{label}</span>
-            </div>
           </div>
-        </div>
-      </div>
-    </DrawerSurfaceCard>
+        )
+      }
+      title={item.externalArtistName ?? 'Unknown Artist'}
+      subtitle={
+        <span className='flex min-w-0 items-center gap-1.5'>
+          <DspProviderIcon provider={item.providerId} size='sm' />
+          <span className='truncate'>{label}</span>
+        </span>
+      }
+      stableLayout
+      titleLineClamp={1}
+      subtitleLineClamp={1}
+      reserveSubtitleSlot
+      reserveMetaSlot
+      metaOverflow='scroll'
+      actions={
+        <DrawerHeaderActions
+          primaryActions={[]}
+          overflowActions={[]}
+          onClose={onClose}
+        />
+      }
+      bodyClassName='pr-8'
+      data-testid='dsp-presence-entity-header'
+    />
   );
 }
 
@@ -146,7 +151,11 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
 
   return (
     <div className='space-y-2'>
-      <DrawerSection title='Match Status' className='space-y-1.5'>
+      <DrawerSection
+        title='Match Status'
+        sectionKind='facts'
+        className='space-y-1.5'
+      >
         <div className='space-y-2'>
           <div className='flex items-center justify-between'>
             <span className='text-xs text-tertiary-token'>Status</span>
@@ -179,29 +188,35 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
         </div>
       </DrawerSection>
 
+      {item.externalArtistUrl ? (
+        <DrawerSection
+          title='Links'
+          sectionKind='links'
+          className='space-y-1.5'
+        >
+          <a
+            href={item.externalArtistUrl}
+            target='_blank'
+            rel='noopener noreferrer'
+            className='flex w-full'
+          >
+            <Button
+              variant='ghost'
+              size='sm'
+              className='h-8 w-full justify-start rounded-full border-subtle bg-surface-0 px-3 text-xs font-caption'
+            >
+              <Icon name='ExternalLink' className='mr-1.5 h-3.5 w-3.5' />
+              View On {label}
+            </Button>
+          </a>
+        </DrawerSection>
+      ) : null}
       <DrawerSection
         title='Actions'
-        className='space-y-1.5 border-t border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] pt-2.5'
+        sectionKind='details'
+        className='space-y-1.5 pt-2.5'
       >
         <div className='space-y-2'>
-          {item.externalArtistUrl && (
-            <a
-              href={item.externalArtistUrl}
-              target='_blank'
-              rel='noopener noreferrer'
-              className='flex w-full'
-            >
-              <Button
-                variant='ghost'
-                size='sm'
-                className='h-8 w-full justify-start rounded-full border-subtle bg-surface-0 px-3 text-xs font-caption'
-              >
-                <Icon name='ExternalLink' className='mr-1.5 h-3.5 w-3.5' />
-                View On {label}
-              </Button>
-            </a>
-          )}
-
           {isSuggested && <SuggestedMatchActions matchId={item.matchId} />}
           {isLinked && !isSuggested && profileId ? (
             <RemovePlatformAction

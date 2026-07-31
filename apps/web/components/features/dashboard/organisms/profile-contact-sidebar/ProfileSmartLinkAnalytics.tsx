@@ -1,12 +1,11 @@
 'use client';
 
-import { Copy, ExternalLink, Link2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from '@/components/feedback';
 import {
   DrawerEmptyState,
-  DrawerInlineIconButton,
   DrawerSurfaceCard,
+  ShareableLinkRow,
 } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { copyToClipboard } from '@/hooks/useClipboard';
@@ -28,49 +27,22 @@ function ProfileSmartLinkControl({
 }: {
   readonly profileUrl: string;
 }) {
-  const smartLinkLabel = profileUrl.replace(/^https?:\/\//u, '');
-
   return (
-    <div
-      className='flex h-9 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-3'
-      data-testid='profile-smart-link-control'
-    >
-      <Link2
-        className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
-        aria-hidden='true'
-      />
-      <span
-        className='min-w-0 flex-1 truncate font-mono text-3xs leading-none tracking-tight text-secondary-token'
-        title={profileUrl}
-      >
-        {smartLinkLabel}
-      </span>
-      <DrawerInlineIconButton
-        onClick={async event => {
-          event.stopPropagation();
-          const copied = await copyToClipboard(profileUrl);
-          if (copied) {
-            toast.success('Profile link copied');
-            return;
-          }
-          toast.error('Failed to copy link');
-        }}
-        title='Copy profile link'
-        className='h-6 w-6 rounded-full text-tertiary-token'
-      >
-        <Copy className='h-3.5 w-3.5' />
-      </DrawerInlineIconButton>
-      <DrawerInlineIconButton
-        onClick={event => {
-          event.stopPropagation();
-          globalThis.open(profileUrl, '_blank', 'noopener,noreferrer');
-        }}
-        title='Open profile link'
-        className='h-6 w-6 rounded-full text-tertiary-token'
-      >
-        <ExternalLink className='h-3.5 w-3.5' />
-      </DrawerInlineIconButton>
-    </div>
+    <ShareableLinkRow
+      url={profileUrl}
+      density='rail'
+      surface='boxed'
+      testId='profile-smart-link-control'
+      copyButtonTitle='Copy profile link'
+      openButtonTitle='Open profile link'
+      onCopy={async () => {
+        if (!(await copyToClipboard(profileUrl))) {
+          throw new Error('Failed to copy profile link');
+        }
+      }}
+      onCopySuccess={() => toast.success('Profile link copied')}
+      onCopyError={() => toast.error('Failed to copy link')}
+    />
   );
 }
 

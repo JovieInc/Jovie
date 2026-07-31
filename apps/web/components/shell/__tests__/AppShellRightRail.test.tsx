@@ -25,6 +25,7 @@ describe('AppShellRightRail', () => {
       'min-h-0',
       'self-stretch',
       'overflow-hidden',
+      'lg:p-1.5',
       'duration-cinematic',
       'ease-cinematic'
     );
@@ -34,7 +35,7 @@ describe('AppShellRightRail', () => {
     expect(rail).toContainElement(screen.getByTestId('fixture-panel'));
   });
 
-  it('applies the canonical rail radius treatment', () => {
+  it('applies the canonical inset rail treatment', () => {
     render(
       <AppShellRightRail>
         <div>Panel</div>
@@ -43,7 +44,10 @@ describe('AppShellRightRail', () => {
 
     const rail = screen.getByTestId('app-shell-right-rail');
 
-    expect(rail).toHaveClass('lg:rounded-(--linear-app-shell-radius)');
+    expect(rail).toHaveClass(
+      'lg:rounded-(--linear-app-shell-radius)',
+      'lg:p-1.5'
+    );
   });
 
   it('has no desktop overlay positioning and only allocates the width of its drawer child', () => {

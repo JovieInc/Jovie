@@ -226,6 +226,7 @@ export function ProfileSidebarHeaderCard({
         </div>
         <DrawerHero
           title={primaryLabel}
+          density='rail'
           subtitle={secondaryLabel}
           stableLayout
           titleLineClamp={1}
@@ -237,11 +238,11 @@ export function ProfileSidebarHeaderCard({
             <DrawerMediaThumb
               src={previewData.avatarUrl}
               alt={primaryLabel}
-              dimension={60}
-              sizeClassName='h-15 w-15 rounded-xl'
-              sizes='60px'
+              dimension={44}
+              sizeClassName='h-11 w-11 rounded-lg'
+              sizes='44px'
               fallback={
-                <span className='text-lg font-semibold text-secondary-token'>
+                <span className='text-sm font-semibold text-secondary-token'>
                   {fallbackLabel}
                 </span>
               }

@@ -242,6 +242,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       headerMode='minimal'
       hideMinimalHeaderBar={hasContact}
       entityHeaderSurface='flat'
+      workspaceSurface='raised'
       contextMenuItems={contextMenuItems}
       isEmpty={!hasContact}
       emptyMessage='Select a contact to view details'
@@ -258,6 +259,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
               />
               <DrawerHero
                 title={contactDisplayName}
+                density='rail'
                 subtitle={roleLabel}
                 stableLayout
                 titleLineClamp={1}
@@ -278,6 +280,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                   ) : undefined
                 }
                 className='[&_h2]:pr-9'
+                testId='contact-detail-entity-header'
               />
             </div>
           </DrawerSurfaceCard>

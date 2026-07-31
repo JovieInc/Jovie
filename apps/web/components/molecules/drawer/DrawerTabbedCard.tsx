@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { DrawerSurfaceCard } from './DrawerSurfaceCard';
 
 export interface DrawerTabbedCardProps {
+  readonly sectionKind?: 'facts' | 'links' | 'status' | 'details';
   readonly tabs: ReactNode;
   readonly children: ReactNode;
   readonly controls?: ReactNode;
@@ -15,6 +16,7 @@ export interface DrawerTabbedCardProps {
 }
 
 export function DrawerTabbedCard({
+  sectionKind,
   tabs,
   children,
   controls,
@@ -26,6 +28,7 @@ export function DrawerTabbedCard({
   return (
     <DrawerSurfaceCard
       variant='card'
+      data-right-rail-section={sectionKind}
       className={cn(
         'flex min-h-0 flex-1 flex-col overflow-hidden',
         'p-2.5',

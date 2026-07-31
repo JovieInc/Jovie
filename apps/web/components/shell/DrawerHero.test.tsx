@@ -125,4 +125,22 @@ describe('DrawerHero', () => {
     const rail = screen.getByTestId('drawer-hero-meta-slot').firstElementChild;
     expect(rail).toHaveClass('overflow-x-auto', 'whitespace-nowrap');
   });
+
+  it('uses compact title geometry for rail density', () => {
+    const { container } = render(
+      <DrawerHero
+        title='Lost in the Light'
+        density='rail'
+        stableLayout
+        titleLineClamp={1}
+      />
+    );
+
+    expect(
+      container.querySelector('[data-density="rail"]')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Lost in the Light' })
+    ).toHaveClass('text-sm', 'line-clamp-1', 'min-h-6');
+  });
 });
