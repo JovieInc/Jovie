@@ -88,6 +88,18 @@ export const homepage: Story = {
   ),
 };
 
+/** Mobile viewport companion — chromatic disabled to protect snapshot budget. */
+export const homepageMobile: Story = {
+  name: 'homepage-mobile',
+  tags: ['mobile-viewport'],
+  parameters: {
+    viewport: { defaultViewport: 'mobile' },
+    chromatic: { disable: true },
+    docs: { description: { story: 'Mobile viewport of homepage recipe.' } },
+  },
+  render: homepage.render,
+};
+
 export const pricing: Story = {
   name: 'pricing',
   parameters: {
@@ -163,6 +175,16 @@ export const pricing: Story = {
   ),
 };
 
+export const pricingMobile: Story = {
+  name: 'pricing-mobile',
+  tags: ['mobile-viewport'],
+  parameters: {
+    viewport: { defaultViewport: 'mobile' },
+    chromatic: { disable: true },
+  },
+  render: pricing.render,
+};
+
 export const artistLp: Story = {
   name: 'artist-lp',
   parameters: {
@@ -180,6 +202,16 @@ export const artistLp: Story = {
       </PublicPageShell>
     </RecipeChrome>
   ),
+};
+
+export const artistLpMobile: Story = {
+  name: 'artist-lp-mobile',
+  tags: ['mobile-viewport'],
+  parameters: {
+    viewport: { defaultViewport: 'mobile' },
+    chromatic: { disable: true },
+  },
+  render: artistLp.render,
 };
 
 export const feature: Story = {

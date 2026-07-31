@@ -186,6 +186,12 @@ const config: StorybookConfig = {
           replacement: require.resolve('./empty-module.js'),
         },
         {
+          // Anthropic SDK pulls node:fs / node:crypto (agent-toolset) which
+          // crash Storybook's browser Vite build. Product stories never call it.
+          find: /^@anthropic-ai\/sdk(\/.*)?$/,
+          replacement: require.resolve('./anthropic-sdk-mock.ts'),
+        },
+        {
           find: 'server-only',
           replacement: require.resolve('./empty-module.js'),
         },
