@@ -3,6 +3,7 @@ import {
   mkdir,
   mkdtemp,
   readdir,
+  readFile,
   realpath,
   rm,
   symlink,
@@ -16,6 +17,8 @@ vi.mock('server-only', () => ({}));
 
 const mocks = vi.hoisted(() => ({
   dispatchHermesWorker: vi.fn(),
+  linkDesignLabDispatchToLinearIssue: vi.fn(),
+  readDesignTasteMemoryExcerpt: vi.fn(),
 }));
 
 vi.mock('@/lib/hermes/dispatch', () => ({
@@ -28,8 +31,19 @@ vi.mock('@/lib/utils/logger', () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
+vi.mock('@/lib/env-server', () => ({
+  env: {
+    HUD_GITHUB_OWNER: 'JovieInc',
+    HUD_GITHUB_REPO: 'Jovie',
+  },
+}));
+
 vi.mock('@/lib/agent-os/design-lab/taste-memory', () => ({
-  readDesignTasteMemoryExcerpt: () => Promise.resolve(''),
+  readDesignTasteMemoryExcerpt: () => mocks.readDesignTasteMemoryExcerpt(),
+}));
+
+vi.mock('@/lib/agent-os/design-lab/linear', () => ({
+  linkDesignLabDispatchToLinearIssue: mocks.linkDesignLabDispatchToLinearIssue,
 }));
 
 let tempRoot = '';
@@ -68,6 +82,14 @@ describe('triggerDesignLabDispatch artifact lifecycle', () => {
       await mkdtemp(path.join(os.tmpdir(), 'design-lab-dispatch-'))
     );
     mocks.dispatchHermesWorker.mockReset().mockResolvedValue(undefined);
+    mocks.linkDesignLabDispatchToLinearIssue
+      .mockReset()
+      .mockResolvedValue(true);
+    mocks.readDesignTasteMemoryExcerpt
+      .mockReset()
+      .mockResolvedValue(
+        '## prior — profile — accepted\nDirection: Quiet surfaces only.'
+      );
   });
 
   afterEach(async () => {
@@ -101,6 +123,77 @@ describe('triggerDesignLabDispatch artifact lifecycle', () => {
     ).toBeTruthy();
   });
 
+  it('routes approval to /design-html with full D2→D5 payload and Linear link', async () => {
+    const { triggerDesignLabDispatch, DESIGN_HTML_BUILDER_SKILLS } =
+      await import('@/lib/agent-os/design-lab/dispatch');
+
+    const result = await triggerDesignLabDispatch({
+      amendmentNotes: 'Keep the underline but reduce accent saturation.',
+      proposal,
+      requestedBy: 'tim@jovie.com',
+    });
+
+    expect(result.triggered).toBe(true);
+    expect(result.dispatchId).toMatch(/^design-lab-/);
+
+    const hermesCall = mocks.dispatchHermesWorker.mock.calls[0]?.[0] as {
+      readonly skills: readonly string[];
+      readonly prompt: string;
+      readonly source: string;
+      readonly sourceId: string;
+    };
+    expect(hermesCall.skills).toEqual([...DESIGN_HTML_BUILDER_SKILLS]);
+    expect(hermesCall.skills).toContain('design-html');
+    expect(hermesCall.source).toBe('linear');
+    expect(hermesCall.sourceId).toBe('JOV-4264');
+    expect(hermesCall.prompt).toContain('Surface ID: profile');
+    expect(hermesCall.prompt).toContain(
+      'Build the approved profile direction.'
+    );
+    expect(hermesCall.prompt).toContain(
+      'Keep the underline but reduce accent saturation.'
+    );
+    expect(hermesCall.prompt).toContain('Taste memory context:');
+    expect(hermesCall.prompt).toContain('Quiet surfaces only.');
+    expect(hermesCall.prompt).toContain('/design-html');
+    expect(hermesCall.prompt.length).toBeLessThanOrEqual(4000);
+
+    const manifestRaw = await readFile(
+      path.join(tempRoot, 'dispatches', `${result.dispatchId}.json`),
+      'utf8'
+    );
+    const manifest = JSON.parse(manifestRaw) as {
+      surfaceId: string;
+      proposalText: string;
+      amendmentNotes: string | null;
+      tasteMemoryExcerpt: string;
+      linearIssueId: string;
+    };
+    expect(manifest.surfaceId).toBe('profile');
+    expect(manifest.proposalText).toBe('Build the approved profile direction.');
+    expect(manifest.amendmentNotes).toBe(
+      'Keep the underline but reduce accent saturation.'
+    );
+    expect(manifest.tasteMemoryExcerpt).toContain('Quiet surfaces only.');
+    expect(manifest.linearIssueId).toBe('JOV-4264');
+
+    expect(mocks.linkDesignLabDispatchToLinearIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        issueIdentifier: 'JOV-4264',
+        dispatchId: result.dispatchId,
+        surfaceId: 'profile',
+        surfaceName: 'Profile',
+        proposalId: 'proposal-1',
+        amendmentNotes: 'Keep the underline but reduce accent saturation.',
+        artifactRelativePath: `agentos/runs/design-lab/artifacts/${result.dispatchId}/`,
+        dispatchRelativePath: `agentos/runs/design-lab/dispatches/${result.dispatchId}.json`,
+        artifactUrl: expect.stringContaining(
+          `agentos/runs/design-lab/artifacts/${result.dispatchId}`
+        ),
+      })
+    );
+  });
+
   it('rejects a new dispatch when unknown symlinked output makes usage unknowable', async () => {
     const outside = await realpath(
       await mkdtemp(path.join(os.tmpdir(), 'design-lab-outside-'))
@@ -119,6 +212,7 @@ describe('triggerDesignLabDispatch artifact lifecycle', () => {
       })
     ).rejects.toThrow(/symlinked artifact path/);
     expect(mocks.dispatchHermesWorker).not.toHaveBeenCalled();
+    expect(mocks.linkDesignLabDispatchToLinearIssue).not.toHaveBeenCalled();
     expect(await readdir(path.join(tempRoot, 'artifacts'))).toEqual([
       'unknown-output',
     ]);
@@ -149,5 +243,35 @@ describe('triggerDesignLabDispatch artifact lifecycle', () => {
       expect(await readdir(artifactRoot)).toHaveLength(100);
     }
     expect(mocks.dispatchHermesWorker).not.toHaveBeenCalled();
+  });
+});
+
+describe('buildDesignHtmlDispatchPrompt', () => {
+  it('includes surface, proposal, amendments, and taste memory', async () => {
+    const { buildDesignHtmlDispatchPrompt } = await import(
+      '@/lib/agent-os/design-lab/dispatch'
+    );
+
+    const prompt = buildDesignHtmlDispatchPrompt({
+      dispatchId: 'design-lab-00000000-0000-4000-8000-000000000099',
+      proposalId: 'proposal-1',
+      surfaceId: 'dashboard-sidebar',
+      surfaceName: 'Dashboard sidebar',
+      proposalText: 'Collapse unused nav groups by default.',
+      amendmentNotes: 'Keep icons monochrome.',
+      linearIssueId: 'JOV-1939',
+      linearIssueUrl: 'https://linear.app/jovie/issue/JOV-1939',
+      tasteMemoryExcerpt: 'Reject loud accent squares on chrome.',
+      requestedAt: '2026-07-31T00:00:00.000Z',
+      requestedBy: 'tim@jovie.com',
+    });
+
+    expect(prompt).toContain('Surface ID: dashboard-sidebar');
+    expect(prompt).toContain('Collapse unused nav groups by default.');
+    expect(prompt).toContain('Keep icons monochrome.');
+    expect(prompt).toContain('Taste memory context:');
+    expect(prompt).toContain('Reject loud accent squares on chrome.');
+    expect(prompt).toContain('/design-html');
+    expect(prompt.length).toBeLessThanOrEqual(4000);
   });
 });
