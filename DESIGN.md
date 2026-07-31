@@ -610,6 +610,11 @@ mobile navigation derive from the same ordered item identities.
 | Entity detail | `EntitySidebarShell` inside the current workspace | Put the next entity action in the rail header or first rail section | Entity detail is rail-only; selecting a row must not create a second page scaffold or page-level entity route |
 | Settings | Settings shell/sidebar + `SettingsSection` | The first editable control begins the flow; one save/confirm action owns primary emphasis | Use the canonical `/app/settings/*` route |
 
+Workspace composition has one canonical `px-3` left optical seam in shared
+primitives. The breadcrumb/title, toolbar edge, table or list first-column
+content, and status/footer rows all resolve to that seam. Do not tune those
+edges independently per page.
+
 The **first-action contract** means the first viewport communicates exactly one
 next useful action. A page may have many available controls, but it must not
 present multiple primary pills, duplicate the same CTA across header/body/footer,

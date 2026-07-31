@@ -29,7 +29,7 @@ export function ContentSectionHeader({
   return (
     <div
       className={cn(
-        'flex min-w-0 shrink-0 items-center justify-between gap-2 px-app-header',
+        'flex min-w-0 shrink-0 items-center justify-between gap-2 px-3',
         variant === 'default' && 'border-b border-subtle bg-transparent',
         density === 'compact'
           ? 'min-h-10 py-1.5'

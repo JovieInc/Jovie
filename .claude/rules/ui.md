@@ -122,6 +122,15 @@ to `variant='primary'`, so an omitted variant counts as primary. Filters,
 display controls, navigation, cancel, and overflow actions must use secondary,
 tertiary, ghost, or `PageToolbarActionButton` treatment.
 
+### One Workspace Left Seam
+
+Authenticated workspace primitives use the canonical `px-3` seam for the
+header/breadcrumb, `PageToolbar`, table/list header cells, first-column cells,
+and status/footer rows. Do not recreate the seam with `px-3.5` or route-local
+padding. Optional selection columns may occupy their own reserved track, but
+the primary content column must return to the shared seam when that track is
+absent.
+
 ## Taste Rules (Hard Invariants)
 
 ### No Emoji in UI — Use Icons
