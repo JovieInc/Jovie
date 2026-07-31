@@ -40,7 +40,7 @@ interface SidebarNavChromeOptions {
 // compact light pill distinguishes creation without competing with the route's
 // neutral active state, including when the chat route is current.
 const SIDEBAR_PRIMARY_CHROME =
-  'w-fit grid-cols-[22px_auto] gap-x-2 bg-white px-3 text-black font-medium shadow-none hover:bg-white/90';
+  'w-fit grid-cols-[22px_auto] gap-x-2 bg-btn-primary px-3 text-btn-primary-foreground font-medium shadow-none hover:bg-btn-primary-hover';
 
 // Active state uses a quiet neutral fill with white type and a Jovie teal icon.
 // Avoid a left rail or guide decoration so every shared sidebar consumer keeps
@@ -113,7 +113,7 @@ export function getSidebarNavIconClassName({
     // The selected row deliberately owns white label text. Keep its icon on
     // the canonical Jovie teal token so the active signal remains quiet.
     tone === 'primary'
-      ? 'text-black'
+      ? 'text-btn-primary-foreground'
       : active
         ? 'text-accent-teal!'
         : inactiveIconColor,
