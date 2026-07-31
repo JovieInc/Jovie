@@ -1,22 +1,31 @@
 /**
- * SKILL_REGISTRY type-shape and invariant tests.
+ * PUBLIC_SKILL_REGISTRY / SKILL_REGISTRY type-shape and invariant tests.
  *
  * No DB connection required — purely validates the code-side registry
  * against the SkillDefinition contract and business invariants.
  */
 
 import { describe, expect, it } from 'vitest';
-import { SKILL_REGISTRY } from './registry';
+import { TOOL_UI_REGISTRY } from '@/lib/chat/tool-ui-registry';
+import {
+  PUBLIC_SKILL_CHAT_TOOL_IDS,
+  PUBLIC_SKILL_REGISTRY,
+  SKILL_REGISTRY,
+} from './registry';
 
-describe('SKILL_REGISTRY', () => {
-  const skills = Object.entries(SKILL_REGISTRY);
+describe('PUBLIC_SKILL_REGISTRY', () => {
+  const skills = Object.entries(PUBLIC_SKILL_REGISTRY);
+
+  it('exports SKILL_REGISTRY as a back-compat alias of PUBLIC_SKILL_REGISTRY', () => {
+    expect(SKILL_REGISTRY).toBe(PUBLIC_SKILL_REGISTRY);
+  });
 
   it('has at least one skill entry', () => {
     expect(skills.length).toBeGreaterThanOrEqual(1);
   });
 
   it('contains the retouch skill', () => {
-    expect(SKILL_REGISTRY).toHaveProperty('retouch');
+    expect(PUBLIC_SKILL_REGISTRY).toHaveProperty('retouch');
   });
 
   it.each(skills)('%s has required string fields', (_key, skill) => {
@@ -54,7 +63,7 @@ describe('SKILL_REGISTRY', () => {
   });
 
   describe('retouch skill', () => {
-    const retouch = SKILL_REGISTRY.retouch;
+    const retouch = PUBLIC_SKILL_REGISTRY.retouch;
 
     it('uses the expected model', () => {
       expect(retouch.model).toBe('google/gemini-2.5-flash-image');
@@ -76,6 +85,53 @@ describe('SKILL_REGISTRY', () => {
 
     it('is version 1.0.0', () => {
       expect(retouch.version).toBe('1.0.0');
+    });
+  });
+
+  /**
+   * JOV-3013 — partial catalog intent.
+   *
+   * PUBLIC_SKILL_REGISTRY is the admin/playbook/postbuild product-skill
+   * catalog. Live chat tools are a larger, plan-gated surface. These tests
+   * fail if cataloged chat-facing skills drift from TOOL_UI_REGISTRY, and
+   * document that the live tool set is intentionally larger.
+   */
+  describe('partial catalog vs live chat tools (JOV-3013)', () => {
+    it('is intentionally smaller than the live chat UI tool registry', () => {
+      const catalogSize = Object.keys(PUBLIC_SKILL_REGISTRY).length;
+      const liveUiSize = Object.keys(TOOL_UI_REGISTRY).length;
+      expect(liveUiSize).toBeGreaterThan(catalogSize);
+    });
+
+    it('maps every cataloged chat-facing skill to a live TOOL_UI_REGISTRY id', () => {
+      for (const [skillId, chatToolId] of Object.entries(
+        PUBLIC_SKILL_CHAT_TOOL_IDS
+      )) {
+        expect(
+          TOOL_UI_REGISTRY[chatToolId as keyof typeof TOOL_UI_REGISTRY],
+          `catalog skill "${skillId}" maps to missing chat tool "${chatToolId}"`
+        ).toBeDefined();
+      }
+    });
+
+    it('keeps PUBLIC_SKILL_CHAT_TOOL_IDS keys inside PUBLIC_SKILL_REGISTRY', () => {
+      for (const skillId of Object.keys(PUBLIC_SKILL_CHAT_TOOL_IDS)) {
+        expect(PUBLIC_SKILL_REGISTRY).toHaveProperty(skillId);
+      }
+    });
+
+    it('documents partial-catalog intent in the registry module source', async () => {
+      const { readFile } = await import('node:fs/promises');
+      const { fileURLToPath } = await import('node:url');
+      const path = await import('node:path');
+      const registryPath = path.join(
+        path.dirname(fileURLToPath(import.meta.url)),
+        'registry.ts'
+      );
+      const source = await readFile(registryPath, 'utf8');
+      expect(source).toMatch(/partial catalog/i);
+      expect(source).toContain('PUBLIC_SKILL_REGISTRY');
+      expect(source).toMatch(/NOT.*exhaustive list of tools/i);
     });
   });
 });
