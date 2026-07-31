@@ -129,7 +129,7 @@ export function sanitizeLogValue(value) {
 
 /**
  * @param {LockRecovery} recovery
- * @param {(parts: unknown) => string} formatCommand
+ * @param {(parts: string[]) => string} formatCommand
  */
 export function formatRecoveryLogLine(recovery, formatCommand) {
   const owner = recovery.pid ? `pid ${recovery.pid}` : 'unknown pid';
