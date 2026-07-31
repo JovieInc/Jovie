@@ -58,25 +58,27 @@ The resolver is deterministic. Same Brief → same Composition, every time
 (tested by the golden-fixture determinism gate on every PR). The `trace`
 field shows every decision step — use it to debug.
 
-### 2.5. Visual catalog (Storybook)
+### 2b. Open the visual catalog (Storybook)
 
-After you know the `recipeId` and section list, open the **authoritative visual
-catalog** in Storybook before inventing layout:
+After `resolveComposition`, browse the product compositions in Storybook before
+hand-rolling chrome. Titles are the visual entry for recipes, sections, and shells:
 
-| Catalog | Storybook title |
-| --- | --- |
-| Proven recipes | `Marketing/Recipes/<recipeId>` (e.g. `homepage`, `artist-lp`, `pricing`) |
-| All 17 sections | `Marketing/Sections/<sectionId>` |
-| Shells / chrome | `Marketing/Shells/*` (`PublicPageShell`, containers, header/footer/CTA) |
+| Catalog | Storybook path | Source |
+| --- | --- | --- |
+| Proven recipes | `Marketing/Recipes/<recipeId>` | `components/marketing/storybook/Recipes.stories.tsx` |
+| Sections (all 17) | `Marketing/Sections/<sectionId>` | `components/marketing/storybook/Sections.stories.tsx` |
+| Shells / chrome | `Marketing/Shells/*` | `components/marketing/storybook/Shells.stories.tsx` |
 
-Source: `apps/web/components/marketing/storybook/`. Coverage is CI-gated by
-`apps/web/tests/unit/marketing/storybook-catalog-coverage.test.ts`. Stories are
-product compositions (System A, dark-only, `revalidate = false` on live routes)
-— not design-studio leftovers. Stub recipes may be tagged `stub`; TBD section
-component paths are tagged `wip` and listed in
-`MARKETING_SECTION_STORY_GAPS`.
+Inventory (CI): `apps/web/components/marketing/storybook/catalog.ts` +
+`apps/web/tests/unit/marketing/storybook-catalog.test.ts` assert proven recipes
+and section ids stay covered. Stub recipes are tagged `stub`; TBD/zero-proof
+sections are tagged `wip` (never silently omitted).
 
-Local: `pnpm --filter web storybook` → browse the `Marketing/` tree.
+```bash
+pnpm --filter web run storybook          # interactive
+pnpm --filter web run build-storybook    # static build receipt
+pnpm --filter web run test:a11y          # story a11y (vitest + addon-a11y)
+```
 
 ### 3. Render the sections
 

@@ -16,7 +16,7 @@ This inventory defines the current page-template families and the canonical shel
 - CTA pattern: shared public primary/secondary/inline actions
 - Empty/error/loading: route-local loading pages where present
 - Mobile collapse behavior: stacked hero/content, shared fixed-header offset
-- Storybook: `Marketing/Recipes/homepage`, `Marketing/Recipes/launch`, `Marketing/Shells/PublicPageShell`
+- **Storybook:** `Marketing/Recipes/homepage`, `Marketing/Recipes/launch`, `Marketing/Shells/PublicPageShell`
 
 ## Marketing detail page
 
@@ -27,7 +27,7 @@ This inventory defines the current page-template families and the canonical shel
 - CTA pattern: shared public primary/secondary/inline actions
 - Empty/error/loading: route-local loading states
 - Mobile collapse behavior: single-column stacking, no page-local horizontal overflow
-- Storybook: `Marketing/Recipes/artist-lp`, `Marketing/Recipes/comparison`, `Marketing/Recipes/seo`
+- **Storybook:** `Marketing/Recipes/artist-lp`, `Marketing/Recipes/comparison`, `Marketing/Recipes/seo`, `Marketing/Sections/*`
 
 ## Pricing page
 
@@ -38,7 +38,7 @@ This inventory defines the current page-template families and the canonical shel
 - CTA pattern: shared primary and secondary public actions
 - Empty/error/loading: N/A for static pricing page
 - Mobile collapse behavior: comparison chart switches to plan selector pattern
-- Storybook: `Marketing/Recipes/pricing`, `Marketing/Sections/pricing`
+- **Storybook:** `Marketing/Recipes/pricing`, `Marketing/Sections/pricing`
 
 ## Support page
 
@@ -49,7 +49,7 @@ This inventory defines the current page-template families and the canonical shel
 - CTA pattern: inline public action links plus one primary contact action
 - Empty/error/loading: route loading page
 - Mobile collapse behavior: channels stack from three-column to single-column
-- Storybook: `Marketing/Recipes/seo`, `Marketing/Shells/MarketingContentShell`
+- **Storybook:** `Marketing/Recipes/seo`, `Marketing/Shells/MarketingContentShell`
 
 ## Legal document page
 
@@ -71,7 +71,7 @@ This inventory defines the current page-template families and the canonical shel
 - CTA pattern: inline links and shared TOC/document actions
 - Empty/error/loading: blog fallback states, route loading pages where present
 - Mobile collapse behavior: TOC hidden below large breakpoint, content stays single-column
-- Storybook: `Marketing/Recipes/blog-landing`, `Marketing/Sections/blog-feed`, `Marketing/Sections/content-prose`
+- **Storybook:** `Marketing/Recipes/blog-landing`, `Marketing/Sections/blog-feed`, `Marketing/Sections/content-prose`
 
 ## Auth page
 
