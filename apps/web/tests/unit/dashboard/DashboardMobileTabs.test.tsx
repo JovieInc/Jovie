@@ -44,7 +44,6 @@ const CANONICAL_LABELS = [
   'Contacts',
   'Connections',
   'Calendar',
-  'Tasks',
 ] as const;
 
 describe('DashboardMobileTabs', () => {
@@ -105,7 +104,7 @@ describe('DashboardMobileTabs', () => {
     });
   });
 
-  it('shows the exact seven in order, with Settings separated as utility', async () => {
+  it('shows the exact six in order, with Settings separated as utility', async () => {
     const user = userEvent.setup();
     render(<DashboardMobileTabs />);
 
@@ -115,20 +114,19 @@ describe('DashboardMobileTabs', () => {
     });
     const links = within(menu).getAllByRole('link');
 
-    expect(links.slice(0, 7).map(link => link.textContent?.trim())).toEqual(
+    expect(links.slice(0, 6).map(link => link.textContent?.trim())).toEqual(
       CANONICAL_LABELS
     );
-    expect(links.slice(0, 7).map(link => link.getAttribute('href'))).toEqual([
+    expect(links.slice(0, 6).map(link => link.getAttribute('href'))).toEqual([
       APP_ROUTES.CHAT,
       APP_ROUTES.DASHBOARD,
       APP_ROUTES.LIBRARY,
       APP_ROUTES.CONTACTS,
       APP_ROUTES.PROFILES,
       APP_ROUTES.CALENDAR,
-      APP_ROUTES.TASKS,
     ]);
-    expect(links.at(7)).toHaveTextContent('Settings');
-    expect(links.at(7)).toHaveAttribute('href', APP_ROUTES.SETTINGS);
+    expect(links.at(6)).toHaveTextContent('Settings');
+    expect(links.at(6)).toHaveAttribute('href', APP_ROUTES.SETTINGS);
 
     for (const label of ['Search', 'Touring', 'Audience', 'Releases']) {
       expect(within(menu).queryByRole('link', { name: label })).toBeNull();
@@ -189,7 +187,7 @@ describe('DashboardMobileTabs', () => {
     );
   });
 
-  it('promotes an active overflow destination into the primary tab strip', () => {
+  it('does not reintroduce Tasks into mobile primary navigation on its direct route', () => {
     mockPathname.mockReturnValue(APP_ROUTES.TASKS);
     render(<DashboardMobileTabs />);
 
@@ -198,11 +196,8 @@ describe('DashboardMobileTabs', () => {
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
       'New Chat',
       'Inbox',
-      'Tasks',
+      'Library',
     ]);
-    expect(within(tabs).getByRole('link', { name: 'Tasks' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
+    expect(within(tabs).queryByRole('link', { name: 'Tasks' })).toBeNull();
   });
 });

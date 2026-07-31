@@ -1,7 +1,6 @@
 import {
   Banknote,
   CalendarDays,
-  CheckSquare,
   Gauge,
   HandCoins,
   Home,
@@ -92,15 +91,6 @@ export const calendarNavItem: NavItem = {
   description: 'See release dates, events, and calendar moments',
 };
 
-export const tasksNavItem: NavItem = {
-  name: 'Tasks',
-  href: APP_ROUTES.TASKS,
-  id: 'tasks',
-  icon: CheckSquare,
-  tier: 'core',
-  description: 'Track release work and general artist operations',
-};
-
 /**
  * Founder-approved customer shell IA. This ordered tuple is the only source
  * consumed by desktop and mobile navigation (JOV-3763).
@@ -117,7 +107,6 @@ export const primaryNavigation = [
   contactsNavItem,
   profilesNavItem,
   calendarNavItem,
-  tasksNavItem,
 ] as const satisfies readonly NavItem[];
 
 export const settingsNavItem: NavItem = {

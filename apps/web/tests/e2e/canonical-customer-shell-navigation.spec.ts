@@ -18,21 +18,21 @@ test.skip(
 );
 
 const CANONICAL_LABELS = [
+  'New Chat',
   'Inbox',
-  'Chat',
   'Library',
   'Contacts',
+  'Connections',
   'Calendar',
-  'Tasks',
 ] as const;
 
 const CANONICAL_HREFS = [
-  APP_ROUTES.DASHBOARD,
   APP_ROUTES.CHAT,
+  APP_ROUTES.DASHBOARD,
   APP_ROUTES.LIBRARY,
   APP_ROUTES.CONTACTS,
+  APP_ROUTES.PROFILES,
   APP_ROUTES.CALENDAR,
-  APP_ROUTES.TASKS,
 ] as const;
 
 const FORBIDDEN_LABELS = [

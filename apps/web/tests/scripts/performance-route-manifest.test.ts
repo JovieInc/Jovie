@@ -79,10 +79,9 @@ const CREATOR_SHELL_SLICE_ROUTES = [
   {
     id: 'creator-tasks',
     path: APP_ROUTES.TASKS,
-    measureMode: 'warm-navigation',
-    warmupStrategy: 'authenticated-shell',
-    primaryMetric: 'warm-shell-response',
-    navTrigger: `a[href="${APP_ROUTES.TASKS}"]`,
+    measureMode: 'page-load',
+    warmupStrategy: 'authenticated-route',
+    primaryMetric: 'skeleton-to-content',
   },
   {
     id: 'creator-audience',
@@ -105,7 +104,6 @@ const RELEASE_BUDGET_CREATOR_SHELL_ROUTE_IDS = [
   'creator-releases',
   'creator-library-cold',
   'creator-library',
-  'creator-tasks-cold',
   'creator-tasks',
   'creator-lyrics',
 ] as const;
@@ -135,11 +133,6 @@ const CANONICAL_SHELL_PERF_PAIRS = [
     itemId: 'calendar',
     coldRouteId: 'creator-calendar-cold',
     warmRouteId: 'creator-calendar',
-  },
-  {
-    itemId: 'tasks',
-    coldRouteId: 'creator-tasks-cold',
-    warmRouteId: 'creator-tasks',
   },
 ] as const;
 

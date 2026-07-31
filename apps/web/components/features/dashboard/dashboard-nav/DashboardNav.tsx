@@ -4,7 +4,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { NavBadge } from '@/components/atoms/NavBadge';
 import { toast } from '@/components/feedback';
 import {
   SidebarGroup,
@@ -25,9 +24,7 @@ import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { shouldShowInboxNavigation } from '@/lib/inbox/navigation-availability';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
-import { usePlanGate } from '@/lib/queries';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
-import { useTaskStatsQuery } from '@/lib/queries/useTasksQuery';
 import {
   type NavigationTelemetryContext,
   startNavigationTelemetry,
@@ -97,38 +94,6 @@ function normalizeTrailingSlash(pathname: string): string {
   return pathname === '/' ? pathname : pathname.replace(/\/$/, '');
 }
 
-const TASKS_SEEN_STORAGE_KEY = 'jovie:tasks-seen-at';
-
-function readTasksSeenAt(): string | null {
-  try {
-    return globalThis.localStorage?.getItem(TASKS_SEEN_STORAGE_KEY) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function writeTasksSeenAt(value: string): void {
-  try {
-    globalThis.localStorage?.setItem(TASKS_SEEN_STORAGE_KEY, value);
-  } catch {
-    // Storage can be unavailable in restricted browsers; the badge still works.
-  }
-}
-
-function formatTaskBadge(
-  taskStats:
-    | { activeTodoCount: number; newActiveTodoCount?: number }
-    | undefined,
-  seenAt: string | null
-): string | number | undefined {
-  if (!taskStats || taskStats.activeTodoCount <= 0) return undefined;
-  const count = seenAt
-    ? (taskStats.newActiveTodoCount ?? 0)
-    : taskStats.activeTodoCount;
-  if (count <= 0) return undefined;
-  return count > 99 ? '99+' : count;
-}
-
 export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   const { inboxNavigation, selectedProfile } = useDashboardData();
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
@@ -142,7 +107,6 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   const [threadReadAtById, setThreadReadAtById] = useState<
     Record<string, string>
   >({});
-  const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(null);
   const [hasHydratedPersistedState, setHasHydratedPersistedState] =
     useState(false);
   const profileId = selectedProfile?.id ?? '';
@@ -155,12 +119,6 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     }),
     [isElectron, isMobile]
   );
-  const { canAccessTasksWorkspace, isLoading: isPlanGateLoading } =
-    usePlanGate();
-  const { data: taskStats } = useTaskStatsQuery(profileId, {
-    enabled: !isDemo && canAccessTasksWorkspace,
-    seenAt: tasksSeenAt,
-  });
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
   const eligiblePrimaryNavigation = useMemo(
     () =>
@@ -208,7 +166,6 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
 
   useEffect(() => {
     setThreadReadAtById(readThreadReadState());
-    setTasksSeenAt(readTasksSeenAt());
     setHasHydratedPersistedState(true);
   }, []);
 
@@ -236,13 +193,6 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   }, [conversations, hasHydratedPersistedState]);
 
   useEffect(() => {
-    if (normalizeTrailingSlash(pathname) !== APP_ROUTES.TASKS) return;
-    const nextSeenAt = new Date().toISOString();
-    writeTasksSeenAt(nextSeenAt);
-    setTasksSeenAt(nextSeenAt);
-  }, [pathname]);
-
-  useEffect(() => {
     if (isDemo || isMobile) return;
     trackNavigationImpressions(
       isInSettings
@@ -262,50 +212,17 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
 
   const artistSettingsLabel = 'Artist';
 
-  const decorateItem = useCallback(
-    (item: NavItem): NavItem => {
-      if (item.id === 'tasks') {
-        const taskCount = canAccessTasksWorkspace
-          ? formatTaskBadge(taskStats, tasksSeenAt)
-          : undefined;
-
-        return {
-          ...item,
-          badge: (() => {
-            if (isPlanGateLoading) return undefined;
-            if (canAccessTasksWorkspace) {
-              return taskCount == null ? undefined : (
-                <NavBadge
-                  variant='count'
-                  count={taskCount}
-                  aria-label={`${taskCount} ${tasksSeenAt ? 'new ' : ''}active tasks`}
-                />
-              );
-            }
-            return <NavBadge variant='pro' />;
-          })(),
-        };
-      }
-
-      return item;
-    },
-    [canAccessTasksWorkspace, isPlanGateLoading, taskStats, tasksSeenAt]
-  );
-
   // Memoize nav sections for dashboard (non-settings) mode
   const navSections = useMemo<readonly DashboardNavSection[]>(
     () => [
       {
         key: 'primary',
-        items: visiblePrimaryNavigation.map(decorateItem),
+        items: [...visiblePrimaryNavigation],
       },
     ],
-    [decorateItem, visiblePrimaryNavigation]
+    [visiblePrimaryNavigation]
   );
-  const moreNavItems = useMemo(
-    () => morePrimaryNavigation.map(decorateItem),
-    [decorateItem, morePrimaryNavigation]
-  );
+  const moreNavItems = morePrimaryNavigation;
 
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

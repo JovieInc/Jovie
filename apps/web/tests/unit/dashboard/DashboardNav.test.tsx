@@ -7,8 +7,6 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   mockUseChatConversationsQuery,
   mockUsePathname,
-  mockUsePlanGate,
-  mockUseTaskStatsQuery,
   renderDashboardNav,
   resetDashboardNavTestMocks,
 } from '@/tests/utils/dashboard-nav-test-support';
@@ -25,7 +23,6 @@ const CANONICAL_NAV = [
   ['Contacts', APP_ROUTES.CONTACTS],
   ['Connections', APP_ROUTES.PROFILES],
   ['Calendar', APP_ROUTES.CALENDAR],
-  ['Tasks', APP_ROUTES.TASKS],
 ] as const;
 
 const FORBIDDEN_PRIMARY_LABELS = [
@@ -59,17 +56,12 @@ describe('DashboardNav', () => {
       'const [threadReadAtById, setThreadReadAtById] = useState<'
     );
     expect(source).toContain('>({});');
-    expect(source).toContain(
-      'const [tasksSeenAt, setTasksSeenAt] = useState<string | null>(null);'
-    );
     expect(source).toContain('setThreadReadAtById(readThreadReadState());');
-    expect(source).toContain('setTasksSeenAt(readTasksSeenAt());');
     expect(source).not.toContain(
       'useState<Record<string, string>>(readThreadReadState)'
     );
-    expect(source).not.toContain(
-      'useState<string | null>(\n    readTasksSeenAt'
-    );
+    expect(source).not.toContain('useTaskStatsQuery');
+    expect(source).not.toContain('readTasksSeenAt');
   });
 
   it('renders the canonical navigation in exact order and no forbidden primary rows', () => {
@@ -341,7 +333,7 @@ describe('DashboardNav', () => {
       sidebarProps: { defaultOpen: false },
     });
 
-    expect(primaryLinks(container)).toHaveLength(7);
+    expect(primaryLinks(container)).toHaveLength(6);
     expect(getByRole('link', { name: 'New Chat' }).className).toContain(
       'group-data-[collapsible=icon]:justify-center'
     );
@@ -363,113 +355,5 @@ describe('DashboardNav', () => {
       getByRole('link', { name: 'Audience & Tracking' }).getAttribute('href')
     ).toBe(APP_ROUTES.SETTINGS_AUDIENCE);
     expect(queryByText('Workspace')).toBeNull();
-  });
-
-  it('disables task stats query on nested demo routes', () => {
-    mockUsePathname.mockReturnValue('/demo/showcase/settings');
-    renderDashboardNav({
-      renderFn: fastRender,
-      overrides: {
-        selectedProfile: {
-          id: 'profile_123',
-          displayName: 'Tim White',
-          username: 'tim',
-          usernameNormalized: 'tim',
-        } as DashboardData['selectedProfile'],
-      },
-    });
-
-    expect(mockUseTaskStatsQuery).toHaveBeenCalledWith('profile_123', {
-      enabled: false,
-      seenAt: null,
-    });
-  });
-
-  it('renders stable task count geometry and accessible metadata', () => {
-    mockUseTaskStatsQuery.mockReturnValue({
-      data: {
-        backlog: 1,
-        todo: 2,
-        inProgress: 4,
-        done: 0,
-        cancelled: 0,
-        activeTodoCount: 7,
-      },
-    });
-
-    const { getByRole, getByText } = renderDashboardNav({
-      renderFn: fastRender,
-    });
-    const tasksLink = getByRole('link', { name: 'Tasks 7 active tasks' });
-
-    expect(tasksLink).toHaveClass(
-      'grid-cols-[22px_minmax(0,1fr)_minmax(34px,auto)]'
-    );
-    expect(getByText('7')).toHaveAttribute('data-nav-badge', 'count');
-    expect(getByText('7')).toHaveAttribute('aria-label', '7 active tasks');
-  });
-
-  it('uses the new task count after Tasks has been opened', () => {
-    localStorage.setItem('jovie:tasks-seen-at', '2026-05-24T00:00:00.000Z');
-    mockUseTaskStatsQuery.mockReturnValue({
-      data: {
-        backlog: 1,
-        todo: 2,
-        inProgress: 4,
-        done: 0,
-        cancelled: 0,
-        activeTodoCount: 7,
-        newActiveTodoCount: 2,
-      },
-    });
-
-    const { getByText, queryByText } = renderDashboardNav({
-      renderFn: fastRender,
-      overrides: {
-        selectedProfile: {
-          id: 'profile_123',
-          displayName: 'Tim White',
-          username: 'tim',
-          usernameNormalized: 'tim',
-        } as DashboardData['selectedProfile'],
-      },
-    });
-
-    expect(getByText('2')).toHaveAttribute('aria-label', '2 new active tasks');
-    expect(queryByText('7')).toBeNull();
-    expect(mockUseTaskStatsQuery).toHaveBeenCalledWith('profile_123', {
-      enabled: true,
-      seenAt: '2026-05-24T00:00:00.000Z',
-    });
-  });
-
-  it('reserves task metadata geometry when no badge is present', () => {
-    const { container, getByRole } = renderDashboardNav({
-      renderFn: fastRender,
-    });
-
-    expect(getByRole('link', { name: 'Tasks' })).toHaveClass(
-      'grid-cols-[22px_minmax(0,1fr)_minmax(34px,auto)]'
-    );
-    expect(
-      container.querySelector('[data-nav-badge="count"]')
-    ).not.toBeInTheDocument();
-  });
-
-  it('renders the Pro badge only after task entitlements resolve as locked', () => {
-    mockUsePlanGate.mockReturnValue({
-      canAccessTasksWorkspace: false,
-      isLoading: false,
-    });
-    const locked = renderDashboardNav({ renderFn: fastRender });
-    expect(locked.getByText('Pro')).toHaveAttribute('data-nav-badge', 'pro');
-    locked.unmount();
-
-    mockUsePlanGate.mockReturnValue({
-      canAccessTasksWorkspace: false,
-      isLoading: true,
-    });
-    const loading = renderDashboardNav({ renderFn: fastRender });
-    expect(loading.queryByText('Pro')).toBeNull();
   });
 });
