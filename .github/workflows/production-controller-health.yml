@@ -293,6 +293,7 @@ jobs:
               (.status | type == "string") and
               ((.conclusion | type) == "string" or .conclusion == null) and
               (.created_at | type == "string") and
+              (.updated_at | type == "string") and
               (.html_url | type == "string")
             )
           ' >/dev/null <<<"$controller_runs" || incident incomplete_controller_listing
@@ -325,10 +326,12 @@ jobs:
               .head_repository.full_name == $repo and
               .event == "workflow_run" and
               (.status | type == "string" and length > 0) and
-              ((.conclusion | type) == "string" or .conclusion == null)
+              ((.conclusion | type) == "string" or .conclusion == null) and
+              (.updated_at | type == "string" and length > 0)
             ' >/dev/null <<<"$live_controller" || incident changed_controller_run
             controller_status="$(jq -r '.status' <<<"$live_controller")"
             controller_conclusion="$(jq -r '.conclusion // empty' <<<"$live_controller")"
+            controller_updated="$(jq -r '.updated_at // empty' <<<"$live_controller")"
             echo "run_url=https://github.com/$REPOSITORY/actions/runs/$controller_id" \
               >> "$GITHUB_OUTPUT"
             case "$controller_status" in
@@ -372,6 +375,40 @@ jobs:
                   ;;
                 none) ;;
               esac
+
+              # Post-success grace: artifact listing / upload can lag job
+              # completion. Health is every 15m; wait up to 30m before paging.
+              # (JOV-4442: false controller_completed_without_marker pages.)
+              if [[ "$controller_updated" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T ]]; then
+                controller_epoch="$(date -u -d "$controller_updated" +%s)"
+                controller_age_seconds=$(($(date +%s) - controller_epoch))
+                if [ "$controller_age_seconds" -lt 1800 ]; then
+                  echo "Controller run $controller_id completed ${controller_age_seconds}s ago; waiting for marker visibility (30m grace)."
+                  exit 0
+                fi
+              fi
+
+              # Self-verify prod before paging: if live build matches current
+              # main, deploy path worked and a missing marker is bookkeeping —
+              # not a live outage. Still fail closed when conclusion is not
+              # success (handled below).
+              prod_build_id=""
+              if prod_json="$(curl --fail --silent --show-error \
+                --connect-timeout 10 --max-time 20 \
+                "https://jov.ie/api/version" 2>/dev/null)"; then
+                prod_build_id="$(jq -r '.buildId // empty' <<<"$prod_json" 2>/dev/null || true)"
+              fi
+              short_current="${current_sha:0:7}"
+              if [ -n "$prod_build_id" ] && {
+                [ "$prod_build_id" = "$short_current" ] ||
+                [ "$prod_build_id" = "$current_sha" ] ||
+                [[ "$current_sha" == "$prod_build_id"* ]]
+              }; then
+                echo "Prod build $prod_build_id matches current main; controller succeeded without durable marker. Neutral (bookkeeping gap, not a live outage)."
+                echo "recovery_reason=controller_success_prod_current_without_marker" \
+                  >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
             fi
             incident controller_completed_without_marker
           fi
