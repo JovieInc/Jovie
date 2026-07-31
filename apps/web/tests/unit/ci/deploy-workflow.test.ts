@@ -847,7 +847,11 @@ describe('deploy workflow Vercel env resolution', () => {
     );
     expect(classifierJob).toContain("node-version: '22'");
     // biome-ignore format: exact-diff/fail-closed contract stays compact for the integration-train cap
-    expect([classifierJob.includes('fetch-depth: 0'), classifierJob.includes('filter: blob:none'), classifierJob.includes('git cat-file -e "${DIFF_BASE}^{commit}"'), classifierJob.includes('git diff --name-only "$DIFF_BASE" "${{ github.event.merge_group.head_sha }}"'), classifierJob.includes('DIFF_BASE="${{ github.event.before }}"'), classifierJob.includes('|| git show')]).toEqual([true, true, true, true, true, false]);
+    // JOV-4446: merge_group uses exact base/head SHA vars; push alone binds event.before.
+    expect([classifierJob.includes('fetch-depth: 0'), classifierJob.includes('filter: blob:none'), classifierJob.includes('git cat-file -e "${DIFF_BASE}^{commit}"'), classifierJob.includes('git diff --name-only "$DIFF_BASE" "$HEAD_SHA"'), classifierJob.includes('DIFF_BASE="${{ github.event.before }}"'), classifierJob.includes('|| git show')]).toEqual([true, true, true, true, true, false]);
+    expect(classifierJob).toContain(
+      'HEAD_SHA="${{ github.event.merge_group.head_sha }}"'
+    );
     expect(classifierJob).toContain(
       'node scripts/ci-harness.mjs classify-risk'
     );
