@@ -211,10 +211,10 @@ describe('UnifiedSidebar library route', () => {
       /--linear-app-frame-seam:\s*rgba\(0, 0, 0, 0\.045\);/
     );
     expect(linearTokens).toMatch(
-      /:root\.dark[\s\S]*--linear-border-subtle:\s*rgba\(255, 255, 255, 0\.07\);/
+      /:root\.dark[\s\S]*--linear-border-subtle:\s*rgba\(168, 176, 195, 0\.1\);/
     );
     expect(linearTokens).toMatch(
-      /:root\.dark[\s\S]*--linear-app-frame-seam:\s*rgba\(255, 255, 255, 0\.07\);/
+      /:root\.dark[\s\S]*--linear-app-frame-seam:\s*rgba\(168, 176, 195, 0\.1\);/
     );
     expect(linearTokens).not.toMatch(/--linear-border-divider-subtle/);
   });
