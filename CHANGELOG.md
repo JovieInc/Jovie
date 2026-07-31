@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- [internal] **OAuth provider enablement is a code allowlist, not env flags (JOV-2131):** Documented why `NEXT_PUBLIC_CLERK_OAUTH_*` gating emptied production sign-in (PRs #8458/#8497), confirmed Turbo still hashes `NEXT_PUBLIC_*` and Next still collects them for inlining, and locked the hardcoded apple/google allowlist with source + static-env regression tests.
 - [internal] **Profile redesign proposal loop (JOV-1951):** Design Lab can generate pending mockup proposals for owned profiles and selected competitor handles; output stays gated by D2 approval before any production or design-system rollout.
 - [internal] **Shared organisms layer is server-import-free (JOV-3506):** ProfileSwitcher switches active profiles via `POST /api/dashboard/profile/switch` instead of importing a dashboard server action, driving the server-imports ratchet baseline to 0.
 - **Authenticated shell adopts Jovie Noir Ion dark color system (JOV-4635):** stepped near-black surfaces, cool graphite borders, and electric-blue (Ion) focus/selection replace the prior carbon dark palette; agent, creative, system, and status accents keep their approved meanings.
