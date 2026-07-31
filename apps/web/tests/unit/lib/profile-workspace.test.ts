@@ -15,10 +15,13 @@ const rows = [
 ] as unknown as ProfileWorkspaceRow[];
 
 describe('profile workspace presentation', () => {
-  it('groups websites and authority pages under Sources', () => {
+  it('filters Sources and Websites separately', () => {
     expect(
       filterProfileWorkspaceRows(rows, 'source').map(row => row.id)
-    ).toEqual(['website', 'wiki']);
+    ).toEqual(['wiki']);
+    expect(
+      filterProfileWorkspaceRows(rows, 'website').map(row => row.id)
+    ).toEqual(['website']);
   });
 
   it('filters every remaining category exactly', () => {
