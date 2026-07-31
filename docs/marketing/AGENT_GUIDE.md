@@ -58,6 +58,26 @@ The resolver is deterministic. Same Brief → same Composition, every time
 (tested by the golden-fixture determinism gate on every PR). The `trace`
 field shows every decision step — use it to debug.
 
+### 2.5. Visual catalog (Storybook)
+
+After you know the `recipeId` and section list, open the **authoritative visual
+catalog** in Storybook before inventing layout:
+
+| Catalog | Storybook title |
+| --- | --- |
+| Proven recipes | `Marketing/Recipes/<recipeId>` (e.g. `homepage`, `artist-lp`, `pricing`) |
+| All 17 sections | `Marketing/Sections/<sectionId>` |
+| Shells / chrome | `Marketing/Shells/*` (`PublicPageShell`, containers, header/footer/CTA) |
+
+Source: `apps/web/components/marketing/storybook/`. Coverage is CI-gated by
+`apps/web/tests/unit/marketing/storybook-catalog-coverage.test.ts`. Stories are
+product compositions (System A, dark-only, `revalidate = false` on live routes)
+— not design-studio leftovers. Stub recipes may be tagged `stub`; TBD section
+component paths are tagged `wip` and listed in
+`MARKETING_SECTION_STORY_GAPS`.
+
+Local: `pnpm --filter web storybook` → browse the `Marketing/` tree.
+
 ### 3. Render the sections
 
 Each `sections[i]` gives you `{sectionId, variantId, ctaPosition, proofVerified,
