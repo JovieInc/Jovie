@@ -524,11 +524,25 @@ jobs:
           IS_FORK="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}"
           # Determine changed files
           if [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            # JOV-4446: never fall through to github.base_ref / event.before —
+            # those push/PR-only fields are empty on merge_group and produce
+            # "Could not resolve origin/" + false docs-only classification.
             MERGE_GROUP_BASE_SHA="${{ github.event.merge_group.base_sha }}"
             MERGE_GROUP_HEAD_SHA="${{ github.event.merge_group.head_sha }}"
+            if [[ ! "$MERGE_GROUP_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] ||
+              [[ ! "$MERGE_GROUP_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] ||
+              [[ "$MERGE_GROUP_BASE_SHA" == "0000000000000000000000000000000000000000" ]] ||
+              [[ "$MERGE_GROUP_HEAD_SHA" == "0000000000000000000000000000000000000000" ]]; then
+              echo "::error::merge_group base_sha/head_sha are not usable exact SHAs"
+              exit 1
+            fi
             git cat-file -e "${MERGE_GROUP_BASE_SHA}^{commit}"
             git cat-file -e "${MERGE_GROUP_HEAD_SHA}^{commit}"
             CHANGED_FILES=$(git diff --name-only "$MERGE_GROUP_BASE_SHA...$MERGE_GROUP_HEAD_SHA")
+            if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
+              echo "::error::Empty changed-file list vs merge_group base ${MERGE_GROUP_BASE_SHA}; refusing a false docs-only classification."
+              exit 1
+            fi
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             # Fail closed on base resolution: a failed fetch used to leave an
             # empty CHANGED_FILES list that looked like docs-only and skip-
@@ -550,7 +564,7 @@ jobs:
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
             exit 0
-          else
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
             PUSH_BASE_SHA="${{ github.event.before }}"
             if [[ ! "$PUSH_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] ||
               [[ "$PUSH_BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
@@ -559,6 +573,9 @@ jobs:
             fi
             git cat-file -e "${PUSH_BASE_SHA}^{commit}"
             CHANGED_FILES=$(git diff --name-only "$PUSH_BASE_SHA" HEAD)
+          else
+            echo "::error::Unsupported event for path change detection: ${{ github.event_name }}"
+            exit 1
           fi
 
           IOS_PATTERN='^(apps/ios/|fastlane/|Gemfile$|Gemfile\.lock$|scripts/ios-best-practices-lint\.sh$|\.github/workflows/ios-(ci|testflight)\.yml$)'
@@ -815,9 +832,21 @@ jobs:
             DIFF_BASE="origin/$BASE_REF"
             git diff --name-only "$DIFF_BASE" HEAD > "$CHANGED_FILES"
           elif [[ "$EVENT_NAME" == "merge_group" ]]; then
+            # JOV-4446: use merge_group.base_sha only — github.event.before /
+            # github.base_ref are undefined on merge_group and previously
+            # produced "Unsupported event" / "push.before is not a usable SHA".
             DIFF_BASE="${{ github.event.merge_group.base_sha }}"
+            HEAD_SHA="${{ github.event.merge_group.head_sha }}"
+            if [[ ! "$DIFF_BASE" =~ ^[0-9a-f]{40}$ ]] ||
+              [[ ! "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] ||
+              [[ "$DIFF_BASE" == "0000000000000000000000000000000000000000" ]] ||
+              [[ "$HEAD_SHA" == "0000000000000000000000000000000000000000" ]]; then
+              echo "::error::merge_group base_sha/head_sha are not usable exact SHAs"
+              exit 1
+            fi
             git cat-file -e "${DIFF_BASE}^{commit}"
-            git diff --name-only "$DIFF_BASE" "${{ github.event.merge_group.head_sha }}" > "$CHANGED_FILES"
+            git cat-file -e "${HEAD_SHA}^{commit}"
+            git diff --name-only "$DIFF_BASE" "$HEAD_SHA" > "$CHANGED_FILES"
           elif [[ "$EVENT_NAME" == "push" ]]; then
             DIFF_BASE="${{ github.event.before }}"
             if [[ ! "$DIFF_BASE" =~ ^[0-9a-f]{40}$ ]] ||
