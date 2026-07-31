@@ -37,7 +37,7 @@ import { createMerchArtwork } from './artwork';
 import { resolveMerchCatalogSelection } from './catalog';
 import { MERCH_DEFAULT_PRINTFUL_PRODUCT } from './default-catalog';
 import { resolveArchivedMerchRestoreStatus } from './merch-lifecycle-policy';
-import { selectPreferredMockupUrl } from './mockup-urls';
+import { isPrintfulMockupUrl, selectPreferredMockupUrl } from './mockup-urls';
 import { attachMockupsToDesignOption, generateProductMockups } from './mockups'; // HOT ZONE pipeline (gh-9803)
 import {
   buildMerchPresetPriceQuotes,
@@ -863,11 +863,15 @@ async function hydrateMerchCardPrintfulEconomics(
 export async function selectMerchDesign(params: {
   readonly generationId: string;
   readonly clerkUserId: string;
+  readonly profileId?: string | null;
   readonly optionId?: string | null;
   readonly optionNumber?: number | null;
   readonly publish?: boolean;
 }): Promise<MerchSelectionResult> {
   const rawSelected = await getOptionForSelection(params);
+  if (params.profileId && rawSelected.creatorProfileId !== params.profileId) {
+    throw new Error('Merch design option not found');
+  }
   await assertCanManageMerchProfile(
     rawSelected.creatorProfileId,
     params.clerkUserId
@@ -884,6 +888,24 @@ export async function selectMerchDesign(params: {
     .limit(1);
 
   let card = existing[0] ?? null;
+  if (card) {
+    card = await hydrateMerchCardPrintfulEconomics(card);
+
+    const printfulMockupUrl = selected.mockupUrls.find(isPrintfulMockupUrl);
+    if (printfulMockupUrl && !card.mockupUrls.includes(printfulMockupUrl)) {
+      const [updatedCard] = await db
+        .update(merchCards)
+        .set({
+          primaryImageUrl: printfulMockupUrl,
+          mockupUrls: selected.mockupUrls,
+          updatedAt: new Date(),
+        })
+        .where(eq(merchCards.id, card.id))
+        .returning();
+      card = updatedCard ?? card;
+    }
+  }
+
   if (!card) {
     const rejected = await db
       .select({ id: merchDesignOptions.id })
@@ -977,6 +999,12 @@ export async function selectMerchDesign(params: {
     revalidatePublicProfile(profile.usernameNormalized);
   }
 
+  const cardSellability = getMerchCardSellability(card);
+  const printfulMockupUrl =
+    card.mockupUrls.find(isPrintfulMockupUrl) ??
+    selected.mockupUrls.find(isPrintfulMockupUrl) ??
+    null;
+
   return {
     success: true,
     merchCardId: card.id,
@@ -987,10 +1015,21 @@ export async function selectMerchDesign(params: {
       card.status === 'live'
         ? publicMerchUrl(profile.usernameNormalized, card.id)
         : null,
-    publishBlockedReasons:
-      params.publish === true && !publishSellability.sellable
-        ? publishSellability.reasons
-        : undefined,
+    publishBlockedReasons: cardSellability.sellable
+      ? undefined
+      : cardSellability.reasons,
+    product: {
+      productType: card.productType,
+      productName:
+        card.printful.catalogProductName ?? selected.printfulProductName,
+      colorway: selected.colorway,
+      artworkUrl: selected.printFileUrls[0] ?? null,
+      mockupUrl: printfulMockupUrl,
+      mockupStatus: printfulMockupUrl ? 'ready' : 'pending',
+      retailPrice: formatMerchMoney(card.retailPriceCents),
+      artistProfit: formatMerchMoney(card.artistPayoutPerUnitEstimateCents),
+      publishEligible: cardSellability.sellable,
+    },
   };
 }
 

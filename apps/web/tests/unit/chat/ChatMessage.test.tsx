@@ -430,7 +430,7 @@ describe('ChatMessage', () => {
       expect(submitListener).toHaveBeenCalledTimes(1);
       expect(submitListener.mock.calls[0]?.[0]).toMatchObject({
         detail: {
-          prompt: 'Select merch option 1 from generation generation-1.',
+          prompt: 'Select merch option 1.',
         },
       });
     } finally {

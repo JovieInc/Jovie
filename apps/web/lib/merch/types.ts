@@ -81,6 +81,21 @@ export interface MerchSelectionResult {
   readonly title: string;
   readonly publicUrl: string | null;
   readonly publishBlockedReasons?: readonly string[];
+  /**
+   * Truthful, persisted product state for in-place chat selection. A Printful
+   * mockup is only exposed after the async provider job has attached one.
+   */
+  readonly product?: {
+    readonly productType: string;
+    readonly productName: string;
+    readonly colorway: string;
+    readonly artworkUrl: string | null;
+    readonly mockupUrl: string | null;
+    readonly mockupStatus: 'ready' | 'pending';
+    readonly retailPrice: string;
+    readonly artistProfit: string;
+    readonly publishEligible: boolean;
+  };
 }
 
 // ---------------------------------------------------------------------------

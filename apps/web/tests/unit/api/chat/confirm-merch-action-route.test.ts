@@ -4,6 +4,7 @@ const hoisted = vi.hoisted(() => ({
   authMock: vi.fn(),
   findFirstMock: vi.fn(),
   publishMerchCardMock: vi.fn(),
+  selectMerchDesignMock: vi.fn(),
   updateMerchCardStatusMock: vi.fn(),
   insertValuesMock: vi.fn().mockResolvedValue(undefined),
   insertMock: vi
@@ -38,6 +39,7 @@ vi.mock('drizzle-orm', () => ({ eq: vi.fn() }));
 
 vi.mock('@/lib/merch/service', () => ({
   publishMerchCard: hoisted.publishMerchCardMock,
+  selectMerchDesign: hoisted.selectMerchDesignMock,
   updateMerchCardStatus: hoisted.updateMerchCardStatusMock,
 }));
 
@@ -62,6 +64,25 @@ describe('POST /api/chat/confirm-merch-action', () => {
       id: 'card-1',
       status: 'live',
       title: 'Tour Tee',
+    });
+    hoisted.selectMerchDesignMock.mockResolvedValue({
+      success: true,
+      merchCardId: '00000000-0000-4000-8000-000000000004',
+      status: 'draft',
+      selectedOptionId: '00000000-0000-4000-8000-000000000003',
+      title: 'Tour Tee',
+      publicUrl: null,
+      product: {
+        productType: 't-shirt',
+        productName: 'Unisex Staple T-Shirt',
+        colorway: 'Black',
+        artworkUrl: 'https://blob.example.com/art.png',
+        mockupUrl: null,
+        mockupStatus: 'pending',
+        retailPrice: '$30.00',
+        artistProfit: '$10.00',
+        publishEligible: true,
+      },
     });
   });
 
@@ -97,5 +118,38 @@ describe('POST /api/chat/confirm-merch-action', () => {
     expect(hoisted.publishMerchCardMock).toHaveBeenCalledOnce();
     const body = await response.json();
     expect(body.status).toBe('live');
+  });
+
+  it('selects merch through the existing confirmation contract', async () => {
+    const { POST } = await import('@/app/api/chat/confirm-merch-action/route');
+    const response = await POST(
+      new Request('http://localhost/api/chat/confirm-merch-action', {
+        method: 'POST',
+        body: JSON.stringify({
+          profileId: '00000000-0000-4000-8000-000000000001',
+          generationId: '00000000-0000-4000-8000-000000000002',
+          optionId: '00000000-0000-4000-8000-000000000003',
+          optionNumber: 1,
+          action: 'select',
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(hoisted.selectMerchDesignMock).toHaveBeenCalledWith({
+      generationId: '00000000-0000-4000-8000-000000000002',
+      clerkUserId: 'user-1',
+      profileId: '00000000-0000-4000-8000-000000000001',
+      optionId: '00000000-0000-4000-8000-000000000003',
+      optionNumber: 1,
+      publish: false,
+    });
+    const body = await response.json();
+    expect(body.product).toMatchObject({
+      mockupStatus: 'pending',
+      mockupUrl: null,
+      retailPrice: '$30.00',
+      artistProfit: '$10.00',
+    });
   });
 });

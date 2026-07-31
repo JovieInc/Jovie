@@ -546,9 +546,14 @@ function renderReleasePitchArtifact(event: PersistedToolEvent): ReactNode {
   );
 }
 
-function renderMerchGenerationArtifact(event: PersistedToolEvent): ReactNode {
+function renderMerchGenerationArtifact(
+  event: PersistedToolEvent,
+  profileId?: string
+): ReactNode {
   if (isChatMerchDesignCarouselResult(event.output)) {
-    return <ChatMerchDesignCarousel result={event.output} />;
+    return (
+      <ChatMerchDesignCarousel result={event.output} profileId={profileId} />
+    );
   }
   if (!isChatMerchGenerationResult(event.output)) {
     return null;
@@ -662,8 +667,10 @@ const ARTIFACT_RENDERERS: Partial<Record<string, ArtifactRenderer>> = {
   generateAlbumArt: (event, profileId) =>
     renderAlbumArtArtifact(event, profileId),
   generateReleasePitch: event => renderReleasePitchArtifact(event),
-  createMerch: event => renderMerchGenerationArtifact(event),
-  previewMerchOptions: event => renderMerchGenerationArtifact(event),
+  createMerch: (event, profileId) =>
+    renderMerchGenerationArtifact(event, profileId),
+  previewMerchOptions: (event, profileId) =>
+    renderMerchGenerationArtifact(event, profileId),
   selectMerchDesign: (event, profileId) =>
     renderMerchSelectionArtifact(event, profileId),
   createMerchAlternativeItem: (event, profileId) =>
