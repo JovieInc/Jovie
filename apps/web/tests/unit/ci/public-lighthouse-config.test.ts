@@ -9,6 +9,7 @@ const publicLaunchConfigPath = resolve(
   repoRoot,
   'apps/web/.lighthouserc.public-launch.json'
 );
+const rootPackagePath = resolve(repoRoot, 'package.json');
 
 // Without a puppeteerScript, LHCI uses the node-runner (LighthouseRunner) which
 // reads settings.chromeFlags — NOT puppeteerLaunchOptions. The public launch
@@ -21,6 +22,18 @@ const REQUIRED_CHROME_FLAGS = [
 ] as const;
 
 describe('public Lighthouse CI config', () => {
+  it('uses a Chrome 148-compatible Lighthouse engine for LHCI', () => {
+    const rootPackage = JSON.parse(readFileSync(rootPackagePath, 'utf8')) as {
+      pnpm?: {
+        overrides?: Record<string, string>;
+      };
+    };
+
+    expect(rootPackage.pnpm?.overrides?.['@lhci/cli>lighthouse']).toBe(
+      '13.4.1'
+    );
+  });
+
   it('uses settings.chromeFlags for CI-stable Chrome launch to avoid DevTools protocol timeouts', () => {
     const config = JSON.parse(readFileSync(publicLaunchConfigPath, 'utf8')) as {
       ci?: {

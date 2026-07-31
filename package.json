@@ -27,6 +27,7 @@
       "cookie": ">=1.0.0",
       "tmp": ">=0.2.6",
       "vite": "6.4.3",
+      "@lhci/cli>lighthouse": "13.4.1",
       "drizzle-orm": "0.45.2",
       "jsdom": "26.1.0",
       "react": "19.2.7",
