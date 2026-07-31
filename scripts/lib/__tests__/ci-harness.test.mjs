@@ -105,6 +105,7 @@ describe('ci-harness manifest', () => {
     // Non-gate audit/deploy/cleanup jobs must not pollute PR Ready documentation.
     const nonGates = (manifest.jobs ?? []).filter(job => !job.mergeGate);
     expect(nonGates.map(job => job.name)).toEqual([
+      'Component Ship Gate (via ci-fast structural)',
       'UI Story Coverage Audit (shadow)',
       'Lighthouse (public routes manual)',
       'Lighthouse (dashboard manual)',
@@ -541,7 +542,9 @@ describe('ci-harness manifest', () => {
     for (const name of EXPECTED_MERGE_GATE_NAMES) {
       expect(docs).toContain(`\`${name}\``);
     }
-    expect(docs).toContain('`pnpm run typecheck && pnpm run biome:check`');
+    expect(docs).toContain(
+      '`pnpm run typecheck && pnpm run biome:check && pnpm component-ship-gate`'
+    );
     expect(docs).toContain('no PR label allocates a heavy source-event lane');
   });
 
