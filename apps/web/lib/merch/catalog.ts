@@ -50,6 +50,13 @@ export interface MerchCatalogSelection {
   readonly providerWarnings: string[];
 }
 
+export interface MerchCatalogProductOption {
+  readonly catalogProductId: number;
+  readonly productName: string;
+  readonly productType: string;
+  readonly colorway: string;
+}
+
 function defaultSelection(
   providerWarnings: string[] = []
 ): MerchCatalogSelection {
@@ -231,6 +238,184 @@ function selectVariants(
   return source.slice(0, 4);
 }
 
+function isVariantAvailable(
+  availability: Awaited<ReturnType<typeof getCatalogProductAvailability>>,
+  variantId: number
+): boolean {
+  const row = availability.find(item => item.catalog_variant_id === variantId);
+  return (
+    row?.techniques?.some(
+      technique =>
+        technique.technique === MERCH_DEFAULT_PRINTFUL_PRODUCT.technique &&
+        technique.selling_regions?.some(
+          region =>
+            region.name === 'north_america' &&
+            region.availability.toLowerCase() === 'available'
+        )
+    ) === true
+  );
+}
+
+async function buildCatalogSelection(
+  product: PrintfulCatalogProduct,
+  options: { readonly requireConfirmedAvailability?: boolean } = {}
+): Promise<MerchCatalogSelection> {
+  const selectedVariants = selectVariants(
+    await listCatalogVariants(product.id)
+  );
+  if (selectedVariants.length === 0) {
+    throw new Error('Printful catalog product has no eligible variants');
+  }
+
+  const availability = await getCatalogProductAvailability(
+    product.id,
+    'north_america'
+  );
+  const variants = options.requireConfirmedAvailability
+    ? selectedVariants.filter(variant =>
+        isVariantAvailable(availability, variant.id)
+      )
+    : selectedVariants;
+  if (variants.length === 0) {
+    throw new Error(
+      'Printful catalog product has no confirmed North America variants'
+    );
+  }
+
+  const variantMap = variants.reduce<MerchVariantMap>((map, variant, index) => {
+    map[variantKey(variant, index)] = variant.id;
+    return map;
+  }, {});
+  const prices = await getCatalogVariantPrices(variants[0].id, {
+    currency: 'USD',
+    sellingRegionName: 'north_america',
+  });
+  const productCostCents = parsePrintfulPriceCents(
+    prices,
+    MERCH_DEFAULT_PRINTFUL_PRODUCT.placements,
+    MERCH_DEFAULT_PRINTFUL_PRODUCT.technique
+  );
+  if (!productCostCents) {
+    throw new Error('Printful did not return a usable product cost');
+  }
+
+  const availabilityWarnings =
+    availability.length > 0
+      ? variants.flatMap(variant =>
+          isVariantAvailable(availability, variant.id)
+            ? []
+            : [`Printful variant ${variant.id} is not available.`]
+        )
+      : [];
+  const printfulCostUpdatedAt = new Date().toISOString();
+
+  return {
+    catalogProductId: product.id,
+    productName: product.name,
+    productType: product.type ?? product.model ?? 'Printful product',
+    colorway: variants[0].color ?? MERCH_DEFAULT_PRINTFUL_PRODUCT.colorway,
+    variantMap,
+    catalogVariantIds: variants.map(variant => variant.id),
+    sizes: variants.map(variant => variant.size ?? variant.name),
+    placements: MERCH_DEFAULT_PRINTFUL_PRODUCT.placements,
+    technique: MERCH_DEFAULT_PRINTFUL_PRODUCT.technique,
+    availabilityRegion: MERCH_DEFAULT_PRINTFUL_PRODUCT.availabilityRegion,
+    shippingProfile: MERCH_DEFAULT_PRINTFUL_PRODUCT.shippingProfile,
+    pricing: buildMerchPricingSnapshot({
+      retailPriceCents: calculateRecommendedSalePriceCents(
+        productCostCents,
+        MERCH_DEFAULT_MARGIN_PRESET,
+        {
+          printfulCostSource: 'printful',
+          printfulCostUpdatedAt,
+        }
+      ),
+      printfulProductCostCents: productCostCents,
+      printfulCostSource: 'printful',
+      printfulCostUpdatedAt,
+    }),
+    providerWarnings: availabilityWarnings,
+  };
+}
+
+function catalogProductRank(product: PrintfulCatalogProduct): number {
+  const value = normalize(
+    [product.type, product.name].filter(Boolean).join(' ')
+  );
+  if (value.includes('t shirt') || value.includes('tee')) return 0;
+  if (value.includes('hoodie') || value.includes('sweatshirt')) return 1;
+  if (value.includes('hat') || value.includes('cap')) return 2;
+  return 3;
+}
+
+/**
+ * Return only live, priced, North America-available Printful products.
+ * No draft/default catalog records are exposed as selectable options.
+ */
+export async function listMerchCatalogProductOptions(
+  limit = 3
+): Promise<MerchCatalogProductOption[]> {
+  if (!isPrintfulConfigured() || limit <= 0) return [];
+
+  try {
+    const products = (await listCatalogProductsForSelection())
+      .filter(product => !product.is_discontinued)
+      .sort(
+        (left, right) => catalogProductRank(left) - catalogProductRank(right)
+      );
+    const seenTypes = new Set<string>();
+    const candidates = products.filter(product => {
+      const typeKey = normalize(product.type ?? product.model ?? product.name);
+      if (seenTypes.has(typeKey)) return false;
+      seenTypes.add(typeKey);
+      return true;
+    });
+    const verified = await Promise.all(
+      candidates.slice(0, Math.max(limit * 2, limit)).map(async product => {
+        try {
+          return await buildCatalogSelection(product, {
+            requireConfirmedAvailability: true,
+          });
+        } catch {
+          // A product is not offered until live variants and pricing verify.
+          return null;
+        }
+      })
+    );
+
+    return verified
+      .filter((selection): selection is MerchCatalogSelection =>
+        Boolean(selection)
+      )
+      .slice(0, limit)
+      .map(selection => ({
+        catalogProductId: selection.catalogProductId,
+        productName: selection.productName,
+        productType: selection.productType,
+        colorway: selection.colorway,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+export async function resolveLiveMerchCatalogProduct(
+  catalogProductId: number
+): Promise<MerchCatalogSelection> {
+  if (!isPrintfulConfigured()) {
+    throw new Error('Printful catalog is not configured');
+  }
+  const product = await getCatalogProduct(catalogProductId);
+  if (product.is_discontinued) {
+    throw new Error(
+      `Printful catalog product ${catalogProductId} is discontinued`
+    );
+  }
+  return buildCatalogSelection(product, {
+    requireConfirmedAvailability: true,
+  });
+}
+
 export async function resolveMerchCatalogSelection(
   itemRequest: string | null | undefined
 ): Promise<MerchCatalogSelection> {
@@ -258,81 +443,7 @@ export async function resolveMerchCatalogSelection(
       throw new Error('Printful catalog did not return an eligible product');
     }
 
-    const variants = selectVariants(await listCatalogVariants(product.id));
-    if (variants.length === 0) {
-      throw new Error('Printful catalog product has no eligible variants');
-    }
-
-    const variantMap = variants.reduce<MerchVariantMap>(
-      (map, variant, index) => {
-        map[variantKey(variant, index)] = variant.id;
-        return map;
-      },
-      {}
-    );
-    const prices = await getCatalogVariantPrices(variants[0].id, {
-      currency: 'USD',
-      sellingRegionName: 'north_america',
-    });
-    const productCostCents = parsePrintfulPriceCents(
-      prices,
-      MERCH_DEFAULT_PRINTFUL_PRODUCT.placements,
-      MERCH_DEFAULT_PRINTFUL_PRODUCT.technique
-    );
-    if (!productCostCents) {
-      throw new Error('Printful did not return a usable product cost');
-    }
-
-    const availability = await getCatalogProductAvailability(
-      product.id,
-      'north_america'
-    );
-    const availabilityWarnings =
-      availability.length > 0
-        ? variants.flatMap(variant => {
-            const row = availability.find(
-              item => item.catalog_variant_id === variant.id
-            );
-            const available = row?.techniques?.some(technique =>
-              technique.selling_regions?.some(
-                region =>
-                  region.name === 'north_america' &&
-                  region.availability.toLowerCase() === 'available'
-              )
-            );
-            return available === false
-              ? [`Printful variant ${variant.id} is not available.`]
-              : [];
-          })
-        : [];
-
-    return {
-      catalogProductId: product.id,
-      productName: product.name,
-      productType: product.type ?? product.model ?? 'Printful product',
-      colorway: variants[0].color ?? MERCH_DEFAULT_PRINTFUL_PRODUCT.colorway,
-      variantMap,
-      catalogVariantIds: variants.map(variant => variant.id),
-      sizes: variants.map(variant => variant.size ?? variant.name),
-      placements: MERCH_DEFAULT_PRINTFUL_PRODUCT.placements,
-      technique: MERCH_DEFAULT_PRINTFUL_PRODUCT.technique,
-      availabilityRegion: MERCH_DEFAULT_PRINTFUL_PRODUCT.availabilityRegion,
-      shippingProfile: MERCH_DEFAULT_PRINTFUL_PRODUCT.shippingProfile,
-      pricing: buildMerchPricingSnapshot({
-        retailPriceCents: calculateRecommendedSalePriceCents(
-          productCostCents,
-          MERCH_DEFAULT_MARGIN_PRESET,
-          {
-            printfulCostSource: 'printful',
-            printfulCostUpdatedAt: new Date().toISOString(),
-          }
-        ),
-        printfulProductCostCents: productCostCents,
-        printfulCostSource: 'printful',
-        printfulCostUpdatedAt: new Date().toISOString(),
-      }),
-      providerWarnings: availabilityWarnings,
-    };
+    return buildCatalogSelection(product);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return defaultSelection([

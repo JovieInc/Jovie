@@ -154,8 +154,7 @@ describe('ChatMerchCard', () => {
       expect.objectContaining({
         type: 'jovie-chat-submit-prompt',
         detail: {
-          prompt:
-            'Select and publish merch option 1 from generation 00000000-0000-4000-8000-000000000100.',
+          prompt: 'Select and publish merch option 1.',
         },
       })
     );
@@ -212,7 +211,7 @@ describe('ChatMerchCard', () => {
         type: 'jovie-chat-submit-prompt',
         detail: {
           prompt:
-            'Create a hoodie version of merch card 00000000-0000-4000-8000-000000000201 with the same design.',
+            'Create a hoodie version of this merch item with the same design.',
         },
       })
     );

@@ -34,10 +34,14 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { publicEnv } from '@/lib/env-public';
 import { logger } from '@/lib/utils/logger';
 import { createMerchArtwork } from './artwork';
-import { resolveMerchCatalogSelection } from './catalog';
+import {
+  listMerchCatalogProductOptions,
+  resolveLiveMerchCatalogProduct,
+  resolveMerchCatalogSelection,
+} from './catalog';
 import { MERCH_DEFAULT_PRINTFUL_PRODUCT } from './default-catalog';
 import { resolveArchivedMerchRestoreStatus } from './merch-lifecycle-policy';
-import { selectPreferredMockupUrl } from './mockup-urls';
+import { isPrintfulMockupUrl, selectPreferredMockupUrl } from './mockup-urls';
 import { attachMockupsToDesignOption, generateProductMockups } from './mockups'; // HOT ZONE pipeline (gh-9803)
 import {
   buildMerchPresetPriceQuotes,
@@ -800,6 +804,77 @@ async function hydrateOptionPrintfulEconomics(
   return updated ?? option;
 }
 
+async function applyCatalogProductToOption(
+  option: MerchDesignOption,
+  catalogProductId: number
+): Promise<MerchDesignOption> {
+  if (
+    option.printfulCatalogProductId === catalogProductId &&
+    option.pricing.printfulCostSource === 'printful'
+  ) {
+    return option;
+  }
+
+  const catalog = await resolveLiveMerchCatalogProduct(catalogProductId);
+  const pricing = catalog.pricing;
+  const grossMargin =
+    pricing.retailPriceCents -
+    pricing.estimatedPrintfulProductCostCents -
+    pricing.stripeFeeEstimateCents -
+    pricing.refundReserveCents;
+  const retainedArtwork = option.mockupUrls.filter(
+    url => !isPrintfulMockupUrl(url)
+  );
+
+  const [updated] = await db
+    .update(merchDesignOptions)
+    .set({
+      productType: catalog.productType,
+      printfulProductName: catalog.productName,
+      printfulCatalogProductId: catalog.catalogProductId,
+      printfulCatalogVariantIds: catalog.catalogVariantIds,
+      variantMap: catalog.variantMap,
+      colorway: catalog.colorway,
+      availableSizes: catalog.sizes,
+      placements: catalog.placements,
+      technique: catalog.technique,
+      retailPriceCents: pricing.retailPriceCents,
+      estimatedPrintfulProductCostCents:
+        pricing.estimatedPrintfulProductCostCents,
+      estimatedShippingCostCents: pricing.estimatedShippingCostCents,
+      estimatedGrossMarginCents: grossMargin,
+      artistShareCents: pricing.artistPayoutPerUnitEstimateCents,
+      jovieShareCents: pricing.jovieMarginPerUnitEstimateCents,
+      pricing,
+      mockupUrls: retainedArtwork,
+      productionWarnings: catalog.providerWarnings,
+      updatedAt: new Date(),
+    })
+    .where(eq(merchDesignOptions.id, option.id))
+    .returning();
+
+  if (!updated) {
+    throw new Error('Unable to persist selected Printful product');
+  }
+  return updated;
+}
+
+export async function getMerchProductOptions(params: {
+  readonly generationId: string;
+  readonly clerkUserId: string;
+  readonly profileId: string;
+  readonly optionId: string;
+  readonly optionNumber: number;
+}) {
+  const option = await getOptionForSelection(params);
+  if (option.creatorProfileId !== params.profileId) {
+    throw new Error('Merch design option not found');
+  }
+  await assertCanManageMerchProfile(params.profileId, params.clerkUserId);
+
+  return listMerchCatalogProductOptions(3);
+}
+
 /**
  * Refresh merch card economics from Printful when still on jovie_default so
  * publish / checkout sellability can pass (JOV-3393).
@@ -863,27 +938,60 @@ async function hydrateMerchCardPrintfulEconomics(
 export async function selectMerchDesign(params: {
   readonly generationId: string;
   readonly clerkUserId: string;
+  readonly profileId?: string | null;
   readonly optionId?: string | null;
   readonly optionNumber?: number | null;
+  readonly catalogProductId?: number | null;
   readonly publish?: boolean;
 }): Promise<MerchSelectionResult> {
   const rawSelected = await getOptionForSelection(params);
+  if (params.profileId && rawSelected.creatorProfileId !== params.profileId) {
+    throw new Error('Merch design option not found');
+  }
   await assertCanManageMerchProfile(
     rawSelected.creatorProfileId,
     params.clerkUserId
   );
-  const selected = await hydrateOptionPrintfulEconomics(rawSelected);
+  const existing = await db
+    .select()
+    .from(merchCards)
+    .where(eq(merchCards.selectedDesignOptionId, rawSelected.id))
+    .limit(1);
+  const existingCard = existing[0] ?? null;
+  if (
+    existingCard &&
+    params.catalogProductId &&
+    existingCard.printful.catalogProductId !== params.catalogProductId
+  ) {
+    throw new Error('A product is already selected for this merch design');
+  }
+
+  const selected = params.catalogProductId
+    ? await applyCatalogProductToOption(rawSelected, params.catalogProductId)
+    : await hydrateOptionPrintfulEconomics(rawSelected);
   const profile = await getCreatorProfileForMerch(selected.creatorProfileId);
   const publishSellability = getDesignOptionSellability(selected);
   const shouldPublish = params.publish === true && publishSellability.sellable;
 
-  const existing = await db
-    .select()
-    .from(merchCards)
-    .where(eq(merchCards.selectedDesignOptionId, selected.id))
-    .limit(1);
+  let card = existingCard;
+  if (card) {
+    card = await hydrateMerchCardPrintfulEconomics(card);
 
-  let card = existing[0] ?? null;
+    const printfulMockupUrl = selected.mockupUrls.find(isPrintfulMockupUrl);
+    if (printfulMockupUrl && !card.mockupUrls.includes(printfulMockupUrl)) {
+      const [updatedCard] = await db
+        .update(merchCards)
+        .set({
+          primaryImageUrl: printfulMockupUrl,
+          mockupUrls: selected.mockupUrls,
+          updatedAt: new Date(),
+        })
+        .where(eq(merchCards.id, card.id))
+        .returning();
+      card = updatedCard ?? card;
+    }
+  }
+
   if (!card) {
     const rejected = await db
       .select({ id: merchDesignOptions.id })
@@ -941,6 +1049,9 @@ export async function selectMerchDesign(params: {
       })
       .returning();
     card = inserted;
+    if (params.catalogProductId) {
+      attachPrintfulMockupsAsync([selected]);
+    }
   } else if (shouldPublish && card.status !== 'live') {
     validateMerchCardForPublishing(card);
     [card] = await db
@@ -977,6 +1088,12 @@ export async function selectMerchDesign(params: {
     revalidatePublicProfile(profile.usernameNormalized);
   }
 
+  const cardSellability = getMerchCardSellability(card);
+  const printfulMockupUrl =
+    card.mockupUrls.find(isPrintfulMockupUrl) ??
+    selected.mockupUrls.find(isPrintfulMockupUrl) ??
+    null;
+
   return {
     success: true,
     merchCardId: card.id,
@@ -987,10 +1104,21 @@ export async function selectMerchDesign(params: {
       card.status === 'live'
         ? publicMerchUrl(profile.usernameNormalized, card.id)
         : null,
-    publishBlockedReasons:
-      params.publish === true && !publishSellability.sellable
-        ? publishSellability.reasons
-        : undefined,
+    publishBlockedReasons: cardSellability.sellable
+      ? undefined
+      : cardSellability.reasons,
+    product: {
+      productType: card.productType,
+      productName:
+        card.printful.catalogProductName ?? selected.printfulProductName,
+      colorway: selected.colorway,
+      artworkUrl: selected.printFileUrls[0] ?? null,
+      mockupUrl: printfulMockupUrl,
+      mockupStatus: printfulMockupUrl ? 'ready' : 'pending',
+      retailPrice: formatMerchMoney(card.retailPriceCents),
+      artistProfit: formatMerchMoney(card.artistPayoutPerUnitEstimateCents),
+      publishEligible: cardSellability.sellable,
+    },
   };
 }
 

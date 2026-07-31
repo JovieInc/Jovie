@@ -11,18 +11,73 @@ export type ConfirmChatMerchActionType =
   | 'unpause'
   | 'pause';
 
-export interface ConfirmChatMerchActionInput {
+export interface ConfirmChatMerchStatusActionInput {
   readonly profileId: string;
   readonly merchCardId: string;
   readonly action: ConfirmChatMerchActionType;
 }
 
-interface ConfirmChatMerchActionResponse {
-  readonly success: boolean;
+export interface ConfirmChatMerchSelectInput {
+  readonly profileId: string;
+  readonly generationId: string;
+  readonly optionId: string;
+  readonly optionNumber: number;
+  readonly catalogProductId: number;
+  readonly action: 'select';
+}
+
+export interface ConfirmChatMerchProductsInput {
+  readonly profileId: string;
+  readonly generationId: string;
+  readonly optionId: string;
+  readonly optionNumber: number;
+  readonly action: 'products';
+}
+
+export type ConfirmChatMerchActionInput =
+  | ConfirmChatMerchStatusActionInput
+  | ConfirmChatMerchProductsInput
+  | ConfirmChatMerchSelectInput;
+
+export interface ConfirmChatMerchStatusActionResponse {
+  readonly success: true;
   readonly merchCardId: string;
   readonly status: string;
   readonly title: string;
 }
+
+export interface ConfirmChatMerchSelectResponse
+  extends ConfirmChatMerchStatusActionResponse {
+  readonly selectedOptionId: string;
+  readonly publicUrl: string | null;
+  readonly publishBlockedReasons?: readonly string[];
+  readonly product: {
+    readonly productType: string;
+    readonly productName: string;
+    readonly colorway: string;
+    readonly artworkUrl: string | null;
+    readonly mockupUrl: string | null;
+    readonly mockupStatus: 'ready' | 'pending';
+    readonly retailPrice: string;
+    readonly artistProfit: string;
+    readonly publishEligible: boolean;
+  };
+}
+
+export interface ConfirmChatMerchProductsResponse {
+  readonly success: true;
+  readonly products: readonly {
+    readonly catalogProductId: number;
+    readonly productName: string;
+    readonly productType: string;
+    readonly colorway: string;
+  }[];
+}
+
+export type ConfirmChatMerchActionResponse =
+  | ConfirmChatMerchStatusActionResponse
+  | ConfirmChatMerchProductsResponse
+  | ConfirmChatMerchSelectResponse;
 
 export function useConfirmChatMerchActionMutation() {
   const queryClient = useQueryClient();

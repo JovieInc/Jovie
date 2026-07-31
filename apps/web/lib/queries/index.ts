@@ -260,7 +260,10 @@ export {
 // Confirm chat merch action mutation
 export {
   type ConfirmChatMerchActionInput,
+  type ConfirmChatMerchActionResponse,
   type ConfirmChatMerchActionType,
+  type ConfirmChatMerchProductsResponse,
+  type ConfirmChatMerchSelectResponse,
   useConfirmChatMerchActionMutation,
 } from './useConfirmChatMerchActionMutation';
 // Confirm chat remove link mutation

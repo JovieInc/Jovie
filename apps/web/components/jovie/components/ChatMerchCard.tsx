@@ -130,17 +130,13 @@ function submitMerchPrompt(prompt: string): void {
   );
 }
 
-function optionPrompt(
-  generationId: string,
-  option: MerchGenerationOption,
-  publish: boolean
-): string {
+function optionPrompt(option: MerchGenerationOption, publish: boolean): string {
   const action = publish ? 'Select and publish' : 'Select';
-  return `${action} merch option ${option.option_number} from generation ${generationId}.`;
+  return `${action} merch option ${option.option_number}.`;
 }
 
-function alternativeItemPrompt(merchCardId: string, itemType: string): string {
-  return `Create a ${itemType} version of merch card ${merchCardId} with the same design.`;
+function alternativeItemPrompt(itemType: string): string {
+  return `Create a ${itemType} version of this merch item with the same design.`;
 }
 
 function MerchOptionPricing({
@@ -207,9 +203,9 @@ export function ChatMerchOptionsCard({
 }) {
   const handleSelect = useCallback(
     (option: MerchGenerationOption, publish: boolean) => {
-      submitMerchPrompt(optionPrompt(result.generationId, option, publish));
+      submitMerchPrompt(optionPrompt(option, publish));
     },
-    [result.generationId]
+    []
   );
 
   return (
@@ -340,21 +336,15 @@ export function ChatMerchSelectionCard({
   const statusLabel =
     result.status.slice(0, 1).toUpperCase() + result.status.slice(1);
   const blockedReasons = result.publishBlockedReasons ?? [];
-  const handleAlternativeItem = useCallback(
-    (itemType: string) => {
-      submitMerchPrompt(alternativeItemPrompt(result.merchCardId, itemType));
-    },
-    [result.merchCardId]
-  );
+  const handleAlternativeItem = useCallback((itemType: string) => {
+    submitMerchPrompt(alternativeItemPrompt(itemType));
+  }, []);
 
   return (
-    <ChatGenerationArtifactSurface
-      title={result.title}
-      subtitle='Saved to Library'
-    >
+    <section className='max-w-2xl'>
       <div
         data-testid='chat-merch-selection-card'
-        className='flex items-start gap-3 rounded-lg border border-subtle bg-surface-0 p-3'
+        className='flex items-start gap-3 py-2'
       >
         <span className='grid h-9 w-9 shrink-0 place-items-center rounded-md bg-success-subtle text-success'>
           <CheckCircle2 className='h-4 w-4' strokeWidth={2.25} />
@@ -421,7 +411,7 @@ export function ChatMerchSelectionCard({
         </div>
       </div>
       {profileId && result.publishProposal?.success ? (
-        <div className='mt-3'>
+        <div className='mt-2'>
           <ChatMerchActionCard
             profileId={profileId}
             merchCardId={result.publishProposal.merchCardId}
@@ -433,6 +423,6 @@ export function ChatMerchSelectionCard({
           />
         </div>
       ) : null}
-    </ChatGenerationArtifactSurface>
+    </section>
   );
 }

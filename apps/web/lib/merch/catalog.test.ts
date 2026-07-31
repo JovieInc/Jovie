@@ -11,7 +11,11 @@ const printful = vi.hoisted(() => ({
 
 vi.mock('@/lib/printful/client', () => printful);
 
-import { resolveMerchCatalogSelection } from './catalog';
+import {
+  listMerchCatalogProductOptions,
+  resolveLiveMerchCatalogProduct,
+  resolveMerchCatalogSelection,
+} from './catalog';
 
 describe('resolveMerchCatalogSelection', () => {
   beforeEach(() => {
@@ -222,5 +226,136 @@ describe('resolveMerchCatalogSelection', () => {
     expect(selection.providerWarnings).toEqual([
       'Printful catalog pricing unavailable: catalog timeout',
     ]);
+  });
+
+  it('lists only live products with confirmed variants and pricing', async () => {
+    printful.isPrintfulConfigured.mockReturnValue(true);
+    printful.listCatalogProducts.mockResolvedValue([
+      {
+        id: 71,
+        name: 'Unisex Staple T-Shirt',
+        type: 't-shirt',
+        is_discontinued: false,
+      },
+      {
+        id: 91,
+        name: 'Unisex Heavy Hoodie',
+        type: 'hoodie',
+        is_discontinued: false,
+      },
+      {
+        id: 222,
+        name: 'Structured Cap',
+        type: 'hat',
+        is_discontinued: false,
+      },
+      {
+        id: 999,
+        name: 'Discontinued Tee',
+        type: 't-shirt',
+        is_discontinued: true,
+      },
+    ]);
+    printful.listCatalogVariants.mockImplementation(
+      async (catalogProductId: number) => [
+        {
+          id: catalogProductId * 10,
+          catalog_product_id: catalogProductId,
+          name: 'M / Black',
+          size: 'M',
+          color: 'Black',
+        },
+      ]
+    );
+    printful.getCatalogVariantPrices.mockResolvedValue({
+      currency: 'USD',
+      product: {
+        id: 71,
+        placements: [{ id: 'front', price: '15.00' }],
+      },
+      variant: {
+        id: 710,
+        techniques: [{ technique_key: 'dtg', price: '2.00' }],
+      },
+    });
+    printful.getCatalogProductAvailability.mockImplementation(
+      async (catalogProductId: number) => [
+        {
+          catalog_variant_id: catalogProductId * 10,
+          techniques: [
+            {
+              technique: 'dtg',
+              selling_regions: [
+                { name: 'north_america', availability: 'available' },
+              ],
+            },
+          ],
+        },
+      ]
+    );
+
+    await expect(listMerchCatalogProductOptions()).resolves.toEqual([
+      {
+        catalogProductId: 71,
+        productName: 'Unisex Staple T-Shirt',
+        productType: 't-shirt',
+        colorway: 'Black',
+      },
+      {
+        catalogProductId: 91,
+        productName: 'Unisex Heavy Hoodie',
+        productType: 'hoodie',
+        colorway: 'Black',
+      },
+      {
+        catalogProductId: 222,
+        productName: 'Structured Cap',
+        productType: 'hat',
+        colorway: 'Black',
+      },
+    ]);
+  });
+
+  it('never exposes draft defaults as selectable products', async () => {
+    printful.isPrintfulConfigured.mockReturnValue(false);
+
+    await expect(listMerchCatalogProductOptions()).resolves.toEqual([]);
+    expect(printful.listCatalogProducts).not.toHaveBeenCalled();
+  });
+
+  it('rejects an explicitly selected product without confirmed availability', async () => {
+    printful.isPrintfulConfigured.mockReturnValue(true);
+    printful.getCatalogProduct.mockResolvedValue({
+      id: 333,
+      name: 'Heavyweight Tank',
+      type: 'tank',
+      is_discontinued: false,
+    });
+    printful.listCatalogVariants.mockResolvedValue([
+      {
+        id: 3301,
+        catalog_product_id: 333,
+        name: 'M / Black',
+        size: 'M',
+        color: 'Black',
+      },
+    ]);
+    printful.getCatalogProductAvailability.mockResolvedValue([
+      {
+        catalog_variant_id: 3301,
+        techniques: [
+          {
+            technique: 'embroidery',
+            selling_regions: [
+              { name: 'north_america', availability: 'available' },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    await expect(resolveLiveMerchCatalogProduct(333)).rejects.toThrow(
+      'no confirmed North America variants'
+    );
   });
 });
