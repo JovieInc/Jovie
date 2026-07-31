@@ -14,6 +14,8 @@ All schema files live in `apps/web/lib/db/schema/`. Import tables and types from
 
 **Sync:** `skills_catalog` and `tools_catalog` are upserted from `PUBLIC_SKILL_REGISTRY` (`SKILL_REGISTRY` alias) at deploy time by `apps/web/scripts/sync-skills-catalog.ts` (wired into `postbuild`). Do not hand-edit these rows.
 
+**Live chat tools (JOV-3013):** inventoried in `apps/web/lib/chat/chat-tool-inventory.ts` (`CHAT_ROUTE_TOOL_IDS`); not the same set as this catalog.
+
 **Partial catalog (JOV-3013):** `PUBLIC_SKILL_REGISTRY` is intentionally **not** the exhaustive live chat tool list. Chat tools are assembled in `app/api/chat/route.ts` and gated by plan/entitlements (`lib/chat/tool-access.ts`). Treat `skills_catalog` as admin/playbook/lifecycle source of truth only — not "what the model can call."
 
 **Enums:** `skillKindEnum` (`vertical_agent`, `tool`, `style`); `retouchJobStatusEnum` (`queued`, `running`, `identity_check_failed`, `identity_check_retrying`, `completed`, `failed`, `rejected_by_user`, `accepted_by_user`).
