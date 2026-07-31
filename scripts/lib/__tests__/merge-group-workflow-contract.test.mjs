@@ -339,6 +339,80 @@ describe('merge_group workflow contract', () => {
     expect(SECURITY_WORKFLOW).not.toMatch(/^\s*pull_request:/m);
   });
 
+  // JOV-4446: systemic merge_group failures from push/PR-only event fields.
+  it('resolves path changes and risk classification from merge_group SHAs only (JOV-4446)', () => {
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const risk = getJobBlock(CI_WORKFLOW, 'ci-risk-classifier');
+
+    // Path Changes: explicit merge_group branch with exact base/head SHAs.
+    expect(pathChanges).toContain(
+      'MERGE_GROUP_BASE_SHA="${{ github.event.merge_group.base_sha }}"'
+    );
+    expect(pathChanges).toContain(
+      'MERGE_GROUP_HEAD_SHA="${{ github.event.merge_group.head_sha }}"'
+    );
+    expect(pathChanges).toContain(
+      'git diff --name-only "$MERGE_GROUP_BASE_SHA...$MERGE_GROUP_HEAD_SHA"'
+    );
+    expect(pathChanges).toContain(
+      'Empty changed-file list vs merge_group base'
+    );
+    expect(pathChanges).toContain(
+      'elif [[ "${{ github.event_name }}" == "push" ]]; then'
+    );
+    expect(pathChanges).toContain(
+      'Unsupported event for path change detection'
+    );
+    // Must not treat merge_group as an implicit push (event.before is empty).
+    const detectStep = pathChanges.slice(
+      pathChanges.indexOf('Detect path changes for all job types')
+    );
+    // The push branch is gated; merge_group never reads event.before.
+    expect(detectStep).toMatch(
+      /merge_group[\s\S]*?elif \[\[ "\$\{\{ github\.event_name \}\}" == "push" \]\]/
+    );
+
+    // Risk classifier: same SHA-only contract.
+    expect(risk).toContain('github.event.merge_group.base_sha');
+    expect(risk).toContain('github.event.merge_group.head_sha');
+    expect(risk).toContain(
+      'merge_group base_sha/head_sha are not usable exact SHAs'
+    );
+    expect(risk).toContain(
+      'Unsupported event for CI risk classification: $EVENT_NAME'
+    );
+    // merge_group branch must appear before the push/before fallback.
+    const riskCollect = risk.slice(risk.indexOf('Collect changed files'));
+    const mergeIdx = riskCollect.indexOf('EVENT_NAME" == "merge_group"');
+    const pushIdx = riskCollect.indexOf('EVENT_NAME" == "push"');
+    // Only the push branch may bind github.event.before as DIFF_BASE.
+    const beforeAssignIdx = riskCollect.indexOf(
+      'DIFF_BASE="${{ github.event.before }}"'
+    );
+    expect(mergeIdx).toBeGreaterThanOrEqual(0);
+    expect(pushIdx).toBeGreaterThan(mergeIdx);
+    expect(beforeAssignIdx).toBeGreaterThan(pushIdx);
+  });
+
+  it('starts Build+Layout combined-head server with pinned loopback HOSTNAME (JOV-4446)', () => {
+    const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
+    expect(buildLayout).toContain("github.event_name == 'merge_group'");
+    expect(buildLayout).toContain('Build exact combined head');
+    expect(buildLayout).toContain('Verify combined build output');
+    expect(buildLayout).toContain(
+      'apps/web/.next/standalone/apps/web/server.js'
+    );
+    expect(buildLayout).toContain('export HOSTNAME=localhost');
+    expect(buildLayout).toContain(
+      'PORT=3230 node .next/standalone/apps/web/server.js'
+    );
+    expect(buildLayout).toContain('Combined-head standalone server died');
+    expect(buildLayout).toContain(
+      'Combined-head standalone server failed to start'
+    );
+    expect(buildLayout).not.toContain('actions/download-artifact');
+  });
+
   it('coalesces a short release wave before exact authorization and mutation', () => {
     const coalesce = getJobBlock(
       PRODUCTION_CONTROLLER_WORKFLOW,
