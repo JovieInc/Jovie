@@ -88,15 +88,18 @@ describe('SocialBar', () => {
     );
 
     const links = screen.getAllByRole('link');
-    expect(links[0]).toHaveAttribute('title', 'Follow on instagram');
+    expect(links[0]).toHaveAttribute(
+      'title',
+      'Follow Test Artist on Instagram'
+    );
     expect(links[0]).toHaveAttribute(
       'aria-label',
-      'Follow Test Artist on instagram'
+      'Follow Test Artist on Instagram'
     );
-    expect(links[1]).toHaveAttribute('title', 'Follow on twitter');
+    expect(links[1]).toHaveAttribute('title', 'Follow Test Artist on Twitter');
     expect(links[1]).toHaveAttribute(
       'aria-label',
-      'Follow Test Artist on twitter'
+      'Follow Test Artist on Twitter'
     );
   });
 });

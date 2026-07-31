@@ -40,6 +40,10 @@ import { buildProfileShareContext } from '@/lib/share/context';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
+import {
+  publicLinkAriaLabel,
+  sanitizePublicHref,
+} from '@/lib/utils/public-url';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
@@ -393,7 +397,7 @@ export function ProfileDesktopSurface({
             {heroImageUrl ? (
               <ImageWithFallback
                 src={heroImageUrl}
-                alt={artist.name}
+                alt=''
                 fill
                 priority
                 sizes='(max-width: 1536px) 60vw, 900px'
@@ -445,23 +449,38 @@ export function ProfileDesktopSurface({
 
               {visibleSocialLinks.length > 0 ? (
                 <div className='flex items-center gap-3'>
-                  {visibleSocialLinks.map(link =>
-                    link.platform && link.url ? (
+                  {visibleSocialLinks.map(link => {
+                    if (!link.platform) return null;
+                    const href = sanitizePublicHref(link.url);
+                    if (!href) return null;
+                    const platformLabel =
+                      link.platform.charAt(0).toUpperCase() +
+                      link.platform.slice(1);
+                    return (
                       <a
                         key={link.id}
-                        href={link.url}
+                        href={href}
                         target='_blank'
                         rel='noopener noreferrer'
-                        className='inline-flex h-10 w-10 items-center justify-center text-white/78 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
-                        aria-label={link.platform}
+                        className='inline-flex h-11 w-11 items-center justify-center text-white/78 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                        aria-label={publicLinkAriaLabel(
+                          artist.name,
+                          link.platform,
+                          platformLabel
+                        )}
+                        title={publicLinkAriaLabel(
+                          artist.name,
+                          link.platform,
+                          platformLabel
+                        )}
                       >
                         <SocialIcon
                           platform={link.platform}
-                          className='h-4 w-4'
+                          className='h-5 w-5'
                         />
                       </a>
-                    ) : null
-                  )}
+                    );
+                  })}
                 </div>
               ) : null}
             </div>
