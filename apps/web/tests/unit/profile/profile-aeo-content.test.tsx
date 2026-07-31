@@ -163,42 +163,47 @@ describe('Profile AEO content', () => {
 
     for (const faq of content.faqs) {
       expect(faq.answer).toContain('DJ Test');
-      expect(faq.source.href).toMatch(/^https?:\/\//);
+      expect(faq.source.href.length).toBeGreaterThan(0);
       expect(faq.source.label.length).toBeGreaterThan(0);
     }
 
     expect(content.faqs[1]?.answer).toContain('May 1, 2026');
-    expect(content.faqs[1]?.source.href).toBe(
-      'https://jov.ie/dj-test/neon-circuit'
-    );
+    expect(content.faqs[1]?.source.href).toBe('/dj-test/neon-circuit');
     expect(content.faqs[2]?.answer).toContain('Warehouse 9');
     expect(content.faqs[2]?.source.href).toBe(
       'https://tickets.example.com/dj-test'
     );
     expect(content.faqs[3]?.answer).toContain('Signal Hoodie');
     expect(content.faqs[3]?.answer).toContain('$68.00');
+
+    // Copy quality: no generic pronoun boilerplate or awkward "working in".
+    expect(content.description.join(' ')).not.toContain('Their public Jovie');
+    expect(content.description.join(' ')).toContain('known for');
+    expect(content.description.join(' ')).toContain('Find DJ Test on Jovie');
   });
 
-  it('builds the facts strip from genres, active year, and hometown', () => {
+  it('builds the facts strip from genres, active year, hometown, and based-in', () => {
     const content = buildContent();
 
     expect(content.facts).toEqual([
       { label: 'Genre', value: 'Tech house, electronic, club' },
       { label: 'Active Since', value: '2018' },
       { label: 'Hometown', value: 'Austin, TX' },
+      { label: 'Based In', value: 'Los Angeles, CA' },
     ]);
   });
 
-  it('falls back to location for the hometown fact only when hometown is missing', () => {
+  it('uses based-in when only current location is set', () => {
     const content = buildProfileAeoContent({
       artist: { ...baseArtist, hometown: null, location: 'Berlin, DE' },
       now,
     });
 
     expect(content.facts).toContainEqual({
-      label: 'Hometown',
+      label: 'Based In',
       value: 'Berlin, DE',
     });
+    expect(content.facts.some(fact => fact.label === 'Hometown')).toBe(false);
 
     const withHometown = buildProfileAeoContent({ artist: baseArtist, now });
     expect(withHometown.facts).toContainEqual({
@@ -268,17 +273,70 @@ describe('Profile AEO content', () => {
     );
     // A YouTube social link is categorized as follow, not listen, and
     // suppresses the youtube_url column fallback.
+    // Venmo is support/payment — excluded from Follow.
     expect(content.followLinks.map(link => link.platform)).toEqual([
       'instagram',
       'youtube',
-      'venmo',
     ]);
     // Registry names win; unknown platforms fall back to sentence case.
     expect(content.followLinks.map(link => link.label)).toEqual([
       'Instagram',
       'YouTube',
-      'Venmo',
     ]);
+  });
+
+  it('suppresses malformed website links and uses Visit aria copy for websites', () => {
+    const content = buildProfileAeoContent({
+      artist: baseArtist,
+      socialLinks: [
+        {
+          id: 'link-web-bad',
+          artist_id: 'artist-1',
+          platform: 'website',
+          url: 'https://itstimwhite/',
+          clicks: 0,
+          created_at: '2024-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'link-web-good',
+          artist_id: 'artist-1',
+          platform: 'website',
+          url: 'https://itstimwhite.com',
+          clicks: 0,
+          created_at: '2024-01-01T00:00:00.000Z',
+        },
+      ],
+      now,
+    });
+
+    // Malformed URL is skipped before platform dedupe; valid website remains.
+    expect(content.followLinks.map(link => link.platform)).toEqual(['website']);
+    expect(content.followLinks[0]?.url).toBe('https://itstimwhite.com/');
+
+    render(<ProfileAeoContent content={content} />);
+    expect(
+      screen.getByRole('link', { name: "Visit DJ Test's website" })
+    ).toHaveAttribute('href', 'https://itstimwhite.com/');
+  });
+
+  it('omits empty touring and merch FAQs from the public surface', () => {
+    const content = buildProfileAeoContent({
+      artist: baseArtist,
+      tourDates: [],
+      merchCards: [],
+      now,
+    });
+
+    expect(content.faqs.map(faq => faq.question)).toEqual([
+      'Where is DJ Test from?',
+      "What is DJ Test's latest release?",
+    ]);
+    expect(content.faqs.some(faq => faq.question.includes('touring'))).toBe(
+      false
+    );
+    expect(content.faqs.some(faq => faq.question.includes('merch'))).toBe(
+      false
+    );
   });
 
   it('uses profile DSP URL columns for the listen row when no social links exist', () => {
@@ -321,6 +379,7 @@ describe('Profile AEO content', () => {
     expect(facts).toHaveTextContent('Genre');
     expect(facts).toHaveTextContent('Active Since');
     expect(facts).toHaveTextContent('Hometown');
+    expect(facts).toHaveTextContent('Based In');
 
     const listen = screen.getByTestId('profile-about-listen');
     expect(listen).toBeVisible();
@@ -409,10 +468,17 @@ describe('Profile AEO content', () => {
     expect(first.description.join(' ')).not.toBe(second.description.join(' '));
     expect(first.description.join(' ')).toContain('@first-artist');
     expect(second.description.join(' ')).toContain('@second-artist');
-    expect(first.faqs).toHaveLength(4);
+    // Sparse profiles only keep origin + latest-release FAQs (no empty tour/merch).
+    expect(first.faqs).toHaveLength(2);
     expect(
-      first.faqs.every(faq => faq.source.href.startsWith('https://jov.ie/'))
+      first.faqs.every(
+        faq =>
+          faq.source.href.startsWith('/') ||
+          faq.source.href.startsWith('https://')
+      )
     ).toBe(true);
+    // Same-origin FAQ sources stay environment-relative (no hard-coded prod).
+    expect(first.faqs[0]?.source.href).toBe('/first-artist');
   });
 
   it('renders visible FAQ and source links into static HTML', () => {
@@ -427,7 +493,7 @@ describe('Profile AEO content', () => {
     expect(screen.getByText('Where is DJ Test from?')).toBeVisible();
     expect(
       screen.getByRole('link', { name: 'Source: Jovie release page' })
-    ).toHaveAttribute('href', 'https://jov.ie/dj-test/neon-circuit');
+    ).toHaveAttribute('href', '/dj-test/neon-circuit');
 
     const html = renderToStaticMarkup(<ProfileAeoContent content={content} />);
     expect(html).toContain('data-testid="profile-aeo-content"');

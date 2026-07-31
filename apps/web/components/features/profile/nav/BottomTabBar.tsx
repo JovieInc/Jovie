@@ -44,6 +44,7 @@ interface TabDefinition {
  * All four primary tab definitions, in canonical order.
  */
 const ALL_PRIMARY_TABS: ReadonlyArray<TabDefinition> = [
+  // UserRound = profile home (not a separate "person" destination).
   { mode: 'profile', label: 'Home', icon: UserRound },
   { mode: 'listen', label: 'Music', icon: Music2 },
   { mode: 'tour', label: 'Events', icon: CalendarDays },

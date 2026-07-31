@@ -14,14 +14,15 @@ export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
       className='ap-hero homepage-hero homepage-hero--artist-profile relative overflow-hidden border-b border-subtle'
       aria-labelledby='artist-profile-hero-heading'
     >
+      <div
+        aria-hidden='true'
+        className='ap-hero__atmosphere pointer-events-none absolute inset-0'
+      />
       <MarketingContainer
         width='page'
         className='relative !px-5 sm:!px-6 lg:!px-0'
       >
         <div className='ap-hero__inner mx-auto flex max-w-3xl flex-col items-center justify-center pb-16 text-center sm:pb-20'>
-          <p className='mb-6 text-xs font-medium tracking-wide text-secondary-token'>
-            {hero.eyebrow}
-          </p>
           {/* ui-casing-allow: marketing display headline */}
           <h1
             id='artist-profile-hero-heading'
@@ -32,10 +33,10 @@ export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
           <p className='ap-hero__subhead mt-5 text-secondary-token'>
             {hero.subhead}
           </p>
-          <div className='mt-7 flex justify-center'>
-            <HomeHeroCTA />
+          <div className='ap-hero__focal mt-8 flex w-full justify-center'>
+            <HomeHeroCTA section='artist-profiles-hero' showSupport />
           </div>
-          <p className='mt-5 font-mono text-xs tracking-tight text-tertiary-token'>
+          <p className='mt-4 font-mono text-xs tracking-tight text-tertiary-token'>
             {hero.signature}
           </p>
         </div>

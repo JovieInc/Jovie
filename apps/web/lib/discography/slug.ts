@@ -161,14 +161,47 @@ export async function isSlugAvailable(
   return !existingRedirect;
 }
 
+export interface GenerateUniqueSlugOptions {
+  /**
+   * Prefer year-based disambiguation (`title-2019`) before opaque `-2` suffixes
+   * when two same-title releases collide.
+   */
+  readonly year?: number | null;
+}
+
 /**
- * Generate a unique slug for content, handling collisions with -2, -3, etc.
+ * Ordered slug candidates for collision resolution.
+ * Prefer base → year → numeric suffixes (skipping year-shaped numbers).
+ */
+export function buildSlugDisambiguationCandidates(
+  baseSlug: string,
+  year?: number | null
+): string[] {
+  if (!baseSlug) return [];
+
+  const candidates: string[] = [baseSlug];
+  if (typeof year === 'number' && Number.isFinite(year) && year >= 1000) {
+    candidates.push(`${baseSlug}-${year}`);
+  }
+
+  for (let i = 2; i <= 100; i++) {
+    // Avoid re-emitting a year-shaped suffix already preferred above.
+    if (typeof year === 'number' && i === year) continue;
+    candidates.push(`${baseSlug}-${i}`);
+  }
+
+  return candidates;
+}
+
+/**
+ * Generate a unique slug for content, handling collisions with year then -2, -3.
  */
 export async function generateUniqueSlug(
   creatorProfileId: string,
   title: string,
   contentType: ContentType,
-  existingId?: string
+  existingId?: string,
+  options?: GenerateUniqueSlugOptions
 ): Promise<string> {
   const baseSlug = generateBaseSlug(title);
 
@@ -181,16 +214,12 @@ export async function generateUniqueSlug(
     contentType,
   };
 
-  // Try the base slug first
-  if (await isSlugAvailable(creatorProfileId, baseSlug, excludeOptions)) {
-    return baseSlug;
-  }
-
-  // Try with numeric suffixes
-  for (let i = 2; i <= 100; i++) {
-    const numberedSlug = `${baseSlug}-${i}`;
-    if (await isSlugAvailable(creatorProfileId, numberedSlug, excludeOptions)) {
-      return numberedSlug;
+  for (const candidate of buildSlugDisambiguationCandidates(
+    baseSlug,
+    options?.year
+  )) {
+    if (await isSlugAvailable(creatorProfileId, candidate, excludeOptions)) {
+      return candidate;
     }
   }
 

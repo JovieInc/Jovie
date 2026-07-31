@@ -12,6 +12,10 @@ import {
   linkEntityMentions,
 } from '@/lib/profile/entity-mentions';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
+import {
+  isPaymentSupportPlatform,
+  sanitizePublicHref,
+} from '@/lib/utils/public-url';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
 interface AeoReleaseFact {
@@ -142,18 +146,23 @@ function formatPrice(cents: number | null | undefined): string | null {
   }).format(cents / 100);
 }
 
+/** Absolute URL for share/meta surfaces that require a full origin. */
 function absoluteProfileUrl(handle: string): string {
   return new URL(`/${encodeURIComponent(handle)}`, BASE_URL).toString();
 }
 
-function absoluteProfilePath(handle: string, path = ''): string {
-  return new URL(`/${encodeURIComponent(handle)}${path}`, BASE_URL).toString();
+/**
+ * Environment-safe same-origin profile paths for FAQ source links.
+ * Relative paths keep staging/preview from hard-linking production jov.ie.
+ */
+function profilePath(handle: string, path = ''): string {
+  return `/${encodeURIComponent(handle)}${path}`;
 }
 
 function getProfileSource(artist: Artist): ProfileAeoSource {
   return {
     label: 'Jovie profile',
-    href: absoluteProfileUrl(artist.handle),
+    href: profilePath(artist.handle),
   };
 }
 
@@ -186,7 +195,7 @@ function getReleaseSource(
   if (slug) {
     return {
       label: 'Jovie release page',
-      href: absoluteProfilePath(artist.handle, `/${encodeURIComponent(slug)}`),
+      href: profilePath(artist.handle, `/${encodeURIComponent(slug)}`),
     };
   }
 
@@ -236,8 +245,17 @@ function getUniqueGenres(
   );
 }
 
+function getHometown(artist: Artist): string | null {
+  return cleanText(artist.hometown);
+}
+
+function getBasedLocation(artist: Artist): string | null {
+  return cleanText(artist.location);
+}
+
+/** Prefer hometown for origin phrasing; fall back to current location. */
 function getOrigin(artist: Artist): string | null {
-  return cleanText(artist.hometown) ?? cleanText(artist.location);
+  return getHometown(artist) ?? getBasedLocation(artist);
 }
 
 function pluralize(count: number, singular: string, plural = `${singular}s`) {
@@ -265,9 +283,17 @@ function buildFacts(
     });
   }
 
-  const origin = getOrigin(artist);
-  if (origin) {
-    facts.push({ label: 'Hometown', value: origin });
+  const hometown = getHometown(artist);
+  const based = getBasedLocation(artist);
+
+  // Keep hometown vs based/current location explicit when both exist.
+  if (hometown) {
+    facts.push({ label: 'Hometown', value: hometown });
+  }
+  if (based && based !== hometown) {
+    facts.push({ label: 'Based In', value: based });
+  } else if (!hometown && based) {
+    facts.push({ label: 'Based In', value: based });
   }
 
   return facts;
@@ -292,8 +318,11 @@ function buildLinkSections(
   const seenPlatforms = new Set<string>();
 
   for (const link of socialLinks) {
-    const url = cleanText(link.url);
+    const url = sanitizePublicHref(link.url);
     if (!url) continue;
+
+    // Payment/support links live in tip flows — keep them out of Follow.
+    if (isPaymentSupportPlatform(link.platform)) continue;
 
     const key = normalizePlatformKey(link.platform) ?? link.platform;
     if (seenPlatforms.has(key)) continue;
@@ -322,7 +351,7 @@ function buildLinkSections(
   ] as const;
 
   for (const fallback of dspColumnFallbacks) {
-    const url = cleanText(fallback.url);
+    const url = sanitizePublicHref(fallback.url);
     if (!url || seenPlatforms.has(fallback.platform)) continue;
     seenPlatforms.add(fallback.platform);
 
@@ -359,13 +388,16 @@ function buildDescription(params: {
   } = params;
   const origin = getOrigin(artist);
   const genrePhrase =
-    genres.length > 0 ? ` working in ${formatList(genres.slice(0, 3))}` : '';
+    genres.length > 0
+      ? ` known for ${formatList(genres.slice(0, 3))} music`
+      : '';
   const originPhrase = origin ? ` from ${origin}` : '';
   const activePhrase = artist.active_since_year
     ? `, active since ${artist.active_since_year}`
     : '';
 
-  const lead = `${artist.name} is an artist${genrePhrase}${originPhrase}${activePhrase}. Their public Jovie profile is @${artist.handle}.`;
+  // Avoid pronoun mismatch ("Their") and awkward generated boilerplate.
+  const lead = `${artist.name} is an artist${genrePhrase}${originPhrase}${activePhrase}. Find ${artist.name} on Jovie at @${artist.handle}.`;
   const description = [lead];
   const bio = cleanText(artist.tagline);
   if (bio) {
@@ -400,8 +432,23 @@ function buildDescription(params: {
   }
 
   if (collaborators.length > 0) {
+    const creditReleases = releases
+      .filter(release =>
+        (release.artistNames ?? []).some(
+          name =>
+            !sameArtistName(name, artist.name) &&
+            !sameArtistName(name, artist.handle)
+        )
+      )
+      .slice(0, 2)
+      .map(release => release.title)
+      .filter(Boolean);
+    const releaseContext =
+      creditReleases.length > 0
+        ? ` on ${formatList(creditReleases.map(title => `"${title}"`))}`
+        : '';
     description.push(
-      `Recent release credits on the profile also mention ${formatList(collaborators)}.`
+      `Collaborators credited${releaseContext} include ${formatList(collaborators)}.`
     );
   }
 
@@ -467,7 +514,7 @@ function buildTouringFaq(params: {
   readonly artist: Artist;
   readonly tourDates: readonly TourDateViewModel[];
   readonly now: Date;
-}): ProfileAeoFaqItem {
+}): ProfileAeoFaqItem | null {
   const { artist, tourDates, now } = params;
   const upcomingTourDates = [...tourDates]
     .filter(tourDate => isUpcomingTourDate(tourDate, now))
@@ -477,58 +524,46 @@ function buildTouringFaq(params: {
     );
   const nextTourDate = upcomingTourDates[0] ?? null;
 
-  if (nextTourDate) {
-    const date = formatDate(nextTourDate.startDate);
-    return {
-      question: `Is ${artist.name} touring?`,
-      answer: `Yes. ${artist.name} has ${pluralize(upcomingTourDates.length, 'upcoming show')} listed on Jovie; the next listed date is${date ? ` ${date}` : ''} at ${formatTourLocation(nextTourDate)}.`,
-      source: nextTourDate.ticketUrl
-        ? { label: 'Ticket listing', href: nextTourDate.ticketUrl }
-        : {
-            label: 'Jovie tour dates',
-            href: absoluteProfilePath(artist.handle, '/tour'),
-          },
-    };
+  if (!nextTourDate) {
+    // Empty touring FAQ is intentionally omitted from the public surface.
+    return null;
   }
 
+  const date = formatDate(nextTourDate.startDate);
   return {
     question: `Is ${artist.name} touring?`,
-    answer: `No upcoming tour dates are listed on ${artist.name}'s public Jovie profile right now.`,
-    source: {
-      label: 'Jovie tour dates',
-      href: absoluteProfilePath(artist.handle, '/tour'),
-    },
+    answer: `Yes. ${artist.name} has ${pluralize(upcomingTourDates.length, 'upcoming show')} listed on Jovie; the next listed date is${date ? ` ${date}` : ''} at ${formatTourLocation(nextTourDate)}.`,
+    source: nextTourDate.ticketUrl
+      ? { label: 'Ticket listing', href: nextTourDate.ticketUrl }
+      : {
+          label: 'Jovie tour dates',
+          href: profilePath(artist.handle, '/tour'),
+        },
   };
 }
 
 function buildMerchFaq(params: {
   readonly artist: Artist;
   readonly merchCards: readonly PublicMerchCard[];
-}): ProfileAeoFaqItem {
+}): ProfileAeoFaqItem | null {
   const { artist, merchCards } = params;
   const primaryCard = merchCards[0] ?? null;
 
-  if (primaryCard) {
-    const price = formatPrice(primaryCard.retailPriceCents);
-    return {
-      question: `Where can I buy ${artist.name} merch?`,
-      answer: `Official ${artist.name} merch is available on Jovie. The current featured item is "${primaryCard.title}", a ${primaryCard.productType}${price ? ` priced at ${price}` : ''}.`,
-      source: {
-        label: 'Official merch card',
-        href: absoluteProfilePath(
-          artist.handle,
-          `/merch/${encodeURIComponent(primaryCard.id)}`
-        ),
-      },
-    };
+  if (!primaryCard) {
+    // Empty merch FAQ is intentionally omitted from the public surface.
+    return null;
   }
 
+  const price = formatPrice(primaryCard.retailPriceCents);
   return {
     question: `Where can I buy ${artist.name} merch?`,
-    answer: `No official ${artist.name} merch items are listed on Jovie right now.`,
+    answer: `Official ${artist.name} merch is available on Jovie. The current featured item is "${primaryCard.title}", a ${primaryCard.productType}${price ? ` priced at ${price}` : ''}.`,
     source: {
-      label: 'Jovie shop',
-      href: absoluteProfilePath(artist.handle, '/shop'),
+      label: 'Official merch card',
+      href: profilePath(
+        artist.handle,
+        `/merch/${encodeURIComponent(primaryCard.id)}`
+      ),
     },
   };
 }
@@ -581,6 +616,6 @@ export function buildProfileAeoContent({
       buildLatestReleaseFaq({ artist, latestRelease, releases, socialLinks }),
       buildTouringFaq({ artist, tourDates, now }),
       buildMerchFaq({ artist, merchCards }),
-    ],
+    ].filter((faq): faq is ProfileAeoFaqItem => faq !== null),
   };
 }

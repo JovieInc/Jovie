@@ -16,7 +16,8 @@
  *
  * Design tokens used:
  * - Border radius: concentric overlay surfaces/rows, rounded-full triggers
- * - Background: bg-surface-0 (elevated)
+ * - Background: bg-surface-elevated (floating menus/popovers; shell remaps
+ *   under [data-app-shell-frame] for Noir Ion D)
  * - Border: border-default (uses design token for both modes)
  * - Shadow: consistent across all variants
  * - Transition: duration-fast ease-interactive
@@ -48,9 +49,17 @@ export const DROPDOWN_SLIDE_ANIMATIONS = '';
  * Used by: DropdownMenuContent, ContextMenuContent, PopoverContent, SelectContent
  *
  * Border uses --color-border-default (slightly more opaque than --color-border-subtle used by separators)
+ * Background uses --color-bg-elevated so overlays lift above recessed wells/content.
  */
 export const OVERLAY_SURFACE_BASE =
-  'border border-default bg-surface-0 text-primary-token shadow-popover';
+  'border border-default bg-surface-elevated text-primary-token shadow-popover';
+
+/**
+ * Tooltip surface — floating elevation (shell remaps --color-bg-tooltip).
+ * Radius rules stay on the component (compact pill vs rich rectangle).
+ */
+export const TOOLTIP_SURFACE_BASE =
+  'border border-default bg-surface-tooltip text-primary-token shadow-popover';
 
 /**
  * The shared rounded rectangle used by wrapped overlay content.
@@ -373,7 +382,7 @@ export const searchableSubMenuContentClasses = [
  * Compact base — currently equivalent to DROPDOWN_CONTENT_BASE; retained for future divergence
  */
 export const DROPDOWN_CONTENT_COMPACT_BASE =
-  'z-50 min-w-48 overflow-hidden rounded-(--system-b-radius-overlay) border border-default bg-surface-0 p-0.5 text-primary-token shadow-popover';
+  'z-50 min-w-48 overflow-hidden rounded-(--system-b-radius-overlay) border border-default bg-surface-elevated p-0.5 text-primary-token shadow-popover';
 
 /**
  * Complete compact DropdownMenu content classes

@@ -90,7 +90,7 @@ export function ProfileNavButton({
                 } catch {}
               }}
             >
-              View on mobile
+              Open On Phone
             </DropdownMenuItem>
           )}
 

@@ -13,9 +13,27 @@
   background-color: var(--system-b-cinematic-black);
 }
 
+.ap-hero__atmosphere {
+  background:
+    radial-gradient(
+      60% 48% at 50% 18%,
+      color-mix(in oklab, var(--color-accent) 14%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      48% 40% at 78% 72%,
+      color-mix(in oklab, var(--color-text-primary-token) 5%, transparent),
+      transparent 72%
+    );
+}
+
 .ap-hero__inner {
   min-height: 72svh;
   padding-top: calc(var(--public-shell-header-offset) + 4rem);
+}
+
+.ap-hero__focal {
+  width: min(100%, 26rem);
 }
 
 @media (min-width: 40rem) {

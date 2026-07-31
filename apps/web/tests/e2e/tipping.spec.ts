@@ -248,7 +248,7 @@ test.describe('Tipping MVP', () => {
         // Check that the QR code overlay is visible
         const qrOverlay = page
           .locator('div')
-          .filter({ hasText: 'View on mobile' });
+          .filter({ hasText: 'Open On Phone' });
         await expect(qrOverlay).toBeVisible({
           timeout: SMOKE_TIMEOUTS.VISIBILITY,
         });
@@ -273,7 +273,7 @@ test.describe('Tipping MVP', () => {
 
         // Reopen button should be visible
         const reopenButton = page.getByRole('button', {
-          name: 'View on mobile',
+          name: 'Open On Phone',
         });
         await expect(reopenButton).toBeVisible({
           timeout: SMOKE_TIMEOUTS.VISIBILITY,

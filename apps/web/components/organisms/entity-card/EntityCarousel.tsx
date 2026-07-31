@@ -194,22 +194,26 @@ export function EntityCarousel({
     return null;
   }
 
+  // profile-landscape is full-bleed snap: gap would peek a clipped CTA from
+  // the next card. Portrait keeps a gap for intentional card preview.
+  const isProfileLandscape = layout === 'profile-landscape';
   const cardItemClassName = cn(
     CARD_ITEM_CLASSNAME,
-    layout === 'profile-landscape' && 'w-full'
+    isProfileLandscape && 'w-full'
   );
 
   return (
     <div
       className={cn(
         'group/carousel relative min-h-0',
-        layout === 'profile-landscape' ? 'h-fit w-full' : 'h-full'
+        isProfileLandscape ? 'h-fit w-full' : 'h-full'
       )}
     >
       <ul
         ref={trackRef}
         className={cn(
-          'profile-horizontal-rail flex h-full snap-x snap-mandatory list-none items-stretch gap-3 overflow-x-auto overflow-y-hidden overscroll-x-contain',
+          'profile-horizontal-rail flex h-full snap-x snap-mandatory list-none items-stretch overflow-x-auto overflow-y-hidden overscroll-x-contain',
+          isProfileLandscape ? 'gap-0' : 'gap-3',
           className
         )}
         data-testid={dataTestId ?? 'entity-carousel'}

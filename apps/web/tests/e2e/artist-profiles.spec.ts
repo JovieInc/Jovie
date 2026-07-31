@@ -112,6 +112,10 @@ test.describe('Artist Profiles Landing', () => {
     ).toBeVisible();
     await expect(claimButton).toBeVisible();
     await expect(page.getByLabel(/choose your handle/i)).toBeVisible();
+    await expect(page.getByTestId('homepage-claim-support')).toContainText(
+      /free to start/i
+    );
+    await expect(page.getByText('Built for artists')).toHaveCount(0);
     await expectFullyInViewport(page, claimForm);
     await expectFullyInViewport(page, claimButton);
 
@@ -150,8 +154,9 @@ test.describe('Artist Profiles Landing', () => {
     ).toBeVisible();
     await expect(page.getByTestId('final-cta-action')).toHaveAttribute(
       'href',
-      '/signup'
+      /\/start/
     );
+    await expect(finalCta.getByText(/free to start/i)).toBeVisible();
   });
 
   test('singular artist-profile alias preserves the canonical experience', async ({
