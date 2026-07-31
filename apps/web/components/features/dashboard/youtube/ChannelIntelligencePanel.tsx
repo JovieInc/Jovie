@@ -235,11 +235,7 @@ export function ChannelIntelligencePanel({
               </h3>
               <ContentSurfaceCard className='divide-y divide-subtle p-0'>
                 {report.decliningVideos.map(video => (
-                  <RankedVideoRow
-                    key={video.videoId}
-                    video={video}
-                    showTrend
-                  />
+                  <RankedVideoRow key={video.videoId} video={video} showTrend />
                 ))}
               </ContentSurfaceCard>
             </div>
@@ -248,8 +244,7 @@ export function ChannelIntelligencePanel({
           {/* Sources footnote */}
           {report.sources.length > 0 ? (
             <p className='text-xs text-tertiary-token'>
-              Sources:{' '}
-              {report.sources.map(s => s.label).join(' · ')}
+              Sources: {report.sources.map(s => s.label).join(' · ')}
             </p>
           ) : null}
         </>

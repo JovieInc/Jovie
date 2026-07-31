@@ -91,10 +91,8 @@ export const PUBLIC_SKILL_REGISTRY = {
     activeVersion: '1.0.0',
     entitlement: 'aiCanUseTools',
     model: 'anthropic/claude-haiku-4-5-20251001',
-    inputSchemaZodPath:
-      'apps/web/lib/services/channel-intelligence/types.ts',
-    outputSchemaZodPath:
-      'apps/web/lib/services/channel-intelligence/types.ts',
+    inputSchemaZodPath: 'apps/web/lib/services/channel-intelligence/types.ts',
+    outputSchemaZodPath: 'apps/web/lib/services/channel-intelligence/types.ts',
     metadata: {
       surface: 'youtube',
       action: 'channel_intelligence_report',
