@@ -56,14 +56,25 @@ describe('@critical GET /api/health/build-info', () => {
     expect(body.commitSha).toBe('abcdef1');
   });
 
-  it('marks build info as no-store so desktop reload polling sees fresh deploys', async () => {
+  it('marks build info as no-store at browser and CDN layers (JOV-1958)', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('NEXT_PUBLIC_BUILD_SHA', 'abcdef1');
 
-    const { GET } = await import('@/app/api/health/build-info/route');
+    const { BUILD_INFO_CACHE_HEADERS, GET } = await import(
+      '@/app/api/health/build-info/route'
+    );
     const response = GET();
 
-    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('cache-control')).toBe(
+      BUILD_INFO_CACHE_HEADERS['cache-control']
+    );
+    expect(response.headers.get('cdn-cache-control')).toBe('no-store');
+    expect(response.headers.get('vercel-cdn-cache-control')).toBe('no-store');
+    expect(response.headers.get('pragma')).toBe('no-cache');
+    expect(response.headers.get('expires')).toBe('0');
+    // Must never advertise a positive shared cache lifetime.
+    expect(response.headers.get('cache-control')).not.toMatch(/s-maxage=\d+/);
+    expect(response.headers.get('cache-control')).not.toMatch(/max-age=[1-9]/);
   });
 
   it('returns development build id without warning in development', async () => {

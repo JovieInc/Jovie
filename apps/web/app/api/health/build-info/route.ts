@@ -10,6 +10,20 @@ import releaseInfo from '../../../../../../version.json';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+/**
+ * Build-info is the public production identity receipt (JOV-1958). It must
+ * never be edge- or browser-cached: a stale commitSha after promote is a
+ * false production proof. Keep CDN + browser directives aligned with
+ * next.config.js `/api/health/*` headers.
+ */
+export const BUILD_INFO_CACHE_HEADERS = {
+  'cache-control': 'private, no-cache, no-store, must-revalidate',
+  'cdn-cache-control': 'no-store',
+  'vercel-cdn-cache-control': 'no-store',
+  pragma: 'no-cache',
+  expires: '0',
+} as const;
+
 let _cachedBuildId: string | undefined;
 
 function resolveAppVersion(): string {
@@ -27,12 +41,18 @@ function resolveAppVersion(): string {
   return '0.0.0';
 }
 
+function resolveCommitSha(): string | undefined {
+  const buildSha = env.NEXT_PUBLIC_BUILD_SHA?.trim().slice(0, 7);
+  const runtimeCommitSha = env.VERCEL_GIT_COMMIT_SHA?.trim().slice(0, 7);
+  // Prefer build-time SHA when present (inlined for prebuilt artifacts). Fall
+  // back to the runtime Vercel deployment SHA so CLI deploys still identify.
+  return buildSha || runtimeCommitSha || undefined;
+}
+
 export function GET() {
   const version = resolveAppVersion();
   const environment = env.VERCEL_ENV;
   const isDevelopment = env.NODE_ENV !== 'production';
-  const buildSha = env.NEXT_PUBLIC_BUILD_SHA?.trim().slice(0, 7);
-  const runtimeCommitSha = env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7);
 
   if (_cachedBuildId === undefined) {
     try {
@@ -55,13 +75,11 @@ export function GET() {
       buildId: _cachedBuildId,
       version,
       deployedAt: env.VERCEL_DEPLOYMENT_TIME || Date.now(),
-      commitSha: buildSha || runtimeCommitSha,
+      commitSha: resolveCommitSha(),
       environment,
     },
     {
-      headers: {
-        'cache-control': 'no-store',
-      },
+      headers: { ...BUILD_INFO_CACHE_HEADERS },
     }
   );
 }
