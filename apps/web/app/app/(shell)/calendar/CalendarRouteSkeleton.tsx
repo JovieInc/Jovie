@@ -55,27 +55,32 @@ export function CalendarRouteSkeleton() {
       aria-busy='true'
       aria-label='Loading Calendar'
       aria-live='polite'
+      contentPadding='none'
       toolbar={
         <PageToolbar
-          start={<div className='skeleton h-4 w-56 rounded-md' />}
-          end={
-            <div className='flex flex-wrap items-center justify-end gap-1'>
-              <div className='skeleton h-7 w-12 rounded-full' />
-              <div className='skeleton h-7 w-20 rounded-full' />
-              <div className='skeleton h-7 w-16 rounded-full' />
-              <div className='skeleton h-7 w-28 rounded-full' />
-            </div>
-          }
+          start={<div className='skeleton h-7 w-56 rounded-full' />}
+          end={<div className='skeleton h-7 w-12 rounded-full' />}
         />
       }
     >
-      <PageContent>
-        <div className='flex h-full min-h-0 flex-col gap-4'>
-          <div className='flex flex-wrap items-center justify-between gap-2'>
-            <div className='skeleton h-7 w-40 rounded-md' />
-            <div className='skeleton h-7 w-16 rounded-md' />
+      <PageContent className='px-3 py-2 sm:px-3 sm:py-2'>
+        <div className='grid h-full min-h-0 grid-cols-1 gap-3 lg:grid-cols-[9rem_minmax(0,1fr)]'>
+          <div
+            aria-hidden='true'
+            data-testid='calendar-filter-rail-skeleton'
+            className='flex min-w-0 gap-1 overflow-hidden pb-0.5 lg:flex-col lg:overflow-visible lg:pb-0'
+          >
+            {['all', 'releases', 'events', 'review'].map(key => (
+              <div
+                key={key}
+                className='skeleton h-7 w-20 shrink-0 rounded-full lg:w-full'
+              />
+            ))}
           </div>
-          <div className='overflow-hidden rounded-xl border border-subtle'>
+          <div
+            data-testid='calendar-grid-skeleton'
+            className='overflow-hidden rounded-xl border border-subtle'
+          >
             <div className='grid grid-cols-7 border-b border-subtle'>
               {CALENDAR_WEEKDAY_KEYS.map(key => (
                 <div key={key} className='px-2 py-2'>
