@@ -22,6 +22,14 @@ describe('production auth smoke session contract', () => {
     expect(source).toContain("readyView: 'releases'");
     expect(source).toContain('await page.waitForURL(');
     expect(source).toContain('await waitForProductionDashboardContent(');
+    expect(
+      source.match(/await verifyProductionIosOAuthTokenFlow\(/gu)
+    ).toHaveLength(1);
+    expect(source).toContain("grant_type: 'authorization_code'");
+    expect(source).toContain("grant_type: 'refresh_token'");
+    expect(source).toContain('/api/auth/oauth2/userinfo');
+    expect(source).toContain('/api/auth/oauth2/revoke');
+    expect(source).toContain('recordPlaywrightSensitiveValues(');
     const tabNavigation = source.split('const tabs = ')[1];
     expect(tabNavigation).toBeDefined();
     expect(tabNavigation).not.toContain('.isVisible({ timeout:');
