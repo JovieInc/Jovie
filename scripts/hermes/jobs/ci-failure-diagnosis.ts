@@ -7,6 +7,7 @@ export type CiFailureClass =
   | 'required_smoke_suppressed_by_dependency_skip'
   | 'storybook_browser_iframe_transport'
   | 'lighthouse_protocol_timeout'
+  | 'lighthouse_job_deadline'
   | 'lighthouse_loopback_origin_drift'
   | 'lighthouse_deterministic_assertion'
   | 'bounded_source_scan_timeout'
@@ -199,6 +200,18 @@ const DIAGNOSES: ReadonlyArray<{
       'Do not retry. Fix the named audit, fixture, or threshold regression and rerun the affected Lighthouse route once the exact assertion is addressed.',
   },
   {
+    failureClass: 'lighthouse_job_deadline',
+    matches: log =>
+      /LIGHTHOUSE_FAILURE_CLASS=job_deadline\b/i.test(log) &&
+      /(?:Lighthouse job deadline|LIGHTHOUSE_MIN_ATTEMPT_BUDGET_MS|LIGHTHOUSE_REMAINING_MS)/i.test(
+        log
+      ),
+    rootCause:
+      'Production Lighthouse stopped before the GitHub 20-minute job cancel because the remaining wall-clock budget could not fit another full per-route numberOfRuns attempt after a transient Chrome protocol failure or slow collect.',
+    remediation:
+      'Do not weaken assertions or accept incomplete evidence. Inspect the job_deadline receipt (route, remainingMs, minAttemptBudgetMs, completed routes). If setup is eating the budget, speed setup; if protocol flakes dominate, collect Chrome process/memory diagnostics. Rerun only the exact Production Controller for the same main SHA.',
+  },
+  {
     failureClass: 'lighthouse_protocol_timeout',
     matches: log =>
       /LIGHTHOUSE_FAILURE_CLASS=transient_protocol\b/i.test(log) &&
@@ -208,7 +221,7 @@ const DIAGNOSES: ReadonlyArray<{
     rootCause:
       'Lighthouse lost the Chrome DevTools protocol transport while collecting evidence; this is a browser/tooling failure rather than a product threshold assertion.',
     remediation:
-      "Use only the wrapper's bounded transient retry. If it exhausts, stop and collect the protocol method, Chrome process, memory, open-file, and runner-pressure diagnostics; do not add another workflow rerun or weaken assertions.",
+      "Use only the wrapper's bounded transient per-route retry under the job deadline. If it exhausts, stop and collect the protocol method, Chrome process, memory, open-file, and runner-pressure diagnostics; do not add another workflow rerun or weaken assertions.",
   },
   {
     failureClass: 'runner_image_proof_disk_exhaustion',

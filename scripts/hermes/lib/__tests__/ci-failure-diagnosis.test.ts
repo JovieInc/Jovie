@@ -65,7 +65,18 @@ LIGHTHOUSE_FAILURE_CLASS=transient_protocol LIGHTHOUSE_ATTEMPT=3/3`);
 
     expect(diagnosis.failureClass).toBe('lighthouse_protocol_timeout');
     expect(diagnosis.rootCause).toContain('Chrome DevTools protocol');
-    expect(diagnosis.remediation).toContain('bounded transient retry');
+    expect(diagnosis.remediation).toContain('bounded transient');
+  });
+
+  it('classifies production Lighthouse job-deadline exits separately from protocol exhaustion', () => {
+    const diagnosis = diagnoseCiFailure(`Lighthouse CI (Production)
+PROTOCOL_TIMEOUT: DOMSnapshot.disable
+LIGHTHOUSE_FAILURE_CLASS=job_deadline LIGHTHOUSE_ATTEMPT=2/3 LIGHTHOUSE_ROUTE=/tim LIGHTHOUSE_REMAINING_MS=120000 LIGHTHOUSE_MIN_ATTEMPT_BUDGET_MS=390000
+Lighthouse job deadline exhausted before route /tim; refusing incomplete production evidence.`);
+
+    expect(diagnosis.failureClass).toBe('lighthouse_job_deadline');
+    expect(diagnosis.rootCause).toContain('20-minute job');
+    expect(diagnosis.remediation).toContain('incomplete evidence');
   });
 
   it('stops Lighthouse assertion failures without retrying', () => {
