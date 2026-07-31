@@ -98,20 +98,35 @@ vi.mock('@/components/jovie/components', () => ({
     HTMLTextAreaElement,
     {
       readonly isSubmitting: boolean;
+      readonly dictationEnabled?: boolean;
       readonly onChange: (value: string) => void;
       readonly onSubmit: (event?: FormEvent) => void;
+      readonly placeholder?: string;
       readonly statusBanner?: ReactNode;
       readonly value: string;
     }
   >(function MockChatInput(
-    { isSubmitting, onChange, onSubmit, statusBanner, value },
+    {
+      dictationEnabled,
+      isSubmitting,
+      onChange,
+      onSubmit,
+      placeholder,
+      statusBanner,
+      value,
+    },
     ref
   ) {
     return (
-      <form onSubmit={onSubmit}>
+      <form
+        onSubmit={onSubmit}
+        data-dictation-enabled={dictationEnabled ? 'true' : 'false'}
+        data-has-status-banner={statusBanner ? 'true' : 'false'}
+      >
         <textarea
           ref={ref}
           aria-label='Chat Message Input'
+          placeholder={placeholder}
           value={value}
           onChange={event => onChange(event.currentTarget.value)}
         />
@@ -267,6 +282,10 @@ describe('OnboardingChat Turnstile gating', () => {
 
     expect(screen.getByTestId('onboarding-centered-composer')).toBeVisible();
     expect(screen.queryByTestId('onboarding-composer-dock')).toBeNull();
+    expect(screen.getByLabelText('Chat Message Input')).toHaveAttribute(
+      'placeholder',
+      'Artist, release, or link...'
+    );
 
     chatMocks.messages = [
       {
@@ -279,6 +298,10 @@ describe('OnboardingChat Turnstile gating', () => {
 
     expect(screen.getByTestId('onboarding-centered-composer')).toBeVisible();
     expect(screen.queryByTestId('onboarding-composer-dock')).toBeNull();
+    expect(screen.getByLabelText('Chat Message Input')).toHaveAttribute(
+      'placeholder',
+      'Reply to Jovie…'
+    );
 
     chatMocks.messages = [
       ...chatMocks.messages,
@@ -316,7 +339,7 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(screen.getByLabelText('Chat Message Input')).toHaveValue(
       'Hey, I want to get access to Jovie.'
     );
-    expect(screen.getByTestId('onboarding-turnstile-slot')).toHaveClass(
+    expect(screen.getByTestId('onboarding-flow-status')).toHaveClass(
       'min-h-[10rem]'
     );
     expect(screen.getByTestId('test-turnstile-panel')).toBeInTheDocument();
@@ -344,8 +367,14 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(onTurnstileRequired).toHaveBeenCalledWith(
       'Verify you are human to send'
     );
-    expect(screen.getByTestId('onboarding-turnstile-slot')).toBeInTheDocument();
+    expect(screen.getByTestId('onboarding-flow-status')).toBeInTheDocument();
     expect(screen.getByTestId('test-turnstile-panel')).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Chat Message Input').closest('form')
+    ).toHaveAttribute('data-has-status-banner', 'false');
+    expect(
+      screen.getByLabelText('Chat Message Input').closest('form')
+    ).toHaveAttribute('data-dictation-enabled', 'false');
   });
 
   it('auto-submits a starter prompt once when verification is ready', async () => {
@@ -559,12 +588,11 @@ describe('OnboardingChat Turnstile gating', () => {
     );
 
     errorMocks.metadata = {
-      errorCode: 'TURNSTILE_REQUIRED',
-      message: 'Bot challenge failed',
+      message: 'Network interrupted',
       requestId: 'req-1',
     };
     act(() => {
-      chatMocks.onError?.(new Error('Bot challenge failed'));
+      chatMocks.onError?.(new Error('Network interrupted'));
     });
 
     chatMocks.sendMessage.mockClear();
@@ -610,12 +638,12 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(chatMocks.setMessages).toHaveBeenCalled();
     expect(chatMocks.messages).toEqual([]);
     expect(onTurnstileRejected).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId('onboarding-message-recovery')).toHaveTextContent(
-      'Complete the security check to send your message.'
-    );
     expect(
-      screen.getByTestId('onboarding-message-recovery')
-    ).not.toHaveTextContent('Bot challenge failed');
+      screen.queryByTestId('onboarding-message-recovery')
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('onboarding-flow-status')).toHaveTextContent(
+      'Verify you are human to send'
+    );
     expect(screen.getByLabelText('Chat Message Input')).toHaveValue(
       'I am Test Artist'
     );
@@ -722,7 +750,7 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(screen.getByText('Verify you are human to send')).toBeVisible();
 
     chatMocks.sendMessage.mockClear();
-    fireEvent.click(screen.getByRole('button', { name: 'Retry message' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
 
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Chat Message Input')).toHaveValue(

@@ -476,23 +476,23 @@ function getDisplayMessages(
   ];
 }
 
-interface ComposerStatusBannerProps {
+interface OnboardingFlowStatusProps {
   readonly reserveTurnstileSpace?: boolean;
   readonly shouldShowTurnstileBanner: boolean;
   readonly turnstilePanel: ReactNode;
 }
 
-function ComposerStatusBanner({
+function OnboardingFlowStatus({
   reserveTurnstileSpace = false,
   shouldShowTurnstileBanner,
   turnstilePanel,
-}: ComposerStatusBannerProps) {
+}: OnboardingFlowStatusProps) {
   if (!shouldShowTurnstileBanner) return null;
 
   return (
     <div
       className={reserveTurnstileSpace ? 'min-h-[10rem]' : undefined}
-      data-testid='onboarding-turnstile-slot'
+      data-testid='onboarding-flow-status'
     >
       {turnstilePanel}
     </div>
@@ -962,8 +962,8 @@ export function OnboardingChat({
     (isAwaitingFirstToken ||
       shouldReserveStarterVerification ||
       verificationRequested);
-  const composerStatusBanner = shouldShowTurnstileBanner ? (
-    <ComposerStatusBanner
+  const flowStatus = shouldShowTurnstileBanner ? (
+    <OnboardingFlowStatus
       reserveTurnstileSpace={shouldReserveStarterVerification}
       shouldShowTurnstileBanner={shouldShowTurnstileBanner}
       turnstilePanel={turnstilePanel}
@@ -995,25 +995,26 @@ export function OnboardingChat({
     isSubmitting: isSubmitted,
     isStreaming,
     onStop: stop,
-    // Raw "Securing chat..." text is replaced in follow-up pass with
-    // statusBanner skeleton treatment. Handle step gets a confirm-oriented
-    // placeholder so incomplete free-text is less tempting.
     placeholder: handleDraft
       ? 'Confirm handle or type a different one…'
-      : 'Artist, release, or link...',
+      : hasConversationStarted
+        ? 'Reply to Jovie…'
+        : 'Artist, release, or link...',
+    dictationEnabled: false,
     onPickerOpenChange: setComposerPickerOpen,
     chips: chipTray.chips,
     onRemoveChipAt: chipTray.removeAt,
     onRemoveLastChip: chipTray.removeLast,
     onAddSkill: chipTray.addSkill,
     onAddEntity: chipTray.addEntity,
-    statusBanner: composerStatusBanner,
   } as const;
+  const sendLocalError =
+    chatError?.errorCode === 'TURNSTILE_REQUIRED' ? null : chatError;
   const onboardingComposerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
-      {chatError ? (
+      {sendLocalError ? (
         <OnboardingMessageRecoveryRow
-          chatError={chatError}
+          chatError={sendLocalError}
           handleRetry={handleRetry}
           isBusy={isBusy}
           isSubmitted={isSubmitted}
@@ -1047,6 +1048,7 @@ export function OnboardingChat({
             !shouldDockComposer && 'justify-center'
           )}
         >
+          {flowStatus}
           <OnboardingMessageRegion
             composerPickerOpen={composerPickerOpen}
             displayMessages={displayMessages}

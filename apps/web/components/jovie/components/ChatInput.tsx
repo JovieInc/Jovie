@@ -97,6 +97,8 @@ export interface ChatInputProps {
   readonly profileId?: string;
   /** Optional compact status content rendered inside the composer surface. */
   readonly statusBanner?: ReactNode;
+  /** Enables the shared dictation affordance when the surrounding flow supports it. */
+  readonly dictationEnabled?: boolean;
 }
 
 type SurfaceMode = 'empty' | 'typing' | 'root' | 'entity';
@@ -238,6 +240,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onPickerOpenChange,
       profileId,
       statusBanner,
+      dictationEnabled = true,
     },
     ref
   ) {
@@ -812,7 +815,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   ) : null}
                   {/* Grid accordion reserves height while animating dictation
                       banner in/out — avoids the ~64px jump (JOV-11948). */}
-                  {isDictationSupported ? (
+                  {dictationEnabled && isDictationSupported ? (
                     <div
                       className={cn(
                         'grid transition-[grid-template-rows] duration-subtle ease-in-out',
@@ -851,7 +854,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                       plusMenuOpen={plusMenuOpen}
                       setPlusMenuOpen={setPlusMenuOpen}
                       handlePreserveFocus={handlePreserveFocus}
-                      isDictationSupported={isDictationSupported}
+                      dictationEnabled={dictationEnabled}
+                      isDictationSupported={
+                        dictationEnabled && isDictationSupported
+                      }
                       isListening={isListening}
                       handleMicPushStart={handleMicPushStart}
                       handleMicPushEnd={handleMicPushEnd}
@@ -909,7 +915,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
                 {/* Grid accordion reserves height while animating dictation
                     banner in/out — avoids the ~64px jump (JOV-11948). */}
-                {isDictationSupported ? (
+                {dictationEnabled && isDictationSupported ? (
                   <div
                     className={cn(
                       'grid transition-[grid-template-rows] duration-subtle ease-in-out',
@@ -948,7 +954,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   plusMenuOpen={plusMenuOpen}
                   setPlusMenuOpen={setPlusMenuOpen}
                   handlePreserveFocus={handlePreserveFocus}
-                  isDictationSupported={isDictationSupported}
+                  dictationEnabled={dictationEnabled}
+                  isDictationSupported={
+                    dictationEnabled && isDictationSupported
+                  }
                   isListening={isListening}
                   handleMicPushStart={handleMicPushStart}
                   handleMicPushEnd={handleMicPushEnd}
@@ -1023,6 +1032,7 @@ interface InputRowProps {
   readonly handlePreserveFocus: (
     event: React.MouseEvent<HTMLButtonElement>
   ) => void;
+  readonly dictationEnabled: boolean;
   readonly isDictationSupported: boolean;
   readonly isListening: boolean;
   readonly handleMicPushStart: () => void;
@@ -1072,6 +1082,7 @@ function InputRow({
   plusMenuOpen,
   setPlusMenuOpen,
   handlePreserveFocus,
+  dictationEnabled,
   isDictationSupported,
   isListening,
   handleMicPushStart,
@@ -1221,16 +1232,18 @@ function InputRow({
           </div>
 
           <div className='flex shrink-0 items-center gap-2'>
-            <ComposerMicButton
-              isListening={isListening}
-              isLoading={isLoading}
-              isSubmitting={isSubmitting}
-              isSupported={isDictationSupported}
-              onPreserveFocus={handlePreserveFocus}
-              onPushStart={handleMicPushStart}
-              onPushEnd={handleMicPushEnd}
-              onToggle={handleMicToggle}
-            />
+            {dictationEnabled ? (
+              <ComposerMicButton
+                isListening={isListening}
+                isLoading={isLoading}
+                isSubmitting={isSubmitting}
+                isSupported={isDictationSupported}
+                onPreserveFocus={handlePreserveFocus}
+                onPushStart={handleMicPushStart}
+                onPushEnd={handleMicPushEnd}
+                onToggle={handleMicToggle}
+              />
+            ) : null}
 
             <ComposerSendButton
               canSend={canSend}

@@ -472,6 +472,19 @@ describe('ChatInput', () => {
     expect(screen.getByRole('button', { name: /send message/i })).toBeEnabled();
   });
 
+  it('removes dictation chrome when the surrounding flow disables it', () => {
+    installMockSpeechRecognition();
+
+    fastRender(
+      withProviders(<ChatInput {...baseProps} dictationEnabled={false} />)
+    );
+
+    expect(screen.queryByTestId('dictation-toggle')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /dictation|microphone/i })
+    ).not.toBeInTheDocument();
+  });
+
   it('starts push-to-talk dictation on pointer down and stops on release', async () => {
     installMockSpeechRecognition();
 
