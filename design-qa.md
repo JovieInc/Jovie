@@ -68,7 +68,7 @@ is tracked as candidate follow-up JOV-4627.
 - [Mobile implementation](docs/screenshots/profile-latest/profile-rows-after-mobile-final.png)
 - [Mobile side-by-side](docs/screenshots/profile-latest/profile-rows-comparison-mobile-final.png)
 - [Desktop implementation](docs/screenshots/profile-latest/profile-rows-after-desktop-final.png)
-- [Desktop implementation after progressive-disclosure control verification](docs/screenshots/profile-latest/profile-rows-after-desktop-controls-final.png)
+- [Desktop implementation used for control-geometry verification](docs/screenshots/profile-latest/profile-rows-after-desktop-controls-final.png)
 - [Desktop side-by-side](docs/screenshots/profile-latest/profile-rows-comparison-desktop-final.png)
 - [Selected catalog item](docs/screenshots/profile-latest/profile-rows-mobile-second-item-v1.png)
 
@@ -85,10 +85,12 @@ is tracked as candidate follow-up JOV-4627.
    preview and DSP destinations.
 5. Mobile 390 × 844 and desktop 1440 × 900 comparisons found no clipped
    content, awkward wraps, dock movement, or profile-shell layout shift.
-6. The release review found two discovery/state gaps before merge. Capture
-   states now suppress nonessential art so the email form owns the narrow copy
-   column, and desktop previous/next controls reveal on hover or focus while
-   preserving the chromeless resting state.
+6. The release reviews found three disclosure/layout gaps before merge.
+   Capture and success states now keep the media slot invisibly reserved while
+   an absolute overlay uses the full row, preserving geometry. Previous/next
+   controls are centered to the compact row wrapper and only display for
+   fine-pointer hover-capable devices, while keyboard focus and touch swipe
+   retain their native paths.
 
 ## Severity audit
 

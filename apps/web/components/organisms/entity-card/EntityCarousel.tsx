@@ -200,7 +200,12 @@ export function EntityCarousel({
   );
 
   return (
-    <div className='group/carousel relative h-full min-h-0'>
+    <div
+      className={cn(
+        'group/carousel relative min-h-0',
+        layout === 'profile-landscape' ? 'h-fit w-full' : 'h-full'
+      )}
+    >
       <ul
         ref={trackRef}
         className={cn(
@@ -268,7 +273,7 @@ export function EntityCarousel({
             aria-label='Previous Item'
             disabled={currentIndex === 0}
             onClick={() => scrollToIndex(currentIndex - 1)}
-            className='absolute left-1 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-(--profile-pearl-border) bg-(--profile-pearl-bg) text-secondary-token opacity-0 shadow-(--profile-pearl-shadow) backdrop-blur-xl transition-opacity duration-subtle hover:text-primary-token focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:pointer-events-none disabled:invisible group-focus-within/carousel:opacity-100 group-hover/carousel:opacity-100 md:inline-flex'
+            className='absolute left-1 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-(--profile-pearl-border) bg-(--profile-pearl-bg) text-secondary-token opacity-0 shadow-(--profile-pearl-shadow) backdrop-blur-xl transition-opacity duration-subtle [@media(min-width:768px)_and_(hover:hover)_and_(pointer:fine)]:inline-flex hover:text-primary-token focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:pointer-events-none disabled:invisible group-focus-within/carousel:opacity-100 group-hover/carousel:opacity-100'
           >
             <ChevronLeft className='h-4 w-4' aria-hidden='true' />
           </button>
@@ -277,7 +282,7 @@ export function EntityCarousel({
             aria-label='Next Item'
             disabled={currentIndex === slotCount - 1}
             onClick={() => scrollToIndex(currentIndex + 1)}
-            className='absolute right-1 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-(--profile-pearl-border) bg-(--profile-pearl-bg) text-secondary-token opacity-0 shadow-(--profile-pearl-shadow) backdrop-blur-xl transition-opacity duration-subtle hover:text-primary-token focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:pointer-events-none disabled:invisible group-focus-within/carousel:opacity-100 group-hover/carousel:opacity-100 md:inline-flex'
+            className='absolute right-1 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-(--profile-pearl-border) bg-(--profile-pearl-bg) text-secondary-token opacity-0 shadow-(--profile-pearl-shadow) backdrop-blur-xl transition-opacity duration-subtle [@media(min-width:768px)_and_(hover:hover)_and_(pointer:fine)]:inline-flex hover:text-primary-token focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:pointer-events-none disabled:invisible group-focus-within/carousel:opacity-100 group-hover/carousel:opacity-100'
           >
             <ChevronRight className='h-4 w-4' aria-hidden='true' />
           </button>

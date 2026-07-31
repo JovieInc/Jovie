@@ -746,6 +746,8 @@ export function ProfilePacCard({
     state.kind === 'prompt' ||
     state.kind === 'submitting' ||
     state.kind === 'error';
+  const usesFullWidthCaptureLayout =
+    isProfileLandscape && (isCaptureState || state.kind === 'success');
 
   // Art zone: state-relevant artwork. The merch state shows the merch image;
   // every other state shows the release artwork (artist image as fallback).
@@ -782,7 +784,7 @@ export function ProfilePacCard({
       data-dismiss-affordance={assignment.dismissAffordance}
       data-layout={layout}
       className={cn(
-        'flex h-full w-full min-w-0 overflow-hidden rounded-(--profile-inner-radius) border border-(--profile-pearl-border) bg-(--profile-pearl-bg) shadow-(--profile-pearl-shadow) backdrop-blur-2xl',
+        'relative flex h-full w-full min-w-0 overflow-hidden rounded-(--profile-inner-radius) border border-(--profile-pearl-border) bg-(--profile-pearl-bg) shadow-(--profile-pearl-shadow) backdrop-blur-2xl',
         isProfileLandscape ? 'flex-row p-1.5' : 'flex-col',
         className
       )}
@@ -791,7 +793,10 @@ export function ProfilePacCard({
         className={cn(
           'relative aspect-square flex-none overflow-hidden bg-surface-2',
           isProfileLandscape
-            ? cn('self-stretch w-auto rounded', isCaptureState && 'hidden')
+            ? cn(
+                'self-stretch w-auto rounded',
+                usesFullWidthCaptureLayout && 'invisible'
+              )
             : 'w-full border-b border-subtle'
         )}
       >
@@ -819,7 +824,11 @@ export function ProfilePacCard({
       <div
         className={cn(
           'flex min-h-0 min-w-0 flex-1 flex-col gap-1.5',
-          isProfileLandscape ? 'justify-center py-2 pl-3 pr-2' : 'px-3 py-1.5'
+          isProfileLandscape
+            ? usesFullWidthCaptureLayout
+              ? 'absolute inset-1.5 z-10 justify-center p-2'
+              : 'justify-center py-2 pl-3 pr-2'
+            : 'px-3 py-1.5'
         )}
       >
         {/* Text zone — clips under tight card heights so the action footer
