@@ -18,6 +18,10 @@ import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import { getAppFlagValue } from '@/lib/flags/server';
+import {
+  seedOnboardingPresenceBuild,
+} from '@/lib/onboarding/presence-build';
 import { getCurrentOnboardingSessionId } from '@/lib/onboarding/session';
 import { buildWelcomeMessage } from '@/lib/services/onboarding/welcome-message';
 
@@ -111,6 +115,7 @@ export async function POST(request: Request) {
 
           return {
             conversationId: existingConversation.id,
+            messageId: null as string | null,
             reused: true,
           };
         }
@@ -153,6 +158,7 @@ export async function POST(request: Request) {
 
           return {
             conversationId: claimedConversation.id,
+            messageId: null as string | null,
             reused: true,
           };
         }
@@ -241,11 +247,14 @@ export async function POST(request: Request) {
           })
           .returning({ id: chatConversations.id });
 
-        await tx.insert(chatMessages).values({
-          content: welcomeMessage,
-          conversationId: conversation.id,
-          role: 'assistant',
-        });
+        const [assistantMessage] = await tx
+          .insert(chatMessages)
+          .values({
+            content: welcomeMessage,
+            conversationId: conversation.id,
+            role: 'assistant',
+          })
+          .returning({ id: chatMessages.id });
 
         if (initialReply) {
           await tx.insert(chatMessages).values({
@@ -262,11 +271,41 @@ export async function POST(request: Request) {
 
         return {
           conversationId: conversation.id,
+          messageId: assistantMessage?.id ?? null,
           reused: false,
         };
       },
       { clerkUserId: user.clerkId ?? undefined }
     );
+
+    // JOV-3988: seed presence-build task queue after welcome message lands.
+    // Soft-fail: any seed error degrades to the current welcome chat only.
+    let presenceBuildRunId: string | null = null;
+    if (!result.reused && result.messageId) {
+      try {
+        const wowEnabled = await getAppFlagValue('ONBOARDING_WOW_TASK_QUEUE', {
+          userId: user.clerkId ?? user.id,
+        });
+        if (wowEnabled) {
+          const seeded = await seedOnboardingPresenceBuild({
+            userId: user.id,
+            profileId: profile.id,
+            conversationId: result.conversationId,
+            messageId: result.messageId,
+          });
+          presenceBuildRunId = seeded?.workflowRunId ?? null;
+        }
+      } catch (seedError) {
+        await captureError(
+          'Onboarding presence-build seed failed; degrading to plain welcome chat',
+          seedError,
+          {
+            route: '/api/onboarding/welcome-chat',
+            conversationId: result.conversationId,
+          }
+        );
+      }
+    }
 
     return NextResponse.json(
       {
@@ -274,6 +313,7 @@ export async function POST(request: Request) {
         conversationId: result.conversationId,
         route: buildWelcomeChatRoute(result.conversationId),
         reused: result.reused,
+        presenceBuildRunId,
       },
       {
         status: result.reused ? 200 : 201,

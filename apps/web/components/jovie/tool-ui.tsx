@@ -38,6 +38,7 @@ import {
   isChatMerchDesignCarouselResult,
 } from './components/ChatMerchDesignCarousel';
 import { ChatPitchCard } from './components/ChatPitchCard';
+import { ChatPresenceArtifactCard } from './components/ChatPresenceArtifactCard';
 import { ChatVideoRecordingProposalCard } from './components/ChatVideoRecordingProposalCard';
 import type {
   ChatInsightsToolResult,
@@ -653,6 +654,71 @@ function renderVideoRecordingArtifact(
   );
 }
 
+function isPresenceBuildArtifactOutput(
+  output: unknown
+): output is {
+  action: 'presence_build_artifact';
+  title?: string;
+  summary?: string;
+  facts?: ReadonlyArray<{ label: string; value: string }>;
+  href?: string;
+  draftText?: string;
+  empty?: boolean;
+} {
+  if (typeof output !== 'object' || output === null) return false;
+  const record = output as Record<string, unknown>;
+  return record.action === 'presence_build_artifact';
+}
+
+function renderPresenceBuildArtifact(event: PersistedToolEvent): ReactNode {
+  if (event.state === 'running') {
+    return (
+      <ChatPresenceArtifactCard
+        state='loading'
+        title={getToolUiConfig(event.toolName).label}
+      />
+    );
+  }
+
+  if (event.state === 'failed') {
+    return (
+      <ChatPresenceArtifactCard
+        state='error'
+        title={getToolUiConfig(event.toolName).label}
+        error={event.errorMessage ?? event.summary}
+      />
+    );
+  }
+
+  if (!isPresenceBuildArtifactOutput(event.output)) {
+    return null;
+  }
+
+  return (
+    <ChatPresenceArtifactCard
+      state='success'
+      title={
+        typeof event.output.title === 'string'
+          ? event.output.title
+          : getToolUiConfig(event.toolName).label
+      }
+      summary={
+        typeof event.output.summary === 'string'
+          ? event.output.summary
+          : event.summary
+      }
+      facts={Array.isArray(event.output.facts) ? event.output.facts : []}
+      href={typeof event.output.href === 'string' ? event.output.href : undefined}
+      draftText={
+        typeof event.output.draftText === 'string'
+          ? event.output.draftText
+          : undefined
+      }
+      empty={event.output.empty === true}
+    />
+  );
+}
+
 const ARTIFACT_RENDERERS: Partial<Record<string, ArtifactRenderer>> = {
   proposeAvatarUpload: event => renderAvatarUploadArtifact(event),
   proposeVideoRecording: (event, profileId) =>
@@ -683,6 +749,10 @@ const ARTIFACT_RENDERERS: Partial<Record<string, ArtifactRenderer>> = {
     renderMerchActionArtifact(event, profileId),
   deleteOrArchiveMerchCard: (event, profileId) =>
     renderMerchActionArtifact(event, profileId),
+  researchArtistPresence: event => renderPresenceBuildArtifact(event),
+  assembleArtistProfile: event => renderPresenceBuildArtifact(event),
+  generateSmartLink: event => renderPresenceBuildArtifact(event),
+  draftWelcomePost: event => renderPresenceBuildArtifact(event),
 };
 
 function renderArtifactFailureCard(

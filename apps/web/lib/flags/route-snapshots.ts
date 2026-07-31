@@ -12,6 +12,7 @@ const AUTH_ROUTE_FLAG_NAMES = [] as const satisfies readonly AppFlagName[];
 
 const ONBOARDING_ROUTE_FLAG_NAMES = [
   'CHAT_JANK_MONITOR',
+  'ONBOARDING_WOW_TASK_QUEUE',
 ] as const satisfies readonly AppFlagName[];
 
 function matchesExactRoute(
@@ -92,6 +93,7 @@ export function resolveAppShellRouteFlagNames(
 
   if (needsChatJankMonitorFlag(pathname)) {
     flagNames.add('CHAT_JANK_MONITOR');
+    flagNames.add('ONBOARDING_WOW_TASK_QUEUE');
   }
 
   if (isReleasesShellRoute(pathname)) {
