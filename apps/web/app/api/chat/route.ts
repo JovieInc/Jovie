@@ -56,6 +56,7 @@ import {
   detectAlbumArtGenerationIntent,
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
+import { assertChatToolsRegistered } from '@/lib/chat/chat-tool-inventory';
 import {
   buildLockedToolPromptInfo,
   buildLockedToolSet,
@@ -2897,6 +2898,9 @@ export async function POST(req: Request) {
       ...paidTools,
       ...lockedToolSet,
     };
+    // JOV-3013: fail closed if a live tool is missing from CHAT_ROUTE_TOOL_IDS.
+    // PUBLIC_SKILL_REGISTRY is intentionally partial and is not this inventory.
+    assertChatToolsRegistered(tools);
 
     // Telemetry hooks bind Sentry into `executeChatTurn` without coupling
     // the pure pipeline to Sentry. Eval scripts pass a no-op telemetry.

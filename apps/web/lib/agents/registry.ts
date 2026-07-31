@@ -13,6 +13,8 @@
  * (`buildFreeChatTools` / `buildChatTools`), gated by plan + entitlements
  * (`lib/chat/tool-access.ts`, `lib/chat/locked-tools.ts`), and UI-labeled in
  * `lib/chat/tool-ui-registry.ts` (`TOOL_UI_REGISTRY`).
+ * Fail-closed inventory of live route tool ids lives in
+ * `lib/chat/chat-tool-inventory.ts` (`CHAT_ROUTE_TOOL_IDS`).
  *
  * Do **not** treat `skills_catalog` / this registry as "what the model has."
  * Only product skills that need admin visibility, playbook compile
@@ -25,9 +27,9 @@
  * 4. Run `pnpm --filter web drizzle:generate` if new enum values are needed.
  * 5. The postbuild hook will sync the catalog on next deploy.
  *
- * To add a **live chat tool** only: register it in the chat route builders +
- * `TOOL_UI_REGISTRY` (+ `TOOL_SCHEMAS` when eval coverage is needed). Catalog
- * it here only when it is a product skill surface.
+ * To add a **live chat tool** only: register it in `CHAT_ROUTE_TOOL_IDS`, the
+ * chat route builders, and `TOOL_UI_REGISTRY` (+ `TOOL_SCHEMAS` when eval
+ * coverage is needed). Catalog it here only when it is a product skill surface.
  */
 
 import type { SkillDefinition, ToolDefinition } from './types';
