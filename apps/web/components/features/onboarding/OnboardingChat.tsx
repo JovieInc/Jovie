@@ -482,6 +482,20 @@ interface OnboardingFlowStatusProps {
   readonly turnstilePanel: ReactNode;
 }
 
+function getOnboardingComposerPlaceholder(
+  handleDraft: string | null,
+  hasConversationStarted: boolean
+) {
+  if (handleDraft) return 'Confirm handle or type a different one…';
+  return hasConversationStarted
+    ? 'Reply to Jovie…'
+    : 'Artist, release, or link...';
+}
+
+function getSendLocalError(chatError: ChatError | null) {
+  return chatError?.errorCode === 'TURNSTILE_REQUIRED' ? null : chatError;
+}
+
 function OnboardingFlowStatus({
   reserveTurnstileSpace = false,
   shouldShowTurnstileBanner,
@@ -995,11 +1009,10 @@ export function OnboardingChat({
     isSubmitting: isSubmitted,
     isStreaming,
     onStop: stop,
-    placeholder: handleDraft
-      ? 'Confirm handle or type a different one…'
-      : hasConversationStarted
-        ? 'Reply to Jovie…'
-        : 'Artist, release, or link...',
+    placeholder: getOnboardingComposerPlaceholder(
+      handleDraft,
+      hasConversationStarted
+    ),
     dictationEnabled: false,
     onPickerOpenChange: setComposerPickerOpen,
     chips: chipTray.chips,
@@ -1008,8 +1021,7 @@ export function OnboardingChat({
     onAddSkill: chipTray.addSkill,
     onAddEntity: chipTray.addEntity,
   } as const;
-  const sendLocalError =
-    chatError?.errorCode === 'TURNSTILE_REQUIRED' ? null : chatError;
+  const sendLocalError = getSendLocalError(chatError);
   const onboardingComposerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
       {sendLocalError ? (
