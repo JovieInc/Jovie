@@ -21,6 +21,7 @@ export interface AuthShellProps {
   readonly breadcrumbs: DashboardBreadcrumbItem[];
   readonly headerBadge?: ReactNode;
   readonly headerAction?: ReactNode;
+  readonly railToggle?: ReactNode;
   readonly commandPaletteHeader?: ReactNode;
   readonly showMobileTabs?: boolean;
   readonly isTableRoute?: boolean;
@@ -46,6 +47,7 @@ function AuthShellInner({
   breadcrumbs,
   headerBadge,
   headerAction,
+  railToggle,
   commandPaletteHeader,
   showMobileTabs = false,
   isTableRoute = false,
@@ -100,6 +102,7 @@ function AuthShellInner({
           <DashboardHeader
             breadcrumbs={breadcrumbs}
             sidebarTrigger={sidebarTrigger}
+            railToggle={railToggle}
             breadcrumbSuffix={headerBadge}
             action={headerAction}
             commandPaletteHeader={commandPaletteHeader}

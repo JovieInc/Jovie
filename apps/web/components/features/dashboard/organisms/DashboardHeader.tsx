@@ -8,6 +8,8 @@ export interface DashboardHeaderProps {
   readonly breadcrumbs: DashboardBreadcrumbItem[];
   readonly leading?: ReactNode;
   readonly sidebarTrigger?: ReactNode;
+  /** Mirrored shared right-rail control, reserved immediately before title seam. */
+  readonly railToggle?: ReactNode;
   /** Content shown after breadcrumb (left side) */
   readonly breadcrumbSuffix?: ReactNode;
   /** Content shown on right side */
@@ -73,6 +75,7 @@ export function DashboardHeader({
   breadcrumbs,
   leading,
   sidebarTrigger,
+  railToggle,
   breadcrumbSuffix,
   action,
   searchSurface,
@@ -125,6 +128,12 @@ export function DashboardHeader({
           className='flex min-w-0 flex-1 items-center gap-2 tracking-[-0.012em]'
           data-search-active={isSearchActive ? 'true' : 'false'}
         >
+          <div
+            className='flex h-7 w-7 shrink-0 items-center justify-center'
+            data-testid='dashboard-header-rail-slot'
+          >
+            {railToggle}
+          </div>
           {commandPaletteHeader ? (
             <div
               className='flex h-full min-w-0 flex-1 items-center'

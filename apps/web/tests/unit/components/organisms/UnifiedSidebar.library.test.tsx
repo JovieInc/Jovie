@@ -191,11 +191,11 @@ describe('UnifiedSidebar library route', () => {
     expect(
       screen.getByTestId('user-button').parentElement?.parentElement
         ?.parentElement
-    ).toHaveClass(
-      'min-h-(--app-shell-footer-row-height)',
-      'border-t',
-      'border-(--linear-border-subtle)'
-    );
+    ).toHaveClass('min-h-(--app-shell-footer-row-height)', 'px-2.5', 'py-0.5');
+    expect(
+      screen.getByTestId('user-button').parentElement?.parentElement
+        ?.parentElement
+    ).not.toHaveClass('border-t', 'border-(--linear-border-subtle)');
   });
 
   it('uses existing subtle border token without growing --linear-* namespace', () => {

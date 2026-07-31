@@ -181,6 +181,41 @@ describe('DashboardHeader', () => {
     ).toBeInTheDocument();
   });
 
+  it('reserves the mirrored rail-toggle slot beside the breadcrumb through search activation', () => {
+    const { container, rerender } = render(
+      <DashboardHeader
+        breadcrumbs={[{ label: 'Library', href: '/app/library' }]}
+        railToggle={<button type='button' aria-label='Show artist profile' />}
+        searchSurface={<input type='search' aria-label='Search library' />}
+      />
+    );
+
+    const slot = screen.getByTestId('dashboard-header-rail-slot');
+    expect(slot).toHaveClass('h-7', 'w-7', 'shrink-0');
+    expect(slot).toContainElement(
+      screen.getByRole('button', { name: 'Show artist profile' })
+    );
+    expect(slot.compareDocumentPosition(screen.getByRole('heading'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+
+    rerender(
+      <DashboardHeader
+        breadcrumbs={[{ label: 'Library', href: '/app/library' }]}
+        railToggle={<button type='button' aria-label='Show artist profile' />}
+        searchSurface={<input type='search' aria-label='Search library' />}
+        isSearchActive
+      />
+    );
+
+    expect(
+      container.querySelector('[data-search-active="true"]')
+    ).toContainElement(screen.getByTestId('dashboard-header-rail-slot'));
+    expect(
+      screen.getByRole('searchbox', { name: 'Search library' })
+    ).toBeInTheDocument();
+  });
+
   it('paints an opaque surface fill by default', () => {
     const { getByTestId } = render(
       <DashboardHeader breadcrumbs={[{ label: 'Releases' }]} />

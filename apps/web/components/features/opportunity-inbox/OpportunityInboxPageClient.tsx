@@ -290,13 +290,6 @@ export function OpportunityInboxPageClient({
         connectedDSPs={connectedDSPs}
         initialLinks={initialLinks}
       />
-      <header className='system-b-opportunity-inbox-page-header'>
-        <h1 className='system-b-opportunity-inbox-page-title'>Inbox</h1>
-        <p className='system-b-opportunity-inbox-page-subtitle'>
-          Pending opportunities, ready to accept or dismiss.
-        </p>
-      </header>
-
       {pendingTourDates.length > 0 ? (
         <section
           className='system-b-opportunity-inbox-feed'

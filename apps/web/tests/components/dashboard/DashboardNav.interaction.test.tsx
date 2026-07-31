@@ -49,6 +49,35 @@ describe('DashboardNav interactions', () => {
     }
   });
 
+  it('keeps New Chat a compact create CTA with a larger utility-to-navigation gap', () => {
+    const { container } = renderDashboardNav({
+      renderFn: render,
+      navChildren: <button type='button'>Search</button>,
+    });
+
+    const newChat = screen.getByRole('link', { name: 'New Chat' });
+    const searchSlot = container.querySelector<HTMLElement>(
+      '[data-sidebar-search-slot="true"]'
+    );
+    const inbox = screen.getByRole('link', { name: 'Inbox' });
+
+    expect(newChat).toHaveClass('w-fit', 'rounded-full', 'bg-btn-primary');
+    expect(newChat).not.toHaveClass('bg-sidebar-accent-active', 'w-full');
+    expect(newChat.querySelector('svg')).toHaveClass(
+      'text-btn-primary-foreground'
+    );
+    expect(searchSlot).toHaveClass('mt-1.5', 'mb-3');
+    expect(screen.getAllByRole('button', { name: 'Search' })).toHaveLength(1);
+    expect(
+      newChat.compareDocumentPosition(searchSlot!) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      searchSlot!.compareDocumentPosition(inbox) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
   it('wires a plain nav click to one canonical privacy-safe activation', async () => {
     const user = userEvent.setup();
     renderDashboardNav({ renderFn: render });

@@ -1,7 +1,15 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Search, SlidersHorizontal, X } from 'lucide-react';
+import {
+  CircleHelp,
+  Disc3,
+  MessageCircle,
+  Search,
+  SlidersHorizontal,
+  UserRound,
+  X,
+} from 'lucide-react';
 import Link from 'next/link';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -11,12 +19,17 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  getPlatformIconMetadata,
+  SocialIcon,
+} from '@/components/atoms/SocialIcon';
 import { type HeaderSearchAdapter } from '@/contexts/HeaderActionsContext';
 import { cn } from '@/lib/utils';
 import {
   buildHeaderSearchGroups,
   type HeaderSearchCatalog,
   type HeaderSearchResultGroup,
+  type HeaderSearchResultItem,
   type SearchableRelease,
 } from './header-search-results';
 import { PillSearch } from './PillSearch';
@@ -59,6 +72,38 @@ const headerSearchSurfaceWidth =
 
 function flattenGroups(groups: readonly HeaderSearchResultGroup[]) {
   return groups.flatMap(group => group.items);
+}
+
+function HeaderSearchResultIcon({
+  item,
+}: {
+  readonly item: HeaderSearchResultItem;
+}) {
+  const provider = item.provider?.trim();
+
+  if (provider && getPlatformIconMetadata(provider)) {
+    return (
+      <SocialIcon platform={provider} className='h-3.5 w-3.5' aria-hidden />
+    );
+  }
+
+  if (item.kind === 'threads') {
+    return <MessageCircle className='h-3.5 w-3.5' aria-hidden='true' />;
+  }
+
+  if (item.kind === 'entities') {
+    return <UserRound className='h-3.5 w-3.5' aria-hidden='true' />;
+  }
+
+  if (provider) {
+    return <CircleHelp className='h-3.5 w-3.5' aria-hidden='true' />;
+  }
+
+  return <Disc3 className='h-3.5 w-3.5' aria-hidden='true' />;
+}
+
+interface SearchSelectableResult {
+  readonly id: string;
 }
 
 interface ContextualSuggestion {
@@ -115,7 +160,7 @@ function HeaderGlobalSearch({
   readonly onOpenFilters?: () => void;
 }) {
   const [query, setQuery] = useState('');
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
   const [remoteSearch, setRemoteSearch] = useState<{
     readonly scopeKey: string;
     readonly query: string;
@@ -171,11 +216,23 @@ function HeaderGlobalSearch({
     () => contextualFilterSuggestions(query, adapter),
     [adapter, query]
   );
-  const resultCount = items.length + contextualSuggestions.length;
+  const selectableResults = useMemo<readonly SearchSelectableResult[]>(
+    () => [
+      ...items,
+      ...contextualSuggestions.map(suggestion => ({
+        id: `current-view:${suggestion.field}:${suggestion.value}`,
+      })),
+    ],
+    [contextualSuggestions, items]
+  );
   const hasQuery = query.trim().length > 0;
-  const activeIndex = resultCount
-    ? Math.max(0, Math.min(selectedIndex, resultCount - 1))
-    : null;
+  const activeIndex = useMemo(() => {
+    if (selectableResults.length === 0) return null;
+    const selectedIndex = selectableResults.findIndex(
+      result => result.id === selectedResultId
+    );
+    return selectedIndex === -1 ? 0 : selectedIndex;
+  }, [selectableResults, selectedResultId]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => inputRef.current?.focus());
@@ -183,8 +240,20 @@ function HeaderGlobalSearch({
   }, []);
 
   useEffect(() => {
-    setSelectedIndex(0);
+    setSelectedResultId(null);
   }, [query]);
+
+  // Result groups can resolve at different times. Keep selection on the same
+  // option identity as the list grows, falling back only if that item vanished.
+  useEffect(() => {
+    setSelectedResultId(currentId => {
+      if (selectableResults.length === 0) return null;
+      if (currentId && selectableResults.some(item => item.id === currentId)) {
+        return currentId;
+      }
+      return selectableResults[0]?.id ?? null;
+    });
+  }, [selectableResults]);
 
   useEffect(() => {
     if (!searchLibraryAssets || !canSearchRemotely) {
@@ -246,20 +315,30 @@ function HeaderGlobalSearch({
     }
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      setSelectedIndex(index =>
-        resultCount === 0 ? 0 : Math.min(index + 1, resultCount - 1)
+      if (activeIndex === null) return;
+      setSelectedResultId(
+        selectableResults[
+          Math.min(activeIndex + 1, selectableResults.length - 1)
+        ]?.id ?? null
       );
       return;
     }
     if (event.key === 'ArrowUp') {
       event.preventDefault();
-      setSelectedIndex(index => Math.max(index - 1, 0));
+      if (activeIndex === null) return;
+      setSelectedResultId(
+        selectableResults[Math.max(activeIndex - 1, 0)]?.id ?? null
+      );
       return;
     }
     if (event.key === 'Enter' && activeIndex !== null) {
       event.preventDefault();
       document.getElementById(`${listboxId}-option-${activeIndex}`)?.click();
     }
+  }
+
+  function selectResultAtIndex(index: number) {
+    setSelectedResultId(selectableResults[index]?.id ?? null);
   }
 
   function commitContextualSuggestion(suggestion: ContextualSuggestion) {
@@ -381,15 +460,18 @@ function HeaderGlobalSearch({
                     href={item.href}
                     role='option'
                     aria-selected={activeIndex === index}
-                    onMouseEnter={() => setSelectedIndex(index)}
+                    onMouseEnter={() => selectResultAtIndex(index)}
                     onClick={onClose}
                     className={cn(
-                      'flex min-h-9 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-subtle ease-subtle',
+                      'flex min-h-8 items-center gap-2 rounded-lg px-2 py-1 text-left transition-colors duration-subtle ease-subtle',
                       activeIndex === index
                         ? 'bg-surface-1 text-primary-token'
                         : 'text-secondary-token hover:bg-surface-0 hover:text-primary-token'
                     )}
                   >
+                    <span className='inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-surface-1 text-tertiary-token'>
+                      <HeaderSearchResultIcon item={item} />
+                    </span>
                     <span className='min-w-0 flex-1'>
                       <span className='block truncate text-xs font-medium'>
                         {item.label}
@@ -425,7 +507,7 @@ function HeaderGlobalSearch({
                     variant='ghost'
                     role='option'
                     aria-selected={activeIndex === index}
-                    onMouseEnter={() => setSelectedIndex(index)}
+                    onMouseEnter={() => selectResultAtIndex(index)}
                     onClick={() => commitContextualSuggestion(suggestion)}
                     className={cn(
                       'flex min-h-9 w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-subtle ease-subtle',

@@ -167,6 +167,25 @@ describe('SidebarThreadsSection', () => {
     expect(unreadBadge).toHaveAttribute('data-nav-badge', 'count');
   });
 
+  it('groups Chats through spacing without a visible section divider', () => {
+    render(
+      <SidebarThreadsSection
+        threads={threads}
+        activeThreadId={null}
+        tight
+        collapsed={false}
+      />
+    );
+
+    const sectionHeader = screen.getByText('Chats').parentElement;
+
+    expect(sectionHeader).toHaveClass('px-2.5', 'pb-0.5', 'pt-2');
+    expect(sectionHeader).not.toHaveClass('border-t');
+    expect(sectionHeader?.className).not.toContain(
+      'border-[color-mix(in_oklab,var(--linear-app-frame-seam)_44%,transparent)]'
+    );
+  });
+
   it('renders selectable button rows when no href is provided', () => {
     const onSelect = vi.fn();
 

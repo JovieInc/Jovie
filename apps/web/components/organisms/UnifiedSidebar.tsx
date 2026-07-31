@@ -527,7 +527,7 @@ export function UnifiedSidebar({
         <SidebarFooter className='mt-auto gap-0 px-0 py-0'>
           {/* The footer is the shell's single identity entry. UserButton owns both
               the avatar/name trigger and its existing settings menu. */}
-          <div className='min-h-(--app-shell-footer-row-height) border-t border-(--linear-border-subtle) px-2.5 py-0.5'>
+          <div className='min-h-(--app-shell-footer-row-height) px-2.5 py-0.5'>
             <SidebarMenu>
               <SidebarMenuItem>
                 <UserButton

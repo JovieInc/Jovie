@@ -37,7 +37,6 @@ import {
 import type { ChatActionCard } from '@/components/jovie/types';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
-import { ArtistProfileRailToggle } from '@/components/shell/ArtistProfileRailToggle';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
@@ -510,15 +509,12 @@ export function ChatPageClient({
   }, [conversationId, deleteConversation, router, notifications]);
 
   const headerActions = useMemo(() => {
-    const artistProfileToggle = <ArtistProfileRailToggle />;
-
     if (!conversationId) {
-      return artistProfileToggle;
+      return null;
     }
 
     return (
       <div className='flex items-center gap-1'>
-        {artistProfileToggle}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <AppIconButton

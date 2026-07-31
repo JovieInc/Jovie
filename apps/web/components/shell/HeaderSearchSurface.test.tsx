@@ -162,6 +162,7 @@ describe('HeaderSearchSurface', () => {
               displayName: 'Midnight Artist',
               username: 'midnight-artist',
               usernameNormalized: 'midnight-artist',
+              provider: 'spotify',
             },
           ],
           releases: [
@@ -170,6 +171,7 @@ describe('HeaderSearchSurface', () => {
               title: 'Midnight Drive',
               artistNames: ['Midnight Artist'],
               smartLinkPath: '/midnight-artist/midnight-drive',
+              provider: 'spotify',
             },
           ],
         }}
@@ -210,6 +212,8 @@ describe('HeaderSearchSurface', () => {
       '/midnight-artist/midnight-drive',
     ]);
     expect(options[0]).toHaveAttribute('aria-selected', 'true');
+    expect(options[2]).toHaveClass('min-h-8', 'py-1');
+    expect(options[2]?.firstElementChild).toHaveClass('h-6', 'w-6');
 
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     expect(options[1]).toHaveAttribute('aria-selected', 'true');
@@ -234,6 +238,86 @@ describe('HeaderSearchSurface', () => {
         values: ['Midnight Artist'],
       }),
     ]);
+  });
+
+  it('keeps the active result identity stable as slower groups arrive and falls back only when it disappears', () => {
+    const onClose = vi.fn();
+    const props = {
+      isOpen: true,
+      onOpen: vi.fn(),
+      onClose,
+    };
+    const soberRelease = {
+      id: 'release-sober',
+      title: 'Sober',
+      artistNames: ['Frank Ocean'],
+      smartLinkPath: '/frank-ocean/sober',
+    };
+    const { rerender } = render(
+      <HeaderSearchSurface
+        {...props}
+        catalog={{ conversations: [], profiles: [], releases: [soberRelease] }}
+      />
+    );
+
+    const input = screen.getByRole('combobox', { name: 'Search Jovie' });
+    fireEvent.change(input, { target: { value: 'sober' } });
+    const releaseOption = screen.getByRole('option', {
+      name: 'Sober Frank Ocean',
+    });
+    expect(releaseOption).toHaveAttribute('aria-selected', 'true');
+
+    rerender(
+      <HeaderSearchSurface
+        {...props}
+        catalog={{
+          conversations: [],
+          profiles: [
+            {
+              id: 'gracia-soberana',
+              displayName: 'Gracia Soberana Música',
+              username: 'gracia-soberana',
+              usernameNormalized: 'gracia-soberana',
+            },
+          ],
+          releases: [soberRelease],
+        }}
+      />
+    );
+
+    const stableReleaseOption = screen.getByRole('option', {
+      name: 'Sober Frank Ocean',
+    });
+    expect(stableReleaseOption).toHaveAttribute('aria-selected', 'true');
+    const activateRelease = vi
+      .spyOn(stableReleaseOption as HTMLAnchorElement, 'click')
+      .mockImplementation(() => {});
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(activateRelease).toHaveBeenCalledTimes(1);
+    activateRelease.mockRestore();
+
+    rerender(
+      <HeaderSearchSurface
+        {...props}
+        catalog={{
+          conversations: [],
+          profiles: [
+            {
+              id: 'gracia-soberana',
+              displayName: 'Gracia Soberana Música',
+              username: 'gracia-soberana',
+              usernameNormalized: 'gracia-soberana',
+            },
+          ],
+          releases: [],
+        }}
+      />
+    );
+
+    expect(
+      screen.getByRole('option', { name: /Gracia Soberana Música/ })
+    ).toHaveAttribute('aria-selected', 'true');
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('closes from Escape without rendering a modal surface', () => {
