@@ -123,19 +123,13 @@ function AuthShellWrapperInner({
   const defaultHeaderAction = useMemo(
     () => (
       <>
-        {showArtistProfileRailToggle ? <ArtistProfileRailToggle /> : null}
         {config.showChatUsageIndicator && !config.isDemoRoute ? (
           <HeaderChatUsageIndicator />
         ) : null}
         {isElectron ? null : <UpdateAvailablePill />}
       </>
     ),
-    [
-      config.isDemoRoute,
-      config.showChatUsageIndicator,
-      isElectron,
-      showArtistProfileRailToggle,
-    ]
+    [config.isDemoRoute, config.showChatUsageIndicator, isElectron]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
@@ -269,6 +263,11 @@ function AuthShellWrapperInner({
                 breadcrumbs={config.breadcrumbs}
                 headerBadge={headerBadge}
                 headerAction={headerAction}
+                railToggle={
+                  showArtistProfileRailToggle ? (
+                    <ArtistProfileRailToggle />
+                  ) : null
+                }
                 commandPaletteHeader={headerActions.commandPaletteHeader}
                 showMobileTabs={config.showMobileTabs}
                 isTableRoute={config.isTableRoute}
