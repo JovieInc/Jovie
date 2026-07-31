@@ -53,19 +53,30 @@ function extractShellWorkspaceBlock(css: string): string {
 describe('Noir Ion D — workspace state surfaces (JOV-4648)', () => {
   const shellBlock = extractShellWorkspaceBlock(DESIGN_SYSTEM_CSS);
 
-  it('contains shell-scoped Noir Ion anchors without writing them on :root', () => {
-    expect(shellBlock).toContain('--color-row-hover: rgba(17, 175, 255, 0.06)');
+  it('keeps routine workspace state and depth graphite, reserving Ion for focus', () => {
     expect(shellBlock).toContain(
-      '--color-row-selected: rgba(17, 175, 255, 0.1)'
+      '--color-row-hover: rgba(255, 255, 255, 0.055)'
+    );
+    expect(shellBlock).toContain(
+      '--color-row-selected: rgba(255, 255, 255, 0.085)'
     );
     expect(shellBlock).toContain(
       '--color-focus-ring: rgba(17, 175, 255, 0.72)'
     );
-    expect(shellBlock).toContain('--color-bg-elevated: #151b2a');
-    expect(shellBlock).toContain('--color-bg-tooltip: #1b2436');
-    expect(shellBlock).toContain('--color-skeleton-base: #151b2a');
-    expect(shellBlock).toContain('--app-shell-content-surface: #0a0d16');
-    expect(shellBlock).toContain('--color-bg-surface-1: #0f1420');
+    expect(shellBlock).toContain('--color-bg-elevated: #1b1d22');
+    expect(shellBlock).toContain('--color-bg-tooltip: #24272d');
+    expect(shellBlock).toContain('--color-skeleton-base: #1b1d22');
+    expect(shellBlock).toContain('--app-shell-content-surface: #101114');
+    expect(shellBlock).toContain('--color-bg-surface-1: #14161a');
+    expect(shellBlock).toContain(
+      '--color-bg-hover: rgba(255, 255, 255, 0.055)'
+    );
+    expect(shellBlock).toContain(
+      '--color-bg-active: rgba(255, 255, 255, 0.085)'
+    );
+    expect(shellBlock).toContain(
+      '--color-border-default: rgba(255, 255, 255, 0.12)'
+    );
     // Shrink-only: shell block must not introduce new --linear-* call sites.
     expect(shellBlock).not.toMatch(/--linear-[a-z0-9-]+/);
 
@@ -75,9 +86,11 @@ describe('Noir Ion D — workspace state surfaces (JOV-4648)', () => {
     );
     expect(rootBlocks?.length).toBeGreaterThan(0);
     for (const block of rootBlocks ?? []) {
-      expect(block).not.toContain('--color-row-selected: rgba(17, 175, 255');
-      expect(block).not.toContain('--color-bg-elevated: #151b2a');
-      expect(block).not.toContain('--color-bg-tooltip: #1b2436');
+      expect(block).not.toContain(
+        '--color-row-selected: rgba(255, 255, 255, 0.085)'
+      );
+      expect(block).not.toContain('--color-bg-elevated: #1b1d22');
+      expect(block).not.toContain('--color-bg-tooltip: #24272d');
     }
   });
 

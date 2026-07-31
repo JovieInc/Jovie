@@ -6413,25 +6413,25 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
    ============================================ */
 
 [data-app-shell-frame="true"] {
-  /* Surfaces — stepped Noir Ion elevation via semantic aliases */
-  --app-shell-content-surface: #0a0d16; /* panel canvas */
-  --app-shell-frame-seam: rgba(168, 176, 195, 0.1);
-  --app-shell-border: rgba(168, 176, 195, 0.16);
+  /* Surfaces — neutral graphite elevation; Ion stays reserved for intent. */
+  --app-shell-content-surface: #101114; /* panel canvas */
+  --app-shell-frame-seam: rgba(255, 255, 255, 0.07);
+  --app-shell-border: rgba(255, 255, 255, 0.12);
   --system-b-app-content-surface: var(--app-shell-content-surface);
   --system-b-app-frame-seam: var(--app-shell-frame-seam);
   --system-b-app-shell-border: var(--app-shell-border);
 
-  --color-bg-surface-0: #0a0d16; /* panel / recessed wells */
-  --color-bg-surface-1: #0f1420; /* card */
-  --color-bg-surface-2: #151b2a; /* elevated */
-  --color-bg-surface-3: #1b2436; /* floating */
-  --color-bg-elevated: #151b2a;
-  --color-bg-tooltip: #1b2436;
-  --color-bg-hover: rgba(17, 175, 255, 0.06);
-  --color-bg-active: rgba(17, 175, 255, 0.1);
-  --color-bg-input: #0f1420;
-  --color-row-hover: rgba(17, 175, 255, 0.06);
-  --color-row-selected: rgba(17, 175, 255, 0.1);
+  --color-bg-surface-0: #0b0c0f; /* recessed wells */
+  --color-bg-surface-1: #14161a; /* card */
+  --color-bg-surface-2: #1b1d22; /* elevated */
+  --color-bg-surface-3: #24272d; /* floating */
+  --color-bg-elevated: #1b1d22;
+  --color-bg-tooltip: #24272d;
+  --color-bg-hover: rgba(255, 255, 255, 0.055);
+  --color-bg-active: rgba(255, 255, 255, 0.085);
+  --color-bg-input: #14161a;
+  --color-row-hover: rgba(255, 255, 255, 0.055);
+  --color-row-selected: rgba(255, 255, 255, 0.085);
   --system-b-bg-surface-0: var(--color-bg-surface-0);
   --system-b-bg-surface-1: var(--color-bg-surface-1);
   --system-b-bg-surface-2: var(--color-bg-surface-2);
@@ -6446,19 +6446,19 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
   --color-surface-active: var(--color-bg-active);
 
   /* Borders / focus — electric ion */
-  --color-border-subtle: rgba(168, 176, 195, 0.1);
-  --color-border-default: rgba(168, 176, 195, 0.16);
-  --color-border-strong: rgba(199, 237, 255, 0.26);
+  --color-border-subtle: rgba(255, 255, 255, 0.07);
+  --color-border-default: rgba(255, 255, 255, 0.12);
+  --color-border-strong: rgba(255, 255, 255, 0.22);
   --color-border-focus: rgba(17, 175, 255, 0.72);
   --color-focus-ring: rgba(17, 175, 255, 0.72);
 
   /* Overlay elevation (popovers / tooltips / drawers) */
   --shadow-popover:
-    0 0 0 1px rgba(168, 176, 195, 0.16), 0 12px 32px rgba(0, 0, 0, 0.5);
+    0 0 0 1px rgba(255, 255, 255, 0.12), 0 12px 32px rgba(0, 0, 0, 0.52);
 
   /* Skeleton / loading — reserved geometry; color only */
-  --color-skeleton-base: #151b2a;
-  --color-skeleton-shimmer: rgba(168, 176, 195, 0.14);
+  --color-skeleton-base: #1b1d22;
+  --color-skeleton-shimmer: rgba(255, 255, 255, 0.11);
 }
 
 :where(.system-b-table-row-height) {
