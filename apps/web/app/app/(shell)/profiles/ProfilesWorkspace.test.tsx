@@ -174,6 +174,40 @@ describe('ProfilesWorkspace', () => {
     expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
   });
 
+  it('opens the in-flow add rail with registry-backed services and canonical URL review', async () => {
+    const user = userEvent.setup();
+    renderWorkspace(data);
+
+    await user.click(screen.getByRole('button', { name: 'Add connection' }));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    expect(panel).not.toBeNull();
+
+    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+    expect(
+      screen.getByRole('complementary', { name: 'Add connection' })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Connect services/i }));
+    expect(
+      screen.getByRole('button', {
+        name: 'Gmail Scan booking emails for tour confirmation signals.',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Google Calendar/i })
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await user.click(
+      screen.getByRole('button', { name: /Add public profile/i })
+    );
+    const url = screen.getByRole('textbox', { name: 'Public profile URL' });
+    await user.type(url, 'https://www.instagram.com/tim/?utm_source=test');
+    expect(screen.getByText(/instagram\.com\/tim/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Review profile' })
+    ).toBeEnabled();
+  });
+
   it('preserves the compact mobile table contract', () => {
     renderWorkspace(data);
 
@@ -189,7 +223,7 @@ describe('ProfilesWorkspace', () => {
     expect(screen.getByText('tim@example.com')).toHaveClass('max-sm:hidden');
 
     const summary = screen.getByTestId('connections-summary');
-    expect(summary.parentElement).toHaveClass('overflow-x-auto');
+    expect(summary.parentElement?.parentElement).toHaveClass('overflow-x-auto');
     expect(screen.getByText('Best Rank #2')).toHaveClass('max-sm:hidden');
     expect(screen.getByText('Monitoring Active')).toHaveClass('max-sm:hidden');
   });
