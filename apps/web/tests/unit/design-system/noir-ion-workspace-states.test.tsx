@@ -54,20 +54,20 @@ describe('Noir Ion D — workspace state surfaces (JOV-4648)', () => {
   const shellBlock = extractShellWorkspaceBlock(DESIGN_SYSTEM_CSS);
 
   it('contains shell-scoped Noir Ion anchors without writing them on :root', () => {
+    expect(shellBlock).toContain('--color-row-hover: rgba(17, 175, 255, 0.06)');
     expect(shellBlock).toContain(
-      '--linear-row-hover: rgba(17, 175, 255, 0.06)'
+      '--color-row-selected: rgba(17, 175, 255, 0.1)'
     );
     expect(shellBlock).toContain(
-      '--linear-row-selected: rgba(17, 175, 255, 0.1)'
-    );
-    expect(shellBlock).toContain(
-      '--linear-border-focus: rgba(17, 175, 255, 0.72)'
+      '--color-focus-ring: rgba(17, 175, 255, 0.72)'
     );
     expect(shellBlock).toContain('--color-bg-elevated: #151b2a');
     expect(shellBlock).toContain('--color-bg-tooltip: #1b2436');
     expect(shellBlock).toContain('--color-skeleton-base: #151b2a');
-    expect(shellBlock).toContain('--linear-app-content-surface: #0a0d16');
-    expect(shellBlock).toContain('--linear-bg-surface-1: #0f1420');
+    expect(shellBlock).toContain('--app-shell-content-surface: #0a0d16');
+    expect(shellBlock).toContain('--color-bg-surface-1: #0f1420');
+    // Shrink-only: shell block must not introduce new --linear-* call sites.
+    expect(shellBlock).not.toMatch(/--linear-[a-z0-9-]+/);
 
     // Global/public surfaces must not hardcode the same Noir anchors at :root.
     const rootBlocks = DESIGN_SYSTEM_CSS.match(
@@ -75,7 +75,7 @@ describe('Noir Ion D — workspace state surfaces (JOV-4648)', () => {
     );
     expect(rootBlocks?.length).toBeGreaterThan(0);
     for (const block of rootBlocks ?? []) {
-      expect(block).not.toContain('--linear-row-selected: rgba(17, 175, 255');
+      expect(block).not.toContain('--color-row-selected: rgba(17, 175, 255');
       expect(block).not.toContain('--color-bg-elevated: #151b2a');
       expect(block).not.toContain('--color-bg-tooltip: #1b2436');
     }
@@ -90,12 +90,12 @@ describe('Noir Ion D — workspace state surfaces (JOV-4648)', () => {
     expect(rowState.hover).toBe('system-b-table-row-hover');
     expect(rowState.selected).toBe('system-b-table-row-selected');
     expect(rowState.focusVisible).toBe('system-b-table-row-focus-visible');
-    expect(DESIGN_SYSTEM_CSS).toContain('background: var(--linear-row-hover);');
+    expect(DESIGN_SYSTEM_CSS).toContain('background: var(--color-row-hover);');
     expect(DESIGN_SYSTEM_CSS).toContain(
-      'background: var(--linear-row-selected);'
+      'background: var(--color-row-selected);'
     );
     expect(DESIGN_SYSTEM_CSS).toContain(
-      'color-mix(in oklab, var(--linear-border-focus) 45%, transparent)'
+      'color-mix(in oklab, var(--color-focus-ring) 45%, transparent)'
     );
   });
 
