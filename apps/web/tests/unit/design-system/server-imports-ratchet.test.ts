@@ -20,14 +20,11 @@ import { describe, expect, it } from 'vitest';
  * feature component, lower the baseline in `server-imports.baseline.json`
  * in the same PR.
  *
- * Why a ratchet and not zero-tolerance: 3 organisms currently have a
- * legitimate /actions import that predates this rule:
- *   - organisms/CreateProfileDialog.tsx
- *   - organisms/ProfileSwitcher.tsx
- *   - organisms/release-sidebar/ReleaseSidebar.tsx
- * Banning them outright would block all work. The ratchet locks in
- * progress — regressions fail CI, improvements (moving the import up to a
- * feature wrapper) pass and lower the baseline.
+ * Why a ratchet and not zero-tolerance: the initial JOV-3503 baseline
+ * locked three organism /actions offenders while pure guardrails landed.
+ * Those were driven to zero (JOV-3568 + JOV-3506). The ratchet still
+ * blocks regressions — any new server-only import in shared layers fails
+ * until the baseline is intentionally raised with a Linear ID.
  *
  * Sibling of arbitrary-values-ratchet.test.ts — same committed-baseline shape.
  */
@@ -162,10 +159,9 @@ describe('design-system server-imports ratchet', () => {
               'Files in apps/web/components/{atoms,molecules,organisms} that import a server-only ' +
               'specifier (server-only, @clerk/nextjs/server, drizzle-orm, @/lib/db/*, /actions modules, ' +
               "next/headers, next/cache, etc.) or contain 'use server'. " +
-              'Baseline of 3 reflects organism offenders: CreateProfileDialog.tsx, ' +
-              'ProfileSwitcher.tsx, release-sidebar/ReleaseSidebar.tsx (all import from /actions). ' +
+              'Baseline of 0: organisms/ is server-import-free. ' +
               'Exclusions: *.stories.tsx, *.test.ts(x), *-action.ts, *.server.ts. ' +
-              'Ratchet only goes down — lower this when a PR moves the /actions import to a feature wrapper.',
+              'Ratchet only goes down — raise only with a Linear ID if intentional.',
           },
           null,
           2
