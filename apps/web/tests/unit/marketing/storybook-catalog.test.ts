@@ -12,16 +12,16 @@ import { describe, expect, it } from 'vitest';
 import {
   MARKETING_STORY_INVENTORY,
   PROVEN_RECIPE_IDS,
-  STUB_RECIPE_IDS,
-  WIP_SECTION_IDS,
   recipeStoryTitle,
+  STUB_RECIPE_IDS,
   sectionStoryTitle,
   shellStoryTitle,
+  WIP_SECTION_IDS,
 } from '@/components/marketing/storybook/catalog';
 import {
+  isProvenRecipe,
   MARKETING_RECIPE_IDS,
   MARKETING_SECTION_IDS,
-  isProvenRecipe,
 } from '@/data/marketing';
 
 const storybookDir = join(
@@ -115,15 +115,15 @@ describe('marketing Storybook catalog inventory (JOV-4420)', () => {
   });
 
   it('story files use the Marketing/* title roots', () => {
-    expect(recipesSource).toContain("title: MARKETING_RECIPE_STORY_ROOT");
-    expect(sectionsSource).toContain("title: MARKETING_SECTION_STORY_ROOT");
-    expect(shellsSource).toContain("title: MARKETING_SHELL_STORY_ROOT");
+    expect(recipesSource).toContain('title: MARKETING_RECIPE_STORY_ROOT');
+    expect(sectionsSource).toContain('title: MARKETING_SECTION_STORY_ROOT');
+    expect(shellsSource).toContain('title: MARKETING_SHELL_STORY_ROOT');
   });
 
   it('inventory receipt counts are stable and non-empty', () => {
-    expect(MARKETING_STORY_INVENTORY.provenRecipeTitles.length).toBeGreaterThanOrEqual(
-      8
-    );
+    expect(
+      MARKETING_STORY_INVENTORY.provenRecipeTitles.length
+    ).toBeGreaterThanOrEqual(8);
     expect(MARKETING_STORY_INVENTORY.sectionTitles).toHaveLength(
       MARKETING_SECTION_IDS.length
     );
