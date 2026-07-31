@@ -26,6 +26,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // ----- Local imports -----
 const linear = await import(resolve(__dirname, 'linear-client.mjs'));
 const classifier = await import(resolve(__dirname, 'classifier.mjs'));
+const reconciler = await import(resolve(__dirname, 'reconcile.mjs'));
 const scorer = await import(resolve(__dirname, 'scorer.mjs'));
 const workstreamer = await import(resolve(__dirname, 'workstreamer.mjs'));
 const admitter = await import(resolve(__dirname, 'admitter.mjs'));
@@ -148,44 +149,12 @@ async function runReconcile(cache, isDryRun, issueArg) {
 
   console.log(`Processing ${issues.length} issues`);
 
-  for (const issue of issues) {
-    const stored = classifier.parseStoredClassification(issue);
-    const c = classifier.classifyDeterministic(issue, issues);
-
-    if (stored && stored.fp === c.fingerprint) {
-      console.log(`  SKIP ${issue.identifier} — unchanged`);
-      continue;
-    }
-
-    console.log(
-      `  ${c.category}: ${issue.identifier} — ${(issue.title || '').slice(0, 50)}`
-    );
-
-    if (isDryRun) {
-      console.log(
-        `    (dry-run) would classify as ${c.category}, score ${c.valueScore}`
-      );
-      continue;
-    }
-
-    // Persist classification as machine comment
-    const commentBody = classifier.buildStoredClassification(c);
-    try {
-      await linear.addComment(issue.id, commentBody);
-    } catch (err) {
-      console.error(`    Failed to add comment: ${err.message}`);
-    }
-
-    // If duplicate/obsolete, move to Backlog
-    if (c.category === 'duplicate' || c.category === 'obsolete') {
-      try {
-        await linear.transitionIssue(issue.id, BACKLOG_STATE_ID);
-        console.log(`    Moved to Backlog`);
-      } catch (err) {
-        console.error(`    Failed to transition: ${err.message}`);
-      }
-    }
-  }
+  await reconciler.reconcileIssues({
+    issues,
+    client: linear,
+    isDryRun,
+    backlogStateId: BACKLOG_STATE_ID,
+  });
 
   console.log('Reconciliation complete.');
 }
