@@ -36,11 +36,11 @@ interface SidebarNavChromeOptions {
   readonly className?: string;
 }
 
-// Create actions are deliberately not a second selected-nav treatment. Their
-// blue icon and stronger label distinguish creation without competing with the
-// route's neutral active state.
+// Create actions are deliberately not a second selected-nav treatment. The
+// compact light pill distinguishes creation without competing with the route's
+// neutral active state, including when the chat route is current.
 const SIDEBAR_PRIMARY_CHROME =
-  'text-primary-token font-medium hover:bg-sidebar-accent';
+  'w-fit grid-cols-[22px_auto] gap-x-2 bg-white px-3 text-black font-medium shadow-none hover:bg-white/90';
 
 // Active state uses a quiet neutral fill with white type and a Jovie teal icon.
 // Avoid a left rail or guide decoration so every shared sidebar consumer keeps
@@ -55,12 +55,12 @@ function getToneClassName({
   active,
   tone,
 }: Pick<SidebarNavChromeOptions, 'active' | 'nested' | 'tone'>): string {
-  if (active) {
-    return SIDEBAR_ACTIVE_CHROME;
-  }
-
   if (tone === 'primary') {
     return SIDEBAR_PRIMARY_CHROME;
+  }
+
+  if (active) {
+    return SIDEBAR_ACTIVE_CHROME;
   }
 
   return SIDEBAR_INACTIVE_CHROME;
@@ -78,7 +78,8 @@ export function getSidebarNavRowClassName({
   const nonCollapsedSize = tight ? 'h-6 px-2.5' : 'h-7 px-2.5';
 
   return cn(
-    'relative grid items-center rounded-full w-full transition-[background-color,box-shadow,color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+    'relative grid items-center rounded-full transition-[background-color,box-shadow,color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
+    tone === 'primary' ? undefined : 'w-full',
     'font-normal',
     tight ? 'gap-x-2 text-xs' : 'gap-x-2.5 text-xs',
     collapsed
@@ -111,10 +112,10 @@ export function getSidebarNavIconClassName({
     tight ? 'h-3 w-3' : 'h-3.5 w-3.5',
     // The selected row deliberately owns white label text. Keep its icon on
     // the canonical Jovie teal token so the active signal remains quiet.
-    active
-      ? 'text-accent-teal!'
-      : tone === 'primary'
-        ? 'text-accent-blue'
+    tone === 'primary'
+      ? 'text-black'
+      : active
+        ? 'text-accent-teal!'
         : inactiveIconColor,
     className
   );

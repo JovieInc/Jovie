@@ -49,6 +49,19 @@ describe('DashboardNav interactions', () => {
     }
   });
 
+  it('keeps New Chat a compact create CTA with a larger utility-to-navigation gap', () => {
+    const { container } = renderDashboardNav({ renderFn: render });
+
+    const newChat = screen.getByRole('link', { name: 'New Chat' });
+    expect(newChat).toHaveClass('w-fit', 'rounded-full', 'bg-white');
+    expect(newChat).not.toHaveClass('bg-sidebar-accent-active', 'w-full');
+    expect(newChat.querySelector('svg')).toHaveClass('text-black');
+
+    expect(
+      container.querySelector('[data-sidebar-search-slot="true"]')
+    ).toHaveClass('mt-1.5', 'mb-3');
+  });
+
   it('wires a plain nav click to one canonical privacy-safe activation', async () => {
     const user = userEvent.setup();
     renderDashboardNav({ renderFn: render });

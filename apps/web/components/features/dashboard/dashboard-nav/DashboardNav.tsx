@@ -557,7 +557,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                       {index === 0 && searchSurface ? (
                         <div
                           data-sidebar-search-slot='true'
-                          className='my-1.5 h-7 shrink-0 group-data-[collapsible=icon]:hidden'
+                          className='mb-3 mt-1.5 h-7 shrink-0 group-data-[collapsible=icon]:hidden'
                         >
                           {searchSurface}
                         </div>
