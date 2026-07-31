@@ -699,7 +699,7 @@ function TaskDocumentPanel({
           className='min-h-0 flex-1 overflow-y-auto overscroll-contain'
           data-testid='task-document-scroll-region'
         >
-          <div className='mx-auto flex w-full max-w-[40rem] flex-col gap-3 px-4 pb-5 pt-4 sm:px-5 sm:pb-6 sm:pt-5'>
+          <div className='mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pb-6 pt-5 sm:px-5 sm:pb-7 sm:pt-6'>
             <TaskTitleEditor value={title} onChange={onTitleChange} />
 
             <div

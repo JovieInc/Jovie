@@ -89,7 +89,7 @@ describe('TaskListRow', () => {
       'true'
     );
     expect(getByTestId('task-list-row-task-1').className).toContain(
-      'system-b-table-row-selected'
+      'system-b-shell-list-task-row-selected'
     );
     expect(getByText(mockTask.title)).toBeVisible();
   });
