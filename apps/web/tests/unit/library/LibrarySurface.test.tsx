@@ -61,6 +61,13 @@ const navigationMock = vi.hoisted(() => ({
 }));
 
 const blobUploadMock = vi.hoisted(() => vi.fn());
+const libraryMutationMocks = vi.hoisted(() => ({
+  archiveMerch: vi.fn().mockResolvedValue({ success: true }),
+  archiveRelease: vi.fn().mockResolvedValue({ success: true }),
+  restoreMerch: vi.fn().mockResolvedValue({ success: true }),
+  restoreRelease: vi.fn().mockResolvedValue({ success: true }),
+  updateProfileVisibility: vi.fn().mockResolvedValue('hidden'),
+}));
 
 const audioMock = vi.hoisted(() => {
   const basePlaybackState = {
@@ -93,6 +100,20 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
 
 vi.mock('@vercel/blob/client', () => ({
   upload: blobUploadMock,
+}));
+
+vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
+  archiveLibraryRelease: libraryMutationMocks.archiveRelease,
+  restoreRelease: libraryMutationMocks.restoreRelease,
+}));
+
+vi.mock('@/app/app/(shell)/library/actions', () => ({
+  archiveLibraryMerchCard: libraryMutationMocks.archiveMerch,
+  restoreLibraryMerchCard: libraryMutationMocks.restoreMerch,
+}));
+
+vi.mock('@/lib/library/profile-visibility/client-mutations', () => ({
+  updateLibraryProfileVisibility: libraryMutationMocks.updateProfileVisibility,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -135,6 +156,8 @@ function buildAsset(
     releaseType: 'single',
     status: 'released',
     approvalStatus: 'draft',
+    profileVisibility: 'visible',
+    lifecycleStatus: 'active',
     trackCount: 1,
     providerCount: 1,
     providers: [
@@ -241,6 +264,16 @@ describe('LibrarySurface', () => {
     navigationMock.refresh.mockClear();
     navigationMock.replace.mockClear();
     blobUploadMock.mockReset();
+    libraryMutationMocks.archiveMerch.mockReset();
+    libraryMutationMocks.archiveMerch.mockResolvedValue({ success: true });
+    libraryMutationMocks.archiveRelease.mockReset();
+    libraryMutationMocks.archiveRelease.mockResolvedValue({ success: true });
+    libraryMutationMocks.restoreRelease.mockReset();
+    libraryMutationMocks.restoreRelease.mockResolvedValue({ success: true });
+    libraryMutationMocks.restoreMerch.mockReset();
+    libraryMutationMocks.restoreMerch.mockResolvedValue({ success: true });
+    libraryMutationMocks.updateProfileVisibility.mockReset();
+    libraryMutationMocks.updateProfileVisibility.mockResolvedValue('hidden');
   });
 
   afterEach(() => {
@@ -744,6 +777,156 @@ describe('LibrarySurface', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Copy Share Link' }));
 
     expect(writeText).toHaveBeenCalledWith('https://jov.ie/p/token-1');
+  });
+
+  it('rolls back profile visibility when the canonical mutation fails', async () => {
+    const user = userEvent.setup();
+    libraryMutationMocks.updateProfileVisibility.mockRejectedValueOnce(
+      new Error('network failure')
+    );
+
+    render(
+      <TooltipProvider>
+        <RightPanelProvider>
+          <LibrarySurface assets={[buildAsset()]} profileId='profile-1' />
+          <RightPanelOutlet />
+        </RightPanelProvider>
+      </TooltipProvider>
+    );
+
+    const actions = within(screen.getByTestId('library-row-actions-release-1'));
+    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.click(
+      screen.getByRole('menuitem', { name: 'Hide from Profile' })
+    );
+
+    await waitFor(() => {
+      expect(libraryMutationMocks.updateProfileVisibility).toHaveBeenCalledWith(
+        {
+          profileId: 'profile-1',
+          assetId: 'release-1',
+          itemKind: 'release',
+          profileVisibility: 'hidden',
+        }
+      );
+    });
+
+    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    expect(
+      screen.getByRole('menuitem', { name: 'Hide from Profile' })
+    ).toBeInTheDocument();
+  });
+
+  it('rolls an optimistically archived release back into the table on failure', async () => {
+    const user = userEvent.setup();
+    libraryMutationMocks.archiveRelease.mockRejectedValueOnce(
+      new Error('network failure')
+    );
+
+    render(
+      <TooltipProvider>
+        <RightPanelProvider>
+          <LibrarySurface assets={[buildAsset()]} profileId='profile-1' />
+          <RightPanelOutlet />
+        </RightPanelProvider>
+      </TooltipProvider>
+    );
+
+    const actions = within(screen.getByTestId('library-row-actions-release-1'));
+    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Archive' }));
+
+    await waitFor(() => {
+      expect(libraryMutationMocks.archiveRelease).toHaveBeenCalledWith({
+        releaseId: 'release-1',
+      });
+      expect(
+        screen.getByTestId('library-release-row-release-1')
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('moves releases between active and Archived views through the shared action registry', async () => {
+    const user = userEvent.setup();
+    render(
+      <TooltipProvider>
+        <RightPanelProvider>
+          <LibrarySurface assets={[buildAsset()]} profileId='profile-1' />
+          <RightPanelOutlet />
+        </RightPanelProvider>
+      </TooltipProvider>
+    );
+
+    let actions = within(screen.getByTestId('library-row-actions-release-1'));
+    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Archive' }));
+
+    await waitFor(() => {
+      expect(libraryMutationMocks.archiveRelease).toHaveBeenCalledWith({
+        releaseId: 'release-1',
+      });
+      expect(
+        screen.queryByTestId('library-release-row-release-1')
+      ).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /Archived/u }));
+    actions = within(screen.getByTestId('library-row-actions-release-1'));
+    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Restore' }));
+
+    await waitFor(() => {
+      expect(libraryMutationMocks.restoreRelease).toHaveBeenCalledWith({
+        releaseId: 'release-1',
+      });
+      expect(
+        screen.queryByTestId('library-release-row-release-1')
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it('archives and safely restores merch through its real lifecycle contract', async () => {
+    const user = userEvent.setup();
+    const merch = buildAsset({
+      id: 'merch-card-1',
+      itemKind: 'merch',
+      previewUrl: null,
+      videoUrl: null,
+      assetKinds: ['artwork'],
+    });
+    render(
+      <TooltipProvider>
+        <RightPanelProvider>
+          <LibrarySurface assets={[merch]} profileId='profile-1' />
+          <RightPanelOutlet />
+        </RightPanelProvider>
+      </TooltipProvider>
+    );
+
+    let actions = within(
+      screen.getByTestId('library-row-actions-merch-card-1')
+    );
+    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Archive' }));
+
+    await waitFor(() => {
+      expect(libraryMutationMocks.archiveMerch).toHaveBeenCalledWith({
+        merchCardId: 'card-1',
+        profileId: 'profile-1',
+      });
+    });
+
+    await user.click(screen.getByRole('button', { name: /Archived/u }));
+    actions = within(screen.getByTestId('library-row-actions-merch-card-1'));
+    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Restore' }));
+
+    await waitFor(() => {
+      expect(libraryMutationMocks.restoreMerch).toHaveBeenCalledWith({
+        merchCardId: 'card-1',
+        profileId: 'profile-1',
+      });
+    });
   });
 
   it('renders merch assets with prices and the shared detail drawer', () => {

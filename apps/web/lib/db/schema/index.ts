@@ -400,6 +400,7 @@ export {
   leadStatusEnum,
   libraryAssetApprovalStatusEnum,
   libraryAssetVisibilityEnum,
+  libraryProfileVisibilityEnum,
   linkTypeEnum,
   merchCardStatusEnum,
   merchDesignLaneEnum,
@@ -564,7 +565,7 @@ export {
   selectLeadSchema,
   selectLeadSearchResultSchema,
 } from './leads';
-// Library asset approval workflow (JOV-2932)
+// Library asset approval + independent profile visibility (JOV-2932, JOV-4662)
 export {
   insertLibraryAssetApprovalStatusSchema,
   type LibraryAssetApprovalStatusRow,

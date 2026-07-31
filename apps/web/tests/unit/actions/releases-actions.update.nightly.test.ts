@@ -10,6 +10,7 @@ const {
   mockRevalidateTag,
   mockRevalidatePath,
   mockGetReleaseById,
+  mockGetReleaseTrackSummariesForReleases,
   mockGetReleasesForProfile,
   mockGetTracksForReleaseWithProviders,
   mockUpsertProviderLink,
@@ -25,6 +26,9 @@ const {
   mockUpsertRecording,
   mockUpsertReleaseTrack,
   mockCaptureError,
+  mockHasReleaseClickAnalytics,
+  mockArchiveRelease,
+  mockRestoreRelease,
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
   mockGetDashboardData: vi.fn(),
@@ -32,6 +36,7 @@ const {
   mockRevalidateTag: vi.fn(),
   mockRevalidatePath: vi.fn(),
   mockGetReleaseById: vi.fn(),
+  mockGetReleaseTrackSummariesForReleases: vi.fn(),
   mockGetReleasesForProfile: vi.fn(),
   mockGetTracksForReleaseWithProviders: vi.fn(),
   mockUpsertProviderLink: vi.fn(),
@@ -47,6 +52,9 @@ const {
   mockUpsertRecording: vi.fn(),
   mockUpsertReleaseTrack: vi.fn(),
   mockCaptureError: vi.fn(),
+  mockHasReleaseClickAnalytics: vi.fn(),
+  mockArchiveRelease: vi.fn(),
+  mockRestoreRelease: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -99,6 +107,10 @@ vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: { id: 'id', settings: 'settings', spotifyId: 'spotifyId' },
 }));
 
+vi.mock('@/lib/db/queries/analytics', () => ({
+  hasReleaseClickAnalytics: mockHasReleaseClickAnalytics,
+}));
+
 vi.mock('@/lib/discography/config', () => ({
   PRIMARY_PROVIDER_KEYS: ['spotify', 'apple_music'],
   PROVIDER_CONFIG: {
@@ -114,6 +126,7 @@ vi.mock('@/lib/discography/provider-domains', () => ({
 
 vi.mock('@/lib/discography/queries', () => ({
   getReleaseById: mockGetReleaseById,
+  getReleaseTrackSummariesForReleases: mockGetReleaseTrackSummariesForReleases,
   getReleaseTracksForReleaseWithProviders: mockGetTracksForReleaseWithProviders,
   getReleasesForProfile: mockGetReleasesForProfile,
   getTracksForReleaseWithProviders: mockGetTracksForReleaseWithProviders,
@@ -123,6 +136,11 @@ vi.mock('@/lib/discography/queries', () => ({
   upsertReleaseTrack: mockUpsertReleaseTrack,
   resetProviderLink: mockResetProviderLinkDb,
   getProviderLink: mockGetProviderLink,
+}));
+
+vi.mock('@/lib/releases/release-lifecycle.server', () => ({
+  archiveRelease: mockArchiveRelease,
+  restoreRelease: mockRestoreRelease,
 }));
 
 vi.mock('@/lib/discography/spotify-import', () => ({
@@ -191,7 +209,11 @@ vi.mock('@/lib/utils/redirect-error', () => ({
 }));
 
 vi.mock('@/constants/routes', () => ({
-  APP_ROUTES: { RELEASES: '/dashboard/releases', START: '/start' },
+  APP_ROUTES: {
+    LIBRARY: '/app/library',
+    RELEASES: '/dashboard/releases',
+    START: '/start',
+  },
 }));
 
 vi.mock('@/lib/env-public', () => ({
@@ -334,6 +356,16 @@ describe('@critical releases/actions.ts — update/edit operations', () => {
     mockGetTracksForRelease.mockReset();
     mockUpsertRecording.mockReset();
     mockUpsertReleaseTrack.mockReset();
+    mockGetReleaseTrackSummariesForReleases.mockResolvedValue(new Map());
+    mockHasReleaseClickAnalytics.mockResolvedValue(false);
+    mockArchiveRelease.mockResolvedValue({
+      status: 'archived',
+      archivedAt: new Date(),
+    });
+    mockRestoreRelease.mockResolvedValue({
+      status: 'active',
+      archivedAt: null,
+    });
     mockGetCachedAuth.mockResolvedValue({ userId: MOCK_USER_ID });
     mockGetDashboardData.mockResolvedValue(makeDashboardData());
     mockRedirect.mockImplementation((url: string) => {
@@ -587,7 +619,11 @@ describe('@critical releases/actions.ts — update/edit operations', () => {
   describe('deleteRelease', () => {
     it('hard-deletes a manual Jovie-created release', async () => {
       mockGetReleaseById.mockResolvedValue(
-        makeRelease({ sourceType: 'manual', status: 'draft' })
+        makeRelease({
+          sourceType: 'manual',
+          status: 'draft',
+          releaseDate: null,
+        })
       );
       const deleteWhere = vi.fn().mockResolvedValue(undefined);
       mockDbDelete.mockReturnValue({ where: deleteWhere });
@@ -600,7 +636,7 @@ describe('@critical releases/actions.ts — update/edit operations', () => {
       expect(result.success).toBe(true);
       expect(result.mode).toBe('delete');
       expect(mockDbDelete).toHaveBeenCalled();
-      expect(mockDbUpdate).not.toHaveBeenCalled();
+      expect(mockArchiveRelease).not.toHaveBeenCalled();
       expect(mockRevalidateTag).toHaveBeenCalled();
       expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard/releases');
     });
@@ -613,8 +649,6 @@ describe('@critical releases/actions.ts — update/edit operations', () => {
           releaseDate: new Date('2020-01-01'),
         })
       );
-      setupDbUpdateChain();
-
       const { deleteRelease } = await import(
         '@/app/app/(shell)/dashboard/releases/actions'
       );
@@ -622,7 +656,83 @@ describe('@critical releases/actions.ts — update/edit operations', () => {
 
       expect(result.success).toBe(true);
       expect(result.mode).toBe('archive');
-      expect(mockDbUpdate).toHaveBeenCalled();
+      expect(mockArchiveRelease).toHaveBeenCalledWith({
+        releaseId: 'rel_001',
+        creatorProfileId: MOCK_PROFILE.id,
+      });
+      expect(mockDbDelete).not.toHaveBeenCalled();
+    });
+
+    it('archives manual published music instead of hard-deleting', async () => {
+      mockGetReleaseById.mockResolvedValue(
+        makeRelease({
+          sourceType: 'manual',
+          status: 'released',
+          releaseDate: new Date('2020-01-01'),
+        })
+      );
+
+      const { deleteRelease } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await deleteRelease({ releaseId: 'rel_001' });
+
+      expect(result.mode).toBe('archive');
+      expect(mockArchiveRelease).toHaveBeenCalled();
+      expect(mockDbDelete).not.toHaveBeenCalled();
+    });
+
+    it('archives an unpublished manual release with an ISRC', async () => {
+      mockGetReleaseById.mockResolvedValue(
+        makeRelease({
+          sourceType: 'manual',
+          status: 'draft',
+          releaseDate: null,
+        })
+      );
+      mockGetReleaseTrackSummariesForReleases.mockResolvedValue(
+        new Map([
+          [
+            'rel_001',
+            {
+              primaryIsrc: 'USABC1234567',
+              primaryPreviewUrl: null,
+              totalDurationMs: null,
+            },
+          ],
+        ])
+      );
+
+      const { deleteRelease } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await deleteRelease({ releaseId: 'rel_001' });
+
+      expect(result.mode).toBe('archive');
+      expect(mockArchiveRelease).toHaveBeenCalled();
+      expect(mockDbDelete).not.toHaveBeenCalled();
+    });
+
+    it('fails closed to archive when retention evidence cannot be read', async () => {
+      mockGetReleaseById.mockResolvedValue(
+        makeRelease({
+          sourceType: 'manual',
+          status: 'draft',
+          releaseDate: null,
+        })
+      );
+      mockGetReleaseTrackSummariesForReleases.mockRejectedValue(
+        new Error('database unavailable')
+      );
+
+      const { deleteRelease } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await deleteRelease({ releaseId: 'rel_001' });
+
+      expect(result.mode).toBe('archive');
+      expect(mockCaptureError).toHaveBeenCalled();
+      expect(mockArchiveRelease).toHaveBeenCalled();
       expect(mockDbDelete).not.toHaveBeenCalled();
     });
 
@@ -650,6 +760,48 @@ describe('@critical releases/actions.ts — update/edit operations', () => {
       await expect(deleteRelease({ releaseId: 'rel_001' })).rejects.toThrow(
         'Release not found'
       );
+    });
+  });
+
+  describe('restoreRelease', () => {
+    it('restores the owned release through canonical lifecycle state', async () => {
+      mockGetReleaseById.mockResolvedValue(
+        makeRelease({ deletedAt: new Date('2026-07-01') })
+      );
+
+      const { restoreRelease } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await restoreRelease({ releaseId: 'rel_001' });
+
+      expect(result).toEqual({ success: true });
+      expect(mockRestoreRelease).toHaveBeenCalledWith({
+        releaseId: 'rel_001',
+        creatorProfileId: MOCK_PROFILE.id,
+      });
+      expect(mockRevalidateTag).toHaveBeenCalled();
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard/releases');
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/library');
+    });
+  });
+
+  describe('archiveLibraryRelease', () => {
+    it('always soft-archives the owned release through canonical lifecycle state', async () => {
+      mockGetReleaseById.mockResolvedValue(makeRelease());
+
+      const { archiveLibraryRelease } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await archiveLibraryRelease({ releaseId: 'rel_001' });
+
+      expect(result).toEqual({ success: true });
+      expect(mockArchiveRelease).toHaveBeenCalledWith({
+        releaseId: 'rel_001',
+        creatorProfileId: MOCK_PROFILE.id,
+      });
+      expect(mockDbDelete).not.toHaveBeenCalled();
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard/releases');
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/library');
     });
   });
 

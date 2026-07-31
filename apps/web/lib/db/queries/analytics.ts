@@ -428,3 +428,25 @@ export async function getWeeklyReleaseClickCounts(
   }
   return counts;
 }
+
+/**
+ * Retention evidence for JOV-3374. This intentionally scans the full event
+ * history: a release with any recorded engagement must never be hard-deleted.
+ */
+export async function hasReleaseClickAnalytics(
+  creatorProfileId: string,
+  releaseId: string
+): Promise<boolean> {
+  const result = await db.execute<{ has_analytics: boolean }>(
+    drizzleSql`
+      select exists (
+        select 1
+        from ${clickEvents}
+        where ${clickEvents.creatorProfileId} = ${creatorProfileId}
+          and ${clickEvents.metadata} ->> 'contentId' = ${releaseId}
+      ) as has_analytics
+    `
+  );
+
+  return result.rows?.[0]?.has_analytics === true;
+}

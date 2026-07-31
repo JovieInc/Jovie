@@ -11,11 +11,16 @@ import {
 } from '@/app/app/(shell)/library/library-data';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
+import type { ReleaseViewModel } from '@/lib/discography/types';
 import {
   isLibraryApprovalStatus,
   type LibraryApprovalStatus,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import {
+  isLibraryProfileVisibility,
+  type LibraryProfileVisibility,
+} from '@/lib/library/profile-visibility';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { primaryProviderKeys, providerConfig } from './config';
@@ -26,7 +31,10 @@ export type ReleaseCatalogView = 'list' | 'assets';
 interface ReleaseCatalogPageClientProps {
   readonly view: ReleaseCatalogView;
   readonly merchCards?: readonly LibraryMerchCard[];
+  readonly archivedMerchCards?: readonly LibraryMerchCard[];
+  readonly archivedReleases?: readonly ReleaseViewModel[];
   readonly approvalStatusByAssetId?: Readonly<Record<string, string>>;
+  readonly profileVisibilityByAssetId?: Readonly<Record<string, string>>;
   readonly assetShareByAssetId?: Readonly<
     Record<string, LibraryAssetShareViewModel>
   >;
@@ -42,10 +50,25 @@ function toApprovalStatusMap(
   return new Map(entries);
 }
 
+function toProfileVisibilityMap(
+  profileVisibilityByAssetId: Readonly<Record<string, string>>
+): ReadonlyMap<string, LibraryProfileVisibility> {
+  const entries = Object.entries(profileVisibilityByAssetId).flatMap(
+    ([assetId, visibility]) =>
+      isLibraryProfileVisibility(visibility)
+        ? [[assetId, visibility] as const]
+        : []
+  );
+  return new Map(entries);
+}
+
 export function ReleaseCatalogPageClient({
   view,
   merchCards = [],
+  archivedMerchCards = [],
+  archivedReleases = [],
   approvalStatusByAssetId = {},
+  profileVisibilityByAssetId = {},
   assetShareByAssetId = {},
 }: ReleaseCatalogPageClientProps) {
   const { selectedProfile } = useDashboardData();
@@ -103,6 +126,9 @@ export function ReleaseCatalogPageClient({
       'Artist';
 
     const approvalStatusMap = toApprovalStatusMap(approvalStatusByAssetId);
+    const profileVisibilityMap = toProfileVisibilityMap(
+      profileVisibilityByAssetId
+    );
     const artistHandle =
       selectedProfile?.usernameNormalized?.trim() ||
       selectedProfile?.username?.trim() ||
@@ -120,13 +146,16 @@ export function ReleaseCatalogPageClient({
         profileId={profileId}
         artistHandle={artistHandle}
         assets={[
-          ...buildLibraryReleaseAssets(releases, approvalStatusMap).map(
-            withShare
-          ),
+          ...buildLibraryReleaseAssets(
+            [...releases, ...archivedReleases],
+            approvalStatusMap,
+            profileVisibilityMap
+          ).map(withShare),
           ...buildLibraryMerchAssets(
-            merchCards,
+            [...merchCards, ...archivedMerchCards],
             artistName,
-            approvalStatusMap
+            approvalStatusMap,
+            profileVisibilityMap
           ).map(withShare),
         ]}
       />

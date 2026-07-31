@@ -193,6 +193,7 @@ export interface LibraryMerchCard {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly publishedAt: string | null;
+  readonly archivedAt?: string | null;
 }
 
 export interface MerchCheckoutInput {

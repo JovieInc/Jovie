@@ -27,7 +27,6 @@ import {
   ArrowUpDown,
   Check,
   ChevronDown,
-  Copy,
   Disc3,
   ExternalLink,
   FileAudio2,
@@ -40,7 +39,6 @@ import {
   Music2,
   Pause,
   PlayCircle,
-  Share2,
   Shirt,
   Table2,
   Video,
@@ -61,6 +59,7 @@ import {
   useState,
 } from 'react';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
+import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { LibraryAssetSharePanel } from '@/components/features/library-asset-share/LibraryAssetSharePanel';
 import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-share/LibraryAssetShareUrlCell';
@@ -73,10 +72,7 @@ import {
   DrawerSectionGroup,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
-import {
-  type DrawerHeaderAction,
-  DrawerHeaderActions,
-} from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import {
   TOOLBAR_MENU_CONTENT_CLASS,
   ToolbarMenuChoiceItem,
@@ -97,6 +93,8 @@ import {
 } from '@/components/organisms/table';
 import {
   type ContextMenuItemType,
+  convertContextMenuItems,
+  convertToCommonDropdownItems,
   TableContextMenu,
 } from '@/components/organisms/table/molecules/TableContextMenu';
 import {
@@ -119,12 +117,18 @@ import {
   libraryApprovalStatusDotClasses,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import { updateLibraryProfileVisibility } from '@/lib/library/profile-visibility/client-mutations';
 import {
   releaseStatusClasses,
   releaseStatusDotClasses,
 } from '@/lib/library/release-status';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
+import {
+  archiveLibraryRelease,
+  restoreRelease,
+} from '../dashboard/releases/actions';
+import { archiveLibraryMerchCard, restoreLibraryMerchCard } from './actions';
 import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
 import {
   formatLibraryDuration,
@@ -143,6 +147,10 @@ import {
   libraryAssetMatchesView,
   stackLibraryReleaseVersions,
 } from './library-data';
+import {
+  buildLibraryEntityActions,
+  libraryEntityActionsToContextMenuItems,
+} from './library-entity-actions';
 import {
   LIBRARY_GRID_DENSITY_OPTIONS,
   useLibraryGridDensity,
@@ -193,6 +201,7 @@ type LibraryContextMenuBuilder = (
   asset: LibraryReleaseAsset
 ) => ContextMenuItemType[];
 const noopPreviewToggle: LibraryPreviewToggle = () => undefined;
+const noopContextMenuBuilder: LibraryContextMenuBuilder = () => [];
 const LibraryPreviewContext = createContext<{
   readonly playingPreviewId: string | null;
   readonly onTogglePreview: LibraryPreviewToggle;
@@ -200,6 +209,9 @@ const LibraryPreviewContext = createContext<{
   playingPreviewId: null,
   onTogglePreview: noopPreviewToggle,
 });
+const LibraryEntityActionContext = createContext<LibraryContextMenuBuilder>(
+  noopContextMenuBuilder
+);
 
 type LibraryFilters = {
   readonly statuses: Set<LibraryReleaseAsset['status']>;
@@ -244,7 +256,7 @@ const PRESETS: readonly {
     id: 'all',
     label: 'All',
     description: 'Releases, merch, images, videos, and audio',
-    predicate: () => true,
+    predicate: asset => libraryAssetMatchesView(asset, 'all'),
   },
   {
     id: 'releases',
@@ -275,6 +287,12 @@ const PRESETS: readonly {
     label: 'Audio',
     description: 'Playable previews',
     predicate: asset => libraryAssetMatchesView(asset, 'audio'),
+  },
+  {
+    id: 'archived',
+    label: 'Archived',
+    description: 'Archived releases and merch',
+    predicate: asset => libraryAssetMatchesView(asset, 'archived'),
   },
 ];
 
@@ -643,6 +661,33 @@ function createLibraryTypeColumn(
   });
 }
 
+const LibraryEntityActionCell = memo(function LibraryEntityActionCell({
+  asset,
+}: {
+  readonly asset: LibraryReleaseAsset;
+}) {
+  const getContextMenuItems = useContext(LibraryEntityActionContext);
+  const items = convertContextMenuItems(getContextMenuItems(asset));
+
+  return (
+    <div data-testid={`library-row-actions-${asset.id}`}>
+      <TableActionMenu items={items} align='end' />
+    </div>
+  );
+});
+
+function createLibraryActionColumn(metaClassName: string) {
+  return libraryColumnHelper.display({
+    id: 'actions',
+    header: () => <span className='sr-only'>Actions</span>,
+    cell: ({ row }) => <LibraryEntityActionCell asset={row.original} />,
+    size: 40,
+    minSize: 40,
+    enableSorting: false,
+    meta: { className: metaClassName },
+  });
+}
+
 // Slice 1 minimal catalog column set: status · artwork · title · artist · type.
 // Slice 2/3 adds BPM/key/energy/rating/waveform/DSP columns + the Tracks fold-in.
 const LIBRARY_CATALOG_COLUMNS = [
@@ -698,6 +743,7 @@ const LIBRARY_CATALOG_COLUMNS = [
     meta: { className: 'hidden md:table-cell px-2' },
   }),
   createLibraryTypeColumn('hidden sm:table-cell pl-2 pr-3', 120, 96),
+  createLibraryActionColumn('w-10 pl-1 pr-2'),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
 
 const LIBRARY_TABLE_COLUMNS = [
@@ -759,6 +805,7 @@ const LIBRARY_TABLE_COLUMNS = [
     enableSorting: false,
     meta: { className: 'hidden lg:table-cell px-2' },
   }),
+  createLibraryActionColumn('w-10 pl-1 pr-2'),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
 
 const LIBRARY_VIEW_FILTER_CHIP_KEYS = PRESETS.map(preset => preset.id);
@@ -1738,14 +1785,19 @@ function LibraryReleaseTable({
       skeletonColumnConfig={LIBRARY_TABLE_SKELETON_CONFIG}
     />
   );
+  const tableWithActions = (
+    <LibraryEntityActionContext.Provider value={getContextMenuItems}>
+      {table}
+    </LibraryEntityActionContext.Provider>
+  );
 
   if (!onTogglePreview) {
-    return table;
+    return tableWithActions;
   }
 
   return (
     <LibraryPreviewContext.Provider value={previewContext}>
-      {table}
+      {tableWithActions}
     </LibraryPreviewContext.Provider>
   );
 }
@@ -1925,47 +1977,24 @@ function ApprovalStatusEditor({
   asset,
   profileId,
   disabled,
+  saving,
   onStatusChange,
 }: {
   readonly asset: LibraryReleaseAsset;
   readonly profileId: string | null;
   readonly disabled: boolean;
+  readonly saving: boolean;
   readonly onStatusChange: (
-    assetId: string,
+    asset: LibraryReleaseAsset,
     approvalStatus: LibraryApprovalStatus
-  ) => void;
+  ) => Promise<void>;
 }) {
-  const [saving, setSaving] = useState(false);
-
   async function handleSelect(nextStatus: LibraryApprovalStatus) {
     if (!profileId || nextStatus === asset.approvalStatus) {
       return;
     }
 
-    setSaving(true);
-    onStatusChange(asset.id, nextStatus);
-
-    try {
-      const response = await fetch('/api/library/approval-status', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profileId,
-          assetId: asset.id,
-          itemKind: getLibraryItemKind(asset),
-          approvalStatus: nextStatus,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Approval status update failed');
-      }
-    } catch {
-      toast.error('Unable to update approval status right now');
-      onStatusChange(asset.id, asset.approvalStatus);
-    } finally {
-      setSaving(false);
-    }
+    await onStatusChange(asset, nextStatus);
   }
 
   const isDisabled = disabled || saving || !profileId;
@@ -2023,60 +2052,6 @@ function ApprovalStatusEditor({
   );
 }
 
-function buildLibraryDrawerOverflowActions({
-  asset,
-  isPreviewPlaying,
-  onTogglePreview,
-}: {
-  readonly asset: LibraryReleaseAsset;
-  readonly isPreviewPlaying: boolean;
-  readonly onTogglePreview: LibraryPreviewToggle;
-}): DrawerHeaderAction[] {
-  const href = asset.primaryActionHref ?? asset.smartLinkPath;
-  const items: DrawerHeaderAction[] = [];
-
-  if (asset.previewUrl) {
-    items.push({
-      id: 'play-preview',
-      label: isPreviewPlaying ? 'Pause Preview' : 'Play Preview',
-      icon: PlayCircle,
-      onClick: () => onTogglePreview(asset),
-    });
-  }
-
-  items.push({
-    id: 'open-smart-link',
-    label: 'Open Smart Link',
-    icon: ExternalLink,
-    onClick: () => {
-      globalThis.open(href, '_blank', 'noopener,noreferrer');
-    },
-  });
-
-  const shareUrl = asset.share?.shareUrl;
-  if (shareUrl) {
-    items.push({
-      id: 'copy-share-link',
-      label: 'Copy Share Link',
-      icon: Share2,
-      onClick: () => {
-        void globalThis.navigator?.clipboard?.writeText(shareUrl);
-      },
-    });
-  }
-
-  items.push({
-    id: 'copy-title',
-    label: 'Copy Title',
-    icon: Copy,
-    onClick: () => {
-      void globalThis.navigator?.clipboard?.writeText(asset.title);
-    },
-  });
-
-  return items;
-}
-
 function AssetDrawer({
   asset,
   open,
@@ -2087,6 +2062,7 @@ function AssetDrawer({
   onAudioUploaded,
   getContextMenuItems,
   profileId,
+  approvalSavingIds,
   artistHandle,
   pressKitCandidates,
   onApprovalStatusChange,
@@ -2101,12 +2077,13 @@ function AssetDrawer({
   readonly onAudioUploaded: (assetId: string, previewUrl: string) => void;
   readonly getContextMenuItems: LibraryContextMenuBuilder;
   readonly profileId: string | null;
+  readonly approvalSavingIds: ReadonlySet<string>;
   readonly artistHandle: string | null;
   readonly pressKitCandidates: readonly LibraryReleaseAsset[];
   readonly onApprovalStatusChange: (
-    assetId: string,
+    asset: LibraryReleaseAsset,
     approvalStatus: LibraryApprovalStatus
-  ) => void;
+  ) => Promise<void>;
   readonly onShareChange: (
     assetId: string,
     share: LibraryAssetShareViewModel
@@ -2140,11 +2117,7 @@ function AssetDrawer({
   const drawerHeaderActions = current ? (
     <DrawerHeaderActions
       primaryActions={[]}
-      overflowActions={buildLibraryDrawerOverflowActions({
-        asset: current,
-        isPreviewPlaying,
-        onTogglePreview,
-      })}
+      menuItems={convertToCommonDropdownItems(getContextMenuItems(current))}
       onClose={onClose}
     />
   ) : null;
@@ -2309,6 +2282,7 @@ function AssetDrawer({
                             asset={current}
                             profileId={profileId}
                             disabled={!open}
+                            saving={approvalSavingIds.has(current.id)}
                             onStatusChange={onApprovalStatusChange}
                           />
                         }
@@ -2481,6 +2455,21 @@ export function LibrarySurface({
   const [approvalStatusOverrides, setApprovalStatusOverrides] = useState<
     Record<string, LibraryApprovalStatus>
   >({});
+  const [approvalSavingIds, setApprovalSavingIds] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
+  const [profileVisibilityOverrides, setProfileVisibilityOverrides] = useState<
+    Record<string, LibraryReleaseAsset['profileVisibility']>
+  >({});
+  const [profileVisibilitySavingIds, setProfileVisibilitySavingIds] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
+  const [lifecycleStatusOverrides, setLifecycleStatusOverrides] = useState<
+    Record<string, NonNullable<LibraryReleaseAsset['lifecycleStatus']>>
+  >({});
+  const [lifecycleSavingIds, setLifecycleSavingIds] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
   const [shareOverrides, setShareOverrides] = useState<
     Record<string, LibraryAssetShareViewModel>
   >({});
@@ -2523,6 +2512,12 @@ export function LibrarySurface({
         const previewUrl = audioOverrides[asset.id];
         const approvalStatus =
           approvalStatusOverrides[asset.id] ?? asset.approvalStatus;
+        const profileVisibility =
+          profileVisibilityOverrides[asset.id] ?? asset.profileVisibility;
+        const lifecycleStatus =
+          lifecycleStatusOverrides[asset.id] ??
+          asset.lifecycleStatus ??
+          'active';
         const share = shareOverrides[asset.id] ?? asset.share ?? null;
         const assetKinds: readonly LibraryAssetKind[] =
           previewUrl && !asset.assetKinds.includes('preview')
@@ -2532,6 +2527,8 @@ export function LibrarySurface({
         if (
           !previewUrl &&
           approvalStatus === asset.approvalStatus &&
+          profileVisibility === asset.profileVisibility &&
+          lifecycleStatus === (asset.lifecycleStatus ?? 'active') &&
           share === (asset.share ?? null)
         ) {
           return asset;
@@ -2541,11 +2538,20 @@ export function LibrarySurface({
           ...asset,
           ...(previewUrl ? { previewUrl } : {}),
           approvalStatus,
+          profileVisibility,
+          lifecycleStatus,
           share,
           assetKinds,
         };
       }),
-    [approvalStatusOverrides, assets, audioOverrides, shareOverrides]
+    [
+      approvalStatusOverrides,
+      assets,
+      audioOverrides,
+      lifecycleStatusOverrides,
+      profileVisibilityOverrides,
+      shareOverrides,
+    ]
   );
 
   const visibleAssets = useMemo(() => {
@@ -2676,64 +2682,179 @@ export function LibrarySurface({
     setDrawerOpen(true);
   }
 
-  const getContextMenuItems = useCallback<LibraryContextMenuBuilder>(
-    asset => {
-      const href = asset.primaryActionHref ?? asset.smartLinkPath;
-      const items: ContextMenuItemType[] = [];
-
-      if (asset.previewUrl) {
-        items.push({
-          id: 'play-preview',
-          label:
-            playingPreviewId === asset.id ? 'Pause Preview' : 'Play Preview',
-          icon: <PlayCircle className='h-3.5 w-3.5' />,
-          onClick: () => handleTogglePreview(asset),
-        });
-      }
-
-      items.push({
-        id: 'open-smart-link',
-        label: 'Open Smart Link',
-        icon: <ExternalLink className='h-3.5 w-3.5' />,
-        onClick: () => {
-          globalThis.open(href, '_blank', 'noopener,noreferrer');
-        },
-      });
-
-      const shareUrl = asset.share?.shareUrl;
-      if (shareUrl) {
-        items.push({
-          id: 'copy-share-link',
-          label: 'Copy Share Link',
-          icon: <Share2 className='h-3.5 w-3.5' />,
-          onClick: () => {
-            void globalThis.navigator?.clipboard?.writeText(shareUrl);
-          },
-        });
-      }
-
-      items.push({
-        id: 'copy-title',
-        label: 'Copy Title',
-        icon: <Copy className='h-3.5 w-3.5' />,
-        onClick: () => {
-          void globalThis.navigator?.clipboard?.writeText(asset.title);
-        },
-      });
-
-      return items;
-    },
-    [handleTogglePreview, playingPreviewId]
-  );
-
   const handleApprovalStatusChange = useCallback(
-    (assetId: string, approvalStatus: LibraryApprovalStatus) => {
+    async (
+      asset: LibraryReleaseAsset,
+      approvalStatus: LibraryApprovalStatus
+    ) => {
+      if (!profileId || approvalStatus === asset.approvalStatus) {
+        return;
+      }
+
+      setApprovalSavingIds(previous => new Set(previous).add(asset.id));
       setApprovalStatusOverrides(previous => ({
         ...previous,
-        [assetId]: approvalStatus,
+        [asset.id]: approvalStatus,
       }));
+
+      try {
+        const response = await fetch('/api/library/approval-status', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            profileId,
+            assetId: asset.id,
+            itemKind: getLibraryItemKind(asset),
+            approvalStatus,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Approval status update failed');
+        }
+      } catch {
+        toast.error('Unable to update approval status right now');
+        setApprovalStatusOverrides(previous => ({
+          ...previous,
+          [asset.id]: asset.approvalStatus,
+        }));
+      } finally {
+        setApprovalSavingIds(previous => {
+          const next = new Set(previous);
+          next.delete(asset.id);
+          return next;
+        });
+      }
     },
-    []
+    [profileId]
+  );
+
+  const handleProfileVisibilityChange = useCallback(
+    async (
+      asset: LibraryReleaseAsset,
+      profileVisibility: LibraryReleaseAsset['profileVisibility']
+    ) => {
+      if (!profileId || profileVisibility === asset.profileVisibility) {
+        return;
+      }
+
+      setProfileVisibilitySavingIds(previous =>
+        new Set(previous).add(asset.id)
+      );
+      setProfileVisibilityOverrides(previous => ({
+        ...previous,
+        [asset.id]: profileVisibility,
+      }));
+
+      try {
+        await updateLibraryProfileVisibility({
+          profileId,
+          assetId: asset.id,
+          itemKind: getLibraryItemKind(asset),
+          profileVisibility,
+        });
+      } catch {
+        toast.error('Unable to update profile visibility right now');
+        setProfileVisibilityOverrides(previous => ({
+          ...previous,
+          [asset.id]: asset.profileVisibility,
+        }));
+      } finally {
+        setProfileVisibilitySavingIds(previous => {
+          const next = new Set(previous);
+          next.delete(asset.id);
+          return next;
+        });
+      }
+    },
+    [profileId]
+  );
+
+  const handleLifecycleChange = useCallback(
+    async (
+      asset: LibraryReleaseAsset,
+      lifecycleStatus: NonNullable<LibraryReleaseAsset['lifecycleStatus']>
+    ) => {
+      if (
+        !profileId ||
+        lifecycleStatus === (asset.lifecycleStatus ?? 'active')
+      ) {
+        return;
+      }
+
+      setLifecycleSavingIds(previous => new Set(previous).add(asset.id));
+      setLifecycleStatusOverrides(previous => ({
+        ...previous,
+        [asset.id]: lifecycleStatus,
+      }));
+
+      try {
+        if (getLibraryItemKind(asset) === 'merch') {
+          const merchCardId = asset.id.replace(/^merch-/, '');
+          if (lifecycleStatus === 'archived') {
+            await archiveLibraryMerchCard({ merchCardId, profileId });
+          } else {
+            await restoreLibraryMerchCard({ merchCardId, profileId });
+          }
+        } else if (lifecycleStatus === 'archived') {
+          await archiveLibraryRelease({ releaseId: asset.id });
+        } else {
+          await restoreRelease({ releaseId: asset.id });
+        }
+      } catch {
+        toast.error(
+          lifecycleStatus === 'archived'
+            ? 'Unable to archive release right now'
+            : 'Unable to restore release right now'
+        );
+        setLifecycleStatusOverrides(previous => ({
+          ...previous,
+          [asset.id]: asset.lifecycleStatus ?? 'active',
+        }));
+      } finally {
+        setLifecycleSavingIds(previous => {
+          const next = new Set(previous);
+          next.delete(asset.id);
+          return next;
+        });
+      }
+    },
+    [profileId]
+  );
+
+  const getContextMenuItems = useCallback<LibraryContextMenuBuilder>(
+    asset =>
+      libraryEntityActionsToContextMenuItems(
+        buildLibraryEntityActions({
+          asset,
+          profileId,
+          isPreviewPlaying: playingPreviewId === asset.id,
+          isApprovalSaving: approvalSavingIds.has(asset.id),
+          profileVisibility: {
+            value: asset.profileVisibility,
+            isSaving: profileVisibilitySavingIds.has(asset.id),
+            onChange: handleProfileVisibilityChange,
+          },
+          lifecycle: {
+            value: asset.lifecycleStatus ?? 'active',
+            isSaving: lifecycleSavingIds.has(asset.id),
+            onChange: handleLifecycleChange,
+          },
+          onTogglePreview: handleTogglePreview,
+          onApprovalStatusChange: handleApprovalStatusChange,
+        })
+      ),
+    [
+      approvalSavingIds,
+      handleApprovalStatusChange,
+      handleLifecycleChange,
+      handleProfileVisibilityChange,
+      handleTogglePreview,
+      lifecycleSavingIds,
+      playingPreviewId,
+      profileId,
+      profileVisibilitySavingIds,
+    ]
   );
 
   const handleShareChange = useCallback(
@@ -2835,6 +2956,7 @@ export function LibrarySurface({
         onAudioUploaded={handleAudioUploaded}
         getContextMenuItems={getContextMenuItems}
         profileId={profileId}
+        approvalSavingIds={approvalSavingIds}
         artistHandle={artistHandle}
         pressKitCandidates={effectiveAssets.filter(
           item => getLibraryItemKind(item) === 'release'
@@ -2845,6 +2967,7 @@ export function LibrarySurface({
     ),
     [
       activePreviewId,
+      approvalSavingIds,
       artistHandle,
       drawerOpen,
       effectiveAssets,

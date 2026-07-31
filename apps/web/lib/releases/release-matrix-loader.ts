@@ -48,11 +48,12 @@ async function requireProfile(profileId?: string): Promise<{
 
 async function fetchReleaseMatrixCore(
   profileId: string,
-  profileHandle: string
+  profileHandle: string,
+  lifecycle: 'active' | 'archived' = 'active'
 ): Promise<ReleaseViewModel[]> {
   const providerLabels = buildProviderLabels();
   const [releases, weeklyClickCounts] = await Promise.all([
-    getReleasesFromDb(profileId, { includeDrafts: true }),
+    getReleasesFromDb(profileId, { includeDrafts: true, lifecycle }),
     // Weekly metric degrades gracefully: a failed aggregate never blocks the
     // releases list — rows just render the "—" placeholder.
     getWeeklyReleaseClickCounts(profileId).catch(
@@ -159,6 +160,34 @@ export async function loadReleaseMatrixForProfile(
     () => fetchReleaseMatrixCore(profile.profileId, profile.profileHandle),
     [
       'releases-matrix',
+      profile.userId,
+      profile.profileId,
+      profile.profileHandle,
+    ],
+    {
+      revalidate: CACHE_TTL.MEDIUM,
+      tags: [`releases:${profile.userId}:${profile.profileId}`],
+    }
+  )();
+}
+
+export async function loadArchivedReleaseMatrixForProfile(
+  profile: ReleaseProfileContext
+): Promise<ReleaseViewModel[]> {
+  const { userId } = await getCachedAuth();
+  if (!userId || userId !== profile.userId) {
+    throw new Error('Unauthorized');
+  }
+
+  return unstable_cache(
+    () =>
+      fetchReleaseMatrixCore(
+        profile.profileId,
+        profile.profileHandle,
+        'archived'
+      ),
+    [
+      'releases-matrix-archived',
       profile.userId,
       profile.profileId,
       profile.profileHandle,
