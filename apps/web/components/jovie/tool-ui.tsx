@@ -654,9 +654,7 @@ function renderVideoRecordingArtifact(
   );
 }
 
-function isPresenceBuildArtifactOutput(
-  output: unknown
-): output is {
+function isPresenceBuildArtifactOutput(output: unknown): output is {
   action: 'presence_build_artifact';
   title?: string;
   summary?: string;
@@ -708,7 +706,9 @@ function renderPresenceBuildArtifact(event: PersistedToolEvent): ReactNode {
           : event.summary
       }
       facts={Array.isArray(event.output.facts) ? event.output.facts : []}
-      href={typeof event.output.href === 'string' ? event.output.href : undefined}
+      href={
+        typeof event.output.href === 'string' ? event.output.href : undefined
+      }
       draftText={
         typeof event.output.draftText === 'string'
           ? event.output.draftText

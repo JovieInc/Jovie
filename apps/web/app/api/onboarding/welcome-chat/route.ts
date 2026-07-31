@@ -19,9 +19,7 @@ import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { getAppFlagValue } from '@/lib/flags/server';
-import {
-  seedOnboardingPresenceBuild,
-} from '@/lib/onboarding/presence-build';
+import { seedOnboardingPresenceBuild } from '@/lib/onboarding/presence-build';
 import { getCurrentOnboardingSessionId } from '@/lib/onboarding/session';
 import { buildWelcomeMessage } from '@/lib/services/onboarding/welcome-message';
 

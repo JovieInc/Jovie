@@ -8,6 +8,8 @@ const {
   mockGetSessionErrorResponse,
   mockGetCurrentOnboardingSessionId,
   mockWithDbSessionTx,
+  mockGetAppFlagValue,
+  mockSeedOnboardingPresenceBuild,
 } = vi.hoisted(() => ({
   mockBuildWelcomeMessage: vi.fn(),
   mockCaptureError: vi.fn(),
@@ -15,6 +17,8 @@ const {
   mockGetSessionErrorResponse: vi.fn(),
   mockGetCurrentOnboardingSessionId: vi.fn(),
   mockWithDbSessionTx: vi.fn(),
+  mockGetAppFlagValue: vi.fn(),
+  mockSeedOnboardingPresenceBuild: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/session', () => ({
@@ -38,9 +42,21 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
 }));
 
+vi.mock('@/lib/flags/server', () => ({
+  getAppFlagValue: mockGetAppFlagValue,
+}));
+
+vi.mock('@/lib/onboarding/presence-build', () => ({
+  seedOnboardingPresenceBuild: mockSeedOnboardingPresenceBuild,
+}));
+
 function createTransaction(selectResults: unknown[] = []) {
   const results = [...selectResults];
-  const insertReturningResults: unknown[] = [[{ id: 'conv_new' }], [], []];
+  const insertReturningResults: unknown[] = [
+    [{ id: 'conv_new' }],
+    [{ id: 'msg_welcome' }],
+    [],
+  ];
 
   const updateWhereMock = vi.fn().mockResolvedValue(undefined);
   const updateSetMock = vi.fn(() => ({
@@ -101,6 +117,12 @@ describe('POST /api/onboarding/welcome-chat', () => {
     mockBuildWelcomeMessage.mockReturnValue('Welcome to Jovie');
     mockGetSessionErrorResponse.mockReturnValue(null);
     mockGetCurrentOnboardingSessionId.mockResolvedValue(null);
+    mockGetAppFlagValue.mockResolvedValue(true);
+    mockSeedOnboardingPresenceBuild.mockResolvedValue({
+      workflowRunId: 'run_presence_1',
+      toolEvents: [],
+      reused: false,
+    });
   });
 
   it('returns 404 when the authenticated user has no profile', async () => {
@@ -160,9 +182,11 @@ describe('POST /api/onboarding/welcome-chat', () => {
       conversationId: 'conv_existing',
       route: '/app/chat/conv_existing?panel=profile&from=onboarding',
       reused: true,
+      presenceBuildRunId: null,
     });
     expect(tx.insert).not.toHaveBeenCalled();
     expect(tx.update).not.toHaveBeenCalled();
+    expect(mockSeedOnboardingPresenceBuild).not.toHaveBeenCalled();
   });
 
   it('creates a new welcome conversation and returns the onboarding chat route', async () => {
@@ -200,6 +224,7 @@ describe('POST /api/onboarding/welcome-chat', () => {
       conversationId: 'conv_new',
       route: '/app/chat/conv_new?panel=profile&from=onboarding',
       reused: false,
+      presenceBuildRunId: 'run_presence_1',
     });
     expect(mockBuildWelcomeMessage).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -213,6 +238,47 @@ describe('POST /api/onboarding/welcome-chat', () => {
     );
     expect(tx.insert).toHaveBeenCalledTimes(3);
     expect(tx.update).toHaveBeenCalledTimes(1);
+    expect(mockSeedOnboardingPresenceBuild).toHaveBeenCalledWith({
+      userId: 'db_user_123',
+      profileId: 'profile_123',
+      conversationId: 'conv_new',
+      messageId: 'msg_welcome',
+    });
+  });
+
+  it('skips presence-build seed when the kill-switch flag is off', async () => {
+    mockGetAppFlagValue.mockResolvedValueOnce(false);
+    const tx = createTransaction([
+      [],
+      [],
+      [{ value: 0 }],
+      [{ value: 0 }],
+      [{ value: 0 }],
+      [{ value: 0 }],
+      [
+        {
+          careerHighlights: null,
+          displayName: 'Artist',
+          spotifyId: null,
+          spotifyUrl: null,
+          username: 'artist',
+        },
+      ],
+    ]);
+    mockWithDbSessionTx.mockImplementationOnce(async callback => callback(tx));
+
+    const { POST } = await import('@/app/api/onboarding/welcome-chat/route');
+    const response = await POST(
+      new Request('http://localhost/api/onboarding/welcome-chat', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      })
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(payload.presenceBuildRunId).toBeNull();
+    expect(mockSeedOnboardingPresenceBuild).not.toHaveBeenCalled();
   });
 
   it('adopts the claimed anonymous conversation onto the active profile', async () => {
@@ -235,6 +301,7 @@ describe('POST /api/onboarding/welcome-chat', () => {
       conversationId: 'conv_claimed',
       route: '/app/chat/conv_claimed?panel=profile&from=onboarding',
       reused: true,
+      presenceBuildRunId: null,
     });
     expect(tx.updateSetMock).toHaveBeenCalledWith(
       expect.objectContaining({

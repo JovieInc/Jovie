@@ -7,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@jovie/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
   Archive,
@@ -15,7 +16,6 @@ import {
   Ellipsis,
   RefreshCw,
 } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChatEntityPanelProvider } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
