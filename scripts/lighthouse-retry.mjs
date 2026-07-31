@@ -227,6 +227,25 @@ function formatDeadlineReceipt({
   return parts.join(' ');
 }
 
+/**
+ * @typedef {object} LighthouseAttemptMeta
+ * @property {number | null | undefined} [timeoutMs]
+ * @property {number} [remainingMs]
+ * @property {number} [minAttemptBudgetMs]
+ */
+
+/**
+ * @param {object} options
+ * @param {(attempt: number, meta: LighthouseAttemptMeta) => Promise<{ code: number; output?: string; timedOut?: boolean; reportFiles?: string[] }>} options.executeAttempt
+ * @param {number} [options.maxAttempts]
+ * @param {number} [options.cooldownMs]
+ * @param {number | null} [options.deadlineMs]
+ * @param {number | null} [options.minAttemptBudgetMs]
+ * @param {string | null} [options.routeLabel]
+ * @param {(milliseconds: number) => Promise<void>} [options.sleep]
+ * @param {() => number} [options.now]
+ * @param {(message: string) => unknown} [options.report]
+ */
 export async function runWithClassifiedRetries({
   executeAttempt,
   maxAttempts = 3,
@@ -465,9 +484,9 @@ export async function main(argv = process.argv.slice(2)) {
   const routeLabel = process.env.LIGHTHOUSE_ROUTE_LABEL?.trim() || null;
 
   const result = await runWithClassifiedRetries({
-    executeAttempt: (_attempt, meta = {}) =>
+    executeAttempt: (_attempt, meta) =>
       runStreamingAttempt(command, args, {
-        timeoutMs: meta.timeoutMs,
+        timeoutMs: meta?.timeoutMs ?? undefined,
       }),
     maxAttempts,
     cooldownMs,

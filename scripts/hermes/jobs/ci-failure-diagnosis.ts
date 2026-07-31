@@ -7,6 +7,7 @@ export type CiFailureClass =
   | 'required_smoke_suppressed_by_dependency_skip'
   | 'storybook_browser_iframe_transport'
   | 'lighthouse_protocol_timeout'
+  | 'lighthouse_job_deadline'
   | 'lighthouse_loopback_origin_drift'
   | 'lighthouse_deterministic_assertion'
   | 'bounded_source_scan_timeout'

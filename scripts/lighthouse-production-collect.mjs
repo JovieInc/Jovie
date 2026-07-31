@@ -116,7 +116,8 @@ function listLhrFiles(directory) {
   try {
     return readdirSync(directory)
       .filter(name => /^lhr-\d+\.json$/.test(name))
-      .toSorted();
+      .slice()
+      .sort();
   } catch {
     return [];
   }
@@ -128,25 +129,60 @@ function resetDirectory(directory) {
 }
 
 /**
+ * @typedef {object} ProductionRouteAttemptResult
+ * @property {number} code
+ * @property {string} [output]
+ * @property {string[]} [reportFiles]
+ * @property {boolean} [abortedForDeadline]
+ */
+
+/**
+ * @typedef {object} CollectProductionRoutesOptions
+ * @property {string} configPath
+ * @property {string} [reportsDir]
+ * @property {number} [maxAttempts]
+ * @property {number} [cooldownMs]
+ * @property {number | null} [deadlineMs]
+ * @property {number} [estimatedRunMs]
+ * @property {number} [overheadMs]
+ * @property {(args: {
+ *   url: string;
+ *   routeLabel: string;
+ *   routeIndex: number;
+ *   attempt: number;
+ *   numberOfRuns: number;
+ *   rawConfig: unknown;
+ *   timeoutMs: number | undefined;
+ * }) => Promise<ProductionRouteAttemptResult>} executeRouteAttempt
+ * @property {() => number} [now]
+ * @property {(milliseconds: number) => Promise<void>} [sleep]
+ * @property {(message: string) => unknown} [report]
+ * @property {(path: string) => unknown} [readConfig]
+ */
+
+/**
  * Collect each production route independently under a shared job deadline.
  * Retries are per-route and only start when the remaining budget can fit a full
  * numberOfRuns attempt. Incomplete evidence fails closed.
+ *
+ * @param {CollectProductionRoutesOptions} options
  */
-export async function collectProductionRoutes({
-  configPath,
-  reportsDir = DEFAULT_REPORTS_DIR,
-  maxAttempts = 3,
-  cooldownMs = 10_000,
-  deadlineMs = null,
-  estimatedRunMs = DEFAULT_ESTIMATED_RUN_MS,
-  overheadMs = DEFAULT_ATTEMPT_OVERHEAD_MS,
-  executeRouteAttempt,
-  now = Date.now,
-  sleep = milliseconds =>
-    new Promise(resolve => setTimeout(resolve, milliseconds)),
-  report = message => process.stderr.write(`${message}\n`),
-  readConfig = path => JSON.parse(readFileSync(path, 'utf8')),
-} = {}) {
+export async function collectProductionRoutes(options) {
+  const {
+    configPath,
+    reportsDir = DEFAULT_REPORTS_DIR,
+    maxAttempts = 3,
+    cooldownMs = 10_000,
+    deadlineMs = null,
+    estimatedRunMs = DEFAULT_ESTIMATED_RUN_MS,
+    overheadMs = DEFAULT_ATTEMPT_OVERHEAD_MS,
+    executeRouteAttempt,
+    now = Date.now,
+    sleep = milliseconds =>
+      new Promise(resolve => setTimeout(resolve, milliseconds)),
+    report = message => process.stderr.write(`${message}\n`),
+    readConfig = path => JSON.parse(readFileSync(path, 'utf8')),
+  } = options ?? {};
   if (!configPath) {
     throw new Error('configPath is required');
   }
