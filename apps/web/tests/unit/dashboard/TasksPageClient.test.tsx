@@ -1117,6 +1117,9 @@ describe('TasksPageClient', () => {
     openTask(mockHelperTask);
 
     expect(screen.getByTestId('task-description-helper')).toBeInTheDocument();
+    expect(screen.getByLabelText('Task Description')).not.toHaveAttribute(
+      'placeholder'
+    );
     expect(screen.getByText('Press Release')).toBeInTheDocument();
     expect(
       screen.getByText(/tag @Jovie and ask her to draft a first pass/i)

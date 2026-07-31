@@ -854,7 +854,9 @@ function TaskDocumentPanel({
                 value={description}
                 onFocus={handleDescriptionFocus}
                 onChange={event => onDescriptionChange(event.target.value)}
-                placeholder='Start writing...'
+                placeholder={
+                  showDescriptionHelper ? undefined : 'Start writing...'
+                }
                 className='min-h-130 w-full resize-none rounded-md border-0 bg-transparent px-0 py-0 text-mid leading-[1.8] text-primary-token outline-none placeholder:text-[color-mix(in_oklab,var(--text-tertiary)_82%,transparent)] transition-colors duration-fast focus:outline-none! focus-visible:ring-0! focus:shadow-none! focus-visible:bg-[color-mix(in_oklab,var(--linear-border-focus)_16%,transparent)]'
                 style={{ boxShadow: 'none' }}
               />
