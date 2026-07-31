@@ -1,5 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   LANE_COMMANDS,
@@ -148,6 +150,49 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(controlTest).toContain(
       'lib/__tests__/merge-group-workflow-contract.test.mjs'
     );
+  });
+
+  it('always materializes ci-fast-lanes.json even when setup fails (JOV-4446)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ci-fast-lanes-'));
+    const outPath = join(dir, 'ci-fast-lanes.json');
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [resolve(REPO_ROOT, 'scripts/ci-fast-lanes.mjs')],
+        {
+          cwd: REPO_ROOT,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CI_FAST_LANE_GROUP: 'not-a-real-group',
+            CI_FAST_LANES_OUT: outPath,
+          },
+        }
+      );
+      expect(result.status).not.toBe(0);
+      const payload = JSON.parse(readFileSync(outPath, 'utf8'));
+      expect(payload.schemaVersion).toBe(1);
+      expect(payload.job).toBe('ci-fast');
+      expect(payload.group).toBe('not-a-real-group');
+      expect(payload.lanes).toEqual([]);
+      expect(String(payload.setupError)).toMatch(/Unknown CI_FAST_LANE_GROUP/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('uploads ci-fast lane artifacts with warn-not-error missing policy (JOV-4446)', () => {
+    for (const { jobId, nextJobId } of HOSTED_GROUP_JOBS) {
+      const block = jobBlock(jobId, nextJobId);
+      expect(block).toContain(
+        'CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes.json'
+      );
+      expect(block).toContain('path: ${{ runner.temp }}/ci-fast-lanes.json');
+      expect(block).toContain('if-no-files-found: warn');
+      expect(block).toMatch(
+        /github\.event_name == 'merge_group' && github\.event\.merge_group\.base_sha/
+      );
+    }
   });
 
   it('keeps structural setup out of typecheck and fails closed in the aggregate', () => {

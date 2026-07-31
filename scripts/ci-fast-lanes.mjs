@@ -405,51 +405,14 @@ function writeSummary(results, groupId) {
   appendFileSync(summaryPath, `${lines.join('\n')}\n`);
 }
 
-function main() {
-  const laneGroup = process.env.CI_FAST_LANE_GROUP;
-  const selectedLanes = selectLanes(laneGroup);
-  /** @type {LaneResult[]} */
-  const results = [];
-
-  for (const lane of selectedLanes) {
-    console.log(`\n======== lane: ${lane.id} ========`);
-    let outcome;
-    try {
-      outcome = lane.run();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.stack || error.message : String(error);
-      outcome = { code: 1, output: message };
-    }
-
-    const skipped = Boolean(outcome.skipped);
-    const status = skipped
-      ? 'skipped'
-      : outcome.code === 0
-        ? 'success'
-        : 'failure';
-    const logExcerpt = excerpt(outcome.output);
-
-    if (status === 'failure') {
-      annotateFailure(lane, logExcerpt);
-    }
-
-    console.log(`[ci-fast] ${lane.id}: ${status}`);
-    if (logExcerpt && status !== 'success') {
-      console.log(logExcerpt);
-    }
-
-    results.push({
-      id: lane.id,
-      name: lane.name,
-      nextLocalCommand: lane.nextLocalCommand,
-      status,
-      logExcerpt,
-    });
-  }
-
-  writeSummary(results, laneGroup);
-
+/**
+ * Always materialize CI_FAST_LANES_OUT so the workflow upload step never sees
+ * a missing artifact path (JOV-4446: "No files were found ... ci-fast-lanes.json").
+ * @param {LaneResult[]} results
+ * @param {string | undefined} laneGroup
+ * @param {string | undefined} setupError
+ */
+function writeLaneResults(results, laneGroup, setupError) {
   const outPath =
     process.env.CI_FAST_LANES_OUT || resolve(REPO_ROOT, 'ci-fast-lanes.json');
   writeFileSync(
@@ -460,6 +423,7 @@ function main() {
         job: 'ci-fast',
         group: laneGroup || 'all',
         lanes: results,
+        setupError: setupError || null,
         generatedAt: new Date().toISOString(),
       },
       null,
@@ -467,6 +431,67 @@ function main() {
     )
   );
   console.log(`[ci-fast] wrote lane results → ${outPath}`);
+  return outPath;
+}
+
+function main() {
+  const laneGroup = process.env.CI_FAST_LANE_GROUP;
+  /** @type {LaneResult[]} */
+  const results = [];
+  /** @type {string | undefined} */
+  let setupError;
+
+  try {
+    const selectedLanes = selectLanes(laneGroup);
+
+    for (const lane of selectedLanes) {
+      console.log(`\n======== lane: ${lane.id} ========`);
+      let outcome;
+      try {
+        outcome = lane.run();
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.stack || error.message : String(error);
+        outcome = { code: 1, output: message };
+      }
+
+      const skipped = Boolean(outcome.skipped);
+      const status = skipped
+        ? 'skipped'
+        : outcome.code === 0
+          ? 'success'
+          : 'failure';
+      const logExcerpt = excerpt(outcome.output);
+
+      if (status === 'failure') {
+        annotateFailure(lane, logExcerpt);
+      }
+
+      console.log(`[ci-fast] ${lane.id}: ${status}`);
+      if (logExcerpt && status !== 'success') {
+        console.log(logExcerpt);
+      }
+
+      results.push({
+        id: lane.id,
+        name: lane.name,
+        nextLocalCommand: lane.nextLocalCommand,
+        status,
+        logExcerpt,
+      });
+    }
+  } catch (error) {
+    setupError =
+      error instanceof Error ? error.stack || error.message : String(error);
+    console.error(`[ci-fast] setup failed: ${setupError}`);
+  }
+
+  writeSummary(results, laneGroup);
+  writeLaneResults(results, laneGroup, setupError);
+
+  if (setupError) {
+    process.exit(1);
+  }
 
   const failed = results.filter(r => r.status === 'failure');
   if (failed.length > 0) {
