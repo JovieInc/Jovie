@@ -9,6 +9,7 @@ import { chatAuditLog } from '@/lib/db/schema/chat';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { NO_CACHE_HEADERS } from '@/lib/http/headers';
 import {
+  getMerchProductOptions,
   publishMerchCard,
   selectMerchDesign,
   updateMerchCardStatus,
@@ -27,11 +28,21 @@ const confirmMerchSelectSchema = chatToolSchema({
   generationId: z.string().uuid(),
   optionId: z.string().uuid(),
   optionNumber: z.number().int().min(1).max(4),
+  catalogProductId: z.number().int().positive(),
   action: z.literal('select'),
+});
+
+const confirmMerchProductsSchema = chatToolSchema({
+  profileId: z.string().uuid(),
+  generationId: z.string().uuid(),
+  optionId: z.string().uuid(),
+  optionNumber: z.number().int().min(1).max(4),
+  action: z.literal('products'),
 });
 
 const confirmMerchActionSchema = z.union([
   confirmMerchSelectSchema,
+  confirmMerchProductsSchema,
   confirmMerchStatusActionSchema,
 ]);
 
@@ -92,6 +103,20 @@ export async function POST(req: Request) {
       );
     }
 
+    if (action === 'products') {
+      const products = await getMerchProductOptions({
+        generationId: parseResult.data.generationId,
+        clerkUserId: userId,
+        profileId,
+        optionId: parseResult.data.optionId,
+        optionNumber: parseResult.data.optionNumber,
+      });
+      return NextResponse.json(
+        { success: true, products },
+        { headers: NO_CACHE_HEADERS }
+      );
+    }
+
     if (action === 'select') {
       const result = await selectMerchDesign({
         generationId: parseResult.data.generationId,
@@ -99,6 +124,7 @@ export async function POST(req: Request) {
         profileId,
         optionId: parseResult.data.optionId,
         optionNumber: parseResult.data.optionNumber,
+        catalogProductId: parseResult.data.catalogProductId,
         publish: false,
       });
 
@@ -118,6 +144,7 @@ export async function POST(req: Request) {
         newValue: JSON.stringify({
           merchCardId: result.merchCardId,
           selectedOptionId: result.selectedOptionId,
+          catalogProductId: parseResult.data.catalogProductId,
           status: result.status,
         }),
         ipAddress: ipAddress ?? null,

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const hoisted = vi.hoisted(() => ({
   authMock: vi.fn(),
   findFirstMock: vi.fn(),
+  getMerchProductOptionsMock: vi.fn(),
   publishMerchCardMock: vi.fn(),
   selectMerchDesignMock: vi.fn(),
   updateMerchCardStatusMock: vi.fn(),
@@ -38,6 +39,7 @@ vi.mock('@/lib/db/schema/chat', () => ({
 vi.mock('drizzle-orm', () => ({ eq: vi.fn() }));
 
 vi.mock('@/lib/merch/service', () => ({
+  getMerchProductOptions: hoisted.getMerchProductOptionsMock,
   publishMerchCard: hoisted.publishMerchCardMock,
   selectMerchDesign: hoisted.selectMerchDesignMock,
   updateMerchCardStatus: hoisted.updateMerchCardStatusMock,
@@ -65,6 +67,14 @@ describe('POST /api/chat/confirm-merch-action', () => {
       status: 'live',
       title: 'Tour Tee',
     });
+    hoisted.getMerchProductOptionsMock.mockResolvedValue([
+      {
+        catalogProductId: 71,
+        productName: 'Unisex Staple T-Shirt',
+        productType: 't-shirt',
+        colorway: 'Black',
+      },
+    ]);
     hoisted.selectMerchDesignMock.mockResolvedValue({
       success: true,
       merchCardId: '00000000-0000-4000-8000-000000000004',
@@ -130,6 +140,7 @@ describe('POST /api/chat/confirm-merch-action', () => {
           generationId: '00000000-0000-4000-8000-000000000002',
           optionId: '00000000-0000-4000-8000-000000000003',
           optionNumber: 1,
+          catalogProductId: 71,
           action: 'select',
         }),
       })
@@ -142,6 +153,7 @@ describe('POST /api/chat/confirm-merch-action', () => {
       profileId: '00000000-0000-4000-8000-000000000001',
       optionId: '00000000-0000-4000-8000-000000000003',
       optionNumber: 1,
+      catalogProductId: 71,
       publish: false,
     });
     const body = await response.json();
@@ -151,5 +163,42 @@ describe('POST /api/chat/confirm-merch-action', () => {
       retailPrice: '$30.00',
       artistProfit: '$10.00',
     });
+  });
+
+  it('returns live product choices before creating the merch card', async () => {
+    const { POST } = await import('@/app/api/chat/confirm-merch-action/route');
+    const response = await POST(
+      new Request('http://localhost/api/chat/confirm-merch-action', {
+        method: 'POST',
+        body: JSON.stringify({
+          profileId: '00000000-0000-4000-8000-000000000001',
+          generationId: '00000000-0000-4000-8000-000000000002',
+          optionId: '00000000-0000-4000-8000-000000000003',
+          optionNumber: 1,
+          action: 'products',
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(hoisted.getMerchProductOptionsMock).toHaveBeenCalledWith({
+      generationId: '00000000-0000-4000-8000-000000000002',
+      clerkUserId: 'user-1',
+      profileId: '00000000-0000-4000-8000-000000000001',
+      optionId: '00000000-0000-4000-8000-000000000003',
+      optionNumber: 1,
+    });
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      products: [
+        {
+          catalogProductId: 71,
+          productName: 'Unisex Staple T-Shirt',
+          productType: 't-shirt',
+          colorway: 'Black',
+        },
+      ],
+    });
+    expect(hoisted.selectMerchDesignMock).not.toHaveBeenCalled();
   });
 });

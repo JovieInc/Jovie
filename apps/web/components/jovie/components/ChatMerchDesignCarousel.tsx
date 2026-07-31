@@ -10,6 +10,7 @@ import type {
   MerchDesignPreview,
 } from '@/lib/merch/types';
 import {
+  type ConfirmChatMerchProductsResponse,
   type ConfirmChatMerchSelectResponse,
   useConfirmChatMerchActionMutation,
 } from '@/lib/queries';
@@ -49,6 +50,31 @@ function isSelectionResponse(
   );
 }
 
+function isProductsResponse(
+  value: unknown
+): value is ConfirmChatMerchProductsResponse {
+  const products =
+    typeof value === 'object' && value !== null
+      ? (value as { products?: unknown }).products
+      : null;
+  return (
+    Array.isArray(products) &&
+    products.every(
+      product =>
+        typeof product === 'object' &&
+        product !== null &&
+        typeof (product as { catalogProductId?: unknown }).catalogProductId ===
+          'number' &&
+        (product as { catalogProductId: number }).catalogProductId > 0 &&
+        typeof (product as { productName?: unknown }).productName ===
+          'string' &&
+        typeof (product as { productType?: unknown }).productType ===
+          'string' &&
+        typeof (product as { colorway?: unknown }).colorway === 'string'
+    )
+  );
+}
+
 export function ChatMerchDesignCarousel({
   result,
   profileId,
@@ -60,8 +86,14 @@ export function ChatMerchDesignCarousel({
   const [active, setActive] = useState(0);
   const [selected, setSelected] =
     useState<ConfirmChatMerchSelectResponse | null>(null);
+  const [productOptions, setProductOptions] = useState<
+    ConfirmChatMerchProductsResponse['products']
+  >([]);
+  const [pendingCatalogProductId, setPendingCatalogProductId] = useState<
+    number | null
+  >(null);
   const [pendingAction, setPendingAction] = useState<
-    'select' | 'publish' | null
+    'products' | 'select' | 'publish' | null
   >(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const confirmAction = useConfirmChatMerchActionMutation();
@@ -77,34 +109,68 @@ export function ChatMerchDesignCarousel({
 
   if (count === 0 || !current) return null;
 
-  const handleSelect = () => {
+  const handleLoadProducts = () => {
     setErrorMessage(null);
     if (!profileId) {
       submitMerchPrompt(usePrompt(current));
       return;
     }
 
-    setPendingAction('select');
+    setPendingAction('products');
     confirmAction.mutate(
       {
         profileId,
         generationId: result.generationId,
         optionId: current.id,
         optionNumber: current.option_number,
+        action: 'products',
+      },
+      {
+        onSuccess: response => {
+          setPendingAction(null);
+          if (isProductsResponse(response) && response.products.length > 0) {
+            setProductOptions(response.products);
+            return;
+          }
+          setErrorMessage('No products are available right now.');
+        },
+        onError: () => {
+          setPendingAction(null);
+          setErrorMessage('Unable to load products. Try again.');
+        },
+      }
+    );
+  };
+
+  const handleSelectProduct = (catalogProductId: number) => {
+    if (!profileId) return;
+    setErrorMessage(null);
+    setPendingAction('select');
+    setPendingCatalogProductId(catalogProductId);
+    confirmAction.mutate(
+      {
+        profileId,
+        generationId: result.generationId,
+        optionId: current.id,
+        optionNumber: current.option_number,
+        catalogProductId,
         action: 'select',
       },
       {
         onSuccess: response => {
           setPendingAction(null);
+          setPendingCatalogProductId(null);
           if (isSelectionResponse(response)) {
             setSelected(response);
+            setProductOptions([]);
             return;
           }
           setErrorMessage('Product details are not ready yet.');
         },
         onError: () => {
           setPendingAction(null);
-          setErrorMessage('Unable to use this design. Try again.');
+          setPendingCatalogProductId(null);
+          setErrorMessage('Unable to create this product. Try again.');
         },
       }
     );
@@ -142,7 +208,7 @@ export function ChatMerchDesignCarousel({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (selected || count < 2) return;
+    if (selected || productOptions.length > 0 || count < 2) return;
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
       go(-1);
@@ -184,7 +250,7 @@ export function ChatMerchDesignCarousel({
           <ThreadImageCard status='generating' prompt={current.design_name} />
         )}
 
-        {!selected && count > 1 ? (
+        {!selected && productOptions.length === 0 && count > 1 ? (
           <>
             <CarouselArrow side='left' onClick={() => go(-1)} />
             <CarouselArrow side='right' onClick={() => go(1)} />
@@ -256,25 +322,60 @@ export function ChatMerchDesignCarousel({
               ? 'Live on profile'
               : 'Publish to profile'}
           </Button>
-        ) : (
+        ) : productOptions.length === 0 ? (
           <Button
             type='button'
             size='sm'
             className='shrink-0 whitespace-nowrap'
-            onClick={handleSelect}
+            onClick={handleLoadProducts}
             disabled={current.status !== 'ready' || pendingAction !== null}
           >
-            {pendingAction === 'select' ? (
+            {pendingAction === 'products' ? (
               <Loader2 className='h-3.5 w-3.5 animate-spin' aria-hidden />
             ) : null}
-            {pendingAction === 'select'
-              ? 'Preparing product'
+            {pendingAction === 'products'
+              ? 'Loading products'
               : 'Use this design'}
           </Button>
-        )}
+        ) : null}
       </div>
 
-      {!selected && count > 1 ? (
+      {!selected && productOptions.length > 0 ? (
+        <fieldset className='m-0 border-0 p-0 pb-2'>
+          <legend className='mb-2 text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
+            Choose a product
+          </legend>
+          <div className='grid grid-cols-1 gap-2 sm:grid-cols-3'>
+            {productOptions.map(option => (
+              <Button
+                key={option.catalogProductId}
+                type='button'
+                variant='secondary'
+                className='h-auto min-w-0 justify-start px-3 py-2 text-left'
+                onClick={() => handleSelectProduct(option.catalogProductId)}
+                disabled={pendingAction !== null}
+              >
+                {pendingCatalogProductId === option.catalogProductId ? (
+                  <Loader2
+                    className='h-3.5 w-3.5 shrink-0 animate-spin'
+                    aria-hidden
+                  />
+                ) : null}
+                <span className='min-w-0'>
+                  <span className='block truncate text-xs font-medium'>
+                    {option.productName}
+                  </span>
+                  <span className='block truncate text-2xs text-secondary-token'>
+                    {option.colorway}
+                  </span>
+                </span>
+              </Button>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
+
+      {!selected && productOptions.length === 0 && count > 1 ? (
         <nav className='flex items-center justify-center' aria-label='Concepts'>
           {designs.map((design, index) => (
             <Button

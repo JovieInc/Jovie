@@ -262,6 +262,7 @@ export {
   type ConfirmChatMerchActionInput,
   type ConfirmChatMerchActionResponse,
   type ConfirmChatMerchActionType,
+  type ConfirmChatMerchProductsResponse,
   type ConfirmChatMerchSelectResponse,
   useConfirmChatMerchActionMutation,
 } from './useConfirmChatMerchActionMutation';

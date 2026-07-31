@@ -22,11 +22,21 @@ export interface ConfirmChatMerchSelectInput {
   readonly generationId: string;
   readonly optionId: string;
   readonly optionNumber: number;
+  readonly catalogProductId: number;
   readonly action: 'select';
+}
+
+export interface ConfirmChatMerchProductsInput {
+  readonly profileId: string;
+  readonly generationId: string;
+  readonly optionId: string;
+  readonly optionNumber: number;
+  readonly action: 'products';
 }
 
 export type ConfirmChatMerchActionInput =
   | ConfirmChatMerchStatusActionInput
+  | ConfirmChatMerchProductsInput
   | ConfirmChatMerchSelectInput;
 
 export interface ConfirmChatMerchStatusActionResponse {
@@ -54,8 +64,19 @@ export interface ConfirmChatMerchSelectResponse
   };
 }
 
+export interface ConfirmChatMerchProductsResponse {
+  readonly success: true;
+  readonly products: readonly {
+    readonly catalogProductId: number;
+    readonly productName: string;
+    readonly productType: string;
+    readonly colorway: string;
+  }[];
+}
+
 export type ConfirmChatMerchActionResponse =
   | ConfirmChatMerchStatusActionResponse
+  | ConfirmChatMerchProductsResponse
   | ConfirmChatMerchSelectResponse;
 
 export function useConfirmChatMerchActionMutation() {

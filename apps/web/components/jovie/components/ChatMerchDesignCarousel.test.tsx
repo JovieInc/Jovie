@@ -76,6 +76,26 @@ describe('ChatMerchDesignCarousel', () => {
           onSuccess: (response: Record<string, unknown>) => void;
         }
       ) => {
+        if (input.action === 'products') {
+          callbacks.onSuccess({
+            success: true,
+            products: [
+              {
+                catalogProductId: 71,
+                productName: 'Unisex Staple T-Shirt',
+                productType: 't-shirt',
+                colorway: 'Black',
+              },
+              {
+                catalogProductId: 91,
+                productName: 'Unisex Heavy Hoodie',
+                productType: 'hoodie',
+                colorway: 'Black',
+              },
+            ],
+          });
+          return;
+        }
         if (input.action === 'select') {
           callbacks.onSuccess({
             success: true,
@@ -123,6 +143,24 @@ describe('ChatMerchDesignCarousel', () => {
         generationId: '00000000-0000-4000-8000-000000000010',
         optionId: '00000000-0000-4000-8000-000000000011',
         optionNumber: 1,
+        action: 'products',
+      },
+      expect.any(Object)
+    );
+    expect(screen.getByText('Choose a product')).toBeInTheDocument();
+    expect(screen.queryByText(/artist profit/)).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: /Unisex Staple T-Shirt/ })
+    );
+    expect(mutateMock).toHaveBeenNthCalledWith(
+      2,
+      {
+        profileId: '00000000-0000-4000-8000-000000000001',
+        generationId: '00000000-0000-4000-8000-000000000010',
+        optionId: '00000000-0000-4000-8000-000000000011',
+        optionNumber: 1,
+        catalogProductId: 71,
         action: 'select',
       },
       expect.any(Object)
@@ -139,7 +177,7 @@ describe('ChatMerchDesignCarousel', () => {
       screen.getByRole('button', { name: 'Publish to profile' })
     );
     expect(mutateMock).toHaveBeenNthCalledWith(
-      2,
+      3,
       {
         profileId: '00000000-0000-4000-8000-000000000001',
         merchCardId: '00000000-0000-4000-8000-000000000020',
