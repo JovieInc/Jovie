@@ -16,6 +16,7 @@ import { CACHE_TAGS, createProfileTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
 import { discogReleases } from '@/lib/db/schema/content';
+import { libraryAssetApprovalStatuses } from '@/lib/db/schema/library';
 import {
   type MerchArtistBrief,
   type MerchCard,
@@ -488,6 +489,16 @@ function toLibraryMerchCard(card: MerchCard): LibraryMerchCard {
     updatedAt: card.updatedAt.toISOString(),
     publishedAt: card.publishedAt?.toISOString() ?? null,
   };
+}
+
+function publicMerchProfileVisibilityPredicate() {
+  return drizzleSql`NOT EXISTS (
+    SELECT 1
+    FROM ${libraryAssetApprovalStatuses}
+    WHERE ${libraryAssetApprovalStatuses.creatorProfileId} = ${merchCards.creatorProfileId}
+      AND ${libraryAssetApprovalStatuses.assetId} = 'merch-' || ${merchCards.id}::text
+      AND ${libraryAssetApprovalStatuses.profileVisibility} = 'hidden'
+  )`;
 }
 
 function publicMerchUrl(username: string, cardId: string): string {
@@ -1403,7 +1414,8 @@ export async function getLiveMerchCardsForProfile(
     .where(
       and(
         eq(merchCards.creatorProfileId, profileId),
-        eq(merchCards.status, 'live')
+        eq(merchCards.status, 'live'),
+        publicMerchProfileVisibilityPredicate()
       )
     )
     .orderBy(
@@ -1469,7 +1481,8 @@ export async function getPublicMerchCard(params: {
         eq(creatorProfiles.usernameNormalized, params.username.toLowerCase()),
         eq(creatorProfiles.isPublic, true),
         eq(merchCards.id, params.merchCardId),
-        eq(merchCards.status, 'live')
+        eq(merchCards.status, 'live'),
+        publicMerchProfileVisibilityPredicate()
       )
     )
     .limit(1);

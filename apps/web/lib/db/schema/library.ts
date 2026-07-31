@@ -7,12 +7,23 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
-import { libraryAssetApprovalStatusEnum } from './enums';
+import {
+  libraryAssetApprovalStatusEnum,
+  libraryProfileVisibilityEnum,
+} from './enums';
 import { creatorProfiles } from './profiles';
 
 export type LibraryAssetApprovalStatusValue =
   (typeof libraryAssetApprovalStatusEnum.enumValues)[number];
 
+/**
+ * Canonical per-asset publishing state.
+ *
+ * Approval status controls editorial readiness. Profile visibility controls
+ * whether an otherwise eligible entity appears on the creator's public
+ * profile. Share-link privacy is stored separately in
+ * `library_asset_share_settings`.
+ */
 export const libraryAssetApprovalStatuses = pgTable(
   'library_asset_approval_statuses',
   {
@@ -25,6 +36,9 @@ export const libraryAssetApprovalStatuses = pgTable(
     approvalStatus: libraryAssetApprovalStatusEnum('approval_status')
       .notNull()
       .default('draft'),
+    profileVisibility: libraryProfileVisibilityEnum('profile_visibility')
+      .notNull()
+      .default('visible'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -35,6 +49,9 @@ export const libraryAssetApprovalStatuses = pgTable(
     creatorStatusIdx: index(
       'library_asset_approval_statuses_creator_status_idx'
     ).on(table.creatorProfileId, table.approvalStatus),
+    creatorProfileVisibilityIdx: index(
+      'library_asset_approval_statuses_creator_profile_visibility_idx'
+    ).on(table.creatorProfileId, table.profileVisibility),
   })
 );
 

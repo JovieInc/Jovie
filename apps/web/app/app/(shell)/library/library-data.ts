@@ -4,6 +4,11 @@ import {
   type LibraryApprovalStatus,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import {
+  DEFAULT_LIBRARY_PROFILE_VISIBILITY,
+  type LibraryProfileItemKind,
+  type LibraryProfileVisibility,
+} from '@/lib/library/profile-visibility';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import { hashLibraryWaveformSeed } from './library-waveform-peaks';
 
@@ -20,7 +25,7 @@ export type LibraryAssetKind =
   | 'providers'
   | 'video';
 
-export type LibraryItemKind = 'release' | 'merch' | 'image' | 'video' | 'audio';
+export type LibraryItemKind = LibraryProfileItemKind;
 
 export type LibraryView =
   | 'all'
@@ -52,6 +57,7 @@ export interface LibraryReleaseAsset {
   readonly releaseType: ReleaseViewModel['releaseType'];
   readonly status: ReleaseViewModel['status'];
   readonly approvalStatus: LibraryApprovalStatus;
+  readonly profileVisibility: LibraryProfileVisibility;
   readonly trackCount: number;
   readonly providerCount: number;
   readonly providers: readonly LibraryProviderLink[];
@@ -145,9 +151,20 @@ function resolveLibraryApprovalStatus(
   );
 }
 
+function resolveLibraryProfileVisibility(
+  assetId: string,
+  profileVisibilityByAssetId?: ReadonlyMap<string, LibraryProfileVisibility>
+): LibraryProfileVisibility {
+  return (
+    profileVisibilityByAssetId?.get(assetId) ??
+    DEFAULT_LIBRARY_PROFILE_VISIBILITY
+  );
+}
+
 export function buildLibraryReleaseAssets(
   releases: readonly ReleaseViewModel[],
-  approvalStatusByAssetId?: ReadonlyMap<string, LibraryApprovalStatus>
+  approvalStatusByAssetId?: ReadonlyMap<string, LibraryApprovalStatus>,
+  profileVisibilityByAssetId?: ReadonlyMap<string, LibraryProfileVisibility>
 ): LibraryReleaseAsset[] {
   return releases.map(release => {
     const providers = release.providers.flatMap(provider => {
@@ -190,6 +207,10 @@ export function buildLibraryReleaseAssets(
       approvalStatus: resolveLibraryApprovalStatus(
         release.id,
         approvalStatusByAssetId
+      ),
+      profileVisibility: resolveLibraryProfileVisibility(
+        release.id,
+        profileVisibilityByAssetId
       ),
       trackCount: release.totalTracks,
       providerCount: providers.length,
@@ -239,7 +260,8 @@ function formatMerchStatus(status: LibraryMerchCard['status']): string {
 export function buildLibraryMerchAssets(
   cards: readonly LibraryMerchCard[],
   artistName: string,
-  approvalStatusByAssetId?: ReadonlyMap<string, LibraryApprovalStatus>
+  approvalStatusByAssetId?: ReadonlyMap<string, LibraryApprovalStatus>,
+  profileVisibilityByAssetId?: ReadonlyMap<string, LibraryProfileVisibility>
 ): LibraryReleaseAsset[] {
   return cards.map(card => {
     const imageUrl = normalizeHttpUrl(card.primaryImageUrl);
@@ -260,6 +282,10 @@ export function buildLibraryMerchAssets(
       approvalStatus: resolveLibraryApprovalStatus(
         assetId,
         approvalStatusByAssetId
+      ),
+      profileVisibility: resolveLibraryProfileVisibility(
+        assetId,
+        profileVisibilityByAssetId
       ),
       trackCount: 0,
       providerCount: 0,

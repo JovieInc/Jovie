@@ -1,11 +1,12 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { captureError } from '@/lib/error-tracking';
-import { getLibraryApprovalStatusMapForProfile } from '@/lib/library/approval-status.server';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
 import {
   getLibraryAssetShareMapForProfile,
   loadArtistHandleForProfile,
 } from '@/lib/library/asset-share.server';
+import type { LibraryProfileVisibility } from '@/lib/library/profile-visibility';
+import { getLibraryProfileStateMapForProfile } from '@/lib/library/profile-visibility.server';
 import { getLibraryMerchCardsForProfile } from '@/lib/merch/service';
 import { queryKeys } from '@/lib/queries';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
@@ -33,6 +34,7 @@ export default async function LibraryPage() {
   let merchCards: Awaited<ReturnType<typeof getLibraryMerchCardsForProfile>> =
     [];
   let approvalStatusByAssetId: Record<string, string> = {};
+  let profileVisibilityByAssetId: Record<string, LibraryProfileVisibility> = {};
   let assetShareByAssetId: Record<string, LibraryAssetShareViewModel> = {};
   if (profileId && selectedProfile) {
     const queryClient = getQueryClient();
@@ -43,28 +45,37 @@ export default async function LibraryPage() {
             ? getLibraryAssetShareMapForProfile(profileId, artistHandle)
             : new Map()
       );
-      const [_releases, merch, approvalStatuses, assetShares] =
-        await Promise.all([
-          queryClient.fetchQuery({
-            queryKey: queryKeys.releases.matrix(profileId),
-            queryFn: () =>
-              loadReleaseMatrixForProfile({
-                userId: routeContext.userId,
-                profileId,
-                profileHandle:
-                  selectedProfile.usernameNormalized ??
-                  selectedProfile.username,
-                spotifyId: selectedProfile.spotifyId ?? null,
-                appleMusicId: selectedProfile.appleMusicId ?? null,
-                settings: selectedProfile.settings ?? null,
-              }),
-          }),
-          getLibraryMerchCardsForProfile(profileId),
-          getLibraryApprovalStatusMapForProfile(profileId),
-          assetSharesPromise,
-        ]);
+      const [_releases, merch, profileStates, assetShares] = await Promise.all([
+        queryClient.fetchQuery({
+          queryKey: queryKeys.releases.matrix(profileId),
+          queryFn: () =>
+            loadReleaseMatrixForProfile({
+              userId: routeContext.userId,
+              profileId,
+              profileHandle:
+                selectedProfile.usernameNormalized ?? selectedProfile.username,
+              spotifyId: selectedProfile.spotifyId ?? null,
+              appleMusicId: selectedProfile.appleMusicId ?? null,
+              settings: selectedProfile.settings ?? null,
+            }),
+        }),
+        getLibraryMerchCardsForProfile(profileId),
+        getLibraryProfileStateMapForProfile(profileId),
+        assetSharesPromise,
+      ]);
       merchCards = merch;
-      approvalStatusByAssetId = Object.fromEntries(approvalStatuses);
+      approvalStatusByAssetId = Object.fromEntries(
+        [...profileStates].map(([assetId, state]) => [
+          assetId,
+          state.approvalStatus,
+        ])
+      );
+      profileVisibilityByAssetId = Object.fromEntries(
+        [...profileStates].map(([assetId, state]) => [
+          assetId,
+          state.profileVisibility,
+        ])
+      );
       assetShareByAssetId = Object.fromEntries(assetShares);
     } catch (error) {
       void captureError(
@@ -82,6 +93,7 @@ export default async function LibraryPage() {
       <LibraryPageClient
         merchCards={merchCards}
         approvalStatusByAssetId={approvalStatusByAssetId}
+        profileVisibilityByAssetId={profileVisibilityByAssetId}
         assetShareByAssetId={assetShareByAssetId}
       />
     </HydrateClient>

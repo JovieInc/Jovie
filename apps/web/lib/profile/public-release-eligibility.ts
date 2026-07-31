@@ -14,6 +14,10 @@ import {
   isLibraryReleaseApprovedForPublic,
   type LibraryApprovalStatus,
 } from '@/lib/library/approval-status';
+import {
+  isLibraryAssetVisibleOnProfile,
+  type LibraryProfileVisibility,
+} from '@/lib/library/profile-visibility';
 
 type ReleaseDateInput = Date | string | null | undefined;
 
@@ -25,6 +29,7 @@ export interface PublicReleaseEligibilityInput {
   readonly deletedAt?: Date | string | null;
   readonly hasProviderLinks?: boolean;
   readonly approvalStatus?: LibraryApprovalStatus | null;
+  readonly profileVisibility?: LibraryProfileVisibility | null;
 }
 
 export function hasPublicReleaseArtwork(
@@ -48,6 +53,7 @@ export function isPublicReleaseEligible(
   ) {
     return false;
   }
+  if (!isLibraryAssetVisibleOnProfile(release.profileVisibility)) return false;
   if (!hasPublicReleaseArtwork(release.artworkUrl)) return false;
   if (options.requireProviderLinks && release.hasProviderLinks !== true) {
     return false;
@@ -87,6 +93,7 @@ export function publicReleaseEligibilitySqlPredicate(
       WHERE ${libraryAssetApprovalStatuses.assetId} = ${discogReleases.id}::text
         AND ${libraryAssetApprovalStatuses.creatorProfileId} = ${discogReleases.creatorProfileId}
         AND ${libraryAssetApprovalStatuses.approvalStatus} = 'approved'
+        AND ${libraryAssetApprovalStatuses.profileVisibility} = 'visible'
     )`
   );
 }

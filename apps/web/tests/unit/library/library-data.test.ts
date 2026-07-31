@@ -70,6 +70,7 @@ describe('library data', () => {
         releaseType: 'single',
         status: 'released',
         approvalStatus: 'draft',
+        profileVisibility: 'visible',
         trackCount: 1,
         providerCount: 1,
         providers: [
@@ -150,6 +151,19 @@ describe('library data', () => {
     expect(assets[0]?.approvalStatus).toBe('approved');
   });
 
+  it('applies profile visibility independently from approval status', () => {
+    const assets = buildLibraryReleaseAssets(
+      [buildRelease()],
+      new Map([['release-1', 'approved']]),
+      new Map([['release-1', 'hidden']])
+    );
+
+    expect(assets[0]).toMatchObject({
+      approvalStatus: 'approved',
+      profileVisibility: 'hidden',
+    });
+  });
+
   it('derives library merch assets from chat-selected merch cards', () => {
     const cards: LibraryMerchCard[] = [
       {
@@ -180,6 +194,7 @@ describe('library data', () => {
         artworkUrl: 'https://cdn.example.com/hoodie.png',
         itemKind: 'merch',
         approvalStatus: 'draft',
+        profileVisibility: 'visible',
         itemStatusLabel: 'Draft',
         productType: 'hoodie',
         primaryActionLabel: 'Open Merch',

@@ -1,7 +1,9 @@
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { describe, expect, it } from 'vitest';
 import {
   hasPublicReleaseArtwork,
   isPublicReleaseEligible,
+  publicReleaseEligibilitySqlPredicate,
 } from '@/lib/profile/public-release-eligibility';
 import { DATES, FIXED_NOW } from '../../fixtures/release-dates';
 
@@ -21,6 +23,7 @@ function eligibleRelease(
       | 'approved'
       | 'archived'
       | undefined;
+    profileVisibility: 'visible' | 'hidden' | undefined;
   }> = {}
 ) {
   return {
@@ -29,6 +32,7 @@ function eligibleRelease(
     artworkUrl: ARTWORK_URL,
     hasProviderLinks: true,
     approvalStatus: 'approved' as const,
+    profileVisibility: 'visible' as const,
     ...overrides,
   };
 }
@@ -73,6 +77,24 @@ describe('isPublicReleaseEligible', () => {
     ).toBe(true);
   });
 
+  it('hides releases explicitly hidden from the public profile', () => {
+    expect(
+      isPublicReleaseEligible(
+        eligibleRelease({ profileVisibility: 'hidden' }),
+        now
+      )
+    ).toBe(false);
+  });
+
+  it('defaults legacy releases without a visibility override to visible', () => {
+    expect(
+      isPublicReleaseEligible(
+        eligibleRelease({ profileVisibility: undefined }),
+        now
+      )
+    ).toBe(true);
+  });
+
   it('still hides discog draft releases even when approved', () => {
     expect(
       isPublicReleaseEligible(
@@ -80,6 +102,17 @@ describe('isPublicReleaseEligible', () => {
         now
       )
     ).toBe(false);
+  });
+});
+
+describe('publicReleaseEligibilitySqlPredicate', () => {
+  it('requires independent profile visibility in the canonical public query', () => {
+    const query = new PgDialect().sqlToQuery(
+      publicReleaseEligibilitySqlPredicate()
+    ).sql;
+
+    expect(query).toContain('"profile_visibility" = \'visible\'');
+    expect(query).toContain('"approval_status" = \'approved\'');
   });
 });
 

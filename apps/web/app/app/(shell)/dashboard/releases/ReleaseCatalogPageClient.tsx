@@ -16,6 +16,10 @@ import {
   type LibraryApprovalStatus,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import {
+  isLibraryProfileVisibility,
+  type LibraryProfileVisibility,
+} from '@/lib/library/profile-visibility';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { primaryProviderKeys, providerConfig } from './config';
@@ -27,6 +31,7 @@ interface ReleaseCatalogPageClientProps {
   readonly view: ReleaseCatalogView;
   readonly merchCards?: readonly LibraryMerchCard[];
   readonly approvalStatusByAssetId?: Readonly<Record<string, string>>;
+  readonly profileVisibilityByAssetId?: Readonly<Record<string, string>>;
   readonly assetShareByAssetId?: Readonly<
     Record<string, LibraryAssetShareViewModel>
   >;
@@ -42,10 +47,23 @@ function toApprovalStatusMap(
   return new Map(entries);
 }
 
+function toProfileVisibilityMap(
+  profileVisibilityByAssetId: Readonly<Record<string, string>>
+): ReadonlyMap<string, LibraryProfileVisibility> {
+  const entries = Object.entries(profileVisibilityByAssetId).flatMap(
+    ([assetId, visibility]) =>
+      isLibraryProfileVisibility(visibility)
+        ? [[assetId, visibility] as const]
+        : []
+  );
+  return new Map(entries);
+}
+
 export function ReleaseCatalogPageClient({
   view,
   merchCards = [],
   approvalStatusByAssetId = {},
+  profileVisibilityByAssetId = {},
   assetShareByAssetId = {},
 }: ReleaseCatalogPageClientProps) {
   const { selectedProfile } = useDashboardData();
@@ -103,6 +121,9 @@ export function ReleaseCatalogPageClient({
       'Artist';
 
     const approvalStatusMap = toApprovalStatusMap(approvalStatusByAssetId);
+    const profileVisibilityMap = toProfileVisibilityMap(
+      profileVisibilityByAssetId
+    );
     const artistHandle =
       selectedProfile?.usernameNormalized?.trim() ||
       selectedProfile?.username?.trim() ||
@@ -120,13 +141,16 @@ export function ReleaseCatalogPageClient({
         profileId={profileId}
         artistHandle={artistHandle}
         assets={[
-          ...buildLibraryReleaseAssets(releases, approvalStatusMap).map(
-            withShare
-          ),
+          ...buildLibraryReleaseAssets(
+            releases,
+            approvalStatusMap,
+            profileVisibilityMap
+          ).map(withShare),
           ...buildLibraryMerchAssets(
             merchCards,
             artistName,
-            approvalStatusMap
+            approvalStatusMap,
+            profileVisibilityMap
           ).map(withShare),
         ]}
       />
