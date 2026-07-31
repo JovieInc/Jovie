@@ -128,6 +128,7 @@ import {
   archiveLibraryRelease,
   restoreRelease,
 } from '../dashboard/releases/actions';
+import { archiveLibraryMerchCard, restoreLibraryMerchCard } from './actions';
 import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
 import {
   formatLibraryDuration,
@@ -255,7 +256,7 @@ const PRESETS: readonly {
     id: 'all',
     label: 'All',
     description: 'Releases, merch, images, videos, and audio',
-    predicate: () => true,
+    predicate: asset => libraryAssetMatchesView(asset, 'all'),
   },
   {
     id: 'releases',
@@ -286,6 +287,12 @@ const PRESETS: readonly {
     label: 'Audio',
     description: 'Playable previews',
     predicate: asset => libraryAssetMatchesView(asset, 'audio'),
+  },
+  {
+    id: 'archived',
+    label: 'Archived',
+    description: 'Archived releases and merch',
+    predicate: asset => libraryAssetMatchesView(asset, 'archived'),
   },
 ];
 
@@ -2463,9 +2470,6 @@ export function LibrarySurface({
   const [lifecycleSavingIds, setLifecycleSavingIds] = useState<
     ReadonlySet<string>
   >(() => new Set());
-  const [locallyArchivedIds, setLocallyArchivedIds] = useState<
-    ReadonlySet<string>
-  >(() => new Set());
   const [shareOverrides, setShareOverrides] = useState<
     Record<string, LibraryAssetShareViewModel>
   >({});
@@ -2557,7 +2561,6 @@ export function LibrarySurface({
     const savedViewPredicate = getLibrarySavedViewPredicate(deferredSavedView);
 
     return effectiveAssets
-      .filter(asset => !locallyArchivedIds.has(asset.id))
       .filter(presetPredicate)
       .filter(savedViewPredicate)
       .filter(asset => assetMatchesFilters(asset, deferredFilters))
@@ -2570,7 +2573,6 @@ export function LibrarySurface({
     deferredSavedView,
     deferredSort,
     effectiveAssets,
-    locallyArchivedIds,
   ]);
 
   const artistOptions = useMemo(
@@ -2775,7 +2777,6 @@ export function LibrarySurface({
     ) => {
       if (
         !profileId ||
-        getLibraryItemKind(asset) !== 'release' ||
         lifecycleStatus === (asset.lifecycleStatus ?? 'active')
       ) {
         return;
@@ -2786,12 +2787,16 @@ export function LibrarySurface({
         ...previous,
         [asset.id]: lifecycleStatus,
       }));
-      if (lifecycleStatus === 'archived') {
-        setLocallyArchivedIds(previous => new Set(previous).add(asset.id));
-      }
 
       try {
-        if (lifecycleStatus === 'archived') {
+        if (getLibraryItemKind(asset) === 'merch') {
+          const merchCardId = asset.id.replace(/^merch-/, '');
+          if (lifecycleStatus === 'archived') {
+            await archiveLibraryMerchCard({ merchCardId, profileId });
+          } else {
+            await restoreLibraryMerchCard({ merchCardId, profileId });
+          }
+        } else if (lifecycleStatus === 'archived') {
           await archiveLibraryRelease({ releaseId: asset.id });
         } else {
           await restoreRelease({ releaseId: asset.id });
@@ -2806,11 +2811,6 @@ export function LibrarySurface({
           ...previous,
           [asset.id]: asset.lifecycleStatus ?? 'active',
         }));
-        setLocallyArchivedIds(previous => {
-          const next = new Set(previous);
-          next.delete(asset.id);
-          return next;
-        });
       } finally {
         setLifecycleSavingIds(previous => {
           const next = new Set(previous);
@@ -2835,14 +2835,11 @@ export function LibrarySurface({
             isSaving: profileVisibilitySavingIds.has(asset.id),
             onChange: handleProfileVisibilityChange,
           },
-          lifecycle:
-            getLibraryItemKind(asset) === 'release'
-              ? {
-                  value: asset.lifecycleStatus ?? 'active',
-                  isSaving: lifecycleSavingIds.has(asset.id),
-                  onChange: handleLifecycleChange,
-                }
-              : undefined,
+          lifecycle: {
+            value: asset.lifecycleStatus ?? 'active',
+            isSaving: lifecycleSavingIds.has(asset.id),
+            onChange: handleLifecycleChange,
+          },
           onTogglePreview: handleTogglePreview,
           onApprovalStatusChange: handleApprovalStatusChange,
         })

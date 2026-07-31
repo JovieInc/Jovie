@@ -11,6 +11,7 @@ import {
 } from '@/app/app/(shell)/library/library-data';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
+import type { ReleaseViewModel } from '@/lib/discography/types';
 import {
   isLibraryApprovalStatus,
   type LibraryApprovalStatus,
@@ -30,6 +31,8 @@ export type ReleaseCatalogView = 'list' | 'assets';
 interface ReleaseCatalogPageClientProps {
   readonly view: ReleaseCatalogView;
   readonly merchCards?: readonly LibraryMerchCard[];
+  readonly archivedMerchCards?: readonly LibraryMerchCard[];
+  readonly archivedReleases?: readonly ReleaseViewModel[];
   readonly approvalStatusByAssetId?: Readonly<Record<string, string>>;
   readonly profileVisibilityByAssetId?: Readonly<Record<string, string>>;
   readonly assetShareByAssetId?: Readonly<
@@ -62,6 +65,8 @@ function toProfileVisibilityMap(
 export function ReleaseCatalogPageClient({
   view,
   merchCards = [],
+  archivedMerchCards = [],
+  archivedReleases = [],
   approvalStatusByAssetId = {},
   profileVisibilityByAssetId = {},
   assetShareByAssetId = {},
@@ -142,12 +147,12 @@ export function ReleaseCatalogPageClient({
         artistHandle={artistHandle}
         assets={[
           ...buildLibraryReleaseAssets(
-            releases,
+            [...releases, ...archivedReleases],
             approvalStatusMap,
             profileVisibilityMap
           ).map(withShare),
           ...buildLibraryMerchAssets(
-            merchCards,
+            [...merchCards, ...archivedMerchCards],
             artistName,
             approvalStatusMap,
             profileVisibilityMap

@@ -33,7 +33,8 @@ export type LibraryView =
   | 'merch'
   | 'images'
   | 'videos'
-  | 'audio';
+  | 'audio'
+  | 'archived';
 
 export type LibraryAspectRatio = '1:1' | '16:9' | '9:16';
 
@@ -331,6 +332,10 @@ export function libraryAssetMatchesView(
   asset: LibraryReleaseAsset,
   view: LibraryView
 ): boolean {
+  const isArchived = asset.lifecycleStatus === 'archived';
+  if (view === 'archived') return isArchived;
+  if (isArchived) return false;
+
   const itemKind = getLibraryItemKind(asset);
   if (view === 'all') return true;
   if (view === 'releases') return itemKind === 'release';

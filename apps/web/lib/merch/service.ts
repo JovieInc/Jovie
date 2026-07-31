@@ -36,6 +36,7 @@ import { logger } from '@/lib/utils/logger';
 import { createMerchArtwork } from './artwork';
 import { resolveMerchCatalogSelection } from './catalog';
 import { MERCH_DEFAULT_PRINTFUL_PRODUCT } from './default-catalog';
+import { resolveArchivedMerchRestoreStatus } from './merch-lifecycle-policy';
 import { selectPreferredMockupUrl } from './mockup-urls';
 import { attachMockupsToDesignOption, generateProductMockups } from './mockups'; // HOT ZONE pipeline (gh-9803)
 import {
@@ -488,6 +489,7 @@ function toLibraryMerchCard(card: MerchCard): LibraryMerchCard {
     createdAt: card.createdAt.toISOString(),
     updatedAt: card.updatedAt.toISOString(),
     publishedAt: card.publishedAt?.toISOString() ?? null,
+    archivedAt: card.archivedAt?.toISOString() ?? null,
   };
 }
 
@@ -1405,6 +1407,46 @@ export async function updateMerchCardStatus(params: {
   return card;
 }
 
+/**
+ * Restore an archived merch card to a private, editable draft. We do not
+ * republish automatically because the current schema does not retain the
+ * card's pre-archive status; publication remains an explicit independent act.
+ */
+export async function restoreArchivedMerchCard(params: {
+  readonly cardId: string;
+  readonly profileId: string;
+  readonly clerkUserId: string;
+}): Promise<MerchCard> {
+  const now = new Date();
+  await assertCanManageMerchProfile(params.profileId, params.clerkUserId);
+
+  const [card] = await db
+    .update(merchCards)
+    .set({
+      status: resolveArchivedMerchRestoreStatus(),
+      updatedAt: now,
+      pausedAt: null,
+      archivedAt: null,
+    })
+    .where(
+      and(
+        eq(merchCards.id, params.cardId),
+        eq(merchCards.creatorProfileId, params.profileId),
+        eq(merchCards.status, 'archived')
+      )
+    )
+    .returning();
+  if (!card) throw new Error('Archived merch card not found');
+
+  const usernameNormalized = await getProfileUsernameNormalized(
+    card.creatorProfileId
+  );
+  if (usernameNormalized) {
+    revalidatePublicProfile(usernameNormalized);
+  }
+  return card;
+}
+
 export async function getLiveMerchCardsForProfile(
   profileId: string
 ): Promise<PublicMerchCard[]> {
@@ -1430,17 +1472,20 @@ export async function getLiveMerchCardsForProfile(
 }
 
 export async function getLibraryMerchCardsForProfile(
-  profileId: string
+  profileId: string,
+  options?: { lifecycle?: 'active' | 'archived' | 'all' }
 ): Promise<LibraryMerchCard[]> {
+  const lifecycle = options?.lifecycle ?? 'active';
+  const lifecycleFilter =
+    lifecycle === 'archived'
+      ? eq(merchCards.status, 'archived')
+      : lifecycle === 'active'
+        ? ne(merchCards.status, 'archived')
+        : undefined;
   const cards = await db
     .select()
     .from(merchCards)
-    .where(
-      and(
-        eq(merchCards.creatorProfileId, profileId),
-        ne(merchCards.status, 'archived')
-      )
-    )
+    .where(and(eq(merchCards.creatorProfileId, profileId), lifecycleFilter))
     .orderBy(
       desc(merchCards.pinned),
       asc(merchCards.position),

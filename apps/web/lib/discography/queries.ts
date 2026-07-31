@@ -1,5 +1,13 @@
 import * as Sentry from '@sentry/nextjs';
-import { and, sql as drizzleSql, eq, inArray, isNull, ne } from 'drizzle-orm';
+import {
+  and,
+  sql as drizzleSql,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+} from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { isUniqueViolation as isUniqueViolationUtil } from '@/lib/db/errors';
 import {
@@ -379,16 +387,23 @@ export async function getReleasesForProfileLite(
  */
 export async function getReleasesForProfile(
   creatorProfileId: string,
-  options?: { includeDrafts?: boolean }
+  options?: {
+    includeDrafts?: boolean;
+    lifecycle?: 'active' | 'archived' | 'all';
+  }
 ): Promise<ReleaseWithProviders[]> {
-  const filters = [
-    eq(discogReleases.creatorProfileId, creatorProfileId),
-    isNull(discogReleases.deletedAt),
-  ];
+  const filters = [eq(discogReleases.creatorProfileId, creatorProfileId)];
+  const lifecycle = options?.lifecycle ?? 'active';
+  if (lifecycle === 'active') {
+    filters.push(isNull(discogReleases.deletedAt));
+  } else if (lifecycle === 'archived') {
+    filters.push(isNotNull(discogReleases.deletedAt));
+  }
   if (!options?.includeDrafts) {
     filters.push(ne(discogReleases.status, 'draft'));
   }
-  // Fetch releases (always exclude soft-deleted)
+  // Active is the default. Library's explicit Archived view opts into the
+  // same soft-deleted rows so the canonical Restore action is reachable.
   const releases = await db
     .select()
     .from(discogReleases)

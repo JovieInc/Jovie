@@ -62,7 +62,9 @@ const navigationMock = vi.hoisted(() => ({
 
 const blobUploadMock = vi.hoisted(() => vi.fn());
 const libraryMutationMocks = vi.hoisted(() => ({
+  archiveMerch: vi.fn().mockResolvedValue({ success: true }),
   archiveRelease: vi.fn().mockResolvedValue({ success: true }),
+  restoreMerch: vi.fn().mockResolvedValue({ success: true }),
   restoreRelease: vi.fn().mockResolvedValue({ success: true }),
   updateProfileVisibility: vi.fn().mockResolvedValue('hidden'),
 }));
@@ -103,6 +105,11 @@ vi.mock('@vercel/blob/client', () => ({
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   archiveLibraryRelease: libraryMutationMocks.archiveRelease,
   restoreRelease: libraryMutationMocks.restoreRelease,
+}));
+
+vi.mock('@/app/app/(shell)/library/actions', () => ({
+  archiveLibraryMerchCard: libraryMutationMocks.archiveMerch,
+  restoreLibraryMerchCard: libraryMutationMocks.restoreMerch,
 }));
 
 vi.mock('@/lib/library/profile-visibility/client-mutations', () => ({
@@ -257,10 +264,14 @@ describe('LibrarySurface', () => {
     navigationMock.refresh.mockClear();
     navigationMock.replace.mockClear();
     blobUploadMock.mockReset();
+    libraryMutationMocks.archiveMerch.mockReset();
+    libraryMutationMocks.archiveMerch.mockResolvedValue({ success: true });
     libraryMutationMocks.archiveRelease.mockReset();
     libraryMutationMocks.archiveRelease.mockResolvedValue({ success: true });
     libraryMutationMocks.restoreRelease.mockReset();
     libraryMutationMocks.restoreRelease.mockResolvedValue({ success: true });
+    libraryMutationMocks.restoreMerch.mockReset();
+    libraryMutationMocks.restoreMerch.mockResolvedValue({ success: true });
     libraryMutationMocks.updateProfileVisibility.mockReset();
     libraryMutationMocks.updateProfileVisibility.mockResolvedValue('hidden');
   });
@@ -832,6 +843,89 @@ describe('LibrarySurface', () => {
       expect(
         screen.getByTestId('library-release-row-release-1')
       ).toBeInTheDocument();
+    });
+  });
+
+  it('moves releases between active and Archived views through the shared action registry', async () => {
+    const user = userEvent.setup();
+    render(
+      <TooltipProvider>
+        <RightPanelProvider>
+          <LibrarySurface assets={[buildAsset()]} profileId='profile-1' />
+          <RightPanelOutlet />
+        </RightPanelProvider>
+      </TooltipProvider>
+    );
+
+    let actions = within(screen.getByTestId('library-row-actions-release-1'));
+    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Archive' }));
+
+    await waitFor(() => {
+      expect(libraryMutationMocks.archiveRelease).toHaveBeenCalledWith({
+        releaseId: 'release-1',
+      });
+      expect(
+        screen.queryByTestId('library-release-row-release-1')
+      ).not.toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /Archived/u }));
+    actions = within(screen.getByTestId('library-row-actions-release-1'));
+    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Restore' }));
+
+    await waitFor(() => {
+      expect(libraryMutationMocks.restoreRelease).toHaveBeenCalledWith({
+        releaseId: 'release-1',
+      });
+      expect(
+        screen.queryByTestId('library-release-row-release-1')
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it('archives and safely restores merch through its real lifecycle contract', async () => {
+    const user = userEvent.setup();
+    const merch = buildAsset({
+      id: 'merch-card-1',
+      itemKind: 'merch',
+      previewUrl: null,
+      videoUrl: null,
+      assetKinds: ['artwork'],
+    });
+    render(
+      <TooltipProvider>
+        <RightPanelProvider>
+          <LibrarySurface assets={[merch]} profileId='profile-1' />
+          <RightPanelOutlet />
+        </RightPanelProvider>
+      </TooltipProvider>
+    );
+
+    let actions = within(
+      screen.getByTestId('library-row-actions-merch-card-1')
+    );
+    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Archive' }));
+
+    await waitFor(() => {
+      expect(libraryMutationMocks.archiveMerch).toHaveBeenCalledWith({
+        merchCardId: 'card-1',
+        profileId: 'profile-1',
+      });
+    });
+
+    await user.click(screen.getByRole('button', { name: /Archived/u }));
+    actions = within(screen.getByTestId('library-row-actions-merch-card-1'));
+    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Restore' }));
+
+    await waitFor(() => {
+      expect(libraryMutationMocks.restoreMerch).toHaveBeenCalledWith({
+        merchCardId: 'card-1',
+        profileId: 'profile-1',
+      });
     });
   });
 

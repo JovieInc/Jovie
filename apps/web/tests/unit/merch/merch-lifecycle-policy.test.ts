@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isMerchArchived,
+  resolveArchivedMerchRestoreStatus,
   resolveMerchRemovalPolicy,
 } from '@/lib/merch/merch-lifecycle-policy';
 
@@ -48,5 +49,9 @@ describe('merch lifecycle policy (JOV-3374)', () => {
       })
     ).toBe(true);
     expect(isMerchArchived({ status: 'draft', archivedAt: null })).toBe(false);
+  });
+
+  it('restores archived merch to a private editable draft', () => {
+    expect(resolveArchivedMerchRestoreStatus()).toBe('draft');
   });
 });

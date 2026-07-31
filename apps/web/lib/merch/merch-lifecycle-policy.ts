@@ -54,3 +54,12 @@ export function isMerchArchived(merch: {
 }): boolean {
   return merch.status === 'archived' || merch.archivedAt != null;
 }
+
+/**
+ * Archived merch returns to a private draft because merch_cards does not
+ * currently persist the pre-archive status. This avoids silently republishing
+ * a product while still making Restore a real, editable lifecycle transition.
+ */
+export function resolveArchivedMerchRestoreStatus(): 'draft' {
+  return 'draft';
+}

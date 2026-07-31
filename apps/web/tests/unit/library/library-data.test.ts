@@ -10,6 +10,7 @@ import {
   getLibraryAssetAspectRatio,
   getLibraryDrawerHeroClass,
   LIBRARY_GRID_DENSITY_LAYOUT,
+  libraryAssetMatchesView,
   normalizeLibraryVersionTitle,
   stackLibraryReleaseVersions,
 } from '@/app/app/(shell)/library/library-data';
@@ -204,6 +205,19 @@ describe('library data', () => {
         profitLabel: '$22.00',
       }),
     ]);
+  });
+
+  it('keeps archived entities out of active views and reachable in Archived', () => {
+    const [active] = buildLibraryReleaseAssets([buildRelease()]);
+    const [archived] = buildLibraryReleaseAssets([
+      buildRelease({ id: 'release-archived', deletedAt: '2026-07-31' }),
+    ]);
+
+    expect(libraryAssetMatchesView(active!, 'all')).toBe(true);
+    expect(libraryAssetMatchesView(active!, 'archived')).toBe(false);
+    expect(libraryAssetMatchesView(archived!, 'all')).toBe(false);
+    expect(libraryAssetMatchesView(archived!, 'images')).toBe(false);
+    expect(libraryAssetMatchesView(archived!, 'archived')).toBe(true);
   });
 
   it('formats release dates without local timezone drift', () => {
