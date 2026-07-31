@@ -15,17 +15,20 @@ vi.mock('@/components/molecules/drawer', async importOriginal => {
       children,
       entityHeader,
       entityHeaderSurface,
+      workspaceSurface,
       tabs,
       title,
     }: {
       children: ReactNode;
       entityHeader?: ReactNode;
       entityHeaderSurface?: string;
+      workspaceSurface?: string;
       tabs?: ReactNode;
       title: ReactNode;
     }) => (
       <div
         data-entity-header-surface={entityHeaderSurface ?? 'card'}
+        data-workspace-surface={workspaceSurface}
         data-testid='entity-sidebar-shell'
       >
         <div>{title}</div>
@@ -76,6 +79,14 @@ describe('ContactDetailSidebar', () => {
     expect(screen.getByTestId('entity-sidebar-shell')).toHaveAttribute(
       'data-entity-header-surface',
       'flat'
+    );
+    expect(screen.getByTestId('entity-sidebar-shell')).toHaveAttribute(
+      'data-workspace-surface',
+      'raised'
+    );
+    expect(screen.getByTestId('contact-detail-entity-header')).toHaveAttribute(
+      'data-density',
+      'rail'
     );
     expect(screen.queryByText('Contact')).not.toBeInTheDocument();
     expect(screen.getByText('Contact Info')).toBeInTheDocument();

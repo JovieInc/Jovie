@@ -1,17 +1,19 @@
 'use client';
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { Badge, Button } from '@jovie/ui';
+import { Badge, Button, UserAvatar } from '@jovie/ui';
 import { Copy, ExternalLink } from 'lucide-react';
 import { useCallback } from 'react';
 import { toast } from '@/components/feedback';
 import {
+  DrawerAnalyticsSummaryCard,
   DrawerCardActionBar,
   DrawerSection,
   DrawerSurfaceCard,
-  EntityHeaderCard,
   EntitySidebarShell,
+  ShareableLinkRow,
 } from '@/components/molecules/drawer';
+import { DrawerHero } from '@/components/shell/DrawerHero';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminUserRow } from '@/lib/admin/types';
 
@@ -29,67 +31,16 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
   minute: '2-digit',
 });
 
-interface ProfileField {
-  label: string;
-  filled: boolean;
-}
-
-function computeProfileCompleteness(user: AdminUserRow): {
-  score: number;
-  fields: ProfileField[];
-} {
-  const fields: ProfileField[] = [
-    { label: 'Name', filled: Boolean(user.name) },
-    { label: 'Email', filled: Boolean(user.email) },
-    { label: 'Billing Connected', filled: Boolean(user.stripeCustomerId) },
-    { label: 'Subscription', filled: Boolean(user.stripeSubscriptionId) },
-    { label: 'Active Account', filled: !user.deletedAt },
+function computeProfileCompleteness(user: AdminUserRow): number {
+  const fields = [
+    Boolean(user.name),
+    Boolean(user.email),
+    Boolean(user.stripeCustomerId),
+    Boolean(user.stripeSubscriptionId),
+    !user.deletedAt,
   ];
 
-  const filled = fields.filter(f => f.filled).length;
-  const score = Math.round((filled / fields.length) * 100);
-
-  return { score, fields };
-}
-
-function ProfileCompletenessBar({
-  score,
-  fields,
-}: {
-  readonly score: number;
-  readonly fields: ProfileField[];
-}) {
-  return (
-    <div className='space-y-2.5'>
-      <div className='flex items-center justify-between'>
-        <span className='text-xs font-medium tracking-normal text-secondary-token'>
-          Profile completeness
-        </span>
-        <span className='text-xs font-semibold text-primary-token'>
-          {score}%
-        </span>
-      </div>
-      <div className='h-1.5 w-full overflow-hidden rounded-full bg-surface-3'>
-        <div
-          className='h-full rounded-full bg-brand-primary transition-colors duration-cinematic'
-          style={{ width: `${score}%` }}
-        />
-      </div>
-      <ul className='space-y-1'>
-        {fields.map(field => (
-          <li
-            key={field.label}
-            className='flex items-center gap-2 text-2xs text-secondary-token'
-          >
-            <span
-              className={`inline-block h-1.5 w-1.5 rounded-full ${field.filled ? 'bg-success' : 'bg-error'}`}
-            />
-            {field.label}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+  return Math.round((fields.filter(Boolean).length / fields.length) * 100);
 }
 
 function CopyButton({
@@ -138,15 +89,36 @@ export function AdminUserDetailDrawer({
       onClose={onClose}
       headerMode='minimal'
       hideMinimalHeaderBar
+      workspaceSurface='raised'
+      entityHeaderSurface='flat'
       contextMenuItems={contextMenuItems}
       isEmpty={!hasUser}
       emptyMessage='Select a user to view details.'
       entityHeader={
         user ? (
-          <DrawerSurfaceCard variant='card' className='p-3'>
-            <EntityHeaderCard
-              eyebrow='User'
+          <DrawerSurfaceCard
+            variant='card'
+            className='relative overflow-hidden'
+          >
+            <div className='absolute right-2 top-2 z-10'>
+              <DrawerCardActionBar
+                primaryActions={[]}
+                menuItems={contextMenuItems}
+                onClose={onClose}
+                overflowTriggerPlacement='card-top-right'
+                overflowTriggerIcon='vertical'
+                className='border-0 bg-transparent px-0 py-0'
+              />
+            </div>
+            <DrawerHero
               title={user.name ?? 'Unnamed user'}
+              density='rail'
+              artwork={
+                <UserAvatar
+                  name={user.name ?? user.email ?? 'User'}
+                  size='lg'
+                />
+              }
               subtitle={
                 user.email ? (
                   <div className='flex items-center gap-1.5'>
@@ -176,17 +148,14 @@ export function AdminUserDetailDrawer({
                   )}
                 </div>
               }
-              actions={
-                <DrawerCardActionBar
-                  primaryActions={[]}
-                  menuItems={contextMenuItems}
-                  onClose={onClose}
-                  overflowTriggerPlacement='card-top-right'
-                  overflowTriggerIcon='vertical'
-                  className='border-0 bg-transparent px-0 py-0'
-                />
-              }
-              bodyClassName='pr-9'
+              stableLayout
+              titleLineClamp={1}
+              subtitleLineClamp={1}
+              reserveSubtitleSlot
+              reserveMetaSlot
+              metaOverflow='scroll'
+              className='[&_h2]:pr-9'
+              testId='admin-user-entity-header'
             />
           </DrawerSurfaceCard>
         ) : undefined
@@ -198,13 +167,43 @@ export function AdminUserDetailDrawer({
 }
 
 function UserDrawerContent({ user }: { readonly user: AdminUserRow }) {
-  const { score, fields } = computeProfileCompleteness(user);
+  const score = computeProfileCompleteness(user);
+  const socialLinkCount = user.socialLinks?.length ?? 0;
+  const profileUrl = user.profileUsername
+    ? `https://jov.ie/${user.profileUsername}`
+    : null;
 
   return (
     <>
-      <DrawerSection title='Profile' className='space-y-1.5' surface='card'>
-        <ProfileCompletenessBar score={score} fields={fields} />
-      </DrawerSection>
+      <DrawerAnalyticsSummaryCard
+        testId='admin-user-summary'
+        state='ready'
+        stableLayout
+        reserveFooterSlot
+        metricSlotCount={2}
+        metrics={[
+          {
+            id: 'profile-completeness',
+            label: 'Profile Complete',
+            value: `${score}%`,
+          },
+          {
+            id: 'linked-destinations',
+            label: 'Linked Destinations',
+            value: String(socialLinkCount),
+          },
+        ]}
+        footer={
+          profileUrl ? (
+            <ShareableLinkRow
+              url={profileUrl}
+              density='rail'
+              surface='flat'
+              testId='admin-user-profile-link'
+            />
+          ) : null
+        }
+      />
 
       {user.socialLinks && user.socialLinks.length > 0 ? (
         <DrawerSection
