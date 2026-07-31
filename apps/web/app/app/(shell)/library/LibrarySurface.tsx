@@ -68,10 +68,10 @@ import { LibraryShareDropCreator } from '@/components/features/library-share/Lib
 import { ReleaseAudioAssetPanel } from '@/components/features/release/ReleaseAudioAssetPanel';
 import { toast } from '@/components/feedback';
 import {
-  DrawerHeader,
   DrawerSection,
   DrawerSectionGroup,
-  DrawerSurfaceCard,
+  EntityHeaderCard,
+  EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import {
@@ -79,7 +79,6 @@ import {
   ToolbarMenuChoiceItem,
 } from '@/components/molecules/menus/ToolbarMenuPrimitives';
 import { PageShell } from '@/components/organisms/PageShell';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import {
   PAGE_TOOLBAR_END_GROUP_CLASS,
@@ -137,7 +136,6 @@ import {
   formatLibraryReleaseDateTitle,
   getLibraryAspectRatioClass,
   getLibraryAssetAspectRatio,
-  getLibraryDrawerHeroClass,
   getLibraryItemKind,
   LIBRARY_GRID_DENSITY_LAYOUT,
   type LibraryAssetKind,
@@ -2130,294 +2128,278 @@ function AssetDrawer({
   ) : null;
 
   return (
-    <RightDrawer
+    <EntitySidebarShell
       isOpen={open}
       width={360}
       ariaLabel='Library asset details'
       onKeyDown={handleDrawerKeyDown}
-      className='system-b-library-drawer border-l border-(--app-shell-frame-seam)'
+      contextMenuItems={convertToCommonDropdownItems(
+        current ? getContextMenuItems(current) : []
+      )}
       data-testid='library-asset-drawer'
+      headerMode='minimal'
+      hideMinimalHeaderBar
+      entityHeaderSurface='flat'
+      scrollStrategy='shell'
+      isEmpty={!current}
+      emptyMessage='Select a library item to view details.'
+      entityHeader={
+        current ? (
+          <EntityHeaderCard
+            image={
+              <div className='h-12 w-12 shrink-0 overflow-hidden'>
+                <LibraryMediaThumbnail asset={current} size='drawer' />
+              </div>
+            }
+            title={current.title}
+            subtitle={current.artist}
+            meta={
+              <div className='flex min-w-0 items-center gap-1.5'>
+                <span
+                  role='status'
+                  className={cn(
+                    'system-b-library-status-pill inline-flex h-6 max-w-full items-center truncate rounded-full border px-2',
+                    releaseStatusClasses(current.status)
+                  )}
+                  data-testid={`library-release-status-${current.id}`}
+                  aria-label={`Release Status: ${formatLibraryStatus(current)}`}
+                >
+                  {formatLibraryStatus(current)}
+                </span>
+                {current.assetKinds.slice(0, 2).map(kind => (
+                  <AssetKindPill key={kind} kind={kind} />
+                ))}
+              </div>
+            }
+            stableLayout
+            titleLineClamp={1}
+            subtitleLineClamp={1}
+            reserveSubtitleSlot
+            reserveMetaSlot
+            metaOverflow='scroll'
+            actions={drawerHeaderActions}
+            bodyClassName='pr-8'
+            data-testid='library-asset-entity-header'
+          />
+        ) : undefined
+      }
     >
       {current ? (
         <TableContextMenu items={getContextMenuItems(current)}>
-          <div className='flex h-full min-h-0 flex-col gap-1.5 px-1.5 py-1.5 lg:px-0 lg:py-0'>
-            <div
-              className='shrink-0 space-y-2.5'
-              data-testid='library-asset-drawer-sticky-rail'
-            >
-              <DrawerSurfaceCard variant='card' className='overflow-hidden'>
-                <DrawerHeader
-                  title={isMerch ? 'Merch' : 'Release'}
-                  actions={drawerHeaderActions}
-                />
-                <div className='space-y-3 overflow-visible px-3 pb-3 pt-3'>
-                  <div className='mx-auto flex max-h-72 w-full max-w-56 items-center justify-center overflow-hidden'>
-                    <div
-                      className={cn(
-                        'system-b-library-drawer-artwork overflow-hidden',
-                        getLibraryDrawerHeroClass(
-                          getLibraryAssetAspectRatio(current)
-                        )
-                      )}
-                    >
-                      <LibraryMediaThumbnail asset={current} size='drawer' />
-                    </div>
-                  </div>
+          <DrawerSectionGroup
+            defaultOpenSectionId={isMerch ? 'merch' : 'details'}
+          >
+            <div className='space-y-2.5 overflow-visible px-3'>
+              {isMerch ? (
+                <DrawerSection
+                  sectionId='merch'
+                  surface='card'
+                  title='Merch'
+                  defaultOpen
+                >
+                  <p className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'>
+                    {current.description ?? 'Merch card saved from chat.'}
+                  </p>
+                  <dl className='mt-2'>
+                    <MetadataRow
+                      label='Sale Price'
+                      value={current.salePriceLabel ?? 'No Price'}
+                    />
+                    <MetadataRow
+                      label='Profit'
+                      value={current.profitLabel ?? 'No Estimate'}
+                    />
+                  </dl>
+                </DrawerSection>
+              ) : (
+                <>
+                  <DrawerSection
+                    sectionId='share-link'
+                    surface='card'
+                    title='Share Link'
+                    defaultOpen
+                  >
+                    <LibraryAssetSharePanel
+                      asset={current}
+                      profileId={profileId}
+                      artistHandle={artistHandle}
+                      disabled={!open}
+                      initialShare={current.share}
+                      onShareChange={onShareChange}
+                    />
+                  </DrawerSection>
 
-                  <div className='min-w-0'>
-                    <h2 className='system-b-library-drawer-title truncate'>
-                      {current.title}
-                    </h2>
-                    <p className='system-b-library-drawer-artist mt-1 truncate'>
-                      {current.artist}
-                    </p>
-                  </div>
-
-                  <div className='flex flex-wrap gap-1.5'>
-                    {/*
-                      Release Status only in the hero pills. Approval Status is
-                      editable once in Details (ApprovalStatusEditor) — never
-                      duplicate the axes side-by-side (JOV-3333).
-                    */}
-                    <span
-                      role='status'
-                      className={cn(
-                        'system-b-library-status-pill inline-flex h-6 max-w-full items-center truncate rounded-full border px-2',
-                        releaseStatusClasses(current.status)
-                      )}
-                      data-testid={`library-release-status-${current.id}`}
-                      aria-label={`Release Status: ${formatLibraryStatus(current)}`}
-                    >
-                      {formatLibraryStatus(current)}
-                    </span>
-                    {current.assetKinds.map(kind => (
-                      <AssetKindPill key={kind} kind={kind} />
-                    ))}
-                  </div>
-                </div>
-              </DrawerSurfaceCard>
-            </div>
-
-            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-0 lg:pt-0'>
-              <DrawerSectionGroup defaultOpenSectionId='details'>
-                <div className='space-y-2.5'>
-                  {isMerch ? (
-                    <DrawerSection
-                      sectionId='merch'
-                      surface='card'
-                      title='Merch'
-                      defaultOpen={false}
-                    >
-                      <p className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'>
-                        {current.description ?? 'Merch card saved from chat.'}
-                      </p>
-                    </DrawerSection>
-                  ) : (
-                    <>
-                      <DrawerSection
-                        sectionId='audio'
-                        surface='card'
-                        title='Audio'
-                        defaultOpen={false}
-                        actions={
-                          current.previewUrl ? (
-                            <PreviewActionButton
-                              asset={current}
-                              isPreviewPlaying={isPreviewPlaying}
-                              onTogglePreview={onTogglePreview}
-                              compact
-                              disabledTabIndex={closedTabIndex}
-                            />
-                          ) : null
-                        }
-                      >
-                        <LibraryAudioPanel
+                  <DrawerSection
+                    sectionId='audio'
+                    surface='card'
+                    title='Audio'
+                    defaultOpen={false}
+                    actions={
+                      current.previewUrl ? (
+                        <PreviewActionButton
                           asset={current}
                           isPreviewPlaying={isPreviewPlaying}
                           onTogglePreview={onTogglePreview}
-                          onUploaded={onAudioUploaded}
+                          compact
                           disabledTabIndex={closedTabIndex}
-                          embedded
                         />
-                      </DrawerSection>
-
-                      <DrawerSection
-                        sectionId='share-link'
-                        surface='card'
-                        title='Share Link'
-                        defaultOpen={false}
-                      >
-                        <LibraryAssetSharePanel
-                          asset={current}
-                          profileId={profileId}
-                          artistHandle={artistHandle}
-                          disabled={!open}
-                          initialShare={current.share}
-                          onShareChange={onShareChange}
-                        />
-                      </DrawerSection>
-
-                      <DrawerSection
-                        sectionId='press-kit-drop'
-                        surface='card'
-                        title='Press Kit Drop'
-                        defaultOpen={false}
-                      >
-                        <LibraryShareDropCreator
-                          releaseIds={[current.id]}
-                          candidateAssets={pressKitCandidates.map(item => ({
-                            id: item.id,
-                            title: item.title,
-                          }))}
-                          defaultTitle={`${current.title} press kit`}
-                        />
-                      </DrawerSection>
-                    </>
-                  )}
-
-                  <DrawerSection
-                    sectionId='details'
-                    surface='card'
-                    title='Details'
-                    defaultOpen={false}
+                      ) : null
+                    }
                   >
-                    <dl>
-                      <MetadataRow
-                        label='Approval Status'
-                        value={
-                          <ApprovalStatusEditor
-                            asset={current}
-                            profileId={profileId}
-                            disabled={!open}
-                            saving={approvalSavingIds.has(current.id)}
-                            onStatusChange={onApprovalStatusChange}
-                          />
-                        }
-                      />
-                      <MetadataRow
-                        label={isMerch ? 'Updated' : 'Release Date'}
-                        value={
-                          <span
-                            title={formatLibraryReleaseDateTitle(
-                              current.releaseDate
-                            )}
-                          >
-                            {formatLibraryReleaseDate(current.releaseDate)}
-                          </span>
-                        }
-                      />
-                      <MetadataRow
-                        label='Type'
-                        value={formatLibraryItemType(current)}
-                      />
-                      {isMerch ? (
-                        <>
-                          <MetadataRow
-                            label='Sale Price'
-                            value={current.salePriceLabel ?? 'No Price'}
-                          />
-                          <MetadataRow
-                            label='Profit'
-                            value={current.profitLabel ?? 'No Estimate'}
-                          />
-                          <MetadataRow
-                            label='Sellability'
-                            value={current.sellabilityLabel ?? 'Not Checked'}
-                          />
-                        </>
-                      ) : (
-                        <>
-                          <MetadataRow
-                            label='Tracks'
-                            value={current.trackCount}
-                          />
-                          <MetadataRow
-                            label='Duration'
-                            value={formatLibraryDuration(
-                              current.totalDurationMs
-                            )}
-                          />
-                          <MetadataRow
-                            label='Popularity'
-                            value={
-                              current.spotifyPopularity == null
-                                ? 'No Score'
-                                : `${current.spotifyPopularity}/100`
-                            }
-                          />
-                          <MetadataRow
-                            label='Genres'
-                            value={
-                              current.genres.length > 0
-                                ? current.genres.join(', ')
-                                : 'No Genres'
-                            }
-                          />
-                          <MetadataRow
-                            label='Label'
-                            value={
-                              current.label ?? current.distributor ?? 'No Label'
-                            }
-                          />
-                          <MetadataRow
-                            label='UPC'
-                            value={current.upc ?? 'No UPC'}
-                          />
-                          <MetadataRow
-                            label='Pitch Targets'
-                            value={current.targetPlaylistCount}
-                          />
-                        </>
-                      )}
-                    </dl>
+                    <LibraryAudioPanel
+                      asset={current}
+                      isPreviewPlaying={isPreviewPlaying}
+                      onTogglePreview={onTogglePreview}
+                      onUploaded={onAudioUploaded}
+                      disabledTabIndex={closedTabIndex}
+                      embedded
+                    />
                   </DrawerSection>
 
-                  {!isMerch ? (
-                    <DrawerSection
-                      sectionId='providers'
-                      surface='card'
-                      title='Providers'
-                      defaultOpen={false}
-                    >
-                      {current.providers.length > 0 ? (
-                        <div className='space-y-1'>
-                          {current.providers.map(provider => (
-                            <a
-                              key={`${current.id}-${provider.key}`}
-                              href={provider.url}
-                              target='_blank'
-                              rel='noopener noreferrer'
-                              {...closedInteractiveProps}
-                              className={cn(
-                                'system-b-library-provider-link flex h-8 items-center gap-2 px-2',
-                                LIBRARY_CARD_FOCUS_CLASS
-                              )}
-                            >
-                              <ProviderIcon
-                                provider={provider.key as ProviderKey}
-                                className='h-3.5 w-3.5'
-                              />
-                              <span className='min-w-0 flex-1 truncate'>
-                                {provider.label}
-                              </span>
-                              <ExternalLink className='h-3 w-3 text-tertiary-token' />
-                            </a>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className='system-b-library-provider-empty leading-5 text-secondary-token'>
-                          No provider links are connected for this release yet.
-                        </p>
-                      )}
-                    </DrawerSection>
-                  ) : null}
-                </div>
-              </DrawerSectionGroup>
+                  <DrawerSection
+                    sectionId='press-kit-drop'
+                    surface='card'
+                    title='Press Kit Drop'
+                    defaultOpen={false}
+                  >
+                    <LibraryShareDropCreator
+                      releaseIds={[current.id]}
+                      candidateAssets={pressKitCandidates.map(item => ({
+                        id: item.id,
+                        title: item.title,
+                      }))}
+                      defaultTitle={`${current.title} press kit`}
+                    />
+                  </DrawerSection>
+                </>
+              )}
+
+              <DrawerSection
+                sectionId='details'
+                surface='card'
+                title='Details'
+                defaultOpen={false}
+              >
+                <dl>
+                  <MetadataRow
+                    label='Approval Status'
+                    value={
+                      <ApprovalStatusEditor
+                        asset={current}
+                        profileId={profileId}
+                        disabled={!open}
+                        saving={approvalSavingIds.has(current.id)}
+                        onStatusChange={onApprovalStatusChange}
+                      />
+                    }
+                  />
+                  <MetadataRow
+                    label={isMerch ? 'Updated' : 'Release Date'}
+                    value={
+                      <span
+                        title={formatLibraryReleaseDateTitle(
+                          current.releaseDate
+                        )}
+                      >
+                        {formatLibraryReleaseDate(current.releaseDate)}
+                      </span>
+                    }
+                  />
+                  <MetadataRow
+                    label='Type'
+                    value={formatLibraryItemType(current)}
+                  />
+                  {isMerch ? (
+                    <MetadataRow
+                      label='Sellability'
+                      value={current.sellabilityLabel ?? 'Not Checked'}
+                    />
+                  ) : (
+                    <>
+                      <MetadataRow label='Tracks' value={current.trackCount} />
+                      <MetadataRow
+                        label='Duration'
+                        value={formatLibraryDuration(current.totalDurationMs)}
+                      />
+                      <MetadataRow
+                        label='Popularity'
+                        value={
+                          current.spotifyPopularity == null
+                            ? 'No Score'
+                            : `${current.spotifyPopularity}/100`
+                        }
+                      />
+                      <MetadataRow
+                        label='Genres'
+                        value={
+                          current.genres.length > 0
+                            ? current.genres.join(', ')
+                            : 'No Genres'
+                        }
+                      />
+                      <MetadataRow
+                        label='Label'
+                        value={
+                          current.label ?? current.distributor ?? 'No Label'
+                        }
+                      />
+                      <MetadataRow
+                        label='UPC'
+                        value={current.upc ?? 'No UPC'}
+                      />
+                      <MetadataRow
+                        label='Pitch Targets'
+                        value={current.targetPlaylistCount}
+                      />
+                    </>
+                  )}
+                </dl>
+              </DrawerSection>
+
+              {!isMerch ? (
+                <DrawerSection
+                  sectionId='providers'
+                  surface='card'
+                  title='Providers'
+                  defaultOpen={false}
+                >
+                  {current.providers.length > 0 ? (
+                    <div className='space-y-1'>
+                      {current.providers.map(provider => (
+                        <a
+                          key={`${current.id}-${provider.key}`}
+                          href={provider.url}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          {...closedInteractiveProps}
+                          className={cn(
+                            'system-b-library-provider-link flex h-8 items-center gap-2 px-2',
+                            LIBRARY_CARD_FOCUS_CLASS
+                          )}
+                        >
+                          <ProviderIcon
+                            provider={provider.key as ProviderKey}
+                            className='h-3.5 w-3.5'
+                          />
+                          <span className='min-w-0 flex-1 truncate'>
+                            {provider.label}
+                          </span>
+                          <ExternalLink className='h-3 w-3 text-tertiary-token' />
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className='system-b-library-provider-empty leading-5 text-secondary-token'>
+                      No provider links are connected for this release yet.
+                    </p>
+                  )}
+                </DrawerSection>
+              ) : null}
             </div>
-          </div>
+          </DrawerSectionGroup>
         </TableContextMenu>
       ) : null}
-    </RightDrawer>
+    </EntitySidebarShell>
   );
 }
 
