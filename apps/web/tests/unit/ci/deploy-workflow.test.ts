@@ -1659,8 +1659,11 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     }
   });
 
-  it('verifies production promotion through the canonical public alias', () => {
+  it('verifies production promotion through the canonical public alias (JOV-1958)', () => {
+    // Regression: verifying only the immutable deployment URL can green while
+    // jov.ie still serves a prior commit. Promote must prove the public alias.
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const verifier = readFileSync(productionAliasVerifierPath, 'utf8');
     const promoteJob = getJobBlock(workflow, 'promote-production');
     const domainGuardStep = getStepBlock(
       promoteJob,
@@ -1695,6 +1698,10 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(stageIndex).toBeGreaterThan(domainGuardIndex);
     expect(promoteIndex).toBeGreaterThan(stageIndex);
     expect(verifyIndex).toBeGreaterThan(promoteIndex);
+    expect(verifier).toContain('https://jov.ie/api/health/build-info');
+    expect(verifier).toContain('production_alias_not_updated');
+    expect(verifier).toContain('vcrrForceStable=true');
+    expect(verifier).toContain('vcrrForceCanary=true');
     expect(promoteJob).toContain(
       'steps.stage-production.outputs.failure_subtype || steps.performance-gate.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype'
     );

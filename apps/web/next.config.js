@@ -182,16 +182,21 @@ const nextConfig = {
       },
     };
 
-    return [
+    // Cache-Control merges when multiple sources match. Keep health identity
+    // routes AFTER the general /api rule so no-store wins over s-maxage=300
+    // (JOV-1958: stale public build-info after promote).
+    const healthNoStoreHeaders = [
       {
-        source: '/api/health/build-info',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'no-store, no-cache, must-revalidate',
-          },
-        ],
+        key: 'Cache-Control',
+        value: 'private, no-cache, no-store, must-revalidate',
       },
+      { key: 'CDN-Cache-Control', value: 'no-store' },
+      { key: 'Vercel-CDN-Cache-Control', value: 'no-store' },
+      { key: 'Pragma', value: 'no-cache' },
+      { key: 'Expires', value: '0' },
+    ];
+
+    return [
       {
         source: '/api/(.*)',
         headers: [
@@ -201,6 +206,11 @@ const nextConfig = {
             value: 'public, max-age=300, s-maxage=300', // 5 minutes
           },
         ],
+      },
+      {
+        // Public deployment identity receipt — must never inherit API s-maxage.
+        source: '/api/health/:path*',
+        headers: healthNoStoreHeaders,
       },
       // Marketing pages (pre-rendered at build) - long-lived cache
       {
