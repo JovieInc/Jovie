@@ -63,10 +63,10 @@ describe('surface elevation guardrails', () => {
       /:root\.dark[\s\S]*--sidebar-background:\s*var\(--linear-app-sidebar-background-rgb\);/
     );
     expect(linearTokens).toMatch(
-      /:root\.dark[\s\S]*--linear-app-content-surface:\s*#0a0c0f;/
+      /:root\.dark[\s\S]*--linear-app-content-surface:\s*#0a0d16;/
     );
     expect(linearTokens).toMatch(
-      /:root\.dark[\s\S]*--linear-app-sidebar-background-rgb:\s*6 7 10;/
+      /:root\.dark[\s\S]*--linear-app-sidebar-background-rgb:\s*6 8 13;/
     );
   });
 
@@ -80,8 +80,9 @@ describe('surface elevation guardrails', () => {
       'utf-8'
     );
 
+    // Noir Ion focus ring (electric blue) — not a white halo
     expect(linearTokens).toContain(
-      '--linear-border-focus: rgba(255, 255, 255, 0.32);'
+      '--linear-border-focus: rgba(17, 175, 255, 0.72);'
     );
     expect(designSystem).toContain('--focus-ring-width: 1px;');
     expect(designSystem).toMatch(

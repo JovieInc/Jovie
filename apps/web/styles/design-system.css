@@ -965,137 +965,148 @@ html[data-profile-initial-mode]
      --font-size-regular: 15px, --font-size-large: 18px */
 }
 
-/* Dark mode - same generation logic, inverted lightness */
+/* Dark mode — Jovie Noir Ion (JOV-4635 / #15244).
+   Dark-first authenticated product palette. Neutral graphite surfaces carry
+   structure; electric blue (Ion) carries routine action/focus/selection.
+   Semantic mapping: --noir-ion-* anchors → product tokens (rollback path). */
 :root.dark {
-  /* Dark mode surfaces — matched to shell-v1 Carbon palette */
-  --color-bg-base: #06070a;
-  /* sidebar/page bg */
-  --color-bg-surface-0: #0a0b0e;
-  /* primary app surface — matches --linear-bg-surface-0 */
+  /* —— Noir Ion anchors (canonical approved values) —— */
+  --noir-ion-canvas: #030407;
+  --noir-ion-shell: #06080d;
+  --noir-ion-panel: #0a0d16;
+  --noir-ion-card: #0f1420;
+  --noir-ion-elevated: #151b2a;
+  --noir-ion-floating: #1b2436;
+  --noir-ion-text-strong: #ffffff;
+  --noir-ion-text-primary: #f5f7fb;
+  --noir-ion-text-secondary: #d7dce8;
+  --noir-ion-text-muted: #a8b0c3;
+  --noir-ion-text-tertiary: #7d879d;
+  --noir-ion-text-disabled: #525d75;
+  --noir-ion-text-inverse: #020307;
+  --noir-ion-ion: #11afff;
+  --noir-ion-ion-solid: #0088ff;
+  --noir-ion-ion-soft: rgba(17, 175, 255, 0.12);
+  --noir-ion-pulse: #ff48d2;
+  --noir-ion-pulse-solid: #f725b8;
+  --noir-ion-pulse-soft: rgba(255, 72, 210, 0.12);
+  --noir-ion-ultra: #a982ff;
+  --noir-ion-ultra-solid: #8b5cf6;
+  --noir-ion-ultra-soft: rgba(169, 130, 255, 0.12);
+  --noir-ion-aqua: #24f6d2;
+  --noir-ion-aqua-solid: #00d7c2;
+  --noir-ion-aqua-soft: rgba(36, 246, 210, 0.1);
+  --noir-ion-mint: #39e58c;
+  --noir-ion-mint-solid: #10c76e;
+  --noir-ion-mint-soft: rgba(57, 229, 140, 0.12);
+  --noir-ion-gold: #ffc857;
+  --noir-ion-gold-solid: #f59e0b;
+  --noir-ion-gold-soft: rgba(255, 200, 87, 0.12);
+  --noir-ion-flare: #ff677d;
+  --noir-ion-flare-solid: #ff3b5c;
+  --noir-ion-flare-soft: rgba(255, 103, 125, 0.12);
+  --noir-ion-selected: rgba(17, 175, 255, 0.1);
+  --noir-ion-selected-strong: rgba(17, 175, 255, 0.16);
+  --noir-ion-border-subtle: rgba(168, 176, 195, 0.1);
+  --noir-ion-border-default: rgba(168, 176, 195, 0.16);
+  --noir-ion-border-strong: rgba(199, 237, 255, 0.26);
+  --noir-ion-border-interactive: rgba(17, 175, 255, 0.48);
+  --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
+
+  /* Dark mode surfaces — Noir Ion stepped near-black ladder */
+  --color-bg-base: var(--noir-ion-canvas);
+  /* app canvas */
+  --color-bg-surface-0: var(--noir-ion-shell);
+  /* recessed wells / shell-adjacent */
   --color-bg-surface-1: var(--linear-bg-surface-1);
-  /* Shared card surface inside the dark app shell */
-  --color-bg-surface-2: #161a20;
-  /* inputs, elevated */
-  --color-bg-surface-3: #2a2c32;
-  /* modals, tooltips */
+  /* Shared card surface (maps to --noir-ion-card via linear tokens) */
+  --color-bg-surface-2: var(--noir-ion-elevated);
+  /* elevated / inputs */
+  --color-bg-surface-3: var(--noir-ion-floating);
+  /* floating / modals / tooltips */
 
   /* Additional dark surface levels */
-  --color-bg-page: #06070a;
-  /* Same as base */
-  --color-bg-hover: rgba(255, 255, 255, 0.04);
-  /* Row/item hover */
-  --color-bg-elevated: #0a0b0e;
-  /* Same as surface-0 */
-  --color-bg-input: #101216;
-  /* Same as surface-1 */
-  --color-bg-active: #161a20;
-  /* Same as surface-2 */
-  --color-bg-primary: lch(9.894% 0.5 282);
-  --color-bg-secondary: lch(14.44% 0.5 282);
-  --color-bg-button: #2a2c32;
-  /* Same as surface-3 */
-  --color-bg-tooltip: #2a2c32;
-  /* Matches surface-3 in dark mode */
+  --color-bg-page: var(--noir-ion-canvas);
+  --color-bg-hover: rgba(168, 176, 195, 0.06);
+  /* Row/item hover — graphite, not pure white */
+  --color-bg-elevated: var(--noir-ion-panel);
+  --color-bg-input: var(--noir-ion-card);
+  --color-bg-active: var(--noir-ion-elevated);
+  --color-bg-primary: var(--noir-ion-panel);
+  --color-bg-secondary: var(--noir-ion-shell);
+  --color-bg-button: var(--noir-ion-elevated);
+  --color-bg-tooltip: var(--noir-ion-floating);
   --color-bg-paper: #f7f8f8;
   /* Paper surface remains light for explicit light reading modes */
 
-  /* Text hierarchy - inverted for dark mode
-     Extracted from Linear.app live (2026-02-15):
-       Primary:   lch(100% 0 272)       → oklch ~100% — pure white headings
-       Secondary: lch(90.65% 1.35 272) → oklch ~91% — body text, labels (bright!)
-       Tertiary:  lch(62.6% 1.35 272)   → oklch ~63% — descriptions, meta
-       Quaternary: lch(38.29% 1.35 272) → oklch ~38% — placeholders, disabled
-     Key insight: Linear's secondary is MUCH brighter than typical (90% not 65%) */
-  /* Text hierarchy — extracted from Linear CSS vars (2026-02-17)
-     --color-text-primary:    lch(100% 0 272)       = pure white
-     --color-text-secondary:  lch(90.65% 1.35 272)  = #E3E4E6
-     --color-text-tertiary:   lch(62.6% 1.35 272)   = #969799
-     --color-text-quaternary: lch(38.29% 1.35 272)   = #5A5B5D
-     --content-color:         #6b6f76               = content/meta text */
-  --color-text-primary-token: lch(100% 0 282);
-  /* Pure white — Linear exact (hue 282 per March 2026 refresh) */
-  --color-text-secondary-token: lch(90.65% 1.35 282);
-  /* #E3E4E6 — Linear exact */
-  --color-text-tertiary-token: lch(68% 1.35 282);
-  /* #969799 — Linear exact */
-  --color-text-quaternary-token: #62666d;
-  /* Linear: --color-text-quaternary = #62666d (extracted 2026-03-16) */
-  /* JOV-1780: disabled text lifted from oklch(28%) to oklch(45%) so
-     disabled form controls remain legible against page bg `#08090a`. */
-  --color-text-disabled-token: oklch(45% 0.006 282);
-  --color-text-tooltip: lch(100% 0 282);
-  /* White text on dark tooltips */
+  /* Text hierarchy — Noir Ion */
+  --color-text-primary-token: var(--noir-ion-text-primary);
+  --color-text-secondary-token: var(--noir-ion-text-secondary);
+  --color-text-tertiary-token: var(--noir-ion-text-muted);
+  --color-text-quaternary-token: var(--noir-ion-text-tertiary);
+  --color-text-disabled-token: var(--noir-ion-text-disabled);
+  --color-text-tooltip: var(--noir-ion-text-strong);
 
   /* Logo muted tokens for label logos bar */
-  --color-logo-muted: rgba(255, 255, 255, 0.55);
-  --color-logo-muted-hover: rgba(255, 255, 255, 0.75);
+  --color-logo-muted: rgba(245, 247, 251, 0.55);
+  --color-logo-muted-hover: rgba(245, 247, 251, 0.75);
 
-  /* Border system - extracted from Linear marketing (2026-02-16)
-     Subtle:  rgba(255,255,255,0.05) — card borders, dividers
-     Default: rgba(255,255,255,0.08) — frame borders, input borders
-     Strong:  rgba(255,255,255,0.10) — panel outlines */
-  /* JOV-1780: dark-mode border contrast bump so cards, panels, inputs and
-     dividers have clear boundaries against surface-1 `#17171a`. Previous
-     values (0.04 / 0.07 / 0.12) disappeared on dark surfaces. */
-  --color-border-subtle: rgba(255, 255, 255, 0.07);
-  --color-border-default: rgba(255, 255, 255, 0.11);
-  --color-border-strong: rgba(255, 255, 255, 0.18);
-  --color-border-focus: #7170ff;
-  /* Linear accent for focus */
+  /* Borders — Noir Ion cool graphite + ion focus */
+  --color-border-subtle: var(--noir-ion-border-subtle);
+  --color-border-default: var(--noir-ion-border-default);
+  --color-border-strong: var(--noir-ion-border-strong);
+  --color-border-focus: var(--noir-ion-ion);
+  /* Ion focus */
 
-  /* Accent palette rotation */
+  /* Accent palette rotation — Noir Ion semantics
+     blue/Ion: primary action · purple/Ultra: agent · pink/Pulse: creative
+     teal/Aqua: system · green/Mint: success · orange/Gold: warning
+     red/Flare: danger */
   --color-accent-gray: #8d8d93;
   --color-accent-gray-subtle: rgb(127 127 133 / 0.18);
-  --color-accent-blue: #4d7dff;
-  --color-accent-blue-subtle: rgb(37 99 255 / 0.18);
-  --color-accent-purple: #9b4dff;
-  --color-accent-purple-subtle: rgb(139 30 255 / 0.18);
-  --color-accent-pink: #ea4a9c;
-  --color-accent-pink-subtle: rgb(214 26 127 / 0.18);
-  --color-accent-red: #ff4d5f;
-  --color-accent-red-subtle: rgb(243 18 45 / 0.18);
-  --color-accent-orange: #ffab2e;
-  --color-accent-orange-subtle: rgb(255 152 0 / 0.18);
-  --color-accent-green: #43b85c;
-  --color-accent-green-subtle: rgb(47 158 68 / 0.18);
-  --color-accent-teal: #22b8a7;
-  --color-accent-teal-subtle: rgb(15 155 142 / 0.18);
+  --color-accent-blue: #11afff;
+  --color-accent-blue-subtle: rgba(17, 175, 255, 0.12);
+  --color-accent-purple: #a982ff;
+  --color-accent-purple-subtle: rgba(169, 130, 255, 0.12);
+  --color-accent-pink: #ff48d2;
+  --color-accent-pink-subtle: rgba(255, 72, 210, 0.12);
+  --color-accent-red: #ff677d;
+  --color-accent-red-subtle: rgba(255, 103, 125, 0.12);
+  --color-accent-orange: #ffc857;
+  --color-accent-orange-subtle: rgba(255, 200, 87, 0.12);
+  --color-accent-green: #39e58c;
+  --color-accent-green-subtle: rgba(57, 229, 140, 0.12);
+  --color-accent-teal: #24f6d2;
+  --color-accent-teal-subtle: rgba(36, 246, 210, 0.1);
 
-  /* Interactive accent (focus, links, active) — canonical Jovie DS #7170ff,
-     decoupled from the purple feature accent (carbon palette, title text only) */
-  --color-accent: #7170ff;
-  --color-accent-hover: #b06bff;
-  --color-accent-active: #8a37f4;
-  --color-accent-subtle: var(--color-accent-purple-subtle);
+  /* Interactive accent — Ion electric blue (focus, links, active selection).
+     CTAs remain high-contrast light pills per DESIGN.md; Ion carries intent. */
+  --color-accent: var(--noir-ion-ion);
+  --color-accent-hover: #3bc0ff;
+  --color-accent-active: var(--noir-ion-ion-solid);
+  --color-accent-subtle: var(--noir-ion-ion-soft);
 
-  /* Primary button - inverted for dark mode (Linear: rgb(230,230,230)) */
+  /* Primary button — light-on-dark (restrained; not saturated Ion fill) */
   --color-btn-primary-bg: #e6e6e6;
-  --color-btn-primary-fg: #06070a;
+  --color-btn-primary-fg: var(--noir-ion-text-inverse);
   --color-btn-primary-hover: #f0f0f0;
 
   /* Secondary button */
-  --color-btn-secondary-bg: oklch(
-    19% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-btn-secondary-fg: oklch(90% 0 0);
-  --color-btn-secondary-hover: oklch(
-    24% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-btn-secondary-bg: var(--noir-ion-elevated);
+  --color-btn-secondary-fg: var(--noir-ion-text-primary);
+  --color-btn-secondary-hover: var(--noir-ion-floating);
 
-  /* Interactive states - white-based (Linear uses semi-transparent overlays)
-     Extracted: hover rows = rgba(255,255,255,0.02-0.03), buttons = 0.05, active = 0.05 */
-  --color-interactive-hover: rgba(255, 255, 255, 0.05);
-  --color-interactive-active: rgba(255, 255, 255, 0.05);
+  /* Interactive states */
+  --color-interactive-hover: rgba(168, 176, 195, 0.06);
+  --color-interactive-active: var(--noir-ion-selected);
 
-  /* Badge/tag styles — extracted from Linear marketing demo (2026-02-16)
-     bg: rgba(255,255,255,0.05), border: 1px solid rgba(255,255,255,0.05)
-     radius: 2px, font: 10px/510 */
-  --color-badge-bg: rgba(255, 255, 255, 0.05);
-  --color-badge-border: rgba(255, 255, 255, 0.05);
-  --color-badge-text: rgb(247, 248, 248);
+  /* Badge/tag styles */
+  --color-badge-bg: rgba(168, 176, 195, 0.08);
+  --color-badge-border: var(--noir-ion-border-subtle);
+  --color-badge-text: var(--noir-ion-text-primary);
 
-  /* Table cell hover — same as surface-2 rgb(22,23,24) */
-  --color-cell-hover: #161718;
+  /* Table cell hover — elevated step */
+  --color-cell-hover: var(--noir-ion-elevated);
 
   /* Shadows — extracted from Linear CSS vars (2026-02-17)
      --shadow-tiny: 0px 4px 4px -1px #0000000f, 0px 1px 1px 0px #0000001e
@@ -1202,14 +1213,16 @@ html[data-profile-initial-mode]
     24% var(--theme-base-chroma) var(--theme-base-hue)
   );
 
-  /* Cross-cutting interaction state tokens (state-matrix.md) */
-  --color-link-default: var(--linear-accent-blue);
+  /* Cross-cutting interaction state tokens (state-matrix.md)
+     Links/focus use Ion blue — not marketing linear-accent-blue. */
+  --color-link-default: var(--noir-ion-ion);
   --color-link-hover: color-mix(
     in oklab,
-    var(--linear-accent-blue) 78%,
-    var(--linear-text-primary)
+    var(--noir-ion-ion) 78%,
+    var(--noir-ion-text-primary)
   );
-  --color-link-visited: var(--linear-accent-purple);
+  --color-link-visited: var(--noir-ion-ultra);
+  --color-focus-ring: var(--noir-ion-focus-ring);
   --state-disabled-opacity: 0.5;
   --state-partial-opacity: 0.62;
   --state-offline-bg: var(--color-warning-subtle);
@@ -1226,6 +1239,10 @@ html[data-profile-initial-mode]
     var(--color-warning) 20%,
     transparent
   );
+  /* Selection roles */
+  --color-bg-selected: var(--noir-ion-selected);
+  --color-bg-selected-strong: var(--noir-ion-selected-strong);
+  --color-border-interactive: var(--noir-ion-border-interactive);
 }
 
 /* ============================================
@@ -1573,21 +1590,21 @@ html[data-profile-initial-mode]
 }
 
 :root.dark {
-  /* Success - brighter in dark mode */
+  /* Success — Mint */
   --color-success: var(--color-accent-green);
   --color-success-subtle: var(--color-accent-green-subtle);
 
-  /* Warning */
+  /* Warning — Gold */
   --color-warning: var(--color-accent-orange);
   --color-warning-subtle: var(--color-accent-orange-subtle);
 
-  /* Error */
+  /* Error — Flare */
   --color-error: var(--color-accent-red);
   --color-error-subtle: var(--color-accent-red-subtle);
 
-  /* Info */
-  --color-info: var(--color-accent-blue);
-  --color-info-subtle: var(--color-accent-blue-subtle);
+  /* Info — Aqua/system signal (not Ion blue; Ion is action/focus) */
+  --color-info: var(--color-accent-teal);
+  --color-info-subtle: var(--color-accent-teal-subtle);
 }
 
 /* ============================================
@@ -1870,37 +1887,24 @@ html[data-profile-initial-mode]
 }
 
 :root.dark {
-  /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
-  /* Keep the sidebar on the darker shell canvas so the framed main pane reads above it. */
+  /* Sidebar tokens — Noir Ion shell; active uses Ion selection tint */
   --sidebar-background: var(--linear-app-sidebar-background-rgb);
-  /* Linear: --linear-app-sidebar-background-rgb */
-  --sidebar-foreground: 227 228 229;
-  /* Linear: --linear-app-sidebar-foreground-rgb */
-  --sidebar-primary: 227 228 229;
-  --sidebar-primary-foreground: 12 12 12;
-  --sidebar-accent: 255 255 255 / 0.03;
-  /* Linear: --linear-app-sidebar-accent-rgb */
-  --sidebar-accent-active: 255 255 255 / 0.05;
-  /* Linear: --linear-app-sidebar-accent-active-rgb */
-  --sidebar-accent-foreground: 227 228 229;
-  --sidebar-border: 255 255 255 / 0.06;
-  /* Linear: --linear-app-sidebar-border-rgb */
-  --sidebar-ring: 109 119 230 / 0.55;
-  --sidebar-muted: 138 143 152;
-  /* Linear: --linear-app-sidebar-muted-rgb */
-  --sidebar-muted-foreground: 138 143 152;
+  --sidebar-foreground: 245 247 251;
+  --sidebar-primary: 245 247 251;
+  --sidebar-primary-foreground: 2 3 7;
+  --sidebar-accent: 168 176 195 / 0.06;
+  --sidebar-accent-active: 17 175 255 / 0.1;
+  --sidebar-accent-foreground: 245 247 251;
+  --sidebar-border: 168 176 195 / 0.1;
+  --sidebar-ring: 17 175 255 / 0.72;
+  --sidebar-muted: 125 135 157;
+  --sidebar-muted-foreground: 125 135 157;
   --sidebar-surface: var(--linear-app-sidebar-background-rgb);
-  /* Matches sidebar background */
-  --sidebar-surface-hover: 255 255 255 / 0.04;
-  /* Matches sidebar accent */
-  --sidebar-input-background: 255 255 255 / 0.06;
-  --sidebar-input-border: 255 255 255 / 0.06;
-  --sidebar-item-foreground: 214 218 226;
-  /* Linear: --linear-app-sidebar-item-foreground-rgb */
-  --sidebar-item-icon: 116 120 128;
-  /* Linear: --linear-app-sidebar-item-icon-rgb */
-  --sidebar-accent-active: 255 255 255 / 0.06;
-  /* Linear: --linear-app-sidebar-accent-active-rgb */
+  --sidebar-surface-hover: 168 176 195 / 0.06;
+  --sidebar-input-background: 15 20 32 / 1;
+  --sidebar-input-border: 168 176 195 / 0.16;
+  --sidebar-item-foreground: 215 220 232;
+  --sidebar-item-icon: 125 135 157;
 }
 
 /* ============================================

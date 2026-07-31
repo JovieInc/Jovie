@@ -38,29 +38,30 @@ export const DESIGN_TOKENS = {
     "dark": {
       "gray": "#8d8d93",
       "gray-subtle": "rgb(127 127 133 / 0.18)",
-      "blue": "#4d7dff",
-      "blue-subtle": "rgb(37 99 255 / 0.18)",
-      "purple": "#9b4dff",
-      "purple-subtle": "rgb(139 30 255 / 0.18)",
-      "pink": "#ea4a9c",
-      "pink-subtle": "rgb(214 26 127 / 0.18)",
-      "red": "#ff4d5f",
-      "red-subtle": "rgb(243 18 45 / 0.18)",
-      "orange": "#ffab2e",
-      "orange-subtle": "rgb(255 152 0 / 0.18)",
-      "green": "#43b85c",
-      "green-subtle": "rgb(47 158 68 / 0.18)",
-      "teal": "#22b8a7",
-      "teal-subtle": "rgb(15 155 142 / 0.18)"
+      "blue": "#11afff",
+      "blue-subtle": "rgba(17, 175, 255, 0.12)",
+      "purple": "#a982ff",
+      "purple-subtle": "rgba(169, 130, 255, 0.12)",
+      "pink": "#ff48d2",
+      "pink-subtle": "rgba(255, 72, 210, 0.12)",
+      "red": "#ff677d",
+      "red-subtle": "rgba(255, 103, 125, 0.12)",
+      "orange": "#ffc857",
+      "orange-subtle": "rgba(255, 200, 87, 0.12)",
+      "green": "#39e58c",
+      "green-subtle": "rgba(57, 229, 140, 0.12)",
+      "teal": "#24f6d2",
+      "teal-subtle": "rgba(36, 246, 210, 0.1)"
     }
   },
   "interactive": {
-    "$description": "Interactive accent (focus, links, active). Canonical Jovie DS #7170ff, decoupled from the purple feature accent.",
+    "$description": "Interactive accent (focus, links, active). Dark mode uses Noir Ion electric blue (#11AFFF). Light mode retains System B #7170ff until a light-mode Noir Ion pass.",
     "accent": "#7170ff",
     "accent-hover-light": "#9a46ff",
     "accent-active-light": "#7612df",
-    "accent-hover-dark": "#b06bff",
-    "accent-active-dark": "#8a37f4"
+    "accent-dark": "#11afff",
+    "accent-hover-dark": "#3bc0ff",
+    "accent-active-dark": "#0088ff"
   },
   "radius": {
     "$description": "System B radius scale (styles/design-system.css).",
@@ -85,9 +86,9 @@ export const DESIGN_TOKENS = {
   "divergences": {
     "$description": "Known same-concept/different-value pairs across legacy namespaces, tracked for the namespace-collapse wave. Do NOT silently unify these — each is a visual change requiring its own migration slice.",
     "accent-blue": {
-      "canonical-dark": "#4d7dff",
+      "canonical-dark": "#11afff",
       "linear-marketing": "#2563ff",
-      "note": "--color-accent-blue (dark carbon palette) vs --linear-accent-blue (System A marketing). Unification tracked under the namespace-collapse wave of #12009."
+      "note": "--color-accent-blue dark is Noir Ion electric blue (JOV-4635). --linear-accent-blue remains marketing System A until namespace-collapse."
     }
   }
 } as const;

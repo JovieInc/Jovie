@@ -316,25 +316,50 @@ Three input variables generate the entire palette:
 | Accent | `#7170ff` | — | Focus rings, active states, links |
 | Accent hover | `#828fff` | — | Hover state |
 
-### App Colors — Dark Mode (System B)
+### App Colors — Dark Mode (System B · **Jovie Noir Ion**, JOV-4635)
 
-| Token | Value | Hex | Usage |
-|-------|-------|-----|-------|
-| `--color-bg-base` | `#06070a` | — | Sidebar, page background (carbon palette) |
-| `--color-bg-surface-0` | `#0a0b0e` | — | Primary app surface (carbon palette) |
-| `--color-bg-surface-1` | `#101216` | — | Cards, panels (carbon palette) |
-| `--color-bg-surface-2` | `#161a20` | — | Inputs, elevated (carbon palette) |
-| `--color-bg-surface-3` | `#2a2c32` | — | Modals, tooltips |
-| Text primary | `lch(100% 0 282)` | `#ffffff` | Headings |
-| Text secondary | `lch(90.65% 1.35 282)` | `#E3E4E6` | Body, labels (bright!) |
-| Text tertiary | `lch(62.6% 1.35 282)` | `#969799` | Descriptions, meta |
-| Text quaternary | `#62666d` | — | Placeholders |
-| Content text | `#6b6f76` | — | Content/meta |
-| Highlight text | `#ffffff` | — | Highlighted content |
-| Border subtle | `rgba(255,255,255,0.05)` | — | Dividers |
-| Border default | `rgba(255,255,255,0.08)` | — | Borders |
-| Border strong | `rgba(255,255,255,0.10)` | — | Emphasis |
-| Accent | `#7170ff` | — | Same as light mode |
+Dark mode is the authenticated product default. Neutral near-black graphite
+carries structure; bright color is sparse intent (~90% neutral / 7% soft accent
+/ 3% bright accent). Neon is seasoning. Canonical anchors live as `--noir-ion-*`
+in `apps/web/styles/design-system.css` and map into product tokens (rollback path:
+remap product tokens to prior anchors without a second theme provider).
+
+| Role | Anchor | Product token(s) | Usage |
+|------|--------|------------------|-------|
+| Canvas | `#030407` | `--color-bg-base`, `--color-bg-page`, `--linear-bg-page` | App page |
+| Shell | `#06080D` | `--color-bg-surface-0`, sidebar rgb `6 8 13` | Sidebar / chrome |
+| Panel | `#0A0D16` | `--linear-app-content-surface`, `--linear-panel-bg` | Framed main pane |
+| Card | `#0F1420` | `--linear-bg-surface-1` → `--color-bg-surface-1` | Cards |
+| Elevated | `#151B2A` | `--color-bg-surface-2` | Inputs, raised |
+| Floating | `#1B2436` | `--color-bg-surface-3` | Modals, tooltips |
+| Text primary | `#F5F7FB` | `--color-text-primary-token` | Body / headings |
+| Text secondary | `#D7DCE8` | `--color-text-secondary-token` | Labels |
+| Text muted | `#A8B0C3` | `--color-text-tertiary-token` | Meta |
+| Text tertiary | `#7D879D` | `--color-text-quaternary-token` | Placeholders |
+| Text disabled | `#525D75` | `--color-text-disabled-token` | Disabled |
+| Text inverse | `#020307` | `--linear-text-inverse` | On light CTAs |
+| Border subtle | `rgba(168,176,195,.10)` | `--color-border-subtle` | Dividers |
+| Border default | `rgba(168,176,195,.16)` | `--color-border-default` | Borders |
+| Border strong | `rgba(199,237,255,.26)` | `--color-border-strong` | Emphasis |
+| Focus / selection | Ion `#11AFFF` | `--color-accent`, `--color-border-focus`, `--linear-row-selected` | Focus, links, active nav, selection |
+
+**Accent semantics (dark):**
+
+| Role | Hex | Soft | Meaning |
+|------|-----|------|---------|
+| Ion (blue) | `#11AFFF` | `rgba(17,175,255,.12)` | Primary action intent, focus, active nav, links, selection |
+| Ultra (violet) | `#A982FF` | `rgba(169,130,255,.12)` | Agent intelligence, ranking, recommendations |
+| Pulse (pink) | `#FF48D2` | `rgba(255,72,210,.12)` | Creative energy, launches, merch |
+| Aqua (cyan) | `#24F6D2` | `rgba(36,246,210,.10)` | System signal, sync, API/tool state (`--color-info`) |
+| Mint (green) | `#39E58C` | `rgba(57,229,140,.12)` | Success |
+| Gold | `#FFC857` | `rgba(255,200,87,.12)` | Warning |
+| Flare (coral) | `#FF677D` | `rgba(255,103,125,.12)` | Danger / error |
+
+CTAs remain high-contrast light pills (not saturated Ion fills) per the
+neutral-CTA rule. Ion carries focus, links, selection, and active navigation.
+Every status also uses text, icon, shape, or pattern — color alone never carries meaning.
+
+Specimen: Storybook `Design System/Noir Ion Specimen`.
 
 ### Marketing Colors (System A — Dark by Default)
 
@@ -356,16 +381,16 @@ Three input variables generate the entire palette:
 
 ### Feature Accent Colors (supporting, never brand)
 
-These colors differentiate features in bento grids and semantic indicators. They are supporting cast, never used for CTAs or brand identity.
+These colors differentiate features in bento grids and semantic indicators. They are supporting cast, never used for CTAs or brand identity. Dark values follow Noir Ion (JOV-4635).
 
-| Token | Light | Dark | Feature |
-|-------|-------|------|---------|
-| `--accent-analytics` | `#2563ff` | `#4d7dff` | Analytics |
-| `--accent-conv` | `#8b1eff` | `#9b4dff` | Conversion |
-| `--accent-beauty` | `#d61a7f` | `#ea4a9c` | Beauty/Design |
-| `--accent-links` | `#0f9b8e` | `#22b8a7` | Smart Links |
-| `--accent-speed` | `#2f9e44` | `#43b85c` | Speed |
-| `--accent-pro` | `#ff9800` | `#ffab2e` | Pro Tools |
+| Token | Light | Dark (Noir Ion) | Feature |
+|-------|-------|-----------------|---------|
+| `--accent-analytics` | `#2563ff` | `#11AFFF` (Ion) | Analytics |
+| `--accent-conv` | `#8b1eff` | `#A982FF` (Ultra) | Conversion / agent |
+| `--accent-beauty` | `#d61a7f` | `#FF48D2` (Pulse) | Beauty/Design |
+| `--accent-links` | `#0f9b8e` | `#24F6D2` (Aqua) | Smart Links / system |
+| `--accent-speed` | `#2f9e44` | `#39E58C` (Mint) | Speed / success |
+| `--accent-pro` | `#ff9800` | `#FFC857` (Gold) | Pro Tools / warning |
 
 **Usage rules:**
 - Apply accent color to feature card **title text only** via `text-[color:var(--accent-*)]`

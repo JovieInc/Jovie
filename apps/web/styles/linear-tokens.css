@@ -383,100 +383,91 @@
 :root.dark,
 .system-b-marketing.dark,
 [data-theme="linear"].dark {
-  /* Text — extracted directly from linear.app computed styles (2026-03-10):
-     --color-text-primary: #f7f8f8  (rgb 247,248,248)
-     --color-text-secondary: #d0d6e0 (much brighter than previous)
-     --color-text-tertiary: #8a8f98  (rgb 138,143,152) */
-  --linear-text-primary: #f7f8f8;
-  --linear-text-secondary: #d0d6e0;
-  --linear-text-tertiary: #8a8f98;
-  --linear-text-quaternary: #62666d;
-  --linear-text-inverse: oklch(5% 0.005 282);
-  /* Backgrounds — extracted from linear.app computed styles (2026-03-10):
-     --color-bg-primary: #08090a  body bg
-     --color-bg-secondary: #1c1c1f  cards/panels
-     --color-bg-tertiary: #232326  elevated surfaces */
-  --linear-bg-page: #06070a;
+  /* Text — Jovie Noir Ion (JOV-4635) */
+  --linear-text-primary: #f5f7fb;
+  --linear-text-secondary: #d7dce8;
+  --linear-text-tertiary: #a8b0c3;
+  --linear-text-quaternary: #7d879d;
+  --linear-text-inverse: #020307;
+  /* Backgrounds — Noir Ion stepped surfaces */
+  --linear-bg-page: #030407;
+  /* app canvas */
   --linear-bg-header: transparent;
-  --linear-bg-surface-0: #0a0b0e;
-  /* recessed wells / deepest app surface */
-  --linear-bg-surface-1: #101216;
-  /* shared card surface inside the app shell */
-  --linear-bg-surface-2: #161a20;
-  /* elevated controls and stronger separation */
-  --linear-panel-bg: #0a0b0e;
-  --linear-panel-ring: #23252a;
-  --linear-bg-button: #2a2a2e;
-  --linear-bg-footer: #06070a;
-  --linear-border-footer: #2a2a2e;
-  --linear-bg-hover: rgba(255, 255, 255, 0.06);
-  /* Borders — JOV-1780: dark-mode contrast bump (prev 0.04/0.07/0.12 blended
-     into surface-1 `#17171a` and page `#08090a`, making cards/panels/inputs
-     edge-less in dark mode). */
-  --linear-border-subtle: rgba(255, 255, 255, 0.07);
-  /* Low-emphasis separators inside shell chrome must stay quieter than a frame seam. */
-  --linear-border-default: rgba(255, 255, 255, 0.11);
-  --linear-border-strong: rgba(255, 255, 255, 0.18);
-  --linear-border-focus: rgba(255, 255, 255, 0.32);
-  /* Buttons — white primary on dark bg, matching Linear.app */
+  --linear-bg-surface-0: #06080d;
+  /* shell / recessed wells */
+  --linear-bg-surface-1: #0f1420;
+  /* card */
+  --linear-bg-surface-2: #151b2a;
+  /* elevated */
+  --linear-panel-bg: #0a0d16;
+  /* panel */
+  --linear-panel-ring: rgba(199, 237, 255, 0.26);
+  --linear-bg-button: #151b2a;
+  --linear-bg-footer: #030407;
+  --linear-border-footer: rgba(168, 176, 195, 0.16);
+  --linear-bg-hover: rgba(168, 176, 195, 0.06);
+  /* Borders — Noir Ion cool graphite */
+  --linear-border-subtle: rgba(168, 176, 195, 0.1);
+  --linear-border-default: rgba(168, 176, 195, 0.16);
+  --linear-border-strong: rgba(199, 237, 255, 0.26);
+  --linear-border-focus: rgba(17, 175, 255, 0.72);
+  /* Ion focus */
+  /* Buttons — white primary on dark (restrained CTA; Ion is focus/selection) */
   --linear-btn-primary-bg: #ffffff;
-  --linear-btn-primary-fg: #06070a;
+  --linear-btn-primary-fg: #020307;
   --linear-btn-primary-hover: #e8e9ec;
   --linear-btn-primary-border: #ffffff;
-  --linear-btn-secondary-bg: #232326;
-  --linear-btn-secondary-fg: #f7f8f8;
-  --linear-btn-secondary-hover: #2a2a2e;
-  /* Hero-specific */
+  --linear-btn-secondary-bg: #151b2a;
+  --linear-btn-secondary-fg: #f5f7fb;
+  --linear-btn-secondary-hover: #1b2436;
+  /* Hero-specific — cool ion atmosphere (sparse) */
   --linear-hero-glow: radial-gradient(
     ellipse 80% 60% at 50% 0%,
-    oklch(20% 0.02 265 / 0.6),
+    rgba(17, 175, 255, 0.08),
     transparent 70%
   );
-  /* Section glow backgrounds — dark mode */
   --linear-section-glow-primary: radial-gradient(
     ellipse 70% 50% at 50% 30%,
-    oklch(14% 0.03 270 / 0.5),
+    rgba(169, 130, 255, 0.06),
     transparent 70%
   );
   --linear-cta-glow: radial-gradient(
     ellipse 60% 50% at 50% 40%,
-    oklch(16% 0.035 265 / 0.6),
+    rgba(17, 175, 255, 0.07),
     transparent 65%
   );
-  --linear-hero-gradient-from: #f7f8f8;
-  --linear-hero-gradient-to: #8a8f98;
-  --linear-separator-from: rgba(255, 255, 255, 0.06);
-  --linear-separator-via: rgba(255, 255, 255, 0.03);
-  /* Shadows — deeper on dark. JOV-1780: ring bumped from 0.06 → 0.12 so
-     popovers/dropdowns/menus have a clearly visible rim against the app
-     shell in dark mode. */
+  --linear-hero-gradient-from: #f5f7fb;
+  --linear-hero-gradient-to: #a8b0c3;
+  --linear-separator-from: rgba(168, 176, 195, 0.1);
+  --linear-separator-via: rgba(168, 176, 195, 0.04);
+  /* Shadows — restrained depth on near-black */
   --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.4);
   --linear-shadow-card-elevated:
-    0 0 0 1px rgba(255, 255, 255, 0.12), 0px 8px 40px rgba(0, 0, 0, 0.55);
-  --linear-app-content-surface: #0a0c0f;
-  /* primary framed main-pane surface */
+    0 0 0 1px rgba(168, 176, 195, 0.12), 0px 8px 40px rgba(0, 0, 0, 0.55);
+  --linear-app-content-surface: #0a0d16;
+  /* panel — primary framed main-pane surface */
   --linear-app-card-shadow: none;
-  /* JOV-1780: panel/frame seams bumped so card & panel boundaries are
-     visible in dark mode (prev 0.03 / 0.035 read as no edge at all). */
-  --linear-app-shell-border: #171a20;
-  --linear-app-shell-sidebar-seam: rgba(255, 255, 255, 0.08);
-  --linear-app-frame-seam: rgba(255, 255, 255, 0.07);
+  --linear-app-shell-border: rgba(168, 176, 195, 0.12);
+  --linear-app-shell-sidebar-seam: rgba(168, 176, 195, 0.1);
+  --linear-app-frame-seam: rgba(168, 176, 195, 0.1);
   --linear-app-shell-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.025), 0 14px 36px rgba(0, 0, 0, 0.18);
+    0 0 0 1px rgba(168, 176, 195, 0.06), 0 14px 36px rgba(0, 0, 0, 0.22);
   --linear-app-sidebar-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.02), 0 12px 28px rgba(0, 0, 0, 0.16);
+    0 0 0 1px rgba(168, 176, 195, 0.05), 0 12px 28px rgba(0, 0, 0, 0.18);
   --linear-app-drawer-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.042), 0 18px 42px rgba(0, 0, 0, 0.3);
-  --linear-row-hover: rgba(255, 255, 255, 0.022);
-  --linear-row-selected: rgba(255, 255, 255, 0.048);
-  --linear-app-sidebar-background-rgb: 6 7 10;
-  --linear-app-sidebar-foreground-rgb: 227 228 229;
-  --linear-app-sidebar-border-rgb: 255 255 255 / 0.06;
-  --linear-app-sidebar-accent-rgb: 255 255 255 / 0.03;
-  --linear-app-sidebar-accent-active-rgb: 255 255 255 / 0.05;
-  --linear-app-sidebar-item-foreground-rgb: 214 218 226;
-  --linear-app-sidebar-item-icon-rgb: 116 120 128;
-  --linear-app-sidebar-muted-rgb: 107 111 118;
+    0 0 0 1px rgba(168, 176, 195, 0.1), 0 18px 42px rgba(0, 0, 0, 0.32);
+  --linear-row-hover: rgba(168, 176, 195, 0.06);
+  --linear-row-selected: rgba(17, 175, 255, 0.1);
+  /* Ion selection */
+  --linear-app-sidebar-background-rgb: 6 8 13;
+  /* shell #06080D */
+  --linear-app-sidebar-foreground-rgb: 245 247 251;
+  --linear-app-sidebar-border-rgb: 168 176 195 / 0.1;
+  --linear-app-sidebar-accent-rgb: 168 176 195 / 0.06;
+  --linear-app-sidebar-accent-active-rgb: 17 175 255 / 0.1;
+  --linear-app-sidebar-item-foreground-rgb: 215 220 232;
+  --linear-app-sidebar-item-icon-rgb: 125 135 157;
+  --linear-app-sidebar-muted-rgb: 125 135 157;
 }
 
 /* ============================================

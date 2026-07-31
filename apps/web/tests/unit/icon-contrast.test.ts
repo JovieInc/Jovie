@@ -57,11 +57,12 @@ const SURFACES = {
     'surface-3': '#e6e6e6',
   },
   dark: {
-    base: '#06070a',
-    'surface-0': '#0a0b0e',
-    'surface-1': '#101216',
-    'surface-2': '#161a20',
-    'surface-3': '#2a2c32',
+    // Jovie Noir Ion (JOV-4635)
+    base: '#030407',
+    'surface-0': '#06080d',
+    'surface-1': '#0f1420',
+    'surface-2': '#151b2a',
+    'surface-3': '#1b2436',
   },
 } as const;
 
@@ -71,7 +72,7 @@ const TEXT_TOKENS = {
     'secondary-token': '#555558', // oklch(40% 0.015 272)
   },
   dark: {
-    'secondary-token': '#e3e4e5', // oklch(92% 0.005 272)
+    'secondary-token': '#d7dce8', // Noir Ion secondary
   },
 } as const;
 
@@ -177,7 +178,7 @@ function socialLinkColors(
   }
 
   // hover and active: mirrors SocialLink.tsx hoverColor logic
-  const hoverBg = isDark ? '#101216' : '#fcfcfc';
+  const hoverBg = isDark ? '#0f1420' : '#fcfcfc';
   const effectiveColor =
     isDark && isBrandDark(brandHex)
       ? '#ffffff'
@@ -202,7 +203,7 @@ function dspIconColors(
   surface: 'surface-1' | 'surface-2'
 ): ColorPair {
   const isDark = theme === 'dark';
-  const bgHex = isDark ? '#101216' : '#fcfcfc';
+  const bgHex = isDark ? '#0f1420' : '#fcfcfc';
   const effectiveColor =
     isDark && isBrandDark(`#${brandHex}`)
       ? '#ffffff'
