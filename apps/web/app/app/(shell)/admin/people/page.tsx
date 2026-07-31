@@ -7,6 +7,7 @@ import { AdminUsersTableUnified } from '@/components/features/admin/admin-users-
 import { AdminFeedbackTable } from '@/components/features/admin/feedback-table/AdminFeedbackTable';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { WaitlistMetrics } from '@/components/features/admin/WaitlistMetrics';
+import { WaitlistSettingsPanel } from '@/components/features/admin/WaitlistSettingsPanel';
 import { AdminWaitlistTableWithViews } from '@/components/features/admin/waitlist-table/AdminWaitlistTableWithViews';
 import {
   type AdminPeopleView,
@@ -97,6 +98,7 @@ async function renderPeopleView(
       return (
         <div className='space-y-4'>
           <WaitlistMetrics metrics={metrics} />
+          <WaitlistSettingsPanel />
           <AdminWaitlistTableWithViews
             entries={entries}
             page={1}

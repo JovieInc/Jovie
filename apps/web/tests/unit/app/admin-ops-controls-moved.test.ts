@@ -3,9 +3,8 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
- * JOV-2103 — operational on/off controls must not live under Settings.
- * They belong on the Ops OperationalControlPanel; Settings keeps only a
- * redirect/discovery pointer for admins.
+ * JOV-4639 — environment controls belong on Ops, campaign defaults belong
+ * with Growth, and people intake defaults belong with the waitlist.
  */
 
 function findSourceFile(...candidates: string[]): string {
@@ -62,6 +61,19 @@ const OPS_PAGE = findSourceFile(
   resolve(process.cwd(), 'apps/web/app/app/(shell)/admin/ops/page.tsx')
 );
 
+const GROWTH_COLLAPSIBLES = findSourceFile(
+  resolve(process.cwd(), 'components/features/admin/leads/GtmCollapsibles.tsx'),
+  resolve(
+    process.cwd(),
+    'apps/web/components/features/admin/leads/GtmCollapsibles.tsx'
+  )
+);
+
+const PEOPLE_PAGE = findSourceFile(
+  resolve(process.cwd(), 'app/app/(shell)/admin/people/page.tsx'),
+  resolve(process.cwd(), 'apps/web/app/app/(shell)/admin/people/page.tsx')
+);
+
 const SETTINGS_ROUTE_DIR = findSourceFile(
   resolve(process.cwd(), 'app/app/(shell)/settings'),
   resolve(process.cwd(), 'apps/web/app/app/(shell)/settings')
@@ -70,14 +82,13 @@ const SETTINGS_ROUTE_DIR = findSourceFile(
 const OPERATIONAL_PANEL_MARKERS = [
   'WaitlistSettingsPanel',
   'CampaignSettingsPanel',
-  'OperationalControlPanel',
   'Toggle waitlist gate',
   'Toggle auto-accept',
   'Toggle dev toolbar',
   'Manual approval gate',
 ] as const;
 
-describe('JOV-2103 operational controls moved to Ops', () => {
+describe('JOV-4639 admin settings are owned by their workspace', () => {
   it('keeps /settings/admin as a redirect-only pointer to Ops', () => {
     const source = readFileSync(SETTINGS_ADMIN_PAGE, 'utf8');
 
@@ -89,16 +100,26 @@ describe('JOV-2103 operational controls moved to Ops', () => {
     expect(source).not.toContain('SettingsToggleRow');
   });
 
-  it('mounts the consolidated operational control panel on Ops', () => {
+  it('keeps only environment controls on Ops', () => {
     const opsPage = readFileSync(OPS_PAGE, 'utf8');
     const panel = readFileSync(OPERATIONAL_CONTROL_PANEL, 'utf8');
 
     expect(opsPage).toContain('OperationalControlPanel');
     expect(opsPage).toContain('<OperationalControlPanel');
     expect(panel).toContain("data-testid='operational-control-panel'");
-    expect(panel).toContain('WaitlistSettingsPanel');
-    expect(panel).toContain('CampaignSettingsPanel');
     expect(panel).toContain('Dev toolbar');
+    expect(panel).not.toContain('WaitlistSettingsPanel');
+    expect(panel).not.toContain('CampaignSettingsPanel');
+  });
+
+  it('mounts campaign defaults in Growth advanced settings and waitlist defaults in People', () => {
+    const growthCollapsibles = readFileSync(GROWTH_COLLAPSIBLES, 'utf8');
+    const peoplePage = readFileSync(PEOPLE_PAGE, 'utf8');
+
+    expect(growthCollapsibles).toContain('CampaignSettingsPanel');
+    expect(growthCollapsibles).toContain("title='Advanced Settings'");
+    expect(peoplePage).toContain('WaitlistSettingsPanel');
+    expect(peoplePage).toContain('<WaitlistSettingsPanel');
   });
 
   it('does not reintroduce operational control panels under Settings routes', () => {

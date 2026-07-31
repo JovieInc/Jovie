@@ -2,8 +2,6 @@
 
 import { Terminal } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { CampaignSettingsPanel } from '@/components/features/admin/campaigns/CampaignSettingsPanel';
-import { WaitlistSettingsPanel } from '@/components/features/admin/WaitlistSettingsPanel';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
@@ -45,7 +43,7 @@ export function OperationalControlPanel() {
     >
       <ContentSectionHeader
         title='Operational controls'
-        subtitle='Environment, people intake, and growth defaults in one place.'
+        subtitle='Local environment helpers for operator sessions.'
       />
       <div className='space-y-6 p-4 sm:p-5'>
         <SettingsPanel
@@ -63,9 +61,6 @@ export function OperationalControlPanel() {
             />
           </div>
         </SettingsPanel>
-
-        <WaitlistSettingsPanel />
-        <CampaignSettingsPanel />
       </div>
     </ContentSurfaceCard>
   );

@@ -134,7 +134,8 @@ describe('admin settings heading typography', () => {
 
     expect(operationalControls).toContain('import { SettingsPanel }');
     expect(operationalControls).toContain('<SettingsPanel');
-    expect(operationalControls).toContain('WaitlistSettingsPanel');
-    expect(operationalControls).toContain('CampaignSettingsPanel');
+    // Waitlist/campaign defaults moved to People/Growth (JOV-4639)
+    expect(operationalControls).not.toContain('WaitlistSettingsPanel');
+    expect(operationalControls).not.toContain('CampaignSettingsPanel');
   });
 });
