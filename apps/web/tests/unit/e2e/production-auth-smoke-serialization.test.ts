@@ -21,6 +21,8 @@ describe('production auth smoke session contract', () => {
     expect(source).toContain("readyTestId: 'library-surface'");
     expect(source).toContain("readyView: 'releases'");
     expect(source).toContain('await page.waitForURL(');
+    expect(source.match(/await page.reload\(\{/gu)).toHaveLength(1);
+    expect(source).toContain("'Rendered sign-in reload'");
     expect(source).toContain('await waitForProductionDashboardContent(');
     expect(
       source.match(/await verifyProductionIosOAuthTokenFlow\(/gu)

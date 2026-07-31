@@ -326,21 +326,36 @@ async function signInViaRenderedFlow(
   expectedOrigin: string
 ): Promise<SignInResult> {
   assertExactNavigationUrl(page.url(), expectedOrigin, 'Rendered sign-in flow');
-  const emailForm = page
+  let emailForm = page
     .locator('form[data-auth-email-code-step="email"]')
     .first();
-  const hasIdentifierInput = await emailForm
-    .isVisible({ timeout: 15_000 })
-    .catch(() => false);
-
-  if (!hasIdentifierInput) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const hasIdentifierInput = await emailForm
+      .isVisible({ timeout: 15_000 })
+      .catch(() => false);
+    if (hasIdentifierInput) break;
     if (
       isExactNavigationUrl(page.url(), expectedOrigin) &&
       new URL(page.url()).pathname.startsWith('/app')
     ) {
       return 'authenticated';
     }
-    return 'signin-form-unavailable';
+    if (attempt === 0) {
+      await page.reload({
+        waitUntil: 'domcontentloaded',
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      });
+      assertExactNavigationUrl(
+        page.url(),
+        expectedOrigin,
+        'Rendered sign-in reload'
+      );
+      emailForm = page
+        .locator('form[data-auth-email-code-step="email"]')
+        .first();
+    } else {
+      return 'signin-form-unavailable';
+    }
   }
 
   const { submitButton } = await prepareProductionAuthEmailForm(
