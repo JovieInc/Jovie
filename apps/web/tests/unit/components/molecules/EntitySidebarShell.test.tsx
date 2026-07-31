@@ -20,6 +20,26 @@ vi.mock('@/components/organisms/RightDrawer', () => ({
 }));
 
 describe('EntitySidebarShell', () => {
+  it('defaults entity workspaces to the shared raised surface', () => {
+    render(
+      <EntitySidebarShell isOpen ariaLabel='Entity details'>
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    const workspace = screen
+      .getByTestId('right-drawer')
+      .querySelector('[data-right-rail-workspace]');
+
+    expect(workspace).toHaveAttribute('data-surface-variant', 'raised');
+    expect(workspace).toHaveClass(
+      'overflow-hidden',
+      'rounded-(--linear-app-shell-radius)',
+      'bg-surface-1',
+      'shadow-card'
+    );
+  });
+
   it('keeps the entity header pinned and leaves minimal-mode tab composition to the body', () => {
     render(
       <EntitySidebarShell

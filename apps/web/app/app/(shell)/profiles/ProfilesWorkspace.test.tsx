@@ -1,5 +1,6 @@
 import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
@@ -122,15 +123,16 @@ describe('ProfilesWorkspace', () => {
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('opens connection-specific details from the row action', () => {
+  it('uses the row action registry to open connection-specific details', async () => {
+    const user = userEvent.setup();
     renderWorkspace(data);
 
     const action = screen.getByRole('button', {
       name: 'Actions for Spotify',
     });
-    expect(action.parentElement).toHaveClass('sm:opacity-0');
 
-    fireEvent.click(action);
+    await user.click(action);
+    await user.click(screen.getByRole('menuitem', { name: /View Details/i }));
     const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
     expect(panel).not.toBeNull();
 
@@ -142,6 +144,10 @@ describe('ProfilesWorkspace', () => {
       'relative',
       'flex'
     );
+    expect(screen.getByTestId('profiles-rail-summary')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('profiles-rail-shareable-link')
+    ).toHaveTextContent('jov.ie/tim/s/spotify');
     expect(screen.getByText('Next Best Action')).toBeInTheDocument();
     expect(
       screen.getByText('Upgrade the monitoring limit to track this connection.')
@@ -152,17 +158,19 @@ describe('ProfilesWorkspace', () => {
     );
   });
 
-  it('clears connection details when the table filter changes', () => {
+  it('clears connection details when the table filter changes', async () => {
+    const user = userEvent.setup();
     renderWorkspace(data);
 
-    fireEvent.click(
+    await user.click(
       screen.getByRole('button', { name: 'Actions for Spotify' })
     );
+    await user.click(screen.getByRole('menuitem', { name: /View Details/i }));
     expect(
       vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0]
     ).not.toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Connectors' }));
+    await user.click(screen.getByRole('button', { name: 'Connectors' }));
     expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
   });
 

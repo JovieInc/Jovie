@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, SimpleTooltip } from '@jovie/ui';
+import { Button, type CommonDropdownItem, SimpleTooltip } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
   ArrowDownRight,
@@ -17,23 +17,29 @@ import {
   UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useMemo, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
+  DrawerAnalyticsSummaryCard,
   DrawerSection,
   EntityHeaderCard,
   EntitySidebarShell,
+  ShareableLinkRow,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
+  type ContextMenuItemType,
+  convertContextMenuItems,
+  convertToCommonDropdownItems,
   PageToolbar,
   PageToolbarTabButton,
   TableEmptyState,
-  TableIconButton,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
@@ -47,6 +53,7 @@ import {
   summarizeProfileWorkspaceRows,
 } from '@/lib/profile-surfaces/workspace';
 import { cn } from '@/lib/utils';
+import { buildConnectionActions } from './connection-actions';
 import type {
   ProfilesWorkspaceData,
   ProfilesWorkspaceFilter,
@@ -229,10 +236,12 @@ function ConnectionRail({
   data,
   row,
   onClose,
+  contextMenuItems,
 }: Readonly<{
   data: ProfilesWorkspaceData;
   row: ProfileWorkspaceRow | null;
   onClose: () => void;
+  contextMenuItems: CommonDropdownItem[];
 }>) {
   const primaryAction = row ? getConnectionPrimaryAction(row) : null;
   const rankChange =
@@ -243,6 +252,7 @@ function ConnectionRail({
     <EntitySidebarShell
       isOpen={row !== null}
       ariaLabel='Connection details'
+      contextMenuItems={contextMenuItems}
       scrollStrategy='shell'
       workspaceSurface='raised'
       headerMode='minimal'
@@ -277,6 +287,7 @@ function ConnectionRail({
               <DrawerHeaderActions
                 primaryActions={[]}
                 overflowActions={[]}
+                menuItems={contextMenuItems}
                 onClose={onClose}
               />
             }
@@ -288,6 +299,40 @@ function ConnectionRail({
     >
       {row ? (
         <div className='space-y-2'>
+          <DrawerAnalyticsSummaryCard
+            state='ready'
+            metrics={[
+              {
+                id: 'status',
+                label: 'Status',
+                value: getConnectionStatus(row).label,
+                hint: MONITORING_LABELS[row.monitoringState],
+              },
+              {
+                id: 'rank',
+                label: 'Search Rank',
+                value:
+                  row.rowType === 'surface' && row.monitoringState !== 'locked'
+                    ? String(row.rank ?? '—')
+                    : '—',
+                hint: rankChange === '—' ? 'No change yet' : rankChange,
+              },
+            ]}
+            footer={
+              <ShareableLinkRow
+                url={
+                  row.rowType === 'surface'
+                    ? (row.trackedUrl ?? row.url)
+                    : row.url
+                }
+                density='rail'
+                testId='profiles-rail-shareable-link'
+              />
+            }
+            stableLayout
+            reserveFooterSlot
+            testId='profiles-rail-summary'
+          />
           <DrawerSection
             title='Connection'
             sectionKind='facts'
@@ -299,23 +344,7 @@ function ConnectionRail({
               label='Monitoring'
               value={MONITORING_LABELS[row.monitoringState]}
             />
-            <RailMetric
-              label='Search Rank'
-              value={
-                row.rowType === 'surface' && row.monitoringState !== 'locked'
-                  ? String(row.rank ?? 'Not measured')
-                  : '—'
-              }
-            />
-            <RailMetric label='Change' value={rankChange} />
           </DrawerSection>
-          {row.rowType === 'surface' && row.trackedUrl ? (
-            <DrawerSection title='Tracked Redirect' sectionKind='links'>
-              <div className='break-all rounded-md bg-surface-0 px-2.5 py-2 text-xs text-secondary-token'>
-                {row.trackedUrl}
-              </div>
-            </DrawerSection>
-          ) : null}
           <DrawerSection title='Next Best Action' sectionKind='status'>
             <p className='text-xs leading-5 text-secondary-token'>
               {getConnectionStatus(row).nextAction}
@@ -383,6 +412,7 @@ export function ProfilesWorkspace({
 }: Readonly<{ data: ProfilesWorkspaceData | null }>) {
   const [filter, setFilter] = useState<ProfilesWorkspaceFilter>('all');
   const [selected, setSelected] = useState<ProfileWorkspaceRow | null>(null);
+  const router = useRouter();
   const rows = useMemo(
     () =>
       sortProfileWorkspaceRows(
@@ -397,6 +427,32 @@ export function ProfilesWorkspace({
         data?.providerAvailable ?? false
       ),
     [data?.providerAvailable, data?.rows]
+  );
+  const getContextMenuItems = useCallback(
+    (row: ProfileWorkspaceRow): ContextMenuItemType[] => {
+      const primaryAction = getConnectionPrimaryAction(row);
+      return buildConnectionActions(row, primaryAction, {
+        onViewDetails: setSelected,
+        onOpen: connection => {
+          if (connection.url.startsWith('http')) {
+            globalThis.open(connection.url, '_blank', 'noopener,noreferrer');
+            return;
+          }
+          router.push(connection.url);
+        },
+        onPrimaryAction: connection => {
+          const action = getConnectionPrimaryAction(connection);
+          router.push(
+            action === 'upgrade'
+              ? APP_ROUTES.SETTINGS_BILLING
+              : connection.rowType === 'connector'
+                ? APP_ROUTES.SETTINGS_CONNECTORS
+                : APP_ROUTES.SETTINGS_ARTIST_PROFILE
+          );
+        },
+      });
+    },
+    [router]
   );
   const columns = useMemo(
     () => [
@@ -492,21 +548,24 @@ export function ProfilesWorkspace({
         meta: { className: 'px-1 sm:px-3' },
         cell: context => {
           const row = context.row.original;
+          const actionItems = convertContextMenuItems(getContextMenuItems(row));
           return (
             <div className='flex justify-end opacity-100 transition-opacity duration-subtle sm:pointer-events-none sm:opacity-0 sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:focus-within:pointer-events-auto sm:focus-within:opacity-100'>
-              <TableIconButton
-                icon={<MoreHorizontal className='h-4 w-4' aria-hidden />}
-                onClick={() => setSelected(row)}
-                ariaLabel={`Actions for ${row.label}`}
-                tooltip='View connection details'
-                className='h-11 w-11 sm:h-7 sm:w-7'
-              />
+              <TableActionMenu items={actionItems} align='end' trigger='custom'>
+                <button
+                  type='button'
+                  aria-label={`Actions for ${row.label}`}
+                  className='inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-colors duration-fast hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50 sm:h-7 sm:w-7'
+                >
+                  <MoreHorizontal className='h-4 w-4' aria-hidden />
+                </button>
+              </TableActionMenu>
             </div>
           );
         },
       }),
     ],
-    []
+    [getContextMenuItems]
   );
 
   useRegisterRightPanel(
@@ -515,6 +574,9 @@ export function ProfilesWorkspace({
         data={data}
         row={selected}
         onClose={() => setSelected(null)}
+        contextMenuItems={convertToCommonDropdownItems(
+          getContextMenuItems(selected)
+        )}
       />
     ) : null
   );
@@ -594,6 +656,7 @@ export function ProfilesWorkspace({
         columns={columns as ColumnDef<ProfileWorkspaceRow, unknown>[]}
         getRowId={row => row.id}
         onRowClick={setSelected}
+        getContextMenuItems={getContextMenuItems}
         rowHeight={56}
         minWidth='390px'
         isRowSelected={row => selected?.id === row.id}

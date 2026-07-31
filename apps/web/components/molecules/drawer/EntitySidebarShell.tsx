@@ -119,7 +119,7 @@ export function EntitySidebarShell({
   headerMode = 'standard',
   hideMinimalHeaderBar = false,
   contentBleed = false,
-  workspaceSurface = 'flat',
+  workspaceSurface = 'raised',
   entityHeader,
   entityHeaderSurface = 'card',
   actionsInEntityHeader = false,
@@ -213,7 +213,8 @@ export function EntitySidebarShell({
         data-surface-variant={workspaceSurface}
         className={cn(
           'flex h-full min-h-0 flex-col gap-1.5',
-          workspaceSurface === 'raised' && 'bg-surface-1 shadow-card',
+          workspaceSurface === 'raised' &&
+            'overflow-hidden rounded-(--linear-app-shell-radius) bg-surface-1 shadow-card',
           !contentBleed && 'px-1.5 py-1.5 lg:px-0 lg:py-0'
         )}
       >

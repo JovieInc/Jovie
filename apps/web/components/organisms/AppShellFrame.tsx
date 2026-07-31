@@ -90,58 +90,51 @@ export const AppShellFrame = memo(function AppShellFrame({
         >
           <div
             data-app-shell-main-plane='true'
-            className='flex min-h-0 min-w-0 flex-1 overflow-hidden transition-[gap,flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none lg:gap-(--app-shell-gap)'
+            className='flex min-h-0 min-w-0 flex-1 overflow-hidden transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none'
           >
             <main
               id='main-content'
               className={cn(
-                // `isolate` gives <main> its own stacking context so the negative-z
-                // chat ambient layer below paints above main's background but
-                // beneath the in-flow header/content (#13386).
-                'relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-(--color-bg-surface-0)/90',
+                'relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-(--color-bg-surface-0)/90',
                 'lg:rounded-(--app-shell-radius) lg:border lg:border-(--app-shell-border) lg:bg-(--app-shell-content-surface) lg:shadow-(--linear-app-shell-shadow)'
               )}
             >
-              {/* Full-bleed ambient wash on chat routes — spans the whole content
-              panel so its top edge is above the (transparent) header band.
-              Negative z-index is load-bearing: an absolute sibling with z-auto
-              would paint ON TOP of the in-flow static header; `-z-10` inside
-              the isolated <main> paints it above main's background but beneath
-              the header and content. Opaque content-surface fill preserves the
-              previous chat canvas tone on all breakpoints. Pure background:
-              pointer-events-none, no layout impact (#13386, preserves the
-              full-viewport guarantee from #12135 / JOV-3614). */}
-              {chatAmbientGradient ? (
-                <div
-                  aria-hidden='true'
-                  data-testid='chat-ambient-gradient'
-                  className='pointer-events-none absolute inset-0 -z-10 bg-(--app-shell-content-surface)'
-                  style={{ backgroundImage: CHAT_AMBIENT_GRADIENT_IMAGE }}
-                />
-              ) : null}
-              {isCodeFlagEnabled('CANVAS_GRAIN') && <CanvasGrain />}
-              {header}
               <div
-                className={cn(
-                  'flex flex-1 min-h-0 min-w-0 overflow-hidden transition-[gap] duration-cinematic ease-cinematic motion-reduce:transition-none'
-                )}
+                data-app-shell-main-content='true'
+                className='relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none'
               >
-                <div
-                  data-testid='app-shell-scroll'
-                  className={cn(
-                    // Shell-level pane never owns vertical scroll — routes and table
-                    // surfaces scroll inside this clip so the right rail stays fixed.
-                    'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden overflow-x-auto overscroll-contain transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none pb-[var(--dev-toolbar-height,0px)]',
-                    contentClassName
-                  )}
-                >
-                  {main}
+                {/* The chat wash belongs to the route plane, not the contextual
+                    inspector. Keeping the isolated paint layer in this column
+                    lets the in-flow rail narrow content without tinting its own
+                    raised surface. */}
+                {chatAmbientGradient ? (
+                  <div
+                    aria-hidden='true'
+                    data-testid='chat-ambient-gradient'
+                    className='pointer-events-none absolute inset-0 -z-10 bg-(--app-shell-content-surface)'
+                    style={{ backgroundImage: CHAT_AMBIENT_GRADIENT_IMAGE }}
+                  />
+                ) : null}
+                {isCodeFlagEnabled('CANVAS_GRAIN') && <CanvasGrain />}
+                {header}
+                <div className='flex min-h-0 min-w-0 flex-1 overflow-hidden'>
+                  <div
+                    data-testid='app-shell-scroll'
+                    className={cn(
+                      // Shell-level pane never owns vertical scroll — routes and table
+                      // surfaces scroll inside this clip so the right rail stays fixed.
+                      'flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden overflow-x-auto overscroll-contain transition-[flex-basis,width] duration-cinematic ease-cinematic motion-reduce:transition-none pb-[var(--dev-toolbar-height,0px)]',
+                      contentClassName
+                    )}
+                  >
+                    {main}
+                  </div>
                 </div>
               </div>
+              {rightPanel ? (
+                <AppShellRightRail>{rightPanel}</AppShellRightRail>
+              ) : null}
             </main>
-            {rightPanel ? (
-              <AppShellRightRail>{rightPanel}</AppShellRightRail>
-            ) : null}
           </div>
           {/* The player is shell chrome, not content-card chrome. Keeping it as
               an in-flow sibling reserves its own tray below <main>, matching

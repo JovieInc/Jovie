@@ -29,7 +29,7 @@ describe('AppShellFrame', () => {
     // #main-content keeps its full rounded shell radius — no Electron override
     // strips the top corners now that the header lives inside the card.
     expect(mainContent).toHaveClass('lg:rounded-(--app-shell-radius)');
-    expect(mainContent.closest('[data-app-shell-main-plane]')).toHaveClass(
+    expect(mainContent.closest('[data-app-shell-main-plane]')).not.toHaveClass(
       'lg:gap-(--app-shell-gap)'
     );
     expect(screen.getByText('Sidebar')).toBeInTheDocument();
@@ -40,7 +40,7 @@ describe('AppShellFrame', () => {
     expect(mainContent).toContainElement(headers[0] as HTMLElement);
   });
 
-  it('allocates the right rail beside the complete main plane instead of overlaying route content', () => {
+  it('allocates the right rail inside main beside route content instead of overlaying it', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}
@@ -56,22 +56,26 @@ describe('AppShellFrame', () => {
     expect(scrollPane).toHaveClass('overflow-hidden');
     expect(scrollPane).not.toHaveClass('overflow-y-auto');
     expect(scrollPane).toContainElement(screen.getByText('Main Content'));
-    const mainPlane = screen.getByTestId('app-shell-right-rail').parentElement;
+    const main = screen.getByRole('main');
+    const mainPlane = rightRail.closest('[data-app-shell-main-plane]');
+    const routeContent = main.querySelector('[data-app-shell-main-content]');
 
     expect(mainPlane).toHaveAttribute('data-app-shell-main-plane', 'true');
-    expect(mainPlane).toContainElement(screen.getByRole('main'));
+    expect(mainPlane).toContainElement(main);
     expect(mainPlane).toContainElement(rightRail);
-    expect(screen.getByRole('main')).not.toContainElement(rightRail);
+    expect(main).toContainElement(rightRail);
+    expect(main).toContainElement(routeContent as HTMLElement);
+    expect(rightRail.parentElement).toBe(main);
+    expect(routeContent?.parentElement).toBe(main);
     expect(scrollPane).not.toContainElement(rightRail);
     expect(rightRail).toContainElement(
       screen.getByTestId('fixture-right-rail')
     );
     expect(rightRail).toHaveClass('sticky', 'top-0');
     expect(mainPlane).toHaveClass(
-      'transition-[gap,flex-basis,width]',
+      'transition-[flex-basis,width]',
       'duration-cinematic',
-      'motion-reduce:transition-none',
-      'lg:gap-(--app-shell-gap)'
+      'motion-reduce:transition-none'
     );
   });
 
@@ -137,10 +141,12 @@ describe('AppShellFrame', () => {
       />
     );
 
-    const mainPlane = screen.getByTestId('app-shell-right-rail').parentElement;
+    const mainPlane = screen
+      .getByTestId('app-shell-right-rail')
+      .closest('[data-app-shell-main-plane]');
 
     expect(mainPlane).toHaveClass(
-      'transition-[gap,flex-basis,width]',
+      'transition-[flex-basis,width]',
       'duration-cinematic',
       'motion-reduce:transition-none'
     );
@@ -174,18 +180,21 @@ describe('AppShellFrame', () => {
     const gradient = screen.getByTestId('chat-ambient-gradient');
     const header = screen.getByTestId('fixture-header');
 
-    // The gradient is a direct child of the shell content panel, spanning its
+    // The gradient is a direct child of the route content column, spanning its
     // full box (inset-0) — its top edge is the top of the panel, above the
     // header band, not below it (#13386).
-    expect(gradient.parentElement).toBe(mainContent);
+    const routeContent = mainContent.querySelector(
+      '[data-app-shell-main-content]'
+    );
+    expect(gradient.parentElement).toBe(routeContent);
     expect(gradient).toHaveClass('absolute', 'inset-0', 'pointer-events-none');
     // Stacking guard: the wash is opaque, so it MUST paint beneath the
     // in-flow header — that requires a negative z-index inside an isolated
-    // <main> (an absolute z-auto sibling would paint on top of static
+    // isolated route column (an absolute z-auto sibling would paint on top of static
     // content regardless of DOM order). jsdom can't compute stacking, so pin
     // the classes that make it correct.
     expect(gradient).toHaveClass('-z-10');
-    expect(mainContent).toHaveClass('isolate');
+    expect(routeContent).toHaveClass('isolate');
     expect(mainContent).toContainElement(header);
     expect(gradient.style.backgroundImage).toContain('radial-gradient');
   });

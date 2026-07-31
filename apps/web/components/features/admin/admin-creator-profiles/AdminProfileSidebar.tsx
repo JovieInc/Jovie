@@ -1,20 +1,21 @@
 'use client';
 
-import { type CommonDropdownItem, Label } from '@jovie/ui';
+import type { CommonDropdownItem } from '@jovie/ui';
 import { useMemo, useState } from 'react';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import {
+  DrawerAnalyticsSummaryCard,
   DrawerCardActionBar,
   DrawerSurfaceCard,
   DrawerTabbedCard,
   DrawerTabs,
   EntitySidebarShell,
+  ShareableLinkRow,
 } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
 import { DrawerHero } from '@/components/shell/DrawerHero';
 import { BASE_URL } from '@/constants/domains';
-import { CopyLinkInput } from '@/features/dashboard/atoms/CopyLinkInput';
 import { ProfileAboutTab } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab';
 import {
   type CategoryOption,
@@ -96,61 +97,78 @@ export function AdminProfileSidebar({
       ariaLabel='Creator profile'
       headerMode='minimal'
       hideMinimalHeaderBar
+      workspaceSurface='raised'
       entityHeaderSurface='flat'
       entityHeader={
-        <DrawerSurfaceCard variant='card' className='overflow-hidden'>
-          <div className='relative'>
-            <DrawerCardActionBar
-              primaryActions={primaryActions}
-              menuItems={contextMenuItems}
-              onClose={onClose}
-              overflowTriggerPlacement='card-top-right'
-              className='border-0 bg-transparent px-0 py-0'
-            />
-            <DrawerHero
-              title={profile.displayName ?? profile.username}
-              subtitle={`@${profile.username}`}
-              stableLayout
-              titleLineClamp={1}
-              subtitleLineClamp={1}
-              reserveSubtitleSlot
-              reserveMetaSlot
-              metaOverflow='scroll'
-              artwork={
-                <AvatarUploadable
-                  src={profile.avatarUrl}
-                  alt={`${profile.displayName ?? profile.username} avatar`}
-                  name={profile.displayName ?? profile.username}
-                  size='2xl'
-                  rounded='md'
-                />
-              }
-              meta={
-                <div className='flex items-center gap-2 text-2xs text-tertiary-token'>
-                  <span>
-                    {links.length} linked destination
-                    {links.length === 1 ? '' : 's'}
-                  </span>
-                  {profile.location ? <span>{profile.location}</span> : null}
-                </div>
-              }
-              trailing={
-                <div className='grid grid-cols-[72px,minmax(0,1fr)] items-center gap-3'>
-                  <Label className='text-2xs font-medium text-secondary-token'>
-                    Profile link
-                  </Label>
-                  <CopyLinkInput
-                    url={`${BASE_URL}/${profile.username}`}
-                    size='md'
-                    className='flex-1'
-                    inputClassName='h-7 rounded-md border-subtle bg-surface-0 px-2 py-1 text-2xs'
+        <>
+          <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+            <div className='relative'>
+              <DrawerCardActionBar
+                primaryActions={primaryActions}
+                menuItems={contextMenuItems}
+                onClose={onClose}
+                overflowTriggerPlacement='card-top-right'
+                className='border-0 bg-transparent px-0 py-0'
+              />
+              <DrawerHero
+                title={profile.displayName ?? profile.username}
+                density='rail'
+                subtitle={`@${profile.username}`}
+                stableLayout
+                titleLineClamp={1}
+                subtitleLineClamp={1}
+                reserveSubtitleSlot
+                reserveMetaSlot
+                metaOverflow='scroll'
+                artwork={
+                  <AvatarUploadable
+                    src={profile.avatarUrl}
+                    alt={`${profile.displayName ?? profile.username} avatar`}
+                    name={profile.displayName ?? profile.username}
+                    size='2xl'
+                    rounded='md'
                   />
-                </div>
-              }
-              className='[&_h2]:pr-9'
-            />
-          </div>
-        </DrawerSurfaceCard>
+                }
+                meta={profile.location ? <span>{profile.location}</span> : null}
+                className='[&_h2]:pr-9'
+                testId='admin-creator-entity-header'
+              />
+            </div>
+          </DrawerSurfaceCard>
+          <DrawerAnalyticsSummaryCard
+            testId='admin-creator-summary'
+            state='ready'
+            stableLayout
+            reserveFooterSlot
+            metricSlotCount={2}
+            metrics={[
+              {
+                id: 'linked-destinations',
+                label: 'Linked Destinations',
+                value: String(links.length),
+              },
+              {
+                id: 'profile-state',
+                label: 'Profile State',
+                value: profile.isVerified
+                  ? 'Verified'
+                  : profile.isClaimed
+                    ? 'Claimed'
+                    : 'Unclaimed',
+              },
+            ]}
+            footer={
+              <ShareableLinkRow
+                url={`${BASE_URL}/${profile.username}`}
+                density='rail'
+                surface='flat'
+                copyButtonTitle='Copy Profile Link'
+                openButtonTitle='Open Profile'
+                testId='admin-creator-profile-link'
+              />
+            }
+          />
+        </>
       }
     >
       <DrawerTabbedCard
