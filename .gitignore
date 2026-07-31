@@ -180,10 +180,9 @@ ruvector.db
 .no-mistakes/evidence/**
 !.no-mistakes/evidence/.gitkeep
 
-# AgentOS run artifacts (binary outputs not source-controlled)
+# AgentOS: source + Linear mirror are tracked; run binary outputs are not
 agentos/runs/**/artifacts/
 .hermes/
-agentos/
 docs/leads/
 *.bak
 *.bak2
