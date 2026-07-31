@@ -954,15 +954,44 @@ describe('TasksPageClient', () => {
 
     renderPage();
 
+    expect(screen.getByTestId('tasks-board')).toBeInTheDocument();
     expect(
-      screen.getByTestId('task-workspace-loading-rows')
-    ).toBeInTheDocument();
+      screen.queryByTestId('task-workspace-loading-rows')
+    ).not.toBeInTheDocument();
     expect(mockUseTasksQuery.mock.calls.at(-1)?.[2]).toEqual({
       enabled: false,
     });
     expect(mockUseTaskBoardQuery.mock.calls.at(-1)?.[2]).toEqual({
       enabled: false,
     });
+  });
+
+  it('retains cached list content through saved view mode hydration', () => {
+    mockViewModeHydrated = false;
+
+    renderPage();
+
+    expect(screen.getByTestId('tasks-table')).toHaveAttribute(
+      'data-loading',
+      'false'
+    );
+    expect(
+      screen.queryByTestId('task-workspace-loading-rows')
+    ).not.toBeInTheDocument();
+  });
+
+  it('retains populated list content during a warm refetch', () => {
+    mockListQueryIsLoading = true;
+
+    renderPage();
+
+    expect(screen.getByTestId('tasks-table')).toHaveAttribute(
+      'data-loading',
+      'false'
+    );
+    expect(
+      screen.queryByTestId('task-workspace-loading-rows')
+    ).not.toBeInTheDocument();
   });
 
   it('shows shell loading rows on mobile instead of flashing the empty state', () => {
