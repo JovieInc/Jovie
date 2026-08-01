@@ -14,6 +14,7 @@ const contextualActionColumns = [
   'components/features/admin/admin-users-table/AdminUsersTableUnified.tsx',
   'components/features/admin/admin-creator-profiles/utils/column-definitions.tsx',
   'components/features/admin/waitlist-table/AdminWaitlistTableUnified.tsx',
+  'app/app/(shell)/profiles/ProfilesWorkspace.tsx',
 ];
 
 describe('table action contract', () => {
