@@ -8,9 +8,7 @@ import {
   Copy,
   Disc3,
   ExternalLink,
-  ImageIcon,
   Link as LinkIcon,
-  MessageSquareText,
   Music2,
   UserRound,
   X,
@@ -31,7 +29,11 @@ import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelCo
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-tasks/ReleaseTaskChecklist';
 import { CompactReleasePlanUpgradeCard } from '@/components/features/dashboard/tasks/TasksUpgradeInterstitial';
-import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
+import {
+  DrawerSection,
+  EntityHeaderCard,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import type { EntityCardModel } from '@/components/organisms/entity-card';
@@ -536,32 +538,6 @@ function ChatRailContextCards({
   );
 }
 
-function ChatEntityPanelSection({
-  title,
-  icon,
-  children,
-}: Readonly<{
-  title: string;
-  icon: ReactNode;
-  children: ReactNode;
-}>) {
-  return (
-    <section className='system-b-chat-entity-panel-section'>
-      {/* Flat surface — parent rail already provides card elevation (JOV-3511). */}
-      <DrawerSurfaceCard
-        variant='flat'
-        className='system-b-chat-entity-panel-card'
-      >
-        <div className='system-b-chat-entity-section-heading'>
-          {icon}
-          <h3>{title}</h3>
-        </div>
-        {children}
-      </DrawerSurfaceCard>
-    </section>
-  );
-}
-
 function ChatReleaseEntityPanel({
   release,
   label,
@@ -630,83 +606,96 @@ function ChatReleaseEntityPanel({
 
   return (
     <TableContextMenu items={contextMenuItems}>
-      <aside
-        className='system-b-chat-entity-panel-surface'
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Release details'
+        scrollStrategy='shell'
+        workspaceSurface='raised'
+        headerMode='minimal'
+        hideMinimalHeaderBar
         data-testid='chat-release-entity-panel'
-      >
-        <div className='system-b-chat-entity-panel-header'>
-          <div className='system-b-chat-entity-panel-header-copy'>
-            <p className='system-b-chat-entity-panel-eyebrow'>Release</p>
-            <h2 className='system-b-chat-entity-panel-title'>
-              {release?.title ?? label ?? 'Release'}
-            </h2>
-          </div>
-          <DrawerHeaderActions
-            primaryActions={[]}
-            overflowActions={headerOverflowActions}
-            onClose={onClose}
-          />
-        </div>
-
-        {loading ? (
-          <div
-            className='system-b-chat-entity-panel-status'
-            role='status'
-            aria-live='polite'
-          >
-            <span className='sr-only'>Loading release…</span>
-            <div
-              className='h-4 w-28 rounded skeleton motion-reduce:animate-none'
-              aria-hidden='true'
-            />
-          </div>
-        ) : release ? (
-          <div className='min-h-0 flex-1 overflow-y-auto'>
-            <div className='px-3 py-3'>
-              <div className='system-b-chat-release-summary'>
-                <div
-                  className='system-b-chat-release-artwork'
-                  style={releaseArtStyle}
-                >
-                  {release.artworkUrl ? (
-                    <Image
-                      src={release.artworkUrl}
-                      alt=''
-                      fill
-                      className='object-cover'
-                      sizes='40px'
-                    />
-                  ) : (
-                    <div className='flex h-full w-full items-center justify-center text-tertiary-token'>
-                      <Disc3 className='h-4 w-4' />
-                    </div>
-                  )}
-                </div>
-                <div className='system-b-chat-release-copy'>
-                  <h3 className='system-b-chat-release-title'>
-                    {release.title}
-                  </h3>
-                  <div className='system-b-chat-entity-meta-row'>
-                    <span className='system-b-chat-entity-meta-pill'>
-                      <Disc3 className='h-3 w-3 text-tertiary-token' />
-                      {releaseTypeLabel(release.releaseType)}
-                    </span>
-                    {releaseDate ? (
-                      <span className='system-b-chat-entity-meta-pill'>
-                        <Calendar className='h-3 w-3 text-tertiary-token' />
-                        {releaseDate}
-                      </span>
-                    ) : null}
-                    <span className='system-b-chat-entity-meta-pill'>
-                      {capitalizeFirst(release.status)}
-                    </span>
-                  </div>
-                </div>
+        onKeyDown={event => {
+          if (event.key === 'Escape') onClose();
+        }}
+        entityHeader={
+          <EntityHeaderCard
+            image={
+              <div
+                className='relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border border-subtle bg-surface-0 text-tertiary-token'
+                style={releaseArtStyle}
+              >
+                {release?.artworkUrl ? (
+                  <Image
+                    src={release.artworkUrl}
+                    alt=''
+                    fill
+                    className='object-cover'
+                    sizes='40px'
+                  />
+                ) : (
+                  <Disc3 className='h-4 w-4' />
+                )}
               </div>
+            }
+            eyebrow='Release'
+            title={panelTitle}
+            meta={
+              <>
+                {release ? (
+                  <span className='system-b-chat-entity-meta-pill'>
+                    {releaseTypeLabel(release.releaseType)}
+                  </span>
+                ) : null}
+                {releaseDate ? (
+                  <span className='system-b-chat-entity-meta-pill'>
+                    {releaseDate}
+                  </span>
+                ) : null}
+                {release ? (
+                  <span className='system-b-chat-entity-meta-pill'>
+                    {capitalizeFirst(release.status)}
+                  </span>
+                ) : null}
+              </>
+            }
+            stableLayout
+            titleLineClamp={1}
+            reserveMetaSlot
+            actions={
+              <DrawerHeaderActions
+                primaryActions={[]}
+                overflowActions={headerOverflowActions}
+                onClose={onClose}
+              />
+            }
+            bodyClassName='pr-8'
+          />
+        }
+      >
+        {loading ? (
+          <DrawerSection
+            sectionKind='facts'
+            title='Details'
+            collapsible={false}
+            surface='card'
+          >
+            <div role='status' aria-live='polite' className='space-y-3'>
+              <span className='sr-only'>Loading release…</span>
+              <div
+                className='h-4 w-28 rounded skeleton motion-reduce:animate-none'
+                aria-hidden='true'
+              />
             </div>
-
-            {release ? (
-              <div className='flex flex-wrap gap-1 px-3 pb-3'>
+          </DrawerSection>
+        ) : release ? (
+          <>
+            <DrawerSection
+              sectionKind='facts'
+              title='Details'
+              collapsible={false}
+              surface='card'
+            >
+              <div className='flex flex-wrap gap-1'>
                 <button
                   type='button'
                   onClick={() =>
@@ -714,7 +703,7 @@ function ChatReleaseEntityPanel({
                   }
                   className='system-b-chat-entity-action-link'
                 >
-                  <CheckSquare className='h-3.5 w-3.5 text-tertiary-token' />
+                  <CheckSquare className='h-3.5 w-3.5 text-tertiary-token' />{' '}
                   Tasks
                 </button>
                 {release.smartLinkPath ? (
@@ -722,23 +711,24 @@ function ChatReleaseEntityPanel({
                     href={release.smartLinkPath}
                     className='system-b-chat-entity-action-link'
                   >
-                    <ExternalLink className='h-3.5 w-3.5 text-tertiary-token' />
+                    <ExternalLink className='h-3.5 w-3.5 text-tertiary-token' />{' '}
                     Open
                   </Link>
                 ) : null}
               </div>
-            ) : null}
-
+            </DrawerSection>
             {hasMedia ? (
-              <ChatEntityPanelSection
-                title='Media'
-                icon={<ImageIcon className='h-3.5 w-3.5 text-tertiary-token' />}
+              <DrawerSection
+                sectionKind='links'
+                title='Links & media'
+                collapsible={false}
+                surface='card'
               >
                 <div className='space-y-3'>
                   {release.previewUrl ? (
                     <div className='system-b-chat-entity-audio-card'>
                       <div className='system-b-chat-entity-audio-label'>
-                        <Music2 className='h-3.5 w-3.5 text-tertiary-token' />
+                        <Music2 className='h-3.5 w-3.5 text-tertiary-token' />{' '}
                         Preview
                       </div>
                       <audio
@@ -750,8 +740,7 @@ function ChatReleaseEntityPanel({
                       </audio>
                     </div>
                   ) : null}
-
-                  {visibleProviders && visibleProviders.length > 0 ? (
+                  {visibleProviders?.length ? (
                     <div className='space-y-1'>
                       {visibleProviders.slice(0, 6).map(provider => (
                         <a
@@ -778,37 +767,18 @@ function ChatReleaseEntityPanel({
                     </div>
                   ) : null}
                 </div>
-              </ChatEntityPanelSection>
+              </DrawerSection>
             ) : null}
-
-            {threadTitle ? (
-              <ChatEntityPanelSection
-                title='Chat'
-                icon={
-                  <MessageSquareText className='h-3.5 w-3.5 text-tertiary-token' />
-                }
-              >
-                <div className='system-b-chat-entity-note-card'>
-                  <p className='truncate font-semibold text-primary-token'>
-                    {threadTitle}
-                  </p>
-                  <p className='mt-1 text-tertiary-token'>
-                    This release was referenced in the current chat.
-                  </p>
-                </div>
-              </ChatEntityPanelSection>
-            ) : null}
-
             {shouldShowReleaseTasksSection ? (
-              <ChatEntityPanelSection
+              <DrawerSection
+                sectionKind='status'
                 title='Tasks'
-                icon={
-                  <CheckSquare className='h-3.5 w-3.5 text-tertiary-token' />
-                }
+                collapsible={false}
+                surface='card'
               >
                 {isTasksWorkspaceGateLoading ? (
                   <div
-                    className='rounded-lg border border-subtle bg-surface-1 px-3 py-3'
+                    className='space-y-3'
                     data-testid='chat-release-tasks-loading-state'
                   >
                     <div
@@ -816,7 +786,7 @@ function ChatReleaseEntityPanel({
                       aria-hidden='true'
                     />
                     <div
-                      className='mt-3 h-20 rounded-md skeleton motion-reduce:animate-none'
+                      className='h-20 rounded-md skeleton motion-reduce:animate-none'
                       aria-hidden='true'
                     />
                   </div>
@@ -834,15 +804,37 @@ function ChatReleaseEntityPanel({
                     onDismiss={() => setShowTasksUpgrade(false)}
                   />
                 ) : null}
-              </ChatEntityPanelSection>
+              </DrawerSection>
             ) : null}
-          </div>
+            {threadTitle ? (
+              <DrawerSection
+                sectionKind='details'
+                title='Chat context'
+                collapsible={false}
+                surface='card'
+              >
+                <div className='system-b-chat-entity-note-card'>
+                  <p className='truncate font-semibold text-primary-token'>
+                    {threadTitle}
+                  </p>
+                  <p className='mt-1 text-tertiary-token'>
+                    This release was referenced in the current chat.
+                  </p>
+                </div>
+              </DrawerSection>
+            ) : null}
+          </>
         ) : (
-          <div className='system-b-chat-entity-panel-status'>
+          <DrawerSection
+            sectionKind='details'
+            title='Details'
+            collapsible={false}
+            surface='card'
+          >
             This release is not available in the current profile.
-          </div>
+          </DrawerSection>
         )}
-      </aside>
+      </EntitySidebarShell>
     </TableContextMenu>
   );
 }
@@ -874,50 +866,6 @@ function ChatReleaseEntityPanelLoader({
   );
 }
 
-function ChatSimpleEntityPanel({
-  eyebrow,
-  title,
-  loading,
-  emptyMessage,
-  onClose,
-  children,
-  testId,
-}: Readonly<{
-  eyebrow: string;
-  title: string;
-  loading: boolean;
-  emptyMessage: string;
-  onClose: () => void;
-  children: ReactNode;
-  testId: string;
-}>) {
-  const hasContent = !loading && children !== null;
-  return (
-    <aside className='system-b-chat-entity-panel-surface' data-testid={testId}>
-      <div className='system-b-chat-entity-panel-header'>
-        <div className='system-b-chat-entity-panel-header-copy'>
-          <p className='system-b-chat-entity-panel-eyebrow'>{eyebrow}</p>
-          <h2 className='system-b-chat-entity-panel-title'>{title}</h2>
-        </div>
-        <DrawerHeaderActions
-          primaryActions={[]}
-          overflowActions={[]}
-          onClose={onClose}
-        />
-      </div>
-      {loading ? (
-        <div className='system-b-chat-entity-panel-status'>Loading…</div>
-      ) : hasContent ? (
-        <div className='min-h-0 flex-1 overflow-y-auto px-4 py-4'>
-          {children}
-        </div>
-      ) : (
-        <div className='system-b-chat-entity-panel-status'>{emptyMessage}</div>
-      )}
-    </aside>
-  );
-}
-
 function ChatContactEntityPanelLoader({
   target,
   profileId,
@@ -936,47 +884,109 @@ function ChatContactEntityPanelLoader({
     target.label ||
     'Contact';
   return (
-    <ChatSimpleEntityPanel
-      eyebrow='Contact'
-      title={title}
-      loading={isLoading}
-      emptyMessage='This contact is not available in the current profile.'
-      onClose={onClose}
-      testId='chat-contact-entity-panel'
+    <EntitySidebarShell
+      isOpen
+      ariaLabel='Contact details'
+      scrollStrategy='shell'
+      workspaceSurface='raised'
+      headerMode='minimal'
+      hideMinimalHeaderBar
+      data-testid='chat-contact-entity-panel'
+      onKeyDown={event => {
+        if (event.key === 'Escape') onClose();
+      }}
+      entityHeader={
+        <EntityHeaderCard
+          image={
+            <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0 text-tertiary-token'>
+              <UserRound className='h-4 w-4' />
+            </div>
+          }
+          eyebrow='Contact'
+          title={title}
+          subtitle={contact?.companyName ?? contact?.role}
+          stableLayout
+          titleLineClamp={1}
+          reserveSubtitleSlot
+          actions={
+            <DrawerHeaderActions
+              primaryActions={[]}
+              overflowActions={[]}
+              onClose={onClose}
+            />
+          }
+          bodyClassName='pr-8'
+        />
+      }
     >
-      {contact ? (
-        <div className='system-b-chat-contact-details'>
-          {contact.role ? (
-            <span className='system-b-chat-entity-meta-pill'>
-              {contact.role}
-            </span>
-          ) : null}
-          {contact.email ? (
-            <a
-              href={`mailto:${contact.email}`}
-              className='system-b-chat-entity-provider-link'
-            >
-              <LinkIcon className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-              <span className='truncate'>{contact.email}</span>
-            </a>
-          ) : null}
-          {contact.phone ? (
-            <a
-              href={`tel:${contact.phone}`}
-              className='system-b-chat-entity-provider-link'
-            >
-              <LinkIcon className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-              <span className='truncate'>{contact.phone}</span>
-            </a>
-          ) : null}
+      {isLoading ? (
+        <DrawerSection
+          sectionKind='facts'
+          title='Details'
+          collapsible={false}
+          surface='card'
+        >
+          <div
+            role='status'
+            aria-live='polite'
+            className='h-4 w-28 rounded skeleton motion-reduce:animate-none'
+          >
+            <span className='sr-only'>Loading contact…</span>
+          </div>
+        </DrawerSection>
+      ) : contact ? (
+        <>
+          <DrawerSection
+            sectionKind='links'
+            title='Contact'
+            collapsible={false}
+            surface='card'
+          >
+            <div className='system-b-chat-contact-details'>
+              {contact.email ? (
+                <a
+                  href={`mailto:${contact.email}`}
+                  className='system-b-chat-entity-provider-link'
+                >
+                  <LinkIcon className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
+                  <span className='truncate'>{contact.email}</span>
+                </a>
+              ) : null}
+              {contact.phone ? (
+                <a
+                  href={`tel:${contact.phone}`}
+                  className='system-b-chat-entity-provider-link'
+                >
+                  <LinkIcon className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
+                  <span className='truncate'>{contact.phone}</span>
+                </a>
+              ) : null}
+            </div>
+          </DrawerSection>
           {contact.territories.length > 0 ? (
-            <p className='system-b-chat-contact-copy'>
-              {contact.territories.join(', ')}
-            </p>
+            <DrawerSection
+              sectionKind='details'
+              title='Details'
+              collapsible={false}
+              surface='card'
+            >
+              <p className='system-b-chat-contact-copy'>
+                {contact.territories.join(', ')}
+              </p>
+            </DrawerSection>
           ) : null}
-        </div>
-      ) : null}
-    </ChatSimpleEntityPanel>
+        </>
+      ) : (
+        <DrawerSection
+          sectionKind='details'
+          title='Details'
+          collapsible={false}
+          surface='card'
+        >
+          This contact is not available in the current profile.
+        </DrawerSection>
+      )}
+    </EntitySidebarShell>
   );
 }
 
@@ -995,40 +1005,121 @@ function ChatTourDateEntityPanelLoader({
   const eventDate = formatReleaseDate(event?.eventDate);
   const title = event?.title ?? target.label ?? 'Tour date';
   return (
-    <ChatSimpleEntityPanel
-      eyebrow='Tour date'
-      title={title}
-      loading={isLoading}
-      emptyMessage='This tour date is not available in the current profile.'
-      onClose={onClose}
-      testId='chat-tour-date-entity-panel'
+    <EntitySidebarShell
+      isOpen
+      ariaLabel='Tour date details'
+      scrollStrategy='shell'
+      workspaceSurface='raised'
+      headerMode='minimal'
+      hideMinimalHeaderBar
+      data-testid='chat-tour-date-entity-panel'
+      onKeyDown={keyboardEvent => {
+        if (keyboardEvent.key === 'Escape') onClose();
+      }}
+      entityHeader={
+        <EntityHeaderCard
+          image={
+            <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0 text-tertiary-token'>
+              <Calendar className='h-4 w-4' />
+            </div>
+          }
+          eyebrow='Tour date'
+          title={title}
+          subtitle={event?.subtitle}
+          meta={
+            <>
+              {eventDate ? (
+                <span className='system-b-chat-entity-meta-pill'>
+                  {eventDate}
+                </span>
+              ) : null}
+              {event?.status ? (
+                <span className='system-b-chat-entity-meta-pill'>
+                  {event.status}
+                </span>
+              ) : null}
+            </>
+          }
+          stableLayout
+          titleLineClamp={1}
+          reserveSubtitleSlot
+          reserveMetaSlot
+          actions={
+            <DrawerHeaderActions
+              primaryActions={[]}
+              overflowActions={[]}
+              onClose={onClose}
+            />
+          }
+          bodyClassName='pr-8'
+        />
+      }
     >
-      {event ? (
-        <div className='space-y-3'>
-          <div className='system-b-chat-entity-meta-row'>
-            {eventDate ? (
-              <span className='system-b-chat-entity-meta-pill'>
-                <Calendar className='h-3 w-3 text-tertiary-token' />
-                {eventDate}
-              </span>
-            ) : null}
-            {event.status ? (
-              <span className='system-b-chat-entity-meta-pill'>
-                {event.status}
-              </span>
-            ) : null}
-            {event.provider ? (
-              <span className='system-b-chat-entity-meta-pill'>
-                {event.provider}
-              </span>
-            ) : null}
+      {isLoading ? (
+        <DrawerSection
+          sectionKind='facts'
+          title='Details'
+          collapsible={false}
+          surface='card'
+        >
+          <div
+            role='status'
+            aria-live='polite'
+            className='h-4 w-28 rounded skeleton motion-reduce:animate-none'
+          >
+            <span className='sr-only'>Loading tour date…</span>
           </div>
-          {event.subtitle ? (
-            <p className='system-b-chat-contact-copy'>{event.subtitle}</p>
-          ) : null}
-        </div>
-      ) : null}
-    </ChatSimpleEntityPanel>
+        </DrawerSection>
+      ) : event ? (
+        <>
+          <DrawerSection
+            sectionKind='links'
+            title='Tickets'
+            collapsible={false}
+            surface='card'
+          >
+            {event.ticketUrl ? (
+              <a
+                href={event.ticketUrl}
+                target='_blank'
+                rel='noreferrer'
+                className='system-b-chat-entity-provider-link'
+              >
+                <ExternalLink className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
+                <span className='truncate'>Open tickets</span>
+              </a>
+            ) : (
+              <span className='text-tertiary-token'>
+                No ticket link available.
+              </span>
+            )}
+          </DrawerSection>
+          <DrawerSection
+            sectionKind='details'
+            title='Details'
+            collapsible={false}
+            surface='card'
+          >
+            <div className='space-y-1 text-secondary-token'>
+              {event.venue && event.venue !== title ? (
+                <p>{event.venue}</p>
+              ) : null}
+              {event.city ? <p>{event.city}</p> : null}
+              {event.provider ? <p>{event.provider}</p> : null}
+            </div>
+          </DrawerSection>
+        </>
+      ) : (
+        <DrawerSection
+          sectionKind='details'
+          title='Details'
+          collapsible={false}
+          surface='card'
+        >
+          This tour date is not available in the current profile.
+        </DrawerSection>
+      )}
+    </EntitySidebarShell>
   );
 }
 
