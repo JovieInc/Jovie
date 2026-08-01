@@ -15,8 +15,8 @@ export interface NavItem {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   /** Shared Icon registry key for authenticated shell rendering. */
   iconName?: IconName;
-  /** Gives the one primary sidebar action the shared elevated row treatment. */
-  tone?: 'default' | 'primary';
+  /** Applies a shared sidebar hierarchy treatment without bespoke row chrome. */
+  tone?: 'default' | 'secondary' | 'primary';
   /**
    * Capacity tier. Defaults to `core` when omitted so existing entries stay
    * on the approved rail until explicitly marked experimental.
@@ -29,6 +29,6 @@ export interface NavItem {
 
 export interface DashboardNavProps {
   readonly collapsed?: boolean;
-  /** Shell-owned surface placed after the elevated New Chat action. */
+  /** Shell-owned surface placed after the secondary New Chat action. */
   readonly children?: ReactNode;
 }

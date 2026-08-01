@@ -12,6 +12,16 @@ const DEFAULT_ITEM_HEIGHT = 30;
 const SECTION_PADDING = 12;
 
 /**
+ * Shared shell spacing contract for adjacent sidebar sections. Consumers keep
+ * their own content but use these tokens for stable, separator-free rhythm.
+ */
+export const SIDEBAR_SECTION_RHYTHM = {
+  navGroup: 'space-y-0.5',
+  searchSlot: 'mb-4 mt-1.5 h-7 shrink-0',
+  threads: 'mt-1.5',
+} as const;
+
+/**
  * SidebarSection — collapsible header + body for a sidebar group.
  *
  * Header is a single row: rotating chevron + section name. Click toggles

@@ -1,8 +1,16 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { SidebarSection } from './SidebarSection';
+import { SIDEBAR_SECTION_RHYTHM, SidebarSection } from './SidebarSection';
 
 describe('SidebarSection', () => {
+  it('exports the separator-free section rhythm used by the shell', () => {
+    expect(SIDEBAR_SECTION_RHYTHM).toEqual({
+      navGroup: 'space-y-0.5',
+      searchSlot: 'mb-4 mt-1.5 h-7 shrink-0',
+      threads: 'mt-1.5',
+    });
+  });
+
   it('renders the chevron header with the section name', () => {
     render(
       <SidebarSection
