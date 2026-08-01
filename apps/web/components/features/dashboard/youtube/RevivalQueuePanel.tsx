@@ -1,7 +1,6 @@
 'use client';
 
 import { Icon } from '@/components/atoms/Icon';
-import { ChannelIntelligencePanel } from '@/components/features/dashboard/youtube/ChannelIntelligencePanel';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PageShell } from '@/components/organisms/PageShell';
 import { PageToolbar } from '@/components/organisms/table';
