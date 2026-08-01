@@ -29,13 +29,13 @@ export function resolveScreenshotSourceGitSha({
   environmentSha?: string;
   runGit?: GitRunner;
 }> = {}): string | null {
-  if (environmentSha?.trim()) {
-    return normalizeGitSha(environmentSha);
-  }
-
   try {
     if (runGit(['status', '--porcelain', '--untracked-files=all'])) {
       return null;
+    }
+
+    if (environmentSha?.trim()) {
+      return normalizeGitSha(environmentSha);
     }
 
     return normalizeGitSha(runGit(['rev-parse', 'HEAD']));

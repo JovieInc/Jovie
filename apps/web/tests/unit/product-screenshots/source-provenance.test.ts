@@ -8,7 +8,7 @@ const ENV_SHA = 'A'.repeat(40);
 const LOCAL_SHA = 'b'.repeat(40);
 
 describe('resolveScreenshotSourceGitSha', () => {
-  it('uses a valid CI source SHA without consulting local git state', () => {
+  it('uses a valid CI source SHA only from a clean checkout', () => {
     const calls: string[][] = [];
     const result = resolveScreenshotSourceGitSha({
       environmentSha: ENV_SHA,
@@ -19,12 +19,12 @@ describe('resolveScreenshotSourceGitSha', () => {
     });
 
     expect(result).toBe(ENV_SHA.toLowerCase());
-    expect(calls).toEqual([]);
+    expect(calls).toEqual([['status', '--porcelain', '--untracked-files=all']]);
   });
 
   it('resolves HEAD only from a clean local worktree', () => {
     const result = resolveScreenshotSourceGitSha({
-      environmentSha: undefined,
+      environmentSha: '',
       runGit: args =>
         args[0] === 'status' && args[1] === '--porcelain' ? '' : LOCAL_SHA,
     });
@@ -42,7 +42,7 @@ describe('resolveScreenshotSourceGitSha', () => {
 
     expect(
       resolveScreenshotSourceGitSha({
-        environmentSha: undefined,
+        environmentSha: '',
         runGit: args => (args[0] === 'status' ? ' M app/page.tsx' : LOCAL_SHA),
       })
     ).toBeNull();
