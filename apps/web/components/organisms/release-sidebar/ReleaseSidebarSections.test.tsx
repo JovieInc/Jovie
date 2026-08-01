@@ -1,5 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { ProviderKey } from '@/lib/discography/types';
+import { ReleaseEntityHeader } from './ReleaseSidebarSections';
+import type { Release } from './types';
 
 vi.mock('@/components/atoms/Icon', () => ({
   Icon: ({ name }: { readonly name: string }) => (
@@ -72,9 +75,6 @@ vi.mock('@/features/release/AlbumArtworkContextMenu', () => ({
   buildArtworkSizes: () => ({}),
 }));
 
-import { ReleaseEntityHeader } from './ReleaseSidebarSections';
-import type { Release } from './types';
-
 const mockRelease = {
   id: 'rel_1',
   title: 'Midnight Drive',
@@ -84,7 +84,13 @@ const mockRelease = {
   totalTracks: 1,
   artworkUrl: 'https://placehold.co/400x400',
   links: [],
+  providers: [],
 } as unknown as Release;
+
+const providerConfig = {} as Record<
+  ProviderKey,
+  { label: string; accent: string }
+>;
 
 describe('ReleaseSidebarSections', () => {
   it('renders release entity header title', () => {
@@ -92,9 +98,11 @@ describe('ReleaseSidebarSections', () => {
       <ReleaseEntityHeader
         release={mockRelease}
         artistName='Example Artist'
-        providerConfig={{}}
+        providerConfig={providerConfig}
         canUploadArtwork={false}
         canRevertArtwork={false}
+        onArtworkUpload={undefined}
+        onArtworkRevert={undefined}
         allowDownloads={false}
         previewUrl={null}
         isPlaying={false}

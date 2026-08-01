@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import type { ProviderKey } from '@/lib/discography/types';
 import { ReleaseEntityHeader } from './ReleaseSidebarSections';
 import type { Release } from './types';
 
@@ -11,7 +12,13 @@ const mockRelease = {
   totalTracks: 1,
   artworkUrl: 'https://placehold.co/400x400',
   links: [],
+  providers: [],
 } as unknown as Release;
+
+const providerConfig = {} as Record<
+  ProviderKey,
+  { label: string; accent: string }
+>;
 
 const meta = {
   title: 'Organisms/ReleaseSidebar/ReleaseSidebarSections',
@@ -31,9 +38,11 @@ export const EntityHeader: Story = {
   args: {
     release: mockRelease,
     artistName: 'Example Artist',
-    providerConfig: {},
+    providerConfig,
     canUploadArtwork: false,
     canRevertArtwork: false,
+    onArtworkUpload: undefined,
+    onArtworkRevert: undefined,
     allowDownloads: false,
     previewUrl: null,
     isPlaying: false,
