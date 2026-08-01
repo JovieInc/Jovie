@@ -162,6 +162,7 @@ export const APP_ROUTES = {
   DOWNLOAD: '/download',
   SUPPORT: '/support',
   PAY: '/pay',
+  INSTANT_MERCH: '/instant-merch',
 
   // Legal
   LEGAL_PRIVACY: '/legal/privacy',
