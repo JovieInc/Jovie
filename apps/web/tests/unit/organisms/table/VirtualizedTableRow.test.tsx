@@ -8,12 +8,28 @@ type TestRow = { id: string; name: string };
 const createRow = (
   id: string,
   name: string,
-  isSelected = false
+  isSelected = false,
+  actionVisibility?: 'always' | 'contextual'
 ): Row<TestRow> =>
   ({
     id,
     original: { id, name },
-    getVisibleCells: () => [],
+    getVisibleCells: () =>
+      actionVisibility
+        ? [
+            {
+              id: `${id}-actions`,
+              column: {
+                getSize: () => 150,
+                columnDef: {
+                  meta: { actionVisibility },
+                  cell: () => <button type='button'>More</button>,
+                },
+              },
+              getContext: () => ({}),
+            },
+          ]
+        : [],
     getIsSelected: () => isSelected,
   }) as unknown as Row<TestRow>;
 
@@ -174,5 +190,25 @@ describe('VirtualizedTableRow', () => {
     const row = screen.getByRole('row');
     expect(row).toHaveAttribute('aria-selected', 'true');
     expect(row).toHaveClass('system-b-table-row-selected');
+  });
+
+  it('marks contextual action cells without changing row geometry', () => {
+    render(
+      <table>
+        <tbody>
+          <VirtualizedTableRow
+            {...baseProps}
+            row={createRow('1', 'One', false, 'contextual')}
+          />
+        </tbody>
+      </table>
+    );
+
+    const row = screen.getByRole('row');
+    const actionCell = screen
+      .getByRole('button', { name: 'More' })
+      .closest('td');
+    expect(row).toHaveClass('system-b-table-row-height');
+    expect(actionCell).toHaveClass('system-b-table-contextual-action-cell');
   });
 });

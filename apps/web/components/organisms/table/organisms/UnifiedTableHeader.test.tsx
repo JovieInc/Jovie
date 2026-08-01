@@ -15,9 +15,11 @@ const columnHelper = createColumnHelper<Row>();
 function Harness({
   onSortChange,
   initialSort,
+  semanticOnlyActions = false,
 }: {
   onSortChange?: () => void;
   initialSort?: { id: string; desc: boolean }[];
+  semanticOnlyActions?: boolean;
 }) {
   const columns = [
     columnHelper.accessor('title', {
@@ -32,6 +34,7 @@ function Harness({
       id: 'actions',
       header: 'Actions',
       enableSorting: false,
+      meta: semanticOnlyActions ? { headerVisibility: 'sr-only' } : undefined,
     }),
   ];
 
@@ -81,6 +84,14 @@ describe('UnifiedTableHeader', () => {
     expect(
       screen.queryByRole('button', { name: /Actions/ })
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps icon-only headers semantic while removing visible label chrome', () => {
+    render(<Harness semanticOnlyActions />);
+
+    const actionsHeader = screen.getByText('Actions').closest('th');
+    expect(actionsHeader).toBeInTheDocument();
+    expect(screen.getByText('Actions')).toHaveClass('sr-only');
   });
 
   it('fires the sort handler when a sortable header is clicked', () => {

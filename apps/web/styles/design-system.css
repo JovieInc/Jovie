@@ -6068,6 +6068,49 @@ html:not(.dark) .system-b-claim-handle-row :where(input, button, span) {
     color-mix(in oklab, var(--color-focus-ring) 28%, transparent);
 }
 
+/* Dense table action slots reserve their column width at all times. The
+ * affordance becomes visible only when the row has contextual intent: pointer
+ * hover, selected state, keyboard focus, or an open menu. Keyboard focus stays
+ * reachable because the controls remain mounted; opacity never changes layout.
+ */
+:where(.system-b-table-contextual-action-cell) > :where(*),
+:where(.system-b-table-contextual-action) {
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--system-b-duration-fast) var(--system-b-ease);
+}
+
+:where(.system-b-table-row-shell):hover
+  :where(.system-b-table-contextual-action-cell)
+  > :where(*),
+:where(.system-b-table-row-shell):hover
+  :where(.system-b-table-contextual-action),
+:where(.system-b-table-row-shell):focus-within
+  :where(.system-b-table-contextual-action-cell)
+  > :where(*),
+:where(.system-b-table-row-shell):focus-within
+  :where(.system-b-table-contextual-action),
+:where(.system-b-table-row-selected)
+  :where(.system-b-table-contextual-action-cell)
+  > :where(*),
+:where(.system-b-table-row-selected) :where(.system-b-table-contextual-action),
+:where(.system-b-table-row-checked)
+  :where(.system-b-table-contextual-action-cell)
+  > :where(*),
+:where(.system-b-table-row-checked) :where(.system-b-table-contextual-action),
+:where(.system-b-table-contextual-action):focus-within,
+:where(.system-b-table-contextual-action)[data-menu-open="true"] {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.system-b-table-contextual-action-cell) > :where(*),
+  :where(.system-b-table-contextual-action) {
+    transition-duration: 0s;
+  }
+}
+
 :where(.system-b-table-sticky-header) {
   background: color-mix(
     in oklab,

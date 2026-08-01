@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   alignment,
   columnWidths,
+  contextualAction,
   presets,
   rowState,
   selection,
@@ -27,6 +28,8 @@ describe('table System B style exports', () => {
     expect(alignment.rowHeight).toBe('system-b-table-row-height');
     expect(rowState.selected).toBe('system-b-table-row-selected');
     expect(rowState.focusVisible).toBe('system-b-table-row-focus-visible');
+    expect(contextualAction.cell).toBe('system-b-table-contextual-action-cell');
+    expect(contextualAction.slot).toBe('system-b-table-contextual-action');
     expect(rowState.focused).toBe('system-b-table-row-focused');
     expect(selection.checked).toBe('system-b-table-selection-checked');
     expect(columnWidths.small).toBe('system-b-table-column-small');
@@ -56,6 +59,22 @@ describe('table System B style exports', () => {
     expect(designSystemSource).toContain('height: 40px;');
     expect(designSystemSource).toContain(
       '@media (prefers-reduced-motion: reduce)'
+    );
+  });
+
+  it('reserves contextual action geometry while exposing it for row intent states', () => {
+    const designSystemSource = readFileSync(
+      join(process.cwd(), 'styles/design-system.css'),
+      'utf8'
+    );
+
+    expect(designSystemSource).toContain(
+      '.system-b-table-contextual-action-cell'
+    );
+    expect(designSystemSource).toContain('pointer-events: none;');
+    expect(designSystemSource).toContain('opacity: 0;');
+    expect(designSystemSource).toContain(
+      ':where(.system-b-table-contextual-action)[data-menu-open="true"]'
     );
   });
 });
