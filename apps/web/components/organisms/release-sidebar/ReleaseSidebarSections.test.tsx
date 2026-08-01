@@ -35,11 +35,11 @@ vi.mock('@/components/molecules/drawer', () => ({
   EntityHeaderCard: ({
     children,
     title,
-    testId = 'release-header-card',
+    'data-testid': testId,
   }: {
     readonly children?: React.ReactNode;
     readonly title?: React.ReactNode;
-    readonly testId?: string;
+    readonly 'data-testid'?: string;
   }) => (
     <div data-testid={testId}>
       {title}
