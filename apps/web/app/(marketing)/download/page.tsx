@@ -22,7 +22,7 @@ export const revalidate = false;
 
 const DOWNLOAD_URL = '/api/desktop/download';
 const DESKTOP_RELEASES_HTML_URL = 'https://github.com/JovieInc/Jovie/releases';
-const DESKTOP_IMAGE = getMarketingExportImage('shell-v1-releases-desktop');
+const DESKTOP_IMAGE = getMarketingExportImage('dashboard-releases-desktop');
 const PROFILE_IMAGE = getMarketingExportImage('tim-white-profile-live-mobile');
 
 const FAQ_ITEMS = [
@@ -215,7 +215,7 @@ export default function DownloadPage() {
                   <div className='absolute inset-x-0 top-8 bottom-0 overflow-hidden rounded-xl border border-subtle bg-surface-1/5 shadow-card'>
                     <Image
                       src={DESKTOP_IMAGE.publicUrl}
-                      alt='Jovie native desktop workspace showing releases and release planning'
+                      alt='Jovie desktop workspace showing the releases catalog and release details'
                       width={DESKTOP_IMAGE.width}
                       height={DESKTOP_IMAGE.height}
                       priority

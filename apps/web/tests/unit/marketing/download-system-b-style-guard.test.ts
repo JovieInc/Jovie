@@ -30,6 +30,10 @@ const requiredSharedPrimitives = [
   'public-action-secondary',
   'FaqSection',
 ] as const;
+const currentProofScenario =
+  "getMarketingExportImage('dashboard-releases-desktop')";
+const retiredProofScenario =
+  "getMarketingExportImage('shell-v1-releases-desktop')";
 
 describe('download page System B source contract', () => {
   it('keeps download page visuals on named System B primitives', () => {
@@ -67,6 +71,16 @@ describe('download page System B source contract', () => {
         pattern
       );
     }
+  });
+
+  it('uses the current releases dashboard proof instead of the experimental shell', () => {
+    const source = readFileSync(resolve(process.cwd(), pageSourcePath), 'utf8');
+
+    expect(source).toContain(currentProofScenario);
+    expect(source).not.toContain(retiredProofScenario);
+    expect(source).toContain(
+      'Jovie desktop workspace showing the releases catalog and release details'
+    );
   });
 
   it('removes the page-scoped system-b-download CSS block', () => {
