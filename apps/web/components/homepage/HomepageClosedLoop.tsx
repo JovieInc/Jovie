@@ -55,7 +55,7 @@ export function HomepageClosedLoop({
         <div className='homepage-closed-loop-story'>
           <figure className='homepage-closed-loop-proof'>
             <MarketingScreenshot
-              scenarioId='shell-v1-library-desktop'
+              scenarioId='design-studio-shell-library-desktop'
               altOverride='Jovie catalog workspace showing an artist release library'
               width={2880}
               height={1800}

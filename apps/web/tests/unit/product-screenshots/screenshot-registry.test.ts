@@ -183,41 +183,10 @@ describe('screenshot registry', () => {
     }
   });
 
-  it('opens the Shell v1 releases hero screenshot on a seeded release detail rail', () => {
-    const scenario = SCREENSHOT_SCENARIOS.find(
-      currentScenario => currentScenario.id === 'shell-v1-releases-desktop'
-    );
-
-    expect(scenario?.route).toBe(
-      '/exp/shell-v1?view=releases&release=the-deep-end&capture=marketing'
-    );
-    expect(scenario?.interaction).toBe('open-shell-releases');
-    expect(scenario?.publicExportPath).toBe('shell-v1-releases.png');
-  });
-
-  it('hides the Shell v1 music player on the marketing library screenshot', () => {
-    const scenario = SCREENSHOT_SCENARIOS.find(
-      currentScenario => currentScenario.id === 'shell-v1-library-desktop'
-    );
-
-    expect(scenario?.route).toBe(
-      '/exp/shell-v1?view=library&capture=marketing&player=off'
-    );
-    expect(scenario?.publicExportPath).toBe('shell-v1-library.png');
-  });
-
-  it('keeps Shell v1 marketing screenshots out of admin mode', () => {
-    const shellScenarios = SCREENSHOT_SCENARIOS.filter(
-      scenario =>
-        scenario.id.startsWith('shell-v1-') &&
-        scenario.consumers.includes('marketing-export')
-    );
-
-    expect(shellScenarios.length).toBeGreaterThan(0);
-
-    for (const scenario of shellScenarios) {
-      expect(scenario.route).toContain('capture=marketing');
-    }
+  it('keeps retired Shell v1 experiments out of the screenshot catalog', () => {
+    expect(
+      SCREENSHOT_SCENARIOS.some(scenario => scenario.id.startsWith('shell-v1-'))
+    ).toBe(false);
   });
 
   it('freezes the capture section screenshot on the subscribed state', () => {

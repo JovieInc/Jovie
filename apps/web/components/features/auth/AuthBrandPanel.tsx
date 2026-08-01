@@ -7,7 +7,7 @@ interface AuthBrandPanelProps {
   readonly className?: string;
 }
 
-const AUTH_BRAND_FRAME = 'shell-v1-releases-desktop';
+const AUTH_BRAND_FRAME = 'dashboard-releases-sidebar-desktop';
 
 export function AuthBrandPanel({ className }: Readonly<AuthBrandPanelProps>) {
   return (
