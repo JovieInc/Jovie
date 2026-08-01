@@ -180,7 +180,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     pushMock.mockClear();
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
 
-    const input = screen.getByRole('searchbox', {
+    const input = screen.getByRole('combobox', {
       name: 'Command Palette Search',
     });
     fireEvent.change(input, { target: { value: 'Connections' } });
@@ -222,6 +222,33 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     });
     expect(listbox.className).toContain('flex-1');
     expect(listbox.className).not.toContain('max-h-105');
+  });
+
+  it('wires the active Cmd-K option to the search combobox and resets safely for empty results', () => {
+    render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
+
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    const listbox = screen.getByRole('listbox', {
+      name: 'Command Palette Results',
+    });
+    const listId = listbox.id;
+    const firstRow = screen.getAllByRole('option')[0];
+
+    expect(listId).not.toBe('');
+    expect(input).toHaveAttribute('aria-controls', listId);
+    expect(firstRow).toHaveAttribute('id', `${listId}-row-0`);
+    expect(input).toHaveAttribute('aria-activedescendant', `${listId}-row-0`);
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(input).toHaveAttribute('aria-activedescendant', `${listId}-row-1`);
+
+    fireEvent.change(input, { target: { value: 'no matching command' } });
+    expect(input).not.toHaveAttribute('aria-activedescendant');
+
+    fireEvent.change(input, { target: { value: '' } });
+    expect(input).toHaveAttribute('aria-activedescendant', `${listId}-row-0`);
   });
 
   it('shows aligned numbered shortcuts for the first three visible rows', () => {

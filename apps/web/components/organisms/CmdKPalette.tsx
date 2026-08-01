@@ -22,6 +22,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -77,9 +78,13 @@ interface CmdKPaletteProps {
 function MainPlaneSearchInput({
   onQueryChange,
   onKeyDown,
+  listId,
+  activeRowId,
 }: {
   readonly onQueryChange: (query: string) => void;
   readonly onKeyDown: (event: KeyboardEvent) => void;
+  readonly listId: string;
+  readonly activeRowId: string | null;
 }) {
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -113,6 +118,11 @@ function MainPlaneSearchInput({
         placeholder='Search Jovie or run a command…'
         className='min-w-0 flex-1 appearance-none bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus-visible:outline-none'
         aria-label='Command Palette Search'
+        role='combobox'
+        aria-autocomplete='list'
+        aria-controls={listId}
+        aria-activedescendant={activeRowId ?? undefined}
+        aria-expanded
         data-testid='command-palette-header-input'
       />
       <span className='hidden shrink-0 text-2xs font-medium text-quaternary-token sm:inline'>
@@ -197,6 +207,7 @@ export function CmdKPalette({
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const generatedListId = useId();
 
   // Reset when closing so the next open starts clean.
   useEffect(() => {
@@ -221,6 +232,15 @@ export function CmdKPalette({
   );
 
   const flatItems = useMemo(() => flattenSections(allSections), [allSections]);
+  const activeIndex = useMemo<number | null>(() => {
+    if (flatItems.length === 0) return null;
+    return Math.max(0, Math.min(selectedIndex, flatItems.length - 1));
+  }, [flatItems.length, selectedIndex]);
+  const activeRowId = useMemo(
+    () =>
+      activeIndex === null ? null : `${generatedListId}-row-${activeIndex}`,
+    [activeIndex, generatedListId]
+  );
   const additionalIds = useMemo(() => {
     const ids = new Set<string>();
     for (const s of filteredAdditional) {
@@ -305,13 +325,13 @@ export function CmdKPalette({
         setSelectedIndex(prev => Math.max(prev - 1, 0));
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        commitIndex(selectedIndex);
+        if (activeIndex !== null) commitIndex(activeIndex);
       } else if (e.key === 'Escape') {
         e.preventDefault();
         handleClose();
       }
     },
-    [commitIndex, flatItems.length, handleClose, selectedIndex]
+    [activeIndex, commitIndex, flatItems.length, handleClose]
   );
   const handleKeyboardCommandRef = useRef(handleKeyboardCommand);
   handleKeyboardCommandRef.current = handleKeyboardCommand;
@@ -341,6 +361,11 @@ export function CmdKPalette({
         placeholder='Search Jovie or run a command…'
         className='min-w-0 flex-1 appearance-none bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus-visible:outline-none'
         aria-label='Command Palette Search'
+        role='combobox'
+        aria-autocomplete='list'
+        aria-controls={generatedListId}
+        aria-activedescendant={activeRowId ?? undefined}
+        aria-expanded
         data-testid='command-palette-header-input'
       />
       <span className='hidden shrink-0 text-2xs font-medium text-quaternary-token sm:inline'>
@@ -361,25 +386,29 @@ export function CmdKPalette({
         // the callback from its first render. Resolve through a ref so Enter
         // commits against the current filtered result list.
         onKeyDown={event => handleKeyboardCommandRef.current(event)}
+        listId={generatedListId}
+        activeRowId={activeRowId}
       />
     );
     return () => onHeaderChange?.(null);
-  }, [onHeaderChange, presentation]);
+  }, [activeRowId, generatedListId, onHeaderChange, presentation]);
 
   const results = (
     <div
       className='min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1.5'
       role='listbox'
       aria-label='Command Palette Results'
+      id={generatedListId}
     >
       <PaletteList
         sections={allSections}
-        selectedIndex={selectedIndex}
+        selectedIndex={activeIndex ?? -1}
         setSelectedIndex={setSelectedIndex}
         commitIndex={commitIndex}
         emptyHint='No matches.'
         variant='cmdk'
         showIndexedShortcuts
+        listId={generatedListId}
       />
     </div>
   );
