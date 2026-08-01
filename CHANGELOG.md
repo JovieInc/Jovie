@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- **Channel intelligence report (JOV-3193):** YouTube videos rank by watch-minutes-per-impression (not CTR alone), surface face/text/topic/length correlations for this channel, and answer best/worst/what’s-working/declining questions with Reporting-API sources. Dashboard panel on `/app/youtube`; live metrics wait on the YouTube OAuth connector.
 - [internal] **Storybook marketing template library (JOV-4420):** full `Marketing/Recipes/*`, `Marketing/Sections/*`, and `Marketing/Shells/*` catalog with registry coverage tests and AGENT_GUIDE visual entry after Brief → resolveComposition.
 - [internal] **Machine-access revenue-share compliance package (JOV-3831):** draft decision set (70/30 artist-majority, opt-in default OFF, monthly $10 Connect fiat floor, platform stablecoin off-ramp), consent/ToS language, tax reporting path, and Pay Per Crawl public-docs verification — Tim sign-off still required before P1 build.
 - [internal] **Profile redesign proposal loop (JOV-1951):** Design Lab can generate pending mockup proposals for owned profiles and selected competitor handles; output stays gated by D2 approval before any production or design-system rollout.
