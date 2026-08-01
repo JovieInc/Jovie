@@ -7,9 +7,31 @@ import { audienceMembers } from '@/lib/db/schema/analytics';
 
 const CREATOR_PROFILE_ID = 'a96b46e1-1250-4e7c-98b2-9e271eb72c37';
 
-const hasRealDatabase =
-  Boolean(process.env.DATABASE_URL) &&
-  !process.env.DATABASE_URL?.includes('dummy');
+const SCREENSHOT_WORKFLOW_PLACEHOLDER_DATABASE_URLS = new Set([
+  'postgresql://localhost/noop',
+  'postgres://localhost/noop',
+]);
+
+function isRealDatabaseUrl(databaseUrl?: string): boolean {
+  return Boolean(
+    databaseUrl &&
+      !databaseUrl.includes('dummy') &&
+      !SCREENSHOT_WORKFLOW_PLACEHOLDER_DATABASE_URLS.has(databaseUrl)
+  );
+}
+
+const hasRealDatabase = isRealDatabaseUrl(process.env.DATABASE_URL);
+
+describe('audience upsert database environment', () => {
+  it('rejects screenshot workflow placeholder database URLs', () => {
+    expect(isRealDatabaseUrl('postgresql://localhost/noop')).toBe(false);
+    expect(isRealDatabaseUrl('postgres://localhost/noop')).toBe(false);
+  });
+
+  it('accepts configured database URLs', () => {
+    expect(isRealDatabaseUrl('postgresql://db.example.com/jovie')).toBe(true);
+  });
+});
 
 describe('audience upsert via db client', () => {
   it.skipIf(!hasRealDatabase)(
