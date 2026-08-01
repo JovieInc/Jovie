@@ -437,6 +437,13 @@ describe('ChatEntityRightPanelHost', () => {
       'release-1'
     );
     expect(mockUseReleasesQuery).not.toHaveBeenCalled();
+    const releasePanel = screen.getByTestId('chat-release-entity-panel');
+    expect(releasePanel).toHaveAttribute('aria-label', 'Release details');
+    expect(
+      Array.from(
+        releasePanel.querySelectorAll<HTMLElement>('[data-right-rail-section]')
+      ).map(section => section.dataset.rightRailSection)
+    ).toEqual(['identity', 'facts', 'status', 'details']);
     expect(
       screen.getByTestId('compact-release-plan-upgrade-card')
     ).toBeInTheDocument();
@@ -803,7 +810,7 @@ describe('ChatEntityRightPanelHost', () => {
     expect(screen.getByText('Brooklyn Steel')).toBeInTheDocument();
   });
 
-  it('entity panel eyebrows carry the EntityCard-aligned CSS class on release panels', () => {
+  it('renders the canonical entity header for release panels', () => {
     mockPreviewPanelOpen = false;
     mockUseRegisterRightPanel.mockClear();
     mockUseReleaseEntityQuery.mockReturnValue({
@@ -836,14 +843,12 @@ describe('ChatEntityRightPanelHost', () => {
     expect(registeredPanel).not.toBeNull();
     render(registeredPanel as React.ReactElement);
 
-    const eyebrow = screen
-      .getByTestId('chat-release-entity-panel')
-      .querySelector('.system-b-chat-entity-panel-eyebrow');
-    expect(eyebrow).not.toBeNull();
-    expect(eyebrow?.textContent).toBe('Release');
+    expect(screen.getByTestId('chat-release-entity-panel')).toHaveTextContent(
+      'Release'
+    );
   });
 
-  it('entity panel eyebrows carry the EntityCard-aligned CSS class on contact panels', () => {
+  it('renders the canonical entity header for contact panels', () => {
     mockPreviewPanelOpen = false;
     mockUseRegisterRightPanel.mockClear();
     mockUseContactsQuery.mockReturnValue({
@@ -877,14 +882,12 @@ describe('ChatEntityRightPanelHost', () => {
     expect(registeredPanel).not.toBeNull();
     render(registeredPanel as React.ReactElement);
 
-    const eyebrow = screen
-      .getByTestId('chat-contact-entity-panel')
-      .querySelector('.system-b-chat-entity-panel-eyebrow');
-    expect(eyebrow).not.toBeNull();
-    expect(eyebrow?.textContent).toBe('Contact');
+    expect(screen.getByTestId('chat-contact-entity-panel')).toHaveTextContent(
+      'Contact'
+    );
   });
 
-  it('entity panel eyebrows carry the EntityCard-aligned CSS class on tour-date panels', () => {
+  it('renders the canonical entity header for tour-date panels', () => {
     mockPreviewPanelOpen = false;
     mockUseRegisterRightPanel.mockClear();
     mockUseEventsQuery.mockReturnValue({
@@ -918,11 +921,9 @@ describe('ChatEntityRightPanelHost', () => {
     expect(registeredPanel).not.toBeNull();
     render(registeredPanel as React.ReactElement);
 
-    const eyebrow = screen
-      .getByTestId('chat-tour-date-entity-panel')
-      .querySelector('.system-b-chat-entity-panel-eyebrow');
-    expect(eyebrow).not.toBeNull();
-    expect(eyebrow?.textContent).toBe('Tour date');
+    expect(screen.getByTestId('chat-tour-date-entity-panel')).toHaveTextContent(
+      'Tour date'
+    );
   });
 
   it('keeps the right rail empty when flag is off (no panel for contact target)', () => {
