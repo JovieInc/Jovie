@@ -51,6 +51,11 @@ export const APP_FLAG_DEFAULTS = {
   INBOX_HOME: false,
   PROFILES_WORKSPACE: false,
   PROFILE_SEARCH_MONITORING: false,
+  /**
+   * Post-signup wow-moment: seed real presence-build tasks into workflow_runs
+   * and stream tool artifacts in the welcome chat (JOV-3988). Kill-switchable.
+   */
+  ONBOARDING_WOW_TASK_QUEUE: true,
 } as const;
 
 export type AppFlagName = keyof typeof APP_FLAG_DEFAULTS;
@@ -77,6 +82,7 @@ export const APP_FLAG_KEYS = {
   INBOX_HOME: 'inbox_home',
   PROFILES_WORKSPACE: 'profiles_workspace',
   PROFILE_SEARCH_MONITORING: 'profile_search_monitoring',
+  ONBOARDING_WOW_TASK_QUEUE: 'onboarding_wow_task_queue',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_OVERRIDE_KEYS = {
@@ -98,6 +104,7 @@ export const APP_FLAG_OVERRIDE_KEYS = {
   INBOX_HOME: 'code:INBOX_HOME',
   PROFILES_WORKSPACE: 'code:PROFILES_WORKSPACE',
   PROFILE_SEARCH_MONITORING: 'code:PROFILE_SEARCH_MONITORING',
+  ONBOARDING_WOW_TASK_QUEUE: 'code:ONBOARDING_WOW_TASK_QUEUE',
 } as const satisfies Record<AppFlagName, string>;
 
 export const APP_FLAG_TO_STATSIG_GATE = {
@@ -144,6 +151,8 @@ export const APP_FLAG_DESCRIPTIONS = {
     'Unified public Profiles and Connections workspace navigation',
   PROFILE_SEARCH_MONITORING:
     'Google-first artist search-presence monitoring runner',
+  ONBOARDING_WOW_TASK_QUEUE:
+    'Seed real onboarding presence-build tasks with live chat artifacts (JOV-3988)',
 } as const satisfies Record<AppFlagName, string>;
 
 /**
@@ -163,4 +172,5 @@ export const LOCAL_DEFAULT_ONLY_FLAGS = new Set<AppFlagName>([
   'INBOX_HOME', // rollout gate for Inbox-as-home IA; default off in prod (JOV-3931)
   'PROFILES_WORKSPACE', // JOV-2659 Tim-first unified Profiles rollout
   'PROFILE_SEARCH_MONITORING', // JOV-2659 server runner remains separately health-gated
+  'ONBOARDING_WOW_TASK_QUEUE', // JOV-3988 kill-switch; local default + env/admin override, no Statsig gate
 ]);

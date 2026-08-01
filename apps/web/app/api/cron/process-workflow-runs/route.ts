@@ -39,6 +39,10 @@ import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { workflowRuns } from '@/lib/db/schema/connectors';
 import { captureError, captureWarning } from '@/lib/error-tracking';
+import {
+  ONBOARDING_PRESENCE_BUILD_WORKFLOW_KIND,
+  runOnboardingPresenceBuild,
+} from '@/lib/onboarding/presence-build';
 import { RELEASE_TO_REVENUE_WORKFLOW_KIND } from '@/lib/release-to-revenue/types';
 import { initializeReleaseToRevenueRun } from '@/lib/release-to-revenue/workflows/initialize-run';
 import { logger } from '@/lib/utils/logger';
@@ -144,6 +148,9 @@ export async function GET(request: Request): Promise<Response> {
               processed++;
             } else if (run.kind === PACKAGING_SWAP_EXPERIMENT_WORKFLOW_KIND) {
               await executePackagingSwapExperiment({ workflowRunId: run.id });
+              processed++;
+            } else if (run.kind === ONBOARDING_PRESENCE_BUILD_WORKFLOW_KIND) {
+              await runOnboardingPresenceBuild(run.id);
               processed++;
             } else {
               logger.warn('[process-workflow-runs] unknown workflow kind', {

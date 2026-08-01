@@ -7,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@jovie/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
   Archive,
@@ -49,6 +50,7 @@ import {
 } from '@/lib/onboarding/session-keys';
 import { mergePreviewPanelHydration } from '@/lib/profile/preview-panel-optimistic';
 import {
+  queryKeys,
   useDashboardSocialLinksQuery,
   useDeleteConversationMutation,
 } from '@/lib/queries';
@@ -333,6 +335,7 @@ export function ChatPageClient({
   const { open: openPreviewPanel } = usePreviewPanelState();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const notifications = useNotifications();
   const [initialQueryHandled, setInitialQueryHandled] = useState(false);
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
@@ -780,6 +783,63 @@ export function ChatPageClient({
     router,
     setWelcomeChatBootstrapStatus,
   ]);
+
+  // JOV-3988: poll presence-build steps live after onboarding (soft-fail).
+  useEffect(() => {
+    if (!fromOnboarding || !conversationId || !activeProfile) return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof globalThis.setTimeout> | null = null;
+    let ticks = 0;
+    const MAX_TICKS = 12;
+    const TICK_MS = 900;
+    const schedule = (ms: number) => {
+      timer = globalThis.setTimeout(() => {
+        void tick();
+      }, ms);
+    };
+
+    const tick = async () => {
+      if (cancelled || ticks >= MAX_TICKS) return;
+      ticks += 1;
+      try {
+        const response = await fetch('/api/onboarding/presence-build', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok || cancelled) return;
+        const payload = (await response.json()) as {
+          done?: boolean;
+          advanced?: boolean;
+          disabled?: boolean;
+          missing?: boolean;
+          degraded?: boolean;
+        };
+        if (payload.advanced) {
+          await queryClient.invalidateQueries({
+            queryKey: queryKeys.chat.conversation(conversationId),
+          });
+        }
+        if (
+          payload.done ||
+          payload.disabled ||
+          payload.missing ||
+          payload.degraded
+        ) {
+          return;
+        }
+        schedule(TICK_MS);
+      } catch {
+        // Non-blocking — chat remains usable.
+      }
+    };
+
+    schedule(400);
+    return () => {
+      cancelled = true;
+      if (timer !== null) globalThis.clearTimeout(timer);
+    };
+  }, [activeProfile, conversationId, fromOnboarding, queryClient]);
 
   // Profile unavailable — show actionable error instead of infinite spinner.
   // This happens when billing/entitlements fail or the DB query times out,
