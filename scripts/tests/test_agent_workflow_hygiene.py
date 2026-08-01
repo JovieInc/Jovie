@@ -656,6 +656,24 @@ def test_deep_lanes_are_staggered_and_bounded() -> None:
     assert "'0 9 * * 2'" in harness
 
 
+def test_product_screenshot_budget_covers_capture_and_publication() -> None:
+    """The screenshot publisher must outlive capture plus the normal push gate."""
+    job = _job_block("screenshots.yml", "generate")
+    capture = _step_block("screenshots.yml", "Capture screenshot catalog")
+    publication = _step_block("screenshots.yml", "Create or update screenshot PR")
+
+    job_timeout = int(re.search(r"timeout-minutes: (\d+)", job).group(1))
+    capture_timeout = int(
+        re.search(r"timeout-minutes: (\d+)", capture).group(1)
+    )
+    publication_timeout = int(
+        re.search(r"timeout-minutes: (\d+)", publication).group(1)
+    )
+
+    assert publication_timeout >= 60
+    assert job_timeout >= capture_timeout + publication_timeout + 10
+
+
 def test_cost_monitoring_docs_match_activation_gated_observer() -> None:
     """Declared scheduling must not be confused with activation or rollback."""
     workflow = (WORKFLOWS / "cost-anomaly-gate.yml").read_text(encoding="utf-8")

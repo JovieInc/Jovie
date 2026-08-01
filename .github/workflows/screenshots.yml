@@ -40,7 +40,9 @@ jobs:
   generate:
     name: Generate Screenshots
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    # The catalog currently takes ~17 minutes and the generated branch must
+    # still pass the repository's normal pre-push gate before publication.
+    timeout-minutes: 120
     permissions:
       contents: read
     defaults:
@@ -144,6 +146,7 @@ jobs:
 
       - name: Create or update screenshot PR
         if: steps.diff.outputs.changed == 'true'
+        timeout-minutes: 75
         working-directory: .
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
