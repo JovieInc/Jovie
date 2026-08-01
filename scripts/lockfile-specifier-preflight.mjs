@@ -62,23 +62,41 @@ export function parseImporterSpecifiers(lockfile) {
 }
 
 function workspacePackagePaths(root) {
-  const paths = ['.'];
+  const included = new Set(['.']);
+  const excluded = new Set();
   const workspace = readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8');
   for (const match of workspace.matchAll(/^\s*-\s*['"]([^'"]+)['"]\s*$/gm)) {
-    const pattern = match[1];
-    if (!pattern.endsWith('/*'))
-      throw new Error(`Unsupported workspace pattern: ${pattern}`);
-    const parent = pattern.slice(0, -2);
-    for (const entry of readdirSync(join(root, parent)).sort()) {
-      const candidate = join(root, parent, entry);
-      if (
-        statSync(candidate).isDirectory() &&
-        statSync(join(candidate, 'package.json'), { throwIfNoEntry: false })
-      )
-        paths.push(relative(root, candidate));
+    const raw = match[1];
+    const negated = raw.startsWith('!');
+    const pattern = negated ? raw.slice(1) : raw;
+
+    if (pattern.endsWith('/*')) {
+      const parent = pattern.slice(0, -2);
+      for (const entry of readdirSync(join(root, parent)).sort()) {
+        const candidate = join(root, parent, entry);
+        if (
+          statSync(candidate).isDirectory() &&
+          statSync(join(candidate, 'package.json'), { throwIfNoEntry: false })
+        ) {
+          const rel = relative(root, candidate);
+          if (negated) excluded.add(rel);
+          else included.add(rel);
+        }
+      }
+      continue;
     }
+
+    // Exact package path (used by pnpm exclusions like !apps/eve-pilot).
+    if (negated) {
+      excluded.add(pattern);
+      continue;
+    }
+
+    throw new Error(`Unsupported workspace pattern: ${raw}`);
   }
-  return paths.sort();
+
+  for (const path of excluded) included.delete(path);
+  return [...included].sort();
 }
 
 export function compareWorkspaceSpecifiers({
