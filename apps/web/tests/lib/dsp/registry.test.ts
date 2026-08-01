@@ -10,6 +10,7 @@ import {
   buildSearchUrl,
   DSP_CONFIGS,
   DSP_REGISTRY,
+  getDspDisplayName,
   getRegistryEntry,
   getRegistryEntryByService,
   isDspPlatform,
@@ -157,6 +158,15 @@ describe('normalizePlatformKey', () => {
   it('returns null for unknown platforms', () => {
     expect(normalizePlatformKey('fakePlatform')).toBeNull();
     expect(normalizePlatformKey('')).toBeNull();
+  });
+});
+
+describe('getDspDisplayName', () => {
+  it('turns internal provider keys into canonical product labels', () => {
+    expect(getDspDisplayName('seven_digital')).toBe('7digital');
+    expect(getDspDisplayName('amazon_music')).toBe('Amazon Music');
+    expect(getDspDisplayName('telmor_musik')).toBe('Telmor Musik');
+    expect(getDspDisplayName('unknown_provider')).toBeNull();
   });
 });
 

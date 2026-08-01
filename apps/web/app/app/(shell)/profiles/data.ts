@@ -15,6 +15,7 @@ import {
   profileSurfaces,
 } from '@/lib/db/schema/profile-surfaces';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getDspDisplayName } from '@/lib/dsp-registry';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { publicEnv } from '@/lib/env-public';
 import { resolveProfileSearchMarket } from '@/lib/profile-search/market';
@@ -361,7 +362,12 @@ export async function loadProfilesWorkspaceData(input: {
       rowType: 'surface',
       kind: surface.kind as ProfileSurfaceKind,
       platform: surface.platform,
-      label: surface.displayName || surface.platform,
+      label:
+        surface.displayName ||
+        getDspDisplayName(surface.platform) ||
+        surface.platform
+          .replaceAll('_', ' ')
+          .replaceAll(/\b\w/g, letter => letter.toUpperCase()),
       handle: surface.handle,
       url: surface.url,
       trackedUrl,

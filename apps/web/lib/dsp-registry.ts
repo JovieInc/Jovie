@@ -632,6 +632,12 @@ export function normalizePlatformKey(platform: string): string | null {
   return null;
 }
 
+/** Resolve an internal platform key to its canonical product-facing name. */
+export function getDspDisplayName(platform: string): string | null {
+  const key = normalizePlatformKey(platform);
+  return key ? (_byKey.get(key)?.name ?? null) : null;
+}
+
 /**
  * Keys that are categorized as DSPs for dashboard routing.
  * Excludes regular YouTube (which is shown on listen page but categorized

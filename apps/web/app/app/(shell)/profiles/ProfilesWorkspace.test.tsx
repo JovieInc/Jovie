@@ -104,14 +104,16 @@ describe('ProfilesWorkspace', () => {
     expect(screen.getByText('Monitored 1/5')).toBeInTheDocument();
     expect(screen.getByText('Needs Attention 1')).toBeInTheDocument();
     expect(screen.getByText('Monitoring Active')).toBeInTheDocument();
-    const typeTrigger = screen.getByRole('button', {
+    const typeGlyph = screen.getByRole('img', {
       name: 'DSP connection type',
     });
-    expect(typeTrigger).toBeInTheDocument();
-    fireEvent.focus(typeTrigger);
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(
-      'DSP connection'
-    );
+    expect(typeGlyph).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'DSP connection type' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Add Connection' })
+    ).toBeInTheDocument();
     expect(screen.getByText('Requires Upgrade')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'DSPs' }));
@@ -178,7 +180,7 @@ describe('ProfilesWorkspace', () => {
     const user = userEvent.setup();
     renderWorkspace(data);
 
-    await user.click(screen.getByRole('button', { name: 'Add connection' }));
+    await user.click(screen.getByRole('button', { name: 'Add Connection' }));
     const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
     expect(panel).not.toBeNull();
 
@@ -224,6 +226,11 @@ describe('ProfilesWorkspace', () => {
 
     const summary = screen.getByTestId('connections-summary');
     expect(summary.parentElement?.parentElement).toHaveClass('overflow-x-auto');
+    expect(summary).toHaveClass('min-w-0', 'overflow-x-auto');
+    expect(screen.getByRole('button', { name: 'Add Connection' })).toHaveClass(
+      'shrink-0',
+      'max-sm:w-7.5'
+    );
     expect(screen.getByText('Best Rank #2')).toHaveClass('max-sm:hidden');
     expect(screen.getByText('Monitoring Active')).toHaveClass('max-sm:hidden');
   });
