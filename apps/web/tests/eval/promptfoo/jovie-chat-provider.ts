@@ -454,6 +454,35 @@ const ADVANCED_TOOL_SCHEMAS = {
       script: z.string().min(12).max(1200),
     }),
   },
+  // JOV-3988 onboarding presence-build wow-moment artifacts (UI event names; not chat-model tools)
+  researchArtistPresence: {
+    description:
+      'Onboarding presence-build research step artifact. System-emitted tool event, not a model-invoked chat tool.',
+    inputSchema: z.object({
+      stepId: z.string().optional(),
+    }),
+  },
+  assembleArtistProfile: {
+    description:
+      'Onboarding presence-build profile assembly artifact. System-emitted tool event, not a model-invoked chat tool.',
+    inputSchema: z.object({
+      stepId: z.string().optional(),
+    }),
+  },
+  generateSmartLink: {
+    description:
+      'Onboarding presence-build smart link artifact. System-emitted tool event, not a model-invoked chat tool.',
+    inputSchema: z.object({
+      stepId: z.string().optional(),
+    }),
+  },
+  draftWelcomePost: {
+    description:
+      'Onboarding presence-build welcome draft artifact. System-emitted tool event, not a model-invoked chat tool.',
+    inputSchema: z.object({
+      stepId: z.string().optional(),
+    }),
+  },
 } as const;
 
 const ALL_EVAL_TOOL_SCHEMAS = {
@@ -501,6 +530,10 @@ const ALWAYS_PAID_TOOL_NAMES = [
   'markCanvasUploaded',
   'formatLyrics',
   'proposeVideoRecording',
+  'researchArtistPresence',
+  'assembleArtistProfile',
+  'generateSmartLink',
+  'draftWelcomePost',
 ] as const;
 
 const PAID_TOOL_NAMES = [
@@ -721,6 +754,10 @@ const TOOL_RESULT_REQUIRED_KEYS: Record<string, readonly string[]> = {
   suggestRelatedArtists: ['success', 'action', 'artists', 'summary'],
   unpauseMerchCard: ['success', 'action', 'merchCardId'],
   writeWorldClassBio: ['success', 'action', 'bio', 'summary'],
+  researchArtistPresence: ['action', 'stepId', 'title', 'summary'],
+  assembleArtistProfile: ['action', 'stepId', 'title', 'summary'],
+  generateSmartLink: ['action', 'stepId', 'title', 'summary'],
+  draftWelcomePost: ['action', 'stepId', 'title', 'summary'],
 };
 const SENSITIVE_RESULT_KEY_PATTERN =
   /(?:api[_-]?key|authorization|cookie|password|secret|session|token)/i;
@@ -4284,6 +4321,17 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
           'Luna Waves pairs ambient textures with a concise release story for editorial pitching.',
         summary: 'Pitch ready.',
       };
+    case 'researchArtistPresence':
+    case 'assembleArtistProfile':
+    case 'generateSmartLink':
+    case 'draftWelcomePost':
+      return {
+        action: 'presence_build_artifact',
+        stepId:
+          typeof args.stepId === 'string' ? args.stepId : 'research_artist',
+        title: 'Presence build artifact',
+        summary: 'Synthetic presence-build artifact for evals.',
+      };
     default:
       return { success: true, action: toolName, input: args };
   }
@@ -4910,6 +4958,11 @@ function sampleToolInput(toolName: string): Record<string, unknown> {
         script:
           'Hey everyone, Neon Reef is out now. Thank you so much for listening.',
       };
+    case 'researchArtistPresence':
+    case 'assembleArtistProfile':
+    case 'generateSmartLink':
+    case 'draftWelcomePost':
+      return { stepId: 'research_artist' };
     default:
       return {};
   }
