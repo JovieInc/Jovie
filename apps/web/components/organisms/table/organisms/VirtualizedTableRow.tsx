@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/organisms/table/VirtualizedTableRow.test.tsx
 import type { Row } from '@tanstack/react-table';
 import { flexRender } from '@tanstack/react-table';
 import React, { memo, useCallback, useEffect, useRef } from 'react';
