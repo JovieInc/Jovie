@@ -104,9 +104,11 @@ describe('AdminProfileSidebar', () => {
     expect(screen.getByRole('tab', { name: 'Algorithm' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'About' })).toBeInTheDocument();
     expect(screen.getAllByText('@alice').length).toBeGreaterThan(0);
-    expect(screen.getByTestId('admin-creator-entity-header')).toHaveAttribute(
-      'data-density',
-      'rail'
+    expect(screen.getByTestId('admin-creator-entity-header')).toHaveClass(
+      'relative',
+      'flex',
+      'items-start',
+      'gap-3'
     );
     expect(screen.getByTestId('admin-creator-summary')).toBeInTheDocument();
     expect(

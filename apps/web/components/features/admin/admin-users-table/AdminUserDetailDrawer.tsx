@@ -9,11 +9,10 @@ import {
   DrawerAnalyticsSummaryCard,
   DrawerCardActionBar,
   DrawerSection,
-  DrawerSurfaceCard,
+  EntityHeaderCard,
   EntitySidebarShell,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
-import { DrawerHero } from '@/components/shell/DrawerHero';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminUserRow } from '@/lib/admin/types';
 
@@ -96,11 +95,47 @@ export function AdminUserDetailDrawer({
       emptyMessage='Select a user to view details.'
       entityHeader={
         user ? (
-          <DrawerSurfaceCard
-            variant='card'
-            className='relative overflow-hidden'
-          >
-            <div className='absolute right-2 top-2 z-10'>
+          <EntityHeaderCard
+            title={user.name ?? 'Unnamed user'}
+            stableLayout
+            titleLineClamp={1}
+            subtitleLineClamp={1}
+            reserveSubtitleSlot
+            reserveMetaSlot
+            metaOverflow='scroll'
+            image={
+              <UserAvatar name={user.name ?? user.email ?? 'User'} size='lg' />
+            }
+            subtitle={
+              user.email ? (
+                <div className='flex items-center gap-1.5'>
+                  <span className='truncate'>{user.email}</span>
+                  <CopyButton value={user.email} label='Email' />
+                </div>
+              ) : (
+                'No email'
+              )
+            }
+            meta={
+              <div className='flex flex-wrap gap-1.5'>
+                <Badge
+                  size='sm'
+                  variant={user.plan === 'pro' ? 'primary' : 'secondary'}
+                >
+                  {user.plan}
+                </Badge>
+                {user.deletedAt ? (
+                  <Badge size='sm' variant='warning'>
+                    Deleted
+                  </Badge>
+                ) : (
+                  <Badge size='sm' variant='success'>
+                    Active
+                  </Badge>
+                )}
+              </div>
+            }
+            actions={
               <DrawerCardActionBar
                 primaryActions={[]}
                 menuItems={contextMenuItems}
@@ -109,55 +144,10 @@ export function AdminUserDetailDrawer({
                 overflowTriggerIcon='vertical'
                 className='border-0 bg-transparent px-0 py-0'
               />
-            </div>
-            <DrawerHero
-              title={user.name ?? 'Unnamed user'}
-              density='rail'
-              artwork={
-                <UserAvatar
-                  name={user.name ?? user.email ?? 'User'}
-                  size='lg'
-                />
-              }
-              subtitle={
-                user.email ? (
-                  <div className='flex items-center gap-1.5'>
-                    <span className='truncate'>{user.email}</span>
-                    <CopyButton value={user.email} label='Email' />
-                  </div>
-                ) : (
-                  'No email'
-                )
-              }
-              meta={
-                <div className='flex flex-wrap gap-1.5'>
-                  <Badge
-                    size='sm'
-                    variant={user.plan === 'pro' ? 'primary' : 'secondary'}
-                  >
-                    {user.plan}
-                  </Badge>
-                  {user.deletedAt ? (
-                    <Badge size='sm' variant='warning'>
-                      Deleted
-                    </Badge>
-                  ) : (
-                    <Badge size='sm' variant='success'>
-                      Active
-                    </Badge>
-                  )}
-                </div>
-              }
-              stableLayout
-              titleLineClamp={1}
-              subtitleLineClamp={1}
-              reserveSubtitleSlot
-              reserveMetaSlot
-              metaOverflow='scroll'
-              className='[&_h2]:pr-9'
-              testId='admin-user-entity-header'
-            />
-          </DrawerSurfaceCard>
+            }
+            bodyClassName='pr-9'
+            data-testid='admin-user-entity-header'
+          />
         ) : undefined
       }
     >

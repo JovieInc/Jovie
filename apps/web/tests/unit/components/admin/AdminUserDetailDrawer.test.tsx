@@ -81,9 +81,11 @@ describe('AdminUserDetailDrawer', () => {
       'data-entity-header-surface',
       'flat'
     );
-    expect(screen.getByTestId('admin-user-entity-header')).toHaveAttribute(
-      'data-density',
-      'rail'
+    expect(screen.getByTestId('admin-user-entity-header')).toHaveClass(
+      'relative',
+      'flex',
+      'items-start',
+      'gap-3'
     );
     expect(
       screen.getByTestId('drawer-analytics-metric-value-profile-completeness')
