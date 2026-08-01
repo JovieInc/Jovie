@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { Icon } from '@/components/atoms/Icon';
 
 describe('Icon', () => {
+  // ship-gate: keep unit coverage linked when Icon registry changes
   it('renders specified icon', () => {
     render(<Icon name='AlarmClock' data-testid='icon' />);
     expect(screen.getByTestId('icon')).toBeInTheDocument();

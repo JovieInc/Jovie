@@ -1,3 +1,5 @@
+// @coverage-via apps/web/tests/unit/Icon.test.tsx
+
 import {
   Activity,
   AlarmClock,
