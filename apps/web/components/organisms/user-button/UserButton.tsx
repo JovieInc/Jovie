@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/user-button.test.tsx
+
 import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
 import { Button, CommonDropdown } from '@jovie/ui';
 import {
@@ -26,6 +28,7 @@ import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { useFeedbackMutation } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import type { UserButtonProps } from './types';
@@ -554,7 +557,7 @@ export function UserButton({
     (showUserInfo ? (
       <button
         type='button'
-        className='flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0'
+        className='group/user-button flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0'
       >
         <Avatar
           src={userImageUrl}
@@ -577,7 +580,12 @@ export function UserButton({
         <Icon
           name='ChevronRight'
           data-user-button-chevron
-          className='size-3 text-sidebar-item-icon group-data-[collapsible=icon]:hidden'
+          className={cn(
+            'size-3 text-sidebar-item-icon transition-opacity duration-subtle group-data-[collapsible=icon]:hidden',
+            isMenuOpen
+              ? 'opacity-100'
+              : 'opacity-0 group-hover/user-button:opacity-100 group-focus-visible/user-button:opacity-100'
+          )}
           aria-hidden='true'
         />
       </button>

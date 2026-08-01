@@ -65,10 +65,10 @@ describe('SidebarThreadsSection', () => {
       name: `Chat Actions for ${title}`,
     });
 
-    expect(row).toHaveClass('grid-cols-[22px_minmax(0,1fr)]');
+    expect(row).toHaveClass('grid-cols-[18px_minmax(0,1fr)]');
     expect(row).not.toHaveClass(
-      'grid-cols-[22px_minmax(0,1fr)_20px]',
-      'grid-cols-[22px_minmax(0,1fr)_minmax(34px,auto)]',
+      'grid-cols-[18px_minmax(0,1fr)_20px]',
+      'grid-cols-[18px_minmax(0,1fr)_minmax(34px,auto)]',
       'pr-8'
     );
     expect(action).toHaveClass('right-2.5', 'group-hover/thread:bg-surface-0');

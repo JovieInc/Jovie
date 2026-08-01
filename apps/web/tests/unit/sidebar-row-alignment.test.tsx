@@ -177,7 +177,7 @@ describe('Sidebar row alignment', () => {
     // icon-column grid template.
     expect(settingsRow).toContain('grid-cols-[minmax(0,1fr)]');
     expect(settingsRow).not.toContain(
-      'grid-cols-[22px_minmax(0,1fr)_minmax(34px,auto)]'
+      'grid-cols-[18px_minmax(0,1fr)_minmax(34px,auto)]'
     );
   });
 
@@ -207,7 +207,7 @@ describe('Sidebar row alignment', () => {
     expect(rowClassName).toContain('px-2.5');
     expect(rowClassName).toContain('gap-x-2.5');
     expect(rowClassName).toContain(
-      'grid-cols-[22px_minmax(0,1fr)_minmax(34px,auto)]'
+      'grid-cols-[18px_minmax(0,1fr)_minmax(34px,auto)]'
     );
     expect(rowClassName).not.toContain('before:');
     expect(rowClassName).not.toContain('after:');
