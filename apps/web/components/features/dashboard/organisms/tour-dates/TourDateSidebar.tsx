@@ -29,9 +29,9 @@ import {
   EntitySidebarShell,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
+import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { convertToCommonDropdownItems } from '@/components/organisms/table';
-import { DrawerHero } from '@/components/shell/DrawerHero';
 import { CANONICAL_METRICS } from '@/lib/analytics/metrics';
 import {
   useDeleteTourDateMutation,
@@ -264,24 +264,16 @@ export function TourDateSidebar({
         entityHeader={
           tourDate ? (
             <>
-              <DrawerSurfaceCard
-                variant='card'
-                className='relative overflow-hidden'
-              >
-                <div className='absolute right-2 top-2 z-10'>
-                  <DrawerCardActionBar
-                    primaryActions={[]}
-                    menuItems={contextMenuItems}
-                    onClose={onClose}
-                    overflowTriggerPlacement='card-top-right'
-                    overflowTriggerIcon='vertical'
-                    className='border-0 bg-transparent px-0 py-0'
-                  />
-                </div>
-                <DrawerHero
+              <DrawerSurfaceCard variant='card' className='overflow-hidden p-3'>
+                <EntityHeaderCard
                   title={tourDate.title?.trim() || tourDate.venueName}
-                  density='rail'
-                  artwork={
+                  stableLayout
+                  titleLineClamp={1}
+                  subtitleLineClamp={1}
+                  reserveSubtitleSlot
+                  reserveMetaSlot
+                  metaOverflow='scroll'
+                  image={
                     <DrawerMediaThumb
                       alt=''
                       fallback={
@@ -303,12 +295,6 @@ export function TourDateSidebar({
                       {tourDate.country}
                     </>
                   }
-                  stableLayout
-                  titleLineClamp={1}
-                  subtitleLineClamp={1}
-                  reserveSubtitleSlot
-                  reserveMetaSlot
-                  metaOverflow='scroll'
                   meta={
                     tourDate.provider === 'bandsintown' ? (
                       <span className='inline-flex items-center gap-1.5 text-2xs text-secondary-token'>
@@ -317,8 +303,18 @@ export function TourDateSidebar({
                       </span>
                     ) : null
                   }
-                  className='[&_h2]:pr-9'
-                  testId='tour-date-entity-header'
+                  actions={
+                    <DrawerCardActionBar
+                      primaryActions={[]}
+                      menuItems={contextMenuItems}
+                      onClose={onClose}
+                      overflowTriggerPlacement='card-top-right'
+                      overflowTriggerIcon='vertical'
+                      className='border-0 bg-transparent px-0 py-0'
+                    />
+                  }
+                  bodyClassName='pr-9'
+                  data-testid='tour-date-entity-header'
                 />
               </DrawerSurfaceCard>
               <DrawerAnalyticsSummaryCard
