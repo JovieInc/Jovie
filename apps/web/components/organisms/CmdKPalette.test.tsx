@@ -66,7 +66,7 @@ describe('CmdKPalette', () => {
     pushMock.mockClear();
     render(<MainPlaneHarness />);
 
-    const input = screen.getByRole('searchbox', {
+    const input = screen.getByRole('combobox', {
       name: 'Command Palette Search',
     });
     fireEvent.change(input, { target: { value: 'Calendar' } });
