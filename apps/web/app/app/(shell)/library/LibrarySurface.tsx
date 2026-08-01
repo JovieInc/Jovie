@@ -684,12 +684,16 @@ const LibraryEntityActionCell = memo(function LibraryEntityActionCell({
 function createLibraryActionColumn(metaClassName: string) {
   return libraryColumnHelper.display({
     id: 'actions',
-    header: () => <span className='sr-only'>Actions</span>,
+    header: 'Actions',
     cell: ({ row }) => <LibraryEntityActionCell asset={row.original} />,
     size: 40,
     minSize: 40,
     enableSorting: false,
-    meta: { className: metaClassName },
+    meta: {
+      className: metaClassName,
+      headerVisibility: 'sr-only',
+      actionVisibility: 'contextual',
+    },
   });
 }
 

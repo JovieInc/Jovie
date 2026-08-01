@@ -106,7 +106,7 @@ export function createCreatorProfileColumns({
     // Actions column - shows ellipsis menu with SAME items as right-click context menu
     columnHelper.display({
       id: 'actions',
-      header: '',
+      header: 'Actions',
       cell: ({ row }: { row: Row<AdminCreatorProfileRow> }) => {
         const profile = row.original;
         const contextMenuItems = getContextMenuItems(profile);
@@ -119,6 +119,10 @@ export function createCreatorProfileColumns({
         );
       },
       size: 64,
+      meta: {
+        headerVisibility: 'sr-only',
+        actionVisibility: 'contextual',
+      },
     }),
   ] as ColumnDef<AdminCreatorProfileRow, unknown>[];
 }

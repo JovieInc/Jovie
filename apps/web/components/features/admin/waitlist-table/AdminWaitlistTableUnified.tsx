@@ -150,7 +150,7 @@ export function AdminWaitlistTableUnified({
       // Primary Goal column
       columnHelper.accessor('primaryGoal', {
         id: 'primaryGoal',
-        header: 'Primary goal',
+        header: 'Primary Goal',
         cell: ({ getValue }) => renderPrimaryGoalCell(getValue()),
         size: 140,
       }),
@@ -198,9 +198,13 @@ export function AdminWaitlistTableUnified({
       // Actions column - shows ellipsis menu with SAME items as right-click context menu
       columnHelper.display({
         id: 'actions',
-        header: '',
+        header: 'Actions',
         cell: createActionsCellRenderer(createContextMenuItems),
         size: 48,
+        meta: {
+          headerVisibility: 'sr-only',
+          actionVisibility: 'contextual',
+        },
       }),
     ],
     [

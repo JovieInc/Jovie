@@ -531,9 +531,13 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
       // Actions column - shows ellipsis menu with SAME items as right-click context menu
       columnHelper.display({
         id: 'actions',
-        header: '',
+        header: 'Actions',
         cell: ActionsCell,
         size: 48,
+        meta: {
+          headerVisibility: 'sr-only',
+          actionVisibility: 'contextual',
+        },
       }),
     ],
     [SelectHeader, SelectCell, ActionsCell]
