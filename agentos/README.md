@@ -9,6 +9,14 @@ AgentOS is the private orchestration surface for Jovie. Linear is the canonical 
 | `agents/` | Per-agent role definition files for AgentOS-specific agent types |
 | `runs/` | Agent run output artifacts (screenshots, diffs, generated proposals) |
 
+## Department agents
+
+| Role | Policy | Runtime | CLI |
+|------|--------|---------|-----|
+| Design/Taste ([`agents/design-taste-department.md`](./agents/design-taste-department.md)) | [`memory/design-taste.md`](./memory/design-taste.md) | `apps/web/lib/agent-os/departments/design-taste/` | `pnpm --filter @jovie/web run design-taste-department -- --run-id=<id>` |
+
+Design/Taste dispatches on UI-touching PRs (`ui-pr`) or forced scheduled audits (`--trigger=scheduled-audit`). Runs write `AgentRunArtifact` under `runs/design-taste/<run-id>/`.
+
 ## References
 
 - Phase 0 ADR: [`docs/AGENT_OS_ARCHITECTURE.md`](../docs/AGENT_OS_ARCHITECTURE.md)

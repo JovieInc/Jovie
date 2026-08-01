@@ -7,6 +7,7 @@ Run directories follow the naming convention: `<run-type>/<YYYY-MM-DD>/<run-id>/
 Examples:
 - `design-review/2026-05-08/abc123/`
 - `qa/2026-05-08/def456/`
+- `design-taste/<run-id>/{manifest,agent-run-artifact,pr-comment,complete}.json|md` (Design/Taste department; JOV-2012)
 - `visual-qa/<run_id>/<surface>/{baseline,after}-{dark,light}.png` (proposal-validation captures; see `apps/web/lib/visual-qa/registry.ts`)
 - `visual-qa/<run_id>/<surface>/diff-overlay.png` (pixel-diff overlay artifacts)
 - `visual-qa/<run_id>/diff-summary.json` (pixel-diff summary)
