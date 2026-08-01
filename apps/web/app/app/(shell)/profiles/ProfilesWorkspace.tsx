@@ -631,7 +631,7 @@ export function ProfilesWorkspace({
         <PageToolbar
           className='flex-col items-stretch gap-0 px-0 py-0 lg:flex-row lg:items-center lg:gap-1.5 lg:px-app-header lg:py-1.5'
           startClassName='w-full flex-none px-app-header py-1.5 lg:min-w-0 lg:flex-1 lg:px-0 lg:py-0'
-          endClassName='ml-0 w-full min-w-0 max-w-full shrink justify-start overflow-x-auto border-t border-subtle px-app-header py-1.5 lg:ml-auto lg:w-auto lg:max-w-none lg:shrink-0 lg:justify-end lg:overflow-visible lg:border-t-0 lg:px-0 lg:py-0'
+          endClassName='ml-0 w-full min-w-0 max-w-full shrink justify-start overflow-hidden border-t border-subtle px-app-header py-1.5 lg:ml-auto lg:w-auto lg:max-w-none lg:shrink-0 lg:justify-end lg:overflow-visible lg:border-t-0 lg:px-0 lg:py-0'
           start={FILTERS.map(option => (
             <PageToolbarTabButton
               key={option.id}
@@ -644,27 +644,20 @@ export function ProfilesWorkspace({
             />
           ))}
           end={
-            <div className='flex w-full items-center gap-2 whitespace-nowrap lg:w-auto lg:gap-3'>
+            <div
+              className='flex w-full min-w-0 items-center justify-between gap-2 whitespace-nowrap lg:w-auto lg:justify-end lg:gap-3'
+              data-testid='connections-toolbar-actions'
+            >
               <div
                 data-testid='connections-summary'
-                className='flex min-w-0 flex-1 items-center gap-2 overflow-x-auto text-xs text-tertiary-token tabular-nums lg:flex-none lg:overflow-visible'
+                className='flex min-w-0 items-center gap-2 overflow-hidden text-xs text-tertiary-token tabular-nums lg:flex-none lg:overflow-visible'
               >
                 <span>{summary.connectionCount} Connections</span>
-                <span aria-hidden className='text-quaternary-token'>
-                  ·
+                <span className='max-lg:hidden'>{limitLabel}</span>
+                <span className='max-lg:hidden'>
+                  Needs Attention {summary.needsAttentionCount}
                 </span>
-                <span>{limitLabel}</span>
-                <span aria-hidden className='text-quaternary-token'>
-                  ·
-                </span>
-                <span>Needs Attention {summary.needsAttentionCount}</span>
-                <span
-                  aria-hidden
-                  className='max-sm:hidden text-quaternary-token'
-                >
-                  ·
-                </span>
-                <span className='max-sm:hidden'>
+                <span className='max-lg:hidden'>
                   Best Rank{' '}
                   {summary.bestRank === null ? (
                     <SimpleTooltip content='No search rank has been measured yet.'>
@@ -676,13 +669,7 @@ export function ProfilesWorkspace({
                     `#${summary.bestRank}`
                   )}
                 </span>
-                <span
-                  aria-hidden
-                  className='max-sm:hidden text-quaternary-token'
-                >
-                  ·
-                </span>
-                <span className='max-sm:hidden'>
+                <span className='max-lg:hidden'>
                   Monitoring {summary.monitoringLabel}
                 </span>
               </div>
