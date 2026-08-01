@@ -1,4 +1,7 @@
+import type { CommonDropdownItem } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Copy } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-member-sidebar/AudienceMemberSidebar';
@@ -65,6 +68,16 @@ const member: AudienceMember = {
   lastSeenAt: null,
 };
 
+const audienceActionItems: CommonDropdownItem[] = [
+  {
+    type: 'action',
+    id: 'copy-email',
+    label: 'Copy Email',
+    icon: Copy,
+    onClick: vi.fn(),
+  },
+];
+
 describe('AudienceMemberSidebar', () => {
   it('renders the canonical audience header with the member title', () => {
     render(
@@ -116,6 +129,23 @@ describe('AudienceMemberSidebar', () => {
         .getByTestId('audience-member-header-card')
         .querySelector('.size-12')
     ).toBeInTheDocument();
+  });
+
+  it('uses the same canonical actions in the header overflow and drawer context menu', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <AudienceMemberSidebar
+        member={member}
+        isOpen
+        onClose={() => undefined}
+        contextMenuItems={audienceActionItems}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'More actions' }));
+
+    expect(screen.getByRole('menuitem', { name: 'Copy Email' })).toBeVisible();
   });
 
   it('renders location and visit count in meta slot', () => {
