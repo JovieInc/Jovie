@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/SettingsToggleRow.test.tsx
 import { Switch } from '@jovie/ui';
 import * as React from 'react';
 import { SettingsPlanGateLabel } from '@/components/atoms/SettingsPlanGateLabel';

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+// @coverage-via apps/web/tests/unit/dashboard/SettingsPanel.test.tsx
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { cn } from '@/lib/utils';
 
