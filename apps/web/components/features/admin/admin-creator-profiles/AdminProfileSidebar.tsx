@@ -6,15 +6,14 @@ import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelC
 import {
   DrawerAnalyticsSummaryCard,
   DrawerCardActionBar,
-  DrawerSurfaceCard,
   DrawerTabbedCard,
   DrawerTabs,
+  EntityHeaderCard,
   EntitySidebarShell,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
-import { DrawerHero } from '@/components/shell/DrawerHero';
 import { BASE_URL } from '@/constants/domains';
 import { ProfileAboutTab } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab';
 import {
@@ -101,8 +100,26 @@ export function AdminProfileSidebar({
       entityHeaderSurface='flat'
       entityHeader={
         <>
-          <DrawerSurfaceCard variant='card' className='overflow-hidden'>
-            <div className='relative'>
+          <EntityHeaderCard
+            title={profile.displayName ?? profile.username}
+            subtitle={`@${profile.username}`}
+            stableLayout
+            titleLineClamp={1}
+            subtitleLineClamp={1}
+            reserveSubtitleSlot
+            reserveMetaSlot
+            metaOverflow='scroll'
+            image={
+              <AvatarUploadable
+                src={profile.avatarUrl}
+                alt={`${profile.displayName ?? profile.username} avatar`}
+                name={profile.displayName ?? profile.username}
+                size='2xl'
+                rounded='md'
+              />
+            }
+            meta={profile.location ? <span>{profile.location}</span> : null}
+            actions={
               <DrawerCardActionBar
                 primaryActions={primaryActions}
                 menuItems={contextMenuItems}
@@ -110,31 +127,10 @@ export function AdminProfileSidebar({
                 overflowTriggerPlacement='card-top-right'
                 className='border-0 bg-transparent px-0 py-0'
               />
-              <DrawerHero
-                title={profile.displayName ?? profile.username}
-                density='rail'
-                subtitle={`@${profile.username}`}
-                stableLayout
-                titleLineClamp={1}
-                subtitleLineClamp={1}
-                reserveSubtitleSlot
-                reserveMetaSlot
-                metaOverflow='scroll'
-                artwork={
-                  <AvatarUploadable
-                    src={profile.avatarUrl}
-                    alt={`${profile.displayName ?? profile.username} avatar`}
-                    name={profile.displayName ?? profile.username}
-                    size='2xl'
-                    rounded='md'
-                  />
-                }
-                meta={profile.location ? <span>{profile.location}</span> : null}
-                className='[&_h2]:pr-9'
-                testId='admin-creator-entity-header'
-              />
-            </div>
-          </DrawerSurfaceCard>
+            }
+            bodyClassName='pr-9'
+            data-testid='admin-creator-entity-header'
+          />
           <DrawerAnalyticsSummaryCard
             testId='admin-creator-summary'
             state='ready'
