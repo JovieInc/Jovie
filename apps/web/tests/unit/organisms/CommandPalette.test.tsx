@@ -175,6 +175,31 @@ describe('CommandPalette', () => {
     expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
   });
 
+  it('commits the selected sidebar-triggered main-plane result with Enter', () => {
+    pushMock.mockClear();
+    render(
+      withDashboard(
+        <>
+          <CommandPalette />
+          <HeaderSearchSurfaceFromContext />
+        </>
+      )
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    const input = screen.getByLabelText('Command Palette Search');
+    fireEvent.change(input, { target: { value: 'Calendar' } });
+    expect(input).toHaveValue('Calendar');
+    expect(
+      screen.getByRole('option', {
+        name: 'Calendar Plan release dates and campaign moments. ⌘1',
+      })
+    ).toHaveAttribute('aria-selected', 'true');
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(pushMock).toHaveBeenCalledWith('/app/calendar');
+  });
+
   it('lists recent chats with safe fallback titles', () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });

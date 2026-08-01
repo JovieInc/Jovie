@@ -18,6 +18,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   useCallback,
   useEffect,
@@ -75,8 +76,10 @@ interface CmdKPaletteProps {
 
 function MainPlaneSearchInput({
   onQueryChange,
+  onKeyDown,
 }: {
   readonly onQueryChange: (query: string) => void;
+  readonly onKeyDown: (event: KeyboardEvent) => void;
 }) {
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -99,6 +102,13 @@ function MainPlaneSearchInput({
           const nextQuery = event.target.value;
           setQuery(nextQuery);
           onQueryChange(nextQuery);
+        }}
+        onKeyDown={(event: ReactKeyboardEvent<HTMLInputElement>) => {
+          // The shell header lives outside the command plane's DOM subtree.
+          // Commit here so Enter always reaches the selected result even when
+          // the header seam changes during a route transition.
+          event.stopPropagation();
+          onKeyDown(event.nativeEvent);
         }}
         placeholder='Search Jovie or run a command…'
         className='min-w-0 flex-1 appearance-none bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus-visible:outline-none'
@@ -269,10 +279,8 @@ export function CmdKPalette({
     [flatItems, additionalIds, onAdditionalSelect, handleClose, router]
   );
 
-  // Keyboard nav: arrow up/down/enter/escape with IME guard.
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
+  const handleKeyboardCommand = useCallback(
+    (e: KeyboardEvent) => {
       if (e.isComposing) return;
       if (
         (e.metaKey || e.ctrlKey) &&
@@ -302,10 +310,19 @@ export function CmdKPalette({
         e.preventDefault();
         handleClose();
       }
-    }
-    globalThis.addEventListener('keydown', onKey, true);
-    return () => globalThis.removeEventListener('keydown', onKey, true);
-  }, [open, flatItems.length, commitIndex, selectedIndex, handleClose]);
+    },
+    [commitIndex, flatItems.length, handleClose, selectedIndex]
+  );
+  const handleKeyboardCommandRef = useRef(handleKeyboardCommand);
+  handleKeyboardCommandRef.current = handleKeyboardCommand;
+
+  // Keyboard nav: arrow up/down/enter/escape with IME guard.
+  useEffect(() => {
+    if (!open) return;
+    globalThis.addEventListener('keydown', handleKeyboardCommand);
+    return () =>
+      globalThis.removeEventListener('keydown', handleKeyboardCommand);
+  }, [handleKeyboardCommand, open]);
 
   const dialogInput = (
     <div className='flex h-full min-w-0 flex-1 items-center gap-2'>
@@ -340,6 +357,10 @@ export function CmdKPalette({
           setQuery(nextQuery);
           setSelectedIndex(0);
         }}
+        // This header element is mounted through context and otherwise keeps
+        // the callback from its first render. Resolve through a ref so Enter
+        // commits against the current filtered result list.
+        onKeyDown={event => handleKeyboardCommandRef.current(event)}
       />
     );
     return () => onHeaderChange?.(null);
