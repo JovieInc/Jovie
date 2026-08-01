@@ -871,7 +871,7 @@ function LibraryViewFilterChips({
 }) {
   return (
     <div
-      className='flex min-w-0 flex-wrap items-center gap-1'
+      className='flex shrink-0 flex-nowrap items-center gap-1'
       data-testid='library-view-filter-chips'
     >
       {PRESETS.map(view => (
