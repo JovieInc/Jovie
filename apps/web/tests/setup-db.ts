@@ -79,6 +79,20 @@ export async function setupDatabase() {
     await db.execute('ALTER TABLE creator_profiles FORCE ROW LEVEL SECURITY');
     await db.execute('ALTER TABLE profile_photos ENABLE ROW LEVEL SECURITY');
     await db.execute('ALTER TABLE profile_photos FORCE ROW LEVEL SECURITY');
+    // JOV-3061 sensitive surface — force RLS in tests even if migrate() was skipped
+    for (const table of [
+      'user_profile_claims',
+      'billing_audit_log',
+      'stripe_webhook_events',
+      'chat_conversations',
+      'chat_messages',
+      'tips',
+      'ingestion_jobs',
+      'admin_audit_log',
+    ]) {
+      await db.execute(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
+      await db.execute(`ALTER TABLE ${table} FORCE ROW LEVEL SECURITY`);
+    }
 
     await db.execute('SET row_security = on;');
 

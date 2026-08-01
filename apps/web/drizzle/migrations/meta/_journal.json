@@ -603,6 +603,13 @@
       "when": 1785476816819,
       "tag": "0085_lonely_jamie_braddock",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1785476817819,
+      "tag": "0086_sensitive_tables_rls",
+      "breakpoints": true
     }
   ]
 }
