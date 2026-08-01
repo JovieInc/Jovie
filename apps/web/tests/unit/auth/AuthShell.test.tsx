@@ -98,6 +98,25 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     ).not.toBeNull();
   });
 
+  it('keeps OAuth buttons disabled until client hydration attaches handlers', async () => {
+    const serverMarkup = renderToStaticMarkup(<AuthShell mode='sign-in' />);
+    expect(serverMarkup).toContain('data-auth-shell-hydrated="false"');
+    // SSR emits `disabled=""` before the provider slot attribute.
+    expect(serverMarkup).toMatch(
+      /disabled=""[^>]*data-auth-provider-slot="google"/
+    );
+
+    const { container } = render(<AuthShell mode='sign-in' />);
+    await waitFor(() => {
+      expect(
+        container.querySelector('[data-auth-shell-hydrated="true"]')
+      ).not.toBeNull();
+    });
+    expect(
+      await screen.findByRole('button', { name: /google/i })
+    ).toBeEnabled();
+  });
+
   it('does not call the proxy-backed One Tap route when the plugin is unconfigured', async () => {
     render(<AuthShell mode='sign-up' />);
 
@@ -131,9 +150,9 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
       });
     });
 
-    expect(
-      await screen.findByRole('button', { name: /google/i })
-    ).toBeVisible();
+    const google = await screen.findByRole('button', { name: /google/i });
+    await waitFor(() => expect(google).toBeEnabled());
+    expect(google).toBeVisible();
   });
 
   it('starts Google sign-in through Better Auth social with mode-aware callbacks', async () => {
@@ -141,6 +160,7 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     render(<AuthShell mode='sign-in' />);
 
     const google = await screen.findByRole('button', { name: /google/i });
+    await waitFor(() => expect(google).toBeEnabled());
     await user.click(google);
 
     await waitFor(() => {
@@ -160,6 +180,7 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     render(<AuthShell mode='sign-up' />);
 
     const apple = await screen.findByRole('button', { name: /apple/i });
+    await waitFor(() => expect(apple).toBeEnabled());
     await user.click(apple);
 
     await waitFor(() => {
@@ -171,6 +192,21 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
         })
       );
     });
+  });
+
+  it('surfaces Better Auth social soft-errors instead of leaving the button pending', async () => {
+    const user = userEvent.setup();
+    signInSocialMock.mockResolvedValueOnce({
+      error: { message: 'provider unavailable' },
+    });
+    render(<AuthShell mode='sign-in' />);
+
+    const google = await screen.findByRole('button', { name: /google/i });
+    await waitFor(() => expect(google).toBeEnabled());
+    await user.click(google);
+
+    expect(await screen.findByText(/could not start sign-in/i)).toBeVisible();
+    await waitFor(() => expect(google).toBeEnabled());
   });
 
   it('keeps the signed-in first render deterministic, then hides after hydration', async () => {

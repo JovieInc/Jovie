@@ -156,7 +156,10 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
 
   const handleProviderSelect = useCallback(
     async (provider: PrimaryAuthOAuthProvider) => {
-      if (pendingProvider) return;
+      // SSR HTML paints enabled-looking buttons before React attaches listeners.
+      // Refuse pre-hydration starts so a fast click cannot become a silent no-op
+      // (staging OAuth runtime proof / real users on slow first paint).
+      if (!hasHydrated || pendingProvider) return;
 
       const callbackURL = getCallbackUrl(mode);
       const errorCallbackURL = getErrorCallbackUrl(mode);
@@ -173,12 +176,22 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
         // `callbackURL` (or `newUserCallbackURL` for new users). Plan
         // decision 8. Account linking is enabled for verified google↔apple
         // (server-side, in `socialProviders` config) — audit row 19.
-        await authClient.signIn.social({
+        const result = await authClient.signIn.social({
           provider,
           callbackURL,
           errorCallbackURL,
           newUserCallbackURL,
         });
+        // better-auth may resolve with `{ error }` instead of throwing. Surface
+        // that the same way as a thrown failure so pending state never sticks
+        // with no provider navigation (IdentityPageClient uses the same gate).
+        if (result?.error) {
+          throw new Error(
+            typeof result.error.message === 'string' && result.error.message
+              ? result.error.message
+              : 'OAuth start failed'
+          );
+        }
       } catch (error) {
         setOauthError(getAuthStartErrorMessage(mode));
         setPendingProvider(null);
@@ -193,7 +206,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
         );
       }
     },
-    [mode, pendingProvider]
+    [hasHydrated, mode, pendingProvider]
   );
 
   if (hasHydrated && isAuthLoaded && isSignedIn) {
@@ -215,6 +228,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
         data-auth-shell-mode={mode}
         data-auth-shell-compact={compact ? 'true' : undefined}
         data-auth-shell-ready='true'
+        data-auth-shell-hydrated={hasHydrated ? 'true' : 'false'}
         data-auth-shell-providers='0'
         className='relative min-h-72'
       >
@@ -224,6 +238,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
           forceHardNavigation={forceOppositeModeHardNavigation}
           providers={enabledOAuthProviders}
           pendingProvider={pendingProvider}
+          interactive={hasHydrated}
           errorMessage={oauthError}
           onProviderSelect={handleProviderSelect}
           redirectUrl={resolvedRedirect}
@@ -239,11 +254,12 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       data-auth-shell-mode={mode}
       data-auth-shell-compact={compact ? 'true' : undefined}
       data-auth-shell-ready='true'
+      data-auth-shell-hydrated={hasHydrated ? 'true' : 'false'}
       className='relative min-h-96'
     >
       <GoogleOneTap
         mode={mode}
-        suppress={pendingProvider !== null || otpStepActive}
+        suppress={!hasHydrated || pendingProvider !== null || otpStepActive}
       />
       <AuthOAuthStartSurface
         mode={mode}
@@ -251,6 +267,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
         forceHardNavigation={forceOppositeModeHardNavigation}
         providers={enabledOAuthProviders}
         pendingProvider={pendingProvider}
+        interactive={hasHydrated}
         errorMessage={oauthError}
         onProviderSelect={handleProviderSelect}
         redirectUrl={resolvedRedirect}
@@ -285,6 +302,7 @@ function AuthOAuthStartSurface({
   forceHardNavigation,
   providers,
   pendingProvider,
+  interactive,
   errorMessage,
   onProviderSelect,
   redirectUrl,
@@ -296,6 +314,11 @@ function AuthOAuthStartSurface({
   forceHardNavigation: boolean;
   providers: readonly PrimaryAuthOAuthProvider[];
   pendingProvider: PrimaryAuthOAuthProvider | null;
+  /**
+   * False until the client hydrates React event handlers. Keeps OAuth buttons
+   * disabled on SSR/first paint so a click cannot be a silent no-op.
+   */
+  interactive: boolean;
   errorMessage: string | null;
   onProviderSelect: (provider: PrimaryAuthOAuthProvider) => void;
   redirectUrl: string;
@@ -303,6 +326,7 @@ function AuthOAuthStartSurface({
   onOtpStepChange?: (active: boolean) => void;
 }>) {
   const hasProviders = providers.length > 0;
+  const providersBusy = !interactive || Boolean(pendingProvider);
 
   return (
     <div data-auth-sso-surface>
@@ -312,15 +336,15 @@ function AuthOAuthStartSurface({
         <fieldset
           data-auth-provider-slots
           className='grid grid-cols-1 gap-1.5'
-          aria-busy={pendingProvider ? 'true' : undefined}
+          aria-busy={providersBusy ? 'true' : undefined}
         >
           <legend className='sr-only'>Social sign-in options</legend>
           {providers.map(provider => (
             <AuthProviderButtonSlot
               key={provider}
               provider={provider}
-              disabled={Boolean(pendingProvider)}
-              pending={pendingProvider === provider}
+              disabled={!interactive || Boolean(pendingProvider)}
+              pending={interactive && pendingProvider === provider}
               onClick={() => onProviderSelect(provider)}
             />
           ))}
