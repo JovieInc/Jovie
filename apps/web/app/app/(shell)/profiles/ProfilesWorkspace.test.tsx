@@ -210,7 +210,7 @@ describe('ProfilesWorkspace', () => {
     ).toBeEnabled();
   });
 
-  it('preserves the compact mobile table contract', () => {
+  it('keeps the single Add connection action in bounds at the 670px toolbar contract', () => {
     renderWorkspace(data);
 
     expect(screen.getByRole('columnheader', { name: 'Rank' })).toHaveClass(
@@ -224,14 +224,17 @@ describe('ProfilesWorkspace', () => {
     ).toHaveClass('max-xl:hidden');
     expect(screen.getByText('tim@example.com')).toHaveClass('max-sm:hidden');
 
+    const toolbarActions = screen.getByTestId('connections-toolbar-actions');
     const summary = screen.getByTestId('connections-summary');
-    expect(summary.parentElement?.parentElement).toHaveClass('overflow-x-auto');
-    expect(summary).toHaveClass('min-w-0', 'overflow-x-auto');
+    expect(toolbarActions).toHaveClass('w-full', 'min-w-0', 'justify-between');
+    expect(summary).toHaveClass('min-w-0', 'overflow-hidden');
     expect(screen.getByRole('button', { name: 'Add Connection' })).toHaveClass(
       'shrink-0',
       'max-sm:w-7.5'
     );
-    expect(screen.getByText('Best Rank #2')).toHaveClass('max-sm:hidden');
-    expect(screen.getByText('Monitoring Active')).toHaveClass('max-sm:hidden');
+    expect(screen.getByText('Monitored 1/5')).toHaveClass('max-lg:hidden');
+    expect(screen.getByText('Needs Attention 1')).toHaveClass('max-lg:hidden');
+    expect(screen.getByText('Best Rank #2')).toHaveClass('max-lg:hidden');
+    expect(screen.getByText('Monitoring Active')).toHaveClass('max-lg:hidden');
   });
 });
