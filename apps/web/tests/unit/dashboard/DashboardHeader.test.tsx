@@ -158,6 +158,7 @@ describe('DashboardHeader', () => {
     expect(
       within(header!).queryByRole('heading', { name: 'New Chat' })
     ).toBeNull();
+    expect(within(header!).queryByText('Jovie')).toBeNull();
   });
 
   it('keeps the breadcrumb in its slot when search activates', () => {
