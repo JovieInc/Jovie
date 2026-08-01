@@ -160,6 +160,33 @@ describe('ProfilesWorkspace', () => {
     );
   });
 
+  it('opens a row action menu without selecting the row via pointer or keyboard', async () => {
+    const user = userEvent.setup();
+    renderWorkspace(data);
+
+    const action = screen.getByRole('button', {
+      name: 'Actions for Spotify',
+    });
+
+    vi.mocked(useRegisterRightPanel).mockClear();
+    await user.click(action);
+
+    expect(
+      screen.getByRole('menuitem', { name: /View Details/i })
+    ).toBeInTheDocument();
+    expect(useRegisterRightPanel).not.toHaveBeenCalled();
+
+    await user.keyboard('{Escape}');
+    vi.mocked(useRegisterRightPanel).mockClear();
+    action.focus();
+    await user.keyboard('{Enter}');
+
+    expect(
+      screen.getByRole('menuitem', { name: /View Details/i })
+    ).toBeInTheDocument();
+    expect(useRegisterRightPanel).not.toHaveBeenCalled();
+  });
+
   it('uses the shared semantic, contextual action slot without shifting rows', () => {
     renderWorkspace(data);
 
