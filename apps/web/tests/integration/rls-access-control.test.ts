@@ -1,9 +1,12 @@
-import { sql as drizzleSql } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 /* eslint-disable no-restricted-imports -- Test requires full schema access */
 import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
 import { beforeAll, describe, expect, it } from 'vitest';
 import * as schema from '@/lib/db/schema';
+import { tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
+import { billingAuditLog } from '@/lib/db/schema/billing';
+import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
 import { withRlsAnonymous, withRlsUser } from '../setup-db';
 
@@ -33,6 +36,8 @@ if (!db) {
   describe('RLS access control (database)', () => {
     let userAClerkId: string;
     let userBClerkId: string;
+    let userAId: string;
+    let userBId: string;
     let publicProfileId: string;
     let privateProfileId: string;
     let publicPhotoId: string;
@@ -50,6 +55,8 @@ if (!db) {
           { clerkId: userBClerkId, userStatus: 'active' },
         ])
         .returning({ id: users.id });
+      userAId = userA.id;
+      userBId = userB.id;
 
       const [publicProfile, privateProfile] = await db
         .insert(creatorProfiles)
@@ -194,6 +201,88 @@ if (!db) {
 
       // Anonymous users should not see photos for private profiles
       expect(privateRows.rows.length).toBe(0);
+    });
+
+    it('prevents non-owners from reading billing audit rows (JOV-3061)', async () => {
+      const [audit] = await db
+        .insert(billingAuditLog)
+        .values({
+          userId: userAId,
+          eventType: 'rls_test',
+          source: 'test',
+        })
+        .returning({ id: billingAuditLog.id });
+
+      const asB = await withRlsUser(userBClerkId, async tx => {
+        return tx.execute(
+          drizzleSql.raw(
+            `SELECT id FROM billing_audit_log WHERE id = '${audit.id}'`
+          )
+        );
+      });
+      expect(asB.rows.length).toBe(0);
+    });
+
+    it('prevents non-owners from reading another user chat conversation (JOV-3061)', async () => {
+      const [conversation] = await db
+        .insert(chatConversations)
+        .values({
+          userId: userBId,
+          creatorProfileId: privateProfileId,
+          title: 'private-rls-chat',
+        })
+        .returning({ id: chatConversations.id });
+
+      await db.insert(chatMessages).values({
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'secret message',
+      });
+
+      const asA = await withRlsUser(userAClerkId, async tx => {
+        return tx.execute(
+          drizzleSql.raw(
+            `SELECT id FROM chat_conversations WHERE id = '${conversation.id}'`
+          )
+        );
+      });
+      expect(asA.rows.length).toBe(0);
+
+      const messagesAsA = await withRlsUser(userAClerkId, async tx => {
+        return tx.execute(
+          drizzleSql.raw(
+            `SELECT id FROM chat_messages WHERE conversation_id = '${conversation.id}'`
+          )
+        );
+      });
+      expect(messagesAsA.rows.length).toBe(0);
+    });
+
+    it('prevents non-owners from reading tips for another creator (JOV-3061)', async () => {
+      const [tip] = await db
+        .insert(tips)
+        .values({
+          creatorProfileId: privateProfileId,
+          amountCents: 500,
+          paymentIntentId: `pi_rls_${Date.now()}`,
+          status: 'completed',
+        })
+        .returning({ id: tips.id });
+
+      const asA = await withRlsUser(userAClerkId, async tx => {
+        return tx.execute(
+          drizzleSql.raw(`SELECT id FROM tips WHERE id = '${tip.id}'`)
+        );
+      });
+      expect(asA.rows.length).toBe(0);
+
+      // Sanity: row exists for the privileged test connection
+      const [row] = await db
+        .select({ id: tips.id })
+        .from(tips)
+        .where(eq(tips.id, tip.id))
+        .limit(1);
+      expect(row?.id).toBe(tip.id);
     });
   });
 }

@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- [internal] **Sensitive tables get FORCE RLS (JOV-3061):** billing, chat, tips, profiles, claims, ingestion jobs, and admin audit logs enable + force row-level security with ownership/public/system policies and an owner-only null-session bridge so non-owner roles are deny-by-default without bricking existing server paths.
 - **Channel intelligence report (JOV-3193):** YouTube videos rank by watch-minutes-per-impression (not CTR alone), surface face/text/topic/length correlations for this channel, and answer best/worst/what’s-working/declining questions with Reporting-API sources. Dashboard panel on `/app/youtube`; live metrics wait on the YouTube OAuth connector.
 - [internal] **Storybook marketing template library (JOV-4420):** full `Marketing/Recipes/*`, `Marketing/Sections/*`, and `Marketing/Shells/*` catalog with registry coverage tests and AGENT_GUIDE visual entry after Brief → resolveComposition.
 - [internal] **Machine-access revenue-share compliance package (JOV-3831):** draft decision set (70/30 artist-majority, opt-in default OFF, monthly $10 Connect fiat floor, platform stablecoin off-ramp), consent/ToS language, tax reporting path, and Pay Per Crawl public-docs verification — Tim sign-off still required before P1 build.
