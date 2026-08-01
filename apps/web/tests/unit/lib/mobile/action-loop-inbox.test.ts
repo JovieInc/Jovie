@@ -42,7 +42,7 @@ describe('buildMobileInbox', () => {
           title: 'Connect Spotify',
           body: 'Link your catalog so Jovie can spot releases.',
           actionLabel: 'Connect catalog',
-          href: '/app/settings/artist-profile',
+          href: '/app/profiles',
         },
       ],
     });
@@ -66,7 +66,7 @@ describe('buildMobileInbox', () => {
           title: 'Connect Spotify',
           body: 'Link your catalog so Jovie can spot releases.',
           actionLabel: 'Connect catalog',
-          continueOnWebPath: '/app/settings/artist-profile',
+          continueOnWebPath: '/app/profiles',
         },
       ],
       chatPrompt:

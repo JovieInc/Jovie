@@ -12,7 +12,7 @@ describe('OpportunityInboxEmptyState', () => {
             title: 'Connect Spotify',
             body: 'Link your catalog so Jovie can spot releases.',
             actionLabel: 'Connect catalog',
-            href: '/app/settings/artist-profile',
+            href: '/app/profiles',
           },
         ]}
       />
@@ -22,7 +22,7 @@ describe('OpportunityInboxEmptyState', () => {
     expect(emptyState).toHaveClass('flex-1', 'items-center', 'justify-center');
     expect(
       screen.getByRole('link', { name: 'Connect catalog' })
-    ).toHaveAttribute('href', '/app/settings/artist-profile');
+    ).toHaveAttribute('href', '/app/profiles');
   });
 
   it('keeps the chat fallback when no catalog action is available', () => {

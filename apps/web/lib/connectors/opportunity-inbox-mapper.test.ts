@@ -221,6 +221,7 @@ describe('buildOpportunityInboxData', () => {
     expect(data.cards).toEqual([]);
     expect(data.emptyActionCards).toHaveLength(2);
     expect(data.emptyActionCards[0]?.id).toBe('connect-spotify');
+    expect(data.emptyActionCards[0]?.href).toBe('/app/profiles');
   });
 });
 

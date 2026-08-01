@@ -209,7 +209,7 @@ describe('OpportunityInboxPageClient', () => {
               title: 'Connect Spotify',
               body: 'Link your catalog so Jovie can spot releases.',
               actionLabel: 'Connect catalog',
-              href: '/app/settings/artist-profile',
+              href: '/app/profiles',
             },
           ],
         }}
@@ -223,7 +223,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.getByText('Your Inbox Is Clear')).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Connect catalog' })
-    ).toHaveAttribute('href', '/app/settings/artist-profile');
+    ).toHaveAttribute('href', '/app/profiles');
   });
 
   it('filters cards by signal type and restores them on All', () => {
