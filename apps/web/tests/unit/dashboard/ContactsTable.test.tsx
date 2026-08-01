@@ -196,7 +196,7 @@ describe('ContactsTable', () => {
     expect(screen.queryByText('No Contacts Yet')).not.toBeInTheDocument();
   });
 
-  it('offers the canonical add contact action from the empty state', () => {
+  it('keeps the header action as the only add contact CTA for the empty state', () => {
     const onAddContact = vi.fn();
 
     renderContactsTable({
@@ -208,18 +208,17 @@ describe('ContactsTable', () => {
       onAddContact,
     });
 
-    expect(screen.getByRole('heading', { name: 'No Contacts' })).toBeVisible();
     expect(
-      screen.getByText(
-        'Add a contact to manage bookings, management, and press.'
-      )
+      screen.getByRole('heading', { name: 'No Contacts Yet' })
     ).toBeVisible();
-    const addContactButton = screen.getByRole('button', {
-      name: 'Add Contact',
-    });
-    expect(addContactButton).toHaveTextContent('Add Contact');
+    expect(
+      screen.getByText('Add bookings, management, and press contacts.')
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Add Contact' })
+    ).not.toBeInTheDocument();
 
-    fireEvent.click(addContactButton);
-    expect(onAddContact).toHaveBeenCalledTimes(1);
+    expect(setHeaderActions).toHaveBeenCalledWith(expect.anything());
+    expect(onAddContact).not.toHaveBeenCalled();
   });
 });
