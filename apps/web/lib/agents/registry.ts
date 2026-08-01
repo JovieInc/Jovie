@@ -80,6 +80,25 @@ export const PUBLIC_SKILL_REGISTRY = {
       connector: 'youtube',
     },
   },
+  channelIntelligenceReport: {
+    id: 'channelIntelligenceReport',
+    name: 'Channel intelligence report',
+    description:
+      'Rank channel videos by watch-minutes-per-impression, surface face/text/topic/length correlations, and answer best/worst/working/declining questions from YouTube Reporting API metrics with sources.',
+    kind: 'tool',
+    version: '1.0.0',
+    lifecycle: 'ga',
+    activeVersion: '1.0.0',
+    entitlement: 'aiCanUseTools',
+    model: 'anthropic/claude-haiku-4-5-20251001',
+    inputSchemaZodPath: 'apps/web/lib/services/channel-intelligence/types.ts',
+    outputSchemaZodPath: 'apps/web/lib/services/channel-intelligence/types.ts',
+    metadata: {
+      surface: 'youtube',
+      action: 'channel_intelligence_report',
+      connector: 'youtube',
+    },
+  },
   // Playbook-facing tool stubs (catalog + compile resolution). Executors may
   // land in follow-up PRs; unresolved references must fail at compile time.
   smart_link_switch_live: {

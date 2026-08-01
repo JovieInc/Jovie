@@ -125,6 +125,10 @@ describe('compilePlaybookToSkill', () => {
   it('registry tool set includes analyzePackaging', () => {
     expect(getRegistryToolIds().has('analyzePackaging')).toBe(true);
   });
+
+  it('registry tool set includes channelIntelligenceReport', () => {
+    expect(getRegistryToolIds().has('channelIntelligenceReport')).toBe(true);
+  });
 });
 
 describe('compiled dogfood playbooks', () => {

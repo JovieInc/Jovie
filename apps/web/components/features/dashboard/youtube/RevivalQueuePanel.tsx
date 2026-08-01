@@ -1,10 +1,12 @@
 'use client';
 
 import { Icon } from '@/components/atoms/Icon';
+import { ChannelIntelligencePanel } from '@/components/features/dashboard/youtube/ChannelIntelligencePanel';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PageShell } from '@/components/organisms/PageShell';
 import { PageToolbar } from '@/components/organisms/table';
 import { computeRatePercent } from '@/lib/analytics/metrics';
+import type { ChannelIntelligenceReport } from '@/lib/services/channel-intelligence';
 import type {
   ExperimentRecord,
   ExperimentStatus,
@@ -261,6 +263,11 @@ export interface RevivalQueuePanelProps {
   readonly quota: QuotaUsage | null;
   /** True when the YouTube connector is set up */
   readonly isConnected: boolean;
+  /**
+   * Channel-intelligence report (GH-10917). Null while connector metrics
+   * have not synced; the panel still renders an empty / connect state.
+   */
+  readonly intelligenceReport?: ChannelIntelligenceReport | null;
   readonly testId?: string;
 }
 
@@ -269,6 +276,7 @@ export function RevivalQueuePanel({
   experiments,
   quota,
   isConnected,
+  intelligenceReport = null,
   testId = 'youtube-revival-queue',
 }: RevivalQueuePanelProps) {
   const toolbar = (
@@ -288,6 +296,11 @@ export function RevivalQueuePanel({
     <PageShell toolbar={toolbar} data-testid={testId}>
       <div className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden'>
         <div className='flex flex-col gap-6 px-3 py-2.5 sm:px-4 sm:py-3.5'>
+          <ChannelIntelligencePanel
+            report={intelligenceReport}
+            isConnected={isConnected}
+          />
+
           {!isConnected ? (
             <NotConnectedState />
           ) : (

@@ -18,12 +18,15 @@ export default async function YouTubeRevivalQueuePage() {
 
   // ponytail: connector and experiment engine are not yet wired (GH-10921 BlockedBy).
   // Show the unconnected empty state until the YouTube OAuth connector lands.
+  // Channel intelligence (GH-10917 / JOV-3193) shares this page and hydrates
+  // from Reporting API rows once the connector syncs.
   return (
     <RevivalQueuePanel
       candidates={[]}
       experiments={[]}
       quota={null}
       isConnected={false}
+      intelligenceReport={null}
     />
   );
 }
