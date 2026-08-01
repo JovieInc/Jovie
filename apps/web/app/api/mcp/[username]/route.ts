@@ -16,14 +16,24 @@
  *   - get_ticket_link           → resolve a ticket URL for an event
  *   - check_merch_availability  → confirm a merch item is purchasable
  *   - add_to_cart               → redirect to the merch purchase URL
+ *   - generate_merch             → generate three draft design options (auth)
+ *   - select_merch_design        → select an option and create a draft (auth)
+ *   - publish_merch_card         → propose or confirm publication (auth)
  */
 
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { BASE_URL } from '@/constants/app';
+import { getCachedAuth } from '@/lib/auth/cached';
+import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
-import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
+import {
+  createMerchGeneration,
+  getLiveMerchCardsForProfile,
+  publishMerchCard,
+  selectMerchDesign,
+} from '@/lib/merch/service';
 import { getProfileByUsername } from '@/lib/services/profile';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 
@@ -291,6 +301,49 @@ function buildToolDescriptors() {
         required: ['itemId'],
       },
     },
+    {
+      name: 'generate_merch',
+      description:
+        'Generate exactly three merch design options for the authenticated owner of this artist profile. Creates drafts only; it never publishes.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          prompt: { type: 'string', maxLength: 500 },
+          itemType: { type: 'string', maxLength: 80 },
+        },
+      },
+    },
+    {
+      name: 'select_merch_design',
+      description:
+        'Select one generated merch option for the authenticated owner and create a draft merch card. Returns a publish confirmation proposal; it does not publish.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          generationId: { type: 'string', format: 'uuid' },
+          optionNumber: { type: 'integer', minimum: 1, maximum: 3 },
+          optionId: { type: 'string', format: 'uuid' },
+        },
+        required: ['generationId'],
+      },
+    },
+    {
+      name: 'publish_merch_card',
+      description:
+        'Propose publishing a merch card, or publish it only when confirmed is explicitly true. Requires authenticated ownership and the existing merch sellability checks.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          merchCardId: { type: 'string', format: 'uuid' },
+          confirmed: {
+            type: 'boolean',
+            description:
+              'Set true only after the artist explicitly confirms the publish proposal.',
+          },
+        },
+        required: ['merchCardId'],
+      },
+    },
   ];
 }
 
@@ -398,6 +451,122 @@ async function callTool(
     const item = merch.find(m => m.id === itemId);
     if (!item) return { error: `Merch item not found: ${itemId}` };
     return { data: { itemId, checkoutUrl: `${profileUrl}/merch` } };
+  }
+
+  if (
+    name === 'generate_merch' ||
+    name === 'select_merch_design' ||
+    name === 'publish_merch_card'
+  ) {
+    const { userId } = await getCachedAuth();
+    if (!userId) return { error: 'Authentication required for merch writes' };
+
+    if (name === 'generate_merch') {
+      const parsed = z
+        .object({
+          prompt: z.string().max(500).optional(),
+          itemType: z.string().max(80).optional(),
+        })
+        .safeParse(args);
+      if (!parsed.success) return { error: 'Invalid generate_merch arguments' };
+
+      const prompt = [
+        parsed.data.prompt,
+        parsed.data.itemType ? `Item type: ${parsed.data.itemType}` : undefined,
+      ]
+        .filter(Boolean)
+        .join('\n')
+        .trim();
+      try {
+        const result = await createMerchGeneration({
+          profileId: profile.id,
+          clerkUserId: userId,
+          prompt: prompt || 'Make premium merch for this artist.',
+          command: 'create_merch',
+        });
+        return {
+          data: {
+            ...result,
+            nextStep:
+              'Pick an option number, then review the publish proposal.',
+          },
+        };
+      } catch {
+        return { error: 'Unable to generate merch options' };
+      }
+    }
+
+    if (name === 'select_merch_design') {
+      const parsed = z
+        .object({
+          generationId: z.string().uuid(),
+          optionNumber: z.number().int().min(1).max(3).optional(),
+          optionId: z.string().uuid().optional(),
+        })
+        .refine(
+          (value: { optionNumber?: number; optionId?: string }) =>
+            value.optionNumber !== undefined || value.optionId
+        )
+        .safeParse(args);
+      if (!parsed.success)
+        return { error: 'Invalid select_merch_design arguments' };
+
+      try {
+        const result = await selectMerchDesign({
+          generationId: parsed.data.generationId,
+          clerkUserId: userId,
+          optionNumber: parsed.data.optionNumber,
+          optionId: parsed.data.optionId,
+          publish: false,
+        });
+        if (!result.success) return { data: result };
+        const publishProposal = await proposeMerchAction({
+          action: 'publish',
+          merchCardId: result.merchCardId,
+          profileId: profile.id,
+        });
+        return { data: { ...result, publishProposal } };
+      } catch {
+        return { error: 'Unable to select merch design' };
+      }
+    }
+
+    const parsed = z
+      .object({
+        merchCardId: z.string().uuid(),
+        confirmed: z.boolean().optional().default(false),
+      })
+      .safeParse(args);
+    if (!parsed.success)
+      return { error: 'Invalid publish_merch_card arguments' };
+
+    if (!parsed.data.confirmed) {
+      const proposal = await proposeMerchAction({
+        action: 'publish',
+        merchCardId: parsed.data.merchCardId,
+        profileId: profile.id,
+      });
+      return { data: { confirmed: false, proposal } };
+    }
+
+    try {
+      const card = await publishMerchCard({
+        cardId: parsed.data.merchCardId,
+        profileId: profile.id,
+        clerkUserId: userId,
+      });
+      return {
+        data: {
+          confirmed: true,
+          success: true,
+          merchCardId: card.id,
+          status: card.status,
+          title: card.title,
+        },
+      };
+    } catch {
+      return { error: 'Unable to publish merch card' };
+    }
   }
 
   return { error: `Unknown tool: ${name}` };

@@ -118,7 +118,7 @@ async function getCreatorProfileForMerch(
   return profile;
 }
 
-async function assertCanManageMerchProfile(
+export async function assertCanManageMerchProfile(
   profileId: string,
   clerkUserId: string
 ): Promise<void> {
@@ -600,6 +600,7 @@ export async function createMerchGeneration(params: {
   readonly conversationId?: string | null;
   readonly turnId?: string | null;
 }): Promise<MerchGenerationResult> {
+  await assertCanManageMerchProfile(params.profileId, params.clerkUserId);
   const command = merchCommandSchema.parse(params.command);
   const profile = await getCreatorProfileForMerch(params.profileId);
   const releaseContext = await getReleaseContext(params.profileId);
