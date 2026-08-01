@@ -24,14 +24,12 @@ export {
   isRankable,
   MIN_IMPRESSIONS_FOR_RANKING,
   meanWatchMinutesPerImpression,
-  titleLengthBucket,
-  watchMinutesPerImpression,
-} from './metrics';
-export {
   rankDecliningVideos,
   rankVideosByWatchMinutesPerImpression,
   rankWorstVideosByWatchMinutesPerImpression,
-} from './rank';
+  titleLengthBucket,
+  watchMinutesPerImpression,
+} from './metrics';
 export { buildChannelIntelligenceReport } from './report';
 export type {
   AnswerChannelIntelligenceQueryInput,

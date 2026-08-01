@@ -13,6 +13,7 @@
 import type {
   ChannelVideoMetrics,
   DurationBucket,
+  RankedVideo,
   TitleLengthBucket,
 } from './types';
 
@@ -109,4 +110,55 @@ export function meanWatchMinutesPerImpression(
     0
   );
   return sum / rankable.length;
+}
+
+function toRanked(metrics: ChannelVideoMetrics, rank: number): RankedVideo {
+  return {
+    videoId: metrics.videoId,
+    title: metrics.title,
+    thumbnailUrl: metrics.thumbnailUrl,
+    publishedAt: metrics.publishedAt,
+    watchMinutesPerImpression: watchMinutesPerImpression(metrics),
+    ctrTimesAvgViewDurationMinutes: ctrTimesAvgViewDurationMinutes(metrics),
+    ctr: metrics.ctr,
+    avgViewDurationSeconds: metrics.avgViewDurationSeconds,
+    impressions: metrics.impressions,
+    views: metrics.views,
+    watchMinutes: metrics.watchMinutes,
+    reachTrend: metrics.reachTrend,
+    rank,
+  };
+}
+
+/** Rank by watch_minutes_per_impression descending (best first). */
+export function rankVideosByWatchMinutesPerImpression(
+  videos: readonly ChannelVideoMetrics[]
+): RankedVideo[] {
+  return videos
+    .filter(isRankable)
+    .slice()
+    .sort((a, b) => {
+      const wmpi = watchMinutesPerImpression(b) - watchMinutesPerImpression(a);
+      return wmpi !== 0 ? wmpi : b.impressions - a.impressions;
+    })
+    .map((video, index) => toRanked(video, index + 1));
+}
+
+/** Worst videos: ascending WMPI (not CTR). */
+export function rankWorstVideosByWatchMinutesPerImpression(
+  videos: readonly ChannelVideoMetrics[]
+): RankedVideo[] {
+  return rankVideosByWatchMinutesPerImpression(videos)
+    .slice()
+    .reverse()
+    .map((video, index) => ({ ...video, rank: index + 1 }));
+}
+
+/** Declining reach, weakest WMPI first among decliners. */
+export function rankDecliningVideos(
+  videos: readonly ChannelVideoMetrics[]
+): RankedVideo[] {
+  return rankWorstVideosByWatchMinutesPerImpression(
+    videos.filter(v => isRankable(v) && isDeclining(v))
+  );
 }

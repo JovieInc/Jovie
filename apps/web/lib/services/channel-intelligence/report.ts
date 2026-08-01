@@ -6,12 +6,12 @@ import {
   computeChannelCorrelations,
   mergeLearningLayerAnnotations,
 } from './correlations';
-import { meanWatchMinutesPerImpression } from './metrics';
 import {
+  meanWatchMinutesPerImpression,
   rankDecliningVideos,
   rankVideosByWatchMinutesPerImpression,
   rankWorstVideosByWatchMinutesPerImpression,
-} from './rank';
+} from './metrics';
 import type {
   BuildChannelIntelligenceReportInput,
   ChannelIntelligenceReport,
