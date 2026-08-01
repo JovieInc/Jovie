@@ -176,6 +176,25 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     );
   });
 
+  it('filters to Connections and opens the canonical workspace on Enter', () => {
+    pushMock.mockClear();
+    render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
+
+    const input = screen.getByRole('searchbox', {
+      name: 'Command Palette Search',
+    });
+    fireEvent.change(input, { target: { value: 'Connections' } });
+
+    expect(
+      screen.getByRole('option', {
+        name: 'Connections Manage artist identities and connected services. ⌘1',
+      })
+    ).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(pushMock).toHaveBeenCalledWith(APP_ROUTES.PROFILES);
+  });
+
   it('renders nav, skill, and release sections when open', () => {
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
     expect(screen.getByTestId('shared-command-palette')).toBeInTheDocument();

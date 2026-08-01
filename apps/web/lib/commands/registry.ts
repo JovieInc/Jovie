@@ -229,6 +229,13 @@ export const COMMANDS: readonly Command[] = [
     APP_ROUTES.CHAT_PROFILE_PANEL
   ),
   nav(
+    'go-connections',
+    'Connections',
+    'Manage artist identities and connected services.',
+    'Waypoints',
+    APP_ROUTES.PROFILES
+  ),
+  nav(
     'go-chats',
     'Chats',
     'Open the chats workspace.',
