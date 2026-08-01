@@ -9,10 +9,9 @@ import {
   DrawerFormGridRow,
   DrawerMediaThumb,
   DrawerSection,
-  DrawerSurfaceCard,
+  EntityHeaderCard,
 } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
-import { DrawerHero } from '@/components/shell/DrawerHero';
 import { DropDateChip } from '@/components/shell/DropDateChip';
 import {
   type DspAvatarItem,
@@ -35,8 +34,6 @@ import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import type { Release } from './types';
 import { isValidUrl } from './utils';
-
-const RELEASE_SIDEBAR_CARD_CLASSNAME = 'overflow-hidden';
 
 const RELEASE_TYPE_LABELS: Record<string, string> = {
   single: 'Single',
@@ -229,7 +226,6 @@ export function ReleaseEntityHeader({
     artistName,
     onArtistClick
   );
-  const hasActionBar = Boolean(actionBar);
   const releaseTypeLabel = getReleaseTypeLabel(release.releaseType);
   const releaseDate = release.releaseDate
     ? dropDateMeta(release.releaseDate)
@@ -238,113 +234,101 @@ export function ReleaseEntityHeader({
   const trackLabel = formatTrackCount(release.totalTracks);
 
   return (
-    <DrawerSurfaceCard
-      variant='card'
-      className={RELEASE_SIDEBAR_CARD_CLASSNAME}
-      testId='release-header-card'
-    >
-      <div className='relative'>
-        {hasActionBar ? (
-          <div className='absolute right-2.5 top-2.5'>{actionBar}</div>
-        ) : null}
-        <DrawerHero
-          title={release.title}
-          density='rail'
-          stableLayout
-          titleLineClamp={1}
-          subtitleLineClamp={1}
-          reserveSubtitleSlot
-          reserveMetaSlot
-          metaOverflow='scroll'
-          subtitle={
-            artistLine ? (
-              <span className='line-clamp-2 block'>{artistLine}</span>
-            ) : null
-          }
-          artwork={
-            <div className='group/artwork relative shrink-0'>
-              <AlbumArtworkContextMenu
-                title={release.title}
-                sizes={buildArtworkSizes(undefined, release.artworkUrl)}
-                allowDownloads={allowDownloads}
-                releaseId={release.id}
-                canRevert={canRevertArtwork}
-                onRevert={canRevertArtwork ? onArtworkRevert : undefined}
-              >
-                {canUploadArtwork && onArtworkUpload ? (
-                  <AvatarUploadable
-                    src={release.artworkUrl}
-                    alt={artworkAlt}
-                    name={release.title}
-                    size='md'
-                    rounded='md'
-                    uploadable={canUploadArtwork}
-                    onUpload={onArtworkUpload}
-                    showHoverOverlay
-                  />
-                ) : (
-                  <DrawerMediaThumb
-                    src={release.artworkUrl}
-                    alt={artworkAlt}
-                    dimension={48}
-                    sizeClassName='h-12 w-12 rounded-lg'
-                    sizes='48px'
-                    fallback={
-                      <Icon
-                        name='Disc3'
-                        className='h-6 w-6 text-tertiary-token'
-                        aria-hidden='true'
-                      />
-                    }
-                  />
-                )}
-              </AlbumArtworkContextMenu>
-
-              <button
-                type='button'
-                onClick={onTogglePreview}
-                disabled={!previewUrl}
-                aria-pressed={isPlaying}
-                className={cn(
-                  'absolute inset-0 flex items-center justify-center rounded-lg transition-[background-color,opacity] duration-subtle',
-                  'bg-black/0 opacity-0',
-                  'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
-                  'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
-                  'disabled:pointer-events-none disabled:hidden'
-                )}
-                aria-label={getPreviewAriaLabel(Boolean(previewUrl), isPlaying)}
-              >
-                {isPlaying ? (
-                  <Pause className='h-4 w-4 text-white dark:text-white drop-shadow-sm' />
-                ) : (
-                  <Play className='h-4 w-4 translate-x-px text-white dark:text-white drop-shadow-sm' />
-                )}
-              </button>
-            </div>
-          }
-          meta={
-            <>
-              <StatusBadge status={getShellReleaseStatus(release)} />
-              {releaseTypeLabel ? <TypeBadge label={releaseTypeLabel} /> : null}
-              {releaseDate ? (
-                <DropDateChip
-                  tone={releaseDate.tone}
-                  label={releaseDate.label}
+    <div className='overflow-hidden' data-testid='release-header-card'>
+      <EntityHeaderCard
+        title={release.title}
+        stableLayout
+        titleLineClamp={1}
+        subtitleLineClamp={1}
+        reserveSubtitleSlot
+        reserveMetaSlot
+        metaOverflow='scroll'
+        subtitle={
+          artistLine ? (
+            <span className='line-clamp-2 block'>{artistLine}</span>
+          ) : null
+        }
+        image={
+          <div className='group/artwork relative shrink-0'>
+            <AlbumArtworkContextMenu
+              title={release.title}
+              sizes={buildArtworkSizes(undefined, release.artworkUrl)}
+              allowDownloads={allowDownloads}
+              releaseId={release.id}
+              canRevert={canRevertArtwork}
+              onRevert={canRevertArtwork ? onArtworkRevert : undefined}
+            >
+              {canUploadArtwork && onArtworkUpload ? (
+                <AvatarUploadable
+                  src={release.artworkUrl}
+                  alt={artworkAlt}
+                  name={release.title}
+                  size='md'
+                  rounded='md'
+                  uploadable={canUploadArtwork}
+                  onUpload={onArtworkUpload}
+                  showHoverOverlay
                 />
-              ) : null}
-              {trackLabel ? <MetaPill>{trackLabel}</MetaPill> : null}
-              <DspAvatarStack dsps={dspItems} />
-            </>
-          }
-          className={cn('pb-2.5', hasActionBar && '[&_h2]:pr-9')}
-        />
-      </div>
+              ) : (
+                <DrawerMediaThumb
+                  src={release.artworkUrl}
+                  alt={artworkAlt}
+                  dimension={48}
+                  sizeClassName='h-12 w-12 rounded-lg'
+                  sizes='48px'
+                  fallback={
+                    <Icon
+                      name='Disc3'
+                      className='h-6 w-6 text-tertiary-token'
+                      aria-hidden='true'
+                    />
+                  }
+                />
+              )}
+            </AlbumArtworkContextMenu>
+
+            <button
+              type='button'
+              onClick={onTogglePreview}
+              disabled={!previewUrl}
+              aria-pressed={isPlaying}
+              className={cn(
+                'absolute inset-0 flex items-center justify-center rounded-lg transition-[background-color,opacity] duration-subtle',
+                'bg-black/0 opacity-0',
+                'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
+                'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
+                'disabled:pointer-events-none disabled:hidden'
+              )}
+              aria-label={getPreviewAriaLabel(Boolean(previewUrl), isPlaying)}
+            >
+              {isPlaying ? (
+                <Pause className='h-4 w-4 text-white dark:text-white drop-shadow-sm' />
+              ) : (
+                <Play className='h-4 w-4 translate-x-px text-white dark:text-white drop-shadow-sm' />
+              )}
+            </button>
+          </div>
+        }
+        meta={
+          <>
+            <StatusBadge status={getShellReleaseStatus(release)} />
+            {releaseTypeLabel ? <TypeBadge label={releaseTypeLabel} /> : null}
+            {releaseDate ? (
+              <DropDateChip tone={releaseDate.tone} label={releaseDate.label} />
+            ) : null}
+            {trackLabel ? <MetaPill>{trackLabel}</MetaPill> : null}
+            <DspAvatarStack dsps={dspItems} />
+          </>
+        }
+        actions={actionBar}
+        bodyClassName={cn('pb-2.5', actionBar && 'pr-9')}
+      />
       {footer ? (
         <div className='border-t border-(--app-shell-frame-seam) px-3 py-2.5'>
           {footer}
         </div>
       ) : null}
-    </DrawerSurfaceCard>
+    </div>
   );
 }
 

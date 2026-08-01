@@ -115,8 +115,25 @@ vi.mock('@/components/molecules/drawer', () => ({
         {footer}
       </div>
     ),
-  EntityHeaderCard: ({ children }: { children?: React.ReactNode }) => (
-    <div>{children}</div>
+  EntityHeaderCard: ({
+    title,
+    subtitle,
+    meta,
+    actions,
+    stableLayout,
+  }: {
+    title: string;
+    subtitle?: React.ReactNode;
+    meta?: React.ReactNode;
+    actions?: React.ReactNode;
+    stableLayout?: boolean;
+  }) => (
+    <div data-testid='entity-header-card' data-stable-layout={stableLayout}>
+      <h2 className='text-sm line-clamp-1 min-h-6'>{title}</h2>
+      {subtitle}
+      <div data-testid='entity-header-meta-slot'>{meta}</div>
+      {actions}
+    </div>
   ),
   DrawerEmptyState: ({ message }: { message: string }) => (
     <p data-testid='empty-state'>{message}</p>
@@ -596,12 +613,14 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.getByTestId('release-header-card')).toBeInTheDocument();
   });
 
-  it('opts into the card surface variant contract', () => {
+  it('uses the canonical entity header without a nested card surface', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    expect(screen.getByTestId('release-header-card')).toHaveAttribute(
-      'data-surface-variant',
-      'card'
+    const header = screen.getByTestId('release-header-card');
+    expect(header).not.toHaveAttribute('data-surface-variant');
+    expect(within(header).getByTestId('entity-header-card')).toHaveAttribute(
+      'data-stable-layout',
+      'true'
     );
     expect(screen.getByTestId('release-properties-card')).toBeInTheDocument();
     expect(screen.getByTestId('release-tabbed-card')).toBeInTheDocument();
@@ -617,9 +636,7 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(
       within(header).getByRole('heading', { name: mockRelease.title })
     ).toHaveClass('text-sm', 'line-clamp-1', 'min-h-6');
-    expect(
-      screen.getByTestId('drawer-hero-meta-slot').firstElementChild
-    ).toHaveClass('overflow-x-auto', 'whitespace-nowrap');
+    expect(screen.getByTestId('entity-header-meta-slot')).toBeInTheDocument();
   });
 
   it('resets the active tab to Details when the release changes', async () => {
