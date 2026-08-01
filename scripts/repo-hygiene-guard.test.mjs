@@ -120,6 +120,7 @@ test('blocks every ignored generated output even when presented as an added path
     'apps/web/audit-screenshots/signin.png',
     'apps/web/.issues/sonar-issues-latest.json',
     'agentos/runs/design-lab/dispatches/design-lab-id.json',
+    'agentos/runs/design-taste/run-1/manifest.json',
     'agentos/runs/design-taste-jury/run-1/manifest.json',
     'scripts/node_modules/.vite/vitest/results.json',
   ]) {

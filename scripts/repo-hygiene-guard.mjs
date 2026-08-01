@@ -97,7 +97,7 @@ const FORBIDDEN_GENERATED_PATHS = [
   /^\.context\/qa\/releases-dashboard(?:\/|$)/,
   /^apps\/web\/audit-screenshots(?:\/|$)/,
   /^apps\/web\/\.issues(?:\/|$)/,
-  /^agentos\/runs\/(?:design-lab|design-taste-jury)(?:\/|$)/,
+  /^agentos\/runs\/(?:design-lab|design-taste|design-taste-jury)(?:\/|$)/,
 ];
 
 const TEMP_FILE_PATTERN =
