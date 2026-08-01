@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CalendarPageClient } from '@/app/app/(shell)/calendar/CalendarPageClient';
+import { CalendarRouteSkeleton } from '@/app/app/(shell)/calendar/CalendarRouteSkeleton';
 import { buildReleaseTasksRoute } from '@/constants/routes';
 import type { EventRecord } from '@/lib/queries/useEventsQuery';
 
@@ -167,6 +168,18 @@ describe('CalendarPageClient', () => {
     expect(screen.getByText('Movement Festival')).toBeInTheDocument();
   });
 
+  it('keeps filters in a stable responsive rail while the calendar keeps the main plane', () => {
+    renderCalendar();
+
+    const filterRail = screen.getByTestId('calendar-filter-rail');
+    expect(filterRail).toHaveAttribute('aria-label', 'Calendar filters');
+    expect(filterRail).toHaveClass('lg:flex-col');
+    expect(screen.getByRole('button', { name: 'All' })).toHaveClass(
+      'system-b-calendar-filter-pill'
+    );
+    expect(screen.getByRole('button', { name: 'Today' })).toBeInTheDocument();
+  });
+
   it('uses canonical Button variants for filters and event-review actions', () => {
     mocks.useEventsQuery.mockReturnValue({
       data: [pendingEvent, confirmedEvent, rejectedEvent],
@@ -271,5 +284,17 @@ describe('CalendarPageClient', () => {
     expect(screen.getByRole('button', { name: 'Undo Reject' })).toHaveClass(
       'system-b-calendar-action-secondary'
     );
+  });
+});
+
+describe('CalendarRouteSkeleton', () => {
+  it('reserves the same filter rail and calendar plane as the hydrated workspace', () => {
+    render(<CalendarRouteSkeleton />);
+
+    expect(screen.getByLabelText('Loading Calendar')).toBeInTheDocument();
+    expect(screen.getByTestId('calendar-filter-rail-skeleton')).toHaveClass(
+      'lg:flex-col'
+    );
+    expect(screen.getByTestId('calendar-grid-skeleton')).toBeInTheDocument();
   });
 });

@@ -27,7 +27,10 @@ import {
 } from '@/app/app/(shell)/dashboard/tour-dates/events-actions';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
-import { PageToolbar } from '@/components/organisms/table';
+import {
+  PageToolbar,
+  PageToolbarTabButton,
+} from '@/components/organisms/table';
 import { buildReleaseTasksRoute } from '@/constants/routes';
 import { getEventLocalDateKey } from '@/lib/events/date';
 import { normalizeTicketUrl } from '@/lib/events/ticket-url';
@@ -422,36 +425,34 @@ export function CalendarPageClient() {
   return (
     <PageShell
       data-testid='calendar-workspace'
+      contentPadding='none'
       toolbar={
         <PageToolbar
-          start={null}
+          start={
+            <MonthNavigation
+              cursor={cursor}
+              onPrevious={() => {
+                const next = new Date(cursor);
+                next.setMonth(cursor.getMonth() - 1);
+                setCursor(startOfMonth(next));
+              }}
+              onNext={() => {
+                const next = new Date(cursor);
+                next.setMonth(cursor.getMonth() + 1);
+                setCursor(startOfMonth(next));
+              }}
+            />
+          }
           end={
-            <div className='flex flex-wrap items-center justify-end gap-1'>
-              <FilterPill
-                label='All'
-                active={filter === 'all'}
-                onClick={() => setFilter('all')}
-              />
-              <FilterPill
-                label='Releases'
-                active={filter === 'releases'}
-                onClick={() => setFilter('releases')}
-              />
-              <FilterPill
-                label='Events'
-                active={filter === 'events'}
-                onClick={() => setFilter('events')}
-              />
-              <FilterPill
-                label={
-                  'Needs review' +
-                  (pendingCount > 0 ? ' · ' + pendingCount : '')
-                }
-                active={filter === 'needs_review'}
-                onClick={() => setFilter('needs_review')}
-                tone={pendingCount > 0 ? 'warn' : 'default'}
-              />
-            </div>
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              onClick={() => setCursor(startOfMonth(new Date()))}
+              className='system-b-calendar-action-ghost h-7 px-2.5 font-caption transition-colors duration-subtle ease-subtle'
+            >
+              Today
+            </Button>
           }
         />
       }
@@ -460,360 +461,348 @@ export function CalendarPageClient() {
         destination='calendar'
         ready={!isLoading && !releasesError && !eventsError}
       />
-      <PageContent>
-        <div className='flex h-full min-h-0 flex-col gap-4'>
-          <div className='flex flex-wrap items-center justify-between gap-2'>
-            <div className='system-b-calendar-month-control inline-flex min-w-0 items-center gap-1'>
-              <Button
-                type='button'
-                variant='ghost'
-                size='icon'
-                onClick={() => {
-                  const next = new Date(cursor);
-                  next.setMonth(cursor.getMonth() - 1);
-                  setCursor(startOfMonth(next));
-                }}
-                className='system-b-calendar-action-ghost h-7 w-7 transition-colors duration-subtle ease-subtle'
-                aria-label='Previous Month'
-              >
-                <ChevronLeft className='h-4 w-4' strokeWidth={2.25} />
-              </Button>
-              <h2 className='system-b-calendar-month-label'>
-                {MONTH_NAMES[cursor.getMonth()]} {cursor.getFullYear()}
-              </h2>
-              <Button
-                type='button'
-                variant='ghost'
-                size='icon'
-                onClick={() => {
-                  const next = new Date(cursor);
-                  next.setMonth(cursor.getMonth() + 1);
-                  setCursor(startOfMonth(next));
-                }}
-                className='system-b-calendar-action-ghost h-7 w-7 transition-colors duration-subtle ease-subtle'
-                aria-label='Next Month'
-              >
-                <ChevronRight className='h-4 w-4' strokeWidth={2.25} />
-              </Button>
-            </div>
-            <Button
-              type='button'
-              variant='ghost'
-              size='sm'
-              onClick={() => setCursor(startOfMonth(new Date()))}
-              className='system-b-calendar-action-ghost h-7 px-3 font-caption transition-colors duration-subtle ease-subtle'
-            >
-              Today
-            </Button>
-          </div>
+      <PageContent className='px-3 py-2 sm:px-3 sm:py-2'>
+        <div className='grid h-full min-h-0 grid-cols-1 gap-3 lg:grid-cols-[9rem_minmax(0,1fr)]'>
+          <nav
+            aria-label='Calendar filters'
+            data-testid='calendar-filter-rail'
+            className='flex min-w-0 gap-1 overflow-x-auto overflow-y-hidden pb-0.5 lg:flex-col lg:overflow-visible lg:pb-0'
+          >
+            <FilterPill
+              label='All'
+              active={filter === 'all'}
+              onClick={() => setFilter('all')}
+            />
+            <FilterPill
+              label='Releases'
+              active={filter === 'releases'}
+              onClick={() => setFilter('releases')}
+            />
+            <FilterPill
+              label='Events'
+              active={filter === 'events'}
+              onClick={() => setFilter('events')}
+            />
+            <FilterPill
+              label={
+                'Needs review' + (pendingCount > 0 ? ' · ' + pendingCount : '')
+              }
+              active={filter === 'needs_review'}
+              onClick={() => setFilter('needs_review')}
+              tone={pendingCount > 0 ? 'warn' : 'default'}
+            />
+          </nav>
 
-          <div className='system-b-calendar-panel overflow-hidden'>
-            <div className='system-b-calendar-weekday-row grid grid-cols-7'>
-              {DAY_NAMES.map(d => (
-                <div
-                  key={d}
-                  className='system-b-calendar-weekday px-2 py-2 font-caption'
-                >
-                  {d}
-                </div>
-              ))}
-            </div>
-            <div className='grid grid-cols-7'>
-              {grid.map(cell => {
-                const key = localDateKey(cell.date);
-                const visibleReleases = cellShowsRelease ? cell.releases : [];
-                const visibleEvents = cell.events.filter(cellShowsEvent);
-                const hasContent =
-                  visibleReleases.length > 0 || visibleEvents.length > 0;
-                const isSelected =
-                  selectedDay && isSameDay(cell.date, selectedDay);
-                const totalShown = Math.min(
-                  3,
-                  visibleReleases.length + visibleEvents.length
-                );
-                const overflow =
-                  visibleReleases.length + visibleEvents.length - totalShown;
-                return (
-                  <button
-                    key={key}
-                    type='button'
-                    onClick={() => setSelectedDay(cell.date)}
-                    className={cn(
-                      'system-b-calendar-day-cell relative flex flex-col items-start gap-1 border-r border-b px-2 pt-2 pb-1.5 text-left transition-colors duration-subtle ease-subtle',
-                      cell.inMonth
-                        ? 'system-b-calendar-day-cell-active'
-                        : 'system-b-calendar-day-cell-muted',
-                      isSelected && 'system-b-calendar-day-cell-selected',
-                      cell.isToday && 'system-b-calendar-day-cell-today'
-                    )}
+          <div className='flex min-w-0 flex-col gap-3'>
+            <div className='system-b-calendar-panel overflow-hidden'>
+              <div className='system-b-calendar-weekday-row grid grid-cols-7'>
+                {DAY_NAMES.map(d => (
+                  <div
+                    key={d}
+                    className='system-b-calendar-weekday px-2 py-2 font-caption'
                   >
-                    <span
+                    {d}
+                  </div>
+                ))}
+              </div>
+              <div className='grid grid-cols-7'>
+                {grid.map(cell => {
+                  const key = localDateKey(cell.date);
+                  const visibleReleases = cellShowsRelease ? cell.releases : [];
+                  const visibleEvents = cell.events.filter(cellShowsEvent);
+                  const hasContent =
+                    visibleReleases.length > 0 || visibleEvents.length > 0;
+                  const isSelected =
+                    selectedDay && isSameDay(cell.date, selectedDay);
+                  const totalShown = Math.min(
+                    3,
+                    visibleReleases.length + visibleEvents.length
+                  );
+                  const overflow =
+                    visibleReleases.length + visibleEvents.length - totalShown;
+                  return (
+                    <button
+                      key={key}
+                      type='button'
+                      onClick={() => setSelectedDay(cell.date)}
                       className={cn(
-                        'system-b-calendar-day-number font-caption tabular-nums',
-                        cell.isToday && 'system-b-calendar-day-number-today',
-                        !cell.isToday &&
-                          cell.inMonth &&
-                          'system-b-calendar-day-number-current'
+                        'system-b-calendar-day-cell relative flex flex-col items-start gap-1 border-r border-b px-2 pt-2 pb-1.5 text-left transition-colors duration-subtle ease-subtle',
+                        cell.inMonth
+                          ? 'system-b-calendar-day-cell-active'
+                          : 'system-b-calendar-day-cell-muted',
+                        isSelected && 'system-b-calendar-day-cell-selected',
+                        cell.isToday && 'system-b-calendar-day-cell-today'
                       )}
                     >
-                      {cell.date.getDate()}
-                    </span>
-                    {hasContent && (
-                      <div className='flex w-full flex-col gap-1'>
-                        {visibleReleases.slice(0, 3).map(r => (
-                          <div
-                            key={`r-${r.id}`}
-                            className='flex min-w-0 items-center gap-1.5'
-                            title={`${r.title} (${r.status})`}
-                          >
-                            <span
-                              aria-hidden='true'
-                              className={cn(
-                                'h-1.5 w-1.5 shrink-0 rounded-full',
-                                statusTone(r.status)
-                              )}
-                            />
-                            <span className='system-b-calendar-cell-item-text truncate'>
-                              {r.title}
-                            </span>
-                          </div>
-                        ))}
-                        {visibleEvents
-                          .slice(0, Math.max(0, 3 - visibleReleases.length))
-                          .map(e => (
+                      <span
+                        className={cn(
+                          'system-b-calendar-day-number font-caption tabular-nums',
+                          cell.isToday && 'system-b-calendar-day-number-today',
+                          !cell.isToday &&
+                            cell.inMonth &&
+                            'system-b-calendar-day-number-current'
+                        )}
+                      >
+                        {cell.date.getDate()}
+                      </span>
+                      {hasContent && (
+                        <div className='flex w-full flex-col gap-1'>
+                          {visibleReleases.slice(0, 3).map(r => (
                             <div
-                              key={`e-${e.id}`}
+                              key={`r-${r.id}`}
                               className='flex min-w-0 items-center gap-1.5'
-                              title={`${EVENT_TYPE_LABEL[e.eventType]} · ${e.subtitle}${e.confirmationStatus === 'pending' ? ' · pending review' : ''}`}
+                              title={`${r.title} (${r.status})`}
                             >
                               <span
                                 aria-hidden='true'
-                                className={eventDotClasses(e)}
-                              />
-                              <span
                                 className={cn(
-                                  'truncate',
-                                  e.confirmationStatus === 'pending'
-                                    ? 'system-b-calendar-cell-event-pending'
-                                    : e.confirmationStatus === 'rejected'
-                                      ? 'system-b-calendar-cell-event-rejected'
-                                      : 'system-b-calendar-cell-item-text'
+                                  'h-1.5 w-1.5 shrink-0 rounded-full',
+                                  statusTone(r.status)
                                 )}
-                              >
-                                {e.title}
+                              />
+                              <span className='system-b-calendar-cell-item-text truncate'>
+                                {r.title}
                               </span>
                             </div>
                           ))}
-                        {overflow > 0 && (
-                          <span className='system-b-calendar-overflow-count'>
-                            +{overflow} more
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {selectedDay && (
-            <section className='system-b-calendar-panel system-b-calendar-detail-panel'>
-              <h3 className='system-b-calendar-detail-heading font-medium'>
-                {selectedDay.toLocaleDateString(undefined, {
-                  weekday: 'long',
-                  month: 'long',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-              </h3>
-
-              {actionError && (
-                <p className='system-b-calendar-error-text mt-2'>
-                  {actionError}
-                </p>
-              )}
-
-              {/* Releases */}
-              {selectedReleases.length > 0 && (
-                <div className='mt-3'>
-                  <h4 className='system-b-calendar-detail-section-heading font-medium'>
-                    Releases
-                  </h4>
-                  <ul className='mt-2 flex flex-col gap-2'>
-                    {selectedReleases.map(r => (
-                      <li key={r.id} className='flex items-center gap-3'>
-                        <div className='system-b-calendar-release-artwork relative h-9 w-9 shrink-0 overflow-hidden'>
-                          {r.artworkUrl && (
-                            <Image
-                              src={r.artworkUrl}
-                              alt=''
-                              fill
-                              sizes='36px'
-                              className='object-cover'
-                              unoptimized
-                            />
+                          {visibleEvents
+                            .slice(0, Math.max(0, 3 - visibleReleases.length))
+                            .map(e => (
+                              <div
+                                key={`e-${e.id}`}
+                                className='flex min-w-0 items-center gap-1.5'
+                                title={`${EVENT_TYPE_LABEL[e.eventType]} · ${e.subtitle}${e.confirmationStatus === 'pending' ? ' · pending review' : ''}`}
+                              >
+                                <span
+                                  aria-hidden='true'
+                                  className={eventDotClasses(e)}
+                                />
+                                <span
+                                  className={cn(
+                                    'truncate',
+                                    e.confirmationStatus === 'pending'
+                                      ? 'system-b-calendar-cell-event-pending'
+                                      : e.confirmationStatus === 'rejected'
+                                        ? 'system-b-calendar-cell-event-rejected'
+                                        : 'system-b-calendar-cell-item-text'
+                                  )}
+                                >
+                                  {e.title}
+                                </span>
+                              </div>
+                            ))}
+                          {overflow > 0 && (
+                            <span className='system-b-calendar-overflow-count'>
+                              +{overflow} more
+                            </span>
                           )}
                         </div>
-                        <div className='min-w-0 flex-1'>
-                          <div className='flex min-w-0 items-center gap-2'>
-                            <div className='system-b-calendar-row-title truncate font-caption'>
-                              {r.title}
-                            </div>
-                            <Link
-                              href={buildReleaseTasksRoute(r.id)}
-                              className='system-b-calendar-context-link shrink-0 font-medium'
-                            >
-                              Tasks
-                            </Link>
-                          </div>
-                          <div className='system-b-calendar-row-meta capitalize'>
-                            {r.status}
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-              {/* Confirmed events */}
-              {confirmedSelectedEvents.length > 0 && (
-                <div className='mt-4'>
-                  <h4 className='system-b-calendar-detail-section-heading font-medium'>
-                    Events
-                  </h4>
-                  <ul className='mt-2 flex flex-col gap-2'>
-                    {confirmedSelectedEvents.map(e => (
-                      <EventRow
-                        key={e.id}
-                        event={e}
-                        variant='confirmed'
-                        onReject={() => handleReject(e.id)}
-                        disabled={isActionPending}
-                      />
-                    ))}
-                  </ul>
-                </div>
-              )}
+            {selectedDay && (
+              <section className='system-b-calendar-panel system-b-calendar-detail-panel'>
+                <h3 className='system-b-calendar-detail-heading font-medium'>
+                  {selectedDay.toLocaleDateString(undefined, {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </h3>
 
-              {/* Pending events — the trust queue */}
-              {pendingSelectedEvents.length > 0 && (
-                <div className='mt-4'>
-                  <div className='flex items-center justify-between'>
-                    <h4 className='system-b-calendar-warning-heading font-medium'>
-                      Pending Review · {pendingSelectedEvents.length}
+                {actionError && (
+                  <p className='system-b-calendar-error-text mt-2'>
+                    {actionError}
+                  </p>
+                )}
+
+                {/* Releases */}
+                {selectedReleases.length > 0 && (
+                  <div className='mt-3'>
+                    <h4 className='system-b-calendar-detail-section-heading font-medium'>
+                      Releases
                     </h4>
+                    <ul className='mt-2 flex flex-col gap-2'>
+                      {selectedReleases.map(r => (
+                        <li key={r.id} className='flex items-center gap-3'>
+                          <div className='system-b-calendar-release-artwork relative h-9 w-9 shrink-0 overflow-hidden'>
+                            {r.artworkUrl && (
+                              <Image
+                                src={r.artworkUrl}
+                                alt=''
+                                fill
+                                sizes='36px'
+                                className='object-cover'
+                                unoptimized
+                              />
+                            )}
+                          </div>
+                          <div className='min-w-0 flex-1'>
+                            <div className='flex min-w-0 items-center gap-2'>
+                              <div className='system-b-calendar-row-title truncate font-caption'>
+                                {r.title}
+                              </div>
+                              <Link
+                                href={buildReleaseTasksRoute(r.id)}
+                                className='system-b-calendar-context-link shrink-0 font-medium'
+                              >
+                                Tasks
+                              </Link>
+                            </div>
+                            <div className='system-b-calendar-row-meta capitalize'>
+                              {r.status}
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul className='mt-2 flex flex-col gap-2'>
-                    {pendingSelectedEvents.map(e => (
-                      <EventRow
-                        key={e.id}
-                        event={e}
-                        variant='pending'
-                        selected={selectedPendingIds.has(e.id)}
-                        onToggleSelect={() => togglePendingSelected(e.id)}
-                        onConfirm={() => handleConfirm(e.id)}
-                        onReject={() => handleReject(e.id)}
-                        disabled={isActionPending}
-                      />
-                    ))}
-                  </ul>
-                  <div
-                    className='system-b-calendar-bulk-action-slot mt-3 flex items-center gap-2'
-                    data-active={selectedPendingIds.size > 0}
-                  >
-                    {selectedPendingIds.size > 0 && (
-                      <>
-                        <Button
-                          type='button'
-                          variant='secondary'
-                          size='sm'
-                          onClick={handleBulkConfirm}
-                          disabled={isActionPending}
-                          className='system-b-calendar-action-confirm h-7 rounded-md px-3 font-caption transition-colors duration-subtle ease-subtle'
-                        >
-                          Confirm Selected ({selectedPendingIds.size})
-                        </Button>
-                        <Button
-                          type='button'
-                          variant='tertiary'
-                          size='sm'
-                          destructive
-                          onClick={handleBulkReject}
-                          disabled={isActionPending}
-                          className='system-b-calendar-action-reject h-7 rounded-md px-3 font-caption transition-colors duration-subtle ease-subtle'
-                        >
-                          Reject Selected ({selectedPendingIds.size})
-                        </Button>
-                        <Button
-                          type='button'
-                          variant='ghost'
-                          size='sm'
-                          onClick={() => setSelectedPendingIds(new Set())}
-                          disabled={isActionPending}
-                          className='system-b-calendar-action-ghost h-7 rounded-md px-2 transition-colors duration-subtle ease-subtle'
-                        >
-                          Clear
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
+                )}
 
-              {/* Rejected events — collapsed by default */}
-              {rejectedSelectedEvents.length > 0 && (
-                <div className='mt-4'>
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='sm'
-                    onClick={() => setShowRejected(s => !s)}
-                    aria-expanded={showRejected}
-                    aria-controls='rejected-events-list'
-                    className='system-b-calendar-rejected-toggle font-caption transition-colors duration-subtle ease-subtle'
-                  >
-                    {showRejected
-                      ? 'Hide rejected'
-                      : `Show rejected · ${rejectedSelectedEvents.length}`}
-                  </Button>
-                  {showRejected && (
-                    <ul
-                      id='rejected-events-list'
-                      className='mt-2 flex flex-col gap-2'
-                    >
-                      {rejectedSelectedEvents.map(e => (
+                {/* Confirmed events */}
+                {confirmedSelectedEvents.length > 0 && (
+                  <div className='mt-4'>
+                    <h4 className='system-b-calendar-detail-section-heading font-medium'>
+                      Events
+                    </h4>
+                    <ul className='mt-2 flex flex-col gap-2'>
+                      {confirmedSelectedEvents.map(e => (
                         <EventRow
                           key={e.id}
                           event={e}
-                          variant='rejected'
-                          onUndoReject={() => handleUndoReject(e.id)}
+                          variant='confirmed'
+                          onReject={() => handleReject(e.id)}
                           disabled={isActionPending}
                         />
                       ))}
                     </ul>
+                  </div>
+                )}
+
+                {/* Pending events — the trust queue */}
+                {pendingSelectedEvents.length > 0 && (
+                  <div className='mt-4'>
+                    <div className='flex items-center justify-between'>
+                      <h4 className='system-b-calendar-warning-heading font-medium'>
+                        Pending Review · {pendingSelectedEvents.length}
+                      </h4>
+                    </div>
+                    <ul className='mt-2 flex flex-col gap-2'>
+                      {pendingSelectedEvents.map(e => (
+                        <EventRow
+                          key={e.id}
+                          event={e}
+                          variant='pending'
+                          selected={selectedPendingIds.has(e.id)}
+                          onToggleSelect={() => togglePendingSelected(e.id)}
+                          onConfirm={() => handleConfirm(e.id)}
+                          onReject={() => handleReject(e.id)}
+                          disabled={isActionPending}
+                        />
+                      ))}
+                    </ul>
+                    <div
+                      className='system-b-calendar-bulk-action-slot mt-3 flex items-center gap-2'
+                      data-active={selectedPendingIds.size > 0}
+                    >
+                      {selectedPendingIds.size > 0 && (
+                        <>
+                          <Button
+                            type='button'
+                            variant='secondary'
+                            size='sm'
+                            onClick={handleBulkConfirm}
+                            disabled={isActionPending}
+                            className='system-b-calendar-action-confirm h-7 rounded-md px-3 font-caption transition-colors duration-subtle ease-subtle'
+                          >
+                            Confirm Selected ({selectedPendingIds.size})
+                          </Button>
+                          <Button
+                            type='button'
+                            variant='tertiary'
+                            size='sm'
+                            destructive
+                            onClick={handleBulkReject}
+                            disabled={isActionPending}
+                            className='system-b-calendar-action-reject h-7 rounded-md px-3 font-caption transition-colors duration-subtle ease-subtle'
+                          >
+                            Reject Selected ({selectedPendingIds.size})
+                          </Button>
+                          <Button
+                            type='button'
+                            variant='ghost'
+                            size='sm'
+                            onClick={() => setSelectedPendingIds(new Set())}
+                            disabled={isActionPending}
+                            className='system-b-calendar-action-ghost h-7 rounded-md px-2 transition-colors duration-subtle ease-subtle'
+                          >
+                            Clear
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Rejected events — collapsed by default */}
+                {rejectedSelectedEvents.length > 0 && (
+                  <div className='mt-4'>
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => setShowRejected(s => !s)}
+                      aria-expanded={showRejected}
+                      aria-controls='rejected-events-list'
+                      className='system-b-calendar-rejected-toggle font-caption transition-colors duration-subtle ease-subtle'
+                    >
+                      {showRejected
+                        ? 'Hide rejected'
+                        : `Show rejected · ${rejectedSelectedEvents.length}`}
+                    </Button>
+                    {showRejected && (
+                      <ul
+                        id='rejected-events-list'
+                        className='mt-2 flex flex-col gap-2'
+                      >
+                        {rejectedSelectedEvents.map(e => (
+                          <EventRow
+                            key={e.id}
+                            event={e}
+                            variant='rejected'
+                            onUndoReject={() => handleUndoReject(e.id)}
+                            disabled={isActionPending}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                {selectedReleases.length === 0 &&
+                  selectedEvents.length === 0 && (
+                    <p className='system-b-calendar-empty-day mt-2'>
+                      Nothing on this day.
+                    </p>
                   )}
-                </div>
-              )}
-
-              {selectedReleases.length === 0 && selectedEvents.length === 0 && (
-                <p className='system-b-calendar-empty-day mt-2'>
-                  Nothing on this day.
-                </p>
-              )}
-            </section>
-          )}
-
-          {/* Always rendered so cold-load → loaded never changes page height */}
-          <div
-            className={cn(
-              'system-b-calendar-loading-text',
-              !isLoading && 'invisible'
+              </section>
             )}
-            aria-hidden={!isLoading}
-          >
-            Loading calendar…
+
+            {/* Always rendered so cold-load → loaded never changes page height */}
+            <div
+              className={cn(
+                'system-b-calendar-loading-text',
+                !isLoading && 'invisible'
+              )}
+              aria-hidden={!isLoading}
+            >
+              Loading calendar…
+            </div>
           </div>
         </div>
       </PageContent>
@@ -830,23 +819,56 @@ type FilterPillProps = Readonly<{
 
 function FilterPill(props: FilterPillProps) {
   return (
-    <Button
-      type='button'
-      variant='ghost'
-      size='sm'
+    <PageToolbarTabButton
+      label={props.label}
       onClick={props.onClick}
-      aria-pressed={props.active}
+      active={props.active}
+      ariaPressed={props.active}
       className={cn(
-        'system-b-calendar-filter-pill h-7 rounded-full px-3 font-caption transition-colors duration-subtle ease-subtle',
+        'system-b-calendar-filter-pill shrink-0 justify-start px-2.5 lg:w-full',
         props.active
           ? props.tone === 'warn'
             ? 'system-b-calendar-filter-pill-warn'
             : 'system-b-calendar-filter-pill-active'
           : 'system-b-calendar-filter-pill-idle'
       )}
-    >
-      {props.label}
-    </Button>
+    />
+  );
+}
+
+interface MonthNavigationProps {
+  readonly cursor: Date;
+  readonly onPrevious: () => void;
+  readonly onNext: () => void;
+}
+
+function MonthNavigation({ cursor, onPrevious, onNext }: MonthNavigationProps) {
+  return (
+    <div className='system-b-calendar-month-control inline-flex min-w-0 items-center gap-1'>
+      <Button
+        type='button'
+        variant='ghost'
+        size='icon'
+        onClick={onPrevious}
+        className='system-b-calendar-action-ghost h-7 w-7 transition-colors duration-subtle ease-subtle'
+        aria-label='Previous Month'
+      >
+        <ChevronLeft className='h-4 w-4' strokeWidth={2.25} />
+      </Button>
+      <h2 className='system-b-calendar-month-label'>
+        {MONTH_NAMES[cursor.getMonth()]} {cursor.getFullYear()}
+      </h2>
+      <Button
+        type='button'
+        variant='ghost'
+        size='icon'
+        onClick={onNext}
+        className='system-b-calendar-action-ghost h-7 w-7 transition-colors duration-subtle ease-subtle'
+        aria-label='Next Month'
+      >
+        <ChevronRight className='h-4 w-4' strokeWidth={2.25} />
+      </Button>
+    </div>
   );
 }
 
