@@ -769,9 +769,13 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(screen.getByTestId('task-document-pane')).toBeVisible();
+    expect(screen.getByText('Select a task')).toBeInTheDocument();
+    expect(screen.getByTestId('task-document-empty-state')).toHaveTextContent(
+      'Choose a task from the list to view its details.'
+    );
     expect(
-      screen.getByText('Pick A Task From The List To See What It Needs.')
-    ).toBeInTheDocument();
+      screen.queryByText('Pick A Task From The List To See What It Needs.')
+    ).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
   });
 
@@ -819,9 +823,7 @@ describe('TasksPageClient', () => {
     renderPage();
 
     expect(screen.getByTestId('task-document-pane')).toBeInTheDocument();
-    expect(
-      screen.getByText('Pick A Task From The List To See What It Needs.')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Select a task')).toBeInTheDocument();
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
 
     act(() => {
@@ -866,9 +868,7 @@ describe('TasksPageClient', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Assigned To Jovie 1' }));
 
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
-    expect(
-      screen.getByText('Pick A Task From The List To See What It Needs.')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Select a task')).toBeInTheDocument();
     expect(getLatestTableProps()?.data?.map(task => task.id)).toEqual([
       'task-jovie',
     ]);
@@ -1025,7 +1025,9 @@ describe('TasksPageClient', () => {
 
     renderPage();
 
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('task-workspace-loading-rows')
+    ).toBeInTheDocument();
     expect(screen.getByText('Loading tasks')).toBeInTheDocument();
     expect(
       screen.queryByText('Your Task List Is Empty')
@@ -1548,9 +1550,7 @@ describe('TasksPageClient', () => {
   it('supports j and k keyboard navigation across visible tasks', () => {
     renderPage();
 
-    expect(
-      screen.getByText('Pick A Task From The List To See What It Needs.')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Select a task')).toBeInTheDocument();
 
     fireEvent.keyDown(window, { key: 'j' });
     expect(screen.getByLabelText('Task Title')).toHaveValue(mockTaskTwo.title);
@@ -1583,9 +1583,7 @@ describe('TasksPageClient', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
 
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
-    expect(
-      screen.getByText('Pick A Task From The List To See What It Needs.')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Select a task')).toBeInTheDocument();
   });
 
   it('keeps task keyboard navigation out of text editors', () => {
