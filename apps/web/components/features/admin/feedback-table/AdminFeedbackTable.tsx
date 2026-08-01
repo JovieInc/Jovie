@@ -1,7 +1,7 @@
 'use client';
 
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { ClipboardCopy, MessageSquareText, XCircle } from 'lucide-react';
+import { ClipboardCopy, MessageSquareText } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
@@ -15,7 +15,6 @@ import {
   EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
-import { type DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import {
   type ContextMenuItemType,
   PAGE_TOOLBAR_META_TEXT_CLASS,
@@ -31,6 +30,11 @@ import {
 } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useDismissFeedbackMutation } from '@/lib/queries';
+import {
+  buildFeedbackActions,
+  feedbackActionsToContextMenuItems,
+  feedbackActionsToDropdownItems,
+} from './feedback-actions';
 
 interface FeedbackRow {
   id: string;
@@ -197,6 +201,18 @@ function AdminFeedbackDetailPanel({
   readonly copyRowAsMarkdown: (item: FeedbackRow) => Promise<void>;
   readonly onClose: () => void;
 }) {
+  const selectedActions = selected
+    ? buildFeedbackActions(selected, {
+        onCopyAsMarkdown: item => {
+          void copyRowAsMarkdown(item);
+        },
+        onDismiss: item => {
+          void dismissRow(item);
+        },
+        isDismissPending,
+      })
+    : [];
+
   return (
     <EntitySidebarShell
       isOpen={Boolean(selected)}
@@ -204,6 +220,7 @@ function AdminFeedbackDetailPanel({
       ariaLabel='Feedback details'
       scrollStrategy='shell'
       onClose={onClose}
+      contextMenuItems={feedbackActionsToDropdownItems(selectedActions)}
       headerMode='minimal'
       hideMinimalHeaderBar
       isEmpty={!selected}
@@ -230,31 +247,8 @@ function AdminFeedbackDetailPanel({
               }
               actions={
                 <DrawerCardActionBar
-                  primaryActions={
-                    [
-                      ...(selected.status === 'dismissed'
-                        ? []
-                        : [
-                            {
-                              id: 'dismiss-feedback',
-                              label: 'Dismiss',
-                              icon: XCircle,
-                              disabled: isDismissPending(selected.id),
-                              onClick: () => {
-                                dismissRow(selected);
-                              },
-                            } satisfies DrawerHeaderAction,
-                          ]),
-                      {
-                        id: 'copy-feedback-markdown',
-                        label: 'Copy As Markdown',
-                        icon: ClipboardCopy,
-                        onClick: () => {
-                          copyRowAsMarkdown(selected);
-                        },
-                      } satisfies DrawerHeaderAction,
-                    ] satisfies readonly DrawerHeaderAction[]
-                  }
+                  primaryActions={[]}
+                  overflowActions={selectedActions}
                   onClose={onClose}
                   overflowTriggerPlacement='card-top-right'
                   overflowTriggerIcon='vertical'
@@ -379,22 +373,18 @@ export function AdminFeedbackTable({
   }, []);
 
   const getContextMenuItems = useCallback(
-    (item: FeedbackRow): ContextMenuItemType[] => [
-      {
-        id: 'copy-markdown',
-        label: 'Copy As Markdown',
-        icon: <ClipboardCopy className='h-4 w-4' />,
-        onClick: () => copyRowAsMarkdown(item),
-      },
-      { type: 'separator' },
-      {
-        id: 'dismiss',
-        label: 'Dismiss',
-        icon: <XCircle className='h-4 w-4' />,
-        onClick: () => dismissRow(item),
-        disabled: item.status === 'dismissed' || isDismissPending(item.id),
-      },
-    ],
+    (item: FeedbackRow): ContextMenuItemType[] =>
+      feedbackActionsToContextMenuItems(
+        buildFeedbackActions(item, {
+          onCopyAsMarkdown: feedback => {
+            void copyRowAsMarkdown(feedback);
+          },
+          onDismiss: feedback => {
+            void dismissRow(feedback);
+          },
+          isDismissPending,
+        })
+      ),
     [copyRowAsMarkdown, dismissRow, isDismissPending]
   );
 
