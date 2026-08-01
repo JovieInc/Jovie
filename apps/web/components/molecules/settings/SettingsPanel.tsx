@@ -41,10 +41,12 @@ export function SettingsPanel({
           <div className='min-w-0 flex-1 space-y-0.5'>
             {title ? (
               <h3
-                className={cn(
+                className={[
                   'text-app font-[540] tracking-tighter text-primary-token',
-                  titleClassName
-                )}
+                  titleClassName,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
               >
                 {title}
               </h3>

@@ -43,7 +43,7 @@ export function SettingsNotificationsSection({
         {isGrowth ? (
           <SettingsToggleRow
             icon={<ShieldCheck className='h-4 w-4' aria-hidden />}
-            title='Double opt-in verification'
+            title='Double Opt-in Verification'
             description={DOUBLE_OPT_IN_DESCRIPTION}
             checked={checked}
             onCheckedChange={handleToggle}
@@ -54,7 +54,7 @@ export function SettingsNotificationsSection({
           <SettingsToggleRow
             gated
             icon={<ShieldCheck className='h-4 w-4' aria-hidden />}
-            title='Double opt-in verification'
+            title='Double Opt-in Verification'
             description={DOUBLE_OPT_IN_DESCRIPTION}
             gatePlanName='Growth'
             gateFeatureContext='Double opt-in confirmation'
