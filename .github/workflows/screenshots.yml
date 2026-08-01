@@ -174,7 +174,11 @@ jobs:
           PUSHED=false
           for ATTEMPT in 1 2 3; do
             set +e
-            PUSH_OUTPUT=$(git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push --force origin "$BRANCH" 2>&1)
+            # Capture-only overrides must not leak into the repository's normal
+            # pre-push tests. They intentionally alter dev chrome and auth
+            # fallback behavior, so run the hook with those two values unset.
+            PUSH_OUTPUT=$(env -u NEXT_DISABLE_TOOLBAR -u E2E_CLERK_USER_ID \
+              git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push --force origin "$BRANCH" 2>&1)
             PUSH_EXIT=$?
             set -e
 
