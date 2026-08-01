@@ -12,6 +12,7 @@ const {
   mockUseReleaseEntityQuery,
   mockUseTaskBoardQuery,
   mockUseTasksQuery,
+  mockEntitySidebarShell,
 } = vi.hoisted(() => ({
   mockRouterPush: vi.fn(),
   mockRegisterRightPanel: vi.fn(),
@@ -19,6 +20,7 @@ const {
   mockUseReleaseEntityQuery: vi.fn(),
   mockUseTaskBoardQuery: vi.fn(),
   mockUseTasksQuery: vi.fn(),
+  mockEntitySidebarShell: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -207,6 +209,12 @@ let mockBoardQueryIsError = false;
 let mockViewMode: 'board' | 'list' = 'list';
 let mockViewModeHydrated = true;
 let mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
+let mockReleaseEntityData: {
+  readonly id: string;
+  readonly title: string;
+} | null = null;
+let mockReleaseEntityIsError = false;
+let mockReleaseEntityIsLoading = false;
 const mockUnifiedTable = vi.fn();
 const mockSetViewMode = vi.fn((viewMode: 'board' | 'list') => {
   mockViewMode = viewMode;
@@ -301,11 +309,23 @@ vi.mock('@/lib/queries/useReleaseEntityQuery', () => ({
     mockUseReleaseEntityQuery(profileId, releaseId);
 
     return {
-      data: releaseId ? { id: releaseId, title: 'QA Release' } : null,
-      isError: false,
-      isLoading: false,
+      data: releaseId ? mockReleaseEntityData : null,
+      isError: mockReleaseEntityIsError,
+      isLoading: mockReleaseEntityIsLoading,
       refetch: vi.fn(),
     };
+  },
+}));
+
+vi.mock('@/components/molecules/drawer/EntitySidebarShell', () => ({
+  EntitySidebarShell: ({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+  }) => {
+    mockEntitySidebarShell(props);
+    return <div data-testid={props['data-testid']}>{children}</div>;
   },
 }));
 
@@ -637,6 +657,7 @@ describe('TasksPageClient', () => {
     mockRegisterRightPanel.mockReset();
     mockRouterPush.mockReset();
     mockUseReleaseEntityQuery.mockClear();
+    mockEntitySidebarShell.mockClear();
     mockUseTaskBoardQuery.mockClear();
     mockUseTasksQuery.mockClear();
     mockRefetchTasks.mockReset();
@@ -654,6 +675,9 @@ describe('TasksPageClient', () => {
     mockViewMode = 'list';
     mockViewModeHydrated = true;
     mockCanShowTaskDocumentAlongsideReleaseSidebar = true;
+    mockReleaseEntityData = { id: 'release-1', title: 'QA Release' };
+    mockReleaseEntityIsError = false;
+    mockReleaseEntityIsLoading = false;
   });
 
   afterEach(() => {
@@ -1055,6 +1079,28 @@ describe('TasksPageClient', () => {
     expect(mockRegisterRightPanel).toHaveBeenLastCalledWith(
       expect.objectContaining({
         type: expect.any(Function),
+      })
+    );
+  });
+
+  it.each([
+    ['loading', { isLoading: true }],
+    ['error', { isError: true }],
+    ['empty', {}],
+  ] as const)('uses the raised release recovery rail for the %s state', (_status, queryState) => {
+    mockReleaseEntityData = null;
+    mockReleaseEntityIsError = queryState.isError ?? false;
+    mockReleaseEntityIsLoading = queryState.isLoading ?? false;
+
+    renderPage();
+    openTask();
+    fireEvent.click(screen.getByRole('button', { name: 'QA Release' }));
+    const rightPanel = mockRegisterRightPanel.mock.calls.at(-1)?.[0];
+    render(rightPanel as React.ReactElement);
+
+    expect(mockEntitySidebarShell).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        workspaceSurface: 'raised',
       })
     );
   });
