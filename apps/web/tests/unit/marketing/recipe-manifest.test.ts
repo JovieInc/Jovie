@@ -364,9 +364,9 @@ describe('marketing route manifest integrity', () => {
   });
 
   it('manifest glob-count floor (catches route-group rename — silent-failure guard)', () => {
-    // Per codebase-baseline §1: 26 (marketing) page.tsx + (home) + waitlist = 28 manifest entries.
-    // Floor = 28 - 2 (tolerance for legitimate removals) = 26. Below this = route-group rename went unmapped.
-    const FLOOR = 26;
+    // Per JOV-4508: 25 (marketing) page.tsx + (home) + waitlist = 27 manifest entries.
+    // Floor = 27 - 2 (tolerance for legitimate removals) = 25. Below this = route-group rename went unmapped.
+    const FLOOR = 25;
     if (MARKETING_ROUTE_MANIFEST.length < FLOOR) {
       fail(
         `manifest has ${MARKETING_ROUTE_MANIFEST.length} entries; floor is ${FLOOR}`,
@@ -431,19 +431,25 @@ describe('marketing route manifest integrity', () => {
     }
   });
 
-  it('keeps audited route-to-recipe parity gaps visible', () => {
-    const launchPricing = MARKETING_ROUTE_MANIFEST.find(
-      entry => entry.url === '/launch/pricing'
+  it('keeps canonical pricing recipe parity visible', () => {
+    const pricing = MARKETING_ROUTE_MANIFEST.find(
+      entry => entry.url === '/pricing'
     );
     const artistProfiles = MARKETING_ROUTE_MANIFEST.find(
       entry => entry.url === '/artist-profiles'
     );
-    expect(launchPricing).toBeDefined();
+    expect(pricing).toBeDefined();
     expect(artistProfiles).toBeDefined();
 
-    const launchReport = getRouteRecipeParity(launchPricing!);
-    expect(launchReport.actualSectionIds).toEqual(['hero', 'pricing']);
-    expect(launchReport.expectedSectionIds).toEqual([
+    const pricingReport = getRouteRecipeParity(pricing!);
+    expect(pricingReport.actualSectionIds).toEqual([
+      'hero',
+      'pricing',
+      'social-proof',
+      'comparison',
+      'cta',
+    ]);
+    expect(pricingReport.expectedSectionIds).toEqual([
       'hero',
       'pricing',
       'social-proof',
@@ -451,7 +457,7 @@ describe('marketing route manifest integrity', () => {
       'faq',
       'cta',
     ]);
-    expect(launchReport.matches).toBe(false);
+    expect(pricingReport.matches).toBe(false);
 
     const artistReport = getRouteRecipeParity(artistProfiles!);
     expect(artistReport.actualSectionIds).toEqual([

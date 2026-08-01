@@ -83,6 +83,23 @@ test.describe('Pricing Page', () => {
     );
   });
 
+  test('keeps campaign attribution when legacy launch pricing links redirect', async ({
+    page,
+  }) => {
+    await page.goto(
+      '/launch/pricing?utm_source=release-email&utm_campaign=fall',
+      {
+        waitUntil: 'domcontentloaded',
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      }
+    );
+
+    await expect(page).toHaveURL(
+      /\/pricing\?utm_source=release-email&utm_campaign=fall$/
+    );
+    await expect(page.locator('h1')).toHaveText('Pricing');
+  });
+
   test('has working call-to-action buttons', async ({ page }) => {
     const freeTierCta = page
       .getByRole('link', { name: 'Claim your profile' })

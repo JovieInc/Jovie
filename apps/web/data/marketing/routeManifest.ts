@@ -98,8 +98,9 @@ export interface RouteManifestEntry {
 }
 
 /**
- * The route manifest. Per codebase-baseline §1 — 26 page.tsx under (marketing)/
- * + (home)/page.tsx + app/waitlist/page.tsx = 28 entries.
+ * The route manifest. Per JOV-4508 — 25 page.tsx under (marketing)/ after
+ * retiring the legacy launch pricing visual fork, plus (home)/page.tsx and
+ * app/waitlist/page.tsx = 27 entries.
  *
  * Exemptions are sanctioned (carry linearId + approvedBy + prUrl) per DX2.
  * The baseline exemption count for the ratchet = current sanctioned count.
@@ -163,23 +164,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/pricing',
-  },
-  {
-    glob: '(marketing)/launch/pricing/page.tsx',
-    recipeId: 'pricing',
-    renderedSections: approvedBindings(
-      'apps/web/app/(marketing)/launch/pricing/page.tsx',
-      'hero',
-      'pricing'
-    ),
-    bindingEvidence: {
-      status: 'verified',
-      source: 'route audit 2026-07-11',
-      notes: 'Hand-built plan cards; later pricing recipe beats are absent.',
-    },
-    status: 'active',
-    specVersion: '1.0.0',
-    url: '/launch/pricing',
   },
   {
     glob: '(marketing)/artist-profiles/page.tsx',

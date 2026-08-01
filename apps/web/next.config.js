@@ -415,6 +415,14 @@ const nextConfig = {
         destination: '/artist-notifications',
         permanent: true,
       },
+      // Legacy launch-campaign links now use the canonical, indexed pricing
+      // page. Next.js preserves the original query string, including UTM
+      // attribution, when a redirect destination does not supply one.
+      {
+        source: '/launch/pricing',
+        destination: '/pricing',
+        permanent: true,
+      },
       // Press / brand aliases — journalists searching "Jovie press kit"
       // land on the brand kit's Downloads section.
       {

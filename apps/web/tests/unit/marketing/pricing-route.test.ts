@@ -31,4 +31,12 @@ describe('marketing pricing route redirects', () => {
       /source:\s*['"`]\/pricing['"`][\s\S]*?destination:\s*['"`]\/['"`]/
     );
   });
+
+  it('permanently consolidates the legacy launch pricing URL onto the canonical page', () => {
+    const redirectsBlock = readRedirectsBlock();
+
+    expect(redirectsBlock).toMatch(
+      /source:\s*['"`]\/launch\/pricing['"`][\s\S]*?destination:\s*['"`]\/pricing['"`][\s\S]*?permanent:\s*true/
+    );
+  });
 });

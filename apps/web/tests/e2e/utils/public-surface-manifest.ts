@@ -263,8 +263,9 @@ const MARKETING_SURFACES = [
   {
     id: 'marketing-launch-pricing',
     family: 'marketing',
-    expectedState: 'ok',
+    expectedState: 'redirect',
     path: APP_ROUTES.LAUNCH_PRICING,
+    expectedRedirects: [/^\/pricing$/],
     readySelectors: ['h1', 'main'],
     mainSelector: 'main',
     minMainTextLength: 120,
