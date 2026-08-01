@@ -98,7 +98,7 @@ describe('ContactDetailSidebar', () => {
     expect(screen.getByText('Role')).toBeInTheDocument();
     expect(
       container.querySelectorAll('[data-surface-variant="card"]')
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expect(screen.getByText('Role')).not.toHaveClass('uppercase');
   });
 
