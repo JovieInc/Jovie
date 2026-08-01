@@ -295,6 +295,26 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     noindex: true,
   },
   {
+    glob: '(marketing)/instant-merch/page.tsx',
+    recipeId: 'feature',
+    renderedSections: approvedBindings(
+      'apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx',
+      'hero',
+      'feature-grid',
+      'how-it-works',
+      'cta'
+    ),
+    bindingEvidence: {
+      status: 'verified',
+      source: 'route audit 2026-08-01',
+      notes:
+        'Uses the authenticated chat merch creation flow; product concepts are illustrative and not proof claims.',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/instant-merch',
+  },
+  {
     glob: '(marketing)/launch/page.tsx',
     recipeId: 'launch',
     renderedSections: approvedBindings(
