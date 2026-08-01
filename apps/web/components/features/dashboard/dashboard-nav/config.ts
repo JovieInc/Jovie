@@ -31,6 +31,7 @@ export const dashboardHome: NavItem = {
   href: APP_ROUTES.CHAT,
   id: 'overview',
   icon: Home,
+  iconName: 'Home',
   tier: 'core',
   description: 'Start a new chat',
 };
@@ -41,6 +42,7 @@ export const inboxNavItem: NavItem = {
   href: APP_ROUTES.DASHBOARD,
   id: 'inbox',
   icon: Inbox,
+  iconName: 'Inbox',
   tier: 'core',
   description: 'Review pending opportunities',
 };
@@ -50,6 +52,7 @@ export const chatNavItem: NavItem = {
   href: APP_ROUTES.CHAT,
   id: 'chat',
   icon: SquarePen,
+  iconName: 'SquarePen',
   tone: 'primary',
   tier: 'core',
   description: 'Start a new conversation',
@@ -60,6 +63,7 @@ export const libraryNavItem: NavItem = {
   href: APP_ROUTES.LIBRARY,
   id: 'library',
   icon: Music,
+  iconName: 'Music',
   tier: 'core',
   description: 'Browse releases, audio, video, images, and files',
 };
@@ -69,6 +73,7 @@ export const contactsNavItem: NavItem = {
   href: APP_ROUTES.CONTACTS,
   id: 'contacts',
   icon: IdCard,
+  iconName: 'IdCard',
   tier: 'core',
   description: 'Manage artist contacts',
 };
@@ -78,6 +83,7 @@ export const profilesNavItem: NavItem = {
   href: APP_ROUTES.PROFILES,
   id: 'profiles',
   icon: Waypoints,
+  iconName: 'Waypoints',
   tier: 'core',
   description: 'Monitor artist identities and connected services',
 };
@@ -87,6 +93,7 @@ export const calendarNavItem: NavItem = {
   href: APP_ROUTES.CALENDAR,
   id: 'calendar',
   icon: CalendarDays,
+  iconName: 'CalendarDays',
   tier: 'core',
   description: 'See release dates, events, and calendar moments',
 };

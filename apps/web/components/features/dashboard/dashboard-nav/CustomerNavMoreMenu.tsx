@@ -9,6 +9,7 @@ import {
 import { MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+import { Icon } from '@/components/atoms/Icon';
 import { SidebarMenuItem } from '@/components/organisms/Sidebar';
 import {
   getSidebarNavIconClassName,
@@ -96,7 +97,7 @@ export function CustomerNavMoreMenu({
         >
           {items.map(item => {
             const active = isItemActive(item);
-            const Icon = item.icon;
+            const ItemIcon = item.icon;
             return (
               <DropdownMenuItem key={item.id} asChild>
                 <Link
@@ -125,7 +126,20 @@ export function CustomerNavMoreMenu({
                     active && 'font-medium text-primary-token'
                   )}
                 >
-                  <Icon className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
+                  {item.iconName ? (
+                    <Icon
+                      name={item.iconName}
+                      className='h-3.5 w-3.5 shrink-0'
+                      strokeWidth={2.25}
+                      aria-hidden='true'
+                    />
+                  ) : (
+                    <ItemIcon
+                      className='h-3.5 w-3.5 shrink-0'
+                      strokeWidth={2.25}
+                      aria-hidden='true'
+                    />
+                  )}
                   <span className='min-w-0 truncate'>{item.name}</span>
                 </Link>
               </DropdownMenuItem>

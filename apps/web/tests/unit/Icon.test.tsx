@@ -39,6 +39,30 @@ describe('Icon', () => {
     expect(screen.getByTestId('calendar-days-icon')).toBeInTheDocument();
   });
 
+  it('registers authenticated sidebar, search, and rail glyphs (JOV-4701)', () => {
+    const names = [
+      'Home',
+      'Inbox',
+      'SquarePen',
+      'Music',
+      'IdCard',
+      'Waypoints',
+      'CalendarDays',
+      'Search',
+      'PanelLeft',
+      'PanelLeftClose',
+      'PanelLeftOpen',
+      'PanelRight',
+      'PanelRightClose',
+      'PanelRightOpen',
+    ] as const;
+
+    for (const name of names) {
+      render(<Icon name={name} data-testid={`icon-${name}`} />);
+      expect(screen.getByTestId(`icon-${name}`)).toBeInTheDocument();
+    }
+  });
+
   it('returns null for unknown icon', () => {
     const { container } = render(
       <Icon name={'NotRealIcon' as any} data-testid='icon' />

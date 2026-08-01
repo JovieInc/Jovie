@@ -15,6 +15,7 @@ import {
   useEffect,
   useRef,
 } from 'react';
+import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
 import { SidebarMenuItem } from '@/components/organisms/Sidebar';
 import {
@@ -279,14 +280,26 @@ export function NavMenuItem({
   });
   const shellInnerContent = (
     <>
-      <item.icon
-        className={getSidebarNavIconClassName({
-          active: isActive,
-          tone: item.tone,
-        })}
-        strokeWidth={2.25}
-        aria-hidden='true'
-      />
+      {item.iconName ? (
+        <Icon
+          name={item.iconName}
+          className={getSidebarNavIconClassName({
+            active: isActive,
+            tone: item.tone,
+          })}
+          strokeWidth={2.25}
+          aria-hidden='true'
+        />
+      ) : (
+        <item.icon
+          className={getSidebarNavIconClassName({
+            active: isActive,
+            tone: item.tone,
+          })}
+          strokeWidth={2.25}
+          aria-hidden='true'
+        />
+      )}
       <span className='min-w-0 truncate text-left justify-self-start group-data-[collapsible=icon]:hidden'>
         {item.name}
       </span>
