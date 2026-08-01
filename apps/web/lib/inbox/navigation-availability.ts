@@ -26,8 +26,7 @@ export function resolveInboxNavigationAvailability(
 }
 
 export function shouldShowInboxNavigation(
-  availability: InboxNavigationAvailability | undefined,
-  isActive: boolean
+  availability: InboxNavigationAvailability | undefined
 ): boolean {
-  return isActive || availability?.state !== 'empty';
+  return availability?.state !== 'empty';
 }
