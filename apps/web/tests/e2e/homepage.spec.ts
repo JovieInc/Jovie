@@ -150,9 +150,7 @@ test.describe('Homepage', () => {
 
     await expect(commandCenter).toBeVisible();
     await expect(
-      commandCenter.getByAltText(
-        'Jovie artist dashboard showing an opportunity and the workspace used to act on it'
-      )
+      commandCenter.getByAltText('Jovie authenticated releases workspace')
     ).toBeVisible();
     await expect(commandCenter.locator('img')).toHaveCount(1);
     await expect(commandCenter.getByRole('button')).toHaveCount(0);
@@ -205,7 +203,7 @@ test.describe('Homepage', () => {
     }
     await expect(commandCenter.locator('img')).toHaveAttribute(
       'src',
-      /shell-v1-dashboard/
+      /releases-dashboard-full/
     );
   });
 

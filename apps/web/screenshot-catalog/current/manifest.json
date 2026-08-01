@@ -625,8 +625,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-07-09T03:17:23.336Z",
-    "gitSha": "f3d5a648ff3e6806a025dab817f69985d65e9202",
+    "capturedAt": "2026-08-01T13:17:35.434Z",
+    "gitSha": null,
     "imagePath": "dashboard-releases-desktop.png",
     "publicExportPath": "releases-dashboard-full.png"
   },

@@ -142,10 +142,12 @@ async function captureCatalogImage(
     if (scenario.captureTarget === 'locator' && scenario.captureSelector) {
       await page.locator(scenario.captureSelector).first().screenshot({
         path: nextPath,
+        type: 'png',
       });
     } else {
       await page.screenshot({
         path: nextPath,
+        type: 'png',
         fullPage: scenario.fullPage,
       });
     }
