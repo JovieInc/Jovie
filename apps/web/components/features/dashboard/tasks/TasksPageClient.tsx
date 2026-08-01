@@ -60,7 +60,6 @@ import { ReleaseDueBadge } from '@/components/molecules/ReleaseDueBadge';
 import { PageShell } from '@/components/organisms/PageShell';
 import { ReleaseSidebar } from '@/components/organisms/release-sidebar';
 import {
-  type ContextMenuItemType,
   ShellListRowButton,
   TableEmptyState,
 } from '@/components/organisms/table';
@@ -124,6 +123,12 @@ import {
   TaskWorkspaceHeaderBar,
 } from './TaskWorkspaceHeaderBar';
 import { TaskWorkspaceLoadingRows } from './TaskWorkspaceLoadingRows';
+import {
+  buildTaskActionMenuItems,
+  TASK_ASSIGNEE_OPTIONS,
+  TASK_PRIORITY_OPTIONS,
+  TASK_STATUS_OPTIONS,
+} from './task-action-registry';
 import { distinctTaskTitles, taskSearchFromPills } from './task-header-search';
 import {
   getTaskAssigneeVisual,
@@ -146,27 +151,6 @@ function isTaskRowNavigationAction(
 ): action is 'next' | 'prev' {
   return action === 'next' || action === 'prev';
 }
-
-const TASK_STATUS_OPTIONS = [
-  ['backlog', 'Backlog'],
-  ['todo', 'Todo'],
-  ['in_progress', 'In Progress'],
-  ['done', 'Done'],
-  ['cancelled', 'Cancelled'],
-] as const satisfies ReadonlyArray<readonly [TaskStatus, string]>;
-
-const TASK_PRIORITY_OPTIONS = [
-  ['urgent', 'Urgent'],
-  ['high', 'High'],
-  ['medium', 'Medium'],
-  ['low', 'Low'],
-  ['none', 'None'],
-] as const satisfies ReadonlyArray<readonly [TaskPriority, string]>;
-
-const TASK_ASSIGNEE_OPTIONS = [
-  ['human', 'Me'],
-  ['jovie', 'Jovie'],
-] as const satisfies ReadonlyArray<readonly [TaskAssigneeKind, string]>;
 
 const NOOP = () => {};
 const NOOP_TASK_OPEN = (_task: TaskView) => {};
@@ -608,6 +592,7 @@ function TaskDocumentPanel({
   onUpdateStatus,
   onUpdatePriority,
   onUpdateAssignee,
+  actionItems,
   artistName,
   isDesktopLayout,
   compactMetadata = false,
@@ -622,6 +607,7 @@ function TaskDocumentPanel({
   onUpdateStatus: (taskId: string, status: TaskStatus) => void;
   onUpdatePriority: (taskId: string, priority: TaskPriority) => void;
   onUpdateAssignee: (taskId: string, assigneeKind: TaskAssigneeKind) => void;
+  actionItems: ReturnType<typeof buildTaskActionMenuItems>;
   artistName?: string | null;
   isDesktopLayout: boolean;
   compactMetadata?: boolean;
@@ -701,7 +687,12 @@ function TaskDocumentPanel({
           data-testid='task-document-scroll-region'
         >
           <div className='mx-auto flex w-full max-w-xl flex-col gap-4 px-4 pb-6 pt-5 sm:px-5 sm:pb-7 sm:pt-6'>
-            <TaskTitleEditor value={title} onChange={onTitleChange} />
+            <div className='flex min-w-0 items-start gap-2'>
+              <div className='min-w-0 flex-1'>
+                <TaskTitleEditor value={title} onChange={onTitleChange} />
+              </div>
+              <TaskRowActionMenu items={actionItems} />
+            </div>
 
             <div
               className={cn(
@@ -1210,121 +1201,59 @@ function useTaskActions({
     [onRequestDelete]
   );
 
-  const getTaskContextMenuItems = useCallback(
-    (task: TaskView): ContextMenuItemType[] => {
+  const getTaskActionMenuItems = useCallback(
+    (task: TaskView, surface: 'context' | 'overflow' | 'detail') => {
       const StageIcon = getTaskStageVisual(task.status, task.agentStatus).icon;
-      const canGeneratePitch = Boolean(
-        task.releaseId &&
-          task.releaseTitle &&
-          isPitchRelatedText(`${task.title} ${task.category ?? ''}`)
-      );
-      const statusIcon = (
-        <StageIcon
-          className={cn('h-4 w-4', task.status === 'done' && 'fill-current')}
-        />
-      );
-      return [
-        {
-          id: 'open-task',
-          label: 'Open Task',
-          icon: <FileText className='h-4 w-4' />,
-          onClick: () => openTaskDocument(task),
+
+      return buildTaskActionMenuItems({
+        task,
+        surface,
+        canGeneratePitch: Boolean(
+          task.releaseId &&
+            task.releaseTitle &&
+            isPitchRelatedText(`${task.title} ${task.category ?? ''}`)
+        ),
+        handlers: {
+          onOpenTask: openTaskDocument,
+          onOpenRelease: openReleaseSidebar,
+          onGeneratePitch,
+          onRequestDelete: handleDeleteTask,
+          onUpdateStatus: (taskId, status) =>
+            updateTaskField(taskId, { status }),
+          onUpdatePriority: (taskId, priority) =>
+            updateTaskField(taskId, { priority }),
+          onUpdateAssignee: (taskId, assigneeKind) =>
+            updateTaskField(taskId, { assigneeKind }),
         },
-        ...(task.releaseId
-          ? [
-              {
-                id: 'open-release',
-                label: 'Open Release',
-                icon: <Disc3 className='h-4 w-4' />,
-                onClick: () => openReleaseSidebar(task),
-              } satisfies ContextMenuItemType,
-              ...(canGeneratePitch
-                ? [
-                    {
-                      id: 'generate-pitch',
-                      label: 'Generate Pitch',
-                      icon: <Sparkles className='h-4 w-4' />,
-                      onClick: () => onGeneratePitch(task),
-                    } satisfies ContextMenuItemType,
-                  ]
-                : []),
-              { type: 'separator' } satisfies ContextMenuItemType,
-            ]
-          : []),
-        {
-          id: 'change-status',
-          label: 'Status',
-          icon: statusIcon,
-          items: TASK_STATUS_OPTIONS.map(([value, label]) => ({
-            id: `status-${value}`,
-            label,
-            icon: <TaskStatusLeadingVisual status={value} />,
-            onClick: () => updateTaskField(task.id, { status: value }),
-            disabled: task.status === value,
-          })),
-        },
-        {
-          id: 'change-priority',
-          label: 'Priority',
-          icon: <TaskPriorityLeadingVisual priority={task.priority} />,
-          items: TASK_PRIORITY_OPTIONS.map(([value, label]) => ({
-            id: `priority-${value}`,
-            label,
-            icon: <TaskPriorityLeadingVisual priority={value} />,
-            onClick: () => updateTaskField(task.id, { priority: value }),
-            disabled: task.priority === value,
-          })),
-        },
-        {
-          id: 'change-assignee',
-          label: 'Assignee',
-          icon: (
+        visuals: {
+          openTask: <FileText className='h-4 w-4' />,
+          openRelease: <Disc3 className='h-4 w-4' />,
+          generatePitch: <Sparkles className='h-4 w-4' />,
+          deleteTask: <Trash2 className='h-4 w-4' />,
+          status: status => {
+            const StatusIcon =
+              status === task.status
+                ? StageIcon
+                : getTaskStatusVisual(status).icon;
+            return (
+              <StatusIcon
+                className={cn('h-4 w-4', status === 'done' && 'fill-current')}
+              />
+            );
+          },
+          priority: priority => (
+            <TaskPriorityLeadingVisual priority={priority} />
+          ),
+          assignee: assigneeKind => (
             <span aria-hidden='true'>
               <TaskAssigneeLeadingVisual
-                assigneeKind={task.assigneeKind}
+                assigneeKind={assigneeKind}
                 artistName={artistName}
               />
             </span>
           ),
-          items: [
-            {
-              id: 'assignee-human',
-              label: 'Me',
-              icon: (
-                <span aria-hidden='true'>
-                  <TaskAssigneeLeadingVisual
-                    assigneeKind='human'
-                    artistName={artistName}
-                  />
-                </span>
-              ),
-              onClick: () =>
-                updateTaskField(task.id, { assigneeKind: 'human' }),
-              disabled: task.assigneeKind === 'human',
-            },
-            {
-              id: 'assignee-jovie',
-              label: 'Jovie',
-              icon: (
-                <span aria-hidden='true'>
-                  <TaskAssigneeLeadingVisual assigneeKind='jovie' />
-                </span>
-              ),
-              onClick: () =>
-                updateTaskField(task.id, { assigneeKind: 'jovie' }),
-              disabled: task.assigneeKind === 'jovie',
-            },
-          ],
         },
-        { type: 'separator' },
-        {
-          id: 'delete-task',
-          label: 'Delete Task',
-          icon: <Trash2 className='h-4 w-4' />,
-          destructive: true,
-          onClick: () => handleDeleteTask(task),
-        },
-      ];
+      });
     },
     [
       artistName,
@@ -1336,7 +1265,25 @@ function useTaskActions({
     ]
   );
 
-  return { getTaskContextMenuItems, handleDeleteTask, updateTaskField };
+  const getTaskContextMenuItems = useCallback(
+    (task: TaskView) => getTaskActionMenuItems(task, 'context'),
+    [getTaskActionMenuItems]
+  );
+  const getTaskOverflowMenuItems = useCallback(
+    (task: TaskView) => getTaskActionMenuItems(task, 'overflow'),
+    [getTaskActionMenuItems]
+  );
+  const getTaskDetailMenuItems = useCallback(
+    (task: TaskView) => getTaskActionMenuItems(task, 'detail'),
+    [getTaskActionMenuItems]
+  );
+
+  return {
+    getTaskContextMenuItems,
+    getTaskDetailMenuItems,
+    getTaskOverflowMenuItems,
+    updateTaskField,
+  };
 }
 
 export function TasksPageClient() {
@@ -1707,7 +1654,12 @@ export function TasksPageClient() {
     [router]
   );
 
-  const { getTaskContextMenuItems, updateTaskField } = useTaskActions({
+  const {
+    getTaskContextMenuItems,
+    getTaskDetailMenuItems,
+    getTaskOverflowMenuItems,
+    updateTaskField,
+  } = useTaskActions({
     artistName,
     onGeneratePitch: handleGenerateTaskPitch,
     onRequestDelete: setTaskPendingDelete,
@@ -2015,7 +1967,7 @@ export function TasksPageClient() {
           hideDue={hideSelectedRowDue && isRowSelected}
           actionSlot={
             <TaskRowActionMenu
-              items={getTaskContextMenuItems(info.row.original)}
+              items={getTaskOverflowMenuItems(info.row.original)}
               selected={isRowSelected}
               visibility='hover'
             />
@@ -2026,7 +1978,7 @@ export function TasksPageClient() {
     [
       artistName,
       effectiveSelectedTaskId,
-      getTaskContextMenuItems,
+      getTaskOverflowMenuItems,
       openReleaseSidebar,
       showAssigneeInListRows,
       hideSelectedRowDue,
@@ -2097,7 +2049,7 @@ export function TasksPageClient() {
         onOpenTask={openTaskDocument}
         onCreateTask={() => setHeaderMode('create')}
         onMoveTask={handleMoveTask}
-        getTaskContextMenuItems={getTaskContextMenuItems}
+        getTaskContextMenuItems={getTaskOverflowMenuItems}
       />
     );
   } else if (isDesktopTaskLayout) {
@@ -2320,6 +2272,7 @@ export function TasksPageClient() {
                     onUpdateAssignee={(taskId, assigneeKind) =>
                       updateTaskField(taskId, { assigneeKind })
                     }
+                    actionItems={getTaskDetailMenuItems(selectedTask)}
                     artistName={artistName}
                     isDesktopLayout={isDesktopTaskLayout}
                     compactMetadata={isBoardMode}
@@ -2336,6 +2289,7 @@ export function TasksPageClient() {
                     onUpdateStatus={NOOP_TASK_STATUS_UPDATE}
                     onUpdatePriority={NOOP_TASK_PRIORITY_UPDATE}
                     onUpdateAssignee={NOOP_TASK_ASSIGNEE_UPDATE}
+                    actionItems={[]}
                     artistName={artistName}
                     isDesktopLayout={isDesktopTaskLayout}
                     compactMetadata={false}
