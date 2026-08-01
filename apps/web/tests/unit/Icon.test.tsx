@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { Icon } from '@/components/atoms/Icon';
 
 describe('Icon', () => {
+  // ship-gate: keep unit coverage linked when Icon registry changes
   it('renders specified icon', () => {
     render(<Icon name='AlarmClock' data-testid='icon' />);
     expect(screen.getByTestId('icon')).toBeInTheDocument();
@@ -37,6 +38,30 @@ describe('Icon', () => {
 
     render(<Icon name='CalendarDays' data-testid='calendar-days-icon' />);
     expect(screen.getByTestId('calendar-days-icon')).toBeInTheDocument();
+  });
+
+  it('registers authenticated sidebar, search, and rail glyphs (JOV-4701)', () => {
+    const names = [
+      'Home',
+      'Inbox',
+      'SquarePen',
+      'Music',
+      'IdCard',
+      'Waypoints',
+      'CalendarDays',
+      'Search',
+      'PanelLeft',
+      'PanelLeftClose',
+      'PanelLeftOpen',
+      'PanelRight',
+      'PanelRightClose',
+      'PanelRightOpen',
+    ] as const;
+
+    for (const name of names) {
+      render(<Icon name={name} data-testid={`icon-${name}`} />);
+      expect(screen.getByTestId(`icon-${name}`)).toBeInTheDocument();
+    }
   });
 
   it('returns null for unknown icon', () => {

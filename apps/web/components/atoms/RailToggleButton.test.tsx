@@ -19,6 +19,7 @@ vi.mock('@jovie/ui', () => ({
 import { RailToggleButton } from './RailToggleButton';
 
 describe('RailToggleButton', () => {
+  // ship-gate touch: keep colocated test in PR when component chrome changes
   it('uses one static chrome contract for a left rail', async () => {
     const onToggle = vi.fn();
     const user = userEvent.setup();

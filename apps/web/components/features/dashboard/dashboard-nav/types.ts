@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode, SVGProps } from 'react';
+import type { IconName } from '@/components/atoms/Icon';
 
 /**
  * Core destinations are founder-approved and always take primary-rail slots
@@ -12,6 +13,8 @@ export interface NavItem {
   href: string;
   id: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
+  /** Shared Icon registry key for authenticated shell rendering. */
+  iconName?: IconName;
   /** Gives the one primary sidebar action the shared elevated row treatment. */
   tone?: 'default' | 'primary';
   /**

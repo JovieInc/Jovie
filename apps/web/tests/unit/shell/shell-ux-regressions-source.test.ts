@@ -96,6 +96,26 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
     expect(sharedToggle).toContain('h-7 w-7 rounded-full');
     expect(sharedToggle).toContain("size='icon'");
     expect(sharedToggle).not.toContain('active:scale');
+    expect(sharedToggle).toContain("from '@/components/atoms/Icon'");
+  });
+
+  it('routes authenticated sidebar, search, and rail glyphs through the shared Icon registry (JOV-4701)', () => {
+    const navItem = readFileSync(
+      path.join(
+        webRoot,
+        'components/features/dashboard/dashboard-nav/NavMenuItem.tsx'
+      ),
+      'utf8'
+    );
+    const search = readFileSync(
+      path.join(webRoot, 'components/shell/HeaderSearchSurfaceFromContext.tsx'),
+      'utf8'
+    );
+
+    expect(navItem).toContain("from '@/components/atoms/Icon'");
+    expect(navItem).toContain('item.iconName ?');
+    expect(search).toContain("from '@/components/atoms/Icon'");
+    expect(search).toContain("name='Search'");
   });
 
   it('keeps left allocation, main-plane geometry, and right allocation on one rail-motion contract (JOV-4522)', () => {
