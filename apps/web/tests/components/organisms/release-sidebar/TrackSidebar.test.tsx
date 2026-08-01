@@ -85,7 +85,9 @@ describe('TrackSidebar', () => {
     expect(screen.getByTestId('track-platforms-empty')).toBeInTheDocument();
   });
 
-  it('keeps the playback card visible in the default view', () => {
+  it('uses one compact entity header and shares actions with the rail context menu', async () => {
+    const user = userEvent.setup();
+
     render(
       <TrackSidebar
         track={buildTrack()}
@@ -98,12 +100,24 @@ describe('TrackSidebar', () => {
     expect(screen.getAllByText('Midnight Echo').length).toBeGreaterThan(0);
     expect(screen.getByTitle('Copy Track Link')).toBeInTheDocument();
     expect(screen.getByText(/Preview Unverified/i)).toBeInTheDocument();
-    const header = screen.getByTestId('track-header-card');
+    const header = screen.getByTestId('track-entity-header');
     const details = screen.getByTestId('track-tabbed-card');
     expect(header).toContainElement(screen.getByTitle('Copy Track Link'));
     expect(
       header.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
+    expect(
+      screen.queryByTestId('drawer-card-action-bar')
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'More actions' }));
+
+    expect(
+      screen.getByRole('menuitem', { name: 'Copy Track Link' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: 'Open Track Link' })
+    ).toBeInTheDocument();
     expect(screen.getByTestId('track-tabbed-card')).toHaveAttribute(
       'data-surface-variant',
       'card'
