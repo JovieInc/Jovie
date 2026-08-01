@@ -672,6 +672,7 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
 
     assert publication_timeout >= 75
     assert job_timeout >= capture_timeout + publication_timeout + 20
+    assert "env -u NEXT_DISABLE_TOOLBAR -u E2E_CLERK_USER_ID" in publication
 
 
 def test_cost_monitoring_docs_match_activation_gated_observer() -> None:
