@@ -6,7 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@jovie/ui';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check } from 'lucide-react';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -52,10 +52,6 @@ export function WorkspaceSelector<Id extends string>({
           <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)] group-data-[collapsible=icon]:hidden'>
             {currentWorkspace.label}
           </span>
-          <ChevronDown
-            className='size-2.5 shrink-0 text-sidebar-item-icon group-data-[collapsible=icon]:hidden'
-            aria-hidden='true'
-          />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='start' sideOffset={4} className='w-48'>

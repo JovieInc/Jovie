@@ -813,8 +813,11 @@ describe('UserButton billing actions', () => {
     expect(
       trigger.querySelector('[data-user-button-display-name]')
     ).toHaveClass('group-data-[collapsible=icon]:hidden');
+    expect(trigger).toHaveClass('group/user-button');
     expect(trigger.querySelector('[data-user-button-chevron]')).toHaveClass(
-      'group-data-[collapsible=icon]:hidden'
+      'group-data-[collapsible=icon]:hidden',
+      'opacity-0',
+      'group-hover/user-button:opacity-100'
     );
   });
 

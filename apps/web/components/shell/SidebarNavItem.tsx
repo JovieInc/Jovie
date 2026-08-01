@@ -36,11 +36,11 @@ interface SidebarNavChromeOptions {
   readonly className?: string;
 }
 
-// Create actions are deliberately not a second selected-nav treatment. The
-// compact light pill distinguishes creation without competing with the route's
-// neutral active state, including when the chat route is current.
+// Create actions are deliberately not a second selected-nav treatment. Keep
+// them compact and secondary so the active destination remains the strongest
+// signal in the rail.
 const SIDEBAR_PRIMARY_CHROME =
-  'w-fit grid-cols-[22px_auto] gap-x-2 bg-btn-primary px-3 text-btn-primary-foreground font-medium shadow-none hover:bg-btn-primary-hover';
+  'w-fit grid-cols-[18px_auto] gap-x-1.5 bg-sidebar-accent/40 px-2.5 text-sidebar-item-foreground font-medium shadow-none hover:bg-sidebar-accent/70';
 
 // Active state uses a quiet neutral fill with white type and a Jovie teal icon.
 // Avoid a left rail or guide decoration so every shared sidebar consumer keeps
@@ -86,8 +86,8 @@ export function getSidebarNavRowClassName({
       ? 'h-7 w-10 mx-auto grid-cols-1 place-items-center'
       : cn(
           trailingOverlay
-            ? 'grid-cols-[22px_minmax(0,1fr)]'
-            : 'grid-cols-[22px_minmax(0,1fr)_minmax(34px,auto)]',
+            ? 'grid-cols-[18px_minmax(0,1fr)]'
+            : 'grid-cols-[18px_minmax(0,1fr)_minmax(34px,auto)]',
           nonCollapsedSize,
           'group-data-[collapsible=icon]:grid-cols-1 group-data-[collapsible=icon]:place-items-center'
         ),
@@ -113,7 +113,7 @@ export function getSidebarNavIconClassName({
     // The selected row deliberately owns white label text. Keep its icon on
     // the canonical Jovie teal token so the active signal remains quiet.
     tone === 'primary'
-      ? 'text-btn-primary-foreground'
+      ? 'text-accent-teal!'
       : active
         ? 'text-accent-teal!'
         : inactiveIconColor,
@@ -144,7 +144,7 @@ export function SidebarNavItem({
           nested,
           tight,
         })}
-        strokeWidth={2.25}
+        strokeWidth={2}
       />
       {!collapsed && (
         <span className='min-w-0 justify-self-stretch overflow-hidden whitespace-nowrap text-clip text-left [mask-image:linear-gradient(to_right,black_calc(100%_-_1rem),transparent)]'>

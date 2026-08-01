@@ -45,9 +45,9 @@ describe('WorkspaceSelector', () => {
       <WorkspaceSelector currentWorkspaceId='ov' workspaces={workspaces} />
     );
 
-    expect(
-      screen.getByRole('button', { name: 'Switch Workspace' })
-    ).toHaveTextContent('OV');
+    const trigger = screen.getByRole('button', { name: 'Switch Workspace' });
+    expect(trigger).toHaveTextContent('OV');
+    expect(trigger.querySelector('svg.lucide-chevron-down')).toBeNull();
   });
 
   it('renders every supplied workspace with the active destination marked', () => {

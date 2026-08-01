@@ -3,6 +3,10 @@
 import { Search } from 'lucide-react';
 import { useHeaderActions } from '@/contexts/HeaderActionsContext';
 import { cn } from '@/lib/utils';
+import {
+  getSidebarNavIconClassName,
+  getSidebarNavRowClassName,
+} from './SidebarNavItem';
 
 /**
  * Sidebar entry for the one shell-owned search/command surface.
@@ -23,12 +27,17 @@ export function HeaderSearchSurfaceFromContext({
       data-app-search-trigger='true'
       onClick={openCommandPalette}
       className={cn(
-        'inline-flex h-9 min-h-9 w-full min-w-0 items-center justify-start gap-2 rounded-xl border border-subtle bg-surface-0 px-3 text-left text-xs text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle ease-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-ring-themed',
+        getSidebarNavRowClassName({}),
+        'grid-cols-[18px_minmax(0,1fr)_auto] text-left',
         className
       )}
       aria-label='Search Jovie'
     >
-      <Search className='size-4 shrink-0' aria-hidden='true' />
+      <Search
+        className={getSidebarNavIconClassName({})}
+        aria-hidden='true'
+        strokeWidth={2}
+      />
       <span className='min-w-0 flex-1 truncate'>Search</span>
       <kbd className='shrink-0 text-2xs text-tertiary-token'>⌘K</kbd>
     </button>
