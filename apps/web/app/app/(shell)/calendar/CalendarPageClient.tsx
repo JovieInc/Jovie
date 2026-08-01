@@ -25,20 +25,23 @@ import {
   rejectEvents,
   undoRejectEvent,
 } from '@/app/app/(shell)/dashboard/tour-dates/events-actions';
+import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
   PageToolbar,
   PageToolbarTabButton,
+  TableContextMenu,
 } from '@/components/organisms/table';
+import { convertContextMenuItems } from '@/components/organisms/table/molecules/TableContextMenu';
 import { buildReleaseTasksRoute } from '@/constants/routes';
 import { getEventLocalDateKey } from '@/lib/events/date';
-import { normalizeTicketUrl } from '@/lib/events/ticket-url';
 import { queryKeys } from '@/lib/queries';
 import { type EventRecord, useEventsQuery } from '@/lib/queries/useEventsQuery';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import { cn } from '@/lib/utils';
 import { useDashboardData } from '../dashboard/DashboardDataContext';
+import { buildCalendarEventActions } from './calendar-event-actions';
 
 type FilterChip = 'all' | 'releases' | 'events' | 'needs_review';
 
@@ -891,109 +894,65 @@ interface EventRowProps {
 function EventRow(props: EventRowProps) {
   const { event } = props;
   const reviewedLabel = formatReviewedAt(event.reviewedAt);
-  const safeTicketUrl = normalizeTicketUrl(event.ticketUrl);
+  const actionItems = buildCalendarEventActions(event, {
+    variant: props.variant,
+    onConfirm: props.onConfirm,
+    onReject: props.onReject,
+    onUndoReject: props.onUndoReject,
+    disabled: props.disabled,
+  });
+  const menuItems = convertContextMenuItems(actionItems);
+
   return (
-    <li className='system-b-calendar-event-row flex items-start gap-3 rounded-lg border p-3'>
-      {props.variant === 'pending' && props.onToggleSelect && (
-        <input
-          type='checkbox'
-          checked={!!props.selected}
-          onChange={props.onToggleSelect}
-          disabled={props.disabled}
-          aria-label={`Select ${event.title}`}
-          className='system-b-calendar-pending-checkbox mt-1 h-3.5 w-3.5 cursor-pointer'
-        />
-      )}
-      <div className='min-w-0 flex-1'>
-        <div className='flex items-center gap-2 flex-wrap'>
-          <span className='system-b-calendar-row-title truncate font-caption'>
-            {event.title}
-          </span>
-          <ProviderChip provider={event.provider ?? 'Manual'} />
-          <TypeChip type={event.eventType} />
-          {event.status && (
-            <span className='system-b-calendar-status-text'>
-              {event.status}
+    <TableContextMenu items={actionItems}>
+      <li className='system-b-calendar-event-row group flex items-start gap-3 rounded-lg border p-3'>
+        {props.variant === 'pending' && props.onToggleSelect && (
+          <input
+            type='checkbox'
+            checked={!!props.selected}
+            onChange={props.onToggleSelect}
+            disabled={props.disabled}
+            aria-label={`Select ${event.title}`}
+            className='system-b-calendar-pending-checkbox mt-1 h-3.5 w-3.5 cursor-pointer'
+          />
+        )}
+        <div className='min-w-0 flex-1'>
+          <div className='flex flex-wrap items-center gap-2'>
+            <span className='system-b-calendar-row-title truncate font-caption'>
+              {event.title}
             </span>
+            <ProviderChip provider={event.provider ?? 'Manual'} />
+            <TypeChip type={event.eventType} />
+            {event.status && (
+              <span className='system-b-calendar-status-text'>
+                {event.status}
+              </span>
+            )}
+          </div>
+          <div className='system-b-calendar-row-description mt-1'>
+            {event.subtitle}
+          </div>
+          {props.variant === 'pending' && event.lastSyncedAt && (
+            <div className='system-b-calendar-row-secondary mt-1'>
+              Last synced {formatReviewedAt(event.lastSyncedAt)}
+            </div>
+          )}
+          {props.variant === 'confirmed' && reviewedLabel && (
+            <div className='system-b-calendar-row-secondary mt-1'>
+              Reviewed {reviewedLabel}
+            </div>
           )}
         </div>
-        <div className='system-b-calendar-row-description mt-1'>
-          {event.subtitle}
+        <div className='flex h-7 w-7 shrink-0 items-center justify-center'>
+          <div
+            data-selected={props.selected || undefined}
+            className='opacity-0 transition-opacity duration-subtle ease-subtle group-hover:opacity-100 group-focus-within:opacity-100 data-[selected=true]:opacity-100'
+          >
+            <TableActionMenu items={menuItems} align='end' />
+          </div>
         </div>
-        {props.variant === 'pending' && event.lastSyncedAt && (
-          <div className='system-b-calendar-row-secondary mt-1'>
-            Last synced {formatReviewedAt(event.lastSyncedAt)}
-          </div>
-        )}
-        {props.variant === 'confirmed' && reviewedLabel && (
-          <div className='system-b-calendar-row-secondary mt-1'>
-            Reviewed {reviewedLabel}
-          </div>
-        )}
-      </div>
-      <div className='flex shrink-0 items-center gap-1'>
-        {safeTicketUrl && props.variant !== 'rejected' && (
-          <a
-            href={safeTicketUrl}
-            target='_blank'
-            rel='noreferrer'
-            className='system-b-calendar-action-ghost grid h-7 place-items-center rounded-md px-2 transition-colors duration-subtle ease-subtle'
-          >
-            Tickets
-          </a>
-        )}
-        {props.variant === 'pending' && (
-          <>
-            <Button
-              type='button'
-              variant='secondary'
-              size='sm'
-              onClick={props.onConfirm}
-              disabled={props.disabled}
-              className='system-b-calendar-action-confirm h-7 rounded-md px-3 font-caption transition-colors duration-subtle ease-subtle'
-            >
-              Confirm
-            </Button>
-            <Button
-              type='button'
-              variant='tertiary'
-              size='sm'
-              destructive
-              onClick={props.onReject}
-              disabled={props.disabled}
-              className='system-b-calendar-action-reject h-7 rounded-md px-3 font-caption transition-colors duration-subtle ease-subtle'
-            >
-              Reject
-            </Button>
-          </>
-        )}
-        {props.variant === 'confirmed' && props.onReject && (
-          <Button
-            type='button'
-            variant='ghost'
-            size='sm'
-            destructive
-            onClick={props.onReject}
-            disabled={props.disabled}
-            className='system-b-calendar-action-danger-ghost h-7 rounded-md px-2 transition-colors duration-subtle ease-subtle'
-          >
-            Reject
-          </Button>
-        )}
-        {props.variant === 'rejected' && props.onUndoReject && (
-          <Button
-            type='button'
-            variant='secondary'
-            size='sm'
-            onClick={props.onUndoReject}
-            disabled={props.disabled}
-            className='system-b-calendar-action-secondary h-7 rounded-md px-3 font-caption transition-colors duration-subtle ease-subtle'
-          >
-            Undo Reject
-          </Button>
-        )}
-      </div>
-    </li>
+      </li>
+    </TableContextMenu>
   );
 }
 

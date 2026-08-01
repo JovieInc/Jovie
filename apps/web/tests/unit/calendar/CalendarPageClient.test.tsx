@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CalendarPageClient } from '@/app/app/(shell)/calendar/CalendarPageClient';
 import { CalendarRouteSkeleton } from '@/app/app/(shell)/calendar/CalendarRouteSkeleton';
@@ -195,7 +195,7 @@ describe('CalendarPageClient', () => {
     expect(screen.getByRole('button', { name: 'Today' })).toBeInTheDocument();
   });
 
-  it('uses canonical Button variants for filters and event-review actions', () => {
+  it('uses the shared event action source for overflow and context actions', () => {
     mocks.useEventsQuery.mockReturnValue({
       data: [pendingEvent, confirmedEvent, rejectedEvent],
       isLoading: false,
@@ -213,18 +213,58 @@ describe('CalendarPageClient', () => {
       })
     );
 
-    expect(screen.getByRole('button', { name: 'Confirm' })).toHaveAttribute(
-      'data-variant',
-      'secondary'
+    const pendingRow = screen
+      .getAllByText('Movement Festival')
+      .at(-1)
+      ?.closest('li');
+    expect(pendingRow).toHaveClass('group');
+    expect(
+      within(pendingRow!).getByRole('button', { name: 'More actions' })
+    ).toBeInTheDocument();
+
+    fireEvent.contextMenu(pendingRow!);
+    const contextMenu = screen.getByRole('menu');
+    expect(
+      within(contextMenu).getByRole('menuitem', { name: 'Confirm' })
+    ).toBeInTheDocument();
+    expect(
+      within(contextMenu).getByRole('menuitem', { name: 'Reject' })
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      within(contextMenu).getByRole('menuitem', { name: 'Confirm' })
     );
+    expect(mocks.confirmEvent).toHaveBeenCalledWith(pendingEvent.id);
+  });
+
+  it('keeps the event overflow keyboard-accessible without changing its reserved slot', () => {
+    renderCalendar();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /18 Movement Festival/ })
+    );
+
+    const eventRow = screen
+      .getAllByText('Movement Festival')
+      .at(-1)
+      ?.closest('li');
+    const overflow = within(eventRow!).getByRole('button', {
+      name: 'More actions',
+    });
+
+    expect(eventRow).toHaveClass('group');
+    expect(overflow.parentElement?.parentElement).toHaveClass('h-7', 'w-7');
+
+    overflow.focus();
+    fireEvent.keyDown(overflow, { key: 'Enter', code: 'Enter' });
+
+    const menu = screen.getByRole('menu');
     expect(
-      screen
-        .getAllByRole('button', { name: 'Reject' })
-        .some(button => button.getAttribute('data-variant') === 'tertiary')
-    ).toBe(true);
+      within(menu).getByRole('menuitem', { name: 'Confirm' })
+    ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Show rejected · 1' })
-    ).toHaveAttribute('data-variant', 'ghost');
+      within(menu).getByRole('menuitem', { name: 'Reject' })
+    ).toBeInTheDocument();
   });
 
   it('does not fetch scoped release or event data without a selected profile', () => {
@@ -296,9 +336,15 @@ describe('CalendarPageClient', () => {
     fireEvent.click(rejectedToggle);
 
     expect(screen.getAllByText('Old Listing')).toHaveLength(2);
-    expect(screen.getByRole('button', { name: 'Undo Reject' })).toHaveClass(
-      'system-b-calendar-action-secondary'
-    );
+    expect(
+      screen.getAllByRole('button', { name: 'More actions' })
+    ).toHaveLength(3);
+    expect(
+      screen
+        .getByRole('checkbox', { name: /Movement Festival/ })
+        .closest('li')
+        ?.querySelector('[data-selected="true"]')
+    ).toBeInTheDocument();
   });
 });
 
