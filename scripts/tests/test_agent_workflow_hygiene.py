@@ -670,8 +670,8 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
         re.search(r"timeout-minutes: (\d+)", publication).group(1)
     )
 
-    assert publication_timeout >= 60
-    assert job_timeout >= capture_timeout + publication_timeout + 10
+    assert publication_timeout >= 75
+    assert job_timeout >= capture_timeout + publication_timeout + 20
 
 
 def test_cost_monitoring_docs_match_activation_gated_observer() -> None:
