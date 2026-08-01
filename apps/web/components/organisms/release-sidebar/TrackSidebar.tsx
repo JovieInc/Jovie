@@ -1,12 +1,13 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/organisms/release-sidebar/TrackSidebar.test.tsx
+import type { CommonDropdownItem } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Pause, Play, VolumeX } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import { toast } from '@/components/feedback';
 import {
   DrawerBackButton,
-  DrawerCardActionBar,
   DrawerMediaThumb,
   DrawerSurfaceCard,
   DrawerTabbedCard,
@@ -15,7 +16,7 @@ import {
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
 import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
-import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import type {
   PreviewSource,
@@ -227,21 +228,25 @@ export function TrackSidebar({
   const unresolvedProviders =
     track?.providerConfidenceSummary?.unresolvedProviders ?? [];
 
-  const overflowActions = useMemo<DrawerHeaderAction[]>(() => {
+  const trackActionItems = useMemo<CommonDropdownItem[]>(() => {
     if (!track) return [];
     return [
       {
-        id: 'refresh-copy',
+        type: 'action',
+        id: 'copy-track-link',
         label: isSmartLinkCopied ? 'Copied!' : 'Copy Track Link',
-        icon: Copy,
-        activeIcon: Check,
-        isActive: isSmartLinkCopied,
+        icon: isSmartLinkCopied ? (
+          <Check className='h-4 w-4' />
+        ) : (
+          <Copy className='h-4 w-4' />
+        ),
         onClick: handleCopySmartLink,
       },
       {
-        id: 'open',
+        type: 'action',
+        id: 'open-track-link',
         label: 'Open Track Link',
-        icon: ExternalLink,
+        icon: <ExternalLink className='h-4 w-4' />,
         onClick: () => {
           if (track.smartLinkPath) {
             globalThis.open(smartLinkUrl, '_blank', 'noopener,noreferrer');
@@ -303,6 +308,7 @@ export function TrackSidebar({
       isOpen={isOpen}
       width={width}
       ariaLabel='Track details'
+      contextMenuItems={trackActionItems}
       data-testid='track-sidebar'
       workspaceSurface='raised'
       onClose={onClose}
@@ -323,87 +329,81 @@ export function TrackSidebar({
                 onClick={handleBackToRelease}
               />
             ) : null}
-            <DrawerSurfaceCard
-              variant='card'
-              className='overflow-hidden p-3'
-              testId='track-header-card'
-            >
-              <EntityHeaderCard
-                title={track.title}
-                stableLayout
-                titleLineClamp={1}
-                subtitleLineClamp={1}
-                reserveSubtitleSlot
-                reserveMetaSlot
-                reserveFooterSlot
-                metaOverflow='scroll'
-                subtitle={
-                  <span className='flex items-center gap-1.5'>
-                    <span className='tabular-nums'>{trackLabel}.</span>
-                    {track.releaseTitle}
-                    {track.isExplicit ? (
-                      <span className='rounded bg-surface-1 px-1 text-3xs font-caption text-tertiary-token'>
-                        E
-                      </span>
-                    ) : null}
-                  </span>
-                }
-                image={
-                  <DrawerMediaThumb
-                    src={track.releaseArtworkUrl}
-                    alt={`${track.releaseTitle} artwork`}
-                    dimension={44}
-                    sizeClassName='h-11 w-11 rounded-lg'
-                    sizes='44px'
-                    fallback={
-                      <div className='h-11 w-11 rounded-lg bg-surface-0' />
-                    }
+            <EntityHeaderCard
+              data-testid='track-entity-header'
+              className='px-3 pt-3'
+              title={track.title}
+              stableLayout
+              titleLineClamp={1}
+              subtitleLineClamp={1}
+              reserveSubtitleSlot
+              reserveMetaSlot
+              reserveFooterSlot
+              metaOverflow='scroll'
+              subtitle={
+                <span className='flex items-center gap-1.5'>
+                  <span className='tabular-nums'>{trackLabel}.</span>
+                  {track.releaseTitle}
+                  {track.isExplicit ? (
+                    <span className='rounded bg-surface-1 px-1 text-3xs font-caption text-tertiary-token'>
+                      E
+                    </span>
+                  ) : null}
+                </span>
+              }
+              image={
+                <DrawerMediaThumb
+                  src={track.releaseArtworkUrl}
+                  alt={`${track.releaseTitle} artwork`}
+                  dimension={44}
+                  sizeClassName='h-11 w-11 rounded-lg'
+                  sizes='44px'
+                  fallback={
+                    <div className='h-11 w-11 rounded-lg bg-surface-0' />
+                  }
+                />
+              }
+              meta={
+                <div className='flex items-center gap-2 text-3xs text-tertiary-token'>
+                  {track.durationMs == null ? null : (
+                    <span className='tabular-nums'>
+                      {formatDuration(track.durationMs)}
+                    </span>
+                  )}
+                  {track.isrc ? (
+                    <span className='font-mono text-3xs tracking-wider'>
+                      {track.isrc}
+                    </span>
+                  ) : null}
+                </div>
+              }
+              actions={
+                <DrawerHeaderActions
+                  primaryActions={[]}
+                  menuItems={trackActionItems}
+                  onClose={onClose}
+                />
+              }
+              footer={
+                smartLinkUrl ? (
+                  <ShareableLinkRow
+                    url={smartLinkUrl}
+                    density='compact'
+                    surface='boxed'
+                    copyButtonTitle='Copy Track Link'
+                    openButtonTitle='Open Track Link'
+                    onCopySuccess={() => {
+                      showSmartLinkCopied();
+                    }}
+                    onCopyError={() => {
+                      toast.error('Failed to copy link');
+                    }}
                   />
-                }
-                meta={
-                  <div className='flex items-center gap-2 text-3xs text-tertiary-token'>
-                    {track.durationMs == null ? null : (
-                      <span className='tabular-nums'>
-                        {formatDuration(track.durationMs)}
-                      </span>
-                    )}
-                    {track.isrc ? (
-                      <span className='font-mono text-3xs tracking-wider'>
-                        {track.isrc}
-                      </span>
-                    ) : null}
-                  </div>
-                }
-                actions={
-                  <DrawerCardActionBar
-                    primaryActions={[]}
-                    overflowActions={overflowActions}
-                    onClose={onClose}
-                    overflowTriggerPlacement='card-top-right'
-                    overflowTriggerIcon='vertical'
-                    className='border-0 bg-transparent px-0 py-0'
-                  />
-                }
-                footer={
-                  smartLinkUrl ? (
-                    <ShareableLinkRow
-                      url={smartLinkUrl}
-                      density='compact'
-                      surface='boxed'
-                      copyButtonTitle='Copy Track Link'
-                      openButtonTitle='Open Track Link'
-                      onCopySuccess={() => {
-                        showSmartLinkCopied();
-                      }}
-                      onCopyError={() => {
-                        toast.error('Failed to copy link');
-                      }}
-                    />
-                  ) : null
-                }
-                bodyClassName='pr-9'
-              />
-            </DrawerSurfaceCard>
+                ) : null
+              }
+              bodyClassName='pr-9'
+              footerClassName='pb-3'
+            />
           </div>
         ) : undefined
       }
