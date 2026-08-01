@@ -26,7 +26,6 @@ export interface ChatPresenceArtifactCardProps {
 
 function CopyDraftButton({ text }: Readonly<{ text: string }>) {
   const [copied, setCopied] = useState(false);
-
   const handleCopy = useCallback(() => {
     navigator.clipboard
       ?.writeText(text)
@@ -107,7 +106,6 @@ export function ChatPresenceArtifactCard({
             Nothing verified yet — connect sources to fill this in.
           </p>
         ) : null}
-
         {facts.length > 0 ? (
           <dl className='grid gap-2'>
             {facts.map(fact => (
@@ -125,13 +123,11 @@ export function ChatPresenceArtifactCard({
             ))}
           </dl>
         ) : null}
-
         {draftText ? (
           <div className='rounded-md bg-surface-0 p-3 text-sm text-primary-token'>
             <p className='whitespace-pre-wrap'>{draftText}</p>
           </div>
         ) : null}
-
         <div className='flex flex-wrap items-center gap-2'>
           {draftText ? <CopyDraftButton text={draftText} /> : null}
           {href ? (

@@ -6,16 +6,14 @@ import {
 } from './constants';
 import type { PresenceBuildArtifact, PresenceBuildStepState } from './types';
 
-function toolCallIdForStep(stepId: PresenceBuildStepId): string {
-  return `presence-build:${stepId}`;
-}
+const toolCallId = (stepId: PresenceBuildStepId) => `presence-build:${stepId}`;
 
 export function buildRunningToolEvent(
   stepId: PresenceBuildStepId
 ): PersistedToolEvent {
   return {
     schemaVersion: 2,
-    toolCallId: toolCallIdForStep(stepId),
+    toolCallId: toolCallId(stepId),
     toolName: PRESENCE_BUILD_TOOL_NAMES[stepId],
     state: 'running',
     uiHint: 'artifact',
@@ -34,7 +32,7 @@ export function buildSucceededToolEvent(
 ): PersistedToolEvent {
   return {
     schemaVersion: 2,
-    toolCallId: toolCallIdForStep(stepId),
+    toolCallId: toolCallId(stepId),
     toolName: PRESENCE_BUILD_TOOL_NAMES[stepId],
     state: 'succeeded',
     uiHint: 'artifact',
@@ -59,7 +57,7 @@ export function buildFailedToolEvent(
 ): PersistedToolEvent {
   return {
     schemaVersion: 2,
-    toolCallId: toolCallIdForStep(stepId),
+    toolCallId: toolCallId(stepId),
     toolName: PRESENCE_BUILD_TOOL_NAMES[stepId],
     state: 'failed',
     uiHint: 'artifact',
@@ -70,37 +68,12 @@ export function buildFailedToolEvent(
   };
 }
 
-export function buildSkippedToolEvent(
-  stepId: PresenceBuildStepId,
-  summary: string
-): PersistedToolEvent {
-  return {
-    schemaVersion: 2,
-    toolCallId: toolCallIdForStep(stepId),
-    toolName: PRESENCE_BUILD_TOOL_NAMES[stepId],
-    state: 'succeeded',
-    uiHint: 'artifact',
-    summary,
-    input: { stepId },
-    output: {
-      action: 'presence_build_artifact',
-      stepId,
-      title: 'Nothing found yet',
-      summary,
-      facts: [],
-      empty: true,
-    },
-  };
-}
-
 export function replaceToolEvent(
   events: readonly PersistedToolEvent[],
   next: PersistedToolEvent
 ): PersistedToolEvent[] {
   const index = events.findIndex(event => event.toolCallId === next.toolCallId);
-  if (index < 0) {
-    return [...events, next];
-  }
+  if (index < 0) return [...events, next];
   return events.map((event, i) => (i === index ? next : event));
 }
 
@@ -108,10 +81,7 @@ export function initialStepStates(): Record<
   PresenceBuildStepId,
   PresenceBuildStepState
 > {
-  return {
-    research_artist: { id: 'research_artist', status: 'queued' },
-    assemble_profile: { id: 'assemble_profile', status: 'queued' },
-    generate_smart_link: { id: 'generate_smart_link', status: 'queued' },
-    draft_welcome_post: { id: 'draft_welcome_post', status: 'queued' },
-  };
+  return Object.fromEntries(
+    PRESENCE_BUILD_STEPS.map(id => [id, { id, status: 'queued' as const }])
+  ) as Record<PresenceBuildStepId, PresenceBuildStepState>;
 }

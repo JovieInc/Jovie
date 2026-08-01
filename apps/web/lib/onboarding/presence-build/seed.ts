@@ -30,21 +30,15 @@ export interface SeedPresenceBuildResult {
   readonly reused: boolean;
 }
 
-/**
- * Idempotently seed an onboarding presence-build workflow run and attach
- * initial running tool events to the welcome assistant message.
- *
- * Failures are soft — callers must degrade to current onboarding.
- */
+/** Idempotent seed; soft-fails so callers degrade to plain welcome chat. */
 export async function seedOnboardingPresenceBuild(
   input: SeedPresenceBuildInput
 ): Promise<SeedPresenceBuildResult | null> {
   try {
-    const existing = await db
+    const [existing] = await db
       .select({
         id: workflowRuns.id,
         stepOutputs: workflowRuns.stepOutputs,
-        status: workflowRuns.status,
       })
       .from(workflowRuns)
       .where(
@@ -55,23 +49,13 @@ export async function seedOnboardingPresenceBuild(
       )
       .limit(1);
 
-    if (existing[0]) {
-      const outputs = existing[0].stepOutputs as
-        | PresenceBuildStepOutputs
-        | Record<string, unknown>
-        | null;
+    if (existing) {
+      const outputs = existing.stepOutputs as PresenceBuildStepOutputs | null;
       const toolEvents =
-        outputs &&
-        typeof outputs === 'object' &&
-        Array.isArray((outputs as PresenceBuildStepOutputs).toolEvents)
-          ? (outputs as PresenceBuildStepOutputs).toolEvents
+        outputs && Array.isArray(outputs.toolEvents)
+          ? outputs.toolEvents
           : buildInitialPresenceToolEvents();
-
-      return {
-        workflowRunId: existing[0].id,
-        toolEvents,
-        reused: true,
-      };
+      return { workflowRunId: existing.id, toolEvents, reused: true };
     }
 
     const toolEvents = buildInitialPresenceToolEvents();
@@ -98,9 +82,7 @@ export async function seedOnboardingPresenceBuild(
       })
       .returning({ id: workflowRuns.id });
 
-    if (!run) {
-      return null;
-    }
+    if (!run) return null;
 
     await db
       .update(chatMessages)
@@ -113,11 +95,7 @@ export async function seedOnboardingPresenceBuild(
       conversationId: input.conversationId,
     });
 
-    return {
-      workflowRunId: run.id,
-      toolEvents,
-      reused: false,
-    };
+    return { workflowRunId: run.id, toolEvents, reused: false };
   } catch (error) {
     await captureError('Failed to seed onboarding presence build', error, {
       route: 'onboarding/presence-build',

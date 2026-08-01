@@ -20,11 +20,9 @@ export interface PresenceBuildArtifact {
   readonly title: string;
   readonly summary: string;
   readonly facts: readonly PresenceBuildFact[];
-  /** Absolute or path URL the user can open when present. */
   readonly href?: string;
-  /** Copyable draft body (welcome post / pitch). */
   readonly draftText?: string;
-  /** True when the step ran but found nothing to surface (not a failure). */
+  /** Step ran but found nothing real to surface. */
   readonly empty?: boolean;
 }
 
@@ -51,16 +49,16 @@ export function isPresenceBuildStepOutputs(
   value: unknown
 ): value is PresenceBuildStepOutputs {
   if (typeof value !== 'object' || value === null) return false;
-  const record = value as Record<string, unknown>;
+  const r = value as Record<string, unknown>;
   return (
-    record.kind === 'onboarding_presence_build' &&
-    record.schemaVersion === 1 &&
-    typeof record.profileId === 'string' &&
-    typeof record.conversationId === 'string' &&
-    typeof record.messageId === 'string' &&
-    typeof record.userId === 'string' &&
-    typeof record.steps === 'object' &&
-    record.steps !== null &&
-    Array.isArray(record.toolEvents)
+    r.kind === 'onboarding_presence_build' &&
+    r.schemaVersion === 1 &&
+    typeof r.profileId === 'string' &&
+    typeof r.conversationId === 'string' &&
+    typeof r.messageId === 'string' &&
+    typeof r.userId === 'string' &&
+    typeof r.steps === 'object' &&
+    r.steps !== null &&
+    Array.isArray(r.toolEvents)
   );
 }

@@ -42,9 +42,7 @@ function nextQueuedStep(
 ): PresenceBuildStepId | null {
   for (const stepId of PRESENCE_BUILD_STEPS) {
     const status = outputs.steps[stepId]?.status;
-    if (status === 'queued' || status === 'running') {
-      return stepId;
-    }
+    if (status === 'queued' || status === 'running') return stepId;
   }
   return null;
 }
@@ -58,10 +56,7 @@ function allTerminal(outputs: PresenceBuildStepOutputs): boolean {
   });
 }
 
-/**
- * Advance one presence-build step for a workflow run.
- * Updates workflow_runs.stepOutputs and the welcome message tool_calls.
- */
+/** Advance one presence-build step; updates stepOutputs + welcome tool_calls. */
 export async function advanceOnboardingPresenceBuild(options: {
   readonly workflowRunId: string;
 }): Promise<AdvancePresenceBuildResult | null> {
@@ -80,14 +75,12 @@ export async function advanceOnboardingPresenceBuild(options: {
     if (!run || run.kind !== ONBOARDING_PRESENCE_BUILD_WORKFLOW_KIND) {
       return null;
     }
-
     if (!isPresenceBuildStepOutputs(run.stepOutputs)) {
       await markWorkflowFailed(run.id, 'invalid presence-build stepOutputs');
       return null;
     }
 
     const outputs = run.stepOutputs;
-
     if (run.status === 'completed' || allTerminal(outputs)) {
       return {
         done: true,
@@ -101,9 +94,10 @@ export async function advanceOnboardingPresenceBuild(options: {
 
     const stepId = nextQueuedStep(outputs);
     if (!stepId) {
-      await markWorkflowCompleted(run.id, {
-        ...outputs,
-      } as unknown as Record<string, unknown>);
+      await markWorkflowCompleted(
+        run.id,
+        outputs as unknown as Record<string, unknown>
+      );
       return {
         done: true,
         advanced: false,
@@ -114,14 +108,14 @@ export async function advanceOnboardingPresenceBuild(options: {
       };
     }
 
-    // Claim running if still queued
+    const leaseExpiresAt = new Date(Date.now() + 5 * 60_000);
     if (run.status === 'queued') {
       await db
         .update(workflowRuns)
         .set({
           status: 'running',
           claimedAt: new Date(),
-          leaseExpiresAt: new Date(Date.now() + 5 * 60_000),
+          leaseExpiresAt,
           currentStep: stepId,
           updatedAt: new Date(),
         })
@@ -133,7 +127,7 @@ export async function advanceOnboardingPresenceBuild(options: {
         .update(workflowRuns)
         .set({
           currentStep: stepId,
-          leaseExpiresAt: new Date(Date.now() + 5 * 60_000),
+          leaseExpiresAt,
           updatedAt: new Date(),
         })
         .where(eq(workflowRuns.id, run.id));
@@ -141,17 +135,15 @@ export async function advanceOnboardingPresenceBuild(options: {
 
     let nextToolEvent: PersistedToolEvent;
     let nextStepState: PresenceBuildStepState;
-
     try {
       const artifact = await executePresenceBuildStep(
         stepId,
         outputs.profileId
       );
-      const isEmpty = Boolean(artifact.empty);
       nextToolEvent = buildSucceededToolEvent(stepId, artifact);
       nextStepState = {
         id: stepId,
-        status: isEmpty ? 'skipped' : 'completed',
+        status: artifact.empty ? 'skipped' : 'completed',
         artifact,
         completedAt: new Date().toISOString(),
       };
@@ -175,10 +167,7 @@ export async function advanceOnboardingPresenceBuild(options: {
     const nextToolEvents = replaceToolEvent(outputs.toolEvents, nextToolEvent);
     const nextOutputs: PresenceBuildStepOutputs = {
       ...outputs,
-      steps: {
-        ...outputs.steps,
-        [stepId]: nextStepState,
-      },
+      steps: { ...outputs.steps, [stepId]: nextStepState },
       toolEvents: nextToolEvents,
     };
 
@@ -223,7 +212,7 @@ export async function advanceOnboardingPresenceBuild(options: {
         error instanceof Error ? error.message : String(error)
       );
     } catch {
-      // markWorkflowFailed is best-effort
+      // best-effort
     }
     return null;
   }
@@ -235,8 +224,6 @@ export async function runOnboardingPresenceBuild(
 ): Promise<void> {
   for (let i = 0; i < PRESENCE_BUILD_STEPS.length + 1; i += 1) {
     const result = await advanceOnboardingPresenceBuild({ workflowRunId });
-    if (!result || result.done || !result.advanced) {
-      return;
-    }
+    if (!result || result.done || !result.advanced) return;
   }
 }

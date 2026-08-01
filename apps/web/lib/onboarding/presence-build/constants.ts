@@ -1,10 +1,4 @@
-/**
- * Onboarding wow-moment presence-build queue (JOV-3988).
- *
- * Seeds real post-signup tasks into workflow_runs and surfaces live tool
- * artifacts in the welcome chat. Kill-switched via APP flag
- * ONBOARDING_WOW_TASK_QUEUE.
- */
+/** JOV-3988 presence-build queue; kill-switch ONBOARDING_WOW_TASK_QUEUE. */
 
 export const ONBOARDING_PRESENCE_BUILD_WORKFLOW_KIND =
   'onboarding_presence_build' as const;

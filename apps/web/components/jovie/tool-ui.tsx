@@ -669,52 +669,30 @@ function isPresenceBuildArtifactOutput(output: unknown): output is {
 }
 
 function renderPresenceBuildArtifact(event: PersistedToolEvent): ReactNode {
+  const label = getToolUiConfig(event.toolName).label;
   if (event.state === 'running') {
-    return (
-      <ChatPresenceArtifactCard
-        state='loading'
-        title={getToolUiConfig(event.toolName).label}
-      />
-    );
+    return <ChatPresenceArtifactCard state='loading' title={label} />;
   }
-
   if (event.state === 'failed') {
     return (
       <ChatPresenceArtifactCard
         state='error'
-        title={getToolUiConfig(event.toolName).label}
+        title={label}
         error={event.errorMessage ?? event.summary}
       />
     );
   }
-
-  if (!isPresenceBuildArtifactOutput(event.output)) {
-    return null;
-  }
-
+  if (!isPresenceBuildArtifactOutput(event.output)) return null;
+  const out = event.output;
   return (
     <ChatPresenceArtifactCard
       state='success'
-      title={
-        typeof event.output.title === 'string'
-          ? event.output.title
-          : getToolUiConfig(event.toolName).label
-      }
-      summary={
-        typeof event.output.summary === 'string'
-          ? event.output.summary
-          : event.summary
-      }
-      facts={Array.isArray(event.output.facts) ? event.output.facts : []}
-      href={
-        typeof event.output.href === 'string' ? event.output.href : undefined
-      }
-      draftText={
-        typeof event.output.draftText === 'string'
-          ? event.output.draftText
-          : undefined
-      }
-      empty={event.output.empty === true}
+      title={typeof out.title === 'string' ? out.title : label}
+      summary={typeof out.summary === 'string' ? out.summary : event.summary}
+      facts={Array.isArray(out.facts) ? out.facts : []}
+      href={typeof out.href === 'string' ? out.href : undefined}
+      draftText={typeof out.draftText === 'string' ? out.draftText : undefined}
+      empty={out.empty === true}
     />
   );
 }

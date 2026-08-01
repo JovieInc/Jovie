@@ -1,13 +1,6 @@
 /**
- * POST /api/onboarding/presence-build
- *
- * Advances one onboarding presence-build step for the authenticated user
- * (JOV-3988). Client polls this while the first-session chat is open so
- * tool artifacts appear live without waiting for the 6-minute workflow cron.
- *
- * Kill-switch: APP flag ONBOARDING_WOW_TASK_QUEUE.
- * Failure mode: returns { disabled: true } / { done: true } without error —
- * chat remains usable.
+ * POST /api/onboarding/presence-build — advance one presence-build step (JOV-3988).
+ * Kill-switch: ONBOARDING_WOW_TASK_QUEUE. Soft-degrades so chat never hard-fails.
  */
 
 import { and, desc, eq } from 'drizzle-orm';
@@ -25,30 +18,26 @@ import {
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const NO_STORE = { 'Cache-Control': 'no-store' } as const;
+
+function ok(body: Record<string, unknown>, status = 200) {
+  return NextResponse.json(body, { status, headers: NO_STORE });
+}
 
 export async function POST() {
   try {
     const { user, profile } = await getSessionContext({
       requireProfile: false,
     });
-
     if (!profile) {
-      return NextResponse.json(
-        { error: 'Profile not found' },
-        { status: 404, headers: NO_STORE_HEADERS }
-      );
+      return ok({ error: 'Profile not found' }, 404);
     }
 
     const enabled = await getAppFlagValue('ONBOARDING_WOW_TASK_QUEUE', {
       userId: user.clerkId ?? user.id,
     });
-
     if (!enabled) {
-      return NextResponse.json(
-        { ok: true, disabled: true, done: true, advanced: false },
-        { status: 200, headers: NO_STORE_HEADERS }
-      );
+      return ok({ ok: true, disabled: true, done: true, advanced: false });
     }
 
     const [run] = await db
@@ -64,71 +53,47 @@ export async function POST() {
       .limit(1);
 
     if (!run) {
-      return NextResponse.json(
-        { ok: true, done: true, advanced: false, missing: true },
-        { status: 200, headers: NO_STORE_HEADERS }
-      );
+      return ok({ ok: true, done: true, advanced: false, missing: true });
     }
-
     if (run.status === 'completed' || run.status === 'failed') {
-      return NextResponse.json(
-        {
-          ok: true,
-          done: true,
-          advanced: false,
-          workflowRunId: run.id,
-          status: run.status,
-        },
-        { status: 200, headers: NO_STORE_HEADERS }
-      );
+      return ok({
+        ok: true,
+        done: true,
+        advanced: false,
+        workflowRunId: run.id,
+        status: run.status,
+      });
     }
 
     const result = await advanceOnboardingPresenceBuild({
       workflowRunId: run.id,
     });
-
     if (!result) {
-      return NextResponse.json(
-        {
-          ok: true,
-          done: true,
-          advanced: false,
-          workflowRunId: run.id,
-          degraded: true,
-        },
-        { status: 200, headers: NO_STORE_HEADERS }
-      );
+      return ok({
+        ok: true,
+        done: true,
+        advanced: false,
+        workflowRunId: run.id,
+        degraded: true,
+      });
     }
 
-    return NextResponse.json(
-      {
-        ok: true,
-        done: result.done,
-        advanced: result.advanced,
-        workflowRunId: result.workflowRunId,
-        lastStepId: result.lastStepId,
-        toolEvents: result.toolEvents,
-        steps: result.steps,
-      },
-      { status: 200, headers: NO_STORE_HEADERS }
-    );
+    return ok({
+      ok: true,
+      done: result.done,
+      advanced: result.advanced,
+      workflowRunId: result.workflowRunId,
+      lastStepId: result.lastStepId,
+      toolEvents: result.toolEvents,
+      steps: result.steps,
+    });
   } catch (error) {
-    const sessionErrorResponse = getSessionErrorResponse(
-      error,
-      NO_STORE_HEADERS
-    );
-    if (sessionErrorResponse) {
-      return sessionErrorResponse;
-    }
+    const sessionErrorResponse = getSessionErrorResponse(error, NO_STORE);
+    if (sessionErrorResponse) return sessionErrorResponse;
 
     await captureError('Onboarding presence-build tick failed', error, {
       route: '/api/onboarding/presence-build',
     });
-
-    // Degrade closed to non-error so the chat shell never hard-fails.
-    return NextResponse.json(
-      { ok: true, done: true, advanced: false, degraded: true },
-      { status: 200, headers: NO_STORE_HEADERS }
-    );
+    return ok({ ok: true, done: true, advanced: false, degraded: true });
   }
 }

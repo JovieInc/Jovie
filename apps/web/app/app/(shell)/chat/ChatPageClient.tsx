@@ -784,40 +784,30 @@ export function ChatPageClient({
     setWelcomeChatBootstrapStatus,
   ]);
 
-  // JOV-3988: live presence-build task queue — advance one step per tick and
-  // refresh conversation tool cards. Soft-fails if the flag is off or queue fails.
+  // JOV-3988: poll presence-build steps live after onboarding (soft-fail).
   useEffect(() => {
-    if (!fromOnboarding || !conversationId || !activeProfile) {
-      return;
-    }
+    if (!fromOnboarding || !conversationId || !activeProfile) return;
 
     let cancelled = false;
     let timer: ReturnType<typeof globalThis.setTimeout> | null = null;
     let ticks = 0;
     const MAX_TICKS = 12;
     const TICK_MS = 900;
-
-    const schedule = (delayMs: number) => {
+    const schedule = (ms: number) => {
       timer = globalThis.setTimeout(() => {
         void tick();
-      }, delayMs);
+      }, ms);
     };
 
     const tick = async () => {
-      if (cancelled || ticks >= MAX_TICKS) {
-        return;
-      }
+      if (cancelled || ticks >= MAX_TICKS) return;
       ticks += 1;
-
       try {
         const response = await fetch('/api/onboarding/presence-build', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
         });
-        if (!response.ok || cancelled) {
-          return;
-        }
-
+        if (!response.ok || cancelled) return;
         const payload = (await response.json()) as {
           done?: boolean;
           advanced?: boolean;
@@ -825,13 +815,11 @@ export function ChatPageClient({
           missing?: boolean;
           degraded?: boolean;
         };
-
         if (payload.advanced) {
           await queryClient.invalidateQueries({
             queryKey: queryKeys.chat.conversation(conversationId),
           });
         }
-
         if (
           payload.done ||
           payload.disabled ||
@@ -840,20 +828,16 @@ export function ChatPageClient({
         ) {
           return;
         }
-
         schedule(TICK_MS);
       } catch {
-        // Non-blocking enhancement — chat remains usable.
+        // Non-blocking — chat remains usable.
       }
     };
 
     schedule(400);
-
     return () => {
       cancelled = true;
-      if (timer !== null) {
-        globalThis.clearTimeout(timer);
-      }
+      if (timer !== null) globalThis.clearTimeout(timer);
     };
   }, [activeProfile, conversationId, fromOnboarding, queryClient]);
 

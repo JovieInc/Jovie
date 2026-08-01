@@ -2,18 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockSelect, mockDb } = vi.hoisted(() => {
   const mockSelect = vi.fn();
-  return {
-    mockSelect,
-    mockDb: {
-      select: mockSelect,
-    },
-  };
+  return { mockSelect, mockDb: { select: mockSelect } };
 });
 
-vi.mock('@/lib/db', () => ({
-  db: mockDb,
-}));
-
+vi.mock('@/lib/db', () => ({ db: mockDb }));
 vi.mock('@/constants/domains', () => ({
   getProfileUrl: (handle: string) => `https://jov.ie/${handle}`,
 }));
@@ -30,10 +22,18 @@ function chainSelect(result: unknown) {
     where: vi.fn(() => terminal),
     limit: vi.fn().mockResolvedValue(result),
   };
-  return {
-    from: vi.fn(() => fromChain),
-  };
+  return { from: vi.fn(() => fromChain) };
 }
+
+const emptyProfile = {
+  id: 'p1',
+  username: 'ada',
+  displayName: null as string | null,
+  bio: null,
+  avatarUrl: null,
+  spotifyId: null,
+  spotifyUrl: null,
+};
 
 describe('executePresenceBuildStep', () => {
   beforeEach(() => {
@@ -43,24 +43,12 @@ describe('executePresenceBuildStep', () => {
   it('drafts a welcome post only from real profile fields', async () => {
     mockSelect
       .mockReturnValueOnce(
-        chainSelect([
-          {
-            id: 'p1',
-            username: 'ada',
-            displayName: 'Ada',
-            bio: null,
-            avatarUrl: null,
-            spotifyId: null,
-            spotifyUrl: null,
-            careerHighlights: null,
-          },
-        ])
+        chainSelect([{ ...emptyProfile, displayName: 'Ada' }])
       )
       .mockReturnValueOnce(chainSelect([{ value: 2 }]))
       .mockReturnValueOnce(chainSelect([{ value: 1 }]));
 
     const artifact = await executePresenceBuildStep('draft_welcome_post', 'p1');
-
     expect(artifact.empty).toBeFalsy();
     expect(artifact.draftText).toContain("I'm Ada");
     expect(artifact.draftText).toContain('2 tracks');
@@ -70,20 +58,8 @@ describe('executePresenceBuildStep', () => {
 
   it('returns an empty smart-link artifact when handle is missing', async () => {
     mockSelect.mockReturnValueOnce(
-      chainSelect([
-        {
-          id: 'p1',
-          username: '',
-          displayName: null,
-          bio: null,
-          avatarUrl: null,
-          spotifyId: null,
-          spotifyUrl: null,
-          careerHighlights: null,
-        },
-      ])
+      chainSelect([{ ...emptyProfile, username: '' }])
     );
-
     const artifact = await executePresenceBuildStep(
       'generate_smart_link',
       'p1'
@@ -94,20 +70,7 @@ describe('executePresenceBuildStep', () => {
 
   it('does not invent research facts when the profile has no sources', async () => {
     mockSelect
-      .mockReturnValueOnce(
-        chainSelect([
-          {
-            id: 'p1',
-            username: 'ada',
-            displayName: null,
-            bio: null,
-            avatarUrl: null,
-            spotifyId: null,
-            spotifyUrl: null,
-            careerHighlights: null,
-          },
-        ])
-      )
+      .mockReturnValueOnce(chainSelect([emptyProfile]))
       .mockReturnValueOnce(chainSelect([]))
       .mockReturnValueOnce(chainSelect([]));
 
