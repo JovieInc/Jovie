@@ -243,7 +243,7 @@ export function MenuCell({ row }: CellContext<AudienceMember, unknown>) {
   const actionMenuItems = convertContextMenuItems(contextMenuItems);
 
   return (
-    <div className='flex items-center justify-end'>
+    <div className='system-b-table-contextual-action flex items-center justify-end'>
       <TableActionMenu items={actionMenuItems} align='end' />
     </div>
   );
@@ -491,7 +491,7 @@ export function QuickActionsCell({
         type='button'
         onClick={() => onViewProfile(member)}
         className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
-        aria-label='View profile'
+        aria-label='View Profile'
         title='View profile'
       >
         <Eye className='h-4 w-4' />
@@ -501,7 +501,7 @@ export function QuickActionsCell({
           type='button'
           onClick={() => onSendNotification(member)}
           className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
-          aria-label='Send notification'
+          aria-label='Send Notification'
           title='Send notification'
         >
           <Bell className='h-4 w-4' />

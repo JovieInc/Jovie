@@ -138,7 +138,7 @@ export function createContactColumns(
     // Actions column with dropdown menu
     contactColumnHelper.display({
       id: 'actions',
-      header: '',
+      header: 'Actions',
       cell: ({ row }) => {
         const contact = row.original;
         const items: TableActionMenuItem[] = convertContextMenuItems(
@@ -154,6 +154,10 @@ export function createContactColumns(
         );
       },
       size: 48,
+      meta: {
+        headerVisibility: 'sr-only',
+        actionVisibility: 'contextual',
+      },
     }),
   ];
 }

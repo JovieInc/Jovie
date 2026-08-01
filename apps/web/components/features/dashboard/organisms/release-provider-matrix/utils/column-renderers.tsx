@@ -148,6 +148,7 @@ export function createActionsHeaderRenderer(
     if (selectedCount > 0 && onClearSelection) {
       return (
         <div className='flex items-center justify-end'>
+          <span className='sr-only'>Actions</span>
           <Button
             variant='ghost'
             size='sm'
@@ -161,8 +162,8 @@ export function createActionsHeaderRenderer(
       );
     }
 
-    // Empty header when no selection
-    return null;
+    // Keep a semantic action header even when no bulk action is present.
+    return <span className='sr-only'>Actions</span>;
   };
 }
 
@@ -318,7 +319,7 @@ export function createActionsCellRenderer(
     const actionMenuItems = convertContextMenuItems(contextMenuItems);
 
     return (
-      <div className='flex items-center justify-end'>
+      <div className='system-b-table-contextual-action flex items-center justify-end'>
         <TableActionMenu items={actionMenuItems} align='end' />
       </div>
     );
