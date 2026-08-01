@@ -33,4 +33,14 @@ describe('workspace page optical seam contract', () => {
     expect(tableStyles).toContain("cellPadding: 'px-3 py-1'");
     expect(tableStyles).toContain("headerPadding: 'px-3 py-1.5'");
   });
+
+  it('keeps Library leading columns on the shared table seam', () => {
+    const librarySurface = read('app/app/(shell)/library/LibrarySurface.tsx');
+
+    expect(librarySurface).toContain(
+      "import { alignment } from '@/components/organisms/table/table.styles';"
+    );
+    expect(librarySurface.match(/alignment\.workspaceSeamX/g)).toHaveLength(2);
+    expect(librarySurface).not.toContain('pl-2.5');
+  });
 });

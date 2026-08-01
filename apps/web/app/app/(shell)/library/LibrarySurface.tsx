@@ -97,6 +97,7 @@ import {
   convertToCommonDropdownItems,
   TableContextMenu,
 } from '@/components/organisms/table/molecules/TableContextMenu';
+import { alignment } from '@/components/organisms/table/table.styles';
 import {
   type DspAvatarItem,
   DspAvatarStack,
@@ -706,7 +707,7 @@ const LIBRARY_CATALOG_COLUMNS = [
     cell: ({ row }) => <StatusCell asset={row.original} />,
     size: 112,
     minSize: 96,
-    meta: { className: 'pl-2.5 pr-2' },
+    meta: { className: alignment.workspaceSeamX },
   }),
   libraryColumnHelper.display({
     id: 'artwork',
@@ -763,7 +764,7 @@ const LIBRARY_TABLE_COLUMNS = [
     minSize: 220,
     size: 9999,
     enableSorting: false,
-    meta: { className: 'pl-2.5 pr-2' },
+    meta: { className: alignment.workspaceSeamX },
   }),
   libraryColumnHelper.display({
     id: 'releaseDate',

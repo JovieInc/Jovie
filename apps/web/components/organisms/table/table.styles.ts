@@ -16,6 +16,7 @@ export const typography = {
 
 // Alignment & Spacing - Perfect Vertical Alignment
 export const alignment = {
+  workspaceSeamX: 'px-3',
   checkboxCell: 'flex items-center justify-center', // Center checkbox
   numberCell: 'flex items-center justify-end tabular-nums', // Right-align numbers
   rowHeight: 'system-b-table-row-height', // Comfortable density with room for two-line cells
