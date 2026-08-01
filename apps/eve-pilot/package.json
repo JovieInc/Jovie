@@ -1,0 +1,32 @@
+{
+  "name": "@jovie/eve-pilot",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "imports": {
+    "#*": "./agent/*",
+    "#evals/*": "./evals/*"
+  },
+  "scripts": {
+    "build": "eve build",
+    "dev": "eve dev",
+    "start": "eve start",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "1.9.1",
+    "ai": "7.0.34",
+    "braintrust": "3.25.0",
+    "eve": "0.27.8",
+    "just-bash": "3.2.0",
+    "microsandbox": "0.5.10",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.13",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}

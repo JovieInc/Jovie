@@ -95,4 +95,25 @@ describe('lockfile importer specifier preflight', () => {
       '- packages/audio-contracts: devDependencies:typescript (manifest="^6.0.3", lockfile="^5.9.0")'
     );
   });
+
+  it('honors negated workspace package paths like !apps/eve-pilot', () => {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-lockfile-preflight-'));
+    tempRoots.push(root);
+    writeFileSync(
+      join(root, 'pnpm-workspace.yaml'),
+      "packages:\n  - 'apps/*'\n  - '!apps/eve-pilot'\n  - 'packages/*'\n"
+    );
+    writeFileSync(join(root, 'package.json'), '{}\n');
+    mkdirPackage(root, 'apps/web', {
+      dependencies: { next: '15.0.0' },
+    });
+    mkdirPackage(root, 'apps/eve-pilot', {
+      dependencies: { '@openai/agents': '0.1.0' },
+    });
+    mkdirPackage(root, 'packages/audio-contracts', {
+      devDependencies: { typescript: '^6.0.3' },
+    });
+    const lockfile = `lockfileVersion: '9.0'\n\nimporters:\n  .:\n  apps/web:\n    dependencies:\n      next:\n        specifier: 15.0.0\n  packages/audio-contracts:\n    devDependencies:\n      typescript:\n        specifier: ^6.0.3\n`;
+    expect(compareWorkspaceSpecifiers({ root, lockfile })).toEqual([]);
+  });
 });
