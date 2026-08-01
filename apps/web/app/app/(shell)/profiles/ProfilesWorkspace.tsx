@@ -13,12 +13,13 @@ import {
   LockKeyhole,
   MoreHorizontal,
   Orbit,
+  Plus,
   Share2,
   UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useCallback, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -53,6 +54,7 @@ import {
   summarizeProfileWorkspaceRows,
 } from '@/lib/profile-surfaces/workspace';
 import { cn } from '@/lib/utils';
+import { AddConnectionRail } from './AddConnectionRail';
 import { buildConnectionActions } from './connection-actions';
 import type {
   ProfilesWorkspaceData,
@@ -412,7 +414,15 @@ export function ProfilesWorkspace({
 }: Readonly<{ data: ProfilesWorkspaceData | null }>) {
   const [filter, setFilter] = useState<ProfilesWorkspaceFilter>('all');
   const [selected, setSelected] = useState<ProfileWorkspaceRow | null>(null);
+  const [isAddConnectionOpen, setIsAddConnectionOpen] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('add') === 'service') {
+      setSelected(null);
+      setIsAddConnectionOpen(true);
+    }
+  }, [searchParams]);
   const rows = useMemo(
     () =>
       sortProfileWorkspaceRows(
@@ -446,7 +456,7 @@ export function ProfilesWorkspace({
             action === 'upgrade'
               ? APP_ROUTES.SETTINGS_BILLING
               : connection.rowType === 'connector'
-                ? APP_ROUTES.SETTINGS_CONNECTORS
+                ? `${APP_ROUTES.PROFILES}?add=service`
                 : APP_ROUTES.SETTINGS_ARTIST_PROFILE
           );
         },
@@ -480,7 +490,7 @@ export function ProfilesWorkspace({
       }),
       columnHelper.display({
         id: 'type',
-        header: 'Type',
+        header: () => <span className='sr-only'>Type</span>,
         size: 48,
         meta: { className: 'px-1 sm:px-3' },
         cell: context => <TypeCell row={context.row.original} />,
@@ -569,15 +579,27 @@ export function ProfilesWorkspace({
   );
 
   useRegisterRightPanel(
-    data && selected ? (
-      <ConnectionRail
-        data={data}
-        row={selected}
-        onClose={() => setSelected(null)}
-        contextMenuItems={convertToCommonDropdownItems(
-          getContextMenuItems(selected)
-        )}
-      />
+    data ? (
+      isAddConnectionOpen ? (
+        <AddConnectionRail
+          data={data}
+          onClose={() => setIsAddConnectionOpen(false)}
+          onReviewSuggestions={() => {
+            setFilter('all');
+            setSelected(null);
+            setIsAddConnectionOpen(false);
+          }}
+        />
+      ) : selected ? (
+        <ConnectionRail
+          data={data}
+          row={selected}
+          onClose={() => setSelected(null)}
+          contextMenuItems={convertToCommonDropdownItems(
+            getContextMenuItems(selected)
+          )}
+        />
+      ) : null
     ) : null
   );
 
@@ -624,28 +646,41 @@ export function ProfilesWorkspace({
             />
           ))}
           end={
-            <div
-              data-testid='connections-summary'
-              className='flex items-center gap-3 whitespace-nowrap text-xs text-tertiary-token'
-            >
-              <span>{summary.connectionCount} Connections</span>
-              <span>{limitLabel}</span>
-              <span>Needs Attention {summary.needsAttentionCount}</span>
-              <span className='max-sm:hidden'>
-                Best Rank{' '}
-                {summary.bestRank === null ? (
-                  <SimpleTooltip content='No search rank has been measured yet.'>
-                    <span role='img' aria-label='Best Rank Unavailable'>
-                      —
-                    </span>
-                  </SimpleTooltip>
-                ) : (
-                  `#${summary.bestRank}`
-                )}
-              </span>
-              <span className='max-sm:hidden'>
-                Monitoring {summary.monitoringLabel}
-              </span>
+            <div className='flex items-center gap-3 whitespace-nowrap'>
+              <div
+                data-testid='connections-summary'
+                className='flex items-center gap-3 text-xs text-tertiary-token'
+              >
+                <span>{summary.connectionCount} Connections</span>
+                <span>{limitLabel}</span>
+                <span>Needs Attention {summary.needsAttentionCount}</span>
+                <span className='max-sm:hidden'>
+                  Best Rank{' '}
+                  {summary.bestRank === null ? (
+                    <SimpleTooltip content='No search rank has been measured yet.'>
+                      <span role='img' aria-label='Best Rank Unavailable'>
+                        —
+                      </span>
+                    </SimpleTooltip>
+                  ) : (
+                    `#${summary.bestRank}`
+                  )}
+                </span>
+                <span className='max-sm:hidden'>
+                  Monitoring {summary.monitoringLabel}
+                </span>
+              </div>
+              <Button
+                type='button'
+                size='sm'
+                onClick={() => {
+                  setSelected(null);
+                  setIsAddConnectionOpen(true);
+                }}
+              >
+                <Plus className='h-3.5 w-3.5' aria-hidden />
+                Add connection
+              </Button>
             </div>
           }
         />
