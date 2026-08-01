@@ -51,6 +51,7 @@ import {
 } from '@/components/jovie/hooks/useTextareaAutosize';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { EntitySidebarShell } from '@/components/molecules/drawer';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import {
   TOOLBAR_MENU_CONTENT_CLASS,
   TOOLBAR_MENU_SEPARATOR_CLASS,
@@ -658,18 +659,13 @@ function TaskDocumentPanel({
             data-testid='task-document-scroll-region'
           >
             <div className='flex min-h-full items-center justify-center px-6 py-6'>
-              <div className='max-w-[34rem] px-6 py-10 text-center'>
-                <div className='mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-surface-1 text-secondary-token'>
-                  <FileText className='h-5 w-5' />
-                </div>
-                <h2 className='mt-5 text-xl font-semibold tracking-[-0.03em] text-primary-token'>
-                  Pick A Task From The List To See What It Needs.
-                </h2>
-                <p className='mt-2 text-app leading-relaxed text-tertiary-token'>
-                  Open a task to review its status, metadata, due state, and
-                  body in the detail pane.
-                </p>
-              </div>
+              <EmptyState
+                icon={<FileText className='h-4 w-4' strokeWidth={2} />}
+                heading='Select a task'
+                description='Choose a task from the list to view its details.'
+                className='max-w-sm py-8'
+                testId='task-document-empty-state'
+              />
             </div>
           </div>
         </div>
