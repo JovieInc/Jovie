@@ -72,7 +72,7 @@ const LANES = [
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
-      'pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+      'pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
     run: runStructural,
   },
 ];
@@ -340,6 +340,8 @@ function runStructural() {
     'pnpm --filter=@jovie/web run lint:no-native-dialogs',
     'pnpm --filter=@jovie/web run lint:seo',
     'pnpm --filter=@jovie/web run lint:contrast-ratchet',
+    // JOV-4421: hard ship gate — tests + matching stories for shippable UI.
+    'pnpm component-ship-gate',
     'pnpm doc:freshness:check',
     'node .github/scripts/quarantine-ledger.mjs validate',
     'python3 .github/scripts/test-security-suppression-audit.py',

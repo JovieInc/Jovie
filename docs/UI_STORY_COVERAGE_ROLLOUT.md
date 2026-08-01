@@ -8,6 +8,11 @@ changes do not enter these lanes.
 
 - Reusable components under `apps/web/components` and `packages/ui` require an
   adjacent Storybook story. `packages/ui/atoms` is ratcheted at 100% coverage.
+- **Hard ship gate (JOV-4421):** `pnpm component-ship-gate` runs inside the
+  `ci-fast` structural lane. Changed shippable components must have matching
+  tests + stories (import/prop match) plus green story quality. Multi-root
+  floors live in `scripts/story-coverage-baseline.json` (schema v2). See
+  `docs/VISUAL_TESTING_POLICY.md`.
 - Route surfaces (`page`, `layout`, `loading`, `error`, and `not-found` TSX
   files) require Storybook or Playwright visual evidence for the changed state.
 - Shared Storybook configuration, styles, design tokens, and the Chromatic

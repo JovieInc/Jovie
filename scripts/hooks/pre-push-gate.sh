@@ -41,6 +41,9 @@ run_affected() {
   # Keep pushes independent of the full repository suite while catching the
   # changed surface before CI has to spend a runner on it.
   run_lint
+  # JOV-4421: hard ship gate (diff match + story quality + multi-root ratchet).
+  echo "[pre-push-gate] running component-ship-gate"
+  pnpm component-ship-gate
   bash scripts/automation-verify.sh affected
 }
 

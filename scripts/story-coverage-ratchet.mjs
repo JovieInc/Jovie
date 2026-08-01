@@ -1,53 +1,49 @@
 #!/usr/bin/env node
 
 /**
- * packages/ui atom story-coverage ratchet (visual-testing Phase 2).
+ * Multi-root story-coverage ratchet (JOV-4421 / visual-testing Phase 2+).
  *
- * Measures % of reusable atoms under packages/ui/atoms that have a matching
- * `*.stories.tsx` file. Coverage may only go UP (lock_up ratchet).
- *
- * Also fails when a PR adds/modifies a covered atom source without touching
- * its story in the same diff (when DIFF_BASE is set or --changed is passed).
+ * Measures % of shippable components under each coverage root that have a
+ * matching adjacent `*.stories.tsx` file. Coverage may only go UP (lock_up).
+ * New uncovered components fail even when percent holds via denominator tricks.
  *
  * Commands:
  *   node scripts/story-coverage-ratchet.mjs              # check against baseline
  *   node scripts/story-coverage-ratchet.mjs measure       # print JSON measurement
- *   node scripts/story-coverage-ratchet.mjs update        # write measured floor
+ *   node scripts/story-coverage-ratchet.mjs update        # write measured floors
  *   node scripts/story-coverage-ratchet.mjs validate      # schema-only
  *
  * Baseline: scripts/story-coverage-baseline.json
  * Rollout: docs/UI_STORY_COVERAGE_ROLLOUT.md
  */
 
-import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  COVERAGE_ROOTS,
+  EXCLUDE_BASENAMES,
+  listComponentsInRoot,
+  measureAllRoots,
+  measureRootCoverage,
+  REPO_ROOT,
+} from './component-ship-policy.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = resolve(__dirname, '..');
 const ATOMS_DIR = join(REPO_ROOT, 'packages/ui/atoms');
 const BASELINE_PATH = join(REPO_ROOT, 'scripts/story-coverage-baseline.json');
-
-/** Internal helpers — not story surfaces. */
-const EXCLUDE_BASENAMES = new Set([
-  'index',
-  'common-dropdown-item-renderers',
-  'common-dropdown-renderer',
-  'common-dropdown-types',
-  'common-dropdown-utils',
-]);
 
 const SOURCE_RE = /^(.+)\.tsx$/;
 const STORY_RE = /^(.+)\.stories\.(tsx|ts|jsx|js|mdx)$/i;
 const TEST_RE = /\.(test|spec)\.(tsx|ts)$/i;
 
+/** @deprecated Prefer listComponentsInRoot — kept for existing unit tests. */
 export function listAtomComponents(atomsDir = ATOMS_DIR) {
   if (!existsSync(atomsDir)) {
     throw new Error(`atoms dir missing: ${atomsDir}`);
   }
   const files = readdirSync(atomsDir);
-  const stories = new Map(); // lowercased base → story filename
+  const stories = new Map();
   for (const name of files) {
     const m = name.match(STORY_RE);
     if (m) stories.set(m[1].toLowerCase(), name);
@@ -72,6 +68,7 @@ export function listAtomComponents(atomsDir = ATOMS_DIR) {
   return components;
 }
 
+/** @deprecated Prefer measureRootCoverage / measureAllRoots. */
 export function measureStoryCoverage(atomsDir = ATOMS_DIR) {
   const components = listAtomComponents(atomsDir);
   const total = components.length;
@@ -96,143 +93,210 @@ export function loadBaseline(path = BASELINE_PATH) {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
-export function validateBaseline(baseline) {
-  const errors = [];
+/**
+ * Normalize v1 (atoms-only) baseline into v2 multi-root shape for comparison.
+ */
+export function normalizeBaseline(baseline) {
   if (!baseline || typeof baseline !== 'object') {
-    return { ok: false, errors: ['baseline must be an object'] };
+    return {
+      ok: false,
+      errors: ['baseline must be an object'],
+      baseline: null,
+    };
   }
-  if (baseline.schemaVersion !== 1) {
-    errors.push('schemaVersion must be 1');
+  if (baseline.schemaVersion === 2 && baseline.roots) {
+    return { ok: true, errors: [], baseline };
   }
-  if (
-    typeof baseline.percent !== 'number' ||
-    baseline.percent < 0 ||
-    baseline.percent > 100
-  ) {
-    errors.push('percent must be a number in [0, 100]');
+  if (baseline.schemaVersion === 1) {
+    // Legacy atoms-only baseline — map to packages/ui/atoms only; other roots
+    // get floor 0 until first update.
+    const roots = {};
+    for (const root of COVERAGE_ROOTS) {
+      if (root === 'packages/ui/atoms') {
+        roots[root] = {
+          percent: baseline.percent,
+          covered: baseline.covered,
+          total: baseline.total,
+          uncovered: Math.max(
+            0,
+            (baseline.total ?? 0) - (baseline.covered ?? 0)
+          ),
+        };
+      } else {
+        roots[root] = { percent: 0, covered: 0, total: 0, uncovered: 0 };
+      }
+    }
+    return {
+      ok: true,
+      errors: [],
+      baseline: {
+        schemaVersion: 2,
+        direction: 'lock_up',
+        roots,
+        updatedAt: baseline.updatedAt ?? null,
+        note: baseline.note,
+      },
+    };
   }
-  if (!Number.isInteger(baseline.covered) || baseline.covered < 0) {
-    errors.push('covered must be a non-negative integer');
+  return {
+    ok: false,
+    errors: ['schemaVersion must be 1 or 2'],
+    baseline: null,
+  };
+}
+
+export function validateBaseline(baseline) {
+  const normalized = normalizeBaseline(baseline);
+  if (!normalized.ok) {
+    return { ok: false, errors: normalized.errors };
   }
-  if (!Number.isInteger(baseline.total) || baseline.total < 0) {
-    errors.push('total must be a non-negative integer');
+  const b = normalized.baseline;
+  const errors = [];
+  if (b.direction && b.direction !== 'lock_up') {
+    errors.push('direction must be lock_up');
   }
-  return { ok: errors.length === 0, errors };
+  if (!b.roots || typeof b.roots !== 'object') {
+    errors.push('roots must be an object');
+  } else {
+    for (const [root, entry] of Object.entries(b.roots)) {
+      if (
+        typeof entry.percent !== 'number' ||
+        entry.percent < 0 ||
+        entry.percent > 100
+      ) {
+        errors.push(`${root}: percent must be in [0, 100]`);
+      }
+      if (!Number.isInteger(entry.covered) || entry.covered < 0) {
+        errors.push(`${root}: covered must be a non-negative integer`);
+      }
+      if (!Number.isInteger(entry.total) || entry.total < 0) {
+        errors.push(`${root}: total must be a non-negative integer`);
+      }
+    }
+  }
+  return { ok: errors.length === 0, errors, baseline: b };
 }
 
 /**
- * Ratchet: coverage percent may only go up. Total may grow (new atoms) but
- * percent floor is the baseline percent.
+ * Ratchet per root: percent may only go up; uncovered count may only go down
+ * (blocks denominator tricks at 0%).
  */
+export function compareRootCoverage(measurement, baselineEntry, root) {
+  const baselinePercent = baselineEntry?.percent ?? 0;
+  const baselineUncovered =
+    baselineEntry?.uncovered ??
+    Math.max(0, (baselineEntry?.total ?? 0) - (baselineEntry?.covered ?? 0));
+
+  const measuredUncovered =
+    typeof measurement.uncovered === 'number'
+      ? measurement.uncovered
+      : Math.max(0, (measurement.total ?? 0) - (measurement.covered ?? 0));
+
+  const percentOk = measurement.percent + 1e-9 >= baselinePercent;
+  const uncoveredOk = measuredUncovered <= baselineUncovered + 1e-9;
+  const ok = percentOk && uncoveredOk;
+
+  let message;
+  if (ok) {
+    message = `${root}: ${measurement.percent}% >= ${baselinePercent}% (${measurement.covered}/${measurement.total}, uncovered ${measuredUncovered} <= ${baselineUncovered})`;
+  } else if (!percentOk) {
+    message = `${root}: story coverage regressed ${measurement.percent}% < baseline ${baselinePercent}% (${measurement.covered}/${measurement.total})`;
+  } else {
+    message = `${root}: uncovered count rose ${measuredUncovered} > baseline ${baselineUncovered} (new components need stories)`;
+  }
+
+  return {
+    ok,
+    root,
+    measuredPercent: measurement.percent,
+    baselinePercent,
+    measuredUncovered,
+    baselineUncovered,
+    measuredCovered: measurement.covered,
+    measuredTotal: measurement.total,
+    uncoveredComponents: measurement.uncoveredComponents,
+    message,
+  };
+}
+
 export function compareCoverage(measurement, baseline) {
+  // Back-compat: single-root atoms measurement shape
+  if (
+    measurement &&
+    typeof measurement.percent === 'number' &&
+    !measurement.roots
+  ) {
+    const validation = validateBaseline(baseline);
+    if (!validation.ok) {
+      throw new Error(`Invalid baseline: ${validation.errors.join('; ')}`);
+    }
+    const atomBaseline = validation.baseline.roots?.['packages/ui/atoms'] ?? {
+      percent: baseline.percent,
+      covered: baseline.covered,
+      total: baseline.total,
+      uncovered: Math.max(0, (baseline.total ?? 0) - (baseline.covered ?? 0)),
+    };
+    const result = compareRootCoverage(
+      measurement,
+      atomBaseline,
+      'packages/ui/atoms'
+    );
+    return {
+      ok: result.ok,
+      measuredPercent: result.measuredPercent,
+      baselinePercent: result.baselinePercent,
+      measuredCovered: result.measuredCovered,
+      measuredTotal: result.measuredTotal,
+      uncoveredComponents: result.uncoveredComponents,
+      message: result.message,
+      roots: [result],
+    };
+  }
+
   const validation = validateBaseline(baseline);
   if (!validation.ok) {
     throw new Error(`Invalid baseline: ${validation.errors.join('; ')}`);
   }
-  const ok = measurement.percent + 1e-9 >= baseline.percent;
+  const b = validation.baseline;
+  const rootResults = [];
+  for (const root of COVERAGE_ROOTS) {
+    const m = measurement.roots?.[root] ?? measureRootCoverage(root);
+    const entry = b.roots[root] ?? {
+      percent: 0,
+      covered: 0,
+      total: 0,
+      uncovered: 0,
+    };
+    rootResults.push(compareRootCoverage(m, entry, root));
+  }
+  const failed = rootResults.filter(r => !r.ok);
+  const ok = failed.length === 0;
   return {
     ok,
-    measuredPercent: measurement.percent,
-    baselinePercent: baseline.percent,
-    measuredCovered: measurement.covered,
-    measuredTotal: measurement.total,
-    uncoveredComponents: measurement.uncoveredComponents,
+    roots: rootResults,
     message: ok
-      ? `story coverage ${measurement.percent}% >= baseline ${baseline.percent}% (${measurement.covered}/${measurement.total})`
-      : `story coverage regressed: ${measurement.percent}% < baseline ${baseline.percent}% (${measurement.covered}/${measurement.total}). Uncovered: ${measurement.uncoveredComponents.join(', ')}`,
-  };
-}
-
-function changedAtomSources(diffBase) {
-  const result = spawnSync(
-    'git',
-    [
-      'diff',
-      '--diff-filter=ACMR',
-      '--name-only',
-      `${diffBase}...HEAD`,
-      '--',
-      'packages/ui/atoms',
-    ],
-    { cwd: REPO_ROOT, encoding: 'utf8' }
-  );
-  if (result.status !== 0) {
-    throw new Error(
-      `could not resolve changed atom sources from ${diffBase}: ${result.stderr.trim()}`
-    );
-  }
-  return result.stdout
-    .split('\n')
-    .map(l => l.trim())
-    .filter(Boolean)
-    .filter(p => p.endsWith('.tsx') && !TEST_RE.test(p) && !STORY_RE.test(p));
-}
-
-function storyTouchedFor(sourcePath, diffBase) {
-  const base = sourcePath
-    .replace(/^packages\/ui\/atoms\//, '')
-    .replace(/\.tsx$/, '');
-  const result = spawnSync(
-    'git',
-    [
-      'diff',
-      '--diff-filter=ACMR',
-      '--name-only',
-      `${diffBase}...HEAD`,
-      '--',
-      `packages/ui/atoms/${base}.stories.tsx`,
-      `packages/ui/atoms/${base}.stories.ts`,
-      // Case variants (e.g. Card.stories.tsx for card.tsx)
-      `packages/ui/atoms/${base[0]?.toUpperCase()}${base.slice(1)}.stories.tsx`,
-    ],
-    { cwd: REPO_ROOT, encoding: 'utf8' }
-  );
-  if (result.status !== 0) return false;
-  return result.stdout.trim().length > 0;
-}
-
-export function checkChangedAtomsRequireStories(diffBase) {
-  const sources = changedAtomSources(diffBase);
-  const missing = [];
-  for (const src of sources) {
-    const file = src.split('/').pop() ?? '';
-    const base = file.replace(/\.tsx$/, '');
-    if (EXCLUDE_BASENAMES.has(base.toLowerCase())) continue;
-    // Must have a story file on disk after the change
-    const measurement = listAtomComponents();
-    const entry = measurement.find(c => c.sourceFile === file);
-    if (!entry) continue;
-    if (!entry.covered) {
-      missing.push({ source: src, reason: 'no story file' });
-      continue;
-    }
-    // If source changed, story should change in the same PR (material change).
-    // Skip pure formatting-only detection — require story file touched OR new.
-    if (!storyTouchedFor(src, diffBase)) {
-      // Soft: only hard-fail when story is completely missing (above).
-      // Material-change pairing is advisory in v1 to avoid blocking renames.
-    }
-  }
-  return {
-    ok: missing.length === 0,
-    missing,
-    message:
-      missing.length === 0
-        ? 'changed atoms have stories'
-        : `atoms changed without stories: ${missing.map(m => m.source).join(', ')}`,
+      ? `story coverage ok across ${rootResults.length} roots`
+      : `story coverage failed:\n${failed.map(f => f.message).join('\n')}`,
   };
 }
 
 function writeBaseline(measurement, path = BASELINE_PATH) {
+  const roots = {};
+  for (const root of COVERAGE_ROOTS) {
+    const m = measurement.roots[root];
+    roots[root] = {
+      percent: m.percent,
+      covered: m.covered,
+      total: m.total,
+      uncovered: m.uncovered,
+    };
+  }
   const payload = {
-    schemaVersion: 1,
-    dimension: 'packages-ui-atom-story-coverage-percent',
+    schemaVersion: 2,
     direction: 'lock_up',
-    percent: measurement.percent,
-    covered: measurement.covered,
-    total: measurement.total,
     updatedAt: new Date().toISOString(),
-    note: 'Coverage % may only increase. Run `pnpm story-coverage:update` after adding stories.',
+    note: 'Coverage % and uncovered floors may only improve. Run `pnpm story-coverage:update` after adding stories. New components without stories fail even if % holds.',
+    roots,
   };
   writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
   return payload;
@@ -240,10 +304,22 @@ function writeBaseline(measurement, path = BASELINE_PATH) {
 
 function main(argv = process.argv.slice(2)) {
   const cmd = argv[0] ?? 'check';
-  const measurement = measureStoryCoverage();
+  const measurement = measureAllRoots();
 
   if (cmd === 'measure') {
-    console.log(JSON.stringify(measurement, null, 2));
+    // Compact summary for humans + full JSON
+    const summary = Object.fromEntries(
+      Object.entries(measurement.roots).map(([root, m]) => [
+        root,
+        {
+          percent: m.percent,
+          covered: m.covered,
+          total: m.total,
+          uncovered: m.uncovered,
+        },
+      ])
+    );
+    console.log(JSON.stringify({ ...measurement, roots: summary }, null, 2));
     return 0;
   }
 
@@ -254,52 +330,37 @@ function main(argv = process.argv.slice(2)) {
       console.error(v.errors.join('\n'));
       return 1;
     }
-    console.log('baseline schema ok');
+    console.log('baseline schema ok (v2 multi-root)');
     return 0;
   }
 
   if (cmd === 'update') {
     const written = writeBaseline(measurement);
     console.log(
-      `updated baseline → ${relative(REPO_ROOT, BASELINE_PATH)} (${written.percent}% = ${written.covered}/${written.total})`
+      `updated baseline → ${relative(REPO_ROOT, BASELINE_PATH)} (schema v2, ${Object.keys(written.roots).length} roots)`
     );
+    for (const [root, entry] of Object.entries(written.roots)) {
+      console.log(
+        `  ${root}: ${entry.percent}% (${entry.covered}/${entry.total}, uncovered ${entry.uncovered})`
+      );
+    }
     return 0;
   }
 
   // check (default)
   const baseline = loadBaseline();
   const comparison = compareCoverage(measurement, baseline);
-  console.log(comparison.message);
-
-  const diffBase =
-    process.env.STORY_COVERAGE_DIFF_BASE ||
-    process.env.TURBO_SCM_BASE ||
-    (process.env.GITHUB_BASE_REF
-      ? `origin/${process.env.GITHUB_BASE_REF}`
-      : null);
-
-  if (diffBase) {
-    const changed = checkChangedAtomsRequireStories(diffBase);
-    console.log(changed.message);
-    if (!changed.ok) {
-      console.error(changed.message);
-      return 1;
-    }
+  for (const root of comparison.roots ?? []) {
+    console.log(root.message);
   }
-
   if (!comparison.ok) {
+    console.error(comparison.message);
     console.error(
-      'Raise coverage by adding stories under packages/ui/atoms/*.stories.tsx, then run `pnpm story-coverage:update`.'
+      'Add adjacent *.stories.tsx for uncovered components, then run `pnpm story-coverage:update` if floors should rise.'
     );
     return 1;
   }
-
-  // Soft: print uncovered for visibility even when percent holds.
-  if (measurement.uncoveredComponents.length > 0) {
-    console.log(
-      `still uncovered (${measurement.uncovered}): ${measurement.uncoveredComponents.join(', ')}`
-    );
-  }
+  console.log(comparison.message);
   return 0;
 }
 
@@ -310,3 +371,10 @@ const isMain =
 if (isMain) {
   process.exit(main());
 }
+
+export {
+  COVERAGE_ROOTS,
+  listComponentsInRoot,
+  measureAllRoots,
+  measureRootCoverage,
+};
