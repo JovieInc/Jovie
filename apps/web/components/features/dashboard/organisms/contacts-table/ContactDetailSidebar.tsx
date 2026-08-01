@@ -294,7 +294,10 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
         >
           {activeTab === 'info' && (
             <>
-              <DrawerSection title='Role' className='space-y-2' surface='card'>
+              <DrawerSection
+                title='Role'
+                className='space-y-2 border-b border-subtle pb-3'
+              >
                 <Label className='text-app text-secondary-token'>
                   Contact Type
                 </Label>
@@ -324,8 +327,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
 
               <DrawerSection
                 title='Contact Info'
-                className='space-y-2'
-                surface='card'
+                className='space-y-2 border-b border-subtle pb-3'
               >
                 <div className='space-y-1'>
                   {renderEditableField(
@@ -359,8 +361,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
               {hasEmailAndPhone && (
                 <DrawerSection
                   title='Preferred Contact'
-                  className='space-y-2'
-                  surface='card'
+                  className='space-y-2 border-b border-subtle pb-3'
                 >
                   <div className='space-y-2'>
                     <Label className='text-app text-secondary-token'>
@@ -387,11 +388,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
           )}
 
           {activeTab === 'territories' && (
-            <DrawerSection
-              title='Territories'
-              className='space-y-2'
-              surface='card'
-            >
+            <DrawerSection title='Territories' className='space-y-2'>
               <div className='space-y-2'>
                 <DrawerPropertyRow
                   label='Coverage'
@@ -417,7 +414,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                         aria-pressed={isSelected}
                         title={territory}
                         className={cn(
-                          'inline-flex h-6 max-w-full shrink-0 items-center whitespace-nowrap rounded-md border px-2 text-2xs font-caption leading-none transition-[background-color,border-color,color] duration-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                          'inline-flex h-11 max-w-full shrink-0 items-center whitespace-nowrap rounded-md border px-2 text-2xs font-caption leading-none transition-[background-color,border-color,color] duration-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring sm:h-7',
                           isSelected
                             ? 'border-(--linear-border-focus)/35 bg-surface-1 text-primary-token'
                             : 'border-subtle bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'
@@ -441,7 +438,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
           {/* Saving indicator */}
           {contact.isSaving && (
             <div className='rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-center text-app text-tertiary-token'>
-              Saving...
+              Saving…
             </div>
           )}
         </DrawerTabbedCard>

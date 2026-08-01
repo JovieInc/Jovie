@@ -63,7 +63,7 @@ const contact: EditableContact = {
 
 describe('ContactDetailSidebar', () => {
   it('renders the calm entity header and Info tab content by default', () => {
-    render(
+    const { container } = render(
       <ContactDetailSidebar
         contact={contact}
         isOpen
@@ -96,6 +96,10 @@ describe('ContactDetailSidebar', () => {
     expect(screen.queryByText('Contact')).not.toBeInTheDocument();
     expect(screen.getByText('Contact Info')).toBeInTheDocument();
     expect(screen.getByText('Role')).toBeInTheDocument();
+    expect(
+      container.querySelectorAll('[data-surface-variant="card"]')
+    ).toHaveLength(2);
+    expect(screen.getByText('Role')).not.toHaveClass('uppercase');
   });
 
   it('shows Territories when the Territories tab is clicked', async () => {
@@ -115,5 +119,9 @@ describe('ContactDetailSidebar', () => {
     await user.click(screen.getByRole('tab', { name: 'Territories' }));
 
     expect(screen.getAllByText('Territories').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'North America' })).toHaveClass(
+      'h-11',
+      'sm:h-7'
+    );
   });
 });
