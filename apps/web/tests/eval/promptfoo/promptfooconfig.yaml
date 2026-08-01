@@ -1576,6 +1576,10 @@ tests:
           - suggestRelatedArtists
           - unpauseMerchCard
           - writeWorldClassBio
+          - researchArtistPresence
+          - assembleArtistProfile
+          - generateSmartLink
+          - draftWelcomePost
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend
@@ -1596,6 +1600,7 @@ tests:
       coverage:
         expectedSkillIds:
           - analyzePackaging
+          - channelIntelligenceReport
           - fan_email_send
           - generateReleasePitch
           - retouch
@@ -1616,6 +1621,7 @@ tests:
       coverage:
         expectedSkillIds:
           - analyzePackaging
+          - channelIntelligenceReport
           - fan_email_send
           - generateReleasePitch
           - retouch
@@ -1643,6 +1649,7 @@ tests:
       coverage:
         expectedSkillIds:
           - analyzePackaging
+          - channelIntelligenceReport
           - fan_email_send
           - generateReleasePitch
           - retouch
@@ -1684,6 +1691,7 @@ tests:
       coverage:
         expectedSkillIds:
           - analyzePackaging
+          - channelIntelligenceReport
           - fan_email_send
           - generateReleasePitch
           - retouch
@@ -2884,6 +2892,90 @@ tests:
         kind: promo
         title: "Release day shout-out"
         script: "Hey everyone, Neon Reef is out now. Thank you so much for listening."
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaValid
+      - type: javascript
+        value: file://assertions.cjs:assertToolExecuted
+
+  - description: Tool contract accepts presence-build research artifact event
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Presence-build research artifact."
+      target: tool-contract
+      toolName: researchArtistPresence
+      mode: app
+      plan: pro
+      toolInput:
+        stepId: research_artist
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaValid
+      - type: javascript
+        value: file://assertions.cjs:assertToolExecuted
+
+  - description: Tool contract accepts presence-build profile assembly artifact event
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Presence-build profile assembly artifact."
+      target: tool-contract
+      toolName: assembleArtistProfile
+      mode: app
+      plan: pro
+      toolInput:
+        stepId: assemble_profile
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaValid
+      - type: javascript
+        value: file://assertions.cjs:assertToolExecuted
+
+  - description: Tool contract accepts presence-build smart link artifact event
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Presence-build smart link artifact."
+      target: tool-contract
+      toolName: generateSmartLink
+      mode: app
+      plan: pro
+      toolInput:
+        stepId: generate_smart_link
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaValid
+      - type: javascript
+        value: file://assertions.cjs:assertToolExecuted
+
+  - description: Tool contract accepts presence-build welcome draft artifact event
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Presence-build welcome draft artifact."
+      target: tool-contract
+      toolName: draftWelcomePost
+      mode: app
+      plan: pro
+      toolInput:
+        stepId: draft_welcome_post
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend

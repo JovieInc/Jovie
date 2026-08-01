@@ -339,6 +339,39 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Ready to record',
     errorTitle: "Couldn't prepare your recording",
   },
+  // JOV-3988 onboarding presence-build wow-moment artifacts
+  researchArtistPresence: {
+    label: 'Artist research',
+    uiHint: 'artifact',
+    renderer: 'artifact',
+    loadingTitle: 'Researching your artist presence…',
+    successTitle: 'Artist research ready',
+    errorTitle: "Couldn't research this artist",
+  },
+  assembleArtistProfile: {
+    label: 'Profile assembly',
+    uiHint: 'artifact',
+    renderer: 'artifact',
+    loadingTitle: 'Assembling your profile…',
+    successTitle: 'Profile sections ready',
+    errorTitle: "Couldn't assemble your profile",
+  },
+  generateSmartLink: {
+    label: 'Smart link',
+    uiHint: 'artifact',
+    renderer: 'artifact',
+    loadingTitle: 'Generating your smart link…',
+    successTitle: 'Smart link ready',
+    errorTitle: "Couldn't generate your smart link",
+  },
+  draftWelcomePost: {
+    label: 'Welcome post',
+    uiHint: 'artifact',
+    renderer: 'artifact',
+    loadingTitle: 'Drafting your first post…',
+    successTitle: 'Welcome draft ready',
+    errorTitle: "Couldn't draft a welcome post",
+  },
 } as const satisfies Record<string, ToolUiConfig>;
 
 function startCaseFromCamelCase(value: string): string {

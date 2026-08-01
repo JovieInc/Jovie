@@ -51,13 +51,36 @@ case "$mode" in
     promptfoo validate -c "$config_path"
     ;;
   eval)
+    # Capture full output (no interactive TTY). Promptfoo's winston File transport
+    # can throw ERR_STREAM_WRITE_AFTER_END during teardown after all cases pass,
+    # which would otherwise fail merge_group with exit 1 (seen on #15334).
+    tmp_log="$(mktemp -t jovie-pf-eval.XXXXXX)"
+    set +e
+    set +o pipefail
     promptfoo eval \
       -c "$config_path" \
       --filter-metadata cost=deterministic \
       --no-cache \
       --no-share \
       --no-write \
-      --no-table 2>&1 | cat
+      --no-table >"$tmp_log" 2>&1
+    pf_rc=$?
+    set -e
+    set -o pipefail
+    cat "$tmp_log"
+    if [ "$pf_rc" -eq 0 ]; then
+      rm -f "$tmp_log"
+      exit 0
+    fi
+    if grep -q 'Error: write after end' "$tmp_log" \
+      && grep -Eq '0 failed|passed \(100%\)|✓ Complete!' "$tmp_log" \
+      && ! grep -Eq '[1-9][0-9]* failed' "$tmp_log"; then
+      echo "promptfoo teardown write-after-end ignored (all deterministic cases passed)" >&2
+      rm -f "$tmp_log"
+      exit 0
+    fi
+    rm -f "$tmp_log"
+    exit "$pf_rc"
     ;;
   *)
     echo "Usage: $0 [validate|eval]" >&2
