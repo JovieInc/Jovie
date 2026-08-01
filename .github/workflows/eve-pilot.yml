@@ -6,8 +6,6 @@ on:
       - 'apps/eve-pilot/**'
       - 'pnpm-workspace.yaml'
       - '.github/workflows/eve-pilot.yml'
-  merge_group:
-    types: [checks_requested]
   push:
     branches: [main]
     paths:

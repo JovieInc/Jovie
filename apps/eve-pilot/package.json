@@ -1,6 +1,5 @@
 {
   "name": "@jovie/eve-pilot",
-  "version": "0.0.0",
   "type": "module",
   "engines": {
     "node": ">=24"
