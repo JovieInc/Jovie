@@ -146,18 +146,16 @@ function TypeCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
   const label = kindLabel(row);
   return (
     <SimpleTooltip content={`${label} connection`}>
-      <button
-        type='button'
+      <span
+        role='img'
         aria-label={`${label} connection type`}
         className={cn(
-          'inline-flex h-7 w-7 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16',
-          row.kind === 'jovie'
-            ? 'text-accent'
-            : 'text-tertiary-token hover:text-secondary-token'
+          'inline-flex h-7 w-7 items-center justify-center',
+          row.kind === 'jovie' ? 'text-accent' : 'text-tertiary-token'
         )}
       >
         <ConnectionTypeGlyph row={row} />
-      </button>
+      </span>
     </SimpleTooltip>
   );
 }
@@ -470,7 +468,7 @@ export function ProfilesWorkspace({
         header: 'Connection',
         size: 220,
         minSize: 160,
-        meta: { className: 'px-2 sm:px-3' },
+        meta: { className: 'px-3' },
         cell: context => {
           const row = context.row.original;
           return (
@@ -492,14 +490,14 @@ export function ProfilesWorkspace({
         id: 'type',
         header: () => <span className='sr-only'>Type</span>,
         size: 48,
-        meta: { className: 'px-1 sm:px-3' },
+        meta: { className: 'px-3' },
         cell: context => <TypeCell row={context.row.original} />,
       }),
       columnHelper.accessor(row => getConnectionStatus(row).label, {
         id: 'status',
         header: 'Status / Issue',
         size: 140,
-        meta: { className: 'px-1 sm:px-3' },
+        meta: { className: 'px-3' },
         cell: context => <StatusCell row={context.row.original} />,
       }),
       columnHelper.display({
@@ -555,7 +553,7 @@ export function ProfilesWorkspace({
         id: 'actions',
         header: () => <span className='sr-only'>Actions</span>,
         size: 44,
-        meta: { className: 'px-1 sm:px-3' },
+        meta: { className: 'px-3' },
         cell: context => {
           const row = context.row.original;
           const actionItems = convertContextMenuItems(getContextMenuItems(row));
@@ -646,14 +644,26 @@ export function ProfilesWorkspace({
             />
           ))}
           end={
-            <div className='flex items-center gap-3 whitespace-nowrap'>
+            <div className='flex w-full items-center gap-2 whitespace-nowrap lg:w-auto lg:gap-3'>
               <div
                 data-testid='connections-summary'
-                className='flex items-center gap-3 text-xs text-tertiary-token'
+                className='flex min-w-0 flex-1 items-center gap-2 overflow-x-auto text-xs text-tertiary-token tabular-nums lg:flex-none lg:overflow-visible'
               >
                 <span>{summary.connectionCount} Connections</span>
+                <span aria-hidden className='text-quaternary-token'>
+                  ·
+                </span>
                 <span>{limitLabel}</span>
+                <span aria-hidden className='text-quaternary-token'>
+                  ·
+                </span>
                 <span>Needs Attention {summary.needsAttentionCount}</span>
+                <span
+                  aria-hidden
+                  className='max-sm:hidden text-quaternary-token'
+                >
+                  ·
+                </span>
                 <span className='max-sm:hidden'>
                   Best Rank{' '}
                   {summary.bestRank === null ? (
@@ -666,6 +676,12 @@ export function ProfilesWorkspace({
                     `#${summary.bestRank}`
                   )}
                 </span>
+                <span
+                  aria-hidden
+                  className='max-sm:hidden text-quaternary-token'
+                >
+                  ·
+                </span>
                 <span className='max-sm:hidden'>
                   Monitoring {summary.monitoringLabel}
                 </span>
@@ -673,13 +689,15 @@ export function ProfilesWorkspace({
               <Button
                 type='button'
                 size='sm'
+                aria-label='Add Connection'
+                className='shrink-0 max-sm:w-7.5 max-sm:px-0'
                 onClick={() => {
                   setSelected(null);
                   setIsAddConnectionOpen(true);
                 }}
               >
                 <Plus className='h-3.5 w-3.5' aria-hidden />
-                Add connection
+                <span className='max-sm:sr-only'>Add Connection</span>
               </Button>
             </div>
           }

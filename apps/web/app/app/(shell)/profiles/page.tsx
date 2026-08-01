@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   loadAppShellRouteContext,
@@ -7,6 +8,11 @@ import { loadProfilesWorkspaceData } from './data';
 import { ProfilesWorkspace } from './ProfilesWorkspace';
 
 export const runtime = 'nodejs';
+
+export const metadata: Metadata = {
+  title: 'Connections',
+  description: 'Manage and monitor your connected platforms',
+};
 
 export default async function ProfilesPage() {
   const routeContext = await loadAppShellRouteContext({

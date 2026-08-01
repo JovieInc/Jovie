@@ -6,7 +6,7 @@ import { CalendarPageClient } from './CalendarPageClient';
 export const runtime = 'nodejs';
 
 export const metadata: Metadata = {
-  title: 'Calendar | Jovie',
+  title: 'Calendar',
   description: 'Releases and events at a glance',
 };
 

@@ -393,13 +393,28 @@ describe('ChatPageClient', () => {
     });
   });
 
-  it('clears header badge when title changes to null', () => {
-    renderChatPage('conv-123');
+  it('preserves the server title when an existing chat briefly reports null', async () => {
+    fastRender(
+      <DashboardDataProvider value={baseDashboardData}>
+        <ChatPageClient
+          conversationId='conv-123'
+          initialConversationTitle='Release Planning Conversation'
+        />
+      </DashboardDataProvider>
+    );
     expect(capturedOnTitleChange).toBeDefined();
 
     capturedOnTitleChange!(null);
 
-    expect(mockSetHeaderBadge).toHaveBeenCalledWith(null);
+    await waitFor(() => {
+      expect(mockSetHeaderBadge).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          props: expect.objectContaining({
+            title: 'Release Planning Conversation',
+          }),
+        })
+      );
+    });
   });
 
   it('cleans up header badge on unmount', () => {

@@ -131,7 +131,7 @@ export function SettingsAppearanceSection() {
 
         <div className='border-t border-subtle pt-4'>
           <SettingsToggleRow
-            title='High contrast'
+            title='High Contrast'
             description='Increase contrast for text, borders, and surfaces.'
             checked={isHighContrast}
             onCheckedChange={handleHighContrastChange}

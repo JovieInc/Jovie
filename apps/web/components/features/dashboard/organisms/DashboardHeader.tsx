@@ -89,7 +89,9 @@ export function DashboardHeader({
   const currentLabel = breadcrumbs.at(-1)?.label ?? '';
   const rootLabel =
     breadcrumbs.length > 1 ? (breadcrumbs[0]?.label ?? 'Jovie') : 'Jovie';
-  const usesSectionTitleLayout = breadcrumbs.length === 1 && !breadcrumbSuffix;
+  // A live chat title replaces the route label in place. Keep the one-item
+  // breadcrumb geometry stable instead of inserting a root crumb after load.
+  const usesSectionTitleLayout = breadcrumbs.length === 1;
   const showInlineSearch = Boolean(searchSurface);
 
   return (

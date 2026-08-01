@@ -47,6 +47,13 @@ const CALENDAR_GRID_CELL_KEYS = [
   'calendar-cell-33',
   'calendar-cell-34',
   'calendar-cell-35',
+  'calendar-cell-36',
+  'calendar-cell-37',
+  'calendar-cell-38',
+  'calendar-cell-39',
+  'calendar-cell-40',
+  'calendar-cell-41',
+  'calendar-cell-42',
 ] as const;
 
 export function CalendarRouteSkeleton() {
@@ -64,11 +71,11 @@ export function CalendarRouteSkeleton() {
       }
     >
       <PageContent className='px-3 py-2 sm:px-3 sm:py-2'>
-        <div className='grid h-full min-h-0 grid-cols-1 gap-3 lg:grid-cols-[9rem_minmax(0,1fr)]'>
+        <div className='grid h-full min-h-0 grid-cols-1 gap-3 lg:grid-cols-6'>
           <div
             aria-hidden='true'
             data-testid='calendar-filter-rail-skeleton'
-            className='flex min-w-0 gap-1 overflow-hidden pb-0.5 lg:flex-col lg:overflow-visible lg:pb-0'
+            className='flex min-h-8 min-w-0 gap-1 overflow-hidden pb-0.5 lg:flex-col lg:overflow-visible lg:pb-0'
           >
             {['all', 'releases', 'events', 'review'].map(key => (
               <div
@@ -79,7 +86,7 @@ export function CalendarRouteSkeleton() {
           </div>
           <div
             data-testid='calendar-grid-skeleton'
-            className='overflow-hidden rounded-xl border border-subtle'
+            className='overflow-hidden rounded-xl border border-subtle lg:col-span-5'
           >
             <div className='grid grid-cols-7 border-b border-subtle'>
               {CALENDAR_WEEKDAY_KEYS.map(key => (

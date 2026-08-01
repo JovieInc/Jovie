@@ -14,9 +14,10 @@ describe('SettingsPanel', () => {
       </SettingsPanel>
     );
 
-    expect(
-      screen.getByRole('heading', { name: 'Appearance' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Appearance' })).toHaveClass(
+      'text-app',
+      'text-primary-token'
+    );
     expect(
       screen.getByText('Theme and contrast preferences for your workspace.')
     ).toBeInTheDocument();

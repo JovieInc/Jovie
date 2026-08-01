@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/SettingsToggleRow.test.tsx
 import { Switch } from '@jovie/ui';
 import * as React from 'react';
 import { SettingsPlanGateLabel } from '@/components/atoms/SettingsPlanGateLabel';
@@ -61,10 +62,9 @@ export function SettingsToggleRow(props: Readonly<SettingsToggleRowProps>) {
         <div className='min-w-0'>
           <h3
             id={titleId}
-            className={cn(
-              'text-app font-[540] tracking-tighter',
+            className={`text-app font-[540] tracking-tighter ${
               props.gated ? 'text-tertiary-token' : 'text-primary-token'
-            )}
+            }`}
           >
             {title}
           </h3>
