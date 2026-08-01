@@ -131,6 +131,31 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerCardActionBar: () => <div data-testid='drawer-card-action-bar' />,
 }));
 
+vi.mock('@/components/molecules/drawer/EntityHeaderCard', () => ({
+  EntityHeaderCard: ({
+    title,
+    subtitle,
+    meta,
+    actions,
+    stableLayout,
+    'data-testid': testId,
+  }: {
+    title: React.ReactNode;
+    subtitle?: React.ReactNode;
+    meta?: React.ReactNode;
+    actions?: React.ReactNode;
+    stableLayout?: boolean;
+    'data-testid'?: string;
+  }) => (
+    <div data-testid={testId} data-stable-layout={stableLayout}>
+      <div>{title}</div>
+      {subtitle}
+      {meta}
+      {actions}
+    </div>
+  ),
+}));
+
 vi.mock('@/components/molecules/LoadingSkeleton', () => ({
   LoadingSkeleton: () => <div data-testid='loading-skeleton' />,
 }));
@@ -226,6 +251,25 @@ describe('TourDateSidebar analytics section', () => {
     expect(screen.getAllByTestId('loading-skeleton').length).toBeGreaterThan(0);
   });
 
+  it('uses the canonical entity header for identity and overflow actions', () => {
+    mockUseTourDateAnalyticsQuery.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+    });
+
+    renderSidebar();
+
+    expect(screen.getByTestId('tour-date-entity-header')).toHaveTextContent(
+      'Summer Tour 2026'
+    );
+    expect(screen.getByTestId('tour-date-entity-header')).toHaveAttribute(
+      'data-stable-layout',
+      'true'
+    );
+    expect(screen.getByTestId('drawer-card-action-bar')).toBeInTheDocument();
+  });
+
   it('shows error message when analytics fail to load', () => {
     mockUseTourDateAnalyticsQuery.mockReturnValue({
       data: undefined,
@@ -276,11 +320,6 @@ describe('TourDateSidebar analytics section', () => {
       'data-workspace-surface',
       'raised'
     );
-    expect(screen.getByTestId('tour-date-entity-header')).toHaveAttribute(
-      'data-density',
-      'rail'
-    );
-
     // Check stat tiles
     const ticketStat = screen.getByTestId('stat-Ticket Clicks');
     expect(ticketStat).toBeInTheDocument();
