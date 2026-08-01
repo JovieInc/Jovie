@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/user-button.test.tsx
+
 import type { CommonDropdownItem, CommonDropdownSubmenu } from '@jovie/ui';
 import { Button, CommonDropdown } from '@jovie/ui';
 import {
