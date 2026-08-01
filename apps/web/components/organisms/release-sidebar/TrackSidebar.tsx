@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/organisms/release-sidebar/TrackSidebar.test.tsx
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Pause, Play, VolumeX } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
