@@ -84,6 +84,7 @@ export function AudienceMemberSidebar({
               <DrawerHeaderActions
                 primaryActions={[]}
                 overflowActions={[]}
+                menuItems={contextMenuItems}
                 onClose={onClose}
               />
             }
