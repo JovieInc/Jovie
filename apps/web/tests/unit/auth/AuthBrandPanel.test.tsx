@@ -20,7 +20,9 @@ describe('AuthBrandPanel', () => {
 
     expect(preview).not.toHaveAttribute('aria-roledescription', 'carousel');
     expect(
-      screen.getByTestId('product-screenshot-frame-shell-v1-releases-desktop')
+      screen.getByTestId(
+        'product-screenshot-frame-dashboard-releases-sidebar-desktop'
+      )
     ).toBeInTheDocument();
     expect(
       screen.queryByTestId(
@@ -28,7 +30,9 @@ describe('AuthBrandPanel', () => {
       )
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByTestId('product-screenshot-frame-shell-v1-library-desktop')
+      screen.queryByTestId(
+        'product-screenshot-frame-design-studio-shell-library-desktop'
+      )
     ).not.toBeInTheDocument();
   });
 });

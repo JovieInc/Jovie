@@ -19,9 +19,7 @@ export type ScreenshotConsumer =
 export type ScreenshotInteraction =
   | 'none'
   | 'open-first-release'
-  | 'open-first-release-dsps'
-  | 'open-shell-library'
-  | 'open-shell-releases';
+  | 'open-first-release-dsps';
 
 export type ScreenshotCaptureTarget = 'page' | 'locator';
 

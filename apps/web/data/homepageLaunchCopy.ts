@@ -48,7 +48,7 @@ export const HOMEPAGE_LAUNCH_COPY = {
   workspace: {
     kicker: 'What Jovie finds.',
     headline: 'All your music.\nWorking while you sleep.',
-    screenshotKey: 'shell-v1-library-desktop',
+    screenshotKey: 'design-studio-shell-library-desktop',
     callouts: [
       {
         key: 'import',

@@ -598,48 +598,6 @@
     "publicExportPath": "design-studio-shell-track.png"
   },
   {
-    "id": "shell-v1-dashboard-desktop",
-    "title": "Shell v1 — Dashboard",
-    "group": "dashboard",
-    "groupLabel": "Dashboard",
-    "route": "/exp/shell-v1?capture=marketing",
-    "viewport": "desktop",
-    "theme": "dark",
-    "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-07-10T06:21:19.658Z",
-    "gitSha": "c305936ad8f8a2ee156a7a8c362c892009388923",
-    "imagePath": "shell-v1-dashboard-desktop.png",
-    "publicExportPath": "shell-v1-dashboard.png"
-  },
-  {
-    "id": "shell-v1-library-desktop",
-    "title": "Shell v1 — Library",
-    "group": "dashboard",
-    "groupLabel": "Dashboard",
-    "route": "/exp/shell-v1?view=library&capture=marketing&player=off",
-    "viewport": "desktop",
-    "theme": "dark",
-    "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-06-27T11:31:13.302Z",
-    "gitSha": "0a9937d43c7418c32e8cb60ac0bc486865b34b0b",
-    "imagePath": "shell-v1-library-desktop.png",
-    "publicExportPath": "shell-v1-library.png"
-  },
-  {
-    "id": "shell-v1-releases-desktop",
-    "title": "Shell v1 — Releases",
-    "group": "dashboard",
-    "groupLabel": "Dashboard",
-    "route": "/exp/shell-v1?view=releases&release=the-deep-end&capture=marketing",
-    "viewport": "desktop",
-    "theme": "dark",
-    "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-07-10T12:06:10.349Z",
-    "gitSha": "687065dc93af3b72a1dfbd71a7d2cd5c31a08d2b",
-    "imagePath": "shell-v1-releases-desktop.png",
-    "publicExportPath": "shell-v1-releases.png"
-  },
-  {
     "id": "dashboard-releases-desktop",
     "title": "Releases Dashboard",
     "group": "dashboard",
