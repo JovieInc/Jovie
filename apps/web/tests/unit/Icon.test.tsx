@@ -64,6 +64,15 @@ describe('Icon', () => {
     }
   });
 
+  it('registers sidebar thread utility glyphs (JOV-4716)', () => {
+    const names = ['ArrowRight', 'MessageSquarePlus'] as const;
+
+    for (const name of names) {
+      render(<Icon name={name} data-testid={`icon-${name}`} />);
+      expect(screen.getByTestId(`icon-${name}`)).toBeInTheDocument();
+    }
+  });
+
   it('returns null for unknown icon', () => {
     const { container } = render(
       <Icon name={'NotRealIcon' as any} data-testid='icon' />

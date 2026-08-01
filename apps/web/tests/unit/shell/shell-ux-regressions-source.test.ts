@@ -118,6 +118,27 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
     expect(search).toContain("name='Search'");
   });
 
+  it('routes sidebar thread utilities through the shared Icon registry and sidebar sizing contract (JOV-4716)', () => {
+    const threads = readFileSync(
+      path.join(webRoot, 'components/shell/SidebarThreadsSection.tsx'),
+      'utf8'
+    );
+    const icons = readFileSync(
+      path.join(webRoot, 'components/atoms/Icon.tsx'),
+      'utf8'
+    );
+
+    expect(threads).toContain("from '@/components/atoms/Icon'");
+    expect(threads).toContain('getSidebarNavIconClassName');
+    expect(threads).not.toContain("from 'lucide-react'");
+    expect(threads).toContain("name='Ellipsis'");
+    expect(threads).toContain("name='RefreshCw'");
+    expect(threads).toContain("name='MessageSquarePlus'");
+    expect(threads).toContain("name='ArrowRight'");
+    expect(icons).toContain('ArrowRight,');
+    expect(icons).toContain('MessageSquarePlus,');
+  });
+
   it('keeps left allocation, main-plane geometry, and right allocation on one rail-motion contract (JOV-4522)', () => {
     const frame = readFileSync(
       path.join(webRoot, 'components/organisms/AppShellFrame.tsx'),

@@ -2,20 +2,18 @@
 
 import { Button } from '@jovie/ui';
 
-import {
-  ArrowRight,
-  MessageSquarePlus,
-  MoreHorizontal,
-  RefreshCw,
-} from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import React, { useMemo } from 'react';
+import { Icon } from '@/components/atoms/Icon';
 import { NavBadge } from '@/components/atoms/NavBadge';
 import { APP_ROUTES } from '@/constants/routes';
 import type { ChatConversation } from '@/lib/queries/useChatConversationsQuery';
 import { cn } from '@/lib/utils';
-import { getSidebarNavRowClassName } from './SidebarNavItem';
+import {
+  getSidebarNavIconClassName,
+  getSidebarNavRowClassName,
+} from './SidebarNavItem';
 import { Tooltip } from './Tooltip';
 
 // Chat list types — co-located so consumers import from one place. Production
@@ -289,8 +287,13 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
               'opacity-0 group-hover/thread:opacity-100 group-hover/thread:bg-surface-0 focus-visible:opacity-100'
             )}
           >
-            <MoreHorizontal
-              className='h-3 w-3'
+            <Icon
+              name='Ellipsis'
+              className={getSidebarNavIconClassName({
+                tight: true,
+                className:
+                  'group-hover/thread:text-sidebar-item-foreground focus-visible:text-sidebar-item-foreground',
+              })}
               strokeWidth={2.25}
               aria-hidden='true'
             />
@@ -383,8 +386,9 @@ export function SidebarThreadsSection({
                 aria-label='Retry Chats'
                 className='grid h-5 w-5 shrink-0 place-items-center rounded text-quaternary-token transition-[background-color] duration-subtle ease-subtle hover:bg-sidebar-accent/55 hover:text-primary-token'
               >
-                <RefreshCw
-                  className='h-3 w-3'
+                <Icon
+                  name='RefreshCw'
+                  className={getSidebarNavIconClassName({ tight: true })}
                   aria-hidden='true'
                   strokeWidth={2.25}
                 />
@@ -405,8 +409,9 @@ export function SidebarThreadsSection({
               'h-auto text-left hover:bg-transparent'
             )}
           >
-            <MessageSquarePlus
-              className='h-3.5 w-3.5 shrink-0 justify-self-center text-quaternary-token'
+            <Icon
+              name='MessageSquarePlus'
+              className={getSidebarNavIconClassName({ tight })}
               aria-hidden='true'
               strokeWidth={2.25}
             />
@@ -442,8 +447,9 @@ export function SidebarThreadsSection({
               'text-left'
             )}
           >
-            <ArrowRight
-              className='h-3.5 w-3.5 shrink-0 justify-self-center text-quaternary-token'
+            <Icon
+              name='ArrowRight'
+              className={getSidebarNavIconClassName({ tight })}
               aria-hidden='true'
               strokeWidth={2.25}
             />

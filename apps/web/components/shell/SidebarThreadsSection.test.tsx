@@ -24,6 +24,57 @@ const threads: SidebarThread[] = [
 ];
 
 describe('SidebarThreadsSection', () => {
+  it('routes thread utility glyphs through the shared sidebar icon contracts', () => {
+    const { rerender } = render(
+      <SidebarThreadsSection
+        threads={threads}
+        activeThreadId={null}
+        onThreadContextMenu={vi.fn()}
+        tight
+        collapsed={false}
+      />
+    );
+
+    const chatActionIcon = screen
+      .getByRole('button', { name: 'Chat Actions for Pitch tasks' })
+      .querySelector('svg');
+    const allChatsIcon = screen
+      .getByRole('link', { name: 'All Chats' })
+      .querySelector('svg');
+
+    expect(chatActionIcon).toHaveClass('h-3', 'w-3', 'text-sidebar-muted/70');
+    expect(allChatsIcon).toHaveClass('h-3', 'w-3', 'text-sidebar-muted/70');
+
+    rerender(
+      <SidebarThreadsSection
+        threads={[]}
+        activeThreadId={null}
+        state='error'
+        onRetry={vi.fn()}
+        tight
+        collapsed={false}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Retry Chats' }).querySelector('svg')
+    ).toHaveClass('h-3', 'w-3', 'text-sidebar-muted/70');
+
+    rerender(
+      <SidebarThreadsSection
+        threads={[]}
+        activeThreadId={null}
+        onNewThread={vi.fn()}
+        tight
+        collapsed={false}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'New Chat' }).querySelector('svg')
+    ).toHaveClass('h-3', 'w-3', 'text-sidebar-muted/70');
+  });
+
   it('uses the full middle track at rest and layers chat actions over a visible cross-engine faded edge', () => {
     const title =
       'Reply with exactly one short sentence confirming the artist release plan';
