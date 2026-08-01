@@ -74,6 +74,14 @@ test.describe('candidate-bound Better Auth OAuth runtime @production-smoke', () 
         `${contract.provider} OAuth UI entry`
       );
 
+      // Provider buttons stay disabled until React hydrates event handlers.
+      // Waiting on enabled (not merely visible) is the contract that prevents a
+      // pre-hydration click from becoming a silent no-op with no social POST.
+      await expect(
+        page.locator('[data-auth-shell-hydrated="true"]'),
+        `${CONFIRMED_RUNTIME_CONTRACT}: auth shell never hydrated`
+      ).toBeVisible({ timeout: 20_000 });
+
       const button = page.locator(
         `button[data-auth-provider-slot="${contract.provider}"]`
       );
@@ -93,15 +101,6 @@ test.describe('candidate-bound Better Auth OAuth runtime @production-smoke', () 
       const providerNavigation = new Promise<URL>((resolve, reject) => {
         resolveProviderNavigation = resolve;
         rejectProviderNavigation = reject;
-        navigationTimer = setTimeout(
-          () =>
-            reject(
-              new Error(
-                `${CONFIRMED_RUNTIME_CONTRACT}: ${contract.provider} provider navigation was not emitted`
-              )
-            ),
-          20_000
-        );
       });
 
       await page.route(`https://${contract.host}/**`, async route => {
@@ -138,6 +137,17 @@ test.describe('candidate-bound Better Auth OAuth runtime @production-smoke', () 
       );
 
       try {
+        // Start the navigation budget at click time (not route-setup time) so
+        // hydration wait does not steal from the post-click OAuth budget.
+        navigationTimer = setTimeout(
+          () =>
+            rejectProviderNavigation(
+              new Error(
+                `${CONFIRMED_RUNTIME_CONTRACT}: ${contract.provider} provider navigation was not emitted`
+              )
+            ),
+          20_000
+        );
         await button.click({ noWaitAfter: true });
         const [request, providerUrl] = await Promise.all([
           socialPost,

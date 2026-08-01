@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- [internal] **Staging OAuth runtime proof no longer dead-clicks pre-hydration provider buttons (#15371):** AuthShell keeps Google/Apple buttons disabled until React hydrates, surfaces Better Auth soft-errors, and the production-smoke OAuth test waits on `data-auth-shell-hydrated` so provider navigation is actually emitted.
 - **Onboarding shows real presence-build tasks live after signup (JOV-3988):** new creators get four seeded workflow tasks (research artist, assemble profile, smart link, welcome draft) that only surface data already found, stream tool artifacts in the welcome chat, and fall back to the existing welcome path when the kill-switch is off or the queue fails.
 - [internal] **Typecheck singleflight no longer replaces live owners by age (JOV-4524):** locks are reclaimed only for dead owners, missing-pid age expiry, or bounded corrupt-lock recovery; live owners past the 30m window stay authoritative, with structured recovery logs and regression coverage.
 - [internal] **Machine-access revenue-share compliance package (JOV-3831):** draft decision set (70/30 artist-majority, opt-in default OFF, monthly $10 Connect fiat floor, platform stablecoin off-ramp), consent/ToS language, tax reporting path, and Pay Per Crawl public-docs verification — Tim sign-off still required before P1 build.
