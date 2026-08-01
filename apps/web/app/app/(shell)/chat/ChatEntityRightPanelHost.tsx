@@ -34,7 +34,6 @@ import {
   EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
-import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import type { EntityCardModel } from '@/components/organisms/entity-card';
 import {
@@ -46,6 +45,7 @@ import {
 } from '@/components/organisms/entity-card';
 import {
   type ContextMenuItemType,
+  convertToCommonDropdownItems,
   TableContextMenu,
 } from '@/components/organisms/table';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
@@ -574,31 +574,10 @@ function ChatReleaseEntityPanel({
       }),
     [panelTitle, smartLinkPath]
   );
-  const headerOverflowActions = useMemo<DrawerHeaderAction[]>(() => {
-    const actions: DrawerHeaderAction[] = [];
-
-    if (smartLinkPath) {
-      actions.push({
-        id: 'open-smart-link',
-        label: 'Open Smart Link',
-        icon: ExternalLink,
-        onClick: () => {
-          globalThis.open(smartLinkPath, '_blank', 'noopener,noreferrer');
-        },
-      });
-    }
-
-    actions.push({
-      id: 'copy-title',
-      label: 'Copy Title',
-      icon: Copy,
-      onClick: () => {
-        void globalThis.navigator?.clipboard?.writeText(panelTitle);
-      },
-    });
-
-    return actions;
-  }, [panelTitle, smartLinkPath]);
+  const railActionItems = useMemo(
+    () => convertToCommonDropdownItems(contextMenuItems),
+    [contextMenuItems]
+  );
 
   useEffect(() => {
     setShowTasksUpgrade(true);
@@ -611,6 +590,7 @@ function ChatReleaseEntityPanel({
         ariaLabel='Release details'
         scrollStrategy='shell'
         workspaceSurface='raised'
+        contextMenuItems={railActionItems}
         headerMode='minimal'
         hideMinimalHeaderBar
         data-testid='chat-release-entity-panel'
@@ -664,7 +644,7 @@ function ChatReleaseEntityPanel({
             actions={
               <DrawerHeaderActions
                 primaryActions={[]}
-                overflowActions={headerOverflowActions}
+                menuItems={railActionItems}
                 onClose={onClose}
               />
             }

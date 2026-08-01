@@ -1,4 +1,11 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React, { useCallback, useEffect } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -846,6 +853,52 @@ describe('ChatEntityRightPanelHost', () => {
     expect(screen.getByTestId('chat-release-entity-panel')).toHaveTextContent(
       'Release'
     );
+  });
+
+  it('mirrors canonical release actions in the compact header overflow', async () => {
+    const user = userEvent.setup();
+    mockPreviewPanelOpen = false;
+    mockUseRegisterRightPanel.mockClear();
+    mockUseReleaseEntityQuery.mockReturnValue({
+      data: {
+        id: 'release-1',
+        title: 'Lost In The Light',
+        releaseType: 'single',
+        status: 'released',
+        slug: 'lost-in-the-light',
+        smartLinkPath: '/r/lost-in-the-light',
+        profileId: 'profile-1',
+        totalTracks: 1,
+        providers: [],
+      },
+      isLoading: false,
+    });
+
+    render(
+      <ChatEntityPanelProvider>
+        <OpenReleaseTarget />
+        <ChatEntityRightPanelHost
+          enablePreviewPanel={false}
+          enableChatEntityPanels
+          profileId='profile-1'
+        />
+      </ChatEntityPanelProvider>
+    );
+
+    const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
+    expect(registeredPanel).not.toBeNull();
+    render(registeredPanel as React.ReactElement);
+
+    await user.click(screen.getByRole('button', { name: 'More actions' }));
+
+    const menu = await screen.findByRole('menu');
+    expect(
+      within(menu).getByRole('menuitem', { name: 'Open Smart Link' })
+    ).toBeVisible();
+    expect(
+      within(menu).getByRole('menuitem', { name: 'Copy Title' })
+    ).toBeVisible();
+    expect(within(menu).getByRole('menuitem', { name: 'Close' })).toBeVisible();
   });
 
   it('renders the canonical entity header for contact panels', () => {
