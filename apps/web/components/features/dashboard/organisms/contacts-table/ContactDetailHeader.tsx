@@ -1,5 +1,6 @@
 'use client';
 
+import type { CommonDropdownItem } from '@jovie/ui';
 import { Check, Copy, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -15,6 +16,7 @@ interface UseContactDetailHeaderProps {
   readonly email?: string | null;
   readonly onDelete: () => void;
   readonly onClose?: () => void;
+  readonly menuItems?: readonly CommonDropdownItem[];
 }
 
 interface UseContactDetailHeaderResult {
@@ -30,6 +32,7 @@ export function useContactDetailHeaderParts({
   email,
   onDelete,
   onClose,
+  menuItems,
 }: UseContactDetailHeaderProps): UseContactDetailHeaderResult {
   const notifications = useNotifications();
   const [isCopied, setIsCopied] = useState(false);
@@ -69,7 +72,7 @@ export function useContactDetailHeaderParts({
   const overflowActions: DrawerHeaderAction[] = [
     {
       id: 'delete',
-      label: 'Delete contact',
+      label: 'Delete Contact',
       icon: Trash2,
       onClick: onDelete,
     },
@@ -84,6 +87,7 @@ export function useContactDetailHeaderParts({
         <DrawerHeaderActions
           primaryActions={primaryActions}
           overflowActions={overflowActions}
+          menuItems={menuItems}
           onClose={onClose}
         />
       ) : undefined,

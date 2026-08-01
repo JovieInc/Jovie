@@ -13,16 +13,14 @@ import {
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
-  DrawerCardActionBar,
   DrawerEditableTextField,
   DrawerPropertyRow,
-  DrawerSurfaceCard,
   DrawerTabbedCard,
   DrawerTabs,
+  EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
-import { DrawerHero } from '@/components/shell/DrawerHero';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
 import {
   CONTACT_ROLE_OPTIONS,
@@ -168,13 +166,15 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     [contact, onUpdate, debouncedSave]
   );
 
-  const { title: headerTitle, primaryActions } = useContactDetailHeaderParts({
-    role: contact?.role ?? 'other',
-    customLabel: contact?.customLabel,
-    email: contact?.email,
-    onDelete,
-    onClose: handleClose,
-  });
+  const { title: headerTitle, actions: headerActions } =
+    useContactDetailHeaderParts({
+      role: contact?.role ?? 'other',
+      customLabel: contact?.customLabel,
+      email: contact?.email,
+      onDelete,
+      onClose: handleClose,
+      menuItems: contextMenuItems,
+    });
 
   const hasContact = Boolean(contact);
   const roleLabel = contact
@@ -248,42 +248,31 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       emptyMessage='Select a contact to view details'
       entityHeader={
         contact ? (
-          <DrawerSurfaceCard variant='card' className='overflow-hidden'>
-            <div className='relative'>
-              <DrawerCardActionBar
-                primaryActions={primaryActions}
-                menuItems={contextMenuItems}
-                onClose={handleClose}
-                overflowTriggerPlacement='card-top-right'
-                className='border-0 bg-transparent px-0 py-0'
-              />
-              <DrawerHero
-                title={contactDisplayName}
-                density='rail'
-                subtitle={roleLabel}
-                stableLayout
-                titleLineClamp={1}
-                subtitleLineClamp={1}
-                reserveSubtitleSlot
-                reserveMetaSlot
-                metaOverflow='scroll'
-                meta={
-                  territorySummary ? (
-                    <div className='flex items-center gap-1.5 text-2xs text-tertiary-token'>
-                      <Badge
-                        size='sm'
-                        className='rounded-md border border-subtle bg-surface-0 px-1.5 text-3xs text-secondary-token'
-                      >
-                        {territorySummary}
-                      </Badge>
-                    </div>
-                  ) : undefined
-                }
-                className='[&_h2]:pr-9'
-                testId='contact-detail-entity-header'
-              />
-            </div>
-          </DrawerSurfaceCard>
+          <EntityHeaderCard
+            title={contactDisplayName}
+            subtitle={roleLabel}
+            stableLayout
+            titleLineClamp={1}
+            subtitleLineClamp={1}
+            reserveSubtitleSlot
+            reserveMetaSlot
+            metaOverflow='scroll'
+            meta={
+              territorySummary ? (
+                <div className='flex items-center gap-1.5 text-2xs text-tertiary-token'>
+                  <Badge
+                    size='sm'
+                    className='rounded-md border border-subtle bg-surface-0 px-1.5 text-3xs text-secondary-token'
+                  >
+                    {territorySummary}
+                  </Badge>
+                </div>
+              ) : undefined
+            }
+            actions={headerActions}
+            bodyClassName='pr-8'
+            data-testid='contact-detail-entity-header'
+          />
         ) : undefined
       }
     >

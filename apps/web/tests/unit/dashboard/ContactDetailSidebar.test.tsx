@@ -84,10 +84,15 @@ describe('ContactDetailSidebar', () => {
       'data-workspace-surface',
       'raised'
     );
-    expect(screen.getByTestId('contact-detail-entity-header')).toHaveAttribute(
-      'data-density',
-      'rail'
-    );
+    expect(
+      screen.getByTestId('contact-detail-entity-header')
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('entity-header-meta-slot')).toBeInTheDocument();
+    expect(
+      screen
+        .getByTestId('contact-detail-entity-header')
+        .querySelector('[data-testid="drawer-card-action-bar"]')
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('Contact')).not.toBeInTheDocument();
     expect(screen.getByText('Contact Info')).toBeInTheDocument();
     expect(screen.getByText('Role')).toBeInTheDocument();
