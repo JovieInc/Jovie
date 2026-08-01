@@ -1,5 +1,5 @@
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -157,6 +157,24 @@ describe('ProfilesWorkspace', () => {
     expect(screen.getByRole('link', { name: 'Upgrade' })).toHaveAttribute(
       'href',
       '/app/settings/billing'
+    );
+  });
+
+  it('uses the shared semantic, contextual action slot without shifting rows', () => {
+    renderWorkspace(data);
+
+    expect(
+      within(screen.getByRole('columnheader', { name: 'Actions' })).getByText(
+        'Actions'
+      )
+    ).toHaveClass('sr-only');
+
+    const action = screen.getByRole('button', {
+      name: 'Actions for Spotify',
+    });
+    expect(action.parentElement).not.toHaveClass('sm:opacity-0');
+    expect(action.closest('td')).toHaveClass(
+      'system-b-table-contextual-action-cell'
     );
   });
 

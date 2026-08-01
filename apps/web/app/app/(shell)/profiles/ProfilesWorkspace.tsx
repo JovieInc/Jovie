@@ -551,14 +551,18 @@ export function ProfilesWorkspace({
       }),
       columnHelper.display({
         id: 'actions',
-        header: () => <span className='sr-only'>Actions</span>,
+        header: 'Actions',
         size: 44,
-        meta: { className: 'px-3' },
+        meta: {
+          className: 'px-3',
+          headerVisibility: 'sr-only',
+          actionVisibility: 'contextual',
+        },
         cell: context => {
           const row = context.row.original;
           const actionItems = convertContextMenuItems(getContextMenuItems(row));
           return (
-            <div className='flex justify-end opacity-100 transition-opacity duration-subtle sm:pointer-events-none sm:opacity-0 sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:focus-within:pointer-events-auto sm:focus-within:opacity-100'>
+            <div className='flex justify-end'>
               <TableActionMenu items={actionItems} align='end' trigger='custom'>
                 <button
                   type='button'
