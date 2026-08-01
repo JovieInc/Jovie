@@ -1,6 +1,6 @@
 'use client';
 
-import { Search } from 'lucide-react';
+import { Icon } from '@/components/atoms/Icon';
 import { useHeaderActions } from '@/contexts/HeaderActionsContext';
 import { cn } from '@/lib/utils';
 import {
@@ -33,10 +33,11 @@ export function HeaderSearchSurfaceFromContext({
       )}
       aria-label='Search Jovie'
     >
-      <Search
+      <Icon
+        name='Search'
         className={getSidebarNavIconClassName({})}
         aria-hidden='true'
-        strokeWidth={2}
+        strokeWidth={2.25}
       />
       <span className='min-w-0 flex-1 truncate'>Search</span>
       <kbd className='shrink-0 text-2xs text-tertiary-token'>⌘K</kbd>

@@ -1,8 +1,8 @@
 'use client';
 
 import { Button, Kbd } from '@jovie/ui';
-import { PanelLeft } from 'lucide-react';
 import React from 'react';
+import { Icon } from '@/components/atoms/Icon';
 import { SIDEBAR_KEYBOARD_SHORTCUT_BARE } from '@/hooks/useSidebarKeyboardShortcut';
 import { cn } from '@/lib/utils';
 import { useSidebar } from './context';
@@ -35,7 +35,7 @@ export const SidebarTrigger = React.forwardRef<
       onClick={handleClick}
       {...props}
     >
-      <PanelLeft className='h-3 w-3' />
+      <Icon name='PanelLeft' className='h-3 w-3' strokeWidth={2.25} />
       <span className='sr-only'>Toggle Sidebar</span>
     </Button>
   );

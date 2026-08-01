@@ -1,12 +1,7 @@
 'use client';
 
 import { Button, TooltipShortcut } from '@jovie/ui';
-import {
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
-} from 'lucide-react';
+import { Icon, type IconName } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
 export const RAIL_TOGGLE_BUTTON_CLASS =
@@ -42,14 +37,14 @@ export function RailToggleButton({
   iconTestId,
 }: RailToggleButtonProps) {
   const label = open ? openLabel : closedLabel;
-  const Icon =
+  const iconName: IconName =
     side === 'left'
       ? open
-        ? PanelLeftClose
-        : PanelLeftOpen
+        ? 'PanelLeftClose'
+        : 'PanelLeftOpen'
       : open
-        ? PanelRightClose
-        : PanelRightOpen;
+        ? 'PanelRightClose'
+        : 'PanelRightOpen';
 
   const button = (
     <Button
@@ -66,6 +61,7 @@ export function RailToggleButton({
       className={cn(RAIL_TOGGLE_BUTTON_CLASS, className)}
     >
       <Icon
+        name={iconName}
         className='size-3.5'
         strokeWidth={2}
         aria-hidden='true'
