@@ -4,33 +4,48 @@ import { Icon } from '@/components/atoms/Icon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type {
   ChannelIntelligenceReport,
-  ChannelWinSignal,
+  CorrelationFinding,
   RankedVideo,
 } from '@/lib/services/channel-intelligence';
 
+// ---------------------------------------------------------------------------
+// Format helpers
+// ---------------------------------------------------------------------------
+
 function formatWmpi(value: number): string {
-  return value.toFixed(3);
+  if (value >= 1) return value.toFixed(2);
+  if (value >= 0.01) return value.toFixed(3);
+  return value.toFixed(4);
 }
 
-function formatCtr(ctr: number): string {
-  return `${(ctr * 100).toFixed(1)}%`;
+function formatLift(lift: number): string {
+  const pct = lift * 100;
+  const sign = pct >= 0 ? '+' : '';
+  return `${sign}${pct.toFixed(0)}%`;
 }
 
 function formatTrend(trend: number): string {
-  const pct = (trend * 100).toFixed(0);
-  return trend >= 0 ? `+${pct}%` : `${pct}%`;
+  const pct = trend * 100;
+  return pct >= 0 ? `+${pct.toFixed(0)}%` : `${pct.toFixed(0)}%`;
 }
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
 
 interface RankedVideoRowProps {
   readonly video: RankedVideo;
-  readonly showTrend?: boolean;
 }
 
-function RankedVideoRow({ video, showTrend = false }: RankedVideoRowProps) {
+function RankedVideoRow({ video }: RankedVideoRowProps) {
   return (
-    <div className='flex items-start gap-3 px-4 py-3'>
+    <div className='flex items-start gap-3 border-b border-subtle px-4 py-3 last:border-b-0'>
+      <span className='w-6 shrink-0 text-xs font-medium tabular-nums text-tertiary-token'>
+        {video.rank}
+      </span>
       {video.thumbnailUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element -- external YouTube thumbs
+        // External YouTube CDN URLs — plain img matches RevivalQueuePanel
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={video.thumbnailUrl}
           alt=''
@@ -44,81 +59,89 @@ function RankedVideoRow({ video, showTrend = false }: RankedVideoRowProps) {
       )}
       <div className='min-w-0 flex-1'>
         <p className='truncate text-app font-medium text-primary-token'>
-          <span className='mr-1.5 tabular-nums text-tertiary-token'>
-            {video.rank}.
-          </span>
           {video.title}
         </p>
         <div className='mt-1 flex flex-wrap gap-3 text-xs text-tertiary-token'>
           <span>
-            <span className='font-medium text-secondary-token'>
-              Watch-min/impression
-            </span>{' '}
+            <span className='font-medium text-secondary-token'>WMPI</span>{' '}
             {formatWmpi(video.watchMinutesPerImpression)}
           </span>
           <span>
             <span className='font-medium text-secondary-token'>CTR</span>{' '}
-            {formatCtr(video.ctr)}
+            {(video.ctr * 100).toFixed(1)}%
           </span>
           <span>
-            <span className='font-medium text-secondary-token'>AVD</span>{' '}
-            {Math.round(video.avgViewDurationSeconds)}s
+            <span className='font-medium text-secondary-token'>
+              Impressions
+            </span>{' '}
+            {video.impressions.toLocaleString()}
           </span>
-          {showTrend ? (
-            <span>
-              <span className='font-medium text-secondary-token'>Reach</span>{' '}
-              {formatTrend(video.reachTrend)}
-            </span>
-          ) : null}
         </div>
       </div>
     </div>
   );
 }
 
-function WinSignalCard({ signal }: { readonly signal: ChannelWinSignal }) {
+interface FindingRowProps {
+  readonly finding: CorrelationFinding;
+}
+
+function FindingRow({ finding }: FindingRowProps) {
+  const positive = finding.liftVsChannel > 0;
   return (
-    <div className='rounded-md bg-surface-0 px-3 py-2'>
-      <p className='text-xs font-medium text-primary-token'>{signal.summary}</p>
-      <p className='mt-0.5 text-xs text-tertiary-token'>
-        {signal.confidence} confidence · n={signal.sampleSize} ·{' '}
-        {signal.source.label}
-      </p>
+    <div className='flex items-start justify-between gap-3 border-b border-subtle px-4 py-3 last:border-b-0'>
+      <div className='min-w-0'>
+        <p className='text-app text-primary-token'>{finding.segment}</p>
+        <p className='mt-0.5 text-xs text-tertiary-token'>
+          n={finding.sampleSize} · {finding.confidence} confidence ·{' '}
+          {finding.dimension}
+        </p>
+      </div>
+      <span
+        className={`shrink-0 text-xs font-medium tabular-nums ${positive ? 'text-accent-green' : 'text-accent-red'}`}
+      >
+        {formatLift(finding.liftVsChannel)}
+      </span>
     </div>
   );
 }
 
-function VideoList({
-  videos,
-  empty,
-  showTrend,
-}: {
-  readonly videos: readonly RankedVideo[];
-  readonly empty: string;
-  readonly showTrend?: boolean;
-}) {
-  if (videos.length === 0) {
-    return (
-      <ContentSurfaceCard className='px-4 py-4 text-center'>
-        <p className='text-app text-secondary-token'>{empty}</p>
-      </ContentSurfaceCard>
-    );
-  }
+function NotConnectedState() {
   return (
-    <ContentSurfaceCard className='divide-y divide-subtle p-0'>
-      {videos.map(video => (
-        <RankedVideoRow
-          key={video.videoId}
-          video={video}
-          showTrend={showTrend}
-        />
-      ))}
+    <ContentSurfaceCard className='flex flex-col items-center justify-center px-6 py-10 text-center'>
+      <div className='flex h-10 w-10 items-center justify-center rounded-xl bg-surface-0'>
+        <Icon name='ChartBar' className='h-5 w-5 text-tertiary-token' />
+      </div>
+      <h3 className='mt-3 text-app font-semibold text-primary-token'>
+        Channel Intelligence
+      </h3>
+      <p className='mt-1 max-w-sm text-app text-secondary-token leading-snug'>
+        Connect YouTube to rank videos by watch minutes per impression, see what
+        packaging correlates with wins on your channel, and ask Jovie what is
+        working.
+      </p>
     </ContentSurfaceCard>
   );
 }
 
+function EmptyReportState() {
+  return (
+    <ContentSurfaceCard className='px-4 py-6 text-center'>
+      <p className='text-app text-secondary-token'>
+        Not enough Reporting API data yet. Once videos clear the impression
+        floor, rankings and packaging correlations appear here.
+      </p>
+    </ContentSurfaceCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main panel
+// ---------------------------------------------------------------------------
+
 export interface ChannelIntelligencePanelProps {
   readonly report: ChannelIntelligenceReport | null;
+  /** True when the YouTube connector is set up */
   readonly isConnected: boolean;
   readonly testId?: string;
 }
@@ -126,94 +149,96 @@ export interface ChannelIntelligencePanelProps {
 export function ChannelIntelligencePanel({
   report,
   isConnected,
-  testId = 'youtube-channel-intelligence',
+  testId = 'channel-intelligence-report',
 }: ChannelIntelligencePanelProps) {
   return (
-    <section
-      aria-labelledby='channel-intelligence-heading'
-      data-testid={testId}
-      className='space-y-6'
-    >
-      <div>
-        <h2
-          id='channel-intelligence-heading'
-          className='mb-1 text-app font-caption tracking-normal text-secondary-token'
-        >
-          Channel Intelligence
-        </h2>
-        {report && isConnected ? (
-          <p className='text-xs text-tertiary-token'>
-            Ranked by watch-min/impression · channel mean{' '}
-            {formatWmpi(report.channelMeanWatchMinutesPerImpression)} ·{' '}
-            {report.videoCount} video{report.videoCount !== 1 ? 's' : ''}
-          </p>
-        ) : null}
-      </div>
-
+    <div className='flex flex-col gap-6' data-testid={testId}>
       {!isConnected ? (
-        <ContentSurfaceCard className='flex flex-col items-center px-4 py-10 text-center'>
-          <div className='mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-surface-0'>
-            <Icon name='ChartBar' className='h-5 w-5 text-tertiary-token' />
-          </div>
-          <h3 className='text-app font-semibold text-primary-token'>
-            Connect YouTube Analytics
-          </h3>
-          <p className='mt-1 max-w-sm text-app text-secondary-token leading-snug'>
-            Ask Jovie about your best and worst videos once analytics are
-            connected. Rankings use watch-minutes-per-impression, not CTR alone.
-          </p>
-        </ContentSurfaceCard>
+        <NotConnectedState />
       ) : !report || report.videoCount === 0 ? (
-        <ContentSurfaceCard className='px-4 py-6 text-center'>
-          <p className='text-app text-secondary-token'>
-            No Reporting API metrics yet. After the connector syncs, videos with
-            at least 100 impressions appear ranked by watch-min/impression.
-          </p>
-        </ContentSurfaceCard>
+        <EmptyReportState />
       ) : (
         <>
-          <div>
-            <h3 className='mb-2 text-xs font-medium text-secondary-token'>
-              Best Videos
-            </h3>
-            <VideoList
-              videos={report.bestVideos}
-              empty='No rankable videos yet.'
-            />
-          </div>
+          <section aria-labelledby='channel-intel-best-heading'>
+            <h2
+              id='channel-intel-best-heading'
+              className='mb-3 text-app font-caption tracking-normal text-secondary-token'
+            >
+              Ranked By Watch Minutes Per Impression
+            </h2>
+            <ContentSurfaceCard className='overflow-hidden p-0'>
+              {report.rankedVideos.slice(0, 10).map(video => (
+                <RankedVideoRow key={video.videoId} video={video} />
+              ))}
+            </ContentSurfaceCard>
+            <p className='mt-2 text-xs text-tertiary-token'>
+              Primary metric is watch minutes per impression (not CTR alone).
+              Channel mean WMPI {formatWmpi(report.channelMeanWmpi)}.
+            </p>
+          </section>
 
-          {report.winSignals.length > 0 ? (
-            <div>
-              <h3 className='mb-2 text-xs font-medium text-secondary-token'>
-                What Works On This Channel
-              </h3>
-              <div className='space-y-2'>
-                {report.winSignals.map(signal => (
-                  <WinSignalCard
-                    key={`${signal.dimension}-${signal.winningLabel ?? signal.summary}`}
-                    signal={signal}
-                  />
+          <section aria-labelledby='channel-intel-works-heading'>
+            <h2
+              id='channel-intel-works-heading'
+              className='mb-3 text-app font-caption tracking-normal text-secondary-token'
+            >
+              What Works On This Channel
+            </h2>
+            {report.whatWorks.length === 0 ? (
+              <ContentSurfaceCard className='px-4 py-6 text-center'>
+                <p className='text-app text-secondary-token'>
+                  Need more face / text / topic / length labels before packaging
+                  correlations are reliable.
+                </p>
+              </ContentSurfaceCard>
+            ) : (
+              <ContentSurfaceCard className='overflow-hidden p-0'>
+                {report.whatWorks.map(finding => (
+                  <FindingRow key={finding.segmentKey} finding={finding} />
                 ))}
-              </div>
-            </div>
-          ) : null}
+              </ContentSurfaceCard>
+            )}
+          </section>
 
-          {report.decliningVideos.length > 0 ? (
-            <div>
-              <h3 className='mb-2 text-xs font-medium text-secondary-token'>
-                Declining Reach
-              </h3>
-              <VideoList videos={report.decliningVideos} empty='' showTrend />
-            </div>
-          ) : null}
+          <section aria-labelledby='channel-intel-declining-heading'>
+            <h2
+              id='channel-intel-declining-heading'
+              className='mb-3 text-app font-caption tracking-normal text-secondary-token'
+            >
+              Declining Reach
+            </h2>
+            {report.declining.length === 0 ? (
+              <ContentSurfaceCard className='px-4 py-6 text-center'>
+                <p className='text-app text-secondary-token'>
+                  No videos currently show a meaningful reach decline.
+                </p>
+              </ContentSurfaceCard>
+            ) : (
+              <ContentSurfaceCard className='overflow-hidden p-0'>
+                {report.declining.slice(0, 5).map(video => (
+                  <div
+                    key={video.videoId}
+                    className='flex items-center justify-between gap-3 border-b border-subtle px-4 py-3 last:border-b-0'
+                  >
+                    <p className='min-w-0 truncate text-app text-primary-token'>
+                      {video.title}
+                    </p>
+                    <span className='shrink-0 text-xs font-medium tabular-nums text-accent-red'>
+                      {formatTrend(video.reachTrend)}
+                    </span>
+                  </div>
+                ))}
+              </ContentSurfaceCard>
+            )}
+          </section>
 
-          {report.sources.length > 0 ? (
+          {report.sources.length > 0 && (
             <p className='text-xs text-tertiary-token'>
               Sources: {report.sources.map(s => s.label).join(' · ')}
             </p>
-          ) : null}
+          )}
         </>
       )}
-    </section>
+    </div>
   );
 }

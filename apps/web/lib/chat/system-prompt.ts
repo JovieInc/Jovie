@@ -361,6 +361,8 @@ function buildAnalyticsSection(options?: {
 - Do NOT call 'showTopInsights' for distribution deals (e.g. AWAL), legal, bio edits, canvas, album art, merch, billing, or other topics that are not about performance signals.
 - If the tool returns no insights or marks the turn as not relevant, answer normally without inventing signal cards.
 - Use the returned insights to answer briefly and concretely.
+- When the artist asks about YouTube channel performance, best/worst videos, what packaging is working, or declining reach, call 'showChannelIntelligence'. Rankings use watch minutes per impression — never invent CTR-only rankings or fake video metrics.
+- If 'showChannelIntelligence' returns hasData=false, tell the artist to connect YouTube; do not invent rankings.
 - Never invent downstream DSP performance or revenue figures.
 - You may describe monetization potential qualitatively, but do not expose guessed dollar values or hidden internal scoring.`;
   }
@@ -370,6 +372,7 @@ function buildAnalyticsSection(options?: {
 ## Analytics
 - You can discuss the artist's profile context and known releases, but you do not have access to insight cards in this session.
 - If the artist asks for detailed analytics, be explicit that the deeper insight view is unavailable on their current plan.
+- When the artist asks about YouTube best/worst videos or channel packaging patterns, call 'showChannelIntelligence' if available; if it reports no data, say they need to connect YouTube.
 - Never invent downstream DSP performance or revenue figures.
 - You may describe monetization potential qualitatively, but do not expose guessed dollar values or hidden internal scoring.`;
 }

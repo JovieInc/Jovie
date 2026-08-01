@@ -1493,6 +1493,57 @@ function createShowTopInsightsTool(
 }
 
 /**
+ * Channel-intelligence Q&A (JOV-3193).
+ * Ranks videos by watch_minutes_per_impression and cites Reporting-API sources.
+ * Live metrics require the YouTube OAuth connector (GH-10912); until then the
+ * tool returns a connect CTA instead of inventing numbers.
+ */
+function createShowChannelIntelligenceTool(lastUserText: string) {
+  return tool({
+    description:
+      'Answer YouTube channel questions from real Reporting-API metrics: best/worst videos, what packaging works on THIS channel, and what is declining. Rank by watch minutes per impression (not CTR alone). Call when the artist asks about their YouTube videos, channel performance, thumbnails/packaging patterns, or reach decline. Do NOT invent metrics.',
+    inputSchema: chatToolSchema({
+      intent: z
+        .enum([
+          'best_videos',
+          'worst_videos',
+          'whats_working',
+          'whats_declining',
+          'channel_overview',
+        ])
+        .optional()
+        .describe(
+          'Optional intent override. When omitted, intent is detected from the user message.'
+        ),
+    }),
+    execute: async ({ intent: intentOverride }) => {
+      const { answerChannelQuestion, detectChannelQuestionIntent } =
+        await import('@/lib/services/channel-intelligence');
+
+      const intent =
+        intentOverride ??
+        detectChannelQuestionIntent(lastUserText) ??
+        'channel_overview';
+
+      // Connector metrics not wired yet (BlockedBy GH-10912). Fail closed
+      // with sources instead of fabricating rankings.
+      const answer = answerChannelQuestion(null, intent);
+
+      return {
+        success: true,
+        title: 'Channel intelligence',
+        intent: answer.intent,
+        hasData: answer.hasData,
+        summary: answer.summary,
+        rankedVideos: answer.rankedVideos,
+        findings: answer.findings,
+        sources: answer.sources,
+      };
+    },
+  });
+}
+
+/**
  * Creates the markCanvasUploaded tool.
  * Lets artists self-report that they've uploaded a canvas to Spotify for Artists.
  * Since Spotify has no public API for canvas status, this is the only reliable way to track it.
@@ -1989,6 +2040,7 @@ function buildChatTools(
           ),
         }
       : {}),
+    showChannelIntelligence: createShowChannelIntelligenceTool(lastUserText),
     proposeProfileEdit: createProfileEditTool(artistContext),
     importBioFromUrl: createImportBioFromUrlTool({ userId: clerkUserId }),
     checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId, releases),

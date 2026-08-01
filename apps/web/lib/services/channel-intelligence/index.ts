@@ -1,50 +1,47 @@
 /**
- * Channel-intelligence report (GH-10917 / JOV-3193).
+ * Channel-intelligence report (JOV-3193 / GH-10917).
  *
- * Pure query + summarize layer over YouTube Reporting API metrics:
- * rank by watch_minutes_per_impression, surface channel-specific packaging
- * correlations, and answer chat questions with sources.
+ * Rank videos by watch_minutes_per_impression, surface per-channel packaging
+ * correlations, and answer chat questions with Reporting-API sources.
  */
 
 export {
-  answerChannelIntelligenceQuery,
-  classifyChannelIntelligenceIntent,
-} from './answer';
-export {
   computeChannelCorrelations,
-  MIN_GROUP_SAMPLE,
-  MIN_LIFT_ABS,
-  mergeLearningLayerAnnotations,
+  findingsFromLearningLayer,
+  MIN_SEGMENT_SAMPLE,
+  selectWhatWorks,
 } from './correlations';
 export {
   ctrTimesAvgViewDurationMinutes,
   DECLINING_REACH_THRESHOLD,
-  durationBucket,
   isDeclining,
-  isRankable,
-  MIN_IMPRESSIONS_FOR_RANKING,
-  meanWatchMinutesPerImpression,
-  rankDecliningVideos,
-  rankVideosByWatchMinutesPerImpression,
-  rankWorstVideosByWatchMinutesPerImpression,
-  titleLengthBucket,
+  isEligibleForRank,
+  LENGTH_MEDIUM_MAX_SECONDS,
+  LENGTH_SHORT_MAX_SECONDS,
+  lengthBucket,
+  lengthBucketLabel,
+  MIN_IMPRESSIONS_FOR_RANK,
   watchMinutesPerImpression,
 } from './metrics';
-export { buildChannelIntelligenceReport } from './report';
+export {
+  answerChannelQuestion,
+  answerChannelQuestionFromText,
+  detectChannelQuestionIntent,
+} from './qa';
+export { channelMeanWmpi, rankVideosByWatchMinutesPerImpression } from './rank';
+export {
+  type BuildChannelIntelligenceReportInput,
+  buildChannelIntelligenceReport,
+  hasChannelIntelligenceData,
+} from './report';
 export type {
-  AnswerChannelIntelligenceQueryInput,
-  BuildChannelIntelligenceReportInput,
   ChannelIntelligenceAnswer,
-  ChannelIntelligenceIntent,
   ChannelIntelligenceReport,
+  ChannelQuestionIntent,
   ChannelVideoMetrics,
-  ChannelWinSignal,
   CorrelationDimension,
-  CorrelationGroup,
-  DurationBucket,
-  LearningLayerWinAnnotation,
+  CorrelationFinding,
+  LengthBucket,
   MetricSource,
-  MetricSourceKind,
   RankedVideo,
-  TitleLengthBucket,
 } from './types';

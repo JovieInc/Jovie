@@ -80,11 +80,11 @@ export const PUBLIC_SKILL_REGISTRY = {
       connector: 'youtube',
     },
   },
-  channelIntelligenceReport: {
-    id: 'channelIntelligenceReport',
-    name: 'Channel intelligence report',
+  showChannelIntelligence: {
+    id: 'showChannelIntelligence',
+    name: 'Channel intelligence',
     description:
-      'Rank channel videos by watch-minutes-per-impression, surface face/text/topic/length correlations, and answer best/worst/working/declining questions from YouTube Reporting API metrics with sources.',
+      "Rank the artist's YouTube videos by watch minutes per impression, surface packaging correlations on this channel, and answer best/worst/working/declining questions from Reporting-API metrics with sources.",
     kind: 'tool',
     version: '1.0.0',
     lifecycle: 'ga',
@@ -95,8 +95,9 @@ export const PUBLIC_SKILL_REGISTRY = {
     outputSchemaZodPath: 'apps/web/lib/services/channel-intelligence/types.ts',
     metadata: {
       surface: 'youtube',
-      action: 'channel_intelligence_report',
+      action: 'channel_intelligence',
       connector: 'youtube',
+      chatToolId: 'showChannelIntelligence',
     },
   },
   // Playbook-facing tool stubs (catalog + compile resolution). Executors may
@@ -173,4 +174,5 @@ export type SkillId = keyof typeof PUBLIC_SKILL_REGISTRY;
 export const PUBLIC_SKILL_CHAT_TOOL_IDS = {
   generateReleasePitch: 'generateReleasePitch',
   retouch: 'retouchImage',
+  showChannelIntelligence: 'showChannelIntelligence',
 } as const satisfies Partial<Record<SkillId, string>>;

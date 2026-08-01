@@ -269,6 +269,11 @@ export interface RevivalQueuePanelProps {
    */
   readonly intelligenceReport?: ChannelIntelligenceReport | null;
   readonly testId?: string;
+  /**
+   * When false, render body only (no PageShell). Use when embedding under a
+   * parent YouTube channel shell (channel-intelligence report).
+   */
+  readonly withShell?: boolean;
 }
 
 export function RevivalQueuePanel({
@@ -278,7 +283,67 @@ export function RevivalQueuePanel({
   isConnected,
   intelligenceReport = null,
   testId = 'youtube-revival-queue',
+  withShell = true,
 }: RevivalQueuePanelProps) {
+  const body = (
+    <>
+      {!isConnected ? (
+        <NotConnectedState />
+      ) : (
+        <>
+          {quota && <QuotaBar quota={quota} />}
+
+          <section aria-labelledby='revival-queue-heading'>
+            <h2
+              id='revival-queue-heading'
+              className='mb-3 text-app font-caption tracking-normal text-secondary-token'
+            >
+              Revival Candidates
+            </h2>
+            {candidates.length === 0 ? (
+              <ContentSurfaceCard className='px-4 py-6 text-center'>
+                <p className='text-app text-secondary-token'>
+                  No underperforming videos found. All videos are meeting
+                  channel baselines.
+                </p>
+              </ContentSurfaceCard>
+            ) : (
+              <div className='space-y-3'>
+                {candidates.map(c => (
+                  <RevivalCandidateCard key={c.videoId} candidate={c} />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {experiments.length > 0 && (
+            <section aria-labelledby='experiments-heading'>
+              <h2
+                id='experiments-heading'
+                className='mb-3 text-app font-caption tracking-normal text-secondary-token'
+              >
+                Experiments
+              </h2>
+              <ContentSurfaceCard className='divide-y divide-subtle p-0'>
+                {experiments.map(exp => (
+                  <ExperimentRow key={exp.experimentId} experiment={exp} />
+                ))}
+              </ContentSurfaceCard>
+            </section>
+          )}
+        </>
+      )}
+    </>
+  );
+
+  if (!withShell) {
+    return (
+      <div className='flex flex-col gap-6' data-testid={testId}>
+        {body}
+      </div>
+    );
+  }
+
   const toolbar = (
     <PageToolbar
       start={
@@ -301,60 +366,7 @@ export function RevivalQueuePanel({
     >
       <div className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden'>
         <div className='flex flex-col gap-6 px-3 py-2.5 sm:px-4 sm:py-3.5'>
-          <ChannelIntelligencePanel
-            report={intelligenceReport}
-            isConnected={isConnected}
-          />
-
-          {!isConnected ? (
-            <NotConnectedState />
-          ) : (
-            <>
-              {/* Quota bar */}
-              {quota && <QuotaBar quota={quota} />}
-
-              {/* Revival queue */}
-              <section aria-labelledby='revival-queue-heading'>
-                <h2
-                  id='revival-queue-heading'
-                  className='mb-3 text-app font-caption tracking-normal text-secondary-token'
-                >
-                  Revival Candidates
-                </h2>
-                {candidates.length === 0 ? (
-                  <ContentSurfaceCard className='px-4 py-6 text-center'>
-                    <p className='text-app text-secondary-token'>
-                      No underperforming videos found. All videos are meeting
-                      channel baselines.
-                    </p>
-                  </ContentSurfaceCard>
-                ) : (
-                  <div className='space-y-3'>
-                    {candidates.map(c => (
-                      <RevivalCandidateCard key={c.videoId} candidate={c} />
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              {/* Experiments dashboard */}
-              {experiments.length > 0 && (
-                <section aria-labelledby='experiments-heading'>
-                  <h2
-                    id='experiments-heading'
-                    className='mb-3 text-app font-caption tracking-normal text-secondary-token'
-                  >
-                    Experiments
-                  </h2>
-                  <ContentSurfaceCard className='divide-y divide-subtle p-0'>
-                    {experiments.map(exp => (
-                      <ExperimentRow key={exp.experimentId} experiment={exp} />
-                    ))}
-                  </ContentSurfaceCard>
-                </section>
-              )}
-            </>
-          )}
+          {body}
         </div>
       </div>
     </PageShell>

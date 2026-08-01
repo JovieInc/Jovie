@@ -1,109 +1,96 @@
 /**
- * Build a full channel-intelligence report from Reporting-API shaped metrics.
+ * Builds the full channel-intelligence report (JOV-3193).
  */
 
+import type { ChannelPackagingRules } from '@/lib/services/packaging-intelligence/channel-rules';
 import {
   computeChannelCorrelations,
-  mergeLearningLayerAnnotations,
+  findingsFromLearningLayer,
+  selectWhatWorks,
 } from './correlations';
-import {
-  meanWatchMinutesPerImpression,
-  rankDecliningVideos,
-  rankVideosByWatchMinutesPerImpression,
-  rankWorstVideosByWatchMinutesPerImpression,
-} from './metrics';
+import { isDeclining, isEligibleForRank } from './metrics';
+import { channelMeanWmpi, rankVideosByWatchMinutesPerImpression } from './rank';
 import type {
-  BuildChannelIntelligenceReportInput,
   ChannelIntelligenceReport,
+  ChannelVideoMetrics,
   MetricSource,
+  RankedVideo,
 } from './types';
 
-const DEFAULT_LIST_LIMIT = 10;
+export interface BuildChannelIntelligenceReportInput {
+  readonly channelId: string;
+  readonly videos: readonly ChannelVideoMetrics[];
+  /** Optional learning-layer rules for this channel */
+  readonly channelRules?: ChannelPackagingRules | null;
+  /** ISO timestamp override for tests */
+  readonly nowIso?: string;
+}
 
-function reportingSources(
-  videoIds: readonly string[],
-  windowStart: string | null,
-  windowEnd: string | null
-): MetricSource[] {
-  return [
-    {
-      kind: 'youtube_reporting_api',
-      label: 'YouTube Reporting API',
-      metricKeys: [
-        'impressions',
-        'views',
-        'watch_minutes',
-        'ctr',
-        'average_view_duration',
-        'watch_minutes_per_impression',
-      ],
-      videoIds,
-      ...(windowStart ? { windowStart } : {}),
-      ...(windowEnd ? { windowEnd } : {}),
-    },
-    {
-      kind: 'derived',
-      label: 'Derived: watch_minutes_per_impression',
-      metricKeys: ['watch_minutes_per_impression'],
-      videoIds,
-    },
-  ];
+function decliningVideos(ranked: readonly RankedVideo[]): RankedVideo[] {
+  return ranked
+    .filter(v => v.reachTrend < -0.1)
+    .sort((a, b) => a.reachTrend - b.reachTrend);
 }
 
 /**
- * Build the channel-intelligence dashboard report.
- *
- * Ranking is always by watch_minutes_per_impression (not CTR alone).
- * Win signals come from packaging correlations on THIS channel's data,
- * optionally annotated by the packaging learning layer.
+ * Builds a channel-intelligence report from Reporting-API video metrics
+ * and optional learning-layer packaging rules.
  */
 export function buildChannelIntelligenceReport(
   input: BuildChannelIntelligenceReportInput
 ): ChannelIntelligenceReport {
-  const listLimit = input.listLimit ?? DEFAULT_LIST_LIMIT;
-  const windowStart = input.windowStart ?? null;
-  const windowEnd = input.windowEnd ?? null;
   const generatedAt = input.nowIso ?? new Date().toISOString();
-
-  const bestVideos = rankVideosByWatchMinutesPerImpression(input.videos).slice(
-    0,
-    listLimit
-  );
-  const worstVideos = rankWorstVideosByWatchMinutesPerImpression(
-    input.videos
-  ).slice(0, listLimit);
-  const decliningVideos = rankDecliningVideos(input.videos).slice(0, listLimit);
-
-  const metricSignals = computeChannelCorrelations(input.videos);
-  const winSignals = mergeLearningLayerAnnotations(
-    metricSignals,
-    input.learningLayerSummaries
+  const rankedVideos = rankVideosByWatchMinutesPerImpression(input.videos);
+  const { findings: metricFindings, channelMeanWmpi: meanFromCorr } =
+    computeChannelCorrelations(input.videos);
+  const learningFindings = findingsFromLearningLayer(
+    input.channelRules ?? null
   );
 
-  const videoIds = input.videos.map(v => v.videoId);
-  const sources = reportingSources(videoIds, windowStart, windowEnd);
+  // Prefer learning-layer keys when both speak to the same dimension signal
+  const learningKeys = new Set(learningFindings.map(f => f.segmentKey));
+  const mergedFindings = [
+    ...learningFindings,
+    ...metricFindings.filter(f => !learningKeys.has(f.segmentKey)),
+  ].sort((a, b) => Math.abs(b.liftVsChannel) - Math.abs(a.liftVsChannel));
 
-  if (input.learningLayerSummaries?.some(a => a.source === 'observed')) {
+  const mean =
+    rankedVideos.length > 0 ? channelMeanWmpi(rankedVideos) : meanFromCorr;
+
+  const sources: MetricSource[] = [
+    {
+      kind: 'youtube_reporting_api',
+      label: 'YouTube Reporting API',
+      detail: `Ranked ${rankedVideos.length} of ${input.videos.length} videos by watch_minutes_per_impression`,
+      videoIds: rankedVideos.map(v => v.videoId),
+    },
+  ];
+  if (learningFindings.length > 0) {
     sources.push({
       kind: 'learning_layer',
-      label: 'Channel packaging learning layer',
-      metricKeys: ['experiment_lift', 'face', 'text', 'title_length'],
+      label: 'Channel packaging rules',
+      detail: `${learningFindings.length} observed dimension rule(s)`,
     });
   }
 
   return {
     channelId: input.channelId,
     generatedAt,
-    windowStart,
-    windowEnd,
-    videoCount: input.videos.length,
-    channelMeanWatchMinutesPerImpression: meanWatchMinutesPerImpression(
-      input.videos
-    ),
-    bestVideos,
-    worstVideos,
-    decliningVideos,
-    winSignals,
+    rankedVideos,
+    channelMeanWmpi: mean,
+    correlations: mergedFindings,
+    whatWorks: selectWhatWorks(mergedFindings),
+    declining: decliningVideos(rankedVideos),
     sources,
+    videoCount: rankedVideos.length,
   };
 }
+
+/** True when at least one video is eligible for ranking. */
+export function hasChannelIntelligenceData(
+  videos: readonly ChannelVideoMetrics[]
+): boolean {
+  return videos.some(isEligibleForRank);
+}
+
+export { isDeclining };
