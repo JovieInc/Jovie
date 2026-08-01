@@ -60,14 +60,11 @@ describe('DashboardNav interactions', () => {
     );
     const inbox = screen.getByRole('link', { name: 'Inbox' });
 
-    expect(newChat).toHaveClass(
-      'w-fit',
-      'rounded-full',
-      'bg-sidebar-accent/40'
-    );
+    expect(newChat).toHaveClass('w-fit', 'rounded-full');
+    expect(newChat).not.toHaveClass('bg-sidebar-accent/40');
     expect(newChat).not.toHaveClass('bg-sidebar-accent-active', 'w-full');
-    expect(newChat.querySelector('svg')).toHaveClass('text-accent-teal!');
-    expect(searchSlot).toHaveClass('mt-1.5', 'mb-4');
+    expect(newChat.querySelector('svg')).toHaveClass('text-sidebar-muted/70');
+    expect(searchSlot).toHaveClass('mt-1.5', 'mb-4', 'h-7', 'shrink-0');
     expect(screen.getAllByRole('button', { name: 'Search' })).toHaveLength(1);
     expect(
       newChat.compareDocumentPosition(searchSlot!) &

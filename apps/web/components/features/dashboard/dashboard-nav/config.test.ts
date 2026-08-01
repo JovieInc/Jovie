@@ -24,9 +24,9 @@ function toContract(items: readonly (typeof primaryNavigation)[number][]) {
 }
 
 describe('canonical customer shell navigation', () => {
-  it('keeps New Chat as the elevated first action and Connections in the canonical order', () => {
+  it('keeps New Chat as the quiet secondary first action and Connections in the canonical order', () => {
     expect(toContract(primaryNavigation)).toEqual(CANONICAL_NAVIGATION);
-    expect(primaryNavigation[0].tone).toBe('primary');
+    expect(primaryNavigation[0].tone).toBe('secondary');
     expect(primaryNavigation.every(item => item.tier === 'core')).toBe(true);
   });
 

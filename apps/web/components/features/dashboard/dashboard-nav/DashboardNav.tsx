@@ -12,6 +12,7 @@ import {
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
+import { SIDEBAR_SECTION_RHYTHM } from '@/components/shell/SidebarSection';
 import {
   readThreadReadState,
   type SidebarThread,
@@ -453,7 +454,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
           </>
         ) : (
           <SidebarGroup className='mb-0.5'>
-            <SidebarGroupContent className='space-y-0.5'>
+            <SidebarGroupContent className={SIDEBAR_SECTION_RHYTHM.navGroup}>
               {navSections.map((section, index) => (
                 <div key={section.key} data-nav-section>
                   {/* Section divider for visual separation (except for first section) */}
@@ -474,7 +475,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                       {index === 0 && searchSurface ? (
                         <div
                           data-sidebar-search-slot='true'
-                          className='mb-4 mt-1.5 h-7 shrink-0 group-data-[collapsible=icon]:hidden'
+                          className={`${SIDEBAR_SECTION_RHYTHM.searchSlot} group-data-[collapsible=icon]:hidden`}
                         >
                           {searchSurface}
                         </div>
@@ -491,7 +492,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
         )}
 
         {threadsVisible ? (
-          <div className='mt-1.5'>
+          <div className={SIDEBAR_SECTION_RHYTHM.threads}>
             <SidebarThreadsSection
               threads={sidebarThreads}
               activeThreadId={activeThreadId}

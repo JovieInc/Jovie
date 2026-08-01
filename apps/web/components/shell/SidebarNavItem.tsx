@@ -32,13 +32,18 @@ interface SidebarNavChromeOptions {
   readonly tight?: boolean;
   /** An absolute trailing action layers over the label's faded edge. */
   readonly trailingOverlay?: boolean;
-  readonly tone?: 'default' | 'primary';
+  readonly tone?: 'default' | 'secondary' | 'primary';
   readonly className?: string;
 }
 
 // Create actions are deliberately not a second selected-nav treatment. Keep
 // them compact and secondary so the active destination remains the strongest
 // signal in the rail.
+const SIDEBAR_SECONDARY_CHROME =
+  'w-fit grid-cols-[18px_auto] gap-x-1.5 px-2.5 text-sidebar-item-foreground font-medium hover:bg-sidebar-accent';
+
+// Retained for callers that explicitly need the established elevated action
+// treatment. Customer navigation uses the quiet secondary tone instead.
 const SIDEBAR_PRIMARY_CHROME =
   'w-fit grid-cols-[18px_auto] gap-x-1.5 bg-sidebar-accent/40 px-2.5 text-sidebar-item-foreground font-medium shadow-none hover:bg-sidebar-accent/70';
 
@@ -57,6 +62,10 @@ function getToneClassName({
 }: Pick<SidebarNavChromeOptions, 'active' | 'nested' | 'tone'>): string {
   if (tone === 'primary') {
     return SIDEBAR_PRIMARY_CHROME;
+  }
+
+  if (tone === 'secondary') {
+    return SIDEBAR_SECONDARY_CHROME;
   }
 
   if (active) {
@@ -79,7 +88,7 @@ export function getSidebarNavRowClassName({
 
   return cn(
     'relative grid items-center rounded-full transition-[background-color,box-shadow,color] duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
-    tone === 'primary' ? undefined : 'w-full',
+    tone === 'primary' || tone === 'secondary' ? undefined : 'w-full',
     'font-normal',
     tight ? 'gap-x-2 text-xs' : 'gap-x-2.5 text-xs',
     collapsed
@@ -114,7 +123,7 @@ export function getSidebarNavIconClassName({
     // the canonical Jovie teal token so the active signal remains quiet.
     tone === 'primary'
       ? 'text-accent-teal!'
-      : active
+      : active && tone !== 'secondary'
         ? 'text-accent-teal!'
         : inactiveIconColor,
     className
