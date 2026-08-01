@@ -12,7 +12,7 @@ export const TIMEOUTS = {
   SETTLE: 3_000,
 } as const;
 
-const WEB_ROOT = resolve(import.meta.dirname, '../..');
+const WEB_ROOT = resolve(__dirname, '../..');
 
 export const CATALOG_OUTPUT_DIR = join(
   WEB_ROOT,

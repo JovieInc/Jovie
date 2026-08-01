@@ -72,7 +72,7 @@ describe('homepage hero next-move contract (JOV-4475)', () => {
     );
 
     expect(pageSource).toContain(
-      "getMarketingExportImage('shell-v1-dashboard-desktop')"
+      "getMarketingExportImage('dashboard-releases-desktop')"
     );
     expect(pageSource).toContain('<HomepageHeroCommandCenter');
     expect(commandCenterSource).toContain('homepage-product-pane__image');
