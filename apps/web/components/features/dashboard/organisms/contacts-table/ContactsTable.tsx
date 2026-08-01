@@ -219,7 +219,6 @@ export const ContactsTable = memo(function ContactsTable({
     <div className='flex h-full min-h-0 flex-row' data-testid='contacts-table'>
       {/* Main content area */}
       <div className='flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden'>
-        <h1 className='sr-only'>Contacts</h1>
         <p className='sr-only'>
           Manage bookings, management, and press contacts for {artistName}
         </p>
@@ -240,12 +239,8 @@ export const ContactsTable = memo(function ContactsTable({
           {isEmpty ? (
             <EmptyState
               icon={<UserPlus className='h-6 w-6' aria-hidden='true' />}
-              heading='No Contacts'
-              description='Add a contact to manage bookings, management, and press.'
-              action={{
-                label: 'Add Contact',
-                onClick: () => onAddContact(),
-              }}
+              heading='No Contacts Yet'
+              description='Add bookings, management, and press contacts.'
             />
           ) : (
             <UnifiedTable
