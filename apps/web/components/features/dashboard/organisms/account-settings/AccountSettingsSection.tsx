@@ -19,9 +19,16 @@ function AccountIdentitySummary() {
 
   if (!isLoaded) {
     return (
-      <div className='space-y-3 py-1' data-testid='account-identity-loading'>
-        <LoadingSkeleton height='h-4' width='w-20' />
-        <LoadingSkeleton height='h-12' />
+      <div
+        className='min-h-32 space-y-3'
+        data-testid='account-identity-loading'
+      >
+        {[0, 1, 2].map(index => (
+          <div key={index} className='space-y-1'>
+            <LoadingSkeleton height='h-3' width='w-16' />
+            <LoadingSkeleton height='h-4' width='w-44' />
+          </div>
+        ))}
       </div>
     );
   }
@@ -29,7 +36,7 @@ function AccountIdentitySummary() {
   if (!isSignedIn || !user) {
     return (
       <p
-        className='text-app text-secondary-token'
+        className='flex min-h-32 items-center text-app text-secondary-token'
         data-testid='account-identity-unsigned'
       >
         Sign in to view your account details.
@@ -41,7 +48,10 @@ function AccountIdentitySummary() {
   const displayName = user.fullName?.trim() || null;
 
   return (
-    <dl className='space-y-3 text-app' data-testid='account-identity-summary'>
+    <dl
+      className='min-h-32 space-y-3 text-app'
+      data-testid='account-identity-summary'
+    >
       <div className='space-y-1'>
         <dt className='text-secondary-token'>Email</dt>
         <dd
@@ -85,11 +95,8 @@ export function AccountSettingsSection({
   isGrowth = false,
 }: AccountSettingsSectionProps) {
   return (
-    <div className='space-y-6' data-testid='account-settings-section'>
-      <SettingsPanel
-        title='Signed In As'
-        cardClassName='border-0 bg-transparent shadow-none p-0'
-      >
+    <div className='space-y-4' data-testid='account-settings-section'>
+      <SettingsPanel title='Signed In As' cardClassName='px-4 py-4 sm:px-5'>
         <AccountIdentitySummary />
       </SettingsPanel>
       <SettingsAppearanceSection />

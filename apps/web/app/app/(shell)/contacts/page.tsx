@@ -7,7 +7,7 @@ import { ContactsPageClient } from './ContactsPageClient';
 export const runtime = 'nodejs';
 
 export const metadata: Metadata = {
-  title: 'Contacts | Jovie',
+  title: 'Contacts',
   description: 'Manage bookings, management, and press contacts',
 };
 

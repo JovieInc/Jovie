@@ -47,6 +47,9 @@ describe('AccountSettingsSection', () => {
     render(<AccountSettingsSection />);
 
     expect(screen.getByTestId('account-identity-summary')).toBeTruthy();
+    expect(screen.getByTestId('account-identity-summary')).toHaveClass(
+      'min-h-32'
+    );
     expect(screen.getByTestId('account-identity-email').textContent).toBe(
       'artist@example.com'
     );
@@ -70,6 +73,32 @@ describe('AccountSettingsSection', () => {
     });
 
     render(<AccountSettingsSection />);
-    expect(screen.getByTestId('account-identity-loading')).toBeTruthy();
+    expect(screen.getByTestId('account-identity-loading')).toHaveClass(
+      'min-h-32'
+    );
+  });
+
+  it('preserves identity geometry when loading resolves signed out', () => {
+    useUserSafe.mockReturnValue({
+      isLoaded: false,
+      isSignedIn: false,
+      user: null,
+    });
+
+    const { rerender } = render(<AccountSettingsSection />);
+    expect(screen.getByTestId('account-identity-loading')).toHaveClass(
+      'min-h-32'
+    );
+
+    useUserSafe.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: false,
+      user: null,
+    });
+    rerender(<AccountSettingsSection />);
+
+    expect(screen.getByTestId('account-identity-unsigned')).toHaveClass(
+      'min-h-32'
+    );
   });
 });

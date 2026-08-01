@@ -582,9 +582,15 @@ export function ChatPageClient({
   );
 
   // Update the header badge when the conversation title changes
-  const handleTitleChange = useCallback((title: string | null) => {
-    setCurrentThreadTitle(title);
-  }, []);
+  const handleTitleChange = useCallback(
+    (title: string | null) => {
+      setCurrentThreadTitle(currentTitle => {
+        if (title) return title;
+        return conversationId ? currentTitle : null;
+      });
+    },
+    [conversationId]
+  );
 
   useEffect(() => {
     if (currentThreadTitle) {

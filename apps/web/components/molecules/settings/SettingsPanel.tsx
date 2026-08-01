@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+// @coverage-via apps/web/tests/unit/dashboard/SettingsPanel.test.tsx
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { cn } from '@/lib/utils';
 
@@ -41,10 +42,12 @@ export function SettingsPanel({
           <div className='min-w-0 flex-1 space-y-0.5'>
             {title ? (
               <h3
-                className={cn(
+                className={[
                   'text-app font-[540] tracking-tighter text-primary-token',
-                  titleClassName
-                )}
+                  titleClassName,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
               >
                 {title}
               </h3>

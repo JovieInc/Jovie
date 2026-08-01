@@ -277,16 +277,21 @@ export function CalendarPageClient() {
   );
 
   const selectedReleases = useMemo<ReleaseDot[]>(() => {
-    if (!selectedDay) return [];
+    if (!selectedDay || filter === 'events' || filter === 'needs_review') {
+      return [];
+    }
     const key = localDateKey(selectedDay);
     return releasesByDay.get(key) ?? [];
-  }, [selectedDay, releasesByDay]);
+  }, [filter, selectedDay, releasesByDay]);
 
   const selectedEvents = useMemo<EventRecord[]>(() => {
-    if (!selectedDay) return [];
+    if (!selectedDay || filter === 'releases') return [];
     const key = localDateKey(selectedDay);
-    return eventsByDay.get(key) ?? [];
-  }, [selectedDay, eventsByDay]);
+    const dayEvents = eventsByDay.get(key) ?? [];
+    return filter === 'needs_review'
+      ? dayEvents.filter(event => event.confirmationStatus === 'pending')
+      : dayEvents;
+  }, [filter, selectedDay, eventsByDay]);
 
   const confirmedSelectedEvents = useMemo(
     () => selectedEvents.filter(e => e.confirmationStatus === 'confirmed'),
@@ -462,11 +467,11 @@ export function CalendarPageClient() {
         ready={!isLoading && !releasesError && !eventsError}
       />
       <PageContent className='px-3 py-2 sm:px-3 sm:py-2'>
-        <div className='grid h-full min-h-0 grid-cols-1 gap-3 lg:grid-cols-[9rem_minmax(0,1fr)]'>
+        <div className='grid h-full min-h-0 grid-cols-1 gap-3 lg:grid-cols-6'>
           <nav
-            aria-label='Calendar filters'
+            aria-label='Calendar Filters'
             data-testid='calendar-filter-rail'
-            className='flex min-w-0 gap-1 overflow-x-auto overflow-y-hidden pb-0.5 lg:flex-col lg:overflow-visible lg:pb-0'
+            className='flex min-h-8 min-w-0 gap-1 overflow-x-auto overflow-y-hidden pb-0.5 lg:flex-col lg:overflow-visible lg:pb-0'
           >
             <FilterPill
               label='All'
@@ -485,7 +490,7 @@ export function CalendarPageClient() {
             />
             <FilterPill
               label={
-                'Needs review' + (pendingCount > 0 ? ' · ' + pendingCount : '')
+                'Needs Review' + (pendingCount > 0 ? ' · ' + pendingCount : '')
               }
               active={filter === 'needs_review'}
               onClick={() => setFilter('needs_review')}
@@ -493,7 +498,7 @@ export function CalendarPageClient() {
             />
           </nav>
 
-          <div className='flex min-w-0 flex-col gap-3'>
+          <div className='flex min-w-0 flex-col gap-3 lg:col-span-5'>
             <div className='system-b-calendar-panel overflow-hidden'>
               <div className='system-b-calendar-weekday-row grid grid-cols-7'>
                 {DAY_NAMES.map(d => (

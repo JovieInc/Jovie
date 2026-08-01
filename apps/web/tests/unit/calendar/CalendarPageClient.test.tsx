@@ -162,18 +162,33 @@ describe('CalendarPageClient', () => {
 
     expect(mocks.useEventsQuery).toHaveBeenCalledWith('profile-1');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Needs review · 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Needs Review · 1' }));
 
     expect(screen.queryByText('May Release')).not.toBeInTheDocument();
     expect(screen.getByText('Movement Festival')).toBeInTheDocument();
+  });
+
+  it('keeps the selected-day detail consistent with the active filter', () => {
+    renderCalendar();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /18 Movement Festival/ })
+    );
+    expect(screen.getAllByText('Movement Festival').length).toBeGreaterThan(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Releases' }));
+
+    expect(screen.queryAllByText('Movement Festival')).toHaveLength(0);
+    expect(screen.getByText('Nothing on this day.')).toBeInTheDocument();
   });
 
   it('keeps filters in a stable responsive rail while the calendar keeps the main plane', () => {
     renderCalendar();
 
     const filterRail = screen.getByTestId('calendar-filter-rail');
-    expect(filterRail).toHaveAttribute('aria-label', 'Calendar filters');
-    expect(filterRail).toHaveClass('lg:flex-col');
+    expect(filterRail).toHaveAttribute('aria-label', 'Calendar Filters');
+    expect(filterRail).toHaveClass('min-h-8', 'lg:flex-col');
+    expect(filterRail.parentElement).toHaveClass('lg:grid-cols-6');
     expect(screen.getByRole('button', { name: 'All' })).toHaveClass(
       'system-b-calendar-filter-pill'
     );
@@ -293,8 +308,17 @@ describe('CalendarRouteSkeleton', () => {
 
     expect(screen.getByLabelText('Loading Calendar')).toBeInTheDocument();
     expect(screen.getByTestId('calendar-filter-rail-skeleton')).toHaveClass(
+      'min-h-8',
       'lg:flex-col'
     );
     expect(screen.getByTestId('calendar-grid-skeleton')).toBeInTheDocument();
+    expect(screen.getByTestId('calendar-grid-skeleton')).toHaveClass(
+      'lg:col-span-5'
+    );
+    expect(
+      screen
+        .getByTestId('calendar-grid-skeleton')
+        .querySelectorAll('.grid-cols-7 > div')
+    ).toHaveLength(49);
   });
 });
