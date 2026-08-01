@@ -58,7 +58,7 @@ export function HomepageHeroCommandCenter({
       <div className='homepage-product-rail system-b-mounted-home-command-rail'>
         <ProductPane
           image={images.product}
-          alt='Jovie authenticated releases workspace'
+          alt='Jovie public demo showing the releases catalog'
           sizes='(min-width: 1360px) 1298px, (min-width: 768px) calc(100vw - 4rem), calc(100vw - 3rem)'
           className='homepage-product-pane--desktop'
           priority

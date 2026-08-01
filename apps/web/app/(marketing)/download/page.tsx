@@ -192,6 +192,7 @@ export default function DownloadPage() {
                       </a>
                     </Button>
                     <div className='flex items-center gap-2'>
+                      {/* eslint-disable-next-line @jovie/canonical-ui-label-casing -- Apple product name casing */}
                       <Badge variant='outline'>iPhone Alpha</Badge>
                       <UiLink
                         asChild
@@ -215,7 +216,7 @@ export default function DownloadPage() {
                   <div className='absolute inset-x-0 top-8 bottom-0 overflow-hidden rounded-xl border border-subtle bg-surface-1/5 shadow-card'>
                     <Image
                       src={DESKTOP_IMAGE.publicUrl}
-                      alt='Jovie desktop workspace showing the releases catalog and release details'
+                      alt='Jovie public demo showing the releases catalog'
                       width={DESKTOP_IMAGE.width}
                       height={DESKTOP_IMAGE.height}
                       priority

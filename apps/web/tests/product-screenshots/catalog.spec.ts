@@ -26,6 +26,10 @@ import {
   waitForImages,
   waitForSettle,
 } from './helpers';
+import {
+  resolveScreenshotEvidence,
+  resolveScreenshotSourceGitSha,
+} from './source-provenance';
 
 const SCREENSHOT_FLAG_OVERRIDES = JSON.stringify({});
 
@@ -318,7 +322,7 @@ async function prepareScenario(
 }
 
 let manifestEntriesById = new Map<string, ScreenshotManifestEntry>();
-const gitSha = process.env.GITHUB_SHA ?? null;
+const gitSha = resolveScreenshotSourceGitSha();
 
 test.describe('Screenshot Catalog', () => {
   test.describe.configure({ mode: 'serial' });
@@ -374,6 +378,14 @@ test.describe('Screenshot Catalog', () => {
         await syncPublicExport(catalogPath, preparedScenario.publicExportPath);
       }
 
+      const evidence = resolveScreenshotEvidence({
+        capturedAt: new Date().toISOString(),
+        imageChanged,
+        previousCapturedAt: previousEntry?.capturedAt,
+        previousGitSha: previousEntry?.gitSha,
+        sourceGitSha: gitSha,
+      });
+
       const nextManifestEntry: ScreenshotManifestEntry = {
         id: preparedScenario.id,
         title: preparedScenario.title,
@@ -387,11 +399,8 @@ test.describe('Screenshot Catalog', () => {
         viewport: preparedScenario.viewport,
         theme: preparedScenario.theme,
         consumers: preparedScenario.consumers,
-        capturedAt:
-          !imageChanged && previousEntry
-            ? previousEntry.capturedAt
-            : new Date().toISOString(),
-        gitSha: !imageChanged && previousEntry ? previousEntry.gitSha : gitSha,
+        capturedAt: evidence.capturedAt,
+        gitSha: evidence.gitSha,
         imagePath: `${preparedScenario.id}.png`,
         publicExportPath: preparedScenario.publicExportPath,
       };

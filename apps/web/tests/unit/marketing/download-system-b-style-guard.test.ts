@@ -73,14 +73,13 @@ describe('download page System B source contract', () => {
     }
   });
 
-  it('uses the current releases dashboard proof instead of the experimental shell', () => {
+  it('describes the current public demo proof without authenticated detail claims', () => {
     const source = readFileSync(resolve(process.cwd(), pageSourcePath), 'utf8');
 
     expect(source).toContain(currentProofScenario);
     expect(source).not.toContain(retiredProofScenario);
-    expect(source).toContain(
-      'Jovie desktop workspace showing the releases catalog and release details'
-    );
+    expect(source).toContain('Jovie public demo showing the releases catalog');
+    expect(source).not.toMatch(/authenticated releases|release details/i);
   });
 
   it('removes the page-scoped system-b-download CSS block', () => {

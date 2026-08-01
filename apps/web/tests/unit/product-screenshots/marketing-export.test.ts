@@ -53,6 +53,19 @@ describe('getMarketingExportScenarios', () => {
 });
 
 describe('getMarketingExportImage', () => {
+  it('binds the homepage releases demo proof to an exact source commit', () => {
+    const scenario = SCREENSHOT_SCENARIOS.find(
+      candidate => candidate.id === 'dashboard-releases-desktop'
+    );
+    const manifestEntry = screenshotCatalogManifest.find(
+      entry => entry.id === 'dashboard-releases-desktop'
+    );
+
+    expect(scenario?.route).toBe('/demo');
+    expect(scenario?.canonicalSurfaceReviewRoute).toBe('/demo');
+    expect(manifestEntry?.gitSha).toMatch(/^[0-9a-f]{40}$/);
+  });
+
   it('returns a public URL, retina dimensions, and alt text for a full-viewport desktop scenario', () => {
     const image = getMarketingExportImage('dashboard-releases-desktop');
     expect(image.publicUrl).toMatch(
