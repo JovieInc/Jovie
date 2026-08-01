@@ -32,6 +32,20 @@ vi.mock('@/components/molecules/drawer', () => ({
     readonly children?: React.ReactNode;
     readonly testId?: string;
   }) => <div data-testid={testId}>{children}</div>,
+  EntityHeaderCard: ({
+    children,
+    title,
+    testId = 'release-header-card',
+  }: {
+    readonly children?: React.ReactNode;
+    readonly title?: React.ReactNode;
+    readonly testId?: string;
+  }) => (
+    <div data-testid={testId}>
+      {title}
+      {children}
+    </div>
+  ),
 }));
 
 vi.mock('@/components/organisms/AvatarUploadable', () => ({
