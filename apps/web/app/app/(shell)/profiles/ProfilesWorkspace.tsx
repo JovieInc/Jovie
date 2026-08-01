@@ -567,6 +567,8 @@ export function ProfilesWorkspace({
                 <button
                   type='button'
                   aria-label={`Actions for ${row.label}`}
+                  onClick={event => event.stopPropagation()}
+                  onKeyDown={event => event.stopPropagation()}
                   className='inline-flex h-11 w-11 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-colors duration-fast hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50 sm:h-7 sm:w-7'
                 >
                   <MoreHorizontal className='h-4 w-4' aria-hidden />
