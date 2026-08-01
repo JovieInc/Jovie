@@ -125,13 +125,9 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     () =>
       primaryNavigation.filter(
         item =>
-          item.id !== 'inbox' ||
-          shouldShowInboxNavigation(
-            inboxNavigation,
-            isItemActive(pathname, item)
-          )
+          item.id !== 'inbox' || shouldShowInboxNavigation(inboxNavigation)
       ),
-    [inboxNavigation, pathname]
+    [inboxNavigation]
   );
   const activePrimaryItemId = useMemo(() => {
     const active = eligiblePrimaryNavigation.find(item => {

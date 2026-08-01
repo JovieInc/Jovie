@@ -24,16 +24,13 @@ describe('Inbox navigation availability', () => {
     });
   });
 
-  it('fails open for unknown availability and preserves an active empty Inbox', () => {
+  it('fails open for unknown availability and hides a conclusively empty Inbox', () => {
     expect(
-      shouldShowInboxNavigation(UNKNOWN_INBOX_NAVIGATION_AVAILABILITY, false)
+      shouldShowInboxNavigation(UNKNOWN_INBOX_NAVIGATION_AVAILABILITY)
     ).toBe(true);
-    expect(shouldShowInboxNavigation(undefined, false)).toBe(true);
-    expect(
-      shouldShowInboxNavigation({ state: 'empty', pendingCount: 0 }, true)
-    ).toBe(true);
-    expect(
-      shouldShowInboxNavigation({ state: 'empty', pendingCount: 0 }, false)
-    ).toBe(false);
+    expect(shouldShowInboxNavigation(undefined)).toBe(true);
+    expect(shouldShowInboxNavigation({ state: 'empty', pendingCount: 0 })).toBe(
+      false
+    );
   });
 });
