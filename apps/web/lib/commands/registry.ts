@@ -88,6 +88,14 @@ export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
     'Merch lifecycle action shown from merch cards, not the root slash menu.',
   writeWorldClassBio:
     'Pro-only; chat surfaces it conversationally rather than via slash.',
+  researchArtistPresence:
+    'Onboarding presence-build system event; not a model-invoked or slash tool.',
+  assembleArtistProfile:
+    'Onboarding presence-build system event; not a model-invoked or slash tool.',
+  generateSmartLink:
+    'Onboarding presence-build system event; not a model-invoked or slash tool.',
+  draftWelcomePost:
+    'Onboarding presence-build system event; not a model-invoked or slash tool.',
 } as const;
 
 export type CommandSurface = 'chat-slash' | 'cmdk';
