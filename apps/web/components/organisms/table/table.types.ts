@@ -13,6 +13,8 @@ declare module '@tanstack/react-table' {
   interface ColumnMeta<TData extends RowData, TValue> {
     /** Additional tokenized cell/header classes owned by the consumer. */
     readonly className?: string;
+    /** Horizontal alignment for dense numeric/action columns. */
+    readonly align?: 'left' | 'center' | 'right';
     /** Keep the header in the accessibility tree but remove visible label chrome. */
     readonly headerVisibility?: 'visible' | 'sr-only';
     /** Reserve the action cell while revealing its contents only in contextual states. */
