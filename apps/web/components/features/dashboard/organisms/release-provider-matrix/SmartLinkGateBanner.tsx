@@ -143,7 +143,7 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
                   size='sm'
                   className='mt-1.5 h-7 w-fit rounded-lg px-2 text-2xs'
                 >
-                  <Link href={APP_ROUTES.LAUNCH_PRICING}>{copy.cta}</Link>
+                  <Link href={APP_ROUTES.PRICING}>{copy.cta}</Link>
                 </DrawerButton>
               </>
             );

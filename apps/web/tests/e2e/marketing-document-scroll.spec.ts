@@ -14,7 +14,7 @@ test.describe('marketing document scroll contract', () => {
 
   const cases = [
     { route: '/pay', label: 'pay' },
-    { route: '/launch/pricing', label: 'launch pricing' },
+    { route: '/pricing', label: 'pricing' },
   ] as const;
 
   for (const { route, label } of cases) {

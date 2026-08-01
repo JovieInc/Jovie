@@ -292,9 +292,9 @@ test.describe('Content Gate — Public Pages', () => {
       },
       {
         path: APP_ROUTES.LAUNCH_PRICING,
-        name: 'Launch pricing',
-        expectedUrl: /\/launch\/pricing$/,
-        readyText: /simple pricing/i,
+        name: 'Legacy launch pricing redirect',
+        expectedUrl: /\/pricing$/,
+        readyText: /artist profiles are free forever|compare all features/i,
         minLength: 120,
       },
       {
