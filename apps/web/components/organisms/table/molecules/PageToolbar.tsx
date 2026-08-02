@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/table/PageToolbar.test.tsx
 import { Button, TooltipShortcut } from '@jovie/ui';
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
