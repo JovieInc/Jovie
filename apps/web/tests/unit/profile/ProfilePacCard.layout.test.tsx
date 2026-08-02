@@ -1,9 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProfilePacCard } from '@/features/profile/pac/ProfilePacCard';
 import { DEFAULT_PROFILE_PAC_ASSIGNMENT } from '@/lib/flags/profile-pac';
 import type { Artist } from '@/types/db';
+
+const mockUseTrackAudioPlayer = vi.hoisted(() => vi.fn());
 
 vi.mock('next/link', () => ({
   default: ({
@@ -40,16 +42,7 @@ vi.mock('@/components/atoms/ImageWithFallback', () => ({
 }));
 
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
-  useTrackAudioPlayer: () => ({
-    playbackState: {
-      activeTrackId: 'pac-artist-1-release',
-      currentTime: 30,
-      duration: 60,
-      isPlaying: true,
-    },
-    toggleTrack: vi.fn(),
-    seek: vi.fn(),
-  }),
+  useTrackAudioPlayer: () => mockUseTrackAudioPlayer(),
 }));
 
 vi.mock('@/features/profile/usePacEvents', () => ({
@@ -78,6 +71,19 @@ const artist = {
 } as Artist;
 
 describe('ProfilePacCard landscape states', () => {
+  beforeEach(() => {
+    mockUseTrackAudioPlayer.mockReturnValue({
+      playbackState: {
+        activeTrackId: 'pac-artist-1-release',
+        currentTime: 30,
+        duration: 60,
+        isPlaying: true,
+      },
+      toggleTrack: vi.fn(),
+      seek: vi.fn(),
+    });
+  });
+
   it('gives the capture form the full compact row width after the listen threshold', async () => {
     render(
       <ProfilePacCard
@@ -107,8 +113,42 @@ describe('ProfilePacCard landscape states', () => {
       screen.getByRole('img', { name: 'Release artwork' })
     ).toHaveAttribute('data-priority', 'true');
     expect(card.querySelector('.aspect-square')).toHaveClass('invisible');
-    expect(screen.getByRole('textbox').closest('.absolute')).toHaveClass(
-      'inset-1.5'
+    const compactContent = screen.getByRole('textbox').closest('.absolute');
+    expect(compactContent).toHaveClass('inset-1.5', 'gap-1');
+  });
+
+  it('reserves enough compact-row height for subject copy and a 44px action', () => {
+    mockUseTrackAudioPlayer.mockReturnValue({
+      playbackState: {
+        activeTrackId: null,
+        currentTime: 0,
+        duration: 0,
+        isPlaying: false,
+      },
+      toggleTrack: vi.fn(),
+      seek: vi.fn(),
+    });
+
+    render(
+      <ProfilePacCard
+        artist={artist}
+        release={{
+          title: 'Release',
+          slug: 'release',
+          artworkUrl: '/release.jpg',
+          previewUrl: null,
+          releaseType: 'Single',
+          releaseDate: '2026-08-02',
+        }}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        renderMode='preview'
+      />
     );
+
+    const card = screen.getByTestId('profile-pac');
+    const compactContent = card.children.item(1);
+    expect(compactContent).toHaveClass('gap-1', 'py-1.5');
+    expect(screen.getByRole('link', { name: /listen/i })).toHaveClass('h-11');
   });
 });
