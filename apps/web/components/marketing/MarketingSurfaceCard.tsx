@@ -1,8 +1,12 @@
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
-export type MarketingSurfaceVariant = 'floating' | 'panel' | 'phone-inset';
-export type MarketingGlowTone = 'violet' | 'blue' | 'amber' | 'none';
+export type MarketingSurfaceVariant =
+  | 'floating'
+  | 'panel'
+  | 'phone-inset'
+  | 'product-callout';
+export type MarketingGlowTone = 'violet' | 'blue' | 'teal' | 'amber' | 'none';
 export type MarketingSurfaceChrome = 'framed' | 'full-bleed';
 
 export interface MarketingSurfaceCardProps {
@@ -17,8 +21,13 @@ export interface MarketingSurfaceCardProps {
   readonly chrome?: MarketingSurfaceChrome;
   readonly className?: string;
   readonly imageClassName?: string;
+  readonly contentClassName?: string;
   /** Override the default sizes hint for the inner next/image. */
   readonly imageSizes?: string;
+  /** Product-language label shown in the shared callout chrome. */
+  readonly label?: string;
+  /** Optional current-state label, for example "Release Alerts". */
+  readonly stateLabel?: string;
   readonly children?: React.ReactNode;
 }
 
@@ -29,12 +38,14 @@ const VARIANT_CLASS_NAMES: Record<MarketingSurfaceVariant, string> = {
     'rounded-[1.5rem] border-white/10 bg-[linear-gradient(180deg,rgba(18,20,27,0.96),rgba(11,13,18,0.94))] shadow-[0_28px_90px_rgba(0,0,0,0.38),0_8px_24px_rgba(0,0,0,0.24)]',
   'phone-inset':
     'rounded-[2rem] border-white/14 bg-[linear-gradient(180deg,rgba(17,18,24,0.98),rgba(9,10,15,0.98))] shadow-[0_30px_90px_rgba(0,0,0,0.48),0_10px_30px_rgba(0,0,0,0.28)]',
+  'product-callout': 'rounded-3xl border-subtle bg-surface-0 shadow-card',
 };
 
 const GLOW_CLASS_NAMES: Record<MarketingGlowTone, string> = {
   violet:
     'bg-[radial-gradient(circle_at_top,rgba(129,140,248,0.24),transparent_58%)]',
   blue: 'bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_58%)]',
+  teal: 'bg-[radial-gradient(circle_at_top,color-mix(in_oklab,var(--color-accent-teal)_16%,transparent),transparent_58%)]',
   amber:
     'bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.18),transparent_58%)]',
   none: '',
@@ -53,6 +64,9 @@ export function MarketingSurfaceCard({
   className,
   imageSizes,
   imageClassName,
+  contentClassName,
+  label,
+  stateLabel,
   children,
 }: Readonly<MarketingSurfaceCardProps>) {
   const resolvedChrome = chrome ?? (src ? 'full-bleed' : 'framed');
@@ -60,6 +74,9 @@ export function MarketingSurfaceCard({
   return (
     <div
       data-testid={testId}
+      data-marketing-product-callout={
+        variant === 'product-callout' ? 'true' : undefined
+      }
       className={cn(
         'relative overflow-hidden',
         resolvedChrome === 'framed' && 'border backdrop-blur-sm',
@@ -88,6 +105,23 @@ export function MarketingSurfaceCard({
         </>
       ) : null}
 
+      {label || stateLabel ? (
+        <div className='relative z-20 flex min-h-12 items-center justify-between gap-4 border-b border-subtle px-5 py-3 sm:px-6'>
+          {label ? (
+            <p className='text-xs font-semibold tracking-tight text-primary-token'>
+              {label}
+            </p>
+          ) : (
+            <span />
+          )}
+          {stateLabel ? (
+            <span className='font-mono text-3xs tracking-tight text-tertiary-token'>
+              {stateLabel}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       {src ? (
         <Image
           src={src}
@@ -101,7 +135,14 @@ export function MarketingSurfaceCard({
       ) : null}
 
       {children ? (
-        <div className='relative z-20 h-full w-full'>{children}</div>
+        <div
+          className={cn(
+            'relative z-20 h-full w-full min-w-0',
+            contentClassName
+          )}
+        >
+          {children}
+        </div>
       ) : null}
 
       <div

@@ -1,11 +1,9 @@
-import Image from 'next/image';
 import type {
   ArtistProfileCaptureVisualCopy,
   ArtistProfileLandingCopy,
 } from '@/data/artistProfileCopy';
-import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { ArtistProfileCaptureVisual } from '../MarketingStoryPrimitives';
-import { ArtistProfilePhoneFrame } from './ArtistProfilePhoneFrame';
+import { MarketingSurfaceCard } from '../MarketingSurfaceCard';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 import './ArtistProfileCaptureSection.css';
@@ -16,10 +14,6 @@ interface ArtistProfileCaptureSectionProps {
     | ArtistProfileCaptureVisualCopy
     | ArtistProfileLandingCopy['capture'];
 }
-
-const SUBSCRIBE_PROFILE = getMarketingExportImage(
-  'tim-white-profile-subscribe-mobile'
-);
 
 function isEditorialCapture(
   capture: ArtistProfileCaptureSectionProps['capture']
@@ -83,32 +77,24 @@ export function ArtistProfileCaptureSection({
         </div>
 
         <figure
-          className='ap-capture-loop__visual relative flex min-h-128 items-center justify-center'
+          className='ap-capture-loop__visual relative'
           data-testid='artist-profile-capture-demo'
         >
           <figcaption className='sr-only'>
-            Fan relationship loop: a fan acts, opts in, and hears from the
-            artist again.
+            A focused Jovie fan opt-in accepts an email, confirms the fan, and
+            turns that moment into an audience the artist can reach again.
           </figcaption>
-          <div className='ap-capture-loop__ring' aria-hidden='true' />
-          <span className='ap-capture-loop__node ap-capture-loop__node--act'>
-            Fan Acts
-          </span>
-          <span className='ap-capture-loop__node ap-capture-loop__node--opt-in'>
-            Opts In
-          </span>
-          <span className='ap-capture-loop__node ap-capture-loop__node--return'>
-            Hears From You Again
-          </span>
-          <ArtistProfilePhoneFrame className='ap-capture-loop__phone'>
-            <Image
-              fill
-              src={SUBSCRIBE_PROFILE.publicUrl}
-              alt='Jovie artist profile showing a fan email and SMS opt-in.'
-              className='object-cover object-top'
-              sizes='(min-width: 1024px) 18rem, 16rem'
-            />
-          </ArtistProfilePhoneFrame>
+          <MarketingSurfaceCard
+            variant='product-callout'
+            glowTone='teal'
+            chrome='framed'
+            label='Fan Opt-in'
+            stateLabel='Release Alerts'
+            className='ap-capture-loop__callout'
+            contentClassName='ap-capture-loop__callout-content'
+          >
+            <ArtistProfileCaptureVisual capture={capture} />
+          </MarketingSurfaceCard>
         </figure>
       </div>
     </ArtistProfileSectionShell>

@@ -47,14 +47,6 @@ export type PillAccentStyle = CSSProperties & {
   readonly '--pill-accent': string;
 };
 
-/**
- * @deprecated The animation/effect styles now live in `./captureShared.css`,
- * which this module imports for side effects. Kept as an empty string so the
- * existing `<style>` injection in MarketingStoryPrimitives keeps typechecking
- * until that consumer migrates.
- */
-export const CAPTURE_ANIMATION_STYLES = '';
-
 export function CaptureActionPill({
   capture,
   phase,
@@ -69,6 +61,7 @@ export function CaptureActionPill({
   return (
     <div
       className='ap-capture-action w-full max-w-108 rounded-full p-1.5 backdrop-blur-xl'
+      data-phase={phase}
       aria-live='polite'
     >
       <div

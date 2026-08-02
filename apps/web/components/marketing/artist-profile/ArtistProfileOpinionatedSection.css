@@ -2,12 +2,15 @@
   max-width: 12ch;
 }
 
-.ap-opinionated__comparison {
+.marketing-snap-rail__scroller.ap-opinionated__comparison {
+  display: block;
+  padding-inline: 0;
+  overflow-x: auto;
   scrollbar-width: none;
   scroll-snap-type: x mandatory;
 }
 
-.ap-opinionated__comparison::-webkit-scrollbar {
+.marketing-snap-rail__scroller.ap-opinionated__comparison::-webkit-scrollbar {
   display: none;
 }
 

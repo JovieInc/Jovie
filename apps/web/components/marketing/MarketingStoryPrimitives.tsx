@@ -22,7 +22,6 @@ import { cn } from '@/lib/utils';
 import type { CapturePhase } from './artist-profile/captureShared';
 import {
   AudienceRail,
-  CAPTURE_ANIMATION_STYLES,
   CaptureActionPill,
 } from './artist-profile/captureShared';
 
@@ -188,27 +187,11 @@ export function ArtistProfileCaptureVisual({
     };
   }, [activated, phase, reducedMotion]);
 
-  useEffect(() => {
-    if (!activated || reducedMotion || phase !== 'done') {
-      return;
-    }
-
-    const loopTimer = globalThis.setTimeout(() => {
-      setPhase('typing');
-    }, 2600);
-
-    return () => {
-      globalThis.clearTimeout(loopTimer);
-    };
-  }, [activated, phase, reducedMotion]);
-
   return (
     <div
       ref={rootRef}
       className={cn('artist-profile-capture-shell', className)}
     >
-      <style>{CAPTURE_ANIMATION_STYLES}</style>
-
       <div className='mx-auto flex max-w-lg justify-center'>
         <CaptureActionPill capture={capture} phase={phase} />
       </div>
