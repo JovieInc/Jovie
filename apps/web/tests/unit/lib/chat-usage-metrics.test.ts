@@ -5,6 +5,7 @@ import {
   getMonthlyUsage,
   getOverallRemainingPercent,
   getRemainingPercent,
+  isChatUsageBelowWarningThreshold,
 } from '@/lib/chat-usage/metrics';
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
 
@@ -48,6 +49,32 @@ describe('chat usage metrics', () => {
         monthlyRemaining: 50,
       })
     ).toBe(16);
+  });
+
+  it('only warns when the tighter usage window is below ten percent', () => {
+    expect(
+      isChatUsageBelowWarningThreshold({
+        ...baseUsage,
+        dailyLimit: 100,
+        used: 91,
+        remaining: 9,
+        monthlyLimit: 3100,
+        monthlyUsed: 2790,
+        monthlyRemaining: 310,
+      })
+    ).toBe(true);
+
+    expect(
+      isChatUsageBelowWarningThreshold({
+        ...baseUsage,
+        dailyLimit: 100,
+        used: 90,
+        remaining: 10,
+        monthlyLimit: 3100,
+        monthlyUsed: 2790,
+        monthlyRemaining: 310,
+      })
+    ).toBe(false);
   });
 
   it('formats compact reset labels for the inline menu', () => {
