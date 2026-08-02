@@ -12,6 +12,7 @@ const execFileAsync = promisify(execFile);
 
 const classifier = await import('../classifier.mjs');
 const { reconcileIssues } = await import('../reconcile.mjs');
+const linear = await import('../linear-client.mjs');
 const scorer = await import('../scorer.mjs');
 const workstreamer = await import('../workstreamer.mjs');
 const reporter = await import('../reporter.mjs');
@@ -134,6 +135,90 @@ describe('reconciliation idempotency', () => {
     await reconcileIssues({ issues: [reread()], client });
 
     assert.equal(calls.comments.length, 1);
+  });
+
+  it('returns a deterministic dry-run receipt with no mutations', async () => {
+    const issue = makeIssue({ identifier: 'JOV-4604' });
+    const receipt = await reconcileIssues({
+      issues: [issue],
+      client: {
+        async addComment() {
+          throw new Error('must not mutate');
+        },
+      },
+      isDryRun: true,
+      backlogStateId: 'backlog-id',
+    });
+    assert.equal(receipt.schema, 'backlog-orchestrator/reconcile/v1');
+    assert.equal(receipt.mode, 'dry-run');
+    assert.equal(receipt.mutations, 0);
+    assert.equal(receipt.classified, 1);
+    assert.equal(receipt.results[0].identifier, 'JOV-4604');
+  });
+});
+
+describe('Linear transport', () => {
+  it('retries transient fetch failures and preserves the raw Linear auth format', async () => {
+    const previous = process.env.LINEAR_API_KEY;
+    process.env.LINEAR_API_KEY = 'test-secret-that-must-not-leak';
+    let attempts = 0;
+    const sleeps = [];
+    /** @type {any} */
+    const fetchImpl = async (_url, options) => {
+      attempts += 1;
+      const headers = /** @type {Record<string, string>} */ (options.headers);
+      assert.equal(headers.Authorization, process.env.LINEAR_API_KEY);
+      if (attempts < 3) {
+        throw Object.assign(new Error('fetch failed'), { code: 'ETIMEDOUT' });
+      }
+      return { json: async () => ({ data: { viewer: { id: 'viewer' } } }) };
+    };
+    const data = await linear.graphql(
+      'query Test { viewer { id } }',
+      {},
+      {
+        fetchImpl,
+        sleepImpl: async ms => {
+          sleeps.push(ms);
+        },
+        retryBaseMs: 7,
+      }
+    );
+    assert.deepEqual(data, { viewer: { id: 'viewer' } });
+    assert.equal(attempts, 3);
+    assert.deepEqual(sleeps, [7, 14]);
+    if (previous === undefined) delete process.env.LINEAR_API_KEY;
+    else process.env.LINEAR_API_KEY = previous;
+  });
+
+  it('classifies an exhausted abort as a timeout without logging the secret', async () => {
+    const previous = process.env.LINEAR_API_KEY;
+    process.env.LINEAR_API_KEY = 'timeout-secret';
+    await assert.rejects(
+      linear.graphql(
+        'query Timeout { viewer { id } }',
+        {},
+        {
+          timeoutMs: 1,
+          maxAttempts: 1,
+          fetchImpl: (_url, options) =>
+            new Promise((_resolve, reject) => {
+              options.signal.addEventListener('abort', () =>
+                reject(new DOMException('aborted', 'AbortError'))
+              );
+            }),
+        }
+      ),
+      error => {
+        const err = /** @type {{ code?: unknown; message?: string }} */ (error);
+        return (
+          err.code === 'TIMEOUT' &&
+          !String(err.message ?? '').includes('timeout-secret')
+        );
+      }
+    );
+    if (previous === undefined) delete process.env.LINEAR_API_KEY;
+    else process.env.LINEAR_API_KEY = previous;
   });
 });
 
