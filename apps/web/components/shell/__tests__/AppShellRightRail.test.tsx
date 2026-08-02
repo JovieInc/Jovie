@@ -15,22 +15,25 @@ describe('AppShellRightRail', () => {
     expect(rail).toHaveAttribute('aria-label', 'Context Panel');
     expect(rail).toHaveAttribute('data-shell-rail-motion', 'right');
     expect(rail).toHaveClass(
-      'sticky',
-      'top-0',
+      'relative',
       'z-30',
-      'lg:z-10',
       'w-0',
+      'h-0',
+      'overflow-visible',
+      'lg:sticky',
+      'lg:top-0',
+      'lg:z-10',
       'lg:w-fit',
-      'h-full',
-      'min-h-0',
-      'self-stretch',
-      'overflow-hidden',
+      'lg:h-full',
+      'lg:min-h-0',
+      'lg:self-stretch',
+      'lg:overflow-hidden',
       'lg:p-1.5',
       'duration-cinematic',
       'ease-cinematic'
     );
     expect(rail).toHaveClass('transition-[flex-basis,width,opacity,transform]');
-    expect(rail).not.toHaveClass('self-start');
+    expect(rail).not.toHaveClass('lg:self-start');
     expect(rail).not.toHaveClass('z-10');
     expect(rail).toContainElement(screen.getByTestId('fixture-panel'));
   });
@@ -77,6 +80,6 @@ describe('AppShellRightRail', () => {
 
     const rail = screen.getByTestId('app-shell-right-rail');
 
-    expect(rail).toHaveClass('fixture-rail', 'sticky', 'top-0');
+    expect(rail).toHaveClass('fixture-rail', 'relative', 'lg:sticky');
   });
 });

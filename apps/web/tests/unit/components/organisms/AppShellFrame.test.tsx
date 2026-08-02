@@ -73,7 +73,7 @@ describe('AppShellFrame', () => {
     expect(rightRail).toContainElement(
       screen.getByTestId('fixture-right-rail')
     );
-    expect(rightRail).toHaveClass('sticky', 'top-0');
+    expect(rightRail).toHaveClass('lg:sticky', 'lg:top-0');
     expect(mainPlane).toHaveClass(
       'transition-[flex-basis,width]',
       'duration-cinematic',

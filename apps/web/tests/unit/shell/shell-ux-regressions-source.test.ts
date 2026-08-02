@@ -49,8 +49,9 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
     expect(previewHost).toContain('height: 100%');
     expect(previewHost).not.toContain('box-shadow');
     expect(previewHost).not.toContain('border:');
-    expect(rail).toMatch(/flex-col self-stretch overflow-hidden/);
-    expect(rail).not.toMatch(/flex-col self-start overflow-hidden/);
+    expect(rail).toMatch(/lg:flex-col lg:self-stretch lg:overflow-hidden/);
+    expect(rail).toMatch(/h-0 w-0[\s\S]*overflow-visible/);
+    expect(rail).not.toMatch(/lg:flex-col lg:self-start lg:overflow-hidden/);
   });
 
   it('keeps the sidebar collapse toggle borderless (JOV-3959)', () => {
