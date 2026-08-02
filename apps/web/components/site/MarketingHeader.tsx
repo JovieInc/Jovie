@@ -168,7 +168,9 @@ export function MarketingHeader({
     (showStagedNav ? DEFAULT_STAGED_HOMEPAGE_NAV_LINKS : MARKETING_NAV_LINKS);
   const isMinimal = variant === 'minimal';
   const isHomepage = variant === 'homepage';
-  const isArtistProfiles = pathname === APP_ROUTES.ARTIST_PROFILES;
+  const isArtistProfiles =
+    pathname === APP_ROUTES.ARTIST_PROFILES ||
+    pathname === APP_ROUTES.ARTIST_PROFILE_LEGACY;
   const usesHomepageChrome = isHomepage || isArtistProfiles;
   const presentation = isMinimal
     ? 'default'
@@ -190,6 +192,7 @@ export function MarketingHeader({
 
   return (
     <HeaderNav
+      className={isArtistProfiles ? 'artist-profiles-home-header' : undefined}
       logoSize={isArtistProfiles ? 'sm' : logoSize}
       logoVariant={isArtistProfiles ? 'icon' : logoVariant}
       authMode='public-static'

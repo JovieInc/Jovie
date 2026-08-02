@@ -23,7 +23,10 @@ import { ArtistProfileMonetizationSection } from '@/components/marketing/artist-
 import { ArtistProfileOpinionatedSection } from '@/components/marketing/artist-profile/ArtistProfileOpinionatedSection';
 import { ArtistProfileOutcomesCarousel } from '@/components/marketing/artist-profile/ArtistProfileOutcomesCarousel';
 import { ArtistProfileSectionShell } from '@/components/marketing/artist-profile/ArtistProfileSectionShell';
-import { ArtistProfileSocialProof } from '@/components/marketing/artist-profile/ArtistProfileSocialProof';
+import {
+  ArtistProfileReleaseCycleGallery,
+  ArtistProfileSocialProof,
+} from '@/components/marketing/artist-profile/ArtistProfileSocialProof';
 import { ArtistProfileSpecWall } from '@/components/marketing/artist-profile/ArtistProfileSpecWall';
 import { CaptureActionPill } from '@/components/marketing/artist-profile/captureShared';
 import { HomepageV2FinalCta } from '@/components/marketing/homepage-v2/HomepageV2Ctas';
@@ -225,6 +228,9 @@ export const socialProof: Story = {
           </p>
         </MarketingContainer>
       )}
+      <ArtistProfileReleaseCycleGallery
+        releaseCycle={ARTIST_PROFILE_COPY.releaseCycle}
+      />
     </SectionFrame>
   ),
 };

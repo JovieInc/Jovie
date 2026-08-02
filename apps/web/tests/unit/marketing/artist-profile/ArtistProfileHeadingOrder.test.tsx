@@ -1,9 +1,15 @@
-import { render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { run as axeRun } from 'axe-core';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ArtistProfileHeroAdaptiveIntro } from '@/components/marketing/artist-profile/ArtistProfileHeroAdaptiveIntro';
 import { ArtistProfileOutcomesCarousel } from '@/components/marketing/artist-profile/ArtistProfileOutcomesCarousel';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
+
+const trackHomepageEvent = vi.hoisted(() => vi.fn());
+
+vi.mock('@/components/homepage/homepage-analytics', () => ({
+  trackHomepageEvent,
+}));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -40,6 +46,35 @@ function renderHeroThroughOutcomes() {
 }
 
 describe('artist-profiles heading order (JOV-2246)', () => {
+  beforeEach(() => {
+    trackHomepageEvent.mockClear();
+  });
+
+  it('emits defined analytics events from both hero actions', () => {
+    renderHeroThroughOutcomes();
+    window.addEventListener('click', event => event.preventDefault(), {
+      capture: true,
+      once: true,
+    });
+
+    fireEvent.click(
+      screen.getByRole('link', { name: ARTIST_PROFILE_COPY.hero.ctaLabel })
+    );
+
+    expect(trackHomepageEvent).toHaveBeenCalledWith(
+      'landing_cta_claim_profile',
+      undefined
+    );
+
+    fireEvent.click(screen.getByRole('link', { name: 'See How It Adapts' }));
+
+    expect(trackHomepageEvent).toHaveBeenLastCalledWith(
+      'artist_profiles_adaptive_cta_clicked',
+      { source: 'artist-profiles-hero' }
+    );
+    expect(trackHomepageEvent).not.toHaveBeenCalledWith(undefined, undefined);
+  });
+
   it('renders an h2 between the hero h1 and the outcome card h3s', () => {
     const { container } = renderHeroThroughOutcomes();
 

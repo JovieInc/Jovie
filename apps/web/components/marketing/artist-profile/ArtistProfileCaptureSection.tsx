@@ -89,7 +89,7 @@ export function ArtistProfileCaptureSection({
             glowTone='teal'
             chrome='framed'
             label='Fan Opt-in'
-            stateLabel='Release Alerts'
+            stateLabel='Illustrative fan activity'
             className='ap-capture-loop__callout'
             contentClassName='ap-capture-loop__callout-content'
           >

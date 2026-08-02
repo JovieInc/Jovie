@@ -2,12 +2,10 @@ import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
-import { ARTIST_PROFILE_TRUTH_TILES } from '@/data/artistProfileFeatures';
 import {
   ARTIST_PROFILE_SECTION_ORDER,
   ARTIST_PROFILE_SECTION_TEST_IDS,
 } from '@/data/artistProfilePageOrder';
-import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
 
 interface ChildrenProps {
@@ -96,7 +94,7 @@ vi.mock(
       <section>
         <h2>{outcomes.headline}</h2>
         <div data-testid='artist-profile-outcomes-grid'>
-          {outcomes.landingCards.map(card => (
+          {outcomes.landingCards.slice(0, 4).map(card => (
             <article key={card.id} data-testid='artist-profile-outcome-card'>
               {card.title}
             </article>
@@ -141,25 +139,6 @@ vi.mock(
   })
 );
 
-vi.mock('@/components/marketing/artist-profile/ArtistProfileSpecWall', () => ({
-  ArtistProfileSpecWall: ({
-    specWall,
-    truthTiles,
-  }: {
-    readonly specWall: typeof ARTIST_PROFILE_COPY.specWall;
-    readonly truthTiles: typeof ARTIST_PROFILE_TRUTH_TILES;
-  }) => (
-    <section>
-      <h2>{specWall.headline}</h2>
-      {truthTiles.map(tile => (
-        <article data-testid='artist-profile-truth-tile' key={tile.title}>
-          {tile.title}
-        </article>
-      ))}
-    </section>
-  ),
-}));
-
 vi.mock(
   '@/components/marketing/artist-profile/ArtistProfileHowItWorks',
   () => ({
@@ -182,14 +161,14 @@ vi.mock(
 vi.mock(
   '@/components/marketing/artist-profile/ArtistProfileSocialProof',
   () => ({
-    ArtistProfileSocialProof: ({
-      socialProof,
+    ArtistProfileReleaseCycleGallery: ({
+      releaseCycle,
     }: {
-      readonly socialProof: typeof ARTIST_PROFILE_COPY.socialProof;
+      readonly releaseCycle: typeof ARTIST_PROFILE_COPY.releaseCycle;
     }) => (
       <section>
-        <h2>{socialProof.headline}</h2>
-        <p>{socialProof.intro}</p>
+        <h2>{releaseCycle.headline}</h2>
+        <p>{releaseCycle.intro}</p>
       </section>
     ),
   })
@@ -233,10 +212,7 @@ function getEnabledSectionTestIds(flags: ArtistProfileSectionFlags) {
   }
 
   return ARTIST_PROFILE_SECTION_ORDER.filter(
-    section =>
-      (!section.enabledByFlag || flags[section.enabledByFlag]) &&
-      (section.id !== 'socialProof' ||
-        ARTIST_PROFILE_SOCIAL_PROOF.hasRealQuotes)
+    section => !section.enabledByFlag || flags[section.enabledByFlag]
   ).map(section => section.testId);
 }
 
@@ -266,14 +242,7 @@ async function renderArtistProfileLandingPage(
     '@/components/marketing/artist-profile'
   );
 
-  render(
-    <ArtistProfileLandingPage
-      copy={ARTIST_PROFILE_COPY}
-      truthTiles={ARTIST_PROFILE_TRUTH_TILES}
-      socialProof={ARTIST_PROFILE_SOCIAL_PROOF}
-      flags={flags}
-    />
-  );
+  render(<ArtistProfileLandingPage copy={ARTIST_PROFILE_COPY} flags={flags} />);
 }
 
 describe('ArtistProfilesPage', () => {
@@ -324,13 +293,13 @@ describe('ArtistProfilesPage', () => {
     }
     expect(ARTIST_PROFILE_COPY.adaptive.modes).toHaveLength(4);
     expect(screen.getAllByTestId('artist-profile-outcome-card')).toHaveLength(
-      5
+      4
     );
     expect(screen.getAllByTestId('artist-profile-truth-tile')).toHaveLength(4);
     expect(ARTIST_PROFILE_COPY.faq.items).toHaveLength(4);
     expect(
-      screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.socialProof)
-    ).not.toBeInTheDocument();
+      screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.releaseCycle)
+    ).toBeInTheDocument();
     expect(
       screen.queryByTestId('artist-profile-section-trust')
     ).not.toBeInTheDocument();
@@ -340,12 +309,9 @@ describe('ArtistProfilesPage', () => {
     expect(
       screen.queryByTestId('artist-profile-section-monetization')
     ).not.toBeInTheDocument();
-    expect(
-      screen.getByText(ARTIST_PROFILE_COPY.howItWorks.sync.otherProvidersLabel)
-    ).toBeInTheDocument();
   });
 
-  it('omits optional social proof and FAQ sections when their flags are off', async () => {
+  it('keeps product evidence while omitting the optional FAQ when its flag is off', async () => {
     await renderArtistProfileLandingPage({
       FULL_PAGE: true,
       SOCIAL_PROOF: false,
@@ -353,8 +319,8 @@ describe('ArtistProfilesPage', () => {
     });
 
     expect(
-      screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.socialProof)
-    ).not.toBeInTheDocument();
+      screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.releaseCycle)
+    ).toBeInTheDocument();
     expect(
       screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.faq)
     ).not.toBeInTheDocument();

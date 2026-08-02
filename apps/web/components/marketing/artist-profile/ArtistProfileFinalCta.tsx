@@ -5,8 +5,6 @@ import { HomepageV2FinalCta } from '../homepage-v2/HomepageV2Ctas';
 interface ArtistProfileFinalCtaProps {
   readonly finalCta: ArtistProfileLandingCopy['finalCta'];
   readonly ctaHref?: string;
-  readonly roomy?: boolean;
-  readonly showSignature?: boolean;
 }
 
 export function ArtistProfileFinalCta({

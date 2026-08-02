@@ -19,6 +19,7 @@ import { ReleasesEmptyState } from '@/features/dashboard/organisms/release-provi
 import { ReleasesExperience } from '@/features/dashboard/organisms/release-provider-matrix/ReleasesExperience';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import { getDesignStudioItem } from '@/lib/design-studio/registry';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import type { InsightCategory } from '@/types/insights';
 import { DemoAuthShell } from './DemoAuthShell';
 import { DemoClientProviders } from './DemoClientProviders';
@@ -61,6 +62,11 @@ type ReleaseShowcaseState = (typeof RELEASE_SHOWCASE_STATES)[number];
 interface DemoShowcaseSurfaceProps {
   readonly surface: DemoRenderableSurfaceId;
 }
+
+const DEMO_TIM_WHITE_HANDLE_VALIDATION = {
+  ...DEMO_HANDLE_VALIDATION,
+  suggestions: [],
+};
 
 function DemoShowcasePanel({
   testId,
@@ -183,14 +189,17 @@ export function DemoShowcaseSurface({
   surface,
 }: Readonly<DemoShowcaseSurfaceProps>) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchParams = useSearchParams();
+  const isTimWhiteProfile = searchParams.get('profile') === 'tim-white';
   const [handleInput, setHandleInput] = useState(
-    INTERNAL_DJ_DEMO_PERSONA.profile.handle
+    isTimWhiteProfile
+      ? TIM_WHITE_PROFILE.publicProfileHandle
+      : INTERNAL_DJ_DEMO_PERSONA.profile.handle
   );
   const [selectedInsightCategory, setSelectedInsightCategory] = useState<
     InsightCategory | 'all'
   >('all');
   const noop = useCallback(() => {}, []);
-  const searchParams = useSearchParams();
   const demoInsights = useMemo(
     () =>
       selectedInsightCategory === 'all'
@@ -310,7 +319,11 @@ export function DemoShowcaseSurface({
             prompt='This is how fans will find and remember you.'
             handleInput={handleInput}
             isHydrated
-            handleValidation={DEMO_HANDLE_VALIDATION}
+            handleValidation={
+              isTimWhiteProfile
+                ? DEMO_TIM_WHITE_HANDLE_VALIDATION
+                : DEMO_HANDLE_VALIDATION
+            }
             stateError={null}
             isSubmitting={false}
             isTransitioning={false}

@@ -8,7 +8,7 @@ export type ArtistProfileSectionId =
   | 'opinionated'
   | 'specWall'
   | 'howItWorks'
-  | 'socialProof'
+  | 'releaseCycle'
   | 'faq'
   | 'finalCta';
 
@@ -17,10 +17,7 @@ export interface ArtistProfileSectionOrderEntry {
   readonly label: string;
   readonly testId: string;
   readonly screenshotScenarioId?: string;
-  readonly enabledByFlag?: keyof Pick<
-    ArtistProfileSectionFlags,
-    'SOCIAL_PROOF' | 'FAQ'
-  >;
+  readonly enabledByFlag?: keyof Pick<ArtistProfileSectionFlags, 'FAQ'>;
 }
 
 export type ArtistProfileScreenshotSectionOrderEntry =
@@ -73,10 +70,9 @@ export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEnt
       screenshotScenarioId: 'artist-profile-how-it-works-section-desktop',
     },
     {
-      id: 'socialProof',
-      label: 'Social Proof',
-      testId: 'artist-profile-section-social-proof',
-      enabledByFlag: 'SOCIAL_PROOF',
+      id: 'releaseCycle',
+      label: 'Release Cycle',
+      testId: 'artist-profile-section-release-cycle',
     },
     {
       id: 'faq',

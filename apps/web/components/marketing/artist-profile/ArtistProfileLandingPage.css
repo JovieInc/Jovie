@@ -59,6 +59,25 @@
   padding-inline: 0;
 }
 
+.artist-profiles-home-header [data-testid="site-logo-link"] {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  justify-content: center;
+  margin-left: -0.75rem;
+}
+
+.system-b-marketing .system-b-mounted-home-footer a[aria-label="Jovie Home"] {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.system-b-marketing .system-b-mounted-home-footer .mf-legal-link {
+  min-height: 2.75rem;
+  align-items: center;
+}
+
 @media (max-width: 47.99rem) {
   .system-b-marketing .system-b-mounted-home-footer > div {
     padding-block: var(--space-10) var(--space-8);
@@ -115,8 +134,8 @@
 }
 
 .ap-annotated-truth__marker--action {
+  top: 49%;
   right: 24%;
-  bottom: 27%;
 }
 
 .ap-annotated-truth__marker--navigation {
@@ -134,6 +153,83 @@
   height: 0.4rem;
   border-radius: var(--radius-pill);
   background: var(--color-border-default);
+}
+
+.ap-how-it-works__setup-flow {
+  display: grid;
+  gap: 1px;
+  padding: 1px;
+  background: var(--color-border-subtle);
+}
+
+.ap-how-it-works__setup-stage {
+  min-width: 0;
+  background: var(--color-bg-surface-0);
+}
+
+.ap-how-it-works__setup-stage-header {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: baseline;
+  padding: var(--space-3) var(--space-4);
+}
+
+.ap-how-it-works__setup-media {
+  position: relative;
+  aspect-ratio: 2.7 / 1;
+  overflow: hidden;
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-base);
+}
+
+.ap-how-it-works__setup-image {
+  object-fit: cover;
+}
+
+.ap-how-it-works__setup-image--claim {
+  object-position: center 13%;
+  transform: translateX(4%) scale(1.75);
+  transform-origin: center top;
+}
+
+.ap-how-it-works__setup-image--connect {
+  object-position: center 50%;
+  transform: scale(1.8);
+}
+
+.ap-how-it-works__setup-image--share {
+  object-fit: contain;
+  object-position: center top;
+  transform: scale(1.08);
+  transform-origin: center top;
+}
+
+@media (min-width: 64rem) {
+  .ap-how-it-works__setup-flow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ap-how-it-works__setup-stage--share {
+    grid-column: 1 / -1;
+  }
+
+  .ap-how-it-works__setup-stage--claim .ap-how-it-works__setup-media,
+  .ap-how-it-works__setup-stage--connect .ap-how-it-works__setup-media {
+    aspect-ratio: 1.55 / 1;
+  }
+
+  .ap-how-it-works__setup-stage--share .ap-how-it-works__setup-media {
+    aspect-ratio: 2.2 / 1;
+  }
+
+  .ap-how-it-works__setup-image--claim {
+    transform: translateX(4%) scale(2.2);
+  }
+
+  .ap-how-it-works__setup-image--connect {
+    transform: scale(1.8);
+  }
 }
 
 @media (max-width: 63.99rem) {
@@ -156,9 +252,36 @@
   .ap-annotated-truth__marker--navigation {
     left: 15%;
   }
+
+  .ap-how-it-works__setup-media {
+    aspect-ratio: 2.15 / 1;
+  }
 }
 
-.ap-profile-gallery {
+@media (max-width: 47.99rem) {
+  .ap-how-it-works__setup-stage-header {
+    grid-template-columns: 1.75rem minmax(0, 1fr);
+  }
+
+  .ap-how-it-works__setup-stage-detail {
+    grid-column: 2;
+  }
+
+  .ap-how-it-works__setup-media {
+    aspect-ratio: 1.8 / 1;
+  }
+
+  .ap-how-it-works__setup-stage--share .ap-how-it-works__setup-media {
+    aspect-ratio: 1.25 / 1;
+  }
+}
+
+.marketing-snap-rail__scroller.ap-profile-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(15rem, 1fr));
+  gap: var(--space-4);
+  padding-inline: 0;
+  overflow-x: auto;
   scroll-snap-type: x mandatory;
   scrollbar-width: thin;
 }
@@ -169,14 +292,14 @@
 }
 
 @media (min-width: 48rem) {
-  .ap-profile-gallery {
+  .marketing-snap-rail__scroller.ap-profile-gallery {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     overflow-x: visible;
   }
 }
 
 @media (max-width: 47.99rem) {
-  .ap-profile-gallery {
+  .marketing-snap-rail__scroller.ap-profile-gallery {
     grid-template-columns: repeat(3, minmax(16.5rem, 78vw));
   }
 

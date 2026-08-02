@@ -1,6 +1,9 @@
 import Image from 'next/image';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
+import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
+import ONBOARDING_DSP_CAPTURE from '@/screenshot-catalog/current/onboarding-dsp-desktop.png';
+import ONBOARDING_HANDLE_CAPTURE from '@/screenshot-catalog/current/onboarding-handle-desktop.png';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 
@@ -8,9 +11,31 @@ interface ArtistProfileHowItWorksProps {
   readonly howItWorks: ArtistProfileLandingCopy['howItWorks'];
 }
 
-const SYNC_SETTINGS = getMarketingExportImage(
-  'artist-spec-sync-settings-desktop'
-);
+const LIVE_PROFILE = getMarketingExportImage('tim-white-profile-live-mobile');
+
+const SETUP_STAGES = [
+  {
+    id: 'claim',
+    label: 'Claim',
+    detail: TIM_WHITE_PROFILE.publicProfileDisplay,
+    src: ONBOARDING_HANDLE_CAPTURE,
+    alt: 'Jovie onboarding with the Tim White profile handle ready to claim.',
+  },
+  {
+    id: 'connect',
+    label: 'Connect',
+    detail: 'Import your catalog',
+    src: ONBOARDING_DSP_CAPTURE,
+    alt: 'Jovie onboarding asking an artist to connect their music catalog.',
+  },
+  {
+    id: 'share',
+    label: 'Share',
+    detail: `${TIM_WHITE_PROFILE.publicProfileDisplay} is live`,
+    src: LIVE_PROFILE.publicUrl,
+    alt: "Tim White's live Jovie artist profile ready to share from one link.",
+  },
+] as const;
 
 export function ArtistProfileHowItWorks({
   howItWorks,
@@ -55,18 +80,38 @@ export function ArtistProfileHowItWorks({
             <span aria-hidden='true' />
             <span aria-hidden='true' />
             <figcaption className='ml-2 font-mono text-3xs text-tertiary-token'>
-              Connect Music
+              Set up your profile
             </figcaption>
           </div>
-          <div className='relative aspect-[1.2875]'>
-            <Image
-              fill
-              src={SYNC_SETTINGS.publicUrl}
-              alt='Jovie settings showing music services connected to an artist profile.'
-              className='object-cover object-top'
-              sizes='(min-width: 1024px) 48rem, 100vw'
-            />
-          </div>
+          <ol className='ap-how-it-works__setup-flow'>
+            {SETUP_STAGES.map((stage, index) => (
+              <li
+                key={stage.id}
+                className={`ap-how-it-works__setup-stage ap-how-it-works__setup-stage--${stage.id}`}
+              >
+                <div className='ap-how-it-works__setup-stage-header'>
+                  <span className='font-mono text-3xs text-tertiary-token'>
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <strong className='text-sm font-semibold text-primary-token'>
+                    {stage.label}
+                  </strong>
+                  <span className='ap-how-it-works__setup-stage-detail font-mono text-3xs text-tertiary-token'>
+                    {stage.detail}
+                  </span>
+                </div>
+                <div className='ap-how-it-works__setup-media'>
+                  <Image
+                    fill
+                    src={stage.src}
+                    alt={stage.alt}
+                    className={`ap-how-it-works__setup-image ap-how-it-works__setup-image--${stage.id}`}
+                    sizes='(min-width: 1024px) 48rem, 100vw'
+                  />
+                </div>
+              </li>
+            ))}
+          </ol>
         </figure>
       </div>
     </ArtistProfileSectionShell>

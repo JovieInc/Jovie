@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { HomepageElectricSeam } from '@/components/homepage/HomepageElectricSeam';
 import { HomepagePosterHero } from '@/components/homepage/HomepagePosterHero';
+import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
@@ -49,6 +50,8 @@ export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
         secondaryCta={{
           label: 'See How It Adapts',
           href: '#adaptive',
+          eventName: 'artist_profiles_adaptive_cta_clicked',
+          eventProperties: { source: 'artist-profiles-hero' },
         }}
         seam={
           <HomepageElectricSeam
@@ -57,6 +60,7 @@ export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
           />
         }
         media={<ArtistProfileHeroMedia />}
+        trackedLinkComponent={HomepageTrackedLink}
       />
     </div>
   );
