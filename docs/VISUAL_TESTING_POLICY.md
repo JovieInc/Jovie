@@ -25,11 +25,20 @@ source lacks:
 
 1. **Test** — colocated `*.test.ts(x)` / `*.spec.ts(x)`, **touched in the same
    diff**, or a verified `// @coverage-via <path>` whose target imports the
-   component.
-2. **Story** — colocated `*.stories.ts(x)`.
+   component. Existing components may also use a changed central test that
+   imports and exercises the exact component module, or asserts against an
+   exact source-file read; name mentions, mocks, and unasserted reads do not
+   count. Newly added components may not use this exception.
+2. **Story** — colocated `*.stories.ts(x)`. Existing marketing/site components
+   may use a verified real-component story in the canonical
+   `MarketingRecipes`, `MarketingSections`, or `MarketingShells` catalog;
+   newly added components still require an adjacent story.
 3. **Match** — story imports the real component module; required public props
    appear in story args/JSX (or `parameters.jovie.uncoveredProps` allowlist);
    disabled/loading props are exercised when present on the component API.
+   Canonical catalog stories scope evidence to the component's own JSX and use
+   `parameters.jovie.uncoveredPropsByComponent` for any explicit exemption, so
+   unrelated stories and components cannot satisfy the match.
 4. **Hygiene** — `pnpm storybook:quality` (no pure-black voids, no fake CTAs).
 5. **Ratchet** — multi-root floors in `scripts/story-coverage-baseline.json`
    may only improve; new uncovered components fail even if percent holds.
