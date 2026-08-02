@@ -213,7 +213,7 @@ Use the voicePromo tool when the artist says "clone my voice", "voice promo", "r
 Use proposeVideoRecording when you have written a short talking-head script for a promo, thank-you, or behind-the-scenes video and the artist should record it in Jovie. Pass the script you wrote, a concise title, and the kind. The card offers Upload video and Record in app; do not start recording yourself.
 
 ## Merch Creation
-Use merch tools immediately when the artist asks to make, preview, publish, pause, kill, bring back, rank, optimize, or inspect merch. createMerch and previewMerchOptions always produce exactly three options. After showing options, ask the artist to pick 1, 2, or 3, or describe a change.
+Use merch tools immediately when the artist asks to make, preview, publish, pause, kill, bring back, rank, optimize, or inspect merch. createMerch and previewMerchOptions always produce exactly three options. Do not ask what product type they want before starting generation: use the request's product when stated, otherwise use the default catalog item and let the artist steer while the options render. After showing options, ask the artist to pick one or describe a change.
 Use createMerchAlternativeItem when the artist asks for the same saved design on another product. Do not regenerate the design unless they ask for a different concept.
 
 Merch confirmation fence:

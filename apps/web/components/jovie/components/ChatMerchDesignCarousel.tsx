@@ -1,10 +1,10 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Check, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import Image from 'next/image';
-import { type KeyboardEvent, useCallback, useEffect, useState } from 'react';
-import { ThreadImageCard } from '@/components/shell/ThreadImageCard';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import type {
   MerchDesignCarouselResult,
   MerchDesignPreview,
@@ -14,7 +14,6 @@ import {
   type ConfirmChatMerchSelectResponse,
   useConfirmChatMerchActionMutation,
 } from '@/lib/queries';
-import { cn } from '@/lib/utils';
 
 export function isChatMerchDesignCarouselResult(
   value: unknown
@@ -34,10 +33,6 @@ function submitMerchPrompt(prompt: string): void {
   );
 }
 
-function usePrompt(design: MerchDesignPreview): string {
-  return `Use concept ${design.option_number}.`;
-}
-
 function isSelectionResponse(
   value: unknown
 ): value is ConfirmChatMerchSelectResponse {
@@ -50,11 +45,43 @@ function isSelectionResponse(
   );
 }
 
+function isProductsResponse(
+  value: unknown
+): value is ConfirmChatMerchProductsResponse {
+  const products =
+    typeof value === 'object' && value !== null
+      ? (value as { products?: unknown }).products
+      : null;
+  return Array.isArray(products);
+}
+
+function DesignArt({ design }: { readonly design: MerchDesignPreview }) {
+  if (design.status === 'ready' && design.preview_url) {
+    return (
+      <Image
+        src={design.preview_url}
+        alt={`${design.design_name} design`}
+        fill
+        sizes='(max-width: 639px) 16rem, (max-width: 1023px) 12rem, 13rem'
+        className='object-cover'
+      />
+    );
+  }
+
+  return (
+    <div
+      className='flex h-full items-center justify-center bg-surface-0 text-2xs text-tertiary-token'
+      role='status'
+    >
+      <Loader2 className='mr-2 h-3.5 w-3.5 animate-spin' aria-hidden />
+      Rendering
+    </div>
+  );
+}
+
 /**
- * Start all concept previews together after the tool result arrives. The
- * browser owns request deduplication; this prevents arrow navigation from
- * becoming a second image-loading wait without changing the image provider's
- * work or URL provenance.
+ * Warm every ready image when the tool result arrives so choosing among the
+ * three concepts never adds a second image-loading wait.
  */
 export function prefetchMerchDesignPreviews(
   designs: readonly MerchDesignPreview[]
@@ -75,19 +102,15 @@ export function prefetchMerchDesignPreviews(
   }
 }
 
-/**
- * The running tool reserves the same three-up media area that the chooser
- * needs. Its intentionally quiet placeholders communicate progress without
- * making users read or react while external image generation is still pending.
- */
+/** Reserves the exact three-slot chooser footprint while generation runs. */
 export function ChatMerchDesignCarouselLoading() {
   return (
     <section
       aria-busy='true'
       aria-label='Preparing merch concepts'
-      className='max-w-2xl'
+      className='max-w-3xl'
     >
-      <div className='grid grid-cols-3 gap-2.5' aria-hidden='true'>
+      <div className='grid grid-cols-3 gap-3' aria-hidden='true'>
         {[0, 1, 2].map(index => (
           <div
             key={index}
@@ -106,13 +129,14 @@ export function ChatMerchDesignCarousel({
   readonly result: MerchDesignCarouselResult;
   readonly profileId?: string;
 }) {
-  const designs = result.designs;
-  const [active, setActive] = useState(0);
-  const [selected, setSelected] =
-    useState<ConfirmChatMerchSelectResponse | null>(null);
+  const [chosenDesign, setChosenDesign] = useState<MerchDesignPreview | null>(
+    null
+  );
   const [productOptions, setProductOptions] = useState<
     ConfirmChatMerchProductsResponse['products']
   >([]);
+  const [selected, setSelected] =
+    useState<ConfirmChatMerchSelectResponse | null>(null);
   const [pendingCatalogProductId, setPendingCatalogProductId] = useState<
     number | null
   >(null);
@@ -121,46 +145,35 @@ export function ChatMerchDesignCarousel({
   >(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const confirmAction = useConfirmChatMerchActionMutation();
-  const count = designs.length;
-  const current = designs[Math.min(active, Math.max(0, count - 1))];
 
   useEffect(() => {
-    prefetchMerchDesignPreviews(designs);
-  }, [designs]);
+    prefetchMerchDesignPreviews(result.designs);
+  }, [result.designs]);
 
-  const go = useCallback(
-    (dir: -1 | 1) => {
-      setActive(prev => (prev + dir + count) % count);
-    },
-    [count]
-  );
-
-  if (count === 0 || !current) return null;
-
-  const handleLoadProducts = () => {
+  const loadProducts = (design: MerchDesignPreview) => {
+    setChosenDesign(design);
     setErrorMessage(null);
     if (!profileId) {
-      submitMerchPrompt(usePrompt(current));
+      submitMerchPrompt(`Use concept ${design.option_number}.`);
       return;
     }
-
-    setPendingAction('select');
+    setPendingAction('products');
     confirmAction.mutate(
       {
         profileId,
         generationId: result.generationId,
-        optionId: current.id,
-        optionNumber: current.option_number,
-        action: 'create',
+        optionId: design.id,
+        optionNumber: design.option_number,
+        action: 'products',
       },
       {
         onSuccess: response => {
           setPendingAction(null);
-          if (isSelectionResponse(response)) {
-            setSelected(response);
+          if (isProductsResponse(response) && response.products.length > 0) {
+            setProductOptions(response.products);
             return;
           }
-          setErrorMessage('Product creation did not return a verified card.');
+          setErrorMessage('No products are available right now.');
         },
         onError: () => {
           setPendingAction(null);
@@ -170,8 +183,8 @@ export function ChatMerchDesignCarousel({
     );
   };
 
-  const handleSelectProduct = (catalogProductId: number) => {
-    if (!profileId) return;
+  const selectProduct = (catalogProductId: number) => {
+    if (!profileId || !chosenDesign) return;
     setErrorMessage(null);
     setPendingAction('select');
     setPendingCatalogProductId(catalogProductId);
@@ -179,8 +192,8 @@ export function ChatMerchDesignCarousel({
       {
         profileId,
         generationId: result.generationId,
-        optionId: current.id,
-        optionNumber: current.option_number,
+        optionId: chosenDesign.id,
+        optionNumber: chosenDesign.option_number,
         catalogProductId,
         action: 'select',
       },
@@ -204,17 +217,12 @@ export function ChatMerchDesignCarousel({
     );
   };
 
-  const handlePublish = () => {
+  const publish = () => {
     if (!profileId || !selected) return;
-
     setErrorMessage(null);
     setPendingAction('publish');
     confirmAction.mutate(
-      {
-        profileId,
-        merchCardId: selected.merchCardId,
-        action: 'publish',
-      },
+      { profileId, merchCardId: selected.merchCardId, action: 'publish' },
       {
         onSuccess: response => {
           setPendingAction(null);
@@ -227,6 +235,10 @@ export function ChatMerchDesignCarousel({
               ? {
                   ...previous,
                   status: response.status,
+                  publicUrl:
+                    'publicUrl' in response
+                      ? response.publicUrl
+                      : previous.publicUrl,
                 }
               : previous
           );
@@ -239,72 +251,37 @@ export function ChatMerchDesignCarousel({
     );
   };
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (selected || productOptions.length > 0 || count < 2) return;
-    if (event.key === 'ArrowLeft') {
-      event.preventDefault();
-      go(-1);
-    } else if (event.key === 'ArrowRight') {
-      event.preventDefault();
-      go(1);
-    }
-  };
+  if (result.designs.length === 0) return null;
 
-  const product = selected?.product;
-  const showProductMockup =
-    product?.mockupStatus === 'ready' && Boolean(product.mockupUrl);
-
-  return (
-    <section
-      aria-label='Merch design concepts'
-      aria-roledescription='carousel'
-      className='max-w-2xl'
-    >
-      <div className='relative overflow-hidden rounded-xl'>
-        {showProductMockup && product?.mockupUrl ? (
-          <div className='relative aspect-square bg-surface-2'>
-            <Image
-              src={product.mockupUrl}
-              alt={`${current.design_name} product mockup`}
-              fill
-              sizes='(max-width: 768px) 100vw, 640px'
-              className='object-cover'
-              unoptimized
-            />
+  if (selected && chosenDesign) {
+    const product = selected.product;
+    const live = selected.status === 'live';
+    const art =
+      product.mockupStatus === 'ready' && product.mockupUrl
+        ? product.mockupUrl
+        : chosenDesign.preview_url;
+    return (
+      <section aria-label='Selected merch product' className='max-w-3xl'>
+        <article className='grid gap-3 sm:grid-cols-3'>
+          <div className='relative aspect-square overflow-hidden rounded-lg bg-surface-0'>
+            {art ? (
+              <Image
+                src={art}
+                alt={`${selected.title} ${product.productName}`}
+                fill
+                sizes='(max-width: 639px) 100vw, 13rem'
+                className='object-cover'
+              />
+            ) : (
+              <DesignArt design={chosenDesign} />
+            )}
           </div>
-        ) : current.status === 'ready' && current.preview_url ? (
-          <ThreadImageCard
-            status='ready'
-            prompt={current.design_name}
-            previewUrl={current.preview_url}
-          />
-        ) : (
-          <ThreadImageCard status='generating' prompt={current.design_name} />
-        )}
-
-        {!selected && productOptions.length === 0 && count > 1 ? (
-          <>
-            <CarouselArrow side='left' onClick={() => go(-1)} />
-            <CarouselArrow side='right' onClick={() => go(1)} />
-          </>
-        ) : null}
-      </div>
-
-      <div className='flex min-h-20 items-start justify-between gap-4 pt-3'>
-        <div className='min-w-0 flex-1'>
-          <p className='text-3xs font-medium uppercase tracking-wide text-tertiary-token'>
-            {selected
-              ? product?.mockupStatus === 'ready'
-                ? 'Product mockup'
-                : 'Artwork preview'
-              : `Concept ${active + 1} of ${count}`}
-          </p>
-          <h3 className='mt-0.5 truncate text-app font-semibold text-primary-token'>
-            {selected?.title ?? current.design_name}
-          </h3>
-          {selected && product ? (
-            <>
-              <p className='mt-0.5 truncate text-xs text-secondary-token'>
+          <div className='flex min-w-0 flex-col justify-between gap-3 py-1 sm:col-span-2'>
+            <div>
+              <h3 className='truncate text-app font-semibold text-primary-token'>
+                {selected.title}
+              </h3>
+              <p className='mt-1 text-xs text-secondary-token'>
                 {product.productName} · {product.colorway}
               </p>
               <p className='mt-1 text-2xs text-tertiary-token'>
@@ -312,171 +289,126 @@ export function ChatMerchDesignCarousel({
               </p>
               {product.mockupStatus === 'pending' ? (
                 <p className='mt-1 text-2xs text-tertiary-token'>
-                  Product mockup is still rendering. Artwork shown.
+                  Artwork is shown while the product mockup renders.
                 </p>
-              ) : null}
-              {selected.publicUrl ? (
-                <a
-                  className='mt-1 block text-2xs font-medium text-primary-token underline'
-                  href={selected.publicUrl}
-                >
-                  Verified product URL
-                </a>
               ) : null}
               {selected.publishBlockedReasons?.length ? (
                 <p className='mt-1 line-clamp-2 text-2xs text-tertiary-token'>
                   {selected.publishBlockedReasons.join(' ')}
                 </p>
               ) : null}
-            </>
-          ) : current.concept ? (
-            <p className='mt-0.5 line-clamp-2 text-xs text-secondary-token'>
-              {current.concept}
-            </p>
-          ) : null}
-          {!selected && current.product_name ? (
-            <p className='mt-1 text-2xs text-tertiary-token'>
-              {current.recommended ? 'Best recommendation · ' : ''}
-              {current.product_name} · {current.colorway} · {current.sale_price}{' '}
-              · {current.artist_profit} creator profit
-            </p>
-          ) : null}
-          {!selected && current.fulfillment ? (
-            <p className='mt-1 text-2xs text-tertiary-token'>
-              {current.fulfillment} · {current.profile_destination}
-            </p>
-          ) : null}
-          {errorMessage ? (
-            <output className='mt-1 block text-2xs text-error'>
-              {errorMessage}
-            </output>
-          ) : null}
-        </div>
-
-        {selected && product ? (
-          <Button
-            type='button'
-            size='sm'
-            className='shrink-0 whitespace-nowrap'
-            onClick={handlePublish}
-            disabled={
-              selected.status === 'live' ||
-              !product.publishEligible ||
-              pendingAction !== null
-            }
-          >
-            {pendingAction === 'publish' ? (
-              <Loader2 className='h-3.5 w-3.5 animate-spin' aria-hidden />
-            ) : selected.status === 'live' ? (
-              <Check className='h-3.5 w-3.5' aria-hidden />
-            ) : null}
-            {selected.status === 'live'
-              ? 'Live on profile'
-              : 'Publish to profile'}
-          </Button>
-        ) : productOptions.length === 0 ? (
-          <Button
-            type='button'
-            size='sm'
-            className='shrink-0 whitespace-nowrap'
-            onClick={handleLoadProducts}
-            disabled={current.status !== 'ready' || pendingAction !== null}
-          >
-            {pendingAction === 'select' ? (
-              <Loader2 className='h-3.5 w-3.5 animate-spin' aria-hidden />
-            ) : null}
-            {pendingAction === 'select'
-              ? 'Creating and publishing tee'
-              : 'Approve & publish tee'}
-          </Button>
-        ) : null}
-      </div>
-
-      {!selected && productOptions.length > 0 ? (
-        <fieldset className='m-0 border-0 p-0 pb-2'>
-          <legend className='mb-2 text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
-            Choose a product
-          </legend>
-          <div className='grid grid-cols-1 gap-2 sm:grid-cols-3'>
-            {productOptions.map(option => (
-              <Button
-                key={option.catalogProductId}
-                type='button'
-                variant='secondary'
-                className='h-auto min-w-0 justify-start px-3 py-2 text-left'
-                onClick={() => handleSelectProduct(option.catalogProductId)}
-                disabled={pendingAction !== null}
-              >
-                {pendingCatalogProductId === option.catalogProductId ? (
-                  <Loader2
-                    className='h-3.5 w-3.5 shrink-0 animate-spin'
-                    aria-hidden
-                  />
-                ) : null}
-                <span className='min-w-0'>
-                  <span className='block truncate text-xs font-medium'>
-                    {option.productName}
-                  </span>
-                  <span className='block truncate text-2xs text-secondary-token'>
-                    {option.colorway}
-                  </span>
-                </span>
+            </div>
+            {live && selected.publicUrl ? (
+              <Button asChild size='sm' className='w-fit'>
+                <Link href={selected.publicUrl}>Open merch page</Link>
               </Button>
-            ))}
+            ) : (
+              <Button
+                type='button'
+                size='sm'
+                className='w-fit'
+                onClick={publish}
+                disabled={
+                  !product.publishEligible || pendingAction !== null || live
+                }
+              >
+                {pendingAction === 'publish' ? (
+                  <Loader2 className='h-3.5 w-3.5 animate-spin' aria-hidden />
+                ) : live ? (
+                  <Check className='h-3.5 w-3.5' aria-hidden />
+                ) : null}
+                {live ? 'Live on profile' : 'Publish to profile'}
+              </Button>
+            )}
           </div>
-        </fieldset>
-      ) : null}
+        </article>
+      </section>
+    );
+  }
 
-      {!selected && productOptions.length === 0 && count > 1 ? (
-        <nav className='flex items-center justify-center' aria-label='Concepts'>
-          {designs.map((design, index) => (
-            <Button
-              key={design.id}
-              type='button'
-              variant='ghost'
-              aria-label={`Go to concept ${index + 1}`}
-              aria-pressed={index === active}
-              onClick={() => setActive(index)}
-              onKeyDown={handleKeyDown}
-              className='h-8 w-8 min-w-0 p-0 before:content-none'
-            >
-              <span
-                className={cn(
-                  'h-1.5 rounded-full transition-[width,background-color] duration-subtle',
-                  index === active
-                    ? 'w-5 bg-primary-token'
-                    : 'w-1.5 bg-surface-2'
-                )}
-              />
-            </Button>
-          ))}
-        </nav>
+  if (chosenDesign && productOptions.length > 0) {
+    return (
+      <section aria-label='Choose a merch product' className='max-w-3xl'>
+        <article className='grid gap-3 sm:grid-cols-3'>
+          <div className='relative aspect-square overflow-hidden rounded-lg bg-surface-0'>
+            <DesignArt design={chosenDesign} />
+          </div>
+          <div className='min-w-0 py-1 sm:col-span-2'>
+            <h3 className='truncate text-app font-semibold text-primary-token'>
+              {chosenDesign.design_name}
+            </h3>
+            <p className='mt-1 text-xs text-secondary-token'>
+              Choose the product.
+            </p>
+            <ul className='mt-3 flex flex-wrap gap-2'>
+              {productOptions.map(option => (
+                <li key={option.catalogProductId}>
+                  <Button
+                    type='button'
+                    variant='secondary'
+                    size='sm'
+                    onClick={() => selectProduct(option.catalogProductId)}
+                    disabled={pendingAction !== null}
+                  >
+                    {pendingCatalogProductId === option.catalogProductId ? (
+                      <Loader2
+                        className='h-3.5 w-3.5 animate-spin'
+                        aria-hidden
+                      />
+                    ) : null}
+                    {option.productName}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </article>
+      </section>
+    );
+  }
+
+  return (
+    <section aria-label='Merch design concepts' className='max-w-3xl'>
+      <p className='mb-3 text-xs text-secondary-token'>
+        Do you like any of these?
+      </p>
+      <div className='flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-3 sm:overflow-visible'>
+        {result.designs.slice(0, 3).map(design => (
+          <article
+            key={design.id}
+            data-testid='chat-merch-option-card'
+            className='group relative min-w-64 snap-start overflow-hidden rounded-xl bg-surface-0 sm:min-w-0'
+          >
+            <div className='relative aspect-square'>
+              <DesignArt design={design} />
+              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 to-transparent' />
+              <Button
+                type='button'
+                size='sm'
+                className='absolute bottom-2 right-2 z-10 whitespace-nowrap'
+                onClick={() => loadProducts(design)}
+                disabled={design.status !== 'ready' || pendingAction !== null}
+              >
+                {pendingAction === 'products' &&
+                chosenDesign?.id === design.id ? (
+                  <Loader2 className='h-3.5 w-3.5 animate-spin' aria-hidden />
+                ) : null}
+                Select
+              </Button>
+            </div>
+            <div className='min-w-0 px-2.5 py-2'>
+              <h3 className='truncate text-xs font-medium text-primary-token'>
+                {design.design_name}
+              </h3>
+            </div>
+          </article>
+        ))}
+      </div>
+      {errorMessage ? (
+        <output className='mt-2 block text-2xs text-error'>
+          {errorMessage}
+        </output>
       ) : null}
     </section>
-  );
-}
-
-function CarouselArrow({
-  side,
-  onClick,
-}: {
-  readonly side: 'left' | 'right';
-  readonly onClick: () => void;
-}) {
-  const Icon = side === 'left' ? ChevronLeft : ChevronRight;
-  return (
-    <Button
-      type='button'
-      variant='frosted'
-      size='icon'
-      aria-label={side === 'left' ? 'Previous concept' : 'Next concept'}
-      onClick={onClick}
-      className={cn(
-        'absolute top-1/2 h-8 w-8 -translate-y-1/2',
-        side === 'left' ? 'left-2' : 'right-2'
-      )}
-    >
-      <Icon className='h-4 w-4' strokeWidth={2.25} />
-    </Button>
   );
 }

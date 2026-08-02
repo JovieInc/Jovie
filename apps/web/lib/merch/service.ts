@@ -507,7 +507,7 @@ function publicMerchProfileVisibilityPredicate() {
   )`;
 }
 
-function publicMerchUrl(username: string, cardId: string): string {
+export function publicMerchUrl(username: string, cardId: string): string {
   const baseUrl = publicEnv.NEXT_PUBLIC_PROFILE_URL || 'https://jov.ie';
   return `${baseUrl}/${username}/merch/${cardId}`;
 }

@@ -10,6 +10,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { NO_CACHE_HEADERS } from '@/lib/http/headers';
 import {
   getMerchProductOptions,
+  publicMerchUrl,
   publishMerchCard,
   selectMerchDesign,
   updateMerchCardStatus,
@@ -95,7 +96,7 @@ export async function POST(req: Request) {
   try {
     const profile = await db.query.creatorProfiles.findFirst({
       where: eq(creatorProfiles.id, profileId),
-      columns: { id: true, userId: true },
+      columns: { id: true, userId: true, usernameNormalized: true },
     });
 
     if (!profile) {
@@ -200,6 +201,10 @@ export async function POST(req: Request) {
         merchCardId: card.id,
         status: card.status,
         title: card.title,
+        publicUrl:
+          action === 'publish' && card.status === 'live'
+            ? publicMerchUrl(profile.usernameNormalized, card.id)
+            : null,
       }),
       ipAddress: ipAddress ?? null,
       userAgent: userAgent ?? null,
@@ -211,6 +216,10 @@ export async function POST(req: Request) {
         merchCardId: card.id,
         status: card.status,
         title: card.title,
+        publicUrl:
+          action === 'publish' && card.status === 'live'
+            ? publicMerchUrl(profile.usernameNormalized, card.id)
+            : null,
       },
       { headers: NO_CACHE_HEADERS }
     );

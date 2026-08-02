@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MerchDesignCarouselResult } from '@/lib/merch/types';
@@ -12,12 +12,6 @@ const mutateMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/queries', () => ({
   useConfirmChatMerchActionMutation: () => ({ mutate: mutateMock }),
-}));
-
-vi.mock('@/components/shell/ThreadImageCard', () => ({
-  ThreadImageCard: ({ prompt, status }: { prompt: string; status: string }) => (
-    <div data-testid='concept-art'>{`${prompt}:${status}`}</div>
-  ),
 }));
 
 const result: MerchDesignCarouselResult = {
@@ -42,66 +36,40 @@ const result: MerchDesignCarouselResult = {
       preview_url: 'https://blob.example.com/two.png',
       slots: { artist_name: 'Signal' },
     },
+    {
+      id: '00000000-0000-4000-8000-000000000013',
+      option_number: 3,
+      design_name: 'Signal Bold',
+      concept: 'Large type with a compact emblem.',
+      status: 'ready',
+      preview_url: 'https://blob.example.com/three.png',
+      slots: { artist_name: 'Signal' },
+    },
   ],
 };
 
 describe('ChatMerchDesignCarousel', () => {
-  beforeEach(() => {
-    mutateMock.mockReset();
-  });
+  beforeEach(() => mutateMock.mockReset());
 
-  it('moves one concept at a time with arrows, keyboard, and stable dots', async () => {
-    const user = userEvent.setup();
+  it('shows exactly three compact selectable concepts without carousel chrome', () => {
     render(<ChatMerchDesignCarousel result={result} />);
 
+    expect(screen.getAllByTestId('chat-merch-option-card')).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: 'Select' })).toHaveLength(3);
     expect(
-      screen.queryByTestId('chat-generation-artifact-surface')
+      screen.queryByRole('button', { name: /next concept|previous concept/i })
     ).not.toBeInTheDocument();
-    expect(screen.getByText('Signal Vintage')).toBeInTheDocument();
-    expect(screen.queryByText('Signal Mono')).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Next concept' }));
-    expect(screen.getByText('Signal Mono')).toBeInTheDocument();
-
-    const dots = screen.getAllByRole('button', { name: /Go to concept/ });
-    expect(dots).toHaveLength(2);
-    expect(dots[0]).toHaveClass('h-8', 'w-8');
-    fireEvent.keyDown(dots[1], { key: 'ArrowLeft' });
-    expect(screen.getByText('Signal Vintage')).toBeInTheDocument();
-    expect(dots[0]).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Do you like any of these?')).toBeInTheDocument();
   });
 
-  it('selects in place and labels pending mockups truthfully', async () => {
+  it('keeps the product choice in the selected surface before creating a truthful pricing card', async () => {
     const user = userEvent.setup();
     mutateMock.mockImplementation(
       (
-        input: { action: string },
-        callbacks: {
-          onSuccess: (response: Record<string, unknown>) => void;
-        }
+        input?: { action: string },
+        callbacks?: { onSuccess: (response: Record<string, unknown>) => void }
       ) => {
-        if (input.action === 'create') {
-          callbacks.onSuccess({
-            success: true,
-            merchCardId: '00000000-0000-4000-8000-000000000020',
-            status: 'live',
-            selectedOptionId: '00000000-0000-4000-8000-000000000011',
-            title: 'Signal Vintage',
-            publicUrl:
-              'https://jovie.test/signal/merch/00000000-0000-4000-8000-000000000020',
-            product: {
-              productType: 'premium tee',
-              productName: 'Unisex Premium T-Shirt',
-              colorway: 'black',
-              artworkUrl: 'https://blob.example.com/one.png',
-              mockupUrl: 'https://printful.example.com/mockup.png',
-              mockupStatus: 'ready',
-              retailPrice: '$30.00',
-              artistProfit: '$10.00',
-              publishEligible: true,
-            },
-          });
-        }
+        if (!input || !callbacks) return;
         if (input.action === 'products') {
           callbacks.onSuccess({
             success: true,
@@ -110,12 +78,6 @@ describe('ChatMerchDesignCarousel', () => {
                 catalogProductId: 71,
                 productName: 'Unisex Staple T-Shirt',
                 productType: 't-shirt',
-                colorway: 'Black',
-              },
-              {
-                catalogProductId: 91,
-                productName: 'Unisex Heavy Hoodie',
-                productType: 'hoodie',
                 colorway: 'Black',
               },
             ],
@@ -127,7 +89,7 @@ describe('ChatMerchDesignCarousel', () => {
             success: true,
             merchCardId: '00000000-0000-4000-8000-000000000020',
             status: 'draft',
-            selectedOptionId: '00000000-0000-4000-8000-000000000011',
+            selectedOptionId: result.designs[0].id,
             title: 'Signal Vintage',
             publicUrl: null,
             product: {
@@ -149,6 +111,7 @@ describe('ChatMerchDesignCarousel', () => {
           merchCardId: '00000000-0000-4000-8000-000000000020',
           status: 'live',
           title: 'Signal Vintage',
+          publicUrl: 'https://jov.ie/signal/merch/20',
         });
       }
     );
@@ -160,39 +123,34 @@ describe('ChatMerchDesignCarousel', () => {
       />
     );
 
-    await user.click(
-      screen.getByRole('button', { name: 'Approve & publish tee' })
-    );
-
+    await user.click(screen.getAllByRole('button', { name: 'Select' })[0]);
+    expect(screen.getByText('Choose the product.')).toBeInTheDocument();
     expect(mutateMock).toHaveBeenCalledWith(
-      {
-        profileId: '00000000-0000-4000-8000-000000000001',
-        generationId: '00000000-0000-4000-8000-000000000010',
-        optionId: '00000000-0000-4000-8000-000000000011',
-        optionNumber: 1,
-        action: 'create',
-      },
+      expect.objectContaining({ action: 'products', optionNumber: 1 }),
       expect.any(Object)
     );
-    expect(
-      screen.getByText('Unisex Premium T-Shirt · black')
-    ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Unisex Staple T-Shirt' })
+    );
     expect(
       screen.getByText('$30.00 · $10.00 artist profit')
     ).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Publish to profile' })
+    );
     expect(
-      screen.getByRole('button', { name: 'Live on profile' })
-    ).toBeDisabled();
+      screen.getByRole('link', { name: 'Open merch page' })
+    ).toHaveAttribute('href', 'https://jov.ie/signal/merch/20');
   });
 
-  it('falls back to a concise prompt without exposing generation IDs', async () => {
+  it('falls back to a concise selection prompt without exposing IDs', async () => {
     const dispatch = vi.spyOn(globalThis, 'dispatchEvent');
     const user = userEvent.setup();
     render(<ChatMerchDesignCarousel result={result} />);
 
-    await user.click(
-      screen.getByRole('button', { name: 'Approve & publish tee' })
-    );
+    await user.click(screen.getAllByRole('button', { name: 'Select' })[0]);
 
     expect(dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -216,7 +174,7 @@ describe('ChatMerchDesignCarousel', () => {
 
     prefetchMerchDesignPreviews([...result.designs, result.designs[0]]);
 
-    expect(image).toHaveBeenCalledTimes(2);
+    expect(image).toHaveBeenCalledTimes(3);
     Object.defineProperty(globalThis, 'Image', {
       configurable: true,
       value: OriginalImage,
