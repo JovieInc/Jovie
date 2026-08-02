@@ -163,7 +163,7 @@ function ConnectionBrandIcon({
 
   const revealClassName = emphasized
     ? 'absolute inset-0 opacity-100'
-    : 'absolute inset-0 opacity-0 transition-opacity duration-fast motion-reduce:transition-none group-hover/connection-row:opacity-100 group-focus-visible/connection-row:opacity-100';
+    : 'absolute inset-0 opacity-0 transition-opacity duration-fast motion-reduce:transition-none group-hover/connection-row:opacity-100 group-focus-visible/connection-row:opacity-100 group-aria-[selected=true]/connection-row:opacity-100';
 
   return (
     <span

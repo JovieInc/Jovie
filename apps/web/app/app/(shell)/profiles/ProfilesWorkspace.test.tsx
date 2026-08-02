@@ -123,12 +123,17 @@ describe('ProfilesWorkspace', () => {
     expect(
       mark.querySelector('.group-focus-visible\\/connection-row\\:opacity-100')
     ).not.toBeNull();
+    expect(
+      mark.querySelector(
+        '.group-aria-\\[selected\\=true\\]\\/connection-row\\:opacity-100'
+      )
+    ).not.toBeNull();
     expect(mark.querySelector('.opacity-0')).not.toBeNull();
     const user = userEvent.setup();
-    await user.click(
-      screen.getByRole('button', { name: 'Actions for Spotify' })
-    );
-    await user.click(screen.getByRole('menuitem', { name: /View Details/i }));
+    await user.click(screen.getByText('Spotify'));
+
+    const selectedRow = screen.getByText('Spotify').closest('tr');
+    expect(selectedRow).toHaveAttribute('aria-selected', 'true');
 
     const selectedReveal = screen
       .getByRole('img', { name: 'Spotify' })
