@@ -28,6 +28,7 @@ import {
   RowBody,
   RowVisual,
 } from '../jovie/components/picker-rows';
+import { ShellListRowFrame } from './table/atoms/ShellListRowFrame';
 
 export interface PaletteSection {
   readonly id: string;
@@ -163,7 +164,7 @@ function CmdKPaletteRow({
   shortcutLabel,
 }: CmdKPaletteRowProps) {
   return (
-    <div
+    <ShellListRowFrame
       role='option'
       id={rowId}
       tabIndex={-1}
@@ -176,21 +177,18 @@ function CmdKPaletteRow({
         e.preventDefault();
         onCommit(index);
       }}
-      className={cn(
-        'flex min-h-14 w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left outline-none transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
-        isActive
-          ? 'bg-[color-mix(in_oklab,var(--app-shell-content-surface)_76%,white_14%)] text-primary-token shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_36%,transparent),0_10px_28px_-24px_rgba(0,0,0,0.9)]'
-          : 'hover:bg-white/[0.045]'
-      )}
+      isSelected={isActive}
+      interactive
+      className='system-b-table-row-shell flex min-h-11 w-full items-center gap-2 px-3 py-1.5 text-left'
     >
-      <RowVisual item={item} />
-      <RowBody item={item} />
+      <RowVisual item={item} variant='dense' />
+      <RowBody item={item} variant='dense' />
       {shortcutLabel ? (
         <span className='ml-auto flex min-w-9 shrink-0 justify-end tabular-nums text-2xs font-medium text-quaternary-token'>
           {shortcutLabel}
         </span>
       ) : null}
-    </div>
+    </ShellListRowFrame>
   );
 }
 
@@ -236,7 +234,7 @@ export function PaletteList({
             <div
               className={cn(
                 variant === 'cmdk'
-                  ? 'px-3 pb-1.5 pt-2 text-2xs font-semibold uppercase tracking-[0.08em] text-quaternary-token'
+                  ? 'px-3 pb-1 pt-2 text-2xs font-medium text-quaternary-token'
                   : 'px-3 pb-1 pt-3 text-3xs font-semibold uppercase tracking-[0.1em] text-tertiary-token'
               )}
             >

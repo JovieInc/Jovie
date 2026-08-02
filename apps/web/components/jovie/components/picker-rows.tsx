@@ -198,9 +198,12 @@ export const PromptArt = memo(function PromptArt() {
 
 export const RowVisual = memo(function RowVisual({
   item,
+  variant = 'picker',
 }: {
   readonly item: PickerItem;
+  readonly variant?: 'picker' | 'dense';
 }) {
+  if (variant === 'dense') return <DenseRowVisual item={item} />;
   if (item.kind === 'skill') return <SkillArt skill={item.skill} />;
   if (item.kind === 'nav') return <NavArt nav={item.nav} />;
   if (item.kind === 'prompt') return <PromptArt />;
@@ -221,11 +224,66 @@ export const RowVisual = memo(function RowVisual({
   );
 });
 
-export const RowBody = memo(function RowBody({
+/** Compact, unboxed semantic column for dense entity-table rows. */
+const DenseRowVisual = memo(function DenseRowVisual({
   item,
 }: {
   readonly item: PickerItem;
 }) {
+  if (item.kind === 'entity' && item.entity.thumbnail) {
+    return (
+      <span
+        className={cn(
+          'relative size-7 shrink-0 overflow-hidden',
+          item.entity.kind === 'artist' ? 'rounded-full' : 'rounded-sm'
+        )}
+        aria-hidden='true'
+      >
+        <Image
+          src={item.entity.thumbnail}
+          alt=''
+          fill
+          sizes='28px'
+          className='object-cover'
+          unoptimized
+        />
+      </span>
+    );
+  }
+
+  const Icon =
+    item.kind === 'skill'
+      ? (ICON_MAP[item.skill.iconName] ?? Calendar)
+      : item.kind === 'nav'
+        ? (ICON_MAP[item.nav.iconName] ?? Calendar)
+        : item.kind === 'prompt'
+          ? Sparkles
+          : item.entity.kind === 'event'
+            ? Calendar
+            : item.entity.kind === 'track'
+              ? Music2
+              : item.entity.kind === 'artist'
+                ? UserCircle
+                : Music;
+
+  return (
+    <span
+      className='flex size-7 shrink-0 items-center justify-center text-tertiary-token'
+      aria-hidden='true'
+    >
+      <Icon className='size-4' strokeWidth={1.5} />
+    </span>
+  );
+});
+
+export const RowBody = memo(function RowBody({
+  item,
+  variant = 'picker',
+}: {
+  readonly item: PickerItem;
+  readonly variant?: 'picker' | 'dense';
+}) {
+  if (variant === 'dense') return <DenseRowBody item={item} />;
   if (item.kind === 'skill') {
     return (
       <div className='min-w-0 flex-1'>
@@ -255,6 +313,40 @@ export const RowBody = memo(function RowBody({
     <div className='min-w-0 flex-1'>
       <p className='system-b-picker-row-title'>{item.entity.label}</p>
       {meta ? <p className='system-b-picker-row-meta'>{meta}</p> : null}
+    </div>
+  );
+});
+
+function denseRowText(item: PickerItem): {
+  title: string;
+  meta: string | null;
+} {
+  if (item.kind === 'skill') {
+    return { title: item.skill.label, meta: item.skill.description };
+  }
+  if (item.kind === 'nav') {
+    return { title: item.nav.label, meta: item.nav.description };
+  }
+  if (item.kind === 'prompt') {
+    return { title: item.prompt.label, meta: item.prompt.description };
+  }
+  return { title: item.entity.label, meta: formatRowMeta(item.entity) };
+}
+
+const DenseRowBody = memo(function DenseRowBody({
+  item,
+}: {
+  readonly item: PickerItem;
+}) {
+  const { title, meta } = denseRowText(item);
+  return (
+    <div className='flex min-w-0 flex-1 items-baseline gap-2 overflow-hidden'>
+      <span className='truncate text-app font-caption text-primary-token'>
+        {title}
+      </span>
+      {meta ? (
+        <span className='truncate text-2xs text-tertiary-token'>{meta}</span>
+      ) : null}
     </div>
   );
 });

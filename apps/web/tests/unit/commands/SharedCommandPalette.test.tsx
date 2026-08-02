@@ -67,7 +67,7 @@ vi.mock('@/lib/queries/useReleasesQuery', () => ({
       {
         id: 'rel-1',
         title: 'Midnight Run',
-        artworkUrl: null,
+        artworkUrl: 'https://cdn.example.com/midnight-run.jpg',
         artistNames: ['Test Artist'],
         releaseDate: '2024-01-01',
         releaseType: 'single',
@@ -193,6 +193,39 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
 
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(pushMock).toHaveBeenCalledWith(APP_ROUTES.PROFILES);
+  });
+
+  it('renders cmd+k results with the shared dense-table row contract', () => {
+    render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
+    fireEvent.change(
+      screen.getByRole('combobox', { name: 'Command Palette Search' }),
+      { target: { value: 'Connections' } }
+    );
+
+    const selected = screen.getByRole('option', {
+      name: 'Connections Manage artist identities and connected services. ⌘1',
+    });
+    expect(selected).toHaveClass('system-b-table-row-shell');
+    expect(selected).toHaveClass('system-b-table-row-selected');
+    expect(selected).not.toHaveClass('system-b-picker-row');
+    expect(selected.querySelector('.system-b-picker-art')).toBeNull();
+  });
+
+  it('preserves real entity artwork without restoring boxed icon chrome', () => {
+    render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
+    fireEvent.change(
+      screen.getByRole('combobox', { name: 'Command Palette Search' }),
+      { target: { value: 'Midnight Run' } }
+    );
+
+    const release = screen.getByRole('option', {
+      name: `Midnight Run Single · Jan 1 ${CMD_LABEL}1`,
+    });
+    expect(release.querySelector('[data-testid="img"]')).toHaveAttribute(
+      'data-src',
+      'https://cdn.example.com/midnight-run.jpg'
+    );
+    expect(release.querySelector('.system-b-picker-art')).toBeNull();
   });
 
   it('renders nav, skill, and release sections when open', () => {
