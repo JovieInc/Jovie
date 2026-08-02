@@ -36,6 +36,42 @@ function fixtureRepo(tree) {
   return root;
 }
 
+const LEGACY_COMPONENT_REL =
+  'apps/web/components/marketing/legacy/LegacyPanel.tsx';
+const LEGACY_TEST_REL = 'apps/web/tests/unit/marketing/LegacyPanel.test.tsx';
+const LEGACY_STORY_REL =
+  'apps/web/components/marketing/storybook/MarketingSections.stories.tsx';
+const LEGACY_COMPONENT_SOURCE =
+  'export interface LegacyPanelProps { readonly title: string }\n' +
+  'export function LegacyPanel({ title }: LegacyPanelProps) { return <h2>{title}</h2> }';
+const LEGACY_TEST_SOURCE =
+  "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';\nvoid LegacyPanel;";
+const LEGACY_STORY_SOURCE =
+  "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';\n" +
+  "export const Legacy = { render: () => <LegacyPanel title='Legacy' /> };";
+
+function legacyEvidenceResult({
+  componentSource = LEGACY_COMPONENT_SOURCE,
+  testSource = LEGACY_TEST_SOURCE,
+  storySource = LEGACY_STORY_SOURCE,
+  testRel = LEGACY_TEST_REL,
+  changedTest = true,
+  legacy = true,
+} = {}) {
+  const root = fixtureRepo({
+    [LEGACY_COMPONENT_REL]: componentSource,
+    [testRel]: testSource,
+    [LEGACY_STORY_REL]: storySource,
+  });
+  return checkChangedComponents(
+    changedTest ? [LEGACY_COMPONENT_REL, testRel] : [LEGACY_COMPONENT_REL],
+    {
+      repoRoot: root,
+      legacyComponents: legacy ? new Set([LEGACY_COMPONENT_REL]) : new Set(),
+    }
+  );
+}
+
 describe('component-ship-policy scope', () => {
   it('includes shippable surfaces and excludes tests/stories/utils', () => {
     expect(isUnderShipScope('packages/ui/atoms/button.tsx')).toBe(true);
@@ -178,6 +214,167 @@ describe('diff gate', () => {
     expect(list.some(c => c.covered)).toBe(true);
     void bare;
     void checkChangedComponents;
+  });
+
+  it('accepts central evidence only for a changed legacy component', () => {
+    expect(legacyEvidenceResult().ok).toBe(true);
+
+    const unchangedTest = legacyEvidenceResult({ changedTest: false });
+    expect(unchangedTest.ok).toBe(false);
+    expect(
+      unchangedTest.issues.some(issue => issue.rule === 'missing-test')
+    ).toBe(true);
+
+    const newComponent = legacyEvidenceResult({ legacy: false });
+    expect(newComponent.ok).toBe(false);
+    expect(newComponent.issues.map(issue => issue.rule)).toEqual(
+      expect.arrayContaining(['missing-test', 'missing-story'])
+    );
+  });
+
+  it.each([
+    [
+      'an exact import replaced by a component mock',
+      [
+        "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';",
+        "const target = '@/components/marketing/legacy/LegacyPanel';",
+        'vi.mock(target, () => ({ LegacyPanel: () => null }));',
+        'void LegacyPanel;',
+      ].join('\n'),
+    ],
+    [
+      'a commented import',
+      [
+        "// import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';",
+        'void LegacyPanel;',
+      ].join('\n'),
+    ],
+    [
+      'runtime use of a local binding that shadows the import',
+      [
+        "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';",
+        'function exerciseShadow() {',
+        '  const LegacyPanel = () => null;',
+        '  return LegacyPanel();',
+        '}',
+        'exerciseShadow();',
+      ].join('\n'),
+    ],
+    [
+      'an asserted source read from a fake local reader',
+      [
+        "const readFileSync = () => 'fake source';",
+        "const source = readFileSync('components/marketing/legacy/LegacyPanel.tsx', 'utf8');",
+        "expect(source).toContain('LegacyPanel');",
+      ].join('\n'),
+    ],
+  ])('rejects %s as central test evidence', (_case, testSource) => {
+    const result = legacyEvidenceResult({ testSource });
+    expect(result.ok).toBe(false);
+    expect(result.issues.some(issue => issue.rule === 'missing-test')).toBe(
+      true
+    );
+  });
+
+  it('accepts an asserted exact source read through node:fs', () => {
+    const result = legacyEvidenceResult({
+      testRel: LEGACY_TEST_REL.replace('.tsx', '.ts'),
+      testSource: [
+        "import { readFileSync } from 'node:fs';",
+        "import { resolve } from 'node:path';",
+        "const source = readFileSync(resolve(process.cwd(), 'components/marketing/legacy/LegacyPanel.tsx'), 'utf8');",
+        "expect(source).toContain('LegacyPanel');",
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it.each([
+    [
+      'props and exemptions from unrelated story content',
+      [
+        "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';",
+        "import { OtherPanel } from '@/components/marketing/other/OtherPanel';",
+        "export const MissingTitle = { parameters: { jovie: { uncoveredProps: ['title'] } }, render: () => <LegacyPanel /> };",
+        "export const Unrelated = { render: () => <OtherPanel title='Not evidence' /> };",
+      ].join('\n'),
+    ],
+    [
+      'comment- and string-only JSX',
+      [
+        "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';",
+        'const fakeMarkup = "<LegacyPanel title=\'String only\' />";',
+        "/* <LegacyPanel title='Comment only' /> */",
+        'export const Empty = { render: () => null };',
+      ].join('\n'),
+    ],
+    [
+      'a rendered mock',
+      [
+        "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';",
+        "vi.mock('@/components/marketing/legacy/LegacyPanel' + '', () => ({ LegacyPanel: () => null }));",
+        "export const Mocked = { render: () => <LegacyPanel title='Mocked' /> };",
+      ].join('\n'),
+    ],
+    [
+      'a same-named import from the wrong module',
+      [
+        "import { LegacyPanel } from '@/components/marketing/other/LegacyPanel';",
+        "export const WrongModule = { render: () => <LegacyPanel title='Legacy' /> };",
+      ].join('\n'),
+    ],
+  ])('rejects %s as canonical story evidence', (_case, storySource) => {
+    const result = legacyEvidenceResult({ storySource });
+    expect(result.ok).toBe(false);
+    expect(result.issues.some(issue => issue.rule === 'missing-story')).toBe(
+      true
+    );
+  });
+
+  it('honors only a component-scoped prop exemption', () => {
+    const result = legacyEvidenceResult({
+      componentSource: [
+        'export interface LegacyPanelProps {',
+        '  readonly title: string;',
+        '  readonly disabled: boolean;',
+        '}',
+        'export function LegacyPanel({ title }: LegacyPanelProps) { return <h2>{title}</h2> }',
+      ].join('\n'),
+      storySource: [
+        "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';",
+        'export const Legacy = {',
+        "  parameters: { jovie: { uncoveredPropsByComponent: { LegacyPanel: ['disabled'] } } },",
+        "  render: () => <LegacyPanel title='Legacy' />,",
+        '};',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('does not let one export exempt another export', () => {
+    const result = legacyEvidenceResult({
+      componentSource: [
+        'export interface PrimaryPanelProps { readonly title: string }',
+        'export function PrimaryPanel({ title }: PrimaryPanelProps) { return <h2>{title}</h2> }',
+        'export interface SecondaryPanelProps { readonly disabled: boolean }',
+        'export function SecondaryPanel() { return null }',
+      ].join('\n'),
+      testSource: [
+        "import { PrimaryPanel } from '@/components/marketing/legacy/LegacyPanel';",
+        'void PrimaryPanel;',
+      ].join('\n'),
+      storySource: [
+        "import { PrimaryPanel, SecondaryPanel } from '@/components/marketing/legacy/LegacyPanel';",
+        'export const Both = {',
+        "  parameters: { jovie: { uncoveredPropsByComponent: { PrimaryPanel: ['disabled'] } } },",
+        "  render: () => <><PrimaryPanel title='Primary' /><SecondaryPanel /></>,",
+        '};',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(false);
+    expect(result.issues.some(issue => issue.rule === 'missing-story')).toBe(
+      true
+    );
   });
 });
 
