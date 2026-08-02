@@ -218,6 +218,10 @@ describe('ProfilesWorkspace', () => {
     const user = userEvent.setup();
     renderWorkspace(data);
 
+    expect(
+      screen.getByTitle('https://jov.ie/tim/s/instagram')
+    ).toHaveTextContent('jov.ie · tim/s/instagram');
+
     await user.click(
       screen.getByRole('button', { name: 'Actions for Instagram' })
     );

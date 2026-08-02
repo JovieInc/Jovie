@@ -186,10 +186,17 @@ function ConnectionBrandIcon({
   );
 }
 
+function connectionDisplayUrl(row: ProfileWorkspaceRow): string {
+  return row.rowType === 'surface' && row.kind === 'social'
+    ? (row.trackedUrl ?? row.url)
+    : row.url;
+}
+
 function connectionUrlDisplay(row: ProfileWorkspaceRow): string {
-  if (row.handle) return row.handle;
+  const displayUrl = connectionDisplayUrl(row);
+  if (row.handle && displayUrl === row.url) return row.handle;
   try {
-    const url = new URL(row.url);
+    const url = new URL(displayUrl);
     const host = url.hostname.replace(/^www\./, '');
     const path = url.pathname.replace(/^\/+|\/+$/g, '');
     if (!path) return host;
@@ -199,7 +206,7 @@ function connectionUrlDisplay(row: ProfileWorkspaceRow): string {
       return `${host} · ${path}`;
     }
   } catch {
-    return row.url;
+    return displayUrl;
   }
 }
 
@@ -207,8 +214,9 @@ function ConnectionUrlDisplay({
   row,
   className,
 }: Readonly<{ row: ProfileWorkspaceRow; className?: string }>) {
+  const displayUrl = connectionDisplayUrl(row);
   return (
-    <span className={cn('truncate', className)} title={row.url}>
+    <span className={cn('truncate', className)} title={displayUrl}>
       {connectionUrlDisplay(row)}
     </span>
   );
