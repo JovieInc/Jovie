@@ -43,6 +43,32 @@ import type { MerchDesignCarouselResult, MerchDesignPreview } from './types';
 
 const DEFAULT_DESIGN_COUNT = 3;
 
+/**
+ * Starts independent generation prerequisites together so image rendering is
+ * not delayed by unrelated profile, catalog, and preference reads. Keeping
+ * this small helper generic makes the concurrency contract directly testable.
+ */
+export async function resolveMerchGenerationPrerequisites<
+  TArtistName,
+  TCatalog,
+  TModelWeights,
+>(tasks: {
+  readonly artistName: () => Promise<TArtistName>;
+  readonly catalog: () => Promise<TCatalog>;
+  readonly modelWeights: () => Promise<TModelWeights>;
+}): Promise<{
+  readonly artistName: TArtistName;
+  readonly catalog: TCatalog;
+  readonly modelWeights: TModelWeights;
+}> {
+  const [artistName, catalog, modelWeights] = await Promise.all([
+    tasks.artistName(),
+    tasks.catalog(),
+    tasks.modelWeights(),
+  ]);
+  return { artistName, catalog, modelWeights };
+}
+
 /** Distinct art directions so the carousel reads as real variety, not 3 of the same. */
 const STYLE_DIRECTIONS: readonly { label: string; style: string }[] = [
   {
@@ -271,13 +297,26 @@ export async function generateMerchDesigns(params: {
   readonly conversationId?: string | null;
   readonly turnId?: string | null;
 }): Promise<MerchDesignCarouselResult> {
-  const name = await artistName(params.profileId);
+  const startedAt = Date.now();
   const generationId = randomUUID();
   const count = Math.min(Math.max(params.count ?? DEFAULT_DESIGN_COUNT, 1), 4);
-  // Resolve live Printful economics up front so selected designs can go live
-  // without a separate cost-hydration step (JOV-3393 demo path).
-  const catalog = await resolveGenerationPricing(params.prompt);
+  // These reads do not depend on one another. Starting them together removes
+  // avoidable time-to-first-image without relaxing the pricing or provenance
+  // contract used when an artist selects a design.
+  const prerequisites = await resolveMerchGenerationPrerequisites({
+    artistName: () => artistName(params.profileId),
+    catalog: () => resolveGenerationPricing(params.prompt),
+    modelWeights: () => getModelSelectionWeights(params.profileId),
+  });
+  const name = prerequisites.artistName;
+  const catalog = prerequisites.catalog;
+  const modelWeights = prerequisites.modelWeights;
   const pricing = catalog.pricing;
+
+  logger.info('[merch-designs] generation prerequisites ready', {
+    ms: Date.now() - startedAt,
+    generationId,
+  });
 
   await db.insert(merchGenerationBatches).values({
     id: generationId,
@@ -290,9 +329,6 @@ export async function generateMerchDesigns(params: {
     artistBrief: minimalBrief(name, params.prompt),
     status: 'generating',
   });
-
-  // Bias model selection toward the artist's previously-picked aesthetic.
-  const modelWeights = await getModelSelectionWeights(params.profileId);
 
   const directions = STYLE_DIRECTIONS.slice(0, count);
   const grossMargin =
@@ -392,6 +428,13 @@ export async function generateMerchDesigns(params: {
   );
 
   const ready = designs.filter((d): d is MerchDesignPreview => d !== null);
+
+  logger.info('[merch-designs] generation response ready', {
+    ms: Date.now() - startedAt,
+    generationId,
+    requestedDesignCount: count,
+    readyDesignCount: ready.length,
+  });
 
   // Non-blocking: attach the truthful Printful product mockup to each design.
   attachPrintfulMockupsAsync(

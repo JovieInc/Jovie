@@ -2,7 +2,11 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MerchDesignCarouselResult } from '@/lib/merch/types';
-import { ChatMerchDesignCarousel } from './ChatMerchDesignCarousel';
+import {
+  ChatMerchDesignCarousel,
+  ChatMerchDesignCarouselLoading,
+  prefetchMerchDesignPreviews,
+} from './ChatMerchDesignCarousel';
 
 const mutateMock = vi.hoisted(() => vi.fn());
 
@@ -207,5 +211,33 @@ describe('ChatMerchDesignCarousel', () => {
       result.generationId
     );
     dispatch.mockRestore();
+  });
+
+  it('preloads each ready preview once for instant concept navigation', () => {
+    const OriginalImage = globalThis.Image;
+    const image = vi.fn();
+    Object.defineProperty(globalThis, 'Image', {
+      configurable: true,
+      value: image,
+    });
+
+    prefetchMerchDesignPreviews([...result.designs, result.designs[0]]);
+
+    expect(image).toHaveBeenCalledTimes(2);
+    Object.defineProperty(globalThis, 'Image', {
+      configurable: true,
+      value: OriginalImage,
+    });
+  });
+
+  it('reserves a quiet three-concept area while image generation runs', () => {
+    const { container } = render(<ChatMerchDesignCarouselLoading />);
+
+    expect(screen.getByLabelText('Preparing merch concepts')).toHaveAttribute(
+      'aria-busy',
+      'true'
+    );
+    expect(container.querySelectorAll('.aspect-square')).toHaveLength(3);
+    expect(screen.queryByText(/generating/i)).not.toBeInTheDocument();
   });
 });

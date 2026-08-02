@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import { Check, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import Image from 'next/image';
-import { type KeyboardEvent, useCallback, useState } from 'react';
+import { type KeyboardEvent, useCallback, useEffect, useState } from 'react';
 import { ThreadImageCard } from '@/components/shell/ThreadImageCard';
 import type {
   MerchDesignCarouselResult,
@@ -75,6 +75,55 @@ function isProductsResponse(
   );
 }
 
+/**
+ * Start all concept previews together after the tool result arrives. The
+ * browser owns request deduplication; this prevents arrow navigation from
+ * becoming a second image-loading wait without changing the image provider's
+ * work or URL provenance.
+ */
+export function prefetchMerchDesignPreviews(
+  designs: readonly MerchDesignPreview[]
+): void {
+  if (typeof globalThis.Image === 'undefined') return;
+
+  const urls = new Set(
+    designs.flatMap(design =>
+      design.status === 'ready' && design.preview_url
+        ? [design.preview_url]
+        : []
+    )
+  );
+  for (const url of urls) {
+    const image = new globalThis.Image();
+    image.decoding = 'async';
+    image.src = url;
+  }
+}
+
+/**
+ * The running tool reserves the same three-up media area that the chooser
+ * needs. Its intentionally quiet placeholders communicate progress without
+ * making users read or react while external image generation is still pending.
+ */
+export function ChatMerchDesignCarouselLoading() {
+  return (
+    <section
+      aria-busy='true'
+      aria-label='Preparing merch concepts'
+      className='max-w-2xl'
+    >
+      <div className='grid grid-cols-3 gap-2.5' aria-hidden='true'>
+        {[0, 1, 2].map(index => (
+          <div
+            key={index}
+            className='aspect-square rounded-xl bg-surface-1 shadow-card'
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function ChatMerchDesignCarousel({
   result,
   profileId,
@@ -99,6 +148,10 @@ export function ChatMerchDesignCarousel({
   const confirmAction = useConfirmChatMerchActionMutation();
   const count = designs.length;
   const current = designs[Math.min(active, Math.max(0, count - 1))];
+
+  useEffect(() => {
+    prefetchMerchDesignPreviews(designs);
+  }, [designs]);
 
   const go = useCallback(
     (dir: -1 | 1) => {
