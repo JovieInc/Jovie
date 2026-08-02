@@ -1,7 +1,6 @@
 import Image from 'next/image';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { ARTIST_PROFILE_SECTION_TEST_IDS } from '@/data/artistProfilePageOrder';
-import type { ArtistProfileSocialProofData } from '@/data/socialProof';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { ArtistProfileCaptureSection } from './ArtistProfileCaptureSection';
@@ -15,7 +14,7 @@ import { ArtistProfileOutcomesCarousel } from './ArtistProfileOutcomesCarousel';
 import { ArtistProfilePhoneFrame } from './ArtistProfilePhoneFrame';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
-import { ArtistProfileSocialProof } from './ArtistProfileSocialProof';
+import { ArtistProfileReleaseCycleGallery } from './ArtistProfileSocialProof';
 
 const LIVE_PROFILE = getMarketingExportImage('tim-white-profile-live-mobile');
 
@@ -33,7 +32,7 @@ const DEFAULT_CALLOUTS = [
   {
     id: 'action',
     title: 'The Right Next Move',
-    body: 'Listen, pre-save, find tickets, or support—the action follows the moment.',
+    body: 'Get release alerts, listen, find tickets, or support—the action follows the moment.',
   },
   {
     id: 'navigation',
@@ -109,13 +108,11 @@ function ArtistProfileAnnotatedTruth({
 
 interface ArtistProfileLandingPageProps {
   readonly copy: ArtistProfileLandingCopy;
-  readonly socialProof: ArtistProfileSocialProofData;
   readonly flags: ArtistProfileSectionFlags;
 }
 
 export function ArtistProfileLandingPage({
   copy,
-  socialProof,
   flags,
 }: Readonly<ArtistProfileLandingPageProps>) {
   if (!flags.FULL_PAGE) {
@@ -150,14 +147,9 @@ export function ArtistProfileLandingPage({
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.howItWorks}>
         <ArtistProfileHowItWorks howItWorks={copy.howItWorks} />
       </div>
-      {flags.SOCIAL_PROOF && socialProof.hasRealQuotes ? (
-        <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.socialProof}>
-          <ArtistProfileSocialProof
-            socialProof={copy.socialProof}
-            proofData={socialProof}
-          />
-        </div>
-      ) : null}
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.releaseCycle}>
+        <ArtistProfileReleaseCycleGallery releaseCycle={copy.releaseCycle} />
+      </div>
       {flags.FAQ ? (
         <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.faq}>
           <ArtistProfileFaq faq={copy.faq} />

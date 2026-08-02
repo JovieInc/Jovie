@@ -479,7 +479,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     {
       id: 'onboarding-handle-desktop',
       title: 'Onboarding Handle Step',
-      route: '/demo/showcase/onboarding-handle',
+      route: '/demo/showcase/onboarding-handle?profile=tim-white',
       waitFor: '#handle-input',
     },
     {

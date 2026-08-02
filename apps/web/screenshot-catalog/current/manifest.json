@@ -340,8 +340,8 @@
     "viewport": "mobile",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-02T00:46:44.844Z",
-    "gitSha": "a7a92a79d67d056e43a3d6a0afd7b9cf87cced86",
+    "capturedAt": "2026-08-03T00:02:18.226Z",
+    "gitSha": null,
     "imagePath": "tim-white-profile-tour-mobile.png",
     "publicExportPath": "tim-white-profile-tour-phone.png"
   },
@@ -751,12 +751,12 @@
     "title": "Onboarding Handle Step",
     "group": "onboarding",
     "groupLabel": "Onboarding",
-    "route": "/demo/showcase/onboarding-handle",
+    "route": "/demo/showcase/onboarding-handle?profile=tim-white",
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-02T00:56:20.425Z",
-    "gitSha": "a7a92a79d67d056e43a3d6a0afd7b9cf87cced86",
+    "capturedAt": "2026-08-03T00:33:10.351Z",
+    "gitSha": null,
     "imagePath": "onboarding-handle-desktop.png"
   },
   {

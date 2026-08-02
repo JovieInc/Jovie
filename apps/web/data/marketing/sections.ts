@@ -908,7 +908,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         alignment: 'centered',
         chooseWhen:
           'audience=artist AND proofItems are artist faces/profiles (names, no quotes — creator R3)',
-        exemplar: { route: '/artist-profiles', section: 'socialProof' },
         status: 'active',
       },
       {

@@ -69,8 +69,11 @@ describe('MarketingFooter', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('keeps artist profiles on the minimal homepage footer treatment', () => {
-    mockUsePathname.mockReturnValue('/artist-profiles');
+  it.each([
+    '/artist-profiles',
+    '/artist-profile',
+  ])('keeps %s on the minimal homepage footer treatment', pathname => {
+    mockUsePathname.mockReturnValue(pathname);
 
     render(<MarketingFooter />);
 
