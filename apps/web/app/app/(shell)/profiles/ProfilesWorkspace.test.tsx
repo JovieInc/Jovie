@@ -40,7 +40,7 @@ const data: ProfilesWorkspaceData = {
       kind: 'dsp',
       platform: 'spotify',
       label: 'Spotify',
-      handle: 'Tim White',
+      handle: null,
       url: 'https://open.spotify.com/artist/tim',
       trackedUrl: 'https://jov.ie/tim/s/spotify',
       qualificationStatus: 'qualified',
@@ -91,6 +91,22 @@ describe('ProfilesWorkspace', () => {
     expect(
       screen.getByRole('link', { name: 'Set Up Artist Profile' })
     ).toHaveAttribute('href', '/app/settings/artist-profile');
+  });
+
+  it('uses the canonical mark state contract and a compact URL display', () => {
+    renderWorkspace(data);
+
+    const url = screen.getByTitle('https://open.spotify.com/artist/tim');
+    expect(url).toHaveTextContent('open.spotify.com · artist/tim');
+
+    const mark = screen.getByRole('img', { name: 'Spotify' });
+    expect(mark).toHaveClass('relative');
+    expect(
+      mark.querySelector('.group-hover\\/connection-row\\:opacity-100')
+    ).not.toBeNull();
+    expect(
+      mark.querySelector('.group-focus-visible\\/connection-row\\:opacity-100')
+    ).not.toBeNull();
   });
 
   it('renders a connection summary and filters without exposing locked ranks', async () => {
