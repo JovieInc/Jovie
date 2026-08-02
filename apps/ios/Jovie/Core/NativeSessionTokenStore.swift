@@ -68,6 +68,24 @@ enum NativeSessionTokenStore {
     UserDefaults.standard.removeObject(forKey: expiresAtKey)
   }
 
+  /// Persists the Better Auth bearer-plugin roll emitted on successful API calls.
+  /// The response header contains only the token; keep the existing user identity
+  /// and extend the local lease to match the server's seven-day session lifetime.
+  static func refresh(from response: URLResponse) {
+    guard
+      let httpResponse = response as? HTTPURLResponse,
+      let token = httpResponse.value(forHTTPHeaderField: "set-auth-token"),
+      !token.isEmpty,
+      let stored = load()
+    else { return }
+
+    save(
+      token: token,
+      userID: stored.userID,
+      expiresAt: Date().addingTimeInterval(60 * 60 * 24 * 7)
+    )
+  }
+
   private static func loadToken() -> String? {
     var query = baseQuery()
     query[kSecReturnData as String] = true
@@ -108,8 +126,8 @@ enum NativeSessionTokenStore {
  * the bearer plugin authenticates API calls with it. No client refresh —
  * the server rolls `expiresAt` per `updateAge`, and the bearer plugin's
  * `set-auth-token` response header refreshes the stored token + expiry on
- * each API call (handled in `APIClient`). A terminal 401 from the server
- * clears the Keychain (handled in `APIClient`'s 401 path).
+ * successful API calls (handled by `APIClient` and `MobileChatClient`). A
+ * terminal 401 clears the Keychain in each client.
  */
 struct NativeSessionTokenProvider: TokenProviding {
   func bearerToken(forceRefresh: Bool) async throws -> String {

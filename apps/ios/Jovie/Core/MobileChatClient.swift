@@ -62,9 +62,17 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
   }
 
   func sendTurn(_ request: MobileChatTurnRequest) async throws -> [MobileChatStreamEvent] {
+    try await sendTurn(request, forceRefresh: false)
+  }
+
+  private func sendTurn(
+    _ request: MobileChatTurnRequest,
+    forceRefresh: Bool
+  ) async throws -> [MobileChatStreamEvent] {
     var urlRequest = try await authorizedRequest(
       url: baseURL.appending(path: "/api/mobile/v1/chat/turns"),
-      method: "POST"
+      method: "POST",
+      forceRefresh: forceRefresh
     )
     urlRequest.setValue("application/x-ndjson", forHTTPHeaderField: "Accept")
     urlRequest.httpBody = try encoder.encode(request)
@@ -75,15 +83,27 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
       throw MobileChatClientError.invalidResponse
     }
 
+    if httpResponse.statusCode == 401, !forceRefresh {
+      return try await sendTurn(request, forceRefresh: true)
+    }
+    if httpResponse.statusCode == 401, forceRefresh {
+      NativeSessionTokenStore.clear()
+    }
+
     guard (200 ... 299).contains(httpResponse.statusCode) else {
       throw MobileChatClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
 
+    NativeSessionTokenStore.refresh(from: response)
     return try parseStreamEvents(from: data)
   }
 
-  private func authorizedRequest(url: URL, method: String) async throws -> URLRequest {
-    let token = try await tokenProvider.bearerToken(forceRefresh: false)
+  private func authorizedRequest(
+    url: URL,
+    method: String,
+    forceRefresh: Bool = false
+  ) async throws -> URLRequest {
+    let token = try await tokenProvider.bearerToken(forceRefresh: forceRefresh)
     var request = URLRequest(url: url)
     request.httpMethod = method
     request.timeoutInterval = requestTimeout

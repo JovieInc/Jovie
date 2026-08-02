@@ -181,6 +181,18 @@ final class ChatRepository {
   }
 
   private func apply(events: [MobileChatStreamEvent], clientTurnId: String) {
+    var pendingDeltas: [String: String] = [:]
+
+    func flushDelta(for turnID: String) {
+      guard let text = pendingDeltas.removeValue(forKey: turnID), !text.isEmpty else { return }
+      updateAssistant(clientTurnId: turnID) { item in
+        var updated = item
+        updated.status = .streaming
+        updated.content += text
+        return updated
+      }
+    }
+
     for event in events {
       switch event {
       case let .turnReserved(conversationId, _, _):
@@ -191,26 +203,23 @@ final class ChatRepository {
           return updated
         }
 
-      case let .assistantDelta(clientTurnId, text):
-        updateAssistant(clientTurnId: clientTurnId) { item in
-          var updated = item
-          updated.status = .streaming
-          updated.content += text
-          return updated
-        }
+      case let .assistantDelta(eventClientTurnId, text):
+        pendingDeltas[eventClientTurnId, default: ""] += text
 
-      case let .assistantCompleted(clientTurnId, conversationId, _, text):
+      case let .assistantCompleted(eventClientTurnId, conversationId, _, text):
+        flushDelta(for: eventClientTurnId)
         activeConversationID = conversationId
-        updateAssistant(clientTurnId: clientTurnId) { item in
+        updateAssistant(clientTurnId: eventClientTurnId) { item in
           var updated = item
           updated.status = .completed
           updated.content = text
           return updated
         }
 
-      case let .webHandoff(clientTurnId, conversationId, url, summary):
+      case let .webHandoff(eventClientTurnId, conversationId, url, summary):
+        flushDelta(for: eventClientTurnId)
         activeConversationID = conversationId
-        updateAssistant(clientTurnId: clientTurnId) { item in
+        updateAssistant(clientTurnId: eventClientTurnId) { item in
           var updated = item
           updated.status = .completed
           updated.content = summary
@@ -220,8 +229,13 @@ final class ChatRepository {
         }
 
       case let .error(_, message):
+        flushDelta(for: clientTurnId)
         markAssistantFailed(clientTurnId: clientTurnId, message: message)
       }
+    }
+
+    for eventClientTurnId in Array(pendingDeltas.keys) {
+      flushDelta(for: eventClientTurnId)
     }
   }
 
