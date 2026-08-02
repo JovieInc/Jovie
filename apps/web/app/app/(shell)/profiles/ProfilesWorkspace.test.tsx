@@ -51,6 +51,22 @@ const data: ProfilesWorkspaceData = {
       lastObservedAt: '2026-07-16T00:00:00.000Z',
     },
     {
+      id: 'instagram',
+      rowType: 'surface',
+      kind: 'social',
+      platform: 'instagram',
+      label: 'Instagram',
+      handle: '@tim',
+      url: 'https://instagram.com/tim',
+      trackedUrl: 'https://jov.ie/tim/s/instagram',
+      qualificationStatus: 'qualified',
+      isOfficial: true,
+      monitoringState: 'active',
+      rank: 4,
+      previousRank: 5,
+      lastObservedAt: '2026-07-16T00:00:00.000Z',
+    },
+    {
       id: 'gmail',
       rowType: 'connector',
       kind: 'connector',
@@ -129,7 +145,7 @@ describe('ProfilesWorkspace', () => {
     expect(screen.getByText('Jovie Profile')).toBeInTheDocument();
     expect(screen.getByText('Spotify')).toBeInTheDocument();
     expect(screen.queryByText('7')).not.toBeInTheDocument();
-    expect(screen.getByText('3 Connections')).toBeInTheDocument();
+    expect(screen.getByText('4 Connections')).toBeInTheDocument();
     expect(screen.getByText('Monitored 1/5')).toBeInTheDocument();
     expect(screen.getByText('Needs Attention 1')).toBeInTheDocument();
     expect(screen.getByText('Monitoring Active')).toBeInTheDocument();
@@ -178,7 +194,11 @@ describe('ProfilesWorkspace', () => {
     expect(screen.getByTestId('profiles-rail-summary')).toBeInTheDocument();
     expect(
       screen.getByTestId('profiles-rail-shareable-link')
-    ).toHaveTextContent('jov.ie/tim/s/spotify');
+    ).toHaveTextContent('open.spotify.com/artist/tim');
+    expect(screen.getByRole('link', { name: 'Open' })).toHaveAttribute(
+      'href',
+      'https://open.spotify.com/artist/tim'
+    );
     expect(screen.getByText('Next Best Action')).toBeInTheDocument();
     expect(
       screen.getByText('Upgrade the monitoring limit to track this connection.')
@@ -186,6 +206,27 @@ describe('ProfilesWorkspace', () => {
     expect(screen.getByRole('link', { name: 'Upgrade' })).toHaveAttribute(
       'href',
       '/app/settings/billing'
+    );
+  });
+
+  it('uses the canonical Jovie URL only for supported social connections', async () => {
+    const user = userEvent.setup();
+    renderWorkspace(data);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Actions for Instagram' })
+    );
+    await user.click(screen.getByRole('menuitem', { name: /View Details/i }));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    expect(panel).not.toBeNull();
+
+    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+    expect(
+      screen.getByTestId('profiles-rail-shareable-link')
+    ).toHaveTextContent('jov.ie/tim/s/instagram');
+    expect(screen.getByRole('link', { name: 'Open' })).toHaveAttribute(
+      'href',
+      'https://instagram.com/tim'
     );
   });
 

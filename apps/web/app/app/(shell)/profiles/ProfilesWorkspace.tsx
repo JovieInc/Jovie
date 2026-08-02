@@ -393,7 +393,7 @@ function ConnectionRail({
             footer={
               <ShareableLinkRow
                 url={
-                  row.rowType === 'surface'
+                  row.rowType === 'surface' && row.kind === 'social'
                     ? (row.trackedUrl ?? row.url)
                     : row.url
                 }
