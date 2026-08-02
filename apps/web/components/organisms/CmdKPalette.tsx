@@ -395,7 +395,7 @@ export function CmdKPalette({
 
   const results = (
     <div
-      className='min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1.5'
+      className='min-h-0 flex-1 overflow-y-auto pb-2 pt-1.5'
       role='listbox'
       aria-label='Command Palette Results'
       id={generatedListId}
