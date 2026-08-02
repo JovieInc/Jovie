@@ -192,11 +192,14 @@ describe('DashboardHeader', () => {
     );
 
     const slot = screen.getByTestId('dashboard-header-rail-slot');
+    const titleSlot = screen.getByTestId('dashboard-header-title-slot');
     expect(slot).toHaveClass('h-7', 'w-7', 'shrink-0');
+    expect(slot).toHaveClass('order-last');
+    expect(titleSlot).toHaveClass('order-first', 'flex-1');
     expect(slot).toContainElement(
       screen.getByRole('button', { name: 'Show artist profile' })
     );
-    expect(screen.getByRole('heading').compareDocumentPosition(slot)).toBe(
+    expect(titleSlot.compareDocumentPosition(slot)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
 

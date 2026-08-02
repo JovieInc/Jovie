@@ -711,6 +711,7 @@ export function ProfilesWorkspace({
       surfaceMode='table'
       toolbar={
         <PageToolbar
+          data-testid='connections-workspace-toolbar'
           className='flex-col items-stretch gap-0 px-0 py-0 lg:flex-row lg:items-center lg:gap-1.5 lg:px-app-header lg:py-1.5'
           startClassName='w-full flex-none px-app-header py-1.5 lg:min-w-0 lg:flex-1 lg:px-0 lg:py-0'
           endClassName='ml-0 w-full min-w-0 max-w-full shrink justify-start overflow-hidden border-t border-subtle px-app-header py-1.5 lg:ml-auto lg:w-auto lg:max-w-none lg:shrink-0 lg:justify-end lg:overflow-visible lg:border-t-0 lg:px-0 lg:py-0'

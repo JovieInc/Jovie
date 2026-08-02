@@ -132,31 +132,36 @@ export function DashboardHeader({
           className='flex min-w-0 flex-1 items-center gap-2 tracking-[-0.012em]'
           data-search-active={isSearchActive ? 'true' : 'false'}
         >
-          {commandPaletteHeader ? (
-            <div
-              className='flex h-full min-w-0 flex-1 items-center'
-              data-testid='dashboard-command-palette-header'
-            >
-              {commandPaletteHeader}
-            </div>
-          ) : (
-            <HeaderTitle
-              usesSectionTitleLayout={usesSectionTitleLayout}
-              currentLabel={currentLabel}
-              rootLabel={rootLabel}
-              breadcrumbSuffix={breadcrumbSuffix}
-            />
-          )}
+          <div
+            className='order-first flex min-w-0 flex-1 items-center gap-2'
+            data-testid='dashboard-header-title-slot'
+          >
+            {commandPaletteHeader ? (
+              <div
+                className='flex h-full min-w-0 flex-1 items-center'
+                data-testid='dashboard-command-palette-header'
+              >
+                {commandPaletteHeader}
+              </div>
+            ) : (
+              <HeaderTitle
+                usesSectionTitleLayout={usesSectionTitleLayout}
+                currentLabel={currentLabel}
+                rootLabel={rootLabel}
+                breadcrumbSuffix={breadcrumbSuffix}
+              />
+            )}
+          </div>
           {showInlineSearch ? (
             <div className='ml-auto flex min-w-0 shrink-0 items-center justify-start max-sm:w-app-control-sm sm:ml-1.5'>
               {searchSurface}
             </div>
           ) : null}
-          {/* Keep the workspace title on the canonical left seam. The shared
-              rail slot stays mounted at a fixed width, but follows title/search
-              content so opening search or a rail never shifts the title. */}
+          {/* The control must remain visually after title/search even if a
+              caller's wrapper changes DOM order. Its fixed footprint prevents
+              search or rail state from shifting the workspace title. */}
           <div
-            className='flex h-7 w-7 shrink-0 items-center justify-center'
+            className='order-last flex h-7 w-7 shrink-0 items-center justify-center'
             data-testid='dashboard-header-rail-slot'
           >
             {railToggle}
