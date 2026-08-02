@@ -321,15 +321,12 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     expect(pushMock).toHaveBeenCalledWith('/app/releases');
   });
 
-  it('uses the canonical audience route for the Audience nav item', () => {
-    pushMock.mockClear();
+  it('does not duplicate Audience as a separate command', () => {
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
     const audienceNav = screen
       .getAllByRole('option')
       .find(el => el.textContent?.includes('Understand your audience'));
-    expect(audienceNav).toBeDefined();
-    fireEvent.mouseDown(audienceNav!);
-    expect(pushMock).toHaveBeenCalledWith('/app/audience');
+    expect(audienceNav).toBeUndefined();
   });
 
   it('routes a skill commit to chat with the ?skill= handoff', () => {

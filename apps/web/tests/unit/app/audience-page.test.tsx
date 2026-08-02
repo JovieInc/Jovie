@@ -1,23 +1,32 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 
-describe('audience app shell route', () => {
-  it('uses the shared route context without reloading dashboard shell data locally', () => {
-    const source = readFileSync(
-      resolve(process.cwd(), 'app/app/(shell)/audience/page.tsx'),
-      'utf8'
+const redirectMock = vi.hoisted(() => vi.fn());
+
+vi.mock('next/navigation', () => ({ redirect: redirectMock }));
+
+import AudiencePage, {
+  buildAudienceContactsRedirectPath,
+} from '@/app/app/(shell)/audience/page';
+
+describe('legacy audience route', () => {
+  it('preserves audience state while moving it into Contacts', () => {
+    expect(
+      buildAudienceContactsRedirectPath({
+        view: 'identified',
+        segments: ['fans', 'supporters'],
+        tab: 'contacts',
+      })
+    ).toBe(
+      `${APP_ROUTES.CONTACTS}?tab=audience&view=identified&segments=fans&segments=supporters`
     );
+  });
 
-    expect(source).toContain('LazyDashboardAudienceClient');
-    expect(source).toContain('loadAppShellRouteContext');
-    expect(source).toContain('loadAuthenticatedAppShellUserId');
-    expect(source).toContain('requireAppShellDashboardUserId');
-    expect(source).toContain('authenticatedUserId: userId');
-    expect(source).not.toContain('buildAppShellSignInUrl');
-    expect(source).not.toContain('getCachedAuth');
-    expect(source).not.toContain('getDashboardShellData');
-    expect(source).not.toContain('dashboardLoadError');
-    expect(source).not.toMatch(/\bgetDashboardData(?:Essential)?\(/);
+  it('redirects old audience links to the Contacts audience view', async () => {
+    await AudiencePage({ searchParams: Promise.resolve({ view: 'all' }) });
+
+    expect(redirectMock).toHaveBeenCalledWith(
+      `${APP_ROUTES.CONTACTS}?tab=audience&view=all`
+    );
   });
 });

@@ -72,7 +72,7 @@ function isItemActive(pathname: string, item: NavItem): boolean {
       pathname === APP_ROUTES.DASHBOARD_AUDIENCE ||
       pathname === APP_ROUTES.AUDIENCE
     ) {
-      return APP_ROUTES.AUDIENCE;
+      return APP_ROUTES.CONTACTS;
     }
     return pathname;
   })();

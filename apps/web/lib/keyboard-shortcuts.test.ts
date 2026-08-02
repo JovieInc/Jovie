@@ -96,7 +96,7 @@ describe('keyboard-shortcuts definitions', () => {
       expect(ids).toContain('nav-releases');
       expect(ids).toContain('nav-calendar');
       expect(ids).toContain('nav-tour-dates');
-      expect(ids).toContain('nav-audience');
+      expect(ids).not.toContain('nav-audience');
       expect(ids).toContain('nav-earnings');
       expect(ids).toContain('nav-chat');
       expect(ids).toContain('nav-settings');
@@ -113,10 +113,6 @@ describe('keyboard-shortcuts definitions', () => {
 
     it('uses the canonical calendar route for calendar navigation', () => {
       expect(NAV_SHORTCUTS.calendar.href).toBe(APP_ROUTES.CALENDAR);
-    });
-
-    it('uses the canonical audience route for audience navigation', () => {
-      expect(NAV_SHORTCUTS.audience.href).toBe(APP_ROUTES.AUDIENCE);
     });
   });
 
@@ -169,7 +165,7 @@ describe('keyboard-shortcuts definitions', () => {
       expect(NAV_SHORTCUTS.library).toBeDefined();
       expect(NAV_SHORTCUTS.calendar).toBeDefined();
       expect(NAV_SHORTCUTS.touring).toBeDefined();
-      expect(NAV_SHORTCUTS.audience).toBeDefined();
+      expect(NAV_SHORTCUTS.audience).toBeUndefined();
       expect(NAV_SHORTCUTS.earnings).toBeDefined();
       expect(NAV_SHORTCUTS.chat).toBeDefined();
       expect(NAV_SHORTCUTS.account).toBeDefined();
