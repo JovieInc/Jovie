@@ -35,6 +35,23 @@ export interface MerchArtistBrief {
   best_merch_hypothesis: string;
   commercial_angle: string;
   risk_level: 'safe' | 'medium' | 'experimental';
+  /**
+   * The exact catalog phrase or artist-owned asset used for this generation.
+   * Kept in the batch JSON so an option can be audited without a schema
+   * migration and selection can reject legacy, ungrounded generations.
+   */
+  source?: {
+    sourceType:
+      | 'song_title'
+      | 'album_title'
+      | 'library_asset'
+      | 'user_provided';
+    sourceText: string;
+    provenanceTitle: string;
+    rightsStatus: 'owned' | 'user_provided';
+    assetId?: string;
+    assetUrl?: string;
+  };
 }
 
 export interface MerchVariantMap {

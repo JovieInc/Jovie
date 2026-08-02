@@ -17,7 +17,7 @@ import 'server-only';
 
 import { randomUUID } from 'node:crypto';
 import { put } from '@vercel/blob';
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { uploadBufferToBlob } from '@/app/api/images/upload/lib/blob-upload';
 import { db } from '@/lib/db';
 import {
@@ -40,14 +40,17 @@ import {
   MERCH_DEFAULT_MARGIN_PRESET,
   MERCH_DEFAULT_PRINTFUL_PRODUCT_COST_CENTS,
 } from './pricing';
+import {
+  type MerchSource,
+  requiresAssetPreservingRender,
+} from './source-candidates';
 import type { MerchDesignCarouselResult, MerchDesignPreview } from './types';
 
 const DEFAULT_DESIGN_COUNT = 3;
 
 /**
- * Starts independent generation prerequisites together so image rendering is
- * not delayed by unrelated profile, catalog, and preference reads. Keeping
- * this small helper generic makes the concurrency contract directly testable.
+ * Starts independent generation prerequisites together so rendering is not
+ * delayed by unrelated profile, catalog, and preference reads.
  */
 export async function resolveMerchGenerationPrerequisites<
   TArtistName,
@@ -70,24 +73,112 @@ export async function resolveMerchGenerationPrerequisites<
   return { artistName, catalog, modelWeights };
 }
 
-/** Distinct art directions so the carousel reads as real variety, not 3 of the same. */
-const STYLE_DIRECTIONS: readonly { label: string; style: string }[] = [
+/**
+ * Each strategy deliberately occupies a different visual lane. Keep the
+ * fields separate so adjective-only changes cannot collapse the options into
+ * the same composition again.
+ */
+export interface MerchDesignStrategy {
+  readonly label: string;
+  readonly composition: string;
+  readonly typographyRole: string;
+  readonly motifSystem: string;
+  readonly palette: string;
+  readonly density: string;
+}
+
+export const MERCH_DESIGN_STRATEGIES: readonly MerchDesignStrategy[] = [
   {
-    label: 'Vintage',
-    style:
-      'vintage distressed band-merch screen print, heavy wash and grain, retro limited palette, gnarly hand-drawn display lettering',
+    label: 'Signal Field',
+    composition:
+      'an offset left-to-right signal field with one dominant graphic band and intentional open space',
+    typographyRole:
+      'artist name as a small signature line, with the verified source phrase as the primary readable type',
+    motifSystem:
+      'abstract pulse lines, register marks, and measured signal fragments only',
+    palette: 'ink black, bone, and one electric blue accent',
+    density: 'medium density with a clear quiet margin',
   },
   {
-    label: 'Bold',
-    style:
-      'bold modern illustrated graphic, clean heavy linework, confident type lockup, high contrast',
+    label: 'Archive Stamp',
+    composition:
+      'a compact centered archival seal with a broad empty outer field, not a poster layout',
+    typographyRole:
+      'verified source phrase set as small circular utility type, artist name as a secondary catalog credit',
+    motifSystem:
+      'abstract catalog notches, concentric rings, and a single geometric identifier',
+    palette: 'one-color charcoal print with no secondary accent',
+    density: 'minimal density with large negative space',
   },
   {
-    label: 'Mono',
-    style:
-      'minimal one-color line illustration, refined editorial type, lots of negative space, premium capsule feel',
+    label: 'Night Transit',
+    composition:
+      'a wide horizontal transit strip across the lower third, leaving the upper field deliberately empty',
+    typographyRole:
+      'artist name as a wide wordmark, verified source phrase as a short route label beneath it',
+    motifSystem:
+      'abstract route geometry, timing ticks, and directional arrows without place names or dates',
+    palette: 'deep charcoal, silver gray, and restrained violet',
+    density: 'medium-high density confined to the lower strip',
+  },
+  {
+    label: 'Editorial Cut',
+    composition:
+      'a vertical editorial split with the image language concentrated in one narrow side column',
+    typographyRole:
+      'verified source phrase as the hero typographic crop, artist name as a small byline',
+    motifSystem:
+      'abstract crop marks, halftone texture, and one cut-paper shape',
+    palette: 'black, soft white, and one muted pink accent',
+    density: 'high contrast with controlled medium density',
+  },
+  {
+    label: 'Object Study',
+    composition:
+      'one isolated abstract object centered low on the canvas with a large unprinted field above',
+    typographyRole:
+      'artist name as compact utility type, verified source phrase as a caption adjacent to the object',
+    motifSystem:
+      'one non-figurative geometric object built from the source phrase initials, never a logo recreation',
+    palette: 'black and off-white only',
+    density: 'minimal density',
+  },
+  {
+    label: 'Type Stack',
+    composition:
+      'a tall stacked type system filling the center column with no illustrative scene',
+    typographyRole:
+      'verified source phrase and artist name share equal typographic weight in distinct lines',
+    motifSystem:
+      'simple rule lines and typographic spacing only, no icons or symbolic illustration',
+    palette: 'ink black with one restrained orange registration mark',
+    density: 'typography-dense but visually spare',
   },
 ];
+
+function normalizedStrategyLabel(value: string): string {
+  return value.trim().toLocaleLowerCase();
+}
+
+export function selectMerchDesignStrategies(
+  count: number,
+  recentSelectedLabels: readonly string[] = []
+): readonly MerchDesignStrategy[] {
+  const recent = new Set(recentSelectedLabels.map(normalizedStrategyLabel));
+  const fresh = MERCH_DESIGN_STRATEGIES.filter(
+    strategy => !recent.has(normalizedStrategyLabel(strategy.label))
+  );
+  const candidates =
+    fresh.length >= count
+      ? fresh
+      : [
+          ...fresh,
+          ...MERCH_DESIGN_STRATEGIES.filter(strategy =>
+            recent.has(normalizedStrategyLabel(strategy.label))
+          ),
+        ];
+  return candidates.slice(0, count);
+}
 
 async function uploadAlphaPng(path: string, buffer: Buffer): Promise<string> {
   if (!env.BLOB_READ_WRITE_TOKEN) {
@@ -116,31 +207,54 @@ async function artistName(profileId: string): Promise<string> {
   return profile.displayName?.trim() || profile.username;
 }
 
-function minimalBrief(name: string, prompt: string): MerchArtistBrief {
+function minimalBrief(
+  name: string,
+  prompt: string,
+  source?: MerchSource
+): MerchArtistBrief {
   return {
     artist_myth: `${name} merch.`,
     fan_identity:
       'Fans want a wearable graphic that looks designed, not generic.',
     visual_language: ['illustrated graphic', 'band-merch energy'],
-    forbidden_cliches: ['fake tour dates', 'generic centered logo'],
+    forbidden_cliches: [
+      'fake tour dates',
+      'generic centered logo',
+      'no people, faces, portraits, models, or human figures',
+      'no unverified artist likeness',
+    ],
     campaign_context: `Artist request: ${prompt}`,
     best_merch_hypothesis: 'A strong illustrated graphic on a premium blank.',
     commercial_angle: 'Wearable artist graphic.',
     risk_level: 'safe',
+    ...(source ? { source } : {}),
   };
 }
 
-function buildImagePrompt(
+export function buildMerchImagePrompt(
   name: string,
   userPrompt: string,
-  style: string
+  strategy: MerchDesignStrategy,
+  source: MerchSource,
+  recentSelectedLabels: readonly string[] = []
 ): string {
+  const recentLine = recentSelectedLabels.length
+    ? `Do not reuse the recently selected strategy families: ${recentSelectedLabels.join(', ')}. This option must remain visibly distinct from them.`
+    : '';
+
   return [
-    `${style}.`,
+    `Strategy family: ${strategy.label}.`,
     `Concept: ${userPrompt}.`,
-    `Feature the artist name "${name}" as bold band-merch lettering.`,
-    'Centered composition, print-ready artwork, no garment, no mockup.',
-  ].join(' ');
+    `Use this verified ${source.sourceType.replaceAll('_', ' ')} exactly as the textual source: "${source.sourceText}". Provenance: ${source.provenanceTitle}.`,
+    `Composition: ${strategy.composition}.`,
+    `Typography role: ${strategy.typographyRole}.`,
+    `Motif system: ${strategy.motifSystem}.`,
+    `Palette: ${strategy.palette}. Density: ${strategy.density}.`,
+    recentLine,
+    'Print-ready artwork only, no garment and no mockup. Render no text beyond the verified source phrase and artist name. Do not depict people, faces, portraits, models, bodies, or human figures. Do not invent, imitate, or imply the artist likeness. Do not recreate logos, trademarks, lyrics, catalog facts, place names, or tour dates from a textual description.',
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 function fallbackPricing() {
@@ -245,6 +359,39 @@ async function getModelSelectionWeights(
 }
 
 /**
+ * A selected design is the artist's strongest signal. Keep its strategy out
+ * of the next generation batch when alternatives are available, rather than
+ * asking the model to make another near-copy of the last approved visual.
+ */
+async function getRecentSelectedStrategyLabels(
+  profileId: string
+): Promise<readonly string[]> {
+  try {
+    const rows = await db
+      .select({
+        strategy: drizzleSql<
+          string | null
+        >`${merchDesignOptions.learning}->>'typographyStyle'`,
+      })
+      .from(merchCards)
+      .innerJoin(
+        merchDesignOptions,
+        eq(merchCards.selectedDesignOptionId, merchDesignOptions.id)
+      )
+      .where(eq(merchCards.creatorProfileId, profileId))
+      .orderBy(desc(merchCards.updatedAt))
+      .limit(DEFAULT_DESIGN_COUNT);
+    return rows.flatMap(row => (row.strategy ? [row.strategy] : []));
+  } catch (error) {
+    logger.warn(
+      '[merch-designs] recent strategy read failed; generating from full strategy set',
+      { err: error instanceof Error ? error.message : String(error) }
+    );
+    return [];
+  }
+}
+
+/**
  * Fire-and-forget: render the fulfillment-accurate Printful mockup for each
  * design (the alpha graphic on the real default product) and attach it. The
  * selected card then prefers the truthful Printful photo over the alpha preview
@@ -295,23 +442,28 @@ export async function generateMerchDesigns(params: {
   readonly clerkUserId: string;
   readonly prompt: string;
   readonly count?: number;
+  readonly source: MerchSource;
   readonly conversationId?: string | null;
   readonly turnId?: string | null;
 }): Promise<MerchDesignCarouselResult> {
   const startedAt = Date.now();
+  if (requiresAssetPreservingRender(params.source)) {
+    throw new TypeError(
+      'This Library asset needs an asset-preserving render path. Jovie will not recreate an uploaded logo from a text prompt.'
+    );
+  }
+
   const generationId = randomUUID();
   const count = Math.min(Math.max(params.count ?? DEFAULT_DESIGN_COUNT, 1), 4);
-  // These reads do not depend on one another. Starting them together removes
-  // avoidable time-to-first-image without relaxing the pricing or provenance
-  // contract used when an artist selects a design.
-  const prerequisites = await resolveMerchGenerationPrerequisites({
-    artistName: () => artistName(params.profileId),
-    catalog: () => resolveGenerationPricing(params.prompt),
-    modelWeights: () => getModelSelectionWeights(params.profileId),
-  });
-  const name = prerequisites.artistName;
-  const catalog = prerequisites.catalog;
-  const modelWeights = prerequisites.modelWeights;
+  const [prerequisites, recentSelectedLabels] = await Promise.all([
+    resolveMerchGenerationPrerequisites({
+      artistName: () => artistName(params.profileId),
+      catalog: () => resolveGenerationPricing(params.prompt),
+      modelWeights: () => getModelSelectionWeights(params.profileId),
+    }),
+    getRecentSelectedStrategyLabels(params.profileId),
+  ]);
+  const { artistName: name, catalog, modelWeights } = prerequisites;
   const pricing = catalog.pricing;
 
   logger.info('[merch-designs] generation prerequisites ready', {
@@ -327,11 +479,13 @@ export async function generateMerchDesigns(params: {
     chatTurnId: params.turnId ?? null,
     prompt: params.prompt,
     command: 'generate_merch_designs',
-    artistBrief: minimalBrief(name, params.prompt),
+    artistBrief: minimalBrief(name, params.prompt, params.source),
     status: 'generating',
   });
 
-  const directions = STYLE_DIRECTIONS.slice(0, count);
+  // Bias model selection toward the artist's previous picks while selecting
+  // visual strategy families away from their recent choices.
+  const directions = selectMerchDesignStrategies(count, recentSelectedLabels);
   const grossMargin =
     pricing.retailPriceCents -
     pricing.estimatedPrintfulProductCostCents -
@@ -344,15 +498,26 @@ export async function generateMerchDesigns(params: {
         const optionId = randomUUID();
         try {
           const graphic = await generatePrintGraphic({
-            prompt: buildImagePrompt(name, params.prompt, direction.style),
+            prompt: buildMerchImagePrompt(
+              name,
+              params.prompt,
+              direction,
+              params.source,
+              recentSelectedLabels
+            ),
             selection: { weights: modelWeights },
           });
           const previewUrl = await uploadAlphaPng(
             `merch/generated/${params.profileId}/${generationId}/${optionId}.png`,
             graphic.image
           );
-          const designName = `${name} ${direction.label}`;
-          const concept = `${direction.label} direction: ${params.prompt}`;
+          const sourceLabel = params.source
+            ? `${params.source.sourceType.replaceAll('_', ' ')}: ${params.source.provenanceTitle}`
+            : null;
+          const designName = params.source
+            ? `${params.source.sourceText} ${direction.label}`
+            : `${name} ${direction.label}`;
+          const concept = `${direction.label} direction: ${params.prompt}${sourceLabel ? ` · Source: ${sourceLabel}` : ''}`;
 
           await db.insert(merchDesignOptions).values({
             id: optionId,
@@ -380,7 +545,9 @@ export async function generateMerchDesigns(params: {
             jovieShareCents: pricing.jovieMarginPerUnitEstimateCents,
             pricing,
             concept,
-            whyItFits: 'Illustrated graphic generated for this artist.',
+            whyItFits: params.source
+              ? `Built from the verified ${params.source.sourceType.replaceAll('_', ' ')} “${params.source.sourceText}”.`
+              : 'Illustrated graphic generated for this artist without an invented likeness.',
             mockupUrls: [previewUrl],
             printFileUrls: [previewUrl],
             // Catalog warnings about unavailability stay; cost-source warnings
@@ -398,9 +565,13 @@ export async function generateMerchDesigns(params: {
             learning: {
               styleLane: 'fashion_graphic_item',
               typographyStyle: direction.label,
-              graphicDensity: 'medium',
+              graphicDensity: direction.density.includes('minimal')
+                ? 'minimal'
+                : direction.density.includes('high')
+                  ? 'maximal'
+                  : 'medium',
               garmentColor: catalog.colorway,
-              motifs: [direction.label],
+              motifs: [direction.motifSystem],
               selectedOverOptionIds: [],
               rejectedAttributes: [],
               imageModelKey: graphic.modelKey,
@@ -415,7 +586,12 @@ export async function generateMerchDesigns(params: {
             concept,
             status: 'ready',
             preview_url: previewUrl,
-            slots: { artist_name: name },
+            slots: {
+              artist_name: name,
+              short_text: params.source.sourceText,
+              source_label: sourceLabel ?? undefined,
+              source_type: params.source.sourceType,
+            },
             recommended: index === 0,
             product_name: catalog.productName,
             product_type: catalog.productType,

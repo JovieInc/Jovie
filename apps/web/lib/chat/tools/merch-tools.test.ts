@@ -81,6 +81,9 @@ describe('TOOL_SCHEMAS descriptions', () => {
   it('createMerch has a useful description', () => {
     expect(TOOL_SCHEMAS.createMerch.description.length).toBeGreaterThan(10);
     expect(TOOL_SCHEMAS.createMerch.description).toContain('merch');
+    expect(TOOL_SCHEMAS.createMerch.description).toContain(
+      'Never ask a product question in the same turn'
+    );
   });
 
   it('previewMerchOptions has a useful description', () => {
