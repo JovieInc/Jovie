@@ -152,6 +152,7 @@ interface ChatThreadMessage {
   readonly status?: string;
   readonly parts: MessagePart[];
   readonly toolStepCapExhausted?: boolean;
+  readonly modelRotationNotice?: string;
   /** Persisted chat turn id — enables 👍/👎 model attribution (JOV #11460). */
   readonly turnId?: string;
 }
@@ -196,6 +197,33 @@ export function ChatThreadMessages({
   onScrollToBottom,
   conversationId,
 }: ChatThreadMessagesProps) {
+  const renderMessage = (message: ChatThreadMessage, index: number) => {
+    const isThinking =
+      message.role === 'assistant' && message.status === 'pending';
+
+    return (
+      <div key={message.id} className='pb-4'>
+        {message.modelRotationNotice ? (
+          <ChatModelRotationMetadata notice={message.modelRotationNotice} />
+        ) : null}
+        <ChatMessage
+          id={message.id}
+          role={message.role}
+          parts={message.parts}
+          isStreaming={isStreaming && index === lastAssistantIndex}
+          isThinking={isThinking}
+          avatarUrl={message.role === 'user' ? avatarUrl : undefined}
+          profileId={profileId}
+          skipEntrance={knownMessageIds.has(message.id)}
+          toolStepCapExhausted={message.toolStepCapExhausted}
+          turnId={message.turnId}
+          conversationId={conversationId ?? undefined}
+          enableFeedback
+        />
+      </div>
+    );
+  };
+
   return (
     <div>
       {shouldVirtualizeMessages ? (
@@ -211,8 +239,6 @@ export function ChatThreadMessages({
           {virtualizer.getVirtualItems().map(virtualItem => {
             const message = messages[virtualItem.index];
             const index = virtualItem.index;
-            const isThinking =
-              message.role === 'assistant' && message.status === 'pending';
             return (
               <div
                 key={message.id}
@@ -226,22 +252,7 @@ export function ChatThreadMessages({
                   transform: `translateY(${virtualItem.start}px)`,
                 }}
               >
-                <div className='pb-4'>
-                  <ChatMessage
-                    id={message.id}
-                    role={message.role}
-                    parts={message.parts}
-                    isStreaming={isStreaming && index === lastAssistantIndex}
-                    isThinking={isThinking}
-                    avatarUrl={message.role === 'user' ? avatarUrl : undefined}
-                    profileId={profileId}
-                    skipEntrance={knownMessageIds.has(message.id)}
-                    toolStepCapExhausted={message.toolStepCapExhausted}
-                    turnId={message.turnId}
-                    conversationId={conversationId ?? undefined}
-                    enableFeedback
-                  />
-                </div>
+                {renderMessage(message, index)}
               </div>
             );
           })}
@@ -254,28 +265,7 @@ export function ChatThreadMessages({
             paddingBottom: messageViewportPaddingBottom,
           }}
         >
-          {messages.map((message, index) => {
-            const isThinking =
-              message.role === 'assistant' && message.status === 'pending';
-            return (
-              <div key={message.id} className='pb-4'>
-                <ChatMessage
-                  id={message.id}
-                  role={message.role}
-                  parts={message.parts}
-                  isStreaming={isStreaming && index === lastAssistantIndex}
-                  isThinking={isThinking}
-                  avatarUrl={message.role === 'user' ? avatarUrl : undefined}
-                  profileId={profileId}
-                  skipEntrance={knownMessageIds.has(message.id)}
-                  toolStepCapExhausted={message.toolStepCapExhausted}
-                  turnId={message.turnId}
-                  conversationId={conversationId ?? undefined}
-                  enableFeedback
-                />
-              </div>
-            );
-          })}
+          {messages.map((message, index) => renderMessage(message, index))}
         </div>
       )}
 
@@ -290,6 +280,20 @@ export function ChatThreadMessages({
 
       <ScrollToBottom visible={!isStuckToBottom} onClick={onScrollToBottom} />
     </div>
+  );
+}
+
+function ChatModelRotationMetadata({ notice }: { readonly notice: string }) {
+  return (
+    <p
+      role='status'
+      aria-live='polite'
+      aria-atomic='true'
+      data-testid='chat-model-rotation-notice'
+      className='pb-2 text-center text-xs text-tertiary-token'
+    >
+      {notice}
+    </p>
   );
 }
 

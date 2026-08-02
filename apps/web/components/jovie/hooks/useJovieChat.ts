@@ -5,14 +5,7 @@ import { useAsyncRateLimiter } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useRouter } from 'next/navigation';
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 import { matchCommand } from '@/lib/chat/command-registry';
 import {
@@ -21,10 +14,9 @@ import {
   saveComposerDraft,
 } from '@/lib/chat/composer-draft-store';
 import {
-  modelRotationNoticeForStep,
+  consumeModelRotationNotice,
   readModelRotationStep,
   recordAssistantTurnClean,
-  subscribeModelRotation,
 } from '@/lib/chat/model-rotation-store';
 import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
 import { trimMessagesForChatRequest } from '@/lib/chat/request-validation';
@@ -836,20 +828,6 @@ export function useJovieChat({
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
 
-  // Reactive view of the 👎 model-rotation state (JOV-3362 / #11461). The
-  // store mutates from ChatFeedbackControl (a different component), so the
-  // hook subscribes rather than reading module state during render only.
-  const rotationSnapshot = useCallback(
-    () => readModelRotationStep(activeConversationId),
-    [activeConversationId]
-  );
-  const modelRotationStep = useSyncExternalStore(
-    subscribeModelRotation,
-    rotationSnapshot,
-    () => 0
-  );
-  const modelRotationNotice = modelRotationNoticeForStep(modelRotationStep);
-
   useEffect(() => {
     if (status !== 'ready') return;
     queryClient.invalidateQueries({
@@ -1023,6 +1001,10 @@ export function useJovieChat({
       // client only transmits an integer step; the server resolves + clamps
       // the actual model from its own vetted chain.
       const modelRotationStep = readModelRotationStep(activeConversationId);
+      const modelRotationNotice = consumeModelRotationNotice(
+        activeConversationId,
+        modelRotationStep
+      );
 
       const sendOptions = {
         body: {
@@ -1039,6 +1021,7 @@ export function useJovieChat({
         clientTurnId,
         clientMessageId: `${clientTurnId}:user`,
         requestId: clientTurnId,
+        ...(modelRotationNotice ? { modelRotationNotice } : {}),
         parts: [
           { type: 'text' as const, text: trimmedText },
           ...(files ?? []),
@@ -1234,8 +1217,6 @@ export function useJovieChat({
     activeConversationId,
     /** Auto-generated or user-set conversation title (null if not yet generated) */
     conversationTitle,
-    /** Quiet status line while the conversation is rotated off the default model (👎 recovery). */
-    modelRotationNotice,
     // Refs
     inputRef,
     // Handlers
