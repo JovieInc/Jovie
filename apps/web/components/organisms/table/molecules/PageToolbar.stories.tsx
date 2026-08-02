@@ -10,6 +10,10 @@ const meta: Meta<typeof PageToolbar> = {
   component: PageToolbar,
   parameters: {
     layout: 'padded',
+    jovie: {
+      // PageToolbar shell has no disabled prop; ActionButton disabled is covered below.
+      uncoveredProps: ['disabled'],
+    },
   },
 };
 
@@ -28,7 +32,14 @@ export const Default: Story = {
       </>
     ),
     end: (
-      <PageToolbarActionButton label='Display' ariaLabel='Display options' />
+      <>
+        <PageToolbarActionButton label='Display' ariaLabel='Display options' />
+        <PageToolbarActionButton
+          label='Disabled'
+          ariaLabel='Disabled action'
+          disabled
+        />
+      </>
     ),
     'data-testid': 'page-toolbar-story',
   },
