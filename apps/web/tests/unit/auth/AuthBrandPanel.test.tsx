@@ -35,4 +35,13 @@ describe('AuthBrandPanel', () => {
       )
     ).not.toBeInTheDocument();
   });
+
+  it('uses the noir studio image as a decorative, high-contrast-safe layer', () => {
+    const { container } = render(<AuthBrandPanel />);
+
+    const backdrop = container.querySelector('img[alt=""]');
+
+    expect(backdrop).toHaveAttribute('alt', '');
+    expect(backdrop).toHaveClass('forced-colors:hidden');
+  });
 });

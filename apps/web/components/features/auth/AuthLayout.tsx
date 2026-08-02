@@ -75,7 +75,7 @@ function SplitLayoutContent({
       {/* max-w constrains the split layout on ultra-wide displays so the form
           column doesn't strand at the left with an enormous dead-space right panel */}
       <div className='grid w-full max-w-360 gap-2 lg:grid-cols-[minmax(0,480px)_minmax(0,1fr)] lg:items-stretch'>
-        <div className='flex min-h-0 flex-col items-center justify-center px-4 sm:px-8 lg:max-w-120 lg:px-10'>
+        <div className='relative flex min-h-0 flex-col items-center justify-center px-4 sm:px-8 lg:max-w-120 lg:px-10 lg:pb-18 lg:[&_[data-auth-legal-copy]]:absolute lg:[&_[data-auth-legal-copy]]:right-10 lg:[&_[data-auth-legal-copy]]:bottom-6 lg:[&_[data-auth-legal-copy]]:left-10 lg:[&_[data-auth-legal-copy]]:mt-0'>
           {showFormTitle && formTitle ? (
             <h1
               className={cn(
