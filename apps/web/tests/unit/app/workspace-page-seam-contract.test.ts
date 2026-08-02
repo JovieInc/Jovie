@@ -43,4 +43,15 @@ describe('workspace page optical seam contract', () => {
     expect(librarySurface.match(/alignment\.workspaceSeamX/g)).toHaveLength(2);
     expect(librarySurface).not.toContain('pl-2.5');
   });
+
+  it('keeps the dashboard title before the reserved rail control so it starts on the workspace seam', () => {
+    const header = read(
+      'components/features/dashboard/organisms/DashboardHeader.tsx'
+    );
+    const titleOrCommand = header.indexOf('commandPaletteHeader ?');
+    const railSlot = header.indexOf("data-testid='dashboard-header-rail-slot'");
+
+    expect(titleOrCommand).toBeGreaterThan(-1);
+    expect(railSlot).toBeGreaterThan(titleOrCommand);
+  });
 });
