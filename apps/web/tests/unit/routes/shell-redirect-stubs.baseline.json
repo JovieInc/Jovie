@@ -1,5 +1,6 @@
 {
   "routes": [
+    "/app/audience",
     "/app/contact",
     "/app/dashboard",
     "/app/dashboard/audience",
