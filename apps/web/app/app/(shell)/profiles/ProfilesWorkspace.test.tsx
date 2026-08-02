@@ -93,7 +93,7 @@ describe('ProfilesWorkspace', () => {
     ).toHaveAttribute('href', '/app/settings/artist-profile');
   });
 
-  it('uses the canonical mark state contract and a compact URL display', () => {
+  it('uses the canonical mark state contract and a compact URL display', async () => {
     renderWorkspace(data);
 
     const url = screen.getByTitle('https://open.spotify.com/artist/tim');
@@ -107,6 +107,19 @@ describe('ProfilesWorkspace', () => {
     expect(
       mark.querySelector('.group-focus-visible\\/connection-row\\:opacity-100')
     ).not.toBeNull();
+    expect(mark.querySelector('.opacity-0')).not.toBeNull();
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole('button', { name: 'Actions for Spotify' })
+    );
+    await user.click(screen.getByRole('menuitem', { name: /View Details/i }));
+
+    const selectedReveal = screen
+      .getByRole('img', { name: 'Spotify' })
+      .querySelector('span[aria-hidden="true"]');
+    expect(selectedReveal).toHaveClass('opacity-100');
+    expect(selectedReveal).not.toHaveClass('opacity-0');
+    expect(selectedReveal).toHaveStyle({ color: '#1DB954' });
   });
 
   it('renders a connection summary and filters without exposing locked ranks', async () => {
