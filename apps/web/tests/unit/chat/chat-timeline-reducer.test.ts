@@ -36,6 +36,23 @@ describe('chat timeline reducer', () => {
     ]);
   });
 
+  it('anchors model rotation metadata to the rotated user turn', () => {
+    const state = reduceChatTimeline(createInitialChatTimelineState(), {
+      type: 'message.send.started',
+      conversationId: 'conv_1',
+      clientTurnId: 'turn_client_1',
+      clientMessageId: 'turn_client_1:user',
+      modelRotationNotice: 'Now using Gemini 2.5 Pro',
+      parts: [textPart('Try again')],
+      now: 100,
+    });
+
+    expect(selectRenderableMessages(state)[0]).toMatchObject({
+      role: 'user',
+      modelRotationNotice: 'Now using Gemini 2.5 Pro',
+    });
+  });
+
   it('reconciles server acknowledgement without changing render keys', () => {
     const sending = reduceChatTimeline(createInitialChatTimelineState(), {
       type: 'message.send.started',

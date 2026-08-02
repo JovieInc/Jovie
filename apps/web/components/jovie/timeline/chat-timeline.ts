@@ -23,6 +23,8 @@ export interface ChatTimelineMessage {
   readonly serverMessageId?: string;
   readonly failedReason?: string;
   readonly toolStepCapExhausted?: boolean;
+  /** Quiet system metadata shown immediately before a rotated user turn. */
+  readonly modelRotationNotice?: string;
   readonly updatedAt: number;
   readonly completedAt?: number;
   readonly streamRevision: number;
@@ -100,6 +102,7 @@ export type ChatTimelineEvent =
       readonly type: 'message.send.started';
       readonly clientTurnId: string;
       readonly clientMessageId: string;
+      readonly modelRotationNotice?: string;
       readonly parts: MessagePart[];
     })
   | (BaseEvent & {
@@ -269,6 +272,7 @@ function appendSendStarted(
         clientTurnId: event.clientTurnId,
         clientMessageId: event.clientMessageId,
         requestId: event.requestId ?? undefined,
+        modelRotationNotice: event.modelRotationNotice,
         updatedAt: now,
         streamRevision: 0,
         source: 'local',

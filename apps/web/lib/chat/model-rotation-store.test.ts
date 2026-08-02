@@ -6,6 +6,7 @@ import {
 } from '@/lib/constants/ai-models';
 import {
   AUTO_REVERT_CLEAN_STREAK,
+  consumeModelRotationNotice,
   friendlyModelLabel,
   modelRotationNoticeForStep,
   readModelRotationStep,
@@ -100,8 +101,24 @@ describe('model-rotation-store', () => {
   it('modelRotationNoticeForStep is null at step 0 and names the rotated model above it', () => {
     expect(modelRotationNoticeForStep(0)).toBeNull();
     const notice = modelRotationNoticeForStep(1);
-    expect(notice).toContain('Switched to');
+    expect(notice).toContain('Now using');
     expect(notice).toContain(friendlyModelLabel(resolveRotatedChatModel(1)));
+  });
+
+  it('announces a rotated model once, including when the request is retried', () => {
+    recordThumbsDownRotation(CONVO);
+    const step = readModelRotationStep(CONVO);
+    expect(consumeModelRotationNotice(CONVO, step)).toContain('Now using');
+    expect(consumeModelRotationNotice(CONVO, step)).toBeNull();
+  });
+
+  it('does not re-announce when another thumbs-down is clamped to the same model', () => {
+    recordThumbsDownRotation(CONVO);
+    const step = readModelRotationStep(CONVO);
+    expect(consumeModelRotationNotice(CONVO, step)).not.toBeNull();
+    recordThumbsDownRotation(CONVO);
+    expect(readModelRotationStep(CONVO)).toBe(step);
+    expect(consumeModelRotationNotice(CONVO, step)).toBeNull();
   });
 
   it('friendlyModelLabel produces a human-readable name', () => {

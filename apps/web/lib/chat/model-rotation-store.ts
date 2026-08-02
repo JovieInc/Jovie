@@ -36,6 +36,8 @@ interface RotationState {
 }
 
 const rotationByConversationId = new Map<string, RotationState>();
+/** Rotation steps already surfaced in the transcript for this session. */
+const announcedRotationStepByConversationId = new Map<string, number>();
 const listeners = new Set<() => void>();
 
 function rotationKey(conversationId: string | null | undefined): string {
@@ -57,12 +59,14 @@ function pruneRotationCache(): void {
     const oldestKey = rotationByConversationId.keys().next().value;
     if (!oldestKey) break;
     rotationByConversationId.delete(oldestKey);
+    announcedRotationStepByConversationId.delete(oldestKey);
   }
 }
 
 function writeState(key: string, state: RotationState): void {
   if (state.step <= 0) {
     rotationByConversationId.delete(key);
+    announcedRotationStepByConversationId.delete(key);
   } else {
     rotationByConversationId.set(key, state);
     pruneRotationCache();
@@ -86,8 +90,12 @@ export function recordThumbsDownRotation(
 ): void {
   const key = rotationKey(conversationId);
   const current = rotationByConversationId.get(key);
+  const nextStep = Math.min((current?.step ?? 0) + 1, MAX_ROTATION_STEP);
+  if (nextStep !== current?.step) {
+    announcedRotationStepByConversationId.delete(key);
+  }
   writeState(key, {
-    step: Math.min((current?.step ?? 0) + 1, MAX_ROTATION_STEP),
+    step: nextStep,
     cleanStreak: 0,
   });
 }
@@ -103,6 +111,7 @@ export function undoThumbsDownRotation(
   const key = rotationKey(conversationId);
   const current = rotationByConversationId.get(key);
   if (!current) return;
+  announcedRotationStepByConversationId.delete(key);
   writeState(key, {
     step: Math.max(current.step - 1, 0),
     cleanStreak: current.cleanStreak,
@@ -156,11 +165,30 @@ export function friendlyModelLabel(modelId: string): string {
 export function modelRotationNoticeForStep(step: number): string | null {
   if (step <= 0) return null;
   const model = resolveRotatedChatModel(step);
-  return `Switched to ${friendlyModelLabel(model)} for better quality`;
+  return `Now using ${friendlyModelLabel(model)}`;
+}
+
+/**
+ * Return the transcript metadata for a rotated send once per active rotation.
+ * A failed request can be retried, but the transcript should not repeat the
+ * same switch notice on every attempt.
+ */
+export function consumeModelRotationNotice(
+  conversationId: string | null | undefined,
+  step: number
+): string | null {
+  if (step <= 0) return null;
+  const key = rotationKey(conversationId);
+  if (announcedRotationStepByConversationId.get(key) === step) return null;
+  const notice = modelRotationNoticeForStep(step);
+  if (!notice) return null;
+  announcedRotationStepByConversationId.set(key, step);
+  return notice;
 }
 
 /** Test helper — reset module state between unit tests. */
 export function resetModelRotationStoreForTests(): void {
   rotationByConversationId.clear();
+  announcedRotationStepByConversationId.clear();
   listeners.clear();
 }
