@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/organisms/RightDrawer.interaction.test.tsx
+
 import type { CommonDropdownItem } from '@jovie/ui';
 import { CommonDropdown } from '@jovie/ui';
 import React, { useEffect, useId, useRef, useState } from 'react';
@@ -343,7 +345,10 @@ export function RightDrawer({
       tabIndex={isOpen ? -1 : undefined}
       inert={isOpen ? undefined : true}
       className={cn(
-        'z-10 shrink-0 h-full min-h-0 flex flex-col',
+        // Desktop inspector is an in-flow sibling of route content, but it
+        // remains its own raised surface. This gives the shell one stable
+        // elevation ladder: base/sidebar → main plane → inspector → overlays.
+        'z-10 shrink-0 h-full min-h-0 flex flex-col rounded-(--app-shell-radius) border border-(--app-shell-frame-seam) bg-surface-1 shadow-(--linear-app-drawer-shadow)',
         'outline-none focus:outline-none focus-visible:ring-0',
         'overflow-hidden',
         'transition-[width,opacity] duration-cinematic ease-cinematic motion-reduce:transition-none',

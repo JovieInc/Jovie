@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/molecules/EntitySidebarShell.test.tsx
+
 import type { CommonDropdownItem } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -214,7 +216,10 @@ export function EntitySidebarShell({
         className={cn(
           'flex h-full min-h-0 flex-col gap-1.5',
           workspaceSurface === 'raised' &&
-            'overflow-hidden rounded-(--linear-app-shell-radius) bg-surface-1 shadow-card',
+            // RightDrawer owns the inspector elevation. Keep the workspace
+            // transparent so every entity rail shares one uninterrupted plane
+            // instead of nesting a same-level card inside it.
+            'overflow-hidden bg-transparent shadow-none',
           !contentBleed && 'px-1.5 py-1.5 lg:px-0 lg:py-0'
         )}
       >

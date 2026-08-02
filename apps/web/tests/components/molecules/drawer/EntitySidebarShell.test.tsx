@@ -9,6 +9,21 @@ vi.mock('@/components/organisms/RightDrawer', () => ({
 }));
 
 describe('EntitySidebarShell', () => {
+  it('keeps the raised workspace flat so RightDrawer owns inspector elevation', () => {
+    render(
+      <EntitySidebarShell isOpen ariaLabel='Details drawer' title='Details'>
+        <p>Body content</p>
+      </EntitySidebarShell>
+    );
+
+    const workspace = screen
+      .getByTestId('right-drawer')
+      .querySelector('[data-right-rail-workspace]');
+    expect(workspace).toHaveAttribute('data-surface-variant', 'raised');
+    expect(workspace).toHaveClass('bg-transparent', 'shadow-none');
+    expect(workspace).not.toHaveClass('rounded-(--linear-app-shell-radius)');
+  });
+
   it('keeps header, identity area, and tabs together in a sticky top rail', () => {
     render(
       <EntitySidebarShell

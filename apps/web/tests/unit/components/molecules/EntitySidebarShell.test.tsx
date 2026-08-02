@@ -34,10 +34,10 @@ describe('EntitySidebarShell', () => {
     expect(workspace).toHaveAttribute('data-surface-variant', 'raised');
     expect(workspace).toHaveClass(
       'overflow-hidden',
-      'rounded-(--linear-app-shell-radius)',
-      'bg-surface-1',
-      'shadow-card'
+      'bg-transparent',
+      'shadow-none'
     );
+    expect(workspace).not.toHaveClass('rounded-(--linear-app-shell-radius)');
   });
 
   it('keeps the entity header pinned and leaves minimal-mode tab composition to the body', () => {
@@ -261,7 +261,7 @@ describe('EntitySidebarShell', () => {
     );
 
     expect(workspace).toHaveAttribute('data-surface-variant', 'raised');
-    expect(workspace).toHaveClass('bg-surface-1', 'shadow-card');
+    expect(workspace).toHaveClass('bg-transparent', 'shadow-none');
     expect(identity).toHaveTextContent('Compact entity identity');
     expect(sectionStack).toHaveTextContent('Tabbed details');
     expect(

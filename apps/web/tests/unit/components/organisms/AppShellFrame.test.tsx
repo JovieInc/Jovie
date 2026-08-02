@@ -26,6 +26,8 @@ describe('AppShellFrame', () => {
       'motion-reduce:transition-none'
     );
     expect(mainContent).toHaveClass('lg:shadow-(--linear-app-shell-shadow)');
+    expect(mainContent).toHaveClass('bg-(--app-shell-content-surface)');
+    expect(mainContent).not.toHaveClass('bg-(--color-bg-surface-0)/90');
     // #main-content keeps its full rounded shell radius — no Electron override
     // strips the top corners now that the header lives inside the card.
     expect(mainContent).toHaveClass('lg:rounded-(--app-shell-radius)');
