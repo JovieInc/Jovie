@@ -104,9 +104,6 @@ struct MobileChatView: View {
       .onChange(of: repository.timeline.count) {
         scrollToBottomIfPinned(using: proxy, animated: true)
       }
-      .onChange(of: repository.timeline.last?.content) {
-        scrollToBottomIfPinned(using: proxy, animated: false)
-      }
       .onChange(of: repository.timeline.last?.status) {
         guard repository.timeline.last?.status == .streaming else { return }
         guard MobileChatKeyboardPolicy.shouldDismissOnStreamingStart(

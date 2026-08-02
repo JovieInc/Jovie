@@ -250,12 +250,17 @@ struct MobileChatClientTests {
 
     let client = makeClient(tokenProvider: tokenProvider)
 
-    // sendTurn does not itself retry on 401 (only sendJSON-backed GET calls do);
-    // a non-2xx response from the POST turn endpoint must surface as requestFailed.
-    await #expect(throws: MobileChatClientError.requestFailed(statusCode: 401)) {
-      _ = try await client.sendTurn(makeTurnRequest())
-    }
-    #expect(await tokenProvider.recordedForceRefreshValues() == [false])
+    let events = try await client.sendTurn(makeTurnRequest())
+
+    #expect(events == [
+      .assistantCompleted(
+        clientTurnId: "client_turn_1",
+        conversationId: "conv_1",
+        turnId: "turn_1",
+        text: "Hello"
+      ),
+    ])
+    #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
   }
 
   @Test func listConversationsRetriesWithFreshTokenAfterUnauthorized() async throws {

@@ -116,6 +116,32 @@ struct ChatRepositoryTests {
     #expect(repository.timeline.map(\.content) == ["Here is your plan"])
   }
 
+  @Test func sendCoalescesStreamDeltasIntoAssistantTimeline() async {
+    let client = ScriptedChatClient(
+      sendTurnResult: .success([
+        .turnReserved(conversationId: "conv_stream", turnId: "turn_1", clientTurnId: "PLACEHOLDER"),
+        .assistantDelta(clientTurnId: "PLACEHOLDER", text: "A"),
+        .assistantDelta(clientTurnId: "PLACEHOLDER", text: " streamed"),
+        .assistantDelta(clientTurnId: "PLACEHOLDER", text: " answer"),
+      ]),
+      listConversationsResult: .success([]),
+      fetchConversationResult: .failure(MobileChatClientError.requestFailed(statusCode: 404))
+    )
+
+    let repository = ChatRepository(
+      client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-stream")!),
+      clerkUserID: "user_repo_stream",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    await repository.send(text: "Stream this")
+
+    let assistantItem = repository.timeline.first { $0.role == .assistant }
+    #expect(assistantItem?.status == .completed)
+    #expect(assistantItem?.content == "A streamed answer")
+  }
+
   @Test func sendAppliesWebHandoffEventAndFlagsRequiresWebHandoff() async {
     let handoffURL = URL(string: "https://jov.ie/app/chat/conv_handoff")!
     let client = ScriptedChatClient(
