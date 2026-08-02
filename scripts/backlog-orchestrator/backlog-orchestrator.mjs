@@ -126,6 +126,27 @@ async function runAudit(cache, isDryRun) {
   });
 
   console.log(report);
+  console.log('Audit receipt:');
+  console.log(
+    JSON.stringify(
+      {
+        schema: 'backlog-orchestrator/audit/v1',
+        mode: isDryRun ? 'dry-run' : 'shadow',
+        issueCount: allIssues.length,
+        triageCount: allIssues.filter(issue => issue.state?.name === 'Triage')
+          .length,
+        classified: classifications.length,
+        skipped,
+        wouldMove: classifications.filter(
+          c => c.category === 'duplicate' || c.category === 'obsolete'
+        ).length,
+        mutations: 0,
+        note: 'Triageable issues intentionally remain in Triage; only duplicate/obsolete classifications are move candidates.',
+      },
+      null,
+      2
+    )
+  );
 
   // Persist report
   const reportPath = resolve(__dirname, 'shadow-report-latest.txt');
@@ -149,13 +170,15 @@ async function runReconcile(cache, isDryRun, issueArg) {
 
   console.log(`Processing ${issues.length} issues`);
 
-  await reconciler.reconcileIssues({
+  const receipt = await reconciler.reconcileIssues({
     issues,
     client: linear,
     isDryRun,
     backlogStateId: BACKLOG_STATE_ID,
   });
 
+  console.log('Reconciliation receipt:');
+  console.log(JSON.stringify(receipt, null, 2));
   console.log('Reconciliation complete.');
 }
 
@@ -243,6 +266,16 @@ async function runAdmitNext(cache, isDryRun) {
 }
 
 main().catch(err => {
+  console.error(
+    'Failure receipt:',
+    JSON.stringify({
+      schema: 'backlog-orchestrator/failure/v1',
+      status: 'blocked',
+      code: err.code || 'UNKNOWN',
+      attempts: err.attempts,
+      message: err.message,
+    })
+  );
   console.error('Fatal error:', err);
   process.exit(1);
 });

@@ -39,7 +39,6 @@ export class IssueClassification {
       issue.identifier,
       issue.title?.trim() || '',
       (issue.description || '').trim().slice(0, 200),
-      issue.state?.name || '',
       issue.labels?.nodes
         ?.map(l => l.name)
         .sort()
@@ -357,22 +356,30 @@ function computeRisk(c) {
  * Read/replay previously stored classification from a machine-owned comment.
  */
 export function parseStoredClassification(issue) {
-  const machineComments = (issue.comments?.nodes || []).filter(c =>
-    c.body.startsWith('<!-- backlog-orchestrator:v1 -->')
-  );
-  if (machineComments.length === 0) return null;
-  const latest = machineComments.sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  )[0];
-  try {
-    const jsonPart = latest.body
-      .split('<!--/backlog-orchestrator-->')[0]
-      ?.split('-->')[1]
-      ?.trim();
-    return jsonPart ? JSON.parse(jsonPart) : null;
-  } catch {
-    return null;
-  }
+  const entries = parseStoredClassifications(issue);
+  return entries[0] || null;
+}
+
+/** Return all parseable machine classifications, newest first. */
+export function parseStoredClassifications(issue) {
+  return (issue.comments?.nodes || [])
+    .filter(c => c.body?.startsWith('<!-- backlog-orchestrator:v1 -->'))
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
+    .map(comment => {
+      try {
+        const jsonPart = comment.body
+          .split('<!--/backlog-orchestrator-->')[0]
+          ?.split('-->')[1]
+          ?.trim();
+        return jsonPart ? JSON.parse(jsonPart) : null;
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
 }
 
 /**

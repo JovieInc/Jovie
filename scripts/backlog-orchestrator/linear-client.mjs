@@ -5,9 +5,29 @@
  * No SDK — bare fetch with the team's API key env var.
  */
 
+import { setDefaultResultOrder } from 'node:dns';
+
+// Gem hosts may have an unreachable IPv6 route while IPv4 reaches Linear.
+// Prefer IPv4 so the bounded fetch/retry policy handles application failures,
+// not avoidable dual-stack connection stalls.
+setDefaultResultOrder('ipv4first');
+
 export const LINEAR_API_KEY_ENV = 'LINEAR_API_KEY';
 
 const API_URL = 'https://api.linear.app/graphql';
+export const LINEAR_REQUEST_TIMEOUT_MS = 10_000;
+export const LINEAR_MAX_ATTEMPTS = 3;
+export const LINEAR_RETRY_BASE_MS = 100;
+
+export class LinearTransportError extends Error {
+  /** @param {string} message @param {any} [options] */
+  constructor(message, { code, cause, attempts } = {}) {
+    super(message, { cause });
+    this.name = 'LinearTransportError';
+    this.code = code;
+    this.attempts = attempts;
+  }
+}
 
 function requireKey() {
   const key = process.env[LINEAR_API_KEY_ENV];
@@ -15,23 +35,84 @@ function requireKey() {
   return key;
 }
 
-export async function graphql(query, variables = {}) {
+/** @param {any} error */
+function isTransientNetworkError(error) {
+  return (
+    error?.name === 'AbortError' ||
+    error?.name === 'TimeoutError' ||
+    error?.code === 'ETIMEDOUT' ||
+    error?.code === 'ECONNRESET' ||
+    error?.code === 'ECONNREFUSED' ||
+    error?.code === 'ENETUNREACH' ||
+    error?.code === 'EAI_AGAIN' ||
+    error?.message === 'fetch failed'
+  );
+}
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Bounded, retrying GraphQL transport. Only the API key is sent as the
+ * normal Linear `Authorization: <key>` header; it is never logged or exposed
+ * in an error. Retry is limited to transient network/timeout failures.
+ */
+export async function graphql(
+  query,
+  variables = {},
+  {
+    fetchImpl = globalThis.fetch,
+    timeoutMs = LINEAR_REQUEST_TIMEOUT_MS,
+    maxAttempts = LINEAR_MAX_ATTEMPTS,
+    retryBaseMs = LINEAR_RETRY_BASE_MS,
+    sleepImpl = sleep,
+  } = {}
+) {
   const key = requireKey();
-  const resp = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: key,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-  const data = /** @type {any} */ (await resp.json());
-  if (data.errors) {
-    throw new Error(
-      `Linear API error: ${data.errors.map(e => e.message).join('; ')}`
-    );
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const resp = await fetchImpl(API_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: key,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query, variables }),
+        signal: controller.signal,
+      });
+      const data = /** @type {any} */ (await resp.json());
+      if (data.errors) {
+        throw new Error(
+          `Linear API error: ${data.errors.map(e => e.message).join('; ')}`
+        );
+      }
+      return data.data;
+    } catch (error) {
+      lastError = error;
+      if (!isTransientNetworkError(error) || attempt === maxAttempts) {
+        const code =
+          error?.name === 'AbortError' || error?.name === 'TimeoutError'
+            ? 'TIMEOUT'
+            : isTransientNetworkError(error)
+              ? 'NETWORK'
+              : 'API';
+        throw new LinearTransportError(
+          `Linear GraphQL request failed (${code.toLowerCase()}, attempts=${attempt})`,
+          { code, cause: error, attempts: attempt }
+        );
+      }
+      await sleepImpl(retryBaseMs * 2 ** (attempt - 1));
+    } finally {
+      clearTimeout(timer);
+    }
   }
-  return data.data;
+  throw new LinearTransportError('Linear GraphQL request failed', {
+    code: 'NETWORK',
+    cause: lastError,
+    attempts: maxAttempts,
+  });
 }
 
 /**
