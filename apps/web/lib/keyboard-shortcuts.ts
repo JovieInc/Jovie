@@ -22,7 +22,6 @@ import {
   Sun,
   Type,
   UserCircle,
-  Users,
   X,
 } from 'lucide-react';
 import { APP_ROUTES } from '@/constants/routes';
@@ -230,18 +229,6 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     decision: { status: 'required', binding: 'useSequentialShortcuts' },
   },
   {
-    id: 'nav-audience',
-    label: 'Go to audience',
-    keys: 'G then A',
-    category: 'navigation',
-    icon: Users,
-    href: APP_ROUTES.AUDIENCE,
-    isSequential: true,
-    firstKey: 'g',
-    secondKey: 'a',
-    decision: { status: 'required', binding: 'useSequentialShortcuts' },
-  },
-  {
     id: 'nav-earnings',
     label: 'Go to earnings',
     keys: 'G then E',
@@ -398,7 +385,6 @@ export const NAV_SHORTCUTS: Record<string, KeyboardShortcut> = {
   releases: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-releases')!,
   library: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-releases')!,
   calendar: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-calendar')!,
-  audience: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-audience')!,
   earnings: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-earnings')!,
   chat: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-chat')!,
   account: KEYBOARD_SHORTCUTS.find(s => s.id === 'nav-settings')!,

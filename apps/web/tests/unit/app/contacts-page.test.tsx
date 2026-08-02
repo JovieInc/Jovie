@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
@@ -18,7 +19,15 @@ vi.mock('@/app/app/(shell)/contacts/ContactsPageClient', () => ({
   },
 }));
 
-import ContactsPage from '@/app/app/(shell)/contacts/page';
+vi.mock('@/components/organisms/table/molecules/PageToolbar', () => ({
+  PageToolbar: ({ start }: { start: ReactNode }) => <div>{start}</div>,
+  PAGE_TOOLBAR_TAB_BUTTON_CLASS: 'page-toolbar-tab',
+  PAGE_TOOLBAR_TAB_ACTIVE_CLASS: 'page-toolbar-tab-active',
+}));
+
+import ContactsPage, {
+  resolveContactsWorkspaceTab,
+} from '@/app/app/(shell)/contacts/page';
 
 const profile = {
   id: 'profile_123',
@@ -53,6 +62,15 @@ describe('canonical contacts page', () => {
       artistHandle: profile.usernameNormalized,
     });
     expect(screen.getByText('Contacts workspace')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Audience' })).toHaveAttribute(
+      'href',
+      `${APP_ROUTES.CONTACTS}?tab=audience`
+    );
+  });
+
+  it('normalizes workspace state and preserves audience filters in the tab URL', () => {
+    expect(resolveContactsWorkspaceTab('audience')).toBe('audience');
+    expect(resolveContactsWorkspaceTab('other')).toBe('contacts');
   });
 
   it('renders the shared route-context error', async () => {
