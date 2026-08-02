@@ -53,12 +53,13 @@ export interface ConfirmChatMerchStatusActionResponse {
   readonly merchCardId: string;
   readonly status: string;
   readonly title: string;
+  /** Server-derived only after a card is truly live. */
+  readonly publicUrl: string | null;
 }
 
 export interface ConfirmChatMerchSelectResponse
   extends ConfirmChatMerchStatusActionResponse {
   readonly selectedOptionId: string;
-  readonly publicUrl: string | null;
   readonly publishBlockedReasons?: readonly string[];
   readonly product: {
     readonly productType: string;

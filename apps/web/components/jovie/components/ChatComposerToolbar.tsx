@@ -56,33 +56,39 @@ function getButtonIcon(
 
 export interface ComposerSendButtonProps {
   readonly canSend: boolean;
+  readonly canInterruptAndSend?: boolean;
   readonly isStreaming: boolean;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
   readonly reducedMotion: boolean | null;
   readonly onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
   readonly onSend?: () => void;
+  readonly onInterruptAndSend?: () => void;
   readonly onStop?: () => void;
 }
 
 export function ComposerSendButton({
   canSend,
+  canInterruptAndSend = false,
   isStreaming,
   isLoading,
   isSubmitting,
   reducedMotion,
   onMouseDown,
   onSend,
+  onInterruptAndSend,
   onStop,
 }: ComposerSendButtonProps) {
-  const showStop = isStreaming && Boolean(onStop);
+  const showStop = isStreaming && Boolean(onStop) && !canInterruptAndSend;
   const { key, icon } = getButtonIcon(showStop, isLoading, isSubmitting);
   const motionInit = reducedMotion ? undefined : { scale: 0.5, opacity: 0 };
-  const isInteractive = showStop || canSend;
+  const isInteractive = showStop || canSend || canInterruptAndSend;
 
-  const actionLabel = showStop
-    ? CHAT_COMPOSER_STOP_ARIA_LABEL
-    : CHAT_COMPOSER_SEND_ARIA_LABEL;
+  const actionLabel = canInterruptAndSend
+    ? 'Interrupt and send'
+    : showStop
+      ? CHAT_COMPOSER_STOP_ARIA_LABEL
+      : CHAT_COMPOSER_SEND_ARIA_LABEL;
   // When empty, keep the same accessible name (tests + AT) but clarify the
   // disabled reason in the hover tooltip — disabled buttons need a span wrapper
   // so the tooltip trigger can still receive pointer events.
@@ -100,8 +106,14 @@ export function ComposerSendButton({
         <button
           type='button'
           onMouseDown={onMouseDown}
-          onClick={showStop ? onStop : onSend}
-          disabled={!showStop && !canSend}
+          onClick={
+            showStop
+              ? onStop
+              : canInterruptAndSend
+                ? onInterruptAndSend
+                : onSend
+          }
+          disabled={!showStop && !canSend && !canInterruptAndSend}
           className={cn(
             'system-b-chat-composer-primary-action flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
             !isInteractive && 'cursor-not-allowed'

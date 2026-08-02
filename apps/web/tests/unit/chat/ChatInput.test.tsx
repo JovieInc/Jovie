@@ -173,6 +173,25 @@ describe('ChatInput', () => {
     expect(textarea).toHaveFocus();
   });
 
+  it('interrupts an active response before submitting the typed follow-up', async () => {
+    const user = userEvent.setup();
+    const onInterruptAndSend = vi.fn();
+    const { getByRole } = fastRender(
+      withProviders(
+        <ChatInput
+          {...baseProps}
+          value='like a hoodie'
+          isLoading
+          onInterruptAndSend={onInterruptAndSend}
+        />
+      )
+    );
+
+    await user.click(getByRole('button', { name: /interrupt and send/i }));
+
+    expect(onInterruptAndSend).toHaveBeenCalledTimes(1);
+  });
+
   it('opens the file attach menu when clicking the plus button', async () => {
     const user = userEvent.setup();
     const onFileAttach = vi.fn();

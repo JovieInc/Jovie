@@ -61,6 +61,8 @@ export interface ChatInputProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly onSubmit: (e?: React.FormEvent) => void;
+  /** Safely stops an active response and submits the retained draft. */
+  readonly onInterruptAndSend?: () => void;
   readonly isLoading: boolean;
   readonly isSubmitting: boolean;
   readonly placeholder?: string;
@@ -219,6 +221,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       value,
       onChange,
       onSubmit,
+      onInterruptAndSend,
       isLoading,
       isSubmitting,
       placeholder = CHAT_COMPOSER_EMPTY_PLACEHOLDER,
@@ -354,6 +357,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       !isOverLimit &&
       !isFileProcessing &&
       !sendBlockedByPicker;
+    const canInterruptAndSend =
+      Boolean(value.trim()) &&
+      !isOverLimit &&
+      !isFileProcessing &&
+      !sendBlockedByPicker &&
+      (isLoading || isSubmitting) &&
+      Boolean(onInterruptAndSend);
 
     const handlePickerClose = useCallback(() => {
       onPickerOpenChange?.(false);
@@ -559,18 +569,36 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         e.preventDefault();
         // Empty / blocked drafts must not submit — send is disabled, but native
         // form events and programmatic submits can still reach this handler.
-        if (!canSend) return;
-        onSubmit(e);
+        if (canSend) {
+          onSubmit(e);
+        } else if (canInterruptAndSend) {
+          onInterruptAndSend?.();
+        } else {
+          return;
+        }
         scheduleTextareaRefocus();
       },
-      [canSend, onSubmit, scheduleTextareaRefocus]
+      [
+        canInterruptAndSend,
+        canSend,
+        onInterruptAndSend,
+        onSubmit,
+        scheduleTextareaRefocus,
+      ]
     );
 
     const handleSendClick = useCallback(() => {
-      if (!canSend) return;
-      onSubmit();
+      if (canSend) onSubmit();
+      else if (canInterruptAndSend) onInterruptAndSend?.();
+      else return;
       scheduleTextareaRefocus();
-    }, [canSend, onSubmit, scheduleTextareaRefocus]);
+    }, [
+      canInterruptAndSend,
+      canSend,
+      onInterruptAndSend,
+      onSubmit,
+      scheduleTextareaRefocus,
+    ]);
 
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -584,9 +612,14 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         }
         // While the picker is open, swallow Enter — SlashCommandMenu owns it.
         if (picker.state.status !== 'closed' && e.key === 'Enter') return;
-        if (e.key === 'Enter' && !e.shiftKey && canSend) {
+        if (
+          e.key === 'Enter' &&
+          !e.shiftKey &&
+          (canSend || canInterruptAndSend)
+        ) {
           e.preventDefault();
-          onSubmit();
+          if (canInterruptAndSend) onInterruptAndSend?.();
+          else onSubmit();
           scheduleTextareaRefocus();
           return;
         }
@@ -602,6 +635,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       },
       [
         onSubmit,
+        onInterruptAndSend,
+        canInterruptAndSend,
         canSend,
         value,
         chips,
@@ -738,8 +773,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       handleMicPushEnd,
       handleMicToggle,
       canSend,
+      canInterruptAndSend,
       isStreaming,
       onSend: handleSendClick,
+      onInterruptAndSend: handleSendClick,
       onStop,
       setIsFocused,
       setComposerFocused,
@@ -997,8 +1034,10 @@ interface InputRowProps {
   readonly handleMicPushEnd: () => void;
   readonly handleMicToggle: () => void;
   readonly canSend: boolean;
+  readonly canInterruptAndSend: boolean;
   readonly isStreaming: boolean;
   readonly onSend: () => void;
+  readonly onInterruptAndSend: () => void;
   readonly onStop?: () => void;
   readonly setIsFocused: (focused: boolean) => void;
   readonly setComposerFocused: (focused: boolean) => void;
@@ -1047,8 +1086,10 @@ function InputRow({
   handleMicPushEnd,
   handleMicToggle,
   canSend,
+  canInterruptAndSend,
   isStreaming,
   onSend,
+  onInterruptAndSend,
   onStop,
   setIsFocused,
   setComposerFocused,
@@ -1205,12 +1246,14 @@ function InputRow({
 
             <ComposerSendButton
               canSend={canSend}
+              canInterruptAndSend={canInterruptAndSend}
               isStreaming={isStreaming}
               isLoading={isLoading}
               isSubmitting={isSubmitting}
               reducedMotion={reducedMotion}
               onMouseDown={handlePreserveFocus}
               onSend={onSend}
+              onInterruptAndSend={onInterruptAndSend}
               onStop={onStop}
             />
           </div>

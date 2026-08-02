@@ -106,6 +106,8 @@ type ChatTurnSource = 'typed' | 'quick_action' | 'slash_command';
 interface SubmitChatMessageOptions {
   readonly source?: ChatTurnSource;
   readonly toolIntent?: string | null;
+  /** Stop the active turn before submitting a user-authored steering message. */
+  readonly interrupt?: boolean;
 }
 
 interface ChatTurnMetadata {
@@ -967,7 +969,10 @@ export function useJovieChat({
     ): Promise<boolean> => {
       const hasFiles = files && files.length > 0;
       if (!text.trim() && !hasFiles) return false;
-      if (isLoading || isSubmitting) return false;
+      const shouldInterrupt =
+        (isLoading || isSubmitting) && options?.interrupt === true;
+      if ((isLoading || isSubmitting) && !shouldInterrupt) return false;
+      if (shouldInterrupt) stop();
 
       // Validate message length
       if (text.length > MAX_MESSAGE_LENGTH) {
@@ -1061,6 +1066,7 @@ export function useJovieChat({
       isLoading,
       isSubmitting,
       sendMessage,
+      stop,
       tryHandleCommand,
     ]
   );
@@ -1137,6 +1143,16 @@ export function useJovieChat({
     },
     [rateLimitedSubmitter]
   );
+
+  const handleInterruptAndSubmit = useCallback(() => {
+    const composed = composeMessage(chipTray.chips, input);
+    const skillChip = chipTray.chips.find(chip => chip.type === 'skill');
+    void doSubmit(composed, undefined, {
+      source: skillChip ? 'slash_command' : 'typed',
+      toolIntent: skillChip ? inferToolIntentFromSkill(skillChip.id) : null,
+      interrupt: true,
+    });
+  }, [chipTray, doSubmit, input]);
 
   // Consume a pending prompt set before the chat component mounted
   // (e.g. via "open-chat-with-prompt"). This is programmatic/automated, not
@@ -1226,6 +1242,7 @@ export function useJovieChat({
     handleSubmit,
     handleRetry,
     handleSuggestedPrompt,
+    handleInterruptAndSubmit,
     /** Programmatic message submission (for imperative use without input state) */
     submitMessage: doSubmit,
     setChatError,

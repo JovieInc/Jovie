@@ -40,6 +40,8 @@ vi.mock('drizzle-orm', () => ({ eq: vi.fn() }));
 
 vi.mock('@/lib/merch/service', () => ({
   getMerchProductOptions: hoisted.getMerchProductOptionsMock,
+  publicMerchUrl: (username: string, cardId: string) =>
+    `https://jov.ie/${username}/merch/${cardId}`,
   publishMerchCard: hoisted.publishMerchCardMock,
   selectMerchDesign: hoisted.selectMerchDesignMock,
   updateMerchCardStatus: hoisted.updateMerchCardStatusMock,
@@ -61,6 +63,7 @@ describe('POST /api/chat/confirm-merch-action', () => {
     hoisted.findFirstMock.mockResolvedValue({
       id: 'profile-1',
       userId: 'user-1',
+      usernameNormalized: 'tour-artist',
     });
     hoisted.publishMerchCardMock.mockResolvedValue({
       id: 'card-1',
@@ -128,6 +131,7 @@ describe('POST /api/chat/confirm-merch-action', () => {
     expect(hoisted.publishMerchCardMock).toHaveBeenCalledOnce();
     const body = await response.json();
     expect(body.status).toBe('live');
+    expect(body.publicUrl).toContain('/tour-artist/merch/card-1');
   });
 
   it('selects merch through the existing confirmation contract', async () => {
