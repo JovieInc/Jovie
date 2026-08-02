@@ -133,6 +133,19 @@ export interface MerchDesignPreview {
   /** Transparent (alpha) print-art preview. Present only when status is `ready`. */
   readonly preview_url?: string;
   readonly slots: MerchDesignSlots;
+  /** Product economics shown before the single approval action. */
+  readonly recommended?: boolean;
+  readonly product_name?: string;
+  readonly product_type?: string;
+  readonly colorway?: string;
+  readonly sale_price?: string;
+  readonly artist_profit?: string;
+  readonly fulfillment?: string;
+  readonly profile_destination?: string;
+  readonly sellability?: {
+    readonly sellable: boolean;
+    readonly reasons: readonly string[];
+  };
 }
 
 export interface MerchDesignCarouselResult {

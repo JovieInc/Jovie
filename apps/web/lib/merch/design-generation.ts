@@ -36,6 +36,7 @@ import { attachMockupsToDesignOption, generateProductMockups } from './mockups';
 import {
   buildMerchPricingSnapshot,
   calculateRecommendedSalePriceCents,
+  formatMerchMoney,
   MERCH_DEFAULT_MARGIN_PRESET,
   MERCH_DEFAULT_PRINTFUL_PRODUCT_COST_CENTS,
 } from './pricing';
@@ -415,6 +416,25 @@ export async function generateMerchDesigns(params: {
             status: 'ready',
             preview_url: previewUrl,
             slots: { artist_name: name },
+            recommended: index === 0,
+            product_name: catalog.productName,
+            product_type: catalog.productType,
+            colorway: catalog.colorway,
+            sale_price: formatMerchMoney(pricing.retailPriceCents),
+            artist_profit: formatMerchMoney(
+              pricing.artistPayoutPerUnitEstimateCents
+            ),
+            fulfillment: 'Printful standard US',
+            profile_destination: 'Artist profile merch section',
+            sellability: {
+              sellable: pricing.printfulCostSource === 'printful',
+              reasons:
+                pricing.printfulCostSource === 'printful'
+                  ? []
+                  : [
+                      'Catalog/fulfillment unavailable; approval will quarantine this item as a private draft.',
+                    ],
+            },
           };
         } catch (error) {
           logger.warn('[merch-designs] generation failed for one design', {

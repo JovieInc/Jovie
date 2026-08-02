@@ -80,6 +80,28 @@ describe('ChatMerchDesignCarousel', () => {
           onSuccess: (response: Record<string, unknown>) => void;
         }
       ) => {
+        if (input.action === 'create') {
+          callbacks.onSuccess({
+            success: true,
+            merchCardId: '00000000-0000-4000-8000-000000000020',
+            status: 'live',
+            selectedOptionId: '00000000-0000-4000-8000-000000000011',
+            title: 'Signal Vintage',
+            publicUrl:
+              'https://jovie.test/signal/merch/00000000-0000-4000-8000-000000000020',
+            product: {
+              productType: 'premium tee',
+              productName: 'Unisex Premium T-Shirt',
+              colorway: 'black',
+              artworkUrl: 'https://blob.example.com/one.png',
+              mockupUrl: 'https://printful.example.com/mockup.png',
+              mockupStatus: 'ready',
+              retailPrice: '$30.00',
+              artistProfit: '$10.00',
+              publishEligible: true,
+            },
+          });
+        }
         if (input.action === 'products') {
           callbacks.onSuccess({
             success: true,
@@ -138,57 +160,26 @@ describe('ChatMerchDesignCarousel', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Use this design' }));
-
-    expect(mutateMock).toHaveBeenNthCalledWith(
-      1,
-      {
-        profileId: '00000000-0000-4000-8000-000000000001',
-        generationId: '00000000-0000-4000-8000-000000000010',
-        optionId: '00000000-0000-4000-8000-000000000011',
-        optionNumber: 1,
-        action: 'products',
-      },
-      expect.any(Object)
-    );
-    expect(screen.getByText('Choose a product')).toBeInTheDocument();
-    expect(screen.queryByText(/artist profit/)).not.toBeInTheDocument();
-
     await user.click(
-      screen.getByRole('button', { name: /Unisex Staple T-Shirt/ })
+      screen.getByRole('button', { name: 'Approve & publish tee' })
     );
-    expect(mutateMock).toHaveBeenNthCalledWith(
-      2,
+
+    expect(mutateMock).toHaveBeenCalledWith(
       {
         profileId: '00000000-0000-4000-8000-000000000001',
         generationId: '00000000-0000-4000-8000-000000000010',
         optionId: '00000000-0000-4000-8000-000000000011',
         optionNumber: 1,
-        catalogProductId: 71,
-        action: 'select',
+        action: 'create',
       },
       expect.any(Object)
     );
     expect(
-      screen.getByText('Product mockup is still rendering. Artwork shown.')
+      screen.getByText('Unisex Premium T-Shirt · black')
     ).toBeInTheDocument();
     expect(
       screen.getByText('$30.00 · $10.00 artist profit')
     ).toBeInTheDocument();
-    expect(screen.queryByAltText(/product mockup/i)).not.toBeInTheDocument();
-
-    await user.click(
-      screen.getByRole('button', { name: 'Publish to profile' })
-    );
-    expect(mutateMock).toHaveBeenNthCalledWith(
-      3,
-      {
-        profileId: '00000000-0000-4000-8000-000000000001',
-        merchCardId: '00000000-0000-4000-8000-000000000020',
-        action: 'publish',
-      },
-      expect.any(Object)
-    );
     expect(
       screen.getByRole('button', { name: 'Live on profile' })
     ).toBeDisabled();
@@ -199,7 +190,9 @@ describe('ChatMerchDesignCarousel', () => {
     const user = userEvent.setup();
     render(<ChatMerchDesignCarousel result={result} />);
 
-    await user.click(screen.getByRole('button', { name: 'Use this design' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Approve & publish tee' })
+    );
 
     expect(dispatch).toHaveBeenCalledWith(
       expect.objectContaining({

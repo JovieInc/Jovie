@@ -165,6 +165,32 @@ describe('POST /api/chat/confirm-merch-action', () => {
     });
   });
 
+  it('creates and publishes the approved default tee in one action', async () => {
+    const { POST } = await import('@/app/api/chat/confirm-merch-action/route');
+    const response = await POST(
+      new Request('http://localhost/api/chat/confirm-merch-action', {
+        method: 'POST',
+        body: JSON.stringify({
+          profileId: '00000000-0000-4000-8000-000000000001',
+          generationId: '00000000-0000-4000-8000-000000000002',
+          optionId: '00000000-0000-4000-8000-000000000003',
+          optionNumber: 1,
+          action: 'create',
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(hoisted.selectMerchDesignMock).toHaveBeenCalledWith({
+      generationId: '00000000-0000-4000-8000-000000000002',
+      clerkUserId: 'user-1',
+      profileId: '00000000-0000-4000-8000-000000000001',
+      optionId: '00000000-0000-4000-8000-000000000003',
+      optionNumber: 1,
+      catalogProductId: undefined,
+      publish: true,
+    });
+  });
   it('returns live product choices before creating the merch card', async () => {
     const { POST } = await import('@/app/api/chat/confirm-merch-action/route');
     const response = await POST(

@@ -50,31 +50,6 @@ function isSelectionResponse(
   );
 }
 
-function isProductsResponse(
-  value: unknown
-): value is ConfirmChatMerchProductsResponse {
-  const products =
-    typeof value === 'object' && value !== null
-      ? (value as { products?: unknown }).products
-      : null;
-  return (
-    Array.isArray(products) &&
-    products.every(
-      product =>
-        typeof product === 'object' &&
-        product !== null &&
-        typeof (product as { catalogProductId?: unknown }).catalogProductId ===
-          'number' &&
-        (product as { catalogProductId: number }).catalogProductId > 0 &&
-        typeof (product as { productName?: unknown }).productName ===
-          'string' &&
-        typeof (product as { productType?: unknown }).productType ===
-          'string' &&
-        typeof (product as { colorway?: unknown }).colorway === 'string'
-    )
-  );
-}
-
 /**
  * Start all concept previews together after the tool result arrives. The
  * browser owns request deduplication; this prevents arrow navigation from
@@ -169,23 +144,23 @@ export function ChatMerchDesignCarousel({
       return;
     }
 
-    setPendingAction('products');
+    setPendingAction('select');
     confirmAction.mutate(
       {
         profileId,
         generationId: result.generationId,
         optionId: current.id,
         optionNumber: current.option_number,
-        action: 'products',
+        action: 'create',
       },
       {
         onSuccess: response => {
           setPendingAction(null);
-          if (isProductsResponse(response) && response.products.length > 0) {
-            setProductOptions(response.products);
+          if (isSelectionResponse(response)) {
+            setSelected(response);
             return;
           }
-          setErrorMessage('No products are available right now.');
+          setErrorMessage('Product creation did not return a verified card.');
         },
         onError: () => {
           setPendingAction(null);
@@ -340,6 +315,14 @@ export function ChatMerchDesignCarousel({
                   Product mockup is still rendering. Artwork shown.
                 </p>
               ) : null}
+              {selected.publicUrl ? (
+                <a
+                  className='mt-1 block text-2xs font-medium text-primary-token underline'
+                  href={selected.publicUrl}
+                >
+                  Verified product URL
+                </a>
+              ) : null}
               {selected.publishBlockedReasons?.length ? (
                 <p className='mt-1 line-clamp-2 text-2xs text-tertiary-token'>
                   {selected.publishBlockedReasons.join(' ')}
@@ -349,6 +332,18 @@ export function ChatMerchDesignCarousel({
           ) : current.concept ? (
             <p className='mt-0.5 line-clamp-2 text-xs text-secondary-token'>
               {current.concept}
+            </p>
+          ) : null}
+          {!selected && current.product_name ? (
+            <p className='mt-1 text-2xs text-tertiary-token'>
+              {current.recommended ? 'Best recommendation · ' : ''}
+              {current.product_name} · {current.colorway} · {current.sale_price}{' '}
+              · {current.artist_profit} creator profit
+            </p>
+          ) : null}
+          {!selected && current.fulfillment ? (
+            <p className='mt-1 text-2xs text-tertiary-token'>
+              {current.fulfillment} · {current.profile_destination}
             </p>
           ) : null}
           {errorMessage ? (
@@ -387,12 +382,12 @@ export function ChatMerchDesignCarousel({
             onClick={handleLoadProducts}
             disabled={current.status !== 'ready' || pendingAction !== null}
           >
-            {pendingAction === 'products' ? (
+            {pendingAction === 'select' ? (
               <Loader2 className='h-3.5 w-3.5 animate-spin' aria-hidden />
             ) : null}
-            {pendingAction === 'products'
-              ? 'Loading products'
-              : 'Use this design'}
+            {pendingAction === 'select'
+              ? 'Creating and publishing tee'
+              : 'Approve & publish tee'}
           </Button>
         ) : null}
       </div>
