@@ -48,7 +48,7 @@ const sectionComponents = [
   'ArtistProfileOutcomesCarousel',
   'ArtistProfileCaptureSection',
   'ArtistProfileOpinionatedSection',
-  'ArtistProfileSpecWall',
+  'ArtistProfileAnnotatedTruth',
   'ArtistProfileHowItWorks',
   'ArtistProfileSocialProof',
   'ArtistProfileFaq',
@@ -168,6 +168,16 @@ describe('artist profile landing family System B source contract', () => {
     expect(opinionated).toContain('StaticMenuPreview');
     expect(opinionated).toContain('ap-opinionated__comparison-track');
     expect(opinionated).toContain("'tim-white-profile-live-mobile'");
+
+    const howItWorks = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/marketing/artist-profile/ArtistProfileHowItWorks.tsx'
+      ),
+      'utf8'
+    );
+    expect(howItWorks).toContain("'artist-spec-sync-settings-desktop'");
+    expect(howItWorks).toContain('<Image');
 
     const finalCta = readFileSync(
       resolve(

@@ -326,7 +326,7 @@ describe('ArtistProfilesPage', () => {
     expect(screen.getAllByTestId('artist-profile-outcome-card')).toHaveLength(
       5
     );
-    expect(screen.getAllByTestId('artist-profile-truth-tile')).toHaveLength(10);
+    expect(screen.getAllByTestId('artist-profile-truth-tile')).toHaveLength(4);
     expect(ARTIST_PROFILE_COPY.faq.items).toHaveLength(4);
     expect(
       screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.socialProof)

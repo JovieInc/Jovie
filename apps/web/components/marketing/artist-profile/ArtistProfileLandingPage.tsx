@@ -1,8 +1,9 @@
+import Image from 'next/image';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
-import type { ArtistProfileTruthTile } from '@/data/artistProfileFeatures';
 import { ARTIST_PROFILE_SECTION_TEST_IDS } from '@/data/artistProfilePageOrder';
 import type { ArtistProfileSocialProofData } from '@/data/socialProof';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
+import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { ArtistProfileCaptureSection } from './ArtistProfileCaptureSection';
 import { ArtistProfileFaq } from './ArtistProfileFaq';
 import { ArtistProfileFinalCta } from './ArtistProfileFinalCta';
@@ -11,19 +12,109 @@ import { ArtistProfileHeroAdaptiveIntro } from './ArtistProfileHeroAdaptiveIntro
 import { ArtistProfileHowItWorks } from './ArtistProfileHowItWorks';
 import { ArtistProfileOpinionatedSection } from './ArtistProfileOpinionatedSection';
 import { ArtistProfileOutcomesCarousel } from './ArtistProfileOutcomesCarousel';
+import { ArtistProfilePhoneFrame } from './ArtistProfilePhoneFrame';
+import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
+import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 import { ArtistProfileSocialProof } from './ArtistProfileSocialProof';
-import { ArtistProfileSpecWall } from './ArtistProfileSpecWall';
+
+const LIVE_PROFILE = getMarketingExportImage('tim-white-profile-live-mobile');
+
+const DEFAULT_CALLOUTS = [
+  {
+    id: 'identity',
+    title: 'Your Identity',
+    body: 'Artwork, artist name, and verified destinations stay unmistakably yours.',
+  },
+  {
+    id: 'release',
+    title: 'What Is Current',
+    body: 'The newest release leads without asking fans to search for it.',
+  },
+  {
+    id: 'action',
+    title: 'The Right Next Move',
+    body: 'Listen, pre-save, find tickets, or support—the action follows the moment.',
+  },
+  {
+    id: 'navigation',
+    title: 'Everything Else',
+    body: 'Music-native navigation keeps the rest close without competing for attention.',
+  },
+] as const;
+
+function ArtistProfileAnnotatedTruth({
+  specWall,
+}: Readonly<{ specWall: ArtistProfileLandingCopy['specWall'] }>) {
+  const callouts = specWall.callouts ?? DEFAULT_CALLOUTS;
+
+  return (
+    <ArtistProfileSectionShell className='ap-annotated-truth bg-surface-0'>
+      <div className='mx-auto max-w-public-content'>
+        <ArtistProfileSectionHeader
+          align='left'
+          headline={specWall.headline}
+          body={specWall.subhead}
+          className='max-w-3xl'
+          bodyClassName='max-w-xl'
+        />
+
+        <div className='ap-annotated-truth__composition mt-12 grid items-center gap-10 border-y border-subtle py-8 lg:grid-cols-[minmax(28rem,1.15fr)_minmax(20rem,0.85fr)] lg:gap-16 lg:py-12'>
+          <div className='ap-annotated-truth__product-stage relative flex min-h-144 items-center justify-center'>
+            <ArtistProfilePhoneFrame className='ap-annotated-truth__phone'>
+              <Image
+                fill
+                src={LIVE_PROFILE.publicUrl}
+                alt="Tim White's live Jovie artist profile."
+                className='object-cover object-top'
+                sizes='(min-width: 1024px) 21rem, 18rem'
+              />
+            </ArtistProfilePhoneFrame>
+            {callouts.map((callout, index) => (
+              <span
+                key={callout.id}
+                aria-hidden='true'
+                className={`ap-annotated-truth__marker ap-annotated-truth__marker--${callout.id}`}
+              >
+                {index + 1}
+              </span>
+            ))}
+          </div>
+
+          <ol className='ap-annotated-truth__callouts border-t border-subtle'>
+            {callouts.map((callout, index) => (
+              <li
+                key={callout.id}
+                data-testid='artist-profile-truth-tile'
+                className='grid grid-cols-[2rem_minmax(0,1fr)] gap-3 border-b border-subtle py-5'
+              >
+                <span className='font-mono text-3xs text-tertiary-token'>
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <div>
+                  <h3 className='text-sm font-semibold text-primary-token'>
+                    {callout.title}
+                  </h3>
+                  <p className='mt-2 text-app leading-relaxed text-secondary-token'>
+                    {callout.body}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
+    </ArtistProfileSectionShell>
+  );
+}
 
 interface ArtistProfileLandingPageProps {
   readonly copy: ArtistProfileLandingCopy;
-  readonly truthTiles: readonly ArtistProfileTruthTile[];
   readonly socialProof: ArtistProfileSocialProofData;
   readonly flags: ArtistProfileSectionFlags;
 }
 
 export function ArtistProfileLandingPage({
   copy,
-  truthTiles,
   socialProof,
   flags,
 }: Readonly<ArtistProfileLandingPageProps>) {
@@ -54,10 +145,7 @@ export function ArtistProfileLandingPage({
         <ArtistProfileOpinionatedSection opinionated={copy.opinionated} />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.specWall}>
-        <ArtistProfileSpecWall
-          specWall={copy.specWall}
-          truthTiles={truthTiles}
-        />
+        <ArtistProfileAnnotatedTruth specWall={copy.specWall} />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.howItWorks}>
         <ArtistProfileHowItWorks howItWorks={copy.howItWorks} />
@@ -76,7 +164,7 @@ export function ArtistProfileLandingPage({
         </div>
       ) : null}
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.finalCta}>
-        <ArtistProfileFinalCta finalCta={copy.finalCta} roomy showSignature />
+        <ArtistProfileFinalCta finalCta={copy.finalCta} />
       </div>
     </>
   );
