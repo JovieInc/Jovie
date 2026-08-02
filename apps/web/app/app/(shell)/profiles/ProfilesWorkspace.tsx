@@ -151,22 +151,23 @@ function ConnectionBrandIcon({
   const metadata = getPlatformIconMetadata(row.platform);
   if (!metadata) {
     return (
-      <ConnectionTypeGlyph
-        row={row}
-        className={cn('text-tertiary-token', className)}
-      />
+      <span
+        className={cn('inline-flex shrink-0 text-tertiary-token', className)}
+        aria-label={row.label}
+        role='img'
+      >
+        <SocialIcon platform={row.platform} className='h-full w-full' />
+      </span>
     );
   }
 
-  const iconClassName = cn('h-4 w-4', className);
-  const revealClassName = cn(
-    'absolute inset-0 opacity-0 transition-opacity duration-fast motion-reduce:transition-none',
-    'group-hover/connection-row:opacity-100 group-focus-visible/connection-row:opacity-100',
-    emphasized && 'opacity-100'
-  );
+  const revealClassName = emphasized
+    ? 'absolute inset-0 opacity-100'
+    : 'absolute inset-0 opacity-0 transition-opacity duration-fast motion-reduce:transition-none group-hover/connection-row:opacity-100 group-focus-visible/connection-row:opacity-100';
+
   return (
     <span
-      className={cn('relative inline-flex shrink-0', iconClassName)}
+      className={cn('relative inline-flex h-4 w-4 shrink-0', className)}
       aria-label={row.label}
       role='img'
     >
