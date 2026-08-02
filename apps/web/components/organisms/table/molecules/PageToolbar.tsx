@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/table/PageToolbar.test.tsx
 import { Button, TooltipShortcut } from '@jovie/ui';
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -77,6 +78,7 @@ interface PageToolbarProps {
   readonly startClassName?: string;
   readonly endClassName?: string;
   readonly topDivider?: boolean;
+  readonly 'data-testid'?: string;
 }
 
 export function PageToolbar({
@@ -86,9 +88,11 @@ export function PageToolbar({
   startClassName,
   endClassName,
   topDivider = false,
+  'data-testid': testId,
 }: PageToolbarProps) {
   return (
     <div
+      data-testid={testId}
       data-top-divider={topDivider ? 'true' : undefined}
       className={cn(
         PAGE_TOOLBAR_CONTAINER_CLASS,

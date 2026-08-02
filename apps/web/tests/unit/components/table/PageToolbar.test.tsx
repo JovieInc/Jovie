@@ -40,6 +40,19 @@ describe('PageToolbar buttons', () => {
     expect(toolbar).not.toHaveClass('border-b');
   });
 
+  it('forwards data-testid onto the toolbar shell', () => {
+    const { container } = render(
+      <PageToolbar
+        start={<span>Start</span>}
+        end={<span>End</span>}
+        data-testid='page-toolbar-under-test'
+      />
+    );
+    const toolbar = container.firstElementChild;
+
+    expect(toolbar).toHaveAttribute('data-testid', 'page-toolbar-under-test');
+  });
+
   it('adds an explicit top divider when requested', () => {
     const { container } = render(
       <PageToolbar

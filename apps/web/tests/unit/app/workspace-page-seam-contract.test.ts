@@ -44,14 +44,22 @@ describe('workspace page optical seam contract', () => {
     expect(librarySurface).not.toContain('pl-2.5');
   });
 
-  it('keeps the dashboard title before the reserved rail control so it starts on the workspace seam', () => {
+  it('keeps the dashboard title on the workspace seam ahead of the visual rail-control order', () => {
     const header = read(
       'components/features/dashboard/organisms/DashboardHeader.tsx'
     );
-    const titleOrCommand = header.indexOf('commandPaletteHeader ?');
+    expect(header).toContain("data-testid='dashboard-header-title-slot'");
+    expect(header).toContain("className='order-first flex min-w-0 flex-1");
+    expect(header).toContain(
+      "className='order-last flex h-7 w-7 shrink-0 items-center justify-center'"
+    );
+
+    const titleSlot = header.indexOf(
+      "data-testid='dashboard-header-title-slot'"
+    );
     const railSlot = header.indexOf("data-testid='dashboard-header-rail-slot'");
 
-    expect(titleOrCommand).toBeGreaterThan(-1);
-    expect(railSlot).toBeGreaterThan(titleOrCommand);
+    expect(titleSlot).toBeGreaterThan(-1);
+    expect(railSlot).toBeGreaterThan(titleSlot);
   });
 });
