@@ -1,46 +1,63 @@
-import { HomeHeroCTA } from '@/components/features/home/HomeHeroCTA';
+import Image from 'next/image';
+import { HomepageElectricSeam } from '@/components/homepage/HomepageElectricSeam';
+import { HomepagePosterHero } from '@/components/homepage/HomepagePosterHero';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
-import { MarketingContainer } from '../MarketingContainer';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
+import { getMarketingExportImage } from '@/lib/screenshots/registry';
+import { ArtistProfilePhoneFrame } from './ArtistProfilePhoneFrame';
 import './ArtistProfileHero.css';
 
 interface ArtistProfileHeroProps {
   readonly hero: ArtistProfileLandingCopy['hero'];
 }
 
-export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
+const HERO_PROFILE = getMarketingExportImage('tim-white-profile-live-mobile');
+
+function ArtistProfileHeroMedia() {
   return (
-    <section
-      data-testid='homepage-hero'
-      className='ap-hero homepage-hero homepage-hero--artist-profile relative overflow-hidden border-b border-subtle'
-      aria-labelledby='artist-profile-hero-heading'
-    >
-      <div
-        aria-hidden='true'
-        className='ap-hero__atmosphere pointer-events-none absolute inset-0'
+    <div className='ap-hero__product-stage'>
+      <div className='ap-hero__stage-grid' aria-hidden='true' />
+      <ArtistProfilePhoneFrame className='ap-hero__phone'>
+        <Image
+          fill
+          priority
+          src={HERO_PROFILE.publicUrl}
+          alt="Tim White's Jovie artist profile leading with his latest release and a Listen action."
+          className='object-cover object-top'
+          sizes='(min-width: 768px) 19rem, 15rem'
+        />
+      </ArtistProfilePhoneFrame>
+    </div>
+  );
+}
+
+export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
+  const claimIntent = getClaimProfileIntent();
+
+  return (
+    <div className='ap-hero'>
+      <HomepagePosterHero
+        headingId='artist-profile-hero-heading'
+        headline={hero.headline}
+        subtitle={hero.subhead}
+        primaryCta={{
+          label: hero.ctaLabel,
+          href: claimIntent.href,
+          eventName: claimIntent.eventName,
+          signUp: true,
+        }}
+        secondaryCta={{
+          label: 'See How It Adapts',
+          href: '#adaptive',
+        }}
+        seam={
+          <HomepageElectricSeam
+            idSeed='artist-profile-hero-electric-seam'
+            className='homepage-poster-hero__electric-seam'
+          />
+        }
+        media={<ArtistProfileHeroMedia />}
       />
-      <MarketingContainer
-        width='page'
-        className='relative !px-5 sm:!px-6 lg:!px-0'
-      >
-        <div className='ap-hero__inner mx-auto flex max-w-3xl flex-col items-center justify-center pb-16 text-center sm:pb-20'>
-          {/* ui-casing-allow: marketing display headline */}
-          <h1
-            id='artist-profile-hero-heading'
-            className='ap-hero__title text-primary-token'
-          >
-            {hero.headline}
-          </h1>
-          <p className='ap-hero__subhead mt-5 text-secondary-token'>
-            {hero.subhead}
-          </p>
-          <div className='ap-hero__focal mt-8 flex w-full justify-center'>
-            <HomeHeroCTA section='artist-profiles-hero' showSupport />
-          </div>
-          <p className='mt-4 font-mono text-xs tracking-tight text-tertiary-token'>
-            {hero.signature}
-          </p>
-        </div>
-      </MarketingContainer>
-    </section>
+    </div>
   );
 }

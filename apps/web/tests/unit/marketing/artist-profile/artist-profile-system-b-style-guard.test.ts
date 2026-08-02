@@ -26,7 +26,7 @@ const familyDir = 'components/marketing/artist-profile' as const;
 
 const forbiddenVisualPatterns = [
   /style=\{/,
-  /#[0-9a-fA-F]{3,8}/,
+  /#[0-9a-fA-F]{3,8}(?![0-9a-zA-Z-])/,
   /rgba?\(/,
   /hsla?\(/,
   /linear-gradient|radial-gradient/,
@@ -128,8 +128,23 @@ describe('artist profile landing family System B source contract', () => {
       ),
       'utf8'
     );
-    expect(hero).toContain('showSupport');
+    expect(hero).toContain('HomepagePosterHero');
+    expect(hero).toContain(
+      "getMarketingExportImage('tim-white-profile-live-mobile')"
+    );
+    expect(hero).toContain("href: '#adaptive'");
+    expect(hero).not.toContain('showSupport');
     expect(hero).not.toContain('hero.eyebrow');
+
+    const intro = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/marketing/artist-profile/ArtistProfileHeroAdaptiveIntro.tsx'
+      ),
+      'utf8'
+    );
+    expect(intro).toContain('HomeTrustSection');
+    expect(intro).toContain("presentation='inline-strip'");
 
     const finalCta = readFileSync(
       resolve(

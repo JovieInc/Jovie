@@ -17,6 +17,7 @@ import { ArtistProfileFinalCta } from '@/components/marketing/artist-profile/Art
 import { ArtistProfileHero } from '@/components/marketing/artist-profile/ArtistProfileHero';
 import { ArtistProfileHeroAdaptiveIntro } from '@/components/marketing/artist-profile/ArtistProfileHeroAdaptiveIntro';
 import { ArtistProfileHowItWorks } from '@/components/marketing/artist-profile/ArtistProfileHowItWorks';
+import { ArtistProfileModeSwitcher } from '@/components/marketing/artist-profile/ArtistProfileModeSwitcher';
 import { ArtistProfileMonetizationSection } from '@/components/marketing/artist-profile/ArtistProfileMonetizationSection';
 import { ArtistProfileOutcomesCarousel } from '@/components/marketing/artist-profile/ArtistProfileOutcomesCarousel';
 import { ArtistProfileSectionShell } from '@/components/marketing/artist-profile/ArtistProfileSectionShell';
@@ -170,6 +171,10 @@ export const featureSplit: Story = {
       <ArtistProfileHeroAdaptiveIntro
         hero={ARTIST_PROFILE_COPY.hero}
         adaptive={ARTIST_PROFILE_COPY.adaptive}
+      />
+      <ArtistProfileModeSwitcher
+        adaptive={ARTIST_PROFILE_COPY.adaptive}
+        showIntroHeading={false}
       />
     </SectionFrame>
   ),
