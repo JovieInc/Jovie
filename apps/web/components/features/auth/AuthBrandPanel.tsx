@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { ProductScreenshotFrame } from '@/components/marketing/ProductScreenshotFrame';
 import { cn } from '@/lib/utils';
 
@@ -36,21 +37,35 @@ function AuthBrandFrame() {
       aria-label='Product Preview'
       className='absolute inset-0 flex flex-col'
     >
+      <div aria-hidden='true' className='absolute inset-0 overflow-hidden'>
+        <Image
+          src='/images/auth/noir-studio.webp'
+          alt=''
+          fill
+          priority
+          sizes='(min-width: 1024px) 50vw, 0vw'
+          className='object-cover object-right opacity-55 forced-colors:hidden'
+        />
+        <div className='absolute inset-0 bg-gradient-to-r from-(--color-bg-tooltip) via-(--color-bg-tooltip)/78 to-(--color-bg-tooltip)/20' />
+        <div className='absolute inset-0 bg-gradient-to-t from-(--color-bg-tooltip) via-transparent to-(--color-bg-tooltip)/28' />
+      </div>
+
       {/* Spacer above the floating screenshot. */}
-      <div className='min-h-0 flex-1' />
+      <div className='relative min-h-0 flex-1' />
 
       {/* Stage with reserved 16:10 space so the static preview never shifts. */}
-      <div className='relative mx-8 aspect-[16/10] sm:mx-10'>
+      <div className='relative z-10 mx-8 aspect-[16/10] sm:mx-10'>
         <ProductScreenshotFrame
           scenarioId={AUTH_BRAND_FRAME}
           sizes='(min-width: 1280px) 540px, (min-width: 1024px) 44vw, 88vw'
           priority
           fill
+          className='border-white/[0.12] bg-(--color-bg-base)'
         />
       </div>
 
       {/* Spacer pushes the headline + bars to the bottom of the card. */}
-      <div className='min-h-0 flex-1' />
+      <div className='relative min-h-0 flex-1' />
 
       <div className='relative z-10 px-8 pb-4 sm:px-10'>
         <h2 className='text-balance text-[clamp(1.5rem,2.6vw,2rem)] font-bold leading-[1.05] tracking-[-0.025em] text-(--color-text-tooltip)'>
