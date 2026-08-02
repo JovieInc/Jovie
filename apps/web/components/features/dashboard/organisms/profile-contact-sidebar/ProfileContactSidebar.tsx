@@ -257,9 +257,9 @@ export function ProfileContactSidebar() {
   const { previewData, setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
 
-  // Rail mode: 'view' shows the phone-preview bento (default — "show off" /
-  // "give me my link"); 'edit' shows the link-editing tabs. The Edit profile
-  // button flips to edit; Done flips back.
+  // Rail mode: 'view' is the deliberately compact, read-only chat summary;
+  // 'edit' remains available for legacy deep links while Connections is the
+  // canonical management workspace.
   const [mode, setMode] = useState<'view' | 'edit'>('view');
   const router = useRouter();
   const pathname = usePathname();
@@ -850,6 +850,11 @@ export function ProfileContactSidebar() {
     router.push(APP_ROUTES.AUDIENCE);
   }, [router]);
 
+  const handleManageConnections = useCallback(() => {
+    close();
+    router.push(APP_ROUTES.PROFILES);
+  }, [close, router]);
+
   // Handle smart add — receives a detected link from SidebarLinkInput
   const handleSmartAddLink = useCallback(
     async (link: DetectedLink) => {
@@ -1208,7 +1213,7 @@ export function ProfileContactSidebar() {
         <ProfileBentoView
           previewData={previewData}
           profileUrl={profileUrl}
-          onClose={close}
+          onManageConnections={handleManageConnections}
           onEditProfile={() => setMode('edit')}
         />
       </EntitySidebarShell>

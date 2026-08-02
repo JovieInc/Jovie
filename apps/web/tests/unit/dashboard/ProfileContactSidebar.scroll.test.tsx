@@ -7,10 +7,6 @@ const mockState = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
   setPreviewData: vi.fn(),
-  refetchDspMatches: vi.fn(),
-  dspMatches: [] as Record<string, unknown>[],
-  dspMatchesLoading: false,
-  dspMatchesError: null as Error | null,
   previewData: {
     username: 'tim',
     displayName: 'Tim White',
@@ -99,10 +95,10 @@ vi.mock('@/lib/queries', () => ({
     isError: false,
   }),
   useDspMatchesQuery: () => ({
-    data: mockState.dspMatches,
-    isLoading: mockState.dspMatchesLoading,
-    error: mockState.dspMatchesError,
-    refetch: mockState.refetchDspMatches,
+    data: [],
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
   }),
   usePressPhotosQuery: () => ({
     data: [],
@@ -130,90 +126,41 @@ vi.mock('@/features/dashboard/organisms/dsp-matches/hooks', () => ({
   }),
 }));
 
-const suggestedMatch = {
-  id: 'match-1',
-  providerId: 'deezer',
-  externalArtistName: 'Tim White',
-  externalArtistUrl: null,
-  externalArtistImageUrl: null,
-  confidenceScore: 0.92,
-  matchingIsrcCount: 12,
-};
-
 describe('ProfileContactSidebar scroll contract', () => {
   beforeEach(() => {
-    mockState.dspMatches = [];
-    mockState.dspMatchesLoading = false;
-    mockState.dspMatchesError = null;
-    mockState.refetchDspMatches.mockReset();
+    mockState.close.mockReset();
+    mockState.push.mockReset();
   });
 
-  it('uses child-owned scrolling without the legacy full-height wrapper', () => {
-    const { container } = render(<ProfileContactSidebar />);
+  it('uses a compact read-only summary instead of mounting the phone preview', () => {
+    render(<ProfileContactSidebar />);
 
-    // The rail opens in the preview (bento) mode; the editing tabs live behind
-    // the "Edit profile" button.
-    fireEvent.click(screen.getByRole('button', { name: /edit profile/i }));
-
-    const shellBody = container.querySelector('[data-scroll-strategy="child"]');
-    const tabbedCard = screen.getByTestId('profile-contact-tabbed-card');
-    const scrollRegion = screen.getByTestId(
-      'profile-contact-tabbed-card-scroll-region'
+    expect(screen.getByTestId('profile-preview-summary')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('profile-preview-entity-header')
+    ).toHaveTextContent('Tim White');
+    expect(screen.getByTestId('profile-preview-summary')).toHaveClass(
+      'min-h-0',
+      'overflow-x-hidden',
+      'overflow-y-auto'
     );
-
-    expect(shellBody).toBeInTheDocument();
-    expect(shellBody).not.toHaveClass('overflow-y-auto');
-    expect(tabbedCard.closest('.min-h-full')).toBeNull();
-    expect(scrollRegion).toHaveAttribute('data-scroll-mode', 'internal');
-    expect(scrollRegion).toHaveClass('overflow-y-auto');
+    expect(
+      screen.getByTestId('profile-smart-link-control')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Manage in Connections' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Your Live Profile')).toBeNull();
   });
 
-  it('keeps loading, empty, populated, and error suggestion transitions at the fixed scroll tail', () => {
-    mockState.dspMatchesLoading = true;
+  it('hands profile management back to Connections and closes the chat rail', () => {
+    render(<ProfileContactSidebar />);
 
-    const view = render(<ProfileContactSidebar />);
-    fireEvent.click(screen.getByRole('button', { name: /edit profile/i }));
-    fireEvent.click(screen.getByTestId('drawer-tab-dsp'));
-    fireEvent.click(screen.getByRole('button', { name: 'Add Music link' }));
-
-    const tabbedCard = screen.getByTestId('profile-contact-tabbed-card');
-    const scrollRegion = screen.getByTestId(
-      'profile-contact-tabbed-card-scroll-region'
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Manage in Connections' })
     );
-    const linkInput = screen.getByRole('textbox', { name: 'Add Link' });
-    expect(tabbedCard).toHaveClass('min-h-0', 'flex-1', 'overflow-hidden');
-    const rerenderState = () => {
-      view.rerender(<ProfileContactSidebar />);
-      expect(
-        screen.getByTestId('profile-contact-tabbed-card-scroll-region')
-      ).toBe(scrollRegion);
-      expect(scrollRegion).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
-      expect(scrollRegion).toContainElement(linkInput);
-    };
 
-    rerenderState();
-    expect(screen.queryByTestId('suggested-dsp-matches')).toBeNull();
-
-    mockState.dspMatchesLoading = false;
-    rerenderState();
-    expect(screen.queryByTestId('suggested-dsp-matches')).toBeNull();
-
-    mockState.dspMatches = [suggestedMatch];
-    rerenderState();
-    const populatedSuggestions = screen.getByTestId('suggested-dsp-matches');
-    expect(populatedSuggestions).toHaveAttribute('data-state', 'ready');
-    expect(scrollRegion.lastElementChild).toBe(populatedSuggestions);
-
-    mockState.dspMatches = [];
-    mockState.dspMatchesLoading = true;
-    rerenderState();
-    expect(screen.queryByTestId('suggested-dsp-matches')).toBeNull();
-
-    mockState.dspMatchesLoading = false;
-    mockState.dspMatchesError = new Error('Network error');
-    rerenderState();
-    const errorSuggestions = screen.getByTestId('suggested-dsp-matches');
-    expect(errorSuggestions).toHaveAttribute('data-state', 'error');
-    expect(scrollRegion.lastElementChild).toBe(errorSuggestions);
+    expect(mockState.close).toHaveBeenCalledTimes(1);
+    expect(mockState.push).toHaveBeenCalledWith('/app/profiles');
   });
 });

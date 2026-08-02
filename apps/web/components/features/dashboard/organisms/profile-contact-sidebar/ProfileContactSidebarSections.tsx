@@ -1,175 +1,86 @@
 'use client';
 
-import { Button, CommonDropdown, type CommonDropdownItem } from '@jovie/ui';
-import {
-  Check,
-  Copy,
-  ExternalLink,
-  MoreVertical,
-  Pencil,
-  SlidersHorizontal,
-  X,
-} from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { Button } from '@jovie/ui';
+import { Check, UserRound } from 'lucide-react';
+import Link from 'next/link';
 import { type PreviewPanelData } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { toast } from '@/components/feedback';
 import {
   DrawerMediaThumb,
   DrawerSurfaceCard,
+  EntityHeaderCard,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
 import { DrawerHero } from '@/components/shell/DrawerHero';
-import { ProfilePreviewBento } from '@/features/profile/ProfilePreviewBento';
-import { UtmBuilderDialog } from '@/features/profile/UtmBuilderDialog';
-import {
-  buildPreviewArtistFromProfile,
-  buildProfilePreviewLinks,
-} from '@/features/profile/view-models';
-import { copyToClipboard } from '@/hooks/useClipboard';
-import type { LegacySocialLink } from '@/types/db';
+import { APP_ROUTES } from '@/constants/routes';
 import { ProfileSmartLinkAnalytics } from './ProfileSmartLinkAnalytics';
 
-function toPreviewSocialLinks(
-  links: PreviewPanelData['links']
-): LegacySocialLink[] {
-  const now = new Date().toISOString();
-  return buildProfilePreviewLinks(links).map(link => ({
-    id: link.id,
-    platform: link.platform,
-    url: link.url,
-    title: link.title,
-    order: 0,
-    is_visible: link.isVisible,
-    created_at: now,
-    updated_at: now,
-    artist_id: 'preview',
-    clicks: 0,
-  }));
-}
-
+/**
+ * Read-only profile summary for the explicitly opened chat rail. Profile
+ * editing and connection management live in the Connections workspace; chat
+ * only needs a compact identity, share link, and a single clear hand-off.
+ */
 export function ProfileBentoView({
   previewData,
   profileUrl,
-  onClose,
-  onEditProfile,
+  onManageConnections,
+  onEditProfile: _onEditProfile,
 }: Readonly<{
   previewData: PreviewPanelData;
   profileUrl: string;
-  onClose: () => void;
-  onEditProfile: () => void;
+  onManageConnections?: () => void;
+  /** Legacy callback retained while the editing rail is retired from chat. */
+  onEditProfile?: () => void;
 }>) {
-  const [utmOpen, setUtmOpen] = useState(false);
-
-  const artist = buildPreviewArtistFromProfile({
-    username: previewData.username,
-    displayName: previewData.displayName,
-    avatarUrl: previewData.avatarUrl,
-    bio: previewData.bio,
-  });
-  const socialLinks = toPreviewSocialLinks(previewData.links);
-
-  const handleCopyLink = useCallback(async () => {
-    const copied = await copyToClipboard(profileUrl);
-    if (copied) {
-      toast.success('Profile link copied');
-      return;
-    }
-    toast.error('Failed to copy link');
-  }, [profileUrl]);
-
-  const menuItems: CommonDropdownItem[] = [
-    {
-      type: 'action',
-      id: 'open-link',
-      label: 'Open Link',
-      icon: <ExternalLink className='h-3.5 w-3.5' />,
-      onClick: () =>
-        globalThis.open(profileUrl, '_blank', 'noopener,noreferrer'),
-    },
-    {
-      type: 'action',
-      id: 'copy-link',
-      label: 'Copy Link',
-      icon: <Copy className='h-3.5 w-3.5' />,
-      onClick: handleCopyLink,
-    },
-    {
-      type: 'action',
-      id: 'utm-builder',
-      label: 'UTM Builder',
-      icon: <SlidersHorizontal className='h-3.5 w-3.5' />,
-      onClick: () => setUtmOpen(true),
-    },
-  ];
+  const title = previewData.displayName || `@${previewData.username}`;
 
   return (
-    <div className='flex min-h-0 flex-1 flex-col overflow-y-auto'>
-      <ProfilePreviewBento
-        artist={artist}
-        socialLinks={socialLinks}
-        genres={previewData.genres}
-        profileHref={previewData.profilePath}
-        showLiveBadge
-        caption='Your Live Profile'
-        phoneAlign='top'
-        showBottomFade
-        className='shrink-0'
-        heroClassName='aspect-4/5 max-h-110 w-full pt-2'
-        phoneFrameClassName='h-110 w-57'
-        topRight={
-          <div className='flex items-center gap-1.5'>
-            <Button
-              type='button'
-              variant='ghost'
-              size='icon'
-              aria-label='Close'
-              onClick={onClose}
-              className='h-6 w-6 rounded-full border border-white/12 bg-black/50 text-white backdrop-blur-md hover:bg-black/65 dark:text-white'
-            >
-              <X className='h-3.5 w-3.5' />
-            </Button>
-            <CommonDropdown
-              items={menuItems}
-              align='end'
-              // The UTM action opens a Dialog. Keeping this transient menu
-              // non-modal avoids competing Radix body pointer-event layers.
-              modal={false}
-              aria-label='Profile Actions'
-              trigger={
-                <Button
-                  type='button'
-                  variant='ghost'
-                  size='icon'
-                  aria-label='Profile Actions'
-                  className='h-6 w-6 rounded-full border border-white/12 bg-black/50 text-white backdrop-blur-md hover:bg-black/65 dark:text-white'
-                >
-                  <MoreVertical className='h-3.5 w-3.5' />
-                </Button>
-              }
-            />
-          </div>
+    <div
+      className='flex min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto px-3 pb-3 pt-2 lg:px-0 lg:pb-0'
+      data-testid='profile-preview-summary'
+    >
+      <EntityHeaderCard
+        image={
+          <DrawerMediaThumb
+            src={previewData.avatarUrl}
+            alt={title}
+            fallback={<UserRound className='h-5 w-5 text-tertiary-token' />}
+            dimension={40}
+            sizes='40px'
+            sizeClassName='h-10 w-10 rounded-full'
+          />
         }
-        footer={
-          <div className='space-y-2 px-1.5 pb-1.5 pt-1.5 lg:px-0 lg:pb-0'>
-            <ProfileSmartLinkAnalytics profileUrl={profileUrl} variant='flat' />
-            <Button
-              type='button'
-              variant='primary'
-              onClick={onEditProfile}
-              className='h-10 w-full rounded-xl text-xs font-caption tracking-tight'
-            >
-              <Pencil className='mr-2 h-3.5 w-3.5' aria-hidden='true' />
-              Edit Profile
-            </Button>
-          </div>
+        title={title}
+        subtitle={`@${previewData.username}`}
+        meta={
+          previewData.bio ? (
+            <span className='line-clamp-2 text-2xs leading-4 text-secondary-token'>
+              {previewData.bio}
+            </span>
+          ) : undefined
         }
+        stableLayout
+        titleLineClamp={1}
+        subtitleLineClamp={1}
+        metaOverflow='wrap'
+        data-testid='profile-preview-entity-header'
       />
-      <UtmBuilderDialog
-        open={utmOpen}
-        onClose={() => setUtmOpen(false)}
-        baseUrl={profileUrl}
-      />
+      <ProfileSmartLinkAnalytics profileUrl={profileUrl} variant='flat' />
+      {onManageConnections ? (
+        <Button
+          type='button'
+          variant='secondary'
+          size='sm'
+          className='w-full'
+          onClick={onManageConnections}
+        >
+          Manage in Connections
+        </Button>
+      ) : (
+        <Button asChild variant='secondary' size='sm' className='w-full'>
+          <Link href={APP_ROUTES.PROFILES}>Manage in Connections</Link>
+        </Button>
+      )}
     </div>
   );
 }
