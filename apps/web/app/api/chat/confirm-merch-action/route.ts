@@ -40,9 +40,18 @@ const confirmMerchProductsSchema = chatToolSchema({
   action: z.literal('products'),
 });
 
+const confirmMerchCreateSchema = chatToolSchema({
+  profileId: z.string().uuid(),
+  generationId: z.string().uuid(),
+  optionId: z.string().uuid(),
+  optionNumber: z.number().int().min(1).max(4),
+  action: z.literal('create'),
+});
+
 const confirmMerchActionSchema = z.union([
   confirmMerchSelectSchema,
   confirmMerchProductsSchema,
+  confirmMerchCreateSchema,
   confirmMerchStatusActionSchema,
 ]);
 
@@ -117,15 +126,16 @@ export async function POST(req: Request) {
       );
     }
 
-    if (action === 'select') {
+    if (action === 'select' || action === 'create') {
       const result = await selectMerchDesign({
         generationId: parseResult.data.generationId,
         clerkUserId: userId,
         profileId,
         optionId: parseResult.data.optionId,
         optionNumber: parseResult.data.optionNumber,
-        catalogProductId: parseResult.data.catalogProductId,
-        publish: false,
+        catalogProductId:
+          action === 'select' ? parseResult.data.catalogProductId : undefined,
+        publish: action === 'create',
       });
 
       if (!result.product) {
@@ -138,13 +148,16 @@ export async function POST(req: Request) {
       await db.insert(chatAuditLog).values({
         userId,
         creatorProfileId: profileId,
-        action: AUDIT_ACTION_BY_CONFIRM[action],
+        action: AUDIT_ACTION_BY_CONFIRM.select,
         field: 'merch_selection',
         previousValue: null,
         newValue: JSON.stringify({
           merchCardId: result.merchCardId,
           selectedOptionId: result.selectedOptionId,
-          catalogProductId: parseResult.data.catalogProductId,
+          catalogProductId:
+            'catalogProductId' in parseResult.data
+              ? parseResult.data.catalogProductId
+              : undefined,
           status: result.status,
         }),
         ipAddress: ipAddress ?? null,

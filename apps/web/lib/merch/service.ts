@@ -756,9 +756,20 @@ async function hydrateOptionPrintfulEconomics(
     return option;
   }
 
-  const catalog = await resolveMerchCatalogSelection(
-    option.productType || option.printfulProductName || option.designName
-  );
+  let catalog;
+  try {
+    catalog = await resolveMerchCatalogSelection(
+      option.productType || option.printfulProductName || option.designName
+    );
+  } catch {
+    return {
+      ...option,
+      productionWarnings: [
+        ...option.productionWarnings,
+        'Catalog/fulfillment unavailable; product quarantined as a private draft.',
+      ],
+    };
+  }
   if (catalog.pricing.printfulCostSource !== 'printful') {
     return option;
   }

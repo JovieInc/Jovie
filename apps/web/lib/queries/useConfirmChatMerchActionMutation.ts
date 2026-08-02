@@ -26,6 +26,14 @@ export interface ConfirmChatMerchSelectInput {
   readonly action: 'select';
 }
 
+export interface ConfirmChatMerchCreateInput {
+  readonly profileId: string;
+  readonly generationId: string;
+  readonly optionId: string;
+  readonly optionNumber: number;
+  readonly action: 'create';
+}
+
 export interface ConfirmChatMerchProductsInput {
   readonly profileId: string;
   readonly generationId: string;
@@ -37,7 +45,8 @@ export interface ConfirmChatMerchProductsInput {
 export type ConfirmChatMerchActionInput =
   | ConfirmChatMerchStatusActionInput
   | ConfirmChatMerchProductsInput
-  | ConfirmChatMerchSelectInput;
+  | ConfirmChatMerchSelectInput
+  | ConfirmChatMerchCreateInput;
 
 export interface ConfirmChatMerchStatusActionResponse {
   readonly success: true;
