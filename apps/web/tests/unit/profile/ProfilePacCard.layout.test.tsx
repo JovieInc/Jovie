@@ -23,12 +23,20 @@ vi.mock('@/components/atoms/ImageWithFallback', () => ({
   ImageWithFallback: ({
     alt,
     className,
+    priority,
     src,
   }: {
     readonly alt: string;
     readonly className?: string;
+    readonly priority?: boolean;
     readonly src: string;
-  }) => React.createElement('img', { alt, className, src }),
+  }) =>
+    React.createElement('img', {
+      alt,
+      className,
+      'data-priority': priority ? 'true' : 'false',
+      src,
+    }),
 }));
 
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
@@ -82,6 +90,7 @@ describe('ProfilePacCard landscape states', () => {
         }}
         assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
         layout='profile-landscape'
+        artPriority
       />
     );
 
@@ -94,6 +103,9 @@ describe('ProfilePacCard landscape states', () => {
     expect(email).toHaveClass('h-11');
     expect(submit).toBeVisible();
     expect(submit).toHaveClass('h-11');
+    expect(
+      screen.getByRole('img', { name: 'Release artwork' })
+    ).toHaveAttribute('data-priority', 'true');
     expect(card.querySelector('.aspect-square')).toHaveClass('invisible');
     expect(screen.getByRole('textbox').closest('.absolute')).toHaveClass(
       'inset-1.5'
