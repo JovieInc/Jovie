@@ -70,7 +70,7 @@ describe('DashboardHeader', () => {
     expect(actionWrapper).not.toHaveClass(
       'rounded-full',
       'border',
-      'bg-(--linear-app-content-surface)',
+      'bg-(--app-shell-content-surface)',
       'p-1'
     );
     expect(actionWrapper).toHaveClass('flex', 'items-center', 'gap-1');
@@ -223,7 +223,7 @@ describe('DashboardHeader', () => {
     );
 
     const header = getByTestId('dashboard-header');
-    expect(header).toHaveClass('bg-(--linear-app-content-surface)');
+    expect(header).toHaveClass('bg-(--app-shell-content-surface)');
     expect(header).not.toHaveClass('bg-transparent');
   });
 
@@ -234,7 +234,7 @@ describe('DashboardHeader', () => {
 
     const header = getByTestId('dashboard-header');
     expect(header).toHaveClass('bg-transparent');
-    expect(header).not.toHaveClass('bg-(--linear-app-content-surface)');
+    expect(header).not.toHaveClass('bg-(--app-shell-content-surface)');
     // Layout is unchanged — the desktop row keeps the compact header height.
     expect(
       container.querySelector(

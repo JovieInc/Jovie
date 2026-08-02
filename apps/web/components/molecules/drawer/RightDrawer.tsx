@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/organisms/RightDrawer.interaction.test.tsx
+
 import type { CommonDropdownItem } from '@jovie/ui';
 import { CommonDropdown } from '@jovie/ui';
 import React, { useEffect, useId, useRef, useState } from 'react';

@@ -1,3 +1,5 @@
+// @coverage-via apps/web/tests/unit/components/organisms/AppShellFrame.test.tsx
+
 import type { ReactNode } from 'react';
 import { memo } from 'react';
 import { CanvasGrain } from '@/components/atoms/CanvasGrain';

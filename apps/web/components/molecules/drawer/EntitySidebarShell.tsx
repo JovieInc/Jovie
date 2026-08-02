@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/molecules/EntitySidebarShell.test.tsx
+
 import type { CommonDropdownItem } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
