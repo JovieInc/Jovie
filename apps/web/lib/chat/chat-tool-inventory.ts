@@ -49,6 +49,7 @@ export const CHAT_ROUTE_TOOL_IDS = [
   'createRelease',
   'generateReleasePitch',
   // Merch suite
+  'findMerchSources',
   'createMerch',
   'previewMerchOptions',
   'selectMerchDesign',

@@ -51,6 +51,7 @@ import {
   type MerchSellabilityResult,
 } from './pricing';
 import { getMerchCardSellability } from './safety';
+import { hasHumanSafeMerchContract } from './source-candidates';
 import type {
   LibraryMerchCard,
   MerchDesignLane,
@@ -964,6 +965,22 @@ export async function selectMerchDesign(params: {
     rawSelected.creatorProfileId,
     params.clerkUserId
   );
+  const [generation] = await db
+    .select({ artistBrief: merchGenerationBatches.artistBrief })
+    .from(merchGenerationBatches)
+    .where(eq(merchGenerationBatches.id, rawSelected.generationBatchId))
+    .limit(1);
+  if (
+    !generation ||
+    !hasHumanSafeMerchContract({
+      forbiddenCliches: generation.artistBrief.forbidden_cliches,
+      source: generation.artistBrief.source,
+    })
+  ) {
+    throw new Error(
+      'This older merch option cannot be selected because its source and no-people safety contract were not verified. Regenerate from a confirmed catalog source.'
+    );
+  }
   const existing = await db
     .select()
     .from(merchCards)

@@ -100,6 +100,7 @@ import {
   createMerchGenerateTool,
   createMerchPreviewTool,
   createMerchSelectTool,
+  createMerchSourceTool,
 } from '@/lib/chat/tools/merch-tools';
 import { createProposeVideoRecordingTool } from '@/lib/chat/tools/propose-video-recording';
 import { createRetouchImageTool } from '@/lib/chat/tools/retouch-image';
@@ -2123,6 +2124,9 @@ function buildChatTools(
       : {}),
     ...(canAccessMerchCreation
       ? {
+          findMerchSources: createMerchSourceTool({
+            profileId: resolvedProfileId,
+          }),
           createMerch: createMerchGenerateTool({
             profileId: resolvedProfileId,
             clerkUserId,

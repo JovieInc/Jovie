@@ -114,6 +114,13 @@ export interface MerchDesignSlots {
   readonly artist_name: string;
   readonly short_text?: string;
   readonly lyric?: string;
+  /** Visible provenance label for the exact source used in this design. */
+  readonly source_label?: string;
+  readonly source_type?:
+    | 'song_title'
+    | 'album_title'
+    | 'library_asset'
+    | 'user_provided';
   readonly year?: string;
   readonly location?: string;
   readonly tracklist?: readonly string[];

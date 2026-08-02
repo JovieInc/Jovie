@@ -15,6 +15,7 @@ import {
   createMerchGenerateTool,
   createMerchPreviewTool,
   createMerchSelectTool,
+  createMerchSourceTool,
 } from '@/lib/chat/tools/merch-tools';
 import {
   markChatTurnStreaming,
@@ -312,6 +313,7 @@ export async function handleMobileChatTurn(
   const mobileMerchTools: ToolSet = {
     ...(accountContext.planLimits.booleans.canAccessMerchCreation
       ? {
+          findMerchSources: createMerchSourceTool({ profileId }),
           createMerch: createMerchGenerateTool({
             profileId,
             clerkUserId: userId,

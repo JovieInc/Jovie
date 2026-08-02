@@ -91,20 +91,56 @@ export const TOOL_SCHEMAS = {
 
   createMerch: {
     description:
-      'Generate exactly three premium merch options for the artist. Use when the artist asks to make merch, create a tee/hoodie/item, or make something that would sell.',
+      'Generate exactly three premium merch options from a verified merch source. Call findMerchSources first when the artist has not selected a catalog title or explicitly supplied a phrase. If no itemType is stated, generate a premium tee and tell the artist it can be changed after selection. Never ask a product question in the same turn as this tool call, and never generate a person, face, model, or artist likeness by default.',
     inputSchema: chatToolSchema({
       prompt: z.string().max(500).optional(),
       itemType: z.string().max(80).optional(),
       makeLive: z.boolean().optional(),
+      source: z
+        .object({
+          sourceType: z.enum([
+            'song_title',
+            'album_title',
+            'library_asset',
+            'user_provided',
+          ]),
+          sourceText: z.string().min(1).max(200),
+          provenanceTitle: z.string().min(1).max(200),
+          rightsStatus: z.enum(['owned', 'user_provided']),
+          assetId: z.string().uuid().optional(),
+          assetUrl: z.string().url().optional(),
+        })
+        .optional(),
     }),
+  },
+
+  findMerchSources: {
+    description:
+      'List and rank confirmed catalog title candidates before creating merch. Use first for “make me merch,” “use a lyric/title of mine,” or “idk, help me pick.” Return the best candidate instead of asking the artist to provide unavailable lyrics.',
+    inputSchema: chatToolSchema({}),
   },
 
   previewMerchOptions: {
     description:
-      'Preview three merch design options without publishing them. Use when the artist asks for concepts or wants to see merch ideas first.',
+      'Preview exactly three premium merch design options from a verified merch source without publishing them. Call findMerchSources first when the artist has not selected a source. If no itemType is stated, preview a premium tee and say it can be changed after selection. Never ask a product question in the same turn as this tool call.',
     inputSchema: chatToolSchema({
       prompt: z.string().max(500).optional(),
       itemType: z.string().max(80).optional(),
+      source: z
+        .object({
+          sourceType: z.enum([
+            'song_title',
+            'album_title',
+            'library_asset',
+            'user_provided',
+          ]),
+          sourceText: z.string().min(1).max(200),
+          provenanceTitle: z.string().min(1).max(200),
+          rightsStatus: z.enum(['owned', 'user_provided']),
+          assetId: z.string().uuid().optional(),
+          assetUrl: z.string().url().optional(),
+        })
+        .optional(),
     }),
   },
 
