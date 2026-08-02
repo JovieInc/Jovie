@@ -95,7 +95,10 @@ export const AppShellFrame = memo(function AppShellFrame({
             <main
               id='main-content'
               className={cn(
-                'relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-(--color-bg-surface-0)/90',
+                // The header and route column live on this one raised plane.
+                // Do not use a translucent recessed well here: it makes the
+                // frame, header, and content read as unrelated backgrounds.
+                'relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-(--app-shell-content-surface)',
                 'lg:rounded-(--app-shell-radius) lg:border lg:border-(--app-shell-border) lg:bg-(--app-shell-content-surface) lg:shadow-(--linear-app-shell-shadow)'
               )}
             >

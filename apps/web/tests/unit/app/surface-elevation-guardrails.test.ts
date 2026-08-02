@@ -63,7 +63,7 @@ describe('surface elevation guardrails', () => {
       /:root\.dark[\s\S]*--sidebar-background:\s*var\(--linear-app-sidebar-background-rgb\);/
     );
     expect(linearTokens).toMatch(
-      /:root\.dark[\s\S]*--linear-app-content-surface:\s*#0a0d16;/
+      /:root\.dark[\s\S]*--linear-bg-page:\s*#06080d;/
     );
     expect(linearTokens).toMatch(
       /:root\.dark[\s\S]*--linear-app-sidebar-background-rgb:\s*6 8 13;/
@@ -430,17 +430,12 @@ describe('surface elevation guardrails', () => {
       'group-data-[variant=sidebar]:lg:shadow-[var(--linear-app-sidebar-shadow)]'
     );
     expect(rightDrawer).toContain('border-l border-(--app-shell-frame-seam)');
-    // Mobile overlay retains shadow; desktop drawer is flat so elevation
-    // comes from DrawerSurfaceCard cards inside the shell, not the outer aside.
+    // The in-flow desktop drawer owns the raised inspector tier. Its children
+    // must stay flat so entity surfaces do not reintroduce same-level nesting.
     expect(rightDrawer).toContain('shadow-(--linear-app-drawer-shadow)');
-    // Desktop-only classes: no border, no radius — flat inline sidebar.
-    // Assert the production Tailwind v4 token form so this negative check
-    // tracks the class AppShellFrame / RightRail actually emit.
-    expect(rightDrawer).not.toContain('lg:rounded-(--linear-app-shell-radius)');
-    expect(rightDrawer).not.toContain(
-      'lg:rounded-[var(--linear-app-shell-radius)]'
-    );
-    expect(rightDrawer).not.toContain('lg:border');
+    expect(rightDrawer).toContain('rounded-(--app-shell-radius)');
+    expect(rightDrawer).toContain('border-(--app-shell-frame-seam)');
+    expect(rightDrawer).toContain('bg-surface-1');
     expect(adminTableShell).toContain('bg-(--app-shell-content-surface)/96');
   });
 

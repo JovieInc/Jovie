@@ -99,7 +99,9 @@ export function DashboardHeader({
       data-testid='dashboard-header'
       className={cn(
         'z-20',
-        transparent ? 'bg-transparent' : 'bg-(--linear-app-content-surface)',
+        // Keep ordinary headers on the AppShellFrame plane. Chat explicitly
+        // opts into transparent so its owned ambient wash remains full bleed.
+        transparent ? 'bg-transparent' : 'bg-(--app-shell-content-surface)',
         className
       )}
     >

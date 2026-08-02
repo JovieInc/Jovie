@@ -49,8 +49,12 @@ describe('RightDrawer', () => {
     expect(aside).toHaveStyle({ width: '360px' });
     expect(aside).not.toHaveClass('border-l');
     expect(aside).not.toHaveClass('bg-surface-0');
-    expect(aside).not.toHaveClass('lg:border');
-    expect(aside).not.toHaveClass('shadow-(--linear-app-drawer-shadow)');
+    expect(aside).toHaveClass(
+      'rounded-(--app-shell-radius)',
+      'border-(--app-shell-frame-seam)',
+      'bg-surface-1',
+      'shadow-(--linear-app-drawer-shadow)'
+    );
     expect(aside).toHaveClass('outline-none', 'focus:outline-none');
   });
 

@@ -390,8 +390,8 @@
   --linear-text-quaternary: #7d879d;
   --linear-text-inverse: #020307;
   /* Backgrounds — Noir Ion stepped surfaces */
-  --linear-bg-page: #030407;
-  /* app canvas */
+  --linear-bg-page: #06080d;
+  /* app canvas / sidebar base — the shell's recess is one continuous plane */
   --linear-bg-header: transparent;
   --linear-bg-surface-0: #06080d;
   /* shell / recessed wells */
