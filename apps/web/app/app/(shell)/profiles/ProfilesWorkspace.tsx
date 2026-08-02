@@ -22,7 +22,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
+import {
+  getPlatformIconMetadata,
+  SocialIcon,
+} from '@/components/atoms/SocialIcon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
   DrawerAnalyticsSummaryCard,
@@ -92,7 +95,10 @@ function kindLabel(row: ProfileWorkspaceRow): string {
 function ConnectionTypeGlyph({
   row,
   className,
-}: Readonly<{ row: ProfileWorkspaceRow; className?: string }>) {
+}: Readonly<{
+  row: ProfileWorkspaceRow;
+  className?: string;
+}>) {
   const iconClassName = cn('h-4 w-4', className);
   if (row.kind === 'connector')
     return <Cable className={iconClassName} aria-hidden />;
@@ -110,7 +116,12 @@ function ConnectionTypeGlyph({
 function ConnectionBrandIcon({
   row,
   className,
-}: Readonly<{ row: ProfileWorkspaceRow; className?: string }>) {
+  emphasized = false,
+}: Readonly<{
+  row: ProfileWorkspaceRow;
+  className?: string;
+  emphasized?: boolean;
+}>) {
   if (row.rowType === 'connector')
     return (
       <ConnectionTypeGlyph
@@ -137,8 +148,68 @@ function ConnectionBrandIcon({
       />
     );
   }
+  const metadata = getPlatformIconMetadata(row.platform);
+  if (!metadata) {
+    return (
+      <ConnectionTypeGlyph
+        row={row}
+        className={cn('text-tertiary-token', className)}
+      />
+    );
+  }
+
+  const iconClassName = cn('h-4 w-4', className);
+  const revealClassName = cn(
+    'absolute inset-0 opacity-0 transition-opacity duration-fast motion-reduce:transition-none',
+    'group-hover/connection-row:opacity-100 group-focus-visible/connection-row:opacity-100',
+    emphasized && 'opacity-100'
+  );
   return (
-    <SocialIcon platform={row.platform} className={cn('h-4 w-4', className)} />
+    <span
+      className={cn('relative inline-flex shrink-0', iconClassName)}
+      aria-label={row.label}
+      role='img'
+    >
+      <SocialIcon
+        platform={row.platform}
+        className='h-full w-full text-primary-token opacity-70'
+      />
+      <span
+        className={revealClassName}
+        style={{ color: `#${metadata.hex}` }}
+        aria-hidden
+      >
+        <SocialIcon platform={row.platform} className='h-full w-full' />
+      </span>
+    </span>
+  );
+}
+
+function connectionUrlDisplay(row: ProfileWorkspaceRow): string {
+  if (row.handle) return row.handle;
+  try {
+    const url = new URL(row.url);
+    const host = url.hostname.replace(/^www\./, '');
+    const path = url.pathname.replace(/^\/+|\/+$/g, '');
+    if (!path) return host;
+    try {
+      return `${host} · ${decodeURIComponent(path)}`;
+    } catch {
+      return `${host} · ${path}`;
+    }
+  } catch {
+    return row.url;
+  }
+}
+
+function ConnectionUrlDisplay({
+  row,
+  className,
+}: Readonly<{ row: ProfileWorkspaceRow; className?: string }>) {
+  return (
+    <span className={cn('truncate', className)} title={row.url}>
+      {connectionUrlDisplay(row)}
+    </span>
   );
 }
 
@@ -264,7 +335,7 @@ function ConnectionRail({
           <EntityHeaderCard
             image={
               <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0'>
-                <ConnectionBrandIcon row={row} className='h-6 w-6' />
+                <ConnectionBrandIcon row={row} className='h-6 w-6' emphasized />
               </div>
             }
             title={row.label}
@@ -276,7 +347,7 @@ function ConnectionRail({
                 </span>
               </span>
             }
-            meta={row.handle ?? row.url}
+            meta={<ConnectionUrlDisplay row={row} />}
             stableLayout
             titleLineClamp={1}
             subtitleLineClamp={1}
@@ -473,14 +544,19 @@ export function ProfilesWorkspace({
           const row = context.row.original;
           return (
             <div className='flex min-w-0 items-center gap-2.5'>
-              <ConnectionBrandIcon row={row} className='h-5 w-5 shrink-0' />
+              <ConnectionBrandIcon
+                row={row}
+                className='h-5 w-5 shrink-0'
+                emphasized={selected?.id === row.id}
+              />
               <div className='min-w-0'>
                 <div className='truncate text-sm font-medium text-primary-token'>
                   {row.label}
                 </div>
-                <div className='truncate text-xs text-tertiary-token max-sm:hidden'>
-                  {row.handle ?? row.url}
-                </div>
+                <ConnectionUrlDisplay
+                  row={row}
+                  className='text-xs text-tertiary-token max-sm:hidden'
+                />
               </div>
             </div>
           );
@@ -579,7 +655,7 @@ export function ProfilesWorkspace({
         },
       }),
     ],
-    [getContextMenuItems]
+    [getContextMenuItems, selected?.id]
   );
 
   useRegisterRightPanel(
@@ -706,6 +782,7 @@ export function ProfilesWorkspace({
         rowHeight={56}
         minWidth='390px'
         isRowSelected={row => selected?.id === row.id}
+        getRowClassName={() => 'group/connection-row'}
         emptyState={
           <TableEmptyState
             title='No Connections in This Category'
