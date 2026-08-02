@@ -189,6 +189,7 @@ The example above says one thing three times. Jovie should say it once.
 - Multiple nested surfaces whose only job is to create the feeling of "designed"
 - Treating borders as the primary way to separate content instead of using spacing, alignment, contrast, and typography
 - Hover motion that makes panels, buttons, screenshots, or cards jump, lift, or slide for no functional reason
+- **Selling the artifact instead of the product** — customer-facing copy must never describe how the page was designed, produced, captured, annotated, or verified. Ban phrases such as "no mockups," "not a concept render," "real screenshot," "captured from the registry," and similar provenance commentary. Replace them with the customer outcome or product capability the visual proves.
 - **Emoji/symbol on colored background square** — explicitly banned. This pattern cheapens the brand and reads as consumer-grade AI slop. Use accent color on title text only.
 - **Gold colors in brand/CTA expression** — banned. Avoid prestige-signaling metallic tones for identity or primary actions. (Feature accent orange/amber for Pro tier is a distinct, permitted use.)
 - **Saturated brand colors** for CTAs — CTAs are white-on-black (Apple approach). Accent colors are for feature differentiation only.
