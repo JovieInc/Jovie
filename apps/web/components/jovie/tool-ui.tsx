@@ -35,6 +35,7 @@ import {
 } from './components/ChatMerchCard';
 import {
   ChatMerchDesignCarousel,
+  ChatMerchDesignCarouselLoading,
   isChatMerchDesignCarouselResult,
 } from './components/ChatMerchDesignCarousel';
 import { ChatPitchCard } from './components/ChatPitchCard';
@@ -551,6 +552,9 @@ function renderMerchGenerationArtifact(
   event: PersistedToolEvent,
   profileId?: string
 ): ReactNode {
+  if (event.state === 'running') {
+    return <ChatMerchDesignCarouselLoading />;
+  }
   if (isChatMerchDesignCarouselResult(event.output)) {
     return (
       <ChatMerchDesignCarousel result={event.output} profileId={profileId} />
