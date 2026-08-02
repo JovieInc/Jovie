@@ -1,11 +1,15 @@
 'use client';
 
+import { SimpleTooltip } from '@jovie/ui';
 import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { memo } from 'react';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
-import { getChatUsageCopy } from '@/lib/chat-usage/copy';
+import {
+  getOverallRemainingPercent,
+  isChatUsageBelowWarningThreshold,
+} from '@/lib/chat-usage/metrics';
 import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries';
 
@@ -22,43 +26,26 @@ export const HeaderChatUsageIndicator = memo(
       return null;
     }
 
-    const copy = getChatUsageCopy(data);
-    const isPaidPlan = data.plan === 'pro' || data.plan === 'max';
-    const showHealthyPaidUsage =
-      isPaidPlan && !data.isNearLimit && !data.isExhausted;
-
-    if (!isPaidPlan && !data.isNearLimit && !data.isExhausted) {
+    if (!isChatUsageBelowWarningThreshold(data)) {
       return null;
     }
 
-    if (showHealthyPaidUsage) {
-      return (
-        <Link
-          href={APP_ROUTES.PRICING}
-          className='group inline-flex items-center gap-1.5 rounded-lg border border-subtle bg-surface-1 px-2.5 py-1.5 text-app font-caption text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
-          aria-label={copy.headerAriaLabel}
-        >
-          <span className='font-medium text-primary-token'>
-            {copy.planLabel}
-          </span>
-          <span className='text-tertiary-token' aria-hidden>
-            ·
-          </span>
-          <span className='tabular-nums'>{copy.headerLabel}</span>
-        </Link>
-      );
-    }
+    const remainingPercent = getOverallRemainingPercent(data);
+    const label = `${remainingPercent}% remaining`;
+    const detail = `${label}. Open the user menu for daily and monthly usage details.`;
 
     return (
-      <Link
-        href={APP_ROUTES.PRICING}
-        className='group inline-flex items-center gap-1.5 rounded-lg border border-amber-400/35 bg-amber-500/10 px-2.5 py-1.5 text-app font-caption text-amber-800 transition-colors hover:bg-amber-500/20 dark:text-amber-200'
-        aria-label={copy.headerAriaLabel}
-      >
-        <AlertTriangle className='h-3.5 w-3.5 shrink-0' />
-        <span className='max-sm:hidden sm:inline'>Chat</span>
-        <span className='tabular-nums'>{copy.headerLabel}</span>
-      </Link>
+      <SimpleTooltip content={detail} side='bottom'>
+        <Link
+          href={APP_ROUTES.PRICING}
+          className='group inline-flex items-center gap-1.5 rounded-lg border border-amber-400/35 bg-amber-500/10 px-2.5 py-1.5 text-app font-caption text-amber-800 transition-colors hover:bg-amber-500/20 dark:text-amber-200'
+          aria-label={detail}
+        >
+          <AlertTriangle className='h-3.5 w-3.5 shrink-0' />
+          <span className='max-sm:hidden sm:inline'>Usage</span>
+          <span className='tabular-nums'>{label}</span>
+        </Link>
+      </SimpleTooltip>
     );
   }
 );

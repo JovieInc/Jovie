@@ -1,5 +1,7 @@
 import type { ChatUsageData } from '@/lib/queries/useChatUsageQuery';
 
+export const CHAT_USAGE_WARNING_PERCENT = 10;
+
 export interface MonthlyUsageSnapshot {
   readonly limit: number;
   readonly used: number;
@@ -29,6 +31,14 @@ export function getOverallRemainingPercent(data: ChatUsageData): number {
   const dailyPercent = getRemainingPercent(data.remaining, data.dailyLimit);
   const monthlyPercent = getRemainingPercent(monthly.remaining, monthly.limit);
   return Math.min(dailyPercent, monthlyPercent);
+}
+
+/**
+ * Keeps the app-shell warning policy in one place while the user menu retains
+ * the detailed daily and monthly breakdown.
+ */
+export function isChatUsageBelowWarningThreshold(data: ChatUsageData): boolean {
+  return getOverallRemainingPercent(data) < CHAT_USAGE_WARNING_PERCENT;
 }
 
 export function formatResetAt(value: string | null | undefined): string {

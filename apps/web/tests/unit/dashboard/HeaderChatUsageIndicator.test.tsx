@@ -1,9 +1,23 @@
+import { TooltipProvider } from '@jovie/ui';
 import { describe, expect, it, vi } from 'vitest';
 import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatUsageIndicator';
 import { fastRender } from '@/tests/utils/fast-render';
 
 const mockUseChatUsageQuery = vi.fn();
 const mockUsePathname = vi.fn(() => '/app/chat');
+
+const usage = {
+  plan: 'pro' as const,
+  dailyLimit: 100,
+  used: 0,
+  remaining: 100,
+  monthlyLimit: 3000,
+  monthlyUsed: 0,
+  monthlyRemaining: 3000,
+  isNearLimit: false,
+  isExhausted: false,
+  warningThreshold: 5,
+};
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
@@ -13,65 +27,88 @@ vi.mock('@/lib/queries/useChatUsageQuery', () => ({
   useChatUsageQuery: () => mockUseChatUsageQuery(),
 }));
 
+function renderIndicator() {
+  return fastRender(
+    <TooltipProvider>
+      <HeaderChatUsageIndicator />
+    </TooltipProvider>
+  );
+}
+
 describe('HeaderChatUsageIndicator', () => {
   it('renders nothing when usage is healthy', () => {
     mockUseChatUsageQuery.mockReturnValue({
       data: {
+        ...usage,
         remaining: 12,
-        isNearLimit: false,
-        isExhausted: false,
+        used: 88,
+        monthlyRemaining: 360,
+        monthlyUsed: 2640,
       },
     });
 
-    const { queryByRole } = fastRender(<HeaderChatUsageIndicator />);
+    const { queryByRole } = renderIndicator();
 
     expect(queryByRole('link')).toBeNull();
   });
 
-  it('renders near-limit copy in header', () => {
+  it('renders a quiet warning when overall usage is below ten percent', () => {
     mockUseChatUsageQuery.mockReturnValue({
       data: {
-        plan: 'free',
-        remaining: 2,
-        isNearLimit: true,
-        isExhausted: false,
+        ...usage,
+        remaining: 9,
+        used: 91,
       },
     });
 
-    const { getByRole, getByText } = fastRender(<HeaderChatUsageIndicator />);
+    const { getByRole, getByText } = renderIndicator();
 
     expect(getByRole('link')).toBeDefined();
-    expect(getByText('2 messages left')).toBeDefined();
+    expect(getByText('9% remaining')).toBeDefined();
+    expect(getByRole('link')).toHaveAccessibleName(
+      '9% remaining. Open the user menu for daily and monthly usage details.'
+    );
   });
 
-  it('renders healthy paid plan usage in header', () => {
+  it('hides healthy paid plan usage in the header', () => {
     mockUseChatUsageQuery.mockReturnValue({
       data: {
-        plan: 'pro',
+        ...usage,
         remaining: 42,
-        isNearLimit: false,
-        isExhausted: false,
+        used: 58,
       },
     });
 
-    const { getByRole, getByText } = fastRender(<HeaderChatUsageIndicator />);
+    const { queryByRole } = renderIndicator();
 
-    expect(getByRole('link')).toBeDefined();
-    expect(getByText('Pro')).toBeDefined();
-    expect(getByText('42 messages left')).toBeDefined();
+    expect(queryByRole('link')).toBeNull();
+  });
+
+  it('does not warn at exactly ten percent remaining', () => {
+    mockUseChatUsageQuery.mockReturnValue({
+      data: {
+        ...usage,
+        remaining: 10,
+        used: 90,
+      },
+    });
+
+    const { queryByRole } = renderIndicator();
+
+    expect(queryByRole('link')).toBeNull();
   });
 
   it('suppresses the banner on nested demo routes', () => {
     mockUsePathname.mockReturnValueOnce('/demo/showcase/settings');
     mockUseChatUsageQuery.mockReturnValue({
       data: {
+        ...usage,
         remaining: 1,
-        isNearLimit: true,
-        isExhausted: false,
+        used: 99,
       },
     });
 
-    const { queryByRole } = fastRender(<HeaderChatUsageIndicator />);
+    const { queryByRole } = renderIndicator();
 
     expect(queryByRole('link')).toBeNull();
   });
