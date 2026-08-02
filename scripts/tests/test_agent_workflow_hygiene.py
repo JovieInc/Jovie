@@ -672,7 +672,16 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
 
     assert publication_timeout >= 75
     assert job_timeout >= capture_timeout + publication_timeout + 20
-    assert "env -u NEXT_DISABLE_TOOLBAR -u E2E_CLERK_USER_ID" in publication
+    for capture_only_variable in (
+        "DATABASE_URL",
+        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+        "CLERK_SECRET_KEY",
+        "NEXT_DISABLE_TOOLBAR",
+        "NEXT_PUBLIC_CLERK_PROXY_DISABLED",
+        "E2E_USE_TEST_AUTH_BYPASS",
+        "E2E_CLERK_USER_ID",
+    ):
+        assert f"-u {capture_only_variable}" in publication
 
 
 def test_cost_monitoring_docs_match_activation_gated_observer() -> None:

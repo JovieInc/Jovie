@@ -175,9 +175,16 @@ jobs:
           for ATTEMPT in 1 2 3; do
             set +e
             # Capture-only overrides must not leak into the repository's normal
-            # pre-push tests. They intentionally alter dev chrome and auth
-            # fallback behavior, so run the hook with those two values unset.
-            PUSH_OUTPUT=$(env -u NEXT_DISABLE_TOOLBAR -u E2E_CLERK_USER_ID \
+            # pre-push tests. They intentionally alter database, dev chrome, and
+            # auth behavior, so run the hook without the screenshot job env.
+            PUSH_OUTPUT=$(env \
+              -u DATABASE_URL \
+              -u NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY \
+              -u CLERK_SECRET_KEY \
+              -u NEXT_DISABLE_TOOLBAR \
+              -u NEXT_PUBLIC_CLERK_PROXY_DISABLED \
+              -u E2E_USE_TEST_AUTH_BYPASS \
+              -u E2E_CLERK_USER_ID \
               git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push --force origin "$BRANCH" 2>&1)
             PUSH_EXIT=$?
             set -e
