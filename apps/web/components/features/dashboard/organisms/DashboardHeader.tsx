@@ -132,12 +132,6 @@ export function DashboardHeader({
           className='flex min-w-0 flex-1 items-center gap-2 tracking-[-0.012em]'
           data-search-active={isSearchActive ? 'true' : 'false'}
         >
-          <div
-            className='flex h-7 w-7 shrink-0 items-center justify-center'
-            data-testid='dashboard-header-rail-slot'
-          >
-            {railToggle}
-          </div>
           {commandPaletteHeader ? (
             <div
               className='flex h-full min-w-0 flex-1 items-center'
@@ -158,6 +152,15 @@ export function DashboardHeader({
               {searchSurface}
             </div>
           ) : null}
+          {/* Keep the workspace title on the canonical left seam. The shared
+              rail slot stays mounted at a fixed width, but follows title/search
+              content so opening search or a rail never shifts the title. */}
+          <div
+            className='flex h-7 w-7 shrink-0 items-center justify-center'
+            data-testid='dashboard-header-rail-slot'
+          >
+            {railToggle}
+          </div>
         </div>
         {action ? (
           <div

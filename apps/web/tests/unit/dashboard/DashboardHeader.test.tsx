@@ -182,7 +182,7 @@ describe('DashboardHeader', () => {
     ).toBeInTheDocument();
   });
 
-  it('reserves the mirrored rail-toggle slot beside the breadcrumb through search activation', () => {
+  it('keeps the breadcrumb on the workspace seam while reserving the mirrored rail-toggle slot through search activation', () => {
     const { container, rerender } = render(
       <DashboardHeader
         breadcrumbs={[{ label: 'Library', href: '/app/library' }]}
@@ -196,7 +196,7 @@ describe('DashboardHeader', () => {
     expect(slot).toContainElement(
       screen.getByRole('button', { name: 'Show artist profile' })
     );
-    expect(slot.compareDocumentPosition(screen.getByRole('heading'))).toBe(
+    expect(screen.getByRole('heading').compareDocumentPosition(slot)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING
     );
 
