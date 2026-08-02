@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/commands/SharedCommandPalette.test.tsx
 
 /**
  * SharedCommandPalette — primitives shared by the chat slash picker and the

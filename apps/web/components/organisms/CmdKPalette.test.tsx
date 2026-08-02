@@ -76,9 +76,36 @@ describe('CmdKPalette', () => {
         name: 'Calendar Plan release dates and campaign moments. ⌘1',
       })
     ).toHaveAttribute('aria-selected', 'true');
+    expect(
+      screen.getByRole('option', {
+        name: 'Calendar Plan release dates and campaign moments. ⌘1',
+      })
+    ).toHaveClass('system-b-table-row-shell');
 
     fireEvent.keyDown(input, { key: 'Enter' });
 
     expect(pushMock).toHaveBeenCalledWith('/app/calendar');
+  });
+
+  it('keeps dense table results keyboard-selectable before committing', () => {
+    render(<MainPlaneHarness />);
+
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    const profile = screen.getByRole('option', {
+      name: 'Profile Open your profile in the chat workspace. ⌘1',
+    });
+
+    expect(profile).toHaveAttribute('aria-selected', 'true');
+    expect(profile).toHaveClass('system-b-table-row-shell');
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+
+    expect(
+      screen.getByRole('option', {
+        name: 'Connections Manage artist identities and connected services. ⌘2',
+      })
+    ).toHaveAttribute('aria-selected', 'true');
   });
 });
