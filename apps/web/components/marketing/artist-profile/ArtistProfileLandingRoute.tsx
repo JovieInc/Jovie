@@ -4,10 +4,11 @@ import { ARTIST_PROFILE_TRUTH_TILES } from '@/data/artistProfileFeatures';
 import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import { ARTIST_PROFILE_FLAGS } from '@/lib/featureFlags';
 import { ArtistProfileLandingPage } from './ArtistProfileLandingPage';
+import './ArtistProfileLandingPage.css';
 
 export function ArtistProfileLandingRoute() {
   return (
-    <MarketingPageShell>
+    <MarketingPageShell className='artist-profiles-home-system'>
       <ArtistProfileLandingPage
         copy={ARTIST_PROFILE_COPY}
         truthTiles={ARTIST_PROFILE_TRUTH_TILES}

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
@@ -31,6 +31,10 @@ vi.mock('@/lib/flags/marketing-static', async importOriginal => {
 describe('MarketingHeader', () => {
   beforeEach(() => {
     mockUsePathname.mockReturnValue('/about');
+    Object.defineProperty(window, 'scrollY', {
+      configurable: true,
+      value: 0,
+    });
   });
 
   it('renders marketing center navigation when the center-nav flag is enabled', () => {
@@ -60,6 +64,41 @@ describe('MarketingHeader', () => {
 
     expect(screen.getByRole('button', { name: /Features/ })).toBeVisible();
     expect(screen.getByRole('button', { name: /Resources/ })).toBeVisible();
+  });
+
+  it('uses the homepage presentation on the artist-profiles route', () => {
+    mockUsePathname.mockReturnValue('/artist-profiles');
+
+    render(<MarketingHeader />);
+
+    expect(screen.getByTestId('header-nav')).toHaveAttribute(
+      'data-presentation',
+      'homepage-embedded'
+    );
+  });
+
+  it('applies and cleans up the homepage scroll treatment', () => {
+    mockUsePathname.mockReturnValue('/artist-profiles');
+    const removeEventListener = vi.spyOn(window, 'removeEventListener');
+    const { unmount } = render(<MarketingHeader />);
+    const header = screen.getByTestId('header-nav');
+
+    expect(header).not.toHaveAttribute('data-scrolled');
+
+    Object.defineProperty(window, 'scrollY', {
+      configurable: true,
+      value: 24,
+    });
+    fireEvent.scroll(window);
+
+    expect(header).toHaveAttribute('data-scrolled', 'true');
+
+    unmount();
+    expect(removeEventListener).toHaveBeenCalledWith(
+      'scroll',
+      expect.any(Function)
+    );
+    removeEventListener.mockRestore();
   });
 
   it('renders explicit custom nav links when the shared nav flag is enabled', () => {

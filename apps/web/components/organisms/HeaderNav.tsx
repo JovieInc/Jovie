@@ -351,7 +351,7 @@ export function HeaderNav({
   }, [clearFlyoutCloseTimer]);
 
   useEffect(() => {
-    if (!isMarketingGlass) {
+    if (!isMarketingGlass && !isHomepagePresentation) {
       return;
     }
 
@@ -360,7 +360,7 @@ export function HeaderNav({
     window.addEventListener('scroll', handleScroll, { passive: true });
 
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [isMarketingGlass]);
+  }, [isHomepagePresentation, isMarketingGlass]);
 
   useEffect(() => {
     if (!isMarketingGlass || openFlyoutId === null) {

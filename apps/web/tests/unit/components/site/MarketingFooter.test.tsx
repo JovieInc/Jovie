@@ -69,6 +69,19 @@ describe('MarketingFooter', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('keeps artist profiles on the minimal homepage footer treatment', () => {
+    mockUsePathname.mockReturnValue('/artist-profiles');
+
+    render(<MarketingFooter />);
+
+    expect(screen.getByTestId('marketing-footer')).toHaveClass(
+      'system-b-mounted-home-footer'
+    );
+    expect(
+      screen.queryByTestId('marketing-footer-cta')
+    ).not.toBeInTheDocument();
+  });
+
   it('honors the expanded footer variant when the full-footer flag is enabled', () => {
     render(<MarketingFooter variant='expanded' />);
 

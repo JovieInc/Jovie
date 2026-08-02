@@ -32,7 +32,7 @@ const forbiddenPricingCssPatterns = [
 
 function extractPricingComponentSource(source: string): string {
   const start = source.indexOf('export function HomepageV2Pricing()');
-  const end = source.indexOf('export function HomepageV2FinalCta()', start);
+  const end = source.indexOf('export function HomepageV2FinalCta(', start);
 
   expect(start, 'homepage pricing source exists').toBeGreaterThanOrEqual(0);
   expect(end, 'homepage pricing source is bounded').toBeGreaterThan(start);

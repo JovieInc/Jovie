@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- **Artist Profiles now tells one product-first conversion story:** homepage-matched chrome, an adaptive four-moment profile, outcome ledger, permission-based fan loop, annotated product truth, continuous setup, honest release-cycle states, and the shared FAQ/close replace card-heavy marketing drift.
 - [internal] **Staging OAuth runtime proof no longer dead-clicks pre-hydration provider buttons (#15371):** AuthShell keeps Google/Apple buttons disabled until React hydrates, surfaces Better Auth soft-errors, and the production-smoke OAuth test waits on `data-auth-shell-hydrated` so provider navigation is actually emitted.
 - **Onboarding shows real presence-build tasks live after signup (JOV-3988):** new creators get four seeded workflow tasks (research artist, assemble profile, smart link, welcome draft) that only surface data already found, stream tool artifacts in the welcome chat, and fall back to the existing welcome path when the kill-switch is off or the queue fails.
 - [internal] **Typecheck singleflight no longer replaces live owners by age (JOV-4524):** locks are reclaimed only for dead owners, missing-pid age expiry, or bounded corrupt-lock recovery; live owners past the 30m window stay authoritative, with structured recovery logs and regression coverage.

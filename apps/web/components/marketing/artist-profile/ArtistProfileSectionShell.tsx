@@ -2,8 +2,7 @@ import type { ReactNode, Ref } from 'react';
 import { cn } from '@/lib/utils';
 import { MarketingContainer } from '../MarketingContainer';
 
-const PAGE_CHROME_ALIGNED_CONTAINER_CLASS =
-  '!max-w-linear-content !px-5 sm:!px-6 lg:!px-0';
+const PAGE_CHROME_ALIGNED_CONTAINER_CLASS = 'ap-section-container !px-0';
 
 interface ArtistProfileSectionShellProps {
   readonly id?: string;
@@ -29,7 +28,7 @@ export function ArtistProfileSectionShell({
       className={cn(
         // Shared rhythm keeps every landing-page chapter on the same vertical
         // cadence while each section controls only its own surface treatment.
-        'frame-section relative py-20 sm:py-24 lg:py-28',
+        'ap-section-shell frame-section relative py-20 sm:py-24 lg:py-28',
         className
       )}
     >

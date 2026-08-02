@@ -16,6 +16,55 @@
  * or design-system.css.
  */
 
+[data-testid="header-nav"][data-presentation="homepage-embedded"] nav {
+  --homepage-embedded-gutter: clamp(var(--space-5), 2.2vw, var(--space-8));
+  width: min(
+    var(--ds-public-content-max),
+    calc(100% - (var(--homepage-embedded-gutter) * 2))
+  ) !important;
+  max-width: var(--ds-public-content-max) !important;
+  margin-inline: auto !important;
+  padding-inline: 0 !important;
+}
+
+[data-testid="header-nav"][data-presentation="homepage-embedded"] nav > div {
+  height: calc(var(--space-10) + var(--space-1)) !important;
+  max-width: var(--ds-public-content-max);
+  margin-top: var(--space-2);
+  padding-inline: 0;
+  border: 1px solid transparent;
+  border-radius: calc(var(--space-5) + var(--space-0-5));
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition:
+    background-color var(--ds-motion-subtle-duration)
+    var(--ds-motion-subtle-easing),
+    border-color var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
+    backdrop-filter var(--ds-motion-subtle-duration)
+    var(--ds-motion-subtle-easing);
+}
+
+[data-testid="header-nav"][data-presentation="homepage-embedded"][data-scrolled="true"]
+  nav
+  > div {
+  border-color: color-mix(
+    in oklab,
+    var(--system-b-text-primary) 6%,
+    transparent
+  );
+  background: color-mix(in oklab, var(--system-b-bg-page) 78%, transparent);
+  backdrop-filter: blur(var(--space-5)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--space-5)) saturate(150%);
+}
+
+[data-testid="header-nav"][data-presentation="homepage-embedded"]
+  [data-testid="site-logo"] {
+  width: auto;
+  height: var(--space-5);
+}
+
 .marketing-glass-header {
   --marketing-glass-top: clamp(0.42rem, 0.8vw, 0.62rem);
   --marketing-glass-height: 2.72rem;
