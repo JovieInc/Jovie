@@ -56,10 +56,6 @@ const items: EntityCardModel[] = [
 ];
 
 describe('EntityCarousel profile geometry', () => {
-  beforeEach(() => {
-    mockUseReducedMotion.mockReturnValue(false);
-  });
-
   it('scopes card impressions to the carousel viewport', () => {
     const observerOptions: Array<IntersectionObserverInit | undefined> = [];
     class MockIntersectionObserver {
