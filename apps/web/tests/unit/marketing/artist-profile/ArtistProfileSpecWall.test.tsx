@@ -15,13 +15,11 @@ describe('ArtistProfileSpecWall', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: 'Built for artists.',
+        name: ARTIST_PROFILE_COPY.specWall.headline,
       })
     ).toBeInTheDocument();
     expect(
-      screen.getByText(
-        'The product truth behind one fast, music-native profile—kept compact on purpose.'
-      )
+      screen.getByText(ARTIST_PROFILE_COPY.specWall.subhead)
     ).toBeInTheDocument();
 
     expect(screen.getAllByTestId('artist-profile-truth-tile')).toHaveLength(10);

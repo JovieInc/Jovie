@@ -345,6 +345,11 @@ export interface ArtistProfileLandingCopy {
   readonly specWall: {
     readonly headline: string;
     readonly subhead: string;
+    readonly callouts?: readonly {
+      readonly id: 'identity' | 'release' | 'action' | 'navigation';
+      readonly title: string;
+      readonly body: string;
+    }[];
   };
   readonly howItWorks: {
     readonly headline: string;
@@ -427,7 +432,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     eyebrow: '',
     headline: 'The link your music deserves.',
     subhead:
-      'One adaptive home for music, merch, social links, and fan capture — free to start.',
+      'One profile that puts the right action first—from pre-save and release day to nearby shows, support, and fan follow-up.',
     ctaLabel: 'Claim your profile',
     signature: 'jov.ie/you',
     proofWhisper: 'Used by artists on',
@@ -436,13 +441,13 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   adaptive: {
     eyebrow: '',
-    headline: 'One profile that adapts to every fan.',
+    headline: 'One adaptive profile. Four moments.',
     alternateHeadlines: [
       'One profile for every release moment.',
       'One link, tuned to what matters right now.',
       'The same link, different job.',
     ],
-    body: 'Link once. Capture the fan. Learn what converts. Close the moment. Before a drop, the profile becomes a countdown. On release day, fans route to the right service. On tour, nearby dates lead. At the merch table, one scan becomes support and capture.',
+    body: 'Keep the same link everywhere. Jovie changes the leading action as the moment changes.',
     contextCues: [
       'Release-aware',
       'Location-aware',
@@ -617,7 +622,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   outcomes: {
     headline: 'Built around fan outcomes.',
-    body: 'Link, capture, learn, convert — each profile state reduces friction and moves the fan to the next right action.',
+    body: 'Every state removes a choice and moves the fan toward one useful action.',
     cards: [
       {
         id: 'drive-streams',
@@ -646,25 +651,25 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     landingCards: [
       {
         id: 'straight-to-listen',
-        title: 'Straight to listen',
+        title: 'Listen',
         description:
           'Fans land on the right release and the right platform without hunting through a stack of links.',
       },
       {
         id: 'local-dates-first',
-        title: 'Local dates first',
+        title: 'Show Up',
         description:
           'Touring fans see the show that matters to them instead of scrolling through cities that do not.',
       },
       {
         id: 'support-without-friction',
-        title: 'Support without friction',
+        title: 'Support',
         description:
           'When someone is ready to support, the profile turns that moment into action fast.',
       },
       {
         id: 'capture-the-fan',
-        title: 'Capture the fan',
+        title: 'Stay Close',
         description:
           'A listen, a signup, or a support moment can become a real fan relationship instead of an anonymous click.',
       },
@@ -770,9 +775,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   opinionated: {
     eyebrow: 'Opinionated by design',
-    headline: 'Built to convert, not decorate.',
-    body: 'Jovie is intentionally constrained. No theme builder. No layout rabbit hole. No generic creator-site sprawl. Every profile teaches fans what to tap because the product is built around release moments, show moments, and conversion.',
-    principle: 'No template maze.',
+    headline: 'One clear action beats a wall of links.',
+    body: 'Fans should not have to choose from a wall of links. Jovie leads with the action that matters now.',
+    principle: 'One profile. One decision.',
     columns: ['Moment', 'Jovie reads', 'Primary action'],
     decisions: [
       {
@@ -934,9 +939,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     playLabel: 'Play pay flow',
   },
   capture: {
-    headline: 'Capture every fan, not just the click.',
-    subhead: 'One opt-in can become a lasting fan relationship.',
-    body: 'Fans opt in once. From there, Jovie can keep them close with release alerts and future follow-up. The profile is not just a destination. It is the start of an owned audience.',
+    headline: 'One fan moment. A relationship you keep.',
+    subhead: 'One opt-in can become the next release listen.',
+    body: 'When a fan opts in, the next release or nearby show has a direct path back to them. Their permission turns one moment into an audience you can reach again.',
     action: {
       title: 'Get updates',
       detail: 'Release and nearby-show alerts.',
@@ -1086,13 +1091,35 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     ],
   },
   specWall: {
-    headline: 'Built for artists.',
+    headline: 'Your music stays together. The right action leads.',
     subhead:
-      'The product truth behind one fast, music-native profile—kept compact on purpose.',
+      'Fans can listen, find shows, follow, and support you without leaving your profile.',
+    callouts: [
+      {
+        id: 'identity',
+        title: 'They Know It Is You',
+        body: 'Your name, image, and verified destinations make the profile unmistakably yours.',
+      },
+      {
+        id: 'release',
+        title: 'New Music Is Ready',
+        body: 'Your current release is ready to play without making fans search for it.',
+      },
+      {
+        id: 'action',
+        title: 'The Right Next Move',
+        body: 'Pre-save before release. Listen when it drops. Tickets when fans are nearby.',
+      },
+      {
+        id: 'navigation',
+        title: 'Everything Stays Close',
+        body: 'Music, shows, support, and updates stay in one place.',
+      },
+    ],
   },
   howItWorks: {
     headline: 'One link. Three steps.',
-    body: 'Claim the profile, connect the essentials, and keep the same URL everywhere.',
+    body: 'Claim your artist name, connect your catalog, and share one Jovie link everywhere.',
     steps: [
       {
         id: 'claim',
@@ -1155,11 +1182,12 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     },
   },
   socialProof: {
-    headline: 'Built for real artist workflows.',
-    intro: 'Real artist profiles. Real release moments.',
+    headline: 'One profile through the whole release cycle.',
+    intro:
+      'Pre-save before release. Nearby tickets on tour. Direct support in person.',
   },
   faq: {
-    headline: 'Questions, answered.',
+    headline: 'Questions',
     items: [
       {
         question: 'How is this different from Linktree?',
@@ -1177,15 +1205,15 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           'Yes. Touring, tickets, QR sharing, and support flows all fit inside the same profile instead of living on separate links.',
       },
       {
-        question: 'How long does setup take?',
+        question: 'Is an Artist Profile free?',
         answer:
-          'Fast. Claim the profile, connect your music and links, and start sharing one URL.',
+          'Yes. Artist Profiles are free. Pro adds release tools when you need them.',
       },
     ],
   },
   finalCta: {
     headline: 'Claim your profile.',
-    subhead: 'One link for every release, show, and fan action.',
+    subhead: 'One adaptive profile for every release, show, and fan action.',
     ctaLabel: 'Claim your profile',
     signature: 'jov.ie/you',
   },
