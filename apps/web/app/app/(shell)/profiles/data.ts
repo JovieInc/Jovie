@@ -349,6 +349,7 @@ export async function loadProfilesWorkspaceData(input: {
     const qualificationStatus =
       surface.qualificationStatus as ProfileQualificationStatus;
     const trackedUrl =
+      surface.kind === 'social' &&
       socialSourceIds.has(surface.id) &&
       resolveSocialShortcutPlatforms(surface.platform) &&
       profileRows[0]?.username
