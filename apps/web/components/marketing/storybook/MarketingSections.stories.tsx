@@ -19,6 +19,7 @@ import { ArtistProfileHeroAdaptiveIntro } from '@/components/marketing/artist-pr
 import { ArtistProfileHowItWorks } from '@/components/marketing/artist-profile/ArtistProfileHowItWorks';
 import { ArtistProfileModeSwitcher } from '@/components/marketing/artist-profile/ArtistProfileModeSwitcher';
 import { ArtistProfileMonetizationSection } from '@/components/marketing/artist-profile/ArtistProfileMonetizationSection';
+import { ArtistProfileOpinionatedSection } from '@/components/marketing/artist-profile/ArtistProfileOpinionatedSection';
 import { ArtistProfileOutcomesCarousel } from '@/components/marketing/artist-profile/ArtistProfileOutcomesCarousel';
 import { ArtistProfileSectionShell } from '@/components/marketing/artist-profile/ArtistProfileSectionShell';
 import { ArtistProfileSocialProof } from '@/components/marketing/artist-profile/ArtistProfileSocialProof';
@@ -377,6 +378,9 @@ export const capture: Story = {
       <ArtistProfileCaptureSection
         capture={ARTIST_PROFILE_COPY.capture}
         id='storybook-capture'
+      />
+      <ArtistProfileOpinionatedSection
+        opinionated={ARTIST_PROFILE_COPY.opinionated}
       />
     </SectionFrame>
   ),

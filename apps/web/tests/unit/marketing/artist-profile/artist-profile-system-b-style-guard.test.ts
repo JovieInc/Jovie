@@ -147,6 +147,28 @@ describe('artist profile landing family System B source contract', () => {
     expect(intro).toContain('HomeTrustSection');
     expect(intro).toContain("presentation='inline-strip'");
 
+    const capture = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/marketing/artist-profile/ArtistProfileCaptureSection.tsx'
+      ),
+      'utf8'
+    );
+    expect(capture).toContain('ap-capture-loop');
+    expect(capture).toContain('ArtistProfilePhoneFrame');
+    expect(capture).toContain("'tim-white-profile-subscribe-mobile'");
+
+    const opinionated = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/marketing/artist-profile/ArtistProfileOpinionatedSection.tsx'
+      ),
+      'utf8'
+    );
+    expect(opinionated).toContain('StaticMenuPreview');
+    expect(opinionated).toContain('ap-opinionated__comparison-track');
+    expect(opinionated).toContain("'tim-white-profile-live-mobile'");
+
     const finalCta = readFileSync(
       resolve(
         process.cwd(),

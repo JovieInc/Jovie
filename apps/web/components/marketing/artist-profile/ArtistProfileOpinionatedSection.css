@@ -1,13 +1,72 @@
-/*
- * Artist-profile opinionated section (System B).
- *
- * Only the ch measure limit that Tailwind utilities cannot express lives
- * here; everything else stays on token utilities and the shared SHELL_*
- * type classes in the TSX.
- *
- * Scoped to the `ap-opinionated` prefix.
- */
-
 .ap-opinionated__headline {
   max-width: 12ch;
+}
+
+.ap-opinionated__comparison {
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
+}
+
+.ap-opinionated__comparison::-webkit-scrollbar {
+  display: none;
+}
+
+.ap-opinionated__comparison-pane {
+  scroll-snap-align: start;
+}
+
+.ap-opinionated__comparison-media {
+  position: relative;
+  height: clamp(22rem, 42vw, 34rem);
+  overflow: hidden;
+  background: var(--color-bg-surface-0);
+}
+
+.ap-opinionated__menu-preview {
+  width: min(20rem, 72%);
+  margin: 0 auto;
+  padding-top: clamp(2rem, 6vw, 4rem);
+}
+
+.ap-opinionated__menu-avatar {
+  width: 4rem;
+  height: 4rem;
+  margin: 0 auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-surface-2);
+}
+
+.ap-opinionated__menu-name {
+  width: 7rem;
+  height: 0.6rem;
+  margin: var(--space-4) auto var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--color-border-default);
+}
+
+.ap-opinionated__menu-links {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.ap-opinionated__menu-link {
+  display: flex;
+  min-height: 3.25rem;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-xs);
+}
+
+@media (max-width: 47.99rem) {
+  .ap-opinionated__comparison-track {
+    width: 164vw;
+  }
+
+  .ap-opinionated__comparison-media {
+    height: 21rem;
+  }
 }
