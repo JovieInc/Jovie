@@ -1,5 +1,7 @@
-import { ArrowRight, MapPin, Music2, QrCode } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
+import Image from 'next/image';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
+import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { cn } from '@/lib/utils';
 import { SHELL_H2_CLASS, SHELL_LEAD_CLASS } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
@@ -9,83 +11,93 @@ interface ArtistProfileOpinionatedSectionProps {
   readonly opinionated: ArtistProfileLandingCopy['opinionated'];
 }
 
-const DECISION_ICONS = {
-  release: Music2,
-  tour: MapPin,
-  support: QrCode,
-} as const;
+const LIVE_PROFILE = getMarketingExportImage('tim-white-profile-live-mobile');
+
+function StaticMenuPreview() {
+  const links = [
+    'Latest Release',
+    'Tour Dates',
+    'Merch',
+    'Subscribe',
+    'Contact',
+  ];
+
+  return (
+    <div
+      className='ap-opinionated__menu-preview'
+      role='img'
+      aria-label='Static Link Menu Giving Every Destination Equal Weight.'
+    >
+      <div className='ap-opinionated__menu-avatar' />
+      <div className='ap-opinionated__menu-name' />
+      <div className='ap-opinionated__menu-links'>
+        {links.map(link => (
+          <div key={link} className='ap-opinionated__menu-link'>
+            <span>{link}</span>
+            <ArrowUpRight aria-hidden='true' size={14} strokeWidth={1.6} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function ArtistProfileOpinionatedSection({
   opinionated,
 }: Readonly<ArtistProfileOpinionatedSectionProps>) {
   return (
     <ArtistProfileSectionShell>
-      <div className='grid items-start gap-12 lg:grid-cols-[minmax(0,0.8fr)_minmax(30rem,1.2fr)] lg:gap-20'>
-        <div className='max-w-xl lg:sticky lg:top-32'>
-          {/* ui-casing-allow: marketing display headline */}
+      <div className='mx-auto max-w-public-content'>
+        <div className='grid items-end gap-8 lg:grid-cols-[minmax(0,0.78fr)_minmax(0,1fr)]'>
           <h2 className={cn(SHELL_H2_CLASS, 'ap-opinionated__headline')}>
             {opinionated.headline}
           </h2>
-          <p className={cn(SHELL_LEAD_CLASS, 'mt-6')}>{opinionated.body}</p>
-          <p className='mt-7 inline-flex rounded-full border border-subtle bg-surface-0 px-4 py-2 font-mono text-xs text-secondary-token'>
-            {opinionated.principle}
+          <p className={cn(SHELL_LEAD_CLASS, 'max-w-xl lg:justify-self-end')}>
+            {opinionated.body}
           </p>
         </div>
 
-        <div className='overflow-hidden rounded-2xl border border-subtle bg-surface-0'>
-          <div
-            aria-hidden='true'
-            className='hidden grid-cols-[1fr_1fr_auto] gap-6 border-b border-subtle px-5 py-4 text-3xs font-semibold text-tertiary-token sm:grid'
-          >
-            {opinionated.columns.map(column => (
-              <span key={column}>{column}</span>
-            ))}
-          </div>
+        <div className='ap-opinionated__comparison mt-12 overflow-x-auto'>
+          <div className='ap-opinionated__comparison-track grid min-w-168 grid-cols-2 border-y border-subtle'>
+            <figure className='ap-opinionated__comparison-pane py-5 pr-5 sm:py-7 sm:pr-7'>
+              <figcaption className='mb-5 flex items-baseline justify-between gap-4'>
+                <strong className='text-sm font-semibold text-primary-token'>
+                  Static Menu
+                </strong>
+                <span className='text-xs text-tertiary-token'>
+                  Every option at once
+                </span>
+              </figcaption>
+              <div className='ap-opinionated__comparison-media'>
+                <StaticMenuPreview />
+              </div>
+            </figure>
 
-          <div className='divide-y divide-subtle'>
-            {opinionated.decisions.map(decision => {
-              const Icon = DECISION_ICONS[decision.id];
-
-              return (
-                <article key={decision.id} className='px-5 py-6'>
-                  <dl className='grid gap-5 sm:grid-cols-[1fr_1fr_auto] sm:items-center sm:gap-6'>
-                    <div>
-                      <dt className='sr-only'>{opinionated.columns[0]}</dt>
-                      <dd className='flex items-center gap-3'>
-                        <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1 text-secondary-token'>
-                          <Icon className='h-4 w-4' aria-hidden='true' />
-                        </span>
-                        <span className='text-sm font-semibold text-primary-token'>
-                          {decision.context}
-                        </span>
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className='sr-only'>{opinionated.columns[1]}</dt>
-                      <dd className='text-app text-secondary-token'>
-                        {decision.signal}
-                      </dd>
-                    </div>
-
-                    <div>
-                      <dt className='sr-only'>{opinionated.columns[2]}</dt>
-                      <dd className='flex items-center gap-3 sm:justify-end'>
-                        <ArrowRight
-                          className='h-4 w-4 text-tertiary-token'
-                          aria-hidden='true'
-                        />
-                        <span className='font-mono text-xs font-semibold text-primary-token'>
-                          {decision.action}
-                        </span>
-                      </dd>
-                    </div>
-                  </dl>
-                </article>
-              );
-            })}
+            <figure className='ap-opinionated__comparison-pane border-l border-subtle py-5 pl-5 sm:py-7 sm:pl-7'>
+              <figcaption className='mb-5 flex items-baseline justify-between gap-4'>
+                <strong className='text-sm font-semibold text-primary-token'>
+                  Adaptive Lead
+                </strong>
+                <span className='text-xs text-tertiary-token'>
+                  One clear move
+                </span>
+              </figcaption>
+              <div className='ap-opinionated__comparison-media'>
+                <Image
+                  fill
+                  src={LIVE_PROFILE.publicUrl}
+                  alt='Jovie artist profile leading with one clear Listen action.'
+                  className='object-contain object-top'
+                  sizes='(min-width: 1024px) 36rem, 78vw'
+                />
+              </div>
+            </figure>
           </div>
         </div>
+
+        <p className='mt-5 font-mono text-xs text-tertiary-token'>
+          {opinionated.principle}
+        </p>
       </div>
     </ArtistProfileSectionShell>
   );
