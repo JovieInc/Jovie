@@ -14,6 +14,7 @@
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs reconcile --dry-run
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs audit
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs admit-next
+ *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs approve-plan --issue=JOV-123 --evidence-file=/path/evidence.json
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs report
  */
 
@@ -28,6 +29,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 import * as admitter from './admitter.mjs';
 import * as classifier from './classifier.mjs';
 import * as linear from './linear-client.mjs';
+import * as planGate from './plan-gate.mjs';
 import * as reconciler from './reconcile.mjs';
 import * as reporter from './reporter.mjs';
 import * as scorer from './scorer.mjs';
@@ -60,6 +62,16 @@ async function main() {
   const command = args[0];
   const isDryRun = args.includes('--dry-run');
   const issueArg = args.find(a => a.startsWith('--issue='))?.split('=')[1];
+  const evidenceFile = args
+    .find(a => a.startsWith('--evidence-file='))
+    ?.split('=')
+    .slice(1)
+    .join('=');
+  const evidenceJson = args
+    .find(a => a.startsWith('--evidence='))
+    ?.split('=')
+    .slice(1)
+    .join('=');
 
   if (!command || command === '--help') {
     console.log(`
@@ -69,6 +81,7 @@ Usage:
   node backlog-orchestrator.mjs reconcile --issue=JOV-123  Single issue
   node backlog-orchestrator.mjs audit                Full backlog audit (shadow)
   node backlog-orchestrator.mjs admit-next            Admit next work item
+  node backlog-orchestrator.mjs approve-plan --issue=JOV-123 --evidence-file=/path/evidence.json
   node backlog-orchestrator.mjs report                Generate shadow report
 `);
     return;
@@ -82,10 +95,45 @@ Usage:
     await runReconcile(cache, isDryRun, issueArg);
   } else if (command === 'admit-next') {
     await runAdmitNext(cache, isDryRun);
+  } else if (command === 'approve-plan') {
+    await runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun);
   } else {
     console.error(`Unknown command: ${command}`);
     process.exit(1);
   }
+}
+
+async function runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun) {
+  if (!issueArg || (!evidenceFile && !evidenceJson))
+    throw new Error(
+      'approve-plan requires --issue and --evidence-file or --evidence'
+    );
+  const evidence = evidenceFile
+    ? JSON.parse(readFileSync(evidenceFile, 'utf8'))
+    : JSON.parse(evidenceJson);
+  const issue = await linear.fetchIssue(issueArg);
+  if (!issue) throw new Error(`Issue ${issueArg} not found`);
+  const reason = planGate.validatePlanCandidate(issue, evidence);
+  if (isDryRun) {
+    console.log(
+      JSON.stringify(
+        {
+          schema: planGate.PLAN_GATE_SCHEMA,
+          status: reason ? 'rejected' : 'would-approve',
+          reason,
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+  const receipt = await planGate.approvePlan({
+    issue,
+    evidence,
+    client: linear,
+  });
+  console.log(JSON.stringify(receipt, null, 2));
 }
 
 async function runAudit(cache, isDryRun) {

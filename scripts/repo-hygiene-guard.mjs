@@ -70,6 +70,17 @@ const FORBIDDEN_ROOT_DIRECTORIES = new Set([
   'tmp',
 ]);
 
+// These paths are committed outputs/metadata consumed by the application or
+// scheduled audits. They remain covered by the byte and binary budgets, but do
+// not consume the source-file-count budget; otherwise a source PR is blocked as
+// soon as the measured baseline reaches the cap.
+const TRACKED_FILE_COUNT_EXCLUSIONS = [
+  /^apps\/web\/lib\/design\/generated\//,
+  /^apps\/web\/styles\/generated\//,
+  /^apps\/web\/reports\//,
+  /^apps\/web\/screenshot-catalog\/current\/manifest\.json$/,
+];
+
 const FORBIDDEN_GENERATED_PATHS = [
   /(?:^|\/)node_modules(?:\/|$)/,
   /(?:^|\/)\.next(?:\/|$)/,
@@ -278,7 +289,9 @@ export function evaluateRepoHygiene({
     // A symlink's target is outside the tracked payload and must not be followed.
     if (!stats.isFile()) continue;
 
-    trackedFiles += 1;
+    if (!TRACKED_FILE_COUNT_EXCLUSIONS.some(pattern => pattern.test(path))) {
+      trackedFiles += 1;
+    }
     trackedBytes += stats.size;
     if (!isBinary(path)) continue;
     trackedBinaryFiles += 1;
