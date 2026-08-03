@@ -1,10 +1,15 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/atoms/table-action-menu/TableActionMenu.interaction.test.tsx
+
 import type { CommonDropdownItem } from '@jovie/ui';
 import { CommonDropdown } from '@jovie/ui';
 import { MoreVertical } from 'lucide-react';
 import type { TableActionMenuItem, TableActionMenuProps } from './types';
-import { isSeparatorItem } from './utils';
+
+function isSeparatorItem(id: string): boolean {
+  return id === 'separator' || id.startsWith('separator-');
+}
 
 const DEFAULT_TRIGGER_CLASS_NAME = [
   'ml-auto',
