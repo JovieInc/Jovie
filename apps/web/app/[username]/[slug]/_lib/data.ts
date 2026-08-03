@@ -662,7 +662,8 @@ function rehydrateContent(
  */
 export async function getUnpublishedReleasePresence(
   creatorProfileId: string,
-  slug: string
+  slug: string,
+  options: { readonly onError?: 'return-null' | 'throw' } = {}
 ): Promise<{ readonly title: string } | null> {
   try {
     const [row] = await db
@@ -694,6 +695,7 @@ export async function getUnpublishedReleasePresence(
       },
       'public-smart-link'
     );
+    if (options.onError === 'throw') throw error;
     return null;
   }
 }

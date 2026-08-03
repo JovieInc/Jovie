@@ -81,7 +81,7 @@ export function CookieBannerSection() {
 
     const root = document.documentElement;
 
-    if (!visible || isSuppressedPath) {
+    if (!visible || isSuppressedPath || customize) {
       root.style.removeProperty('--cookie-banner-h');
       return;
     }
@@ -122,7 +122,7 @@ export function CookieBannerSection() {
       globalThis.removeEventListener('resize', update);
       root.style.removeProperty('--cookie-banner-h');
     };
-  }, [visible, isSuppressedPath, shouldClearProfileDock]);
+  }, [visible, isSuppressedPath, shouldClearProfileDock, customize]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -203,10 +203,10 @@ export function CookieBannerSection() {
         <aside
           aria-label='Cookie Consent'
           data-testid='cookie-banner'
-          className={`cookie-banner-card fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-85 sm:max-w-95 ${
+          className={`cookie-banner-card fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-85 ${
             shouldClearProfileDock
               ? 'cookie-banner-card--above-public-profile-dock'
-              : ''
+              : 'sm:max-w-95'
           }`}
         >
           <div className='rounded-2xl border border-(--linear-app-frame-seam) bg-surface-1 shadow-card px-4 py-4'>

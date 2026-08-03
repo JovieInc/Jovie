@@ -142,9 +142,15 @@ describe('CookieBannerSection', () => {
     );
   });
 
-  it('gives the preferences modal sole ownership of the consent surface', () => {
+  it('gives the preferences modal sole ownership of the consent surface', async () => {
     setCookie('jv_cc_required=1');
     render(<CookieBannerSection />);
+
+    await vi.waitFor(() => {
+      expect(
+        document.documentElement.style.getPropertyValue('--cookie-banner-h')
+      ).toBe('28px');
+    });
 
     fireEvent.click(screen.getByRole('button', { name: /customize/i }));
 
@@ -152,6 +158,11 @@ describe('CookieBannerSection', () => {
     expect(
       screen.getByRole('dialog', { name: /cookie preferences/i })
     ).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(
+        document.documentElement.style.getPropertyValue('--cookie-banner-h')
+      ).toBe('');
+    });
 
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
 
@@ -159,6 +170,11 @@ describe('CookieBannerSection', () => {
       screen.queryByRole('dialog', { name: /cookie preferences/i })
     ).not.toBeInTheDocument();
     expect(screen.getByTestId('cookie-banner')).toBeInTheDocument();
+    await vi.waitFor(() => {
+      expect(
+        document.documentElement.style.getPropertyValue('--cookie-banner-h')
+      ).toBe('28px');
+    });
   });
 
   it('publishes --cookie-banner-h CSS var for coordinated floating surfaces', async () => {

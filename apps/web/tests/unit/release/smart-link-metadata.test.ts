@@ -212,9 +212,37 @@ describe('smart-link metadata', () => {
     ).rejects.toThrow('NEXT_REDIRECT');
     expect(getUnpublishedReleasePresenceMock).toHaveBeenCalledWith(
       'creator-1',
-      'music'
+      'music',
+      { onError: 'throw' }
+    );
+    expect(findRedirectByOldSlugMock).toHaveBeenCalledWith(
+      'creator-1',
+      'music',
+      { onError: 'throw' }
     );
     expect(redirectMock).toHaveBeenCalledWith('/dualipa?mode=listen&source=qr');
+  });
+
+  it('does not convert failed collision checks into a cached mode redirect', async () => {
+    getContentBySlugMock.mockResolvedValue(null);
+    findRedirectByOldSlugMock.mockRejectedValue(
+      new Error('collision lookup unavailable')
+    );
+
+    const { default: ProfileAliasResolverPage } = await import(
+      '@/app/[username]/[...slug]/page'
+    );
+
+    await expect(
+      ProfileAliasResolverPage({
+        params: Promise.resolve({
+          username: 'dualipa',
+          slug: ['music', '__profile-mode-alias', 'resolve'],
+        }),
+      })
+    ).rejects.toThrow('collision lookup unavailable');
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(permanentRedirectMock).not.toHaveBeenCalled();
   });
 
   it('keeps renamed-release redirects ahead of matching mode aliases', async () => {

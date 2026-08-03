@@ -1011,6 +1011,8 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
       { label: 'compact edge', width: 767, height: 1024 },
       { label: 'tablet', width: 768, height: 1024 },
       { label: 'desktop', width: 1024, height: 1024 },
+      { label: 'compact desktop edge', width: 1179, height: 1024 },
+      { label: 'desktop layout edge', width: 1180, height: 1024 },
       { label: 'wide desktop', width: 1440, height: 1024 },
     ] as const;
 
@@ -1036,7 +1038,9 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
             if (!element) return null;
             const bounds = element.getBoundingClientRect();
             return {
+              left: bounds.left,
               top: bounds.top,
+              right: bounds.right,
               bottom: bounds.bottom,
               width: bounds.width,
               height: bounds.height,
@@ -1072,7 +1076,7 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
         Object.assign(banner.style, {
           position: 'fixed',
           right: '16px',
-          width: 'min(340px, calc(100vw - 32px))',
+          width: 'min(380px, calc(100vw - 32px))',
           height: '118px',
           zIndex: '60',
         });
@@ -1108,6 +1112,19 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
           after.banner?.bottom ?? Number.POSITIVE_INFINITY,
           'phone consent card should clear the glass dock'
         ).toBeLessThanOrEqual((after.dock?.top ?? 0) - 8);
+      }
+
+      if (after.banner && after.dock) {
+        const overlapsHorizontally =
+          after.banner.left < after.dock.right &&
+          after.banner.right > after.dock.left;
+        const overlapsVertically =
+          after.banner.top < after.dock.bottom &&
+          after.banner.bottom > after.dock.top;
+        expect(
+          overlapsHorizontally && overlapsVertically,
+          `${viewport.label} consent card must not cover the glass dock`
+        ).toBe(false);
       }
 
       await page.evaluate(() => {
