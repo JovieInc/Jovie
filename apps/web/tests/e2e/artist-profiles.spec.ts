@@ -100,45 +100,20 @@ test.describe('Artist Profiles Landing', () => {
   });
 
   test('hero renders with headline and CTAs', async ({ page }) => {
-    const claimForm = page.getByTestId('homepage-claim-form');
-    const claimButton = page.getByRole('button', {
-      name: /claim your profile/i,
-    });
+    const claimLink = page
+      .getByRole('link', {
+        name: /claim your profile/i,
+      })
+      .first();
 
     await expect(
       page.getByRole('heading', {
         name: /the link your music deserves\./i,
       })
     ).toBeVisible();
-    await expect(claimButton).toBeVisible();
-    await expect(page.getByLabel(/choose your handle/i)).toBeVisible();
-    await expect(page.getByTestId('homepage-claim-support')).toContainText(
-      /free to start/i
-    );
-    await expect(page.getByText('Built for artists')).toHaveCount(0);
-    await expectFullyInViewport(page, claimForm);
-    await expectFullyInViewport(page, claimButton);
-
-    await page.getByLabel(/choose your handle/i).fill('@river-signal');
-    await page.route('**/start?**', route =>
-      route.fulfill({
-        status: 200,
-        contentType: 'text/html',
-        body: '<!doctype html><title>Claim profile</title>',
-      })
-    );
-    await Promise.all([
-      page.waitForURL(url => {
-        return (
-          url.pathname === '/start' &&
-          url.searchParams.get('handle') === 'river-signal' &&
-          url.searchParams
-            .get('starter_prompt')
-            ?.includes('jov.ie/river-signal') === true
-        );
-      }),
-      claimButton.click(),
-    ]);
+    await expect(claimLink).toBeVisible();
+    await expect(claimLink).toHaveAttribute('href', /\/start/);
+    await expectFullyInViewport(page, claimLink);
   });
 
   test('final CTA renders with claim form', async ({ page }) => {
@@ -156,7 +131,6 @@ test.describe('Artist Profiles Landing', () => {
       'href',
       /\/start/
     );
-    await expect(finalCta.getByText(/free to start/i)).toBeVisible();
   });
 
   test('singular artist-profile alias preserves the canonical experience', async ({
@@ -185,12 +159,13 @@ test.describe('Artist Profiles Landing', () => {
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
-    await expect(
-      page.getByRole('button', { name: /claim your profile/i })
-    ).toBeVisible({
+    const claimLink = page
+      .getByRole('link', { name: /claim your profile/i })
+      .first();
+    await expect(claimLink).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
-    await expectFullyInViewport(page, page.getByTestId('homepage-claim-form'));
+    await expectFullyInViewport(page, claimLink);
   });
 
   test('adaptive profile exposes four moment-based modes without layout shift', async ({
@@ -201,7 +176,7 @@ test.describe('Artist Profiles Landing', () => {
 
     await expect(
       adaptiveSection.getByRole('heading', {
-        name: 'One profile that adapts to every fan.',
+        name: 'One adaptive profile. Four moments.',
       })
     ).toBeVisible();
     await expect(adaptiveSection.getByRole('tab')).toHaveCount(4);
@@ -212,9 +187,9 @@ test.describe('Artist Profiles Landing', () => {
     const modes = [
       {
         label: 'Upcoming Release',
-        headline: 'Before a drop, your profile becomes a countdown.',
+        headline: 'Before a drop, your profile collects release alerts.',
         screenshotAlt:
-          'Jovie artist profile showing an upcoming release and pre-save state.',
+          'Jovie artist profile inviting fans to get release updates.',
       },
       {
         label: 'Release Day',
@@ -343,6 +318,7 @@ test.describe('Artist Profiles Landing', () => {
       'artist-profile-section-opinionated',
       'artist-profile-section-spec-wall',
       'artist-profile-section-how-it-works',
+      'artist-profile-section-release-cycle',
       'artist-profile-section-faq',
       'artist-profile-section-final-cta',
     ];
@@ -375,7 +351,7 @@ test.describe('Artist Profiles Landing', () => {
     ).toHaveCount(0);
   });
 
-  test('five fan outcomes keep a stable rail across breakpoints', async ({
+  test('four fan outcomes keep a stable ledger across breakpoints', async ({
     page,
   }) => {
     await expectNoHorizontalOverflow(page);
@@ -390,30 +366,12 @@ test.describe('Artist Profiles Landing', () => {
     await expect(scroller).toBeHidden();
     await expect(
       outcomesSection.getByTestId('artist-profile-outcome-card')
-    ).toHaveCount(5);
-    for (const title of [
-      'Straight to listen',
-      'Local dates first',
-      'Support without friction',
-      'Capture the fan',
-      'Keep one link everywhere',
-    ]) {
+    ).toHaveCount(4);
+    for (const title of ['Listen', 'Show Up', 'Support', 'Stay Close']) {
       await expect(
         outcomesSection.getByRole('heading', { name: title })
       ).toBeVisible();
     }
-    await expect(outcomesSection.getByText('Tim White')).toHaveCount(2);
-    await expect(outcomesSection.getByText('w/ Cosmic Gate')).toHaveCount(2);
-    await expect(
-      outcomesSection.getByTestId('artist-profile-drive-streams-live-card')
-    ).toBeVisible();
-    await expect(
-      outcomesSection.getByTestId('artist-profile-drive-streams-presave-card')
-    ).toBeVisible();
-    await expect(
-      outcomesSection.getByTestId('artist-profile-sell-out-tour-card')
-    ).toBeVisible();
-    await expect(page.getByText('Wired to my latest release')).toHaveCount(0);
     const outcomesTop = await outcomesSection.evaluate(
       element => element.getBoundingClientRect().top + window.scrollY
     );
@@ -422,40 +380,8 @@ test.describe('Artist Profiles Landing', () => {
     );
     expect(captureTop).toBeGreaterThan(outcomesTop);
 
-    const previousButton = outcomesSection.locator(
-      'button[aria-label="Scroll Outcomes Left"]:visible'
-    );
-    const nextButton = outcomesSection.locator(
-      'button[aria-label="Scroll Outcomes Right"]:visible'
-    );
-    await expect(previousButton).toHaveCount(1);
-    await expect(nextButton).toHaveCount(1);
-
-    for (const control of [previousButton, nextButton]) {
-      const box = await control.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
-      expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
-    }
-
-    const initialScrollLeft = await grid.evaluate(
-      element => element.scrollLeft
-    );
-    await nextButton.click();
-    await expect
-      .poll(() => grid.evaluate(element => element.scrollLeft))
-      .toBeGreaterThan(initialScrollLeft);
-    const forwardScrollLeft = await grid.evaluate(
-      element => element.scrollLeft
-    );
-
-    await previousButton.click();
-    await expect
-      .poll(() => grid.evaluate(element => element.scrollLeft))
-      .toBeLessThan(forwardScrollLeft);
-
     const startScrollY = await page.evaluate(() => window.scrollY);
-    await grid.locator('article').first().hover();
+    await grid.locator('li').first().hover();
     await page.mouse.wheel(0, 720);
     await page.waitForTimeout(180);
     const endScrollY = await page.evaluate(() => window.scrollY);
@@ -477,7 +403,7 @@ test.describe('Artist Profiles Landing', () => {
     await expect(mobileScroller).toBeHidden();
     await expect(
       mobileOutcomesSection.getByTestId('artist-profile-outcome-card')
-    ).toHaveCount(5);
+    ).toHaveCount(4);
 
     await expectNoHorizontalOverflow(page);
   });
@@ -488,7 +414,7 @@ test.describe('Artist Profiles Landing', () => {
     const captureSection = page.getByTestId('artist-profile-section-capture');
     await expect(
       captureSection.getByRole('heading', {
-        name: 'Capture every fan, not just the click.',
+        name: 'One fan moment. A relationship you keep.',
       })
     ).toBeVisible();
     await expect(captureSection.getByText('You’re on the list')).toBeVisible();
@@ -497,9 +423,12 @@ test.describe('Artist Profiles Landing', () => {
     ).toBeVisible();
     await expect(captureSection.getByText('Reach the moment')).toBeVisible();
     await expect(captureSection.getByText('Keep the audience')).toBeVisible();
-    const capturePreview = captureSection.getByRole('img', {
-      name: /example fan opt-in with an email or phone field/i,
-    });
+    await expect(
+      captureSection.getByText('Illustrative fan activity')
+    ).toBeVisible();
+    const capturePreview = captureSection.getByTestId(
+      'artist-profile-capture-demo'
+    );
     await expect(capturePreview).toBeVisible();
     await expect(capturePreview.locator('input, button')).toHaveCount(0);
 
@@ -508,13 +437,11 @@ test.describe('Artist Profiles Landing', () => {
     );
     await expect(
       opinionatedSection.getByRole('heading', {
-        name: 'Built to convert, not decorate.',
+        name: 'One clear action beats a wall of links.',
       })
     ).toBeVisible();
-    await expect(opinionatedSection.locator('article')).toHaveCount(3);
-    await expect(
-      opinionatedSection.getByText('No template maze.')
-    ).toBeVisible();
+    await expect(opinionatedSection.getByText('Static Menu')).toBeVisible();
+    await expect(opinionatedSection.getByText('Adaptive Lead')).toBeVisible();
 
     const specWallSection = page.getByTestId(
       'artist-profile-section-spec-wall'
@@ -523,15 +450,17 @@ test.describe('Artist Profiles Landing', () => {
 
     await expect(
       specWallSection.getByRole('heading', {
-        name: 'Built for artists.',
+        name: 'Your music stays together. The right action leads.',
       })
     ).toBeVisible();
     await expect(
       specWallSection.getByTestId('artist-profile-truth-tile')
-    ).toHaveCount(10);
-    await expect(specWallSection.getByText('Fast load')).toBeVisible();
+    ).toHaveCount(4);
     await expect(
-      specWallSection.getByText('Views, clicks, referrers')
+      specWallSection.getByText('They Know It Is You')
+    ).toBeVisible();
+    await expect(
+      specWallSection.getByText('The Right Next Move')
     ).toBeVisible();
 
     const howSection = page.getByTestId('artist-profile-section-how-it-works');
@@ -552,7 +481,7 @@ test.describe('Artist Profiles Landing', () => {
 
     const faqSection = page.getByTestId('artist-profile-section-faq');
     await expect(
-      faqSection.getByRole('heading', { name: 'Questions, answered.' })
+      faqSection.getByRole('heading', { name: 'Questions' })
     ).toBeVisible();
     await expect(faqSection.getByRole('button')).toHaveCount(4);
     const firstQuestion = faqSection.getByRole('button', {
