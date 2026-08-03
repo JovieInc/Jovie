@@ -385,6 +385,33 @@ test('enforces repository-wide tracked file, byte, and binary payload budgets', 
   }
 });
 
+test('excludes committed generated and metadata outputs from the tracked file-count budget', () => {
+  const root = mkdtempSync(join(tmpdir(), 'jovie-hygiene-generated-count-'));
+  try {
+    const trackedPaths = [
+      'source/plan-gate.mjs',
+      'apps/web/lib/design/generated/design-tokens.ts',
+      'apps/web/lib/design/generated/design-tokens.manifest.json',
+      'apps/web/styles/generated/design-tokens.css',
+      'apps/web/reports/nightly-agent/last-run.json',
+      'apps/web/reports/test-coverage-snapshot.json',
+      'apps/web/screenshot-catalog/current/manifest.json',
+    ];
+    for (const path of trackedPaths) fixtureFile(root, path);
+
+    const result = evaluateRepoHygiene({
+      addedPaths: [],
+      root,
+      trackedPaths,
+    });
+    assert.equal(result.errors.length, 0);
+    assert.equal(result.trackedFiles, 1);
+    assert.equal(result.trackedBytes, trackedPaths.length);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('tracked payload skips missing paths and symlinks without following them', () => {
   const root = mkdtempSync(join(tmpdir(), 'jovie-hygiene-repo-links-'));
   try {
