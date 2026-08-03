@@ -7,10 +7,11 @@ const emptyState = {
   composerHasIntent: false,
   opportunityCardCount: 0,
   starterActionCount: 0,
+  suggestionCount: 0,
 } as const;
 
 describe('resolveChatEmptyStateAffordance', () => {
-  it('prioritizes opportunities, then starter actions, then suggestion pills', () => {
+  it('prioritizes opportunities, then starter actions, then featured suggestions', () => {
     expect(
       resolveChatEmptyStateAffordance({
         ...emptyState,
@@ -21,9 +22,10 @@ describe('resolveChatEmptyStateAffordance', () => {
     expect(
       resolveChatEmptyStateAffordance({ ...emptyState, starterActionCount: 3 })
     ).toBe('starter-actions');
-    expect(resolveChatEmptyStateAffordance(emptyState)).toBe(
-      'suggestion-pills'
-    );
+    expect(
+      resolveChatEmptyStateAffordance({ ...emptyState, suggestionCount: 1 })
+    ).toBe('suggestion-pills');
+    expect(resolveChatEmptyStateAffordance(emptyState)).toBe('none');
   });
 
   it.each([

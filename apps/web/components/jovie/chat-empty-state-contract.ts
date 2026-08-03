@@ -10,6 +10,7 @@ interface ResolveChatEmptyStateAffordanceInput {
   readonly composerHasIntent: boolean;
   readonly opportunityCardCount: number;
   readonly starterActionCount: number;
+  readonly suggestionCount: number;
 }
 
 /** One visibility contract for empty-chat affordances. */
@@ -19,11 +20,13 @@ export function resolveChatEmptyStateAffordance({
   composerHasIntent,
   opportunityCardCount,
   starterActionCount,
+  suggestionCount,
 }: ResolveChatEmptyStateAffordanceInput): ChatEmptyStateAffordance {
   if (conversationExists || conversationInProgress || composerHasIntent) {
     return 'none';
   }
   if (opportunityCardCount > 0) return 'opportunity-cards';
   if (starterActionCount > 0) return 'starter-actions';
-  return 'suggestion-pills';
+  if (suggestionCount > 0) return 'suggestion-pills';
+  return 'none';
 }

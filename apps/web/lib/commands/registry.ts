@@ -121,7 +121,24 @@ export interface SkillCommand {
   readonly iconName: string;
   readonly surfaces: readonly CommandSurface[];
   readonly entitySlots: readonly EntitySlot[];
+  /**
+   * Opt-in metadata for unprompted empty-chat discovery.
+   * Registered skills remain available in explicit command surfaces without
+   * automatically earning space in the new-chat empty state.
+   */
+  readonly featuredSuggestion?: FeaturedSkillSuggestion;
 }
+
+export interface FeaturedSkillSuggestion {
+  readonly prompt: string;
+  readonly telemetryKey: string;
+  /** Lower values appear first when multiple featured skills are eligible. */
+  readonly priority: number;
+}
+
+export type FeaturedSkillCommand = SkillCommand & {
+  readonly featuredSuggestion: FeaturedSkillSuggestion;
+};
 
 /** A direct-navigation entry (cmd+k only for now). */
 export interface NavCommand {
@@ -156,7 +173,8 @@ function skill(
   label: string,
   description: string,
   iconName: string,
-  entitySlots: readonly EntitySlot[] = []
+  entitySlots: readonly EntitySlot[] = [],
+  featuredSuggestion?: FeaturedSkillSuggestion
 ): SkillCommand {
   return {
     kind: 'skill',
@@ -166,6 +184,7 @@ function skill(
     iconName,
     surfaces: BOTH_SURFACES,
     entitySlots,
+    ...(featuredSuggestion ? { featuredSuggestion } : {}),
   };
 }
 
@@ -295,5 +314,20 @@ export function skillsApplicableTo(kind: EntityKind): SkillCommand[] {
   return COMMANDS.filter(
     (c): c is SkillCommand =>
       c.kind === 'skill' && c.entitySlots.some(s => s.kind === kind)
+  );
+}
+
+/**
+ * Skills explicitly approved for unprompted empty-chat discovery.
+ * An empty result is intentional: omit the rail instead of filling it with a
+ * generic utility action.
+ */
+export function featuredSkillCommands(): FeaturedSkillCommand[] {
+  return COMMANDS.filter(
+    (command): command is FeaturedSkillCommand =>
+      command.kind === 'skill' && command.featuredSuggestion !== undefined
+  ).sort(
+    (left, right) =>
+      left.featuredSuggestion.priority - right.featuredSuggestion.priority
   );
 }

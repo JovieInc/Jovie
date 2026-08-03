@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { SuggestedPrompts } from '@/components/jovie/components/SuggestedPrompts';
+import {
+  featuredSkillToSuggestion,
+  SuggestedPrompts,
+} from '@/components/jovie/components/SuggestedPrompts';
 import {
   CHAT_STARTER_ACTION_ORDER,
   CHAT_STARTER_ACTIONS,
@@ -8,6 +11,36 @@ import {
 import { fastRender } from '@/tests/utils/fast-render';
 
 describe('SuggestedPrompts', () => {
+  it('renders nothing when no installed skill is explicitly featured', () => {
+    const { queryByTestId, queryByText } = fastRender(
+      <SuggestedPrompts onSelect={vi.fn()} featuredOnly />
+    );
+
+    expect(queryByTestId('suggested-prompts-rail')).toBeNull();
+    expect(queryByText('Share Feedback')).toBeNull();
+  });
+
+  it('keeps canonical action identity available for featured-skill safeguards', () => {
+    const suggestion = featuredSkillToSuggestion({
+      kind: 'skill',
+      id: 'generateAlbumArt',
+      label: 'Generate album art',
+      description: 'Generate album art.',
+      iconName: 'Image',
+      surfaces: ['chat-slash', 'cmdk'],
+      entitySlots: [],
+      featuredSuggestion: {
+        prompt: 'Generate album art for my latest release.',
+        telemetryKey: 'generate_album_art',
+        priority: 1,
+      },
+    });
+
+    expect(suggestion).toEqual(
+      expect.objectContaining({ actionId: 'generate-album-art' })
+    );
+  });
+
   const defaultStarterActions = CHAT_STARTER_ACTION_ORDER.map(
     id => CHAT_STARTER_ACTIONS[id]
   );

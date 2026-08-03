@@ -179,14 +179,9 @@ describe('JovieChat empty state', () => {
     mockChatState.chipTray.chips = [];
   });
 
-  it('renders a stable docked composer with prompt-pill fallback when empty', () => {
-    const {
-      container,
-      getByTestId,
-      queryByTestId,
-      queryByText,
-      getAllByLabelText,
-    } = renderWithQueryClient(<JovieChat profileId='profile-1' />);
+  it('renders a stable docked composer without filler prompts when no skill is featured', () => {
+    const { container, getByTestId, queryByTestId, queryByText } =
+      renderWithQueryClient(<JovieChat profileId='profile-1' />);
 
     expect(queryByTestId('chat-empty-state-top-signals')).toBeNull();
     expect(queryByTestId('chat-empty-thread-ornament')).toBeNull();
@@ -195,19 +190,16 @@ describe('JovieChat empty state', () => {
     expect(queryByText("Hey, I'm Jovie.")).toBeNull();
     const emptyViewport = getByTestId('chat-empty-state-viewport');
     expect(emptyViewport.className).toContain('flex-1');
-    expect(emptyViewport).toHaveAttribute(
-      'data-empty-affordance',
-      'suggestion-pills'
-    );
+    expect(emptyViewport).toHaveAttribute('data-empty-affordance', 'none');
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
     expect(queryByTestId('chat-empty-state-logo')).toBeNull();
     expect(queryByTestId('chat-empty-state-greeting')).toBeNull();
     expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();
-    // No actionCards prop → no action-card slot, but prompt rail is wired.
+    // No action cards and no featured skills: the composer stands alone.
     expect(queryByTestId('chat-empty-state-action-card-slot')).toBeNull();
     expect(queryByTestId('chat-composer-dock')).toBeNull();
-    expect(getByTestId('chat-empty-state-soft-suggestions-slot')).toBeTruthy();
-    expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
+    expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
+    expect(queryByTestId('suggested-prompts-rail')).toBeNull();
     expect(getByTestId('chat-input')).toBeTruthy();
     expect(getByTestId('chat-input').getAttribute('data-placeholder')).toBe(
       'Ask Jovie to plan your next release...'
@@ -218,9 +210,7 @@ describe('JovieChat empty state', () => {
     expect(fileInput).not.toBeNull();
     expect(fileInput).toHaveClass('hidden');
     expect(fileInput).toHaveAttribute('tabindex', '-1');
-    // ≥3 profile-aware starters (rail pills use aria-label = suggestion label).
-    expect(getAllByLabelText(/Plan a Release/i).length).toBeGreaterThan(0);
-    expect(getAllByLabelText(/Generate Album Art/i).length).toBeGreaterThan(0);
+    expect(queryByText('Share Feedback')).toBeNull();
     // Old task-list-style actions should NOT appear — they belong in the profile switcher.
     expect(queryByText('Preview profile')).toBeNull();
     expect(queryByText('Change photo')).toBeNull();
@@ -352,11 +342,11 @@ describe('JovieChat empty state', () => {
       screen.queryByTestId('chat-empty-state-action-card-slot')
     ).toBeNull();
     expect(
-      screen.getByTestId('chat-empty-state-soft-suggestions-slot')
-    ).toBeTruthy();
+      screen.queryByTestId('chat-empty-state-soft-suggestions-slot')
+    ).toBeNull();
     expect(screen.getByTestId('chat-empty-state-viewport')).toHaveAttribute(
       'data-empty-affordance',
-      'suggestion-pills'
+      'none'
     );
     expect(
       screen.getByTestId('chat-empty-state-composer-region')
@@ -531,13 +521,12 @@ describe('JovieChat empty state', () => {
   });
 
   it('does not render opportunity cards when there are none pending', () => {
-    const { queryByTestId, getByTestId } = renderWithQueryClient(
+    const { queryByTestId } = renderWithQueryClient(
       <JovieChat profileId='profile-1' />
     );
 
     expect(queryByTestId('chat-empty-state-opportunity-cards')).toBeNull();
-    // Zero pending opportunities → first-run prompt rail scaffolding (JOV-3547).
-    expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
-    expect(getByTestId('chat-empty-state-soft-suggestions-slot')).toBeTruthy();
+    expect(queryByTestId('suggested-prompts-rail')).toBeNull();
+    expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
   });
 });
