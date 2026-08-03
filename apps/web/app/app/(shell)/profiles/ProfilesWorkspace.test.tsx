@@ -125,17 +125,6 @@ const data: ProfilesWorkspaceData = {
       previousRank: 5,
       lastObservedAt: '2026-07-16T00:00:00.000Z',
     },
-    {
-      id: 'gmail',
-      rowType: 'connector',
-      kind: 'connector',
-      platform: 'gmail',
-      label: 'Gmail',
-      handle: 'tim@example.com',
-      url: '/app/settings/connectors',
-      status: 'connected',
-      monitoringState: 'active',
-    },
   ],
   monitoringLimit: 5,
   monitoredCount: 1,
@@ -255,9 +244,9 @@ describe('ProfilesWorkspace', () => {
     expect(screen.getByText('Spotify')).toBeInTheDocument();
     expect(screen.queryByText('Jovie Profile')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Connectors' }));
-    expect(screen.getByText('Gmail')).toBeInTheDocument();
-    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
+    expect(
+      screen.queryByRole('button', { name: 'Connectors' })
+    ).not.toBeInTheDocument();
   });
 
   it('uses the row action registry to open connection-specific details', async () => {
@@ -382,7 +371,7 @@ describe('ProfilesWorkspace', () => {
       vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0]
     ).not.toBeNull();
 
-    await user.click(screen.getByRole('button', { name: 'Connectors' }));
+    await user.click(screen.getByRole('button', { name: 'Social' }));
     expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
   });
 
@@ -482,9 +471,6 @@ describe('ProfilesWorkspace', () => {
     expect(
       screen.getByRole('columnheader', { name: 'Monitoring' })
     ).toHaveClass('max-2xl:hidden');
-    fireEvent.click(screen.getByRole('button', { name: 'Connectors' }));
-    expect(screen.getByText('tim@example.com')).toHaveClass('max-sm:hidden');
-
     expect(screen.getByTestId('connections-workspace-toolbar')).toHaveClass(
       'min-h-10',
       'px-3',

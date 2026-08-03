@@ -55,6 +55,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app/dashboard/tasks': 'Legacy tasks workspace retained for old bookmarks',
   '/app/settings/retargeting-ads':
     'Legacy settings route redirected to Audience',
+  '/app/settings/connectors':
+    'Settings Connections page loads shared shell route context directly (data-backed since JOV-4799)',
   '/app/settings/admin': 'Legacy admin settings route redirected to Ops',
   '/app/dashboard/release-plan':
     'Release plan demo page (gated by RELEASE_PLAN_DEMO flag)',

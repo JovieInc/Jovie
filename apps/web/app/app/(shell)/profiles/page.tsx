@@ -10,8 +10,9 @@ import { ProfilesWorkspace } from './ProfilesWorkspace';
 export const runtime = 'nodejs';
 
 export const metadata: Metadata = {
-  title: 'Connections',
-  description: 'Manage and monitor your connected platforms',
+  title: 'Presence',
+  description:
+    'Monitor your DSP profiles, social networks, and presence signals',
 };
 
 export default async function ProfilesPage() {

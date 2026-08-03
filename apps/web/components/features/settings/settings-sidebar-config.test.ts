@@ -31,7 +31,7 @@ describe('SETTINGS_SIDEBAR_GROUPS', () => {
     expect(membership).toEqual({
       profile: ['artist-profile', 'contacts', 'appearance'],
       account: ['account', 'data-privacy', 'delete-account'],
-      workspace: ['connectors', 'retargeting-ads', 'admin'],
+      workspace: ['connections', 'retargeting-ads', 'admin'],
       billing: ['billing', 'usage', 'referral'],
     });
   });
