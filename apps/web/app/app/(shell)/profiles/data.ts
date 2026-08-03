@@ -28,7 +28,6 @@ import {
 import { reconcileProfileSurfaces } from '@/lib/profile-surfaces/reconciliation';
 import { resolveSocialShortcutPlatforms } from '@/lib/social/shortcut-platforms';
 import type { SettingsConnectorState } from '../settings/connectors/connectors-data';
-import { loadSettingsConnectorsData } from '../settings/connectors/connectors-data';
 
 export type ProfilesWorkspaceFilter =
   | 'all'
@@ -36,8 +35,7 @@ export type ProfilesWorkspaceFilter =
   | 'social'
   | 'source'
   | 'website'
-  | 'jovie'
-  | 'connector';
+  | 'jovie';
 
 export interface ProfileWorkspaceSurfaceRow {
   readonly id: string;
@@ -222,14 +220,8 @@ export async function loadProfilesWorkspaceData(input: {
     monitoringLimit,
   });
 
-  const [
-    profileRows,
-    surfaces,
-    preferences,
-    connectorData,
-    providerHealth,
-    latestRuns,
-  ] = await Promise.all([
+  const [profileRows, surfaces, preferences, providerHealth, latestRuns] =
+    await Promise.all([
     db
       .select({
         username: creatorProfiles.username,
@@ -263,7 +255,6 @@ export async function loadProfilesWorkspaceData(input: {
           )
         )
       ),
-    loadSettingsConnectorsData(input.clerkUserId),
     db
       .select({ enabled: profileSearchProviderHealth.enabled })
       .from(profileSearchProviderHealth)
@@ -383,12 +374,6 @@ export async function loadProfilesWorkspaceData(input: {
       lastObservedAt: surface.lastObservedAt?.toISOString() ?? null,
     };
   });
-  const connectors = connectorData
-    ? [
-        connectorRow('gmail', connectorData.gmail),
-        connectorRow('google_calendar', connectorData.calendar),
-      ]
-    : [];
   const qualifiedResults = rankRows.filter(
     row =>
       row.runId === latestRun?.id &&
@@ -403,7 +388,7 @@ export async function loadProfilesWorkspaceData(input: {
       username: profileRows[0]?.username ?? '',
       avatarUrl: profileRows[0]?.avatarUrl ?? null,
     },
-    rows: [...surfaceRows, ...connectors],
+    rows: surfaceRows,
     monitoringLimit,
     monitoredCount: activeExternalIds.size,
     qualifiedShare:

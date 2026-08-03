@@ -265,7 +265,7 @@ function ChoiceRow({
 }
 
 /**
- * In-flow add surface for the Connections workspace. Provider availability is
+ * In-flow add surface for the Presence workspace. Provider availability is
  * intentionally derived from the connector registry: unsupported DSP/social
  * services never appear as implied integrations.
  */
@@ -379,7 +379,7 @@ export function AddConnectionRail({
             </div>
           }
           title={title}
-          subtitle='Connections'
+          subtitle='Presence'
           stableLayout
           reserveSubtitleSlot
           actions={

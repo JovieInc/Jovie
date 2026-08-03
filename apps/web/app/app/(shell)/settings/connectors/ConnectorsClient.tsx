@@ -102,7 +102,7 @@ export function ConnectorsClient({
   return (
     <SettingsSection
       id='connectors'
-      title='Connectors'
+      title='Connections'
       description='Connect Gmail and Google Calendar to automatically detect booking confirmations.'
     >
       <SettingsPanel title='Google Account'>

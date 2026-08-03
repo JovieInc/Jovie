@@ -282,7 +282,7 @@ describe('settings shell normalization', () => {
     }
   });
 
-  it('keeps connector queries outside the settings connectors page', () => {
+  it('loads account connections in the Settings Connections page', () => {
     expect(SETTINGS_CONNECTORS_PAGE).toBeDefined();
 
     if (!SETTINGS_CONNECTORS_PAGE) {
@@ -290,16 +290,11 @@ describe('settings shell normalization', () => {
     }
 
     const source = readFileSync(SETTINGS_CONNECTORS_PAGE, 'utf8');
-    expect(source).toContain("import { redirect } from 'next/navigation'");
-    expect(source).toContain('APP_ROUTES.PROFILES');
-    expect(source).toContain('?add=service');
-    expect(source).not.toContain('loadAppShellRouteContext');
-    expect(source).not.toContain('loadSettingsConnectorsData');
-    expect(source).not.toContain('@/lib/db');
-    expect(source).not.toContain('@/lib/db/queries/shared');
-    expect(source).not.toContain('@/lib/db/schema/connectors');
-    expect(source).not.toContain('getUserByClerkId');
-    expect(source).not.toContain('connectorAccounts');
+    expect(source).toContain('loadAppShellRouteContext');
+    expect(source).toContain('loadSettingsConnectorsData');
+    expect(source).toContain('ConnectorsClient');
+    expect(source).not.toContain('APP_ROUTES.PROFILES');
+    expect(source).not.toContain('?add=service');
   });
 
   it('keeps gated settings pages on server redirects instead of client effects', () => {
