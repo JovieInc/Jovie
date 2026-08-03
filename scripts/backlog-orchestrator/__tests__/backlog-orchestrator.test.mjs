@@ -98,15 +98,123 @@ describe('classifier', () => {
     assert.equal(scorer.scoreIssue(c).score, 0);
   });
 
-  it('counts only Linear In Progress issues as active shipping leases', () => {
+  it('counts only fresh active machine leases, not ordinary In Progress work', () => {
+    const now = '2026-08-03T12:00:00.000Z';
+    const activeMachineLease = makeIssue({
+      state: 'In Progress',
+      comments: [
+        {
+          body: 'machine-agent running process: 123 workspace: /tmp/jovie branch: fix/JOV-1',
+          createdAt: '2026-08-03T11:00:00.000Z',
+        },
+      ],
+    });
     assert.deepEqual(
-      scorer.currentShippingLoad([
-        makeIssue({ state: 'Todo' }),
-        makeIssue({ state: 'In Progress' }),
-      ]),
+      scorer.currentShippingLoad(
+        [
+          makeIssue({ state: 'Todo' }),
+          makeIssue({ state: 'In Progress' }),
+          activeMachineLease,
+        ],
+        { now }
+      ),
       { healthy: true, count: 1 }
     );
-    assert.deepEqual(scorer.currentShippingLoad([]), {
+  });
+
+  it('excludes Tim-owned and protected machine-looking work', () => {
+    const evidence = [
+      {
+        body: 'machine-agent running process: 123 workspace: /tmp/jovie branch: fix/JOV-1',
+        createdAt: '2026-08-03T11:00:00.000Z',
+      },
+    ];
+    const now = '2026-08-03T12:00:00.000Z';
+    assert.deepEqual(
+      scorer.currentShippingLoad(
+        [
+          makeIssue({
+            assignee: { id: 'tim', name: 'Tim White' },
+            state: 'In Progress',
+            comments: evidence,
+          }),
+          makeIssue({
+            labels: ['needs-human'],
+            state: 'In Progress',
+            comments: evidence,
+          }),
+        ],
+        { now }
+      ),
+      { healthy: true, count: 0 }
+    );
+  });
+
+  it('fails closed for stale, terminal, and ambiguous machine evidence', () => {
+    const now = '2026-08-03T12:00:00.000Z';
+    const base = (body, createdAt = '2026-08-03T11:00:00.000Z') => ({
+      body,
+      createdAt,
+    });
+    assert.deepEqual(
+      scorer.currentShippingLoad(
+        [
+          makeIssue({
+            state: 'In Progress',
+            comments: [
+              base(
+                'machine-agent running process: 1 workspace: /tmp/x branch: fix/x'
+              ),
+            ],
+          }),
+          makeIssue({
+            state: 'In Progress',
+            comments: [
+              base(
+                'machine-agent completed process: 2 workspace: /tmp/x branch: fix/y'
+              ),
+            ],
+          }),
+          makeIssue({
+            state: 'In Progress',
+            comments: [
+              base('machine-agent running process: 3 workspace: /tmp/x'),
+            ],
+          }),
+          makeIssue({
+            state: 'In Progress',
+            comments: [
+              base(
+                'machine-agent running process: 4 workspace: /tmp/x branch: fix/stale',
+                '2026-08-01T00:00:00.000Z'
+              ),
+            ],
+          }),
+        ],
+        { now }
+      ),
+      { healthy: true, count: 1 }
+    );
+  });
+
+  it('returns a stable zero-load read-back when no valid lease is present', () => {
+    const now = '2026-08-03T12:00:00.000Z';
+    const snapshot = [
+      makeIssue({
+        state: 'In Progress',
+        comments: [
+          {
+            body: 'machine-agent running',
+            createdAt: '2026-08-03T11:00:00.000Z',
+          },
+        ],
+      }),
+    ];
+    assert.deepEqual(scorer.currentShippingLoad(snapshot, { now }), {
+      healthy: true,
+      count: 0,
+    });
+    assert.deepEqual(scorer.currentShippingLoad(snapshot, { now }), {
       healthy: true,
       count: 0,
     });
