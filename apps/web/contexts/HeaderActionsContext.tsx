@@ -177,6 +177,13 @@ export function HeaderActionsProvider({
     priorFocusRef.current = null;
     focusRestoreFrameRef.current = requestAnimationFrame(() => {
       focusRestoreFrameRef.current = null;
+      const activeElement = document.activeElement;
+      if (
+        activeElement instanceof HTMLElement &&
+        activeElement.closest('[data-app-shell-sidebar-mount="true"]')
+      ) {
+        return;
+      }
       if (priorFocus?.isConnected) priorFocus.focus();
     });
   }, []);

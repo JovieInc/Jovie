@@ -20,12 +20,13 @@ export function HeaderSearchSurfaceFromContext({
 }: {
   readonly className?: string;
 }) {
-  const { openCommandPalette } = useHeaderActions();
+  const { closeCommandPalette, isCommandPaletteOpen, openCommandPalette } =
+    useHeaderActions();
   return (
     <button
       type='button'
       data-app-search-trigger='true'
-      onClick={openCommandPalette}
+      onClick={isCommandPaletteOpen ? closeCommandPalette : openCommandPalette}
       className={cn(
         getSidebarNavRowClassName({}),
         'grid-cols-[18px_minmax(0,1fr)_auto] text-left',

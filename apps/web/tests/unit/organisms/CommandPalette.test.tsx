@@ -175,6 +175,24 @@ describe('CommandPalette', () => {
     expect(screen.getByLabelText('Command Palette Search')).toHaveFocus();
   });
 
+  it('toggles the main plane closed from the active sidebar Search trigger', () => {
+    render(
+      withDashboard(
+        <>
+          <CommandPalette />
+          <HeaderSearchSurfaceFromContext />
+        </>
+      )
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Search Jovie' });
+    fireEvent.click(trigger);
+    expect(screen.getByTestId('cmdk-main-plane')).toBeInTheDocument();
+
+    fireEvent.click(trigger);
+    expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
+  });
+
   it('commits the selected sidebar-triggered main-plane result with Enter', () => {
     pushMock.mockClear();
     render(
