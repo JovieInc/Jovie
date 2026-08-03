@@ -13,14 +13,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { render, screen } from '@testing-library/react';
-import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
-import { PublicProfileErrorState } from '@/app/[username]/_components/PublicProfileErrorState';
-import {
-  getLegacyProfileModeRedirectHref,
-  getProfileModeRedirectHref,
-} from '@/app/[username]/_lib/mode-route-redirect';
 import {
   getLegacyProfileModeRedirectHref,
   getProfileModeRedirectHref,
@@ -42,7 +35,7 @@ const PUBLIC_PROFILE_PAGE_SOURCE = readFileSync(
   path.join(WEB_ROOT, 'app/[username]/page.tsx'),
   'utf8'
 );
-const PUBLIC_PROFILE_LAYOUT_SOURCE = readFileSync(
+const _PUBLIC_PROFILE_LAYOUT_SOURCE = readFileSync(
   path.join(WEB_ROOT, 'app/[username]/layout.tsx'),
   'utf8'
 );
