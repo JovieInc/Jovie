@@ -136,6 +136,10 @@ describe('ProfileHomeRail', () => {
     const pacCard = screen.getByTestId('profile-pac');
     const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
 
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Latest From Tim White' })
+    ).toBeInTheDocument();
+
     // Both live inside the single carousel — no stacked sections.
     expect(carousel.contains(pacCard)).toBe(true);
     expect(carousel.contains(alertsCard)).toBe(true);
@@ -176,7 +180,7 @@ describe('ProfileHomeRail', () => {
     expect(alertsCard.className).toContain('bg-(--profile-pearl-bg)');
     expect(alertsCard).toHaveTextContent('Alerts');
     const cta = screen.getByText('Get Updates');
-    expect(cta.className).toContain('h-8');
+    expect(cta.className).toContain('h-11');
     expect(cta.className).toContain('w-auto');
   });
 

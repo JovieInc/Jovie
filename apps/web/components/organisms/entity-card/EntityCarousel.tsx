@@ -61,6 +61,8 @@ export function EntityCarousel({
   const trackRef = useRef<HTMLUListElement | null>(null);
   const itemRefs = useRef<Array<HTMLLIElement | null>>([]);
   const trackedImpressionKeys = useRef<Set<string>>(new Set());
+  const scrollFrameRef = useRef<number | null>(null);
+  const snapStepRef = useRef(0);
   const prefersReducedMotion = useReducedMotion();
   const [currentIndex, setCurrentIndex] = useState(0);
   const slotCount = items.length + (leading ? 1 : 0) + (trailing ? 1 : 0);
@@ -88,22 +90,56 @@ export function EntityCarousel({
   );
 
   const handleScroll = useCallback(() => {
-    const track = trackRef.current;
-    if (!track) return;
-    const trackLeft = track.getBoundingClientRect().left;
-    let nearestIndex = 0;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-    for (const [index, child] of Array.from(track.children).entries()) {
-      const distance = Math.abs(
-        (child as HTMLElement).getBoundingClientRect().left - trackLeft
+    if (scrollFrameRef.current !== null) return;
+
+    scrollFrameRef.current = window.requestAnimationFrame(() => {
+      scrollFrameRef.current = null;
+      const track = trackRef.current;
+      const snapStep = snapStepRef.current;
+      if (!track || snapStep <= 0) return;
+
+      const nearestIndex = Math.max(
+        0,
+        Math.min(Math.round(track.scrollLeft / snapStep), slotCount - 1)
       );
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestIndex = index;
-      }
+      setCurrentIndex(index => (index === nearestIndex ? index : nearestIndex));
+    });
+  }, [slotCount]);
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!showsDesktopControls || !track) {
+      snapStepRef.current = 0;
+      return;
     }
-    setCurrentIndex(nearestIndex);
-  }, []);
+
+    const refreshSnapStep = () => {
+      const scrollRange = track.scrollWidth - track.clientWidth;
+      snapStepRef.current =
+        slotCount > 1 && scrollRange > 0 ? scrollRange / (slotCount - 1) : 0;
+    };
+
+    refreshSnapStep();
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(refreshSnapStep);
+
+    if (resizeObserver) {
+      resizeObserver.observe(track);
+    } else {
+      window.addEventListener('resize', refreshSnapStep);
+    }
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', refreshSnapStep);
+      if (scrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(scrollFrameRef.current);
+        scrollFrameRef.current = null;
+      }
+    };
+  }, [showsDesktopControls, slotCount]);
 
   useEffect(() => {
     if (!onCardImpression || items.length === 0) {
@@ -146,7 +182,7 @@ export function EntityCarousel({
           onCardImpression(index, model);
         }
       },
-      { threshold: 0.5 }
+      { root: trackRef.current, threshold: 0.5 }
     );
 
     for (const node of itemRefs.current) {
@@ -158,15 +194,23 @@ export function EntityCarousel({
     return () => observer.disconnect();
   }, [items, onCardImpression]);
 
-  // Scroll-driven edge treatment: cards not fully inside the track dim and
-  // scale down slightly (transform/opacity only). Skipped entirely when the
-  // user prefers reduced motion — cards stay at full scale/opacity.
+  // Scroll-driven edge treatment: cards not fully inside the track dim
+  // slightly. Skipped entirely when the user prefers reduced motion — cards
+  // stay at full opacity. Geometry never changes while the rail is moving.
   useEffect(() => {
-    if (prefersReducedMotion || typeof IntersectionObserver === 'undefined') {
-      return;
-    }
     const track = trackRef.current;
     if (!track) {
+      return;
+    }
+
+    const clearEdgeTreatment = () => {
+      for (const node of Array.from(track.children)) {
+        (node as HTMLElement).dataset.edge = 'false';
+      }
+    };
+
+    if (prefersReducedMotion || typeof IntersectionObserver === 'undefined') {
+      clearEdgeTreatment();
       return;
     }
 
@@ -187,15 +231,20 @@ export function EntityCarousel({
       observer.observe(node);
     }
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      clearEdgeTreatment();
+    };
   }, [prefersReducedMotion, items, leading, trailing]);
 
   if (items.length === 0 && !leading && !trailing) {
     return null;
   }
 
-  // profile-landscape is full-bleed snap: gap would peek a clipped CTA from
-  // the next card. Portrait keeps a gap for intentional card preview.
+  // profile-landscape keeps one page-pad gap between full-content-width cards.
+  // The rail itself is page-pad inset, so that gap lands the neighboring card
+  // exactly outside the viewport at rest. Portrait keeps a smaller gap for its
+  // intentional card preview.
   const isProfileLandscape = layout === 'profile-landscape';
   const cardItemClassName = cn(
     CARD_ITEM_CLASSNAME,
@@ -213,7 +262,7 @@ export function EntityCarousel({
         ref={trackRef}
         className={cn(
           'profile-horizontal-rail flex h-full snap-x snap-mandatory list-none items-stretch overflow-x-auto overflow-y-hidden overscroll-x-contain',
-          isProfileLandscape ? 'gap-0' : 'gap-3',
+          isProfileLandscape ? 'gap-(--page-pad) md:gap-4' : 'gap-3',
           className
         )}
         data-testid={dataTestId ?? 'entity-carousel'}

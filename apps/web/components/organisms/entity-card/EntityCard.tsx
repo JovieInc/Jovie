@@ -45,10 +45,11 @@ interface EntityCardProps {
   /**
    * 'unified': the single profile-card anatomy — full-bleed square art zone
    * (object-cover, no letterboxing), eyebrow/title/meta text zone, and a
-   * full-width 36px CTA anchored to the bottom. Used by every card in the
-   * profile home carousel so the featured card, entity cards, and slot cards
-   * share one design. 'default' keeps the legacy per-treatment layout
-   * (chat/app consumers).
+   * full-width CTA anchored to the bottom. Public-profile landscape actions
+   * use the 44px mobile touch-target floor; portrait cards retain their
+   * compact 36px action. Used by every card in the profile home carousel so
+   * the featured card, entity cards, and slot cards share one design.
+   * 'default' keeps the legacy per-treatment layout (chat/app consumers).
    */
   readonly anatomy?: 'default' | 'unified' | 'profile-landscape';
 }
@@ -105,7 +106,7 @@ function EntityCtaControl({
       <span
         className={cn(
           'flex items-center text-xs text-tertiary-token',
-          landscape ? 'h-8 w-auto' : 'h-9 w-full'
+          landscape ? 'h-11 w-auto' : 'h-9 w-full'
         )}
       >
         {cta.label}
@@ -115,10 +116,11 @@ function EntityCtaControl({
 
   const className = cn(
     'inline-flex shrink-0 items-center justify-center rounded-full border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
-    // Unified anatomy: full-width 36px CTA (two CTAs share the row evenly).
+    // Landscape profile actions keep the native 44px touch-target floor.
+    // Portrait unified cards retain their compact 36px action row.
     unified
       ? landscape
-        ? 'h-8 min-w-0 flex-none'
+        ? 'h-11 min-w-0 flex-none'
         : 'h-9 min-w-0 flex-1'
       : block
         ? 'h-11 w-full'
@@ -375,11 +377,11 @@ export function EntityCard({
         className={cn(
           'flex min-h-0 min-w-0 flex-1 flex-col gap-1.5',
           treatment === 'big' && 'p-3',
-          // Unified: the text zone + 36px CTA share (card height − card
-          // width), which is tight on small cards — keep chrome minimal so
-          // eyebrow + title + CTA always fit; the meta line hides entirely
-          // below the card-height threshold where it would clip (see
-          // .entity-card-meta in design-system.css).
+          // Unified: the text zone + CTA share (card height − card width),
+          // which is tight on small cards — keep chrome minimal so eyebrow +
+          // title + CTA always fit; the meta line hides entirely below the
+          // card-height threshold where it would clip (see .entity-card-meta
+          // in design-system.css).
           isProfileLandscape
             ? 'justify-center py-2 pl-3 pr-2'
             : isUnified && 'px-3 py-1.5'
@@ -503,16 +505,16 @@ export function EntityCard({
               ) : null}
             </>
           ) : isUnified ? (
-            // Unified anatomy: full-width 36px CTA at the bottom of every
-            // card. The CTA is a visual cue for the whole-card link — when
-            // neither the card nor the CTA has a target, it degrades to
-            // plain muted meta text instead of button chrome.
+            // Unified anatomy: one CTA at the bottom of every card. The CTA
+            // is a visual cue for the whole-card link — when neither the card
+            // nor the CTA has a target, it degrades to plain muted meta text
+            // instead of button chrome.
             model.cta ? (
               model.cta.disabled || (!model.cta.href && !cardHref) ? (
                 <span
                   className={cn(
                     'flex items-center text-xs text-tertiary-token',
-                    isProfileLandscape ? 'h-8 w-auto' : 'h-9 w-full'
+                    isProfileLandscape ? 'h-11 w-auto' : 'h-9 w-full'
                   )}
                 >
                   {model.cta.label}
@@ -520,8 +522,8 @@ export function EntityCard({
               ) : (
                 <span
                   className={cn(
-                    'inline-flex shrink-0 items-center justify-center rounded-full bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-[background-color,transform] duration-subtle group-hover:bg-btn-primary-hover group-active:scale-[var(--scale-press)] motion-reduce:transform-none',
-                    isProfileLandscape ? 'h-8 w-fit' : 'h-9 w-full'
+                    'inline-flex shrink-0 items-center justify-center rounded-full bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-colors duration-subtle group-hover:bg-btn-primary-hover',
+                    isProfileLandscape ? 'h-11 w-fit' : 'h-9 w-full'
                   )}
                 >
                   {model.cta.label}

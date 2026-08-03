@@ -162,7 +162,7 @@ function PrimaryPill({
   ariaLabel?: string;
 }>) {
   const className = cn(
-    'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-white px-4 text-sm font-semibold text-black shadow-sm transition-opacity duration-subtle hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60'
+    'inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full bg-white px-4 text-sm font-semibold text-black shadow-sm transition-opacity duration-subtle hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60'
   );
 
   if (href && href.startsWith('/')) {
@@ -599,8 +599,8 @@ export function ProfilePacCard({
       contextLabel = 'Stay In The Loop';
       ContextIcon = Bell;
       // JOV-3908: text "Not now" (control) vs borderless icon-X (candidate).
-      // One control element keeps the raw-button ratchet flat; min-h/w-11 keeps
-      // the icon arm at the 44px WCAG touch-target floor.
+      // One control element keeps the raw-button ratchet flat; both treatments
+      // keep a quiet 44px WCAG touch target.
       const isIconDismiss = assignment.dismissAffordance === 'icon';
       contextAside = (
         <button
@@ -613,7 +613,7 @@ export function ProfilePacCard({
             'shrink-0 text-white/50 transition-colors duration-subtle hover:text-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70',
             isIconDismiss
               ? '-mr-1.5 -mt-1.5 flex min-h-11 min-w-11 items-center justify-center rounded-full hover:bg-white/10'
-              : 'text-xs font-medium'
+              : 'flex min-h-11 min-w-11 items-center justify-center rounded-full px-2 text-xs font-medium'
           )}
         >
           {isIconDismiss ? (
@@ -644,7 +644,7 @@ export function ProfilePacCard({
             disabled={state.kind === 'submitting'}
             aria-label={`Email address for ${artist.name} updates`}
             aria-invalid={Boolean(fieldError) || state.kind === 'error'}
-            className='h-9 min-w-0 flex-1 rounded-full border border-white/15 bg-white/10 px-4 text-sm text-white dark:text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60'
+            className='h-11 min-w-0 flex-1 rounded-full border border-white/15 bg-white/10 px-4 text-sm text-white dark:text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60'
           />
           <PrimaryPill type='submit' disabled={state.kind === 'submitting'}>
             {state.kind === 'submitting'
@@ -837,6 +837,7 @@ export function ProfilePacCard({
             src={artImageUrl}
             alt={artImageAlt}
             fill
+            priority={artPriority}
             sizes={
               isProfileLandscape
                 ? '(max-width: 767px) 44vw, 180px'
@@ -855,11 +856,12 @@ export function ProfilePacCard({
 
       <div
         className={cn(
-          'flex min-h-0 min-w-0 flex-1 flex-col gap-1.5',
+          'flex min-h-0 min-w-0 flex-1 flex-col',
+          isProfileLandscape ? 'gap-1' : 'gap-1.5',
           isProfileLandscape
             ? usesFullWidthCaptureLayout
               ? 'absolute inset-1.5 z-10 justify-center p-2'
-              : 'justify-center py-2 pl-3 pr-2'
+              : 'justify-center py-1.5 pl-3 pr-2'
             : 'px-3 py-1.5'
         )}
       >

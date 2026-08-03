@@ -383,6 +383,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
       className='flex min-h-0 min-w-0 flex-1 flex-col md:mx-auto md:w-full md:max-w-80'
       data-testid='profile-home-rail'
     >
+      <h2 className='sr-only'>Latest From {artist.name}</h2>
       <ReleaseCatalogCarousel
         items={carouselItems}
         artistHandle={artist.handle}
@@ -399,6 +400,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
             isSubscribed={isSubscribed}
             renderMode={renderMode}
             layout='profile-landscape'
+            artPriority={pacArtPriority}
           />
         }
         trailing={alertsCard}
