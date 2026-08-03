@@ -184,6 +184,22 @@ describe('CookieModal loads saved preferences', () => {
     );
   });
 
+  it('keeps consent controls on a 44px touch-target floor', async () => {
+    const { CookieModal } = await import('@/components/organisms/CookieModal');
+    render(<CookieModal open onClose={vi.fn()} />);
+
+    for (const control of screen.getAllByRole('switch')) {
+      expect(control.className).toContain('before:h-11');
+      expect(control.className).toContain('before:w-11');
+    }
+    expect(screen.getByRole('button', { name: /cancel/i }).className).toContain(
+      'min-h-11'
+    );
+    expect(
+      screen.getByRole('button', { name: /save preferences/i }).className
+    ).toContain('min-h-11');
+  });
+
   it('calls onSave and onClose when Save Preferences succeeds', async () => {
     const onSave = vi.fn();
     const onClose = vi.fn();

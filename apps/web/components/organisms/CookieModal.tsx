@@ -99,6 +99,7 @@ function CookieCategories({
                 disabled={category.disabled}
                 aria-labelledby={titleId}
                 aria-describedby={descId}
+                className='before:h-11 before:w-11'
               />
             </div>
           </div>
@@ -193,7 +194,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
               size='sm'
               onClick={onClose}
               disabled={isSaving}
-              className='flex-1'
+              className='min-h-11 flex-1'
             >
               Cancel
             </Button>
@@ -203,7 +204,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
               size='sm'
               onClick={save}
               disabled={isSaving}
-              className='flex-1'
+              className='min-h-11 flex-1'
             >
               Save Preferences
             </Button>
@@ -257,6 +258,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
           size='sm'
           onClick={onClose}
           disabled={isSaving}
+          className='min-h-11'
         >
           Cancel
         </Button>
@@ -266,6 +268,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
           size='sm'
           onClick={save}
           disabled={isSaving}
+          className='min-h-11'
         >
           Save Preferences
         </Button>

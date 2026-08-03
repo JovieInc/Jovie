@@ -999,6 +999,122 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
     }
   });
 
+  test('late cookie consent measurement never reflows the profile stage or covers the dock', async ({
+    page,
+  }) => {
+    const viewports = [
+      { label: 'phone small', width: 320, height: 568 },
+      { label: 'phone', width: 390, height: 844 },
+      { label: 'phone max', width: 430, height: 932 },
+      { label: 'compact edge', width: 767, height: 1024 },
+      { label: 'tablet', width: 768, height: 1024 },
+      { label: 'desktop', width: 1024, height: 1024 },
+      { label: 'wide desktop', width: 1440, height: 1024 },
+    ] as const;
+
+    for (const viewport of viewports) {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      });
+      await smokeNavigate(page, '/demo/showcase/public-profile', {
+        timeout: 120_000,
+      });
+      await waitForHydration(page);
+      await waitForAnyVisible(
+        page,
+        ['[data-testid="profile-pac"]'],
+        SMOKE_TIMEOUTS.NAVIGATION
+      );
+      await settleLayout(page);
+
+      const readGeometry = () =>
+        page.evaluate(() => {
+          const rect = (element: Element | null) => {
+            if (!element) return null;
+            const bounds = element.getBoundingClientRect();
+            return {
+              top: bounds.top,
+              bottom: bounds.bottom,
+              width: bounds.width,
+              height: bounds.height,
+            };
+          };
+
+          return {
+            shell: rect(document.querySelector('.profile-viewport')),
+            frame: rect(document.querySelector('.public-profile-layout-frame')),
+            cover: rect(
+              document.querySelector('[data-testid="profile-cover"]')
+            ),
+            dock: rect(
+              document.querySelector('[data-testid="profile-tab-bar"]')
+            ),
+            banner: rect(
+              document.querySelector('[data-testid="cookie-banner"]')
+            ),
+          };
+        });
+
+      const before = await readGeometry();
+      await page.evaluate(() => {
+        document.documentElement.style.setProperty(
+          '--cookie-banner-h',
+          '146px'
+        );
+
+        const banner = document.createElement('aside');
+        banner.className =
+          'cookie-banner-card cookie-banner-card--above-public-profile-dock';
+        banner.dataset.testid = 'cookie-banner';
+        Object.assign(banner.style, {
+          position: 'fixed',
+          right: '16px',
+          width: 'min(340px, calc(100vw - 32px))',
+          height: '118px',
+          zIndex: '60',
+        });
+        document.body.append(banner);
+      });
+      await page.evaluate(
+        () =>
+          new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+      );
+
+      const after = await readGeometry();
+      expect(
+        after.shell,
+        `${viewport.label} shell must ignore delayed cookie height`
+      ).toEqual(before.shell);
+      expect(
+        after.frame,
+        `${viewport.label} frame must ignore delayed cookie height`
+      ).toEqual(before.frame);
+      expect(
+        after.cover,
+        `${viewport.label} hero must ignore delayed cookie height`
+      ).toEqual(before.cover);
+      expect(
+        after.dock,
+        `${viewport.label} dock must ignore delayed cookie height`
+      ).toEqual(before.dock);
+
+      if (viewport.width < 768) {
+        expect(after.banner, 'phone consent card should render').not.toBeNull();
+        expect(after.dock, 'phone dock should render').not.toBeNull();
+        expect(
+          after.banner?.bottom ?? Number.POSITIVE_INFINITY,
+          'phone consent card should clear the glass dock'
+        ).toBeLessThanOrEqual((after.dock?.top ?? 0) - 8);
+      }
+
+      await page.evaluate(() => {
+        document.documentElement.style.removeProperty('--cookie-banner-h');
+        document.querySelector('[data-testid="cookie-banner"]')?.remove();
+      });
+    }
+  });
+
   test('mock-home includes horizontally scrollable back-catalog cards', async ({
     page,
   }) => {

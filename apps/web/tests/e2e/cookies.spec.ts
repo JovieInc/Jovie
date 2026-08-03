@@ -39,6 +39,14 @@ async function openHomepageWithBanner(
     }
   });
 
+  // Middleware refreshes the region flag on every request. Send the same
+  // deterministic EU geo signal used by production edge requests so it cannot
+  // overwrite the fixture cookie with a non-consent region during navigation.
+  await page.setExtraHTTPHeaders({
+    'x-vercel-ip-country': 'DE',
+    'x-vercel-ip-country-region': 'BE',
+  });
+
   // Set the middleware-controlled cookie that enables the banner
   await page.context().addCookies([
     {
@@ -82,6 +90,21 @@ test.describe('Cookie banner @smoke', () => {
     expect(box, 'Cookie banner has no bounding box').not.toBeNull();
     expect(box!.width, 'Cookie banner has zero width').toBeGreaterThan(0);
     expect(box!.height, 'Cookie banner has zero height').toBeGreaterThan(0);
+
+    for (const actionName of ['Reject', 'Customize', 'Accept All']) {
+      const actionBox = await banner
+        .getByRole('button', { name: actionName, exact: true })
+        .boundingBox();
+      expect(actionBox, `${actionName} has no bounding box`).not.toBeNull();
+      expect(
+        actionBox!.width,
+        `${actionName} misses the 44px touch width`
+      ).toBeGreaterThanOrEqual(44);
+      expect(
+        actionBox!.height,
+        `${actionName} misses the 44px touch height`
+      ).toBeGreaterThanOrEqual(44);
+    }
   });
 
   test('Accept All button is clickable and has nonzero bounding box', async ({
@@ -94,8 +117,7 @@ test.describe('Cookie banner @smoke', () => {
     const banner = page.locator('[data-testid="cookie-banner"]');
     await expect(banner).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
 
-    // On mobile viewports the actions area is hidden until "Manage" is clicked.
-    // At desktop width (1280px default) the actions are always visible.
+    // Floating-card actions stay directly available at every breakpoint.
     const acceptBtn = banner.getByRole('button', { name: 'Accept All' });
 
     await expect(
@@ -105,10 +127,14 @@ test.describe('Cookie banner @smoke', () => {
 
     const box = await acceptBtn.boundingBox();
     expect(box, '"Accept All" button has no bounding box').not.toBeNull();
-    expect(box!.width, '"Accept All" button has zero width').toBeGreaterThan(0);
-    expect(box!.height, '"Accept All" button has zero height').toBeGreaterThan(
-      0
-    );
+    expect(
+      box!.width,
+      '"Accept All" button misses 44px touch width'
+    ).toBeGreaterThanOrEqual(44);
+    expect(
+      box!.height,
+      '"Accept All" button misses 44px touch height'
+    ).toBeGreaterThanOrEqual(44);
 
     // Clicking must not throw and must dismiss the banner
     await acceptBtn.click();
@@ -133,13 +159,14 @@ test.describe('Cookie banner @smoke', () => {
 
     const custBox = await customizeBtn.boundingBox();
     expect(custBox, '"Customize" button has no bounding box').not.toBeNull();
-    expect(custBox!.width, '"Customize" button has zero width').toBeGreaterThan(
-      0
-    );
+    expect(
+      custBox!.width,
+      '"Customize" button misses 44px touch width'
+    ).toBeGreaterThanOrEqual(44);
     expect(
       custBox!.height,
-      '"Customize" button has zero height'
-    ).toBeGreaterThan(0);
+      '"Customize" button misses 44px touch height'
+    ).toBeGreaterThanOrEqual(44);
 
     // Open the cookie modal
     await customizeBtn.click();
@@ -154,6 +181,12 @@ test.describe('Cookie banner @smoke', () => {
       '"Save Preferences" button did not appear after clicking Customize'
     ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
 
+    // Dialog scale-in briefly transforms the visual box below its settled CSS
+    // size. Evaluate the stable interaction state, not an animation frame.
+    await expect
+      .poll(async () => (await saveBtn.boundingBox())?.height ?? 0)
+      .toBeGreaterThanOrEqual(44);
+
     const saveBox = await saveBtn.boundingBox();
     expect(
       saveBox,
@@ -161,11 +194,32 @@ test.describe('Cookie banner @smoke', () => {
     ).not.toBeNull();
     expect(
       saveBox!.width,
-      '"Save Preferences" button has zero width'
-    ).toBeGreaterThan(0);
+      '"Save Preferences" button misses 44px touch width'
+    ).toBeGreaterThanOrEqual(44);
     expect(
       saveBox!.height,
-      '"Save Preferences" button has zero height'
-    ).toBeGreaterThan(0);
+      '"Save Preferences" button misses 44px touch height'
+    ).toBeGreaterThanOrEqual(44);
+
+    const cancelBtn = page.getByRole('button', { name: 'Cancel', exact: true });
+    const cancelBox = await cancelBtn.boundingBox();
+    expect(cancelBox, '"Cancel" button has no bounding box').not.toBeNull();
+    expect(cancelBox!.width).toBeGreaterThanOrEqual(44);
+    expect(cancelBox!.height).toBeGreaterThanOrEqual(44);
+
+    const analyticsSwitch = page.getByRole('switch', { name: /analytics/i });
+    const switchHitArea = await analyticsSwitch.evaluate(control => {
+      const pseudo = getComputedStyle(control, '::before');
+      return {
+        width: Number.parseFloat(pseudo.width),
+        height: Number.parseFloat(pseudo.height),
+      };
+    });
+    expect(switchHitArea.width).toBeGreaterThanOrEqual(44);
+    expect(switchHitArea.height).toBeGreaterThanOrEqual(44);
+
+    await analyticsSwitch.focus();
+    await page.keyboard.press('Space');
+    await expect(analyticsSwitch).toBeChecked();
   });
 });

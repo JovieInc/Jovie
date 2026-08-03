@@ -38,7 +38,7 @@ export function PublicProfileLayoutShell({
   const hasAmbientBg = Boolean(heroImageUrl && !heroImageError);
   return (
     <div
-      className='profile-viewport relative h-[calc(100dvh-var(--cookie-banner-h,0px))] overflow-hidden bg-(--profile-stage-bg) text-primary-token md:h-auto md:min-h-[calc(100dvh-var(--cookie-banner-h,0px))] md:overflow-x-hidden md:overflow-y-auto'
+      className='profile-viewport relative h-dvh overflow-hidden bg-(--profile-stage-bg) text-primary-token md:h-auto md:min-h-dvh md:overflow-x-hidden md:overflow-y-auto'
       style={profileAccentStyle}
       data-testid='public-profile-layout-shell'
     >
@@ -62,8 +62,8 @@ export function PublicProfileLayoutShell({
           // Center the stable stage container (not per-content height) so
           // mode/tab switches do not reflow vertical position (JOV-1369).
           isDesktopLayout
-            ? 'public-profile-layout-frame--desktop min-h-[calc(100dvh-var(--cookie-banner-h,0px))] items-center'
-            : 'public-profile-layout-frame--compact min-h-[calc(100dvh-var(--cookie-banner-h,0px))] items-stretch md:items-center'
+            ? 'public-profile-layout-frame--desktop min-h-dvh items-center'
+            : 'public-profile-layout-frame--compact min-h-dvh items-stretch md:items-center'
         )}
         data-layout={isDesktopLayout ? 'desktop' : 'compact'}
       >
