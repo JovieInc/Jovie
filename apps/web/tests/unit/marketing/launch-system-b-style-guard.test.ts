@@ -3,7 +3,8 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const pageSourcePath = 'app/(marketing)/launch/page.tsx';
-const designSystemPath = 'styles/design-system.css';
+const designSystemPath =
+  'components/marketing/artist-profile/ArtistProfileLandingPage.css';
 const launchVisibleSourcePaths = [
   pageSourcePath,
   'components/features/home/ProfileMockup.tsx',
@@ -53,9 +54,7 @@ const forbiddenLaunchCssPatterns = [
 function extractLaunchCss(source: string): string {
   const start = source.indexOf(':where(.system-b-launch-page)');
   const nextSectionMarkers = [
-    '/* ============================================\n   SYSTEM B PRICING PAGE',
-    '/* ============================================\n   SYSTEM B CHAT ENTITY PREVIEW PRIMITIVES',
-    '/* ============================================\n   GEIST ACCENT PALETTE',
+    '/* ============================================\n   SYSTEM B SHARED MARKETING PRIMITIVES',
   ];
   const end = nextSectionMarkers
     .map(marker => source.indexOf(marker, start))

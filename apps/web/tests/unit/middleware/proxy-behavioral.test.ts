@@ -287,6 +287,29 @@ describe('proxy.ts middleware', () => {
     });
   });
 
+  describe('private profile alias marker', () => {
+    it.each([
+      '/dualipa/music/__profile-mode-alias/resolve',
+      '/dualipa/listen/__profile-mode-alias/resolve',
+      '/tim/subscribe/__profile-mode-alias/resolve',
+    ])('returns 404 for direct marker path %s before auth', async path => {
+      const req = createUnauthenticatedRequest({ pathname: path });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(404);
+      expect(mocks.getSessionCookie).not.toHaveBeenCalled();
+      expect(mocks.resolveTestBypassUserId).not.toHaveBeenCalled();
+      expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
+    });
+
+    it('does not block the public alias before its afterFiles rewrite', async () => {
+      const req = createUnauthenticatedRequest({ pathname: '/dualipa/music' });
+      const res = await callMiddleware(req);
+
+      expect(res.status).not.toBe(404);
+    });
+  });
+
   // ==========================================================================
   // Catch-all handle hardening (JOV-3054)
   // ==========================================================================

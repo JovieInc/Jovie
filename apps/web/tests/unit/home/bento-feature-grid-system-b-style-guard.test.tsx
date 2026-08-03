@@ -7,7 +7,7 @@ import { BentoFeatureGrid } from '@/features/home/BentoFeatureGrid';
 const webRoot = path.resolve(__dirname, '../../..');
 const bentoSourcePath = 'components/features/home/BentoFeatureGrid.tsx';
 const curveSourcePath = 'components/features/home/MomentumCurves.tsx';
-const cssPath = 'styles/design-system.css';
+const cssPath = 'app/(home)/home.css';
 
 const forbiddenSourcePatterns = [
   /#[0-9a-fA-F]{3,8}/,

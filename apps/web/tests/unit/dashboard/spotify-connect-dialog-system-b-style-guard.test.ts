@@ -42,7 +42,7 @@ describe('SpotifyConnectDialog System B style guard', () => {
   });
 
   it('keeps dialog primitives token-backed', () => {
-    const source = readWebFile('styles/design-system.css');
+    const source = readWebFile('styles/system-b-app.css');
     const spotifyConnectCss = source.match(
       /:where\(\.system-b-spotify-connect-card\)[\s\S]*?(?=\.system-b-release-provider-banner)/
     )?.[0];

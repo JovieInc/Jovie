@@ -47,7 +47,7 @@ describe('ReleaseTable System B style guard', () => {
   });
 
   it('keeps ReleaseTable primitives token-backed', () => {
-    const source = readWebFile('styles/design-system.css');
+    const source = readWebFile('styles/system-b-app.css');
     const releaseTableCss = source.match(
       /\.system-b-release-table-row[\s\S]*?:where\(\.system-b-track-row\)/
     )?.[0];

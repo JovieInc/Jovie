@@ -41,7 +41,7 @@ describe('public profile not-found System B source tokens', () => {
   it('backs the public profile not-found primitives with System B profile tokens', async () => {
     const css = await readFile(designSystemPath, 'utf8');
     const block = css.match(
-      /SYSTEM B PUBLIC PROFILE NOT FOUND PRIMITIVES[\s\S]*?\/\* ============================================\s+SYSTEM B UNAVAILABLE PAGE PRIMITIVES/
+      /SYSTEM B PUBLIC PROFILE NOT FOUND PRIMITIVES[\s\S]*?\/\* Inline entity links in public profile bio/
     )?.[0];
 
     expect(block).toBeTruthy();

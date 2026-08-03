@@ -31,11 +31,11 @@ describe('UnavailablePage System B style guard', () => {
 
   it('keeps unavailable page CSS quiet and token-backed', () => {
     const source = readFileSync(
-      path.join(webRoot, 'styles/design-system.css'),
+      path.join(webRoot, 'styles/system-b-app.css'),
       'utf8'
     );
     const unavailableCss = source.match(
-      /:where\(\.system-b-unavailable-page\)[\s\S]*?\/\* ============================================\s+SYSTEM B ONBOARDING V2 PRIMITIVES/
+      /:where\(\.system-b-unavailable-page\)[\s\S]*?\/\* ============================================\s+SYSTEM B START LOADING PRIMITIVES/
     )?.[0];
 
     expect(unavailableCss).toContain('var(--system-b-bg-page)');

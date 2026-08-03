@@ -1045,6 +1045,17 @@ jobs:
             echo "performance_status=passed" >> "$GITHUB_OUTPUT"
           fi
 
+          CI=true pnpm exec tsx scripts/performance-budgets-guard.ts \
+            --base-url "$deployment_url" \
+            --runs 5 \
+            --route-id public-profile-listen \
+            --route-id public-profile-music \
+            --route-id public-profile-subscribe \
+            --route-id public-profile-tip \
+            --route-id public-profile-tour \
+            --route-id public-profile-releases || \
+            fail_performance_gate "Public-profile alias usable-result contract failed on the immutable staged deployment."
+
       - name: Recheck main immediately before production promotion
         id: final-current
         if: ${{ steps.mutation-head.outputs.is_current == 'true' && steps.performance-gate.outcome == 'success' }}
@@ -1090,6 +1101,36 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         run: bash .github/scripts/verify-production-alias.sh
+
+  production-public-profile-alias-gate:
+    name: Production public-profile alias usable-result gate
+    needs: [promote-production]
+    if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-playwright
+      - name: Gate canonical public-profile aliases on usable results
+        working-directory: apps/web
+        env:
+          CI: 'true'
+        run: >-
+          pnpm exec tsx scripts/performance-budgets-guard.ts
+          --base-url https://jov.ie
+          --runs 5
+          --route-id public-profile-listen
+          --route-id public-profile-music
+          --route-id public-profile-subscribe
+          --route-id public-profile-tip
+          --route-id public-profile-tour
+          --route-id public-profile-releases
 
   sentry-error-gate:
     name: Sentry Error Gate (production)
@@ -1489,6 +1530,7 @@ jobs:
         alias-staging,
         production-head,
         promote-production,
+        production-public-profile-alias-gate,
         sentry-error-gate,
         production-oauth-gate,
         rollback-production,
@@ -1599,6 +1641,7 @@ jobs:
             "alias-staging:${{ needs.alias-staging.result }}" \
             "production-head:${{ needs.production-head.result }}" \
             "promote-production:${{ needs.promote-production.result }}" \
+            "production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}" \
             "sentry-error-gate:${{ needs.sentry-error-gate.result }}" \
             "production-oauth-gate:${{ needs.production-oauth-gate.result }}"; do
             name="${gate%%:*}"

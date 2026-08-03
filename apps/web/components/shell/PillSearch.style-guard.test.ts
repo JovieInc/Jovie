@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 const componentPath = path.resolve(__dirname, 'PillSearch.tsx');
 const designSystemPath = path.resolve(
   __dirname,
-  '../../styles/design-system.css'
+  '../../styles/system-b-app.css'
 );
 
 const componentVisualDriftPatterns = [

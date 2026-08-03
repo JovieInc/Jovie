@@ -40,11 +40,11 @@ describe('/start loading System B style guard', () => {
 
   it('keeps the loading CSS quiet and token-backed', () => {
     const source = readFileSync(
-      path.join(webRoot, 'styles/design-system.css'),
+      path.join(webRoot, 'styles/system-b-app.css'),
       'utf8'
     );
     const loadingCss = source.match(
-      /:where\(\.system-b-start-loading-page\)[\s\S]*?\/\* ============================================\s+SYSTEM B ONBOARDING V2 PRIMITIVES/
+      /:where\(\.system-b-start-loading-page\)[\s\S]*?\/\* ============================================\s+SYSTEM B SHELL LOADING PRIMITIVES/
     )?.[0];
 
     expect(loadingCss).toBeDefined();

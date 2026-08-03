@@ -227,13 +227,14 @@ test.describe('Public profile metadata regression @regression', () => {
 
       const robots = await page
         .locator('head meta[name="robots"]')
-        .first()
-        .getAttribute('content');
+        .evaluateAll(nodes =>
+          nodes.map(node => node.getAttribute('content')?.toLowerCase() ?? '')
+        );
 
       expect(
-        robots?.toLowerCase() ?? '',
+        robots.some(content => content.includes('noindex')),
         'missing profile must emit noindex robots metadata'
-      ).toContain('noindex');
+      ).toBe(true);
     } finally {
       await page.close().catch(() => undefined);
       await context.close().catch(() => undefined);

@@ -1,3 +1,4 @@
+import '../../../components/marketing/MarketingSnapRail.css';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
 import { MarketingEnhancements } from '@/features/home/MarketingEnhancements';
 

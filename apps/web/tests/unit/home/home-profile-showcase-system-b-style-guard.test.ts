@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const webRoot = path.resolve(__dirname, '../../..');
 const sourcePath = 'components/features/home/HomeProfileShowcase.tsx';
-const cssPath = 'styles/design-system.css';
+const cssPath = 'app/(home)/home.css';
 
 const forbiddenShowcaseSourcePatterns = [
   /\btext-\[[^\]]+\]/,

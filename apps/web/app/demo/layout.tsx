@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { type ReactNode, Suspense } from 'react';
+import '../../styles/system-b-app.css';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const metadata: Metadata = {

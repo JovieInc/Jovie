@@ -15,7 +15,13 @@
  * @module lib/sentry/client-lite
  */
 
-import * as Sentry from '@sentry/nextjs';
+import {
+  addBreadcrumb,
+  captureException,
+  captureMessage,
+  getClient,
+  init,
+} from '@sentry/nextjs';
 import {
   getBaseClientConfig,
   SENTRY_DSN_CLIENT,
@@ -33,18 +39,16 @@ let isInitialized = false;
  * isomorphic surface, so derive it from the init() options' integrations array.
  */
 type SentryIntegration = Extract<
-  NonNullable<NonNullable<Parameters<typeof Sentry.init>[0]>['integrations']>,
+  NonNullable<NonNullable<Parameters<typeof init>[0]>['integrations']>,
   readonly unknown[]
 >[number];
 
-/**
- * breadcrumbsIntegration is a client-only export that exists on @sentry/nextjs
- * at runtime in the browser build but is absent from its isomorphic type surface
- * in SDK v10. Cast to a typed view of the client-only factory this module calls.
- */
-const clientSentry = Sentry as typeof Sentry & {
-  breadcrumbsIntegration: () => SentryIntegration;
-};
+const LITE_DISABLED_INTEGRATIONS = new Set([
+  'BrowserProfiling',
+  'BrowserTracing',
+  'ProfilingIntegration',
+  'Replay',
+]);
 
 /**
  * Lite Sentry configuration options.
@@ -79,24 +83,13 @@ export interface LiteSentryConfig {
  */
 export function getLiteClientConfig(
   options: LiteSentryConfig = {}
-): NonNullable<Parameters<typeof Sentry.init>[0]> {
+): NonNullable<Parameters<typeof init>[0]> {
   const baseConfig = getBaseClientConfig();
   const {
     tracesSampleRate = TRACES_SAMPLE_RATE,
     additionalIntegrations = [],
     enableBreadcrumbs = true,
   } = options;
-
-  // Build integrations array - minimal set for core error tracking
-  const integrations: SentryIntegration[] = [];
-
-  // Add breadcrumb integration if enabled (default behavior)
-  if (enableBreadcrumbs) {
-    integrations.push(clientSentry.breadcrumbsIntegration());
-  }
-
-  // Add any custom lightweight integrations
-  integrations.push(...additionalIntegrations);
 
   return {
     dsn: baseConfig.dsn,
@@ -105,8 +98,19 @@ export function getLiteClientConfig(
     sendDefaultPii: baseConfig.sendDefaultPii,
     beforeSend: baseConfig.beforeSend,
 
-    // Lite-specific: minimal integrations (no Replay, no Profiling)
-    integrations,
+    // Lite-specific: preserve core error capture (GlobalHandlers,
+    // BrowserApiErrors, LinkedErrors, Dedupe, and PII filtering) while dropping
+    // the tracing/replay/profiling integrations that public routes do not need.
+    // Using the callback plus named imports avoids statically retaining Replay
+    // through this module without silently disabling uncaught-error reporting.
+    integrations: defaultIntegrations => [
+      ...defaultIntegrations.filter(
+        integration =>
+          !LITE_DISABLED_INTEGRATIONS.has(integration.name) &&
+          (enableBreadcrumbs || integration.name !== 'Breadcrumbs')
+      ),
+      ...additionalIntegrations,
+    ],
 
     // Disable Replay sample rates since we're not using Replay
     replaysSessionSampleRate: 0,
@@ -155,7 +159,7 @@ export function initLiteSentry(options: LiteSentryConfig = {}): boolean {
   }
 
   const config = getLiteClientConfig(options);
-  Sentry.init(config);
+  init(config);
   isInitialized = true;
 
   return true;
@@ -178,14 +182,8 @@ export function isLiteSentryInitialized(): boolean {
  * @returns The Sentry client or undefined
  */
 export function getSentryClient() {
-  return Sentry.getClient();
+  return getClient();
 }
-
-/**
- * Re-export Sentry's router transition capture for Next.js App Router.
- * This should be used regardless of SDK variant for navigation tracking.
- */
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
 
 // ---------------------------------------------------------------------------
 // Re-exported Sentry API functions
@@ -197,17 +195,7 @@ export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
 // ---------------------------------------------------------------------------
 
 /**
- * Capture an exception in Sentry.
- * Re-exported so client components don't need a wildcard Sentry import.
+ * Re-export the lightweight capture surface so client components do not need
+ * a wildcard Sentry import.
  */
-export const captureException = Sentry.captureException;
-
-/**
- * Capture a plain-text message in Sentry.
- */
-export const captureMessage = Sentry.captureMessage;
-
-/**
- * Add a breadcrumb to the current Sentry scope.
- */
-export const addBreadcrumb = Sentry.addBreadcrumb;
+export { addBreadcrumb, captureException, captureMessage };

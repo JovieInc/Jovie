@@ -45,3 +45,126 @@
     0 0 0 2px
     color-mix(in oklab, var(--system-b-cinematic-black) 15%, transparent);
 }
+
+/**
+ * Shared System B public-page theme bridge.
+ *
+ * Imported by home/marketing layouts, never by the public artist profile.
+ */
+
+/* ============================================
+   MARKETING MODE - Linear Theme Bridge
+   ============================================
+
+   Activate Linear styling on marketing pages by adding
+   [data-theme="linear"] to a parent element or the semantic
+   .system-b-marketing wrapper. The legacy .linear-marketing class is
+   retired (System A teardown, 2026-07-21).
+
+   This maps Linear tokens to the existing design system
+   variables for seamless integration.
+*/
+
+[data-theme="linear"],
+.system-b-marketing {
+  /* Unified type (one system, two languages): Inter body + UI; Satoshi reserved
+     for display/headings (approved exception). DM Sans retired 2026-06-18. */
+  font-family: var(--font-sans);
+  --marketing-font-display:
+    var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
+  --marketing-font-body: var(--font-sans);
+
+  /* Map Linear text colors to design system */
+  --color-text-primary-token: var(--linear-text-primary);
+  --color-text-secondary-token: var(--linear-text-secondary);
+  --color-text-tertiary-token: var(--linear-text-tertiary);
+
+  /* Map Linear backgrounds to design system */
+  --color-bg-base: var(--linear-bg-page);
+  --color-bg-surface-0: var(--linear-bg-surface-0);
+  --color-bg-surface-1: var(--linear-bg-surface-1);
+  --color-bg-surface-2: var(--linear-bg-surface-2);
+
+  /* Map Linear borders to design system */
+  --color-border-subtle: var(--linear-border-subtle);
+  --color-border-default: var(--linear-border-default);
+  --color-border-strong: var(--linear-border-strong);
+
+  /* Map Linear buttons to design system */
+  --color-btn-primary-bg: var(--linear-btn-primary-bg);
+  --color-btn-primary-fg: var(--linear-btn-primary-fg);
+  --color-btn-secondary-bg: var(--linear-btn-secondary-bg);
+  --color-btn-secondary-fg: var(--linear-btn-secondary-fg);
+
+  /* Map Linear interactive states */
+  --color-interactive-hover: var(--linear-bg-hover);
+
+  /* Map Linear page bg and focus ring */
+  --color-bg-page: var(--linear-bg-page);
+  --color-border-focus: var(--linear-border-focus);
+}
+
+.system-b-marketing.dark,
+.home-viewport.dark,
+.system-b-root-not-found-page.dark {
+  --linear-text-primary: #f7f8f8;
+  --linear-text-secondary: #d0d6e0;
+  --linear-text-tertiary: #8a8f98;
+  --linear-text-quaternary: #62666d;
+  --linear-bg-page: #06070a;
+  --linear-bg-surface-0: #0a0b0e;
+  --linear-bg-surface-1: #101216;
+  --linear-bg-surface-2: #161a20;
+  --linear-bg-button: #2a2c32;
+  --linear-bg-footer: #06070a;
+  --linear-border-subtle: rgba(255, 255, 255, 0.07);
+  --linear-border-default: rgba(255, 255, 255, 0.11);
+  --linear-border-strong: rgba(255, 255, 255, 0.18);
+
+  --color-text-primary-token: var(--linear-text-primary);
+  --color-text-secondary-token: var(--linear-text-secondary);
+  --color-text-tertiary-token: var(--linear-text-tertiary);
+  --color-text-quaternary-token: var(--linear-text-quaternary);
+  --color-bg-base: var(--linear-bg-page);
+  --color-bg-surface-0: var(--linear-bg-surface-0);
+  --color-bg-surface-1: var(--linear-bg-surface-1);
+  --color-bg-surface-2: var(--linear-bg-surface-2);
+  --color-bg-page: var(--linear-bg-page);
+  --color-bg-elevated: var(--linear-bg-surface-0);
+  --color-bg-input: var(--linear-bg-surface-1);
+  --color-bg-button: var(--linear-bg-button);
+  --color-bg-hover: rgba(255, 255, 255, 0.04);
+  --color-bg-active: var(--linear-bg-surface-2);
+  --color-bg-tooltip: var(--linear-bg-button);
+  --color-border-subtle: var(--linear-border-subtle);
+  --color-border-default: var(--linear-border-default);
+  --color-border-strong: var(--linear-border-strong);
+  --color-base: var(--color-bg-base);
+  --color-surface-0: var(--color-bg-surface-0);
+  --color-surface-1: var(--color-bg-surface-1);
+  --color-surface-2: var(--color-bg-surface-2);
+  --color-surface-3: var(--color-bg-button);
+  --color-surface-page: var(--color-bg-page);
+  --color-surface-hover: var(--color-bg-hover);
+  --color-surface-elevated: var(--color-bg-elevated);
+  --color-surface-input: var(--color-bg-input);
+  --color-surface-active: var(--color-bg-active);
+  --color-surface-button: var(--color-bg-button);
+  --color-surface-tooltip: var(--color-bg-tooltip);
+  --color-primary-token: var(--color-text-primary-token);
+  --color-secondary-token: var(--color-text-secondary-token);
+  --color-tertiary-token: var(--color-text-tertiary-token);
+  --color-quaternary-token: var(--color-text-quaternary-token);
+  --color-muted-token: var(--color-text-secondary-token);
+  --color-foreground: var(--color-text-primary-token);
+  --color-muted-foreground: var(--color-text-secondary-token);
+  --system-b-text-primary: var(--color-text-primary-token);
+  --system-b-bg-page: var(--color-bg-base);
+  --system-b-bg-surface-0: var(--color-bg-surface-0);
+  --system-b-bg-surface-1: var(--color-bg-surface-1);
+  --system-b-bg-surface-2: var(--color-bg-surface-2);
+  --public-shell-bg: var(--color-bg-base);
+  --public-shell-text: var(--color-text-primary-token);
+
+  color-scheme: dark;
+}

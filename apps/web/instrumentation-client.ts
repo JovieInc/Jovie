@@ -26,21 +26,38 @@
  * Users can request data deletion via privacy@jov.ie.
  */
 
-import { captureRouterTransitionStart } from '@sentry/nextjs';
 import { getSdkMode, isApiRoute } from './lib/sentry/route-detector';
+
+type RouterTransitionStart = (href: string, navigationType: string) => void;
+
+let routerTransitionCapture: Promise<RouterTransitionStart> | undefined;
+
+function loadRouterTransitionCapture() {
+  routerTransitionCapture ??= import('@sentry/nextjs').then(
+    ({ captureRouterTransitionStart }) => captureRouterTransitionStart
+  );
+  return routerTransitionCapture;
+}
 
 /**
  * Export the router transition capture for Next.js App Router.
  * This is used by Next.js to track client-side navigation.
  */
 export function onRouterTransitionStart(
-  ...args: Parameters<typeof captureRouterTransitionStart>
+  ...args: Parameters<RouterTransitionStart>
 ) {
   if (process.env.NEXT_PUBLIC_CI === 'true') {
     return;
   }
 
-  captureRouterTransitionStart(...args);
+  if (
+    typeof globalThis.location === 'undefined' ||
+    getSdkMode(globalThis.location.pathname) !== 'full'
+  ) {
+    return;
+  }
+
+  void loadRouterTransitionCapture().then(capture => capture(...args));
 }
 
 /**

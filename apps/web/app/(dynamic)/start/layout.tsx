@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import '../../../styles/system-b-app.css';
 import { ResolvedClientProviders } from '@/components/providers/ResolvedClientProviders';
 import { env, isSecureEnv } from '@/lib/env-server';
 import { AppFlagProvider } from '@/lib/flags/client';

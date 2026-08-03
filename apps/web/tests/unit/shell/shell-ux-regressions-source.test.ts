@@ -32,7 +32,7 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
       'utf8'
     );
     const css = readFileSync(
-      path.join(webRoot, 'styles/design-system.css'),
+      path.join(webRoot, 'styles/system-b-app.css'),
       'utf8'
     );
     const rail = readFileSync(

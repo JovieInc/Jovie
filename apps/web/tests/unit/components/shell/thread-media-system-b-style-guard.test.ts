@@ -34,7 +34,7 @@ describe('thread media System B style guard', () => {
 
   it('keeps thread media card CSS on globally defined System B tokens', () => {
     const source = readFileSync(
-      path.join(webRoot, 'styles/design-system.css'),
+      path.join(webRoot, 'styles/system-b-app.css'),
       'utf8'
     );
     const threadMediaCss = source.match(

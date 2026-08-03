@@ -102,7 +102,11 @@ async function collectVisibleButtonLabels(page: Page): Promise<string[]> {
         (element.textContent ?? '').trim();
       const normalized = label.replace(/\s+/g, ' ').trim();
       if (normalized.length > 0 && normalized.length <= 40) {
-        labels.push(normalized);
+        const destination =
+          element instanceof HTMLAnchorElement
+            ? new URL(element.href, window.location.href).href
+            : (element.getAttribute('aria-controls') ?? '');
+        labels.push(`${normalized}\u0000${destination}`);
       }
     }
     return labels;
@@ -128,8 +132,8 @@ async function assertNoPlaceholderCopy(page: Page, label: string) {
 async function assertNoDuplicateCtaClusters(page: Page, label: string) {
   const labels = await collectVisibleButtonLabels(page);
   const counts = new Map<string, number>();
-  for (const text of labels) {
-    counts.set(text, (counts.get(text) ?? 0) + 1);
+  for (const action of labels) {
+    counts.set(action, (counts.get(action) ?? 0) + 1);
   }
 
   // We allow up to 1 duplicate (e.g., a CTA repeated in header + footer is
@@ -139,7 +143,8 @@ async function assertNoDuplicateCtaClusters(page: Page, label: string) {
   const offenders = Array.from(counts.entries())
     .filter(([, count]) => count > 2)
     // Exclude well-known intentional duplications:
-    .filter(([text]) => {
+    .filter(([action]) => {
+      const [text = ''] = action.split('\u0000');
       const lower = text.toLowerCase();
       return (
         // Tab labels that legitimately appear in tab bar + drawer
@@ -152,7 +157,10 @@ async function assertNoDuplicateCtaClusters(page: Page, label: string) {
   expect(
     offenders,
     `${label} has duplicate CTA clusters: ${offenders
-      .map(([text, count]) => `"${text}" (×${count})`)
+      .map(([action, count]) => {
+        const [text = ''] = action.split('\u0000');
+        return `"${text}" (×${count})`;
+      })
       .join(', ')}`
   ).toEqual([]);
 }

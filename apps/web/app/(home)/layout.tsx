@@ -1,4 +1,5 @@
 import './home.css';
+import '../../components/marketing/MarketingSnapRail.css';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
 import { HomeScrollWatcher } from '@/components/homepage/HomeScrollWatcher';
 import { MarketingFooter } from '@/components/site/MarketingFooter';

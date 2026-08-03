@@ -43,7 +43,7 @@ describe('library badge accents (no two semantic badges share one color)', () =>
 
 describe('library right-rail System B structural compliance', () => {
   const surface = readSource('app/app/(shell)/library/LibrarySurface.tsx');
-  const css = readSource('styles/design-system.css');
+  const css = readSource('styles/system-b-app.css');
 
   it('renders provider rows (drawer + rail filter) with brand provider icons', () => {
     // Both the drawer Providers list and the rail Providers filter rows.

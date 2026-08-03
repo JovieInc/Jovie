@@ -212,7 +212,7 @@ describe('AppShellLayout OV mode', () => {
         actions: [
           expect.objectContaining({ label: 'Retry', variant: 'primary' }),
           expect.objectContaining({
-            label: 'Return to Jovie',
+            label: 'Return To Jovie',
             variant: 'secondary',
           }),
         ],

@@ -8,13 +8,15 @@ import { describe, expect, it } from 'vitest';
  * Part of the founder-directed System A -> System B marketing migration
  * (DESIGN.md 2026-06-18). Mirrors the shipped about/support/download guards
  * for the route source, and the download guard's CSS check for the
- * system-b-marketing-not-found block in styles/design-system.css: the 404
+ * system-b-marketing-not-found block in the route-owned marketing stylesheet:
+ * the 404
  * numeral and viewport sizing live in tokenized CSS, not arbitrary Tailwind
  * values in the route.
  */
 
 const routeSource = 'app/(marketing)/not-found.tsx' as const;
-const designSystemPath = 'styles/design-system.css' as const;
+const designSystemPath =
+  'components/marketing/artist-profile/ArtistProfileLandingPage.css' as const;
 
 const forbiddenRouteVisualPatterns = [
   /style=\{/,
@@ -42,14 +44,14 @@ const forbiddenCssPatterns = [
 
 function extractMarketingNotFoundCss(source: string): string {
   const start = source.indexOf('SYSTEM B MARKETING NOT-FOUND PRIMITIVES');
-  const end = source.indexOf('SYSTEM B ERROR FALLBACK PRIMITIVES', start);
+  const end = source.length;
 
   expect(start, 'marketing not-found CSS block exists').toBeGreaterThanOrEqual(
     0
   );
   expect(
     end,
-    'marketing not-found CSS block is bounded before the next section'
+    'marketing not-found CSS block is bounded by the route stylesheet end'
   ).toBeGreaterThan(start);
 
   return source.slice(start, end);

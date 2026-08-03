@@ -89,11 +89,11 @@ describe('chat and profile loading System B style guard', () => {
 
   it('defines the shell loading composer from System B aliases', () => {
     const source = readFileSync(
-      path.join(webRoot, 'styles/design-system.css'),
+      path.join(webRoot, 'styles/system-b-app.css'),
       'utf8'
     );
     const composerCss = source.match(
-      /:where\(\.system-b-shell-loading-composer\)[\s\S]*?\/\* ============================================\s+SYSTEM B ONBOARDING V2 PRIMITIVES/
+      /:where\(\.system-b-shell-loading-composer\)[\s\S]*?\.system-b-assistant-skill-mention\s*\{/
     )?.[0];
 
     expect(composerCss).toBeDefined();
@@ -109,7 +109,7 @@ describe('chat and profile loading System B style guard', () => {
 
   it('defines chat loading primitives from System B aliases', () => {
     const source = readFileSync(
-      path.join(webRoot, 'styles/design-system.css'),
+      path.join(webRoot, 'styles/system-b-app.css'),
       'utf8'
     );
     const chatLoadingCss = source.match(

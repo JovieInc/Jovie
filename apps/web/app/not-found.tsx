@@ -1,3 +1,5 @@
+import '../components/marketing/MarketingSnapRail.css';
+import '../components/marketing/artist-profile/ShellCtaButton.css';
 import { Container } from '@/components/site/Container';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';

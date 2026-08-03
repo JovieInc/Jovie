@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 
 const pageSourcePath = 'app/brand/page.tsx';
 const layoutSourcePath = 'app/brand/layout.tsx';
-const designSystemPath = 'styles/design-system.css';
+const designSystemPath =
+  'components/marketing/artist-profile/ArtistProfileLandingPage.css';
 
 const forbiddenRouteVisualPatterns = [
   /style=\{/,
@@ -36,8 +37,7 @@ const forbiddenBrandCssPatterns = [
 function extractBrandCss(source: string): string {
   const start = source.indexOf(':where(.system-b-brand-layout)');
   const nextSectionMarkers = [
-    '/* ============================================\n   SYSTEM B CHAT ENTITY PREVIEW PRIMITIVES',
-    '/* ============================================\n   GEIST ACCENT PALETTE',
+    ':where(.system-b-artist-notifications-hero-backdrop)',
   ];
   const end = nextSectionMarkers
     .map(marker => source.indexOf(marker, start))

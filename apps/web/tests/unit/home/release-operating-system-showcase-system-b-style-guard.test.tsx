@@ -23,7 +23,7 @@ vi.mock('@/components/marketing/MarketingSurfaceCard', () => ({
 const webRoot = path.resolve(__dirname, '../../..');
 const sourcePath =
   'components/features/home/ReleaseOperatingSystemShowcase.tsx';
-const cssPath = 'styles/design-system.css';
+const cssPath = 'app/(home)/home.css';
 
 const forbiddenSourceVisualPatterns = [
   /#[0-9a-fA-F]{3,8}/,

@@ -484,6 +484,42 @@ function matchesExpectedPath(actualUrl: URL, expectedPath: string) {
   return actualUrl.pathname === normalizedExpected;
 }
 
+export function assertAliasUsableResultUrl(
+  baseUrl: string,
+  route: PerfRouteDefinition,
+  resolvedPath: string,
+  finalUrl: string
+) {
+  const contract = route.aliasUsableResult;
+  if (!contract) return;
+
+  const actualUrl = new URL(finalUrl);
+  const canonicalPath = resolveExpectedDynamicPath(
+    contract.canonicalPath,
+    resolvedPath
+  );
+  if (actualUrl.origin !== new URL(baseUrl).origin) {
+    throw new Error(`Alias route ${route.id} left the configured origin.`);
+  }
+  if (!matchesExpectedPath(actualUrl, canonicalPath)) {
+    throw new Error(
+      `Alias route ${route.id} reached ${actualUrl.pathname}${actualUrl.search}; expected ${canonicalPath}.`
+    );
+  }
+}
+
+export function assertHostedAliasRunCount(
+  route: PerfRouteDefinition,
+  runs: number,
+  isDevMode: boolean
+) {
+  if (route.aliasUsableResult && !isDevMode && runs !== 5) {
+    throw new TypeError(
+      `Hosted production alias route ${route.id} requires exactly 5 fresh browser-context runs; received ${runs}.`
+    );
+  }
+}
+
 export async function waitForExpectedUrl(
   page: Page,
   expectedPaths: readonly string[],
@@ -896,6 +932,7 @@ async function collectBrowserMetrics(page: Page, devMode = false) {
         'interactive-shell-ready': 0,
         'largest-contentful-paint': metrics.lcp ?? 0,
         'redirect-complete': 0,
+        'usable-alias-result': 0,
         'skeleton-to-content': 0,
         'time-to-first-byte': navigationEntry?.responseStart ?? 0,
         'warm-shell-response': 0,
@@ -1037,6 +1074,7 @@ async function measureRouteSample(
       'interactive-shell-ready': 0,
       'largest-contentful-paint': 0,
       'redirect-complete': 0,
+      'usable-alias-result': 0,
       'skeleton-to-content': 0,
       'time-to-first-byte': 0,
       'warm-shell-response': 0,
@@ -1089,6 +1127,17 @@ async function measureRouteSample(
       ) {
         await waitForExpectedUrl(page, expectedRoutePaths(route, resolvedPath));
         timingValues['redirect-complete'] = Date.now() - startedAt;
+      }
+
+      if (route.aliasUsableResult) {
+        assertAliasUsableResultUrl(baseUrl, route, resolvedPath, page.url());
+        await waitForAnyVisible(page, route.readySelectors.shell);
+        await waitForAnyVisible(page, route.readySelectors.content);
+        await waitForAnyVisible(
+          page,
+          route.aliasUsableResult.destinationAffordances
+        );
+        timingValues['usable-alias-result'] = Date.now() - startedAt;
       }
 
       if (
@@ -1144,7 +1193,7 @@ async function measureRouteSample(
   }
 }
 
-function createPageResult(
+export function createPageResult(
   route: PerfRouteDefinition,
   resolvedPath: string,
   samples: readonly GuardSample[],
@@ -1174,6 +1223,7 @@ function createPageResult(
     'skeleton-to-content': medianTimingValue(samples, 'skeleton-to-content'),
     'time-to-first-byte': medianTimingValue(samples, 'time-to-first-byte'),
     'warm-shell-response': medianTimingValue(samples, 'warm-shell-response'),
+    'usable-alias-result': medianTimingValue(samples, 'usable-alias-result'),
   } satisfies Record<PerfTimingMetricName, number>;
   const rawResourceSizes = {
     font: medianResourceValue(samples, 'font'),
@@ -1194,6 +1244,18 @@ function createPageResult(
       budget.metric === 'cumulative-layout-shift' ? '' : 'ms'
     )
   );
+  if (route.aliasUsableResult) {
+    timings.push(
+      buildMetricResult(
+        'usable-alias-result-max',
+        Math.max(
+          ...samples.map(sample => sample.timingValues['usable-alias-result'])
+        ),
+        1500 * timingFactor,
+        'ms'
+      )
+    );
+  }
   const resourceSizes = getRouteResourceBudgets(route).map(budget =>
     buildMetricResult(
       budget.resourceType,
@@ -1476,6 +1538,7 @@ async function measureRoutesAgainstBudgets(
         authCookies
       );
       assertResolvedPerfRoutePath(route, resolvedPath);
+      assertHostedAliasRunCount(route, options.runs, devMode);
       const url = resolveRouteUrl(options.baseUrl, resolvedPath);
       logInfo(`Checking ${route.id} -> ${resolvedPath}`, options);
 
@@ -1512,7 +1575,11 @@ async function measureRoutesAgainstBudgets(
         violation => violation.kind === 'resource'
       );
 
-      if (initialTimingViolations.length === 0 || hasResourceViolation) {
+      if (
+        initialTimingViolations.length === 0 ||
+        hasResourceViolation ||
+        route.aliasUsableResult
+      ) {
         results.push(initialPage);
         continue;
       }

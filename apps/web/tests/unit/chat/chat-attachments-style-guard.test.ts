@@ -38,7 +38,7 @@ describe('chat attachment and action System B source contract', () => {
       'utf8'
     );
     const designSystemSource = readFileSync(
-      resolve(process.cwd(), 'styles/design-system.css'),
+      resolve(process.cwd(), 'styles/system-b-app.css'),
       'utf8'
     );
     const requiredClasses = [
