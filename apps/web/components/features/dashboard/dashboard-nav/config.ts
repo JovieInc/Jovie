@@ -10,6 +10,7 @@ import {
   MailCheck,
   Music,
   PieChart,
+  Plug,
   Settings,
   ShieldCheck,
   SquarePen,
@@ -135,6 +136,13 @@ export const userSettingsNavigation: NavItem[] = [
     href: APP_ROUTES.SETTINGS_ACCOUNT,
     id: 'account',
     icon: ShieldCheck,
+  },
+  {
+    name: 'Connections',
+    href: APP_ROUTES.SETTINGS_CONNECTORS,
+    id: 'connections',
+    icon: Plug,
+    description: 'Manage account-authorized services',
   },
   {
     name: 'Usage Stats',
