@@ -8,6 +8,10 @@ import {
   AudioWaveform,
   BookOpen,
   Cable,
+  Circle,
+  CircleAlert,
+  CircleCheck,
+  CircleX,
   ExternalLink,
   Globe2,
   LockKeyhole,
@@ -27,6 +31,8 @@ import {
   SocialIcon,
 } from '@/components/atoms/SocialIcon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import { DashboardHeaderActionButton } from '@/components/features/dashboard/atoms/DashboardHeaderActionButton';
+import { DashboardHeaderActionGroup } from '@/components/features/dashboard/atoms/DashboardHeaderActionGroup';
 import {
   DrawerAnalyticsSummaryCard,
   DrawerSection,
@@ -47,6 +53,7 @@ import {
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
   filterProfileWorkspaceRows,
@@ -54,7 +61,6 @@ import {
   getConnectionPrimaryAction,
   getConnectionStatus,
   sortProfileWorkspaceRows,
-  summarizeProfileWorkspaceRows,
 } from '@/lib/profile-surfaces/workspace';
 import { cn } from '@/lib/utils';
 import { AddConnectionRail } from './AddConnectionRail';
@@ -71,7 +77,6 @@ const FILTERS: ReadonlyArray<{
   id: ProfilesWorkspaceFilter;
   label: string;
 }> = [
-  { id: 'all', label: 'All' },
   { id: 'dsp', label: DSP_FILTER_LABEL },
   { id: 'social', label: 'Social' },
   { id: 'source', label: 'Sources' },
@@ -242,20 +247,28 @@ function TypeCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
 
 function StatusCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
   const status = getConnectionStatus(row);
+  const StatusIcon =
+    status.tone === 'success'
+      ? CircleCheck
+      : status.tone === 'warning'
+        ? CircleAlert
+        : status.tone === 'error'
+          ? CircleX
+          : Circle;
   return (
-    <span className='inline-flex min-w-0 items-center gap-1.5 rounded-md bg-surface-1 px-2 py-1 text-2xs font-medium text-secondary-token'>
+    <SimpleTooltip content={status.label}>
       <span
         className={cn(
-          'h-1.5 w-1.5 shrink-0 rounded-full',
-          status.tone === 'success' && 'bg-success',
-          status.tone === 'warning' && 'bg-warning',
-          status.tone === 'error' && 'bg-error',
-          status.tone === 'neutral' && 'bg-disabled'
+          'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-tertiary-token',
+          status.tone === 'success' && 'text-success',
+          status.tone === 'warning' && 'text-warning',
+          status.tone === 'error' && 'text-error'
         )}
-        aria-hidden
-      />
-      <span className='truncate'>{status.label}</span>
-    </span>
+      >
+        <StatusIcon className='h-3.5 w-3.5' aria-hidden />
+        <span className='sr-only'>{status.label}</span>
+      </span>
+    </SimpleTooltip>
   );
 }
 
@@ -490,7 +503,7 @@ function RailMetric({
 export function ProfilesWorkspace({
   data,
 }: Readonly<{ data: ProfilesWorkspaceData | null }>) {
-  const [filter, setFilter] = useState<ProfilesWorkspaceFilter>('all');
+  const [filter, setFilter] = useState<ProfilesWorkspaceFilter>('dsp');
   const [selected, setSelected] = useState<ProfileWorkspaceRow | null>(null);
   const [isAddConnectionOpen, setIsAddConnectionOpen] = useState(false);
   const router = useRouter();
@@ -508,14 +521,24 @@ export function ProfilesWorkspace({
       ),
     [data?.rows, filter]
   );
-  const summary = useMemo(
-    () =>
-      summarizeProfileWorkspaceRows(
-        data?.rows ?? [],
-        data?.providerAvailable ?? false
-      ),
-    [data?.providerAvailable, data?.rows]
+  const handleAddConnection = useCallback(() => {
+    setSelected(null);
+    setIsAddConnectionOpen(true);
+  }, []);
+  const headerActions = useMemo(
+    () => (
+      <DashboardHeaderActionGroup>
+        <DashboardHeaderActionButton
+          ariaLabel='Add connection'
+          onClick={handleAddConnection}
+          icon={<Plus className='h-3.5 w-3.5' />}
+          label='Add Connection'
+        />
+      </DashboardHeaderActionGroup>
+    ),
+    [handleAddConnection]
   );
+  useRegisterHeaderActions(headerActions);
   const getContextMenuItems = useCallback(
     (row: ProfileWorkspaceRow): ContextMenuItemType[] => {
       const primaryAction = getConnectionPrimaryAction(row);
@@ -580,8 +603,8 @@ export function ProfilesWorkspace({
       }),
       columnHelper.accessor(row => getConnectionStatus(row).label, {
         id: 'status',
-        header: 'Status / Issue',
-        size: 140,
+        header: () => <span className='sr-only'>Status / Issue</span>,
+        size: 48,
         meta: { className: 'px-3' },
         cell: context => <StatusCell row={context.row.original} />,
       }),
@@ -589,14 +612,14 @@ export function ProfilesWorkspace({
         id: 'rank',
         header: 'Rank',
         size: 72,
-        meta: { className: 'max-md:hidden' },
+        meta: { className: 'max-lg:hidden' },
         cell: context => <RankCell row={context.row.original} />,
       }),
       columnHelper.display({
         id: 'change',
         header: 'Change',
         size: 78,
-        meta: { className: 'max-lg:hidden' },
+        meta: { className: 'max-xl:hidden' },
         cell: context => {
           const row = context.row.original;
           if (row.rowType === 'connector') {
@@ -631,7 +654,7 @@ export function ProfilesWorkspace({
         id: 'monitoring',
         header: 'Monitoring',
         size: 124,
-        meta: { className: 'max-xl:hidden' },
+        meta: { className: 'max-2xl:hidden' },
         cell: context => <MonitoringCell row={context.row.original} />,
       }),
       columnHelper.display({
@@ -674,7 +697,7 @@ export function ProfilesWorkspace({
           data={data}
           onClose={() => setIsAddConnectionOpen(false)}
           onReviewSuggestions={() => {
-            setFilter('all');
+            setFilter('social');
             setSelected(null);
             setIsAddConnectionOpen(false);
           }}
@@ -710,10 +733,6 @@ export function ProfilesWorkspace({
     );
   }
 
-  const limitLabel =
-    data.monitoringLimit === null
-      ? `Monitored ${data.monitoredCount}`
-      : `Monitored ${data.monitoredCount}/${data.monitoringLimit}`;
   return (
     <PageShell
       data-testid='profiles-workspace'
@@ -721,9 +740,6 @@ export function ProfilesWorkspace({
       toolbar={
         <PageToolbar
           data-testid='connections-workspace-toolbar'
-          className='flex-col items-stretch gap-0 px-0 py-0 lg:flex-row lg:items-center lg:gap-1.5 lg:px-app-header lg:py-1.5'
-          startClassName='w-full flex-none px-app-header py-1.5 lg:min-w-0 lg:flex-1 lg:px-0 lg:py-0'
-          endClassName='ml-0 w-full min-w-0 max-w-full shrink justify-start overflow-hidden border-t border-subtle px-app-header py-1.5 lg:ml-auto lg:w-auto lg:max-w-none lg:shrink-0 lg:justify-end lg:overflow-visible lg:border-t-0 lg:px-0 lg:py-0'
           start={FILTERS.map(option => (
             <PageToolbarTabButton
               key={option.id}
@@ -735,51 +751,6 @@ export function ProfilesWorkspace({
               }}
             />
           ))}
-          end={
-            <div
-              className='flex w-full min-w-0 items-center justify-between gap-2 whitespace-nowrap lg:w-auto lg:justify-end lg:gap-3'
-              data-testid='connections-toolbar-actions'
-            >
-              <div
-                data-testid='connections-summary'
-                className='flex min-w-0 items-center gap-2 overflow-hidden text-xs text-tertiary-token tabular-nums lg:flex-none lg:overflow-visible'
-              >
-                <span>{summary.connectionCount} Connections</span>
-                <span className='max-lg:hidden'>{limitLabel}</span>
-                <span className='max-lg:hidden'>
-                  Needs Attention {summary.needsAttentionCount}
-                </span>
-                <span className='max-lg:hidden'>
-                  Best Rank{' '}
-                  {summary.bestRank === null ? (
-                    <SimpleTooltip content='No search rank has been measured yet.'>
-                      <span role='img' aria-label='Best Rank Unavailable'>
-                        —
-                      </span>
-                    </SimpleTooltip>
-                  ) : (
-                    `#${summary.bestRank}`
-                  )}
-                </span>
-                <span className='max-lg:hidden'>
-                  Monitoring {summary.monitoringLabel}
-                </span>
-              </div>
-              <Button
-                type='button'
-                size='sm'
-                aria-label='Add Connection'
-                className='shrink-0 max-sm:w-7.5 max-sm:px-0'
-                onClick={() => {
-                  setSelected(null);
-                  setIsAddConnectionOpen(true);
-                }}
-              >
-                <Plus className='h-3.5 w-3.5' aria-hidden />
-                <span className='max-sm:sr-only'>Add Connection</span>
-              </Button>
-            </div>
-          }
         />
       }
     >

@@ -3,6 +3,10 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import {
+  HeaderActionsProvider,
+  useHeaderActions,
+} from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ProfilesWorkspaceData } from './data';
 import { ProfilesWorkspace } from './ProfilesWorkspace';
@@ -88,10 +92,18 @@ const data: ProfilesWorkspaceData = {
 
 function renderWorkspace(workspaceData: ProfilesWorkspaceData | null) {
   return render(
-    <TooltipProvider>
-      <ProfilesWorkspace data={workspaceData} />
-    </TooltipProvider>
+    <HeaderActionsProvider>
+      <TooltipProvider>
+        <RegisteredHeaderActions />
+        <ProfilesWorkspace data={workspaceData} />
+      </TooltipProvider>
+    </HeaderActionsProvider>
   );
+}
+
+function RegisteredHeaderActions() {
+  const { headerActions } = useHeaderActions();
+  return <div data-testid='registered-header-actions'>{headerActions}</div>;
 }
 
 describe('ProfilesWorkspace', () => {
@@ -143,17 +155,25 @@ describe('ProfilesWorkspace', () => {
     expect(selectedReveal).toHaveStyle({ color: '#1DB954' });
   });
 
-  it('renders a connection summary and filters without exposing locked ranks', async () => {
+  it('keeps navigation filters compact and moves the primary action to the header', async () => {
     renderWorkspace(data);
 
     expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
-    expect(screen.getByText('Jovie Profile')).toBeInTheDocument();
     expect(screen.getByText('Spotify')).toBeInTheDocument();
+    expect(screen.queryByText('Jovie Profile')).not.toBeInTheDocument();
+    expect(screen.queryByText('Gmail')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'All' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'DSPs' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
     expect(screen.queryByText('7')).not.toBeInTheDocument();
-    expect(screen.getByText('4 Connections')).toBeInTheDocument();
-    expect(screen.getByText('Monitored 1/5')).toBeInTheDocument();
-    expect(screen.getByText('Needs Attention 1')).toBeInTheDocument();
-    expect(screen.getByText('Monitoring Active')).toBeInTheDocument();
+    expect(screen.queryByTestId('connections-summary')).not.toBeInTheDocument();
+    expect(screen.queryByText('4 Connections')).not.toBeInTheDocument();
+    expect(screen.queryByText('Monitored 1/5')).not.toBeInTheDocument();
+    expect(screen.queryByText('Needs Attention 1')).not.toBeInTheDocument();
     const typeGlyph = screen.getByRole('img', {
       name: 'DSP connection type',
     });
@@ -162,9 +182,19 @@ describe('ProfilesWorkspace', () => {
       screen.queryByRole('button', { name: 'DSP connection type' })
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Add Connection' })
+      within(screen.getByTestId('registered-header-actions')).getByRole(
+        'button',
+        { name: 'Add connection' }
+      )
     ).toBeInTheDocument();
-    expect(screen.getByText('Requires Upgrade')).toBeInTheDocument();
+
+    const spotifyRow = screen.getByText('Spotify').closest('tr');
+    expect(spotifyRow).not.toBeNull();
+    expect(
+      within(spotifyRow as HTMLElement)
+        .getAllByText('Limit Reached')
+        .some(element => element.classList.contains('sr-only'))
+    ).toBe(true);
 
     fireEvent.click(screen.getByRole('button', { name: 'DSPs' }));
     expect(screen.getByText('Spotify')).toBeInTheDocument();
@@ -217,6 +247,7 @@ describe('ProfilesWorkspace', () => {
   it('uses the canonical Jovie URL only for supported social connections', async () => {
     const user = userEvent.setup();
     renderWorkspace(data);
+    await user.click(screen.getByRole('button', { name: 'Social' }));
 
     expect(
       screen.getByTitle('https://jov.ie/tim/s/instagram')
@@ -304,7 +335,7 @@ describe('ProfilesWorkspace', () => {
     const user = userEvent.setup();
     renderWorkspace(data);
 
-    await user.click(screen.getByRole('button', { name: 'Add Connection' }));
+    await user.click(screen.getByRole('button', { name: 'Add connection' }));
     const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
     expect(panel).not.toBeNull();
 
@@ -334,31 +365,34 @@ describe('ProfilesWorkspace', () => {
     ).toBeEnabled();
   });
 
-  it('keeps the single Add connection action in bounds at the 670px toolbar contract', () => {
+  it('keeps secondary columns out of the selected-rail width contract', () => {
     renderWorkspace(data);
 
     expect(screen.getByRole('columnheader', { name: 'Rank' })).toHaveClass(
-      'max-md:hidden'
+      'max-lg:hidden'
     );
     expect(screen.getByRole('columnheader', { name: 'Change' })).toHaveClass(
-      'max-lg:hidden'
+      'max-xl:hidden'
     );
     expect(
       screen.getByRole('columnheader', { name: 'Monitoring' })
-    ).toHaveClass('max-xl:hidden');
+    ).toHaveClass('max-2xl:hidden');
+    fireEvent.click(screen.getByRole('button', { name: 'Connectors' }));
     expect(screen.getByText('tim@example.com')).toHaveClass('max-sm:hidden');
 
-    const toolbarActions = screen.getByTestId('connections-toolbar-actions');
-    const summary = screen.getByTestId('connections-summary');
-    expect(toolbarActions).toHaveClass('w-full', 'min-w-0', 'justify-between');
-    expect(summary).toHaveClass('min-w-0', 'overflow-hidden');
-    expect(screen.getByRole('button', { name: 'Add Connection' })).toHaveClass(
-      'shrink-0',
-      'max-sm:w-7.5'
+    expect(screen.getByTestId('connections-workspace-toolbar')).toHaveClass(
+      'min-h-10',
+      'px-3',
+      'py-1.5'
     );
-    expect(screen.getByText('Monitored 1/5')).toHaveClass('max-lg:hidden');
-    expect(screen.getByText('Needs Attention 1')).toHaveClass('max-lg:hidden');
-    expect(screen.getByText('Best Rank #2')).toHaveClass('max-lg:hidden');
-    expect(screen.getByText('Monitoring Active')).toHaveClass('max-lg:hidden');
+    expect(
+      screen.getByRole('columnheader', { name: 'Status / Issue' })
+    ).toHaveTextContent('Status / Issue');
+    expect(
+      within(
+        screen.getByRole('columnheader', { name: 'Status / Issue' })
+      ).getByText('Status / Issue')
+    ).toHaveClass('sr-only');
+    expect(screen.queryByTestId('connections-toolbar-actions')).toBeNull();
   });
 });
