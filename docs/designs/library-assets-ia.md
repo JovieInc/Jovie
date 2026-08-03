@@ -104,4 +104,3 @@ In a mixed-assets screenshot review, a reviewer can identify and open the
 `Songs` view in one action, and the filtered result contains every song with no
 non-song interleaving. The URL preserves the selected type and release context
 across reload and direct navigation.
-
