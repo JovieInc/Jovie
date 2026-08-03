@@ -7,13 +7,16 @@
  * - generateMetadata (SEO metadata generation)
  * - getCachedProfileAndLinks (only caches successful results)
  *
- * These are pure logic tests that don't render React components.
+ * Includes the small server-rendered recovery surface used by the page.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { render, screen } from '@testing-library/react';
+import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
+import { PublicProfileErrorState } from '@/app/[username]/_components/PublicProfileErrorState';
 import {
   getLegacyProfileModeRedirectHref,
   getProfileModeRedirectHref,
@@ -33,6 +36,10 @@ const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.resolve(TEST_FILE_DIR, '../../..');
 const PUBLIC_PROFILE_PAGE_SOURCE = readFileSync(
   path.join(WEB_ROOT, 'app/[username]/page.tsx'),
+  'utf8'
+);
+const PUBLIC_PROFILE_LAYOUT_SOURCE = readFileSync(
+  path.join(WEB_ROOT, 'app/[username]/layout.tsx'),
   'utf8'
 );
 // Profile loader (cache + error class + TTL) was extracted to its own file
@@ -136,6 +143,59 @@ describe('Public Profile Page Logic', () => {
       ).toBe(false);
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
         '<Suspense fallback={<ProfileLoading />}>'
+      );
+    });
+
+    it('resolves missing profiles before the streamed page boundary', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        "import { notFound } from 'next/navigation'"
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'const profileResult = await getProfileAndLinks(username)'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        "profileResult.status === 'not_found'"
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('notFound()');
+      expect(
+        PUBLIC_PROFILE_PAGE_SOURCE.indexOf("status === 'not_found'")
+      ).toBeLessThan(
+        PUBLIC_PROFILE_PAGE_SOURCE.indexOf(
+          '<Suspense fallback={<ProfileLoading />}>'
+        )
+      );
+      expect(PUBLIC_PROFILE_LAYOUT_SOURCE).not.toContain('notFound()');
+    });
+
+    it('keeps the transient profile error state out of the client graph', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain(
+        '@/features/feedback/ErrorBanner'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        '<PublicProfileErrorState retryHref={`/${username.toLowerCase()}`} />'
+      );
+    });
+
+    it('renders a full-size accessible recovery surface for transient errors', () => {
+      render(createElement(PublicProfileErrorState, { retryHref: '/dualipa' }));
+
+      expect(screen.getByRole('main')).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveAccessibleName(
+        'Profile Is Temporarily Unavailable'
+      );
+      expect(screen.getByRole('link', { name: 'Try Again' })).toHaveAttribute(
+        'href',
+        '/dualipa'
+      );
+      expect(screen.getByRole('link', { name: 'Try Again' })).toHaveClass(
+        'min-h-11'
+      );
+      expect(screen.getByRole('link', { name: 'Go Home' })).toHaveAttribute(
+        'href',
+        '/'
+      );
+      expect(screen.getByRole('link', { name: 'Go Home' })).toHaveClass(
+        'min-h-11'
       );
     });
 

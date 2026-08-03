@@ -27,6 +27,9 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 const PROFILE_HANDLE = process.env.SMOKE_PROFILE_HANDLE ?? 'timwhite';
 const LOAD_BUDGET_MS = Number(process.env.SMOKE_LOAD_BUDGET_MS ?? '3000');
+const hasDatabase = Boolean(
+  process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('dummy')
+);
 
 test('public profile renders core elements within budget', async ({ page }) => {
   test.setTimeout(60_000);
@@ -111,5 +114,44 @@ test('public profile renders core elements within budget', async ({ page }) => {
   await page.screenshot({
     path: `test-results/public-profile-smoke-${PROFILE_HANDLE}.png`,
     fullPage: true,
+  });
+});
+
+test.describe('public profile document semantics @regression', () => {
+  test.skip(!hasDatabase, 'Profile document semantics require a real database');
+
+  test('a seeded public profile remains a successful document', async ({
+    page,
+  }) => {
+    const response = await page.goto('/dualipa', {
+      waitUntil: 'domcontentloaded',
+    });
+
+    expect(response?.status()).toBe(200);
+    await expect(
+      page.getByRole('heading', { name: 'Dua Lipa', level: 1 })
+    ).toBeVisible();
+    await expect(page.getByTestId('not-found')).toHaveCount(0);
+  });
+
+  test('a missing valid handle returns the branded profile 404', async ({
+    page,
+  }) => {
+    const response = await page.goto('/nonexistent-artist', {
+      waitUntil: 'domcontentloaded',
+    });
+
+    expect(response?.status()).toBe(404);
+    await expect(
+      page.getByRole('heading', { name: 'Profile not found' })
+    ).toBeVisible();
+    await expect(page.getByTestId('not-found')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Go home' })).toHaveAttribute(
+      'href',
+      '/'
+    );
+    await expect(
+      page.locator('meta[name="robots"][content*="noindex"]')
+    ).toHaveCount(1);
   });
 });
