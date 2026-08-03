@@ -337,7 +337,9 @@ async function waitForAnyVisible(
 
 async function settleLayout(page: Page) {
   await page.evaluate(async () => {
-    if ('fonts' in document) {
+    // WebKit can leave FontFaceSet.ready pending across repeated viewport
+    // navigations even after the set has reached its terminal loaded state.
+    if ('fonts' in document && document.fonts.status === 'loading') {
       await document.fonts.ready;
     }
   });
