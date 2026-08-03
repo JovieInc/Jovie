@@ -24,6 +24,11 @@ import { expect, test } from '@playwright/test';
  */
 
 test.use({ storageState: { cookies: [], origins: [] } });
+// Keep the latency assertion isolated from the status-semantics requests added
+// below. With fullyParallel enabled globally, three simultaneous cold profile
+// renders contend for the same standalone server and turn this browser budget
+// into a worker-count benchmark rather than a visitor-load measurement.
+test.describe.configure({ mode: 'serial' });
 
 const PROFILE_HANDLE = process.env.SMOKE_PROFILE_HANDLE ?? 'timwhite';
 const LOAD_BUDGET_MS = Number(process.env.SMOKE_LOAD_BUDGET_MS ?? '3000');
