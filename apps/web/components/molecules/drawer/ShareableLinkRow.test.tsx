@@ -44,4 +44,18 @@ describe('ShareableLinkRow', () => {
     );
     expect(screen.getByTestId('row')).toHaveClass('h-8');
   });
+
+  it('keeps compact rail actions inside the shareable-link field', () => {
+    render(
+      <ShareableLinkRow
+        url='https://jov.ie/tim/s/tiktok'
+        density='rail'
+        testId='row'
+      />
+    );
+
+    for (const button of screen.getAllByRole('button')) {
+      expect(button).toHaveClass('h-5', 'min-h-0', 'w-5', 'min-w-0');
+    }
+  });
 });
