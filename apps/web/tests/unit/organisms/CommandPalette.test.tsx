@@ -193,6 +193,24 @@ describe('CommandPalette', () => {
     expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
   });
 
+  it('dismisses the main plane before a persistent sidebar destination runs', () => {
+    render(
+      withDashboard(
+        <div data-app-shell-sidebar-mount='true'>
+          <HeaderSearchSurfaceFromContext />
+          <button type='button'>Library</button>
+          <CommandPalette />
+        </div>
+      )
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search Jovie' }));
+    expect(screen.getByTestId('cmdk-main-plane')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Library' }));
+    expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
+  });
+
   it('commits the selected sidebar-triggered main-plane result with Enter', () => {
     pushMock.mockClear();
     render(

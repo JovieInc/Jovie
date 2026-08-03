@@ -1,6 +1,6 @@
 'use client';
 
-import type { MouseEventHandler, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { useComposerFocus } from '@/components/features/chat/Composer';
@@ -34,7 +34,6 @@ export interface AuthShellProps {
   readonly isChatRoute?: boolean;
   readonly onSidebarOpenChange?: (open: boolean) => void;
   readonly sidebarDefaultOpen?: boolean;
-  readonly onSidebarClickCapture?: MouseEventHandler<HTMLDivElement>;
   readonly children: ReactNode;
 }
 
@@ -54,7 +53,6 @@ function AuthShellInner({
   isTableRoute = false,
   isLyricsRoute = false,
   isChatRoute = false,
-  onSidebarClickCapture,
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile, state: sidebarState } = useSidebar();
@@ -99,7 +97,6 @@ function AuthShellInner({
   return (
     <AppShellFrame
       sidebar={sidebar}
-      onSidebarClickCapture={onSidebarClickCapture}
       header={
         hideTopHeader ? null : (
           <DashboardHeader

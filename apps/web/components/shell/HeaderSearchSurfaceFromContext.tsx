@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { useHeaderActions } from '@/contexts/HeaderActionsContext';
 import { cn } from '@/lib/utils';
@@ -22,6 +23,26 @@ export function HeaderSearchSurfaceFromContext({
 }) {
   const { closeCommandPalette, isCommandPaletteOpen, openCommandPalette } =
     useHeaderActions();
+
+  useEffect(() => {
+    if (!isCommandPaletteOpen) return;
+
+    const dismissSearchFromSidebar = (event: MouseEvent) => {
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest('[data-app-shell-sidebar-mount="true"]')
+      ) {
+        closeCommandPalette();
+      }
+    };
+
+    document.addEventListener('click', dismissSearchFromSidebar, true);
+    return () => {
+      document.removeEventListener('click', dismissSearchFromSidebar, true);
+    };
+  }, [closeCommandPalette, isCommandPaletteOpen]);
+
   return (
     <button
       type='button'

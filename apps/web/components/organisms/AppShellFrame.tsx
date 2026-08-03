@@ -1,6 +1,6 @@
 // @coverage-via apps/web/tests/unit/components/organisms/AppShellFrame.test.tsx
 
-import type { MouseEventHandler, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { memo } from 'react';
 import { CanvasGrain } from '@/components/atoms/CanvasGrain';
 import { DesktopTitlebar } from '@/components/atoms/DesktopTitlebar';
@@ -17,8 +17,6 @@ interface AppShellFrameProps {
   readonly mobileBottomNav?: ReactNode;
   readonly contentClassName?: string;
   readonly containerClassName?: string;
-  /** Shell-owned sidebar interaction boundary (for example, dismissing search). */
-  readonly onSidebarClickCapture?: MouseEventHandler<HTMLDivElement>;
   /** When true (desktop), sidebar dims and right rail fully collapses off-canvas. */
   readonly composerFocusActive?: boolean;
   /**
@@ -56,7 +54,6 @@ export const AppShellFrame = memo(function AppShellFrame({
   mobileBottomNav,
   contentClassName,
   containerClassName,
-  onSidebarClickCapture,
   composerFocusActive = false,
   chatAmbientGradient = false,
 }: Readonly<AppShellFrameProps>) {
@@ -85,7 +82,6 @@ export const AppShellFrame = memo(function AppShellFrame({
         <div
           data-app-shell-sidebar-mount='true'
           data-testid='app-shell-sidebar-mount'
-          onClickCapture={onSidebarClickCapture}
           className='flex h-full min-h-0 shrink-0 flex-col transition-[flex-basis,width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none'
         >
           {sidebar}

@@ -158,12 +158,6 @@ function AuthShellWrapperInner({
     [persistSidebarCollapsed, startTransition]
   );
 
-  const handleSidebarClickCapture = useCallback(() => {
-    if (headerActions.isCommandPaletteOpen) {
-      headerActions.closeCommandPalette();
-    }
-  }, [headerActions.closeCommandPalette, headerActions.isCommandPaletteOpen]);
-
   const clearPendingShell = useCallback((route?: PendingShellRoute) => {
     setPendingShellRoute(current =>
       route && current !== route ? current : null
@@ -283,7 +277,6 @@ function AuthShellWrapperInner({
                   persistSidebarCollapsed ? handleSidebarOpenChange : undefined
                 }
                 sidebarDefaultOpen={sidebarDefaultOpen}
-                onSidebarClickCapture={handleSidebarClickCapture}
               >
                 {shellChildren}
               </AuthShell>

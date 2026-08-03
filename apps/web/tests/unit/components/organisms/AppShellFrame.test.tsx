@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 
 describe('AppShellFrame', () => {
@@ -133,19 +133,14 @@ describe('AppShellFrame', () => {
     expect(mount).toContainElement(screen.getByTestId('fixture-sidebar'));
   });
 
-  it('exposes one capture boundary for persistent sidebar interactions', () => {
-    const onSidebarClickCapture = vi.fn();
+  it('exposes one semantic boundary for persistent sidebar interactions', () => {
     render(
       <AppShellFrame
         sidebar={<button type='button'>Library</button>}
         main={<div>Main Content</div>}
-        onSidebarClickCapture={onSidebarClickCapture}
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Library' }));
-
-    expect(onSidebarClickCapture).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('app-shell-sidebar-mount')).toHaveAttribute(
       'data-app-shell-sidebar-mount',
       'true'
