@@ -187,17 +187,6 @@ const PERSISTED_AUTH_FIXTURE_REPAIR_DIFF = [
   ...PERSISTED_AUTH_FIXTURE_REPAIR_CORE,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
-const GTMQ_SOURCE_GATE_REAPER_MANIFEST = [
-  '.github/actions/setup-node-pnpm/action.yml',
-  '.github/workflows/gtmq-source-authorization.yml',
-  '.github/workflows/merge-queue-autoenroll.yml',
-  'apps/web/tests/unit/ci/runner-setup-action.test.ts',
-  'scripts/drain-pr-queue.sh',
-  'scripts/guard-gtmq-source-authorization.sh',
-  'scripts/tests/test_gh_retry.py',
-  'scripts/run-affected-tests.mjs',
-  'scripts/lib/__tests__/automation-verify.test.mjs',
-];
 const MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST = [
   'apps/web/tests/e2e/mobile-overflow.spec.ts',
   'apps/web/tests/e2e/utils/mobile-overflow.ts',
@@ -277,6 +266,16 @@ const NEON_ATTEMPT_ARTIFACT_MANIFEST = [
 ];
 
 describe('automation-verify affected scope', () => {
+  it('does not require retired Graphite source authorization artifacts', () => {
+    for (const retiredPath of [
+      '.github/workflows/gtmq-source-authorization.yml',
+      'scripts/guard-gtmq-source-authorization.sh',
+    ]) {
+      expect(runner).not.toContain(retiredPath);
+      expect(script).not.toContain(retiredPath);
+    }
+  });
+
   it('keeps a production workflow contract-only diff on focused coverage', () => {
     const plan = buildAffectedTestPlan([
       '.github/workflows/production-release.yml',
@@ -925,48 +924,6 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
-  it('selects the Graphite source-gate regression and selector self-test for the exact repair signature', () => {
-    const plan = buildAffectedTestPlan(GTMQ_SOURCE_GATE_REAPER_MANIFEST);
-
-    expect(plan.mode).toBe('selected');
-    expect(plan.pythonTests).toEqual(['scripts/tests/test_gh_retry.py']);
-    expect(plan.scriptVitestTests).toEqual([
-      'scripts/lib/__tests__/automation-verify.test.mjs',
-    ]);
-    expect(buildSelectedTestCommands(plan, '2')).toEqual([
-      [
-        'pnpm',
-        [
-          'exec',
-          'vitest',
-          '--root',
-          'scripts',
-          '--config',
-          'vitest.config.mts',
-          'run',
-          'lib/__tests__/automation-verify.test.mjs',
-          '--maxWorkers',
-          '2',
-        ],
-      ],
-      ['python3', ['-m', 'pytest', 'scripts/tests/test_gh_retry.py', '-q']],
-      [
-        'pnpm',
-        [
-          '--filter',
-          '@jovie/web',
-          'exec',
-          'vitest',
-          'run',
-          'tests/unit/ci/runner-setup-action.test.ts',
-          '--passWithNoTests',
-          '--maxWorkers',
-          '2',
-        ],
-      ],
-    ]);
-  });
-
   it('keeps Playwright deep and selects deterministic mobile overflow regressions', () => {
     const plan = buildAffectedTestPlan(
       MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST
@@ -1145,16 +1102,6 @@ describe('automation-verify affected scope', () => {
   });
 
   it.each(
-    GTMQ_SOURCE_GATE_REAPER_MANIFEST
-  )('fails closed when the Graphite source-gate repair is missing %s', missingInput => {
-    expect(
-      buildAffectedTestPlan(
-        GTMQ_SOURCE_GATE_REAPER_MANIFEST.filter(file => file !== missingInput)
-      ).mode
-    ).toBe('full');
-  });
-
-  it.each(
     MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST
   )('fails closed when the mobile overflow navigation repair is missing %s', missingInput => {
     expect(
@@ -1209,15 +1156,6 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan([
         ...PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST,
         'scripts/hermes/lib/unknown-profiler-helper.ts',
-      ]).mode
-    ).toBe('full');
-  });
-
-  it('fails closed when the Graphite source-gate repair includes an unknown peer', () => {
-    expect(
-      buildAffectedTestPlan([
-        ...GTMQ_SOURCE_GATE_REAPER_MANIFEST,
-        'scripts/unknown-graphite-controller.sh',
       ]).mode
     ).toBe('full');
   });
