@@ -234,6 +234,7 @@
     "backlog:reconcile": "node scripts/backlog-orchestrator/backlog-orchestrator.mjs reconcile",
     "backlog:audit": "node scripts/backlog-orchestrator/backlog-orchestrator.mjs audit",
     "backlog:admit-next": "node scripts/backlog-orchestrator/backlog-orchestrator.mjs admit-next",
+    "backlog:approve-plan": "node scripts/backlog-orchestrator/backlog-orchestrator.mjs approve-plan",
     "backlog:report": "node scripts/backlog-orchestrator/backlog-orchestrator.mjs report",
     "backlog:test": "node --test scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs"
   },
