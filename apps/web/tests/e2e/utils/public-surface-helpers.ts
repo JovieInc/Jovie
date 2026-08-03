@@ -57,6 +57,21 @@ export async function installPublicRouteMocks(page: Page) {
   await page.route('**/api/profile/view', route =>
     route.fulfill({ status: 200, body: '{}' })
   );
+  await page.route('**/api/profile/capture-dismissal**', route =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        suppressed: route.request().method() === 'POST',
+        sessionCount: 0,
+        nextEligibleAt: null,
+      }),
+    })
+  );
+  await page.route('**/api/profile/pac-event', route =>
+    route.fulfill({ status: 204, body: '' })
+  );
   await page.route('**/api/audience/visit-token*', route =>
     route.fulfill({
       status: 200,
@@ -68,6 +83,9 @@ export async function installPublicRouteMocks(page: Page) {
   );
   await page.route('**/api/track', route =>
     route.fulfill({ status: 200, body: '{}' })
+  );
+  await page.route('**/api/px', route =>
+    route.fulfill({ status: 204, body: '' })
   );
 }
 
