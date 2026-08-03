@@ -87,7 +87,10 @@ async function newestMtimeMs(target) {
   for (let index = 0; index < entries.length; index += 256) {
     const mtimes = await Promise.all(
       entries.slice(index, index + 256).map(async entry => {
-        const parentPath = entry.parentPath ?? entry.path;
+        const parentPath =
+          entry.parentPath ??
+          /** @type {{ path?: string }} */ (entry).path ??
+          target;
         return (await lstat(path.join(parentPath, entry.name))).mtimeMs;
       })
     );
