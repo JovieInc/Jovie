@@ -7,6 +7,7 @@ import {
   type Locator,
   type Page,
 } from '@playwright/test';
+import { PAC_TAB_BAR_RETURN_VISIT_KEY } from '../lib/profile/pac-tab-bar-experiment';
 import {
   assertResolvedPerfRoutePath,
   assertValidPerfRouteManifest,
@@ -435,6 +436,22 @@ function resolveExpectedDynamicPath(
   return expectedPath;
 }
 
+export function resolveWarmNavigationStartPath(
+  route: PerfRouteDefinition,
+  resolvedPath: string
+) {
+  const startPath = route.warmNavigationStartPath;
+  if (!startPath) {
+    throw new TypeError(
+      `Warm-navigation route "${route.id}" is missing warmNavigationStartPath.`
+    );
+  }
+
+  const resolvedStartPath = resolveExpectedDynamicPath(startPath, resolvedPath);
+  assertResolvedPerfRoutePath(route, resolvedStartPath);
+  return resolvedStartPath;
+}
+
 function expectedRoutePaths(route: PerfRouteDefinition, resolvedPath: string) {
   const redirectDestinations = (
     (route.readySelectors.redirectDestinations ?? []) as readonly string[]
@@ -676,11 +693,20 @@ export async function measureWarmNavigationRoute(
   baseUrl: string,
   url: string
 ) {
-  const startPath = route.warmNavigationStartPath;
-  if (!startPath) {
-    throw new TypeError(
-      `Warm-navigation route "${route.id}" is missing warmNavigationStartPath.`
-    );
+  const parsedUrl = new URL(url);
+  const resolvedDestinationPath = `${parsedUrl.pathname}${parsedUrl.search}`;
+  const startPath = resolveWarmNavigationStartPath(
+    route,
+    resolvedDestinationPath
+  );
+
+  if (route.measureMode === 'profile-warm-transition') {
+    // The profile tab-bar experiment intentionally hides navigation for some
+    // first-time visitors. This contract measures the warmed/returning state
+    // named in JOV-4780, where the real visible controls are available.
+    await page.addInitScript(storageKey => {
+      globalThis.localStorage.setItem(storageKey, '1');
+    }, PAC_TAB_BAR_RETURN_VISIT_KEY);
   }
 
   await page.goto(resolveRouteUrl(baseUrl, startPath), {
@@ -700,18 +726,18 @@ export async function measureWarmNavigationRoute(
   }
 
   const startedAt = Date.now();
-  const parsedUrl = new URL(url);
-  const expectedPaths = expectedRoutePaths(
-    route,
-    `${parsedUrl.pathname}${parsedUrl.search}`
-  );
+  const expectedPaths = expectedRoutePaths(route, resolvedDestinationPath);
   await armWarmNavigationStart(visibleTrigger);
   const routeReadyPromise = waitForExpectedUrl(page, expectedPaths);
   await visibleTrigger.click({ noWaitAfter: true });
 
   await routeReadyPromise;
   const warmShellResponse = await readWarmNavigationElapsed(page);
-  const skeletonToContent = hasTimingBudget(route, 'skeleton-to-content')
+  const shouldMeasureDestinationContent =
+    hasTimingBudget(route, 'skeleton-to-content') ||
+    (route.measureMode === 'profile-warm-transition' &&
+      hasTimingBudget(route, 'interactive-shell-ready'));
+  const skeletonToContent = shouldMeasureDestinationContent
     ? await waitForContentReady(page, route, startedAt, true)
     : 0;
 
@@ -919,6 +945,7 @@ function createContextOptions(
           origins: [],
         }
       : undefined,
+    viewport: route.viewport,
   };
 }
 
@@ -930,6 +957,17 @@ async function createContext(
   const options = createContextOptions(route, cookies);
   const context = await browser.newContext(options);
   return context;
+}
+
+export function applyProfileWarmTransitionTimings(
+  timingValues: Record<PerfTimingMetricName, number>,
+  interaction: {
+    readonly skeletonToContent: number;
+    readonly warmShellResponse: number;
+  }
+) {
+  timingValues['warm-shell-response'] = interaction.warmShellResponse;
+  timingValues['interactive-shell-ready'] = interaction.skeletonToContent;
 }
 
 async function warmRoute(
@@ -988,6 +1026,9 @@ async function measureRouteSample(
   try {
     const page = await context.newPage();
     await page.addInitScript(PERF_INIT_SCRIPT);
+    let browserMetrics:
+      | Awaited<ReturnType<typeof collectBrowserMetrics>>
+      | undefined;
 
     const timingValues: Record<PerfTimingMetricName, number> = {
       'cumulative-layout-shift': 0,
@@ -1001,7 +1042,31 @@ async function measureRouteSample(
       'warm-shell-response': 0,
     };
 
-    if (
+    if (route.measureMode === 'profile-warm-transition') {
+      // Keep cold target-load evidence independent from the warmed user
+      // action. The first leg owns FCP/LCP/CLS/FID/TTFB and resources; the
+      // second leg starts from a real profile state and clicks a visible tab.
+      await page.goto(url, {
+        timeout: NAVIGATION_TIMEOUT_MS,
+        waitUntil: 'domcontentloaded',
+      });
+      await waitForAnyVisible(page, route.readySelectors.content);
+      browserMetrics = await collectBrowserMetrics(page, devMode);
+
+      const interactionPage = await context.newPage();
+      try {
+        await interactionPage.addInitScript(PERF_INIT_SCRIPT);
+        const interaction = await measureWarmNavigationRoute(
+          interactionPage,
+          route,
+          baseUrl,
+          url
+        );
+        applyProfileWarmTransitionTimings(timingValues, interaction);
+      } finally {
+        await interactionPage.close();
+      }
+    } else if (
       route.measureMode === 'warm-navigation' ||
       route.measureMode === 'same-route-interaction'
     ) {
@@ -1056,7 +1121,7 @@ async function measureRouteSample(
       }
     }
 
-    const browserMetrics = await collectBrowserMetrics(page, devMode);
+    browserMetrics ??= await collectBrowserMetrics(page, devMode);
     timingValues['cumulative-layout-shift'] =
       browserMetrics.timingValues['cumulative-layout-shift'];
     timingValues['first-contentful-paint'] =

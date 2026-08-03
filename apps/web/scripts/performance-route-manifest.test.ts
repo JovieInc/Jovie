@@ -206,6 +206,134 @@ describe('performance route manifest', () => {
     ).toBe(75);
   });
 
+  it('measures the four public profile mobile tabs through real 100ms controls', () => {
+    const routes = getEndUserPerfRouteManifest();
+    const warmProfileRoutes = routes.filter(
+      route => route.measureMode === 'profile-warm-transition'
+    );
+
+    expect(warmProfileRoutes.map(route => route.id)).toEqual([
+      'public-profile-main',
+      'public-profile-mode-listen',
+      'public-profile-mode-subscribe',
+      'public-profile-mode-tour',
+    ]);
+
+    for (const route of warmProfileRoutes) {
+      expect(route.viewport).toEqual({ width: 390, height: 844 });
+      expect(route.warmNavigationStartPath).toContain('[username]');
+      expect(route.readySelectors.navTrigger).toHaveLength(1);
+      expect(route.readySelectors.navTrigger?.[0]).toContain(
+        '[data-testid="profile-bottom-nav"] button[aria-label='
+      );
+      expect(route.readySelectors.content).not.toContain(
+        '[data-testid="profile-header"]'
+      );
+      expect(
+        getRouteTimingBudgets(route).find(
+          timing => timing.metric === 'interactive-shell-ready'
+        )?.budget
+      ).toBe(100);
+      expect(
+        getRouteTimingBudgets(route).find(
+          timing => timing.metric === 'warm-shell-response'
+        )?.budget
+      ).toBe(100);
+    }
+
+    const root = warmProfileRoutes.find(
+      route => route.id === 'public-profile-main'
+    );
+    expect(root?.warmNavigationStartPath).toBe('/[username]?mode=listen');
+    expect(root?.readySelectors.content).toEqual([
+      '[data-testid="profile-home-rail"]',
+    ]);
+    expect(getRouteTimingBudgets(root!).map(timing => timing.metric)).toEqual(
+      expect.arrayContaining([
+        'first-contentful-paint',
+        'largest-contentful-paint',
+        'cumulative-layout-shift',
+        'first-input-delay',
+        'time-to-first-byte',
+      ])
+    );
+  });
+
+  it('keeps non-tab profile modes as honest page-load contracts', () => {
+    const pageLoadModeIds = [
+      'public-profile-mode-pay',
+      'public-profile-mode-about',
+      'public-profile-mode-contact',
+      'public-profile-mode-releases',
+    ];
+    const routes = getEndUserPerfRouteManifest().filter(route =>
+      pageLoadModeIds.includes(route.id)
+    );
+
+    expect(routes.map(route => route.id)).toEqual(pageLoadModeIds);
+    for (const route of routes) {
+      expect(route.measureMode).toBe('page-load');
+      expect(route.readySelectors.navTrigger).toBeUndefined();
+      expect(
+        getRouteTimingBudgets(route).some(
+          timing => timing.metric === 'interactive-shell-ready'
+        )
+      ).toBe(false);
+      expect(getRouteTimingBudgets(route).map(timing => timing.metric)).toEqual(
+        expect.arrayContaining([
+          'first-contentful-paint',
+          'largest-contentful-paint',
+          'cumulative-layout-shift',
+          'time-to-first-byte',
+        ])
+      );
+    }
+  });
+
+  it('rejects profile warm transitions that weaken the mobile eval', () => {
+    const route = {
+      id: 'profile-warm-fixture',
+      group: 'public-profile-mode-shell',
+      surface: 'public-profile',
+      path: '/[username]?mode=listen',
+      warmNavigationStartPath: '/[username]',
+      resolvePath: async () => '/tim?mode=listen',
+      requiresAuth: false,
+      warmupStrategy: 'public-route',
+      measureMode: 'profile-warm-transition',
+      readySelectors: {
+        content: ['[data-testid="profile-primary-tab-listen"]'],
+        navTrigger: [
+          '[data-testid="profile-bottom-nav"] button[aria-label="Music"]',
+        ],
+      },
+      viewport: { width: 390, height: 844 },
+      timings: [
+        { metric: 'interactive-shell-ready', budget: 100 },
+        { metric: 'warm-shell-response', budget: 100 },
+      ],
+      resourceSizes: [{ resourceType: 'total', budget: 1200 }],
+      priority: 1,
+    } as const satisfies PerfRouteDefinition;
+
+    expect(() => assertValidPerfRouteDefinition(route)).not.toThrow();
+    expect(() =>
+      assertValidPerfRouteDefinition({
+        ...route,
+        viewport: { width: 375, height: 812 },
+      })
+    ).toThrow('must use the 390x844 mobile viewport');
+    expect(() =>
+      assertValidPerfRouteDefinition({
+        ...route,
+        timings: [
+          { metric: 'interactive-shell-ready', budget: 101 },
+          { metric: 'warm-shell-response', budget: 100 },
+        ],
+      })
+    ).toThrow('must preserve 100ms');
+  });
+
   it('rejects empty locators and redirect loops with route-specific errors', () => {
     const baseRoute = {
       id: 'fixture-route',
