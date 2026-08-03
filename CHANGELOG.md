@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
-- [internal] **Desktop electron 43.x dependency bump only:** Dependabot package/lockfile update; no DMG publish in this PR.
+- [internal] **Desktop @types/node aligned to 26.x with monorepo:** Dependabot package bumps only; no DMG publish in this PR.
 - **New Chat stays quiet until a useful skill earns discovery (JOV-4790):** the empty composer omits generic filler such as Share Feedback; only explicitly featured installed skills may appear unprompted, while the existing command surfaces keep every registered utility available on demand.
 - **Artist profiles now browse like a native music service (JOV-4763):** the mobile home rail presents one complete merch, event, music, or alerts card per snap across compact phones through desktop; hero media and the glass dock stay stable; legacy music, releases, tour, subscribe, tip, and listen deep links resolve to the exact profile mode; and 44px actions, reduced-motion navigation, keyboard focus, touch dragging, and rate-limit-resilient alert dismissal are covered by focused regressions.
 - [internal] **Staging OAuth runtime proof no longer dead-clicks pre-hydration provider buttons (#15371):** AuthShell keeps Google/Apple buttons disabled until React hydrates, surfaces Better Auth soft-errors, and the production-smoke OAuth test waits on `data-auth-shell-hydrated` so provider navigation is actually emitted.
