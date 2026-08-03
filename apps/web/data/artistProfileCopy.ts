@@ -386,6 +386,10 @@ export interface ArtistProfileLandingCopy {
     readonly headline: string;
     readonly intro: string;
   };
+  readonly releaseCycle: {
+    readonly headline: string;
+    readonly intro: string;
+  };
   readonly faq: {
     readonly headline: string;
     readonly items: readonly ArtistProfileFaqItem[];
@@ -432,7 +436,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     eyebrow: '',
     headline: 'The link your music deserves.',
     subhead:
-      'One profile that puts the right action first—from pre-save and release day to nearby shows, support, and fan follow-up.',
+      'One profile that puts the right action first—from release alerts and release day to nearby shows, support, and fan follow-up.',
     ctaLabel: 'Claim your profile',
     signature: 'jov.ie/you',
     proofWhisper: 'Used by artists on',
@@ -465,25 +469,25 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       {
         id: 'upcoming-release',
         label: 'Upcoming Release',
-        headline: 'Before a drop, your profile becomes a countdown.',
-        description: 'Before a drop, your profile becomes a countdown.',
+        headline: 'Before a drop, your profile collects release alerts.',
+        description: 'Fans opt in once and hear from you when the song lands.',
         pathLabel: 'jov.ie/you',
         drawer: {
           title: 'The Deep End',
           subtitle: 'New release arriving soon.',
-          ctaLabel: 'Pre-save release',
+          ctaLabel: 'Get release alerts',
           items: [
             {
-              id: 'countdown',
-              label: 'Release countdown',
-              detail: '02 days · 14 hours',
-              action: 'Live',
+              id: 'release-alerts',
+              label: 'Release alerts',
+              detail: 'Fans hear from you when it lands',
+              action: 'On',
             },
             {
-              id: 'presave',
-              label: 'Pre-save',
-              detail: 'Spotify + Apple Music',
-              action: 'Save',
+              id: 'share',
+              label: 'Share before release',
+              detail: 'The same profile link stays live',
+              action: 'Copy link',
             },
             {
               id: 'notify',
@@ -494,10 +498,10 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           ],
         },
         screenshotSrc: getMarketingExportImage(
-          'tim-white-profile-presave-mobile'
+          'tim-white-profile-subscribe-mobile'
         ).publicUrl,
         screenshotAlt:
-          'Jovie artist profile showing an upcoming release and pre-save state.',
+          'Jovie artist profile inviting fans to get release updates.',
         screenshotWidth: 660,
         screenshotHeight: 1368,
       },
@@ -628,7 +632,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         id: 'drive-streams',
         title: 'Drive Streams',
         description:
-          'Put the latest release, pre-save, or countdown at the front of the profile.',
+          'Put the latest release or release alert at the front of the profile.',
       },
       {
         id: 'sell-out',
@@ -1093,7 +1097,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   specWall: {
     headline: 'Your music stays together. The right action leads.',
     subhead:
-      'Fans can listen, find shows, follow, and support you without leaving your profile.',
+      'Fans can choose where to listen, find shows, follow, and support you from one profile.',
     callouts: [
       {
         id: 'identity',
@@ -1108,7 +1112,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       {
         id: 'action',
         title: 'The Right Next Move',
-        body: 'Pre-save before release. Listen when it drops. Tickets when fans are nearby.',
+        body: 'Get release alerts before the drop. Listen when it lands. Find tickets when a show is nearby.',
       },
       {
         id: 'navigation',
@@ -1182,9 +1186,13 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     },
   },
   socialProof: {
+    headline: 'Built for real artist workflows.',
+    intro: 'Verified artist stories, when available.',
+  },
+  releaseCycle: {
     headline: 'One profile through the whole release cycle.',
     intro:
-      'Pre-save before release. Nearby tickets on tour. Direct support in person.',
+      'Release alerts before the drop. Nearby tickets on tour. Direct support in person.',
   },
   faq: {
     headline: 'Questions',
@@ -1197,7 +1205,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       {
         question: 'Can I use this before release day?',
         answer:
-          'Yes. The profile can become a countdown or pre-release surface before the song is live, then switch behavior when release day arrives.',
+          'Yes. Before release day, the profile can collect release alerts, then switch behavior when the song lands.',
       },
       {
         question: 'Can I use it for shows and support?',

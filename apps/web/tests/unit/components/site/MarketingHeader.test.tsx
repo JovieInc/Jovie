@@ -66,18 +66,43 @@ describe('MarketingHeader', () => {
     expect(screen.getByRole('button', { name: /Resources/ })).toBeVisible();
   });
 
-  it('uses the homepage presentation on the artist-profiles route', () => {
+  it('scopes homepage-style header overrides to the artist-profiles route', () => {
     mockUsePathname.mockReturnValue('/artist-profiles');
 
     render(<MarketingHeader />);
 
+    expect(screen.getByTestId('header-nav')).toHaveClass(
+      'artist-profiles-home-header'
+    );
     expect(screen.getByTestId('header-nav')).toHaveAttribute(
       'data-presentation',
       'homepage-embedded'
     );
   });
 
-  it('applies and cleans up the homepage scroll treatment', () => {
+  it('keeps the legacy artist-profile alias on the same shared chrome', () => {
+    mockUsePathname.mockReturnValue('/artist-profile');
+
+    render(<MarketingHeader />);
+
+    expect(screen.getByTestId('header-nav')).toHaveClass(
+      'artist-profiles-home-header'
+    );
+  });
+
+  it('does not leak artist-profile header overrides onto the homepage', () => {
+    mockUsePathname.mockReturnValue('/');
+
+    render(
+      <MarketingHeader variant='homepage' showHomepageCenterNav={false} />
+    );
+
+    expect(screen.getByTestId('header-nav')).not.toHaveClass(
+      'artist-profiles-home-header'
+    );
+  });
+
+  it('applies and cleans up homepage-style scroll treatment', () => {
     mockUsePathname.mockReturnValue('/artist-profiles');
     const removeEventListener = vi.spyOn(window, 'removeEventListener');
     const { unmount } = render(<MarketingHeader />);

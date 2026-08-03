@@ -50,7 +50,7 @@ const sectionComponents = [
   'ArtistProfileOpinionatedSection',
   'ArtistProfileAnnotatedTruth',
   'ArtistProfileHowItWorks',
-  'ArtistProfileSocialProof',
+  'ArtistProfileReleaseCycleGallery',
   'ArtistProfileFaq',
   'ArtistProfileFinalCta',
 ] as const;
@@ -145,6 +145,7 @@ describe('artist profile landing family System B source contract', () => {
       'utf8'
     );
     expect(hero).toContain('HomepagePosterHero');
+    expect(hero).toContain('trackedLinkComponent={HomepageTrackedLink}');
     expect(hero).toContain(
       "getMarketingExportImage('tim-white-profile-live-mobile')"
     );
@@ -207,7 +208,11 @@ describe('artist profile landing family System B source contract', () => {
       ),
       'utf8'
     );
-    expect(howItWorks).toContain("'artist-spec-sync-settings-desktop'");
+    expect(howItWorks).toContain('ONBOARDING_HANDLE_CAPTURE');
+    expect(howItWorks).toContain('ONBOARDING_DSP_CAPTURE');
+    expect(howItWorks).toContain(
+      "getMarketingExportImage('tim-white-profile-live-mobile')"
+    );
     expect(howItWorks).toContain('<Image');
 
     const finalCta = readFileSync(

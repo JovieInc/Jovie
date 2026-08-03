@@ -431,7 +431,7 @@ describe('marketing route manifest integrity', () => {
     }
   });
 
-  it('keeps canonical pricing recipe parity visible', () => {
+  it('keeps canonical route recipe parity visible', () => {
     const pricing = MARKETING_ROUTE_MANIFEST.find(
       entry => entry.url === '/pricing'
     );
@@ -464,13 +464,12 @@ describe('marketing route manifest integrity', () => {
       'hero',
       'logo-cloud',
       'feature-split',
-      'social-proof',
+      'feature-grid',
       'capture',
-      'feature-split',
-      'monetization',
+      'comparison',
       'spec-wall',
       'how-it-works',
-      'social-proof',
+      'feature-grid',
       'faq',
       'cta',
     ]);

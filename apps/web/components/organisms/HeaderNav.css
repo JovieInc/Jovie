@@ -16,19 +16,19 @@
  * or design-system.css.
  */
 
-[data-testid="header-nav"][data-presentation="homepage-embedded"] nav {
+.artist-profiles-home-header[data-presentation="homepage-embedded"] nav {
   --homepage-embedded-gutter: clamp(var(--space-5), 2.2vw, var(--space-8));
   width: min(
     var(--ds-public-content-max),
     calc(100% - (var(--homepage-embedded-gutter) * 2))
-  ) !important;
-  max-width: var(--ds-public-content-max) !important;
-  margin-inline: auto !important;
-  padding-inline: 0 !important;
+  );
+  max-width: var(--ds-public-content-max);
+  margin-inline: auto;
+  padding-inline: 0;
 }
 
-[data-testid="header-nav"][data-presentation="homepage-embedded"] nav > div {
-  height: calc(var(--space-10) + var(--space-1)) !important;
+.artist-profiles-home-header[data-presentation="homepage-embedded"] nav > div {
+  height: calc(var(--space-10) + var(--space-1));
   max-width: var(--ds-public-content-max);
   margin-top: var(--space-2);
   padding-inline: 0;
@@ -46,7 +46,7 @@
     var(--ds-motion-subtle-easing);
 }
 
-[data-testid="header-nav"][data-presentation="homepage-embedded"][data-scrolled="true"]
+.artist-profiles-home-header[data-presentation="homepage-embedded"][data-scrolled="true"]
   nav
   > div {
   border-color: color-mix(
@@ -59,7 +59,7 @@
   -webkit-backdrop-filter: blur(var(--space-5)) saturate(150%);
 }
 
-[data-testid="header-nav"][data-presentation="homepage-embedded"]
+.artist-profiles-home-header[data-presentation="homepage-embedded"]
   [data-testid="site-logo"] {
   width: auto;
   height: var(--space-5);

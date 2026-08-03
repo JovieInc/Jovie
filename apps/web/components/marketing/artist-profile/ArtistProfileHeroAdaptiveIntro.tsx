@@ -36,7 +36,6 @@ export function ArtistProfileHeroAdaptiveIntro({
         <ArtistProfileSectionShell
           id='adaptive'
           className='border-b border-subtle'
-          containerClassName='!px-5 sm:!px-6 lg:!px-0'
         >
           <div data-testid='artist-profile-adaptive-sequence'>
             <ArtistProfileModeSwitcher adaptive={adaptive} />

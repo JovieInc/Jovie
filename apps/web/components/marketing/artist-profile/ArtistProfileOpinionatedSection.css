@@ -70,6 +70,30 @@
   }
 
   .ap-opinionated__comparison-media {
-    height: 21rem;
+    height: 23.5rem;
+  }
+
+  .ap-opinionated__menu-preview {
+    width: min(17rem, 84%);
+    padding-top: var(--space-5);
+  }
+
+  .ap-opinionated__menu-avatar {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .ap-opinionated__menu-name {
+    height: 0.5rem;
+    margin: var(--space-3) auto var(--space-5);
+  }
+
+  .ap-opinionated__menu-links {
+    gap: var(--space-2);
+  }
+
+  .ap-opinionated__menu-link {
+    min-height: 2.75rem;
+    padding-inline: var(--space-3);
   }
 }
