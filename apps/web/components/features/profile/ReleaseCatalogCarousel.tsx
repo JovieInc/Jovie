@@ -90,9 +90,9 @@ export function ReleaseCatalogCarousel({
       // Edge-to-edge on mobile: cancel the surface's --page-pad with a
       // negative margin, then re-inset the track so the first card aligns
       // with the padded content above while later cards scroll off the true
-      // surface edge. On desktop the shell's rounded corner would clip the
-      // peek card mid-radius, so the track stays inside the padded gutter and
-      // its own straight clip edge crops the peek card instead.
+      // surface edge. The landscape card gap equals that inset, keeping every
+      // neighboring card fully outside the viewport at a settled snap. On
+      // desktop the track stays inside the shell's padded gutter.
       // min-h-0 + flex-1 reserves a stable stage around the compact row.
       className='-mx-(--page-pad) min-h-0 flex-1 scroll-px-(--page-pad) px-(--page-pad) md:mx-0 md:scroll-px-0 md:px-0'
       onCardImpression={handleCardImpression}

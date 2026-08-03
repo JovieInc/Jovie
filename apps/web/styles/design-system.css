@@ -374,9 +374,8 @@
   align-self: center;
   /* Size container so card content can respond to the card's own height. */
   container-type: size;
-  transition:
-    transform var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing),
-    opacity var(--ds-motion-subtle-duration) var(--ds-motion-subtle-easing);
+  transition: opacity var(--ds-motion-subtle-duration)
+    var(--ds-motion-subtle-easing);
 }
 
 /* Direction C public-profile rail: one full-content-width card per snap. The
@@ -412,17 +411,16 @@
   }
 }
 
-/* Scroll-driven edge treatment (transform/opacity only; applied via
-   IntersectionObserver and skipped entirely under reduced motion). */
+/* Scroll-driven edge treatment (opacity only; applied via IntersectionObserver
+   and skipped entirely under reduced motion). Card geometry stays invariant
+   throughout drag, momentum, and snap so the rail never appears to breathe. */
 :where(.profile-entity-card[data-edge="true"]) {
-  transform: scale(0.96);
   opacity: 0.75;
 }
 
 :where(
   .profile-entity-card[data-layout="profile-landscape"][data-edge="true"]
 ) {
-  transform: scale(0.985);
   opacity: 0.82;
 }
 

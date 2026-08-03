@@ -40,7 +40,7 @@ describe('shared press-motion contract', () => {
     );
   });
 
-  it('keeps immediate-state controls static and remaining press feedback at 0.98', () => {
+  it('keeps immediate-state and carousel controls static while remaining press feedback stays at 0.98', () => {
     const bottomTabs = readWeb(
       'components/features/profile/nav/BottomTabBar.tsx'
     );
@@ -60,8 +60,8 @@ describe('shared press-motion contract', () => {
 
     expect(bottomTabs).not.toContain('active:scale');
     expect(bottomTabs).not.toContain('transition-[color,transform]');
-    expect(entityCard).toContain('group-active:scale-[var(--scale-press)]');
-    expect(entityCard).not.toContain('group-active:scale-[0.96]');
+    expect(entityCard).not.toContain('group-active:scale');
+    expect(entityCard).not.toContain('transition-[background-color,transform]');
     expect(smartLinkAudioPreview).not.toContain('active:scale');
     expect(homepagePosterHero).not.toContain('active:scale');
     expect(captureShared).not.toContain('scale-[0.96]');
