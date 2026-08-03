@@ -104,7 +104,8 @@ describe('plan-gate/v1', () => {
       ],
     ];
 
-    for (const [name, overrides, evidenceOverrides] of cases) {
+    for (const [rawName, overrides, evidenceOverrides] of cases) {
+      const name = String(rawName);
       const fake = client();
       const result = await planGate.approvePlan({
         issue: issue(overrides),
