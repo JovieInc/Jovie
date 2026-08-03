@@ -80,10 +80,7 @@ export function DashboardMobileTabs({
     });
     return {
       primaryItems: partition.visible.map(toMenuItem),
-      expandedItems: [
-        ...partition.more,
-        ...artistNavigation,
-      ].map(toMenuItem),
+      expandedItems: [...partition.more, ...artistNavigation].map(toMenuItem),
     };
   }, [activeItemId]);
 

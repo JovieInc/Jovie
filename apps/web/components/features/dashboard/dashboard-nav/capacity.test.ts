@@ -2,12 +2,12 @@ import { CalendarDays, CheckSquare, Music, SquarePen } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
-  artistNavigation,
   CUSTOMER_NAV_CAPACITY,
   customerNavVisibleCap,
   partitionCustomerNavigation,
 } from './capacity';
 import {
+  artistNavigation,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
   primaryNavigation,
