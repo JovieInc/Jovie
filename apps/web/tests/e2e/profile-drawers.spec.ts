@@ -37,13 +37,12 @@ async function interceptAnalytics(page: Page) {
   );
 }
 
-function artistNameLocator(page: Page) {
-  return page.getByText('Dua Lipa', { exact: true }).first();
-}
-
-async function assertProfileRestored(page: Page) {
+async function assertProfileRestored(page: Page, artistName = 'Dua Lipa') {
   await expect(
-    artistNameLocator(page),
+    page
+      .getByText(artistName, { exact: true })
+      .filter({ visible: true })
+      .first(),
     'Artist name should be visible after drawer close'
   ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
 }
@@ -63,10 +62,10 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
   test.setTimeout(180_000);
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 1. Listen Drawer
+  // 1. Music Mode
   // ──────────────────────────────────────────────────────────────────────────
 
-  test('listen drawer opens and closes', async ({ page }) => {
+  test('music mode opens and returns home', async ({ page }) => {
     await interceptAnalytics(page);
     await page.setViewportSize(MOBILE_VIEWPORT);
 
@@ -77,17 +76,39 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
     expect(response?.status() ?? 0).toBeLessThan(500);
     await waitForHydration(page);
 
-    const drawerContent = page
-      .getByText(/listen on/i)
-      .or(page.locator('a[href*="spotify"], a[href*="apple"]').first())
+    const musicPanel = page
+      .getByTestId('profile-primary-tab-releases')
+      .or(page.getByTestId('profile-primary-tab-listen'))
       .first();
 
-    if (!(await drawerContent.isVisible().catch(() => false))) {
-      test.skip(true, 'Listen drawer content not visible — skipping');
-      return;
-    }
+    await expect(musicPanel).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+    await page.getByRole('button', { name: 'Home' }).click();
 
-    await expect(drawerContent).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/${TEST_PROFILES.DUALIPA}$`));
+    await expect(musicPanel).toBeHidden();
+    await expect(page.getByTestId('profile-home-rail')).toBeVisible();
+
+    await assertProfileRestored(page);
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 2. Tip Drawer
+  // ──────────────────────────────────────────────────────────────────────────
+
+  test('tip drawer opens and closes', async ({ page }) => {
+    await interceptAnalytics(page);
+    await page.setViewportSize(MOBILE_VIEWPORT);
+
+    const response = await smokeNavigate(page, '/tim?mode=pay');
+    expect(response?.status() ?? 0).toBeLessThan(500);
+    await waitForHydration(page);
+
+    const drawerContent = page.getByTestId('profile-mode-drawer-pay');
+    await expect(drawerContent).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
     await closeDrawer(page);
 
@@ -101,37 +122,30 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
       contentStillVisible,
       'Drawer content should be hidden after close'
     ).toBe(false);
-    await page.waitForTimeout(300);
-    await expect(page).toHaveURL(new RegExp(`/${TEST_PROFILES.DUALIPA}$`));
-    await expect(
-      page.getByRole('button', { name: /close/i }).first()
-    ).toBeHidden();
-    await expect(drawerContent).toBeHidden();
 
-    await assertProfileRestored(page);
+    await expect(page).toHaveURL(/\/tim$/);
+    await assertProfileRestored(page, 'Tim White');
   });
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 2. Tip Drawer
+  // 3. Subscribe Drawer
   // ──────────────────────────────────────────────────────────────────────────
 
-  test('tip drawer opens and closes', async ({ page }) => {
+  test('subscribe drawer opens and closes', async ({ page }) => {
     await interceptAnalytics(page);
     await page.setViewportSize(MOBILE_VIEWPORT);
 
-    await smokeNavigate(page, `/${TEST_PROFILES.DUALIPA}`);
+    const response = await smokeNavigate(
+      page,
+      `/${TEST_PROFILES.DUALIPA}?mode=subscribe`
+    );
+    expect(response?.status() ?? 0).toBeLessThan(500);
     await waitForHydration(page);
 
-    const trigger = page.locator('[data-testid="pay-trigger"]').first();
+    const drawerContent = page
+      .getByTestId('profile-mobile-notifications-flow')
+      .first();
 
-    if (!(await trigger.isVisible().catch(() => false))) {
-      test.skip(true, 'Tip trigger not visible — skipping');
-      return;
-    }
-
-    await trigger.click();
-
-    const drawerContent = page.getByText(/tip/i).first();
     await expect(drawerContent).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
@@ -153,54 +167,10 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 3. Subscribe Drawer
+  // 4. About Mode
   // ──────────────────────────────────────────────────────────────────────────
 
-  test('subscribe drawer opens and closes', async ({ page }) => {
-    await interceptAnalytics(page);
-    await page.setViewportSize(MOBILE_VIEWPORT);
-
-    const response = await smokeNavigate(
-      page,
-      `/${TEST_PROFILES.DUALIPA}?mode=subscribe`
-    );
-    expect(response?.status() ?? 0).toBeLessThan(500);
-    await waitForHydration(page);
-
-    const drawerContent = page
-      .locator('input[type="email"], input[type="tel"]')
-      .first()
-      .or(page.getByText(/turn on notifications/i).first())
-      .or(page.getByText(/get notified/i).first());
-
-    if (!(await drawerContent.isVisible().catch(() => false))) {
-      test.skip(true, 'Subscribe drawer content not visible — skipping');
-      return;
-    }
-
-    await expect(drawerContent).toBeVisible();
-
-    await closeDrawer(page);
-
-    await drawerContent
-      .waitFor({ state: 'hidden', timeout: 5_000 })
-      .catch(() => {});
-    const contentStillVisible = await drawerContent
-      .isVisible()
-      .catch(() => false);
-    expect(
-      contentStillVisible,
-      'Drawer content should be hidden after close'
-    ).toBe(false);
-
-    await assertProfileRestored(page);
-  });
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // 4. About Drawer
-  // ──────────────────────────────────────────────────────────────────────────
-
-  test('about drawer opens and closes', async ({ page }) => {
+  test('about mode opens and returns home', async ({ page }) => {
     await interceptAnalytics(page);
     await page.setViewportSize(MOBILE_VIEWPORT);
 
@@ -211,30 +181,15 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
     expect(response?.status() ?? 0).toBeLessThan(500);
     await waitForHydration(page);
 
-    const drawerContent = page
-      .getByText(/about/i)
-      .first()
-      .or(page.locator('[data-testid="about-section"]').first());
+    const aboutPanel = page.getByTestId('profile-primary-tab-about');
 
-    if (!(await drawerContent.isVisible().catch(() => false))) {
-      test.skip(true, 'About drawer content not visible — skipping');
-      return;
-    }
-
-    await expect(drawerContent).toBeVisible();
-
-    await closeDrawer(page);
-
-    await drawerContent
-      .waitFor({ state: 'hidden', timeout: 5_000 })
-      .catch(() => {});
-    const contentStillVisible = await drawerContent
-      .isVisible()
-      .catch(() => false);
-    expect(
-      contentStillVisible,
-      'Drawer content should be hidden after close'
-    ).toBe(false);
+    await expect(aboutPanel).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+    await page.getByRole('button', { name: 'Home' }).click();
+    await expect(page).toHaveURL(new RegExp(`/${TEST_PROFILES.DUALIPA}$`));
+    await expect(aboutPanel).toBeHidden();
+    await expect(page.getByTestId('profile-home-rail')).toBeVisible();
 
     await assertProfileRestored(page);
   });
@@ -254,17 +209,11 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
     expect(response?.status() ?? 0).toBeLessThan(500);
     await waitForHydration(page);
 
-    const drawerContent = page
-      .getByText(/contact/i)
-      .first()
-      .or(page.locator('[data-testid="contacts-trigger"]').first());
+    const drawerContent = page.getByTestId('profile-mode-drawer-contact');
 
-    if (!(await drawerContent.isVisible().catch(() => false))) {
-      test.skip(true, 'Contact drawer content not visible — skipping');
-      return;
-    }
-
-    await expect(drawerContent).toBeVisible();
+    await expect(drawerContent).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
     await closeDrawer(page);
 
@@ -283,10 +232,10 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 6. Tour Drawer
+  // 6. Events Mode
   // ──────────────────────────────────────────────────────────────────────────
 
-  test('tour drawer opens and closes', async ({ page }) => {
+  test('events mode opens and returns home', async ({ page }) => {
     await interceptAnalytics(page);
     await page.setViewportSize(MOBILE_VIEWPORT);
 
@@ -297,31 +246,15 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
     expect(response?.status() ?? 0).toBeLessThan(500);
     await waitForHydration(page);
 
-    const drawerContent = page
-      .getByText(/no upcoming shows/i)
-      .first()
-      .or(page.getByText(/tour/i).first())
-      .or(page.locator('[data-testid="tour-section"]').first());
+    const eventsPanel = page.getByTestId('profile-primary-tab-tour');
 
-    if (!(await drawerContent.isVisible().catch(() => false))) {
-      test.skip(true, 'Tour drawer content not visible — skipping');
-      return;
-    }
-
-    await expect(drawerContent).toBeVisible();
-
-    await closeDrawer(page);
-
-    await drawerContent
-      .waitFor({ state: 'hidden', timeout: 5_000 })
-      .catch(() => {});
-    const contentStillVisible = await drawerContent
-      .isVisible()
-      .catch(() => false);
-    expect(
-      contentStillVisible,
-      'Drawer content should be hidden after close'
-    ).toBe(false);
+    await expect(eventsPanel).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+    await page.getByRole('button', { name: 'Home' }).click();
+    await expect(page).toHaveURL(new RegExp(`/${TEST_PROFILES.DUALIPA}$`));
+    await expect(eventsPanel).toBeHidden();
+    await expect(page.getByTestId('profile-home-rail')).toBeVisible();
 
     await assertProfileRestored(page);
   });
@@ -337,38 +270,25 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
     await smokeNavigate(page, `/${TEST_PROFILES.DUALIPA}`);
     await waitForHydration(page);
 
-    // Look for menu trigger: hamburger icon, ellipsis, or menu button
-    const trigger = page
-      .getByRole('button', { name: /menu/i })
-      .first()
-      .or(page.locator('[data-testid="menu-trigger"]').first())
-      .or(page.locator('button[aria-label*="menu" i]').first())
-      .or(page.locator('[data-testid="hamburger"]').first());
+    // The public-profile contract gives the top overflow trigger one stable,
+    // exact accessible name. Broad fallback unions can resolve a stale or
+    // hidden menu-like control while the compact shell is hydrating.
+    const trigger = page.getByRole('button', {
+      name: 'Menu',
+      exact: true,
+    });
 
-    if (!(await trigger.isVisible().catch(() => false))) {
-      test.skip(true, 'Menu trigger not visible — skipping');
-      return;
-    }
-
+    await expect(trigger).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
     await trigger.click();
 
     // Menu drawer should show navigation items or menu content
-    const drawerContent = page
-      .getByRole('navigation')
-      .first()
-      .or(page.locator('[role="menu"]').first())
-      .or(page.locator('[data-testid="menu-drawer"]').first());
+    const drawerContent = page.getByTestId('profile-menu-drawer');
 
-    const menuVisible = await drawerContent
-      .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
-      .catch(() => false);
-
-    if (!menuVisible) {
-      test.skip(true, 'Menu drawer content not visible after click — skipping');
-      return;
-    }
-
-    await expect(drawerContent).toBeVisible();
+    await expect(drawerContent).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
     // Close menu via Escape (menus typically lack a close button)
     await page.keyboard.press('Escape');

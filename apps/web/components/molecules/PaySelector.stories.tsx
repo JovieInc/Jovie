@@ -60,3 +60,23 @@ export const DrawerPresentation: Story = {
     showOtherPaymentOptions: true,
   },
 };
+
+export const UnavailablePaymentMethod: Story = {
+  args: {
+    amounts: [5, 10, 20],
+    paymentMethod: {
+      id: 'apple-pay',
+      label: 'Apple Pay',
+      availability: 'unavailable',
+    },
+    presentation: 'drawer',
+  },
+  play: async ({ canvasElement }) => {
+    const action = canvasElement.querySelector<HTMLButtonElement>(
+      'button[aria-label="Pay $10 with Apple Pay"]'
+    );
+    if (!action?.disabled) {
+      throw new Error('Unavailable payment action must remain disabled');
+    }
+  },
+};
