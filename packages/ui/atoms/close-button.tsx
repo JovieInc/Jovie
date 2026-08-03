@@ -9,7 +9,7 @@ import { cn } from '../lib/utils';
  * Provides consistent close button styling across Dialog, AlertDialog, and Sheet.
  */
 export const closeButtonStyles = {
-  base: 'absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full text-secondary-token opacity-70 transition-colors duration-normal ease-interactive',
+  base: 'absolute right-4 top-4 inline-flex h-12 w-12 items-center justify-center rounded-full text-secondary-token opacity-70 transition-colors duration-normal ease-interactive',
   hover:
     'hover:bg-interactive-hover hover:text-primary-token hover:opacity-100',
   focus:

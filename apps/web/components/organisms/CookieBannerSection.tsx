@@ -199,7 +199,7 @@ export function CookieBannerSection() {
 
   return (
     <>
-      {visible && !isSuppressedPath ? (
+      {visible && !isSuppressedPath && !customize ? (
         <aside
           aria-label='Cookie Consent'
           data-testid='cookie-banner'

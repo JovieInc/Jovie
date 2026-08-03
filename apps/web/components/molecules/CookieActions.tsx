@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/cookie-banner.test.tsx
 'use client';
 
 import type { CSSProperties } from 'react';

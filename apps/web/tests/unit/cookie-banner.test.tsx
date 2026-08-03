@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { CookieActions } from '@/components/molecules/CookieActions';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
 import {
   shouldPlaceCookieBannerAbovePublicProfileDock,
@@ -17,6 +18,36 @@ function setCookie(value: string) {
     value,
   });
 }
+
+describe('CookieActions', () => {
+  it('keeps every compact action touch-sized and dispatches its callback', () => {
+    const onAcceptAll = vi.fn();
+    const onReject = vi.fn();
+    const onCustomize = vi.fn();
+
+    render(
+      <CookieActions
+        compact
+        onAcceptAll={onAcceptAll}
+        onReject={onReject}
+        onCustomize={onCustomize}
+      />
+    );
+
+    const actions = [
+      screen.getByRole('button', { name: /reject/i }),
+      screen.getByRole('button', { name: /customize/i }),
+      screen.getByRole('button', { name: /accept all/i }),
+    ];
+    for (const action of actions) {
+      expect(action).toHaveStyle({ height: '44px' });
+      fireEvent.click(action);
+    }
+    expect(onReject).toHaveBeenCalledOnce();
+    expect(onCustomize).toHaveBeenCalledOnce();
+    expect(onAcceptAll).toHaveBeenCalledOnce();
+  });
+});
 
 describe('CookieBannerSection', () => {
   afterEach(() => {
@@ -109,6 +140,25 @@ describe('CookieBannerSection', () => {
       'href',
       '/legal/privacy'
     );
+  });
+
+  it('gives the preferences modal sole ownership of the consent surface', () => {
+    setCookie('jv_cc_required=1');
+    render(<CookieBannerSection />);
+
+    fireEvent.click(screen.getByRole('button', { name: /customize/i }));
+
+    expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('dialog', { name: /cookie preferences/i })
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+
+    expect(
+      screen.queryByRole('dialog', { name: /cookie preferences/i })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('cookie-banner')).toBeInTheDocument();
   });
 
   it('publishes --cookie-banner-h CSS var for coordinated floating surfaces', async () => {
