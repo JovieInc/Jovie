@@ -90,6 +90,7 @@ modes, neverUse rules.
 - `revalidate = false` (fully static — hard invariant).
 - Dark-only theme (System A — DESIGN.md).
 - Copy-in-data: copy lives in `apps/web/data/*Copy.ts`, not inline in the page.
+- Customer-facing copy sells the product outcome, never the artifact. Do not mention mockups, concept renders, screenshots, registries, annotations, design decisions, or how proof media was produced. Asset provenance belongs in code, alt text, review notes, or manifests—not the rendered marketing story.
 - One body face, one container width (`page` | `prose`), spacing-only transitions.
 - `data-testid="marketing-section-{sectionId}"` on each section wrapper.
 - Proof sections render only if `proofVerified: true` (the resolver already

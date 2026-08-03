@@ -26,6 +26,7 @@ Primary voice question:
 - Confidence must match evidence.
 - Do not overpromise what the product cannot reliably deliver.
 - Do not expose internal machinery unless the customer benefits from knowing it.
+- Do not sell the artifact instead of the product. Customer-facing copy must not discuss mockups, screenshots, concept renders, annotations, registries, design decisions, or production provenance. State the customer outcome or capability that the evidence demonstrates.
 
 ---
 
