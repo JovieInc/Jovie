@@ -266,6 +266,16 @@ const NEON_ATTEMPT_ARTIFACT_MANIFEST = [
 ];
 
 describe('automation-verify affected scope', () => {
+  it('does not require retired Graphite source authorization artifacts', () => {
+    for (const retiredPath of [
+      '.github/workflows/gtmq-source-authorization.yml',
+      'scripts/guard-gtmq-source-authorization.sh',
+    ]) {
+      expect(runner).not.toContain(retiredPath);
+      expect(script).not.toContain(retiredPath);
+    }
+  });
+
   it('keeps a production workflow contract-only diff on focused coverage', () => {
     const plan = buildAffectedTestPlan([
       '.github/workflows/production-release.yml',
