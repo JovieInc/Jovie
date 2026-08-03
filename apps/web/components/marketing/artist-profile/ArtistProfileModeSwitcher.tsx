@@ -3,7 +3,7 @@
 import { Tabs } from '@jovie/ui';
 import { AnimatePresence, motion } from 'motion/react';
 import Image from 'next/image';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
@@ -24,10 +24,6 @@ export function ArtistProfileModeSwitcher({
   phoneSubcaption,
   showIntroHeading = true,
 }: Readonly<ArtistProfileModeSwitcherProps>) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const sequenceTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
-  const sequenceStartedRef = useRef(false);
-  const manualSelectionRef = useRef(false);
   const reducedMotion = useReducedMotion();
   const [activeIndex, setActiveIndex] = useState(0);
   const activeMode = adaptive.modes[activeIndex] ?? adaptive.modes[0];
@@ -35,95 +31,12 @@ export function ArtistProfileModeSwitcher({
     .filter(Boolean)
     .join(' ');
 
-  const clearSequenceTimers = useCallback(() => {
-    for (const timer of sequenceTimersRef.current) {
-      globalThis.clearTimeout(timer);
-    }
-    sequenceTimersRef.current = [];
-  }, []);
-
-  const stopSequence = useCallback(() => {
-    manualSelectionRef.current = true;
-    clearSequenceTimers();
-  }, [clearSequenceTimers]);
-
-  const selectMode = useCallback(
-    (modeId: string, manual = true) => {
-      const nextIndex = adaptive.modes.findIndex(mode => mode.id === modeId);
-      if (nextIndex < 0) {
-        return;
-      }
-
-      if (manual) {
-        stopSequence();
-      }
-
+  const selectMode = (modeId: string) => {
+    const nextIndex = adaptive.modes.findIndex(mode => mode.id === modeId);
+    if (nextIndex >= 0) {
       setActiveIndex(nextIndex);
-    },
-    [adaptive.modes, stopSequence]
-  );
-
-  const startSequence = useCallback(() => {
-    if (manualSelectionRef.current || sequenceStartedRef.current) {
-      return;
     }
-
-    const upcomingReleaseIndex = adaptive.modes.findIndex(
-      mode => mode.id === 'upcoming-release'
-    );
-    const touringIndex = adaptive.modes.findIndex(
-      mode => mode.id === 'touring'
-    );
-    const firstIndex = Math.max(upcomingReleaseIndex, 0);
-
-    sequenceStartedRef.current = true;
-
-    if (reducedMotion) {
-      return;
-    }
-
-    const queueSelection = (index: number, delay: number) => {
-      if (index < 0) {
-        return;
-      }
-
-      const timer = globalThis.setTimeout(() => {
-        if (!manualSelectionRef.current) {
-          setActiveIndex(index);
-        }
-      }, delay);
-      sequenceTimersRef.current.push(timer);
-    };
-
-    queueSelection(firstIndex, 220);
-    if (touringIndex >= 0 && touringIndex !== firstIndex) {
-      queueSelection(touringIndex, 1320);
-    }
-  }, [adaptive.modes, reducedMotion]);
-
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root || globalThis.IntersectionObserver === undefined) {
-      startSequence();
-      return;
-    }
-
-    const observer = new globalThis.IntersectionObserver(
-      entries => {
-        if (!entries[0]?.isIntersecting) {
-          return;
-        }
-        startSequence();
-        observer.disconnect();
-      },
-      { threshold: 0.35 }
-    );
-
-    observer.observe(root);
-    return () => observer.disconnect();
-  }, [startSequence]);
-
-  useEffect(() => clearSequenceTimers, [clearSequenceTimers]);
+  };
 
   if (!activeMode) {
     return null;
@@ -131,9 +44,6 @@ export function ArtistProfileModeSwitcher({
 
   return (
     <div
-      ref={rootRef}
-      onFocusCapture={stopSequence}
-      onPointerEnter={stopSequence}
       className={cn(
         showIntroHeading
           ? 'grid items-center gap-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(22rem,1.1fr)] lg:gap-16'
