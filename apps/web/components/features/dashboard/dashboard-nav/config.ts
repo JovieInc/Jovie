@@ -98,9 +98,17 @@ export const calendarNavItem: NavItem = {
   description: 'See release dates, events, and calendar moments',
 };
 
+/** Destinations owned by the currently selected artist group. */
+export const artistNavigation = [
+  libraryNavItem,
+  contactsNavItem,
+  calendarNavItem,
+] as const satisfies readonly NavItem[];
+
 /**
- * Founder-approved customer shell IA. This ordered tuple is the only source
- * consumed by desktop and mobile navigation (JOV-3763).
+ * Founder-approved global customer shell IA. Artist-scoped destinations live
+ * in `artistNavigation` so the desktop rail can render them under the artist
+ * group while mobile keeps them in the expanded menu (JOV-4800).
  *
  * Capacity (JOV-4515): every entry here is `core` and must fit the desktop
  * primary rail. Mark new trial destinations `experimental` so they overflow
@@ -110,10 +118,7 @@ export const calendarNavItem: NavItem = {
 export const primaryNavigation = [
   chatNavItem,
   inboxNavItem,
-  libraryNavItem,
-  contactsNavItem,
   profilesNavItem,
-  calendarNavItem,
 ] as const satisfies readonly NavItem[];
 
 export const settingsNavItem: NavItem = {
@@ -236,6 +241,7 @@ export const mobilePrimaryNavigation: NavItem[] = [
 /** Items shown in the expanded "more" menu on mobile. */
 export const mobileExpandedNavigation: NavItem[] = [
   ...mobileDefaultPartition.more,
+  ...artistNavigation,
 ];
 
 export type {

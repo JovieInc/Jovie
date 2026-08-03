@@ -5,6 +5,7 @@ export type {
   PartitionCustomerNavigationOptions,
 } from './config';
 export {
+  artistNavigation,
   artistSettingsNavigation,
   CUSTOMER_NAV_CAPACITY,
   calendarNavItem,

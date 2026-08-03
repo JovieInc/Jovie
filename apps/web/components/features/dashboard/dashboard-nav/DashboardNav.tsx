@@ -33,6 +33,7 @@ import {
 } from '@/lib/tracking/navigation-telemetry';
 import { CustomerNavMoreMenu } from './CustomerNavMoreMenu';
 import {
+  artistNavigation,
   artistSettingsNavigation,
   CUSTOMER_NAV_CAPACITY,
   partitionCustomerNavigation,
@@ -208,6 +209,10 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   ]);
 
   const artistSettingsLabel = 'Artist';
+  const artistLabel =
+    selectedProfile?.displayName?.trim() ||
+    selectedProfile?.username?.trim() ||
+    'Artist';
 
   // Memoize nav sections for dashboard (non-settings) mode
   const navSections = useMemo<readonly DashboardNavSection[]>(
@@ -483,6 +488,15 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                   )}
                 </div>
               ))}
+              <div data-nav-section='artist'>
+                <SidebarCollapsibleGroup
+                  label={artistLabel}
+                  defaultOpen
+                  storageKey={`dashboard.artist.${profileId || 'selected'}`}
+                >
+                  {renderSection(artistNavigation)}
+                </SidebarCollapsibleGroup>
+              </div>
             </SidebarGroupContent>
           </SidebarGroup>
         )}

@@ -2,6 +2,7 @@ import { CalendarDays, CheckSquare, Music, SquarePen } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  artistNavigation,
   CUSTOMER_NAV_CAPACITY,
   customerNavVisibleCap,
   partitionCustomerNavigation,
@@ -51,15 +52,11 @@ describe('partitionCustomerNavigation', () => {
     expect(partition.visible.map(item => item.id)).toEqual([
       'chat',
       'inbox',
-      'library',
-    ]);
-    expect(partition.more.map(item => item.id)).toEqual([
-      'contacts',
       'profiles',
-      'calendar',
     ]);
+    expect(partition.more).toEqual([]);
     expect(partition.visible).toEqual(mobilePrimaryNavigation);
-    expect(partition.more).toEqual(mobileExpandedNavigation);
+    expect(mobileExpandedNavigation).toEqual(artistNavigation);
   });
 
   it('keeps the full approved core set on the desktop rail with an empty More', () => {
@@ -126,7 +123,7 @@ describe('partitionCustomerNavigation', () => {
     expect(partition.visible.map(item => item.id)).toEqual([
       'chat',
       'inbox',
-      'library',
+      'profiles',
     ]);
   });
 
