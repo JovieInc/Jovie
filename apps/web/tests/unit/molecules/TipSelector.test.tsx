@@ -126,6 +126,11 @@ describe('PaySelector', () => {
     expect(selected).toHaveAttribute('aria-pressed', 'true');
     expect(selected).toHaveAttribute('data-selected', 'true');
     expect(selected).toHaveTextContent('$10');
+
+    const unselected = screen.getByRole('button', {
+      name: /Select \$5 payment amount/i,
+    });
+    expect(unselected).toHaveClass('border-white/12', 'bg-white/[0.04]');
   });
 
   it('only enables a provider when its capability is available', () => {

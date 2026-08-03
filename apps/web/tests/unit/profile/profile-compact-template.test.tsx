@@ -432,16 +432,28 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(
-      within(screen.getByTestId('profile-top-chrome')).getByRole('button', {
-        name: 'Menu',
-      })
-    ).toBeInTheDocument();
+    const menuTrigger = within(
+      screen.getByTestId('profile-top-chrome')
+    ).getByRole('button', { name: 'Menu' });
+    expect(menuTrigger).toBeInTheDocument();
     expect(
       within(screen.getByTestId('profile-top-chrome')).queryByRole('button', {
         name: 'Alerts',
       })
     ).not.toBeInTheDocument();
+
+    fireEvent.click(menuTrigger);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+        'data-open',
+        'true'
+      );
+      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
+        'data-view',
+        'menu'
+      );
+    });
   });
 
   // Regression: JOV-3377 — with overflow-y-auto, overflow-x computes to auto
@@ -534,6 +546,10 @@ describe('ProfileCompactTemplate', () => {
     expect(
       within(bottomNav).getByRole('button', { name: 'Home' })
     ).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByTestId('mock-primary-tab-panel')).toHaveAttribute(
+      'data-mode',
+      'about'
+    );
   });
 
   it('uses browser back from the floating back control when history is available', async () => {

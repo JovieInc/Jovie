@@ -1,6 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TourModePanel } from '@/features/profile/TourModePanel';
+import {
+  TourDrawerContent,
+  TourModePanel,
+} from '@/features/profile/TourModePanel';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
 
@@ -38,15 +41,22 @@ vi.mock(
   () => ({
     ArtistNotificationsCTA: ({
       source,
+      triggerClassName,
     }: {
       source?: string;
+      triggerClassName?: string;
       forceExpanded?: boolean;
       hideListenFallback?: boolean;
       artist: Artist;
     }) => (
-      <div data-testid='mock-notifications-cta' data-source={source}>
+      <button
+        type='button'
+        className={triggerClassName}
+        data-testid='mock-notifications-cta'
+        data-source={source}
+      >
         Subscribe CTA
-      </div>
+      </button>
     ),
   })
 );
@@ -143,6 +153,20 @@ describe('TourModePanel', () => {
       'data-source',
       'events_empty_state'
     );
+    expect(screen.getByTestId('mock-notifications-cta')).toHaveClass('h-11!');
+    expect(screen.getByTestId('mock-notifications-cta')).not.toHaveClass(
+      'h-9!'
+    );
+  });
+
+  it('keeps the preview empty-state action at the 44px touch floor', () => {
+    render(
+      <TourDrawerContent artist={artist} tourDates={[]} renderMode='preview' />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Turn On Event Alerts' })
+    ).toHaveClass('h-11');
   });
 
   it('renders a cardless full-plane events empty state without music leakage', () => {

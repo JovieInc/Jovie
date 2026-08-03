@@ -252,7 +252,9 @@ export function ProfileCompactTemplate({
   );
   const revealNotificationsRef = useRef<(() => void) | null>(null);
   const closeResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const compactShellRef = useRef<HTMLDivElement | null>(null);
   const drawerOpenRef = useRef(false);
+  const drawerViewRef = useRef<DrawerView>('menu');
   const lastPrimaryModeRef = useRef<ProfileMode>('profile');
   const initialLocationModeAlignedRef = useRef(false);
   const suppressNextHistorySyncRef = useRef(true);
@@ -546,9 +548,22 @@ export function ProfileCompactTemplate({
     const resolved = resolveInitialView(requestedMode);
     if (resolved) {
       clearCloseResetTimer();
+      drawerViewRef.current = resolved;
       setDrawerView(resolved);
       drawerOpenRef.current = true;
       setDrawerOpen(true);
+      return;
+    }
+
+    // A visitor can tap the root Menu as soon as the global hydration marker
+    // appears, before this component's initial profile-mode effect flushes.
+    // openDrawerMode records that intent synchronously in the ref; do not let
+    // the stale initial `profile` pass immediately close the menu again.
+    if (
+      requestedMode === 'profile' &&
+      drawerOpenRef.current &&
+      drawerViewRef.current === 'menu'
+    ) {
       return;
     }
 
@@ -601,6 +616,16 @@ export function ProfileCompactTemplate({
     globalThis.history.pushState(globalThis.history.state, '', href);
   }, [drawerOpen, drawerView, requestedMode, artist.handle, searchSuffix]);
 
+  useEffect(() => {
+    const shell = compactShellRef.current;
+    if (!shell) return;
+
+    shell.dataset.interactiveReady = 'true';
+    return () => {
+      delete shell.dataset.interactiveReady;
+    };
+  }, [isDesktopLayout]);
+
   const profileHref = useMemo(
     () => getProfileModeHref(artist.handle, 'profile', searchSuffix),
     [artist.handle, searchSuffix]
@@ -617,6 +642,7 @@ export function ProfileCompactTemplate({
 
       suppressNextHistorySyncRef.current = true;
       drawerOpenRef.current = true;
+      drawerViewRef.current = nextView;
       setDrawerView(nextView);
       setDrawerOpen(true);
     },
@@ -635,6 +661,7 @@ export function ProfileCompactTemplate({
         closeResetTimerRef.current = setTimeout(() => {
           closeResetTimerRef.current = null;
           if (!drawerOpenRef.current) {
+            drawerViewRef.current = 'menu';
             setDrawerView('menu');
           }
         }, DRAWER_CLOSE_RESET_DELAY_MS);
@@ -659,6 +686,7 @@ export function ProfileCompactTemplate({
 
       suppressNextHistorySyncRef.current = true;
       drawerOpenRef.current = true;
+      drawerViewRef.current = nextView;
       setDrawerView(nextView);
       setDrawerOpen(true);
     },
@@ -735,6 +763,7 @@ export function ProfileCompactTemplate({
         claimFooterHref={claimFooterHref}
         compactSurface={
           <div
+            ref={compactShellRef}
             className='public-profile-compact-shell relative flex h-full min-w-0 w-full flex-col overflow-hidden bg-(--profile-content-bg) md:mx-auto md:rounded-(--profile-shell-card-radius) md:border md:border-(--profile-panel-border) md:shadow-(--profile-panel-shadow)'
             data-testid='profile-compact-shell'
           >

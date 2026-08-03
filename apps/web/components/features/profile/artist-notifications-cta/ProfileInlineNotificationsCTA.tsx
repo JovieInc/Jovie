@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useProfileNotifications } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
 import { useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
-import { captureError } from '@/lib/error-tracking';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
@@ -234,7 +233,11 @@ export function ProfileInlineNotificationsCTA({
   const [successContactEcho, setSuccessContactEcho] = useState<string | null>(
     null
   );
-  const [captureSuppressed, setCaptureSuppressed] = useState(false);
+  const [captureSuppressedArtistId, setCaptureSuppressedArtistId] = useState<
+    string | null
+  >(null);
+  const captureSuppressed = captureSuppressedArtistId === artist.id;
+  const locallyDismissedArtistIdRef = useRef<string | null>(null);
   const [alertPrefs, setAlertPrefs] = useState<
     Record<NotificationContentType, boolean>
   >(() => {
@@ -403,14 +406,20 @@ export function ProfileInlineNotificationsCTA({
 
   useEffect(() => {
     if (isSubscribed) {
-      setCaptureSuppressed(false);
+      locallyDismissedArtistIdRef.current = null;
+      setCaptureSuppressedArtistId(null);
+      return;
+    }
+
+    if (locallyDismissedArtistIdRef.current === artist.id) {
+      setCaptureSuppressedArtistId(artist.id);
       return;
     }
 
     let isActive = true;
     void getCaptureDismissalStatus(artist.id).then(data => {
-      if (isActive) {
-        setCaptureSuppressed(Boolean(data?.suppressed));
+      if (isActive && locallyDismissedArtistIdRef.current !== artist.id) {
+        setCaptureSuppressedArtistId(data?.suppressed ? artist.id : null);
       }
     });
 
@@ -563,30 +572,30 @@ export function ProfileInlineNotificationsCTA({
     subscriptionDetails.email,
   ]);
 
-  const handleDismissCapture = useCallback(async () => {
-    try {
-      const response = await fetch('/api/profile/capture-dismissal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          artist_id: artist.id,
-          source: resolvedSource,
-        }),
+  const handleDismissCapture = useCallback(() => {
+    // Honor the visitor's intent immediately. Persistence is best-effort so a
+    // rate limit or transient network failure can never trap the consent flow.
+    locallyDismissedArtistIdRef.current = artist.id;
+    setCaptureSuppressedArtistId(artist.id);
+    handleClose();
+    void fetch('/api/profile/capture-dismissal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        artist_id: artist.id,
+        source: resolvedSource,
+      }),
+    })
+      .then(response => {
+        if (response.ok) {
+          invalidateCaptureDismissalStatus(artist.id);
+        }
+      })
+      .catch(() => {
+        // Suppression remains in memory for this session.
       });
-
-      if (!response.ok) {
-        throw new Error('Capture dismissal failed');
-      }
-
-      invalidateCaptureDismissalStatus(artist.id);
-      handleClose();
-    } catch (error) {
-      void captureError('Profile capture dismissal failed', error, {
-        artistId: artist.id,
-        artistHandle: artist.handle,
-      });
-    }
-  }, [artist.handle, artist.id, handleClose, resolvedSource]);
+  }, [artist.id, handleClose, resolvedSource]);
 
   const handleOtpSubmit = useCallback(async () => {
     if (otpVerificationInFlightRef.current) return;

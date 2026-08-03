@@ -212,6 +212,11 @@ export function PaySelector({
                         isSelected={isSelected}
                         onClick={handleAmountSelect}
                         index={idx}
+                        className={
+                          isSelected
+                            ? undefined
+                            : 'border-white/12 bg-white/[0.04] hover:border-white/18 hover:bg-white/[0.07]'
+                        }
                         ariaLabel={`Select ${formatAmountForScreenReader(amount)} payment amount`}
                       />
                     );

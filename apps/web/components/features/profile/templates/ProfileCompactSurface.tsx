@@ -230,9 +230,9 @@ function resolveActivePrimaryTab(params: {
       return 'listen';
     case 'tour':
     case 'subscribe':
+    case 'about':
       return mode;
     case 'profile':
-    case 'about':
     case 'pay':
     case 'contact':
     default:
@@ -874,7 +874,11 @@ export function ProfileCompactSurface({
 
           {showBottomNav ? (
             <BottomTabBar
-              activeTab={activeVisiblePrimaryTab}
+              activeTab={
+                activeVisiblePrimaryTab === 'about'
+                  ? 'profile'
+                  : activeVisiblePrimaryTab
+              }
               hasTourDates={hasTourDates}
               isMenuOpen={isMenuActive}
               onTabSelect={handleTabSelect}

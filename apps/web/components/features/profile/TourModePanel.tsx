@@ -189,7 +189,7 @@ function TourDatesContent({
         <Button
           type='button'
           variant='primary'
-          className='h-9 w-full rounded-full'
+          className='h-11 w-full rounded-full'
           disabled
         >
           Turn On Event Alerts
@@ -202,8 +202,8 @@ function TourDatesContent({
           source={emptyStateSourceContext.ctaLocation}
           sourceContext={emptyStateSourceContext}
           triggerLabel='Turn On Event Alerts'
-          // Unified 36px CTA scale — matches the Listen CTA on home cards.
-          triggerClassName={`${subscriptionPrimaryActionClassName} h-9! w-full justify-center gap-2 px-4 text-xs`}
+          // Public-profile primary actions keep the shared 44px touch floor.
+          triggerClassName={`${subscriptionPrimaryActionClassName} h-11! w-full justify-center gap-2 px-4 text-xs`}
           presentation='overlay'
         />
       );
