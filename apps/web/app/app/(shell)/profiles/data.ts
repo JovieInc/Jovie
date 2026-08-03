@@ -34,7 +34,8 @@ export type ProfilesWorkspaceFilter =
   | 'social'
   | 'source'
   | 'website'
-  | 'jovie';
+  | 'jovie'
+  | 'connector';
 
 export interface ProfileWorkspaceSurfaceRow {
   readonly id: string;
