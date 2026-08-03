@@ -9,19 +9,25 @@ import {
   EyeOff,
   FileCheck2,
   ImageIcon,
+  Link2,
   type LucideIcon,
   Pause,
   PlayCircle,
   Share2,
   Video,
 } from 'lucide-react';
-import { createElement } from 'react';
+import { createElement, isValidElement, type ReactNode } from 'react';
+import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import type { ContextMenuItemType } from '@/components/organisms/table';
 import {
   formatLibraryApprovalStatus,
   LIBRARY_APPROVAL_STATUSES,
   type LibraryApprovalStatus,
 } from '@/lib/library/approval-status';
+import {
+  buildUTMContext,
+  getUTMShareActionMenuItems,
+} from '@/lib/utm/share-menu-items';
 import type { LibraryReleaseAsset } from './library-data';
 
 export const LIBRARY_ENTITY_ACTION_ORDER = [
@@ -31,15 +37,22 @@ export const LIBRARY_ENTITY_ACTION_ORDER = [
   'open-video',
   'open-artwork',
   'open-primary',
+  'copy',
   'archive',
   'restore',
-  'copy-share-link',
-  'copy-title',
 ] as const;
 
 export type LibraryEntityActionId =
   | (typeof LIBRARY_ENTITY_ACTION_ORDER)[number]
-  | `approval-status:${LibraryApprovalStatus}`;
+  | `approval-status:${LibraryApprovalStatus}`
+  | `profile-visibility:${LibraryEntityProfileVisibility}`
+  | 'copy-share-link'
+  | 'copy-tracked-link'
+  | 'copy-title'
+  | 'copy-artist'
+  | 'copy-upc'
+  | 'copy-isrc'
+  | `utm-share-${string}`;
 
 export type LibraryEntityActionAuthority = 'none' | 'profile-owner';
 export type LibraryEntityProfileVisibility = 'visible' | 'hidden';
@@ -48,7 +61,7 @@ export type LibraryEntityLifecycleStatus = 'active' | 'archived';
 export interface LibraryEntityAction {
   readonly id: LibraryEntityActionId;
   readonly label: string;
-  readonly icon: LucideIcon;
+  readonly icon: LucideIcon | ReactNode;
   readonly authority: LibraryEntityActionAuthority;
   readonly disabled: boolean;
   readonly disabledReason?: string;
@@ -131,8 +144,6 @@ function buildProfileVisibilityAction({
 >): LibraryEntityAction | null {
   if (!profileVisibility) return null;
 
-  const nextVisibility =
-    profileVisibility.value === 'visible' ? 'hidden' : 'visible';
   const unavailableReason = !profileId
     ? 'Requires an owned creator profile'
     : profileVisibility.isSaving
@@ -141,14 +152,27 @@ function buildProfileVisibilityAction({
 
   return {
     id: 'profile-visibility',
-    label:
-      nextVisibility === 'hidden' ? 'Hide from Profile' : 'Show on Profile',
-    icon: nextVisibility === 'hidden' ? EyeOff : Eye,
+    label: 'Visibility',
+    icon: Eye,
     authority: 'profile-owner',
-    disabled: Boolean(unavailableReason),
-    disabledReason: unavailableReason,
+    disabled: false,
     destructive: false,
-    onExecute: () => profileVisibility.onChange(asset, nextVisibility),
+    children: (['visible', 'hidden'] as const).map(visibility => {
+      const isCurrent = visibility === profileVisibility.value;
+      return {
+        id: `profile-visibility:${visibility}`,
+        label:
+          visibility === 'visible' ? 'Shown on Profile' : 'Hidden from Profile',
+        icon: isCurrent ? Check : visibility === 'visible' ? Eye : EyeOff,
+        authority: 'profile-owner',
+        disabled: Boolean(unavailableReason) || isCurrent,
+        disabledReason:
+          unavailableReason ??
+          (isCurrent ? 'Current profile visibility' : undefined),
+        destructive: false,
+        onExecute: () => profileVisibility.onChange(asset, visibility),
+      } satisfies LibraryEntityAction;
+    }),
   };
 }
 
@@ -177,7 +201,7 @@ function buildApprovalActions({
 
   return {
     id: 'approval-status',
-    label: `Approval: ${formatLibraryApprovalStatus(asset.approvalStatus)}`,
+    label: 'Status',
     icon: FileCheck2,
     authority: 'profile-owner',
     disabled: false,
@@ -197,6 +221,120 @@ function buildApprovalActions({
         onExecute: () => onApprovalStatusChange(asset, status),
       };
     }),
+  };
+}
+
+function tableActionToLibraryEntityAction(
+  action: TableActionMenuItem
+): LibraryEntityAction {
+  return {
+    id: action.id as LibraryEntityActionId,
+    label: action.label,
+    icon: action.icon ?? Link2,
+    authority: 'none',
+    disabled: Boolean(action.disabled),
+    destructive: action.variant === 'destructive',
+    onExecute: action.onClick,
+    children: action.children?.map(tableActionToLibraryEntityAction),
+  };
+}
+
+function buildCopyAction({
+  asset,
+  copyText,
+}: Pick<BuildLibraryEntityActionsOptions, 'asset'> & {
+  readonly copyText: NonNullable<BuildLibraryEntityActionsOptions['copyText']>;
+}): LibraryEntityAction {
+  const children: LibraryEntityAction[] = [];
+  const shareUrl = asset.share?.shareUrl;
+
+  if (shareUrl) {
+    children.push({
+      id: 'copy-share-link',
+      label: 'Share Link',
+      icon: Share2,
+      authority: 'none',
+      disabled: false,
+      destructive: false,
+      onExecute: () => copyText(shareUrl),
+    });
+
+    const trackedLinkMenu = getUTMShareActionMenuItems({
+      smartLinkUrl: shareUrl,
+      context: buildUTMContext({
+        smartLinkUrl: shareUrl,
+        releaseSlug: asset.share?.shareSlug ?? asset.id,
+        releaseTitle: asset.title,
+        artistName: asset.artist,
+        releaseDate: asset.releaseDate ?? undefined,
+      }),
+    }).at(0);
+
+    if (trackedLinkMenu) {
+      children.push({
+        ...tableActionToLibraryEntityAction(trackedLinkMenu),
+        id: 'copy-tracked-link',
+        label: 'Tracked Link',
+      });
+    }
+  }
+
+  children.push({
+    id: 'copy-title',
+    label: 'Title',
+    icon: Copy,
+    authority: 'none',
+    disabled: false,
+    destructive: false,
+    onExecute: () => copyText(asset.title),
+  });
+
+  if (asset.artist && asset.artist !== 'Unknown Artist') {
+    children.push({
+      id: 'copy-artist',
+      label: 'Artist',
+      icon: Copy,
+      authority: 'none',
+      disabled: false,
+      destructive: false,
+      onExecute: () => copyText(asset.artist),
+    });
+  }
+
+  if (asset.primaryIsrc) {
+    const primaryIsrc = asset.primaryIsrc;
+    children.push({
+      id: 'copy-isrc',
+      label: 'ISRC',
+      icon: Copy,
+      authority: 'none',
+      disabled: false,
+      destructive: false,
+      onExecute: () => copyText(primaryIsrc),
+    });
+  }
+
+  if (asset.upc) {
+    const upc = asset.upc;
+    children.push({
+      id: 'copy-upc',
+      label: 'UPC',
+      icon: Copy,
+      authority: 'none',
+      disabled: false,
+      destructive: false,
+      onExecute: () => copyText(upc),
+    });
+  }
+
+  return {
+    id: 'copy',
+    label: 'Copy',
+    icon: Copy,
+    authority: 'none',
+    disabled: false,
+    destructive: false,
+    children,
   };
 }
 
@@ -278,6 +416,8 @@ export function buildLibraryEntityActions({
     onExecute: () => openUrl(primaryHref),
   });
 
+  actions.push(buildCopyAction({ asset, copyText }));
+
   const lifecycleAction = buildLifecycleAction({
     asset,
     profileId,
@@ -287,37 +427,16 @@ export function buildLibraryEntityActions({
     actions.push(lifecycleAction);
   }
 
-  const shareUrl = asset.share?.shareUrl;
-  if (shareUrl) {
-    actions.push({
-      id: 'copy-share-link',
-      label: 'Copy Share Link',
-      icon: Share2,
-      authority: 'none',
-      disabled: false,
-      destructive: false,
-      onExecute: () => copyText(shareUrl),
-    });
-  }
-
-  actions.push({
-    id: 'copy-title',
-    label: 'Copy Title',
-    icon: Copy,
-    authority: 'none',
-    disabled: false,
-    destructive: false,
-    onExecute: () => copyText(asset.title),
-  });
-
   return actions;
 }
 
 function toContextMenuItem(action: LibraryEntityAction): ContextMenuItemType {
-  const icon = createElement(action.icon, {
-    className: 'h-3.5 w-3.5',
-    'aria-hidden': true,
-  });
+  const icon = isValidElement(action.icon)
+    ? action.icon
+    : createElement(action.icon as LucideIcon, {
+        className: 'h-3.5 w-3.5',
+        'aria-hidden': true,
+      });
 
   if (action.children) {
     return {

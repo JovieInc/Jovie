@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 
 const tableActionMenuSpy = vi.fn();
+const tableActionMenuPropsSpy = vi.fn();
 
 vi.mock('@jovie/ui', () => ({
   Button: ({ children, ...props }: ComponentProps<'button'>) => (
@@ -23,14 +24,16 @@ vi.mock('next/link', () => ({
 }));
 
 vi.mock('@/components/atoms/table-action-menu', () => ({
-  TableActionMenu: ({
-    items,
-    children,
-  }: {
+  TableActionMenu: (props: {
     items: unknown;
     children: ReactNode;
+    searchable?: boolean;
+    searchPlaceholder?: string;
+    searchMode?: 'root' | 'recursive';
   }) => {
+    const { items, children } = props;
     tableActionMenuSpy(items);
+    tableActionMenuPropsSpy(props);
     return <div data-testid='table-action-menu'>{children}</div>;
   },
 }));
@@ -38,6 +41,7 @@ vi.mock('@/components/atoms/table-action-menu', () => ({
 describe('DrawerHeaderActions', () => {
   beforeEach(() => {
     tableActionMenuSpy.mockClear();
+    tableActionMenuPropsSpy.mockClear();
   });
 
   it('appends separator and close action to overflow menu when onClose is provided', () => {
@@ -152,5 +156,32 @@ describe('DrawerHeaderActions', () => {
         ],
       }),
     ]);
+  });
+
+  it('forwards keyboard-first search configuration to the shared menu', () => {
+    render(
+      <DrawerHeaderActions
+        primaryActions={[]}
+        overflowActions={[
+          {
+            id: 'copy',
+            label: 'Copy profile link',
+            icon: Copy,
+            onClick: vi.fn(),
+          },
+        ]}
+        searchable
+        searchPlaceholder='Search actions'
+        searchMode='recursive'
+      />
+    );
+
+    expect(tableActionMenuPropsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        searchable: true,
+        searchPlaceholder: 'Search actions',
+        searchMode: 'recursive',
+      })
+    );
   });
 });

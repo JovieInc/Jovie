@@ -774,7 +774,10 @@ describe('LibrarySurface', () => {
     const drawer = within(screen.getByTestId('library-asset-drawer'));
 
     await user.click(drawer.getByRole('button', { name: 'More actions' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Copy Share Link' }));
+    await user.hover(screen.getByRole('menuitem', { name: 'Copy' }));
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Share Link' })
+    );
 
     expect(writeText).toHaveBeenCalledWith('https://jov.ie/p/token-1');
   });
@@ -796,8 +799,9 @@ describe('LibrarySurface', () => {
 
     const actions = within(screen.getByTestId('library-row-actions-release-1'));
     await user.click(actions.getByRole('button', { name: 'More actions' }));
-    await user.click(
-      screen.getByRole('menuitem', { name: 'Hide from Profile' })
+    await user.hover(screen.getByRole('menuitem', { name: 'Visibility' }));
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Hidden from Profile' })
     );
 
     await waitFor(() => {
@@ -812,8 +816,9 @@ describe('LibrarySurface', () => {
     });
 
     await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.hover(screen.getByRole('menuitem', { name: 'Visibility' }));
     expect(
-      screen.getByRole('menuitem', { name: 'Hide from Profile' })
+      await screen.findByRole('menuitem', { name: 'Hidden from Profile' })
     ).toBeInTheDocument();
   });
 
@@ -1102,7 +1107,7 @@ describe('LibrarySurface', () => {
       screen.getByRole('columnheader', { name: 'Title' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('columnheader', { name: 'Release Date' })
+      screen.getByRole('columnheader', { name: 'Date' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('columnheader', { name: 'Artist' })

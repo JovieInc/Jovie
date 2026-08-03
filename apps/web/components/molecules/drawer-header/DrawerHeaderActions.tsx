@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/DrawerHeaderActions.test.tsx
+
 import type { CommonDropdownItem } from '@jovie/ui';
 import type { LucideIcon } from 'lucide-react';
 import { MoreVertical } from 'lucide-react';
@@ -35,6 +37,9 @@ export interface DrawerHeaderActionsProps {
   readonly overflowActions?: DrawerHeaderAction[]; // Rest in ellipsis menu
   readonly menuItems?: readonly CommonDropdownItem[]; // Shared menu items, usually from contextMenuItems
   readonly onClose?: () => void;
+  readonly searchable?: boolean;
+  readonly searchPlaceholder?: string;
+  readonly searchMode?: 'root' | 'recursive';
 }
 
 /**
@@ -46,6 +51,9 @@ export function DrawerHeaderActions({
   overflowActions = [],
   menuItems,
   onClose,
+  searchable = false,
+  searchPlaceholder,
+  searchMode = 'root',
 }: DrawerHeaderActionsProps) {
   // Ensure max 2 primary actions
   const displayActions = primaryActions.slice(0, 2);
@@ -141,7 +149,14 @@ export function DrawerHeaderActions({
 
       {/* Overflow menu - only shown if there are overflow actions */}
       {resolvedMenuItems.length > 0 && (
-        <TableActionMenu items={resolvedMenuItems} trigger='custom' align='end'>
+        <TableActionMenu
+          items={resolvedMenuItems}
+          trigger='custom'
+          align='end'
+          searchable={searchable}
+          searchPlaceholder={searchPlaceholder}
+          searchMode={searchMode}
+        >
           <AppIconButton
             className={cn(
               DRAWER_HEADER_ICON_BUTTON_CLASSNAME,

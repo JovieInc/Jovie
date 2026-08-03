@@ -614,6 +614,17 @@ describe('CommonDropdown', () => {
   });
 
   describe('Searchable', () => {
+    it('focuses the search input when the menu opens', async () => {
+      const user = userEvent.setup({ delay: null });
+      render(<CommonDropdown items={basicItems} searchable={true} />);
+
+      await user.click(screen.getByRole('button', { name: 'More actions' }));
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Search...')).toHaveFocus();
+      });
+    });
+
     it('renders search input when searchable is true', () => {
       render(
         <CommonDropdown items={basicItems} open={true} searchable={true} />

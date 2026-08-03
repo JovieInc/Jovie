@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/components/organisms/table/organisms/UnifiedTable.keyboard.test.tsx
+
 import {
   type ColumnDef,
   type ColumnPinningState,
@@ -129,6 +131,9 @@ export interface UnifiedTableProps<TData> {
   readonly getContextMenuItems?: (
     row: TData
   ) => ContextMenuItemType[] | Promise<ContextMenuItemType[]>;
+  readonly contextMenuSearchable?: boolean;
+  readonly contextMenuSearchPlaceholder?: string;
+  readonly contextMenuSearchMode?: 'root' | 'recursive';
 
   /**
    * Get custom class names for a row
@@ -355,6 +360,9 @@ export function UnifiedTable<TData>({
   onRowShiftClick,
   onRowContextMenu,
   getContextMenuItems,
+  contextMenuSearchable = false,
+  contextMenuSearchPlaceholder,
+  contextMenuSearchMode = 'root',
   getRowClassName,
   isRowSelected,
   getRowTestId,
@@ -567,6 +575,9 @@ export function UnifiedTable<TData>({
         <TableContextMenu
           key={row.id}
           getItems={() => getContextMenuItems(rowData)}
+          searchable={contextMenuSearchable}
+          searchPlaceholder={contextMenuSearchPlaceholder}
+          searchMode={contextMenuSearchMode}
         >
           {rowElement}
         </TableContextMenu>
@@ -607,6 +618,9 @@ export function UnifiedTable<TData>({
       renderExpandedContent,
       columns.length,
       getContextMenuItems,
+      contextMenuSearchable,
+      contextMenuSearchPlaceholder,
+      contextMenuSearchMode,
     ]
   );
 
@@ -736,6 +750,9 @@ export function UnifiedTable<TData>({
           onRowContextMenu={onRowContextMenu}
           onKeyDown={handleKeyDown}
           getContextMenuItems={getContextMenuItems}
+          contextMenuSearchable={contextMenuSearchable}
+          contextMenuSearchPlaceholder={contextMenuSearchPlaceholder}
+          contextMenuSearchMode={contextMenuSearchMode}
           onRowShiftClick={onRowShiftClick}
           getRowClassName={getRowClassName}
           isRowSelected={isRowSelected}

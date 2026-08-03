@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/organisms/table/TableContextMenu.test.tsx
+
 import type { CommonDropdownItem } from '@jovie/ui';
 import type React from 'react';
 import {
@@ -75,6 +77,10 @@ export interface TableContextMenuProps {
     | Promise<ContextMenuItemType[]>;
   /** Whether the context menu is disabled */
   readonly disabled?: boolean;
+  /** Show a keyboard-first search field when the menu opens. */
+  readonly searchable?: boolean;
+  readonly searchPlaceholder?: string;
+  readonly searchMode?: 'root' | 'recursive';
 }
 
 function isSeparator(item: ContextMenuItemType): item is { type: 'separator' } {
@@ -272,6 +278,9 @@ export function TableContextMenu({
   items,
   getItems,
   disabled = false,
+  searchable = false,
+  searchPlaceholder,
+  searchMode = 'root',
 }: TableContextMenuProps) {
   const [resolvedItems, setResolvedItems] = useState<ContextMenuItemType[]>(
     items ?? []
@@ -349,7 +358,13 @@ export function TableContextMenu({
   }
 
   return (
-    <TableActionMenu items={convertedItems} trigger='context'>
+    <TableActionMenu
+      items={convertedItems}
+      trigger='context'
+      searchable={searchable}
+      searchPlaceholder={searchPlaceholder}
+      searchMode={searchMode}
+    >
       {triggerChild}
     </TableActionMenu>
   );
