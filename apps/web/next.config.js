@@ -260,28 +260,6 @@ const nextConfig = {
     ];
   },
   async redirects() {
-    // Public-profile mode aliases stay at the config layer so they return a
-    // hard 307 before the App Router can stream the profile shell. Next.js
-    // carries through incoming query parameters, preserving attribution such
-    // as `?source=qr` alongside the canonical `mode` destination.
-    const legacyProfileModeRedirects = [
-      { source: '/:username/listen', destination: '/:username?mode=listen' },
-      { source: '/:username/music', destination: '/:username?mode=listen' },
-      {
-        source: '/:username/releases',
-        destination: '/:username?mode=releases',
-      },
-      {
-        source: '/:username/subscribe',
-        destination: '/:username?mode=subscribe',
-      },
-      { source: '/:username/tip', destination: '/:username?mode=pay' },
-      { source: '/:username/tour', destination: '/:username?mode=tour' },
-    ].map(route => ({
-      ...route,
-      permanent: false,
-    }));
-
     // VIP username aliases (case-insensitive handling)
     // Add both lowercase and mixed-case variants for each alias
     const vipUsernameRedirects = [
@@ -425,7 +403,6 @@ const nextConfig = {
         destination: '/app/audience',
         permanent: false,
       },
-      ...legacyProfileModeRedirects,
       ...legacyAppRedirects,
       // Old /tips landing page redirect
       {

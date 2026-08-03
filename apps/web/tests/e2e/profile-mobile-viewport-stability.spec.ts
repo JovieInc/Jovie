@@ -940,6 +940,10 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
         `${viewport.label} PAC copy does not clip behind its action`
       ).toBe(true);
       expect(
+        first.cards[0]?.targets.length,
+        `${viewport.label} first card exposes an action`
+      ).toBeGreaterThan(0);
+      expect(
         first.cards[0]?.targets.every(target => target.height >= 44),
         `${viewport.label} first-card actions meet the 44px floor`
       ).toBe(true);
@@ -984,6 +988,10 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
         last.cards[1]?.right,
         `${viewport.label} last right`
       ).toBeLessThanOrEqual(last.rail.right);
+      expect(
+        last.cards[1]?.targets.length,
+        `${viewport.label} last card exposes an action`
+      ).toBeGreaterThan(0);
       expect(
         last.cards[1]?.targets.every(target => target.height >= 44),
         `${viewport.label} last-card actions meet the 44px floor`
@@ -1120,7 +1128,8 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
       ).__profileScrollBehaviors = scrollBehaviors;
       return {
         sizes: cards.map(card => [card.offsetWidth, card.offsetHeight]),
-        hasEdgeState: cards.some(card => card.hasAttribute('data-edge')),
+        hasDimmedEdgeState: cards.some(card => card.dataset.edge === 'true'),
+        opacities: cards.map(card => getComputedStyle(card).opacity),
       };
     });
 
@@ -1140,7 +1149,8 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
       const cards = [...el.querySelectorAll<HTMLElement>(':scope > li')];
       return {
         sizes: cards.map(card => [card.offsetWidth, card.offsetHeight]),
-        hasEdgeState: cards.some(card => card.hasAttribute('data-edge')),
+        hasDimmedEdgeState: cards.some(card => card.dataset.edge === 'true'),
+        opacities: cards.map(card => getComputedStyle(card).opacity),
         behaviors:
           (
             window as Window & {
@@ -1150,8 +1160,10 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
       };
     });
 
-    expect(before.hasEdgeState).toBe(false);
-    expect(after.hasEdgeState).toBe(false);
+    expect(before.hasDimmedEdgeState).toBe(false);
+    expect(after.hasDimmedEdgeState).toBe(false);
+    expect(before.opacities.every(opacity => opacity === '1')).toBe(true);
+    expect(after.opacities.every(opacity => opacity === '1')).toBe(true);
     expect(after.behaviors).toContain('auto');
     expect(after.sizes).toEqual(before.sizes);
   });
@@ -1222,6 +1234,7 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
   });
 
   test('keyboard focus traverses complete cards and activates profile navigation', async ({
+    browserName,
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -1236,9 +1249,12 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
     );
 
     const carousel = page.getByTestId('profile-home-carousel');
+    // WebKit models Safari's default macOS keyboard policy: Option+Tab moves
+    // through every control, while plain Tab may leave focus on the document.
+    const focusNextKey = browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
     let focusedFirstCard = false;
     for (let attempt = 0; attempt < 12; attempt += 1) {
-      await page.keyboard.press('Tab');
+      await page.keyboard.press(focusNextKey);
       focusedFirstCard = await page.evaluate(() =>
         Boolean(
           document.activeElement?.closest(
@@ -1264,7 +1280,7 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
     expect(firstFocus.height).toBeGreaterThanOrEqual(44);
     expect(firstFocus.focusVisible).toBe(true);
 
-    await page.keyboard.press('Tab');
+    await page.keyboard.press(focusNextKey);
     const targetScrollLeft = await carousel.evaluate(el => {
       const cards = [...el.querySelectorAll<HTMLElement>(':scope > li')];
       return (cards[1]?.offsetLeft ?? 0) - (cards[0]?.offsetLeft ?? 0);
@@ -1289,7 +1305,7 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
 
     let focusedEvents = false;
     for (let attempt = 0; attempt < 6; attempt += 1) {
-      await page.keyboard.press('Tab');
+      await page.keyboard.press(focusNextKey);
       focusedEvents = await page.evaluate(
         () => document.activeElement?.getAttribute('aria-label') === 'Events'
       );

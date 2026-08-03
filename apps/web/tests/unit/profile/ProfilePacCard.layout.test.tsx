@@ -105,10 +105,12 @@ describe('ProfilePacCard landscape states', () => {
 
     const email = screen.getByRole('textbox', { name: /email address/i });
     const submit = screen.getByRole('button', { name: 'Get Updates' });
+    const dismiss = screen.getByRole('button', { name: 'Not now' });
     expect(email).toBeVisible();
     expect(email).toHaveClass('h-11');
     expect(submit).toBeVisible();
     expect(submit).toHaveClass('h-11');
+    expect(dismiss).toHaveClass('min-h-11', 'min-w-11');
     expect(
       screen.getByRole('img', { name: 'Release artwork' })
     ).toHaveAttribute('data-priority', 'true');

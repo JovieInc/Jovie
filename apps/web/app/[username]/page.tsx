@@ -180,10 +180,8 @@ async function getCreditedArtistsForMentions(profileId: string) {
   }
 }
 
-async function ArtistPageContent({
-  username,
-  profileResult,
-}: Readonly<ArtistPageContentProps>) {
+async function ArtistPageContent({ params }: Readonly<Props>) {
+  const { username } = await params;
   const initialMode = 'profile';
 
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
@@ -425,24 +423,10 @@ async function ArtistPageContent({
   );
 }
 
-export default async function ArtistPage({ params }: Readonly<Props>) {
-  const { username } = await params;
-  assertValidProfileUsername(username);
-
-  // Resolve a missing/private profile before the page-level Suspense boundary
-  // can stream its loading shell. This preserves the segment's profile-specific
-  // not-found UI and a real HTTP 404 instead of streaming that UI with HTTP 200.
-  // Only this identity lookup is pre-stream: tour, release, merch, and entity
-  // reads remain inside ArtistPageContent, so valid profiles still use the
-  // existing loading fallback while those independent reads settle.
-  const profileResult = await getProfileAndLinks(username);
-  if (profileResult.status === 'not_found') {
-    notFound();
-  }
-
+export default function ArtistPage(props: Readonly<Props>) {
   return (
     <Suspense fallback={<ProfileLoading />}>
-      <ArtistPageContent username={username} profileResult={profileResult} />
+      <ArtistPageContent {...props} />
     </Suspense>
   );
 }

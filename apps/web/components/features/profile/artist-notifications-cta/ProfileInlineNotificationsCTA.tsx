@@ -575,7 +575,8 @@ export function ProfileInlineNotificationsCTA({
   const handleDismissCapture = useCallback(() => {
     // Honor the visitor's intent immediately. Persistence is best-effort so a
     // rate limit or transient network failure can never trap the consent flow.
-    setCaptureSuppressed(true);
+    locallyDismissedArtistIdRef.current = artist.id;
+    setCaptureSuppressedArtistId(artist.id);
     handleClose();
     void fetch('/api/profile/capture-dismissal', {
       method: 'POST',

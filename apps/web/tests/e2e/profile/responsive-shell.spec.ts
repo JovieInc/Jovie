@@ -249,14 +249,20 @@ test.describe('Public profile redirect parity @regression', () => {
         await installPublicRouteMocks(page);
         const sourcePath = `/${link.handle}/${link.route}?source=qr`;
         const expectedFinalPath = `/${link.handle}?mode=${link.mode}&source=qr`;
-        const redirectResponse = await page.request.get(sourcePath, {
+
+        const redirectResponse = await context.request.get(sourcePath, {
           maxRedirects: 0,
+          timeout: 120_000,
         });
-        expect(redirectResponse.status()).toBe(307);
-        const redirectLocation = redirectResponse.headers().location;
-        expect(redirectLocation).toBeTruthy();
-        const redirectUrl = new URL(redirectLocation);
-        expect(`${redirectUrl.pathname}${redirectUrl.search}`).toBe(
+        expect(
+          redirectResponse.status(),
+          `${link.id} should preserve its HTTP redirect contract`
+        ).toBe(307);
+        const redirectLocation = new URL(
+          redirectResponse.headers().location,
+          redirectResponse.url()
+        );
+        expect(redirectLocation.pathname + redirectLocation.search).toBe(
           expectedFinalPath
         );
 

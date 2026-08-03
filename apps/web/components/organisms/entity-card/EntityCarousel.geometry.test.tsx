@@ -305,6 +305,55 @@ describe('EntityCarousel profile geometry', () => {
     expect(screen.getByText('Item 2 of 2')).toBeInTheDocument();
   });
 
+  it('coalesces scroll tracking without reading every card layout per frame', () => {
+    let scheduledFrame: FrameRequestCallback | null = null;
+    const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+      scheduledFrame = callback;
+      return 1;
+    });
+    vi.stubGlobal('ResizeObserver', undefined);
+    vi.stubGlobal('requestAnimationFrame', requestAnimationFrame);
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+
+    try {
+      render(<EntityCarousel items={items} layout='profile-landscape' />);
+
+      const carousel = screen.getByTestId('entity-carousel');
+      Object.defineProperty(carousel, 'scrollWidth', {
+        configurable: true,
+        value: 672,
+      });
+      Object.defineProperty(carousel, 'clientWidth', {
+        configurable: true,
+        value: 320,
+      });
+      Object.defineProperty(carousel, 'scrollLeft', {
+        configurable: true,
+        value: 352,
+        writable: true,
+      });
+      fireEvent(window, new Event('resize'));
+
+      const geometryReads = [...carousel.children].map(child =>
+        vi.spyOn(child, 'getBoundingClientRect')
+      );
+      fireEvent.scroll(carousel);
+      fireEvent.scroll(carousel);
+
+      expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+      expect(scheduledFrame).not.toBeNull();
+      act(() => {
+        if (scheduledFrame) scheduledFrame(0);
+      });
+      expect(screen.getByText('Item 2 of 2')).toBeInTheDocument();
+      for (const geometryRead of geometryReads) {
+        expect(geometryRead).not.toHaveBeenCalled();
+      }
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('uses immediate carousel navigation when reduced motion is requested', () => {
     mockUseReducedMotion.mockReturnValue(true);
     render(<EntityCarousel items={items} layout='profile-landscape' />);
@@ -325,6 +374,57 @@ describe('EntityCarousel profile geometry', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next Item' }));
 
     expect(scrollTo).toHaveBeenCalledWith({ left: 336, behavior: 'auto' });
+  });
+
+  it('clears edge dimming when reduced motion changes at runtime', () => {
+    let observerCallback: IntersectionObserverCallback | null = null;
+    const disconnect = vi.fn();
+    class MockIntersectionObserver {
+      observe = vi.fn();
+      disconnect = disconnect;
+      unobserve = vi.fn();
+
+      constructor(callback: IntersectionObserverCallback) {
+        observerCallback = callback;
+      }
+    }
+    vi.stubGlobal('IntersectionObserver', MockIntersectionObserver);
+
+    try {
+      const view = render(
+        <EntityCarousel items={items} layout='profile-landscape' />
+      );
+      const carousel = screen.getByTestId('entity-carousel');
+      const firstCard = carousel.children[0] as HTMLElement;
+
+      act(() => {
+        observerCallback?.(
+          [
+            {
+              target: firstCard,
+              isIntersecting: false,
+              intersectionRatio: 0,
+              boundingClientRect: firstCard.getBoundingClientRect(),
+              intersectionRect: firstCard.getBoundingClientRect(),
+              rootBounds: null,
+              time: 0,
+            },
+          ],
+          {} as IntersectionObserver
+        );
+      });
+      expect(firstCard.dataset.edge).toBe('true');
+
+      mockUseReducedMotion.mockReturnValue(true);
+      view.rerender(
+        <EntityCarousel items={items} layout='profile-landscape' />
+      );
+
+      expect(disconnect).toHaveBeenCalled();
+      expect(firstCard.dataset.edge).toBe('false');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('clamps desktop navigation when the available rows shrink', () => {

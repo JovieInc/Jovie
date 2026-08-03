@@ -49,7 +49,8 @@ vi.mock('@/lib/analytics', () => ({
 }));
 
 vi.mock('@/lib/profile/capture-dismissal-client', () => ({
-  getCaptureDismissalStatus: vi.fn().mockResolvedValue(null),
+  getCaptureDismissalStatus: (...args: unknown[]) =>
+    mockGetCaptureDismissalStatus(...args),
   invalidateCaptureDismissalStatus: vi.fn(),
 }));
 
@@ -221,6 +222,85 @@ describe('ProfileInlineNotificationsCTA', () => {
       '/api/profile/capture-dismissal',
       expect.objectContaining({ method: 'POST' })
     );
+  });
+
+  it('stays closed when dismissal persistence rejects offline', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error('offline'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const view = render(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
+    );
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Not Now' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    view.rerender(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('keeps local dismissal monotonic when a stale status read resolves', async () => {
+    let resolveStatus!: (value: null) => void;
+    mockGetCaptureDismissalStatus.mockReturnValue(
+      new Promise<null>(resolve => {
+        resolveStatus = resolve;
+      })
+    );
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+
+    render(<ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />);
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(mockGetCaptureDismissalStatus).toHaveBeenCalledWith('artist-1');
+    fireEvent.click(screen.getByRole('button', { name: 'Not Now' }));
+
+    await act(async () => {
+      resolveStatus(null);
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /get alerts/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not carry local suppression to a different artist', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    const view = render(
+      <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
+    );
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Not Now' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    let resolveNextArtistStatus!: (value: null) => void;
+    mockGetCaptureDismissalStatus.mockReturnValueOnce(
+      new Promise<null>(resolve => {
+        resolveNextArtistStatus = resolve;
+      })
+    );
+    view.rerender(
+      <ProfileInlineNotificationsCTA
+        artist={makeArtist({ id: 'artist-2', name: 'Second Artist' })}
+        autoOpen
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: /get alerts/i })
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      resolveNextArtistStatus(null);
+      await Promise.resolve();
+    });
   });
 
   it('routes subscribed users into manage mode when a handler is provided', () => {

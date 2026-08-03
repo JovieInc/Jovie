@@ -270,13 +270,13 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
     await smokeNavigate(page, `/${TEST_PROFILES.DUALIPA}`);
     await waitForHydration(page);
 
-    // Look for menu trigger: hamburger icon, ellipsis, or menu button
-    const trigger = page
-      .getByRole('button', { name: /menu/i })
-      .first()
-      .or(page.locator('[data-testid="menu-trigger"]').first())
-      .or(page.locator('button[aria-label*="menu" i]').first())
-      .or(page.locator('[data-testid="hamburger"]').first());
+    // The public-profile contract gives the top overflow trigger one stable,
+    // exact accessible name. Broad fallback unions can resolve a stale or
+    // hidden menu-like control while the compact shell is hydrating.
+    const trigger = page.getByRole('button', {
+      name: 'Menu',
+      exact: true,
+    });
 
     await expect(trigger).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
