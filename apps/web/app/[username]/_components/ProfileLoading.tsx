@@ -1,10 +1,11 @@
 /**
  * Loading skeleton for public artist profile pages.
  *
- * Shows a minimal, themed placeholder while the profile data is fetched
- * on client-side navigation between profiles.
+ * Shows a minimal, themed placeholder while the base profile is fetched.
+ * It is mounted by the base profile page's local Suspense boundary so sibling
+ * smart-link pages can return real HTTP redirects before any bytes stream.
  */
-export default function ProfileLoading() {
+export function ProfileLoading() {
   return (
     <div className='min-h-dvh bg-base'>
       <div className='mx-auto max-w-2xl px-4 pt-24 pb-16'>

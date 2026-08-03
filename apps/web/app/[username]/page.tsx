@@ -1,5 +1,6 @@
 import { type Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
 
 // No `export const dynamic` here — the parent layout sets `revalidate: 3600`
 // (ISR). The public profile route must stay ISR-cacheable; avoid any Dynamic
@@ -56,6 +57,7 @@ import {
 } from '@/lib/validation/username-core';
 import type { PublicContact } from '@/types/contacts';
 import { convertCreatorProfileToArtist } from '@/types/db';
+import { ProfileLoading } from './_components/ProfileLoading';
 import { PublicClaimBanner } from './_components/PublicClaimBanner';
 import { getProfileStaticParams } from './_lib/profile-static-params';
 import { getProfileAndLinks } from './_lib/public-profile-loader';
@@ -159,7 +161,7 @@ async function getCreditedArtistsForMentions(profileId: string) {
   }
 }
 
-export default async function ArtistPage({ params }: Readonly<Props>) {
+async function ArtistPageContent({ params }: Readonly<Props>) {
   const { username } = await params;
   const initialMode = 'profile';
 
@@ -422,6 +424,14 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
         <DesktopQrOverlayClient handle={artist.handle} />
       )}
     </>
+  );
+}
+
+export default function ArtistPage(props: Readonly<Props>) {
+  return (
+    <Suspense fallback={<ProfileLoading />}>
+      <ArtistPageContent {...props} />
+    </Suspense>
   );
 }
 

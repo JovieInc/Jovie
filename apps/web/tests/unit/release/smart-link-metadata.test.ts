@@ -4,15 +4,22 @@ const {
   getContentBySlugMock,
   getCreatorByUsernameMock,
   getFeaturedSmartLinkStaticParamsMock,
+  getUnpublishedReleasePresenceMock,
+  notFoundMock,
+  redirectMock,
 } = vi.hoisted(() => ({
   getContentBySlugMock: vi.fn(),
   getCreatorByUsernameMock: vi.fn(),
   getFeaturedSmartLinkStaticParamsMock: vi.fn().mockResolvedValue([]),
+  getUnpublishedReleasePresenceMock: vi.fn(),
+  notFoundMock: vi.fn(),
+  redirectMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
-  notFound: vi.fn(),
+  notFound: notFoundMock,
   permanentRedirect: vi.fn(),
+  redirect: redirectMock,
 }));
 
 vi.mock('@/app/[username]/[slug]/PreferredDspRedirect', () => ({
@@ -33,10 +40,20 @@ vi.mock('@/features/release', () => ({
 }));
 
 vi.mock('@/app/[username]/[slug]/_lib/data', () => ({
+  checkPromoDownloads: vi.fn(),
   getContentBySlug: getContentBySlugMock,
   getCreatorByUsername: getCreatorByUsernameMock,
   getFeaturedSmartLinkStaticParams: getFeaturedSmartLinkStaticParamsMock,
   getReleaseTrackList: vi.fn(),
+  getUnpublishedReleasePresence: getUnpublishedReleasePresenceMock,
+}));
+
+vi.mock('@/lib/discography/slug', () => ({
+  findRedirectByOldSlug: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('@/lib/entity/queries', () => ({
+  getArtistEntitySameAs: vi.fn().mockResolvedValue([]),
 }));
 
 describe('smart-link metadata', () => {
@@ -44,6 +61,16 @@ describe('smart-link metadata', () => {
     vi.resetModules();
     getCreatorByUsernameMock.mockReset();
     getContentBySlugMock.mockReset();
+    getUnpublishedReleasePresenceMock.mockReset();
+    getUnpublishedReleasePresenceMock.mockResolvedValue(null);
+    notFoundMock.mockReset();
+    notFoundMock.mockImplementation(() => {
+      throw new Error('NEXT_NOT_FOUND');
+    });
+    redirectMock.mockReset();
+    redirectMock.mockImplementation(() => {
+      throw new Error('NEXT_REDIRECT');
+    });
     getFeaturedSmartLinkStaticParamsMock.mockResolvedValue([]);
 
     getCreatorByUsernameMock.mockResolvedValue({
@@ -115,5 +142,85 @@ describe('smart-link metadata', () => {
     expect(metadata.openGraph?.url).toBe(
       'https://jov.ie/dualipa/future-nostalgia'
     );
+  });
+
+  it('renders published content before considering a matching mode alias', async () => {
+    getContentBySlugMock.mockResolvedValue({
+      id: 'track-music',
+      type: 'track',
+      slug: 'music',
+      releaseSlug: null,
+      releaseId: null,
+      releaseTitle: null,
+      title: 'Music',
+      artworkUrl: 'https://example.com/music.jpg',
+      artworkSizes: null,
+      releaseDate: new Date('2024-01-01T00:00:00Z'),
+      revealDate: null,
+      providerLinks: [],
+      previewUrl: null,
+      previewMetadata: null,
+      releaseType: null,
+      totalTracks: null,
+      credits: null,
+      durationMs: null,
+      isrc: null,
+      trackNumber: null,
+    });
+
+    const { default: ProfileAliasResolverPage } = await import(
+      '@/app/[username]/[...slug]/page'
+    );
+    const result = await ProfileAliasResolverPage({
+      params: Promise.resolve({
+        username: 'dualipa',
+        slug: ['music', '__profile-mode-alias', 'resolve'],
+      }),
+      searchParams: Promise.resolve({ source: 'qr' }),
+    });
+
+    expect(result).toBeTruthy();
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(getUnpublishedReleasePresenceMock).not.toHaveBeenCalled();
+  });
+
+  it('uses a matching mode alias only after content lookups miss', async () => {
+    getContentBySlugMock.mockResolvedValue(null);
+
+    const { default: ProfileAliasResolverPage } = await import(
+      '@/app/[username]/[...slug]/page'
+    );
+
+    await expect(
+      ProfileAliasResolverPage({
+        params: Promise.resolve({
+          username: 'dualipa',
+          slug: ['music', '__profile-mode-alias', 'resolve'],
+        }),
+        searchParams: Promise.resolve({ source: 'qr' }),
+      })
+    ).rejects.toThrow('NEXT_REDIRECT');
+    expect(getUnpublishedReleasePresenceMock).toHaveBeenCalledWith(
+      'creator-1',
+      'music'
+    );
+    expect(redirectMock).toHaveBeenCalledWith('/dualipa?mode=listen&source=qr');
+  });
+
+  it('keeps direct marker paths for arbitrary slugs on the catch-all 404', async () => {
+    const { default: ProfileAliasResolverPage } = await import(
+      '@/app/[username]/[...slug]/page'
+    );
+
+    await expect(
+      ProfileAliasResolverPage({
+        params: Promise.resolve({
+          username: 'dualipa',
+          slug: ['future-nostalgia', '__profile-mode-alias', 'resolve'],
+        }),
+      })
+    ).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(getCreatorByUsernameMock).not.toHaveBeenCalled();
+    expect(getContentBySlugMock).not.toHaveBeenCalled();
   });
 });

@@ -10,10 +10,14 @@
  * These are pure logic tests that don't render React components.
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import {
+  getLegacyProfileModeRedirectHref,
+  getProfileModeRedirectHref,
+} from '@/app/[username]/_lib/mode-route-redirect';
 import {
   getProfileModeSubtitle,
   profileModes,
@@ -46,6 +50,24 @@ const PUBLIC_PROFILE_TEMPLATE_SOURCE = readFileSync(
   ),
   'utf8'
 );
+
+type RedirectRule = {
+  readonly source: string;
+  readonly destination: string;
+  readonly permanent: boolean;
+};
+
+type RewriteRule = Omit<RedirectRule, 'permanent'>;
+
+function getAfterFilesRewrites(
+  rewrites:
+    | RewriteRule[]
+    | {
+        readonly afterFiles?: readonly RewriteRule[];
+      }
+): readonly RewriteRule[] {
+  return Array.isArray(rewrites) ? rewrites : (rewrites.afterFiles ?? []);
+}
 
 const mockProfile = {
   id: 'profile-123',
@@ -108,6 +130,15 @@ const mockGenres = ['rock', 'indie', 'alternative'];
 
 describe('Public Profile Page Logic', () => {
   describe('public profile ISR boundary', () => {
+    it('scopes streamed loading to the base profile page', () => {
+      expect(
+        existsSync(path.join(WEB_ROOT, 'app/[username]/loading.tsx'))
+      ).toBe(false);
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        '<Suspense fallback={<ProfileLoading />}>'
+      );
+    });
+
     it('keeps request-aware APIs out of the public profile server render', () => {
       expect(PUBLIC_PROFILE_PAGE_AND_LOADER_SOURCE).not.toContain(
         "from 'next/headers'"
@@ -752,5 +783,64 @@ describe('Public Profile Page Logic', () => {
         'return error.result'
       );
     });
+  });
+});
+
+describe('profile mode route redirects', () => {
+  it('does not shadow smart-link slugs with config-level redirects', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
+    const redirects = (await nextConfig.redirects()) as RedirectRule[];
+    const profileRedirects = redirects.filter(rule =>
+      rule.source.startsWith('/:username/')
+    );
+
+    expect(profileRedirects).toEqual([]);
+  });
+
+  it('routes legacy aliases through the collision-safe resolver after filesystem matches', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
+    const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
+
+    expect(afterFiles.slice(0, 6)).toEqual(
+      ['listen', 'music', 'releases', 'subscribe', 'tip', 'tour'].map(
+        alias => ({
+          source: `/:username/${alias}`,
+          destination: `/:username/${alias}/__profile-mode-alias/resolve`,
+        })
+      )
+    );
+  });
+
+  it.each([
+    ['listen', 'listen'],
+    ['music', 'listen'],
+    ['releases', 'releases'],
+    ['subscribe', 'subscribe'],
+    ['tip', 'pay'],
+    ['tour', 'tour'],
+  ] as const)('maps the missing %s slug to %s mode', (slug, mode) => {
+    expect(
+      getLegacyProfileModeRedirectHref('dualipa', slug, { source: 'qr' })
+    ).toBe(`/dualipa?mode=${mode}&source=qr`);
+  });
+
+  it('leaves arbitrary content slugs to the smart-link route', () => {
+    expect(
+      getLegacyProfileModeRedirectHref('dualipa', 'future-nostalgia', {
+        source: 'qr',
+      })
+    ).toBeNull();
+  });
+
+  it('normalizes repeated attribution values without losing the first source', () => {
+    expect(
+      getProfileModeRedirectHref(
+        'dualipa',
+        { source: ['', 'qr', 'campaign'] },
+        'tour'
+      )
+    ).toBe('/dualipa?mode=tour&source=qr');
   });
 });

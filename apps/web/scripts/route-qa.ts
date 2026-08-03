@@ -605,6 +605,7 @@ export async function expandDynamicRoute(
     route === '/[username]/claim' ||
     route === '/[username]/contact' ||
     route === '/[username]/listen' ||
+    route === '/[username]/music' ||
     route === '/[username]/notifications' ||
     route === '/[username]/pay' ||
     route === '/[username]/releases' ||
