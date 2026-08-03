@@ -30,13 +30,17 @@ import { getSdkMode, isApiRoute } from './lib/sentry/route-detector';
 
 type RouterTransitionStart = (href: string, navigationType: string) => void;
 
-let routerTransitionCapture: Promise<RouterTransitionStart> | undefined;
+let routerTransitionCapture: RouterTransitionStart | undefined;
+let routerTransitionCaptureLoad: Promise<RouterTransitionStart> | undefined;
 
 function loadRouterTransitionCapture() {
-  routerTransitionCapture ??= import('@sentry/nextjs').then(
-    ({ captureRouterTransitionStart }) => captureRouterTransitionStart
+  routerTransitionCaptureLoad ??= import('@sentry/nextjs').then(
+    ({ captureRouterTransitionStart }) => {
+      routerTransitionCapture = captureRouterTransitionStart;
+      return captureRouterTransitionStart;
+    }
   );
-  return routerTransitionCapture;
+  return routerTransitionCaptureLoad;
 }
 
 /**
@@ -57,7 +61,12 @@ export function onRouterTransitionStart(
     return;
   }
 
-  void loadRouterTransitionCapture().then(capture => capture(...args));
+  // Sentry reads the transition timestamp when this callback runs. Calling the
+  // capture function after awaiting a dynamic import would shorten the first
+  // navigation span, so only capture synchronously after the full-route preload
+  // has completed. A very early first transition is omitted instead of recorded
+  // with a misleading start time.
+  routerTransitionCapture?.(...args);
 }
 
 /**
@@ -107,6 +116,9 @@ export function onRouterTransitionStart(
     if (sdkMode === 'full') {
       // Dashboard routes: Load full SDK with Replay
       // Dynamic import enables webpack to create a separate chunk
+      // Prime the synchronous router-transition callback before the first
+      // dashboard interaction without retaining the SDK on public routes.
+      void loadRouterTransitionCapture();
       const { initFullSentryAsync } = await import('./lib/sentry/client-full');
       await initFullSentryAsync();
     } else {

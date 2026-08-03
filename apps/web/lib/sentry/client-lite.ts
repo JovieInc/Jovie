@@ -15,13 +15,7 @@
  * @module lib/sentry/client-lite
  */
 
-import {
-  addBreadcrumb,
-  captureException,
-  captureMessage,
-  getClient,
-  init,
-} from '@sentry/nextjs';
+import { getClient, init } from '@sentry/nextjs';
 import {
   getBaseClientConfig,
   SENTRY_DSN_CLIENT,
@@ -198,4 +192,8 @@ export function getSentryClient() {
  * Re-export the lightweight capture surface so client components do not need
  * a wildcard Sentry import.
  */
-export { addBreadcrumb, captureException, captureMessage };
+export {
+  addBreadcrumb,
+  captureException,
+  captureMessage,
+} from '@sentry/nextjs';

@@ -36,13 +36,6 @@
 :where(.system-b-root-not-found-page) {
   --linear-bg-header: var(--system-b-cinematic-black);
   --linear-border-default: var(--color-border-subtle);
-}
-
-/* ============================================
-   SYSTEM B ROOT NOT FOUND PRIMITIVES
-   ============================================ */
-
-:where(.system-b-root-not-found-page) {
   --system-b-primary-bg: var(--color-text-tooltip);
   --system-b-primary-fg: var(--system-b-cinematic-black);
   --system-b-text-primary: var(--color-text-tooltip);
@@ -52,6 +45,10 @@
   color: var(--system-b-text-primary);
   color-scheme: dark;
 }
+
+/* ============================================
+   SYSTEM B ROOT NOT FOUND PRIMITIVES
+   ============================================ */
 
 :where(.system-b-root-not-found-main) {
   padding-top: var(--system-b-header-height);

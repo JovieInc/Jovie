@@ -89,5 +89,9 @@ describe('client instrumentation bundle isolation', () => {
     expect(source).toContain(
       "getSdkMode(globalThis.location.pathname) !== 'full'"
     );
+    expect(source).toContain('routerTransitionCapture?.(...args)');
+    expect(source).not.toContain(
+      'loadRouterTransitionCapture().then(capture => capture(...args))'
+    );
   });
 });
