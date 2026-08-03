@@ -19,12 +19,12 @@
   },
   "dependencies": {
     "next": "16.2.11",
-    "react": "19.2.7",
+    "react": "19.2.8",
     "react-dom": "19.2.7"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "@types/react": "^19.2.14",
+    "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.3",
     "@vitest/coverage-v8": "4.1.10",
     "tsx": "^4.23.1",
