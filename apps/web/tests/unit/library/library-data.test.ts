@@ -64,6 +64,7 @@ describe('library data', () => {
         artist: 'Test Artist',
         artworkUrl: 'https://example.com/art.jpg',
         previewUrl: 'https://example.com/preview.mp3',
+        primaryIsrc: null,
         videoUrl: null,
         waveformSeed: expect.any(Number),
         smartLinkPath: '/artist/test-release',
