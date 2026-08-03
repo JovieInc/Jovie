@@ -1,7 +1,6 @@
 import 'server-only';
 
 import { and, desc, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
-import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
 import {
   profileSearchProviderHealth,
@@ -184,29 +183,6 @@ async function ensureWorkspaceSeeded(input: {
   ]);
 }
 
-function connectorRow(
-  platform: 'gmail' | 'google_calendar',
-  state: SettingsConnectorState
-): ProfileWorkspaceConnectorRow {
-  const connected = state.status === 'connected' || state.status === 'syncing';
-  const needsReconnect = state.status === 'needs_reauth';
-  return {
-    id: `connector:${platform}`,
-    rowType: 'connector',
-    kind: 'connector',
-    platform,
-    label: platform === 'gmail' ? 'Gmail' : 'Google Calendar',
-    handle: state.email ?? null,
-    url: APP_ROUTES.SETTINGS_CONNECTORS,
-    status: state.status,
-    monitoringState: connected
-      ? 'active'
-      : needsReconnect
-        ? 'paused'
-        : 'unavailable',
-  };
-}
-
 export async function loadProfilesWorkspaceData(input: {
   readonly clerkUserId: string;
   readonly databaseUserId: string;
@@ -222,63 +198,66 @@ export async function loadProfilesWorkspaceData(input: {
 
   const [profileRows, surfaces, preferences, providerHealth, latestRuns] =
     await Promise.all([
-    db
-      .select({
-        username: creatorProfiles.username,
-        displayName: creatorProfiles.displayName,
-        avatarUrl: creatorProfiles.avatarUrl,
-      })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.id, input.profileId))
-      .limit(1),
-    db
-      .select()
-      .from(profileSurfaces)
-      .where(
-        and(
-          eq(profileSurfaces.creatorProfileId, input.profileId),
-          drizzleSql`${profileSurfaces.retiredAt} IS NULL`
+      db
+        .select({
+          username: creatorProfiles.username,
+          displayName: creatorProfiles.displayName,
+          avatarUrl: creatorProfiles.avatarUrl,
+        })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.id, input.profileId))
+        .limit(1),
+      db
+        .select()
+        .from(profileSurfaces)
+        .where(
+          and(
+            eq(profileSurfaces.creatorProfileId, input.profileId),
+            drizzleSql`${profileSurfaces.retiredAt} IS NULL`
+          )
+        ),
+      db
+        .select({
+          surfaceId: profileSurfaceMonitoringPreferences.surfaceId,
+          state: profileSurfaceMonitoringPreferences.state,
+        })
+        .from(profileSurfaceMonitoringPreferences)
+        .where(
+          and(
+            eq(
+              profileSurfaceMonitoringPreferences.userId,
+              input.databaseUserId
+            ),
+            eq(
+              profileSurfaceMonitoringPreferences.creatorProfileId,
+              input.profileId
+            )
+          )
+        ),
+      db
+        .select({ enabled: profileSearchProviderHealth.enabled })
+        .from(profileSearchProviderHealth)
+        .where(eq(profileSearchProviderHealth.provider, 'google_serpapi'))
+        .limit(1),
+      db
+        .select({
+          id: profileSearchRuns.id,
+          fetchedAt: profileSearchRuns.fetchedAt,
+        })
+        .from(profileSearchRuns)
+        .innerJoin(
+          profileSearchQueries,
+          eq(profileSearchQueries.id, profileSearchRuns.queryId)
         )
-      ),
-    db
-      .select({
-        surfaceId: profileSurfaceMonitoringPreferences.surfaceId,
-        state: profileSurfaceMonitoringPreferences.state,
-      })
-      .from(profileSurfaceMonitoringPreferences)
-      .where(
-        and(
-          eq(profileSurfaceMonitoringPreferences.userId, input.databaseUserId),
-          eq(
-            profileSurfaceMonitoringPreferences.creatorProfileId,
-            input.profileId
+        .where(
+          and(
+            eq(profileSearchQueries.creatorProfileId, input.profileId),
+            eq(profileSearchRuns.state, 'succeeded')
           )
         )
-      ),
-    db
-      .select({ enabled: profileSearchProviderHealth.enabled })
-      .from(profileSearchProviderHealth)
-      .where(eq(profileSearchProviderHealth.provider, 'google_serpapi'))
-      .limit(1),
-    db
-      .select({
-        id: profileSearchRuns.id,
-        fetchedAt: profileSearchRuns.fetchedAt,
-      })
-      .from(profileSearchRuns)
-      .innerJoin(
-        profileSearchQueries,
-        eq(profileSearchQueries.id, profileSearchRuns.queryId)
-      )
-      .where(
-        and(
-          eq(profileSearchQueries.creatorProfileId, input.profileId),
-          eq(profileSearchRuns.state, 'succeeded')
-        )
-      )
-      .orderBy(desc(profileSearchRuns.fetchedAt))
-      .limit(2),
-  ]);
+        .orderBy(desc(profileSearchRuns.fetchedAt))
+        .limit(2),
+    ]);
 
   const latestRun = latestRuns[0] ?? null;
   const previousRun = latestRuns[1] ?? null;

@@ -11,7 +11,8 @@ export const runtime = 'nodejs';
 
 export const metadata: Metadata = {
   title: 'Presence',
-  description: 'Monitor your DSP profiles, social networks, and presence signals',
+  description:
+    'Monitor your DSP profiles, social networks, and presence signals',
 };
 
 export default async function ProfilesPage() {
