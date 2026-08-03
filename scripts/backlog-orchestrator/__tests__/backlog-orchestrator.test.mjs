@@ -266,6 +266,75 @@ describe('reconciliation idempotency', () => {
 });
 
 describe('Linear transport', () => {
+  it('classifies Linear deprecated GraphQL responses distinctly', () => {
+    assert.equal(
+      linear.classifyGraphQLErrors([
+        {
+          message: 'deprecated',
+          extensions: { userPresentableMessage: 'This endpoint deprecated.' },
+        },
+      ]),
+      'DEPRECATED'
+    );
+    assert.equal(
+      linear.classifyGraphQLErrors([{ message: 'forbidden' }]),
+      'API'
+    );
+  });
+
+  it('classifies a deprecated GraphQL response as a deprecated API error', async () => {
+    process.env.LINEAR_API_KEY = 'deprecated-secret';
+    await assert.rejects(
+      linear.graphql(
+        'query Deprecated { viewer { id } }',
+        {},
+        {
+          /** @type {any} */
+          fetchImpl: async () => ({
+            json: async () => ({
+              errors: [
+                {
+                  message: 'deprecated',
+                  extensions: {
+                    userPresentableMessage: 'This endpoint deprecated.',
+                  },
+                },
+              ],
+            }),
+          }),
+        }
+      ),
+      error => {
+        const err = /** @type {any} */ (error);
+        return (
+          err?.code === 'DEPRECATED' &&
+          !String(err?.message ?? '').includes('deprecated-secret')
+        );
+      }
+    );
+  });
+
+  it('looks up issue keys with the supported team and number filter', async () => {
+    const previous = process.env.LINEAR_API_KEY;
+    process.env.LINEAR_API_KEY = 'query-secret';
+    /** @type {any} */
+    let request;
+    const issue = { id: 'issue-4594', identifier: 'JOV-4594', project: null };
+    const result = await linear.fetchIssue('JOV-4594', {
+      fetchImpl: async (_url, options) => {
+        request = JSON.parse(options.body);
+        return { json: async () => ({ data: { issues: { nodes: [issue] } } }) };
+      },
+    });
+    assert.deepEqual(result, issue);
+    assert.ok(request);
+    assert.match(request.query, /issues\s*\(/);
+    assert.doesNotMatch(request.query, /issueSearch/);
+    assert.deepEqual(request.variables, { teamKey: 'JOV', number: 4594 });
+    if (previous === undefined) delete process.env.LINEAR_API_KEY;
+    else process.env.LINEAR_API_KEY = previous;
+  });
+
   it('retries transient fetch failures and preserves the raw Linear auth format', async () => {
     const previous = process.env.LINEAR_API_KEY;
     process.env.LINEAR_API_KEY = 'test-secret-that-must-not-leak';

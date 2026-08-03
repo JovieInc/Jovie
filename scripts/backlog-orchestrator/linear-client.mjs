@@ -51,6 +51,17 @@ function isTransientNetworkError(error) {
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+/** @param {any[]} errors */
+export function classifyGraphQLErrors(errors) {
+  return errors.some(error =>
+    [error?.message, error?.extensions?.userPresentableMessage]
+      .filter(Boolean)
+      .some(message => /deprecated/i.test(message))
+  )
+    ? 'DEPRECATED'
+    : 'API';
+}
+
 /**
  * Bounded, retrying GraphQL transport. Only the API key is sent as the
  * normal Linear `Authorization: <key>` header; it is never logged or exposed
@@ -84,9 +95,13 @@ export async function graphql(
       });
       const data = /** @type {any} */ (await resp.json());
       if (data.errors) {
-        throw new Error(
-          `Linear API error: ${data.errors.map(e => e.message).join('; ')}`
+        const error = /** @type {any} */ (
+          new Error(
+            `Linear API error: ${data.errors.map(e => e.message).join('; ')}`
+          )
         );
+        error.code = classifyGraphQLErrors(data.errors);
+        throw error;
       }
       return data.data;
     } catch (error) {
@@ -97,7 +112,9 @@ export async function graphql(
             ? 'TIMEOUT'
             : isTransientNetworkError(error)
               ? 'NETWORK'
-              : 'API';
+              : error?.code === 'DEPRECATED'
+                ? 'DEPRECATED'
+                : 'API';
         throw new LinearTransportError(
           `Linear GraphQL request failed (${code.toLowerCase()}, attempts=${attempt})`,
           { code, cause: error, attempts: attempt }
@@ -271,36 +288,51 @@ export async function fetchTeamInProgressIssues(teamId, maxResults = 1000) {
 /**
  * Fetch a single issue by identifier (e.g. "JOV-1234").
  */
-export async function fetchIssue(identifier) {
-  const data = await graphql(
-    `
-    query($identifier: String!) {
-      issueSearch(query: $identifier, first: 1) {
-        nodes {
-          id
-          identifier
-          title
-          description
-          url
-          createdAt
-          updatedAt
-          priority
-          estimate
-          assignee { id name }
-          creator { id name }
-          labels { nodes { id name } }
-          parent { id identifier title }
-          children { nodes { id identifier title } }
-          relations { nodes { type relatedIssue { id identifier title } } }
-          state { id name type }
-          comments { nodes { id body createdAt } }
-        }
-      }
-    }
-  `,
-    { identifier }
-  );
-  return data.issueSearch.nodes[0] || null;
+export async function fetchIssue(identifier, options = {}) {
+  const value = identifier.trim();
+  const issueFields = `
+    id identifier title description url createdAt updatedAt priority estimate
+    assignee { id name } creator { id name }
+    labels { nodes { id name } }
+    project { id name slugId }
+    parent { id identifier title }
+    children { nodes { id identifier title } }
+    relations { nodes { type relatedIssue { id identifier title } } }
+    state { id name type }
+    comments { nodes { id body createdAt } }
+  `;
+  const keyMatch = /^([A-Za-z][A-Za-z0-9]*)-(\d+)$/.exec(value);
+
+  // Linear removed issueSearch. Resolve human identifiers through the
+  // supported team+number filter, or use the stable UUID directly.
+  if (keyMatch) {
+    const data = await graphql(
+      `query($teamKey: String!, $number: Float!) {
+        issues(
+          filter: { team: { key: { eq: $teamKey } }, number: { eq: $number } }
+          first: 1
+        ) { nodes { ${issueFields} } }
+      }`,
+      { teamKey: keyMatch[1].toUpperCase(), number: Number(keyMatch[2]) },
+      options
+    );
+    return data.issues.nodes[0] || null;
+  }
+
+  if (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value
+    )
+  ) {
+    const data = await graphql(
+      `query($id: String!) { issue(id: $id) { ${issueFields} } }`,
+      { id: value },
+      options
+    );
+    return data.issue || null;
+  }
+
+  throw new Error(`Invalid Linear issue identifier: ${identifier}`);
 }
 
 /**
