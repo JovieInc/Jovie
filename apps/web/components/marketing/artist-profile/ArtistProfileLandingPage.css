@@ -1,0 +1,66 @@
+.artist-profiles-home-system {
+  --homepage-page-gutter: clamp(var(--space-5), 2.2vw, var(--space-8));
+  --homepage-grid-max: var(--ds-public-content-max);
+  --homepage-grid-gutter: var(--homepage-page-gutter);
+  --homepage-section-title-size: clamp(
+    var(--text-3xl),
+    3.6vw,
+    calc(var(--text-5xl) + var(--space-1))
+  );
+  --homepage-section-display-size: clamp(
+    var(--text-4xl),
+    4.4vw,
+    calc(var(--text-5xl) + var(--space-4))
+  );
+  --homepage-chapter-space: clamp(
+    calc(var(--space-24) + var(--space-2)),
+    8.5vw,
+    calc(var(--space-24) + var(--space-16))
+  );
+}
+
+.ap-section-container {
+  --ap-page-gutter: clamp(var(--space-5), 2.2vw, var(--space-8));
+  width: min(
+    var(--ds-public-content-max),
+    calc(100% - (var(--ap-page-gutter) * 2))
+  );
+  max-width: var(--ds-public-content-max);
+  padding-inline: 0;
+}
+
+.artist-profiles-home-system #faq,
+.artist-profiles-home-system .ap-section-shell[id] {
+  scroll-margin-top: calc(var(--homepage-header-height, 56px) + var(--space-6));
+}
+
+.system-b-marketing .system-b-mounted-home-footer {
+  --mf-text: var(--color-text-primary-token);
+  --mf-text-secondary: var(--color-text-secondary-token);
+  --mf-text-tertiary: var(--color-text-tertiary-token);
+  --mf-text-muted: var(--color-text-quaternary-token);
+  --mf-hairline: var(--system-b-app-frame-seam);
+
+  border-top: var(--space-px) solid var(--system-b-app-frame-seam);
+  background: var(--system-b-bg-page);
+  color: var(--color-text-primary-token);
+}
+
+.system-b-marketing .system-b-mounted-home-footer > div {
+  --artist-profiles-footer-gutter: clamp(var(--space-5), 2.2vw, var(--space-8));
+  width: min(
+    var(--ds-public-content-max),
+    calc(100% - (var(--artist-profiles-footer-gutter) * 2))
+  );
+  max-width: none;
+  margin-inline: auto;
+  padding-block: clamp(var(--space-12), 4.5vw, var(--space-16))
+    clamp(var(--space-8), 3vw, var(--space-12));
+  padding-inline: 0;
+}
+
+@media (max-width: 47.99rem) {
+  .system-b-marketing .system-b-mounted-home-footer > div {
+    padding-block: var(--space-10) var(--space-8);
+  }
+}

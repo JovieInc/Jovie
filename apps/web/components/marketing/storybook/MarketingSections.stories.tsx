@@ -12,13 +12,17 @@ import {
   MarketingPageShell,
 } from '@/components/marketing';
 import { ArtistProfileCaptureSection } from '@/components/marketing/artist-profile/ArtistProfileCaptureSection';
+import { ArtistProfileFaq } from '@/components/marketing/artist-profile/ArtistProfileFaq';
+import { ArtistProfileFinalCta } from '@/components/marketing/artist-profile/ArtistProfileFinalCta';
 import { ArtistProfileHero } from '@/components/marketing/artist-profile/ArtistProfileHero';
 import { ArtistProfileHeroAdaptiveIntro } from '@/components/marketing/artist-profile/ArtistProfileHeroAdaptiveIntro';
 import { ArtistProfileHowItWorks } from '@/components/marketing/artist-profile/ArtistProfileHowItWorks';
 import { ArtistProfileMonetizationSection } from '@/components/marketing/artist-profile/ArtistProfileMonetizationSection';
 import { ArtistProfileOutcomesCarousel } from '@/components/marketing/artist-profile/ArtistProfileOutcomesCarousel';
+import { ArtistProfileSectionShell } from '@/components/marketing/artist-profile/ArtistProfileSectionShell';
 import { ArtistProfileSocialProof } from '@/components/marketing/artist-profile/ArtistProfileSocialProof';
 import { ArtistProfileSpecWall } from '@/components/marketing/artist-profile/ArtistProfileSpecWall';
+import { HomepageV2FinalCta } from '@/components/marketing/homepage-v2/HomepageV2Ctas';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_ROUTES } from '@/constants/routes';
 import { getComparison } from '@/content/comparisons';
@@ -197,6 +201,27 @@ export const socialProof: Story = {
           </p>
         </MarketingContainer>
       )}
+    </SectionFrame>
+  ),
+};
+
+export const artistProfileChrome: Story = {
+  name: 'artist-profile-chrome',
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Canonical Artist Profiles page chrome: shared section grid, quiet FAQ, and the same compact close used by the homepage.',
+      },
+    },
+  },
+  render: () => (
+    <SectionFrame sectionId='cta'>
+      <ArtistProfileSectionShell>
+        <ArtistProfileFaq faq={ARTIST_PROFILE_COPY.faq} />
+      </ArtistProfileSectionShell>
+      <ArtistProfileFinalCta finalCta={ARTIST_PROFILE_COPY.finalCta} />
+      <HomepageV2FinalCta />
     </SectionFrame>
   ),
 };

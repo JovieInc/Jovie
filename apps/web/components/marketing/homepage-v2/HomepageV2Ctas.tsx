@@ -1,7 +1,7 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
-import { MarketingContainer } from '@/components/marketing';
+import { MarketingContainer } from '@/components/marketing/MarketingContainer';
 import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import { HOMEPAGE_V2_COPY } from '@/data/homepageV2Copy';
 import { cn } from '@/lib/utils';
@@ -79,10 +79,30 @@ export function HomepageV2Pricing() {
   );
 }
 
-export function HomepageV2FinalCta() {
+interface HomepageV2FinalCtaProps {
+  readonly headline?: string;
+  readonly ctaLabel?: string;
+  readonly ctaHref?: string;
+  readonly sectionTestId?: string;
+  readonly headingTestId?: string;
+  readonly actionTestId?: string;
+  readonly analyticsEventName?: string;
+  readonly analyticsSource?: string;
+}
+
+export function HomepageV2FinalCta({
+  headline = HOMEPAGE_V2_COPY.finalCta.headline,
+  ctaLabel = HOMEPAGE_V2_COPY.finalCta.primaryCtaLabel,
+  ctaHref = HOMEPAGE_FRONT_DOOR_CTA.primary.href,
+  sectionTestId = 'homepage-v2-final-cta',
+  headingTestId = 'homepage-v2-final-cta-heading',
+  actionTestId = 'homepage-v2-final-cta-primary',
+  analyticsEventName,
+  analyticsSource,
+}: Readonly<HomepageV2FinalCtaProps> = {}) {
   return (
     <section
-      data-testid='homepage-v2-final-cta'
+      data-testid={sectionTestId}
       className='homepage-story-final-cta system-b-mounted-home-footer-cta relative isolate overflow-hidden'
     >
       <div
@@ -98,10 +118,10 @@ export function HomepageV2FinalCta() {
         <div className='homepage-final-cta-copy system-b-mounted-home-footer-cta-copy mx-auto'>
           <h2
             data-homepage-section-heading
-            data-testid='homepage-v2-final-cta-heading'
+            data-testid={headingTestId}
             className='homepage-final-cta-heading system-b-mounted-home-footer-cta-heading text-balance'
           >
-            {HOMEPAGE_V2_COPY.finalCta.headline}
+            {headline}
           </h2>
           <Button
             variant='primary'
@@ -110,11 +130,13 @@ export function HomepageV2FinalCta() {
             className='homepage-final-cta-action system-b-mounted-home-footer-cta-action'
           >
             <Link
-              href={HOMEPAGE_FRONT_DOOR_CTA.primary.href}
-              data-testid='homepage-v2-final-cta-primary'
+              href={ctaHref}
+              data-testid={actionTestId}
               data-cta-sign-up='true'
+              data-analytics-event={analyticsEventName}
+              data-analytics-source={analyticsSource}
             >
-              {HOMEPAGE_V2_COPY.finalCta.primaryCtaLabel}
+              {ctaLabel}
             </Link>
           </Button>
         </div>

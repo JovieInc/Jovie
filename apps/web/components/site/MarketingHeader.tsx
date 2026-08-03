@@ -168,14 +168,16 @@ export function MarketingHeader({
     (showStagedNav ? DEFAULT_STAGED_HOMEPAGE_NAV_LINKS : MARKETING_NAV_LINKS);
   const isMinimal = variant === 'minimal';
   const isHomepage = variant === 'homepage';
+  const isArtistProfiles = pathname === APP_ROUTES.ARTIST_PROFILES;
+  const usesHomepageChrome = isHomepage || isArtistProfiles;
   const presentation = isMinimal
     ? 'default'
-    : isHomepage
+    : usesHomepageChrome
       ? 'homepage-embedded'
       : 'marketing-glass';
   const centerNavEnabled =
     FEATURE_FLAGS.SHOW_MARKETING_CENTER_NAV &&
-    (!isHomepage || showHomepageCenterNav);
+    (!usesHomepageChrome || (isHomepage && showHomepageCenterNav));
   const useCustomNav = !isMinimal && navLinks !== undefined && centerNavEnabled;
   const hasSimpleNav = isMinimal || useCustomNav;
   const centerNavDisabled = !centerNavEnabled;
@@ -188,8 +190,8 @@ export function MarketingHeader({
 
   return (
     <HeaderNav
-      logoSize={logoSize}
-      logoVariant={logoVariant}
+      logoSize={isArtistProfiles ? 'sm' : logoSize}
+      logoVariant={isArtistProfiles ? 'icon' : logoVariant}
       authMode='public-static'
       hideNav={isMinimal}
       hideDesktopNav={hideCenterNav}
@@ -200,13 +202,17 @@ export function MarketingHeader({
       presentation={presentation}
       flyoutMenus={navConfig.flyoutMenus}
       mobilePublicCtaHref={
-        isHomepage ? HOMEPAGE_FRONT_DOOR_CTA.primary.href : undefined
+        usesHomepageChrome ? HOMEPAGE_FRONT_DOOR_CTA.primary.href : undefined
       }
-      mobilePublicCtaLabel={isHomepage ? HOMEPAGE_PUBLIC_CTA_LABEL : undefined}
+      mobilePublicCtaLabel={
+        usesHomepageChrome ? HOMEPAGE_PUBLIC_CTA_LABEL : undefined
+      }
       mobileNavLinks={navConfig.mobileNavLinks}
       navLinks={navConfig.desktopNavLinks}
-      publicCtaLabel={isHomepage ? HOMEPAGE_PUBLIC_CTA_LABEL : undefined}
-      showContactLink={centerNavEnabled && !isHomepage}
+      publicCtaLabel={
+        usesHomepageChrome ? HOMEPAGE_PUBLIC_CTA_LABEL : undefined
+      }
+      showContactLink={centerNavEnabled && !usesHomepageChrome}
     />
   );
 }

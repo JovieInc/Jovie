@@ -77,7 +77,9 @@ describe('artist profile landing family System B source contract', () => {
       ),
       'utf8'
     );
-    expect(route).toContain('<MarketingPageShell>');
+    expect(route).toContain(
+      "<MarketingPageShell className='artist-profiles-home-system'>"
+    );
 
     const landing = readFileSync(
       resolve(process.cwd(), landingPageSource),
@@ -98,6 +100,16 @@ describe('artist profile landing family System B source contract', () => {
       'utf8'
     );
     expect(sectionHeader).toContain('text-primary-token');
+
+    const sectionShell = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/marketing/artist-profile/ArtistProfileSectionShell.tsx'
+      ),
+      'utf8'
+    );
+    expect(sectionShell).toContain("'ap-section-container !px-0'");
+    expect(sectionShell).toContain('ap-section-shell frame-section');
 
     const outcomes = readFileSync(
       resolve(
@@ -127,8 +139,18 @@ describe('artist profile landing family System B source contract', () => {
       'utf8'
     );
     expect(finalCta).toContain('getClaimProfileIntent');
-    expect(finalCta).toContain('public-action-primary');
+    expect(finalCta).toContain('HomepageV2FinalCta');
     expect(finalCta).not.toContain('APP_ROUTES.SIGNUP');
+
+    const faq = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/marketing/artist-profile/ArtistProfileFaq.tsx'
+      ),
+      'utf8'
+    );
+    expect(faq).toContain('homepage-faq-section');
+    expect(faq).toContain('homepage-story-heading');
     expect(sectionHeader).toContain('text-secondary-token');
   });
 });

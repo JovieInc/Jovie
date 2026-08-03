@@ -32,6 +32,7 @@ import { MarketingFooterCta } from './MarketingFooterCta';
 
 const MINIMAL_FOOTER_PATHS = new Set<string>([
   APP_ROUTES.PRICING,
+  APP_ROUTES.ARTIST_PROFILES,
   APP_ROUTES.LEGAL_PRIVACY,
   APP_ROUTES.LEGAL_TERMS,
 ]);
@@ -107,7 +108,11 @@ export function MarketingFooter({
 
   return (
     <footer
-      className={cn('marketing-footer-premium', className)}
+      className={cn(
+        'marketing-footer-premium',
+        isMinimal && 'system-b-mounted-home-footer',
+        className
+      )}
       data-testid='marketing-footer'
     >
       <div
