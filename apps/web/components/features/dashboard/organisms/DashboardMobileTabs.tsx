@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useMemo } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  artistNavigation,
   CUSTOMER_NAV_CAPACITY,
   isLibraryNavigationRoute,
   partitionCustomerNavigation,
@@ -79,7 +80,10 @@ export function DashboardMobileTabs({
     });
     return {
       primaryItems: partition.visible.map(toMenuItem),
-      expandedItems: partition.more.map(toMenuItem),
+      expandedItems: [
+        ...partition.more,
+        ...artistNavigation,
+      ].map(toMenuItem),
     };
   }, [activeItemId]);
 

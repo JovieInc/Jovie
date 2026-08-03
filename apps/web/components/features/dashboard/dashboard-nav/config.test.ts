@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  artistNavigation,
   CUSTOMER_NAV_CAPACITY,
   desktopMoreNavigation,
   desktopPrimaryNavigation,
@@ -13,13 +14,18 @@ import {
 const CANONICAL_NAVIGATION = [
   ['chat', 'New Chat', APP_ROUTES.CHAT],
   ['inbox', 'Inbox', APP_ROUTES.DASHBOARD],
-  ['library', 'Library', APP_ROUTES.LIBRARY],
-  ['contacts', 'Contacts', APP_ROUTES.CONTACTS],
-  ['profiles', 'Presence', APP_ROUTES.PROFILES],
-  ['calendar', 'Calendar', APP_ROUTES.CALENDAR],
 ] as const;
 
-function toContract(items: readonly (typeof primaryNavigation)[number][]) {
+const ARTIST_NAVIGATION = [
+  ['library', 'Library', APP_ROUTES.LIBRARY],
+  ['contacts', 'Contacts', APP_ROUTES.CONTACTS],
+  ['calendar', 'Calendar', APP_ROUTES.CALENDAR],
+  ['profiles', 'Presence', APP_ROUTES.PROFILES],
+] as const;
+
+function toContract(
+  items: readonly { id: string; name: string; href: string }[]
+) {
   return items.map(item => [item.id, item.name, item.href]);
 }
 
@@ -39,23 +45,30 @@ describe('canonical customer shell navigation', () => {
     );
   });
 
+  it('keeps artist-scoped destinations together for the artist group shell', () => {
+    expect(toContract(artistNavigation)).toEqual(ARTIST_NAVIGATION);
+  });
+
   it('derives mobile primary + More destinations from the capacity partition', () => {
     const partition = partitionCustomerNavigation(primaryNavigation, {
       visibleCap: CUSTOMER_NAV_CAPACITY.mobilePrimaryVisible,
     });
 
     expect(mobilePrimaryNavigation).toEqual(partition.visible);
-    expect(mobileExpandedNavigation).toEqual(partition.more);
-    expect([...mobilePrimaryNavigation, ...mobileExpandedNavigation]).toEqual(
-      primaryNavigation
+    expect(mobileExpandedNavigation.slice(0, partition.more.length)).toEqual(
+      partition.more
     );
 
     for (const [index, item] of [
       ...mobilePrimaryNavigation,
-      ...mobileExpandedNavigation,
+      ...partition.more,
     ].entries()) {
       expect(item).toBe(primaryNavigation[index]);
     }
+
+    expect(mobileExpandedNavigation.slice(partition.more.length)).toEqual(
+      artistNavigation
+    );
   });
 
   it('keeps the full approved core set on desktop with no More overflow', () => {
