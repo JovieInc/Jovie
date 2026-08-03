@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/app/artist-profiles-page.test.tsx
 import { ArrowUpRight } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
