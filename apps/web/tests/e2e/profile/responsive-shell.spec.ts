@@ -116,7 +116,7 @@ async function assertBottomTabBarState(
       ).toHaveCount(1, { timeout: SMOKE_TIMEOUTS.QUICK });
 
       const expectedLabelByMode: Record<string, string> = {
-        profile: 'Profile',
+        profile: 'Home',
         listen: 'Music',
         tour: 'Events',
         subscribe: 'Alerts',
@@ -189,26 +189,46 @@ test.describe('Public profile redirect parity @regression', () => {
   test.setTimeout(120_000);
 
   /**
-   * Direct deep links to the legacy `/[username]/listen`, `/[username]/tour`,
-   * etc. paths must resolve to the unified profile shell. This protects the
-   * consolidation refactor (JOV-2021..2025) from silently regressing into
-   * 404s or full page reloads.
+   * Missing smart-link slugs that match legacy profile aliases resolve to the
+   * unified profile shell. The fallback intentionally runs after content
+   * lookup so real releases called `music`, `tour`, etc. keep their URLs.
    */
   const REDIRECT_DEEP_LINKS = [
     {
       id: 'listen-deep-link',
-      path: `/${process.env.PUBLIC_SURFACE_MUSIC_HANDLE?.trim() || 'dualipa'}/listen`,
-      expectedFinalPath: /\?mode=listen$|\/[^/?#]+$/,
+      handle: process.env.PUBLIC_SURFACE_MUSIC_HANDLE?.trim() || 'dualipa',
+      route: 'listen',
+      mode: 'listen',
     },
     {
-      id: 'tour-deep-link',
-      path: `/${process.env.PUBLIC_SURFACE_MUSIC_HANDLE?.trim() || 'dualipa'}/tour`,
-      expectedFinalPath: /\?mode=tour$|\/[^/?#]+$/,
+      id: 'music-deep-link',
+      handle: process.env.PUBLIC_SURFACE_MUSIC_HANDLE?.trim() || 'dualipa',
+      route: 'music',
+      mode: 'listen',
+    },
+    {
+      id: 'releases-deep-link',
+      handle: process.env.PUBLIC_SURFACE_MUSIC_HANDLE?.trim() || 'dualipa',
+      route: 'releases',
+      mode: 'releases',
     },
     {
       id: 'subscribe-deep-link',
-      path: `/${process.env.PUBLIC_SURFACE_MUSIC_HANDLE?.trim() || 'dualipa'}/subscribe`,
-      expectedFinalPath: /\?mode=subscribe$|\/[^/?#]+$/,
+      handle: process.env.PUBLIC_SURFACE_MUSIC_HANDLE?.trim() || 'dualipa',
+      route: 'subscribe',
+      mode: 'subscribe',
+    },
+    {
+      id: 'tip-deep-link',
+      handle: process.env.PUBLIC_SURFACE_TIPPING_HANDLE?.trim() || 'testartist',
+      route: 'tip',
+      mode: 'pay',
+    },
+    {
+      id: 'tour-deep-link',
+      handle: process.env.PUBLIC_SURFACE_MUSIC_HANDLE?.trim() || 'dualipa',
+      route: 'tour',
+      mode: 'tour',
     },
   ] as const;
 
@@ -227,7 +247,26 @@ test.describe('Public profile redirect parity @regression', () => {
 
       try {
         await installPublicRouteMocks(page);
-        const response = await page.goto(link.path, {
+        const sourcePath = `/${link.handle}/${link.route}?source=qr`;
+        const expectedFinalPath = `/${link.handle}?mode=${link.mode}&source=qr`;
+
+        const redirectResponse = await context.request.get(sourcePath, {
+          maxRedirects: 0,
+          timeout: 120_000,
+        });
+        expect(
+          redirectResponse.status(),
+          `${link.id} should preserve its HTTP redirect contract`
+        ).toBe(307);
+        const redirectLocation = new URL(
+          redirectResponse.headers().location,
+          redirectResponse.url()
+        );
+        expect(redirectLocation.pathname + redirectLocation.search).toBe(
+          expectedFinalPath
+        );
+
+        const response = await page.goto(sourcePath, {
           waitUntil: 'domcontentloaded',
           timeout: 120_000,
         });
@@ -238,14 +277,21 @@ test.describe('Public profile redirect parity @regression', () => {
 
         const finalUrl = new URL(page.url());
         const finalPath = finalUrl.pathname + finalUrl.search;
-        expect(
-          link.expectedFinalPath.test(finalPath),
-          `${link.id} settled at unexpected path: ${finalPath}`
-        ).toBe(true);
+        expect(finalPath).toBe(expectedFinalPath);
       } finally {
         await page.close().catch(() => undefined);
         await context.close().catch(() => undefined);
       }
     });
   }
+
+  test('direct resolver markers for non-alias slugs remain not found', async ({
+    request,
+  }) => {
+    const response = await request.get(
+      '/dualipa/future-nostalgia/__profile-mode-alias/resolve',
+      { maxRedirects: 0, timeout: 120_000 }
+    );
+    expect(response.status()).toBe(404);
+  });
 });
