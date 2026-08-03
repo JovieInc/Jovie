@@ -10,7 +10,7 @@ doc-freshness: docs/marketing/COMPOSITION_RULES.md
 > `maxContent`), and `composition.ts` (the filter pipeline). This file owns
 > the rationale. Agents: start at [`AGENT_GUIDE.md`](./AGENT_GUIDE.md).
 
-The composition rules cluster into seven laws, each with a reason and a
+The composition rules cluster into eight laws, each with a reason and a
 machine-checkable home.
 
 ## Law 1 — Hero is always first
@@ -113,6 +113,40 @@ selection.
 already has, not as a fix for a deficiency (creator-economy research §3).
 
 **Home:** `recipes.ts` `arc` + `sections.ts` `audienceLegality` + `composition.ts` audience-legality filter.
+
+## Law 8 — Product callouts prove one real state
+
+A product callout is a composed editorial surface around one truthful product
+state. Start with `MarketingSurfaceCard variant="product-callout"` for the
+canvas, shared chrome, token-led material, and controlled lighting. Put either
+a registry-backed `MarketingScreenshot` / `ProductScreenshotFrame` or an
+existing dependency-safe product component inside it. Do not invent interface
+chrome to make a marketing composition feel more impressive.
+
+Choose the proof mode in this order:
+
+1. Use a registry screenshot for a stable capability or overview.
+2. Use a real product component in a read-only fixture when the active state is
+   the feature being explained.
+3. Add a device frame only when device context materially changes the story.
+
+Active treatments are optional and state-specific. An elevated interaction pill
+is appropriate for a compact action. A teal-blue focus ring appears only on the
+field that is actually focused. Typing or input-state motion runs once, settles
+into the truthful completed state, reserves its dimensions, and renders the
+stable result immediately under reduced motion. These treatments are never
+ambient decoration and never repeated across every callout.
+
+Composition stays on the page grid: one primary product state per section, one
+frame hierarchy, 8-point spacing, and the shared page container. Labels name
+the product surface or state, not the design artifact. Responsive callouts must
+remain legible without horizontal page overflow; interactive controls keep a
+44px target; status cannot rely on color alone; composed states need an
+accessible figure caption, group name, or meaningful image alt.
+
+**Home:** `MarketingSurfaceCard`, `MarketingScreenshot`,
+`ProductScreenshotFrame`, `MarketingStoryPrimitives`, screenshot registry, and
+the route's colocated responsive CSS.
 
 ## Page-class rules
 

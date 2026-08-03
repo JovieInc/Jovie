@@ -3,6 +3,7 @@ import Image from 'next/image';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { cn } from '@/lib/utils';
+import { MarketingSnapRail } from '../MarketingSnapRail';
 import { SHELL_H2_CLASS, SHELL_LEAD_CLASS } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 import './ArtistProfileOpinionatedSection.css';
@@ -57,7 +58,16 @@ export function ArtistProfileOpinionatedSection({
           </p>
         </div>
 
-        <div className='ap-opinionated__comparison mt-12 overflow-x-auto'>
+        <MarketingSnapRail
+          ariaLabel='Static Menu And Adaptive Profile Comparison'
+          instructions='Use the previous and next buttons, or swipe, to compare both approaches.'
+          className='mt-12'
+          railClassName='ap-opinionated__comparison'
+          previousLabel='Show Static Menu Comparison'
+          nextLabel='Show Adaptive Profile Comparison'
+          showMobileControls
+          showDesktopControls={false}
+        >
           <div className='ap-opinionated__comparison-track grid min-w-168 grid-cols-2 border-y border-subtle'>
             <figure className='ap-opinionated__comparison-pane py-5 pr-5 sm:py-7 sm:pr-7'>
               <figcaption className='mb-5 flex items-baseline justify-between gap-4'>
@@ -93,7 +103,7 @@ export function ArtistProfileOpinionatedSection({
               </div>
             </figure>
           </div>
-        </div>
+        </MarketingSnapRail>
 
         <p className='mt-5 font-mono text-xs text-tertiary-token'>
           {opinionated.principle}

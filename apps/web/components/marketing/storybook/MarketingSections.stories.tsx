@@ -25,7 +25,11 @@ import { ArtistProfileOutcomesCarousel } from '@/components/marketing/artist-pro
 import { ArtistProfileSectionShell } from '@/components/marketing/artist-profile/ArtistProfileSectionShell';
 import { ArtistProfileSocialProof } from '@/components/marketing/artist-profile/ArtistProfileSocialProof';
 import { ArtistProfileSpecWall } from '@/components/marketing/artist-profile/ArtistProfileSpecWall';
+import { CaptureActionPill } from '@/components/marketing/artist-profile/captureShared';
 import { HomepageV2FinalCta } from '@/components/marketing/homepage-v2/HomepageV2Ctas';
+import { MarketingSnapRail } from '@/components/marketing/MarketingSnapRail';
+import { ArtistProfileCaptureVisual } from '@/components/marketing/MarketingStoryPrimitives';
+import { MarketingSurfaceCard } from '@/components/marketing/MarketingSurfaceCard';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_ROUTES } from '@/constants/routes';
 import { getComparison } from '@/content/comparisons';
@@ -396,6 +400,56 @@ export const capture: Story = {
       <ArtistProfileOpinionatedSection
         opinionated={ARTIST_PROFILE_COPY.opinionated}
       />
+    </SectionFrame>
+  ),
+};
+
+export const artistProfileCalloutSystem: Story = {
+  name: 'artist-profile-callout-system',
+  parameters: {
+    jovie: {
+      uncoveredPropsByComponent: {
+        MarketingSnapRail: ['disabled'],
+      },
+    },
+    docs: {
+      description: {
+        story:
+          'Reusable Artist Profiles callout primitives showing a truthful focused fan-capture moment and restrained typing state.',
+      },
+    },
+  },
+  render: () => (
+    <SectionFrame sectionId='capture'>
+      <MarketingSnapRail
+        ariaLabel='Artist Profile Product Moments'
+        instructions='Use the previous and next buttons, or swipe, to inspect each product moment.'
+        showMobileControls
+      >
+        <div className='grid min-w-168 grid-cols-2 gap-4'>
+          <MarketingSurfaceCard
+            variant='product-callout'
+            glowTone='teal'
+            label='Fan Opt-in'
+            stateLabel='Focused'
+            contentClassName='p-6'
+          >
+            <ArtistProfileCaptureVisual capture={ARTIST_PROFILE_COPY.capture} />
+          </MarketingSurfaceCard>
+          <MarketingSurfaceCard
+            variant='product-callout'
+            glowTone='none'
+            label='Input State'
+            stateLabel='Typing'
+            contentClassName='p-6'
+          >
+            <CaptureActionPill
+              capture={ARTIST_PROFILE_COPY.capture}
+              phase='typing'
+            />
+          </MarketingSurfaceCard>
+        </div>
+      </MarketingSnapRail>
     </SectionFrame>
   ),
 };

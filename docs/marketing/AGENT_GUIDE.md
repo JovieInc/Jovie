@@ -100,6 +100,31 @@ modes, neverUse rules.
 - Content budgets: over-budget slot = check failure. Use `text-wrap: balance`.
 - CTA: `primaryCtaLabel` repeated verbatim throughout the page (one primary).
 
+### Product callout assembly
+
+Use the shared callout library instead of creating one-off marketing chrome:
+
+- **Canvas:** `MarketingSurfaceCard variant="product-callout"` owns the
+  editorial surface, frame, material, lighting, and optional product-state
+  labels.
+- **Stable state:** render a registry-backed `MarketingScreenshot` or
+  `ProductScreenshotFrame` by default.
+- **Active state:** reuse an existing dependency-safe product component only
+  when its focused, typing, submitting, or completed state directly explains
+  the feature. Keep the fixture read-only and side-effect free.
+- **Interaction language:** elevated pills, teal-blue focus, and input motion
+  are optional proof cues. Apply them only to the active control, run motion
+  once, preserve layout, and resolve reduced motion to the completed state.
+- **Responsive/accessibility:** one product state per callout, one frame
+  hierarchy, page-grid alignment, no horizontal page overflow, meaningful alt
+  text, figure caption, or group name, 44px interactive targets, and non-color
+  status cues.
+
+The existing product component language leads. Do not invent controls, chrome,
+or decorative interaction states for a marketing page. See
+[`COMPOSITION_RULES.md`](./COMPOSITION_RULES.md#law-8--product-callouts-prove-one-real-state)
+for the selection order and rationale.
+
 ## Inherited invariants (NOT restated in the registry)
 
 These apply to EVERY composition; the registry does not restate them:

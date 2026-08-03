@@ -122,6 +122,21 @@ describe('artist profile landing family System B source contract', () => {
     expect(outcomes).not.toContain('MarketingSnapRail');
     expect(outcomes).not.toContain('scrollByDirection');
 
+    const opinionated = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/marketing/artist-profile/ArtistProfileOpinionatedSection.tsx'
+      ),
+      'utf8'
+    );
+    expect(opinionated).toContain(
+      "ariaLabel='Static Menu And Adaptive Profile Comparison'"
+    );
+    expect(opinionated).toContain('showMobileControls');
+    expect(opinionated).toContain(
+      "instructions='Use the previous and next buttons, or swipe, to compare both approaches.'"
+    );
+
     const hero = readFileSync(
       resolve(
         process.cwd(),
@@ -154,20 +169,36 @@ describe('artist profile landing family System B source contract', () => {
       ),
       'utf8'
     );
-    expect(capture).toContain('ap-capture-loop');
-    expect(capture).toContain('ArtistProfilePhoneFrame');
-    expect(capture).toContain("'tim-white-profile-subscribe-mobile'");
+    expect(capture).toContain('<MarketingSurfaceCard');
+    expect(capture).toContain("variant='product-callout'");
+    expect(capture).toContain("glowTone='teal'");
+    expect(capture).toContain('<ArtistProfileCaptureVisual');
+    expect(capture).not.toContain('ArtistProfilePhoneFrame');
 
-    const opinionated = readFileSync(
+    const captureShared = readFileSync(
       resolve(
         process.cwd(),
-        'components/marketing/artist-profile/ArtistProfileOpinionatedSection.tsx'
+        'components/marketing/artist-profile/captureShared.tsx'
       ),
       'utf8'
     );
-    expect(opinionated).toContain('StaticMenuPreview');
-    expect(opinionated).toContain('ap-opinionated__comparison-track');
-    expect(opinionated).toContain("'tim-white-profile-live-mobile'");
+    expect(captureShared).toContain('data-phase={phase}');
+
+    const captureVisual = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/marketing/MarketingStoryPrimitives.tsx'
+      ),
+      'utf8'
+    );
+    expect(captureVisual).not.toContain('loopTimer');
+
+    const surfaceCard = readFileSync(
+      resolve(process.cwd(), 'components/marketing/MarketingSurfaceCard.tsx'),
+      'utf8'
+    );
+    expect(surfaceCard).toContain("| 'product-callout';");
+    expect(surfaceCard).toContain('data-marketing-product-callout');
 
     const howItWorks = readFileSync(
       resolve(
