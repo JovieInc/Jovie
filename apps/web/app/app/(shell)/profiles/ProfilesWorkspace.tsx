@@ -63,7 +63,10 @@ import {
   sortProfileWorkspaceRows,
 } from '@/lib/profile-surfaces/workspace';
 import { cn } from '@/lib/utils';
-import { AddConnectionRail } from './AddConnectionRail';
+import {
+  AddConnectionRail,
+  type ConnectionIntakeCandidate,
+} from './AddConnectionRail';
 import { buildConnectionActions } from './connection-actions';
 import type {
   ProfilesWorkspaceData,
@@ -506,6 +509,8 @@ export function ProfilesWorkspace({
   const [filter, setFilter] = useState<ProfilesWorkspaceFilter>('dsp');
   const [selected, setSelected] = useState<ProfileWorkspaceRow | null>(null);
   const [isAddConnectionOpen, setIsAddConnectionOpen] = useState(false);
+  const [pendingCandidate, setPendingCandidate] =
+    useState<ConnectionIntakeCandidate | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   useEffect(() => {
@@ -514,15 +519,39 @@ export function ProfilesWorkspace({
       setIsAddConnectionOpen(true);
     }
   }, [searchParams]);
-  const rows = useMemo(
-    () =>
-      sortProfileWorkspaceRows(
-        filterProfileWorkspaceRows(data?.rows ?? [], filter)
-      ),
-    [data?.rows, filter]
-  );
+  const pendingRow = useMemo<ProfileWorkspaceRow | null>(() => {
+    if (!pendingCandidate) return null;
+    return {
+      id: `preview:${pendingCandidate.id}`,
+      rowType: 'surface',
+      kind:
+        pendingCandidate.category === 'website'
+          ? 'website'
+          : pendingCandidate.category,
+      platform: pendingCandidate.platformId,
+      label: pendingCandidate.title,
+      handle: 'Preview only · not saved',
+      url: pendingCandidate.url,
+      trackedUrl: null,
+      qualificationStatus: 'suggested',
+      isOfficial: false,
+      monitoringState: 'unavailable',
+      rank: null,
+      previousRank: null,
+      lastObservedAt: null,
+    };
+  }, [pendingCandidate]);
+  const rows = useMemo(() => {
+    const sourceRows = pendingRow
+      ? [pendingRow, ...(data?.rows ?? [])]
+      : (data?.rows ?? []);
+    return sortProfileWorkspaceRows(
+      filterProfileWorkspaceRows(sourceRows, filter)
+    );
+  }, [data?.rows, filter, pendingRow]);
   const handleAddConnection = useCallback(() => {
     setSelected(null);
+    setPendingCandidate(null);
     setIsAddConnectionOpen(true);
   }, []);
   const headerActions = useMemo(
@@ -541,6 +570,7 @@ export function ProfilesWorkspace({
   useRegisterHeaderActions(headerActions);
   const getContextMenuItems = useCallback(
     (row: ProfileWorkspaceRow): ContextMenuItemType[] => {
+      if (row.id.startsWith('preview:')) return [];
       const primaryAction = getConnectionPrimaryAction(row);
       return buildConnectionActions(row, primaryAction, {
         onViewDetails: setSelected,
@@ -668,6 +698,7 @@ export function ProfilesWorkspace({
         },
         cell: context => {
           const row = context.row.original;
+          if (row.id.startsWith('preview:')) return null;
           const actionItems = convertContextMenuItems(getContextMenuItems(row));
           return (
             <div className='flex justify-end'>
@@ -695,10 +726,28 @@ export function ProfilesWorkspace({
       isAddConnectionOpen ? (
         <AddConnectionRail
           data={data}
-          onClose={() => setIsAddConnectionOpen(false)}
+          onClose={() => {
+            setPendingCandidate(null);
+            setIsAddConnectionOpen(false);
+          }}
+          onCandidatePreview={candidate => {
+            setPendingCandidate(candidate);
+            if (!candidate) return;
+            setFilter(
+              candidate.category === 'website' ? 'website' : candidate.category
+            );
+          }}
+          onReviewCandidate={candidate => {
+            setPendingCandidate(candidate);
+            setFilter(
+              candidate.category === 'website' ? 'website' : candidate.category
+            );
+            setIsAddConnectionOpen(false);
+          }}
           onReviewSuggestions={() => {
             setFilter('social');
             setSelected(null);
+            setPendingCandidate(null);
             setIsAddConnectionOpen(false);
           }}
         />
@@ -758,12 +807,27 @@ export function ProfilesWorkspace({
         data={rows}
         columns={columns as ColumnDef<ProfileWorkspaceRow, unknown>[]}
         getRowId={row => row.id}
-        onRowClick={setSelected}
+        onRowClick={row => {
+          if (!row.id.startsWith('preview:')) setSelected(row);
+        }}
+        onRowContextMenu={(row, event) => {
+          if (row.id.startsWith('preview:')) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }}
         getContextMenuItems={getContextMenuItems}
         rowHeight={56}
         minWidth='390px'
-        isRowSelected={row => selected?.id === row.id}
-        getRowClassName={() => 'group/connection-row'}
+        isRowSelected={row =>
+          !row.id.startsWith('preview:') && selected?.id === row.id
+        }
+        getRowClassName={row =>
+          cn(
+            'group/connection-row',
+            row.id.startsWith('preview:') && 'cursor-default'
+          )
+        }
         emptyState={
           <TableEmptyState
             title='No Connections in This Category'

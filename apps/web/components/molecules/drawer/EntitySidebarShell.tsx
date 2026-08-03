@@ -184,12 +184,14 @@ export function EntitySidebarShell({
       footerSurface === 'card' ? (
         <DrawerSurfaceCard
           variant='card'
-          className='shrink-0 px-3 py-2.5 lg:mx-0'
+          className='shrink-0 px-3 py-2.5 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:mx-0'
         >
           {footer}
         </DrawerSurfaceCard>
       ) : (
-        <div className='shrink-0 px-3 py-2.5 lg:mx-0'>{footer}</div>
+        <div className='shrink-0 px-3 py-2.5 max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))] lg:mx-0'>
+          {footer}
+        </div>
       );
   }
   const shellScrollClassName =

@@ -8,8 +8,63 @@ import {
   useHeaderActions,
 } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import { classifyConnectionInput } from './AddConnectionRail';
 import type { ProfilesWorkspaceData } from './data';
 import { ProfilesWorkspace } from './ProfilesWorkspace';
+
+describe('classifyConnectionInput', () => {
+  it('normalizes and classifies a bare provider domain', () => {
+    const result = classifyConnectionInput('Instagram.com/timwhite', [], 'Tim');
+
+    expect(result.error).toBeNull();
+    expect(result.candidate).toMatchObject({
+      platformId: 'instagram',
+      platformName: 'Instagram',
+      url: 'https://instagram.com/timwhite',
+    });
+  });
+
+  it('offers ranked handle-capable platforms for an at-handle', () => {
+    const result = classifyConnectionInput('@timwhite', [], 'Tim');
+
+    expect(result.candidate).toBeNull();
+    expect(result.suggestions.slice(0, 4).map(item => item.platformId)).toEqual(
+      ['instagram', 'tiktok', 'youtube', 'twitter']
+    );
+    expect(result.suggestions[0]).toMatchObject({
+      handle: '@timwhite',
+      url: 'https://instagram.com/timwhite',
+    });
+  });
+
+  it('fuzzy filters a platform-qualified username', () => {
+    const result = classifyConnectionInput('insta timwhite', [], 'Tim');
+
+    expect(result.suggestions[0]).toMatchObject({
+      platformId: 'instagram',
+      handle: '@timwhite',
+    });
+  });
+
+  it('does not suggest a platform that already exists', () => {
+    const result = classifyConnectionInput('@timwhite', ['instagram'], 'Tim');
+
+    expect(result.suggestions.map(item => item.platformId)).not.toContain(
+      'instagram'
+    );
+  });
+
+  it('rejects credential-bearing URLs', () => {
+    const credentialBearingUrl = [
+      'https://user',
+      'pass@instagram.com/timwhite',
+    ].join(':');
+    const result = classifyConnectionInput(credentialBearingUrl, [], 'Tim');
+
+    expect(result.candidate).toBeNull();
+    expect(result.error).toMatch(/without credentials/i);
+  });
+});
 
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
   useRegisterRightPanel: vi.fn(),
@@ -358,11 +413,61 @@ describe('ProfilesWorkspace', () => {
       screen.getByRole('button', { name: /Add public profile/i })
     );
     const url = screen.getByRole('textbox', { name: 'Public profile URL' });
-    await user.type(url, 'https://www.instagram.com/tim/?utm_source=test');
+    await user.type(url, 'Instagram.com/tim/?utm_source=test');
     expect(screen.getByText(/instagram\.com\/tim/)).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Review profile' })
     ).toBeEnabled();
+  });
+
+  it('suggests handle destinations with keyboard selection and previews a temporary row', async () => {
+    const user = userEvent.setup();
+    renderWorkspace(data);
+
+    await user.click(screen.getByRole('button', { name: 'Add connection' }));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+
+    await user.click(
+      screen.getByRole('button', { name: /Add public profile/i })
+    );
+    const input = screen.getByRole('textbox', { name: 'Public profile URL' });
+    await user.type(input, '@newhandle');
+
+    expect(
+      screen.getByRole('listbox', { name: 'Suggested profile destinations' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /TikTok/i })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+
+    await user.keyboard('{ArrowDown}{Enter}');
+    expect(input).toHaveValue('https://youtube.com/@newhandle');
+    expect(screen.getByText('Detected')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Review profile' })
+    ).toBeEnabled();
+
+    expect(screen.getByText('Preview only · not saved')).toBeInTheDocument();
+
+    const previewRow = screen
+      .getByText('Preview only · not saved')
+      .closest('tr');
+    expect(previewRow).not.toBeNull();
+    expect(
+      within(previewRow as HTMLElement).queryByRole('button', {
+        name: /Actions for/i,
+      })
+    ).not.toBeInTheDocument();
+
+    vi.mocked(useRegisterRightPanel).mockClear();
+    await user.click(previewRow as HTMLElement);
+    expect(useRegisterRightPanel).not.toHaveBeenCalled();
+
+    fireEvent.contextMenu(previewRow as HTMLElement);
+    expect(screen.queryByText('No items found')).not.toBeInTheDocument();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
   it('keeps secondary columns out of the selected-rail width contract', () => {
