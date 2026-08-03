@@ -11,7 +11,10 @@ import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { CmdKPalette } from '@/components/organisms/CmdKPalette';
 import { APP_ROUTES } from '@/constants/routes';
-import { commandsForSurface } from '@/lib/commands/registry';
+import {
+  commandsForSurface,
+  featuredSkillCommands,
+} from '@/lib/commands/registry';
 
 const pushMock = vi.fn();
 const CMD_LABEL = String.fromCodePoint(0x2318);
@@ -132,6 +135,15 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
         ])
       );
     }
+  });
+
+  it('does not feature generic command utilities in the empty chat state', () => {
+    expect(featuredSkillCommands()).toEqual([]);
+    expect(
+      commandsForSurface('chat-slash').find(
+        command => command.id === 'submitFeedback'
+      )
+    ).not.toHaveProperty('featuredSuggestion');
   });
 
   it('adds Calendar as a cmd+k-only nav route', () => {

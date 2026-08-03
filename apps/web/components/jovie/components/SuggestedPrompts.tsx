@@ -6,14 +6,22 @@ import {
   Disc3,
   DollarSign,
   Eye,
+  Image as ImageIcon,
+  Link,
   Link2,
+  Link2Off,
   MessageSquare,
   Music,
+  UserCircle,
 } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 
 import { track } from '@/lib/analytics';
 import { shouldHideAlbumArtChatSuggestion } from '@/lib/chat/album-art-capability';
+import {
+  type FeaturedSkillCommand,
+  featuredSkillCommands,
+} from '@/lib/commands/registry';
 import { cn } from '@/lib/utils';
 import type { ChatStarterActionId } from '../starter-actions';
 import {
@@ -41,9 +49,13 @@ const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   Disc3,
   DollarSign,
   Eye,
+  Image: ImageIcon,
+  Link,
   Link2,
+  Link2Off,
   MessageSquare,
   Music,
+  UserCircle,
 };
 
 interface SuggestedPromptsProps {
@@ -56,6 +68,8 @@ interface SuggestedPromptsProps {
   readonly isProfileComplete?: boolean;
   /** Canonical starter intents already owned by primary action cards. */
   readonly excludeActionIds?: readonly ChatStarterActionId[];
+  /** Restrict unprompted discovery to explicitly featured registry skills. */
+  readonly featuredOnly?: boolean;
   readonly layout?: 'rail' | 'grid' | 'flat';
   /**
    * Variant F: while the slash picker is open, fade chips out (don't unmount)
@@ -63,6 +77,28 @@ interface SuggestedPromptsProps {
    */
   readonly dimmed?: boolean;
 }
+
+const FEATURED_SKILL_STARTER_ACTION_IDS: Partial<
+  Record<string, ChatStarterActionId>
+> = {
+  generateAlbumArt: 'generate-album-art',
+};
+
+export function featuredSkillToSuggestion(
+  command: FeaturedSkillCommand
+): ChatSuggestion {
+  return {
+    actionId: FEATURED_SKILL_STARTER_ACTION_IDS[command.id],
+    icon: command.iconName,
+    label: command.label,
+    prompt: command.featuredSuggestion.prompt,
+    accent: 'blue',
+    telemetryKey: command.featuredSuggestion.telemetryKey,
+  };
+}
+
+export const FEATURED_SKILL_SUGGESTIONS: readonly ChatSuggestion[] =
+  featuredSkillCommands().map(featuredSkillToSuggestion);
 
 function SuggestionPill({
   suggestion,
@@ -141,6 +177,7 @@ export function SuggestedPrompts({
   albumArtCapability,
   isProfileComplete = false,
   excludeActionIds,
+  featuredOnly = false,
   layout = 'rail',
   dimmed = false,
 }: SuggestedPromptsProps) {
@@ -154,7 +191,11 @@ export function SuggestedPrompts({
   };
 
   const promptSuggestions = filterProfileSuggestion(
-    isFirstSession ? FIRST_SESSION_SUGGESTIONS : DEFAULT_SUGGESTIONS
+    featuredOnly
+      ? FEATURED_SKILL_SUGGESTIONS
+      : isFirstSession
+        ? FIRST_SESSION_SUGGESTIONS
+        : DEFAULT_SUGGESTIONS
   );
 
   const resolvedAlbumArtCapability = albumArtCapability ?? {
@@ -205,7 +246,7 @@ export function SuggestedPrompts({
 
   // Build the pitch suggestion (personalized if release title available)
   const pitchSuggestion =
-    canUseAdvancedTools && !isFirstSession
+    !featuredOnly && canUseAdvancedTools && !isFirstSession
       ? (() => {
           if (
             typeof latestReleaseTitle === 'string' &&
@@ -225,8 +266,10 @@ export function SuggestedPrompts({
   const allSuggestions = [
     ...promptSuggestionsWithCapabilities,
     ...(pitchSuggestion ? [pitchSuggestion] : []),
-    FEEDBACK_SUGGESTION,
+    ...(featuredOnly ? [] : [FEEDBACK_SUGGESTION]),
   ];
+
+  if (allSuggestions.length === 0) return null;
 
   const isAlbumArtSuggestion = (suggestion: ChatSuggestion) =>
     suggestion.actionId === 'generate-album-art';
@@ -375,11 +418,13 @@ export function SuggestedPrompts({
               className='snap-start'
             />
           )}
-          <SuggestionPill
-            suggestion={FEEDBACK_SUGGESTION}
-            onSelect={onSelect}
-            className='snap-start'
-          />
+          {!featuredOnly ? (
+            <SuggestionPill
+              suggestion={FEEDBACK_SUGGESTION}
+              onSelect={onSelect}
+              className='snap-start'
+            />
+          ) : null}
         </div>
       </div>
     </div>

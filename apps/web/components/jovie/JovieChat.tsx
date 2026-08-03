@@ -25,7 +25,10 @@ import { ChatPinnedOpportunityHeader } from './components/ChatPinnedOpportunityH
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { ChatStarterActionsRail } from './components/ChatStarterActionsRail';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
-import { SuggestedPrompts } from './components/SuggestedPrompts';
+import {
+  FEATURED_SKILL_SUGGESTIONS,
+  SuggestedPrompts,
+} from './components/SuggestedPrompts';
 import {
   useChatFileAttachments,
   useChatJankMonitor,
@@ -131,6 +134,7 @@ export function JovieChat({
     if (!actionCards || actionCards.length === 0) return [];
     return actionCards.filter(card => !dismissedActionCardIds.has(card.id));
   }, [actionCards, dismissedActionCardIds]);
+  const featuredSkillSuggestionCount = FEATURED_SKILL_SUGGESTIONS.length;
 
   // A configured primary card owns its action for the whole empty-state
   // session, including after dismissal. Do not resurrect it as a lower-context
@@ -520,6 +524,7 @@ export function JovieChat({
       ? pendingOpportunityCards.length
       : 0,
     starterActionCount: visibleActionCards.length,
+    suggestionCount: featuredSkillSuggestionCount,
   });
   const showEmptyActionCards = emptyStateAffordance === 'starter-actions';
   const showEmptyPromptRail = emptyStateAffordance === 'suggestion-pills';
@@ -761,6 +766,7 @@ export function JovieChat({
                           isFirstSession={isFirstSession}
                           isProfileComplete={isProfileComplete}
                           layout='rail'
+                          featuredOnly
                           dimmed={composerPickerOpen}
                           excludeActionIds={promptRailExcludeActionIds}
                         />
