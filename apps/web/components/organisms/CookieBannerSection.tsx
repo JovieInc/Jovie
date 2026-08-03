@@ -7,7 +7,10 @@ import { useEffect, useState } from 'react';
 import { CookieActions } from '@/components/molecules/CookieActions';
 import { CookieModal } from '@/components/organisms/CookieModal';
 import { APP_ROUTES } from '@/constants/routes';
-import { shouldSuppressCookieBannerForPathname } from '@/lib/cookies/banner-visibility';
+import {
+  shouldPlaceCookieBannerAbovePublicProfileDock,
+  shouldSuppressCookieBannerForPathname,
+} from '@/lib/cookies/banner-visibility';
 import { saveConsent } from '@/lib/cookies/consent';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
 import { setConsentState } from '@/lib/tracking/consent';
@@ -32,6 +35,8 @@ function isBannerRequiredFromCookie(): boolean {
 export function CookieBannerSection() {
   const pathname = usePathname();
   const isSuppressedPath = shouldSuppressCookieBannerForPathname(pathname);
+  const shouldClearProfileDock =
+    shouldPlaceCookieBannerAbovePublicProfileDock(pathname);
 
   const [visible, setVisible] = useState(false);
   const [customize, setCustomize] = useState(false);
@@ -65,13 +70,12 @@ export function CookieBannerSection() {
     }
   }, [visible]);
 
-  // Publish banner height + bottom offset + a separation gap as a CSS custom
-  // property on :root so layout regions (profile shells, QR coordination)
-  // reserve the exact space occupied by the fixed bottom-right card
-  // (bottom-4 = 16px + measured h) PLUS a 12px gap so chrome stacked above the
-  // banner (e.g. the public-profile bottom tab nav) never abuts or overlaps it
-  // (JOV-3555 — regression of JOV-1982). Cleared on hide/consent for zero
-  // layout impact. Matches useCookieBannerHeight total offset for toasts.
+  // Publish banner height + its rendered bottom offset + a separation gap as a
+  // CSS custom property on :root so floating surfaces (toasts, QR coordination)
+  // can reserve the exact space occupied by the fixed card. Public-profile
+  // phone navigation clears the card with route-stable CSS instead of reading
+  // this late measurement into page geometry (JOV-4783). Cleared on
+  // hide/consent; matches useCookieBannerHeight total offset for toasts.
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
@@ -87,16 +91,23 @@ export function CookieBannerSection() {
     );
     if (!banner) return;
 
-    // 16px = banner's `bottom-4` inset from the viewport bottom.
+    // 16px is the non-profile `bottom-4` fallback. On a phone profile the
+    // route modifier places the card above the 74px navigation footprint, so
+    // measure the rendered inset instead of publishing a stale constant.
     // 12px = separation gap between the banner top and any chrome stacked above
     // it (bottom tab nav) so both surfaces stay clear and fully tappable.
-    const BANNER_BOTTOM_INSET_PX = 16;
+    const DEFAULT_BANNER_BOTTOM_INSET_PX = 16;
     const BANNER_SEPARATION_GAP_PX = 12;
 
     const update = () => {
+      const bounds = banner.getBoundingClientRect();
+      const renderedBottomInset =
+        bounds.height > 0
+          ? Math.max(0, globalThis.innerHeight - bounds.bottom)
+          : DEFAULT_BANNER_BOTTOM_INSET_PX;
       root.style.setProperty(
         '--cookie-banner-h',
-        `${banner.getBoundingClientRect().height + BANNER_BOTTOM_INSET_PX + BANNER_SEPARATION_GAP_PX}px`
+        `${bounds.height + renderedBottomInset + BANNER_SEPARATION_GAP_PX}px`
       );
     };
 
@@ -104,12 +115,14 @@ export function CookieBannerSection() {
 
     const ro = new ResizeObserver(update);
     ro.observe(banner);
+    globalThis.addEventListener('resize', update);
 
     return () => {
       ro.disconnect();
+      globalThis.removeEventListener('resize', update);
       root.style.removeProperty('--cookie-banner-h');
     };
-  }, [visible, isSuppressedPath]);
+  }, [visible, isSuppressedPath, shouldClearProfileDock]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -186,11 +199,15 @@ export function CookieBannerSection() {
 
   return (
     <>
-      {visible && !isSuppressedPath ? (
+      {visible && !isSuppressedPath && !customize ? (
         <aside
           aria-label='Cookie Consent'
           data-testid='cookie-banner'
-          className='fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-85 sm:max-w-95'
+          className={`cookie-banner-card fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-85 sm:max-w-95 ${
+            shouldClearProfileDock
+              ? 'cookie-banner-card--above-public-profile-dock'
+              : ''
+          }`}
         >
           <div className='rounded-2xl border border-(--linear-app-frame-seam) bg-surface-1 shadow-card px-4 py-4'>
             <div className='flex items-start gap-3'>

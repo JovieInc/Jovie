@@ -244,9 +244,11 @@
 
 .public-profile-layout-frame--compact {
   max-width: min(100%, calc(var(--content-max) + (var(--page-pad) * 2)));
-  /* Mobile: fill viewport so the phone-frame surface can stretch. */
+  /* Keep the stage geometry independent from lazy floating overlays. Cookie
+     consent clears the phone nav by moving its own fixed card, never by
+     resizing the profile after first paint. */
   height: 100%;
-  min-height: calc(100dvh - var(--cookie-banner-h, 0px));
+  min-height: 100dvh;
 }
 
 .public-profile-layout-compact-slot {
@@ -612,6 +614,13 @@
    static DOM, but out of mobile layout so it cannot add page scroll below the
    compact profile. Desktop keeps the readable AEO section. */
 @media (max-width: 767px) {
+  /* The consent card mounts lazily after geo/cookie checks. Its route-derived
+     modifier is present on first paint, keeping it above the canonical glass
+     dock without changing any profile box geometry or moving the card later. */
+  .cookie-banner-card--above-public-profile-dock {
+    bottom: calc(var(--profile-bottom-nav-height) + 8px);
+  }
+
   .profile-viewport ~ .profile-aeo-content {
     position: absolute;
     top: 0;

@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
+import { unstable_cache } from 'next/cache';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import {
   getLegacyProfileModeRedirectHref,
   isLegacyProfileModeAlias,
 } from '@/app/[username]/_lib/mode-route-redirect';
+import { shouldBypassPublicProfileQaCache } from '@/app/[username]/_lib/public-profile-qa';
 import {
   getContentBySlug,
   getCreatorByUsername,
@@ -12,6 +14,7 @@ import {
 import ContentSmartLinkPage, {
   generateMetadata as generateContentSmartLinkMetadata,
 } from '@/app/[username]/[slug]/page';
+import { sanitizeCacheTags } from '@/lib/cache/tags';
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
 import { REDIRECT_SINK_METADATA } from '@/lib/profile/metadata';
 
@@ -38,6 +41,38 @@ function getAliasSlug(slug: readonly string[]): string | null {
   }
   const aliasSlug = slug[0];
   return aliasSlug && isLegacyProfileModeAlias(aliasSlug) ? aliasSlug : null;
+}
+
+async function getAliasCollisionState(
+  creatorProfileId: string,
+  aliasSlug: string
+) {
+  const load = () =>
+    Promise.all([
+      findRedirectByOldSlug(creatorProfileId, aliasSlug),
+      getUnpublishedReleasePresence(creatorProfileId, aliasSlug),
+    ]);
+
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.NODE_ENV === 'development' ||
+    shouldBypassPublicProfileQaCache()
+  ) {
+    return load();
+  }
+
+  return unstable_cache(
+    load,
+    [`profile-mode-alias-collision-${creatorProfileId}-${aliasSlug}`],
+    {
+      tags: sanitizeCacheTags([
+        'smartlink-content',
+        `smartlink-content:${creatorProfileId}`,
+        `smartlink-content:${creatorProfileId}:${aliasSlug}`,
+      ]),
+      revalidate: 300,
+    }
+  )();
 }
 
 // Catch-all for unknown sub-paths — returns a context-aware 404.
@@ -68,17 +103,19 @@ export default async function CatchAllPage({
 
   const content = await getContentBySlug(creator.id, aliasSlug);
   if (!content) {
-    const oldSlugRedirect = await findRedirectByOldSlug(creator.id, aliasSlug);
+    // Both collision checks are read-only and independent. Starting them
+    // together preserves the precedence below while removing one full remote
+    // database round trip from every warmed legacy deep link (JOV-4788).
+    const [oldSlugRedirect, unpublished] = await getAliasCollisionState(
+      creator.id,
+      aliasSlug
+    );
     if (oldSlugRedirect) {
       permanentRedirect(
         `/${creator.usernameNormalized}/${oldSlugRedirect.currentSlug}`
       );
     }
 
-    const unpublished = await getUnpublishedReleasePresence(
-      creator.id,
-      aliasSlug
-    );
     if (!unpublished) {
       const legacyModeHref = getLegacyProfileModeRedirectHref(
         creator.usernameNormalized,

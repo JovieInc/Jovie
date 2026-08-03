@@ -5,20 +5,24 @@ const {
   getCreatorByUsernameMock,
   getFeaturedSmartLinkStaticParamsMock,
   getUnpublishedReleasePresenceMock,
+  findRedirectByOldSlugMock,
   notFoundMock,
+  permanentRedirectMock,
   redirectMock,
 } = vi.hoisted(() => ({
   getContentBySlugMock: vi.fn(),
   getCreatorByUsernameMock: vi.fn(),
   getFeaturedSmartLinkStaticParamsMock: vi.fn().mockResolvedValue([]),
   getUnpublishedReleasePresenceMock: vi.fn(),
+  findRedirectByOldSlugMock: vi.fn(),
   notFoundMock: vi.fn(),
+  permanentRedirectMock: vi.fn(),
   redirectMock: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
   notFound: notFoundMock,
-  permanentRedirect: vi.fn(),
+  permanentRedirect: permanentRedirectMock,
   redirect: redirectMock,
 }));
 
@@ -49,7 +53,7 @@ vi.mock('@/app/[username]/[slug]/_lib/data', () => ({
 }));
 
 vi.mock('@/lib/discography/slug', () => ({
-  findRedirectByOldSlug: vi.fn().mockResolvedValue(null),
+  findRedirectByOldSlug: findRedirectByOldSlugMock,
 }));
 
 vi.mock('@/lib/entity/queries', () => ({
@@ -63,9 +67,15 @@ describe('smart-link metadata', () => {
     getContentBySlugMock.mockReset();
     getUnpublishedReleasePresenceMock.mockReset();
     getUnpublishedReleasePresenceMock.mockResolvedValue(null);
+    findRedirectByOldSlugMock.mockReset();
+    findRedirectByOldSlugMock.mockResolvedValue(null);
     notFoundMock.mockReset();
     notFoundMock.mockImplementation(() => {
       throw new Error('NEXT_NOT_FOUND');
+    });
+    permanentRedirectMock.mockReset();
+    permanentRedirectMock.mockImplementation(() => {
+      throw new Error('NEXT_PERMANENT_REDIRECT');
     });
     redirectMock.mockReset();
     redirectMock.mockImplementation(() => {
@@ -205,6 +215,90 @@ describe('smart-link metadata', () => {
       'music'
     );
     expect(redirectMock).toHaveBeenCalledWith('/dualipa?mode=listen&source=qr');
+  });
+
+  it('keeps renamed-release redirects ahead of matching mode aliases', async () => {
+    getContentBySlugMock.mockResolvedValue(null);
+    findRedirectByOldSlugMock.mockResolvedValue({
+      currentSlug: 'renamed-music',
+    });
+    getUnpublishedReleasePresenceMock.mockResolvedValue({
+      id: 'unpublished-music',
+    });
+
+    const { default: ProfileAliasResolverPage } = await import(
+      '@/app/[username]/[...slug]/page'
+    );
+
+    await expect(
+      ProfileAliasResolverPage({
+        params: Promise.resolve({
+          username: 'dualipa',
+          slug: ['music', '__profile-mode-alias', 'resolve'],
+        }),
+      })
+    ).rejects.toThrow('NEXT_PERMANENT_REDIRECT');
+    expect(permanentRedirectMock).toHaveBeenCalledWith(
+      '/dualipa/renamed-music'
+    );
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps unpublished collisions on the canonical smart-link renderer', async () => {
+    getContentBySlugMock.mockResolvedValue(null);
+    getUnpublishedReleasePresenceMock.mockResolvedValue({
+      id: 'unpublished-music',
+    });
+
+    const { default: ProfileAliasResolverPage } = await import(
+      '@/app/[username]/[...slug]/page'
+    );
+    const result = await ProfileAliasResolverPage({
+      params: Promise.resolve({
+        username: 'dualipa',
+        slug: ['music', '__profile-mode-alias', 'resolve'],
+      }),
+    });
+
+    expect(result).toBeTruthy();
+    expect(permanentRedirectMock).not.toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
+  it('starts independent alias collision checks in parallel', async () => {
+    getContentBySlugMock.mockResolvedValue(null);
+    let resolveRedirectLookup: ((value: null) => void) | undefined;
+    let resolveUnpublishedLookup: ((value: null) => void) | undefined;
+    findRedirectByOldSlugMock.mockImplementation(
+      () =>
+        new Promise<null>(resolve => {
+          resolveRedirectLookup = resolve;
+        })
+    );
+    getUnpublishedReleasePresenceMock.mockImplementation(
+      () =>
+        new Promise<null>(resolve => {
+          resolveUnpublishedLookup = resolve;
+        })
+    );
+
+    const { default: ProfileAliasResolverPage } = await import(
+      '@/app/[username]/[...slug]/page'
+    );
+    const result = ProfileAliasResolverPage({
+      params: Promise.resolve({
+        username: 'dualipa',
+        slug: ['music', '__profile-mode-alias', 'resolve'],
+      }),
+    });
+
+    await vi.waitFor(() => {
+      expect(findRedirectByOldSlugMock).toHaveBeenCalledOnce();
+      expect(getUnpublishedReleasePresenceMock).toHaveBeenCalledOnce();
+    });
+    resolveRedirectLookup?.(null);
+    resolveUnpublishedLookup?.(null);
+    await expect(result).rejects.toThrow('NEXT_REDIRECT');
   });
 
   it('keeps direct marker paths for arbitrary slugs on the catch-all 404', async () => {

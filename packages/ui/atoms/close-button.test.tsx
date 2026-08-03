@@ -103,6 +103,8 @@ describe('closeButtonClassName', () => {
 
   it('uses the shared pill close button shape', () => {
     expect(closeButtonClassName).toContain('rounded-full');
+    expect(closeButtonClassName).toContain('h-12');
+    expect(closeButtonClassName).toContain('w-12');
     expect(closeButtonClassName).not.toContain(
       'rounded-(--linear-app-radius-item)'
     );

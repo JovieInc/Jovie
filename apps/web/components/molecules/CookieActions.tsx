@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/cookie-banner.test.tsx
 'use client';
 
 import type { CSSProperties } from 'react';
@@ -44,24 +45,24 @@ export function CookieActions({
   compact = false,
 }: CookieActionsProps) {
   const containerClass = compact
-    ? `flex shrink-0 flex-row items-center flex-wrap gap-1.5 ${className}`
+    ? `flex shrink-0 flex-row items-center flex-wrap gap-1 ${className}`
     : `flex shrink-0 flex-col sm:flex-row sm:flex-wrap ${className}`;
-  const containerGap = compact ? '6px' : 'var(--linear-space-2)';
+  const containerGap = compact ? '4px' : 'var(--linear-space-2)';
 
   const secStyle: CSSProperties = compact
     ? {
         ...secondaryButtonStyle,
         fontSize: '12px',
-        padding: '6px 10px',
-        height: '36px',
+        padding: '6px',
+        height: '44px',
       }
     : secondaryButtonStyle;
   const priStyle: CSSProperties = compact
     ? {
         ...primaryButtonStyle,
         fontSize: '12px',
-        padding: '6px 12px',
-        height: '36px',
+        padding: '6px 8px',
+        height: '44px',
       }
     : primaryButtonStyle;
 
@@ -77,7 +78,7 @@ export function CookieActions({
     <div className={containerClass} style={{ gap: containerGap }}>
       <div
         className='flex'
-        style={{ gap: compact ? '6px' : 'var(--linear-space-2)' }}
+        style={{ gap: compact ? '4px' : 'var(--linear-space-2)' }}
       >
         <button
           type='button'

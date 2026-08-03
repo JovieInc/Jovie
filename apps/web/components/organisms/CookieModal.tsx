@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/cookie-banner-fixes.test.tsx
 'use client';
 
 import {
@@ -99,6 +100,7 @@ function CookieCategories({
                 disabled={category.disabled}
                 aria-labelledby={titleId}
                 aria-describedby={descId}
+                className='before:h-12 before:w-12'
               />
             </div>
           </div>
@@ -109,7 +111,7 @@ function CookieCategories({
         For more details, see our{' '}
         <Link
           href={APP_ROUTES.LEGAL_COOKIES}
-          className='text-secondary-token underline hover:opacity-80'
+          className='inline-flex min-h-12 items-center text-secondary-token underline hover:opacity-80'
         >
           Cookie Policy
         </Link>
@@ -172,7 +174,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
         >
           <SheetHeader className='pb-1'>
             <SheetTitlePrimitive className='text-app font-semibold text-primary-token'>
-              Cookie preferences
+              Cookie Preferences
             </SheetTitlePrimitive>
             <SheetDescription className='sr-only'>
               Manage your cookie preferences
@@ -193,7 +195,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
               size='sm'
               onClick={onClose}
               disabled={isSaving}
-              className='flex-1'
+              className='min-h-12 flex-1'
             >
               Cancel
             </Button>
@@ -203,7 +205,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
               size='sm'
               onClick={save}
               disabled={isSaving}
-              className='flex-1'
+              className='min-h-12 flex-1'
             >
               Save Preferences
             </Button>
@@ -257,6 +259,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
           size='sm'
           onClick={onClose}
           disabled={isSaving}
+          className='min-h-12'
         >
           Cancel
         </Button>
@@ -266,6 +269,7 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
           size='sm'
           onClick={save}
           disabled={isSaving}
+          className='min-h-12'
         >
           Save Preferences
         </Button>

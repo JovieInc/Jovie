@@ -1,7 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { CookieActions } from '@/components/molecules/CookieActions';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
-import { shouldSuppressCookieBannerForPathname } from '@/lib/cookies/banner-visibility';
+import {
+  shouldPlaceCookieBannerAbovePublicProfileDock,
+  shouldSuppressCookieBannerForPathname,
+} from '@/lib/cookies/banner-visibility';
 
 vi.mock('@/lib/cookies/consent', () => ({
   saveConsent: vi.fn(),
@@ -14,6 +18,36 @@ function setCookie(value: string) {
     value,
   });
 }
+
+describe('CookieActions', () => {
+  it('keeps every compact action touch-sized and dispatches its callback', () => {
+    const onAcceptAll = vi.fn();
+    const onReject = vi.fn();
+    const onCustomize = vi.fn();
+
+    render(
+      <CookieActions
+        compact
+        onAcceptAll={onAcceptAll}
+        onReject={onReject}
+        onCustomize={onCustomize}
+      />
+    );
+
+    const actions = [
+      screen.getByRole('button', { name: /reject/i }),
+      screen.getByRole('button', { name: /customize/i }),
+      screen.getByRole('button', { name: /accept all/i }),
+    ];
+    for (const action of actions) {
+      expect(action).toHaveStyle({ height: '44px' });
+      fireEvent.click(action);
+    }
+    expect(onReject).toHaveBeenCalledOnce();
+    expect(onCustomize).toHaveBeenCalledOnce();
+    expect(onAcceptAll).toHaveBeenCalledOnce();
+  });
+});
 
 describe('CookieBannerSection', () => {
   afterEach(() => {
@@ -56,6 +90,20 @@ describe('CookieBannerSection', () => {
     expect(shouldSuppressCookieBannerForPathname(pathname)).toBe(true);
   });
 
+  it.each([
+    ['/tim', true],
+    ['/tim/alerts', true],
+    ['/dualipa/merch/card-1', true],
+    ['/pricing', false],
+    ['/artist-profiles', false],
+    ['/app/profile', false],
+    ['/', false],
+  ])('classifies profile dock placement for %s', (pathname, expected) => {
+    expect(shouldPlaceCookieBannerAbovePublicProfileDock(pathname)).toBe(
+      expected
+    );
+  });
+
   it('renders as floating bottom-right card (not full-width bar) with correct classes and compact actions when required', () => {
     setCookie('jv_cc_required=1');
     render(<CookieBannerSection />);
@@ -83,6 +131,9 @@ describe('CookieBannerSection', () => {
       screen.getByRole('button', { name: /customize/i })
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /reject/i })).toBeInTheDocument();
+    for (const button of screen.getAllByRole('button')) {
+      expect(button).toHaveStyle({ height: '44px' });
+    }
     // Privacy link present (condensed legal text)
     expect(banner.textContent).toContain('essential functionality');
     expect(screen.getByRole('link', { name: /privacy/i })).toHaveAttribute(
@@ -91,7 +142,26 @@ describe('CookieBannerSection', () => {
     );
   });
 
-  it('publishes --cookie-banner-h CSS var from measured floating card height (for toasts + profile shells)', async () => {
+  it('gives the preferences modal sole ownership of the consent surface', () => {
+    setCookie('jv_cc_required=1');
+    render(<CookieBannerSection />);
+
+    fireEvent.click(screen.getByRole('button', { name: /customize/i }));
+
+    expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('dialog', { name: /cookie preferences/i })
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+
+    expect(
+      screen.queryByRole('dialog', { name: /cookie preferences/i })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('cookie-banner')).toBeInTheDocument();
+  });
+
+  it('publishes --cookie-banner-h CSS var for coordinated floating surfaces', async () => {
     setCookie('jv_cc_required=1');
     render(<CookieBannerSection />);
     // The ResizeObserver effect in Section sets the var from data-testid rect
@@ -103,10 +173,9 @@ describe('CookieBannerSection', () => {
     });
   });
 
-  // JOV-3555: the published reservation must include the banner's 16px bottom
-  // inset PLUS a 12px separation gap so the public-profile bottom tab nav stacked
-  // above it never abuts/overlaps the banner. jsdom reports 0 measured height, so
-  // the value reduces to 16 + 12 = 28px.
+  // The published reservation includes the rendered bottom inset plus a 12px
+  // separation gap. jsdom reports 0 measured height, so the implementation
+  // uses its 16px non-profile fallback and the value reduces to 28px.
   it('reserves bottom inset + separation gap above the measured banner height', async () => {
     setCookie('jv_cc_required=1');
     render(<CookieBannerSection />);
