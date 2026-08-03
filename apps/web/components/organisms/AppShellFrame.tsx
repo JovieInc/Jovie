@@ -80,6 +80,7 @@ export const AppShellFrame = memo(function AppShellFrame({
         )}
       >
         <div
+          data-app-shell-sidebar-mount='true'
           data-testid='app-shell-sidebar-mount'
           className='flex h-full min-h-0 shrink-0 flex-col transition-[flex-basis,width,opacity,transform] duration-cinematic ease-cinematic motion-reduce:transition-none'
         >

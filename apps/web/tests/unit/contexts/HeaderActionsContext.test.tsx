@@ -141,6 +141,32 @@ describe('HeaderActionsContext', () => {
     await waitFor(() => expect(priorFocus).toHaveFocus());
   });
 
+  it('does not steal focus back when a sidebar interaction dismisses search', async () => {
+    const user = userEvent.setup();
+    render(
+      <HeaderActionsProvider>
+        <button type='button'>Sidebar Search</button>
+        <div data-app-shell-sidebar-mount='true'>
+          <SearchProbe />
+        </div>
+      </HeaderActionsProvider>
+    );
+
+    const priorFocus = screen.getByRole('button', { name: 'Sidebar Search' });
+    priorFocus.focus();
+    act(() => {
+      globalThis.dispatchEvent(new Event(OPEN_HEADER_SEARCH_EVENT));
+    });
+
+    const sidebarControl = screen.getByRole('button', {
+      name: 'Close search',
+    });
+    await user.click(sidebarControl);
+
+    expect(screen.getByText('closed')).toBeInTheDocument();
+    await waitFor(() => expect(sidebarControl).toHaveFocus());
+  });
+
   it('uses slash to open unless focus is already in an editable control', async () => {
     const user = userEvent.setup();
     render(

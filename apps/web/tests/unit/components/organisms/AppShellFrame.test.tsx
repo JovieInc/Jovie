@@ -133,6 +133,20 @@ describe('AppShellFrame', () => {
     expect(mount).toContainElement(screen.getByTestId('fixture-sidebar'));
   });
 
+  it('exposes one semantic boundary for persistent sidebar interactions', () => {
+    render(
+      <AppShellFrame
+        sidebar={<button type='button'>Library</button>}
+        main={<div>Main Content</div>}
+      />
+    );
+
+    expect(screen.getByTestId('app-shell-sidebar-mount')).toHaveAttribute(
+      'data-app-shell-sidebar-mount',
+      'true'
+    );
+  });
+
   it('keeps main-plane geometry on the same reduced-motion-safe rail contract', () => {
     render(
       <AppShellFrame
