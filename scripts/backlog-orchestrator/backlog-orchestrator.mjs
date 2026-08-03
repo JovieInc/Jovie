@@ -23,17 +23,16 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// ----- Local imports -----
-const linear = await import(resolve(__dirname, 'linear-client.mjs'));
-const classifier = await import(resolve(__dirname, 'classifier.mjs'));
-const reconciler = await import(resolve(__dirname, 'reconcile.mjs'));
-const scorer = await import(resolve(__dirname, 'scorer.mjs'));
-const workstreamer = await import(resolve(__dirname, 'workstreamer.mjs'));
-const admitter = await import(resolve(__dirname, 'admitter.mjs'));
-const reporter = await import(resolve(__dirname, 'reporter.mjs'));
-const staleLeaseGuard = await import(
-  resolve(__dirname, 'stale-lease-guard.mjs')
-);
+// Keep the complete control-plane dependency closure visible to source sync and
+// module tooling. These are canonical sibling modules, not host-only copies.
+import * as admitter from './admitter.mjs';
+import * as classifier from './classifier.mjs';
+import * as linear from './linear-client.mjs';
+import * as reconciler from './reconcile.mjs';
+import * as reporter from './reporter.mjs';
+import * as scorer from './scorer.mjs';
+import * as staleLeaseGuard from './stale-lease-guard.mjs';
+import * as workstreamer from './workstreamer.mjs';
 
 // ----- Config -----
 const CACHE_FILE = resolve(__dirname, '.orchestrator-cache.json');

@@ -667,7 +667,24 @@ describe('entrypoint contract', () => {
     const wrapperSource = await readFile(wrapper, 'utf8');
     assert.match(wrapperSource, /cd \"\$\(dirname \"\$0\"\)\"/);
     assert.match(wrapperSource, /exec node backlog-orchestrator\.mjs \"\$@\"/);
-    assert.match(await readFile(executable, 'utf8'), /Deterministic-first/);
+    const executableSource = await readFile(executable, 'utf8');
+    assert.match(executableSource, /Deterministic-first/);
+    for (const dependency of [
+      'linear-client.mjs',
+      'classifier.mjs',
+      'reconcile.mjs',
+      'scorer.mjs',
+      'workstreamer.mjs',
+      'admitter.mjs',
+      'reporter.mjs',
+      'stale-lease-guard.mjs',
+    ]) {
+      assert.match(
+        executableSource,
+        new RegExp(`from ['"]\\./${dependency}['"]`),
+        `entrypoint must declare ${dependency} in its static dependency closure`
+      );
+    }
     assert.equal(JSON.parse(await readFile(config, 'utf8')).version, 1);
   });
 
