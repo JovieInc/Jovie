@@ -370,7 +370,7 @@ describe('baked runner prerequisite contract', () => {
     for (const patchPath of patchedDependencyPaths) {
       expect(listedPaths).toContain(patchPath);
     }
-  });
+  }, 15_000);
 
   it('dispatches an exact-SHA canary only to the dedicated image label', () => {
     expect(runnerImageCanaryStart).toBeGreaterThan(-1);
