@@ -22,6 +22,10 @@ import {
   getProfileModeRedirectHref,
 } from '@/app/[username]/_lib/mode-route-redirect';
 import {
+  getLegacyProfileModeRedirectHref,
+  getProfileModeRedirectHref,
+} from '@/app/[username]/_lib/mode-route-redirect';
+import {
   getProfileModeSubtitle,
   profileModes,
 } from '@/features/profile/registry';
