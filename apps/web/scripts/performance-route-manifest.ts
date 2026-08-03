@@ -62,7 +62,13 @@ export type PerfMeasureMode =
   | 'interactive-shell'
   | 'redirect'
   | 'same-route-interaction'
-  | 'warm-navigation';
+  | 'warm-navigation'
+  | 'profile-warm-transition';
+
+export interface PerfViewport {
+  readonly width: number;
+  readonly height: number;
+}
 
 export interface PerfTimingBudget {
   readonly metric: PerfTimingMetricName;
@@ -110,6 +116,7 @@ export interface PerfRouteDefinition {
   readonly warmupStrategy: PerfWarmupStrategy;
   readonly measureMode: PerfMeasureMode;
   readonly readySelectors: PerfReadySelectors;
+  readonly viewport?: PerfViewport;
   readonly timingBudgets?: readonly PerfTimingBudget[];
   readonly resourceBudgets?: readonly PerfResourceBudget[];
   readonly timings?: readonly PerfTimingBudget[];
@@ -185,7 +192,10 @@ export function assertValidPerfRouteDefinition(route: PerfRouteDefinition) {
     );
   }
 
-  if (route.measureMode === 'warm-navigation') {
+  if (
+    route.measureMode === 'warm-navigation' ||
+    route.measureMode === 'profile-warm-transition'
+  ) {
     if (!route.readySelectors.content?.length) {
       throw new TypeError(
         `Warm-navigation route "${route.id}" must define destination-specific content readiness.`
@@ -204,6 +214,32 @@ export function assertValidPerfRouteDefinition(route: PerfRouteDefinition) {
     if (route.warmNavigationStartPath === route.path) {
       throw new TypeError(
         `Warm-navigation route "${route.id}" cannot start from its destination path "${route.path}".`
+      );
+    }
+  }
+
+  if (route.measureMode === 'profile-warm-transition') {
+    const timingBudgets = getRouteTimingBudgets(route);
+    const interactiveBudget = timingBudgets.find(
+      timing => timing.metric === 'interactive-shell-ready'
+    );
+    const shellBudget = timingBudgets.find(
+      timing => timing.metric === 'warm-shell-response'
+    );
+
+    if (route.surface !== 'public-profile') {
+      throw new TypeError(
+        `Profile warm-transition route "${route.id}" must use the public-profile surface.`
+      );
+    }
+    if (route.viewport?.width !== 390 || route.viewport.height !== 844) {
+      throw new TypeError(
+        `Profile warm-transition route "${route.id}" must use the 390x844 mobile viewport.`
+      );
+    }
+    if (interactiveBudget?.budget !== 100 || shellBudget?.budget !== 100) {
+      throw new TypeError(
+        `Profile warm-transition route "${route.id}" must preserve 100ms interactive-shell-ready and warm-shell-response budgets.`
       );
     }
   }
@@ -456,16 +492,22 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     group: 'public-profile-core',
     surface: 'public-profile',
     path: '/[username]',
+    warmNavigationStartPath: '/[username]?mode=listen',
     resolvePath: resolveSeededProfilePath,
     requiresAuth: false,
     warmupStrategy: 'public-route',
-    measureMode: 'interactive-shell',
+    measureMode: 'profile-warm-transition',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: ['main h1', '[data-testid="profile-header"]'],
+      content: ['[data-testid="profile-home-rail"]'],
+      navTrigger: [
+        '[data-testid="profile-bottom-nav"] button[aria-label="Home"]',
+      ],
     },
+    viewport: { width: 390, height: 844 },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
+      { metric: 'warm-shell-response', budget: 100 },
       // Gmail rule targets: 100ms perceived, 500ms hard budget
       { metric: 'first-contentful-paint', budget: 800 },
       { metric: 'largest-contentful-paint', budget: 1500 },
@@ -699,21 +741,25 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     group: 'public-profile-mode-shell',
     surface: 'public-profile',
     path: '/[username]?mode=listen',
+    warmNavigationStartPath: '/[username]',
     resolvePath: resolveSeededProfileModePath,
     requiresAuth: false,
     warmupStrategy: 'public-route',
-    measureMode: 'interactive-shell',
+    measureMode: 'profile-warm-transition',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
       content: [
         '[data-testid="profile-primary-tab-releases"]',
         '[data-testid="profile-primary-tab-listen"]',
-        '[data-testid="profile-mode-drawer-listen"]',
-        '[data-testid="profile-header"]',
+      ],
+      navTrigger: [
+        '[data-testid="profile-bottom-nav"] button[aria-label="Music"]',
       ],
     },
+    viewport: { width: 390, height: 844 },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
+      { metric: 'warm-shell-response', budget: 100 },
       { metric: 'time-to-first-byte', budget: 2400 },
     ],
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
@@ -728,16 +774,15 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     resolvePath: resolveSeededProfileModePath,
     requiresAuth: false,
     warmupStrategy: 'public-route',
-    measureMode: 'interactive-shell',
+    measureMode: 'page-load',
     readySelectors: {
-      shell: ['[data-testid="profile-header"]'],
-      content: [
-        '[data-testid="profile-mode-drawer-pay"]',
-        '[data-testid="profile-header"]',
-      ],
+      content: ['[data-testid="profile-mode-drawer-pay"]'],
     },
     timings: [
-      { metric: 'interactive-shell-ready', budget: 100 },
+      { metric: 'first-contentful-paint', budget: 2800 },
+      { metric: 'largest-contentful-paint', budget: 3300 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
       { metric: 'time-to-first-byte', budget: 2400 },
     ],
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
@@ -749,22 +794,22 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     group: 'public-profile-mode-shell',
     surface: 'public-profile',
     path: '/[username]?mode=subscribe',
+    warmNavigationStartPath: '/[username]',
     resolvePath: resolveSeededProfileModePath,
     requiresAuth: false,
     warmupStrategy: 'public-route',
-    measureMode: 'interactive-shell',
+    measureMode: 'profile-warm-transition',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: [
-        '[data-testid="profile-primary-tab-subscribe"]',
-        '[data-testid="notifications-page"]',
-        '[data-testid="notifications-flow"]',
-        '[data-testid="profile-mode-drawer-subscribe"]',
-        '[data-testid="profile-header"]',
+      content: ['[data-testid="profile-primary-tab-subscribe"]'],
+      navTrigger: [
+        '[data-testid="profile-bottom-nav"] button[aria-label="Alerts"]',
       ],
     },
+    viewport: { width: 390, height: 844 },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
+      { metric: 'warm-shell-response', budget: 100 },
       { metric: 'time-to-first-byte', budget: 2400 },
     ],
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
@@ -779,17 +824,18 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     resolvePath: resolveSeededProfileModePath,
     requiresAuth: false,
     warmupStrategy: 'public-route',
-    measureMode: 'interactive-shell',
+    measureMode: 'page-load',
     readySelectors: {
-      shell: ['[data-testid="profile-header"]'],
       content: [
         '[data-testid="profile-primary-tab-about"]',
         '[data-testid="profile-mode-drawer-about"]',
-        '[data-testid="profile-header"]',
       ],
     },
     timings: [
-      { metric: 'interactive-shell-ready', budget: 100 },
+      { metric: 'first-contentful-paint', budget: 2800 },
+      { metric: 'largest-contentful-paint', budget: 3300 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
       { metric: 'time-to-first-byte', budget: 2400 },
     ],
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
@@ -804,16 +850,15 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     resolvePath: resolveSeededProfileModePath,
     requiresAuth: false,
     warmupStrategy: 'public-route',
-    measureMode: 'interactive-shell',
+    measureMode: 'page-load',
     readySelectors: {
-      shell: ['[data-testid="profile-header"]'],
-      content: [
-        '[data-testid="profile-mode-drawer-contact"]',
-        '[data-testid="profile-header"]',
-      ],
+      content: ['[data-testid="profile-mode-drawer-contact"]'],
     },
     timings: [
-      { metric: 'interactive-shell-ready', budget: 100 },
+      { metric: 'first-contentful-paint', budget: 2800 },
+      { metric: 'largest-contentful-paint', budget: 3300 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
       { metric: 'time-to-first-byte', budget: 2400 },
     ],
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
@@ -825,20 +870,22 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     group: 'public-profile-mode-shell',
     surface: 'public-profile',
     path: '/[username]?mode=tour',
+    warmNavigationStartPath: '/[username]',
     resolvePath: resolveSeededProfileModePath,
     requiresAuth: false,
     warmupStrategy: 'public-route',
-    measureMode: 'interactive-shell',
+    measureMode: 'profile-warm-transition',
     readySelectors: {
       shell: ['[data-testid="profile-header"]'],
-      content: [
-        '[data-testid="profile-primary-tab-tour"]',
-        '[data-testid="profile-mode-drawer-tour"]',
-        '[data-testid="profile-header"]',
+      content: ['[data-testid="profile-primary-tab-tour"]'],
+      navTrigger: [
+        '[data-testid="profile-bottom-nav"] button[aria-label="Events"]',
       ],
     },
+    viewport: { width: 390, height: 844 },
     timings: [
       { metric: 'interactive-shell-ready', budget: 100 },
+      { metric: 'warm-shell-response', budget: 100 },
       { metric: 'time-to-first-byte', budget: 2400 },
     ],
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
@@ -853,16 +900,15 @@ const PUBLIC_PROFILE_MODE_SHELL_ROUTES = [
     resolvePath: resolveSeededProfileModePath,
     requiresAuth: false,
     warmupStrategy: 'public-route',
-    measureMode: 'interactive-shell',
+    measureMode: 'page-load',
     readySelectors: {
-      shell: ['[data-testid="profile-header"]'],
-      content: [
-        '[data-testid="profile-mode-drawer-releases"]',
-        '[data-testid="profile-header"]',
-      ],
+      content: ['[data-testid="profile-mode-drawer-releases"]'],
     },
     timings: [
-      { metric: 'interactive-shell-ready', budget: 100 },
+      { metric: 'first-contentful-paint', budget: 2800 },
+      { metric: 'largest-contentful-paint', budget: 3300 },
+      { metric: 'cumulative-layout-shift', budget: 0.1 },
+      { metric: 'first-input-delay', budget: 100 },
       { metric: 'time-to-first-byte', budget: 2400 },
     ],
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,

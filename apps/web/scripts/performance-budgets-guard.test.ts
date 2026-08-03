@@ -19,6 +19,7 @@ import type {
   ViolationResult,
 } from './performance-budgets-guard';
 import {
+  applyProfileWarmTransitionTimings,
   buildConfirmedPageResult,
   confirmTimingViolations,
   evaluateTimingConfirmation,
@@ -26,6 +27,7 @@ import {
   measureSameRouteInteraction,
   measureWarmNavigationRoute,
   parseGuardCliArgs,
+  resolveWarmNavigationStartPath,
   runPerformanceBudgetsGuard,
   selectGuardRoutes,
   waitForWarmDestinationReady,
@@ -201,6 +203,7 @@ function createInteractivePage({
   trigger.nth.mockReturnValue(trigger);
 
   const page = {
+    addInitScript: vi.fn().mockResolvedValue(undefined),
     evaluate: vi.fn(async () => {
       const elapsed = elapsedValues.shift();
       if (elapsed === undefined) {
@@ -579,6 +582,79 @@ describe('performance budgets guard', () => {
     expect(fixture.events.indexOf('elapsed:12')).toBeLessThan(
       fixture.events.indexOf(`visible:${fixture.contentSelector}`)
     );
+  });
+
+  it('resolves dynamic profile starts and clicks the visible mobile tab', async () => {
+    const triggerSelector =
+      '[data-testid="profile-bottom-nav"] button[aria-label="Music"]';
+    const fixture = createInteractivePage({
+      contentSelector: '[data-testid="profile-primary-tab-listen"]',
+      finalUrl: 'http://127.0.0.1:4100/dualipa?mode=listen',
+      triggerSelector,
+    });
+    const route = {
+      id: 'public-profile-mode-listen',
+      path: '/[username]?mode=listen',
+      warmNavigationStartPath: '/[username]',
+      measureMode: 'profile-warm-transition',
+      readySelectors: {
+        content: [fixture.contentSelector],
+        navTrigger: [triggerSelector],
+      },
+      timings: [
+        { metric: 'interactive-shell-ready', budget: 100 },
+        { metric: 'warm-shell-response', budget: 100 },
+      ],
+    } as PerfRouteDefinition;
+
+    expect(resolveWarmNavigationStartPath(route, '/dualipa?mode=listen')).toBe(
+      '/dualipa'
+    );
+
+    const result = await measureWarmNavigationRoute(
+      fixture.page,
+      route,
+      'http://127.0.0.1:4100',
+      'http://127.0.0.1:4100/dualipa?mode=listen'
+    );
+
+    expect(result).toEqual({
+      warmShellResponse: 12,
+      skeletonToContent: 64,
+    });
+    expect(fixture.page.addInitScript).toHaveBeenCalledOnce();
+    expect(fixture.page.goto).toHaveBeenCalledWith(
+      'http://127.0.0.1:4100/dualipa',
+      expect.objectContaining({ waitUntil: 'domcontentloaded' })
+    );
+    expect(fixture.events).toContain('click');
+  });
+
+  it('maps warm profile readiness without replacing cold-load metrics', () => {
+    const timingValues = {
+      'cumulative-layout-shift': 0,
+      'first-contentful-paint': 96,
+      'first-input-delay': 1,
+      'interactive-shell-ready': 0,
+      'largest-contentful-paint': 96,
+      'redirect-complete': 0,
+      'skeleton-to-content': 0,
+      'time-to-first-byte': 7,
+      'warm-shell-response': 0,
+    } satisfies Record<PerfTimingMetricName, number>;
+
+    applyProfileWarmTransitionTimings(timingValues, {
+      warmShellResponse: 12,
+      skeletonToContent: 64,
+    });
+
+    expect(timingValues).toMatchObject({
+      'first-contentful-paint': 96,
+      'interactive-shell-ready': 64,
+      'largest-contentful-paint': 96,
+      'time-to-first-byte': 7,
+      'warm-shell-response': 12,
+    });
   });
 
   it('executes a same-route profile-rail interaction through deterministic markers', async () => {
