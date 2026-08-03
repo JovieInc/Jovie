@@ -79,6 +79,36 @@ describe('TableActionMenu interactions', () => {
     ).toBeInTheDocument();
   });
 
+  it('focuses and recursively filters the action search when opened', async () => {
+    const user = userEvent.setup({ delay: null });
+
+    render(
+      <TableActionMenu
+        searchable
+        searchPlaceholder='Search actions'
+        searchMode='recursive'
+        items={[
+          { id: 'archive', label: 'Archive', onClick: vi.fn() },
+          {
+            id: 'copy',
+            label: 'Copy',
+            children: [{ id: 'copy-isrc', label: 'ISRC', onClick: vi.fn() }],
+          },
+        ]}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'More actions' }));
+    const search = screen.getByRole('textbox', { name: 'Search actions' });
+    expect(search).toHaveFocus();
+
+    await user.type(search, 'isrc');
+    expect(screen.getByRole('menuitem', { name: 'Copy' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('menuitem', { name: 'Archive' })
+    ).not.toBeInTheDocument();
+  });
+
   it('supports the custom trigger variant', async () => {
     const user = userEvent.setup({ delay: null });
 

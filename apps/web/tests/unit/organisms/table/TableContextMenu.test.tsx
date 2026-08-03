@@ -10,6 +10,9 @@ const tableActionMenuMock = vi.fn(
   }: {
     children: ReactNode;
     items: Array<{ id: string; label: string }>;
+    searchable?: boolean;
+    searchPlaceholder?: string;
+    searchMode?: 'root' | 'recursive';
   }) => (
     <div>
       <div data-testid='context-items'>
@@ -68,6 +71,33 @@ describe('TableContextMenu', () => {
     );
 
     expect(screen.getByTestId('context-items')).toHaveTextContent('copy');
+  });
+
+  it('forwards recursive search configuration to the shared action menu', () => {
+    render(
+      <TableContextMenu
+        searchable
+        searchPlaceholder='Search actions'
+        searchMode='recursive'
+        items={[
+          {
+            id: 'copy',
+            label: 'Copy',
+            onClick: vi.fn(),
+          },
+        ]}
+      >
+        <div>Searchable Row</div>
+      </TableContextMenu>
+    );
+
+    expect(tableActionMenuMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        searchable: true,
+        searchPlaceholder: 'Search actions',
+        searchMode: 'recursive',
+      })
+    );
   });
 
   it('supports async getItems resolution', async () => {

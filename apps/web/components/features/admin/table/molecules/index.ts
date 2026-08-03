@@ -6,13 +6,11 @@
 // Re-export from unified organisms/table location
 export {
   type BulkAction,
-  ContextMenuSubmenu,
   DisplayMenuDropdown,
   ExportCSVButton,
   type ExportCSVButtonProps,
   GroupedTableBody,
   LoadingTableBody,
-  ResponsiveActionsCell,
   SocialLinksCell,
   TableBulkActionsToolbar,
   TableContextMenu,

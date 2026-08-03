@@ -174,7 +174,6 @@
         "**/ProfileLinkCategorySelector.tsx",
         "**/KanbanBoard.tsx",
         "**/TableCheckboxCell.tsx",
-        "**/ContextMenuSubmenu.tsx",
         "**/AudienceCreatedAtCell.tsx",
         "**/AudienceLastSeenCell.tsx",
         "**/AudienceRowSelectionCell.tsx",

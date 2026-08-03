@@ -1,10 +1,15 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/atoms/table-action-menu/TableActionMenu.interaction.test.tsx
+
 import type { CommonDropdownItem } from '@jovie/ui';
 import { CommonDropdown } from '@jovie/ui';
 import { MoreVertical } from 'lucide-react';
 import type { TableActionMenuItem, TableActionMenuProps } from './types';
-import { isSeparatorItem } from './utils';
+
+function isSeparatorItem(id: string): boolean {
+  return id === 'separator' || id.startsWith('separator-');
+}
 
 const DEFAULT_TRIGGER_CLASS_NAME = [
   'ml-auto',
@@ -38,6 +43,9 @@ export function TableActionMenu({
   align = 'end',
   open,
   onOpenChange,
+  searchable = false,
+  searchPlaceholder,
+  searchMode = 'root',
   children,
 }: TableActionMenuProps) {
   const toDropdownItems = (
@@ -80,7 +88,14 @@ export function TableActionMenu({
   // Context menu variant
   if (trigger === 'context' && children) {
     return (
-      <CommonDropdown variant='context' size='compact' items={dropdownItems}>
+      <CommonDropdown
+        variant='context'
+        size='compact'
+        items={dropdownItems}
+        searchable={searchable}
+        searchPlaceholder={searchPlaceholder}
+        searchMode={searchMode}
+      >
         {children}
       </CommonDropdown>
     );
@@ -97,6 +112,9 @@ export function TableActionMenu({
         align={align}
         open={open}
         onOpenChange={onOpenChange}
+        searchable={searchable}
+        searchPlaceholder={searchPlaceholder}
+        searchMode={searchMode}
       />
     );
   }
@@ -111,6 +129,9 @@ export function TableActionMenu({
       align={align}
       open={open}
       onOpenChange={onOpenChange}
+      searchable={searchable}
+      searchPlaceholder={searchPlaceholder}
+      searchMode={searchMode}
       triggerClassName={DEFAULT_TRIGGER_CLASS_NAME}
     />
   );

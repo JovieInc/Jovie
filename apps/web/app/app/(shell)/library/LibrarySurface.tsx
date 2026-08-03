@@ -677,7 +677,13 @@ const LibraryEntityActionCell = memo(function LibraryEntityActionCell({
 
   return (
     <div data-testid={`library-row-actions-${asset.id}`}>
-      <TableActionMenu items={items} align='end' />
+      <TableActionMenu
+        items={items}
+        align='end'
+        searchable
+        searchPlaceholder='Search actions'
+        searchMode='recursive'
+      />
     </div>
   );
 });
@@ -733,7 +739,7 @@ const LIBRARY_CATALOG_COLUMNS = [
   }),
   libraryColumnHelper.display({
     id: 'releaseDate',
-    header: 'Release Date',
+    header: 'Date',
     cell: ({ row }) => <ReleaseDateCell asset={row.original} />,
     size: 112,
     minSize: 96,
@@ -1709,7 +1715,13 @@ function AssetGrid({
       )}
     >
       {assets.map(asset => (
-        <TableContextMenu key={asset.id} items={getContextMenuItems(asset)}>
+        <TableContextMenu
+          key={asset.id}
+          items={getContextMenuItems(asset)}
+          searchable
+          searchPlaceholder='Search actions'
+          searchMode='recursive'
+        >
           <AssetCard
             asset={asset}
             selected={selectedId === asset.id}
@@ -1785,6 +1797,9 @@ function LibraryReleaseTable({
       rowSelection={rowSelection}
       getRowClassName={getRowClassName}
       getContextMenuItems={getContextMenuItems}
+      contextMenuSearchable
+      contextMenuSearchPlaceholder='Search actions'
+      contextMenuSearchMode='recursive'
       enableVirtualization={assets.length >= 20}
       rowHeight={LIBRARY_TABLE_ROW_HEIGHT}
       minWidth={LIBRARY_TABLE_MIN_WIDTH}
@@ -2129,6 +2144,9 @@ function AssetDrawer({
       primaryActions={[]}
       menuItems={convertToCommonDropdownItems(getContextMenuItems(current))}
       onClose={onClose}
+      searchable
+      searchPlaceholder='Search actions'
+      searchMode='recursive'
     />
   ) : null;
 
@@ -2190,7 +2208,12 @@ function AssetDrawer({
       }
     >
       {current ? (
-        <TableContextMenu items={getContextMenuItems(current)}>
+        <TableContextMenu
+          items={getContextMenuItems(current)}
+          searchable
+          searchPlaceholder='Search actions'
+          searchMode='recursive'
+        >
           <DrawerSectionGroup
             defaultOpenSectionId={isMerch ? 'merch' : 'details'}
           >

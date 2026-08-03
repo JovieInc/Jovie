@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/organisms/table/VirtualizedTableBody.test.tsx
+
 import type { Row } from '@tanstack/react-table';
 import type { VirtualItem, Virtualizer } from '@tanstack/react-virtual';
 import React from 'react';
@@ -90,6 +92,9 @@ export interface VirtualizedTableBodyProps<TData> {
   readonly getContextMenuItems?: (
     row: TData
   ) => ContextMenuItemType[] | Promise<ContextMenuItemType[]>;
+  readonly contextMenuSearchable?: boolean;
+  readonly contextMenuSearchPlaceholder?: string;
+  readonly contextMenuSearchMode?: 'root' | 'recursive';
 
   /**
    * Get custom class names for a row
@@ -186,6 +191,9 @@ export function VirtualizedTableBody<TData>({
   onKeyDown,
   onRowShiftClick,
   getContextMenuItems,
+  contextMenuSearchable = false,
+  contextMenuSearchPlaceholder,
+  contextMenuSearchMode = 'root',
   getRowClassName,
   isRowSelected,
   getRowTestId,
@@ -272,6 +280,9 @@ export function VirtualizedTableBody<TData>({
           <TableContextMenu
             key={row.id}
             getItems={() => getContextMenuItems(rowData)}
+            searchable={contextMenuSearchable}
+            searchPlaceholder={contextMenuSearchPlaceholder}
+            searchMode={contextMenuSearchMode}
           >
             {rowElement}
           </TableContextMenu>

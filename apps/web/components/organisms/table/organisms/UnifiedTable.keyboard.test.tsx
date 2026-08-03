@@ -103,4 +103,31 @@ describe('UnifiedTable keyboard interaction', () => {
     fireEvent.keyDown(selected, { key: 'Enter' });
     expect(onRowClick).toHaveBeenCalledWith(data[1]);
   });
+
+  it('opens a searchable action menu from the row context gesture', async () => {
+    render(
+      <UnifiedTable
+        data={data}
+        columns={columns}
+        hideHeader
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        getRowTestId={row => `row-${row.id}`}
+        contextMenuSearchable
+        contextMenuSearchPlaceholder='Search actions'
+        contextMenuSearchMode='recursive'
+        getContextMenuItems={() => [
+          {
+            id: 'copy-title',
+            label: 'Copy Title',
+            onClick: vi.fn(),
+          },
+        ]}
+      />
+    );
+
+    fireEvent.contextMenu(screen.getByTestId('row-one'));
+
+    expect(await screen.findByPlaceholderText('Search actions')).toHaveFocus();
+  });
 });

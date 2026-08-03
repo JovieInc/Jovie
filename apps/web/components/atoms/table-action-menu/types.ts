@@ -20,5 +20,8 @@ export interface TableActionMenuProps {
   readonly align?: 'start' | 'center' | 'end';
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
+  readonly searchable?: boolean;
+  readonly searchPlaceholder?: string;
+  readonly searchMode?: 'root' | 'recursive';
   readonly children?: React.ReactNode;
 }

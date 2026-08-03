@@ -5,6 +5,8 @@ import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { VirtualizedTableBody } from '@/components/organisms/table/organisms/VirtualizedTableBody';
 
+const tableContextMenuSpy = vi.fn();
+
 vi.mock('@/components/organisms/table/organisms/VirtualizedTableRow', () => ({
   VirtualizedTableRow: ({ row }: { row: { id: string } }) => (
     <tr data-testid={`table-row-${row.id}`}>
@@ -14,7 +16,15 @@ vi.mock('@/components/organisms/table/organisms/VirtualizedTableRow', () => ({
 }));
 
 vi.mock('@/components/organisms/table/molecules/TableContextMenu', () => ({
-  TableContextMenu: ({ children }: { children: ReactNode }) => <>{children}</>,
+  TableContextMenu: (props: {
+    children: ReactNode;
+    searchable?: boolean;
+    searchPlaceholder?: string;
+    searchMode?: 'root' | 'recursive';
+  }) => {
+    tableContextMenuSpy(props);
+    return <>{props.children}</>;
+  },
 }));
 
 type TestRow = { id: string; name: string };
@@ -73,5 +83,31 @@ describe('VirtualizedTableBody', () => {
     );
 
     expect(screen.getByTestId('table-row-1')).toBeInTheDocument();
+  });
+
+  it('forwards searchable context-menu configuration for virtual rows', () => {
+    const rows = [createRow('1', 'One')];
+
+    render(
+      <table>
+        <VirtualizedTableBody
+          {...baseProps}
+          rows={rows}
+          shouldVirtualize={false}
+          getContextMenuItems={() => []}
+          contextMenuSearchable
+          contextMenuSearchPlaceholder='Search actions'
+          contextMenuSearchMode='recursive'
+        />
+      </table>
+    );
+
+    expect(tableContextMenuSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        searchable: true,
+        searchPlaceholder: 'Search actions',
+        searchMode: 'recursive',
+      })
+    );
   });
 });

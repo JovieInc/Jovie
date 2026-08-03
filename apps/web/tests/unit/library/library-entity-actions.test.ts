@@ -35,7 +35,8 @@ function buildAsset(
     targetPlaylistCount: 0,
     isExplicit: false,
     label: null,
-    upc: null,
+    upc: '198391373428',
+    primaryIsrc: 'US-ABC-26-00001',
     distributor: null,
     totalDurationMs: null,
     share: {
@@ -77,8 +78,7 @@ describe('library entity actions', () => {
       'open-video',
       'open-artwork',
       'open-primary',
-      'copy-share-link',
-      'copy-title',
+      'copy',
     ]);
   });
 
@@ -98,7 +98,7 @@ describe('library entity actions', () => {
       'approval-status',
       'open-artwork',
       'open-primary',
-      'copy-title',
+      'copy',
     ]);
     expect(actions.find(action => action.id === 'open-primary')?.label).toBe(
       'Open Merch'
@@ -138,21 +138,29 @@ describe('library entity actions', () => {
       'open-video',
       'open-artwork',
       'open-primary',
-      'copy-share-link',
-      'copy-title',
+      'copy',
     ]);
 
     const visibility = actions.find(
       action => action.id === 'profile-visibility'
     );
     expect(visibility).toMatchObject({
-      label: 'Hide from Profile',
+      label: 'Visibility',
       authority: 'profile-owner',
       disabled: false,
       destructive: false,
     });
 
-    await visibility?.onExecute?.();
+    expect(visibility?.children).toHaveLength(2);
+    expect(visibility?.children?.[0]).toMatchObject({
+      id: 'profile-visibility:visible',
+      label: 'Shown on Profile',
+      disabled: true,
+      disabledReason: 'Current profile visibility',
+    });
+    await visibility?.children
+      ?.find(action => action.id === 'profile-visibility:hidden')
+      ?.onExecute?.();
     expect(onChange).toHaveBeenCalledWith(asset, 'hidden');
   });
 
@@ -177,9 +185,8 @@ describe('library entity actions', () => {
       'open-video',
       'open-artwork',
       'open-primary',
+      'copy',
       'archive',
-      'copy-share-link',
-      'copy-title',
     ]);
   });
 
@@ -284,15 +291,24 @@ describe('library entity actions', () => {
     }).find(action => action.id === 'profile-visibility');
 
     expect(withoutOwner).toMatchObject({
-      label: 'Show on Profile',
-      disabled: true,
-      disabledReason: 'Requires an owned creator profile',
+      label: 'Visibility',
+      disabled: false,
     });
-    expect(whileSaving).toMatchObject({
-      label: 'Show on Profile',
-      disabled: true,
-      disabledReason: 'Saving profile visibility',
-    });
+    expect(
+      withoutOwner?.children?.every(
+        action =>
+          action.disabled &&
+          action.disabledReason === 'Requires an owned creator profile'
+      )
+    ).toBe(true);
+    expect(whileSaving).toMatchObject({ label: 'Visibility', disabled: false });
+    expect(
+      whileSaving?.children?.every(
+        action =>
+          action.disabled &&
+          action.disabledReason === 'Saving profile visibility'
+      )
+    ).toBe(true);
   });
 
   it('routes actions through the injected entity handlers', async () => {
@@ -310,7 +326,10 @@ describe('library entity actions', () => {
 
     await actions.find(action => action.id === 'play-preview')?.onExecute?.();
     await actions.find(action => action.id === 'open-video')?.onExecute?.();
-    await actions.find(action => action.id === 'copy-title')?.onExecute?.();
+    const copy = actions.find(action => action.id === 'copy');
+    await copy?.children
+      ?.find(action => action.id === 'copy-title')
+      ?.onExecute?.();
     const approval = actions.find(action => action.id === 'approval-status');
     await approval?.children
       ?.find(action => action.id === 'approval-status:approved')
@@ -320,6 +339,41 @@ describe('library entity actions', () => {
     expect(openUrl).toHaveBeenCalledWith('https://cdn.example.com/canvas.mp4');
     expect(copyText).toHaveBeenCalledWith('Take Me Over');
     expect(onApprovalStatusChange).toHaveBeenCalledWith(asset, 'approved');
+  });
+
+  it('groups share links, tracked links, and release identifiers under Copy', () => {
+    const copy = buildActions(buildAsset()).find(
+      action => action.id === 'copy'
+    );
+
+    expect(copy?.children?.map(action => action.id)).toEqual([
+      'copy-share-link',
+      'copy-tracked-link',
+      'copy-title',
+      'copy-artist',
+      'copy-isrc',
+      'copy-upc',
+    ]);
+    expect(
+      copy?.children?.find(action => action.id === 'copy-tracked-link')
+    ).toMatchObject({
+      label: 'Tracked Link',
+      children: expect.arrayContaining([
+        expect.objectContaining({ id: 'utm-share-instagram-story' }),
+      ]),
+    });
+  });
+
+  it('does not invent identifier copy actions when metadata is absent', () => {
+    const copy = buildActions(
+      buildAsset({ artist: 'Unknown Artist', primaryIsrc: null, upc: null })
+    ).find(action => action.id === 'copy');
+
+    expect(copy?.children?.map(action => action.id)).not.toContain(
+      'copy-artist'
+    );
+    expect(copy?.children?.map(action => action.id)).not.toContain('copy-isrc');
+    expect(copy?.children?.map(action => action.id)).not.toContain('copy-upc');
   });
 
   it('adapts the same typed actions to nested context-menu items', () => {
@@ -332,7 +386,7 @@ describe('library entity actions', () => {
     );
     expect(approval).toMatchObject({
       id: 'approval-status',
-      label: 'Approval: Draft',
+      label: 'Status',
     });
     expect('items' in approval ? approval.items : []).toHaveLength(4);
   });

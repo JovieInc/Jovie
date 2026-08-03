@@ -77,7 +77,9 @@ export function CommonDropdown(props: CommonDropdownProps) {
     : contextMenuContentClasses;
 
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [isOpen, setIsOpen] = React.useState(Boolean(open));
   const searchQueryRef = React.useRef('');
+  const rootSearchInputRef = React.useRef<HTMLInputElement>(null);
   const didMountRef = React.useRef(false);
 
   const filteredItems = React.useMemo(
@@ -107,6 +109,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
 
   const handleOpenChange = React.useCallback(
     (nextOpen: boolean) => {
+      setIsOpen(nextOpen);
       if (!nextOpen && resetSearchOnClose) {
         clearSearch();
       }
@@ -114,6 +117,22 @@ export function CommonDropdown(props: CommonDropdownProps) {
     },
     [clearSearch, onOpenChange, resetSearchOnClose]
   );
+
+  React.useEffect(() => {
+    if (typeof open === 'boolean') {
+      setIsOpen(open);
+    }
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!searchable || !isOpen) return;
+
+    const focusTimer = globalThis.setTimeout(() => {
+      rootSearchInputRef.current?.focus();
+    }, 0);
+
+    return () => globalThis.clearTimeout(focusTimer);
+  }, [isOpen, searchable]);
 
   React.useEffect(() => {
     if (!didMountRef.current) {
@@ -212,6 +231,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
       >
         {searchable ? (
           <SearchableContent
+            inputRef={rootSearchInputRef}
             query={searchQuery}
             placeholder={searchPlaceholder}
             onQueryChange={handleSearchChange}
@@ -257,6 +277,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
       >
         {searchable ? (
           <SearchableContent
+            inputRef={rootSearchInputRef}
             query={searchQuery}
             placeholder={searchPlaceholder}
             onQueryChange={handleSearchChange}

@@ -73,6 +73,7 @@ export interface LibraryReleaseAsset {
   readonly isExplicit: boolean;
   readonly label: string | null;
   readonly upc: string | null;
+  readonly primaryIsrc?: string | null;
   readonly distributor: string | null;
   readonly totalDurationMs: number | null;
   readonly itemStatusLabel?: string;
@@ -232,6 +233,7 @@ export function buildLibraryReleaseAssets(
       isExplicit: release.isExplicit,
       label: release.label?.trim() || null,
       upc: release.upc?.trim() || null,
+      primaryIsrc: release.primaryIsrc?.trim() || null,
       distributor: release.distributor?.trim() || null,
       totalDurationMs: release.totalDurationMs ?? null,
     };
@@ -304,6 +306,7 @@ export function buildLibraryMerchAssets(
       isExplicit: false,
       label: null,
       upc: null,
+      primaryIsrc: null,
       distributor: null,
       totalDurationMs: null,
       itemStatusLabel: formatMerchStatus(card.status),
