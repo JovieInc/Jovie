@@ -198,7 +198,11 @@ describe('EntitySidebarShell', () => {
 
     expect(footerButton).toBeInTheDocument();
     expect(footerContainer).not.toHaveAttribute('data-variant', 'card');
-    expect(footerContainer).toHaveClass('px-3', 'py-2.5');
+    expect(footerContainer).toHaveClass(
+      'px-3',
+      'py-2.5',
+      'max-lg:mb-[calc(3.5rem+env(safe-area-inset-bottom))]'
+    );
   });
 
   it('defaults to child-owned scrolling for drawer body content', () => {
