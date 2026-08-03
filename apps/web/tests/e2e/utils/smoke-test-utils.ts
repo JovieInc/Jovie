@@ -609,12 +609,25 @@ export async function waitForHydration(
         const isReady =
           document.readyState === 'complete' ||
           document.readyState === 'interactive';
-        return isReady && !hasHydrationError;
+        const profileShell = document.querySelector(
+          '[data-testid="profile-compact-shell"]'
+        );
+        const isProfileInteractive =
+          !profileShell ||
+          profileShell.getAttribute('data-interactive-ready') === 'true';
+        return isReady && !hasHydrationError && isProfileInteractive;
       },
       { timeout }
     )
-    .catch(() => {
-      // Fallback: just ensure DOM is ready
+    .catch(async error => {
+      const profileShellCount = await page
+        .locator('[data-testid="profile-compact-shell"]')
+        .count()
+        .catch(() => 0);
+      if (profileShellCount > 0) {
+        throw error;
+      }
+      // Non-profile callers retain the historical DOM-ready fallback.
     });
 }
 

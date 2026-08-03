@@ -66,4 +66,19 @@ describe('route-qa not-found detection', () => {
       ])
     );
   });
+
+  it('expands the public music alias for seeded and missing profiles', async () => {
+    await expect(
+      expandDynamicRoute('/[username]/music', 'route-qa-test')
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: '/e2e-test-user/music' }),
+        expect.objectContaining({ path: '/browse-test-user/music' }),
+        expect.objectContaining({
+          path: '/missing-qa-user/music',
+          expectedState: 'not-found',
+        }),
+      ])
+    );
+  });
 });

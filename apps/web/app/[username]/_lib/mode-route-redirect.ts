@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server';
 import type { ProfileMode } from '@/features/profile/contracts';
 import { getProfileModeHref } from '@/features/profile/registry';
 
@@ -33,36 +32,36 @@ export function getProfileModeRedirectHref(
   return getProfileModeHref(username, mode, searchSuffix);
 }
 
-export function getRouteRedirectSearchParams(searchParams: URLSearchParams) {
-  const sourceValues = searchParams.getAll('source').filter(Boolean);
+const LEGACY_PROFILE_MODE_BY_SLUG: Readonly<
+  Record<string, Exclude<ProfileMode, 'profile'>>
+> = {
+  listen: 'listen',
+  music: 'listen',
+  releases: 'releases',
+  subscribe: 'subscribe',
+  tip: 'pay',
+  tour: 'tour',
+};
 
-  if (sourceValues.length === 0) {
-    return undefined;
-  }
-
-  return {
-    source: sourceValues.length === 1 ? sourceValues[0] : sourceValues,
-  } satisfies RedirectSourceSearchParams;
+export function isLegacyProfileModeAlias(slug: string): boolean {
+  return Object.hasOwn(LEGACY_PROFILE_MODE_BY_SLUG, slug);
 }
 
 /**
- * Hard HTTP 307 response for the legacy mode redirect sinks
- * (/{username}/tour|tip|listen|releases|music|subscribe).
- *
- * These MUST be route handlers, not pages calling `redirect()`: the
- * segment's loading.tsx streams the shell (status 200) before a page-level
- * `redirect()` throws, so a page sink can only deliver a client-side
- * streamed redirect — never the hard 307 the sinks promise. A route handler
- * owns the whole response, so the 307 + Location header are authoritative.
+ * Resolves a legacy profile-mode alias after the smart-link route has proved
+ * that the slug does not belong to published, renamed, or unpublished music.
+ * Alias requests are routed after filesystem matches into the catch-all
+ * resolver, so static application routes retain priority and real releases
+ * called `music` or `tour` keep their public URLs.
  */
-export function profileModeRedirectResponse(
-  requestUrl: string,
+export function getLegacyProfileModeRedirectHref(
   username: string,
-  searchParams: RedirectSourceSearchParams | undefined,
-  mode: Exclude<ProfileMode, 'profile'>
-): NextResponse {
-  const href = searchParams
-    ? getProfileModeRedirectHref(username, searchParams, mode)
-    : getProfileModeHref(username, mode);
-  return NextResponse.redirect(new URL(href, requestUrl), 307);
+  slug: string,
+  searchParams: RedirectSourceSearchParams | undefined
+): string | null {
+  if (!isLegacyProfileModeAlias(slug)) return null;
+  const mode = LEGACY_PROFILE_MODE_BY_SLUG[slug];
+  if (!mode) return null;
+
+  return getProfileModeRedirectHref(username, searchParams, mode);
 }

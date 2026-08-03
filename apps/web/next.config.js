@@ -440,12 +440,32 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    return [
-      {
-        source: '/app/ov/:path*',
-        destination: '/app/admin/:path*',
-      },
-    ];
+    const profileModeAliasRewrites = [
+      'listen',
+      'music',
+      'releases',
+      'subscribe',
+      'tip',
+      'tour',
+    ].map(alias => ({
+      source: `/:username/${alias}`,
+      destination: `/:username/${alias}/__profile-mode-alias/resolve`,
+    }));
+
+    return {
+      beforeFiles: [],
+      // Run after concrete filesystem routes but before /[username]/[slug].
+      // The catch-all resolver checks published, renamed, and unpublished
+      // content before falling back to the legacy profile-mode redirect.
+      afterFiles: [
+        ...profileModeAliasRewrites,
+        {
+          source: '/app/ov/:path*',
+          destination: '/app/admin/:path*',
+        },
+      ],
+      fallback: [],
+    };
   },
   env: {
     // Build-time env vars — these get inlined into client bundles by Next.js
