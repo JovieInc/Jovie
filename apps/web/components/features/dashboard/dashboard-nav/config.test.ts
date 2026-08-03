@@ -15,7 +15,7 @@ const CANONICAL_NAVIGATION = [
   ['inbox', 'Inbox', APP_ROUTES.DASHBOARD],
   ['library', 'Library', APP_ROUTES.LIBRARY],
   ['contacts', 'Contacts', APP_ROUTES.CONTACTS],
-  ['profiles', 'Connections', APP_ROUTES.PROFILES],
+  ['profiles', 'Presence', APP_ROUTES.PROFILES],
   ['calendar', 'Calendar', APP_ROUTES.CALENDAR],
 ] as const;
 

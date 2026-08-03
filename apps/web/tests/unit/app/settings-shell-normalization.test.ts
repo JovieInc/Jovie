@@ -83,17 +83,6 @@ const SETTINGS_ALIAS_ROUTES = [
       )
     ),
   },
-  {
-    route: 'settings connectors',
-    expectedDestination: '`${APP_ROUTES.PROFILES}?add=service`',
-    filePath: findSourceFile(
-      resolve(process.cwd(), 'app/app/(shell)/settings/connectors/page.tsx'),
-      resolve(
-        process.cwd(),
-        'apps/web/app/app/(shell)/settings/connectors/page.tsx'
-      )
-    ),
-  },
 ] as const;
 
 const SETTINGS_SHARED_ROUTE_CONTEXT_FILES = [
@@ -126,6 +115,13 @@ const SETTINGS_SHARED_ROUTE_CONTEXT_FILES = [
       'apps/web/app/app/(shell)/settings/payments/page.tsx'
     )
   ),
+  findSourceFile(
+    resolve(process.cwd(), 'app/app/(shell)/settings/connectors/page.tsx'),
+    resolve(
+      process.cwd(),
+      'apps/web/app/app/(shell)/settings/connectors/page.tsx'
+    )
+  ),
 ] as const;
 
 const SETTINGS_SHARED_ROUTE_CONTEXT_CANDIDATES = [
@@ -134,6 +130,7 @@ const SETTINGS_SHARED_ROUTE_CONTEXT_CANDIDATES = [
   resolve(process.cwd(), 'app/app/(shell)/settings/artist-profile/page.tsx'),
   resolve(process.cwd(), 'app/app/(shell)/settings/admin/page.tsx'),
   resolve(process.cwd(), 'app/app/(shell)/settings/payments/page.tsx'),
+  resolve(process.cwd(), 'app/app/(shell)/settings/connectors/page.tsx'),
 ] as const;
 
 const SETTINGS_CONNECTORS_PAGE = findSourceFile(
