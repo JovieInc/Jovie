@@ -97,7 +97,8 @@ function normalizeTrailingSlash(pathname: string): string {
 }
 
 export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
-  const { inboxNavigation, selectedProfile } = useDashboardData();
+  const { creatorProfiles, inboxNavigation, selectedProfile } =
+    useDashboardData();
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
@@ -213,6 +214,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
     selectedProfile?.displayName?.trim() ||
     selectedProfile?.username?.trim() ||
     'Artist';
+  const hasMultipleProfiles = creatorProfiles.length > 1;
 
   // Memoize nav sections for dashboard (non-settings) mode
   const navSections = useMemo<readonly DashboardNavSection[]>(
@@ -489,13 +491,17 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                 </div>
               ))}
               <div data-nav-section='artist'>
-                <SidebarCollapsibleGroup
-                  label={artistLabel}
-                  defaultOpen
-                  storageKey={`dashboard.artist.${profileId || 'selected'}`}
-                >
-                  {renderSection(artistNavigation)}
-                </SidebarCollapsibleGroup>
+                {hasMultipleProfiles ? (
+                  <SidebarCollapsibleGroup
+                    label={artistLabel}
+                    defaultOpen
+                    storageKey={`dashboard.artist.${profileId || 'selected'}`}
+                  >
+                    {renderSection(artistNavigation)}
+                  </SidebarCollapsibleGroup>
+                ) : (
+                  renderSection(artistNavigation)
+                )}
               </div>
             </SidebarGroupContent>
           </SidebarGroup>

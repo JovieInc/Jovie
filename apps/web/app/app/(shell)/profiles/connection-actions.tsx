@@ -28,7 +28,7 @@ const PRIMARY_ACTION_COPY: Record<
 };
 
 /**
- * Canonical action registry for a Connections workspace entity.
+ * Canonical action registry for a Presence workspace entity.
  *
  * The returned items feed the row context menu, row ellipsis menu, and right
  * rail overflow menu so those entry points cannot drift independently.
@@ -38,6 +38,7 @@ export function buildConnectionActions(
   primaryAction: ConnectionPrimaryAction,
   callbacks: BuildConnectionActionsCallbacks
 ): ContextMenuItemType[] {
+  const entityLabel = row.rowType === 'connector' ? 'Connection' : 'Profile';
   const items: ContextMenuItemType[] = [
     {
       id: 'view-details',
@@ -47,7 +48,7 @@ export function buildConnectionActions(
     },
     {
       id: 'open-connection',
-      label: 'Open Connection',
+      label: `Open ${entityLabel}`,
       icon: <ExternalLink className='h-3.5 w-3.5' aria-hidden />,
       onClick: () => callbacks.onOpen(row),
     },
@@ -56,11 +57,15 @@ export function buildConnectionActions(
   if (primaryAction !== 'open') {
     const action = PRIMARY_ACTION_COPY[primaryAction];
     const Icon = action.icon;
+    const actionLabel =
+      primaryAction === 'review' && row.rowType === 'surface'
+        ? 'Review Profile'
+        : action.label;
     items.push(
       { type: 'separator' },
       {
         id: `connection-${primaryAction}`,
-        label: action.label,
+        label: actionLabel,
         icon: <Icon className='h-3.5 w-3.5' aria-hidden />,
         onClick: () => callbacks.onPrimaryAction(row),
       }

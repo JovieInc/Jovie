@@ -2,12 +2,12 @@ import { CalendarDays, CheckSquare, Music, SquarePen } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
-  artistNavigation,
   CUSTOMER_NAV_CAPACITY,
   customerNavVisibleCap,
   partitionCustomerNavigation,
 } from './capacity';
 import {
+  artistNavigation,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
   primaryNavigation,
@@ -49,11 +49,7 @@ describe('partitionCustomerNavigation', () => {
       visibleCap: CUSTOMER_NAV_CAPACITY.mobilePrimaryVisible,
     });
 
-    expect(partition.visible.map(item => item.id)).toEqual([
-      'chat',
-      'inbox',
-      'profiles',
-    ]);
+    expect(partition.visible.map(item => item.id)).toEqual(['chat', 'inbox']);
     expect(partition.more).toEqual([]);
     expect(partition.visible).toEqual(mobilePrimaryNavigation);
     expect(mobileExpandedNavigation).toEqual(artistNavigation);
@@ -78,7 +74,7 @@ describe('partitionCustomerNavigation', () => {
     ];
 
     const partition = partitionCustomerNavigation(items, {
-      visibleCap: CUSTOMER_NAV_CAPACITY.desktopPrimaryVisible,
+      visibleCap: primaryNavigation.length + 1,
     });
 
     expect(partition.visible.map(item => item.id)).toEqual([
@@ -117,14 +113,8 @@ describe('partitionCustomerNavigation', () => {
       activeItemId: null,
     });
 
-    expect(partition.visible).toHaveLength(
-      CUSTOMER_NAV_CAPACITY.mobilePrimaryVisible
-    );
-    expect(partition.visible.map(item => item.id)).toEqual([
-      'chat',
-      'inbox',
-      'profiles',
-    ]);
+    expect(partition.visible).toHaveLength(primaryNavigation.length);
+    expect(partition.visible.map(item => item.id)).toEqual(['chat', 'inbox']);
   });
 
   it('promotes an active experimental destination ahead of passive experimental slots', () => {

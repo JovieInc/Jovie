@@ -75,6 +75,7 @@ const data: ProfilesWorkspaceData = {
     name: 'Tim White',
     username: 'tim',
     avatarUrl: null,
+    isPublic: true,
   },
   rows: [
     {
@@ -199,36 +200,45 @@ describe('ProfilesWorkspace', () => {
     expect(selectedReveal).toHaveStyle({ color: '#1DB954' });
   });
 
-  it('keeps navigation filters compact and moves the primary action to the header', async () => {
+  it('shows recurring artist outcomes, all monitored pages, and a focused header action', async () => {
     renderWorkspace(data);
 
     expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
     expect(screen.getByText('Spotify')).toBeInTheDocument();
-    expect(screen.queryByText('Jovie Profile')).not.toBeInTheDocument();
+    expect(screen.getByText('Jovie Profile')).toBeInTheDocument();
+    expect(screen.getByText('Instagram')).toBeInTheDocument();
     expect(screen.queryByText('Gmail')).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'All' })
-    ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'DSPs' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'All Pages' })).toHaveAttribute(
       'aria-pressed',
       'true'
     );
+    const outcomes = screen.getByTestId('presence-outcomes');
+    expect(within(outcomes).getByText('Search Visibility')).toBeInTheDocument();
+    expect(within(outcomes).getByText('#2')).toBeInTheDocument();
+    expect(within(outcomes).getByText('Answer Visibility')).toBeInTheDocument();
+    expect(within(outcomes).getByText('Published')).toBeInTheDocument();
+    expect(within(outcomes).getByText('Audience Quality')).toBeInTheDocument();
+    expect(within(outcomes).getByText('Engagement Scored')).toBeInTheDocument();
+    expect(within(outcomes).getByText('Monitored Pages')).toBeInTheDocument();
+    expect(within(outcomes).getByText('1 of 5')).toBeInTheDocument();
+    expect(
+      within(outcomes).getByRole('link', { name: /Published/i })
+    ).toHaveAttribute('href', '/tim');
+    expect(
+      within(outcomes).getByRole('link', { name: /Engagement Scored/i })
+    ).toHaveAttribute('href', '/app/contacts');
     expect(screen.queryByText('7')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('connections-summary')).not.toBeInTheDocument();
-    expect(screen.queryByText('4 Connections')).not.toBeInTheDocument();
-    expect(screen.queryByText('Monitored 1/5')).not.toBeInTheDocument();
-    expect(screen.queryByText('Needs Attention 1')).not.toBeInTheDocument();
     const typeGlyph = screen.getByRole('img', {
-      name: 'DSP connection type',
+      name: 'DSP profile type',
     });
     expect(typeGlyph).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'DSP connection type' })
+      screen.queryByRole('button', { name: 'DSP profile type' })
     ).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId('registered-header-actions')).getByRole(
         'button',
-        { name: 'Add connection' }
+        { name: 'Add Profile Or Site' }
       )
     ).toBeInTheDocument();
 
@@ -264,7 +274,7 @@ describe('ProfilesWorkspace', () => {
 
     render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
     expect(
-      screen.getByRole('complementary', { name: 'Connection details' })
+      screen.getByRole('complementary', { name: 'Presence details' })
     ).toBeInTheDocument();
     expect(screen.getByTestId('profiles-rail-entity-header')).toHaveClass(
       'relative',
@@ -280,7 +290,7 @@ describe('ProfilesWorkspace', () => {
     );
     expect(screen.getByText('Next Best Action')).toBeInTheDocument();
     expect(
-      screen.getByText('Upgrade the monitoring limit to track this connection.')
+      screen.getByText('Upgrade the monitoring limit to track this page.')
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Upgrade' })).toHaveAttribute(
       'href',
@@ -375,37 +385,31 @@ describe('ProfilesWorkspace', () => {
     expect(vi.mocked(useRegisterRightPanel)).toHaveBeenLastCalledWith(null);
   });
 
-  it('opens the in-flow add rail with registry-backed services and canonical URL review', async () => {
+  it('adds monitored public pages without exposing account authorization', async () => {
     const user = userEvent.setup();
     renderWorkspace(data);
 
-    await user.click(screen.getByRole('button', { name: 'Add connection' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Add Profile Or Site' })
+    );
     const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
     expect(panel).not.toBeNull();
 
     render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
     expect(
-      screen.getByRole('complementary', { name: 'Add connection' })
+      screen.getByRole('complementary', { name: 'Add Profile Or Site' })
     ).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Connect services/i }));
-    expect(
-      screen.getByRole('button', {
-        name: 'Gmail Scan booking emails for tour confirmation signals.',
-      })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /Google Calendar/i })
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.queryByText(/Connect services/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Gmail')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Google Calendar/i)).not.toBeInTheDocument();
     await user.click(
       screen.getByRole('button', { name: /Add public profile/i })
     );
-    const url = screen.getByRole('textbox', { name: 'Public profile URL' });
+    const url = screen.getByRole('textbox', { name: 'Public Profile URL' });
     await user.type(url, 'Instagram.com/tim/?utm_source=test');
     expect(screen.getByText(/instagram\.com\/tim/)).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Review profile' })
+      screen.getByRole('button', { name: 'Review Profile' })
     ).toBeEnabled();
   });
 
@@ -413,18 +417,20 @@ describe('ProfilesWorkspace', () => {
     const user = userEvent.setup();
     renderWorkspace(data);
 
-    await user.click(screen.getByRole('button', { name: 'Add connection' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Add Profile Or Site' })
+    );
     const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
     render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
 
     await user.click(
       screen.getByRole('button', { name: /Add public profile/i })
     );
-    const input = screen.getByRole('textbox', { name: 'Public profile URL' });
+    const input = screen.getByRole('textbox', { name: 'Public Profile URL' });
     await user.type(input, '@newhandle');
 
     expect(
-      screen.getByRole('listbox', { name: 'Suggested profile destinations' })
+      screen.getByRole('listbox', { name: 'Suggested Profile Destinations' })
     ).toBeInTheDocument();
     expect(screen.getByRole('option', { name: /TikTok/i })).toHaveAttribute(
       'aria-selected',
@@ -435,7 +441,7 @@ describe('ProfilesWorkspace', () => {
     expect(input).toHaveValue('https://youtube.com/@newhandle');
     expect(screen.getByText('Detected')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Review profile' })
+      screen.getByRole('button', { name: 'Review Profile' })
     ).toBeEnabled();
 
     expect(screen.getByText('Preview only · not saved')).toBeInTheDocument();
@@ -462,9 +468,9 @@ describe('ProfilesWorkspace', () => {
   it('keeps secondary columns out of the selected-rail width contract', () => {
     renderWorkspace(data);
 
-    expect(screen.getByRole('columnheader', { name: 'Rank' })).toHaveClass(
-      'max-lg:hidden'
-    );
+    expect(
+      screen.getByRole('columnheader', { name: 'Search Rank' })
+    ).toHaveClass('max-lg:hidden');
     expect(screen.getByRole('columnheader', { name: 'Change' })).toHaveClass(
       'max-xl:hidden'
     );

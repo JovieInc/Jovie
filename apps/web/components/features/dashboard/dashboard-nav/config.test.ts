@@ -30,7 +30,7 @@ function toContract(
 }
 
 describe('canonical customer shell navigation', () => {
-  it('keeps New Chat as the quiet secondary first action and Connections in the canonical order', () => {
+  it('keeps global actions separate from artist-scoped destinations', () => {
     expect(toContract(primaryNavigation)).toEqual(CANONICAL_NAVIGATION);
     expect(primaryNavigation[0].tone).toBe('secondary');
     expect(primaryNavigation.every(item => item.tier === 'core')).toBe(true);
@@ -92,6 +92,7 @@ describe('canonical customer shell navigation', () => {
         'audience',
         'releases',
         'tasks',
+        'profiles',
       ])
     );
     expect(labels).not.toEqual(

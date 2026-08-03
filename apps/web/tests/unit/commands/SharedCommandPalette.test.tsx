@@ -188,7 +188,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     );
   });
 
-  it('filters to Connections and opens the canonical workspace on Enter', () => {
+  it('filters to Connections and opens account integrations in Settings', () => {
     pushMock.mockClear();
     render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
 
@@ -199,12 +199,12 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
 
     expect(
       screen.getByRole('option', {
-        name: 'Connections Manage artist identities and connected services. ⌘1',
+        name: 'Connections Manage account integrations and authorized services. ⌘1',
       })
     ).toHaveAttribute('aria-selected', 'true');
 
     fireEvent.keyDown(input, { key: 'Enter' });
-    expect(pushMock).toHaveBeenCalledWith(APP_ROUTES.PROFILES);
+    expect(pushMock).toHaveBeenCalledWith(APP_ROUTES.SETTINGS_CONNECTORS);
   });
 
   it('renders cmd+k results with the shared dense-table row contract', () => {
@@ -215,7 +215,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     );
 
     const selected = screen.getByRole('option', {
-      name: 'Connections Manage artist identities and connected services. ⌘1',
+      name: 'Connections Manage account integrations and authorized services. ⌘1',
     });
     expect(selected).toHaveClass('system-b-table-row-shell');
     expect(selected).toHaveClass('system-b-table-row-selected');

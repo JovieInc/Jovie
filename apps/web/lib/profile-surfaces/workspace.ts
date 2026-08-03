@@ -109,7 +109,7 @@ export function getConnectionStatus(
       tone: 'warning',
       needsAttention: true,
       sortPriority: 0,
-      nextAction: 'Confirm whether this connection belongs to the artist.',
+      nextAction: 'Confirm whether this profile belongs to the artist.',
     };
   }
   if (row.monitoringState === 'locked') {
@@ -118,7 +118,7 @@ export function getConnectionStatus(
       tone: 'warning',
       needsAttention: true,
       sortPriority: 1,
-      nextAction: 'Upgrade the monitoring limit to track this connection.',
+      nextAction: 'Upgrade the monitoring limit to track this page.',
     };
   }
   if (row.monitoringState === 'unavailable') {
@@ -127,7 +127,7 @@ export function getConnectionStatus(
       tone: 'neutral',
       needsAttention: true,
       sortPriority: 0,
-      nextAction: 'Review the source URL before monitoring this connection.',
+      nextAction: 'Review the source URL before monitoring this page.',
     };
   }
   if (row.monitoringState === 'paused') {
@@ -136,7 +136,7 @@ export function getConnectionStatus(
       tone: 'neutral',
       needsAttention: false,
       sortPriority: 4,
-      nextAction: 'Review monitoring settings before resuming this connection.',
+      nextAction: 'Review monitoring settings before resuming this page.',
     };
   }
   if (row.rank === null) {
@@ -146,7 +146,7 @@ export function getConnectionStatus(
       needsAttention: false,
       sortPriority: 3,
       nextAction: row.lastObservedAt
-        ? 'Review the connection if it should appear in search.'
+        ? 'Review the page if it should appear in search.'
         : 'No action needed until the first monitoring run completes.',
     };
   }

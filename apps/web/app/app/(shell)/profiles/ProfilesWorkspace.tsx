@@ -80,6 +80,7 @@ const FILTERS: ReadonlyArray<{
   id: ProfilesWorkspaceFilter;
   label: string;
 }> = [
+  { id: 'all', label: 'All Pages' },
   { id: 'dsp', label: DSP_FILTER_LABEL },
   { id: 'social', label: 'Social' },
   { id: 'source', label: 'Sources' },
@@ -232,10 +233,10 @@ function ConnectionUrlDisplay({
 function TypeCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
   const label = kindLabel(row);
   return (
-    <SimpleTooltip content={`${label} connection`}>
+    <SimpleTooltip content={`${label} profile type`}>
       <span
         role='img'
-        aria-label={`${label} connection type`}
+        aria-label={`${label} profile type`}
         className={cn(
           'inline-flex h-7 w-7 items-center justify-center',
           row.kind === 'jovie' ? 'text-accent' : 'text-tertiary-token'
@@ -309,7 +310,7 @@ function RankCell({ row }: Readonly<{ row: ProfileWorkspaceRow }>) {
   }
   if (row.monitoringState === 'locked') {
     return (
-      <SimpleTooltip content='Upgrade required to monitor this connection.'>
+      <SimpleTooltip content='Upgrade required to monitor this page.'>
         <span
           role='img'
           aria-label='Rank Unavailable. Upgrade Required.'
@@ -346,14 +347,14 @@ function ConnectionRail({
   return (
     <EntitySidebarShell
       isOpen={row !== null}
-      ariaLabel='Connection details'
+      ariaLabel='Presence details'
       contextMenuItems={contextMenuItems}
       scrollStrategy='shell'
       workspaceSurface='raised'
       headerMode='minimal'
       hideMinimalHeaderBar
       isEmpty={!row}
-      emptyMessage='Select a connection to view details.'
+      emptyMessage='Select a profile or page to view details.'
       entityHeader={
         row ? (
           <EntityHeaderCard
@@ -429,7 +430,7 @@ function ConnectionRail({
             testId='profiles-rail-summary'
           />
           <DrawerSection
-            title='Connection'
+            title='Profile / Page'
             sectionKind='facts'
             className='space-y-2'
           >
@@ -502,10 +503,105 @@ function RailMetric({
   );
 }
 
+function PresenceOutcomeStrip({
+  data,
+}: Readonly<{ data: ProfilesWorkspaceData }>) {
+  const publicProfileHref =
+    data.artist.isPublic && data.artist.username
+      ? `/${encodeURIComponent(data.artist.username)}`
+      : APP_ROUTES.SETTINGS_ARTIST_PROFILE;
+  const monitoredPages =
+    data.monitoringLimit === null
+      ? String(data.monitoredCount)
+      : `${data.monitoredCount} of ${data.monitoringLimit}`;
+  const outcomes: ReadonlyArray<{
+    readonly label: string;
+    readonly value: string;
+    readonly detail: string;
+    readonly href?: string;
+  }> = [
+    {
+      label: 'Search Visibility',
+      value: !data.providerAvailable
+        ? 'Unavailable'
+        : data.bestJovieRank === null
+          ? 'Not Measured'
+          : `#${data.bestJovieRank}`,
+      detail: 'Ranking across public profile pages',
+    },
+    {
+      label: 'Answer Visibility',
+      value: data.artist.isPublic ? 'Published' : 'Draft',
+      detail: 'Structured artist facts and FAQs',
+      href: publicProfileHref,
+    },
+    {
+      label: 'Audience Quality',
+      value: 'Engagement Scored',
+      detail: 'Filter fans by source, segment, and activity',
+      href: APP_ROUTES.CONTACTS,
+    },
+    {
+      label: 'Monitored Pages',
+      value: monitoredPages,
+      detail: 'Profiles and pages tracked for changes',
+    },
+  ];
+
+  return (
+    <section
+      aria-label='Artist Presence Outcomes'
+      data-testid='presence-outcomes'
+      className='grid shrink-0 grid-cols-2 border-b border-subtle lg:grid-cols-4'
+    >
+      {outcomes.map(outcome => {
+        const content = (
+          <>
+            <span className='block text-2xs font-medium text-tertiary-token'>
+              {outcome.label}
+            </span>
+            <span className='mt-1 flex items-center gap-1.5 text-sm font-semibold text-primary-token'>
+              {outcome.value}
+              {outcome.href ? (
+                <ArrowUpRight
+                  className='h-3.5 w-3.5 text-tertiary-token'
+                  aria-hidden
+                />
+              ) : null}
+            </span>
+            <span className='mt-1 block text-2xs leading-4 text-tertiary-token'>
+              {outcome.detail}
+            </span>
+          </>
+        );
+        const className =
+          'min-h-22 border-b border-subtle px-3 py-3 text-left even:border-l lg:min-h-20 lg:border-b-0 lg:border-l lg:first:border-l-0';
+
+        return outcome.href ? (
+          <Link
+            key={outcome.label}
+            href={outcome.href}
+            className={cn(
+              className,
+              'transition-colors duration-fast hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus/50'
+            )}
+          >
+            {content}
+          </Link>
+        ) : (
+          <div key={outcome.label} className={className}>
+            {content}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 export function ProfilesWorkspace({
   data,
 }: Readonly<{ data: ProfilesWorkspaceData | null }>) {
-  const [filter, setFilter] = useState<ProfilesWorkspaceFilter>('dsp');
+  const [filter, setFilter] = useState<ProfilesWorkspaceFilter>('all');
   const [selected, setSelected] = useState<ProfileWorkspaceRow | null>(null);
   const [isAddConnectionOpen, setIsAddConnectionOpen] = useState(false);
   const [pendingCandidate, setPendingCandidate] =
@@ -514,10 +610,9 @@ export function ProfilesWorkspace({
   const searchParams = useSearchParams();
   useEffect(() => {
     if (searchParams.get('add') === 'service') {
-      setSelected(null);
-      setIsAddConnectionOpen(true);
+      router.replace(APP_ROUTES.SETTINGS_CONNECTORS);
     }
-  }, [searchParams]);
+  }, [router, searchParams]);
   const pendingRow = useMemo<ProfileWorkspaceRow | null>(() => {
     if (!pendingCandidate) return null;
     return {
@@ -557,10 +652,10 @@ export function ProfilesWorkspace({
     () => (
       <DashboardHeaderActionGroup>
         <DashboardHeaderActionButton
-          ariaLabel='Add connection'
+          ariaLabel='Add Profile Or Site'
           onClick={handleAddConnection}
           icon={<Plus className='h-3.5 w-3.5' />}
-          label='Add Connection'
+          label='Add Profile Or Site'
         />
       </DashboardHeaderActionGroup>
     ),
@@ -586,7 +681,7 @@ export function ProfilesWorkspace({
             action === 'upgrade'
               ? APP_ROUTES.SETTINGS_BILLING
               : connection.rowType === 'connector'
-                ? `${APP_ROUTES.PROFILES}?add=service`
+                ? APP_ROUTES.SETTINGS_CONNECTORS
                 : APP_ROUTES.SETTINGS_ARTIST_PROFILE
           );
         },
@@ -597,7 +692,7 @@ export function ProfilesWorkspace({
   const columns = useMemo(
     () => [
       columnHelper.accessor('label', {
-        header: 'Connection',
+        header: 'Profile / Page',
         size: 220,
         minSize: 160,
         meta: { className: 'px-3' },
@@ -639,7 +734,7 @@ export function ProfilesWorkspace({
       }),
       columnHelper.display({
         id: 'rank',
-        header: 'Rank',
+        header: 'Search Rank',
         size: 72,
         meta: { className: 'max-lg:hidden' },
         cell: context => <RankCell row={context.row.original} />,
@@ -802,6 +897,7 @@ export function ProfilesWorkspace({
         />
       }
     >
+      <PresenceOutcomeStrip data={data} />
       <UnifiedTable
         data={rows}
         columns={columns as ColumnDef<ProfileWorkspaceRow, unknown>[]}

@@ -124,7 +124,7 @@ export const DEFAULT_OPPORTUNITY_INBOX_EMPTY_ACTION_CARDS: readonly OpportunityI
       title: 'Connect Spotify',
       body: 'Link your catalog so Jovie can spot releases, audience spikes, and pitch windows.',
       actionLabel: 'Connect catalog',
-      href: APP_ROUTES.PROFILES,
+      href: `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`,
     },
     {
       id: 'add-tour-dates',

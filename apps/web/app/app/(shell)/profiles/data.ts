@@ -75,6 +75,7 @@ export interface ProfilesWorkspaceData {
     readonly name: string;
     readonly username: string;
     readonly avatarUrl: string | null;
+    readonly isPublic: boolean;
   };
   readonly rows: ProfileWorkspaceRow[];
   readonly monitoringLimit: number | null;
@@ -204,6 +205,7 @@ export async function loadProfilesWorkspaceData(input: {
           username: creatorProfiles.username,
           displayName: creatorProfiles.displayName,
           avatarUrl: creatorProfiles.avatarUrl,
+          isPublic: creatorProfiles.isPublic,
         })
         .from(creatorProfiles)
         .where(eq(creatorProfiles.id, input.profileId))
@@ -367,6 +369,7 @@ export async function loadProfilesWorkspaceData(input: {
         profileRows[0]?.displayName?.trim() || profileRows[0]?.username || '',
       username: profileRows[0]?.username ?? '',
       avatarUrl: profileRows[0]?.avatarUrl ?? null,
+      isPublic: profileRows[0]?.isPublic === true,
     },
     rows: surfaceRows,
     monitoringLimit,

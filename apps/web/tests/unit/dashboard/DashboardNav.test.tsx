@@ -21,8 +21,8 @@ const CANONICAL_NAV = [
   ['Inbox', APP_ROUTES.DASHBOARD],
   ['Library', APP_ROUTES.LIBRARY],
   ['Contacts', APP_ROUTES.CONTACTS],
-  ['Presence', APP_ROUTES.PROFILES],
   ['Calendar', APP_ROUTES.CALENDAR],
+  ['Presence', APP_ROUTES.PROFILES],
 ] as const;
 
 const FORBIDDEN_PRIMARY_LABELS = [
@@ -36,9 +36,11 @@ const DASHBOARD_NAV_SOURCE =
   'components/features/dashboard/dashboard-nav/DashboardNav.tsx';
 
 function primaryLinks(container: HTMLElement) {
-  const section = container.querySelector('[data-nav-section]');
-  expect(section).toBeInTheDocument();
-  return [...section!.querySelectorAll<HTMLAnchorElement>('a')];
+  const sections = container.querySelectorAll('[data-nav-section]');
+  expect(sections.length).toBeGreaterThan(0);
+  return [
+    ...container.querySelectorAll<HTMLAnchorElement>('[data-nav-section] a'),
+  ];
 }
 
 describe('DashboardNav', () => {
@@ -179,7 +181,7 @@ describe('DashboardNav', () => {
     expect(admin.queryByRole('link', { name: 'People' })).toBeNull();
   });
 
-  it('does not render a duplicate artist avatar row', () => {
+  it('keeps a single artist flat without adding a redundant group control', () => {
     const { container, queryByRole } = renderDashboardNav({
       renderFn: fastRender,
       overrides: {
@@ -192,12 +194,47 @@ describe('DashboardNav', () => {
       },
     });
 
-    const primarySection = container.querySelector('[data-nav-section]');
-    expect(primarySection).toBeInTheDocument();
-    expect(container.querySelector('[data-nav-section="artist"]')).toBeNull();
+    expect(
+      container.querySelector('[data-nav-section="artist"]')
+    ).not.toBeNull();
+    expect(queryByRole('button', { name: 'Tim White' })).toBeNull();
     expect(
       queryByRole('button', { name: 'Open Tim White profile' })
     ).toBeNull();
+  });
+
+  it('groups artist destinations under the active artist when multiple profiles exist', () => {
+    const selectedProfile = {
+      id: 'profile_123',
+      displayName: 'Tim White',
+      username: 'tim',
+      usernameNormalized: 'tim',
+    } as DashboardData['selectedProfile'];
+    const secondProfile = {
+      id: 'profile_456',
+      displayName: 'Night Drive',
+      username: 'night-drive',
+      usernameNormalized: 'night-drive',
+    } as DashboardData['creatorProfiles'][number];
+    const { getByRole } = renderDashboardNav({
+      renderFn: fastRender,
+      overrides: {
+        selectedProfile,
+        creatorProfiles: [
+          selectedProfile as DashboardData['creatorProfiles'][number],
+          secondProfile,
+        ],
+      },
+    });
+
+    expect(getByRole('button', { name: 'Tim White' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    expect(getByRole('link', { name: 'Presence' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.PROFILES
+    );
   });
 
   it('applies active state to the canonical library route and legacy aliases', () => {

@@ -103,6 +103,7 @@ export const artistNavigation = [
   libraryNavItem,
   contactsNavItem,
   calendarNavItem,
+  profilesNavItem,
 ] as const satisfies readonly NavItem[];
 
 /**
@@ -118,7 +119,6 @@ export const artistNavigation = [
 export const primaryNavigation = [
   chatNavItem,
   inboxNavItem,
-  profilesNavItem,
 ] as const satisfies readonly NavItem[];
 
 export const settingsNavItem: NavItem = {

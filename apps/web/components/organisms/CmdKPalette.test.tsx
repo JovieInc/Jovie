@@ -104,7 +104,7 @@ describe('CmdKPalette', () => {
 
     expect(
       screen.getByRole('option', {
-        name: 'Connections Manage artist identities and connected services. ⌘2',
+        name: 'Presence Monitor artist profiles, public pages, and search visibility. ⌘2',
       })
     ).toHaveAttribute('aria-selected', 'true');
   });
