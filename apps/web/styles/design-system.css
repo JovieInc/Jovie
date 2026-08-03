@@ -635,6 +635,20 @@
   }
 }
 
+@media (min-width: 768px) and (max-width: 1179px) {
+  /* The compact card is vertically centered at tablet and narrow-desktop
+     widths. Include that centered shell's bottom inset before clearing its
+     dock; the phone-only offset would otherwise leave the two surfaces
+     overlapping. */
+  .cookie-banner-card--above-public-profile-dock {
+    bottom: calc(
+      max(var(--page-pad), calc((100dvh - 740px) / 2)) +
+      var(--profile-bottom-nav-height) +
+      8px
+    );
+  }
+}
+
 /* Compact mobile home hero: one definite token-driven height on every
    viewport (--cover-height, clamp(220px, 34svh, 400px)). The hero never
    shrink-wraps; media crops via object-cover and the carousel below owns the

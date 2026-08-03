@@ -293,7 +293,8 @@ export async function findContentBySlug(
  */
 export async function findRedirectByOldSlug(
   creatorProfileId: string,
-  oldSlug: string
+  oldSlug: string,
+  options: { readonly onError?: 'return-null' | 'throw' } = {}
 ): Promise<{ type: ContentType; currentSlug: string } | null> {
   try {
     const [redirect] = await withRetry(
@@ -330,6 +331,7 @@ export async function findRedirectByOldSlug(
       },
       'public-smart-link'
     );
+    if (options.onError === 'throw') throw error;
     return null;
   }
 }
