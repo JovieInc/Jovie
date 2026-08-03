@@ -1,11 +1,9 @@
 'use client';
 
 import { Smartphone, X } from 'lucide-react';
-import { motion } from 'motion/react';
 import { useEffect, useMemo, useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { getQrCodeUrl, QRCode } from '@/components/molecules/QRCode';
-import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 
 interface DesktopQrOverlayProps {
@@ -15,7 +13,6 @@ interface DesktopQrOverlayProps {
 export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
   const [mode, setMode] = useState<'hidden' | 'icon' | 'open'>('hidden');
   const [url, setUrl] = useState('');
-  const prefersReducedMotion = useReducedMotion();
   const qrUrl = useMemo(() => {
     if (!url) return '';
     return getQrCodeUrl(url, 120);
@@ -114,36 +111,26 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
   return (
     <>
       {mode === 'open' && (
-        <motion.div
+        <div
           key='qr'
-          initial={
-            prefersReducedMotion
-              ? { opacity: 1 }
-              : { opacity: 0, y: 16, scale: 0.98 }
-          }
-          animate={
-            prefersReducedMotion
-              ? { opacity: 1 }
-              : { opacity: 1, y: 0, scale: 1 }
-          }
-          transition={
-            prefersReducedMotion
-              ? { duration: 0 }
-              : { duration: 0.2, ease: 'easeOut' }
-          }
-          className={`group fixed bottom-4 right-4 ${PROFILE_Z.DRAWER_CONTENT} flex flex-col items-center rounded-xl p-4 ring-1 ring-(--color-border-subtle) shadow-xl bg-surface-0 backdrop-blur-md overflow-hidden`}
+          className={`group fixed bottom-4 right-4 ${PROFILE_Z.DRAWER_CONTENT} flex flex-col items-center overflow-hidden rounded-xl bg-surface-0 p-3 shadow-xl ring-1 ring-(--color-border-subtle) backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 zoom-in-95 duration-cinematic ease-out motion-reduce:animate-none`}
         >
           <div className='pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-slower group-hover:opacity-100'>
             <div className='absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,255,255,0.35),transparent_60%)]' />
           </div>
-          <button
-            type='button'
-            onClick={close}
-            aria-label='Close'
-            className='absolute top-1 right-1 text-tertiary-token hover:text-secondary-token'
-          >
-            <X className='h-4 w-4' />
-          </button>
+          <div className='relative mb-1 flex w-full items-center justify-between gap-2'>
+            <p className='pl-1 text-xs font-medium text-secondary-token'>
+              Open On Phone
+            </p>
+            <button
+              type='button'
+              onClick={close}
+              aria-label='Close'
+              className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+            >
+              <X className='h-4 w-4' aria-hidden='true' />
+            </button>
+          </div>
           {url && (
             <QRCode
               data={url}
@@ -151,26 +138,16 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
               label='Scan To Open This Profile On Your Phone'
             />
           )}
-          <p className='mt-2 text-xs text-secondary-token'>Open On Phone</p>
-        </motion.div>
+        </div>
       )}
 
       {mode === 'icon' && (
-        <motion.div
+        <div
           key='reopen'
-          initial={
-            prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 12 }
-          }
-          animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
-          transition={
-            prefersReducedMotion
-              ? { duration: 0 }
-              : { duration: 0.2, ease: 'easeOut' }
-          }
-          className={`fixed bottom-4 right-4 ${PROFILE_Z.DRAWER_CONTENT}`}
+          className={`fixed bottom-4 right-4 ${PROFILE_Z.DRAWER_CONTENT} animate-in fade-in slide-in-from-bottom-3 duration-cinematic ease-out motion-reduce:animate-none`}
         >
           <CircleIconButton
-            size='md'
+            size='lg'
             variant='surface'
             onClick={reopen}
             ariaLabel='Open On Phone'
@@ -179,7 +156,7 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
             <span className='pointer-events-none absolute inset-0 rounded-full opacity-0 transition-opacity duration-slower group-hover:opacity-100 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,255,255,0.35),transparent_60%)]' />
             <Smartphone className='relative h-5 w-5' aria-hidden='true' />
           </CircleIconButton>
-        </motion.div>
+        </div>
       )}
     </>
   );

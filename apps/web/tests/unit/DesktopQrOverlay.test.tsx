@@ -38,7 +38,13 @@ describe('DesktopQrOverlay', () => {
 
   it('starts as icon on desktop (hidden by default)', () => {
     render(<DesktopQrOverlay handle='tim' />);
-    expect(screen.getByLabelText('Open On Phone')).toBeInTheDocument();
+    const trigger = screen.getByLabelText('Open On Phone');
+    expect(trigger).toBeInTheDocument();
+    expect(trigger.parentElement).toHaveClass(
+      'animate-in',
+      'motion-reduce:animate-none'
+    );
+    expect(trigger).toHaveClass('h-11', 'w-11');
     expect(
       screen.queryByAltText('Scan To Open This Profile On Your Phone')
     ).toBeNull();
@@ -56,9 +62,14 @@ describe('DesktopQrOverlay', () => {
   it('opens QR code when icon is clicked', async () => {
     render(<DesktopQrOverlay handle='tim' />);
     fireEvent.click(screen.getByLabelText('Open On Phone'));
-    expect(
-      await screen.findByAltText('Scan To Open This Profile On Your Phone')
-    ).toBeInTheDocument();
+    const qrCode = await screen.findByAltText(
+      'Scan To Open This Profile On Your Phone'
+    );
+    expect(qrCode).toBeInTheDocument();
+    expect(qrCode.closest('.animate-in')).toHaveClass(
+      'motion-reduce:animate-none'
+    );
+    expect(screen.getByLabelText('Close')).toHaveClass('h-11', 'w-11');
   });
 
   it('closes back to icon when dismiss is clicked', async () => {

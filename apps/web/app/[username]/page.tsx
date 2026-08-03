@@ -8,7 +8,6 @@ import { Suspense } from 'react';
 
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { BASE_URL } from '@/constants/app';
-import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
 import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
@@ -59,8 +58,12 @@ import type { PublicContact } from '@/types/contacts';
 import { convertCreatorProfileToArtist } from '@/types/db';
 import { ProfileLoading } from './_components/ProfileLoading';
 import { PublicClaimBanner } from './_components/PublicClaimBanner';
+import { PublicProfileErrorState } from './_components/PublicProfileErrorState';
 import { getProfileStaticParams } from './_lib/profile-static-params';
-import { getProfileAndLinks } from './_lib/public-profile-loader';
+import {
+  getProfileAndLinks,
+  type PublicProfileLoaderResult,
+} from './_lib/public-profile-loader';
 
 // Profile loader (fetch + cache + per-request memo) lives in
 // _lib/public-profile-loader.ts so per-mode routes (plan PR 3a-2b) can
@@ -78,6 +81,22 @@ interface Props {
   readonly params: Promise<{
     readonly username: string;
   }>;
+}
+
+interface ArtistPageContentProps {
+  readonly username: string;
+  readonly profileResult: PublicProfileLoaderResult;
+}
+
+function assertValidProfileUsername(username: string) {
+  if (
+    username.length < USERNAME_MIN_LENGTH ||
+    username.length > USERNAME_MAX_LENGTH ||
+    !USERNAME_PATTERN.test(username) ||
+    isReservedUsername(username)
+  ) {
+    notFound();
+  }
 }
 
 async function getPublicTourDates(
@@ -161,19 +180,11 @@ async function getCreditedArtistsForMentions(profileId: string) {
   }
 }
 
-async function ArtistPageContent({ params }: Readonly<Props>) {
-  const { username } = await params;
+async function ArtistPageContent({
+  username,
+  profileResult,
+}: Readonly<ArtistPageContentProps>) {
   const initialMode = 'profile';
-
-  // Early reject obviously invalid or reserved usernames before hitting the database
-  if (
-    username.length < USERNAME_MIN_LENGTH ||
-    username.length > USERNAME_MAX_LENGTH ||
-    !USERNAME_PATTERN.test(username) ||
-    isReservedUsername(username)
-  ) {
-    notFound();
-  }
 
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
   const viewerCountryCode = null;
@@ -185,7 +196,6 @@ async function ArtistPageContent({ params }: Readonly<Props>) {
   // renders AnonCookieBootstrap which resolves the per-user variant client-side
   // via /api/profile/audience-anon-cookie and updates its own state.
 
-  const profileResult = await getProfileAndLinks(username);
   const {
     profile,
     links,
@@ -199,19 +209,7 @@ async function ArtistPageContent({ params }: Readonly<Props>) {
   } = profileResult;
 
   if (status === 'error') {
-    return (
-      <div className='px-4 py-8'>
-        <ErrorBanner
-          title='Profile is temporarily unavailable'
-          description='We could not load this profile right now, so please refresh or try again in a few minutes.'
-          actions={[
-            { label: 'Try Again', href: `/${username.toLowerCase()}` },
-            { label: 'Go Home', href: '/' },
-          ]}
-          testId='public-profile-error'
-        />
-      </div>
-    );
+    return <PublicProfileErrorState retryHref={`/${username.toLowerCase()}`} />;
   }
 
   if (!profile) {
@@ -427,10 +425,24 @@ async function ArtistPageContent({ params }: Readonly<Props>) {
   );
 }
 
-export default function ArtistPage(props: Readonly<Props>) {
+export default async function ArtistPage({ params }: Readonly<Props>) {
+  const { username } = await params;
+  assertValidProfileUsername(username);
+
+  // Resolve a missing/private profile before the page-level Suspense boundary
+  // can stream its loading shell. This preserves the segment's profile-specific
+  // not-found UI and a real HTTP 404 instead of streaming that UI with HTTP 200.
+  // Only this identity lookup is pre-stream: tour, release, merch, and entity
+  // reads remain inside ArtistPageContent, so valid profiles still use the
+  // existing loading fallback while those independent reads settle.
+  const profileResult = await getProfileAndLinks(username);
+  if (profileResult.status === 'not_found') {
+    notFound();
+  }
+
   return (
     <Suspense fallback={<ProfileLoading />}>
-      <ArtistPageContent {...props} />
+      <ArtistPageContent username={username} profileResult={profileResult} />
     </Suspense>
   );
 }
@@ -441,15 +453,7 @@ export default function ArtistPage(props: Readonly<Props>) {
 // every public-profile route.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
-
-  if (
-    username.length < USERNAME_MIN_LENGTH ||
-    username.length > USERNAME_MAX_LENGTH ||
-    !USERNAME_PATTERN.test(username) ||
-    isReservedUsername(username)
-  ) {
-    notFound();
-  }
+  assertValidProfileUsername(username);
 
   const profileResult = await getProfileAndLinks(username);
   const { profile, genres, status } = profileResult;

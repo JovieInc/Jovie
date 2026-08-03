@@ -180,10 +180,11 @@ describeProfile('Profile - 404 Page', () => {
   test('shows 404 with navigation for non-existent profile', async ({
     page,
   }) => {
-    await page.goto('/nonexistent-artist', {
+    const response = await page.goto('/nonexistent-artist', {
       timeout: 120_000,
       waitUntil: 'domcontentloaded',
     });
+    expect(response?.status()).toBe(404);
 
     const h1 = page.locator('h1');
     const isH1Visible = await h1
