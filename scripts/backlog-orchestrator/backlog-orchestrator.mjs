@@ -213,7 +213,7 @@ async function runAdmitNext(cache, isDryRun) {
     const stored = classifier.parseStoredClassification(issue);
     const c = classifier.classifyDeterministic(issue, allIssues);
     if (stored) c.preexisting = stored;
-    c.issue = issue;
+    /** @type {typeof c & { issue: typeof issue }} */ (c).issue = issue;
     classifications.push(c);
   }
 
