@@ -5,6 +5,8 @@
  * downloaded only by the layouts that render these primitives.
  */
 
+@source "../node_modules/streamdown/dist/*.js";
+
 /* ============================================
    SYSTEM B ONBOARDING V2 PRIMITIVES
    ============================================ */
