@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 - **Calendar keeps a usable seven-column month grid (JOV-4819):** the authenticated desktop calendar and its loading state now own explicit responsive grid geometry, preventing production builds from collapsing the month into a single narrow day column.
+- [internal] **Unused flag asset dependency removed:** `flag-icons` no longer installs 552 unused package files after the country selector moved its two live flags to owned local SVGs.
+- [internal] **Repository health rollout is evidence-gated:** the arbitrary 10,000-file failure becomes a visible exact-main compatibility baseline, while measured per-PR/area growth and tighter binary-churn checks launch in shadow with retained receipts, typed expiring exceptions, and validated promotion criteria. Existing payload and generated-output gates remain blocking.
 - **Public artist profiles load with a leaner browser bundle:** server-only validation no longer ships with profile music, merch, event, and alerts interactions, removing the Zod client chunk and making hydrated controls ready before background effects while preserving the existing experience.
 - **Profile activity respects the visitor's privacy choices:** anonymous audience joining now follows canonical analytics consent, regional consent requirements, Global Privacy Control, Do Not Track, and legacy opt-outs.
 - **Mac/Electron profile links open in isolated native previews (#15488):** canonical public artist profile URLs open in reusable phone-sized windows without sharing authenticated session state, while the main app history and non-profile external destinations remain unchanged.

@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "baselineRevision": 1,
+  "ownerRole": "shipping-lead",
+  "measuredOn": "2026-08-04",
+  "sourceSha": "93fadfe7d3c9807dddb1ae58398035b58e07168b",
+  "source": "exact origin/main after the final pre-PR rebase",
+  "changeApproval": null,
+  "repository": {
+    "indexedPaths": 10067,
+    "regularFiles": 10014,
+    "symlinks": 53,
+    "legacyBudgetCountedRegularFiles": 9945,
+    "legacyCountExclusions": 69,
+    "regularBytes": 170445756,
+    "binaryFiles": 289,
+    "binaryBytes": 79450067
+  },
+  "legacyFindings": [
+    {
+      "ruleId": "tracked-regular-files",
+      "area": "repository",
+      "kind": "measurement",
+      "count": 10014,
+      "ownerRole": "shipping-lead",
+      "disposition": "grandfathered-visible",
+      "note": "The retired 10000-file ceiling was not evidence-derived. File count remains visible while measured diff and area rules run in shadow."
+    },
+    {
+      "ruleId": "duplicate-content-paths",
+      "area": "repository",
+      "kind": "review-needed",
+      "count": 70,
+      "bytes": 15519536,
+      "ownerRole": "shipping-lead",
+      "disposition": "grandfathered-visible",
+      "note": "Mostly intentional public-export/catalog pairs, logos, and fonts; no path is obsolete without consumer and replacement proof."
+    },
+    {
+      "ruleId": "knip-unused-production-dependencies",
+      "area": "apps/web",
+      "kind": "proven-obsolete",
+      "count": 1,
+      "ownerRole": "shipping-lead",
+      "disposition": "removed-independently",
+      "note": "flag-icons was unused and replaced by two owned local SVGs before this audit."
+    },
+    {
+      "ruleId": "forbidden-tracked-outputs",
+      "area": "repository",
+      "kind": "clean-baseline",
+      "count": 0,
+      "ownerRole": "shipping-lead",
+      "disposition": "blocking-existing-rule",
+      "note": "Existing generated-output placement rules remain blocking."
+    },
+    {
+      "ruleId": "blobs-over-10-mib",
+      "area": "repository",
+      "kind": "clean-baseline",
+      "count": 0,
+      "ownerRole": "shipping-lead",
+      "disposition": "blocking-existing-rule",
+      "note": "Existing per-file payload limits remain blocking."
+    }
+  ]
+}

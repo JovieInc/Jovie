@@ -21,6 +21,22 @@ function getStepBlock(workflow: string, stepName: string): string {
 }
 
 describe('PR screenshot catalog integrity enforcement', () => {
+  it('retains an actionable repository-health receipt for every source PR', () => {
+    const workflow = readFileSync(workflowPath, 'utf8');
+    const enforcement = getStepBlock(workflow, 'Enforce repository hygiene');
+    const upload = getStepBlock(workflow, 'Upload repository health receipt');
+
+    expect(enforcement).toContain('--report repo-health-receipt.json');
+    expect(enforcement).not.toContain('continue-on-error');
+    expect(upload).toContain('if: always()');
+    expect(upload).toContain(
+      'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'
+    );
+    expect(upload).toContain('path: repo-health-receipt.json');
+    expect(upload).toContain('if-no-files-found: error');
+    expect(upload).toContain('retention-days: 90');
+  });
+
   it('detects every source of catalog or public export drift on pull requests', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const detection = getStepBlock(

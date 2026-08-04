@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "mode": "shadow",
+  "ownerRole": "shipping-lead",
+  "candidatePolicyVersion": 1,
+  "promotionApproval": null,
+  "criteria": {
+    "shadowToDelta": {
+      "minimumShadowDays": 14,
+      "minimumRepresentativePullRequests": 20,
+      "minimumShadowRuns": 20,
+      "maximumFalsePositiveRate": 0.05,
+      "maximumP95RuntimeMs": 1000,
+      "minimumActionableOwnershipRate": 0.95
+    },
+    "deltaToFull": {
+      "minimumDeltaBlockingDays": 14,
+      "minimumDeltaBlockingRuns": 20,
+      "requiredLegacyFindingCount": 0,
+      "maximumFalsePositiveRate": 0.02
+    }
+  },
+  "evidence": {
+    "shadowStartedOn": "2026-08-04",
+    "shadowRuns": 0,
+    "representativePullRequests": 0,
+    "falsePositiveRate": null,
+    "p95RuntimeMs": null,
+    "actionableOwnershipRate": null,
+    "deltaBlockingStartedOn": null,
+    "deltaBlockingRuns": 0,
+    "legacyFindingCount": 0
+  }
+}
