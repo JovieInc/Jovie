@@ -1286,6 +1286,23 @@ describe('ProfileCompactTemplate', () => {
     restoreViewport();
   });
 
+  it('publishes and removes the hydrated interaction-ready contract', () => {
+    const view = render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const shell = screen.getByTestId('profile-compact-shell');
+    expect(shell).toHaveAttribute('data-interactive-ready', 'true');
+
+    view.unmount();
+    expect(shell).not.toHaveAttribute('data-interactive-ready');
+  });
+
   it('keeps desktop widths on the compact surface across profile variants', async () => {
     const restoreViewport = mockViewport('desktop');
 
