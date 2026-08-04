@@ -550,6 +550,19 @@ for the canonical CSS + Tailwind references.
 
 ## Motion
 
+### Dominant delight policy
+
+The executable authority for dominant-delight ceilings, progressive delivery,
+and the intentionality gate is
+[`packages/ui/theme/motion-policy.ts`](packages/ui/theme/motion-policy.ts).
+Its numeric limits are maximums after taste approval, never prompts to add
+motion. Zero dominant delight is always valid. Count content-bearing sections
+only; the global header and footer are outside the count, while a distinct proof
+strip or footer CTA counts as a section. Functional
+transitions explain state, while dominant delight intentionally attracts
+attention. Static value may ship independently; editorial and video tiers may
+always be deferred.
+
 ### Two-tier intent (canonical)
 
 Most surfaces should pick from one of these two intent tokens, not from the

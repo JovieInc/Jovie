@@ -50,6 +50,12 @@ export { Badge, badgeVariants } from './atoms/badge';
 // Button
 export type { ButtonProps } from './atoms/button';
 export { Button, buttonVariants } from './atoms/button';
+export {
+  BUTTON_SIZE_NAMES,
+  BUTTON_VARIANT_NAMES,
+  type ButtonSize,
+  type ButtonVariant,
+} from './atoms/button-contract';
 // Card
 export type {
   CardContentProps,
@@ -306,7 +312,19 @@ export {
   linearPillSizeClassNames,
   linearPillSurfaceClassName,
 } from './lib/linear-pill';
-
+export {
+  DOMINANT_DELIGHT_INTENTIONALITY_FIELDS,
+  DOMINANT_DELIGHT_LIMITS,
+  DOMINANT_DELIGHT_REJECTION_RULES,
+  type DominantDelightEvaluation,
+  type DominantDelightEvaluationInput,
+  type DominantDelightProposal,
+  evaluateDominantDelights,
+  getMaxDominantDelights,
+  MOTION_POLICY,
+  MOTION_PRESENTATION_TIERS,
+  type MotionPresentationTier,
+} from './theme/motion-policy';
 // Design tokens
 export {
   accent,

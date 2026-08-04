@@ -59,6 +59,8 @@ Do not spend design effort on:
 - Visual novelty disconnected from activation, retention, trust, or revenue.
 - Redesigning stable surfaces because they feel old.
 - Animations that do not improve comprehension or conversion.
+- Dominant delight that has not passed the executable intentionality gate in
+  [`packages/ui/theme/motion-policy.ts`](../packages/ui/theme/motion-policy.ts).
 - Component churn without product bottleneck evidence.
 
 ---

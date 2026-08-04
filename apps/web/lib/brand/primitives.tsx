@@ -177,6 +177,31 @@ interface LockupProps {
   readonly title?: string;
 }
 
+interface TokenSwatchProps {
+  readonly label: string;
+  readonly value: string;
+}
+
+/**
+ * Visual token sample driven by a canonical CSS-variable value. Public page
+ * code never needs to copy a color literal.
+ */
+export function TokenSwatch({ label, value }: TokenSwatchProps) {
+  const style = {
+    '--system-b-brand-swatch': value,
+  } as CSSProperties;
+
+  return (
+    <li className='system-b-brand-token' style={style}>
+      <span className='system-b-brand-token-swatch' aria-hidden='true' />
+      <span className='system-b-brand-token-copy'>
+        <strong>{label}</strong>
+        <code>{value}</code>
+      </span>
+    </li>
+  );
+}
+
 export function Lockup({
   height = 80,
   color = 'currentColor',
