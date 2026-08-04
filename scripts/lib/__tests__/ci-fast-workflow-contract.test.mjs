@@ -45,6 +45,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(new Set(laneIds).size).toBe(laneIds.length);
     expect([...laneIds].sort()).toEqual([
       'biome',
+      'brand-system',
       'eslint-server-boundaries',
       'guardrails',
       'ios-fast',
@@ -95,6 +96,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'eslint-server-boundaries',
       'typecheck',
       'scripts-typecheck',
+      'brand-system',
       'guardrails',
       'ios-fast',
       'structural',
@@ -116,6 +118,7 @@ describe('ci-fast bounded parallel workflow', () => {
         'pnpm --filter=@jovie/web run lint:server-boundaries',
       typecheck: 'pnpm run typecheck',
       'scripts-typecheck': 'pnpm run typecheck:scripts',
+      'brand-system': 'pnpm run brand-system:check',
       guardrails: 'pnpm next:proxy-guard',
       'ios-fast': 'pnpm run ios:lint',
       structural:

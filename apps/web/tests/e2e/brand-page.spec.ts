@@ -25,91 +25,124 @@ function expectStableBox(before: ElementBox, after: ElementBox) {
   ).toBeLessThanOrEqual(1);
 }
 
-test.describe('brand page', () => {
+test.describe('public Brand System page', () => {
   for (const viewport of VIEWPORTS) {
-    test(`scrolls on the document and fits ${viewport.name}`, async ({
-      page,
-    }) => {
+    test(`renders and fits ${viewport.name}`, async ({ page }) => {
       await page.setViewportSize(viewport);
       await page.goto('/brand', { waitUntil: 'domcontentloaded' });
-      await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(SMOKE_TIMEOUTS.HYDRATION_SETTLE);
 
       await expect(
-        page.getByRole('heading', { name: 'One loop. Every release.' })
+        page.getByRole('heading', { name: 'Build Jovie From The Source.' })
       ).toBeVisible();
       await expect(page.getByTestId('header-nav')).toHaveAttribute(
         'data-presentation',
-        'marketing-glass'
+        'homepage-embedded'
       );
       await expect(page.locator('[data-primary-action="true"]')).toHaveCount(1);
+      await expect(page.locator('section[id]')).toHaveCount(18);
 
       const primaryAction = page.getByRole('link', {
-        name: 'Download brand kit',
+        name: /Download Brand System/,
       });
       const secondaryAction = page.getByRole('link', {
-        name: 'View guidelines',
+        name: 'How the system works',
       });
-      await expect(secondaryAction).toHaveClass('system-b-brand-text-link');
+      await expect(primaryAction).toHaveAttribute('data-size', 'lg');
+      await expect(secondaryAction).toHaveAttribute(
+        'data-variant',
+        'secondary'
+      );
+
       const primaryBox = await primaryAction.boundingBox();
       const secondaryBox = await secondaryAction.boundingBox();
-
       await primaryAction.focus();
       expectStableBox(primaryBox, await primaryAction.boundingBox());
       await primaryAction.hover();
       expectStableBox(primaryBox, await primaryAction.boundingBox());
-
       await secondaryAction.focus();
       expectStableBox(secondaryBox, await secondaryAction.boundingBox());
       await secondaryAction.hover();
       expectStableBox(secondaryBox, await secondaryAction.boundingBox());
 
-      const secondaryVisuals = await secondaryAction.evaluate(element => {
-        const styles = getComputedStyle(element);
-        return {
-          backgroundColor: styles.backgroundColor,
-          borderTopWidth: styles.borderTopWidth,
-        };
-      });
-      expect(secondaryVisuals.backgroundColor).toBe('rgba(0, 0, 0, 0)');
-      expect(secondaryVisuals.borderTopWidth).toBe('0px');
-
-      if (viewport.name === 'desktop') {
-        const finalTitleSize = await page
-          .locator('.system-b-brand-final-title')
-          .evaluate(element =>
-            Number.parseFloat(getComputedStyle(element).fontSize)
-          );
-        expect(finalTitleSize).toBeGreaterThanOrEqual(60);
-      }
-
-      const contactLink = page.getByRole('link', { name: 'brand@jov.ie' });
-      await expect(contactLink).toHaveClass('system-b-brand-contact-link');
-      const contactDecoration = await contactLink.evaluate(
-        element => getComputedStyle(element).textDecorationLine
-      );
-      expect(contactDecoration).toContain('underline');
-
       const before = await page.evaluate(
         () => document.scrollingElement?.scrollTop ?? 0
       );
-
       await page.locator('#downloads').scrollIntoViewIfNeeded();
       await expect(page.locator('#downloads')).toBeVisible();
 
-      const metrics = await page.evaluate(() => {
-        const scrollingElement = document.scrollingElement;
-        return {
-          bodyOverflow: getComputedStyle(document.body).overflowY,
-          documentScrollTop: scrollingElement?.scrollTop ?? 0,
-          innerWidth: window.innerWidth,
-          scrollWidth: document.documentElement.scrollWidth,
-        };
-      });
+      const metrics = await page.evaluate(() => ({
+        bodyOverflow: getComputedStyle(document.body).overflowY,
+        documentScrollTop: document.scrollingElement?.scrollTop ?? 0,
+        innerWidth: window.innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+      }));
 
       expect(metrics.documentScrollTop).toBeGreaterThan(before);
       expect(metrics.bodyOverflow).toBe('visible');
       expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.innerWidth + 1);
+
+      const header = page.getByTestId('header-nav');
+      await expect(header).toHaveAttribute('data-scrolled', 'true');
+      const headerBackground = await header.evaluate(
+        element => getComputedStyle(element).backgroundColor
+      );
+      expect(headerBackground).not.toBe('rgba(0, 0, 0, 0)');
     });
   }
+
+  test('serves the manifest and every registered download', async ({
+    page,
+    request,
+  }) => {
+    await page.goto('/brand');
+
+    const manifestLink = page.getByRole('link', { name: /JSON manifest/ });
+    const manifestHref = await manifestLink.getAttribute('href');
+    expect(manifestHref).toBe('/brand/generated/Jovie-Brand-System.json');
+
+    const manifestResponse = await request.get(manifestHref ?? '');
+    expect(manifestResponse.ok()).toBe(true);
+    expect(manifestResponse.headers()['content-type']).toContain(
+      'application/json'
+    );
+    const manifest = (await manifestResponse.json()) as {
+      readonly version: string;
+      readonly assets: readonly {
+        readonly href: string;
+        readonly sha256: string;
+      }[];
+      readonly media: { readonly published: readonly unknown[] };
+    };
+    expect(manifest.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(manifest.media.published).toEqual([]);
+
+    for (const asset of manifest.assets) {
+      expect(asset.sha256).toMatch(/^[a-f0-9]{64}$/);
+      const response = await request.get(asset.href);
+      expect(response.ok(), asset.href).toBe(true);
+    }
+  });
+
+  test('keeps a static reduced-motion fallback with zero dominant delight', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/brand');
+
+    await expect(page.locator('[data-dominant-delight]')).toHaveCount(0);
+    await expect(page.getByText('Dominant delight on this page')).toBeVisible();
+    await expect(
+      page.locator('.system-b-brand-motion-status strong')
+    ).toHaveText('0');
+
+    const activeAnimations = await page
+      .locator('.system-b-brand-page *')
+      .evaluateAll(elements =>
+        elements
+          .map(element => getComputedStyle(element).animationName)
+          .filter(name => name !== 'none')
+      );
+    expect(activeAnimations).toEqual([]);
+  });
 });
