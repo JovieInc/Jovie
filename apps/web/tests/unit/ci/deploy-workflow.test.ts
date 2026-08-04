@@ -1051,6 +1051,12 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(performanceStep).toContain(
       'PERFORMANCE_AUTH_STATE_PATH="$auth_state"'
     );
+    expect(performanceStep).toContain(
+      'export EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url"'
+    );
+    expect(performanceStep).toContain(
+      'export EXPECTED_VERCEL_ENVIRONMENT=production'
+    );
     expect(performanceStep).toContain('--auth-path "$auth_state"');
     expect(performanceStep).toContain('--runs 3');
     expect(performanceStep).toContain(
