@@ -19,7 +19,8 @@ export type PerfTimingMetricName =
   | 'time-to-first-byte'
   | 'skeleton-to-content'
   | 'warm-shell-response'
-  | 'redirect-complete';
+  | 'redirect-complete'
+  | 'usable-alias-result';
 
 export type PerfResourceMetricName =
   | 'script'
@@ -88,6 +89,16 @@ export interface PerfReadySelectors {
   readonly redirectDestinations?: readonly string[];
 }
 
+/**
+ * A public-profile mode alias is only useful once its canonical destination is
+ * visible and interactive. This deliberately measures the user-visible result,
+ * not the origin's redirect response time.
+ */
+export interface PerfAliasUsableResultContract {
+  readonly canonicalPath: string;
+  readonly destinationAffordances: readonly string[];
+}
+
 export interface PerfAuthCookie {
   readonly name: string;
   readonly value: string;
@@ -116,6 +127,7 @@ export interface PerfRouteDefinition {
   readonly warmupStrategy: PerfWarmupStrategy;
   readonly measureMode: PerfMeasureMode;
   readonly readySelectors: PerfReadySelectors;
+  readonly aliasUsableResult?: PerfAliasUsableResultContract;
   readonly viewport?: PerfViewport;
   readonly timingBudgets?: readonly PerfTimingBudget[];
   readonly resourceBudgets?: readonly PerfResourceBudget[];
@@ -282,6 +294,55 @@ export function assertValidPerfRouteDefinition(route: PerfRouteDefinition) {
     if (destinations.includes(route.path)) {
       throw new TypeError(
         `Redirect route "${route.id}" loops back to its configured path "${route.path}".`
+      );
+    }
+  }
+
+  if (route.aliasUsableResult) {
+    const usableBudget = getRouteTimingBudgets(route).find(
+      timing => timing.metric === 'usable-alias-result'
+    );
+    if (
+      route.surface !== 'public-profile' ||
+      route.measureMode !== 'redirect'
+    ) {
+      throw new TypeError(
+        `Alias usable-result route "${route.id}" must be a public-profile redirect.`
+      );
+    }
+    if (usableBudget?.budget !== 1000) {
+      throw new TypeError(
+        `Alias usable-result route "${route.id}" must preserve its 1000ms median budget.`
+      );
+    }
+    if (
+      getRouteTimingBudgets(route).some(
+        timing => timing.metric === 'redirect-complete'
+      )
+    ) {
+      throw new TypeError(
+        `Alias usable-result route "${route.id}" must not claim redirect-complete timing.`
+      );
+    }
+    if (
+      !route.readySelectors.shell?.includes('[data-testid="profile-header"]')
+    ) {
+      throw new TypeError(
+        `Alias usable-result route "${route.id}" must require the visible profile header.`
+      );
+    }
+    if (
+      !route.readySelectors.content?.includes(
+        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]'
+      )
+    ) {
+      throw new TypeError(
+        `Alias usable-result route "${route.id}" must require the interactive compact shell.`
+      );
+    }
+    if (route.aliasUsableResult.destinationAffordances.length === 0) {
+      throw new TypeError(
+        `Alias usable-result route "${route.id}" must require a destination affordance.`
       );
     }
   }
@@ -575,13 +636,23 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: ['[data-testid="profile-header"]'],
+      shell: ['[data-testid="profile-header"]'],
+      content: [
+        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
+      ],
       redirectDestinations: ['/[username]?mode=listen'],
     },
     timings: [
-      { metric: 'redirect-complete', budget: 100 },
+      { metric: 'usable-alias-result', budget: 1000 },
       { metric: 'time-to-first-byte', budget: 2400 },
     ],
+    aliasUsableResult: {
+      canonicalPath: '/[username]?mode=listen',
+      destinationAffordances: [
+        '[data-testid="profile-primary-tab-releases"]',
+        '[data-testid="profile-primary-tab-listen"]',
+      ],
+    },
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
     priority: 4,
     seedProfile: 'dualipa',
@@ -596,13 +667,23 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: ['[data-testid="profile-header"]'],
+      shell: ['[data-testid="profile-header"]'],
+      content: [
+        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
+      ],
       redirectDestinations: ['/[username]?mode=listen'],
     },
     timings: [
-      { metric: 'redirect-complete', budget: 100 },
+      { metric: 'usable-alias-result', budget: 1000 },
       { metric: 'time-to-first-byte', budget: 2400 },
     ],
+    aliasUsableResult: {
+      canonicalPath: '/[username]?mode=listen',
+      destinationAffordances: [
+        '[data-testid="profile-primary-tab-releases"]',
+        '[data-testid="profile-primary-tab-listen"]',
+      ],
+    },
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
     priority: 4,
     seedProfile: 'dualipa',
@@ -659,13 +740,20 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: ['[data-testid="profile-header"]'],
+      shell: ['[data-testid="profile-header"]'],
+      content: [
+        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
+      ],
       redirectDestinations: ['/[username]?mode=subscribe'],
     },
     timings: [
-      { metric: 'redirect-complete', budget: 100 },
+      { metric: 'usable-alias-result', budget: 1000 },
       { metric: 'time-to-first-byte', budget: 2400 },
     ],
+    aliasUsableResult: {
+      canonicalPath: '/[username]?mode=subscribe',
+      destinationAffordances: ['[data-testid="profile-primary-tab-subscribe"]'],
+    },
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
     priority: 7,
     seedProfile: 'dualipa',
@@ -680,13 +768,20 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: ['[data-testid="profile-header"]'],
+      shell: ['[data-testid="profile-header"]'],
+      content: [
+        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
+      ],
       redirectDestinations: ['/[username]?mode=pay'],
     },
     timings: [
-      { metric: 'redirect-complete', budget: 100 },
+      { metric: 'usable-alias-result', budget: 1000 },
       { metric: 'time-to-first-byte', budget: 2400 },
     ],
+    aliasUsableResult: {
+      canonicalPath: '/[username]?mode=pay',
+      destinationAffordances: ['[data-testid="profile-mode-drawer-pay"]'],
+    },
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
     priority: 8,
     seedProfile: 'testartist',
@@ -701,13 +796,20 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: ['[data-testid="profile-header"]'],
+      shell: ['[data-testid="profile-header"]'],
+      content: [
+        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
+      ],
       redirectDestinations: ['/[username]?mode=tour'],
     },
     timings: [
-      { metric: 'redirect-complete', budget: 100 },
+      { metric: 'usable-alias-result', budget: 1000 },
       { metric: 'time-to-first-byte', budget: 2400 },
     ],
+    aliasUsableResult: {
+      canonicalPath: '/[username]?mode=tour',
+      destinationAffordances: ['[data-testid="profile-primary-tab-tour"]'],
+    },
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
     priority: 9,
     seedProfile: 'dualipa',
@@ -722,13 +824,23 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'redirect',
     readySelectors: {
-      content: ['[data-testid="profile-header"]'],
+      shell: ['[data-testid="profile-header"]'],
+      content: [
+        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
+      ],
       redirectDestinations: ['/[username]?mode=releases'],
     },
     timings: [
-      { metric: 'redirect-complete', budget: 100 },
+      { metric: 'usable-alias-result', budget: 1000 },
       { metric: 'time-to-first-byte', budget: 2400 },
     ],
+    aliasUsableResult: {
+      canonicalPath: '/[username]?mode=releases',
+      destinationAffordances: [
+        '[data-testid="profile-primary-tab-releases"]',
+        '[data-testid="profile-mode-drawer-releases"]',
+      ],
+    },
     resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
     priority: 9,
     seedProfile: 'dualipa',
@@ -2335,6 +2447,7 @@ export function getPrimaryTimingMetricName(route: PerfRouteDefinition) {
   const priorityOrder: readonly PerfTimingMetricName[] = [
     'interactive-shell-ready',
     'warm-shell-response',
+    'usable-alias-result',
     'redirect-complete',
     'skeleton-to-content',
     'first-contentful-paint',

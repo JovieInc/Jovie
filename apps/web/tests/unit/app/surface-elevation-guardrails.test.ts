@@ -47,10 +47,10 @@ const APP_SHELL_GLOBS = [
 
 describe('surface elevation guardrails', () => {
   it('keeps the dark shell canvas separate from the shared card surface', () => {
-    const designSystem = readFileSync(
-      join(ROOT, 'styles/design-system.css'),
-      'utf-8'
-    );
+    const designSystem = [
+      readFileSync(join(ROOT, 'styles/design-system.css'), 'utf-8'),
+      readFileSync(join(ROOT, 'styles/system-b-app.css'), 'utf-8'),
+    ].join('\n');
     const linearTokens = readFileSync(
       join(ROOT, 'styles/linear-tokens.css'),
       'utf-8'
@@ -71,10 +71,10 @@ describe('surface elevation guardrails', () => {
   });
 
   it('keeps focus indicators restrained instead of drawing global text-input halos', () => {
-    const designSystem = readFileSync(
-      join(ROOT, 'styles/design-system.css'),
-      'utf-8'
-    );
+    const designSystem = [
+      readFileSync(join(ROOT, 'styles/design-system.css'), 'utf-8'),
+      readFileSync(join(ROOT, 'styles/system-b-app.css'), 'utf-8'),
+    ].join('\n');
     const linearTokens = readFileSync(
       join(ROOT, 'styles/linear-tokens.css'),
       'utf-8'

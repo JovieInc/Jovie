@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const webRoot = path.resolve(__dirname, '../../..');
 const sourcePath = 'app/app/(shell)/chat/ChatEntityRightPanelHost.tsx';
-const designSystemPath = 'styles/design-system.css';
+const designSystemPath = 'styles/system-b-app.css';
 
 const legacyRightPanelPatterns = [
   /bg-\(--linear-app-content-surface\)/,
@@ -52,7 +52,7 @@ describe('chat entity right panel System B style guard', () => {
   it('defines right-panel chrome from System B aliases', () => {
     const source = readFileSync(path.join(webRoot, designSystemPath), 'utf8');
     const panelCss = source.match(
-      /:where\(\.system-b-chat-entity-right-panel-shell\)[\s\S]*?\.system-b-entity-chip\s*{/
+      /:where\(\.system-b-chat-entity-right-panel-shell\)[\s\S]*?\.system-b-entity-mention-span\s*{/
     )?.[0];
 
     expect(panelCss).toBeDefined();

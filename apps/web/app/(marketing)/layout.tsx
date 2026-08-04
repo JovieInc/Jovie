@@ -1,4 +1,6 @@
 import '../(home)/home.css';
+import '../../components/marketing/MarketingSnapRail.css';
+import '../../components/marketing/artist-profile/ArtistProfileLandingPage.css';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
 import { MarketingEnhancements } from '@/features/home/MarketingEnhancements';
 

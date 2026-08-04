@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
+import '../../../styles/system-b-app.css';
 import { headers } from 'next/headers';
 import { redirect, unstable_rethrow } from 'next/navigation';
 import { Suspense } from 'react';
@@ -182,7 +183,7 @@ export default async function AppShellLayout({
                 href: APP_ROUTES.DASHBOARD,
                 variant: 'primary',
               },
-              { label: 'Return to Jovie', href: '/', variant: 'secondary' },
+              { label: 'Return To Jovie', href: '/', variant: 'secondary' },
             ]}
             testId='dashboard-error'
           />

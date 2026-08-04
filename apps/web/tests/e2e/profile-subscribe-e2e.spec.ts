@@ -33,6 +33,13 @@ const VISIBLE_EMAIL_INPUT_SELECTOR =
   '[data-testid="mobile-email-input"]:visible';
 
 async function getActiveNotificationsFlow(page: Page) {
+  const visibleFlow = page
+    .locator('[data-testid="profile-mobile-notifications-flow"]:visible')
+    .first();
+  if (await visibleFlow.isVisible().catch(() => false)) {
+    return visibleFlow;
+  }
+
   const dialogFlow = page
     .locator('[role="dialog"][data-testid="profile-mobile-notifications-flow"]')
     .first();
@@ -45,9 +52,7 @@ async function getActiveNotificationsFlow(page: Page) {
     return dialogFlow;
   }
 
-  return page
-    .locator('[data-testid="profile-mobile-notifications-flow"]:visible')
-    .first();
+  return visibleFlow;
 }
 
 async function interceptAnalytics(page: Page) {

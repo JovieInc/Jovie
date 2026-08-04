@@ -54,3 +54,47 @@ describe('globals.css ui-feel quick wins (JOV-3368)', () => {
     expect(source).not.toMatch(/\.btn-press\s*\{[^}]*active:opacity-80/);
   });
 });
+
+describe('public root stylesheet isolation', () => {
+  const source = readGlobals();
+  const chatLayout = readFileSync(
+    resolve(process.cwd(), 'app/app/(shell)/chat/layout.tsx'),
+    'utf8'
+  );
+
+  it('keeps chat-only CSS out of public routes', () => {
+    expect(source).not.toContain('streamdown/styles.css');
+    expect(source).not.toContain('chat-file-upload.css');
+    expect(source).not.toContain('node_modules/streamdown');
+    expect(chatLayout).toContain("import 'streamdown/styles.css'");
+    expect(chatLayout).toContain("styles/chat-file-upload.css'");
+  });
+
+  it.each([
+    'app/(home)/layout.tsx',
+    'app/(marketing)/layout.tsx',
+    'app/(dynamic)/playlists/layout.tsx',
+    'app/brand/layout.tsx',
+    'app/exp/layout.tsx',
+    'app/pitch/layout.tsx',
+  ])('loads the shared public theme bridge for %s', routeSource => {
+    const source = readFileSync(resolve(process.cwd(), routeSource), 'utf8');
+
+    expect(source).toContain('components/marketing/MarketingSnapRail.css');
+  });
+
+  it('keeps the root 404 on its isolated public bridge bundle', () => {
+    const notFoundSource = readFileSync(
+      resolve(process.cwd(), 'app/not-found.tsx'),
+      'utf8'
+    );
+
+    expect(notFoundSource).toContain(
+      'components/marketing/MarketingSnapRail.css'
+    );
+    expect(notFoundSource).toContain(
+      'components/marketing/artist-profile/ShellCtaButton.css'
+    );
+    expect(notFoundSource).not.toContain('ArtistProfileLandingPage.css');
+  });
+});

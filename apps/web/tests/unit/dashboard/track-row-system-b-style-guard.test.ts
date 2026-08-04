@@ -36,7 +36,7 @@ describe('TrackRow System B style guard', () => {
 
   it('keeps TrackRow primitives token-backed', () => {
     const source = readFileSync(
-      path.join(webRoot, 'styles/design-system.css'),
+      path.join(webRoot, 'styles/system-b-app.css'),
       'utf8'
     );
     const trackRowCss = source.match(

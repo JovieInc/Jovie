@@ -41,10 +41,10 @@ describe('entity rich chip System B style guard', () => {
   });
 
   it('keeps input skill chip CSS on globally defined System B surface tokens', () => {
-    const source = readFileSync(
-      path.join(webRoot, 'styles/design-system.css'),
-      'utf8'
-    );
+    const source = [
+      readFileSync(path.join(webRoot, 'styles/design-system.css'), 'utf8'),
+      readFileSync(path.join(webRoot, 'styles/system-b-app.css'), 'utf8'),
+    ].join('\n');
     const skillChipCss = source.match(
       /\.system-b-skill-chip[\s\S]*?\.system-b-entity-chip-popover-content/
     )?.[0];
@@ -55,10 +55,10 @@ describe('entity rich chip System B style guard', () => {
   });
 
   it('keeps transcript entity chips bounded and thumbnail-stable', () => {
-    const source = readFileSync(
-      path.join(webRoot, 'styles/design-system.css'),
-      'utf8'
-    );
+    const source = [
+      readFileSync(path.join(webRoot, 'styles/design-system.css'), 'utf8'),
+      readFileSync(path.join(webRoot, 'styles/system-b-app.css'), 'utf8'),
+    ].join('\n');
     const transcriptChipCss = source.match(
       /\.system-b-entity-chip\[data-entity-variant="transcript"\]\s*\{[\s\S]*?\n\}/
     )?.[0];
@@ -80,10 +80,10 @@ describe('entity rich chip System B style guard', () => {
   });
 
   it('keeps assistant entity mention spans on named System B primitives', () => {
-    const source = readFileSync(
-      path.join(webRoot, 'styles/design-system.css'),
-      'utf8'
-    );
+    const source = [
+      readFileSync(path.join(webRoot, 'styles/design-system.css'), 'utf8'),
+      readFileSync(path.join(webRoot, 'styles/system-b-app.css'), 'utf8'),
+    ].join('\n');
     const mentionCss = source.match(
       /\.system-b-entity-mention-span\s*\{[\s\S]*?\n\}/
     )?.[0];
@@ -97,10 +97,10 @@ describe('entity rich chip System B style guard', () => {
       path.join(webRoot, 'components/jovie/components/EntityChipPopover.tsx'),
       'utf8'
     );
-    const designSystemSource = readFileSync(
-      path.join(webRoot, 'styles/design-system.css'),
-      'utf8'
-    );
+    const designSystemSource = [
+      readFileSync(path.join(webRoot, 'styles/design-system.css'), 'utf8'),
+      readFileSync(path.join(webRoot, 'styles/system-b-app.css'), 'utf8'),
+    ].join('\n');
 
     expect(popoverSource).toContain('system-b-entity-chip-trigger');
     expect(popoverSource).toContain('system-b-entity-chip-popover-content');

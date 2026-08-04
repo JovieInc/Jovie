@@ -7,7 +7,8 @@ const comparisonChartPath =
   'components/features/pricing/PricingComparisonChart.tsx';
 const marketingPlansPath =
   'components/features/pricing/MarketingPricingPlans.tsx';
-const designSystemPath = 'styles/design-system.css';
+const designSystemPath =
+  'components/marketing/artist-profile/ArtistProfileLandingPage.css';
 
 const forbiddenRouteVisualPatterns = [
   /style=\{/,
@@ -37,8 +38,6 @@ function extractPricingCss(source: string): string {
   const start = source.indexOf(':where(.system-b-pricing-page)');
   const nextSectionMarkers = [
     '/* ============================================\n   SYSTEM B BRAND PAGE',
-    '/* ============================================\n   SYSTEM B CHAT ENTITY PREVIEW PRIMITIVES',
-    '/* ============================================\n   GEIST ACCENT PALETTE',
   ];
   const end = nextSectionMarkers
     .map(marker => source.indexOf(marker, start))

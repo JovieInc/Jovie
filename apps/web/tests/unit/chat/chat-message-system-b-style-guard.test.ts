@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 const appRoot = resolve(__dirname, '../../..');
 
 const chatMessageSourcePath = 'components/jovie/components/ChatMessage.tsx';
-const designSystemPath = 'styles/design-system.css';
+const designSystemPath = 'styles/system-b-app.css';
 
 const forbiddenChatMessagePatterns = [
   /#[0-9a-fA-F]{3,8}/,
@@ -37,7 +37,10 @@ describe('ChatMessage System B source contract', () => {
       resolve(appRoot, chatMessageSourcePath),
       'utf8'
     );
-    const styles = readFileSync(resolve(appRoot, designSystemPath), 'utf8');
+    const styles = [
+      readFileSync(resolve(appRoot, 'styles/design-system.css'), 'utf8'),
+      readFileSync(resolve(appRoot, designSystemPath), 'utf8'),
+    ].join('\n');
     const requiredClasses = [
       'system-b-chat-message-row',
       'system-b-chat-user-bubble',
@@ -66,7 +69,10 @@ describe('ChatMessage System B source contract', () => {
   });
 
   it('keeps user-bubble light-surface text on the canonical System B alias', () => {
-    const styles = readFileSync(resolve(appRoot, designSystemPath), 'utf8');
+    const styles = [
+      readFileSync(resolve(appRoot, 'styles/design-system.css'), 'utf8'),
+      readFileSync(resolve(appRoot, designSystemPath), 'utf8'),
+    ].join('\n');
 
     expect(styles).toContain('--system-b-chat-user-bubble-text');
     expect(styles).toContain('--system-b-chat-body-size: var(--text-app);');

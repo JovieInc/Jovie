@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 describe('server instrumentation guard', () => {
@@ -70,5 +72,26 @@ describe('server instrumentation guard', () => {
     await onRequestError(error);
 
     expect(Sentry.captureRequestError).toHaveBeenCalledWith(error);
+  });
+});
+
+describe('client instrumentation bundle isolation', () => {
+  const source = readFileSync(
+    resolve(process.cwd(), 'instrumentation-client.ts'),
+    'utf8'
+  );
+
+  it('does not statically retain dashboard Sentry tracing on public routes', () => {
+    expect(source).not.toContain(
+      "import { captureRouterTransitionStart } from '@sentry/nextjs'"
+    );
+    expect(source).toContain("import('@sentry/nextjs')");
+    expect(source).toContain(
+      "getSdkMode(globalThis.location.pathname) !== 'full'"
+    );
+    expect(source).toContain('routerTransitionCapture?.(...args)');
+    expect(source).not.toContain(
+      'loadRouterTransitionCapture().then(capture => capture(...args))'
+    );
   });
 });

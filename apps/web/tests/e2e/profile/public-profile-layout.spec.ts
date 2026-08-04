@@ -317,10 +317,11 @@ test.describe('Public profile /tim layout hardening @regression', () => {
       ).not.toBeNull();
       expect(metrics.shell?.left ?? 0).toBeGreaterThanOrEqual(-1);
       expect(metrics.shell?.right ?? 0).toBeLessThanOrEqual(viewport.width + 1);
-      // Composition floor (#11899): hero media never renders below 240px —
-      // it crops, never squashes. Mobile keeps the taller 300px band.
+      // The iOS-grade compact profile owns a stable token-driven hero
+      // (clamp(220px, 34svh, 400px)); media crops rather than squashing. The
+      // desktop shell keeps its independent 240px composition floor here.
       expect(metrics.cover?.height ?? 0).toBeGreaterThanOrEqual(
-        viewport.isMobile ? 300 : 240
+        viewport.isMobile ? 220 : 240
       );
 
       if (
@@ -336,9 +337,12 @@ test.describe('Public profile /tim layout hardening @regression', () => {
           `${viewport.id} should not leave dead space below home cards`
         ).toBeLessThanOrEqual(24);
         expect(
-          metrics.cover.height,
-          `${viewport.id} tall mobile hero should grow past the old 432px cap`
-        ).toBeGreaterThan(440);
+          Math.abs(
+            metrics.cover.height -
+              Math.min(400, Math.max(220, viewport.height * 0.34))
+          ),
+          `${viewport.id} tall mobile hero should follow the tokenized 34svh composition`
+        ).toBeLessThanOrEqual(1);
       }
 
       for (const image of metrics.visibleLargeImages) {

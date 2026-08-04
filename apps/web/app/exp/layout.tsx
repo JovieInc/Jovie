@@ -2,6 +2,8 @@ import { TooltipProvider } from '@jovie/ui';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
+import '../../styles/system-b-app.css';
+import '../../components/marketing/MarketingSnapRail.css';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';

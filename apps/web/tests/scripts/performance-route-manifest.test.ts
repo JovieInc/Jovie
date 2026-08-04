@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '../../constants/routes';
 import {
+  assertAliasUsableResultUrl,
+  assertHostedAliasRunCount,
+  createPageResult,
+} from '../../scripts/performance-budgets-guard';
+import {
   getEndUserPerfRouteById,
   getPrimaryTimingMetricName,
   getRouteResourceBudgets,
@@ -150,6 +155,33 @@ function expectBudgetCoverage(route: PerfRouteDefinition) {
 }
 
 describe('performance route manifest shell slice coverage', () => {
+  it.each([
+    'public-profile-listen',
+    'public-profile-music',
+    'public-profile-subscribe',
+    'public-profile-tip',
+    'public-profile-tour',
+    'public-profile-releases',
+  ])('uses a usable-result contract for %s aliases', routeId => {
+    const route = requireRoute(routeId);
+
+    expect(route.aliasUsableResult).toBeDefined();
+    expect(route.readySelectors.shell).toContain(
+      '[data-testid="profile-header"]'
+    );
+    expect(route.readySelectors.content).toContain(
+      '[data-testid="profile-compact-shell"][data-interactive-ready="true"]'
+    );
+    expect(getRouteTimingBudgets(route)).toContainEqual({
+      metric: 'usable-alias-result',
+      budget: 1000,
+    });
+    expect(getRouteTimingBudgets(route)).not.toContainEqual({
+      metric: 'redirect-complete',
+      budget: 100,
+    });
+  });
+
   it.each(
     CREATOR_SHELL_SLICE_ROUTES
   )('defines $id with route, readiness, and budget coverage', expectation => {
@@ -210,5 +242,99 @@ describe('performance route manifest shell slice coverage', () => {
     expect(profileRail.readySelectors.content).not.toContain(
       '[data-testid="profile-contact-sidebar-skeleton"]'
     );
+  });
+});
+
+const aliasGuardRoute = getEndUserPerfRouteById('public-profile-listen');
+
+if (!aliasGuardRoute) {
+  throw new Error('public-profile-listen route is required');
+}
+
+function aliasGuardSample(usableAliasResult: number) {
+  return {
+    finalUrl: 'https://jov.ie/dualipa?mode=listen',
+    resolvedPath: '/dualipa/listen',
+    resourceValues: { font: 0, image: 0, script: 0, stylesheet: 0, total: 0 },
+    timingValues: {
+      'cumulative-layout-shift': 0,
+      'first-contentful-paint': 0,
+      'first-input-delay': 0,
+      'interactive-shell-ready': 0,
+      'largest-contentful-paint': 0,
+      'redirect-complete': 0,
+      'skeleton-to-content': 0,
+      'time-to-first-byte': 0,
+      'usable-alias-result': usableAliasResult,
+      'warm-shell-response': 0,
+    },
+  } as const;
+}
+
+describe('public-profile alias usable-result guard', () => {
+  it('rejects same-path results on a different origin', () => {
+    expect(() =>
+      assertAliasUsableResultUrl(
+        'https://jov.ie',
+        aliasGuardRoute,
+        '/dualipa/listen',
+        'https://evil.example/dualipa?mode=listen'
+      )
+    ).toThrow(/left the configured origin/);
+  });
+
+  it('rejects canonical destinations with wrong or extra query parameters', () => {
+    for (const url of [
+      'https://jov.ie/dualipa?mode=pay',
+      'https://jov.ie/dualipa?mode=listen&utm_source=test',
+    ]) {
+      expect(() =>
+        assertAliasUsableResultUrl(
+          'https://jov.ie',
+          aliasGuardRoute,
+          '/dualipa/listen',
+          url
+        )
+      ).toThrow(/expected/);
+    }
+  });
+
+  it('structurally requires the interactive shell and mode affordance', () => {
+    expect(aliasGuardRoute.readySelectors.content).toContain(
+      '[data-testid="profile-compact-shell"][data-interactive-ready="true"]'
+    );
+    expect(aliasGuardRoute.aliasUsableResult?.destinationAffordances).toContain(
+      '[data-testid="profile-primary-tab-listen"]'
+    );
+  });
+
+  it('fails a slow max sample even when the usable-result median passes', () => {
+    const result = createPageResult(
+      aliasGuardRoute,
+      '/dualipa/listen',
+      [
+        aliasGuardSample(900),
+        aliasGuardSample(950),
+        aliasGuardSample(1000),
+        aliasGuardSample(1100),
+        aliasGuardSample(1501),
+      ],
+      false
+    );
+
+    expect(result.rawTimings['usable-alias-result']).toBe(1000);
+    expect(result.timings).toContainEqual(
+      expect.objectContaining({
+        name: 'usable-alias-result-max',
+        passed: false,
+      })
+    );
+    expect(result.terminalStatus).toBe('fail');
+  });
+
+  it.each([1, 3, 4, 6])('rejects hosted alias runs of %s', runs => {
+    expect(() =>
+      assertHostedAliasRunCount(aliasGuardRoute, runs, false)
+    ).toThrow(/exactly 5 fresh browser-context runs/);
   });
 });

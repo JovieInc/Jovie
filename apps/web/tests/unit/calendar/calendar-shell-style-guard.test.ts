@@ -7,7 +7,7 @@ const CALENDAR_CLIENT = join(
   ROOT,
   'app/app/(shell)/calendar/CalendarPageClient.tsx'
 );
-const DESIGN_SYSTEM = join(ROOT, 'styles/design-system.css');
+const DESIGN_SYSTEM = join(ROOT, 'styles/system-b-app.css');
 
 const CHROME_CLASS_PATTERN = /(?:^|\s)(?:uppercase|tracking-[^\s'"]+)/;
 const LABEL_ELEMENT_PATTERN =
@@ -94,7 +94,7 @@ describe('calendar shell style guard', () => {
       .filter(({ line }) => CALENDAR_ACCENT_DRIFT_PATTERN.test(line))
       .map(
         ({ line, lineNumber }) =>
-          `design-system.css:${blockStartLine + lineNumber} ${line.trim()}`
+          `system-b-app.css:${blockStartLine + lineNumber} ${line.trim()}`
       );
 
     expect(primitiveBlock).toContain('system-b-calendar-type-chip');

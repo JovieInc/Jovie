@@ -23,7 +23,7 @@ import { LINEAR_SURFACE } from '@/components/tokens/linear-surface';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = join(__dirname, '..', '..', '..');
 const DESIGN_SYSTEM_CSS = readFileSync(
-  join(WEB_ROOT, 'styles', 'design-system.css'),
+  join(WEB_ROOT, 'styles', 'system-b-app.css'),
   'utf8'
 );
 

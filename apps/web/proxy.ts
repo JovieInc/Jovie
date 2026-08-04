@@ -15,6 +15,7 @@ import {
 } from '@/lib/auth/test-mode';
 import { analyzeHost } from '@/lib/routing/proxy-routing';
 import {
+  createFastNotFoundResponse,
   createProbeDropResponse,
   isMaliciousProbePath,
 } from '@/lib/security/probe-detection';
@@ -71,6 +72,10 @@ function redirectSignedOutElectronAppShell(req: NextRequest): NextResponse {
   return response;
 }
 
+function isReservedProfileAliasMarkerPath(pathname: string): boolean {
+  return pathname.split('/').includes('__profile-mode-alias');
+}
+
 export default async function middleware(
   req: NextRequest,
   event: NextFetchEvent
@@ -85,6 +90,13 @@ export default async function middleware(
   // ========================================================================
   if (isMaliciousProbePath(req.nextUrl.pathname)) {
     return createProbeDropResponse();
+  }
+
+  // The profile-mode marker is a private destination for afterFiles rewrites.
+  // Proxy executes before those rewrites, so a marker present here can only be
+  // a direct/forged request. Drop it before auth, database, or page routing.
+  if (isReservedProfileAliasMarkerPath(req.nextUrl.pathname)) {
+    return createFastNotFoundResponse();
   }
 
   const hostInfo = analyzeHost(req.nextUrl.hostname);

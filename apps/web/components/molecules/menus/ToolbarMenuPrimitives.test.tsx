@@ -10,10 +10,7 @@ const toolbarMenuPrimitivesPath = resolve(
   __dirname,
   './ToolbarMenuPrimitives.tsx'
 );
-const designSystemPath = resolve(
-  __dirname,
-  '../../../styles/design-system.css'
-);
+const designSystemPath = resolve(__dirname, '../../../styles/system-b-app.css');
 
 const toolbarMenuSystemBClasses = [
   'system-b-toolbar-menu-content',

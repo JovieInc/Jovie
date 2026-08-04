@@ -1,4 +1,5 @@
 import '../(home)/home.css';
+import '../../components/marketing/MarketingSnapRail.css';
 
 export const revalidate = false;
 

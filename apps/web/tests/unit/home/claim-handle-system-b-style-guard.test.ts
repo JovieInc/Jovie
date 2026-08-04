@@ -85,7 +85,7 @@ describe('ClaimHandleForm System B source contract', () => {
 
   it('defines stable claim-handle visual states in CSS and Button geometry in source', () => {
     const styles = readFileSync(
-      resolve(appRoot, 'styles/design-system.css'),
+      resolve(appRoot, 'app/(home)/home.css'),
       'utf8'
     );
     const interactiveSource = readFileSync(

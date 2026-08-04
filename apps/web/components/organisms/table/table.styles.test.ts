@@ -52,7 +52,7 @@ describe('table System B style exports', () => {
 
   it('keeps reduced motion and the 40px row invariant in the canonical stylesheet', () => {
     const designSystemSource = readFileSync(
-      join(process.cwd(), 'styles/design-system.css'),
+      join(process.cwd(), 'styles/system-b-app.css'),
       'utf8'
     );
 
@@ -64,7 +64,7 @@ describe('table System B style exports', () => {
 
   it('reserves contextual action geometry while exposing it for row intent states', () => {
     const designSystemSource = readFileSync(
-      join(process.cwd(), 'styles/design-system.css'),
+      join(process.cwd(), 'styles/system-b-app.css'),
       'utf8'
     );
 

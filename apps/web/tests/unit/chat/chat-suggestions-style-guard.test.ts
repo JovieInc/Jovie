@@ -35,7 +35,7 @@ describe('chat suggestions and slash picker System B source contract', () => {
 
   it('keeps suggested profile cards on the System B card depth token', () => {
     const styles = readFileSync(
-      resolve(appRoot, 'styles/design-system.css'),
+      resolve(appRoot, 'styles/system-b-app.css'),
       'utf8'
     );
 

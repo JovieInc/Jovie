@@ -1737,6 +1737,43 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verifyStep).toContain('EXPECTED_PRODUCTION_DEPLOYMENT_ID');
   });
 
+  it('makes canonical public-profile alias usable results release-gating', () => {
+    const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const aliasGate = getJobBlock(
+      workflow,
+      'production-public-profile-alias-gate'
+    );
+    const releaseResult = getJobBlock(workflow, 'release-result');
+
+    expect(aliasGate).toContain('needs: [promote-production]');
+    expect(aliasGate).toContain('setup-playwright');
+    expect(aliasGate).toContain('--base-url https://jov.ie');
+    expect(aliasGate).toContain('--runs 5');
+    const promoteJob = getJobBlock(workflow, 'promote-production');
+    const stagedPerformanceGate = getStepBlock(
+      promoteJob,
+      'Prove canonical navigation budgets on exact staged build'
+    );
+    expect(stagedPerformanceGate).toContain('--base-url "$deployment_url"');
+    expect(stagedPerformanceGate).toContain(
+      'Public-profile alias usable-result contract failed on the immutable staged deployment.'
+    );
+    for (const routeId of [
+      'public-profile-listen',
+      'public-profile-music',
+      'public-profile-subscribe',
+      'public-profile-tip',
+      'public-profile-tour',
+      'public-profile-releases',
+    ]) {
+      expect(aliasGate).toContain(`--route-id ${routeId}`);
+    }
+    expect(releaseResult).toContain('production-public-profile-alias-gate,');
+    expect(releaseResult).toContain(
+      'production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}'
+    );
+  });
+
   it('settles hosted post-deploy probes before announcing Production Verified', () => {
     const workflow = readFileSync(productionControllerWorkflowPath, 'utf8');
     const verified = getJobBlock(workflow, 'production-verified');
@@ -4103,10 +4140,10 @@ describe('production promotion exact-artifact contract', () => {
         'ref: ${{ needs.authorize-production.outputs.expected_sha }}'
       );
     }
-    expect(reusable.match(/actions\/checkout/g)).toHaveLength(7);
+    expect(reusable.match(/actions\/checkout/g)).toHaveLength(8);
     expect(
       reusable.match(/ref: \$\{\{ inputs\.expected_sha \}\}/g)
-    ).toHaveLength(7);
+    ).toHaveLength(8);
   });
 
   it('keeps rollback centralized behind confirmed structured gate failures', () => {

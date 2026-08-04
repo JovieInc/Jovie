@@ -55,7 +55,7 @@ describe('CopyLinkInput System B source contract', () => {
 
   it('defines the copy-link visual states in the design system source of truth', () => {
     const styles = readFileSync(
-      resolve(appRoot, 'styles/design-system.css'),
+      resolve(appRoot, 'styles/system-b-app.css'),
       'utf8'
     );
 

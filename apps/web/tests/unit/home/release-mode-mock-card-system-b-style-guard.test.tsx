@@ -24,7 +24,7 @@ vi.mock('@/features/home/HomepageLabelLogoMark', () => ({
 
 const webRoot = path.resolve(__dirname, '../../..');
 const sourcePath = 'components/features/home/ReleaseModeMockCard.tsx';
-const cssPath = 'styles/design-system.css';
+const cssPath = 'app/(home)/home.css';
 
 const forbiddenSourceVisualPatterns = [
   /#[0-9a-fA-F]{3,8}/,
@@ -51,7 +51,10 @@ function extractReleaseModeCss(source: string): string {
   const start = source.indexOf(
     'SYSTEM B HOME RELEASE MODE MOCK CARD PRIMITIVES'
   );
-  const end = source.indexOf('SYSTEM B ONBOARDING V2 PRIMITIVES', start);
+  const end = source.indexOf(
+    'SYSTEM B HOME RELEASE OPERATING SYSTEM SHOWCASE PRIMITIVES',
+    start
+  );
 
   expect(start, 'release-mode CSS block exists').toBeGreaterThanOrEqual(0);
   expect(end, 'release-mode CSS block is bounded').toBeGreaterThan(start);

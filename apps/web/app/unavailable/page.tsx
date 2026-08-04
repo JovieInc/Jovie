@@ -1,3 +1,4 @@
+import '../../styles/system-b-app.css';
 import { UnavailablePage } from '@/components/UnavailablePage';
 
 export const runtime = 'nodejs';

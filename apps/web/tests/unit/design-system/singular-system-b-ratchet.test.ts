@@ -71,10 +71,16 @@ describe('singular System B — design-system unification ratchet', () => {
       resolve(WEB_ROOT, 'styles/linear-tokens.css'),
       'utf8'
     );
-    const designSystem = readFileSync(
-      resolve(WEB_ROOT, 'styles/design-system.css'),
-      'utf8'
-    );
+    const marketingStyles = [
+      'styles/design-system.css',
+      'components/marketing/MarketingSnapRail.css',
+      'app/(home)/home.css',
+      'styles/system-b-app.css',
+      'components/marketing/artist-profile/ArtistProfileLandingPage.css',
+      'components/marketing/artist-profile/ShellCtaButton.css',
+    ]
+      .map(path => readFileSync(resolve(WEB_ROOT, path), 'utf8'))
+      .join('\n');
 
     expect(layout).toContain('system-b-marketing dark');
     expect(layout).not.toContain('linear-marketing');
@@ -85,13 +91,13 @@ describe('singular System B — design-system unification ratchet', () => {
       /body:has\(\.system-b-marketing\)[\s\S]*?\{[^}]*overflow:\s*visible/
     );
     expect(linearTokens).toContain('.system-b-marketing.dark');
-    expect(designSystem).toContain('.system-b-marketing {');
-    expect(designSystem).toContain('.system-b-marketing.dark');
-    expect(designSystem).toContain('.system-b-marketing h1');
-    expect(designSystem).toMatch(
+    expect(marketingStyles).toContain('.system-b-marketing {');
+    expect(marketingStyles).toContain('.system-b-marketing.dark');
+    expect(marketingStyles).toContain('.system-b-marketing h1');
+    expect(marketingStyles).toMatch(
       /\.system-b-marketing button,[\s\S]*?\.system-b-marketing a\[class\*="btn"\]\s*\{[^}]*font-family:\s*var\(--marketing-font-body\)/
     );
-    expect(designSystem).not.toMatch(
+    expect(marketingStyles).not.toMatch(
       /\.system-b-marketing button,[\s\S]*?\.system-b-marketing a\[class\*="btn"\]\s*\{[^}]*font-family:\s*var\(--marketing-font-display\)/
     );
   });
