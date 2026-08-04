@@ -131,6 +131,7 @@ function markElementVisible(element: Element) {
 
 describe('browser-observed alias readiness', () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     document.body.replaceChildren();
     delete (
       window as Window & {
@@ -157,7 +158,6 @@ describe('browser-observed alias readiness', () => {
       expectedPaths: [`${window.location.pathname}${window.location.search}`],
       sampleKey: 'immediate-sample',
       shellSelectors: ['#alias-shell'],
-      startEpochMs: performance.timeOrigin + performance.now() - 100,
     });
     new Function(probeScript)();
 
@@ -166,7 +166,11 @@ describe('browser-observed alias readiness', () => {
         __perfAliasPhaseProbe?: unknown;
       }
     ).__perfAliasPhaseProbe;
-    const phases = assertAliasPhaseTiming(state, 'immediate-sample', 500);
+    const phases = assertAliasPhaseTiming(
+      state,
+      'immediate-sample',
+      performance.now() + 1_000
+    );
 
     expect(phases.redirectCompleteMs).toBeLessThanOrEqual(
       phases.shellVisibleMs
@@ -177,6 +181,45 @@ describe('browser-observed alias readiness', () => {
     expect(phases.interactiveReadyMs).toBeLessThanOrEqual(
       phases.destinationAffordanceMs
     );
+  });
+
+  it('uses the browser navigation clock instead of a controller epoch', () => {
+    const shell = document.createElement('div');
+    shell.id = 'alias-shell';
+    const content = document.createElement('div');
+    content.id = 'alias-content';
+    const destination = document.createElement('button');
+    destination.id = 'alias-destination';
+    for (const element of [shell, content, destination]) {
+      markElementVisible(element);
+      document.body.append(element);
+    }
+    vi.spyOn(performance, 'now').mockReturnValue(137);
+
+    const probeScript = createAliasPhaseProbeScript({
+      contentSelectors: ['#alias-content'],
+      destinationSelectors: ['#alias-destination'],
+      expectedPaths: [`${window.location.pathname}${window.location.search}`],
+      sampleKey: 'browser-clock-sample',
+      shellSelectors: ['#alias-shell'],
+    });
+    new Function(probeScript)();
+
+    const state = (
+      window as Window & {
+        __perfAliasPhaseProbe?: unknown;
+      }
+    ).__perfAliasPhaseProbe;
+    const phases = assertAliasPhaseTiming(state, 'browser-clock-sample', 5_000);
+
+    expect(phases).toEqual({
+      destinationAffordanceMs: 137,
+      interactiveReadyMs: 137,
+      redirectCompleteMs: 137,
+      shellVisibleMs: 137,
+    });
+    expect(probeScript).not.toContain('Date.now');
+    expect(probeScript).not.toContain('timeOrigin');
   });
 
   it('records a destination that becomes visible after installation', async () => {
@@ -198,7 +241,6 @@ describe('browser-observed alias readiness', () => {
       expectedPaths: [`${window.location.pathname}${window.location.search}`],
       sampleKey: 'mutation-sample',
       shellSelectors: ['#alias-shell'],
-      startEpochMs: performance.timeOrigin + performance.now() - 100,
     });
     new Function(probeScript)();
 
