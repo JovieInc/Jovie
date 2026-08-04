@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "version": "1.0.12",
+  "releasedAt": "2026-08-04",
+  "exceptions": [
+    {
+      "id": "satoshi-display",
+      "introducedIn": "1.0.0",
+      "name": "Satoshi display type",
+      "justification": "Large editorial display may use Satoshi while body copy, controls, navigation, and data remain Inter.",
+      "founderApproved": true
+    }
+  ],
+  "changelog": [
+    {
+      "version": "1.0.12",
+      "date": "2026-08-04",
+      "summary": "Moved the checked public manifest into the generated asset namespace while preserving its vendor data contract."
+    },
+    {
+      "version": "1.0.11",
+      "date": "2026-08-04",
+      "summary": "Enforced canonical Inter rendering for the public body and interface typography specimens."
+    },
+    {
+      "version": "1.0.10",
+      "date": "2026-08-04",
+      "summary": "Recorded the formatter-stable privacy schema and canonical typography projection as the reviewed public release."
+    },
+    {
+      "version": "1.0.9",
+      "date": "2026-08-04",
+      "summary": "Completed the executable public projection schema after focused privacy regression review."
+    },
+    {
+      "version": "1.0.8",
+      "date": "2026-08-04",
+      "summary": "Made the public privacy boundary allowlist-only and completed vendor-safe typography, leading, and tracking token exports."
+    },
+    {
+      "version": "1.0.7",
+      "date": "2026-08-04",
+      "summary": "Aligned semantic manifest validation with the normal repository formatter while preserving all drift and provenance checks."
+    },
+    {
+      "version": "1.0.6",
+      "date": "2026-08-04",
+      "summary": "Added deterministically sorted, readable public manifest serialization."
+    },
+    {
+      "version": "1.0.5",
+      "date": "2026-08-04",
+      "summary": "Aligned public headings, labels, and accessibility names with the canonical UI casing contract."
+    },
+    {
+      "version": "1.0.4",
+      "date": "2026-08-04",
+      "summary": "Moved content-section counting and viewport scope into the executable delight policy so public guidance cannot drift from the evaluator."
+    },
+    {
+      "version": "1.0.3",
+      "date": "2026-08-04",
+      "summary": "Preserved sticky-header contrast over logo and token specimens after mobile anchor testing."
+    },
+    {
+      "version": "1.0.2",
+      "date": "2026-08-04",
+      "summary": "Improved public intentionality labels and anchored-section clearance after real desktop and mobile rendered review."
+    },
+    {
+      "version": "1.0.1",
+      "date": "2026-08-04",
+      "summary": "Locked delight counts as optional maximums, added no-budget-filling receipts, hardened private media projection, and attached the Brand System check to builds and CI."
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-08-04",
+      "summary": "Established the generated public Brand System projection, versioned asset checksums, approved composition examples, privacy boundary, and executable drift gate."
+    }
+  ]
+}
