@@ -50,7 +50,15 @@ test('desktop disposition opens auth routes externally instead of in-app', () =>
   ]);
 });
 
-test('desktop disposition opens allowlisted public routes externally', () => {
+test('desktop disposition keeps exact public profile links in-app', () => {
+  assertDisposition(productionPolicy, 'in-app', [
+    'https://jov.ie/tim',
+    'https://jov.ie/tim/pay?source=qr',
+    'https://jov.ie/tim/summer-tour/sounds',
+  ]);
+});
+
+test('desktop disposition opens allowlisted non-profile routes externally', () => {
   assertDisposition(productionPolicy, 'external', [
     'https://jov.ie/',
     'https://jov.ie/legal/privacy',
@@ -60,9 +68,6 @@ test('desktop disposition opens allowlisted public routes externally', () => {
     'https://jov.ie/blog/the-contact-problem',
     'https://jov.ie/about',
     'https://jov.ie/download',
-    'https://jov.ie/tim',
-    'https://jov.ie/tim/pay?source=qr',
-    'https://jov.ie/tim/summer-tour/sounds',
     'https://jov.ie/docs/getting-started',
     'https://docs.jov.ie/getting-started',
     'mailto:support@jov.ie',
@@ -109,11 +114,11 @@ test('desktop disposition allows local app origin only when running locally', ()
   assertDisposition(localPolicy, 'in-app', [
     'http://127.0.0.1:3112/app',
     'http://127.0.0.1:3112/signin/sso-callback?desktop_return=%2Fapp',
+    'http://127.0.0.1:3112/tim',
   ]);
   assertDisposition(localPolicy, 'external', [
     'http://127.0.0.1:3112/',
     'http://127.0.0.1:3112/pricing',
-    'http://127.0.0.1:3112/tim',
   ]);
   assertDisposition(localPolicy, 'blocked', [
     'http://localhost:3112/app',
