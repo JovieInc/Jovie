@@ -71,7 +71,7 @@ export function CalendarRouteSkeleton() {
       }
     >
       <PageContent className='px-3 py-2 sm:px-3 sm:py-2'>
-        <div className='grid h-full min-h-0 grid-cols-1 gap-3 lg:grid-cols-6'>
+        <div className='system-b-calendar-workspace-grid h-full min-h-0 gap-3'>
           <div
             aria-hidden='true'
             data-testid='calendar-filter-rail-skeleton'
@@ -86,16 +86,16 @@ export function CalendarRouteSkeleton() {
           </div>
           <div
             data-testid='calendar-grid-skeleton'
-            className='overflow-hidden rounded-xl border border-subtle lg:col-span-5'
+            className='system-b-calendar-main-plane overflow-hidden rounded-xl border border-subtle'
           >
-            <div className='grid grid-cols-7 border-b border-subtle'>
+            <div className='system-b-calendar-month-grid border-b border-subtle'>
               {CALENDAR_WEEKDAY_KEYS.map(key => (
                 <div key={key} className='px-2 py-2'>
                   <div className='skeleton mx-auto h-3 w-8 rounded-sm' />
                 </div>
               ))}
             </div>
-            <div className='grid grid-cols-7'>
+            <div className='system-b-calendar-month-grid'>
               {CALENDAR_GRID_CELL_KEYS.map(key => (
                 <div
                   key={key}

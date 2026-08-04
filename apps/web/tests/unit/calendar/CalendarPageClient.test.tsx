@@ -188,7 +188,16 @@ describe('CalendarPageClient', () => {
     const filterRail = screen.getByTestId('calendar-filter-rail');
     expect(filterRail).toHaveAttribute('aria-label', 'Calendar Filters');
     expect(filterRail).toHaveClass('min-h-8', 'lg:flex-col');
-    expect(filterRail.parentElement).toHaveClass('lg:grid-cols-6');
+    expect(filterRail.parentElement).toHaveClass(
+      'system-b-calendar-workspace-grid'
+    );
+    expect(screen.getByTestId('calendar-main-plane')).toHaveClass(
+      'system-b-calendar-main-plane'
+    );
+    expect(screen.getByTestId('calendar-weekday-grid').children).toHaveLength(
+      7
+    );
+    expect(screen.getByTestId('calendar-month-grid').children).toHaveLength(42);
     expect(screen.getByRole('button', { name: 'All' })).toHaveClass(
       'system-b-calendar-filter-pill'
     );
@@ -359,12 +368,12 @@ describe('CalendarRouteSkeleton', () => {
     );
     expect(screen.getByTestId('calendar-grid-skeleton')).toBeInTheDocument();
     expect(screen.getByTestId('calendar-grid-skeleton')).toHaveClass(
-      'lg:col-span-5'
+      'system-b-calendar-main-plane'
     );
     expect(
       screen
         .getByTestId('calendar-grid-skeleton')
-        .querySelectorAll('.grid-cols-7 > div')
+        .querySelectorAll('.system-b-calendar-month-grid > div')
     ).toHaveLength(49);
   });
 });
