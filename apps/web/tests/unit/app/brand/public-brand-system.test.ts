@@ -111,18 +111,17 @@ describe('public Brand System drift gate', () => {
     'age_range',
     'style_label',
     'license_detail',
-  ])('fails closed when a private media field is projected: %s', field => {
-    expect(() =>
-      assertPublicSafeProjection({
-        media: {
-          url: '/brand/editorial.jpg',
-          alt: 'Artist standing on a lit stage.',
-          provenance_status: 'verified',
-          rights_status: 'cleared',
-          [field]: 'private-value',
-        },
-      })
-    ).toThrow(/projection rejected private fields/);
+    'media_rights_operational_metadata',
+    'ethnicity',
+    'profile_selection_notes',
+    'unexpected_safe_sounding_label',
+  ])('fails closed when an unreviewed media field is projected: %s', field => {
+    const manifest = cloneManifest(buildPublicBrandManifest());
+    Object.assign(manifest.media, { [field]: 'private-value' });
+
+    expect(() => assertPublicSafeProjection(manifest)).toThrow(
+      /projection rejected private or unreviewed fields/
+    );
   });
 
   it('accepts only the four public-safe media fields', () => {
@@ -139,7 +138,24 @@ describe('public Brand System drift gate', () => {
         ...media,
         internal_name: 'campaign-option-a',
       } as PublicMediaProjection)
-    ).toThrow(/may contain only/);
+    ).toThrow(/not in the public projection schema/);
+  });
+
+  it('exports every typography token referenced by the vendor contract', () => {
+    const manifest = buildPublicBrandManifest();
+    const tokenNames = new Set(manifest.tokens.map(token => token.name));
+    const referencedTokens = [
+      manifest.typography.fontBody,
+      manifest.typography.fontDisplay,
+      ...Object.values(manifest.typography.leading),
+      ...Object.values(manifest.typography.tracking),
+    ];
+
+    for (const reference of referencedTokens) {
+      const name = String(reference).match(/^var\((--[^)]+)\)$/)?.[1];
+      expect(name, `${reference} is a direct token reference`).toBeTruthy();
+      expect(tokenNames, `${name} is exported`).toContain(name);
+    }
   });
 
   it('publishes no media by default and no local source paths', () => {

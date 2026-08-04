@@ -110,6 +110,21 @@
   "changelog": [
     {
       "date": "2026-08-04",
+      "summary": "Recorded the formatter-stable privacy schema and canonical typography projection as the reviewed public release.",
+      "version": "1.0.10"
+    },
+    {
+      "date": "2026-08-04",
+      "summary": "Completed the executable public projection schema after focused privacy regression review.",
+      "version": "1.0.9"
+    },
+    {
+      "date": "2026-08-04",
+      "summary": "Made the public privacy boundary allowlist-only and completed vendor-safe typography, leading, and tracking token exports.",
+      "version": "1.0.8"
+    },
+    {
+      "date": "2026-08-04",
       "summary": "Aligned semantic manifest validation with the normal repository formatter while preserving all drift and provenance checks.",
       "version": "1.0.7"
     },
@@ -464,11 +479,11 @@
       "tooltip": "var(--color-text-tooltip)"
     }
   },
-  "source_digest": "39bd38d435620471b121e665b20fcca19b3070ef6270615dd6a66cf1765cf497",
+  "source_digest": "26cf10be222276508d8ef8fb6585bc9cad7d70bde1d94a9770bdfb157929589c",
   "sources": [
     {
       "id": "public-manifest-builder",
-      "sha256": "19e0360d4284c3c3def9aef6af0f9ecbab10a613acec55b31c96321e11a08c51"
+      "sha256": "aea07a0b13da9d28c1af86a1b214ad68c3f3737303868e4529783a956030d1cb"
     },
     {
       "id": "public-page",
@@ -480,7 +495,7 @@
     },
     {
       "id": "public-page-styles",
-      "sha256": "cfcadf2291b8ad35779131e3ee164ddb044cab7712489ec7ce6d7ac465bae4fa"
+      "sha256": "2ed6d52fdc58362acbfb8ad083aa9dea3cecbce9762a14179f0662afed306c6a"
     },
     {
       "id": "canonical-token-parser",
@@ -492,7 +507,7 @@
     },
     {
       "id": "live-token-emitter",
-      "sha256": "fb6a3521a3658f309bfeb36d37fd2d1028e860fe806b2b9ce5142e0cf5a75448"
+      "sha256": "b7a34c1dcfa5b37385062b53b3d4f4e25a9fc6b7763d48c8c81628338ad1d653"
     },
     {
       "id": "semantic-token-api",
@@ -556,11 +571,11 @@
     },
     {
       "id": "public-safety-projection",
-      "sha256": "f6a5e7962661abacbff9178f95ade81700832b8cedde06b629efc178e63472db"
+      "sha256": "f73005fe4720527da77439038f10fc62845d9b3afaaab1d06e75353d6524fd12"
     },
     {
       "id": "release-contract",
-      "sha256": "c3cea4cb303fc3d4ffbd942ed5f8a39cb26ff449511e569751da6a054d0a7a46"
+      "sha256": "72f947e238bc6f6d13242574348fde3d72090edb3addb2e1970e92093fd5a1fd"
     }
   ],
   "tokens": [
@@ -993,6 +1008,14 @@
       "value": "var(--ds-motion-subtle-easing)"
     },
     {
+      "name": "--font-body",
+      "value": "var(--font-sans)"
+    },
+    {
+      "name": "--font-display",
+      "value": "var(--font-satoshi, \"Satoshi\"), -apple-system, \"system-ui\", sans-serif"
+    },
+    {
       "name": "--font-features",
       "value": "\"cv01\", \"ss03\""
     },
@@ -1006,7 +1029,7 @@
     },
     {
       "name": "--font-sans",
-      "value": "\"Inter Variable\", \"Inter\", \"SF Pro Display\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Oxygen, Ubuntu, Cantarell, \"Open Sans\", \"Helvetica Neue\", sans-serif"
+      "value": "var(--font-inter, \"Inter Variable\"), \"Inter\", \"SF Pro Display\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Oxygen, Ubuntu, Cantarell, \"Open Sans\", \"Helvetica Neue\", sans-serif"
     },
     {
       "name": "--font-weight-bold",
@@ -1035,6 +1058,26 @@
     {
       "name": "--font-weight-semibold",
       "value": "590"
+    },
+    {
+      "name": "--leading-none",
+      "value": "1"
+    },
+    {
+      "name": "--leading-normal",
+      "value": "1.5"
+    },
+    {
+      "name": "--leading-relaxed",
+      "value": "1.625"
+    },
+    {
+      "name": "--leading-snug",
+      "value": "1.375"
+    },
+    {
+      "name": "--leading-tight",
+      "value": "1.25"
     },
     {
       "name": "--public-content-max-landing",
@@ -1231,6 +1274,22 @@
     {
       "name": "--text-xs",
       "value": "0.75rem"
+    },
+    {
+      "name": "--tracking-normal",
+      "value": "0"
+    },
+    {
+      "name": "--tracking-tight",
+      "value": "-0.01em"
+    },
+    {
+      "name": "--tracking-tighter",
+      "value": "-0.02em"
+    },
+    {
+      "name": "--tracking-wide",
+      "value": "0.01em"
     }
   ],
   "typography": {
@@ -1291,7 +1350,7 @@
       "semibold": "var(--font-weight-semibold)"
     }
   },
-  "version": "1.0.7",
+  "version": "1.0.10",
   "voice": [
     "Lead with the artist outcome, then explain the mechanism.",
     "Use specific, verifiable language. Remove filler and inflated claims.",

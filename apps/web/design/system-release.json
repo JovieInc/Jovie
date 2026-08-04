@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "1.0.7",
+  "version": "1.0.10",
   "releasedAt": "2026-08-04",
   "exceptions": [
     {
@@ -12,6 +12,21 @@
     }
   ],
   "changelog": [
+    {
+      "version": "1.0.10",
+      "date": "2026-08-04",
+      "summary": "Recorded the formatter-stable privacy schema and canonical typography projection as the reviewed public release."
+    },
+    {
+      "version": "1.0.9",
+      "date": "2026-08-04",
+      "summary": "Completed the executable public projection schema after focused privacy regression review."
+    },
+    {
+      "version": "1.0.8",
+      "date": "2026-08-04",
+      "summary": "Made the public privacy boundary allowlist-only and completed vendor-safe typography, leading, and tracking token exports."
+    },
     {
       "version": "1.0.7",
       "date": "2026-08-04",

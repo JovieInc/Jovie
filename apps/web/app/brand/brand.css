@@ -196,6 +196,32 @@
   font-weight: var(--font-weight-medium);
 }
 
+/* Route-owned role enforcement. Shared marketing heading selectors have higher
+   specificity than the low-specificity specimen utilities above. Keep large
+   editorial display in Satoshi and compact reference headings in Inter. */
+.system-b-brand-page .system-b-brand-title,
+.system-b-brand-page .system-b-brand-section-title,
+.system-b-brand-page .system-b-brand-final-title,
+.system-b-brand-page .system-b-brand-type-sample--display {
+  font-family: var(--font-display);
+}
+
+.system-b-brand-page
+  :where(
+    .system-b-brand-contract-card,
+    .system-b-brand-archetype-card,
+    .system-b-brand-do-dont-card,
+    .system-b-brand-safe-projection,
+    .system-b-brand-token-group,
+    .system-b-brand-token-list,
+    .system-b-brand-specimen-group,
+    .system-b-brand-rule-list,
+    .system-b-brand-type-role
+  )
+  h3 {
+  font-family: var(--font-body);
+}
+
 :where(.system-b-brand-token-group),
 :where(.system-b-brand-token-list),
 :where(.system-b-brand-specimen-group) {

@@ -113,6 +113,8 @@ const PUBLIC_TOKEN_PREFIXES = [
   '--radius-',
   '--text-',
   '--font-',
+  '--leading-',
+  '--tracking-',
   '--space-',
   '--duration-',
   '--ease-',
