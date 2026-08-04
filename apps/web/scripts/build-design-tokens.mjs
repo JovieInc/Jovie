@@ -53,10 +53,13 @@ export function generate(tokens = loadSource()) {
   // accent/radius/duration values stay emitted by design-system.css until the
   // namespace-collapse wave moves those definitions here; emitting them twice
   // would create cascade-order ambiguity.
+  const brandVars = entries(tokens.brand)
+    .map(([name, value]) => `  --brand-${name}: ${value};`)
+    .join('\n');
   const grayVars = entries(tokens.gray)
     .map(([step, value]) => `  --gray${step}: ${value};`)
     .join('\n');
-  const css = `/* ${HEADER} */\n:root {\n${grayVars}\n}\n`;
+  const css = `/* ${HEADER} */\n:root {\n${brandVars}\n${grayVars}\n}\n`;
 
   // --- TS: full typed export of the source for programmatic consumers.
   const data = Object.fromEntries(
@@ -70,6 +73,14 @@ export function generate(tokens = loadSource()) {
 
   // --- Manifest: agent-readable index of canonical CSS custom properties.
   const manifestTokens = [];
+  for (const [name, value] of entries(tokens.brand)) {
+    manifestTokens.push({
+      cssVar: `--brand-${name}`,
+      value,
+      status: 'canonical',
+      emittedBy: 'styles/generated/design-tokens.css',
+    });
+  }
   for (const [step, value] of entries(tokens.gray)) {
     manifestTokens.push({
       cssVar: `--gray${step}`,

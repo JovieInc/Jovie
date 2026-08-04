@@ -38,12 +38,26 @@
 - `border-subtle`, `border-default`, `border-strong`
 - `focus-ring-themed` or `focus-visible:*` on interactive elements
 
-## Design Tokens (242 contract tokens; 480 total in CSS)
+## Design Tokens (256 contract tokens; 497 total in CSS)
 
 Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.
 
 ### DS Foundation
 
+- `--ds-marketing-display-leading`: 0.94
+- `--ds-marketing-display-size`: clamp(4rem, 6.9vw, 6.25rem)
+- `--ds-marketing-display-tracking`: -0.045em
+- `--ds-marketing-eyebrow-color`: var(--color-text-tertiary-token)
+- `--ds-marketing-eyebrow-leading`: var(--leading-tight)
+- `--ds-marketing-eyebrow-size`: calc(var(--text-xs) - 1px)
+- `--ds-marketing-eyebrow-tracking`: 0
+- `--ds-marketing-eyebrow-weight`: var(--font-weight-medium)
+- `--ds-marketing-lede-leading`: var(--leading-normal)
+- `--ds-marketing-lede-size`: clamp(1.25rem, 1.6vw, 1.375rem)
+- `--ds-marketing-lede-tracking`: -0.015em
+- `--ds-marketing-title-leading`: 1.08
+- `--ds-marketing-title-size`: clamp( var(--text-4xl), 4.6vw, calc(var(--text-5xl) + var(--space-4)) )
+- `--ds-marketing-title-tracking`: 0
 - `--ds-motion-cinematic-duration`: 420ms
 - `--ds-motion-cinematic-easing`: cubic-bezier(0.22, 1, 0.36, 1)
 - `--ds-motion-subtle-duration`: 150ms
@@ -64,6 +78,8 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--color-bg-paper`: #f7f8f8
 - `--color-bg-primary`: lch(98.94% 0.5 282)
 - `--color-bg-secondary`: lch(95.94% 0.5 282)
+- `--color-bg-selected`: var(--noir-ion-selected)
+- `--color-bg-selected-strong`: var(--noir-ion-selected-strong)
 - `--color-bg-surface-0`: #f5f5f5
 - `--color-bg-surface-1`: var(--linear-app-content-surface)
 - `--color-bg-surface-2`: #f2f3f5
@@ -71,6 +87,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--color-bg-tooltip`: #101012
 - `--color-border-default`: oklch(0% 0 0 / 8%)
 - `--color-border-focus`: #7170ff
+- `--color-border-interactive`: var(--noir-ion-border-interactive)
 - `--color-border-strong`: oklch(0% 0 0 / 15%)
 - `--color-border-subtle`: oklch(0% 0 0 / 5%)
 - `--color-btn-primary-bg`: oklch(10% 0 0)
@@ -91,13 +108,9 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--color-success-foreground`: oklch(100% 0 0)
 - `--color-success-subtle`: var(--color-accent-green-subtle)
 - `--color-text-disabled-token`: oklch( 70% var(--theme-base-chroma) var(--theme-base-hue) )
-- `--color-text-primary`: lch(100% 0 272) = pure white
 - `--color-text-primary-token`: lch(9.894% 0 282)
-- `--color-text-quaternary`: lch(38.29% 1.35 272) = #5A5B5D
 - `--color-text-quaternary-token`: lch(65.3% 1.25 282)
-- `--color-text-secondary`: lch(90.65% 1.35 272) = #E3E4E6
 - `--color-text-secondary-token`: lch(19.788% 1.25 282)
-- `--color-text-tertiary`: lch(62.6% 1.35 272) = #969799
 - `--color-text-tertiary-token`: lch(34% 1.25 282)
 - `--color-text-tooltip`: #ffffff
 - `--color-warning`: var(--color-accent-orange)
@@ -118,11 +131,21 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--system-b-chat-action-card-min-height`: 148px
 - `--system-b-chat-action-card-min-height-compact`: 132px
 - `--system-b-chat-action-card-primary-height`: 32px
+- `--system-b-chat-activity-color`: var(--color-text-secondary-token)
+- `--system-b-chat-activity-gap`: var(--space-0-5)
+- `--system-b-chat-activity-icon-size`: 0.875rem
+- `--system-b-chat-activity-indent`: var(--space-4)
+- `--system-b-chat-activity-line-height`: var(--space-4)
+- `--system-b-chat-activity-meta-color`: var(--color-text-tertiary-token)
+- `--system-b-chat-activity-row-py`: var(--space-1)
+- `--system-b-chat-activity-size`: var(--text-xs)
+- `--system-b-chat-activity-timeline-color`: color-mix( in oklab, var(--linear-app-shell-border) 70%, transparent )
+- `--system-b-chat-activity-weight`: var(--font-weight-book)
 - `--system-b-chat-body-line-height`: 1.5
-- `--system-b-chat-body-size`: 1rem
+- `--system-b-chat-body-size`: var(--text-app)
 - `--system-b-chat-composer-max-width`: 45rem
-- `--system-b-chat-composer-scroll-fade-height`: 7rem
-- `--system-b-chat-composer-thread-scroll-padding`: 9rem
+- `--system-b-chat-composer-scroll-fade-height`: 8rem
+- `--system-b-chat-composer-thread-scroll-padding`: 11rem
 - `--system-b-chat-loading-composer-height`: 88px
 - `--system-b-chat-message-content-max`: 66ch
 - `--system-b-chat-message-max-width`: 78%
@@ -133,13 +156,12 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--system-b-cinematic-black`: #06070a
 - `--system-b-duration-fast`: var(--ds-motion-subtle-duration)
 - `--system-b-ease`: var(--ds-motion-subtle-easing)
-- `--system-b-entity-chip-artist-accent`: var(--color-info)
-- `--system-b-entity-chip-event-accent`: var(--color-success)
+- `--system-b-entity-chip-artist-accent`: var(--color-accent-purple)
+- `--system-b-entity-chip-event-accent`: var(--color-accent-orange)
 - `--system-b-entity-chip-on-light-text`: var(--color-text-primary-token)
 - `--system-b-entity-chip-release-accent`: var(--color-accent)
-- `--system-b-entity-chip-track-accent`: var(--color-accent-pink)
+- `--system-b-entity-chip-track-accent`: var(--color-accent-blue)
 - `--system-b-header-height`: var(--linear-header-height)
-- `--system-b-home-bento-accent`: var(--color-accent)
 - `--system-b-onboarding-step-dsp`: var(--geist-cyan-solid)
 - `--system-b-onboarding-step-handle`: var(--geist-purple-solid)
 - `--system-b-onboarding-step-profile-ready`: var(--color-success)
@@ -147,15 +169,18 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--system-b-onboarding-step-social`: var(--geist-pink-solid)
 - `--system-b-onboarding-step-spotify`: var(--color-brand-spotify)
 - `--system-b-onboarding-step-upgrade`: var(--geist-amber-solid)
+- `--system-b-opportunity-inbox-card-min-height`: 168px
+- `--system-b-opportunity-inbox-comment-shell-height`: 5.75rem
+- `--system-b-opportunity-inbox-max-width`: 45rem
 - `--system-b-primary-bg`: var(--linear-btn-primary-bg)
 - `--system-b-primary-fg`: var(--linear-btn-primary-fg)
+- `--system-b-radius-card`: var(--radius-xl)
+- `--system-b-radius-card-inner`: calc( var(--system-b-radius-card) - var(--space-1) )
+- `--system-b-radius-overlay`: var(--radius-xl)
+- `--system-b-radius-overlay-inner`: calc( var(--system-b-radius-overlay) - var(--space-1) )
+- `--system-b-radius-panel`: var(--radius-3xl)
+- `--system-b-radius-panel-inner`: calc( var(--system-b-radius-panel) - var(--space-1) )
 - `--system-b-radius-pill`: var(--radius-full)
-- `--system-b-release-mode-progress`: 100%
-- `--system-b-release-mode-state`: var(--color-success)
-- `--system-b-release-mode-tone`: var(--color-info)
-- `--system-b-release-provider-accent`: var(--color-brand-spotify)
-- `--system-b-release-provider-accent-hover`: var(--color-brand-spotify-hover)
-- `--system-b-root-not-found-muted`: var(--color-text-tooltip)
 - `--system-b-text-primary`: var(--color-text-primary-token)
 
 ### App Shell
@@ -167,6 +192,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--app-shell-content-max-reading`: 56rem
 - `--app-shell-content-max-wide`: 84rem
 - `--app-shell-content-surface`: var(--linear-app-content-surface)
+- `--app-shell-footer-row-height`: calc(var(--space-6) + var(--space-1-5))
 - `--app-shell-frame-seam`: var(--linear-app-frame-seam)
 - `--app-shell-gap`: var(--linear-app-shell-gap)
 - `--app-shell-header-height`: var(--linear-app-header-height)
@@ -241,15 +267,13 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--font-mono`: "SF Mono", "Fira Code", "Fira Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace
 - `--font-optical-sizing`: 28
 - `--font-sans`: "Inter Variable", "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif
-- `--font-size-micro`: 11px, --font-size-mini: 12px, --font-size-small: 13px,
-- `--font-size-regular`: 15px, --font-size-large: 18px */ } :root.dark {
-- `--font-weight-bold`: 700 */
+- `--font-weight-bold`: 680
 - `--font-weight-book`: 450
 - `--font-weight-heavy`: 680
 - `--font-weight-medium`: 510
 - `--font-weight-nav`: 510
-- `--font-weight-normal`: 450 (book weight — their default!)
-- `--font-weight-semibold`: 600
+- `--font-weight-normal`: 400
+- `--font-weight-semibold`: 590
 
 ### Spacing
 
@@ -278,25 +302,11 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--shadow-card-elevated`: oklch(0% 0 0 / 2.2%) 0px 3px 6px -2px, oklch(0% 0 0 / 4.4%) 0px 1px 1px 0px
 - `--shadow-color`: 240 10% 3.9%
 - `--shadow-divider`: oklch(86% 0 283) 0px -0.5px 0px 0px inset
-- `--shadow-high`: 0 5px 50px #0000004d, 0 4px 30px #0000004d, 0 3px 10px #0000002f */
 - `--shadow-lg`: 0 4px 40px #00000014, 0 3px 20px #0000001a, 0 2px 6px #00000014, 0 1px 1px #0000000f
-- `--shadow-low`: 0 3px 8px #0000002f, 0 2px 5px #0000002f, 0 1px 1px #0000002f
 - `--shadow-md`: 0 3px 8px #0000001a, 0 2px 5px #0000001a, 0 1px 1px #0000001a
-- `--shadow-medium`: 0 4px 40px #00000026, 0 3px 20px #00000036, 0 2px 6px #0000001f, 0 1px 1px #0000001a
 - `--shadow-popover`: 0 8px 24px rgba(0, 0, 0, 0.08)
 - `--shadow-sm`: 0px 4px 4px -1px #0000000a, 0px 1px 1px 0px #00000014
-- `--shadow-tiny`: 0px 4px 4px -1px #0000000f, 0px 1px 1px 0px #0000001e
 - `--shadow-xl`: 0 5px 50px #00000033, 0 4px 30px #00000033, 0 3px 10px #0000001a
-
-### Linear Chrome
-
-- `--linear-bg-button`: #2a2c32
-- `--linear-bg-footer`: #06070a
-- `--linear-bg-header`: var(--system-b-cinematic-black)
-- `--linear-bg-page`: #06070a
-- `--linear-bg-surface-0`: #0a0b0e
-- `--linear-bg-surface-1`: #101216
-- `--linear-bg-surface-2`: #161a20
 
 ### Theme Inputs
 
@@ -327,6 +337,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--duration-slowest`: 350ms
 - `--duration-subtle`: var(--ds-motion-subtle-duration)
 - `--ease-cinematic`: var(--ds-motion-cinematic-easing)
+- `--ease-drawer`: cubic-bezier(0.32, 0.72, 0, 1)
 - `--ease-in-out`: cubic-bezier(0.65, 0, 0.35, 1)
 - `--ease-interactive`: cubic-bezier(0.25, 0.46, 0.45, 0.94)
 - `--ease-linear`: var(--ease-interactive)
@@ -336,7 +347,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--page-pad`: clamp(16px, 4vw, 32px)
 - `--section-gap`: clamp(16px, 3vw, 28px)
 
-## Shared UI Components (31 atom primitives)
+## Shared UI Components (36 atom primitives)
 
 Import from `@jovie/ui` — do not recreate local atom copies.
 
@@ -353,12 +364,15 @@ Import from `@jovie/ui` — do not recreate local atom copies.
 - **DropdownMenu** — `packages/ui/atoms/dropdown-menu.tsx`
 - **Field** — `packages/ui/atoms/field.tsx`
 - **Form** — `packages/ui/atoms/form.tsx`
+- **InlineOffline** — `packages/ui/atoms/inline-offline.tsx`
 - **Input** — `packages/ui/atoms/input.tsx`
 - **InputGroup** — `packages/ui/atoms/input-group.tsx`
 - **Kbd** — `packages/ui/atoms/kbd.tsx`
 - **Label** — `packages/ui/atoms/label.tsx`
+- **Link** — `packages/ui/atoms/link.tsx`
 - **OverflowMenuTrigger** — `packages/ui/atoms/overflow-menu-trigger.tsx`
 - **Popover** — `packages/ui/atoms/popover.tsx`
+- **Progress** — `packages/ui/atoms/progress.tsx`
 - **RadioGroup** — `packages/ui/atoms/radio-group.tsx`
 - **SearchableSubmenu** — `packages/ui/atoms/searchable-submenu.tsx`
 - **SegmentControl** — `packages/ui/atoms/segment-control.tsx`
@@ -367,6 +381,8 @@ Import from `@jovie/ui` — do not recreate local atom copies.
 - **Sheet** — `packages/ui/atoms/sheet.tsx`
 - **SimpleTooltip** — `packages/ui/atoms/simple-tooltip.tsx`
 - **Skeleton** — `packages/ui/atoms/skeleton.tsx`
+- **Spinner** — `packages/ui/atoms/spinner.tsx`
+- **StackableBadgeGroup** — `packages/ui/atoms/stackable-badge-group.tsx`
 - **Switch** — `packages/ui/atoms/switch.tsx`
 - **Textarea** — `packages/ui/atoms/textarea.tsx`
 - **Tooltip** — `packages/ui/atoms/tooltip.tsx`
@@ -395,7 +411,7 @@ Auto-generated from `apps/web/eslint.config.js` and `apps/web/eslint-rules/*`.
 - **`@jovie/no-ad-hoc-currency`** (error) — ESLint rule to enforce canonical currency formatter usage.
 - **`@jovie/no-hardcoded-theme-colors`** (error) — ESLint rule: no-hardcoded-theme-colors Flags Tailwind class utilities that bypass System B semantic tokens: bare text-black / text-white — raw absolute colors without a dark: counterpart bare bg-white   / bg-black  —...
 - **`@jovie/no-raw-focus-ring`** (error) — ESLint rule to enforce design-system focus ring utilities on interactive elements.
-- **`@jovie/no-raw-motion-values`** (error) — ESLint rule to flag raw motion values that bypass the canonical DS_FOUNDATION_V1 motion tokens.
+- **`@jovie/no-raw-motion-values`** (error) — ESLint rule to flag raw motion values that bypass the canonical DS_FOUNDATION_V1 motion tokens, plus motion anti-patterns that make UI feel sluggish or break on touch devices.
 
 ### Restricted Local Atom Imports
 

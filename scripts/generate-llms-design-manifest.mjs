@@ -184,7 +184,10 @@ export function stripReducedMotionOverrides(css) {
  */
 export function parseCssCustomProperties(css) {
   const tokens = new Map();
-  const scopedCss = stripReducedMotionOverrides(css);
+  const scopedCss = stripReducedMotionOverrides(css).replace(
+    /\/\*[\s\S]*?\*\//g,
+    ''
+  );
   const lines = scopedCss.split('\n');
   let currentName = null;
   let currentValue = '';

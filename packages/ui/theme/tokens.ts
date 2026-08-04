@@ -228,8 +228,27 @@ export const spacing = {
 // ============================================
 export const typography = {
   fontSans: 'var(--font-sans)',
+  fontBody: 'var(--font-body)',
+  fontDisplay: 'var(--font-display)',
   fontMono: 'var(--font-mono)',
   fontFeatures: 'var(--font-features)',
+  roles: {
+    display: {
+      family: 'Satoshi',
+      token: 'var(--font-display)',
+      use: 'Large editorial display only',
+    },
+    body: {
+      family: 'Inter',
+      token: 'var(--font-body)',
+      use: 'Body copy and long-form reading',
+    },
+    interface: {
+      family: 'Inter',
+      token: 'var(--font-sans)',
+      use: 'Controls, labels, navigation, and data',
+    },
+  },
   size: {
     '2xs': 'var(--text-2xs)', // 11px — tiny labels
     xs: 'var(--text-xs)', // 12px

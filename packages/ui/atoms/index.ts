@@ -1,7 +1,16 @@
 export type { BadgeProps } from './badge';
 export { Badge, badgeVariants } from './badge';
 export type { ButtonProps } from './button';
-export { Button, buttonVariants } from './button';
+export {
+  Button,
+  buttonVariants,
+} from './button';
+export {
+  BUTTON_SIZE_NAMES,
+  BUTTON_VARIANT_NAMES,
+  type ButtonSize,
+  type ButtonVariant,
+} from './button-contract';
 export {
   DropdownMenu,
   DropdownMenuCheckboxItem,

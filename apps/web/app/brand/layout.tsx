@@ -1,5 +1,6 @@
 import '../../components/marketing/MarketingSnapRail.css';
 import '../../components/marketing/artist-profile/ArtistProfileLandingPage.css';
+import './brand.css';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';

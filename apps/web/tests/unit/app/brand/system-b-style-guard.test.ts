@@ -4,8 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 const pageSourcePath = 'app/brand/page.tsx';
 const layoutSourcePath = 'app/brand/layout.tsx';
-const designSystemPath =
+const legacyBrandCssPath =
   'components/marketing/artist-profile/ArtistProfileLandingPage.css';
+const brandCssPath = 'app/brand/brand.css';
 
 const forbiddenRouteVisualPatterns = [
   /style=\{/,
@@ -34,22 +35,15 @@ const forbiddenBrandCssPatterns = [
   /(?:background|color|border(?:-[^:]+)?|box-shadow|text-decoration-color):[^;]*(?<!-)\b(?:white|black)\b/,
 ] as const;
 
-function extractBrandCss(source: string): string {
+function extractLegacyBrandCss(source: string): string {
   const start = source.indexOf(':where(.system-b-brand-layout)');
-  const nextSectionMarkers = [
+  const end = source.indexOf(
     ':where(.system-b-artist-notifications-hero-backdrop)',
-  ];
-  const end = nextSectionMarkers
-    .map(marker => source.indexOf(marker, start))
-    .filter(index => index > start)
-    .sort((a, b) => a - b)[0];
+    start
+  );
 
-  expect(start, 'brand CSS block exists').toBeGreaterThanOrEqual(0);
-  expect(
-    end,
-    'brand CSS block is bounded before the next section'
-  ).toBeGreaterThan(start);
-
+  expect(start, 'legacy brand foundation exists').toBeGreaterThanOrEqual(0);
+  expect(end, 'legacy brand foundation is bounded').toBeGreaterThan(start);
   return source.slice(start, end);
 }
 
@@ -93,18 +87,28 @@ describe('brand page System B source contract', () => {
   });
 
   it('keeps brand System B CSS within stable tokenized bounds', () => {
-    const source = extractBrandCss(
-      readFileSync(resolve(process.cwd(), designSystemPath), 'utf8')
-    );
+    const sources = [
+      [
+        legacyBrandCssPath,
+        extractLegacyBrandCss(
+          readFileSync(resolve(process.cwd(), legacyBrandCssPath), 'utf8')
+        ),
+      ],
+      [
+        brandCssPath,
+        readFileSync(resolve(process.cwd(), brandCssPath), 'utf8'),
+      ],
+    ] as const;
 
-    for (const pattern of forbiddenBrandCssPatterns) {
-      expect(source, `${designSystemPath} matched ${pattern}`).not.toMatch(
-        pattern
-      );
-    }
+    for (const [sourcePath, source] of sources) {
+      for (const pattern of forbiddenBrandCssPatterns) {
+        expect(source, `${sourcePath} matched ${pattern}`).not.toMatch(pattern);
+      }
 
-    for (const declaration of source.match(/letter-spacing:\s*[^;]+;/g) ?? []) {
-      expect(declaration).toMatch(/letter-spacing:\s*0\s*;/);
+      for (const declaration of source.match(/letter-spacing:\s*[^;]+;/g) ??
+        []) {
+        expect(declaration).toMatch(/letter-spacing:\s*0\s*;/);
+      }
     }
   });
 });

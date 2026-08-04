@@ -1,211 +1,94 @@
-# Icon System Standards
+# Icon and Symbol Standards
 
-## Overview
+This document explains the icon contract. Enforcement lives in
+`apps/web/eslint-rules/icon-usage.js`; social and service artwork lives in the
+shared `SocialIcon` registry; public Jovie symbols live in the Brand System
+asset registry and generated manifest. Do not create a second icon map in page
+code or documentation.
 
-This document defines the standardized approach to icon usage in the Jovie project. Following these standards ensures consistency, maintainability, and optimal bundle size across the application.
+## Decision order
 
-## Icon Libraries
+1. **Interface action, navigation, or state:** import the closest semantic icon
+   from `lucide-react`.
+2. **Social network, music service, or third-party brand:** render the shared
+   `SocialIcon` component. Never import Simple Icons directly.
+3. **Jovie mark, wordmark, or lockup:** use the server-renderable brand
+   primitives in application code or a checksummed file from the public Brand
+   System manifest in vendor work.
+4. **No match:** request and document an exception before adding a custom SVG.
 
-### 1. Lucide React - General Purpose Icons
+## Interface icons
 
-**Use for:** All general-purpose UI icons (navigation, actions, states, etc.)
+Import only the icons a surface uses so the bundler can keep the client payload
+small.
 
 ```tsx
-import { Icon } from '@/components/atoms/Icon';
+import { Check, ChevronRight, Settings } from 'lucide-react';
 
-// ✅ Correct usage
-<Icon name="ChevronRight" className="h-5 w-5" />
-<Icon name="X" className="h-4 w-4" />
+<ChevronRight aria-hidden='true' />
+<button type='button' aria-label='Settings'>
+  <Settings aria-hidden='true' />
+</button>
+<span>
+  <Check aria-hidden='true' /> Saved
+</span>
 ```
 
-**Common categories:**
-- Navigation: `ChevronRight`, `ArrowLeft`, `Home`
-- Actions: `Plus`, `Trash`, `Pencil`, `Share`
-- States: `Check`, `X`, `AlertTriangle`
-- UI Elements: `Menu`, `Search`, `Settings`
+- Use the same semantic icon for the same action across surfaces.
+- Size and color come from the containing canonical component; do not bake
+  presentation into a new wrapper.
+- An icon-only control needs an accessible name. An icon that repeats adjacent
+  text is hidden from assistive technology.
 
-### 2. SimpleIcons - Social Media, DSP, and Brand Icons
+## Social and service icons
 
-**Use for:** All social media platforms, digital service providers (DSPs), and brand-specific icons
+`apps/web/components/atoms/SocialIcon.tsx` is the only application registry for
+social, DSP, payment, and third-party service artwork.
 
 ```tsx
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 
-// ✅ Correct usage
-<SocialIcon platform="spotify" className="h-5 w-5" />
-<SocialIcon platform="instagram" className="h-4 w-4" />
+<SocialIcon platform='spotify' aria-hidden='true' />
 ```
 
-**Supported platforms:** (see `components/atoms/SocialIcon.tsx` for full list)
-- Music DSPs: `spotify`, `applemusic`, `soundcloud`, `bandcamp`
-- Social Media: `instagram`, `twitter`, `tiktok`, `youtube`, `facebook`
-- Other: `discord`, `reddit`, `pinterest`, `github`, `patreon`
+The canonical platform identifiers come from the registry and provider
+metadata. Do not copy its names or SVG paths into another switch statement,
+page manifest, or vendor package.
 
-### 3. Custom SVGs - Only When Necessary
+## Jovie symbols
 
-**Use for:** Brand logos, unique UI elements that don't exist in the above libraries
+Application code uses `Mark`, `Wordmark`, and `Lockup` from `@/lib/brand` so
+every render shares the same geometry and kerning data. External work uses only
+the files listed by `PUBLIC_BRAND_ASSETS` and the checksums emitted in
+`/brand/Jovie-Brand-System.json`.
 
-```tsx
-// ✅ Acceptable custom SVG usage
-<img src="/brand/jovie-logo.svg" alt="Jovie" />
+The public registry currently governs:
 
-// ✅ Inline SVG for unique UI elements (with proper justification)
-<svg className="h-6 w-6" viewBox="0 0 24 24">
-  {/* Custom path for unique Jovie-specific icon */}
-</svg>
-```
+- the mark in ink and cream;
+- the drawn wordmark in ink and cream;
+- the horizontal lockup in ink and cream;
+- the generated app-icon sizes listed by the manifest.
 
-**Approval required for:**
-- New custom SVG icons
-- Inline SVG elements
-- Icons that could potentially be replaced with Lucide or SimpleIcons
+Never type the wordmark, redraw the mark, or publish an unregistered export.
 
-## Decision Tree
+## Custom SVG exceptions
 
-```
-Need an icon?
-├── Is it a social media/DSP/brand icon?
-│   ├── Yes → Use SimpleIcons via SocialIcon component
-│   └── No → Continue
-├── Is it a general UI icon (navigation, actions, states)?
-│   ├── Yes → Use Lucide React via Icon component
-│   └── No → Continue
-├── Is it the Jovie brand logo or unique brand element?
-│   ├── Yes → Use custom SVG (approved)
-│   └── No → Continue
-└── Does an equivalent exist in Lucide?
-    ├── Yes → Use Lucide React
-    ├── No → Request approval for custom SVG
-    └── Unsure → Ask in #design channel
-```
+The lint allowlist contains approved historical and current brand files. That
+allowlist is not a public-download registry. A new custom SVG needs:
 
-## Component Usage Patterns
-
-### IconButton Component
-
-```tsx
-import { Icon } from '@/components/atoms/Icon';
-
-<IconButton ariaLabel="Settings">
-  <Icon name="Settings" className="h-4 w-4" />
-</IconButton>
-```
-
-### IconBadge Component
-
-```tsx
-import { Icon } from '@/components/atoms/Icon';
-
-<IconBadge Icon={<Icon name="Bolt" />} colorVar="--color-yellow-500" />
-```
-
-### SocialIcon Component
-
-```tsx
-// For social media, DSP, and brand icons
-<SocialIcon platform="spotify" className="h-5 w-5" />
-<SocialIcon platform="instagram" size={20} />
-```
+1. a documented gap in Lucide, `SocialIcon`, and the brand primitives;
+2. design approval and an owner;
+3. accessible-name behavior;
+4. an enforcement update and focused test;
+5. public asset registration and checksum verification when it is intended for
+   vendors.
 
 ## Enforcement
 
-### ESLint Rules
-
-The following ESLint rule enforces these standards:
-
-- `@jovie/icon-usage`: Prevents direct SVG imports and inline SVG usage without approval
-- Provides helpful error messages guiding to correct icon libraries
-- Maintains allowlist for approved custom SVGs
-
-### Pre-commit Hooks
-
-Icon usage validation runs automatically on:
-- Pre-commit (via husky)
-- CI/CD pipeline
-- Pre-push workflow
-
-## Exceptions and Approval Process
-
-### Approved Custom SVGs
-
-Current approved custom SVGs:
-- `/brand/jovie-logo.svg` - Main brand logo
-- `/brand/Jovie-Logo-Icon.svg` - Icon version of logo
-- Unique UI elements in specific components (documented inline)
-
-### Requesting New Custom SVGs
-
-1. Check if equivalent exists in Lucide React or SimpleIcons
-2. Create GitHub issue with `icon-request` label
-3. Include:
-   - Use case and context
-   - Why existing libraries don't meet the need
-   - Proposed SVG or design mockup
-4. Get approval from design team
-5. Add to approved list in ESLint configuration
-
-## Migration Guide
-
-### From Custom SVGs to Standard Libraries
-
-```tsx
-// ❌ Before - custom SVG
-<svg className="h-5 w-5" viewBox="0 0 24 24">
-  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-</svg>
-
-// ✅ After - Lucide React
-import { Icon } from '@/components/atoms/Icon';
-<Icon name="Star" className="h-5 w-5" />
-```
-
-### From Direct SimpleIcons to SocialIcon Component
-
-```tsx
-// ❌ Before - direct SimpleIcons usage
-import { siSpotify } from 'simple-icons';
-<svg className="h-5 w-5" viewBox="0 0 24 24">
-  <path d={siSpotify.path} fill="currentColor" />
-</svg>
-
-// ✅ After - SocialIcon component
-<SocialIcon platform="spotify" className="h-5 w-5" />
-```
-
-## Best Practices
-
-1. **Consistency**: Always use the same icon for the same concept across the app
-2. **Size Standards**: Use consistent sizing (`h-4 w-4`, `h-5 w-5`, `h-6 w-6`)
-3. **Accessibility**: Always include proper `aria-label` or `aria-hidden` attributes
-4. **Performance**: Prefer the established components over direct imports
-5. **Documentation**: Document any new custom SVG usage with justification
-
-## Troubleshooting
-
-### Common ESLint Errors
-
-**Error**: `Direct SVG import detected. Use Lucide React for general UI icons.`
-**Solution**: Replace with appropriate Lucide icon via Icon component
-
-**Error**: `Inline SVG detected. Use SocialIcon component for social media icons.`
-**Solution**: Use `<SocialIcon platform="..." />` instead
-
-**Error**: `Custom SVG usage requires approval. See docs/ICON_STANDARDS.md`
-**Solution**: Follow the approval process or use standard library alternative
-
-### Finding the Right Icon
-
-1. **Lucide React**: Browse at [lucide.dev](https://lucide.dev)
-2. **SimpleIcons**: Browse at [simpleicons.org](https://simpleicons.org)
-3. **Existing Usage**: Search codebase for similar use cases
-4. **Ask for Help**: Use #design channel for guidance
-
-## Resources
-
-- [Lucide React Documentation](https://lucide.dev)
-- [SimpleIcons Documentation](https://simpleicons.org)
-- [Existing SocialIcon Component](../components/atoms/SocialIcon.tsx)
-- [Existing Icon Component](../components/atoms/Icon.tsx)
-- [IconButton Component](../components/atoms/IconButton.tsx)
-- [IconBadge Component](../components/atoms/IconBadge.tsx)
-
+- ESLint rejects unapproved SVG imports and direct Simple Icons usage.
+- The public Brand System drift gate hashes this rule, the social registry, the
+  brand geometry, the public asset registry, and every downloadable file.
+- The public projection contains no operational selection metadata or copied
+  social-icon registry.
+- Source changes require a Design System version and changelog update before
+  the public manifest can be regenerated.
