@@ -292,6 +292,10 @@ describe('proxy.ts middleware', () => {
       '/dualipa/music/__profile-mode-alias/resolve',
       '/dualipa/listen/__profile-mode-alias/resolve',
       '/tim/subscribe/__profile-mode-alias/resolve',
+      '/tim/subscribe/__profile-mode-alias/resolve/qr',
+      `/tim/subscribe/__profile-mode-alias/resolve/${'q'.repeat(256)}`,
+      '/tim/subscribe/__profile%2Dmode%2Dalias/resolve/qr',
+      '/tim/subscribe/%5F%5Fprofile-mode-alias/resolve/qr',
     ])('returns 404 for direct marker path %s before auth', async path => {
       const req = createUnauthenticatedRequest({ pathname: path });
       const res = await callMiddleware(req);
@@ -307,6 +311,40 @@ describe('proxy.ts middleware', () => {
       const res = await callMiddleware(req);
 
       expect(res.status).not.toBe(404);
+    });
+
+    it('canonicalizes repeated alias sources to the first non-empty value', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname:
+          '/dualipa/music?campaign=summer&source=&source=link&source=qr',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(307);
+      const location = new URL(
+        res.headers.get('location') ?? '',
+        'https://localhost'
+      );
+      expect(location.pathname).toBe('/dualipa/music');
+      expect(location.searchParams.getAll('source')).toEqual(['link']);
+      expect(location.searchParams.get('campaign')).toBe('summer');
+      expect(mocks.getSessionCookie).not.toHaveBeenCalled();
+      expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
+    });
+
+    it('removes repeated empty alias sources without redirecting elsewhere', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/dualipa/tour?source=&source=',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(307);
+      const location = new URL(
+        res.headers.get('location') ?? '',
+        'https://localhost'
+      );
+      expect(location.pathname).toBe('/dualipa/tour');
+      expect(location.searchParams.has('source')).toBe(false);
     });
   });
 

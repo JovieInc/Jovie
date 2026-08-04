@@ -863,14 +863,42 @@ describe('profile mode route redirects', () => {
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
 
-    expect(afterFiles.slice(0, 6)).toEqual(
-      ['listen', 'music', 'releases', 'subscribe', 'tip', 'tour'].map(
-        alias => ({
-          source: `/:username/${alias}`,
-          destination: `/:username/${alias}/__profile-mode-alias/resolve`,
-        })
+    expect(afterFiles.slice(0, 12)).toEqual(
+      ['listen', 'music', 'releases', 'subscribe', 'tip', 'tour'].flatMap(
+        alias => [
+          {
+            source: `/:username/${alias}`,
+            has: [
+              {
+                type: 'query',
+                key: 'source',
+                value: '^(?<profileSource>link|qr)$',
+              },
+            ],
+            destination: `/:username/${alias}/__profile-mode-alias/resolve/:profileSource`,
+          },
+          {
+            source: `/:username/${alias}`,
+            destination: `/:username/${alias}/__profile-mode-alias/resolve`,
+          },
+        ]
       )
     );
+  });
+
+  it('bounds cacheable attribution variants to Jovie-issued source values', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
+    const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
+    const sourcePattern = new RegExp(afterFiles[0]?.has?.[0]?.value ?? '');
+
+    expect(sourcePattern.test('qr')).toBe(true);
+    expect(sourcePattern.test('link')).toBe(true);
+    expect(sourcePattern.test('qr-code')).toBe(false);
+    expect(sourcePattern.test('email blast')).toBe(false);
+    expect(sourcePattern.test('a/b')).toBe(false);
+    expect(sourcePattern.test('x#y')).toBe(false);
+    expect(sourcePattern.test('q'.repeat(65))).toBe(false);
   });
 
   it.each([
