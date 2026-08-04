@@ -217,6 +217,25 @@ describe('electron-bridge — defensive guards', () => {
     expect(windowOpenSpy).not.toHaveBeenCalled();
   });
 
+  it('openPublicProfileInBrowser uses the isolated preview bridge action', async () => {
+    const openPublicProfileInBrowser = vi.fn(async () => ({ ok: true }));
+    setElectronAPI({ openPublicProfileInBrowser });
+
+    await expect(__testing.openPublicProfileInBrowser()).resolves.toEqual({
+      ok: true,
+    });
+    expect(openPublicProfileInBrowser).toHaveBeenCalledTimes(1);
+    expect(windowOpenSpy).not.toHaveBeenCalled();
+  });
+
+  it('openPublicProfileInBrowser fails closed when the stale bridge lacks the method', async () => {
+    setElectronAPI({ versions: { app: '0.1.0' } });
+    await expect(__testing.openPublicProfileInBrowser()).resolves.toEqual({
+      ok: false,
+      reason: 'profile-browser-bridge-unavailable',
+    });
+  });
+
   it('openDesktopAuthUrl returns the bridge failure reason when open fails', async () => {
     const openDesktopAuthUrl = vi.fn(async () => ({
       ok: false,

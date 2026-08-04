@@ -1,6 +1,10 @@
 export type AppEnvironment = 'production' | 'staging' | 'local';
 
-export type UrlDisposition = 'in-app' | 'external' | 'blocked';
+export type UrlDisposition =
+  | 'in-app'
+  | 'external'
+  | 'profile-preview'
+  | 'blocked';
 
 export interface UrlDispositionOptions {
   readonly appUrl: string;
@@ -9,11 +13,6 @@ export interface UrlDispositionOptions {
 }
 
 const DEFAULT_DOCS_URL = 'https://docs.jov.ie';
-
-// Public artist profiles are first-class in-app destinations in Electron. Keep
-// this route contract beside the URL disposition rules so profile links and
-// deep links cannot drift back to the browser classification.
-const PUBLIC_PROFILE_ROUTE_PREFIX = '/';
 
 /** External auth provider origins that may be opened in the system browser. */
 const AUTH_PROVIDER_ORIGINS = [
@@ -177,7 +176,7 @@ function isAllowedDocsUrl(
   );
 }
 
-function isAllowedPublicProfilePath(pathname: string): boolean {
+export function isAllowedPublicProfilePath(pathname: string): boolean {
   const segments = pathname.split('/').filter(Boolean);
   if (segments.length === 0 || segments.length > 4) return false;
 
@@ -209,7 +208,18 @@ function isAllowedSameOriginExternalPath(pathname: string): boolean {
     return true;
   }
 
-  return isAllowedPublicProfilePath(pathname);
+  return false;
+}
+
+export function isAllowedPublicProfileUrl(
+  parsed: URL,
+  options: UrlDispositionOptions
+): boolean {
+  return (
+    isAppOriginUrl(parsed, options) &&
+    hasSafePathname(parsed.pathname) &&
+    isAllowedPublicProfilePath(parsed.pathname)
+  );
 }
 
 export function isAllowedInAppUrl(
@@ -225,9 +235,7 @@ export function isAllowedInAppUrl(
     ) ||
     AUTH_CALLBACK_ROUTE_PREFIXES.some(prefix =>
       matchesPathPrefix(parsed.pathname, prefix)
-    ) ||
-    (parsed.pathname.startsWith(PUBLIC_PROFILE_ROUTE_PREFIX) &&
-      isAllowedPublicProfilePath(parsed.pathname))
+    )
   );
 }
 
@@ -272,6 +280,7 @@ export function getUrlDisposition(
   const parsed = parseUrl(urlString);
   if (!parsed) return 'blocked';
   if (isAllowedInAppUrl(parsed, options)) return 'in-app';
+  if (isAllowedPublicProfileUrl(parsed, options)) return 'profile-preview';
   if (isAllowedExternalUrl(parsed, options)) return 'external';
   return 'blocked';
 }

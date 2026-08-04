@@ -41,6 +41,8 @@ export interface ElectronAPI {
     readonly ok: boolean;
     readonly reason?: string;
   }>;
+  /** Open the current isolated public profile in the system browser. */
+  readonly openPublicProfileInBrowser?: () => Promise<DesktopAuthActionResult>;
   /** Close the dedicated desktop auth handoff window. */
   readonly closeDesktopAuthWindow?: () => Promise<{
     readonly ok: boolean;
@@ -406,6 +408,18 @@ export async function openDesktopAuthUrl(
   return openBrowserFallback(authUrl);
 }
 
+export async function openPublicProfileInBrowser(): Promise<DesktopAuthActionResult> {
+  const api = getRawElectronAPI();
+  if (api && typeof api.openPublicProfileInBrowser === 'function') {
+    const result = await api.openPublicProfileInBrowser();
+    return result?.ok
+      ? { ok: true }
+      : { ok: false, reason: result?.reason ?? 'profile-browser-open-failed' };
+  }
+  if (api) reportMissingBridgeMethod('openPublicProfileInBrowser');
+  return { ok: false, reason: 'profile-browser-bridge-unavailable' };
+}
+
 export async function closeDesktopAuthWindow(): Promise<void> {
   const api = getRawElectronAPI();
   if (api && typeof api.closeDesktopAuthWindow === 'function') {
@@ -633,6 +647,7 @@ export const __testing = {
   safeOnUpdateDownloaded,
   startDesktopAuthHandoff,
   openDesktopAuthUrl,
+  openPublicProfileInBrowser,
   closeDesktopAuthWindow,
   consumeDesktopAuthCompletion,
   setDesktopTrayState,

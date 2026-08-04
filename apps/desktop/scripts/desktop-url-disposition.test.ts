@@ -50,11 +50,14 @@ test('desktop disposition opens auth routes externally instead of in-app', () =>
   ]);
 });
 
-test('desktop disposition keeps exact public profile links in-app', () => {
-  assertDisposition(productionPolicy, 'in-app', [
+test('desktop disposition opens canonical public profiles in a native preview', () => {
+  assertDisposition(productionPolicy, 'profile-preview', [
     'https://jov.ie/tim',
     'https://jov.ie/tim/pay?source=qr',
-    'https://jov.ie/tim/summer-tour/sounds',
+    'https://jov.ie/tim/summer-tour/sounds#latest',
+  ]);
+  assertDisposition(localPolicy, 'profile-preview', [
+    'http://127.0.0.1:3112/tim',
   ]);
 });
 
@@ -114,7 +117,6 @@ test('desktop disposition allows local app origin only when running locally', ()
   assertDisposition(localPolicy, 'in-app', [
     'http://127.0.0.1:3112/app',
     'http://127.0.0.1:3112/signin/sso-callback?desktop_return=%2Fapp',
-    'http://127.0.0.1:3112/tim',
   ]);
   assertDisposition(localPolicy, 'external', [
     'http://127.0.0.1:3112/',

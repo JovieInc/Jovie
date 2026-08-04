@@ -213,6 +213,43 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
   }
 });
 
+test('desktop public profile previews are isolated, phone-sized, and closable', async () => {
+  const [mainSource, preloadSource, bridgeSource] = await Promise.all([
+    readFile(join(desktopRoot, 'src/main.ts'), 'utf8'),
+    readFile(join(desktopRoot, 'src/preload.ts'), 'utf8'),
+    readFile(
+      join(desktopRoot, '../web/lib/desktop/electron-bridge.ts'),
+      'utf8'
+    ),
+  ]);
+
+  assert.match(mainSource, /PUBLIC_PROFILE_PREVIEW_PARTITION/);
+  assert.match(mainSource, /persist:jovie-public-profile-preview/);
+  assert.match(mainSource, /width: 390/);
+  assert.match(mainSource, /height: 844/);
+  assert.match(mainSource, /session\.fromPartition\(/);
+  assert.match(mainSource, /preview\.on\('closed'/);
+  assert.match(mainSource, /showWindowNow\(mainWindow\)/);
+  assert.match(mainSource, /OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL/);
+  assert.match(mainSource, /canonicalPublicProfileUrl/);
+  assert.match(mainSource, /runtime/);
+  assert.match(mainSource, /desktop_return/);
+  assert.match(mainSource, /label: 'Open in Browser'/);
+  assert.match(preloadSource, /openPublicProfileInBrowser/);
+  assert.match(preloadSource, /OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL/);
+  assert.match(bridgeSource, /openPublicProfileInBrowser/);
+});
+
+test('desktop profile navigation never loads the protected main shell', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  assert.match(mainSource, /disposition === 'profile-preview'/);
+  assert.match(
+    mainSource,
+    /event\.preventDefault\(\);\s*showPublicProfilePreview/
+  );
+  assert.match(mainSource, /const directProfileUrl = process\.argv\.find/);
+  assert.match(mainSource, /showPublicProfilePreview\(directProfileUrl\)/);
+});
 test('desktop production bundle declares the jovie auth protocol', async () => {
   const [builderConfig, mainSource, stagingConfig, localConfig] =
     await Promise.all([
@@ -294,6 +331,12 @@ test('desktop navigation uses explicit URL disposition allowlists', async () => 
   );
   assert.doesNotMatch(mainSource, /resolveNavigationUrl\(event\.url\)/);
   assert.match(mainSource, /getUrlDisposition\(event\.url\) === 'in-app'/);
+  assert.match(navigationSource, /'profile-preview'/);
+  assert.match(navigationSource, /function isAllowedPublicProfileUrl/);
+  assert.doesNotMatch(
+    navigationSource,
+    /return isAllowedPublicProfilePath\(pathname\);/
+  );
   assert.match(
     mainSource,
     /const DESKTOP_BROWSER_AUTH_PATHS = \[\s*'\/signin',\s*'\/signup',\s*'\/sign-in',\s*'\/sign-up',\s*\] as const;/
