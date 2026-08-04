@@ -277,7 +277,6 @@ describe('public-profile alias usable-result guard', () => {
     const config = createAliasPhaseProbeConfig(
       aliasGuardRoute,
       '/dualipa/listen',
-      1_000,
       'sample-key'
     );
 
@@ -292,7 +291,6 @@ describe('public-profile alias usable-result guard', () => {
       expectedPaths: ['/dualipa?mode=listen'],
       sampleKey: 'sample-key',
       shellSelectors: ['[data-testid="profile-header"]'],
-      startEpochMs: 1_000,
     });
   });
 

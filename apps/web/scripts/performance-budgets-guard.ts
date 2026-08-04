@@ -106,7 +106,6 @@ export interface AliasPhaseProbeConfig {
   readonly expectedPaths: readonly string[];
   readonly sampleKey: string;
   readonly shellSelectors: readonly string[];
-  readonly startEpochMs: number;
 }
 
 interface AliasPhaseProbeState {
@@ -289,7 +288,7 @@ export function createAliasPhaseProbeScript(config: AliasPhaseProbeConfig) {
     );
   }
   function elapsedMs() {
-    return performance.timeOrigin + performance.now() - config.startEpochMs;
+    return performance.now();
   }
   function isVisible(selectors) {
     for (const selector of selectors) {
@@ -721,7 +720,6 @@ export function assertAliasUsableResultUrl(
 export function createAliasPhaseProbeConfig(
   route: PerfRouteDefinition,
   resolvedPath: string,
-  startEpochMs: number,
   sampleKey: string
 ): AliasPhaseProbeConfig | undefined {
   if (!route.aliasUsableResult) {
@@ -735,7 +733,6 @@ export function createAliasPhaseProbeConfig(
     ),
     sampleKey,
     shellSelectors: route.readySelectors.shell ?? [],
-    startEpochMs,
   };
 }
 
@@ -1473,7 +1470,6 @@ async function measureRouteSample(
     const aliasProbe = createAliasPhaseProbeConfig(
       route,
       resolvedPath,
-      Date.now(),
       randomUUID()
     );
     if (aliasProbe) {
@@ -1534,7 +1530,10 @@ async function measureRouteSample(
       timingValues['warm-shell-response'] = interaction.warmShellResponse;
       timingValues['skeleton-to-content'] = interaction.skeletonToContent;
     } else {
-      const startedAt = aliasProbe?.startEpochMs ?? Date.now();
+      // Browser-local performance.now() begins at the navigation time origin,
+      // includes same-origin redirects, and excludes Node-to-CDP scheduling.
+      // Keep this wall-clock timer as a controller diagnostic only.
+      const startedAt = Date.now();
       await page.goto(url, {
         timeout: NAVIGATION_TIMEOUT_MS,
         waitUntil: 'domcontentloaded',
