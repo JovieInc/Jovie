@@ -90,7 +90,16 @@ jobs:
         run: git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
 
       - name: Enforce repository hygiene
-        run: node scripts/repo-hygiene-guard.mjs --diff-base "${{ github.event.pull_request.base.sha }}"
+        run: node scripts/repo-hygiene-guard.mjs --diff-base "${{ github.event.pull_request.base.sha }}" --report repo-health-receipt.json
+
+      - name: Upload repository health receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: repo-health-receipt-${{ github.event.pull_request.number }}
+          path: repo-health-receipt.json
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Enforce Agent Skill governance
         run: node scripts/skill-governance-guard.mjs

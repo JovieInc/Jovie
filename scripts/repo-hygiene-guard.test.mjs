@@ -17,9 +17,44 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
-import { evaluateRepoHygiene, HYGIENE_LIMITS } from './repo-hygiene-guard.mjs';
+import {
+  classifyRolloutFindings,
+  evaluateRepoHygiene,
+  HYGIENE_EXCEPTION_MAX_DAYS,
+  HYGIENE_LIMITS,
+  REPO_HEALTH_BASELINE,
+  REPO_HEALTH_CANDIDATE_LIMITS,
+  REPO_HEALTH_ROLLOUT,
+  RETIRED_TRACKED_FILE_CEILING,
+  validateHygieneExceptions,
+  validateRepoHealthBaselineChange,
+  validateRepoHealthRollout,
+} from './repo-hygiene-guard.mjs';
 
 const cleanupScript = resolve('scripts/codex-cleanup.sh');
+
+function promotedRollout(mode) {
+  return {
+    ...REPO_HEALTH_ROLLOUT,
+    mode,
+    promotionApproval: {
+      approvedBy: '@repo-owner',
+      approvedOn: '2026-08-20',
+      issue: 'JOV-9999',
+    },
+    evidence: {
+      ...REPO_HEALTH_ROLLOUT.evidence,
+      actionableOwnershipRate: 1,
+      deltaBlockingRuns: 20,
+      deltaBlockingStartedOn: '2026-08-05',
+      falsePositiveRate: 0.01,
+      legacyFindingCount: 0,
+      p95RuntimeMs: 200,
+      representativePullRequests: 20,
+      shadowRuns: 20,
+    },
+  };
+}
 
 function fixtureFile(root, path, bytes = 1) {
   const absolute = join(root, path);
@@ -342,21 +377,187 @@ test('enforces canonical visual baseline count and byte budgets', () => {
   }
 });
 
-test('enforces repository-wide tracked file, byte, and binary payload budgets', () => {
+test('reports measured repository and per-area growth findings in shadow mode', () => {
+  const webPaths = Array.from(
+    {
+      length:
+        REPO_HEALTH_CANDIDATE_LIMITS.maxNetTrackedFilesByArea['apps/web'] + 1,
+    },
+    (_, index) => `apps/web/lib/new-module-${index}.ts`
+  );
+  const webResult = evaluateRepoHygiene({ addedPaths: webPaths });
+  assert.deepEqual(webResult.errors, []);
+  assert.match(
+    webResult.advisories.join('\n'),
+    /apps\/web net \+16 regular files exceed the candidate \+15 ceiling/
+  );
+
+  const broadPaths = Array.from(
+    { length: REPO_HEALTH_CANDIDATE_LIMITS.maxNetTrackedFiles + 1 },
+    (_, index) => `area-${index}/source.ts`
+  );
+  const broadResult = evaluateRepoHygiene({ addedPaths: broadPaths });
+  assert.deepEqual(broadResult.errors, []);
+  assert.match(
+    broadResult.advisories.join('\n'),
+    /net \+21 regular files exceed the candidate \+20 repository ceiling/
+  );
+
+  const scriptsAdded = Array.from(
+    { length: 8 },
+    (_, index) => `scripts/new-${index}.mjs`
+  );
+  const scriptsDeleted = Array.from(
+    { length: 4 },
+    (_, index) => `scripts/retired-${index}.mjs`
+  );
+  const offsetResult = evaluateRepoHygiene({
+    addedPaths: scriptsAdded,
+    deletedPaths: scriptsDeleted,
+  });
+  assert.equal(offsetResult.netTrackedFiles, 4);
+  assert.deepEqual(offsetResult.errors, []);
+  assert.deepEqual(offsetResult.areaGrowth, [
+    { added: 8, area: 'scripts', deleted: 4, net: 4 },
+  ]);
+});
+
+test('keeps tighter binary churn advisory until rollout promotion', () => {
+  const root = mkdtempSync(join(tmpdir(), 'jovie-hygiene-binary-shadow-'));
+  try {
+    const paths = Array.from(
+      { length: 25 },
+      (_, index) => `apps/web/public/product-screenshots/shadow-${index}.png`
+    );
+    for (const path of paths) fixtureFile(root, path);
+    const shadow = evaluateRepoHygiene({
+      addedPaths: paths,
+      addedRegularPaths: [],
+      root,
+    });
+    assert.deepEqual(shadow.errors, []);
+    assert.match(shadow.advisories.join('\n'), /binary-churn: 25 files/);
+
+    const promoted = evaluateRepoHygiene({
+      addedPaths: paths,
+      addedRegularPaths: [],
+      rollout: promotedRollout('delta-blocking'),
+      root,
+    });
+    assert.match(promoted.errors.join('\n'), /binary-churn: 25 files/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('applies only scoped, owned, issue-linked, unexpired exceptions', () => {
+  const paths = Array.from(
+    { length: REPO_HEALTH_CANDIDATE_LIMITS.maxNetTrackedFiles + 1 },
+    (_, index) => `apps/web/lib/large-slice-${index}.ts`
+  );
+  const exception = {
+    id: 'large-owned-slice',
+    owner: '@repo-owner',
+    issue: 'JOV-9999',
+    headRef: 'codex/large-owned-slice',
+    createdOn: '2026-08-01',
+    expiresOn: '2026-08-30',
+    reason: 'Measured one-time package consolidation with owned replacement.',
+    pathPrefixes: ['apps/web/lib/'],
+    limits: {
+      maxNetTrackedFiles: 25,
+      maxNetTrackedFilesByArea: { 'apps/web': 25 },
+    },
+  };
+
+  const shadow = evaluateRepoHygiene({
+    addedPaths: paths,
+    exceptions: [exception],
+    headRef: exception.headRef,
+    now: new Date('2026-08-15T00:00:00Z'),
+  });
+  assert.deepEqual(shadow.errors, []);
+  assert.deepEqual(shadow.appliedExceptions, []);
+  assert.match(shadow.advisories.join('\n'), /regular-file-growth/);
+
+  const allowed = evaluateRepoHygiene({
+    addedPaths: paths,
+    exceptions: [exception],
+    headRef: exception.headRef,
+    now: new Date('2026-08-15T00:00:00Z'),
+    rollout: promotedRollout('delta-blocking'),
+  });
+  assert.deepEqual(allowed.errors, []);
+  assert.deepEqual(allowed.appliedExceptions, [exception.id]);
+
+  const wrongBranch = evaluateRepoHygiene({
+    addedPaths: paths,
+    exceptions: [exception],
+    headRef: 'codex/unrelated',
+    now: new Date('2026-08-15T00:00:00Z'),
+    rollout: promotedRollout('delta-blocking'),
+  });
+  assert.match(wrongBranch.errors.join('\n'), /regular-file-growth/);
+
+  const expired = validateHygieneExceptions(
+    [exception],
+    new Date('2026-09-01T00:00:00Z')
+  );
+  assert.match(expired.join('\n'), /expired on 2026-08-30/);
+
+  const overlong = {
+    ...exception,
+    id: 'overlong-slice',
+    expiresOn: '2026-09-01',
+  };
+  assert.match(
+    validateHygieneExceptions(
+      [overlong],
+      new Date('2026-08-02T00:00:00Z')
+    ).join('\n'),
+    new RegExp(`at most ${HYGIENE_EXCEPTION_MAX_DAYS} days`)
+  );
+
+  const malformed = {
+    ...exception,
+    id: 'malformed-slice',
+    reason: '',
+    pathPrefixes: ['*'],
+    limits: { maxNetTrackedFilesByArea: 25 },
+  };
+  assert.match(
+    validateHygieneExceptions(
+      [malformed],
+      new Date('2026-08-02T00:00:00Z')
+    ).join('\n'),
+    /reason is invalid|pathPrefixes|must be an area map/
+  );
+});
+
+test('grandfathers the exact file-count baseline while payload budgets stay blocking', () => {
   const root = mkdtempSync(join(tmpdir(), 'jovie-hygiene-repo-budget-'));
   try {
     const source = fixtureFile(root, 'fixtures/source.txt');
     const trackedPaths = ['fixtures/source.txt'];
-    for (let index = 1; index <= HYGIENE_LIMITS.maxTrackedFiles; index += 1) {
+    for (let index = 1; index <= RETIRED_TRACKED_FILE_CEILING; index += 1) {
       const path = `fixtures/file-${index}.txt`;
       linkSync(source, join(root, path));
       trackedPaths.push(path);
     }
+    const trackedResult = evaluateRepoHygiene({
+      addedPaths: [],
+      root,
+      trackedPaths,
+    });
+    assert.equal(
+      trackedResult.trackedFilesTotal,
+      RETIRED_TRACKED_FILE_CEILING + 1
+    );
+    assert.equal(trackedResult.trackedFiles, RETIRED_TRACKED_FILE_CEILING + 1);
+    assert.deepEqual(trackedResult.errors, []);
     assert.match(
-      evaluateRepoHygiene({ addedPaths: [], root, trackedPaths }).errors.join(
-        '\n'
-      ),
-      /tracked regular files.*file repository budget/
+      trackedResult.advisories.join('\n'),
+      /retired 10000-file ceiling is non-blocking/
     );
 
     const oversizedText = fixtureFile(root, 'payload/oversized.txt');
@@ -385,7 +586,7 @@ test('enforces repository-wide tracked file, byte, and binary payload budgets', 
   }
 });
 
-test('excludes committed generated and metadata outputs from the tracked file-count budget', () => {
+test('reports all regular files while preserving the legacy compatibility count', () => {
   const root = mkdtempSync(join(tmpdir(), 'jovie-hygiene-generated-count-'));
   try {
     const trackedPaths = [
@@ -406,6 +607,7 @@ test('excludes committed generated and metadata outputs from the tracked file-co
     });
     assert.equal(result.errors.length, 0);
     assert.equal(result.trackedFiles, 1);
+    assert.equal(result.trackedFilesTotal, trackedPaths.length);
     assert.equal(result.trackedBytes, trackedPaths.length);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -449,6 +651,95 @@ test('tracked payload inspection fails closed on filesystem errors', () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('keeps 800 legacy findings visible without blocking unrelated delta work', () => {
+  const shadow = classifyRolloutFindings({
+    baselineCount: 800,
+    currentCount: 800,
+    mode: 'shadow',
+    ruleId: 'example-legacy-rule',
+  });
+  assert.deepEqual(shadow.errors, []);
+  assert.match(shadow.advisories.join('\n'), /800 current findings/);
+
+  const grandfathered = classifyRolloutFindings({
+    baselineCount: 800,
+    currentCount: 800,
+    mode: 'delta-blocking',
+    ruleId: 'example-legacy-rule',
+  });
+  assert.deepEqual(grandfathered.errors, []);
+  assert.match(
+    grandfathered.advisories.join('\n'),
+    /grandfathered baseline 800/
+  );
+
+  const regression = classifyRolloutFindings({
+    baselineCount: 800,
+    currentCount: 801,
+    mode: 'delta-blocking',
+    ruleId: 'example-legacy-rule',
+  });
+  assert.match(regression.errors.join('\n'), /forbids baseline growth/);
+
+  const full = classifyRolloutFindings({
+    baselineCount: 800,
+    currentCount: 800,
+    mode: 'full-blocking',
+    ruleId: 'example-legacy-rule',
+  });
+  assert.match(full.errors.join('\n'), /requires zero findings/);
+});
+
+test('requires measured evidence and explicit approval before promotion', () => {
+  assert.deepEqual(validateRepoHealthRollout(REPO_HEALTH_ROLLOUT), []);
+  assert.deepEqual(
+    validateRepoHealthRollout(promotedRollout('delta-blocking')),
+    []
+  );
+  assert.deepEqual(
+    validateRepoHealthRollout(promotedRollout('full-blocking')),
+    []
+  );
+
+  const premature = {
+    ...promotedRollout('delta-blocking'),
+    evidence: {
+      ...promotedRollout('delta-blocking').evidence,
+      representativePullRequests: 1,
+    },
+  };
+  assert.match(
+    validateRepoHealthRollout(premature).join('\n'),
+    /representative pull requests/
+  );
+});
+
+test('prevents silent baseline growth while allowing measured approved changes', () => {
+  const increased = structuredClone(REPO_HEALTH_BASELINE);
+  increased.repository.regularFiles += 1;
+  increased.repository.legacyBudgetCountedRegularFiles += 1;
+  assert.match(
+    validateRepoHealthBaselineChange(REPO_HEALTH_BASELINE, increased).join(
+      '\n'
+    ),
+    /cannot grow silently/
+  );
+
+  increased.baselineRevision += 1;
+  increased.sourceSha = '1111111111111111111111111111111111111111';
+  increased.changeApproval = {
+    approvedBy: '@repo-owner',
+    approvedOn: '2026-08-20',
+    issue: 'JOV-9999',
+    measurements: 'Exact-main checkout and trend receipt justify this update.',
+    reason: 'Measured repository growth is healthy and owner-reviewed.',
+  };
+  assert.deepEqual(
+    validateRepoHealthBaselineChange(REPO_HEALTH_BASELINE, increased),
+    []
+  );
 });
 
 function setupCleanupFixture() {
