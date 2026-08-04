@@ -1,33 +1,56 @@
+import { Button, type ButtonSize, type ButtonVariant } from '@jovie/ui';
+import {
+  BUTTON_SIZE_NAMES,
+  BUTTON_VARIANT_NAMES,
+} from '@jovie/ui/atoms/button-contract';
+import {
+  DOMINANT_DELIGHT_LIMITS,
+  MOTION_POLICY,
+} from '@jovie/ui/theme/motion-policy';
+import {
+  accent,
+  borders,
+  radii,
+  spacing,
+  surfaces,
+  text,
+  typography,
+} from '@jovie/ui/theme/tokens';
+import { Check, CircleDot, Download, Music2, Share2 } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { APP_ROUTES } from '@/constants/routes';
-import { Mark, PALETTE, Wordmark } from '@/lib/brand';
+import { MARKETING_SPEC_VERSION } from '@/data/marketing/composition';
+import { MARKETING_RECIPES } from '@/data/marketing/recipes';
+import release from '@/design/system-release.json';
+import { Lockup, Mark, TokenSwatch, Wordmark } from '@/lib/brand';
+import {
+  PUBLIC_ACCESSIBILITY_RULES,
+  PUBLIC_BRAND_ASSETS,
+  PUBLIC_BRAND_MANIFEST,
+  PUBLIC_DENSITY_MODES,
+  PUBLIC_DO_DONT,
+  PUBLIC_ICON_RULES,
+  PUBLIC_IMAGERY_RULES,
+  PUBLIC_LOGO_RULES,
+  PUBLIC_MEDIA_FIELDS,
+  PUBLIC_MEDIA_POLICY,
+  PUBLIC_SCREENSHOT_RULES,
+  PUBLIC_SYSTEM_CONSUMERS,
+  PUBLIC_VOICE_RULES,
+} from '@/lib/brand/public-system';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 export const revalidate = false;
 
-const BRAND_PAGE_TITLE =
-  'Jovie Brand | The Closed-Loop Operating System for Music Artists';
+const BRAND_PAGE_TITLE = 'Jovie Brand System';
 const BRAND_PAGE_DESCRIPTION =
-  'Jovie is the closed-loop operating system for music artists: artist profiles, smart links, presaves, fan capture, release planning, music marketing automation, and AI-powered growth systems in one lean platform.';
+  'The public, versioned source for building Jovie product and marketing work with canonical assets, tokens, components, voice, and accessibility rules.';
 
 export const metadata: Metadata = {
   title: BRAND_PAGE_TITLE,
   description: BRAND_PAGE_DESCRIPTION,
-  keywords: [
-    'closed-loop operating system for music artists',
-    'artist operating system',
-    'music release planning',
-    'artist smart links',
-    'presave campaigns',
-    'fan CRM',
-    'music marketing automation',
-    'AI agent for artists',
-    'artist profile',
-    'release growth flywheel',
-  ],
   openGraph: {
     title: BRAND_PAGE_TITLE,
     description: BRAND_PAGE_DESCRIPTION,
@@ -39,9 +62,7 @@ export const metadata: Metadata = {
     title: BRAND_PAGE_TITLE,
     description: BRAND_PAGE_DESCRIPTION,
   },
-  alternates: {
-    canonical: `${BASE_URL}/brand`,
-  },
+  alternates: { canonical: `${BASE_URL}/brand` },
   robots: { index: true, follow: true },
 };
 
@@ -52,93 +73,46 @@ const BRAND_SCHEMA = {
   description: BRAND_PAGE_DESCRIPTION,
   url: `${BASE_URL}/brand`,
   isPartOf: { '@type': 'WebSite', name: APP_NAME, url: BASE_URL },
-  about: {
-    '@type': 'Organization',
-    name: APP_NAME,
-    description:
-      'Closed-loop operating system for music artists with AI agents for release planning, fan capture, and marketing automation.',
-    url: BASE_URL,
-    knowsAbout: [
-      'AI agent for artists',
-      'artist operating system',
-      'music marketing automation',
-      'release growth flywheel',
-    ],
-  },
-  keywords: ['Jovie', 'artist OS', 'music marketing'],
-  dateModified: new Date().toISOString(),
+  dateModified: release.releasedAt,
 };
 
+const PROVEN_RECIPES = MARKETING_RECIPES.filter(
+  recipe => recipe.status === 'proven'
+);
+
+const COLOR_TOKEN_GROUPS = [
+  { label: 'Surface', tokens: surfaces },
+  { label: 'Text', tokens: text },
+  { label: 'Border', tokens: borders },
+  { label: 'Accent', tokens: accent },
+] as const;
+
 const sectionShell = 'system-b-brand-section';
-const firstSectionShell =
-  'system-b-brand-section system-b-brand-section--first';
 const sectionHeading = 'system-b-brand-section-title';
 const prose = 'system-b-brand-copy';
 const proseStrong = 'system-b-brand-copy system-b-brand-copy--strong';
 const smallText = 'system-b-brand-small';
 
-const DOWNLOADS = [
-  // Marks (light/dark)
-  {
-    label: 'SVG Mark — Ink (dark)',
-    file: 'Jovie-Logo-Mark-Black.svg',
-    href: '/brand/Jovie-Logo-Mark-Black.svg',
-  },
-  {
-    label: 'SVG Mark — Cream (light)',
-    file: 'Jovie-Logo-Mark-Cream.svg',
-    href: '/brand/Jovie-Logo-Mark-Cream.svg',
-  },
-  // Wordmarks (light/dark)
-  {
-    label: 'SVG Wordmark — Ink (dark)',
-    file: 'Jovie-Wordmark-Black.svg',
-    href: '/brand/Jovie-Wordmark-Black.svg',
-  },
-  {
-    label: 'SVG Wordmark — Cream (light)',
-    file: 'Jovie-Wordmark-Cream.svg',
-    href: '/brand/Jovie-Wordmark-Cream.svg',
-  },
-  // Lockups (light/dark)
-  {
-    label: 'SVG Lockup — Ink (dark)',
-    file: 'Jovie-Lockup-Black.svg',
-    href: '/brand/Jovie-Lockup-Black.svg',
-  },
-  {
-    label: 'SVG Lockup — Cream (light)',
-    file: 'Jovie-Lockup-Cream.svg',
-    href: '/brand/Jovie-Lockup-Cream.svg',
-  },
-  // Raster assets
-  {
-    label: 'PNG Mark, 1024',
-    file: 'apple-touch-icon.png',
-    href: '/apple-touch-icon.png',
-  },
-  {
-    label: 'PNG Favicon, 32',
-    file: 'favicon-32x32.png',
-    href: '/favicon-32x32.png',
-  },
-  {
-    label: 'PNG PWA, 192',
-    file: 'web-app-manifest-192x192.png',
-    href: '/web-app-manifest-192x192.png',
-  },
-  {
-    label: 'PNG PWA, 512',
-    file: 'web-app-manifest-512x512.png',
-    href: '/web-app-manifest-512x512.png',
-  },
-] as const;
+function formatName(value: string): string {
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replaceAll(/[-_]/g, ' ')
+    .replace(/^./, character => character.toUpperCase());
+}
 
-const TYPE_SAMPLES = [
-  'The link your music deserves.',
-  'One loop. Every release.',
-  'The artist is the company.',
-] as const;
+function formatContentSectionRange(
+  index: number,
+  upperBound: number | null
+): string {
+  const priorUpperBound =
+    index > 0
+      ? (DOMINANT_DELIGHT_LIMITS[index - 1]?.content_sections_max ?? 0)
+      : 0;
+  const lowerBound = priorUpperBound + 1;
+  return upperBound === null
+    ? `${String(lowerBound)}+ content sections`
+    : `${String(lowerBound)}–${String(upperBound)} content sections`;
+}
 
 export default function BrandPage() {
   return (
@@ -147,16 +121,23 @@ export default function BrandPage() {
         {safeJsonLdStringify(BRAND_SCHEMA)}
       </script>
       <HeroSection />
-      <ThesisSection />
-      <MarkSection />
-      <WordmarkSection />
-      <LockupsSection />
-      <UsageSection />
+      <SystemSection />
+      <LogoSection />
+      <TypographySection />
       <ColorSection />
-      <TypeSection />
-      <IconPackSection />
+      <SpacingDensitySection />
+      <SurfacesSection />
+      <ControlsSection />
+      <IconsSection />
+      <ImagerySection />
+      <ScreenshotsSection />
+      <MotionSection />
+      <AccessibilitySection />
+      <VoiceSection />
+      <ArchetypesSection />
+      <DoDontSection />
       <DownloadsSection />
-      <FinalCta />
+      <ChangelogSection />
     </div>
   );
 }
@@ -166,33 +147,29 @@ function HeroSection() {
     <section id='hero' className='system-b-brand-hero'>
       <div className='system-b-brand-hero-grid'>
         <div className='system-b-brand-hero-copy'>
-          <h1 className='system-b-brand-title'>One loop. Every release.</h1>
+          <p className='system-b-brand-kicker'>Public Brand System</p>
+          <h1 className='system-b-brand-title'>Build Jovie From The Source.</h1>
           <div className='system-b-brand-hero-body'>
             <p className={proseStrong}>
-              Jovie is becoming the closed-loop operating system for music
-              artists.
+              Assets, tokens, components, composition, voice, and release
+              history—compiled from the same system that ships the product.
             </p>
             <p className={prose}>
-              A single surface where releases, fans, links, tasks, payments,
-              shows, and signals return to one place.
+              Use this page for vendor handoffs and agent work. When this guide
+              disagrees with the downloadable manifest, stop: the drift gate
+              should have failed.
             </p>
-            <p className={proseStrong}>
-              Attention becomes action. Action becomes data. Data becomes the
-              next release.
-            </p>
-            <p className={prose}>That is the loop.</p>
           </div>
           <div className='system-b-brand-actions'>
-            <Link
-              href='#downloads'
-              className='system-b-brand-primary-link'
-              data-primary-action='true'
-            >
-              Download brand kit
-            </Link>
-            <Link href='#mark' className='system-b-brand-text-link'>
-              View guidelines
-            </Link>
+            <Button asChild size='lg'>
+              <Link href='#downloads' data-primary-action='true'>
+                <Download aria-hidden='true' />
+                Download Brand System
+              </Link>
+            </Button>
+            <Button asChild size='lg' variant='secondary'>
+              <Link href='#system'>How the system works</Link>
+            </Button>
           </div>
         </div>
         <div className='system-b-brand-hero-mark'>
@@ -203,402 +180,551 @@ function HeroSection() {
   );
 }
 
-function ThesisSection() {
+function SystemSection() {
   return (
-    <section id='thesis' className={firstSectionShell}>
-      <div>
-        <h2 className={sectionHeading}>The artist is the company.</h2>
+    <Section id='system' title='One system. Four surfaces.'>
+      <p className={proseStrong}>
+        Product and marketing share type, color, icons, symbols, radii,
+        controls, and button sizes. Marketing changes composition and spacing,
+        not the foundation.
+      </p>
+      <div className='system-b-brand-version'>
+        <span>Design System</span>
+        <strong>v{release.version}</strong>
+        <span>{release.releasedAt}</span>
       </div>
-      <div className='system-b-brand-copy-stack'>
-        <p className={proseStrong}>
-          Music has always moved in loops. Write. Release. Reach. Learn. Return.
-        </p>
-        <p className={prose}>
-          The old system broke that loop into tools: link-in-bio pages,
-          presaves, spreadsheets, email lists, analytics dashboards, task
-          managers, payment links, and half-remembered conversations.
-        </p>
-        <p className={proseStrong}>Jovie closes it.</p>
-        <p className={prose}>
-          Every release creates a fan path. Every fan path creates signal. Every
-          signal improves the next action. Every action raises the artist one
-          step.
-        </p>
-        <p className={prose}>
-          The profile becomes a career staircase that exists in its own
-          footprint. It does not sprawl. It rises.
-        </p>
-        <p className={prose}>
-          This is our theory of growth: subtraction creates power. Remove the
-          dead tools, the duplicate work, the forgotten data, the unnecessary
-          handoffs. Keep only the system that learns.
-        </p>
-        <p className={proseStrong}>
-          A closed loop is more than automation. It is memory with motion.
-        </p>
-        <div className='system-b-brand-copy-callout'>
-          <p className={proseStrong}>
-            Jovie is building the vertical operating system for music artists.
-          </p>
-          <p className={prose}>
-            The wedge is the artist profile: a high-conversion surface for
-            links, releases, fan capture, payments, and calls to action. The
-            expansion is the release system: presaves, notifications, launch
-            tasks, analytics, campaigns, and AI agents. The compounding layer is
-            the closed loop: every release teaches the system how to route the
-            next one.
-          </p>
-          <p className={prose}>
-            This is not another creator tool. It is infrastructure for the
-            artist-as-company.
-          </p>
-          <p className={proseStrong}>
-            One artist. One system. A career that compounds.
-          </p>
-        </div>
+      <div className='system-b-brand-contract-grid'>
+        {PUBLIC_SYSTEM_CONSUMERS.map(consumer => (
+          <article key={consumer.name} className='system-b-brand-contract-card'>
+            <h3>{consumer.name}</h3>
+            <p>{consumer.relationship}</p>
+          </article>
+        ))}
       </div>
-    </section>
+      <p className={smallText}>
+        Named exceptions are versioned, justified, and founder-approved. The
+        current release records {release.exceptions.length} exception.
+      </p>
+    </Section>
   );
 }
 
-function MarkSection() {
+function LogoSection() {
   return (
-    <section id='mark' className={sectionShell}>
-      <div>
-        <h2 className={sectionHeading}>A loop with a dot.</h2>
-        <div className='system-b-brand-mark-stage'>
-          <Mark size={180} title='Jovie loop mark' />
-        </div>
+    <Section id='logos' title='Logo assets'>
+      <p className={proseStrong}>
+        The mark, drawn wordmark, and lockup come from one geometry source and
+        one checksummed asset pipeline.
+      </p>
+      <div className='system-b-brand-logo-stage'>
+        <Mark size={128} title='Jovie mark' />
+        <Wordmark height={52} title='Jovie wordmark' />
+        <Lockup height={54} title='Jovie horizontal lockup' />
       </div>
-      <div className='system-b-brand-copy-stack'>
-        <p className={proseStrong}>The mark is the company, reduced.</p>
-        <p className={prose}>
-          The loop is the system. The dot is the artist. Small in the geometry.
-          Central in the meaning.
-        </p>
-        <p className={prose}>
-          Around the artist, everything returns: releases, fans, shows,
-          payments, tasks, insights, and the next decision.
-        </p>
-        <p className={proseStrong}>Nothing is decorative. Nothing is extra.</p>
-        <p className={prose}>
-          The mark is strict because the product is strict. It is quiet because
-          the artist should be loud.
-        </p>
-        <Guideline title='Construction'>
-          The mark is built from two circles on a single vertical axis. The
-          dot&apos;s diameter is half the inner ring&apos;s diameter. One rule,
-          many consequences.
-        </Guideline>
-        <Guideline title='Clear space'>
-          Give the mark room to think. Reserve a clear field equal to the
-          dot&apos;s diameter on every side. Nothing enters that field.
-        </Guideline>
-        <Guideline title='Minimum sizes'>
-          The dot must remain visibly separate from the loop. When the mark
-          becomes too small to hold the relationship, use the solid favicon
-          variant. Clarity wins.
-        </Guideline>
-      </div>
-    </section>
+      <RuleList rules={PUBLIC_LOGO_RULES} />
+    </Section>
   );
 }
 
-function WordmarkSection() {
+function TypographySection() {
   return (
-    <section id='wordmark' className={sectionShell}>
-      <div>
-        <h2 className={sectionHeading}>JOVIE.</h2>
-        <div className='system-b-brand-wordmark-stage'>
-          <Wordmark height={72} title='Jovie wordmark' />
-        </div>
+    <Section id='typography' title='Typography roles'>
+      <p className={prose}>
+        Family names, role assignments, and token references below come from the
+        shared typography registry.
+      </p>
+      <div className='system-b-brand-type-stack'>
+        {Object.entries(typography.roles).map(([role, contract]) => (
+          <article key={role} className='system-b-brand-type-role'>
+            <p
+              className={`system-b-brand-type-sample system-b-brand-type-sample--${role}`}
+            >
+              {contract.family}
+            </p>
+            <div>
+              <h3>{formatName(role)}</h3>
+              <p>{contract.use}</p>
+              <code>{contract.token}</code>
+            </div>
+          </article>
+        ))}
       </div>
-      <div className='system-b-brand-copy-stack'>
-        <p className={proseStrong}>Drawn, not typed.</p>
-        <p className={prose}>
-          The wordmark is built to feel inevitable: five letters, one system, no
-          excess.
-        </p>
-        <p className={prose}>
-          The O carries the same logic as the mark. The spacing is hand-tuned.
-          The weight is even. The geometry is calm.
-        </p>
-        <p className={prose}>
-          It should feel less like a logo and more like product infrastructure:
-          a name that can sit on a profile, a deck, a dashboard, a tour bus, a
-          release page, or an investor memo without changing its voice.
-        </p>
-        <Guideline title='Uniform stem'>
-          Every stroke carries the same optical weight. No letter asks for more
-          attention than it earns.
-        </Guideline>
-        <Guideline title='O equals the loop'>
-          The O inherits the mark&apos;s circular logic. The word and the symbol
-          belong to the same system.
-        </Guideline>
-        <Guideline title='Hand-tuned tracking'>
-          Each pair gets the space its shape requires. The result should feel
-          automatic, never mechanical.
-        </Guideline>
-      </div>
-    </section>
-  );
-}
-
-function LockupsSection() {
-  return (
-    <section id='lockups' className={sectionShell}>
-      <div>
-        <h2 className={sectionHeading}>One system. Many surfaces.</h2>
-      </div>
-      <div className='system-b-brand-copy-stack'>
-        <p className={prose}>
-          Jovie should feel native everywhere: a release page, an artist
-          profile, a mobile icon, a deck, a festival screen, a label dashboard,
-          a creator&apos;s phone.
-        </p>
-        <p className={prose}>
-          The horizontal lockup is the default. The stacked lockup is for square
-          surfaces. The mark alone is for product chrome, app icons, and places
-          where the system has already earned recognition.
-        </p>
-        <p className={proseStrong}>
-          The integrated lockup is reserved for moments where the wordmark can
-          carry the full brand by itself.
-        </p>
-        <div className='system-b-brand-lockups'>
-          <Wordmark height={54} title='Jovie wordmark lockup' />
-          <Wordmark height={54} markAsO title='Jovie integrated lockup' />
-          <Mark size={88} title='Jovie mark-only lockup' />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function UsageSection() {
-  return (
-    <section id='usage' className={sectionShell}>
-      <div>
-        <h2 className={sectionHeading}>Quiet system. Loud artist.</h2>
-      </div>
-      <div className='system-b-brand-copy-stack'>
-        <p className={prose}>
-          Jovie does not compete with the artist. The mark is always one color.
-          The contrast is always clear. The surface can move. The symbol stays
-          still.
-        </p>
-        <p className={proseStrong}>
-          No gradients on the mark. No effects. No borrowed energy.
-        </p>
-        <p className={prose}>
-          Artists bring the color. Jovie brings the structure.
-        </p>
-        <Guideline title='Use'>
-          Cream on ink. Ink on cream. Cream on midnight. Black and white.
-          Single-hue surfaces. High contrast. Photo and gradient surfaces only
-          when the mark remains clean.
-        </Guideline>
-        <Guideline title='Avoid'>
-          Do not rotate, stretch, outline, shade, lower contrast, reshape the
-          dot, or crowd the loop. The mark is already doing the work.
-        </Guideline>
-      </div>
-    </section>
+    </Section>
   );
 }
 
 function ColorSection() {
   return (
-    <section id='color' className={sectionShell}>
-      <div>
-        <h2 className={sectionHeading}>No brand color.</h2>
-      </div>
-      <div className='system-b-brand-copy-stack'>
-        <p className={proseStrong}>Jovie is not the headline. The artist is.</p>
-        <p className={prose}>
-          Cream and ink do the structural work. Feature hues carry hierarchy
-          inside the product. The palette behaves like a system, not a mood
-          board.
-        </p>
-        <p className={prose}>
-          Color should clarify state, signal movement, and create rhythm. It
-          should never become the brand itself.
-        </p>
-        <div className='system-b-brand-color-grid'>
-          <ColorList
-            title='Surface ladder'
-            items={PALETTE.surface.map(color => `${color.name} ${color.hex}`)}
-          />
-          <ColorList
-            title='Feature hues'
-            items={PALETTE.feature.map(color => `${color.name} ${color.hex}`)}
-          />
+    <Section id='color' title='Color & semantic tokens'>
+      <p className={proseStrong}>
+        Choose a semantic role, never a sampled color. The JSON manifest is the
+        copy-pasteable export for tools that cannot consume the repository.
+      </p>
+      {COLOR_TOKEN_GROUPS.map(group => (
+        <div key={group.label} className='system-b-brand-token-group'>
+          <h3>{group.label}</h3>
+          <ul className='system-b-brand-token-grid'>
+            {Object.entries(group.tokens).map(([name, value]) => (
+              <TokenSwatch
+                key={name}
+                label={`${group.label}.${name}`}
+                value={value}
+              />
+            ))}
+          </ul>
         </div>
+      ))}
+    </Section>
+  );
+}
+
+function SpacingDensitySection() {
+  return (
+    <Section id='spacing-density' title='Spacing & density'>
+      <p className={proseStrong}>
+        One spacing scale supports two composition modes. Editorial is more
+        spacious; it is not a separate design system.
+      </p>
+      <div className='system-b-brand-contract-grid'>
+        {PUBLIC_DENSITY_MODES.map(mode => (
+          <article key={mode.name} className='system-b-brand-contract-card'>
+            <h3>{mode.name}</h3>
+            <p>{mode.summary}</p>
+          </article>
+        ))}
+      </div>
+      <TokenList title='Canonical spacing scale' tokens={spacing} />
+    </Section>
+  );
+}
+
+function SurfacesSection() {
+  return (
+    <Section id='surfaces' title='Radii & surfaces'>
+      <p className={prose}>
+        Layer surfaces by semantic elevation. Use the shared radius scale and
+        concentric pairs for nested containers; do not invent one-off corners.
+      </p>
+      <ul className='system-b-brand-surface-stack' aria-label='Surface Ladder'>
+        {Object.entries(surfaces)
+          .slice(0, 5)
+          .map(([name, value]) => (
+            <TokenSwatch key={name} label={`Surface.${name}`} value={value} />
+          ))}
+      </ul>
+      <TokenList title='Canonical radius scale' tokens={radii} />
+    </Section>
+  );
+}
+
+function ControlsSection() {
+  return (
+    <Section id='controls' title='Buttons & controls'>
+      <p className={proseStrong}>
+        These are the real shared Button component—not redrawn specimens. Labels
+        describe outcomes and control sizes stay canonical across product and
+        marketing.
+      </p>
+      <SpecimenGroup title='Variants'>
+        {BUTTON_VARIANT_NAMES.map(variant => (
+          <ControlSpecimen key={variant} label={variant}>
+            <Button variant={variant as ButtonVariant}>Continue</Button>
+          </ControlSpecimen>
+        ))}
+      </SpecimenGroup>
+      <SpecimenGroup title='Sizes'>
+        {BUTTON_SIZE_NAMES.map(size => (
+          <ControlSpecimen key={size} label={size}>
+            <Button
+              size={size as ButtonSize}
+              variant='secondary'
+              aria-label={size === 'icon' ? 'Download example' : undefined}
+            >
+              {size === 'icon' ? <Download aria-hidden='true' /> : 'Continue'}
+            </Button>
+          </ControlSpecimen>
+        ))}
+      </SpecimenGroup>
+      <p className={smallText}>
+        Repository contributors consume the shared workspace component. It is
+        not a public npm dependency; external vendors use these rendered
+        references and the versioned manifest.
+      </p>
+    </Section>
+  );
+}
+
+function IconsSection() {
+  return (
+    <Section id='icons' title='Icons & symbols'>
+      <div className='system-b-brand-icon-specimens'>
+        <IconSpecimen label='Interface Action'>
+          <Share2 aria-hidden='true' />
+        </IconSpecimen>
+        <IconSpecimen label='Music Entity'>
+          <Music2 aria-hidden='true' />
+        </IconSpecimen>
+        <IconSpecimen label='Brand Symbol'>
+          <CircleDot aria-hidden='true' />
+        </IconSpecimen>
+      </div>
+      <RuleList rules={PUBLIC_ICON_RULES} />
+    </Section>
+  );
+}
+
+function ImagerySection() {
+  return (
+    <Section id='imagery' title='Imagery & editorial direction'>
+      <p className={proseStrong}>
+        Product structure is the baseline. Artist media earns its place by
+        adding truthful context, not by decorating empty space.
+      </p>
+      <RuleList rules={PUBLIC_IMAGERY_RULES} />
+      <div className='system-b-brand-safe-projection'>
+        <h3>Public-safe Media Projection</h3>
+        <p>{PUBLIC_MEDIA_POLICY.alt}</p>
+        <ul>
+          {PUBLIC_MEDIA_FIELDS.map(field => (
+            <li key={field}>
+              <code>{field}</code>
+            </li>
+          ))}
+        </ul>
         <p className={smallText}>
-          Use feature hues for titles, data highlights, and release states. Do
-          not use them as large brand surfaces, button fills, or decoration
-          without function.
+          Everything else used for selection, governance, or operations stays
+          private and is rejected from HTML, manifests, downloads, and public
+          analytics.
         </p>
       </div>
-    </section>
+    </Section>
   );
 }
 
-function TypeSection() {
+function ScreenshotsSection() {
   return (
-    <section id='type' className={sectionShell}>
-      <div>
-        <h2 className={sectionHeading}>Type as interface.</h2>
+    <Section id='screenshots' title='Product screenshots & mockups'>
+      <p className={proseStrong}>
+        A product screenshot is evidence, not stock art. It must come from a
+        current canonical surface and pass the public-data projection before
+        publication.
+      </p>
+      <RuleList rules={PUBLIC_SCREENSHOT_RULES} />
+      <p className={smallText}>
+        This release publishes no screenshot download by default. Use the
+        approved live archetype references below; request a reviewed capture
+        when a deliverable needs product media.
+      </p>
+    </Section>
+  );
+}
+
+function MotionSection() {
+  return (
+    <Section id='motion' title='Motion & earned delight'>
+      <p className={proseStrong}>
+        Every number is a maximum after taste approval—not a prompt to add
+        motion. Zero dominant delight is always valid and is the choice on this
+        page.
+      </p>
+      <div className='system-b-brand-motion-status'>
+        <span>Dominant delight on this page</span>
+        <strong>0</strong>
+        <span>
+          Optional by policy: {MOTION_POLICY.delight_optional ? 'yes' : 'no'}
+        </span>
       </div>
-      <div className='system-b-brand-copy-stack'>
-        <p className={prose}>
-          Jovie&apos;s typography should feel like a product edited down to its
-          necessary parts.
-        </p>
-        <p className={prose}>
-          Display type carries the thesis. Body type carries the explanation. UI
-          type carries the work.
-        </p>
-        <p className={proseStrong}>
-          Satoshi for display. DM Sans for body. Inter for product UI. Three
-          voices. One system.
-        </p>
-        <div className='system-b-brand-type-stack'>
-          {TYPE_SAMPLES.map(sample => (
-            <p key={sample} className='system-b-brand-type-sample'>
-              {sample}
+      <div className='system-b-brand-contract-grid'>
+        {DOMINANT_DELIGHT_LIMITS.map((limit, index) => (
+          <article
+            key={String(limit.content_sections_max)}
+            className='system-b-brand-contract-card'
+          >
+            <h3>
+              {formatContentSectionRange(index, limit.content_sections_max)}
+            </h3>
+            <p>
+              Maximum {limit.max_dominant_delights}
+              {limit.content_sections_max === null
+                ? ' only with a named exception and complete motion receipts.'
+                : '.'}
             </p>
-          ))}
-        </div>
-        <p className={prose}>
-          Jovie brings artist profiles, smart links, presaves, fan capture,
-          payments, release planning, and AI-powered music marketing automation
-          into one closed-loop workspace.
-        </p>
+          </article>
+        ))}
       </div>
-    </section>
+      <p className={prose}>
+        At most {MOTION_POLICY.simultaneous_active_max} attention-commanding
+        delight may be active in the {MOTION_POLICY.simultaneous_scope}.{' '}
+        {MOTION_POLICY.section_counting.definition} Exclude the{' '}
+        {MOTION_POLICY.section_counting.excluded.join(' and ')}; count a
+        distinct{' '}
+        {MOTION_POLICY.section_counting.distinct_content_sections.join(' or ')}.
+      </p>
+      <div className='system-b-brand-rule-columns'>
+        <RuleList
+          title='A proposal must explain'
+          rules={MOTION_POLICY.intentionality_fields.map(formatName)}
+        />
+        <RuleList title='Reject when' rules={MOTION_POLICY.reject_when} />
+      </div>
+      <p className={smallText}>
+        Functional transitions {MOTION_POLICY.definitions.functional_transition}{' '}
+        Dominant delight {MOTION_POLICY.definitions.dominant_delight}{' '}
+        Reduced-motion and static fallbacks are mandatory; editorial and video
+        tiers may always be deferred while a valuable static tier ships
+        independently.
+      </p>
+    </Section>
   );
 }
 
-function IconPackSection() {
+function AccessibilitySection() {
   return (
-    <section id='icons' className={sectionShell}>
-      <div>
-        <h2 className={sectionHeading}>The loop travels.</h2>
+    <Section id='accessibility' title='Accessibility'>
+      <p className={proseStrong}>
+        Accessibility is part of the system contract, not a handoff note.
+      </p>
+      <RuleList rules={PUBLIC_ACCESSIBILITY_RULES} />
+    </Section>
+  );
+}
+
+function VoiceSection() {
+  return (
+    <Section id='voice' title='Voice & copy'>
+      <p className={proseStrong}>
+        Clear, specific, and outcome-led. Jovie should sound like a capable
+        collaborator who respects the artist&apos;s time.
+      </p>
+      <RuleList rules={PUBLIC_VOICE_RULES} />
+    </Section>
+  );
+}
+
+function ArchetypesSection() {
+  return (
+    <Section id='archetypes' title='Approved composition archetypes'>
+      <p className={prose}>
+        Only proven recipes from marketing composition spec v
+        {MARKETING_SPEC_VERSION} appear here. Their definitions stay in the
+        registry; this page projects the public label and live reference.
+      </p>
+      <div className='system-b-brand-archetype-grid'>
+        {PROVEN_RECIPES.map(recipe => (
+          <article key={recipe.id} className='system-b-brand-archetype-card'>
+            <h3>{recipe.label}</h3>
+            <Button asChild variant='link'>
+              <Link href={recipe.referenceRoute ?? '/'}>View reference</Link>
+            </Button>
+          </article>
+        ))}
       </div>
-      <div className='system-b-brand-copy-stack'>
-        <p className={prose}>
-          The mark is built for every container the operating system can throw
-          at it: favicons, PWA icons, app icons, social avatars, decks,
-          dashboards, release pages, and mobile surfaces.
-        </p>
-        <p className={proseStrong}>
-          Render once. Deploy everywhere. The same path. The same proportion.
-          The same loop.
-        </p>
-        <div className='system-b-brand-icon-row'>
-          {[28, 40, 56, 72, 96].map(size => (
-            <Mark key={size} size={size} title={`Jovie icon ${size}`} />
-          ))}
-        </div>
+    </Section>
+  );
+}
+
+function DoDontSection() {
+  return (
+    <Section id='do-dont' title='Do / don’t'>
+      <div className='system-b-brand-do-dont-grid'>
+        {PUBLIC_DO_DONT.map(rule => (
+          <article key={rule.do} className='system-b-brand-do-dont-card'>
+            <div>
+              <h3>Do</h3>
+              <p>{rule.do}</p>
+            </div>
+            <div>
+              <h3>Don&apos;t</h3>
+              <p>{rule.dont}</p>
+            </div>
+          </article>
+        ))}
       </div>
-    </section>
+    </Section>
   );
 }
 
 function DownloadsSection() {
   return (
-    <section id='downloads' className={sectionShell}>
-      <div>
-        <h2 className={sectionHeading}>Take the system.</h2>
-      </div>
-      <div className='system-b-brand-copy-stack'>
-        <p className={prose}>
-          Every asset is rendered from the same source path. Vector and raster.
-          Ink and cream. Small and large. Static and product-native.
-        </p>
-        <p className={proseStrong}>
-          Use the files as shipped. Protect the geometry. Keep the loop closed.
-        </p>
-        <ul className='system-b-brand-downloads-list'>
-          {DOWNLOADS.map(asset => (
-            <li key={asset.href}>
-              <Link
-                href={asset.href}
-                download={asset.file}
-                className='system-b-brand-download-link'
-              >
-                {asset.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-        <p className={smallText}>
-          Press or usage questions:{' '}
-          <a className='system-b-brand-contact-link' href='mailto:brand@jov.ie'>
-            brand@jov.ie
+    <Section id='downloads' title='Downloads & machine access'>
+      <p className={proseStrong}>
+        Use checksummed assets and the current JSON projection. Never scrape
+        token values or recreate artwork from this rendered page.
+      </p>
+      <div className='system-b-brand-manifest-card'>
+        <div>
+          <span>Machine-readable Brand System</span>
+          <strong>v{release.version}</strong>
+          <code>{`${BASE_URL}${PUBLIC_BRAND_MANIFEST.href}`}</code>
+        </div>
+        <Button asChild variant='secondary'>
+          <a
+            href={PUBLIC_BRAND_MANIFEST.href}
+            download={PUBLIC_BRAND_MANIFEST.file}
+          >
+            <Download aria-hidden='true' />
+            JSON manifest
           </a>
-        </p>
+        </Button>
       </div>
-    </section>
+      <ul className='system-b-brand-downloads-list'>
+        {PUBLIC_BRAND_ASSETS.map(asset => (
+          <li key={asset.file}>
+            <a
+              className='system-b-brand-download-link'
+              href={asset.href}
+              download={asset.file}
+            >
+              <Download aria-hidden='true' />
+              <span>
+                {asset.label}
+                <small>{asset.file}</small>
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+      <p className={smallText}>
+        Questions or a deliverable-specific asset request?{' '}
+        <a className='system-b-brand-contact-link' href='mailto:brand@jov.ie'>
+          brand@jov.ie
+        </a>
+      </p>
+    </Section>
   );
 }
 
-function FinalCta() {
+function ChangelogSection() {
   return (
-    <section className='system-b-brand-final'>
-      <div className='system-b-brand-final-inner'>
-        <h2 className='system-b-brand-final-title'>
-          Build the loop your career runs on.
-        </h2>
-        <p className='system-b-brand-final-copy'>
-          Jovie turns releases into fan paths, fan paths into signal, and signal
-          into the next step up.
-        </p>
-        <Link
-          href={APP_ROUTES.SIGNUP}
-          className='system-b-brand-secondary-link system-b-brand-final-link'
-        >
-          Start Free Trial
-        </Link>
+    <Section id='changelog' title='Version & changelog'>
+      <div className='system-b-brand-changelog'>
+        {release.changelog.map(entry => (
+          <article key={entry.version}>
+            <div>
+              <strong>v{entry.version}</strong>
+              <time dateTime={entry.date}>{entry.date}</time>
+            </div>
+            <p>{entry.summary}</p>
+          </article>
+        ))}
       </div>
-    </section>
+      <p className={smallText}>
+        Source hashes, component names, approved examples, asset checksums, and
+        required public sections are verified at build time. A canonical change
+        without a matching version and changelog update fails the build with a
+        remediation command.
+      </p>
+    </Section>
   );
 }
 
-function Guideline({
+function Section({
+  id,
   title,
   children,
-}: Readonly<{
-  title: string;
-  children: ReactNode;
-}>) {
+}: {
+  readonly id: string;
+  readonly title: string;
+  readonly children: ReactNode;
+}) {
   return (
-    <div className='system-b-brand-guideline'>
-      <h3 className='system-b-brand-subtitle'>{title}</h3>
-      <p className='system-b-brand-guideline-copy'>{children}</p>
+    <section id={id} className={sectionShell}>
+      <div className='system-b-brand-section-intro'>
+        <p className='system-b-brand-section-number'>{id}</p>
+        <h2 className={sectionHeading}>{title}</h2>
+      </div>
+      <div className='system-b-brand-copy-stack'>{children}</div>
+    </section>
+  );
+}
+
+function RuleList({
+  title,
+  rules,
+}: {
+  readonly title?: string;
+  readonly rules: readonly string[];
+}) {
+  return (
+    <div className='system-b-brand-rule-list'>
+      {title ? <h3>{title}</h3> : null}
+      <ul>
+        {rules.map(rule => (
+          <li key={rule}>
+            <Check aria-hidden='true' />
+            <span>{rule}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
-function ColorList({
+function TokenList({
   title,
-  items,
-}: Readonly<{
-  title: string;
-  items: readonly string[];
-}>) {
+  tokens,
+}: {
+  readonly title: string;
+  readonly tokens: Readonly<Record<string, string>>;
+}) {
   return (
-    <div>
-      <h3 className='system-b-brand-subtitle'>{title}</h3>
-      <ul className='system-b-brand-color-list'>
-        {items.map(item => (
-          <li key={item} className={smallText}>
-            {item}
-          </li>
+    <div className='system-b-brand-token-list'>
+      <h3>{title}</h3>
+      <dl>
+        {Object.entries(tokens).map(([name, value]) => (
+          <div key={name}>
+            <dt>{name}</dt>
+            <dd>
+              <code>{value}</code>
+            </dd>
+          </div>
         ))}
-      </ul>
+      </dl>
+    </div>
+  );
+}
+
+function SpecimenGroup({
+  title,
+  children,
+}: {
+  readonly title: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <div className='system-b-brand-specimen-group'>
+      <h3>{title}</h3>
+      <div className='system-b-brand-specimen-grid'>{children}</div>
+    </div>
+  );
+}
+
+function ControlSpecimen({
+  label,
+  children,
+}: {
+  readonly label: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <div className='system-b-brand-control-specimen'>
+      <code>{label}</code>
+      {children}
+    </div>
+  );
+}
+
+function IconSpecimen({
+  label,
+  children,
+}: {
+  readonly label: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <div className='system-b-brand-icon-specimen'>
+      {children}
+      <span>{label}</span>
     </div>
   );
 }
