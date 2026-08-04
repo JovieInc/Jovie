@@ -15,7 +15,6 @@ import { HERO_COPY } from '@/components/homepage/intent';
 import { FaqSection } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
-import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import {
   buildFaqSchema,
   buildOrganizationSchema,
@@ -287,7 +286,6 @@ function HomepageStoryStack() {
 function HomePageShell({ children }: { readonly children: React.ReactNode }) {
   return (
     <>
-      <AuthRedirectHandler />
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>

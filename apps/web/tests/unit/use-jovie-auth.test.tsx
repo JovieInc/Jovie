@@ -213,6 +213,17 @@ describe('useJovieAuth', () => {
     expect(assignMock).toHaveBeenCalledWith('/');
   });
 
+  it('clears the legacy Clerk marker before navigating after signOut', async () => {
+    document.cookie = '__client_uat=1700000000; path=/';
+    signOutMock.mockResolvedValue({ data: { success: true }, error: null });
+    const assignMock = overrideLocation();
+
+    await signOut({ redirectUrl: '/' });
+
+    expect(document.cookie).not.toContain('__client_uat=');
+    expect(assignMock).toHaveBeenCalledWith('/');
+  });
+
   it('defaults to /signin and still navigates when revocation fails', async () => {
     signOutMock.mockRejectedValue(new Error('network down'));
     const assignMock = overrideLocation();

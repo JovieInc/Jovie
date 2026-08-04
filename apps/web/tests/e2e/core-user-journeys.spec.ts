@@ -40,6 +40,29 @@ test.describe('Core User Journeys', () => {
     });
   });
 
+  test('Homepage remains reachable with a stale legacy auth marker', async ({
+    page,
+  }, testInfo) => {
+    const baseURL = testInfo.project.use.baseURL ?? 'http://localhost:3000';
+    await page.context().addCookies([
+      {
+        name: '__client_uat',
+        value: '1700000000',
+        url: new URL('/', baseURL).toString(),
+      },
+    ]);
+
+    await smokeNavigate(page, '/');
+    await expect(page).toHaveURL('/');
+    await expect(page).not.toHaveURL(/signin/);
+
+    // A reload exercises the post-hydration path that previously replaced the
+    // public page with `/signin?redirect_url=%2Fapp` for this stale marker.
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveURL('/');
+    await expect(page).not.toHaveURL(/signin/);
+  });
+
   test('Profile pages load without authentication required', async ({
     page,
   }) => {

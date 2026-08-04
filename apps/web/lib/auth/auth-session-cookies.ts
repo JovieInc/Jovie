@@ -2,6 +2,13 @@ import { TEST_USER_ID_COOKIE } from '@/lib/auth/test-mode-constants';
 
 const CLERK_ACTIVITY_COOKIE = '__client_uat';
 
+/** Remove the legacy Clerk activity marker after Better Auth sign-out. */
+export function clearLegacyClerkSessionMarker(): void {
+  if (typeof document === 'undefined') return;
+
+  document.cookie = `${CLERK_ACTIVITY_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax`;
+}
+
 export function hasActiveClerkSession(cookieValue: string): boolean {
   const cookies = cookieValue.split(';');
   const clientUat = cookies.find(cookie =>
