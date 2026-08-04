@@ -28,7 +28,7 @@ import {
   type PacClientEventName,
   type PacEventExtras,
   type PacState,
-} from '@/lib/tracking/pac-events-contract';
+} from '@/lib/tracking/pac-events-shared';
 
 const EXPOSURE_VISIBILITY_THRESHOLD = 0.5;
 const EXPOSURE_OBSERVER_THRESHOLDS = [0, 0.25, 0.5];

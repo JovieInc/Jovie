@@ -60,11 +60,23 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 import { POST } from '@/app/api/profile/pac-event/route';
-import { PAC_CLIENT_EVENTS } from '@/lib/tracking/pac-events-contract';
+import { AUDIENCE_ANON_COOKIE } from '@/constants/app';
+import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
+import { CONSENT_COOKIE_NAME } from '@/lib/cookies/consent-state';
+import { PAC_CLIENT_EVENTS } from '@/lib/tracking/pac-events-shared';
 
 const PROFILE_ID = '3f9c2f6a-8f1e-4b6a-9a44-1c2d3e4f5a6b';
 const SESSION_ID = '7a1b2c3d-4e5f-4a6b-8c9d-0e1f2a3b4c5d';
 const JV_AID = 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e';
+const CLIENT_SUPPLIED_JV_AID = 'c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f';
+const LEGACY_TRACKING_CONSENT_COOKIE = 'jv_tracking_consent';
+
+function setCookieValues(values: Readonly<Record<string, string>>): void {
+  mockCookiesGet.mockImplementation((name: string) => {
+    const value = values[name];
+    return value === undefined ? undefined : { value };
+  });
+}
 
 function buildPayload(overrides: Record<string, unknown> = {}) {
   return {
@@ -80,11 +92,14 @@ function buildPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function buildRequest(body: unknown) {
+function buildRequest(
+  body: unknown,
+  headers: Readonly<Record<string, string>> = {}
+) {
   return new NextRequest('http://localhost/api/profile/pac-event', {
     method: 'POST',
     body: typeof body === 'string' ? body : JSON.stringify(body),
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
   });
 }
 
@@ -92,7 +107,10 @@ describe('POST /api/profile/pac-event', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGeneralLimiterLimit.mockResolvedValue({ success: true });
-    mockCookiesGet.mockReturnValue({ value: JV_AID });
+    setCookieValues({
+      [AUDIENCE_ANON_COOKIE]: JV_AID,
+      [COOKIE_BANNER_REQUIRED_COOKIE]: '0',
+    });
   });
 
   it('accepts every client event name with a full payload', async () => {
@@ -104,15 +122,20 @@ describe('POST /api/profile/pac-event', () => {
     expect(mockTrackEvent).toHaveBeenCalledTimes(PAC_CLIENT_EVENTS.length);
   });
 
-  it('enriches jv_aid server-side from the httpOnly cookie', async () => {
-    const response = await POST(buildRequest(buildPayload()));
+  it.each([
+    'undecided',
+    'accepted',
+  ] as const)('derives jv_aid from the httpOnly cookie when server policy allows and client consent is %s', async consent => {
+    const response = await POST(
+      buildRequest(buildPayload({ consent, jv_aid: CLIENT_SUPPLIED_JV_AID }))
+    );
 
     expect(response.status).toBe(204);
     expect(mockTrackEvent).toHaveBeenCalledWith(
       'pac_exposure',
       expect.objectContaining({ jv_aid: JV_AID })
     );
-    // Statsig user is the stable jv_aid when identity joining is allowed.
+    // Statsig user is the trusted cookie value, never the client-supplied id.
     expect(mockLogStatsigEvent).toHaveBeenCalledWith(
       JV_AID,
       'pac_exposure',
@@ -122,6 +145,109 @@ describe('POST /api/profile/pac-event', () => {
         pac_state: 'idle',
         session_id: SESSION_ID,
       })
+    );
+  });
+
+  it('joins identity in a consent-required region only with canonical analytics consent', async () => {
+    setCookieValues({
+      [AUDIENCE_ANON_COOKIE]: JV_AID,
+      [COOKIE_BANNER_REQUIRED_COOKIE]: '1',
+      [CONSENT_COOKIE_NAME]: JSON.stringify({
+        essential: true,
+        analytics: true,
+        marketing: false,
+      }),
+    });
+
+    const response = await POST(
+      buildRequest(buildPayload({ consent: 'accepted' }))
+    );
+
+    expect(response.status).toBe(204);
+    expect(mockTrackEvent).toHaveBeenCalledWith(
+      'pac_exposure',
+      expect.objectContaining({ jv_aid: JV_AID })
+    );
+  });
+
+  it.each([
+    {
+      name: 'canonical analytics rejection',
+      cookies: {
+        [AUDIENCE_ANON_COOKIE]: JV_AID,
+        [COOKIE_BANNER_REQUIRED_COOKIE]: '0',
+        [CONSENT_COOKIE_NAME]: JSON.stringify({
+          essential: true,
+          analytics: false,
+          marketing: true,
+        }),
+      },
+      headers: {},
+    },
+    {
+      name: 'missing consent in a required region',
+      cookies: {
+        [AUDIENCE_ANON_COOKIE]: JV_AID,
+        [COOKIE_BANNER_REQUIRED_COOKIE]: '1',
+      },
+      headers: {},
+    },
+    {
+      name: 'server-resolved required geography',
+      cookies: { [AUDIENCE_ANON_COOKIE]: JV_AID },
+      headers: { 'x-vercel-ip-country': 'DE' },
+    },
+    {
+      name: 'Global Privacy Control',
+      cookies: {
+        [AUDIENCE_ANON_COOKIE]: JV_AID,
+        [COOKIE_BANNER_REQUIRED_COOKIE]: '0',
+      },
+      headers: { 'sec-gpc': '1' },
+    },
+    {
+      name: 'Do Not Track',
+      cookies: {
+        [AUDIENCE_ANON_COOKIE]: JV_AID,
+        [COOKIE_BANNER_REQUIRED_COOKIE]: '0',
+      },
+      headers: { dnt: '1' },
+    },
+    {
+      name: 'legacy consent rejection',
+      cookies: {
+        [AUDIENCE_ANON_COOKIE]: JV_AID,
+        [COOKIE_BANNER_REQUIRED_COOKIE]: '0',
+        [LEGACY_TRACKING_CONSENT_COOKIE]: 'rejected',
+      },
+      headers: {},
+    },
+  ])('ignores positive client consent under $name', async ({
+    cookies,
+    headers,
+  }) => {
+    setCookieValues(cookies);
+
+    const response = await POST(
+      buildRequest(
+        buildPayload({
+          consent: 'accepted',
+          jv_aid: CLIENT_SUPPLIED_JV_AID,
+        }),
+        headers
+      )
+    );
+
+    expect(response.status).toBe(204);
+    expect(mockTrackEvent).toHaveBeenCalledWith(
+      'pac_exposure',
+      expect.objectContaining({ jv_aid: null })
+    );
+    expect(mockLogStatsigEvent).toHaveBeenCalledWith(
+      `pac-session:${SESSION_ID}`,
+      'pac_exposure',
+      expect.anything(),
+      expect.anything()
     );
   });
 
@@ -145,7 +271,7 @@ describe('POST /api/profile/pac-event', () => {
   });
 
   it('falls back to session scope when no jv_aid cookie exists', async () => {
-    mockCookiesGet.mockReturnValue(undefined);
+    setCookieValues({ [COOKIE_BANNER_REQUIRED_COOKIE]: '0' });
 
     const response = await POST(buildRequest(buildPayload()));
 

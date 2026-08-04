@@ -26,7 +26,7 @@ import {
   type PacEventExtras,
   type PacEventPayload,
   type PacState,
-} from '@/lib/tracking/pac-events-contract';
+} from '@/lib/tracking/pac-events-shared';
 
 const SESSION_ID_STORAGE_KEY = 'jv_pac_session';
 const EXPOSURE_STORAGE_PREFIX = 'jv_pac_exposed';
