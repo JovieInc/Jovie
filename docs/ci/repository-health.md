@@ -87,7 +87,7 @@ The 10,000-file failure is retired, not raised. `scripts/repo-health-baseline.js
 | `.github` / other area | +3 / +5 | p99 +1 plus bounded headroom |
 | Changed binaries | 24 files / 12 MiB | p99 20 / 9.52 MiB |
 
-`scripts/repo-health-rollout.json` controls maturity. Changing the mode alone cannot promote it:
+`scripts/repo-health-rollout.json` controls maturity. Changing the mode alone cannot promote it: evidence is schema-checked, and approval must name the exact target mode.
 
 | Mode | Behavior | Required evidence |
 | --- | --- | --- |
@@ -107,7 +107,7 @@ The untouched `codex/unified-release-updates` worktree has 12 staged files: five
 
 Generated/build/test output remains forbidden under `node_modules`, `.next`, `.turbo`, cache, coverage, Playwright, build, temp, runtime, and local-agent paths. Track generated output only when a named runtime or audit consumes the stable path; it still counts in receipts and budgets.
 
-Baselines are shrink-only by default. CI compares them with the PR base. An increase or new nonzero legacy rule requires a new SHA, revision, GitHub approver, Linear issue, date, reason, and measurements in `changeApproval`.
+Baselines are shrink-only by default. CI compares them with the PR base. Every measurement edit requires a new SHA and revision; an increase or new nonzero legacy rule additionally requires a GitHub approver, Linear issue, date, reason, and measurements in `changeApproval`.
 
 Exceptions in `scripts/repo-hygiene-exceptions.json` require one exact branch, scoped path prefixes, GitHub owner, Linear issue, measured reason, bounded keys, and at most 30 days. Expired exceptions fail. Shadow validates but never applies exceptions, so they cannot hide advisory signal.
 

@@ -160,7 +160,11 @@ function areaForPath(path) {
     : top || 'root';
 }
 
-function approvalErrors(approval, requireMeasurements = false) {
+function approvalErrors(
+  approval,
+  requireMeasurements = false,
+  targetMode = null
+) {
   const errors = [];
   if (!/^@[A-Za-z0-9_-]+$/.test(approval?.approvedBy ?? ''))
     errors.push('approvedBy must be one GitHub handle');
@@ -168,6 +172,8 @@ function approvalErrors(approval, requireMeasurements = false) {
     errors.push('issue must be a JOV-123 style Linear ID');
   if (!Number.isFinite(dateValue(approval?.approvedOn)))
     errors.push('approvedOn must be YYYY-MM-DD');
+  if (targetMode && approval?.targetMode !== targetMode)
+    errors.push(`targetMode must be ${targetMode}`);
   if (
     requireMeasurements &&
     (typeof approval?.reason !== 'string' ||
@@ -191,6 +197,8 @@ export function validateRepoHealthBaseline(baseline) {
     errors.push('baseline sourceSha must be a full Git SHA');
   if (!Number.isFinite(dateValue(baseline?.measuredOn)))
     errors.push('baseline measuredOn must be YYYY-MM-DD');
+  if (baseline?.changeApproval !== null)
+    errors.push(...approvalErrors(baseline?.changeApproval, true));
 
   const repository = baseline?.repository ?? {};
   const countKeys = [
@@ -224,8 +232,14 @@ export function validateRepoHealthBaseline(baseline) {
       !isCount(finding?.count) ||
       (finding?.bytes !== undefined && !isCount(finding.bytes)) ||
       !isRole(finding?.ownerRole) ||
-      !finding?.area ||
-      !finding?.disposition
+      typeof finding?.area !== 'string' ||
+      finding.area.length === 0 ||
+      typeof finding?.kind !== 'string' ||
+      finding.kind.length === 0 ||
+      typeof finding?.note !== 'string' ||
+      finding.note.length < 20 ||
+      typeof finding?.disposition !== 'string' ||
+      finding.disposition.length === 0
     )
       errors.push(
         `legacy finding ${finding?.ruleId ?? '<missing>'} is invalid`
@@ -237,6 +251,12 @@ export function validateRepoHealthBaseline(baseline) {
 
 export function validateRepoHealthBaselineChange(previous, current) {
   if (!previous) return [];
+  const measurementsChanged =
+    JSON.stringify(previous.repository) !==
+      JSON.stringify(current.repository) ||
+    JSON.stringify(previous.legacyFindings) !==
+      JSON.stringify(current.legacyFindings);
+  if (!measurementsChanged) return [];
   const growth = [];
   for (const key of Object.keys(previous.repository ?? {})) {
     if (current?.repository?.[key] > previous.repository[key]) growth.push(key);
@@ -251,15 +271,18 @@ export function validateRepoHealthBaselineChange(previous, current) {
     if (finding.bytes > (old?.bytes ?? finding.bytes))
       growth.push(`${finding.ruleId}.bytes`);
   }
-  if (growth.length === 0) return [];
-  const errors = approvalErrors(current.changeApproval, true);
+  const errors =
+    growth.length > 0 ? approvalErrors(current.changeApproval, true) : [];
   if (current.baselineRevision <= previous.baselineRevision)
     errors.push('baselineRevision must increase');
   if (current.sourceSha === previous.sourceSha)
     errors.push('sourceSha must identify a new measurement');
-  return errors.length === 0
-    ? []
-    : [`baseline cannot grow silently (${growth.join(', ')})`, ...errors];
+  if (errors.length === 0) return [];
+  const reason =
+    growth.length > 0
+      ? `baseline cannot grow silently (${growth.join(', ')})`
+      : 'baseline measurement changes require a new revision and source SHA';
+  return [reason, ...errors];
 }
 
 export function validateRepoHealthRollout(rollout) {
@@ -268,6 +291,11 @@ export function validateRepoHealthRollout(rollout) {
   if (rollout?.schemaVersion !== 1 || !modes.has(rollout?.mode))
     errors.push('rollout schemaVersion/mode is invalid');
   if (!isRole(rollout?.ownerRole)) errors.push('rollout ownerRole is invalid');
+  if (
+    !isCount(rollout?.candidatePolicyVersion) ||
+    rollout.candidatePolicyVersion < 1
+  )
+    errors.push('candidatePolicyVersion is invalid');
   const shadow = rollout?.criteria?.shadowToDelta ?? {};
   const full = rollout?.criteria?.deltaToFull ?? {};
   const evidence = rollout?.evidence ?? {};
@@ -288,14 +316,44 @@ export function validateRepoHealthRollout(rollout) {
     ].every(value => typeof value === 'number' && value >= 0 && value <= 1)
   )
     errors.push('rollout criteria are invalid');
+  if (
+    !Number.isFinite(dateValue(evidence.shadowStartedOn)) ||
+    ![
+      evidence.shadowRuns,
+      evidence.representativePullRequests,
+      evidence.deltaBlockingRuns,
+      evidence.legacyFindingCount,
+    ].every(isCount) ||
+    ![evidence.falsePositiveRate, evidence.actionableOwnershipRate].every(
+      value =>
+        value === null ||
+        (typeof value === 'number' && value >= 0 && value <= 1)
+    ) ||
+    !(
+      evidence.p95RuntimeMs === null ||
+      (Number.isFinite(evidence.p95RuntimeMs) && evidence.p95RuntimeMs >= 0)
+    ) ||
+    !(
+      evidence.deltaBlockingStartedOn === null ||
+      Number.isFinite(dateValue(evidence.deltaBlockingStartedOn))
+    )
+  )
+    errors.push('rollout evidence is invalid');
   if (errors.length > 0) return errors;
   if (rollout.mode === 'shadow')
     return rollout.promotionApproval === null
       ? []
       : ['shadow mode must not claim promotion approval'];
 
-  errors.push(...approvalErrors(rollout.promotionApproval));
+  errors.push(
+    ...approvalErrors(rollout.promotionApproval, false, rollout.mode)
+  );
   const approvalDate = rollout.promotionApproval?.approvedOn;
+  if (
+    rollout.mode === 'delta-blocking' &&
+    evidence.deltaBlockingStartedOn !== approvalDate
+  )
+    errors.push('deltaBlockingStartedOn must match delta promotion approval');
   const deltaGaps = [];
   if (
     !Number.isFinite(daysBetween(evidence.shadowStartedOn, approvalDate)) ||

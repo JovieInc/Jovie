@@ -34,19 +34,21 @@ import {
 const cleanupScript = resolve('scripts/codex-cleanup.sh');
 
 function promotedRollout(mode) {
+  const approvedOn = mode === 'full-blocking' ? '2026-09-05' : '2026-08-20';
   return {
     ...REPO_HEALTH_ROLLOUT,
     mode,
     promotionApproval: {
       approvedBy: '@repo-owner',
-      approvedOn: '2026-08-20',
+      approvedOn,
       issue: 'JOV-9999',
+      targetMode: mode,
     },
     evidence: {
       ...REPO_HEALTH_ROLLOUT.evidence,
       actionableOwnershipRate: 1,
       deltaBlockingRuns: 20,
-      deltaBlockingStartedOn: '2026-08-05',
+      deltaBlockingStartedOn: '2026-08-20',
       falsePositiveRate: 0.01,
       legacyFindingCount: 0,
       p95RuntimeMs: 200,
@@ -55,6 +57,10 @@ function promotedRollout(mode) {
     },
   };
 }
+
+const rolloutErrors = rollout => validateRepoHealthRollout(rollout).join('\n');
+const baselineChangeErrors = current =>
+  validateRepoHealthBaselineChange(REPO_HEALTH_BASELINE, current).join('\n');
 
 function fixtureFile(root, path, bytes = 1) {
   const absolute = join(root, path);
@@ -710,22 +716,21 @@ test('requires measured evidence and explicit approval before promotion', () => 
       representativePullRequests: 1,
     },
   };
-  assert.match(
-    validateRepoHealthRollout(premature).join('\n'),
-    /representative pull requests/
-  );
+  assert.match(rolloutErrors(premature), /representative pull requests/);
+
+  const wrongApproval = promotedRollout('delta-blocking');
+  wrongApproval.promotionApproval.targetMode = 'full-blocking';
+  assert.match(rolloutErrors(wrongApproval), /targetMode/);
+  const untypedEvidence = promotedRollout('delta-blocking');
+  untypedEvidence.evidence.shadowRuns = '20';
+  assert.match(rolloutErrors(untypedEvidence), /rollout evidence/);
 });
 
 test('prevents silent baseline growth while allowing measured approved changes', () => {
   const increased = structuredClone(REPO_HEALTH_BASELINE);
   increased.repository.regularFiles += 1;
   increased.repository.legacyBudgetCountedRegularFiles += 1;
-  assert.match(
-    validateRepoHealthBaselineChange(REPO_HEALTH_BASELINE, increased).join(
-      '\n'
-    ),
-    /cannot grow silently/
-  );
+  assert.match(baselineChangeErrors(increased), /cannot grow silently/);
 
   increased.baselineRevision += 1;
   increased.sourceSha = '1111111111111111111111111111111111111111';
@@ -739,6 +744,13 @@ test('prevents silent baseline growth while allowing measured approved changes',
   assert.deepEqual(
     validateRepoHealthBaselineChange(REPO_HEALTH_BASELINE, increased),
     []
+  );
+
+  const untraceableShrink = structuredClone(REPO_HEALTH_BASELINE);
+  untraceableShrink.legacyFindings.pop();
+  assert.match(
+    baselineChangeErrors(untraceableShrink),
+    /new revision and source SHA/
   );
 });
 
