@@ -296,11 +296,18 @@ describe('proxy.ts middleware', () => {
       `/tim/subscribe/__profile-mode-alias/resolve/${'q'.repeat(256)}`,
       '/tim/subscribe/__profile%2Dmode%2Dalias/resolve/qr',
       '/tim/subscribe/%5F%5Fprofile-mode-alias/resolve/qr',
+      '/tim/subscribe/%255F%255Fprofile-mode-alias/resolve/qr',
+      '/tim/subscribe/%25255F%25255Fprofile%25252Dmode%25252Dalias/resolve/qr',
+      '/tim/subscribe/%252525255F%252525255Fprofile-mode-alias/resolve/qr',
+      '/tim/subscribe/%252F__profile-mode-alias%252Fresolve/qr',
+      `/tim/subscribe/${'q'.repeat(2049)}/resolve/qr`,
     ])('returns 404 for direct marker path %s before auth', async path => {
       const req = createUnauthenticatedRequest({ pathname: path });
       const res = await callMiddleware(req);
 
       expect(res.status).toBe(404);
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      expect(await res.text()).toBe('');
       expect(mocks.getSessionCookie).not.toHaveBeenCalled();
       expect(mocks.resolveTestBypassUserId).not.toHaveBeenCalled();
       expect(mocks.checkProfileVisitorBlocked).not.toHaveBeenCalled();
@@ -308,6 +315,17 @@ describe('proxy.ts middleware', () => {
 
     it('does not block the public alias before its afterFiles rewrite', async () => {
       const req = createUnauthenticatedRequest({ pathname: '/dualipa/music' });
+      const res = await callMiddleware(req);
+
+      expect(res.status).not.toBe(404);
+    });
+
+    it.each([
+      '/tim/caf%C3%A9',
+      '/tim/100%25-real',
+      '/tim/%25zz',
+    ])('does not reject a valid encoded public path %s', async path => {
+      const req = createUnauthenticatedRequest({ pathname: path });
       const res = await callMiddleware(req);
 
       expect(res.status).not.toBe(404);
