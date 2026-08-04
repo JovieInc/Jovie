@@ -19,10 +19,11 @@ import {
   type PerfRouteDefinition,
   type PerfTimingMetricName,
 } from './performance-route-manifest';
+import protectedOriginModule from './vercel-protected-origin.cjs';
 
 type SameSiteValue = 'Lax' | 'None' | 'Strict';
 
-interface AuthCookie {
+export interface PerformanceContextCookie {
   readonly name: string;
   readonly value: string;
   readonly domain?: string;
@@ -33,6 +34,53 @@ interface AuthCookie {
   readonly secure?: boolean;
   readonly sameSite?: SameSiteValue;
 }
+
+interface AuthCookie extends PerformanceContextCookie {
+  readonly sameSite?: SameSiteValue;
+}
+
+interface OriginBoundCookie {
+  readonly httpOnly: boolean;
+  readonly name: string;
+  readonly secure: boolean;
+  readonly url: string;
+  readonly value: string;
+}
+
+interface ProtectedOriginDependencies {
+  readonly isProtectedDeployment: (baseUrl: string) => boolean;
+  readonly bootstrapOrigin: (
+    baseUrl: string
+  ) => Promise<readonly OriginBoundCookie[]>;
+}
+
+const { bootstrapOriginBoundAccess, isExactVercelDeploymentUrl } =
+  protectedOriginModule as {
+    readonly bootstrapOriginBoundAccess: (
+      baseUrl: string,
+      options: {
+        readonly bypassSecret?: string;
+        readonly expectedCommitSha?: string;
+        readonly expectedDeploymentOrigin?: string;
+        readonly expectedEnvironment?: string;
+      }
+    ) => Promise<{ readonly cookies: readonly OriginBoundCookie[] }>;
+    readonly isExactVercelDeploymentUrl: (baseUrl: string) => boolean;
+  };
+
+const DEFAULT_PROTECTED_ORIGIN_DEPENDENCIES: ProtectedOriginDependencies = {
+  bootstrapOrigin: async baseUrl => {
+    const access = await bootstrapOriginBoundAccess(baseUrl, {
+      bypassSecret: process.env.PLAYWRIGHT_VERCEL_BYPASS_SECRET,
+      expectedCommitSha:
+        process.env.EXPECTED_COMMIT_SHA ?? process.env.GITHUB_SHA,
+      expectedDeploymentOrigin: process.env.EXPECTED_VERCEL_DEPLOYMENT_ORIGIN,
+      expectedEnvironment: process.env.EXPECTED_VERCEL_ENVIRONMENT,
+    });
+    return access.cookies;
+  },
+  isProtectedDeployment: isExactVercelDeploymentUrl,
+};
 
 interface StorageStateFile {
   readonly cookies?: readonly AuthCookie[];
@@ -970,18 +1018,115 @@ function medianResourceValue(
   return medianNumber(samples.map(sample => sample.resourceValues[metric]));
 }
 
-function createContextOptions(
-  route: PerfRouteDefinition,
-  cookies: readonly AuthCookie[]
+function assertExactHostCookieScope(
+  cookie: PerformanceContextCookie,
+  expectedHostname: string
 ) {
-  const hasCookies = route.requiresAuth && cookies.length > 0;
+  const domain = cookie.domain?.toLowerCase();
+  if (
+    !domain ||
+    domain.startsWith('.') ||
+    domain !== expectedHostname ||
+    cookie.path !== '/' ||
+    cookie.secure !== true
+  ) {
+    throw new Error(
+      'Protected-origin performance state escaped the exact deployment host.'
+    );
+  }
+}
+
+/**
+ * Establish Vercel protection access once, verify the immutable build identity,
+ * and return only the resulting host-bound infrastructure cookies. The
+ * bootstrap context starts empty so app authentication can never leak into a
+ * public performance route.
+ */
+export async function loadPerformanceProtectedOriginCookies(
+  browser: Browser,
+  baseUrl: string,
+  dependencies: Partial<ProtectedOriginDependencies> = {}
+): Promise<readonly PerformanceContextCookie[]> {
+  const isProtectedDeployment =
+    dependencies.isProtectedDeployment ??
+    DEFAULT_PROTECTED_ORIGIN_DEPENDENCIES.isProtectedDeployment;
+  if (!isProtectedDeployment(baseUrl)) {
+    return [];
+  }
+
+  const bootstrapOrigin =
+    dependencies.bootstrapOrigin ??
+    DEFAULT_PROTECTED_ORIGIN_DEPENDENCIES.bootstrapOrigin;
+  const target = new URL(baseUrl);
+  const originBoundCookies = await bootstrapOrigin(baseUrl);
+  if (originBoundCookies.length === 0) {
+    throw new Error(
+      'Protected-origin performance bootstrap produced no browser cookie state.'
+    );
+  }
+  const context = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+  });
+  try {
+    await context.addCookies([...originBoundCookies]);
+    const cookies = await context.cookies(target.origin);
+    if (cookies.length === 0) {
+      throw new Error(
+        'Protected-origin performance bootstrap produced no browser cookie state.'
+      );
+    }
+    for (const cookie of cookies) {
+      assertExactHostCookieScope(cookie, target.hostname.toLowerCase());
+    }
+    return cookies;
+  } finally {
+    await context.close();
+  }
+}
+
+function cookieScopeKey(cookie: PerformanceContextCookie) {
+  let hostname = cookie.domain?.replace(/^\./, '').toLowerCase() ?? '';
+  if (!hostname && cookie.url) {
+    try {
+      hostname = new URL(cookie.url).hostname.toLowerCase();
+    } catch {
+      hostname = cookie.url.toLowerCase();
+    }
+  }
+  return `${cookie.name}\u0000${hostname}\u0000${cookie.path}`;
+}
+
+function mergeContextCookies(
+  authCookies: readonly AuthCookie[],
+  protectedOriginCookies: readonly PerformanceContextCookie[]
+) {
+  const cookies = new Map<string, PerformanceContextCookie>();
+  for (const cookie of authCookies) {
+    cookies.set(cookieScopeKey(cookie), cookie);
+  }
+  for (const cookie of protectedOriginCookies) {
+    cookies.set(cookieScopeKey(cookie), cookie);
+  }
+  return [...cookies.values()];
+}
+
+export function createContextOptions(
+  route: PerfRouteDefinition,
+  authCookies: readonly AuthCookie[],
+  protectedOriginCookies: readonly PerformanceContextCookie[] = []
+) {
+  const cookies = mergeContextCookies(
+    route.requiresAuth ? authCookies : [],
+    protectedOriginCookies
+  );
   return {
-    storageState: hasCookies
-      ? {
-          cookies: [...cookies],
-          origins: [],
-        }
-      : undefined,
+    storageState:
+      cookies.length > 0
+        ? {
+            cookies,
+            origins: [],
+          }
+        : undefined,
     viewport: route.viewport,
   };
 }
@@ -989,9 +1134,14 @@ function createContextOptions(
 async function createContext(
   browser: Browser,
   route: PerfRouteDefinition,
-  cookies: readonly AuthCookie[]
+  authCookies: readonly AuthCookie[],
+  protectedOriginCookies: readonly PerformanceContextCookie[]
 ) {
-  const options = createContextOptions(route, cookies);
+  const options = createContextOptions(
+    route,
+    authCookies,
+    protectedOriginCookies
+  );
   const context = await browser.newContext(options);
   return context;
 }
@@ -1012,13 +1162,19 @@ async function warmRoute(
   route: PerfRouteDefinition,
   baseUrl: string,
   url: string,
-  cookies: readonly AuthCookie[]
+  authCookies: readonly AuthCookie[],
+  protectedOriginCookies: readonly PerformanceContextCookie[]
 ) {
   if (route.warmupStrategy === 'none') {
     return;
   }
 
-  const context = await createContext(browser, route, cookies);
+  const context = await createContext(
+    browser,
+    route,
+    authCookies,
+    protectedOriginCookies
+  );
   try {
     const page = await context.newPage();
     if (route.warmupStrategy === 'authenticated-shell') {
@@ -1056,10 +1212,16 @@ async function measureRouteSample(
   baseUrl: string,
   url: string,
   resolvedPath: string,
-  cookies: readonly AuthCookie[],
+  authCookies: readonly AuthCookie[],
+  protectedOriginCookies: readonly PerformanceContextCookie[],
   devMode = false
 ): Promise<GuardSample> {
-  const context = await createContext(browser, route, cookies);
+  const context = await createContext(
+    browser,
+    route,
+    authCookies,
+    protectedOriginCookies
+  );
   try {
     const page = await context.newPage();
     await page.addInitScript(PERF_INIT_SCRIPT);
@@ -1523,6 +1685,10 @@ async function measureRoutesAgainstBudgets(
   const browser = await chromium.launch();
   try {
     const authCookies = loadAuthCookies(options.baseUrl, options.authPath);
+    const protectedOriginCookies = await loadPerformanceProtectedOriginCookies(
+      browser,
+      options.baseUrl
+    );
     const results: PageResult[] = [];
 
     for (const route of routes) {
@@ -1542,7 +1708,14 @@ async function measureRoutesAgainstBudgets(
       const url = resolveRouteUrl(options.baseUrl, resolvedPath);
       logInfo(`Checking ${route.id} -> ${resolvedPath}`, options);
 
-      await warmRoute(browser, route, options.baseUrl, url, authCookies);
+      await warmRoute(
+        browser,
+        route,
+        options.baseUrl,
+        url,
+        authCookies,
+        protectedOriginCookies
+      );
 
       const samples: GuardSample[] = [];
       for (let index = 0; index < options.runs; index += 1) {
@@ -1553,6 +1726,7 @@ async function measureRoutesAgainstBudgets(
           url,
           resolvedPath,
           authCookies,
+          protectedOriginCookies,
           devMode
         );
         samples.push(sample);
@@ -1597,6 +1771,7 @@ async function measureRoutesAgainstBudgets(
           url,
           resolvedPath,
           authCookies,
+          protectedOriginCookies,
           devMode
         );
         confirmationSamples.push(sample);

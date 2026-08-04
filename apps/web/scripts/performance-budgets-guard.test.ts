@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Browser, BrowserContext, Page } from '@playwright/test';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const playwrightMocks = vi.hoisted(() => ({
@@ -22,8 +22,10 @@ import {
   applyProfileWarmTransitionTimings,
   buildConfirmedPageResult,
   confirmTimingViolations,
+  createContextOptions,
   evaluateTimingConfirmation,
   loadGuardManifestRoutes,
+  loadPerformanceProtectedOriginCookies,
   measureSameRouteInteraction,
   measureWarmNavigationRoute,
   parseGuardCliArgs,
@@ -37,6 +39,29 @@ import type {
   PerfRouteDefinition,
   PerfTimingMetricName,
 } from './performance-route-manifest';
+
+const PROTECTED_DEPLOYMENT_URL = 'https://jovie-build123-jovie.vercel.app';
+
+function createProtectedOriginBrowserFixture(
+  cookies: readonly {
+    readonly domain: string;
+    readonly httpOnly: boolean;
+    readonly name: string;
+    readonly path: string;
+    readonly sameSite: 'Lax';
+    readonly secure: boolean;
+    readonly value: string;
+  }[]
+) {
+  const context = {
+    addCookies: vi.fn().mockResolvedValue(undefined),
+    close: vi.fn().mockResolvedValue(undefined),
+    cookies: vi.fn().mockResolvedValue(cookies),
+  } as unknown as BrowserContext;
+  const newContext = vi.fn().mockResolvedValue(context);
+  const browser = { newContext } as unknown as Browser;
+  return { browser, context, newContext };
+}
 
 function createConfirmationSample(
   metric: PerfTimingMetricName,
@@ -512,6 +537,184 @@ describe('performance budgets guard', () => {
 
     expect(playwrightMocks.chromiumLaunch).toHaveBeenCalledOnce();
     expect(playwrightMocks.browserClose).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    'https://jov.ie',
+    'http://127.0.0.1:3000',
+    'https://foreign-project-foreign-team.vercel.app',
+  ])('keeps non-protected measurement target %s free of origin state', async baseUrl => {
+    const fixture = createProtectedOriginBrowserFixture([]);
+    const bootstrapOrigin = vi.fn();
+
+    await expect(
+      loadPerformanceProtectedOriginCookies(fixture.browser, baseUrl, {
+        bootstrapOrigin,
+      })
+    ).resolves.toEqual([]);
+
+    expect(fixture.newContext).not.toHaveBeenCalled();
+    expect(bootstrapOrigin).not.toHaveBeenCalled();
+  });
+
+  it('verifies staged access once and returns only exact-host infrastructure cookies', async () => {
+    const cookie = {
+      domain: 'jovie-build123-jovie.vercel.app',
+      httpOnly: true,
+      name: '__vercel_live_token',
+      path: '/',
+      sameSite: 'Lax' as const,
+      secure: true,
+      value: 'opaque-origin-cookie',
+    };
+    const fixture = createProtectedOriginBrowserFixture([cookie]);
+    const originBoundCookie = {
+      httpOnly: true,
+      name: cookie.name,
+      secure: true,
+      url: PROTECTED_DEPLOYMENT_URL,
+      value: cookie.value,
+    };
+    const bootstrapOrigin = vi.fn().mockResolvedValue([originBoundCookie]);
+
+    await expect(
+      loadPerformanceProtectedOriginCookies(
+        fixture.browser,
+        PROTECTED_DEPLOYMENT_URL,
+        { bootstrapOrigin }
+      )
+    ).resolves.toEqual([cookie]);
+
+    expect(fixture.newContext).toHaveBeenCalledWith({
+      storageState: { cookies: [], origins: [] },
+    });
+    expect(bootstrapOrigin).toHaveBeenCalledWith(PROTECTED_DEPLOYMENT_URL);
+    expect(fixture.context.addCookies).toHaveBeenCalledWith([
+      originBoundCookie,
+    ]);
+    expect(fixture.context.cookies).toHaveBeenCalledWith(
+      PROTECTED_DEPLOYMENT_URL
+    );
+    expect(fixture.context.close).toHaveBeenCalledOnce();
+  });
+
+  it('fails closed and disposes the bootstrap context on unsafe cookie scope', async () => {
+    const fixture = createProtectedOriginBrowserFixture([
+      {
+        domain: '.jovie-build123-jovie.vercel.app',
+        httpOnly: true,
+        name: '__vercel_live_token',
+        path: '/',
+        sameSite: 'Lax',
+        secure: true,
+        value: 'unsafe-domain-cookie',
+      },
+    ]);
+
+    await expect(
+      loadPerformanceProtectedOriginCookies(
+        fixture.browser,
+        PROTECTED_DEPLOYMENT_URL,
+        {
+          bootstrapOrigin: vi.fn().mockResolvedValue([
+            {
+              httpOnly: true,
+              name: '__vercel_live_token',
+              secure: true,
+              url: PROTECTED_DEPLOYMENT_URL,
+              value: 'unsafe-domain-cookie',
+            },
+          ]),
+        }
+      )
+    ).rejects.toThrow('escaped the exact deployment host');
+
+    expect(fixture.context.close).toHaveBeenCalledOnce();
+  });
+
+  it('does not create a browser context when immutable-build verification fails', async () => {
+    const fixture = createProtectedOriginBrowserFixture([]);
+
+    await expect(
+      loadPerformanceProtectedOriginCookies(
+        fixture.browser,
+        PROTECTED_DEPLOYMENT_URL,
+        {
+          bootstrapOrigin: vi
+            .fn()
+            .mockRejectedValue(new Error('wrong commit identity')),
+        }
+      )
+    ).rejects.toThrow('wrong commit identity');
+
+    expect(fixture.newContext).not.toHaveBeenCalled();
+  });
+
+  it('keeps public staged routes app-unauthenticated while attaching exact-host access', () => {
+    const route = {
+      requiresAuth: false,
+      viewport: { height: 844, width: 390 },
+    } as PerfRouteDefinition;
+    const authCookie = {
+      domain: 'jovie-build123-jovie.vercel.app',
+      name: 'better-auth.session_token',
+      path: '/',
+      secure: true,
+      value: 'app-session',
+    };
+    const protectedOriginCookie = {
+      domain: 'jovie-build123-jovie.vercel.app',
+      name: '__vercel_live_token',
+      path: '/',
+      secure: true,
+      value: 'origin-access',
+    };
+
+    expect(
+      createContextOptions(route, [authCookie], [protectedOriginCookie])
+    ).toEqual({
+      storageState: {
+        cookies: [protectedOriginCookie],
+        origins: [],
+      },
+      viewport: route.viewport,
+    });
+  });
+
+  it('merges verified origin access into authenticated contexts without stale duplicates', () => {
+    const route = {
+      requiresAuth: true,
+      viewport: { height: 844, width: 390 },
+    } as PerfRouteDefinition;
+    const authCookie = {
+      domain: 'jovie-build123-jovie.vercel.app',
+      name: 'better-auth.session_token',
+      path: '/',
+      secure: true,
+      value: 'app-session',
+    };
+    const staleProtectedOriginCookie = {
+      domain: 'jovie-20iadpkq2-jovie.vercel.app',
+      name: '__vercel_live_token',
+      path: '/',
+      secure: true,
+      value: 'stale-origin-access',
+    };
+    const protectedOriginCookie = {
+      ...staleProtectedOriginCookie,
+      value: 'verified-origin-access',
+    };
+
+    const options = createContextOptions(
+      route,
+      [authCookie, staleProtectedOriginCookie],
+      [protectedOriginCookie]
+    );
+
+    expect(options.storageState?.cookies).toEqual([
+      authCookie,
+      protectedOriginCookie,
+    ]);
   });
 
   it('does not pass a stalled warm destination from a persistent source shell', async () => {

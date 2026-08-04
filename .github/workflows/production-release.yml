@@ -995,6 +995,8 @@ jobs:
           if [[ ! "$deployment_url" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]]; then
             fail_performance_gate "Exact staged deployment URL is missing or invalid."
           fi
+          export EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$deployment_url"
+          export EXPECTED_VERCEL_ENVIRONMENT=production
 
           auth_state="$RUNNER_TEMP/uas-performance-auth-${GITHUB_RUN_ID}.json"
           dynamic_secrets_file="$RUNNER_TEMP/uas-performance-dynamic-secrets-${GITHUB_RUN_ID}"
