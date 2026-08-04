@@ -3,18 +3,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRateLimitedResponse } from '@/app/api/notifications/route-helpers';
 import { AUDIENCE_ANON_COOKIE } from '@/constants/app';
 import { trackEvent } from '@/lib/analytics/runtime-aware';
+import {
+  COOKIE_BANNER_REQUIRED_COOKIE,
+  isCookieBannerRequired,
+} from '@/lib/cookies/consent-regions';
+import {
+  CONSENT_COOKIE_NAME,
+  parseConsentCookieValue,
+} from '@/lib/cookies/consent-state';
 import { captureError } from '@/lib/error-tracking';
 import { logStatsigEvent } from '@/lib/flags/statsig';
 import { generalLimiter, getClientIP } from '@/lib/rate-limit';
-import {
-  PAC_IDENTITY_BLOCKED_CONSENTS,
-  pacEventBeaconSchema,
-} from '@/lib/tracking/pac-events-contract';
+import { pacEventBeaconSchema } from '@/lib/tracking/pac-events-contract';
+import { PAC_IDENTITY_BLOCKED_CONSENTS } from '@/lib/tracking/pac-events-shared';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
 const MAX_BODY_BYTES = 4096;
+const LEGACY_TRACKING_CONSENT_COOKIE = 'jv_tracking_consent';
 
 /**
  * First-party sink for PAC (Primary Action Card) instrumentation events —
@@ -70,10 +77,39 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const event = parsed.data;
-    const identityAllowed = !PAC_IDENTITY_BLOCKED_CONSENTS.includes(
+    const cookieStore = await cookies();
+
+    // Never trust the beacon's positive consent claim for identity joining.
+    // The httpOnly granular cookie and server-resolved region policy are
+    // authoritative. Client-reported opt-outs remain an extra fail-closed
+    // signal, while GPC/DNT and the legacy rejection cookie are also honored.
+    const requiresCookieConsent =
+      cookieStore.get(COOKIE_BANNER_REQUIRED_COOKIE)?.value === '1' ||
+      isCookieBannerRequired(
+        request.headers.get('x-vercel-ip-country') ??
+          request.headers.get('cf-ipcountry'),
+        request.headers.get('x-vercel-ip-country-region')
+      );
+    const canonicalConsent = parseConsentCookieValue(
+      cookieStore.get(CONSENT_COOKIE_NAME)?.value
+    );
+    const serverAllowsAnalytics =
+      canonicalConsent?.analytics === true ||
+      (canonicalConsent === null && !requiresCookieConsent);
+    const browserOptedOut =
+      request.headers.get('sec-gpc') === '1' ||
+      request.headers.get('dnt') === '1' ||
+      request.headers.get('dnt') === 'yes';
+    const legacyOptedOut =
+      cookieStore.get(LEGACY_TRACKING_CONSENT_COOKIE)?.value === 'rejected';
+    const clientOptedOut = PAC_IDENTITY_BLOCKED_CONSENTS.includes(
       event.consent
     );
-    const cookieStore = await cookies();
+    const identityAllowed =
+      serverAllowsAnalytics &&
+      !browserOptedOut &&
+      !legacyOptedOut &&
+      !clientOptedOut;
     const jvAid = identityAllowed
       ? (cookieStore.get(AUDIENCE_ANON_COOKIE)?.value ?? null)
       : null;

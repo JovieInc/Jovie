@@ -38,7 +38,7 @@ import {
   invalidateCaptureDismissalStatus,
 } from '@/lib/profile/capture-dismissal-client';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
-import type { PacState as PacEventState } from '@/lib/tracking/pac-events-contract';
+import type { PacState as PacEventState } from '@/lib/tracking/pac-events-shared';
 import { cn } from '@/lib/utils';
 import { formatAmount } from '@/lib/utils/format-number';
 import { formatDuration } from '@/lib/utils/formatDuration';

@@ -10,6 +10,7 @@ import { track } from '@/lib/analytics';
 import { captureError } from '@/lib/error-tracking';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { getNotificationCaptureError } from '@/lib/notifications/capture-validation';
 import {
   getNotificationSubscribeSuccessMessage,
   NOTIFICATION_COPY,
@@ -22,7 +23,6 @@ import {
   useSubscribeNotificationsMutation,
   useVerifyEmailOtpMutation,
 } from '@/lib/queries/useNotificationStatusQuery';
-import { getNotificationCaptureError } from '@/lib/validation/schemas/notifications';
 import type { Artist } from '@/types/db';
 import type { NotificationChannel } from '@/types/notifications';
 import {

@@ -5,13 +5,15 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  getNotificationCaptureError,
+  NOTIFICATION_CAPTURE_ERROR_MESSAGES,
+  type NotificationCaptureInput,
+} from '@/lib/notifications/capture-validation';
+import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
 } from '@/lib/notifications/validation';
-import {
-  getNotificationCaptureError,
-  NOTIFICATION_CAPTURE_ERROR_MESSAGES,
-} from '@/lib/validation/schemas/notifications';
+import { notificationCaptureSchema } from '@/lib/validation/schemas/notifications';
 
 describe('Notification Validation', () => {
   describe('getNotificationCaptureError', () => {
@@ -37,6 +39,88 @@ describe('Notification Validation', () => {
           value: 'fan@example.com',
         })
       ).toBeNull();
+    });
+
+    it('stays deterministic and aligned with the server schema', () => {
+      const cases: ReadonlyArray<
+        readonly [NotificationCaptureInput, string | null]
+      > = [
+        [
+          { channel: 'email', value: '' },
+          NOTIFICATION_CAPTURE_ERROR_MESSAGES.emailRequired,
+        ],
+        [
+          { channel: 'email', value: `${'a'.repeat(250)}@x.com` },
+          NOTIFICATION_CAPTURE_ERROR_MESSAGES.emailTooLong,
+        ],
+        [
+          { channel: 'email', value: 'fan @domain.com' },
+          NOTIFICATION_CAPTURE_ERROR_MESSAGES.emailNoSpaces,
+        ],
+        [
+          { channel: 'email', value: 'fan@domain' },
+          NOTIFICATION_CAPTURE_ERROR_MESSAGES.emailFormat,
+        ],
+        [{ channel: 'email', value: 'fan@example.com' }, null],
+        [
+          { channel: 'sms', value: '+15551234567' },
+          NOTIFICATION_CAPTURE_ERROR_MESSAGES.smsCountry,
+        ],
+        [
+          {
+            channel: 'sms',
+            value: '+15551234567',
+            country_code: 'GB',
+          },
+          NOTIFICATION_CAPTURE_ERROR_MESSAGES.smsCountry,
+        ],
+        [
+          { channel: 'sms', value: '', country_code: 'US' },
+          NOTIFICATION_CAPTURE_ERROR_MESSAGES.phoneRequired,
+        ],
+        [
+          {
+            channel: 'sms',
+            value: `+1${'2'.repeat(32)}`,
+            country_code: 'US',
+          },
+          NOTIFICATION_CAPTURE_ERROR_MESSAGES.phoneTooLong,
+        ],
+        [
+          { channel: 'sms', value: '555-1234', country_code: 'US' },
+          NOTIFICATION_CAPTURE_ERROR_MESSAGES.phoneFormat,
+        ],
+        [
+          {
+            channel: 'sms',
+            value: '+15551234567',
+            country_code: 'US',
+          },
+          null,
+        ],
+        [
+          {
+            channel: 'sms',
+            value: '+15551234567',
+            country_code: 'CA',
+          },
+          null,
+        ],
+      ];
+
+      for (const [input, expected] of cases) {
+        expect(getNotificationCaptureError(input)).toBe(expected);
+
+        // Repeat the same validation to guard against stateful regular
+        // expressions changing the user-facing message between submissions.
+        expect(getNotificationCaptureError(input)).toBe(expected);
+
+        const parsed = notificationCaptureSchema.safeParse(input);
+        const serverError = parsed.success
+          ? null
+          : (parsed.error.issues[0]?.message ?? null);
+        expect(serverError).toBe(expected);
+      }
     });
 
     it('limits SMS capture to US and Canada', () => {

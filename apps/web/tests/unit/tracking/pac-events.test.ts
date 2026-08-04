@@ -30,6 +30,7 @@ import {
   trackPacClientEvent,
   trackPacExposure,
 } from '@/lib/tracking/pac-events';
+import { pacEventBeaconSchema } from '@/lib/tracking/pac-events-contract';
 import {
   buildPacVariantId,
   PAC_CLIENT_EVENTS,
@@ -37,8 +38,7 @@ import {
   PAC_SERVER_EVENTS,
   PAC_STATES,
   type PacClientEventName,
-  pacEventBeaconSchema,
-} from '@/lib/tracking/pac-events-contract';
+} from '@/lib/tracking/pac-events-shared';
 
 const PROFILE_ID = '3f9c2f6a-8f1e-4b6a-9a44-1c2d3e4f5a6b';
 

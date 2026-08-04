@@ -16,7 +16,7 @@
 import { trackEvent } from '@/lib/analytics/runtime-aware';
 import type { ProfilePacS2Slot } from '@/lib/flags/profile-pac';
 import { logStatsigEvent } from '@/lib/flags/statsig';
-import type { PacEventPayload } from '@/lib/tracking/pac-events-contract';
+import type { PacEventPayload } from '@/lib/tracking/pac-events-shared';
 import { logger } from '@/lib/utils/logger';
 
 export interface PacS2ConvertInput {

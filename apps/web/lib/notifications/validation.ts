@@ -1,4 +1,4 @@
-import { getNotificationCaptureError } from '@/lib/validation/schemas/notifications';
+import { getNotificationCaptureError } from '@/lib/notifications/capture-validation';
 
 const EMAIL_MAX_LENGTH = 254;
 const PHONE_MAX_LENGTH = 32;
