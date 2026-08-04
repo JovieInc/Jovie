@@ -4,6 +4,7 @@ import {
   type CSSProperties,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -616,7 +617,10 @@ export function ProfileCompactTemplate({
     globalThis.history.pushState(globalThis.history.state, '', href);
   }, [drawerOpen, drawerView, requestedMode, artist.handle, searchSuffix]);
 
-  useEffect(() => {
+  // This is an interaction-readiness contract, not a visual side effect.
+  // Publish it after React commits the hydrated controls, before unrelated
+  // passive work can delay browser readiness probes.
+  useLayoutEffect(() => {
     const shell = compactShellRef.current;
     if (!shell) return;
 
@@ -624,7 +628,7 @@ export function ProfileCompactTemplate({
     return () => {
       delete shell.dataset.interactiveReady;
     };
-  }, [isDesktopLayout]);
+  }, []);
 
   const profileHref = useMemo(
     () => getProfileModeHref(artist.handle, 'profile', searchSuffix),
