@@ -4,6 +4,7 @@ const {
   getContentBySlugMock,
   getCreatorByUsernameMock,
   getFeaturedSmartLinkStaticParamsMock,
+  hasProfileModeAliasContentCandidateMock,
   getUnpublishedReleasePresenceMock,
   findRedirectByOldSlugMock,
   notFoundMock,
@@ -13,6 +14,7 @@ const {
   getContentBySlugMock: vi.fn(),
   getCreatorByUsernameMock: vi.fn(),
   getFeaturedSmartLinkStaticParamsMock: vi.fn().mockResolvedValue([]),
+  hasProfileModeAliasContentCandidateMock: vi.fn(),
   getUnpublishedReleasePresenceMock: vi.fn(),
   findRedirectByOldSlugMock: vi.fn(),
   notFoundMock: vi.fn(),
@@ -56,6 +58,10 @@ vi.mock('@/lib/discography/slug', () => ({
   findRedirectByOldSlug: findRedirectByOldSlugMock,
 }));
 
+vi.mock('@/app/[username]/[...slug]/_lib/content-candidate', () => ({
+  hasProfileModeAliasContentCandidate: hasProfileModeAliasContentCandidateMock,
+}));
+
 vi.mock('@/lib/entity/queries', () => ({
   getArtistEntitySameAs: vi.fn().mockResolvedValue([]),
 }));
@@ -65,6 +71,8 @@ describe('smart-link metadata', () => {
     vi.resetModules();
     getCreatorByUsernameMock.mockReset();
     getContentBySlugMock.mockReset();
+    hasProfileModeAliasContentCandidateMock.mockReset();
+    hasProfileModeAliasContentCandidateMock.mockResolvedValue(false);
     getUnpublishedReleasePresenceMock.mockReset();
     getUnpublishedReleasePresenceMock.mockResolvedValue(null);
     findRedirectByOldSlugMock.mockReset();
@@ -155,6 +163,10 @@ describe('smart-link metadata', () => {
   });
 
   it('renders published content before considering a matching mode alias', async () => {
+    hasProfileModeAliasContentCandidateMock.mockResolvedValue(true);
+    findRedirectByOldSlugMock.mockResolvedValue({
+      currentSlug: 'renamed-music',
+    });
     getContentBySlugMock.mockResolvedValue({
       id: 'track-music',
       type: 'track',
@@ -190,6 +202,7 @@ describe('smart-link metadata', () => {
 
     expect(result).toBeTruthy();
     expect(redirectMock).not.toHaveBeenCalled();
+    expect(permanentRedirectMock).not.toHaveBeenCalled();
     expect(getUnpublishedReleasePresenceMock).toHaveBeenCalledOnce();
   });
 
@@ -202,9 +215,56 @@ describe('smart-link metadata', () => {
     expect(revalidate).toBe(300);
   });
 
-  it('uses a matching mode alias only after content lookups miss', async () => {
-    getContentBySlugMock.mockResolvedValue(null);
+  it('returns redirect-sink metadata without loading the smart-link resolver after definite content misses', async () => {
+    const { generateMetadata } = await import(
+      '@/app/[username]/[...slug]/page'
+    );
 
+    const metadata = await generateMetadata({
+      params: Promise.resolve({
+        username: 'dualipa',
+        slug: ['listen', '__profile-mode-alias', 'resolve'],
+      }),
+    });
+
+    expect(metadata).toEqual({ robots: { index: false, follow: false } });
+    expect(hasProfileModeAliasContentCandidateMock).toHaveBeenCalledWith(
+      'creator-1',
+      'listen'
+    );
+    expect(getContentBySlugMock).not.toHaveBeenCalled();
+  });
+
+  it('delegates candidate metadata to the canonical smart-link resolver', async () => {
+    hasProfileModeAliasContentCandidateMock.mockResolvedValue(true);
+    getContentBySlugMock.mockResolvedValue({
+      id: 'track-music',
+      type: 'track',
+      slug: 'music',
+      releaseSlug: null,
+      title: 'Music',
+      artworkUrl: 'https://example.com/music.jpg',
+      artworkSizes: null,
+      releaseDate: new Date('2024-01-01T00:00:00Z'),
+      providerLinks: [],
+      previewUrl: null,
+    });
+
+    const { generateMetadata } = await import(
+      '@/app/[username]/[...slug]/page'
+    );
+    const metadata = await generateMetadata({
+      params: Promise.resolve({
+        username: 'dualipa',
+        slug: ['music', '__profile-mode-alias', 'resolve'],
+      }),
+    });
+
+    expect(metadata.alternates?.canonical).toBe('https://jov.ie/dualipa/music');
+    expect(getContentBySlugMock).toHaveBeenCalledWith('creator-1', 'music');
+  });
+
+  it('uses a matching mode alias after definite content misses', async () => {
     const { default: ProfileAliasResolverPage } = await import(
       '@/app/[username]/[...slug]/page'
     );
@@ -227,6 +287,7 @@ describe('smart-link metadata', () => {
       'music',
       { onError: 'throw' }
     );
+    expect(getContentBySlugMock).not.toHaveBeenCalled();
     expect(redirectMock).toHaveBeenCalledWith('/dualipa?mode=listen&source=qr');
   });
 
@@ -275,6 +336,28 @@ describe('smart-link metadata', () => {
     expect(permanentRedirectMock).not.toHaveBeenCalled();
   });
 
+  it('fails closed when the content-candidate check is uncertain', async () => {
+    hasProfileModeAliasContentCandidateMock.mockRejectedValue(
+      new Error('candidate lookup unavailable')
+    );
+
+    const { default: ProfileAliasResolverPage } = await import(
+      '@/app/[username]/[...slug]/page'
+    );
+
+    await expect(
+      ProfileAliasResolverPage({
+        params: Promise.resolve({
+          username: 'dualipa',
+          slug: ['listen', '__profile-mode-alias', 'resolve'],
+        }),
+      })
+    ).rejects.toThrow('candidate lookup unavailable');
+    expect(getContentBySlugMock).not.toHaveBeenCalled();
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(permanentRedirectMock).not.toHaveBeenCalled();
+  });
+
   it('keeps renamed-release redirects ahead of matching mode aliases', async () => {
     getContentBySlugMock.mockResolvedValue(null);
     findRedirectByOldSlugMock.mockResolvedValue({
@@ -302,7 +385,34 @@ describe('smart-link metadata', () => {
     expect(redirectMock).not.toHaveBeenCalled();
   });
 
+  it('keeps renamed-release redirects after a conservative candidate falls through', async () => {
+    hasProfileModeAliasContentCandidateMock.mockResolvedValue(true);
+    getContentBySlugMock.mockResolvedValue(null);
+    findRedirectByOldSlugMock.mockResolvedValue({
+      currentSlug: 'renamed-music',
+    });
+
+    const { default: ProfileAliasResolverPage } = await import(
+      '@/app/[username]/[...slug]/page'
+    );
+
+    await expect(
+      ProfileAliasResolverPage({
+        params: Promise.resolve({
+          username: 'dualipa',
+          slug: ['music', '__profile-mode-alias', 'resolve'],
+        }),
+      })
+    ).rejects.toThrow('NEXT_PERMANENT_REDIRECT');
+    expect(getContentBySlugMock).toHaveBeenCalledWith('creator-1', 'music');
+    expect(permanentRedirectMock).toHaveBeenCalledWith(
+      '/dualipa/renamed-music'
+    );
+    expect(redirectMock).not.toHaveBeenCalled();
+  });
+
   it('keeps unpublished collisions on the canonical smart-link renderer', async () => {
+    hasProfileModeAliasContentCandidateMock.mockResolvedValue(true);
     getContentBySlugMock.mockResolvedValue(null);
     getUnpublishedReleasePresenceMock.mockResolvedValue({
       id: 'unpublished-music',
@@ -323,14 +433,14 @@ describe('smart-link metadata', () => {
     expect(redirectMock).not.toHaveBeenCalled();
   });
 
-  it('starts content and independent alias collision checks in parallel', async () => {
-    let resolveContentLookup: ((value: null) => void) | undefined;
+  it('starts candidate and independent alias collision checks in parallel', async () => {
+    let resolveCandidateLookup: ((value: false) => void) | undefined;
     let resolveRedirectLookup: ((value: null) => void) | undefined;
     let resolveUnpublishedLookup: ((value: null) => void) | undefined;
-    getContentBySlugMock.mockImplementation(
+    hasProfileModeAliasContentCandidateMock.mockImplementation(
       () =>
-        new Promise<null>(resolve => {
-          resolveContentLookup = resolve;
+        new Promise<false>(resolve => {
+          resolveCandidateLookup = resolve;
         })
     );
     findRedirectByOldSlugMock.mockImplementation(
@@ -357,17 +467,19 @@ describe('smart-link metadata', () => {
     });
 
     await vi.waitFor(() => {
-      expect(getContentBySlugMock).toHaveBeenCalledOnce();
+      expect(hasProfileModeAliasContentCandidateMock).toHaveBeenCalledOnce();
       expect(findRedirectByOldSlugMock).toHaveBeenCalledOnce();
       expect(getUnpublishedReleasePresenceMock).toHaveBeenCalledOnce();
     });
-    resolveContentLookup?.(null);
+    resolveCandidateLookup?.(false);
     resolveRedirectLookup?.(null);
     resolveUnpublishedLookup?.(null);
     await expect(result).rejects.toThrow('NEXT_REDIRECT');
+    expect(getContentBySlugMock).not.toHaveBeenCalled();
   });
 
   it('settles collision failures while published-content lookup is pending', async () => {
+    hasProfileModeAliasContentCandidateMock.mockResolvedValue(true);
     let resolveContentLookup:
       | ((value: { id: string; type: string; slug: string }) => void)
       | undefined;

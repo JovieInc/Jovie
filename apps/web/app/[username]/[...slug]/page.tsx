@@ -11,12 +11,10 @@ import {
   getCreatorByUsername,
   getUnpublishedReleasePresence,
 } from '@/app/[username]/[slug]/_lib/data';
-import ContentSmartLinkPage, {
-  generateMetadata as generateContentSmartLinkMetadata,
-} from '@/app/[username]/[slug]/page';
 import { sanitizeCacheTags } from '@/lib/cache/tags';
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
 import { REDIRECT_SINK_METADATA } from '@/lib/profile/metadata';
+import { hasProfileModeAliasContentCandidate } from './_lib/content-candidate';
 
 const PROFILE_MODE_ALIAS_MARKER = '__profile-mode-alias';
 const PROFILE_MODE_ALIAS_RESOLVER = 'resolve';
@@ -110,6 +108,18 @@ export async function generateMetadata({
   const { username, slug } = await params;
   const aliasRequest = getAliasRequest(slug);
   if (aliasRequest) {
+    const creator = await getCreatorByUsername(username.toLowerCase());
+    if (!creator) return REDIRECT_SINK_METADATA;
+
+    const hasContentCandidate = await hasProfileModeAliasContentCandidate(
+      creator.id,
+      aliasRequest.aliasSlug
+    );
+    if (!hasContentCandidate) return REDIRECT_SINK_METADATA;
+
+    const { generateMetadata: generateContentSmartLinkMetadata } = await import(
+      '@/app/[username]/[slug]/page'
+    );
     return generateContentSmartLinkMetadata({
       params: Promise.resolve({ username, slug: aliasRequest.aliasSlug }),
     });
@@ -127,10 +137,9 @@ export default async function CatchAllPage({
   const creator = await getCreatorByUsername(username.toLowerCase());
   if (!creator) notFound();
 
-  // Start the collision checks with the content lookup. The common mode-alias
-  // path no longer pays a second serial cache/database stage after proving the
-  // slug is not renderable content. Published content keeps precedence: a
-  // collision-check failure is ignored when the canonical renderer already won.
+  // Start independent collision and candidate checks together. The common
+  // profile-mode alias path performs bounded ID-only checks in parallel;
+  // any possible content still delegates to the canonical smart-link loader.
   const collisionStatePromise = getAliasCollisionState(
     creator.id,
     aliasRequest.aliasSlug
@@ -138,7 +147,13 @@ export default async function CatchAllPage({
     value => ({ ok: true as const, value }),
     error => ({ error, ok: false as const })
   );
-  const content = await getContentBySlug(creator.id, aliasRequest.aliasSlug);
+  const hasContentCandidate = await hasProfileModeAliasContentCandidate(
+    creator.id,
+    aliasRequest.aliasSlug
+  );
+  const content = hasContentCandidate
+    ? await getContentBySlug(creator.id, aliasRequest.aliasSlug)
+    : null;
   if (!content) {
     const collisionState = await collisionStatePromise;
     if (!collisionState.ok) throw collisionState.error;
@@ -163,6 +178,9 @@ export default async function CatchAllPage({
   // Published and unpublished collisions keep the original public URL and use
   // the canonical smart-link renderer. Data helpers are request-memoized, so
   // this delegation does not turn the collision check into duplicate DB work.
+  const { default: ContentSmartLinkPage } = await import(
+    '@/app/[username]/[slug]/page'
+  );
   return (
     <ContentSmartLinkPage
       params={Promise.resolve({
