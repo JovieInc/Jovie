@@ -1,5 +1,5 @@
 import type { Browser, BrowserContext, Page } from '@playwright/test';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const playwrightMocks = vi.hoisted(() => ({
   browserClose: vi.fn(),
@@ -19,9 +19,12 @@ import type {
   ViolationResult,
 } from './performance-budgets-guard';
 import {
+  applyAliasPhaseTimings,
   applyProfileWarmTransitionTimings,
+  assertAliasPhaseTiming,
   buildConfirmedPageResult,
   confirmTimingViolations,
+  createAliasPhaseProbeScript,
   createContextOptions,
   evaluateTimingConfirmation,
   loadGuardManifestRoutes,
@@ -119,6 +122,176 @@ function createTimingViolation(
     routeId,
   };
 }
+
+function markElementVisible(element: Element) {
+  vi.spyOn(element, 'getClientRects').mockReturnValue([
+    { height: 1, width: 1 },
+  ] as unknown as DOMRectList);
+}
+
+describe('browser-observed alias readiness', () => {
+  afterEach(() => {
+    document.body.replaceChildren();
+    delete (
+      window as Window & {
+        __perfAliasPhaseProbe?: unknown;
+      }
+    ).__perfAliasPhaseProbe;
+  });
+
+  it('records immediately visible phases in destination order', () => {
+    const shell = document.createElement('div');
+    shell.id = 'alias-shell';
+    const content = document.createElement('div');
+    content.id = 'alias-content';
+    const destination = document.createElement('button');
+    destination.id = 'alias-destination';
+    for (const element of [shell, content, destination]) {
+      markElementVisible(element);
+      document.body.append(element);
+    }
+
+    const probeScript = createAliasPhaseProbeScript({
+      contentSelectors: ['#alias-content'],
+      destinationSelectors: ['#alias-destination'],
+      expectedPaths: [`${window.location.pathname}${window.location.search}`],
+      sampleKey: 'immediate-sample',
+      shellSelectors: ['#alias-shell'],
+      startEpochMs: performance.timeOrigin + performance.now() - 100,
+    });
+    new Function(probeScript)();
+
+    const state = (
+      window as Window & {
+        __perfAliasPhaseProbe?: unknown;
+      }
+    ).__perfAliasPhaseProbe;
+    const phases = assertAliasPhaseTiming(state, 'immediate-sample', 500);
+
+    expect(phases.redirectCompleteMs).toBeLessThanOrEqual(
+      phases.shellVisibleMs
+    );
+    expect(phases.shellVisibleMs).toBeLessThanOrEqual(
+      phases.interactiveReadyMs
+    );
+    expect(phases.interactiveReadyMs).toBeLessThanOrEqual(
+      phases.destinationAffordanceMs
+    );
+  });
+
+  it('records a destination that becomes visible after installation', async () => {
+    const shell = document.createElement('div');
+    shell.id = 'alias-shell';
+    const content = document.createElement('div');
+    content.id = 'alias-content';
+    const destination = document.createElement('button');
+    destination.id = 'alias-destination';
+    destination.style.display = 'none';
+    for (const element of [shell, content, destination]) {
+      markElementVisible(element);
+      document.body.append(element);
+    }
+
+    const probeScript = createAliasPhaseProbeScript({
+      contentSelectors: ['#alias-content'],
+      destinationSelectors: ['#alias-destination'],
+      expectedPaths: [`${window.location.pathname}${window.location.search}`],
+      sampleKey: 'mutation-sample',
+      shellSelectors: ['#alias-shell'],
+      startEpochMs: performance.timeOrigin + performance.now() - 100,
+    });
+    new Function(probeScript)();
+
+    destination.style.display = 'block';
+    destination.dataset.ready = 'true';
+
+    await vi.waitFor(() => {
+      const state = (
+        window as Window & {
+          __perfAliasPhaseProbe?: {
+            destinationAffordanceMs?: number;
+          };
+        }
+      ).__perfAliasPhaseProbe;
+      expect(state?.destinationAffordanceMs).toEqual(expect.any(Number));
+    });
+  });
+
+  it.each([
+    {
+      label: 'missing',
+      state: {
+        redirectCompleteMs: 10,
+        sampleKey: 'phase-sample',
+        shellVisibleMs: 20,
+      },
+    },
+    {
+      label: 'stale',
+      state: {
+        destinationAffordanceMs: 40,
+        interactiveReadyMs: 30,
+        redirectCompleteMs: 10,
+        sampleKey: 'old-sample',
+        shellVisibleMs: 20,
+      },
+    },
+    {
+      label: 'non-monotonic',
+      state: {
+        destinationAffordanceMs: 40,
+        interactiveReadyMs: 15,
+        redirectCompleteMs: 10,
+        sampleKey: 'phase-sample',
+        shellVisibleMs: 20,
+      },
+    },
+  ])('fails closed on $label phase evidence', ({ state }) => {
+    expect(() => assertAliasPhaseTiming(state, 'phase-sample', 500)).toThrow(
+      /probe|phase/i
+    );
+  });
+
+  it('keeps controller delay diagnostic without charging it to the user metric', () => {
+    const phases = assertAliasPhaseTiming(
+      {
+        destinationAffordanceMs: 580,
+        interactiveReadyMs: 540,
+        redirectCompleteMs: 120,
+        sampleKey: 'phase-sample',
+        shellVisibleMs: 300,
+      },
+      'phase-sample',
+      1600
+    );
+
+    const timings = createConfirmationSample(
+      'usable-alias-result',
+      0
+    ).timingValues;
+    applyAliasPhaseTimings(timings, phases);
+
+    expect(timings['redirect-complete']).toBe(120);
+    expect(timings['interactive-shell-ready']).toBe(540);
+    expect(timings['usable-alias-result']).toBe(580);
+  });
+
+  it('rejects browser phases that exceed controller observation', () => {
+    expect(() =>
+      assertAliasPhaseTiming(
+        {
+          destinationAffordanceMs: 701,
+          interactiveReadyMs: 600,
+          redirectCompleteMs: 100,
+          sampleKey: 'phase-sample',
+          shellVisibleMs: 300,
+        },
+        'phase-sample',
+        500
+      )
+    ).toThrow(/diverged/);
+  });
+});
 
 function createConfirmationPage(options: {
   readonly id: string;

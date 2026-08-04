@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -87,8 +88,38 @@ interface StorageStateFile {
 }
 
 interface PerfPageWindow extends Window {
+  __perfAliasPhaseProbe?: AliasPhaseProbeState;
   __perfWarmNavFallbackStart?: number;
   __perfWarmNavStart?: number;
+}
+
+export interface AliasPhaseTiming {
+  readonly redirectCompleteMs: number;
+  readonly shellVisibleMs: number;
+  readonly interactiveReadyMs: number;
+  readonly destinationAffordanceMs: number;
+}
+
+export interface AliasPhaseProbeConfig {
+  readonly contentSelectors: readonly string[];
+  readonly destinationSelectors: readonly string[];
+  readonly expectedPaths: readonly string[];
+  readonly sampleKey: string;
+  readonly shellSelectors: readonly string[];
+  readonly startEpochMs: number;
+}
+
+interface AliasPhaseProbeState {
+  destinationAffordanceMs?: number;
+  error?: string;
+  installedPath: string;
+  interactiveReadyMs?: number;
+  lastPath?: string;
+  redirectCompleteMs?: number;
+  requestAnimationFrameType: string;
+  scanCount: number;
+  sampleKey: string;
+  shellVisibleMs?: number;
 }
 
 export interface GuardCliOptions {
@@ -103,6 +134,8 @@ export interface GuardCliOptions {
 }
 
 export interface GuardSample {
+  readonly aliasPhases?: AliasPhaseTiming;
+  readonly controllerObservedAliasResultMs?: number;
   readonly finalUrl: string;
   readonly resolvedPath: string;
   readonly timingValues: Record<PerfTimingMetricName, number>;
@@ -226,6 +259,135 @@ const PERF_INIT_SCRIPT = `
   }).observe({ type: 'first-input', buffered: true });
 })();
 `;
+
+/**
+ * Build a raw browser script so TS runtime helpers cannot leak into the code
+ * Playwright serializes. The probe observes the user-visible destination inside
+ * the page, separating renderer readiness from runner/CDP scheduling latency.
+ */
+export function createAliasPhaseProbeScript(config: AliasPhaseProbeConfig) {
+  const serializedConfig = JSON.stringify(config).replaceAll('<', '\\u003c');
+  return `
+(() => {
+  const config = ${serializedConfig};
+  const state = {
+    installedPath: window.location.pathname + window.location.search,
+    requestAnimationFrameType: typeof window.requestAnimationFrame,
+    sampleKey: config.sampleKey,
+    scanCount: 0,
+  };
+  window.__perfAliasPhaseProbe = state;
+
+  function currentPath() {
+    return window.location.pathname + window.location.search;
+  }
+  function isExpectedDestination() {
+    return config.expectedPaths.some(expectedPath =>
+      expectedPath.includes('?')
+        ? currentPath() === expectedPath
+        : window.location.pathname === expectedPath
+    );
+  }
+  function elapsedMs() {
+    return performance.timeOrigin + performance.now() - config.startEpochMs;
+  }
+  function isVisible(selectors) {
+    for (const selector of selectors) {
+      let candidates;
+      try {
+        candidates = document.querySelectorAll(selector);
+      } catch {
+        continue;
+      }
+      for (const candidate of candidates) {
+        const style = window.getComputedStyle(candidate);
+        if (
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          style.visibility !== 'collapse' &&
+          Number.parseFloat(style.opacity || '1') > 0 &&
+          candidate.getClientRects().length > 0
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  let animationFrame;
+  let observer;
+  function finish() {
+    observer?.disconnect();
+    if (animationFrame !== undefined) {
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = undefined;
+    }
+  }
+  function scheduleScan() {
+    if (animationFrame === undefined) {
+      try {
+        animationFrame = window.requestAnimationFrame(scan);
+      } catch (error) {
+        state.error = error instanceof Error ? error.message : String(error);
+        finish();
+      }
+    }
+  }
+  function scan() {
+    animationFrame = undefined;
+    state.scanCount += 1;
+    state.lastPath = currentPath();
+    if (window.__perfAliasPhaseProbe?.sampleKey !== config.sampleKey) {
+      finish();
+      return;
+    }
+    if (!isExpectedDestination()) {
+      scheduleScan();
+      return;
+    }
+
+    state.redirectCompleteMs ??= elapsedMs();
+    if (state.shellVisibleMs === undefined && isVisible(config.shellSelectors)) {
+      state.shellVisibleMs = elapsedMs();
+    }
+    if (
+      state.shellVisibleMs !== undefined &&
+      state.interactiveReadyMs === undefined &&
+      isVisible(config.contentSelectors)
+    ) {
+      state.interactiveReadyMs = elapsedMs();
+    }
+    if (
+      state.interactiveReadyMs !== undefined &&
+      state.destinationAffordanceMs === undefined &&
+      isVisible(config.destinationSelectors)
+    ) {
+      state.destinationAffordanceMs = elapsedMs();
+    }
+
+    if (state.destinationAffordanceMs !== undefined) {
+      finish();
+      return;
+    }
+    scheduleScan();
+  }
+
+  try {
+    observer = new MutationObserver(scheduleScan);
+    observer.observe(document, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+    });
+    document.addEventListener('DOMContentLoaded', scheduleScan, { once: true });
+    scan();
+  } catch (error) {
+    state.error = error instanceof Error ? error.message : String(error);
+  }
+})();
+`;
+}
 
 function writeStderr(message: string) {
   process.stderr.write(`${message}\n`);
@@ -556,6 +718,27 @@ export function assertAliasUsableResultUrl(
   }
 }
 
+export function createAliasPhaseProbeConfig(
+  route: PerfRouteDefinition,
+  resolvedPath: string,
+  startEpochMs: number,
+  sampleKey: string
+): AliasPhaseProbeConfig | undefined {
+  if (!route.aliasUsableResult) {
+    return undefined;
+  }
+  return {
+    contentSelectors: route.readySelectors.content ?? [],
+    destinationSelectors: route.aliasUsableResult.destinationAffordances,
+    expectedPaths: expectedRoutePaths(route, resolvedPath).map(
+      normalizePathWithQuery
+    ),
+    sampleKey,
+    shellSelectors: route.readySelectors.shell ?? [],
+    startEpochMs,
+  };
+}
+
 export function assertHostedAliasRunCount(
   route: PerfRouteDefinition,
   runs: number,
@@ -584,6 +767,60 @@ export async function waitForExpectedUrl(
       ),
     { timeout: timeoutMs, waitUntil: 'domcontentloaded' }
   );
+}
+
+const ALIAS_PHASE_KEYS = [
+  'redirectCompleteMs',
+  'shellVisibleMs',
+  'interactiveReadyMs',
+  'destinationAffordanceMs',
+] as const satisfies readonly (keyof AliasPhaseTiming)[];
+
+export function assertAliasPhaseTiming(
+  input: unknown,
+  expectedSampleKey: string,
+  controllerObservedMs: number
+): AliasPhaseTiming {
+  if (!input || typeof input !== 'object') {
+    throw new Error(
+      'Alias readiness probe produced no browser phase evidence.'
+    );
+  }
+  const candidate = input as Record<string, unknown>;
+  if (candidate.sampleKey !== expectedSampleKey) {
+    throw new Error('Alias readiness probe returned stale sample evidence.');
+  }
+
+  const values = ALIAS_PHASE_KEYS.map(key => {
+    const value = candidate[key];
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+      throw new Error(
+        `Alias readiness probe is missing valid ${key} evidence.`
+      );
+    }
+    return value;
+  });
+  for (let index = 1; index < values.length; index += 1) {
+    if ((values[index] ?? 0) < (values[index - 1] ?? 0)) {
+      throw new Error('Alias readiness probe phases are not monotonic.');
+    }
+  }
+  if (
+    !Number.isFinite(controllerObservedMs) ||
+    controllerObservedMs < 0 ||
+    (values.at(-1) ?? 0) > controllerObservedMs + 100
+  ) {
+    throw new Error(
+      'Alias readiness probe diverged from controller-observed timing.'
+    );
+  }
+
+  return {
+    redirectCompleteMs: values[0] as number,
+    shellVisibleMs: values[1] as number,
+    interactiveReadyMs: values[2] as number,
+    destinationAffordanceMs: values[3] as number,
+  };
 }
 
 async function waitForAnyVisible(
@@ -1157,6 +1394,15 @@ export function applyProfileWarmTransitionTimings(
   timingValues['interactive-shell-ready'] = interaction.skeletonToContent;
 }
 
+export function applyAliasPhaseTimings(
+  timingValues: Record<PerfTimingMetricName, number>,
+  phases: AliasPhaseTiming
+) {
+  timingValues['redirect-complete'] = phases.redirectCompleteMs;
+  timingValues['interactive-shell-ready'] = phases.interactiveReadyMs;
+  timingValues['usable-alias-result'] = phases.destinationAffordanceMs;
+}
+
 async function warmRoute(
   browser: Browser,
   route: PerfRouteDefinition,
@@ -1224,10 +1470,21 @@ async function measureRouteSample(
   );
   try {
     const page = await context.newPage();
+    const aliasProbe = createAliasPhaseProbeConfig(
+      route,
+      resolvedPath,
+      Date.now(),
+      randomUUID()
+    );
+    if (aliasProbe) {
+      await page.addInitScript(createAliasPhaseProbeScript(aliasProbe));
+    }
     await page.addInitScript(PERF_INIT_SCRIPT);
     let browserMetrics:
       | Awaited<ReturnType<typeof collectBrowserMetrics>>
       | undefined;
+    let aliasPhases: AliasPhaseTiming | undefined;
+    let controllerObservedAliasResultMs: number | undefined;
 
     const timingValues: Record<PerfTimingMetricName, number> = {
       'cumulative-layout-shift': 0,
@@ -1277,7 +1534,7 @@ async function measureRouteSample(
       timingValues['warm-shell-response'] = interaction.warmShellResponse;
       timingValues['skeleton-to-content'] = interaction.skeletonToContent;
     } else {
-      const startedAt = Date.now();
+      const startedAt = aliasProbe?.startEpochMs ?? Date.now();
       await page.goto(url, {
         timeout: NAVIGATION_TIMEOUT_MS,
         waitUntil: 'domcontentloaded',
@@ -1292,6 +1549,11 @@ async function measureRouteSample(
       }
 
       if (route.aliasUsableResult) {
+        if (!aliasProbe) {
+          throw new Error(
+            'Alias route is missing its browser readiness probe.'
+          );
+        }
         assertAliasUsableResultUrl(baseUrl, route, resolvedPath, page.url());
         await waitForAnyVisible(page, route.readySelectors.shell);
         await waitForAnyVisible(page, route.readySelectors.content);
@@ -1299,7 +1561,45 @@ async function measureRouteSample(
           page,
           route.aliasUsableResult.destinationAffordances
         );
-        timingValues['usable-alias-result'] = Date.now() - startedAt;
+        try {
+          await page.waitForFunction(
+            sampleKey => {
+              const perfWindow = window as PerfPageWindow;
+              const state = perfWindow.__perfAliasPhaseProbe;
+              return (
+                state?.sampleKey === sampleKey &&
+                typeof state.destinationAffordanceMs === 'number'
+              );
+            },
+            aliasProbe.sampleKey,
+            { timeout: READY_TIMEOUT_MS }
+          );
+        } catch (error) {
+          const probeEvidence = await page.evaluate(sampleKey => {
+            const perfWindow = window as PerfPageWindow;
+            const state = perfWindow.__perfAliasPhaseProbe;
+            return {
+              currentPath: `${window.location.pathname}${window.location.search}`,
+              phases: state?.sampleKey === sampleKey ? state : null,
+            };
+          }, aliasProbe.sampleKey);
+          const reason = error instanceof Error ? error.message : String(error);
+          throw new Error(
+            `Alias readiness probe did not complete: ${JSON.stringify(probeEvidence)}. Underlying: ${reason}`
+          );
+        }
+        controllerObservedAliasResultMs = Date.now() - startedAt;
+        const probeState = await page.evaluate(sampleKey => {
+          const perfWindow = window as PerfPageWindow;
+          const state = perfWindow.__perfAliasPhaseProbe;
+          return state?.sampleKey === sampleKey ? state : null;
+        }, aliasProbe.sampleKey);
+        aliasPhases = assertAliasPhaseTiming(
+          probeState,
+          aliasProbe.sampleKey,
+          controllerObservedAliasResultMs
+        );
+        applyAliasPhaseTimings(timingValues, aliasPhases);
       }
 
       if (
@@ -1345,6 +1645,8 @@ async function measureRouteSample(
       browserMetrics.timingValues['time-to-first-byte'];
 
     return {
+      aliasPhases,
+      controllerObservedAliasResultMs,
       finalUrl: browserMetrics.finalUrl,
       resolvedPath,
       resourceValues: browserMetrics.resourceValues,
@@ -1730,8 +2032,11 @@ async function measureRoutesAgainstBudgets(
           devMode
         );
         samples.push(sample);
+        const aliasPhaseSummary = sample.aliasPhases
+          ? ` phases redirect=${formatMetric(sample.aliasPhases.redirectCompleteMs, 'ms')} shell=${formatMetric(sample.aliasPhases.shellVisibleMs, 'ms')} interactive=${formatMetric(sample.aliasPhases.interactiveReadyMs, 'ms')} affordance=${formatMetric(sample.aliasPhases.destinationAffordanceMs, 'ms')} controller=${formatMetric(sample.controllerObservedAliasResultMs ?? 0, 'ms')}`
+          : '';
         logInfo(
-          `  sample ${index + 1}/${options.runs}: ${formatMetric(sample.timingValues[getPrimaryTimingMetricName(route)], 'ms')}`,
+          `  sample ${index + 1}/${options.runs}: ${formatMetric(sample.timingValues[getPrimaryTimingMetricName(route)], 'ms')}${aliasPhaseSummary}`,
           options
         );
       }

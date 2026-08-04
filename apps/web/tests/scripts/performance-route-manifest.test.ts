@@ -3,6 +3,7 @@ import { APP_ROUTES } from '../../constants/routes';
 import {
   assertAliasUsableResultUrl,
   assertHostedAliasRunCount,
+  createAliasPhaseProbeConfig,
   createPageResult,
 } from '../../scripts/performance-budgets-guard';
 import {
@@ -272,6 +273,29 @@ function aliasGuardSample(usableAliasResult: number) {
 }
 
 describe('public-profile alias usable-result guard', () => {
+  it('builds a destination-scoped browser probe before navigation', () => {
+    const config = createAliasPhaseProbeConfig(
+      aliasGuardRoute,
+      '/dualipa/listen',
+      1_000,
+      'sample-key'
+    );
+
+    expect(config).toEqual({
+      contentSelectors: [
+        '[data-testid="profile-compact-shell"][data-interactive-ready="true"]',
+      ],
+      destinationSelectors: [
+        '[data-testid="profile-primary-tab-releases"]',
+        '[data-testid="profile-primary-tab-listen"]',
+      ],
+      expectedPaths: ['/dualipa?mode=listen'],
+      sampleKey: 'sample-key',
+      shellSelectors: ['[data-testid="profile-header"]'],
+      startEpochMs: 1_000,
+    });
+  });
+
   it('rejects same-path results on a different origin', () => {
     expect(() =>
       assertAliasUsableResultUrl(
