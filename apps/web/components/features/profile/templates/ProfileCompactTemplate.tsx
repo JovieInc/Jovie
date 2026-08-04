@@ -628,7 +628,7 @@ export function ProfileCompactTemplate({
     return () => {
       delete shell.dataset.interactiveReady;
     };
-  }, [isDesktopLayout]);
+  }, []);
 
   const profileHref = useMemo(
     () => getProfileModeHref(artist.handle, 'profile', searchSuffix),
