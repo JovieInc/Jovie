@@ -20,27 +20,50 @@ import { REDIRECT_SINK_METADATA } from '@/lib/profile/metadata';
 
 const PROFILE_MODE_ALIAS_MARKER = '__profile-mode-alias';
 const PROFILE_MODE_ALIAS_RESOLVER = 'resolve';
+const PROFILE_MODE_ALIAS_CACHEABLE_SOURCES = new Set(['link', 'qr']);
+
+// This resolver contains no request-bound Dynamic API. Keeping the supported
+// attribution value in the private rewrite path lets Next cache the collision
+// decision and redirect at the edge while refreshing it on the same five-minute
+// cadence as the underlying collision data.
+export const revalidate = 300;
+
+// Opt unknown catch-all params into on-demand ISR. Returning an empty set is
+// intentional: real handles/slugs are discovered at request time, then the
+// resulting redirect, smart-link, or 404 is refreshed by `revalidate` above.
+export function generateStaticParams() {
+  return [];
+}
 
 interface CatchAllPageProps {
   readonly params: Promise<{
     readonly username: string;
     readonly slug: string[];
   }>;
-  readonly searchParams?: Promise<{
-    readonly source?: string | string[];
-  }>;
 }
 
-function getAliasSlug(slug: readonly string[]): string | null {
+interface ProfileModeAliasRequest {
+  readonly aliasSlug: string;
+  readonly source?: string;
+}
+
+function getAliasRequest(
+  slug: readonly string[]
+): ProfileModeAliasRequest | null {
   if (
-    slug.length !== 3 ||
+    (slug.length !== 3 && slug.length !== 4) ||
     slug[1] !== PROFILE_MODE_ALIAS_MARKER ||
     slug[2] !== PROFILE_MODE_ALIAS_RESOLVER
   ) {
     return null;
   }
   const aliasSlug = slug[0];
-  return aliasSlug && isLegacyProfileModeAlias(aliasSlug) ? aliasSlug : null;
+  if (!aliasSlug || !isLegacyProfileModeAlias(aliasSlug)) return null;
+
+  const source = slug[3]?.trim();
+  return source && PROFILE_MODE_ALIAS_CACHEABLE_SOURCES.has(source)
+    ? { aliasSlug, source }
+    : { aliasSlug };
 }
 
 async function getAliasCollisionState(
@@ -85,10 +108,10 @@ export async function generateMetadata({
   params,
 }: CatchAllPageProps): Promise<Metadata> {
   const { username, slug } = await params;
-  const aliasSlug = getAliasSlug(slug);
-  if (aliasSlug) {
+  const aliasRequest = getAliasRequest(slug);
+  if (aliasRequest) {
     return generateContentSmartLinkMetadata({
-      params: Promise.resolve({ username, slug: aliasSlug }),
+      params: Promise.resolve({ username, slug: aliasRequest.aliasSlug }),
     });
   }
   return REDIRECT_SINK_METADATA;
@@ -96,24 +119,30 @@ export async function generateMetadata({
 
 export default async function CatchAllPage({
   params,
-  searchParams,
 }: Readonly<CatchAllPageProps>) {
   const { username, slug } = await params;
-  const aliasSlug = getAliasSlug(slug);
-  if (!aliasSlug) notFound();
+  const aliasRequest = getAliasRequest(slug);
+  if (!aliasRequest) notFound();
 
   const creator = await getCreatorByUsername(username.toLowerCase());
   if (!creator) notFound();
 
-  const content = await getContentBySlug(creator.id, aliasSlug);
+  // Start the collision checks with the content lookup. The common mode-alias
+  // path no longer pays a second serial cache/database stage after proving the
+  // slug is not renderable content. Published content keeps precedence: a
+  // collision-check failure is ignored when the canonical renderer already won.
+  const collisionStatePromise = getAliasCollisionState(
+    creator.id,
+    aliasRequest.aliasSlug
+  ).then(
+    value => ({ ok: true as const, value }),
+    error => ({ error, ok: false as const })
+  );
+  const content = await getContentBySlug(creator.id, aliasRequest.aliasSlug);
   if (!content) {
-    // Both collision checks are read-only and independent. Starting them
-    // together preserves the precedence below while removing one full remote
-    // database round trip from every warmed legacy deep link (JOV-4788).
-    const [oldSlugRedirect, unpublished] = await getAliasCollisionState(
-      creator.id,
-      aliasSlug
-    );
+    const collisionState = await collisionStatePromise;
+    if (!collisionState.ok) throw collisionState.error;
+    const [oldSlugRedirect, unpublished] = collisionState.value;
     if (oldSlugRedirect) {
       permanentRedirect(
         `/${creator.usernameNormalized}/${oldSlugRedirect.currentSlug}`
@@ -123,8 +152,8 @@ export default async function CatchAllPage({
     if (!unpublished) {
       const legacyModeHref = getLegacyProfileModeRedirectHref(
         creator.usernameNormalized,
-        aliasSlug,
-        await searchParams
+        aliasRequest.aliasSlug,
+        aliasRequest.source ? { source: aliasRequest.source } : undefined
       );
       if (legacyModeHref) redirect(legacyModeHref);
       notFound();
@@ -138,7 +167,7 @@ export default async function CatchAllPage({
     <ContentSmartLinkPage
       params={Promise.resolve({
         username: creator.usernameNormalized,
-        slug: aliasSlug,
+        slug: aliasRequest.aliasSlug,
       })}
     />
   );

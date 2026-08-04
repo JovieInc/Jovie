@@ -73,7 +73,50 @@ function redirectSignedOutElectronAppShell(req: NextRequest): NextResponse {
 }
 
 function isReservedProfileAliasMarkerPath(pathname: string): boolean {
-  return pathname.split('/').includes('__profile-mode-alias');
+  return pathname.split('/').some(segment => {
+    try {
+      return decodeURIComponent(segment) === '__profile-mode-alias';
+    } catch {
+      // Next decodes route params after proxy execution. Reject malformed
+      // escapes here so no ambiguous segment can reach the private resolver.
+      return true;
+    }
+  });
+}
+
+const LEGACY_PROFILE_MODE_ALIASES = new Set([
+  'listen',
+  'music',
+  'releases',
+  'subscribe',
+  'tip',
+  'tour',
+]);
+
+function getDuplicateAliasSourceRedirect(
+  req: NextRequest
+): NextResponse | null {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return null;
+
+  const segments = req.nextUrl.pathname.split('/').filter(Boolean);
+  if (
+    segments.length !== 2 ||
+    !LEGACY_PROFILE_MODE_ALIASES.has(segments[1] ?? '')
+  ) {
+    return null;
+  }
+
+  const sources = req.nextUrl.searchParams.getAll('source');
+  if (sources.length <= 1) return null;
+
+  // The established redirect helper keeps the first non-empty source. Next's
+  // rewrite matcher otherwise selects the last repeated value, so collapse the
+  // request once at the public boundary before it can become an ISR cache key.
+  const source = sources.find(value => value.length > 0);
+  const canonicalUrl = req.nextUrl.clone();
+  canonicalUrl.searchParams.delete('source');
+  if (source) canonicalUrl.searchParams.set('source', source);
+  return NextResponse.redirect(canonicalUrl, 307);
 }
 
 export default async function middleware(
@@ -98,6 +141,9 @@ export default async function middleware(
   if (isReservedProfileAliasMarkerPath(req.nextUrl.pathname)) {
     return createFastNotFoundResponse();
   }
+
+  const duplicateAliasSourceRedirect = getDuplicateAliasSourceRedirect(req);
+  if (duplicateAliasSourceRedirect) return duplicateAliasSourceRedirect;
 
   const hostInfo = analyzeHost(req.nextUrl.hostname);
   if (hostInfo.isSupportHost) {

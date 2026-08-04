@@ -440,6 +440,11 @@ const nextConfig = {
     ];
   },
   async rewrites() {
+    // Only sources issued by Jovie's legacy QR/link helpers become ISR path
+    // variants. Arbitrary query values still resolve through the source-less
+    // fallback below, so reserved characters cannot alter the private path or
+    // create an unbounded cache-key surface.
+    const profileModeAliasSourcePattern = '^(?<profileSource>link|qr)$';
     const profileModeAliasRewrites = [
       'listen',
       'music',
@@ -447,10 +452,23 @@ const nextConfig = {
       'subscribe',
       'tip',
       'tour',
-    ].map(alias => ({
-      source: `/:username/${alias}`,
-      destination: `/:username/${alias}/__profile-mode-alias/resolve`,
-    }));
+    ].flatMap(alias => [
+      {
+        source: `/:username/${alias}`,
+        has: [
+          {
+            type: 'query',
+            key: 'source',
+            value: profileModeAliasSourcePattern,
+          },
+        ],
+        destination: `/:username/${alias}/__profile-mode-alias/resolve/:profileSource`,
+      },
+      {
+        source: `/:username/${alias}`,
+        destination: `/:username/${alias}/__profile-mode-alias/resolve`,
+      },
+    ]);
 
     return {
       beforeFiles: [],
