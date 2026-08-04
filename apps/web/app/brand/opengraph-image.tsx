@@ -1,18 +1,17 @@
+import { typography } from '@jovie/ui/theme/tokens';
 import { ImageResponse } from 'next/og';
 import { JOVIE_PATH } from '@/lib/brand';
-import { loadDMSansFont, loadSatoshiFont } from '@/lib/share/image-utils';
+import { DESIGN_TOKENS } from '@/lib/design/generated/design-tokens';
+import { loadSatoshiFont } from '@/lib/share/image-utils';
 
 export const runtime = 'nodejs';
 export const revalidate = false;
-export const alt = 'Jovie Brand';
+export const alt = 'Jovie Brand System';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
 export default async function Image() {
-  const [satoshiFont, dmSansFont] = await Promise.all([
-    loadSatoshiFont(),
-    loadDMSansFont(),
-  ]);
+  const satoshiFont = await loadSatoshiFont();
 
   return new ImageResponse(
     <div
@@ -23,8 +22,8 @@ export default async function Image() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#08090a',
-        fontFamily: 'Satoshi, sans-serif',
+        background: DESIGN_TOKENS.brand.ink,
+        fontFamily: typography.roles.display.family,
       }}
     >
       <svg
@@ -34,44 +33,38 @@ export default async function Image() {
         xmlns='http://www.w3.org/2000/svg'
         aria-hidden='true'
       >
-        <path fill='#F5F4F0' d={JOVIE_PATH} />
+        <path fill={DESIGN_TOKENS.brand.cream} d={JOVIE_PATH} />
       </svg>
       <div
         style={{
           marginTop: 56,
           fontSize: 84,
           fontWeight: 700,
-          color: '#F5F4F0',
+          color: DESIGN_TOKENS.brand.cream,
           letterSpacing: 0,
         }}
       >
-        Jovie Brand
+        Jovie Brand System
       </div>
       <div
         style={{
           marginTop: 16,
-          fontFamily: 'DM Sans, sans-serif',
+          fontFamily: typography.roles.display.family,
           fontSize: 26,
-          color: 'rgba(245,244,240,0.6)',
+          color: DESIGN_TOKENS.gray['9'],
           letterSpacing: 0,
         }}
       >
-        One loop. Every release.
+        One system. Four surfaces.
       </div>
     </div>,
     {
       ...size,
       fonts: [
         {
-          name: 'Satoshi',
+          name: typography.roles.display.family,
           data: satoshiFont,
           weight: 700,
-          style: 'normal',
-        },
-        {
-          name: 'DM Sans',
-          data: dmSansFont,
-          weight: 400,
           style: 'normal',
         },
       ],
