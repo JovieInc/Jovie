@@ -7,6 +7,8 @@ import {
   chromium,
   type Locator,
   type Page,
+  type Request as PlaywrightRequest,
+  type Response as PlaywrightResponse,
 } from '@playwright/test';
 import { PAC_TAB_BAR_RETURN_VISIT_KEY } from '../lib/profile/pac-tab-bar-experiment';
 import {
@@ -100,6 +102,17 @@ export interface AliasPhaseTiming {
   readonly destinationAffordanceMs: number;
 }
 
+export interface AliasNavigationHopReceipt {
+  readonly age: string | null;
+  readonly edgeCache: string | null;
+  readonly nextCache: string | null;
+  readonly origin: string;
+  readonly path: string;
+  readonly serverTiming: string | null;
+  readonly status: number;
+  readonly vercelId: string | null;
+}
+
 export interface AliasPhaseProbeConfig {
   readonly contentSelectors: readonly string[];
   readonly destinationSelectors: readonly string[];
@@ -134,6 +147,7 @@ export interface GuardCliOptions {
 
 export interface GuardSample {
   readonly aliasPhases?: AliasPhaseTiming;
+  readonly aliasNavigationHops?: readonly AliasNavigationHopReceipt[];
   readonly controllerObservedAliasResultMs?: number;
   readonly finalUrl: string;
   readonly resolvedPath: string;
@@ -691,6 +705,93 @@ function matchesExpectedPath(actualUrl: URL, expectedPath: string) {
   }
 
   return actualUrl.pathname === normalizedExpected;
+}
+
+export async function collectAliasNavigationHopReceipts(
+  finalResponse: PlaywrightResponse | null
+): Promise<readonly AliasNavigationHopReceipt[]> {
+  if (!finalResponse) {
+    throw new Error('Alias navigation produced no HTTP response receipt.');
+  }
+
+  const requests: PlaywrightRequest[] = [];
+  let request: PlaywrightRequest | null = finalResponse.request();
+  while (request) {
+    requests.unshift(request);
+    request = request.redirectedFrom();
+  }
+
+  const receipts: AliasNavigationHopReceipt[] = [];
+  for (const hopRequest of requests) {
+    const response = await hopRequest.response();
+    if (!response) {
+      throw new Error(
+        `Alias navigation hop ${hopRequest.url()} produced no HTTP response receipt.`
+      );
+    }
+    const headers = response.headers();
+    const responseUrl = new URL(response.url());
+    receipts.push({
+      age: headers.age ?? null,
+      edgeCache: headers['x-vercel-cache'] ?? null,
+      nextCache: headers['x-nextjs-cache'] ?? null,
+      origin: responseUrl.origin,
+      path: `${responseUrl.pathname}${responseUrl.search}`,
+      serverTiming: headers['server-timing'] ?? null,
+      status: response.status(),
+      vercelId: headers['x-vercel-id'] ?? null,
+    });
+  }
+
+  return receipts;
+}
+
+export function assertAliasNavigationHopReceipts(
+  baseUrl: string,
+  route: PerfRouteDefinition,
+  resolvedPath: string,
+  receipts: readonly AliasNavigationHopReceipt[]
+) {
+  const contract = route.aliasUsableResult;
+  if (!contract) return;
+
+  if (receipts.length !== 2) {
+    throw new Error(
+      `Alias route ${route.id} produced ${receipts.length} HTTP hops; expected one 307 redirect and one canonical 200 response.`
+    );
+  }
+
+  const [aliasHop, canonicalHop] = receipts;
+  if (!aliasHop || !canonicalHop) {
+    throw new Error(`Alias route ${route.id} is missing an HTTP hop receipt.`);
+  }
+
+  const expectedOrigin = new URL(baseUrl).origin;
+  if (
+    aliasHop.origin !== expectedOrigin ||
+    canonicalHop.origin !== expectedOrigin
+  ) {
+    throw new Error(`Alias route ${route.id} left the configured origin.`);
+  }
+
+  const expectedAliasPath = normalizePathWithQuery(resolvedPath);
+  if (aliasHop.path !== expectedAliasPath || aliasHop.status !== 307) {
+    throw new Error(
+      `Alias route ${route.id} began with ${aliasHop.status} ${aliasHop.path}; expected 307 ${expectedAliasPath}.`
+    );
+  }
+
+  const expectedCanonicalPath = normalizePathWithQuery(
+    resolveExpectedDynamicPath(contract.canonicalPath, resolvedPath)
+  );
+  if (
+    canonicalHop.path !== expectedCanonicalPath ||
+    canonicalHop.status !== 200
+  ) {
+    throw new Error(
+      `Alias route ${route.id} completed with ${canonicalHop.status} ${canonicalHop.path}; expected 200 ${expectedCanonicalPath}.`
+    );
+  }
 }
 
 export function assertAliasUsableResultUrl(
@@ -1480,6 +1581,7 @@ async function measureRouteSample(
       | Awaited<ReturnType<typeof collectBrowserMetrics>>
       | undefined;
     let aliasPhases: AliasPhaseTiming | undefined;
+    let aliasNavigationHops: readonly AliasNavigationHopReceipt[] | undefined;
     let controllerObservedAliasResultMs: number | undefined;
 
     const timingValues: Record<PerfTimingMetricName, number> = {
@@ -1534,7 +1636,7 @@ async function measureRouteSample(
       // includes same-origin redirects, and excludes Node-to-CDP scheduling.
       // Keep this wall-clock timer as a controller diagnostic only.
       const startedAt = Date.now();
-      await page.goto(url, {
+      const navigationResponse = await page.goto(url, {
         timeout: NAVIGATION_TIMEOUT_MS,
         waitUntil: 'domcontentloaded',
       });
@@ -1553,6 +1655,14 @@ async function measureRouteSample(
             'Alias route is missing its browser readiness probe.'
           );
         }
+        aliasNavigationHops =
+          await collectAliasNavigationHopReceipts(navigationResponse);
+        assertAliasNavigationHopReceipts(
+          baseUrl,
+          route,
+          resolvedPath,
+          aliasNavigationHops
+        );
         assertAliasUsableResultUrl(baseUrl, route, resolvedPath, page.url());
         await waitForAnyVisible(page, route.readySelectors.shell);
         await waitForAnyVisible(page, route.readySelectors.content);
@@ -1644,6 +1754,7 @@ async function measureRouteSample(
       browserMetrics.timingValues['time-to-first-byte'];
 
     return {
+      aliasNavigationHops,
       aliasPhases,
       controllerObservedAliasResultMs,
       finalUrl: browserMetrics.finalUrl,
@@ -2034,8 +2145,15 @@ async function measureRoutesAgainstBudgets(
         const aliasPhaseSummary = sample.aliasPhases
           ? ` phases redirect=${formatMetric(sample.aliasPhases.redirectCompleteMs, 'ms')} shell=${formatMetric(sample.aliasPhases.shellVisibleMs, 'ms')} interactive=${formatMetric(sample.aliasPhases.interactiveReadyMs, 'ms')} affordance=${formatMetric(sample.aliasPhases.destinationAffordanceMs, 'ms')} controller=${formatMetric(sample.controllerObservedAliasResultMs ?? 0, 'ms')}`
           : '';
+        const aliasHopSummary =
+          sample.aliasNavigationHops
+            ?.map((hop, hopIndex) => {
+              const cache = hop.edgeCache ?? hop.nextCache ?? '-';
+              return ` hop${hopIndex + 1}=${hop.status}:${hop.path}:cache=${cache}:age=${hop.age ?? '-'}:vercel=${hop.vercelId ?? '-'}`;
+            })
+            .join('') ?? '';
         logInfo(
-          `  sample ${index + 1}/${options.runs}: ${formatMetric(sample.timingValues[getPrimaryTimingMetricName(route)], 'ms')}${aliasPhaseSummary}`,
+          `  sample ${index + 1}/${options.runs}: ${formatMetric(sample.timingValues[getPrimaryTimingMetricName(route)], 'ms')}${aliasPhaseSummary}${aliasHopSummary}`,
           options
         );
       }

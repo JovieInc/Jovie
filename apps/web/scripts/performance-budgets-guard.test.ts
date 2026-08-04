@@ -1,4 +1,9 @@
-import type { Browser, BrowserContext, Page } from '@playwright/test';
+import type {
+  Browser,
+  BrowserContext,
+  Page,
+  Response as PlaywrightResponse,
+} from '@playwright/test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const playwrightMocks = vi.hoisted(() => ({
@@ -21,8 +26,10 @@ import type {
 import {
   applyAliasPhaseTimings,
   applyProfileWarmTransitionTimings,
+  assertAliasNavigationHopReceipts,
   assertAliasPhaseTiming,
   buildConfirmedPageResult,
+  collectAliasNavigationHopReceipts,
   confirmTimingViolations,
   createAliasPhaseProbeScript,
   createContextOptions,
@@ -128,6 +135,184 @@ function markElementVisible(element: Element) {
     { height: 1, width: 1 },
   ] as unknown as DOMRectList);
 }
+
+interface MockNavigationRequest {
+  redirectedFrom: () => MockNavigationRequest | null;
+  response: () => Promise<MockNavigationResponse | null>;
+  url: () => string;
+}
+
+interface MockNavigationResponse {
+  headers: () => Record<string, string>;
+  request: () => MockNavigationRequest;
+  status: () => number;
+  url: () => string;
+}
+
+function createNavigationResponseChain(
+  hops: readonly {
+    readonly headers?: Record<string, string>;
+    readonly status: number;
+    readonly url: string;
+  }[]
+) {
+  let previousRequest: MockNavigationRequest | null = null;
+  let finalResponse: MockNavigationResponse | null = null;
+
+  for (const hop of hops) {
+    const redirectedFrom = previousRequest;
+    let response: MockNavigationResponse;
+    const request: MockNavigationRequest = {
+      redirectedFrom: () => redirectedFrom,
+      response: async () => response,
+      url: () => hop.url,
+    };
+    response = {
+      headers: () => hop.headers ?? {},
+      request: () => request,
+      status: () => hop.status,
+      url: () => hop.url,
+    };
+    previousRequest = request;
+    finalResponse = response;
+  }
+
+  return finalResponse as unknown as PlaywrightResponse;
+}
+
+function createAliasReceiptRoute() {
+  return {
+    aliasUsableResult: {
+      canonicalPath: '/[username]?mode=listen',
+      destinationAffordances: ['[data-testid="profile-primary-tab-listen"]'],
+    },
+    id: 'public-profile-listen',
+    path: '/[username]/listen',
+    readySelectors: {
+      content: ['[data-testid="profile-compact-shell"]'],
+      redirectDestinations: ['/[username]?mode=listen'],
+      shell: ['[data-testid="profile-compact-shell"]'],
+    },
+  } as PerfRouteDefinition;
+}
+
+describe('alias HTTP hop receipts', () => {
+  it('records the ordered redirect and canonical cache receipts', async () => {
+    const response = createNavigationResponseChain([
+      {
+        headers: {
+          age: '3',
+          'server-timing': 'resolver;dur=12',
+          'x-vercel-cache': 'HIT',
+          'x-vercel-id': 'sfo1::iad1::alias',
+        },
+        status: 307,
+        url: 'https://jov.ie/dualipa/listen',
+      },
+      {
+        headers: {
+          age: '901',
+          'x-nextjs-cache': 'HIT',
+          'x-vercel-cache': 'HIT',
+          'x-vercel-id': 'sfo1::canonical',
+        },
+        status: 200,
+        url: 'https://jov.ie/dualipa?mode=listen',
+      },
+    ]);
+
+    const receipts = await collectAliasNavigationHopReceipts(response);
+
+    expect(receipts).toEqual([
+      {
+        age: '3',
+        edgeCache: 'HIT',
+        nextCache: null,
+        origin: 'https://jov.ie',
+        path: '/dualipa/listen',
+        serverTiming: 'resolver;dur=12',
+        status: 307,
+        vercelId: 'sfo1::iad1::alias',
+      },
+      {
+        age: '901',
+        edgeCache: 'HIT',
+        nextCache: 'HIT',
+        origin: 'https://jov.ie',
+        path: '/dualipa?mode=listen',
+        serverTiming: null,
+        status: 200,
+        vercelId: 'sfo1::canonical',
+      },
+    ]);
+    expect(() =>
+      assertAliasNavigationHopReceipts(
+        'https://jov.ie',
+        createAliasReceiptRoute(),
+        '/dualipa/listen',
+        receipts
+      )
+    ).not.toThrow();
+  });
+
+  it.each([
+    {
+      label: 'client-side alias transition',
+      hops: [
+        {
+          age: null,
+          edgeCache: 'HIT',
+          nextCache: null,
+          origin: 'https://jov.ie',
+          path: '/dualipa?mode=listen',
+          serverTiming: null,
+          status: 200,
+          vercelId: 'sfo1::canonical',
+        },
+      ],
+    },
+    {
+      label: 'wrong redirect status',
+      hops: [
+        {
+          age: null,
+          edgeCache: 'HIT',
+          nextCache: null,
+          origin: 'https://jov.ie',
+          path: '/dualipa/listen',
+          serverTiming: null,
+          status: 308,
+          vercelId: 'sfo1::alias',
+        },
+        {
+          age: null,
+          edgeCache: 'HIT',
+          nextCache: null,
+          origin: 'https://jov.ie',
+          path: '/dualipa?mode=listen',
+          serverTiming: null,
+          status: 200,
+          vercelId: 'sfo1::canonical',
+        },
+      ],
+    },
+  ])('fails closed on a $label receipt', ({ hops }) => {
+    expect(() =>
+      assertAliasNavigationHopReceipts(
+        'https://jov.ie',
+        createAliasReceiptRoute(),
+        '/dualipa/listen',
+        hops
+      )
+    ).toThrow(/expected|HTTP hops/);
+  });
+
+  it('fails closed when navigation returns no HTTP response', async () => {
+    await expect(collectAliasNavigationHopReceipts(null)).rejects.toThrow(
+      /no HTTP response receipt/
+    );
+  });
+});
 
 describe('browser-observed alias readiness', () => {
   afterEach(() => {

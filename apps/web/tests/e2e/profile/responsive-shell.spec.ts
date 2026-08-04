@@ -285,6 +285,73 @@ test.describe('Public profile redirect parity @regression', () => {
     });
   }
 
+  test('alias deep links preserve mode and source through browser back and forward', async ({
+    browser,
+  }, testInfo) => {
+    const context = await browser.newContext({
+      ...testInfo.project.use,
+      storageState: { cookies: [], origins: [] },
+      viewport: { width: 390, height: 844 },
+      isMobile: true,
+      hasTouch: true,
+    });
+    const page = await context.newPage();
+
+    try {
+      await installPublicRouteMocks(page);
+      const handle =
+        process.env.PUBLIC_SURFACE_MUSIC_HANDLE?.trim() || 'dualipa';
+      const sourcePath = `/${handle}/listen?source=qr`;
+      const expectedFinalPath = `/${handle}?mode=listen&source=qr`;
+      const previousPath = '/artist-profiles';
+
+      const previousResponse = await page.goto(previousPath, {
+        waitUntil: 'domcontentloaded',
+        timeout: 120_000,
+      });
+      expect(previousResponse?.status() ?? 0).toBeLessThan(500);
+
+      const aliasResponse = await page.goto(sourcePath, {
+        waitUntil: 'domcontentloaded',
+        timeout: 120_000,
+      });
+      expect(aliasResponse?.status() ?? 0).toBe(200);
+      await waitForHydration(page);
+      await waitForAnyVisible(page, ['[data-testid="profile-header"]']);
+      expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe(
+        expectedFinalPath
+      );
+
+      const backResponse = await page.goBack({
+        waitUntil: 'domcontentloaded',
+        timeout: 120_000,
+      });
+      expect(backResponse?.status() ?? 0).toBeLessThan(500);
+      expect(new URL(page.url()).pathname).toBe(previousPath);
+
+      const forwardResponse = await page.goForward({
+        waitUntil: 'domcontentloaded',
+        timeout: 120_000,
+      });
+      // A back-forward cache restoration legitimately has no network response.
+      // If the browser does revalidate, it must still resolve to a healthy 200.
+      if (forwardResponse) {
+        expect(forwardResponse.status()).toBe(200);
+      }
+      await waitForHydration(page);
+      await waitForAnyVisible(page, [
+        '[data-testid="profile-primary-tab-releases"]',
+        '[data-testid="profile-primary-tab-listen"]',
+      ]);
+      expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe(
+        expectedFinalPath
+      );
+    } finally {
+      await page.close().catch(() => undefined);
+      await context.close().catch(() => undefined);
+    }
+  });
+
   test('direct resolver markers for non-alias slugs remain not found', async ({
     request,
   }) => {
