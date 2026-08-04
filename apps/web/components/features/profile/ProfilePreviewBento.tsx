@@ -20,6 +20,8 @@ export interface ProfilePreviewBentoProps {
   readonly socialLinks: LegacySocialLink[];
   readonly genres?: string[] | null;
   readonly profileHref: string;
+  /** Whether the preview visitor already follows the artist. Defaults to false. */
+  readonly isSubscribed?: boolean;
   /** Top-left "Live" pill. */
   readonly showLiveBadge?: boolean;
   /** Top-right node (e.g. the More dropdown trigger). */
@@ -39,7 +41,7 @@ export interface ProfilePreviewBentoProps {
   /** Content rendered below the gradient hero (URL + stats + edit button). */
   readonly footer?: ReactNode;
   readonly className?: string;
-  /** Replaces the default hero gradient (e.g. onboarding's blue). */
+  /** Replaces the default hero gradient when a canonical surface needs it. */
   readonly heroStyle?: CSSProperties;
   /** Extra hero layout classes (sizing, padding). */
   readonly heroClassName?: string;
@@ -76,6 +78,7 @@ export function ProfilePreviewBento({
   socialLinks,
   genres,
   profileHref,
+  isSubscribed = false,
   showLiveBadge = false,
   topRight,
   overlay,
@@ -140,7 +143,7 @@ export function ProfilePreviewBento({
               onModeSelect={() => {}}
               profileHref={profileHref}
               dataTestId={surfaceTestId}
-              isSubscribed
+              isSubscribed={isSubscribed}
               hideBackButton
               hideJovieBranding
               hideMoreMenu

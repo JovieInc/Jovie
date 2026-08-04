@@ -339,18 +339,14 @@ export function OnboardingProfileRail({
           socialLinks={previewLinks}
           genres={previewArtist.genres}
           profileHref={profileHref}
+          // Onboarding previews the cold-visitor experience, never owner controls.
+          isSubscribed={false}
           // Never show Live — ownership is unverified during onboarding.
           showLiveBadge={false}
           dataTestId='onboarding-profile-bento'
           phonePreviewTestId='onboarding-phone-preview'
           surfaceTestId='onboarding-profile-compact-surface'
           className={cn('w-full', isInline ? 'max-w-86' : 'h-full max-w-87')}
-          heroStyle={{
-            background:
-              'linear-gradient(145deg,#0A2A88 0%,#0B6CFF 52%,#7AC7FF 100%)',
-            boxShadow:
-              'inset 0 1px 0 rgba(255,255,255,0.26), 0 30px 80px rgba(0,48,160,0.34)',
-          }}
           heroClassName={cn(
             'w-full rounded-3xl',
             isInline ? 'min-h-114 p-4' : 'min-h-155 max-h-170 p-5'
