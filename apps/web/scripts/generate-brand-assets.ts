@@ -32,6 +32,7 @@ import {
   LETTER_PATHS,
   LETTER_SEQUENCE,
 } from '../lib/brand/wordmark-letters';
+import { DESIGN_TOKENS } from '../lib/design/generated/design-tokens';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = resolve(HERE, '..');
@@ -63,8 +64,8 @@ const MAC_ICONSET_ENTRIES = [
   ['icon_512x512@2x.png', 1024],
 ] as const;
 
-const INK = '#08090a';
-const CREAM = '#F5F4F0';
+const INK = DESIGN_TOKENS.brand.ink;
+const CREAM = DESIGN_TOKENS.brand.cream;
 const APP_ICON_PADDING = 0.14;
 const DESKTOP_APP_ICON_PADDING = 0.2;
 const DESKTOP_APP_ICON_RADIUS = 0.22;

@@ -11,6 +11,18 @@
   },
   "tokens": [
     {
+      "cssVar": "--brand-ink",
+      "value": "#08090a",
+      "status": "canonical",
+      "emittedBy": "styles/generated/design-tokens.css"
+    },
+    {
+      "cssVar": "--brand-cream",
+      "value": "#F5F4F0",
+      "status": "canonical",
+      "emittedBy": "styles/generated/design-tokens.css"
+    },
+    {
       "cssVar": "--gray1",
       "value": "hsl(0, 0%, 99%)",
       "status": "canonical",

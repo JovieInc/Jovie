@@ -50,6 +50,22 @@ test('parseCssCustomProperties keeps first canonical token values', () => {
   assert.equal(tokens.get('--ds-public-content-max'), '1298px');
 });
 
+test('parseCssCustomProperties ignores declaration-shaped text in comments', () => {
+  const css = `
+    :root {
+      --font-size-real: 15px;
+      /* Example only:
+         --font-size-private: 18px, --tracking-reference: JOV-123 */
+    }
+  `;
+
+  const tokens = parseCssCustomProperties(css);
+
+  assert.equal(tokens.get('--font-size-real'), '15px');
+  assert.equal(tokens.has('--font-size-private'), false);
+  assert.equal(tokens.has('--tracking-reference'), false);
+});
+
 test('categorizeTokens groups ds and color prefixes', () => {
   const categories = categorizeTokens(
     new Map([
