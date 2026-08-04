@@ -41,10 +41,6 @@ export async function loadSatoshiFont(): Promise<ArrayBuffer> {
   return loadFontBuffer('Satoshi-Bold.ttf');
 }
 
-export async function loadDMSansFont(): Promise<ArrayBuffer> {
-  return loadFontBuffer('DMSans-Regular.ttf');
-}
-
 export async function loadSourceSerifFont(): Promise<ArrayBuffer> {
   return loadFontBuffer('SourceSerif4-SemiBold.ttf');
 }
