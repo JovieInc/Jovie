@@ -75,6 +75,7 @@ const FORBIDDEN_ROOT_DIRECTORIES = new Set([
 // not consume the source-file-count budget; otherwise a source PR is blocked as
 // soon as the measured baseline reaches the cap.
 const TRACKED_FILE_COUNT_EXCLUSIONS = [
+  /^apps\/web\/tests\/e2e\/__snapshots__\//,
   /^apps\/web\/lib\/design\/generated\//,
   /^apps\/web\/styles\/generated\//,
   /^apps\/web\/reports\//,

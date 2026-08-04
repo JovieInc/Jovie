@@ -482,6 +482,7 @@ test.describe('canonical /start onboarding chat', () => {
     await expect(
       inlineRail.getByTestId('onboarding-profile-compact-surface')
     ).toBeVisible();
+    await expect(inlineRail.getByText('Manage')).toHaveCount(0);
 
     const overflow = await page.evaluate(
       () =>
@@ -490,11 +491,57 @@ test.describe('canonical /start onboarding chat', () => {
     );
     expect(overflow).toBeLessThanOrEqual(0);
 
-    const screenshotPath =
-      'test-results/onboarding-demo-mobile-rail-layout.png';
-    await page.screenshot({ path: screenshotPath, fullPage: true });
+    await expect(inlineRail).toHaveScreenshot(
+      'start-onboarding-profile-mobile.png',
+      {
+        animations: 'disabled',
+        maxDiffPixelRatio: 0.01,
+      }
+    );
     await testInfo.attach('onboarding-demo-mobile-rail-layout', {
-      path: screenshotPath,
+      body: await page.screenshot({ fullPage: true }),
+      contentType: 'image/png',
+    });
+  });
+
+  test('selected artist preview uses the canonical profile treatment on desktop', async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await mockOnboardingChat(page);
+    await page.goto('/start', { waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+
+    await sendComposerMessage(page, 'I am Test Artist');
+    await expect(page.getByTestId('onboarding-artist-picker')).toBeVisible();
+    await page.getByTestId('onboarding-artist-picker').getByText('Use').click();
+
+    const sideRail = page.getByTestId('onboarding-profile-rail');
+    await expect(sideRail).toBeVisible();
+    await expect(
+      sideRail.getByTestId('onboarding-profile-bento')
+    ).toBeVisible();
+    await expect(
+      sideRail.getByTestId('onboarding-profile-compact-surface')
+    ).toBeVisible();
+    await expect(sideRail.getByText('Manage')).toHaveCount(0);
+
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+
+    await expect(sideRail).toHaveScreenshot(
+      'start-onboarding-profile-desktop.png',
+      {
+        animations: 'disabled',
+        maxDiffPixelRatio: 0.01,
+      }
+    );
+    await testInfo.attach('onboarding-demo-desktop-profile-fidelity', {
+      body: await page.screenshot({ fullPage: true }),
       contentType: 'image/png',
     });
   });
