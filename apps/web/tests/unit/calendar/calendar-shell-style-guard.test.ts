@@ -107,6 +107,25 @@ describe('calendar shell style guard', () => {
     ).toEqual([]);
   });
 
+  it('owns seven-column month geometry in named calendar primitives', () => {
+    const source = readFileSync(DESIGN_SYSTEM, 'utf8');
+    const match = source.match(CALENDAR_PRIMITIVES_PATTERN);
+    const primitiveBlock = match?.[1] ?? '';
+
+    expect(primitiveBlock).toMatch(
+      /\.system-b-calendar-workspace-grid[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)/
+    );
+    expect(primitiveBlock).toMatch(
+      /\.system-b-calendar-month-grid[\s\S]*?grid-template-columns:\s*repeat\(7,\s*minmax\(0,\s*1fr\)\)/
+    );
+    expect(primitiveBlock).toMatch(
+      /@media \(min-width:\s*1024px\)[\s\S]*?\.system-b-calendar-workspace-grid[\s\S]*?grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\)/
+    );
+    expect(primitiveBlock).toMatch(
+      /\.system-b-calendar-main-plane[\s\S]*?grid-column:\s*span 5 \/ span 5/
+    );
+  });
+
   it('keeps selected, bulk-action, rejected, and loading states on named hooks', () => {
     const source = readFileSync(CALENDAR_CLIENT, 'utf8');
 

@@ -470,7 +470,7 @@ export function CalendarPageClient() {
         ready={!isLoading && !releasesError && !eventsError}
       />
       <PageContent className='px-3 py-2 sm:px-3 sm:py-2'>
-        <div className='grid h-full min-h-0 grid-cols-1 gap-3 lg:grid-cols-6'>
+        <div className='system-b-calendar-workspace-grid h-full min-h-0 gap-3'>
           <nav
             aria-label='Calendar Filters'
             data-testid='calendar-filter-rail'
@@ -501,9 +501,15 @@ export function CalendarPageClient() {
             />
           </nav>
 
-          <div className='flex min-w-0 flex-col gap-3 lg:col-span-5'>
+          <div
+            data-testid='calendar-main-plane'
+            className='system-b-calendar-main-plane flex min-w-0 flex-col gap-3'
+          >
             <div className='system-b-calendar-panel overflow-hidden'>
-              <div className='system-b-calendar-weekday-row grid grid-cols-7'>
+              <div
+                data-testid='calendar-weekday-grid'
+                className='system-b-calendar-month-grid system-b-calendar-weekday-row'
+              >
                 {DAY_NAMES.map(d => (
                   <div
                     key={d}
@@ -513,7 +519,10 @@ export function CalendarPageClient() {
                   </div>
                 ))}
               </div>
-              <div className='grid grid-cols-7'>
+              <div
+                data-testid='calendar-month-grid'
+                className='system-b-calendar-month-grid'
+              >
                 {grid.map(cell => {
                   const key = localDateKey(cell.date);
                   const visibleReleases = cellShowsRelease ? cell.releases : [];
