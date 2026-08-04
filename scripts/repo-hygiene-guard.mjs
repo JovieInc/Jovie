@@ -702,16 +702,17 @@ export function evaluateRepoHygiene({
     );
 
   const growthByArea = new Map();
-  for (const [paths, field] of [
-    [addedRegular, 'added'],
-    [deletedRegular, 'deleted'],
-  ]) {
-    for (const path of paths) {
-      const area = areaForPath(path);
-      const growth = growthByArea.get(area) ?? { added: 0, deleted: 0 };
-      growth[field] += 1;
-      growthByArea.set(area, growth);
-    }
+  for (const path of addedRegular) {
+    const area = areaForPath(path);
+    const growth = growthByArea.get(area) ?? { added: 0, deleted: 0 };
+    growth.added += 1;
+    growthByArea.set(area, growth);
+  }
+  for (const path of deletedRegular) {
+    const area = areaForPath(path);
+    const growth = growthByArea.get(area) ?? { added: 0, deleted: 0 };
+    growth.deleted += 1;
+    growthByArea.set(area, growth);
   }
   const areaGrowth = [...growthByArea]
     .map(([area, growth]) => ({
