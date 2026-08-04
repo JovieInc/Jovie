@@ -9,6 +9,7 @@ import {
   Menu,
   type MenuItemConstructorOptions,
   screen,
+  session,
   type Session,
   shell,
 } from 'electron';
@@ -41,6 +42,7 @@ import {
 import {
   getUrlDisposition as getDesktopUrlDisposition,
   isAllowedExternalUrl as isAllowedDesktopExternalUrl,
+  isAllowedPublicProfileUrl,
   matchesPathPrefix,
   parseUrl,
   type UrlDisposition,
@@ -160,10 +162,21 @@ const AUTH_HANDOFF_WINDOW_BOUNDS = {
   minHeight: 460,
 } as const;
 const AUTH_COMPLETION_REPLAY_TTL_MS = 60_000;
+const PUBLIC_PROFILE_PREVIEW_PARTITION =
+  'persist:jovie-public-profile-preview';
+const PUBLIC_PROFILE_PREVIEW_BOUNDS = {
+  width: 390,
+  height: 844,
+  minWidth: 320,
+  minHeight: 568,
+} as const;
+const OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL =
+  'open-public-profile-in-browser';
 const reportDesktopSecurityEvent = createDesktopSecurityReporter();
 
 let updateReadyToInstall = false;
 let mainWindow: BrowserWindow | null = null;
+let publicProfilePreviewWindow: BrowserWindow | null = null;
 let authHandoffWindow: BrowserWindow | null = null;
 let menuBarTray: MenuBarTray | null = null;
 let pendingAuthCompletion: DesktopAuthCompletion | null = null;
@@ -244,6 +257,34 @@ function resolveNavigationUrl(urlString: string): string {
   return urlString;
 }
 
+function canonicalPublicProfileUrl(urlString: string): string | null {
+  const parsed = parseUrl(resolveNavigationUrl(urlString));
+  if (!parsed || !isAllowedPublicProfileUrl(parsed, URL_DISPOSITION_OPTIONS)) {
+    return null;
+  }
+
+  // Never carry desktop-shell or auth handoff state into the isolated public
+  // session. The canonical profile URL is otherwise unchanged.
+  parsed.searchParams.delete('runtime');
+  parsed.searchParams.delete(DESKTOP_RETURN_PARAM);
+  parsed.searchParams.delete('auth_return');
+  parsed.searchParams.delete('redirect_url');
+  return parsed.toString();
+}
+
+async function openPublicProfileInBrowser(
+  urlString: string
+): Promise<DesktopAuthOpenResult> {
+  const canonicalUrl = canonicalPublicProfileUrl(urlString);
+  if (!canonicalUrl) return { ok: false, reason: 'blocked-url' };
+  try {
+    await shell.openExternal(canonicalUrl);
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: 'open-external-failed' };
+  }
+}
+
 async function openExternalUrl(urlString: string): Promise<DesktopAuthOpenResult> {
   const parsed = parseUrl(urlString);
   if (!parsed || !isAllowedExternalUrl(parsed)) {
@@ -269,6 +310,16 @@ function getIpcSenderUrl(event: IpcMainInvokeEvent): string {
 function isTrustedIpcSender(event: IpcMainInvokeEvent): boolean {
   const parsed = parseUrl(getIpcSenderUrl(event));
   return parsed?.origin === APP_ORIGIN;
+}
+
+function isTrustedPublicProfilePreviewSender(
+  event: IpcMainInvokeEvent
+): boolean {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender);
+  return (
+    senderWindow === publicProfilePreviewWindow &&
+    Boolean(canonicalPublicProfileUrl(getIpcSenderUrl(event)))
+  );
 }
 
 function isTrustedDesktopAuthSender(event: IpcMainInvokeEvent): boolean {
@@ -994,6 +1045,87 @@ async function checkHudBuildAndReload(): Promise<void> {
   }
 }
 
+function showPublicProfilePreview(urlString: string): boolean {
+  const canonicalUrl = canonicalPublicProfileUrl(urlString);
+  if (!canonicalUrl) return false;
+
+  if (publicProfilePreviewWindow && !publicProfilePreviewWindow.isDestroyed()) {
+    if (publicProfilePreviewWindow.webContents.getURL() !== canonicalUrl) {
+      void publicProfilePreviewWindow.loadURL(canonicalUrl);
+    }
+    showWindowNow(publicProfilePreviewWindow);
+    return true;
+  }
+
+  const previewSession = session.fromPartition(
+    PUBLIC_PROFILE_PREVIEW_PARTITION,
+    { cache: true }
+  );
+  previewSession.setPermissionRequestHandler((_contents, _permission, callback) =>
+    callback(false)
+  );
+  previewSession.setPermissionCheckHandler(() => false);
+
+  const preview = new BrowserWindow({
+    show: false,
+    ...PUBLIC_PROFILE_PREVIEW_BOUNDS,
+    resizable: true,
+    title: 'Jovie Public Profile',
+    backgroundColor: APP_BACKGROUND_COLOR,
+    webPreferences: {
+      session: previewSession,
+      backgroundThrottling: false,
+      contextIsolation: true,
+      devTools: ENABLE_DEVTOOLS,
+      nodeIntegration: false,
+      nodeIntegrationInSubFrames: false,
+      nodeIntegrationInWorker: false,
+      preload: path.join(__dirname, 'preload.js'),
+      sandbox: true,
+      webSecurity: true,
+      webviewTag: false,
+    },
+  });
+  publicProfilePreviewWindow = preview;
+  preview.webContents.setUserAgent(
+    `${preview.webContents.getUserAgent()} ${DESKTOP_USER_AGENT_PRODUCT}`
+  );
+
+  preview.webContents.on('will-navigate', (event, url) => {
+    const navigationUrl = resolveNavigationUrl(url);
+    const disposition = getUrlDisposition(navigationUrl);
+    if (disposition === 'profile-preview') return;
+    event.preventDefault();
+    if (disposition === 'external') void openExternalUrl(navigationUrl);
+  });
+  preview.webContents.on('will-frame-navigate', event => {
+    if (event.isMainFrame) return;
+    event.preventDefault();
+  });
+  preview.webContents.on('will-redirect', (event, url, _inPlace, isMainFrame) => {
+    const navigationUrl = resolveNavigationUrl(url);
+    if (getUrlDisposition(navigationUrl) === 'profile-preview') return;
+    event.preventDefault();
+    if (isMainFrame && getUrlDisposition(navigationUrl) === 'external') {
+      void openExternalUrl(navigationUrl);
+    }
+  });
+  preview.webContents.setWindowOpenHandler(({ url }) => {
+    const navigationUrl = resolveNavigationUrl(url);
+    const disposition = getUrlDisposition(navigationUrl);
+    if (disposition === 'profile-preview') void preview.loadURL(navigationUrl);
+    else if (disposition === 'external') void openExternalUrl(navigationUrl);
+    return { action: 'deny' };
+  });
+  preview.on('closed', () => {
+    publicProfilePreviewWindow = null;
+    if (mainWindow && !mainWindow.isDestroyed()) showWindowNow(mainWindow);
+  });
+  preview.once('ready-to-show', () => showWindowNow(preview));
+  void preview.loadURL(canonicalUrl);
+  return true;
+}
+
 function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   const windowState = loadWindowState();
 
@@ -1223,11 +1355,17 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
       return;
     }
 
+    const disposition = getUrlDisposition(navigationUrl);
+    if (disposition === 'profile-preview') {
+      event.preventDefault();
+      showPublicProfilePreview(navigationUrl);
+      return;
+    }
+
     if (shouldLoadDesktopAuthRouteInApp(navigationUrl)) {
       return;
     }
 
-    const disposition = getUrlDisposition(navigationUrl);
     if (disposition === 'in-app') return;
 
     event.preventDefault();
@@ -1237,7 +1375,14 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   });
 
   win.webContents.on('will-frame-navigate', event => {
-    if (event.isMainFrame || getUrlDisposition(event.url) === 'in-app') return;
+    if (event.isMainFrame) {
+      if (getUrlDisposition(event.url) === 'profile-preview') {
+        event.preventDefault();
+        showPublicProfilePreview(event.url);
+      }
+      return;
+    }
+    if (getUrlDisposition(event.url) === 'in-app') return;
     event.preventDefault();
   });
 
@@ -1248,11 +1393,16 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
       return;
     }
 
+    const disposition = getUrlDisposition(navigationUrl);
+    if (disposition === 'profile-preview') {
+      event.preventDefault();
+      showPublicProfilePreview(navigationUrl);
+      return;
+    }
     if (shouldLoadDesktopAuthRouteInApp(navigationUrl)) {
       return;
     }
 
-    const disposition = getUrlDisposition(navigationUrl);
     if (disposition === 'in-app') return;
 
     event.preventDefault();
@@ -1270,7 +1420,9 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     }
 
     const disposition = getUrlDisposition(url);
-    if (disposition === 'in-app') {
+    if (disposition === 'profile-preview') {
+      showPublicProfilePreview(url);
+    } else if (disposition === 'in-app') {
       void win.loadURL(url);
     } else if (disposition === 'external') {
       void openExternalUrl(url);
@@ -1451,13 +1603,29 @@ function buildApplicationMenu(): Menu {
       },
       {
         label: 'File',
-        submenu: [{ role: 'close', accelerator: 'Command+W' }],
+        submenu: [
+          {
+            label: 'Open in Browser',
+            click: () => {
+              const url = publicProfilePreviewWindow?.webContents.getURL();
+              if (url) void openPublicProfileInBrowser(url);
+            },
+          },
+          { role: 'close', accelerator: 'Command+W' },
+        ],
       }
     );
   } else {
     template.unshift({
       label: 'File',
       submenu: [
+        {
+          label: 'Open in Browser',
+          click: () => {
+            const url = publicProfilePreviewWindow?.webContents.getURL();
+            if (url) void openPublicProfileInBrowser(url);
+          },
+        },
         {
           label: 'Preferences...',
           accelerator: 'Ctrl+,',
@@ -1548,6 +1716,16 @@ ipcMain.handle(GO_FORWARD_CHANNEL, (event: IpcMainInvokeEvent) => {
   if (win && !win.isDestroyed() && win.webContents.canGoForward())
     win.webContents.goForward();
 });
+
+ipcMain.handle(
+  OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL,
+  (event: IpcMainInvokeEvent, ...args: unknown[]) => {
+    if (!isTrustedPublicProfilePreviewSender(event) || args.length !== 0) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+    return openPublicProfileInBrowser(getIpcSenderUrl(event));
+  }
+);
 
 ipcMain.handle(
   START_DESKTOP_AUTH_HANDOFF_CHANNEL,
@@ -1679,6 +1857,12 @@ if (gotSingleInstanceLock) {
       return;
     }
 
+    const profileUrl = argv.find((arg: string) => canonicalPublicProfileUrl(arg));
+    if (profileUrl) {
+      showPublicProfilePreview(profileUrl);
+      return;
+    }
+
     const win =
       mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow();
     showWindow(win);
@@ -1729,6 +1913,10 @@ app.whenReady().then(() => {
         ? new URL(pendingLegacyAuthReturnRoute, APP_URL).toString()
       : APP_ENTRY_URL
   );
+  const directProfileUrl = process.argv.find((arg: string) =>
+    canonicalPublicProfileUrl(arg)
+  );
+  if (directProfileUrl) showPublicProfilePreview(directProfileUrl);
   pendingLegacyAuthReturnRoute = null;
   scheduleDesktopAutoUpdate();
   scheduleHudBuildAutoReload();

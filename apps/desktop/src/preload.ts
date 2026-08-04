@@ -7,6 +7,8 @@ const GO_FORWARD_CHANNEL = 'go-forward';
 const NAV_STATE_CHANNEL = 'nav-state-changed';
 const START_DESKTOP_AUTH_HANDOFF_CHANNEL = 'start-desktop-auth-handoff';
 const OPEN_DESKTOP_AUTH_URL_CHANNEL = 'open-desktop-auth-url';
+const OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL =
+  'open-public-profile-in-browser';
 const CLOSE_DESKTOP_AUTH_WINDOW_CHANNEL = 'close-desktop-auth-window';
 const CONSUME_DESKTOP_AUTH_COMPLETION_CHANNEL =
   'consume-desktop-auth-completion';
@@ -120,6 +122,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ok: boolean;
         reason?: string;
       }>;
+    },
+
+    /** Open this isolated public profile in the system browser. */
+    openPublicProfileInBrowser: () => {
+      return ipcRenderer.invoke(
+        OPEN_PUBLIC_PROFILE_IN_BROWSER_CHANNEL
+      ) as Promise<{ ok: boolean; reason?: string }>;
     },
 
     /** Close the dedicated handoff window without exposing window controls. */

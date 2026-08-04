@@ -1,6 +1,10 @@
 export type AppEnvironment = 'production' | 'staging' | 'local';
 
-export type UrlDisposition = 'in-app' | 'external' | 'blocked';
+export type UrlDisposition =
+  | 'in-app'
+  | 'external'
+  | 'profile-preview'
+  | 'blocked';
 
 export interface UrlDispositionOptions {
   readonly appUrl: string;
@@ -177,7 +181,7 @@ function isAllowedDocsUrl(
   );
 }
 
-function isAllowedPublicProfilePath(pathname: string): boolean {
+export function isAllowedPublicProfilePath(pathname: string): boolean {
   const segments = pathname.split('/').filter(Boolean);
   if (segments.length === 0 || segments.length > 4) return false;
 
@@ -209,7 +213,18 @@ function isAllowedSameOriginExternalPath(pathname: string): boolean {
     return true;
   }
 
-  return isAllowedPublicProfilePath(pathname);
+  return false;
+}
+
+export function isAllowedPublicProfileUrl(
+  parsed: URL,
+  options: UrlDispositionOptions
+): boolean {
+  return (
+    isAppOriginUrl(parsed, options) &&
+    hasSafePathname(parsed.pathname) &&
+    isAllowedPublicProfilePath(parsed.pathname)
+  );
 }
 
 export function isAllowedInAppUrl(
@@ -272,6 +287,7 @@ export function getUrlDisposition(
   const parsed = parseUrl(urlString);
   if (!parsed) return 'blocked';
   if (isAllowedInAppUrl(parsed, options)) return 'in-app';
+  if (isAllowedPublicProfileUrl(parsed, options)) return 'profile-preview';
   if (isAllowedExternalUrl(parsed, options)) return 'external';
   return 'blocked';
 }
