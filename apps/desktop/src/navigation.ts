@@ -14,11 +14,6 @@ export interface UrlDispositionOptions {
 
 const DEFAULT_DOCS_URL = 'https://docs.jov.ie';
 
-// Public artist profiles are first-class in-app destinations in Electron. Keep
-// this route contract beside the URL disposition rules so profile links and
-// deep links cannot drift back to the browser classification.
-const PUBLIC_PROFILE_ROUTE_PREFIX = '/';
-
 /** External auth provider origins that may be opened in the system browser. */
 const AUTH_PROVIDER_ORIGINS = [
   'https://accounts.jov.ie',
@@ -240,9 +235,7 @@ export function isAllowedInAppUrl(
     ) ||
     AUTH_CALLBACK_ROUTE_PREFIXES.some(prefix =>
       matchesPathPrefix(parsed.pathname, prefix)
-    ) ||
-    (parsed.pathname.startsWith(PUBLIC_PROFILE_ROUTE_PREFIX) &&
-      isAllowedPublicProfilePath(parsed.pathname))
+    )
   );
 }
 
