@@ -18,14 +18,41 @@ const API_URL = 'https://api.linear.app/graphql';
 export const LINEAR_REQUEST_TIMEOUT_MS = 10_000;
 export const LINEAR_MAX_ATTEMPTS = 3;
 export const LINEAR_RETRY_BASE_MS = 100;
+export const LINEAR_MAX_ERROR_BODY_LENGTH = 256;
+
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+const JSON_CONTENT_TYPE = /(^|;)\s*application\/json\s*(;|$)/i;
+
+function redactBody(value) {
+  const text = String(value ?? '')
+    .replace(/bearer\s+[^\s,;]+/gi, 'Bearer [REDACTED]')
+    .replace(
+      /(authorization|token|api[-_ ]?key|secret|password)\s*[:=]\s*[^,;\s]+/gi,
+      '$1=[REDACTED]'
+    );
+  return text.length > LINEAR_MAX_ERROR_BODY_LENGTH
+    ? `${text.slice(0, LINEAR_MAX_ERROR_BODY_LENGTH)}…`
+    : text;
+}
+
+function responseMetadata(response, attempt, extra = {}) {
+  return {
+    status: Number.isFinite(response?.status) ? response.status : undefined,
+    contentType: response?.headers?.get?.('content-type') || undefined,
+    attempt,
+    ...extra,
+  };
+}
 
 export class LinearTransportError extends Error {
   /** @param {string} message @param {any} [options] */
-  constructor(message, { code, cause, attempts } = {}) {
+  constructor(message, { code, cause, attempts, metadata, body } = {}) {
     super(message, { cause });
     this.name = 'LinearTransportError';
     this.code = code;
     this.attempts = attempts;
+    this.metadata = metadata;
+    if (body !== undefined) this.body = redactBody(body);
   }
 }
 
@@ -53,25 +80,38 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 /** @param {any[]} errors */
 export function classifyGraphQLErrors(errors) {
-  return errors.some(error =>
-    [error?.message, error?.extensions?.userPresentableMessage]
-      .filter(Boolean)
-      .some(message => /deprecated/i.test(message))
+  const messages = errors.flatMap(error =>
+    [error?.message, error?.extensions?.userPresentableMessage].filter(Boolean)
+  );
+  if (messages.some(message => /deprecated/i.test(message)))
+    return 'DEPRECATED';
+  if (
+    messages.some(message =>
+      /unauthori[sz]ed|invalid token|authentication/i.test(message)
+    )
   )
-    ? 'DEPRECATED'
-    : 'API';
+    return 'AUTH';
+  if (
+    messages.some(message =>
+      /cannot query field|unknown argument|validation|schema|syntax/i.test(
+        message
+      )
+    )
+  )
+    return 'SCHEMA';
+  return 'API';
 }
 
 /**
  * Bounded, retrying GraphQL transport. Only the API key is sent as the
- * normal Linear `Authorization: <key>` header; it is never logged or exposed
- * in an error. Retry is limited to transient network/timeout failures.
+ * normal Linear `Authorization` header; it is never logged or exposed in an
+ * error. Retry is bounded to network, malformed responses, 429, and 5xx.
  */
 export async function graphql(
   query,
   variables = {},
   {
-    fetchImpl = globalThis.fetch,
+    fetchImpl = /** @type {any} */ (globalThis.fetch),
     timeoutMs = LINEAR_REQUEST_TIMEOUT_MS,
     maxAttempts = LINEAR_MAX_ATTEMPTS,
     retryBaseMs = LINEAR_RETRY_BASE_MS,
@@ -93,7 +133,47 @@ export async function graphql(
         body: JSON.stringify({ query, variables }),
         signal: controller.signal,
       });
-      const data = /** @type {any} */ (await resp.json());
+      const contentType = resp?.headers?.get?.('content-type') || '';
+      const rawBody =
+        typeof resp?.text === 'function'
+          ? await resp.text()
+          : JSON.stringify(await resp.json());
+      const metadata = responseMetadata(resp, attempt);
+      if (contentType && !JSON_CONTENT_TYPE.test(contentType)) {
+        const error = /** @type {any} */ (
+          new Error('Linear response was not JSON')
+        );
+        error.code = 'CONTENT_TYPE';
+        error.retryable =
+          RETRYABLE_STATUS.has(resp?.status) || resp?.status >= 500;
+        throw Object.assign(error, { metadata, body: rawBody });
+      }
+      let data;
+      try {
+        data = JSON.parse(rawBody);
+      } catch (parseError) {
+        const error = /** @type {any} */ (
+          new Error('Linear response contained malformed JSON', {
+            cause: parseError,
+          })
+        );
+        error.code = 'INVALID_JSON';
+        error.retryable = true;
+        throw Object.assign(error, { metadata, body: rawBody });
+      }
+      if (resp?.ok === false || resp?.status >= 400) {
+        const error = /** @type {any} */ (
+          new Error(`Linear HTTP error (${resp.status})`)
+        );
+        error.code =
+          resp.status === 429
+            ? 'RATE_LIMITED'
+            : resp.status >= 500
+              ? 'SERVER'
+              : 'HTTP';
+        error.retryable = RETRYABLE_STATUS.has(resp.status);
+        throw Object.assign(error, { metadata, body: rawBody });
+      }
       if (data.errors) {
         const error = /** @type {any} */ (
           new Error(
@@ -101,23 +181,38 @@ export async function graphql(
           )
         );
         error.code = classifyGraphQLErrors(data.errors);
+        error.metadata = metadata;
+        throw error;
+      }
+      if (!data || typeof data !== 'object' || !Object.hasOwn(data, 'data')) {
+        const error = /** @type {any} */ (
+          new Error('Linear response had an invalid GraphQL shape')
+        );
+        error.code = 'SCHEMA';
+        error.metadata = metadata;
         throw error;
       }
       return data.data;
     } catch (error) {
-      lastError = error;
-      if (!isTransientNetworkError(error) || attempt === maxAttempts) {
+      const err = /** @type {any} */ (error);
+      lastError = err;
+      const retryable = Boolean(err?.retryable) || isTransientNetworkError(err);
+      if (!retryable || attempt === maxAttempts) {
         const code =
-          error?.name === 'AbortError' || error?.name === 'TimeoutError'
+          err?.name === 'AbortError' || err?.name === 'TimeoutError'
             ? 'TIMEOUT'
-            : isTransientNetworkError(error)
+            : isTransientNetworkError(err)
               ? 'NETWORK'
-              : error?.code === 'DEPRECATED'
-                ? 'DEPRECATED'
-                : 'API';
+              : err?.code || 'API';
         throw new LinearTransportError(
           `Linear GraphQL request failed (${code.toLowerCase()}, attempts=${attempt})`,
-          { code, cause: error, attempts: attempt }
+          {
+            code,
+            cause: isTransientNetworkError(err) ? err : undefined,
+            attempts: attempt,
+            metadata: { ...(err?.metadata || {}), retryable: false },
+            body: err?.body,
+          }
         );
       }
       await sleepImpl(retryBaseMs * 2 ** (attempt - 1));
@@ -370,7 +465,7 @@ export async function addComment(issueId, body) {
 /**
  * Transition an issue to a new state.
  */
-export async function transitionIssue(issueId, stateId) {
+export async function transitionIssue(issueId, stateId, options = {}) {
   return graphql(
     `
     mutation($id: String!, $stateId: String!) {
@@ -379,7 +474,8 @@ export async function transitionIssue(issueId, stateId) {
       }
     }
   `,
-    { id: issueId, stateId }
+    { id: issueId, stateId },
+    options
   );
 }
 
