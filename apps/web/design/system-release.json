@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "1.0.10",
+  "version": "1.0.11",
   "releasedAt": "2026-08-04",
   "exceptions": [
     {
@@ -12,6 +12,11 @@
     }
   ],
   "changelog": [
+    {
+      "version": "1.0.11",
+      "date": "2026-08-04",
+      "summary": "Enforced canonical Inter rendering for the public body and interface typography specimens."
+    },
     {
       "version": "1.0.10",
       "date": "2026-08-04",

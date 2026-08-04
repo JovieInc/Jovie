@@ -206,6 +206,11 @@
   font-family: var(--font-display);
 }
 
+.system-b-brand-page .system-b-brand-type-sample--body,
+.system-b-brand-page .system-b-brand-type-sample--interface {
+  font-family: var(--font-body);
+}
+
 .system-b-brand-page
   :where(
     .system-b-brand-contract-card,

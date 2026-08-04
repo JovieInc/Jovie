@@ -110,6 +110,11 @@
   "changelog": [
     {
       "date": "2026-08-04",
+      "summary": "Enforced canonical Inter rendering for the public body and interface typography specimens.",
+      "version": "1.0.11"
+    },
+    {
+      "date": "2026-08-04",
       "summary": "Recorded the formatter-stable privacy schema and canonical typography projection as the reviewed public release.",
       "version": "1.0.10"
     },
@@ -479,7 +484,7 @@
       "tooltip": "var(--color-text-tooltip)"
     }
   },
-  "source_digest": "26cf10be222276508d8ef8fb6585bc9cad7d70bde1d94a9770bdfb157929589c",
+  "source_digest": "d6e37277059edd9ef0a993130ab380227d4cd3a3d71e6ea21f5b8444bc081687",
   "sources": [
     {
       "id": "public-manifest-builder",
@@ -495,7 +500,7 @@
     },
     {
       "id": "public-page-styles",
-      "sha256": "2ed6d52fdc58362acbfb8ad083aa9dea3cecbce9762a14179f0662afed306c6a"
+      "sha256": "4d187a97e39a5be65a5cd73cef16c738fbb7f86e978a2007692131a30912faae"
     },
     {
       "id": "canonical-token-parser",
@@ -575,7 +580,7 @@
     },
     {
       "id": "release-contract",
-      "sha256": "72f947e238bc6f6d13242574348fde3d72090edb3addb2e1970e92093fd5a1fd"
+      "sha256": "da2bfbb94e34cc6ede7c0a9690592f6d42d8c8052fd85ba1c0eec98970fb1868"
     }
   ],
   "tokens": [
@@ -1350,7 +1355,7 @@
       "semibold": "var(--font-weight-semibold)"
     }
   },
-  "version": "1.0.10",
+  "version": "1.0.11",
   "voice": [
     "Lead with the artist outcome, then explain the mechanism.",
     "Use specific, verifiable language. Remove filler and inflated claims.",
