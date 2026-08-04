@@ -110,6 +110,11 @@
   "changelog": [
     {
       "date": "2026-08-04",
+      "summary": "Derived public asset variants from canonical filenames to remove registry boilerplate without changing vendor-facing files or checksums.",
+      "version": "1.0.13"
+    },
+    {
+      "date": "2026-08-04",
       "summary": "Moved the checked public manifest into the generated asset namespace while preserving its vendor data contract.",
       "version": "1.0.12"
     },
@@ -489,7 +494,7 @@
       "tooltip": "var(--color-text-tooltip)"
     }
   },
-  "source_digest": "db17b17a485833eab9254a3dee37c7c3f27286750902bd9eab4b706ceae30c0c",
+  "source_digest": "681663da953c9c66527e14a69b17e888dc10724998de4d7e40f5bb1ea5d17348",
   "sources": [
     {
       "id": "public-manifest-builder",
@@ -577,7 +582,7 @@
     },
     {
       "id": "public-contract",
-      "sha256": "bdf2d37ec5c8c9fc6852850adce2378e73acb1495e2759b7b854b0a3cb5088a4"
+      "sha256": "f67ea54156b29e581a902a9c0163bbef8be37320982ecd76ac8e028208cd9a44"
     },
     {
       "id": "public-safety-projection",
@@ -585,7 +590,7 @@
     },
     {
       "id": "release-contract",
-      "sha256": "b6f39b8b0fecaebd41934d6b30d43b661033aac38124f1ccc8881c91a4dd80d0"
+      "sha256": "d414571f7a7565542065edb91e7452b5da2fbbc4b7ad01d45ab534ba42e2a63e"
     }
   ],
   "tokens": [
@@ -1360,7 +1365,7 @@
       "semibold": "var(--font-weight-semibold)"
     }
   },
-  "version": "1.0.12",
+  "version": "1.0.13",
   "voice": [
     "Lead with the artist outcome, then explain the mechanism.",
     "Use specific, verifiable language. Remove filler and inflated claims.",
