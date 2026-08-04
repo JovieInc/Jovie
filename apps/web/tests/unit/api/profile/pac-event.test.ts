@@ -193,8 +193,11 @@ describe('POST /api/profile/pac-event', () => {
       headers: {},
     },
     {
-      name: 'server-resolved required geography',
-      cookies: { [AUDIENCE_ANON_COOKIE]: JV_AID },
+      name: 'server geo overriding a client-writable non-required cookie',
+      cookies: {
+        [AUDIENCE_ANON_COOKIE]: JV_AID,
+        [COOKIE_BANNER_REQUIRED_COOKIE]: '0',
+      },
       headers: { 'x-vercel-ip-country': 'DE' },
     },
     {
