@@ -72,15 +72,46 @@ function redirectSignedOutElectronAppShell(req: NextRequest): NextResponse {
   return response;
 }
 
+const PRIVATE_PROFILE_ALIAS_MARKER = '__profile-mode-alias';
+const MAX_PROFILE_ALIAS_SEGMENT_LENGTH = 2048;
+const MAX_PROFILE_ALIAS_DECODE_PASSES = 4;
+
 function isReservedProfileAliasMarkerPath(pathname: string): boolean {
   return pathname.split('/').some(segment => {
-    try {
-      return decodeURIComponent(segment) === '__profile-mode-alias';
-    } catch {
-      // Next decodes route params after proxy execution. Reject malformed
-      // escapes here so no ambiguous segment can reach the private resolver.
-      return true;
+    let decodedSegment = segment;
+
+    for (let pass = 0; pass < MAX_PROFILE_ALIAS_DECODE_PASSES; pass += 1) {
+      if (decodedSegment.length > MAX_PROFILE_ALIAS_SEGMENT_LENGTH) {
+        return true;
+      }
+
+      let nextDecodedSegment: string;
+      try {
+        nextDecodedSegment = decodeURIComponent(decodedSegment);
+      } catch {
+        // Next decodes route params after proxy execution. Reject malformed
+        // escapes at the public boundary. A literal percent produced by an
+        // earlier successful decode cannot reveal another encoded marker and
+        // remains a valid public path segment.
+        return pass === 0;
+      }
+
+      if (
+        nextDecodedSegment.split('/').includes(PRIVATE_PROFILE_ALIAS_MARKER)
+      ) {
+        return true;
+      }
+
+      if (nextDecodedSegment === decodedSegment) {
+        return false;
+      }
+
+      decodedSegment = nextDecodedSegment;
     }
+
+    // Excessively nested escaping is never emitted by Jovie. Fail closed so
+    // it cannot bypass this boundary or create attacker-controlled ISR keys.
+    return true;
   });
 }
 
