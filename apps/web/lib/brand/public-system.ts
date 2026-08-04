@@ -27,61 +27,57 @@ export const PUBLIC_BRAND_MANIFEST = {
   href: '/brand/generated/Jovie-Brand-System.json',
 } as const;
 
+type PublicBrandAssetKind = 'mark' | 'wordmark' | 'lockup' | 'app-icon';
+
+function definePublicBrandAsset<
+  const Label extends string,
+  const File extends string,
+  const Kind extends PublicBrandAssetKind,
+>(label: Label, file: File, kind: Kind) {
+  return {
+    label,
+    file,
+    href: `/brand/${file}` as const,
+    kind,
+  } as const;
+}
+
+function definePublicBrandSvgPair<
+  const Label extends string,
+  const FileStem extends string,
+  const Kind extends Exclude<PublicBrandAssetKind, 'app-icon'>,
+>(label: Label, fileStem: FileStem, kind: Kind) {
+  return [
+    definePublicBrandAsset(
+      `Jovie ${label} — ink SVG`,
+      `${fileStem}-Black.svg`,
+      kind
+    ),
+    definePublicBrandAsset(
+      `Jovie ${label} — cream SVG`,
+      `${fileStem}-Cream.svg`,
+      kind
+    ),
+  ] as const;
+}
+
+function definePublicBrandAppIcon<const Size extends 192 | 512 | 1024>(
+  size: Size
+) {
+  return definePublicBrandAsset(
+    `Jovie app icon — ${size} PNG`,
+    `app-icons/jovie-app-icon-${size}.png`,
+    'app-icon'
+  );
+}
+
 export const PUBLIC_BRAND_ASSETS = [
-  {
-    label: 'Jovie mark — ink SVG',
-    file: 'Jovie-Logo-Mark-Black.svg',
-    href: '/brand/Jovie-Logo-Mark-Black.svg',
-    kind: 'mark',
-  },
-  {
-    label: 'Jovie mark — cream SVG',
-    file: 'Jovie-Logo-Mark-Cream.svg',
-    href: '/brand/Jovie-Logo-Mark-Cream.svg',
-    kind: 'mark',
-  },
-  {
-    label: 'Jovie wordmark — ink SVG',
-    file: 'Jovie-Wordmark-Black.svg',
-    href: '/brand/Jovie-Wordmark-Black.svg',
-    kind: 'wordmark',
-  },
-  {
-    label: 'Jovie wordmark — cream SVG',
-    file: 'Jovie-Wordmark-Cream.svg',
-    href: '/brand/Jovie-Wordmark-Cream.svg',
-    kind: 'wordmark',
-  },
-  {
-    label: 'Jovie horizontal lockup — ink SVG',
-    file: 'Jovie-Lockup-Black.svg',
-    href: '/brand/Jovie-Lockup-Black.svg',
-    kind: 'lockup',
-  },
-  {
-    label: 'Jovie horizontal lockup — cream SVG',
-    file: 'Jovie-Lockup-Cream.svg',
-    href: '/brand/Jovie-Lockup-Cream.svg',
-    kind: 'lockup',
-  },
-  {
-    label: 'Jovie app icon — 192 PNG',
-    file: 'app-icons/jovie-app-icon-192.png',
-    href: '/brand/app-icons/jovie-app-icon-192.png',
-    kind: 'app-icon',
-  },
-  {
-    label: 'Jovie app icon — 512 PNG',
-    file: 'app-icons/jovie-app-icon-512.png',
-    href: '/brand/app-icons/jovie-app-icon-512.png',
-    kind: 'app-icon',
-  },
-  {
-    label: 'Jovie app icon — 1024 PNG',
-    file: 'app-icons/jovie-app-icon-1024.png',
-    href: '/brand/app-icons/jovie-app-icon-1024.png',
-    kind: 'app-icon',
-  },
+  ...definePublicBrandSvgPair('mark', 'Jovie-Logo-Mark', 'mark'),
+  ...definePublicBrandSvgPair('wordmark', 'Jovie-Wordmark', 'wordmark'),
+  ...definePublicBrandSvgPair('horizontal lockup', 'Jovie-Lockup', 'lockup'),
+  definePublicBrandAppIcon(192),
+  definePublicBrandAppIcon(512),
+  definePublicBrandAppIcon(1024),
 ] as const;
 
 export const PUBLIC_SYSTEM_CONSUMERS = [
