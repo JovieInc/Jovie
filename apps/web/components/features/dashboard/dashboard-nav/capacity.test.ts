@@ -49,7 +49,11 @@ describe('partitionCustomerNavigation', () => {
       visibleCap: CUSTOMER_NAV_CAPACITY.mobilePrimaryVisible,
     });
 
-    expect(partition.visible.map(item => item.id)).toEqual(['chat', 'inbox']);
+    expect(partition.visible.map(item => item.id)).toEqual([
+      'chat',
+      'inbox',
+      'contacts',
+    ]);
     expect(partition.more).toEqual([]);
     expect(partition.visible).toEqual(mobilePrimaryNavigation);
     expect(mobileExpandedNavigation).toEqual(artistNavigation);
@@ -114,7 +118,11 @@ describe('partitionCustomerNavigation', () => {
     });
 
     expect(partition.visible).toHaveLength(primaryNavigation.length);
-    expect(partition.visible.map(item => item.id)).toEqual(['chat', 'inbox']);
+    expect(partition.visible.map(item => item.id)).toEqual([
+      'chat',
+      'inbox',
+      'contacts',
+    ]);
   });
 
   it('promotes an active experimental destination ahead of passive experimental slots', () => {

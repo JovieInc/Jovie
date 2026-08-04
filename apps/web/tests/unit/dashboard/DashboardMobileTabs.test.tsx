@@ -40,8 +40,8 @@ vi.mock('@/lib/tracking/navigation-telemetry', () => ({
 const CANONICAL_LABELS = [
   'New Chat',
   'Inbox',
-  'Library',
   'Contacts',
+  'Library',
   'Calendar',
   'Presence',
 ] as const;
@@ -66,6 +66,7 @@ describe('DashboardMobileTabs', () => {
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
       'New Chat',
       'Inbox',
+      'Contacts',
     ]);
     expect(
       within(tabs).getByRole('button', { name: 'More options' })
@@ -80,7 +81,7 @@ describe('DashboardMobileTabs', () => {
     render(<DashboardMobileTabs />);
 
     expect(mockTrackNavigationImpressions).toHaveBeenCalledWith(
-      ['chat', 'inbox'],
+      ['chat', 'inbox', 'contacts'],
       APP_ROUTES.CHAT,
       expect.objectContaining({
         isMobile: true,
@@ -120,8 +121,8 @@ describe('DashboardMobileTabs', () => {
     expect(links.slice(0, 6).map(link => link.getAttribute('href'))).toEqual([
       APP_ROUTES.CHAT,
       APP_ROUTES.DASHBOARD,
-      APP_ROUTES.LIBRARY,
       APP_ROUTES.CONTACTS,
+      APP_ROUTES.LIBRARY,
       APP_ROUTES.CALENDAR,
       APP_ROUTES.PROFILES,
     ]);
@@ -200,6 +201,7 @@ describe('DashboardMobileTabs', () => {
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
       'New Chat',
       'Inbox',
+      'Contacts',
     ]);
     expect(within(tabs).queryByRole('link', { name: 'Tasks' })).toBeNull();
   });

@@ -102,7 +102,6 @@ export const calendarNavItem: NavItem = {
 /** Destinations owned by the currently selected artist group. */
 export const artistNavigation = [
   libraryNavItem,
-  contactsNavItem,
   calendarNavItem,
   profilesNavItem,
 ] as const satisfies readonly NavItem[];
@@ -120,6 +119,7 @@ export const artistNavigation = [
 export const primaryNavigation = [
   chatNavItem,
   inboxNavItem,
+  contactsNavItem,
 ] as const satisfies readonly NavItem[];
 
 export const settingsNavItem: NavItem = {

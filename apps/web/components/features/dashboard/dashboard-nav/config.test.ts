@@ -14,11 +14,11 @@ import {
 const CANONICAL_NAVIGATION = [
   ['chat', 'New Chat', APP_ROUTES.CHAT],
   ['inbox', 'Inbox', APP_ROUTES.DASHBOARD],
+  ['contacts', 'Contacts', APP_ROUTES.CONTACTS],
 ] as const;
 
 const ARTIST_NAVIGATION = [
   ['library', 'Library', APP_ROUTES.LIBRARY],
-  ['contacts', 'Contacts', APP_ROUTES.CONTACTS],
   ['calendar', 'Calendar', APP_ROUTES.CALENDAR],
   ['profiles', 'Presence', APP_ROUTES.PROFILES],
 ] as const;

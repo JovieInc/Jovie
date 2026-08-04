@@ -25,8 +25,8 @@ vi.mock('@/lib/queries/prefetch-dashboard', () => ({
 const PRIMARY_LABELS = [
   'New Chat',
   'Inbox',
-  'Library',
   'Contacts',
+  'Library',
   'Calendar',
   'Presence',
 ] as const;

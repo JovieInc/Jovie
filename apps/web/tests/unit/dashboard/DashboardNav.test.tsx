@@ -19,8 +19,8 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
 const CANONICAL_NAV = [
   ['New Chat', APP_ROUTES.CHAT],
   ['Inbox', APP_ROUTES.DASHBOARD],
-  ['Library', APP_ROUTES.LIBRARY],
   ['Contacts', APP_ROUTES.CONTACTS],
+  ['Library', APP_ROUTES.LIBRARY],
   ['Calendar', APP_ROUTES.CALENDAR],
   ['Presence', APP_ROUTES.PROFILES],
 ] as const;
@@ -216,7 +216,7 @@ describe('DashboardNav', () => {
       username: 'night-drive',
       usernameNormalized: 'night-drive',
     } as DashboardData['creatorProfiles'][number];
-    const { getByRole } = renderDashboardNav({
+    const { container, getByRole } = renderDashboardNav({
       renderFn: fastRender,
       overrides: {
         selectedProfile,
@@ -234,6 +234,15 @@ describe('DashboardNav', () => {
     expect(getByRole('link', { name: 'Presence' })).toHaveAttribute(
       'href',
       APP_ROUTES.PROFILES
+    );
+    const artistSection = container.querySelector(
+      '[data-nav-section="artist"]'
+    );
+    expect(artistSection).not.toBeNull();
+    expect(artistSection?.querySelector('a[href="/app/contacts"]')).toBeNull();
+    expect(getByRole('link', { name: 'Contacts' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.CONTACTS
     );
   });
 
