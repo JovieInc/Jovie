@@ -33,9 +33,8 @@ import {
  * cookie value when present, `null` otherwise. The proxy hot path treats a
  * non-null return as the signed-in signal — `handleProxyRequest` only needs
  * a truthy marker now that the proxy no longer does user-state DB/Redis
- * work (plan decision 5). The signed-cookie validation lives inside
- * `handleProxyRequest` via `getCookieCache` for the `/` → `/app` convenience
- * redirect only (audit row 16: avoids a 5-min stale-loop on auth pages).
+ * work (plan decision 5). Public `/` remains an explicit navigation target;
+ * protected app routes own their auth redirect.
  */
 function detectBetterAuthSession(req: NextRequest): string | null {
   try {
@@ -225,10 +224,9 @@ export default async function middleware(
   //   - getSessionCookie(req) above is the only auth read on the hot path
   //     (zero DB/Redis).
   //   - handleProxyRequest treats the second argument as a truthy
-  //     signed-in marker. The signed-cookie validation (getCookieCache)
-  //     happens inside handleProxyRequest for the `/` → `/app` redirect
-  //     only. Auth-page signed-in redirects are owned by the pages
-  //     themselves via auth.api.getSession (audit row 16).
+  //     signed-in marker. Public `/` navigation passes through unchanged;
+  //     auth-page signed-in redirects are owned by the pages themselves via
+  //     auth.api.getSession.
   return handleProxyRequest(req, sessionCookie);
 }
 

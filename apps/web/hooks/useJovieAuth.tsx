@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
+import { clearLegacyClerkSessionMarker } from '@/lib/auth/auth-session-cookies';
 import { authClient } from '@/lib/auth/client';
 import { type JovieUser, toJovieUser } from '@/lib/auth/jovie-user';
 
@@ -78,6 +79,7 @@ export interface UseSessionSafeReturn {
  */
 export async function signOut(options?: JovieSignOutOptions): Promise<void> {
   await authClient.signOut().catch(() => undefined);
+  clearLegacyClerkSessionMarker();
 
   const redirectUrl = options?.redirectUrl ?? '/signin';
   if (typeof globalThis.location?.assign === 'function') {

@@ -6,7 +6,10 @@ import { APP_ROUTES } from '@/constants/routes';
 import { hasActiveClerkSession } from '@/lib/auth/auth-session-cookies';
 
 /**
- * Non-blocking redirect handler for authenticated users on the homepage.
+ * Non-blocking redirect handler for authenticated users on legacy launch
+ * surfaces. The public homepage intentionally does not mount this handler:
+ * `/` is an explicit destination after logout, from the logo, and from
+ * browser history.
  *
  * Reads Clerk's `__client_uat` cookie (a non-httpOnly cookie set by Clerk JS
  * containing a Unix timestamp of last user activity). When the value is > 0,

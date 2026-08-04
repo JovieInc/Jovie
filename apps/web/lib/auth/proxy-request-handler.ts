@@ -1,4 +1,3 @@
-import { getCookieCache } from 'better-auth/cookies';
 import { type NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -17,7 +16,6 @@ import { resolveLegacyRootPathRedirect } from '@/lib/routing/legacy-root-path-re
 import {
   analyzeHost,
   categorizePath,
-  DASHBOARD_URL,
   isDedicatedRootSegment,
 } from '@/lib/routing/proxy-routing';
 import { SCRIPT_NONCE_HEADER } from '@/lib/security/content-security-policy';
@@ -65,18 +63,17 @@ function generateNonce(): string {
 }
 
 /**
- * Core proxy request handler: routing, signed-in `/` → `/app` redirect, CSP
- * nonce, and final response composition. Runs after the proxy.ts entry has
+ * Core proxy request handler: routing, public-root pass-through, CSP nonce,
+ * and final response composition. Runs after the proxy.ts entry has
  * resolved the signed-in marker (Better Auth session cookie presence).
  *
  * The handler treats `userId` as a truthy signed-in marker only. Plan
  * decision 5: the proxy no longer does user-state DB/Redis work — the
  * shell layout (`resolveUserState`) owns waitlist/onboarding/banned
  * redirects. Auth-page signed-in redirects are owned by the pages
- * themselves via `auth.api.getSession` (audit row 16 — avoids a 5-min
- * stale cookie-cache redirect loop). The signed-cookie validation via
- * `getCookieCache` is consulted ONLY for the `/` → `/app` convenience
- * redirect (worst case: one bounce to /signin, no loop).
+ * themselves via `auth.api.getSession`. The public root is always an
+ * explicit navigation target: authenticated users may choose it from the
+ * logo or browser history, and protected routes keep their own auth gates.
  */
 export async function handleProxyRequest(
   req: NextRequest,
@@ -310,33 +307,9 @@ export async function handleProxyRequest(
       );
     }
 
-    // ========================================================================
-    // Signed-in `/` → `/app` convenience redirect (audit row 16).
-    //
-    // `getCookieCache(req)` validates the signed session cookie (zero DB hit
-    // for cache reads ≤5 min old). On a valid signed-in session at `/`, the
-    // proxy bounces to /app. On a stale/revoked cookie (worst case), the
-    // user lands on /, the shell layout re-validates via the full
-    // `auth.api.getSession`, and bounces to /signin if needed — one bounce,
-    // no loop. The shell layout owns the waitlist/onboarding redirect for
-    // authenticated /app/* navigations.
-    // ========================================================================
-    if (pathname === '/' && isNavigationMethod) {
-      try {
-        // `getCookieCache` validates the signed session cookie (zero DB hit
-        // for cache reads ≤5 min old). A non-null return means the user has
-        // a live BA session — bounce to /app. A null/throw means stale or
-        // absent — fall through to render the anonymous homepage; the shell
-        // layout revalidates via auth.api.getSession. Audit row 16.
-        const cachedSession = await getCookieCache(req);
-        if (cachedSession) {
-          return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
-        }
-      } catch {
-        // Tampered/unparseable signed cookie — treat as not signed in.
-      }
-    }
-
+    // Public `/` intentionally passes through for both signed-in and
+    // signed-out visitors. Logout, the Jovie logo, and browser Back must be
+    // able to land on the public homepage without a stale cookie-cache bounce.
     // Default: pass through with CSP nonce. /app/* and other authenticated
     // surfaces do their own auth/onboarding/waitlist gating in layouts and
     // route handlers (plan decision 5: shell layout owns user-state
