@@ -17,7 +17,7 @@ import { ProfileSmartLinkAnalytics } from './ProfileSmartLinkAnalytics';
 
 /**
  * Read-only profile summary for the explicitly opened chat rail. Profile
- * editing and connection management live in the Connections workspace; chat
+ * editing and public-profile monitoring live in the Presence workspace; chat
  * only needs a compact identity, share link, and a single clear hand-off.
  */
 export function ProfileBentoView({
@@ -74,11 +74,11 @@ export function ProfileBentoView({
           className='w-full'
           onClick={onManageConnections}
         >
-          Manage in Connections
+          Manage In Presence
         </Button>
       ) : (
         <Button asChild variant='secondary' size='sm' className='w-full'>
-          <Link href={APP_ROUTES.PROFILES}>Manage in Connections</Link>
+          <Link href={APP_ROUTES.PROFILES}>Manage In Presence</Link>
         </Button>
       )}
     </div>

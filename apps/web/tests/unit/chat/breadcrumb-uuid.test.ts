@@ -11,8 +11,8 @@ describe('getBreadcrumbLabel', () => {
     expect(getBreadcrumbLabel('dashboard')).toBe('Dashboard');
   });
 
-  it('returns "Connections" for the internal profiles route', () => {
-    expect(getBreadcrumbLabel('profiles')).toBe('Connections');
+  it('returns "Presence" for the internal profiles route', () => {
+    expect(getBreadcrumbLabel('profiles')).toBe('Presence');
   });
 
   it('returns "Inbox" for the app root segment', () => {

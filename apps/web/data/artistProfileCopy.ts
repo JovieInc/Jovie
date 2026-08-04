@@ -1,3 +1,4 @@
+import { APP_ROUTES } from '@/constants/routes';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
 export interface ArtistProfileMode {
@@ -349,6 +350,18 @@ export interface ArtistProfileLandingCopy {
       readonly id: 'identity' | 'release' | 'action' | 'navigation';
       readonly title: string;
       readonly body: string;
+    }[];
+    readonly relatedHeadline?: string;
+    readonly relatedFeatures?: readonly {
+      readonly id:
+        | 'search-answer-visibility'
+        | 'audience-quality'
+        | 'fan-notifications'
+        | 'instant-merch';
+      readonly title: string;
+      readonly body: string;
+      readonly href?: string;
+      readonly ctaLabel?: string;
     }[];
   };
   readonly howItWorks: {
@@ -1118,6 +1131,33 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         id: 'navigation',
         title: 'Everything Stays Close',
         body: 'Music, shows, support, and updates stay in one place.',
+      },
+    ],
+    relatedHeadline: 'Built to be found—and to turn discovery into action.',
+    relatedFeatures: [
+      {
+        id: 'search-answer-visibility',
+        title: 'Search and Answer Visibility',
+        body: 'Structured artist facts, linked music entities, FAQs, and machine-readable profile data help search and answer engines understand who you are.',
+      },
+      {
+        id: 'audience-quality',
+        title: 'Audience Quality Filtering',
+        body: 'Use source, segment, consent, and engagement signals to separate casual traffic from the fans most likely to act.',
+      },
+      {
+        id: 'fan-notifications',
+        title: 'Instant Fan Notifications',
+        body: 'Turn profile visits into opted-in fans, then bring the right people back for releases, shows, and support moments.',
+        href: APP_ROUTES.ARTIST_NOTIFICATIONS,
+        ctaLabel: 'See Fan Notifications',
+      },
+      {
+        id: 'instant-merch',
+        title: 'Instant Merch',
+        body: 'Create merch in Jovie and publish approved products back to the artist profile with dedicated, indexable product pages.',
+        href: APP_ROUTES.INSTANT_MERCH,
+        ctaLabel: 'See Instant Merch',
       },
     ],
   },

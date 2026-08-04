@@ -462,6 +462,15 @@ test.describe('Artist Profiles Landing', () => {
     await expect(
       specWallSection.getByText('The Right Next Move')
     ).toBeVisible();
+    await expect(
+      specWallSection.getByTestId('artist-profile-related-feature')
+    ).toHaveCount(4);
+    await expect(
+      specWallSection.getByRole('link', { name: /See Fan Notifications/i })
+    ).toHaveAttribute('href', '/artist-notifications');
+    await expect(
+      specWallSection.getByRole('link', { name: /See Instant Merch/i })
+    ).toHaveAttribute('href', '/instant-merch');
 
     const howSection = page.getByTestId('artist-profile-section-how-it-works');
     await expect(

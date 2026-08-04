@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  artistNavigation,
   artistSettingsNavigation,
   paymentsNavItem,
   primaryNavigation,
@@ -137,6 +138,7 @@ function findShellPages(dir: string = SHELL_ROOT): ShellPage[] {
 function getNavRoutePaths(): Set<string> {
   const navItems = [
     ...primaryNavigation,
+    ...artistNavigation,
     settingsNavItem,
     ...userSettingsNavigation,
     paymentsNavItem,

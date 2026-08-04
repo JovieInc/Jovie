@@ -256,11 +256,18 @@ export const COMMANDS: readonly Command[] = [
     APP_ROUTES.CHAT_PROFILE_PANEL
   ),
   nav(
-    'go-connections',
-    'Connections',
-    'Manage artist identities and connected services.',
+    'go-presence',
+    'Presence',
+    'Monitor artist profiles, public pages, and search visibility.',
     'Waypoints',
     APP_ROUTES.PROFILES
+  ),
+  nav(
+    'go-connections',
+    'Connections',
+    'Manage account integrations and authorized services.',
+    'Cable',
+    APP_ROUTES.SETTINGS_CONNECTORS
   ),
   nav(
     'go-chats',

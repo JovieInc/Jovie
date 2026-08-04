@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { primaryNavigation } from '../components/features/dashboard/dashboard-nav/config';
+import {
+  artistNavigation,
+  primaryNavigation,
+} from '../components/features/dashboard/dashboard-nav/config';
 import { APP_ROUTES } from '../constants/routes';
 import {
   assertResolvedPerfRoutePath,
@@ -67,6 +70,7 @@ describe('performance route manifest', () => {
 
   it('keeps canonical navigation in warm-measurement parity', () => {
     const routes = getEndUserPerfRouteManifest();
+    const canonicalNavigation = [...primaryNavigation, ...artistNavigation];
     const warmRoutesByNavigationItem = new Map(
       routes
         .filter(
@@ -78,11 +82,11 @@ describe('performance route manifest', () => {
         .map(route => [route.navigationItemId, route])
     );
 
-    expect([...warmRoutesByNavigationItem.keys()]).toEqual(
-      primaryNavigation.map(item => item.id)
+    expect([...warmRoutesByNavigationItem.keys()].sort()).toEqual(
+      canonicalNavigation.map(item => item.id).sort()
     );
 
-    for (const item of primaryNavigation) {
+    for (const item of canonicalNavigation) {
       const route = warmRoutesByNavigationItem.get(item.id);
       expect(
         route,

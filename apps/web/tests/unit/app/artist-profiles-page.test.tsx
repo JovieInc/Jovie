@@ -296,6 +296,15 @@ describe('ArtistProfilesPage', () => {
       4
     );
     expect(screen.getAllByTestId('artist-profile-truth-tile')).toHaveLength(4);
+    expect(
+      screen.getAllByTestId('artist-profile-related-feature')
+    ).toHaveLength(4);
+    expect(
+      screen.getByRole('link', { name: /See Fan Notifications/i })
+    ).toHaveAttribute('href', '/artist-notifications');
+    expect(
+      screen.getByRole('link', { name: /See Instant Merch/i })
+    ).toHaveAttribute('href', '/instant-merch');
     expect(ARTIST_PROFILE_COPY.faq.items).toHaveLength(4);
     expect(
       screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.releaseCycle)

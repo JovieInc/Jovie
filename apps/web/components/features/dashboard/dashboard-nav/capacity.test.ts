@@ -7,6 +7,7 @@ import {
   partitionCustomerNavigation,
 } from './capacity';
 import {
+  artistNavigation,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
   primaryNavigation,
@@ -51,15 +52,11 @@ describe('partitionCustomerNavigation', () => {
     expect(partition.visible.map(item => item.id)).toEqual([
       'chat',
       'inbox',
-      'library',
-    ]);
-    expect(partition.more.map(item => item.id)).toEqual([
       'contacts',
-      'profiles',
-      'calendar',
     ]);
+    expect(partition.more).toEqual([]);
     expect(partition.visible).toEqual(mobilePrimaryNavigation);
-    expect(partition.more).toEqual(mobileExpandedNavigation);
+    expect(mobileExpandedNavigation).toEqual(artistNavigation);
   });
 
   it('keeps the full approved core set on the desktop rail with an empty More', () => {
@@ -81,7 +78,7 @@ describe('partitionCustomerNavigation', () => {
     ];
 
     const partition = partitionCustomerNavigation(items, {
-      visibleCap: CUSTOMER_NAV_CAPACITY.desktopPrimaryVisible,
+      visibleCap: primaryNavigation.length + 1,
     });
 
     expect(partition.visible.map(item => item.id)).toEqual([
@@ -120,13 +117,11 @@ describe('partitionCustomerNavigation', () => {
       activeItemId: null,
     });
 
-    expect(partition.visible).toHaveLength(
-      CUSTOMER_NAV_CAPACITY.mobilePrimaryVisible
-    );
+    expect(partition.visible).toHaveLength(primaryNavigation.length);
     expect(partition.visible.map(item => item.id)).toEqual([
       'chat',
       'inbox',
-      'library',
+      'contacts',
     ]);
   });
 

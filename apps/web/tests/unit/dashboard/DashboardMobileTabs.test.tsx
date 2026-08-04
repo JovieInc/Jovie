@@ -40,10 +40,10 @@ vi.mock('@/lib/tracking/navigation-telemetry', () => ({
 const CANONICAL_LABELS = [
   'New Chat',
   'Inbox',
-  'Library',
   'Contacts',
-  'Presence',
+  'Library',
   'Calendar',
+  'Presence',
 ] as const;
 
 describe('DashboardMobileTabs', () => {
@@ -55,7 +55,7 @@ describe('DashboardMobileTabs', () => {
     mockTrackNavigationImpressions.mockReset();
   });
 
-  it('fits the first three canonical destinations behind primary plus More', () => {
+  it('keeps global destinations primary and artist destinations behind More', () => {
     render(<DashboardMobileTabs />);
 
     const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
@@ -66,7 +66,7 @@ describe('DashboardMobileTabs', () => {
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
       'New Chat',
       'Inbox',
-      'Library',
+      'Contacts',
     ]);
     expect(
       within(tabs).getByRole('button', { name: 'More options' })
@@ -81,13 +81,14 @@ describe('DashboardMobileTabs', () => {
     render(<DashboardMobileTabs />);
 
     expect(mockTrackNavigationImpressions).toHaveBeenCalledWith(
-      ['chat', 'inbox', 'library'],
+      ['chat', 'inbox', 'contacts'],
       APP_ROUTES.CHAT,
       expect.objectContaining({
         isMobile: true,
         navVariant: 'canonical_customer_ia_v1',
       })
     );
+    await user.click(screen.getByRole('button', { name: 'More options' }));
     const libraryLink = screen.getByRole('link', { name: 'Library' });
     libraryLink.addEventListener('click', event => event.preventDefault());
     await user.click(libraryLink);
@@ -120,10 +121,10 @@ describe('DashboardMobileTabs', () => {
     expect(links.slice(0, 6).map(link => link.getAttribute('href'))).toEqual([
       APP_ROUTES.CHAT,
       APP_ROUTES.DASHBOARD,
-      APP_ROUTES.LIBRARY,
       APP_ROUTES.CONTACTS,
-      APP_ROUTES.PROFILES,
+      APP_ROUTES.LIBRARY,
       APP_ROUTES.CALENDAR,
+      APP_ROUTES.PROFILES,
     ]);
     expect(links.at(6)).toHaveTextContent('Settings');
     expect(links.at(6)).toHaveAttribute('href', APP_ROUTES.SETTINGS);
@@ -176,12 +177,16 @@ describe('DashboardMobileTabs', () => {
     ).toHaveAttribute('aria-current', 'page');
   });
 
-  it('keeps Library active throughout a canonical release workspace', () => {
+  it('keeps Library active in expanded navigation throughout a canonical release workspace', async () => {
+    const user = userEvent.setup();
     mockPathname.mockReturnValue('/app/releases/release-123/tasks');
     render(<DashboardMobileTabs />);
 
-    const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
-    expect(within(tabs).getByRole('link', { name: 'Library' })).toHaveAttribute(
+    await user.click(screen.getByRole('button', { name: 'More options' }));
+    const menu = screen.getByRole('navigation', {
+      name: 'Expanded Navigation Menu',
+    });
+    expect(within(menu).getByRole('link', { name: 'Library' })).toHaveAttribute(
       'aria-current',
       'page'
     );
@@ -196,7 +201,7 @@ describe('DashboardMobileTabs', () => {
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
       'New Chat',
       'Inbox',
-      'Library',
+      'Contacts',
     ]);
     expect(within(tabs).queryByRole('link', { name: 'Tasks' })).toBeNull();
   });

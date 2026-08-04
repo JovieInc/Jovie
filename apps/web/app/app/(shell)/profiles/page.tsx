@@ -20,9 +20,8 @@ export default async function ProfilesPage() {
     route: APP_ROUTES.PROFILES,
     authFailure: 'notFound',
     requiredFlag: 'PROFILES_WORKSPACE',
-    dashboardErrorLogMessage: 'Dashboard data load failed on connections page',
-    dashboardErrorMessage:
-      'Failed to load connections. Please refresh the page.',
+    dashboardErrorLogMessage: 'Dashboard data load failed on Presence page',
+    dashboardErrorMessage: 'Failed to load Presence. Please refresh the page.',
   });
   if (!routeContext.ok) return routeContext.error;
 

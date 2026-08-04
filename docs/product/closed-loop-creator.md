@@ -69,6 +69,69 @@ as `unknown` or `proxy`.
    and how access can be revoked.
 6. Do not use private dogfood observations as public traction or customer proof.
 
+## Authenticated workspace scope
+
+Presence is the recurring artist workspace for DSP profiles, social networks,
+public pages, search rank, answer-engine visibility, audience quality, and
+monitoring signals. Its canonical route is `/app/profiles`; `/app/presence` remains
+a legacy alias. Account-authorized integrations such as Gmail and Google Calendar
+belong in Settings at `/app/settings/connectors`, labeled **Connections**. Shared
+provider plumbing does not make an OAuth grant an artist-presence activity.
+
+Contacts remains a global action and surface in every account. For a single
+artist, Library, Calendar, and Presence stay flat in the sidebar. For multiple
+artists, only those three artist-owned destinations sit under the selected
+artist's collapsible group. Relationship work must not look owned by one artist.
+
+Public marketing may interlink an artist-profile outcome to a dedicated feature
+page only when the relationship is material and supportable. Artist Profiles may
+link to Fan Notifications and Instant Merch because both turn profile discovery
+into a specific next action. Descriptive search/AEO and audience-quality claims
+remain unlinked until they have dedicated canonical pages.
+
+### Manager and agent representation
+
+**Ship now:** keep Contacts global and add no graph or roster architecture in this
+slice. The smallest follow-on UI is a **Represents** section in the detail view of
+contacts whose role is Manager or Agent. A user can search for an existing Jovie
+artist or enter an external artist name with an optional canonical URL. A contact
+may represent more than one artist, and an artist may have more than one
+representative.
+
+Each entry begins as a private user assertion, not a Jovie fact or endorsement.
+The smallest coherent record is:
+
+- contact ID;
+- Jovie artist ID when matched, otherwise external artist name and optional URL;
+- asserted-by user ID, source (`user`), creation/update timestamps, and optional
+  private note;
+- separate verification state (`unverified`, `corroborated`, `verified`, or
+  `disputed`) with provenance references and verification timestamp.
+
+Assertions are visible only to the account or workspace that created them by
+default. Jovie must not publish them, notify the named contact or artist, imply
+consent, use private notes for model training, or authorize outreach from them.
+Recommendations may use an unverified assertion only as clearly labeled context;
+collaboration scoring, industry-roster publication, and identity claims require
+corroboration plus the applicable consent.
+
+Verification progresses without overwriting provenance: user assertion, then
+corroboration from a supplied canonical URL or matching public professional source,
+then explicit confirmation from the contact or artist where the use case requires
+it. Conflicting evidence marks the entry disputed rather than silently deleting
+history.
+
+**Re-evaluate when:** at least 25 accounts have each entered two or more
+representation assertions and at least 30% can be corroborated without unsolicited
+outreach. **Then:** consider a normalized relationship service, bounded verification
+jobs, and an opt-in industry roster view. Until that trigger, the contact-detail
+section and its provenance contract are sufficient.
+
+This slice does not add providers, Gmail behavior, rank-provider infrastructure,
+automatic SEO/AEO remediation, representation storage, verification jobs, or an
+industry roster. Presence summarizes available signals; measured rank expansion
+and automated boosting remain separately gated capabilities.
+
 ## Task contract
 
 Every task candidate must be representable as a bounded record with at least:

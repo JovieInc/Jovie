@@ -31,7 +31,7 @@ describe('buildConnectionActions', () => {
 
     expect(
       actions.flatMap(action => ('label' in action ? [action.label] : []))
-    ).toEqual(['View Details', 'Open Connection', 'Upgrade Monitoring']);
+    ).toEqual(['View Details', 'Open Profile', 'Upgrade Monitoring']);
 
     const upgrade = actions.find(
       action => 'id' in action && action.id === 'connection-upgrade'

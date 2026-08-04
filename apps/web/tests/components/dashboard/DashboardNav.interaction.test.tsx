@@ -25,10 +25,10 @@ vi.mock('@/lib/queries/prefetch-dashboard', () => ({
 const PRIMARY_LABELS = [
   'New Chat',
   'Inbox',
-  'Library',
   'Contacts',
-  'Presence',
+  'Library',
   'Calendar',
+  'Presence',
 ] as const;
 
 describe('DashboardNav interactions', () => {
@@ -106,7 +106,7 @@ describe('DashboardNav interactions', () => {
     }
   });
 
-  it('routes Presence through the canonical navigation row without a duplicate avatar button', () => {
+  it('routes Presence through the artist navigation without a duplicate avatar button', () => {
     renderDashboardNav({
       renderFn: render,
       overrides: {

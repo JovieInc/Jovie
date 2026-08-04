@@ -148,17 +148,15 @@ describe('ProfileContactSidebar scroll contract', () => {
       screen.getByTestId('profile-smart-link-control')
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Manage in Connections' })
+      screen.getByRole('button', { name: 'Manage In Presence' })
     ).toBeInTheDocument();
     expect(screen.queryByText('Your Live Profile')).toBeNull();
   });
 
-  it('hands profile management back to Connections and closes the chat rail', () => {
+  it('hands profile management back to Presence and closes the chat rail', () => {
     render(<ProfileContactSidebar />);
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Manage in Connections' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Manage In Presence' }));
 
     expect(mockState.close).toHaveBeenCalledTimes(1);
     expect(mockState.push).toHaveBeenCalledWith('/app/profiles');

@@ -33,6 +33,7 @@ import {
 } from '@/lib/tracking/navigation-telemetry';
 import { CustomerNavMoreMenu } from './CustomerNavMoreMenu';
 import {
+  artistNavigation,
   artistSettingsNavigation,
   CUSTOMER_NAV_CAPACITY,
   partitionCustomerNavigation,
@@ -96,7 +97,8 @@ function normalizeTrailingSlash(pathname: string): string {
 }
 
 export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
-  const { inboxNavigation, selectedProfile } = useDashboardData();
+  const { creatorProfiles, inboxNavigation, selectedProfile } =
+    useDashboardData();
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
@@ -208,6 +210,11 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   ]);
 
   const artistSettingsLabel = 'Artist';
+  const artistLabel =
+    selectedProfile?.displayName?.trim() ||
+    selectedProfile?.username?.trim() ||
+    'Artist';
+  const hasMultipleProfiles = creatorProfiles.length > 1;
 
   // Memoize nav sections for dashboard (non-settings) mode
   const navSections = useMemo<readonly DashboardNavSection[]>(
@@ -483,6 +490,19 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                   )}
                 </div>
               ))}
+              <div data-nav-section='artist'>
+                {hasMultipleProfiles ? (
+                  <SidebarCollapsibleGroup
+                    label={artistLabel}
+                    defaultOpen
+                    storageKey={`dashboard.artist.${profileId || 'selected'}`}
+                  >
+                    {renderSection(artistNavigation)}
+                  </SidebarCollapsibleGroup>
+                ) : (
+                  renderSection(artistNavigation)
+                )}
+              </div>
             </SidebarGroupContent>
           </SidebarGroup>
         )}

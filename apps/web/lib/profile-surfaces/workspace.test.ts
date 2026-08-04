@@ -51,7 +51,7 @@ function connector(
 }
 
 describe('connections workspace helpers', () => {
-  it('keeps Sources, Websites, Connectors, and Jovie as distinct filters', () => {
+  it('keeps Sources, Websites, and Jovie as distinct Presence filters', () => {
     const rows = [
       surface({
         id: 'source',
@@ -64,7 +64,6 @@ describe('connections workspace helpers', () => {
         platform: 'website',
       }),
       surface({ id: 'jovie', kind: 'jovie', platform: 'jovie' }),
-      connector(),
     ];
 
     expect(
@@ -73,9 +72,6 @@ describe('connections workspace helpers', () => {
     expect(
       filterProfileWorkspaceRows(rows, 'website').map(row => row.id)
     ).toEqual(['website']);
-    expect(
-      filterProfileWorkspaceRows(rows, 'connector').map(row => row.id)
-    ).toEqual(['gmail']);
     expect(
       filterProfileWorkspaceRows(rows, 'jovie').map(row => row.id)
     ).toEqual(['jovie']);

@@ -1,4 +1,7 @@
+// @coverage-via apps/web/tests/unit/app/artist-profiles-page.test.tsx
+import { ArrowUpRight } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { ARTIST_PROFILE_SECTION_TEST_IDS } from '@/data/artistProfilePageOrder';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
@@ -101,6 +104,63 @@ function ArtistProfileAnnotatedTruth({
             ))}
           </ol>
         </div>
+
+        {specWall.relatedHeadline && specWall.relatedFeatures ? (
+          <div className='mt-14 lg:mt-18'>
+            <h3 className='max-w-3xl text-balance text-xl font-semibold tracking-tight text-primary-token sm:text-2xl'>
+              {specWall.relatedHeadline}
+            </h3>
+            <div className='mt-6 grid border-t border-subtle md:grid-cols-2'>
+              {specWall.relatedFeatures.map((feature, index) => {
+                const content = (
+                  <>
+                    <div className='flex items-start justify-between gap-4'>
+                      <h4 className='text-sm font-semibold text-primary-token'>
+                        {feature.title}
+                      </h4>
+                      {feature.href ? (
+                        <ArrowUpRight
+                          className='h-4 w-4 shrink-0 text-tertiary-token'
+                          aria-hidden
+                        />
+                      ) : null}
+                    </div>
+                    <p className='mt-2 text-app leading-relaxed text-secondary-token'>
+                      {feature.body}
+                    </p>
+                    {feature.ctaLabel ? (
+                      <span className='mt-4 block text-xs font-medium text-primary-token'>
+                        {feature.ctaLabel}
+                      </span>
+                    ) : null}
+                  </>
+                );
+                const className = `min-h-40 border-b border-subtle py-6 md:px-6 ${
+                  index % 2 === 0 ? 'md:border-r md:pl-0' : 'md:pr-0'
+                }`;
+
+                return feature.href ? (
+                  <Link
+                    key={feature.id}
+                    href={feature.href}
+                    data-testid='artist-profile-related-feature'
+                    className={`${className} transition-colors duration-fast hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus/50`}
+                  >
+                    {content}
+                  </Link>
+                ) : (
+                  <article
+                    key={feature.id}
+                    data-testid='artist-profile-related-feature'
+                    className={className}
+                  >
+                    {content}
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
       </div>
     </ArtistProfileSectionShell>
   );
