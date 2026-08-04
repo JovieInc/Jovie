@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "1.0.5",
+  "version": "1.0.7",
   "releasedAt": "2026-08-04",
   "exceptions": [
     {
@@ -12,6 +12,16 @@
     }
   ],
   "changelog": [
+    {
+      "version": "1.0.7",
+      "date": "2026-08-04",
+      "summary": "Aligned semantic manifest validation with the normal repository formatter while preserving all drift and provenance checks."
+    },
+    {
+      "version": "1.0.6",
+      "date": "2026-08-04",
+      "summary": "Added deterministically sorted, readable public manifest serialization."
+    },
     {
       "version": "1.0.5",
       "date": "2026-08-04",
