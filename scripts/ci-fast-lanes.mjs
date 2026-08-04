@@ -57,6 +57,12 @@ const LANES = [
     run: runScriptsTypecheck,
   },
   {
+    id: 'brand-system',
+    name: 'Public Brand System drift gate',
+    nextLocalCommand: 'pnpm run brand-system:check',
+    run: runBrandSystem,
+  },
+  {
     id: 'guardrails',
     name: 'Guardrails (proxy)',
     nextLocalCommand: 'pnpm next:proxy-guard',
@@ -90,6 +96,7 @@ export const LANE_GROUPS = Object.freeze({
     'biome',
     'eslint-server-boundaries',
     'scripts-typecheck',
+    'brand-system',
     'guardrails',
     'ios-fast',
     'structural',
@@ -274,6 +281,10 @@ function runScriptsTypecheck() {
   // unconditionally (no path gating) — the baseline comparison is ~6s and the
   // error graph also covers imported files outside scripts/.
   return shell('pnpm run typecheck:scripts');
+}
+
+function runBrandSystem() {
+  return shell('pnpm run brand-system:check');
 }
 
 function runGuardrails() {
