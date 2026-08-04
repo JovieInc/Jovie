@@ -27,7 +27,7 @@ const PRIMARY_LABELS = [
   'Inbox',
   'Library',
   'Contacts',
-  'Connections',
+  'Presence',
   'Calendar',
 ] as const;
 
@@ -106,7 +106,7 @@ describe('DashboardNav interactions', () => {
     }
   });
 
-  it('routes Connections through the canonical navigation row without a duplicate avatar button', () => {
+  it('routes Presence through the canonical navigation row without a duplicate avatar button', () => {
     renderDashboardNav({
       renderFn: render,
       overrides: {
@@ -119,7 +119,7 @@ describe('DashboardNav interactions', () => {
       },
     });
 
-    expect(screen.getByRole('link', { name: 'Connections' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Presence' })).toHaveAttribute(
       'href',
       APP_ROUTES.PROFILES
     );

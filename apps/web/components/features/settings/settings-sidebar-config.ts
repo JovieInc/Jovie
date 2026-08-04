@@ -95,8 +95,8 @@ export const SETTINGS_SIDEBAR_GROUPS: readonly SettingsSidebarGroup[] = [
     label: 'Workspace',
     items: [
       {
-        id: 'connectors',
-        label: 'Connectors',
+        id: 'connections',
+        label: 'Connections',
         href: APP_ROUTES.SETTINGS_CONNECTORS,
         icon: Cable,
       },

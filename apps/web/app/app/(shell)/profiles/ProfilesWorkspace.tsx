@@ -84,7 +84,6 @@ const FILTERS: ReadonlyArray<{
   { id: 'social', label: 'Social' },
   { id: 'source', label: 'Sources' },
   { id: 'website', label: 'Websites' },
-  { id: 'connector', label: 'Connectors' },
   { id: 'jovie', label: 'Jovie' },
 ];
 
@@ -830,7 +829,7 @@ export function ProfilesWorkspace({
         }
         emptyState={
           <TableEmptyState
-            title='No Connections in This Category'
+            title='No Presence in This Category'
             description='Try another filter.'
           />
         }

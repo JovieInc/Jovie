@@ -79,13 +79,13 @@ export const contactsNavItem: NavItem = {
 };
 
 export const profilesNavItem: NavItem = {
-  name: 'Connections',
+  name: 'Presence',
   href: APP_ROUTES.PROFILES,
   id: 'profiles',
   icon: Waypoints,
   iconName: 'Waypoints',
   tier: 'core',
-  description: 'Monitor artist identities and connected services',
+  description: 'Monitor DSP profiles, social networks, and artist presence',
 };
 
 export const calendarNavItem: NavItem = {

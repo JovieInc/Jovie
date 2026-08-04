@@ -42,7 +42,7 @@ const CANONICAL_LABELS = [
   'Inbox',
   'Library',
   'Contacts',
-  'Connections',
+  'Presence',
   'Calendar',
 ] as const;
 
