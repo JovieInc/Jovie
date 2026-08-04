@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- **Mac/Electron profile links stay in the app shell (#15488):** canonical public artist/profile paths now remain in-app with existing history/back and URL allowlist behavior, while non-profile external destinations remain browser-bound.
 - **Presence becomes the artist's recurring visibility workspace (JOV-4799/JOV-4800):** Contacts remains global; single-artist accounts keep Library, Calendar, and Presence flat while multi-artist accounts group only those artist-owned destinations under the selected artist; Presence summarizes search visibility, answer readiness, audience quality, and monitored pages; Gmail and Calendar authorization live only in Settings → Connections; and the Artist Profiles page links to Fan Notifications and Instant Merch where those outcomes materially extend profile discovery.
 - [internal] **Desktop @types/node aligned to 26.x with monorepo:** Dependabot package bumps only; no DMG publish in this PR.
 - **New Chat stays quiet until a useful skill earns discovery (JOV-4790):** the empty composer omits generic filler such as Share Feedback; only explicitly featured installed skills may appear unprompted, while the existing command surfaces keep every registered utility available on demand.
