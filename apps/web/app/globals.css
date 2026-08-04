@@ -569,11 +569,11 @@ body {
   --aspect-card-standard: 4 / 5;
   /* Font stack: var(--font-inter) for Next.js localFont, then Linear's exact fallbacks */
   --font-sans:
-    var(--font-inter), "Inter Variable", "SF Pro Display", -apple-system, "system-ui", "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+    var(--font-inter, "Inter Variable"), "Inter", "SF Pro Display", -apple-system, "system-ui", "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   /* Unified type (one system, two languages): body + UI = Inter; display = Satoshi
      (the single approved display exception). DM Sans retired 2026-06-18. */
   --font-display:
-    var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
+    var(--font-satoshi, "Satoshi"), -apple-system, "system-ui", sans-serif;
   --font-body: var(--font-sans);
   --color-gray-50: #f9fafb;
   --color-gray-100: #f3f4f6;
