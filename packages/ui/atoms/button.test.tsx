@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { Button } from './button';
+import { BUTTON_SIZE_NAMES, BUTTON_VARIANT_NAMES, Button } from './button';
 
 describe('Button', () => {
   afterEach(() => {
@@ -61,6 +61,34 @@ describe('Button', () => {
     const btn = screen.getByRole('button');
     expect(btn.className).toContain('bg-btn-secondary');
     expect(btn.className).toContain('h-7');
+  });
+
+  it('renders every entry in the server-safe button registry', () => {
+    render(
+      <>
+        {BUTTON_VARIANT_NAMES.map(variant => (
+          <Button key={variant} variant={variant}>
+            Variant {variant}
+          </Button>
+        ))}
+        {BUTTON_SIZE_NAMES.map(size => (
+          <Button key={size} size={size}>
+            Size {size}
+          </Button>
+        ))}
+      </>
+    );
+
+    for (const variant of BUTTON_VARIANT_NAMES) {
+      expect(
+        screen.getByRole('button', { name: `Variant ${variant}` })
+      ).toHaveAttribute('data-variant', variant);
+    }
+    for (const size of BUTTON_SIZE_NAMES) {
+      expect(
+        screen.getByRole('button', { name: `Size ${size}` })
+      ).toHaveAttribute('data-size', size);
+    }
   });
 
   it('maps deprecated variants to canonical variants with a warning', () => {
