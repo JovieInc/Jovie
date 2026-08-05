@@ -123,6 +123,14 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Merch options ready',
     errorTitle: "Couldn't create merch",
   },
+  findMerchSources: {
+    label: 'Merch source',
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: 'Finding merch sources…',
+    successTitle: 'Merch source ready',
+    errorTitle: "Couldn't find a merch source",
+  },
   previewMerchOptions: {
     label: 'Merch',
     uiHint: 'artifact',

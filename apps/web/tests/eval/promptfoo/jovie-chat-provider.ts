@@ -497,6 +497,7 @@ const ACCOUNT_TOOL_NAMES = [
 ] as const;
 
 const MERCH_TOOL_NAMES = [
+  'findMerchSources',
   'createMerch',
   'previewMerchOptions',
   'selectMerchDesign',
