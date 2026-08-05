@@ -54,7 +54,15 @@ export async function findArtist(
     if (found) return found;
   }
 
-  // Fallback to normalized name match
+  // A supplied external ID is an identity boundary. If it does not match,
+  // never fall back to a display name: two different artists can share the
+  // same name, and aliases can change independently of their provider ID.
+  if (conditions.length > 0) {
+    return null;
+  }
+
+  // Name matching is only safe for legacy/manual credits that have no stable
+  // external identity at all.
   if (input.name) {
     const normalized = normalizeArtistName(input.name);
     const [found] = await database
@@ -151,9 +159,27 @@ export async function findOrCreateArtist(
   const [created] = await database
     .insert(artists)
     .values(insertData)
+    .onConflictDoNothing()
     .returning();
 
-  return created;
+  if (created) return created;
+
+  // Another import may have inserted the same unique provider identity while
+  // this request was in flight. Resolve that exact identity after the
+  // conflict; never choose a same-name row as the winner.
+  const raced = await findArtist(
+    {
+      spotifyId: input.spotifyId,
+      appleMusicId: input.appleMusicId,
+      musicbrainzId: input.musicbrainzId,
+      deezerId: input.deezerId,
+      name: input.name,
+    },
+    tx
+  );
+  if (raced) return raced;
+
+  throw new Error('Artist could not be created or resolved');
 }
 
 /**

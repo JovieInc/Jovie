@@ -50,7 +50,7 @@ export async function processTrackArtistCredits(
         name: credit.name,
         spotifyId: credit.spotifyId,
         imageUrl: credit.imageUrl,
-        isAutoCreated: !credit.spotifyId, // Auto-created if no Spotify ID
+        isAutoCreated: sourceType === 'ingested',
       },
       db
     );
@@ -106,7 +106,7 @@ export async function processReleaseArtistCredits(
         name: credit.name,
         spotifyId: credit.spotifyId,
         imageUrl: credit.imageUrl,
-        isAutoCreated: !credit.spotifyId,
+        isAutoCreated: sourceType === 'ingested',
       },
       db
     );
@@ -162,7 +162,7 @@ export async function processRecordingArtistCredits(
         name: credit.name,
         spotifyId: credit.spotifyId,
         imageUrl: credit.imageUrl,
-        isAutoCreated: !credit.spotifyId,
+        isAutoCreated: sourceType === 'ingested',
       },
       db
     );

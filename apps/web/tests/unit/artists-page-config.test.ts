@@ -19,4 +19,14 @@ describe('/artists route segment config', () => {
       /export\s+const\s+dynamic\s*=\s*['"]force-dynamic['"]$/m
     );
   });
+
+  it('lists only claimed public profiles, never automatic unclaimed identities', () => {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const pagePath = resolve(__dirname, '../../app/artists/page.tsx');
+    const pageSource = readFileSync(pagePath, 'utf8');
+
+    expect(pageSource).toContain('eq(creatorProfiles.isPublic, true)');
+    expect(pageSource).toContain('eq(creatorProfiles.isClaimed, true)');
+  });
 });

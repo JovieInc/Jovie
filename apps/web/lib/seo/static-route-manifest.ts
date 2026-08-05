@@ -17,6 +17,8 @@ const PROFILE_FIXTURE: Pick<
   | 'location'
   | 'avatar_url'
   | 'is_verified'
+  | 'is_claimed'
+  | 'settings'
 > = {
   username: 'dualipa',
   username_normalized: 'dualipa',
@@ -25,6 +27,8 @@ const PROFILE_FIXTURE: Pick<
   location: 'London',
   avatar_url: 'https://cdn.example.com/avatar.jpg',
   is_verified: true,
+  is_claimed: true,
+  settings: null,
 };
 
 /**

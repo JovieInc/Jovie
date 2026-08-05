@@ -816,7 +816,10 @@ export function evaluateRepoHygiene({
 }
 
 function gitPaths(args) {
-  return execFileSync('git', args, { encoding: 'buffer' })
+  return execFileSync('git', args, {
+    encoding: 'buffer',
+    maxBuffer: 20 * MiB,
+  })
     .toString('utf8')
     .split('\0')
     .filter(Boolean);

@@ -5,6 +5,7 @@
  */
 
 import type { Artist, ArtistRole } from '@/lib/db/schema/content';
+import type { PublicArtistCollaboratorRole } from '../artist-credit-policy';
 
 export interface ArtistWithRole extends Artist {
   role: ArtistRole;
@@ -25,6 +26,21 @@ export interface CreditedArtistWithProfile {
   name: string;
   /** Normalized Jovie handle of the linked public creator profile. */
   handle: string;
+}
+
+/** Exact structured relationship used by public collaborator prose. */
+export interface StructuredReleaseCollaborator {
+  readonly artistId: string;
+  readonly name: string;
+  /** Stable registry route when a public claimed or unclaimed profile exists. */
+  readonly href: string | null;
+  readonly profileState: 'claimed' | 'unclaimed' | 'unavailable';
+  readonly role: PublicArtistCollaboratorRole;
+  readonly releaseId: string;
+  readonly releaseTitle: string;
+  readonly releaseSlug: string;
+  readonly releaseDate: Date | null;
+  readonly position: number;
 }
 
 export interface FindOrCreateArtistInput {

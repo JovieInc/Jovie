@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import Link from 'next/link';
 import { Icon } from '@/components/atoms/Icon';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
@@ -35,7 +35,12 @@ export default async function ArtistsPage() {
         bio: creatorProfiles.bio,
       })
       .from(creatorProfiles)
-      .where(eq(creatorProfiles.isPublic, true))
+      .where(
+        and(
+          eq(creatorProfiles.isPublic, true),
+          eq(creatorProfiles.isClaimed, true)
+        )
+      )
       .orderBy(asc(creatorProfiles.displayName));
   } catch (err) {
     Sentry.captureException(err);
