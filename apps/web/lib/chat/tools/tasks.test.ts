@@ -1,13 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const { mockCreateTask, mockGetTasks } = vi.hoisted(() => ({
-  mockCreateTask: vi.fn(),
-  mockGetTasks: vi.fn(),
-}));
+const { mockCreateTask, mockGetTasks, mockInstantiateReleaseTasks } =
+  vi.hoisted(() => ({
+    mockCreateTask: vi.fn(),
+    mockGetTasks: vi.fn(),
+    mockInstantiateReleaseTasks: vi.fn(),
+  }));
 
 vi.mock('@/app/app/(shell)/dashboard/tasks/task-actions', () => ({
   createTask: mockCreateTask,
   getTasks: mockGetTasks,
+}));
+
+vi.mock('@/app/app/(shell)/dashboard/releases/task-actions', () => ({
+  instantiateReleaseTasks: mockInstantiateReleaseTasks,
 }));
 
 import { createManageTasksTool } from './tasks';
@@ -65,5 +71,33 @@ describe('createManageTasksTool', () => {
 
     expect(mockGetTasks).toHaveBeenCalledWith({ limit: 20 });
     expect(result).toMatchObject({ success: true, tasks: [] });
+  });
+
+  it('sets up a release plan through the existing release task action', async () => {
+    mockInstantiateReleaseTasks.mockResolvedValue([
+      {
+        id: 'task-id',
+        title: 'Announce the release',
+        dueDate: null,
+        completedAt: null,
+        createdAt: new Date('2026-08-05T00:00:00.000Z'),
+        updatedAt: new Date('2026-08-05T00:00:00.000Z'),
+      },
+    ]);
+
+    const releaseId = '00000000-0000-4000-8000-000000000001';
+    const tool = createManageTasksTool('profile-id');
+    const result = await tool.execute?.(
+      { intent: 'release_plan', releaseId },
+      {} as never
+    );
+
+    expect(mockInstantiateReleaseTasks).toHaveBeenCalledWith(releaseId);
+    expect(result).toMatchObject({
+      success: true,
+      intent: 'release_plan',
+      releaseId,
+      tasks: [{ id: 'task-id', createdAt: '2026-08-05T00:00:00.000Z' }],
+    });
   });
 });

@@ -86,6 +86,11 @@ export const TOOL_SCHEMAS = {
         .max(200)
         .optional()
         .describe('Optional task title when creating a task'),
+      releaseId: z
+        .string()
+        .uuid()
+        .optional()
+        .describe('Release ID when setting up a release plan checklist'),
     }),
   },
 
