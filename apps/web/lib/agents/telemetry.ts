@@ -40,6 +40,8 @@ export interface RecordSkillRunEventInput {
   readonly successMetricOutcome?: Record<string, unknown> | null;
   readonly error?: string | null;
   readonly metadata?: Record<string, unknown>;
+  /** Stable rollout cohort, copied from version selection for segmented metrics. */
+  readonly cohort?: string | null;
   readonly lifecycle?: SkillLifecycle;
 }
 
@@ -108,6 +110,7 @@ export async function recordSkillRunEvent(
         error: input.error ?? null,
         metadata: {
           ...(input.metadata ?? {}),
+          ...(input.cohort ? { cohort: input.cohort } : {}),
           ...(input.lifecycle ? { lifecycle: input.lifecycle } : {}),
         },
         updatedAt: new Date(),
@@ -127,6 +130,7 @@ export async function recordSkillRunEvent(
           error: input.error ?? null,
           metadata: {
             ...(input.metadata ?? {}),
+            ...(input.cohort ? { cohort: input.cohort } : {}),
             ...(input.lifecycle ? { lifecycle: input.lifecycle } : {}),
           },
           updatedAt: new Date(),
@@ -152,6 +156,7 @@ export async function getSkillRunMetrics(
     const result = await db.execute<{
       skill_id: string;
       skill_version: string;
+      cohort: string | null;
       run_count: number;
       completed_count: number;
       error_count: number;
@@ -164,6 +169,7 @@ export async function getSkillRunMetrics(
       SELECT
         skill_id,
         skill_version,
+        metadata->>'cohort' AS cohort,
         COUNT(*)::int AS run_count,
         COUNT(*) FILTER (WHERE status = 'completed')::int AS completed_count,
         COUNT(*) FILTER (WHERE status = 'error')::int AS error_count,
@@ -184,8 +190,8 @@ export async function getSkillRunMetrics(
             ? drizzleSql`AND skill_id = ${window.skillId}`
             : drizzleSql``
         }
-      GROUP BY skill_id, skill_version
-      ORDER BY skill_id, skill_version
+      GROUP BY skill_id, skill_version, metadata->>'cohort'
+      ORDER BY skill_id, skill_version, cohort
     `);
 
     const rows =
@@ -194,6 +200,7 @@ export async function getSkillRunMetrics(
           rows?: Array<{
             skill_id: string;
             skill_version: string;
+            cohort: string | null;
             run_count: number;
             completed_count: number;
             error_count: number;
@@ -212,6 +219,7 @@ export async function getSkillRunMetrics(
       return {
         skillId: row.skill_id,
         skillVersion: row.skill_version,
+        ...(row.cohort ? { cohort: row.cohort } : {}),
         runCount,
         completionRate:
           runCount > 0 ? Number(row.completed_count) / runCount : 0,

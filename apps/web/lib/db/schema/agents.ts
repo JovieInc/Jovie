@@ -58,6 +58,8 @@ export const skillsCatalog = pgTable(
      * historical rows live in skills_catalog_versions.
      */
     activeVersion: text('active_version').notNull(),
+    /** Server-managed rollout configuration; operators can change this without deploy. */
+    rollout: jsonb('rollout').default({}).notNull(),
     entitlementRequired: text('entitlement_required'),
     model: text('model'),
     promptPath: text('prompt_path'), // relative to repo root
@@ -82,6 +84,33 @@ export const skillsCatalog = pgTable(
 
 export type SkillsCatalogRow = typeof skillsCatalog.$inferSelect;
 export type NewSkillsCatalogRow = typeof skillsCatalog.$inferInsert;
+
+/** Sticky per-user assignment for a skill experiment. */
+export const skillRolloutAssignments = pgTable(
+  'skill_rollout_assignments',
+  {
+    skillId: text('skill_id').notNull(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    cohort: text('cohort').notNull(),
+    skillVersion: text('skill_version').notNull(),
+    bucket: integer('bucket').notNull(),
+    assignedAt: timestamp('assigned_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    pk: primaryKey({
+      name: 'skill_rollout_assignments_pk',
+      columns: [table.skillId, table.userId],
+    }),
+    userIdx: index('skill_rollout_assignments_user_id_idx').on(table.userId),
+  })
+);
+
+export type SkillRolloutAssignmentRow =
+  typeof skillRolloutAssignments.$inferSelect;
 
 export const insertSkillsCatalogSchema = createInsertSchema(skillsCatalog);
 export const selectSkillsCatalogSchema = createSelectSchema(skillsCatalog);

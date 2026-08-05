@@ -63,4 +63,25 @@ describe('aggregateSkillRunFixtures', () => {
   it('returns empty array for empty fixtures', () => {
     expect(aggregateSkillRunFixtures([])).toEqual([]);
   });
+
+  it('keeps control and named cohort metrics separately', () => {
+    const rows = aggregateSkillRunFixtures([
+      {
+        skillId: 'retouch',
+        skillVersion: '1.0.0',
+        cohort: 'control',
+        status: 'error',
+      },
+      {
+        skillId: 'retouch',
+        skillVersion: '2.0.0',
+        cohort: 'blue',
+        status: 'completed',
+      },
+    ]);
+    expect(rows.map(row => [row.cohort, row.runCount])).toEqual([
+      ['control', 1],
+      ['blue', 1],
+    ]);
+  });
 });

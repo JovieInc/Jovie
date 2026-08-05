@@ -9,6 +9,7 @@ export type SkillRunStatus = 'started' | 'completed' | 'error';
 export interface SkillRunMetricsRow {
   readonly skillId: string;
   readonly skillVersion: string;
+  readonly cohort?: string;
   readonly runCount: number;
   readonly completionRate: number;
   readonly errorRate: number;
@@ -23,6 +24,7 @@ export interface SkillRunMetricsRow {
 export interface SkillRunFixtureEvent {
   readonly skillId: string;
   readonly skillVersion: string;
+  readonly cohort?: string;
   readonly status: SkillRunStatus;
   readonly costUsd?: number | null;
   readonly feedbackVote?: 'up' | 'down' | null;
@@ -41,6 +43,7 @@ export function aggregateSkillRunFixtures(
     {
       skillId: string;
       skillVersion: string;
+      cohort?: string;
       runCount: number;
       completed: number;
       errors: number;
@@ -53,12 +56,13 @@ export function aggregateSkillRunFixtures(
   >();
 
   for (const event of events) {
-    const key = `${event.skillId}::${event.skillVersion}`;
+    const key = `${event.skillId}::${event.skillVersion}::${event.cohort ?? ''}`;
     let group = groups.get(key);
     if (!group) {
       group = {
         skillId: event.skillId,
         skillVersion: event.skillVersion,
+        ...(event.cohort ? { cohort: event.cohort } : {}),
         runCount: 0,
         completed: 0,
         errors: 0,
@@ -100,6 +104,7 @@ export function aggregateSkillRunFixtures(
       return {
         skillId: group.skillId,
         skillVersion: group.skillVersion,
+        ...(group.cohort ? { cohort: group.cohort } : {}),
         runCount: group.runCount,
         completionRate:
           group.runCount > 0 ? group.completed / group.runCount : 0,
@@ -115,7 +120,9 @@ export function aggregateSkillRunFixtures(
     })
     .sort((a, b) =>
       a.skillId === b.skillId
-        ? a.skillVersion.localeCompare(b.skillVersion)
+        ? a.skillVersion === b.skillVersion
+          ? (a.cohort ?? '').localeCompare(b.cohort ?? '')
+          : a.skillVersion.localeCompare(b.skillVersion)
         : a.skillId.localeCompare(b.skillId)
     );
 }
