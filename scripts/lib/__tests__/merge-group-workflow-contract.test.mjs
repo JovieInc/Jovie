@@ -296,9 +296,11 @@ describe('merge_group workflow contract', () => {
     expect(buildLayout).not.toContain('actions/upload-artifact');
     expect(buildLayout).not.toContain('actions/download-artifact');
     expect(unitTests).toContain(
-      "shard: ['1/10', '2/10', '3/10', '4/10', '5/10', '6/10', '7/10', '8/10', '9/10', '10/10']"
+      "shard: ['1/20', '2/20', '3/20', '4/20', '5/20', '6/20', '7/20', '8/20', '9/20', '10/20', '11/20', '12/20', '13/20', '14/20', '15/20', '16/20', '17/20', '18/20', '19/20', '20/20']"
     );
     expect(unitTests).toContain('max-parallel: 120');
+    expect(unitTests).toContain("matrix.shard == '1/20'");
+    expect(unitTests).not.toContain("matrix.shard == '1/5'");
     expect(getJobBlock(CI_WORKFLOW, 'ci-a11y')).not.toContain(
       "github.event_name == 'merge_group'"
     );

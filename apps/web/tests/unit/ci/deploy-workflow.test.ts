@@ -1147,7 +1147,7 @@ describe('deploy workflow Vercel env resolution', () => {
       'node .github/scripts/verify-main-release-readiness.mjs'
     );
     expect(readinessJob).toContain('QUEUE_PROVEN');
-    expect(readinessJob).toContain('Unit Tests (five shards)');
+    expect(readinessJob).toContain('Unit Tests (twenty shards)');
     expect(readinessJob).toContain('Build + Layout');
     expect(readinessJob).toContain('Promptfoo Evals');
     expect(readinessJob).toContain('Golden Eval Set');
@@ -2081,7 +2081,7 @@ describe('unit-test runner capacity', () => {
       "github.event_name == 'merge_group' && needs.ci-path-changes.outputs.run_test == 'true'"
     );
     expect(unitJob).not.toContain('&& 5 || 3');
-    expect(unitJob).toContain('Each ephemeral runner has 2 CPUs');
+    expect(unitJob).toContain('Each hosted runner has 2 CPUs');
     expect(unitJob).toContain('VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"');
     expect(unitJob).not.toContain(
       'VITEST_CI_FLAGS="--pool=forks --maxWorkers=3"'

@@ -1640,10 +1640,14 @@ ${fixtureCheckout}
     ).toHaveLength(1);
     const comparison = fixture('.artifact-comparison-', webRoot);
     const comparisonConfig = join(comparison, 'playwright.config.ts');
-    const comparisonSpec = join(comparison, 'comparison.spec.ts');
+    // Keep the temporary Playwright fixture outside Vitest's *.spec.ts/*.test.ts
+    // discovery. Full verification runs Vitest shards concurrently, so another
+    // shard can otherwise collect this file while Playwright is using it.
+    const comparisonSpec = join(comparison, 'comparison.pw.ts');
+    expect(comparisonSpec).not.toMatch(/\.(?:spec|test)\.[cm]?[jt]sx?$/);
     write(
       comparisonConfig,
-      "import{defineConfig}from'@playwright/test';export default defineConfig({testDir:'.',outputDir:'test-results',snapshotPathTemplate:'snapshots/{arg}{ext}',reporter:'line',use:{trace:'off',video:'off',screenshot:'off',viewport:{width:16,height:16}}})"
+      "import{defineConfig}from'@playwright/test';export default defineConfig({testDir:'.',testMatch:'comparison.pw.ts',outputDir:'test-results',snapshotPathTemplate:'snapshots/{arg}{ext}',reporter:'line',use:{trace:'off',video:'off',screenshot:'off',viewport:{width:16,height:16}}})"
     );
     const comparisonSource = (color: string) =>
       `import{expect,test}from'@playwright/test';test('comparison',async({page})=>{await page.setContent('<style>html,body{margin:0;width:16px;height:16px;background:${color}}</style>');await expect(page).toHaveScreenshot('comparison.png',{animations:'disabled'})})`;

@@ -59,7 +59,7 @@ The workspace has 11 Turbo packages (12 `pnpm list` entries including root), thr
 
 - Warm/local-store install: 18.6s; `node_modules` 3.6 GiB. Setup then hit the pre-existing fail-closed `lsof` retention check.
 - Cache-cold web typecheck: 42.70s.
-- Unsharded web `test:fast`: 2,336 files, 18,379 tests, green in 14m27s; CI uses ten shards.
+- Unsharded web `test:fast`: 2,336 files, 18,379 tests, green in 14m27s; CI uses twenty shards.
 - Knip: 7.90s and one proven obsolete dependency, `flag-icons`; removal saves 552 installed files / 5.5 MiB. Two owned SVGs already serve the live flags.
 
 File count, checkout/history size, dependency/build complexity, and organizational coupling are reported and governed separately.
