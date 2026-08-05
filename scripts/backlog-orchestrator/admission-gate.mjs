@@ -1,10 +1,7 @@
 /** Deterministic approval boundary between a verified plan and Symphony. */
 
 import { createHash } from 'node:crypto';
-import {
-  PLAN_APPROVED_LABEL,
-  planGateReceipt,
-} from './plan-gate.mjs';
+import { PLAN_APPROVED_LABEL, planGateReceipt } from './plan-gate.mjs';
 
 export const ADMISSION_GATE_SCHEMA = 'admission-gate/v1';
 export const ADMISSION_GATE_PREFIX = '<!-- admission-gate/v1 -->';
@@ -114,10 +111,7 @@ export async function approveAdmission({ issue, client, teamId = null }) {
   if (reason) return { status: 'rejected', reason };
 
   const receipt = buildAdmissionGateReceipt(issue);
-  if (
-    hasReceipt(issue, receipt) &&
-    hasLabel(issue, ADMISSION_APPROVED_LABEL)
-  ) {
+  if (hasReceipt(issue, receipt) && hasLabel(issue, ADMISSION_APPROVED_LABEL)) {
     return {
       status: 'already-approved',
       identifier: issue.identifier,

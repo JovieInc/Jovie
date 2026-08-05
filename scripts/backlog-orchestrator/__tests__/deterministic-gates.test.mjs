@@ -63,7 +63,10 @@ describe('deterministic no-model gates', () => {
       'Repeated events group into one issue.',
       'Focused normalizer tests pass.',
     ]);
-    assert.equal(planGate.validatePlanCandidate(issue(), result.evidence), null);
+    assert.equal(
+      planGate.validatePlanCandidate(issue(), result.evidence),
+      null
+    );
   });
 
   it('fails closed on project, ownership, epic, sensitive, stale, and incomplete work', () => {

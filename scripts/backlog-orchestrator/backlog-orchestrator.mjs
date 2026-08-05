@@ -25,10 +25,10 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+import * as admissionGate from './admission-gate.mjs';
 // Keep the complete control-plane dependency closure visible to source sync and
 // module tooling. These are canonical sibling modules, not host-only copies.
 import * as admitter from './admitter.mjs';
-import * as admissionGate from './admission-gate.mjs';
 import * as classifier from './classifier.mjs';
 import * as deterministicGates from './deterministic-gates.mjs';
 import * as linear from './linear-client.mjs';
@@ -199,7 +199,9 @@ async function runGateNext(isDryRun, issueArg) {
           schema: 'deterministic-gates/run/v1',
           status: 'blocked',
           stage: 'selection',
-          reason: issueArg ? 'requested issue is not eligible' : 'no eligible issue',
+          reason: issueArg
+            ? 'requested issue is not eligible'
+            : 'no eligible issue',
           decisions: selection.decisions,
           mutations: 0,
         },
@@ -272,9 +274,11 @@ async function runGateNext(isDryRun, issueArg) {
     throw new Error(`admission gate rejected: ${admissionResult.reason}`);
 
   current = await linear.fetchIssue(selected.identifier);
-  const classification = classifier.classifyDeterministic(current, [current]);
-  classification.issue = current;
-  classification.labels = current.labels.nodes.map(label => label.name);
+  const classification = {
+    ...classifier.classifyDeterministic(current, [current]),
+    issue: current,
+    labels: current.labels.nodes.map(label => label.name),
+  };
   const lease = await admitter.admitIssue({
     issue: current,
     classification,
@@ -291,7 +295,9 @@ async function runGateNext(isDryRun, issueArg) {
   if (
     verified.state?.name !== 'Todo' ||
     !evidence.eligible ||
-    !verified.labels.nodes.some(label => label.name === admitter.SYMPHONY_LABEL) ||
+    !verified.labels.nodes.some(
+      label => label.name === admitter.SYMPHONY_LABEL
+    ) ||
     load.count !== 1
   )
     throw new Error('final gate-and-lease verification failed');

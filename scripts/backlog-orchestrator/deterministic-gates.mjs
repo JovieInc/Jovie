@@ -69,7 +69,10 @@ function section(description, names) {
   const end = lines.findIndex(
     (line, index) => index > start && /^#{2,3}\s+/.test(line)
   );
-  return lines.slice(start + 1, end < 0 ? undefined : end).join('\n').trim();
+  return lines
+    .slice(start + 1, end < 0 ? undefined : end)
+    .join('\n')
+    .trim();
 }
 
 function cleanList(value) {
@@ -158,7 +161,7 @@ export function buildDeterministicPlanEvidence(issue) {
 }
 
 function priorityValue(priority) {
-  return ({ 1: 100, 2: 80, 3: 50, 4: 20, 0: 10 })[priority] || 0;
+  return { 1: 100, 2: 80, 3: 50, 4: 20, 0: 10 }[priority] || 0;
 }
 
 export function selectDeterministicPlanCandidate(
