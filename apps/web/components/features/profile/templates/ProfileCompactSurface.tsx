@@ -40,6 +40,7 @@ import {
   readPacTabBarReturnVisit,
   shouldShowColdVisitorTabBar,
 } from '@/lib/profile/pac-tab-bar-experiment';
+import { resolvePublicHeroObjectPosition } from '@/lib/profile/public-hero-media';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { buildProfileShareContext } from '@/lib/share/context';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -416,6 +417,7 @@ export function ProfileCompactSurface({
     ]
   );
   const heroImageUrl = surfaceState.heroImageUrl;
+  const heroObjectPosition = resolvePublicHeroObjectPosition(artist.settings);
   const resolvedHeroImageUrl = useMemo(() => {
     const imageUrl = heroImageUrl ?? artist.image_url ?? null;
     return isDefaultAvatarUrl(imageUrl) ? null : imageUrl;
@@ -441,10 +443,10 @@ export function ProfileCompactSurface({
     drawerOpen && drawerView === 'menu' && activeVisiblePrimaryTab !== 'tour';
   const topChromeButtonClassName =
     'profile-top-chrome-icon text-white dark:text-white';
-  // 28px visual glyph box with a 44×44 hit area: box-content + p-2 grows the
-  // hit box to 44px while -m-2 cancels the layout footprint (no shift).
+  // The 20px glyph sits inside an explicit 44×44 target. Targets participate
+  // in the identity grid normally so adjacent social actions never overlap.
   const socialIconClassName =
-    'box-content inline-flex h-7 w-7 items-center justify-center p-2 -m-2 text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+    'inline-flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full text-white/68 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
   // Composition rule: the home hero has one definite token-driven height
   // (h-(--cover-height) = clamp(220px, 34svh, 400px)) on every viewport. It
   // never shrink-wraps — the old short-viewport min-h-0/flex-none band
@@ -483,6 +485,7 @@ export function ProfileCompactSurface({
   }, [onModeSelect]);
   const openNotifications = useCallback(
     (sourceContext?: NotificationSourceContext) => {
+      if (!allowFanCapture) return;
       setNotificationSourceContext(
         sourceContext ?? defaultNotificationSourceContext
       );
@@ -503,10 +506,16 @@ export function ProfileCompactSurface({
       onModeSelect('subscribe');
       onRevealNotifications?.();
     },
-    [defaultNotificationSourceContext, onModeSelect, onRevealNotifications]
+    [
+      allowFanCapture,
+      defaultNotificationSourceContext,
+      onModeSelect,
+      onRevealNotifications,
+    ]
   );
   const handleTabSelect = useCallback(
     (tab: ProfilePrimaryTab) => {
+      if (!allowFanCapture && tab === 'subscribe') return;
       restoreTabBar();
       const nextTab = mapPrimaryTabToAnalyticsTab(tab);
       track('profile_tab_click', {
@@ -520,7 +529,14 @@ export function ProfileCompactSurface({
       });
       onModeSelect(tab);
     },
-    [artist.handle, artist.id, currentAnalyticsTab, onModeSelect, restoreTabBar]
+    [
+      allowFanCapture,
+      artist.handle,
+      artist.id,
+      currentAnalyticsTab,
+      onModeSelect,
+      restoreTabBar,
+    ]
   );
   const handleSocialClick = useCallback(
     (link: LegacySocialLink) => {
@@ -580,43 +596,44 @@ export function ProfileCompactSurface({
         <header
           className={cn(
             'relative overflow-hidden',
-            isHomeMode ? 'min-h-0' : 'shrink-0',
+            isHomeMode
+              ? 'profile-home-fluid-hero min-h-0 flex flex-col'
+              : 'shrink-0',
             heroHeightClassName
           )}
           data-testid='profile-cover'
         >
           {isHomeMode ? (
-            <>
-              <div className='profile-cover-home-media absolute inset-0'>
-                {resolvedHeroImageUrl ? (
-                  <ImageWithFallback
-                    src={resolvedHeroImageUrl}
-                    alt=''
-                    fill
-                    priority
-                    sizes='(max-width: 767px) 100vw, 430px'
-                    className='object-cover object-[50%_20%]'
-                    fallbackVariant='avatar'
-                    fallbackClassName='bg-surface-2'
-                  />
-                ) : (
-                  <div
-                    className='h-full w-full bg-[radial-gradient(circle_at_50%_22%,rgba(255,255,255,0.08),transparent_28%),linear-gradient(145deg,#20242c_0%,#11141a_48%,#050608_100%)]'
-                    aria-hidden='true'
-                  />
-                )}
-              </div>
-
+            <div className='profile-cover-home-media relative min-h-0 flex-1'>
+              {resolvedHeroImageUrl ? (
+                <ImageWithFallback
+                  src={resolvedHeroImageUrl}
+                  alt=''
+                  fill
+                  priority
+                  sizes='(max-width: 767px) 100vw, 430px'
+                  className='object-cover'
+                  style={{ objectPosition: heroObjectPosition }}
+                  fallbackVariant='avatar'
+                  fallbackClassName='bg-surface-2'
+                />
+              ) : (
+                <div
+                  className='h-full w-full bg-[radial-gradient(circle_at_50%_22%,rgba(255,255,255,0.08),transparent_28%),linear-gradient(145deg,#20242c_0%,#11141a_48%,#050608_100%)]'
+                  aria-hidden='true'
+                />
+              )}
               <div
-                className='profile-cover-home-gradient pointer-events-none'
+                className='profile-cover-home-gradient profile-cover-home-gradient--face-safe pointer-events-none'
                 aria-hidden='true'
               />
-            </>
+            </div>
           ) : null}
 
           <div
             className={cn(
-              'profile-cover-chrome relative z-10 flex h-full items-start justify-between px-4',
+              'profile-cover-chrome z-10 flex items-start justify-between px-4',
+              isHomeMode ? 'absolute inset-x-0 top-0' : 'relative h-full',
               isPreviewEmbedded
                 ? 'pt-19'
                 : isHomeMode
@@ -677,11 +694,11 @@ export function ProfileCompactSurface({
 
           {isHomeMode ? (
             <div
-              className='profile-hero-identity-scrim absolute inset-x-0 bottom-0 z-10 px-(--page-pad) pb-5 pt-8 backdrop-blur-[2px] [@media(max-height:820px)]:pb-4 [@media(max-height:760px)]:pb-3'
+              className='profile-hero-identity-scrim relative z-10 shrink-0 px-(--page-pad) py-2'
               data-testid='profile-hero-identity-block'
             >
               <div
-                className='min-w-0 py-2 [overflow-wrap:anywhere]'
+                className='grid min-w-0 gap-1 [overflow-wrap:anywhere]'
                 data-testid='profile-hero-identity-content'
               >
                 <IdentityHeading
@@ -695,7 +712,7 @@ export function ProfileCompactSurface({
                     href={profileHref}
                     prefetch={false}
                     aria-label={`Go to ${artist.name}'s profile`}
-                    className='inline-flex max-w-full min-w-0 flex-wrap items-start gap-1 rounded-md py-2.5 -my-2.5 text-3xl font-semibold leading-none tracking-normal text-(--profile-status-pill-fg) drop-shadow-[0_2px_14px_rgba(0,0,0,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-2xl [@media(max-height:760px)]:text-2xl'
+                    className='inline-flex min-h-11 max-w-full min-w-0 flex-wrap items-start gap-1 rounded-md py-1 text-3xl font-semibold leading-8 tracking-normal text-(--profile-status-pill-fg) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-2xl [@media(max-height:760px)]:text-2xl'
                   >
                     <span className='min-w-0 max-w-full [overflow-wrap:anywhere]'>
                       {artist.name}
@@ -717,13 +734,19 @@ export function ProfileCompactSurface({
                   </Link>
                 </IdentityHeading>
 
-                <div className='mt-2 flex min-w-0 items-center justify-between gap-2 [@media(max-height:820px)]:mt-1'>
-                  <p className='flex min-w-0 items-center gap-1.5 text-xs font-medium leading-4 tracking-normal text-white/74 [@media(max-height:820px)]:text-2xs'>
+                <div className='grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2'>
+                  <p className='flex min-h-11 min-w-0 items-center gap-1.5 text-xs font-medium leading-4 tracking-normal text-white/74 [@media(max-height:820px)]:text-2xs'>
                     <span className='min-w-0 truncate'>{heroSubtitle}</span>
                     {locationLabel ? (
                       <>
-                        <span className='h-1 w-1 shrink-0 rounded-full bg-white/34' />
-                        <MapPin className='h-3.5 w-3.5 shrink-0 text-white/58' />
+                        <span
+                          className='h-1 w-1 shrink-0 rounded-full bg-white/34'
+                          aria-hidden='true'
+                        />
+                        <MapPin
+                          className='h-3.5 w-3.5 shrink-0 text-white/58'
+                          aria-hidden='true'
+                        />
                         <span className='min-w-0 truncate'>
                           {locationLabel}
                         </span>
@@ -733,7 +756,7 @@ export function ProfileCompactSurface({
 
                   {visibleSocialLinks.length > 0 ? (
                     <div
-                      className='flex shrink-0 items-center gap-1'
+                      className='grid shrink-0 auto-cols-[2.75rem] grid-flow-col items-center gap-1'
                       data-testid='profile-hero-social-row'
                     >
                       {visibleSocialLinks.map(link => {
@@ -776,10 +799,11 @@ export function ProfileCompactSurface({
           className={cn(
             'relative z-10 flex flex-col px-(--page-pad)',
             homeContentColumnClassName,
-            isHomeMode ? 'pt-0' : 'pt-2'
+            isHomeMode ? 'profile-home-content-column pt-0' : 'pt-2'
           )}
         >
-          {shouldRenderInteractiveOverlays &&
+          {allowFanCapture &&
+          shouldRenderInteractiveOverlays &&
           activeVisiblePrimaryTab !== 'subscribe' ? (
             <ProfileInlineNotificationsCTA
               artist={artist}
@@ -799,7 +823,7 @@ export function ProfileCompactSurface({
 
           {isHomeMode ? <div className='shrink-0 pb-2' /> : null}
 
-          {showSubscriptionConfirmedBanner ? (
+          {allowFanCapture && showSubscriptionConfirmedBanner ? (
             <div className='shrink-0 pb-3'>
               <SubscriptionConfirmedBanner />
             </div>
@@ -818,16 +842,15 @@ export function ProfileCompactSurface({
               // shell edge, where profile-compact-surface already clips.
               isHomeMode && '-mx-(--page-pad) px-(--page-pad)',
               homeContentScrollClassName,
+              isHomeMode && 'profile-home-content-scroll',
               // Home mode: the scroll region becomes a flex column so the
               // carousel rail can flex into the full remaining height
               // (percentage heights fail against flexed parents).
               isHomeMode && 'flex flex-col',
-              // Exactly ONE tab-bar reservation: when the bar is visible it
-              // is in-flow below the scroll region and IS the reservation
-              // (no extra padding — that double-counted ~74px of dead space).
-              // When the bar is hidden (cold visitor) the padding reserves
-              // the same footprint so the bar appearing causes no shift.
-              showBottomNav ? 'pb-0' : CONTENT_SAFE_AREA_BOTTOM_PADDING,
+              // Exactly one stable reservation. The navigation material floats
+              // above this region, while the padding keeps actionable content
+              // clear whether the experiment initially shows or hides it.
+              CONTENT_SAFE_AREA_BOTTOM_PADDING,
               !isHomeMode &&
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
             )}
@@ -853,7 +876,7 @@ export function ProfileCompactSurface({
                 merchCards={merchCards}
                 releases={releases}
                 hasTip={hasTip}
-                pacArtPriority={!resolvedHeroImageUrl}
+                pacArtPriority
               />
             ) : (
               <ProfilePrimaryTabPanel
@@ -884,22 +907,21 @@ export function ProfileCompactSurface({
               />
             )}
           </div>
-
-          {showBottomNav ? (
-            <BottomTabBar
-              activeTab={
-                activeVisiblePrimaryTab === 'about'
-                  ? 'profile'
-                  : activeVisiblePrimaryTab
-              }
-              hasTourDates={hasTourDates}
-              showAlerts={allowFanCapture}
-              isMenuOpen={isMenuActive}
-              showAlertsTab={allowFanCapture}
-              onTabSelect={handleTabSelect}
-            />
-          ) : null}
         </div>
+
+        {showBottomNav ? (
+          <BottomTabBar
+            activeTab={
+              activeVisiblePrimaryTab === 'about'
+                ? 'profile'
+                : activeVisiblePrimaryTab
+            }
+            hasTourDates={hasTourDates}
+            showAlerts={allowFanCapture}
+            isMenuOpen={isMenuActive}
+            onTabSelect={handleTabSelect}
+          />
+        ) : null}
       </div>
 
       {renderMode !== 'preview' && renderInteractiveOverlays ? (

@@ -54,15 +54,19 @@ describe('BottomTabBar — tab rendering', () => {
     expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument();
   });
 
-  it('omits Alerts when fan capture is unavailable', () => {
+  it('removes fan-capture navigation when alerts are not ownership-safe', () => {
     const { container } = render(
-      <BottomTabBar {...makeProps({ showAlertsTab: false })} />
+      <BottomTabBar {...makeProps({ showAlerts: false })} />
     );
-    expect(
-      screen.queryByRole('button', { name: 'Alerts' })
-    ).not.toBeInTheDocument();
+
+    expect(screen.queryByRole('button', { name: 'Alerts' })).toBeNull();
     const grid = container.querySelector('[style*="grid-template-columns"]');
     expect(grid?.getAttribute('style')).toContain('repeat(3,');
+  });
+
+  it('omits Alerts when the legacy availability flag is false', () => {
+    render(<BottomTabBar {...makeProps({ showAlertsTab: false })} />);
+    expect(screen.queryByRole('button', { name: 'Alerts' })).toBeNull();
   });
 
   it('does not render a More button', () => {

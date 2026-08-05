@@ -118,7 +118,7 @@ export function BottomTabBar({
   return (
     <div
       className={cn(
-        'shrink-0 pb-[max(env(safe-area-inset-bottom),10px)] pt-2',
+        'profile-floating-tab-bar shrink-0 pb-[max(env(safe-area-inset-bottom),10px)] pt-2',
         className
       )}
       data-testid='profile-tab-bar'
@@ -126,10 +126,10 @@ export function BottomTabBar({
       <nav
         aria-label='Profile Navigation'
         data-testid='profile-bottom-nav'
-        className='h-12 rounded-full border border-[color:var(--profile-dock-border)] bg-[color:var(--profile-dock-bg)] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_14px_34px_rgba(0,0,0,0.32)] backdrop-blur-2xl'
+        className='profile-liquid-glass-nav h-12 rounded-full border p-1 shadow-(--profile-dock-shadow) backdrop-blur-xl backdrop-saturate-150'
       >
         <div
-          className='-my-0.5 grid h-11 items-center gap-1'
+          className='profile-liquid-glass-nav__grid -my-0.5 grid h-11 items-center gap-1'
           style={{
             gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
           }}
@@ -145,7 +145,7 @@ export function BottomTabBar({
                 type='button'
                 onClick={() => onTabSelect(tab.mode)}
                 className={cn(
-                  'relative flex h-full min-w-0 touch-manipulation items-center justify-center rounded-full text-center transition-colors duration-subtle ease-subtle',
+                  'profile-liquid-glass-nav__item relative flex h-full min-w-0 touch-manipulation items-center justify-center rounded-full text-center transition-colors duration-subtle ease-subtle',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
                   isActive
                     ? 'text-white dark:text-white'
@@ -157,7 +157,7 @@ export function BottomTabBar({
               >
                 <Icon
                   className={cn(
-                    'h-5 w-5 shrink-0 transition-[color,stroke-width] duration-subtle',
+                    'profile-liquid-glass-nav__icon h-5 w-5 shrink-0 transition-[color,stroke-width] duration-subtle',
                     isActive ? 'text-white dark:text-white' : 'text-white/52'
                   )}
                   strokeWidth={isActive ? 2.35 : 1.8}
@@ -165,7 +165,7 @@ export function BottomTabBar({
                 />
                 <span
                   className={cn(
-                    'sr-only',
+                    'profile-liquid-glass-nav__label sr-only',
                     isActive ? 'font-semibold' : 'font-medium'
                   )}
                 >
