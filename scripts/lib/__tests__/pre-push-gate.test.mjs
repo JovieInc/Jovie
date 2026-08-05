@@ -154,6 +154,9 @@ describe('pre-push gate Node and fanout wiring (JOV-4329)', () => {
       'export AUTOMATION_VERIFY_MAX_WORKERS="${AUTOMATION_VERIFY_MAX_WORKERS:-1}"'
     );
     expect(huskyPrePush).not.toMatch(/^AUTOMATION_VERIFY_MAX_WORKERS=1$/m);
+    expect(huskyPrePush).toContain(
+      'export AUTOMATION_VERIFY_SHARD_CONCURRENCY="${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-1}"'
+    );
   });
 
   it('keeps the documented max-workers knob in the verify bundle', () => {
@@ -161,7 +164,7 @@ describe('pre-push gate Node and fanout wiring (JOV-4329)', () => {
       '--max-workers "${AUTOMATION_VERIFY_MAX_WORKERS:-2}"'
     );
     expect(automationVerify).toContain(
-      '--shard-concurrency "${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-2}"'
+      '--shard-concurrency "${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-1}"'
     );
   });
 

@@ -30,7 +30,7 @@ case "$SCOPE" in
     node scripts/run-affected-tests.mjs \
       --base "$BASE_REF" \
       --max-workers "${AUTOMATION_VERIFY_MAX_WORKERS:-2}" \
-      --shard-concurrency "${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-2}"
+      --shard-concurrency "${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-1}"
     pnpm ci:harness:check
     ;;
   full)
