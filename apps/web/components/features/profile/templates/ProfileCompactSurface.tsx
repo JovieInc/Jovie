@@ -157,6 +157,8 @@ interface ProfileCompactSurfaceProps {
     readonly showOldReleases?: boolean;
   } | null;
   readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
+  /** Claim-safe profiles can disable fan-capture controls. */
+  readonly allowFanCapture?: boolean;
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
   readonly alertOptInVariant?: ProfileAlertOptInVariant;
