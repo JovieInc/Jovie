@@ -24,7 +24,10 @@ const PROTECTED_LABELS = new Set([
   'tim-owned',
   'type:epic',
 ]);
-const SAFE_PROJECTS = new Set(['Infra & CI/CD']);
+export const SYMPHONY_PROJECT = {
+  name: 'Infra & CI/CD',
+  slugId: '82c6fbd42405',
+};
 const PROHIBITED_TEXT =
   /credential|secret|password|api[ -]?key|access token|private key|billing|payment|checkout|database migration|schema migration|production deploy|publish externally|delete (?:customer|production|user) data|destructive|synthetic|bundle|workstream|batch|epic-only/i;
 const ACTIVE_PR = /github\.com\/JovieInc\/Jovie\/pull\/\d+/i;
@@ -87,7 +90,11 @@ export function validateDeterministicPlanCandidate(
     return 'inactive-or-active-state';
   if (isTimOwned(issue)) return 'tim-owned';
   if (issue.assignee) return 'already-assigned';
-  if (!SAFE_PROJECTS.has(issue.project?.name)) return 'project-not-allowlisted';
+  if (
+    issue.project?.name !== SYMPHONY_PROJECT.name ||
+    issue.project?.slugId !== SYMPHONY_PROJECT.slugId
+  )
+    return 'project-not-allowlisted';
 
   const labels = labelsOf(issue);
   if (!labels.some(label => READY_LABELS.has(label)))

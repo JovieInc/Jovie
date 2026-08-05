@@ -23,7 +23,7 @@ Normalize the unstable token before sending the event.
     priority: 2,
     estimate: 2,
     state: { name: 'Backlog' },
-    project: { name: 'Infra & CI/CD' },
+    project: { name: 'Infra & CI/CD', slugId: '82c6fbd42405' },
     assignee: null,
     labels: {
       nodes: [
