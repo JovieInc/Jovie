@@ -532,6 +532,50 @@ describe('ProfileCompactTemplate', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('suppresses unowned fan capture and resolves subscribe deep links to home', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='subscribe'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        allowFanCapture={false}
+        showSubscriptionConfirmedBanner
+      />
+    );
+
+    const bottomNav = screen.getByTestId('profile-bottom-nav');
+    expect(
+      within(bottomNav).queryByRole('button', { name: 'Alerts' })
+    ).toBeNull();
+    expect(screen.getByTestId('profile-compact-surface')).toHaveAttribute(
+      'data-mode',
+      'profile'
+    );
+    expect(screen.getByTestId('profile-home-rail')).toBeInTheDocument();
+    expect(screen.queryByText(/Notifications on!/)).toBeNull();
+  });
+
+  it('keeps profile disclosure inside the fixed shell without hiding navigation', () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        profileBanner={<div data-testid='test-profile-banner'>Unclaimed</div>}
+      />
+    );
+
+    const shell = screen.getByTestId('profile-compact-shell');
+    const banner = screen.getByTestId('profile-shell-banner');
+    const surfaceSlot = banner.nextElementSibling;
+
+    expect(shell).toContainElement(banner);
+    expect(banner).toContainElement(screen.getByTestId('test-profile-banner'));
+    expect(surfaceSlot).toHaveClass('min-h-0', 'flex-1');
+  });
+
   it('keeps the home tab active for about mode deep links', async () => {
     render(
       <ProfileCompactTemplate
@@ -1378,9 +1422,37 @@ describe('ProfileCompactTemplate', () => {
   });
 
   describe('hydration-safe profile mode sync', () => {
-    // The public profile route is ISR/static, so the server cannot know query
-    // params or viewport matchMedia. Keep the first client render aligned with
-    // the server, then sync query mode and responsive presentation after mount.
+    // Bounded query modes now arrive from the private ISR renderer. The client
+    // still needs this fallback for history-only changes and stale in-app RSC
+    // payloads, while the first render must honor a server-supplied mode.
+
+    it('opens an available pay drawer on the first render', () => {
+      render(
+        <ProfileCompactTemplate
+          mode='pay'
+          artist={mockArtist}
+          socialLinks={[
+            {
+              id: 'venmo-1',
+              artist_id: mockArtist.id,
+              platform: 'venmo',
+              url: 'https://venmo.com/testartist',
+              clicks: 0,
+              created_at: '2024-01-01T00:00:00.000Z',
+            },
+          ]}
+          contacts={[]}
+          showPayButton
+        />
+      );
+
+      expect(mockProfileUnifiedDrawer.mock.calls[0]?.[0]).toEqual(
+        expect.objectContaining({ open: true, view: 'pay' })
+      );
+      expect(mockUseProfileShell.mock.calls[0]?.[0]).toEqual(
+        expect.objectContaining({ modeOverride: 'pay' })
+      );
+    });
 
     it('starts ?mode=listen from the server mode, then syncs after hydration', async () => {
       mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);

@@ -40,13 +40,6 @@ export function ListenDrawer({
     [onOpenChange]
   );
 
-  // Preload deep-links module when drawer opens
-  useEffect(() => {
-    if (open) {
-      import('@/lib/deep-links').catch(() => {});
-    }
-  }, [open]);
-
   return (
     <ProfileDrawerShell
       open={open}

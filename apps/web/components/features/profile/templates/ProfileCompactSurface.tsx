@@ -157,6 +157,8 @@ interface ProfileCompactSurfaceProps {
     readonly showOldReleases?: boolean;
   } | null;
   readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
+  /** Claim-safe profiles can disable fan-capture controls. */
+  readonly allowFanCapture?: boolean;
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
   readonly alertOptInVariant?: ProfileAlertOptInVariant;
@@ -198,7 +200,6 @@ interface ProfileCompactSurfaceProps {
   readonly hideBackButton?: boolean;
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
-  readonly allowFanCapture?: boolean;
   readonly headerSocialLinksOverride?: readonly LegacySocialLink[];
   readonly renderInteractiveOverlays?: boolean;
   readonly renderSemanticHeading?: boolean;
@@ -251,6 +252,7 @@ export function ProfileCompactSurface({
   latestRelease,
   profileSettings,
   featuredPlaylistFallback,
+  allowFanCapture = true,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   alertOptInVariant = 'button',
@@ -292,7 +294,6 @@ export function ProfileCompactSurface({
   dataTestId,
   hideBackButton = false,
   hideMoreMenu = false,
-  allowFanCapture = true,
   headerSocialLinksOverride,
   renderInteractiveOverlays = true,
   renderSemanticHeading = true,
@@ -324,11 +325,15 @@ export function ProfileCompactSurface({
     artistHandle: artist.handle,
   });
   const isDrawerOverlayActive = renderMode === 'interactive' && drawerOpen;
-  const activePrimaryTab = resolveActivePrimaryTab({
+  const requestedPrimaryTab = resolveActivePrimaryTab({
     mode: activeMode,
     drawerOpen: isDrawerOverlayActive,
     drawerView,
   });
+  const activePrimaryTab =
+    !allowFanCapture && requestedPrimaryTab === 'subscribe'
+      ? 'profile'
+      : requestedPrimaryTab;
   const hasTourDates = tourDates.length > 0;
   const activeVisiblePrimaryTab =
     !allowFanCapture && activePrimaryTab === 'subscribe'
@@ -888,6 +893,7 @@ export function ProfileCompactSurface({
                   : activeVisiblePrimaryTab
               }
               hasTourDates={hasTourDates}
+              showAlerts={allowFanCapture}
               isMenuOpen={isMenuActive}
               showAlertsTab={allowFanCapture}
               onTabSelect={handleTabSelect}

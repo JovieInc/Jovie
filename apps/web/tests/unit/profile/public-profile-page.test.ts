@@ -66,6 +66,14 @@ type RedirectRule = {
 
 type RewriteRule = Omit<RedirectRule, 'permanent'>;
 
+const PRIVATE_PROFILE_MODE_PAGE_SOURCE = readFileSync(
+  path.join(
+    WEB_ROOT,
+    'app/[username]/profile-mode-render/[profileMode]/[marker]/page.tsx'
+  ),
+  'utf8'
+);
+
 function getAfterFilesRewrites(
   rewrites:
     | RewriteRule[]
@@ -136,6 +144,18 @@ const mockLinks = [
 const mockGenres = ['rock', 'indie', 'alternative'];
 
 describe('Public Profile Page Logic', () => {
+  it('uses only structured Spotify links to resolve the profile owner identity', () => {
+    expect(PUBLIC_PROFILE_PAGE_SOURCE).toMatch(
+      /\.filter\(link => link\.platform === 'spotify'\)[\s\S]{0,100}\.map\(link => link\.url\)/
+    );
+  });
+
+  it('disables fan capture for structured-credit profiles pending verified ownership', () => {
+    expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+      'allowFanCapture={!requiresVerifiedOwnership}'
+    );
+  });
+
   describe('public profile ISR boundary', () => {
     it('scopes streamed loading to the base profile page', () => {
       expect(
@@ -884,6 +904,61 @@ describe('profile mode route redirects', () => {
         ]
       )
     );
+  });
+
+  it('server-renders bounded query modes through the private ISR route', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
+    const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
+    const queryModeRewrite = afterFiles.find(
+      rule =>
+        rule.source === '/:username' &&
+        rule.destination.includes('/profile-mode-render/:profileMode')
+    );
+
+    expect(queryModeRewrite).toEqual({
+      source: '/:username',
+      has: [
+        {
+          type: 'query',
+          key: 'mode',
+          value:
+            '^(?<profileMode>listen|pay|subscribe|about|contact|tour|releases|tip)$',
+        },
+      ],
+      destination:
+        '/:username/profile-mode-render/:profileMode/__profile-mode-alias',
+    });
+    expect(PRIVATE_PROFILE_MODE_PAGE_SOURCE).toContain('return ArtistPage({');
+    expect(PRIVATE_PROFILE_MODE_PAGE_SOURCE).toContain(
+      '__profileMode: initialMode'
+    );
+    expect(PRIVATE_PROFILE_MODE_PAGE_SOURCE).toContain(
+      'export const revalidate = 3600'
+    );
+    expect(PRIVATE_PROFILE_MODE_PAGE_SOURCE).toContain(
+      'export function generateStaticParams()'
+    );
+    expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('searchParams');
+  });
+
+  it('keeps unknown and profile query values on the canonical root renderer', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
+    const afterFiles = getAfterFilesRewrites(await nextConfig.rewrites());
+    const queryModeRewrite = afterFiles.find(
+      rule =>
+        rule.source === '/:username' &&
+        rule.destination.includes('/profile-mode-render/:profileMode')
+    );
+    const pattern = new RegExp(queryModeRewrite?.has?.[0]?.value ?? '');
+
+    expect(pattern.test('listen')).toBe(true);
+    expect(pattern.test('tip')).toBe(true);
+    expect(pattern.test('profile')).toBe(false);
+    expect(pattern.test('music')).toBe(false);
+    expect(pattern.test('listen/../../app')).toBe(false);
+    expect(pattern.test('q'.repeat(2049))).toBe(false);
   });
 
   it('bounds cacheable attribution variants to Jovie-issued source values', async () => {

@@ -133,6 +133,8 @@ export function StaticArtistPage({
       contacts={viewModel.contacts}
       showPayButton={viewModel.showPayButton}
       latestRelease={viewModel.latestRelease}
+      profileBanner={profileBanner}
+      allowFanCapture={allowFanCapture}
       enableDynamicEngagement={viewModel.enableDynamicEngagement}
       subscribeTwoStep={viewModel.subscribeTwoStep}
       alertOptInVariant={viewModel.alertOptInVariant}
@@ -153,8 +155,6 @@ export function StaticArtistPage({
       merchCards={viewModel.merchCards}
       hideJovieBranding={hideJovieBranding}
       hideMoreMenu={hideMoreMenu}
-      profileBanner={profileBanner}
-      allowFanCapture={allowFanCapture}
       showClaimFooter={showClaimFooter}
       claimFooterHref={claimFooterHref}
     />

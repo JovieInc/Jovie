@@ -204,6 +204,28 @@ describe('ProfileHomeRail', () => {
     expect(cta.className).toContain('w-auto');
   });
 
+  it('can suppress fan capture without pretending the visitor follows the artist', () => {
+    render(
+      <ProfileHomeRail
+        artist={makeArtist()}
+        latestRelease={null}
+        profileSettings={{ showOldReleases: true }}
+        featuredPlaylistFallback={null}
+        tourDates={[]}
+        hasPlayableDestinations
+        renderMode='preview'
+        isSubscribed={false}
+        showAlertsCard={false}
+      />
+    );
+
+    expect(
+      screen.queryByTestId('profile-home-alerts-fallback-card')
+    ).toBeNull();
+    expect(screen.queryByText('Following')).toBeNull();
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+  });
+
   it('keeps the carousel shell with PAC and alerts cards even when the catalog is empty', () => {
     render(
       <ProfileHomeRail

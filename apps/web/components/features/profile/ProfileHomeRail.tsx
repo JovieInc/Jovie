@@ -383,7 +383,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   return (
     <div
       ref={exposureRef}
-      className='flex min-h-0 min-w-0 flex-1 flex-col md:mx-auto md:w-full md:max-w-80'
+      className='flex min-h-0 min-w-0 flex-1 flex-col md:mx-auto md:w-full'
       data-testid='profile-home-rail'
     >
       <h2 className='sr-only'>Latest From {artist.name}</h2>

@@ -445,6 +445,8 @@ const nextConfig = {
     // fallback below, so reserved characters cannot alter the private path or
     // create an unbounded cache-key surface.
     const profileModeAliasSourcePattern = '^(?<profileSource>link|qr)$';
+    const profileQueryModePattern =
+      '^(?<profileMode>listen|pay|subscribe|about|contact|tour|releases|tip)$';
     const profileModeAliasRewrites = [
       'listen',
       'music',
@@ -477,6 +479,18 @@ const nextConfig = {
       // content before falling back to the legacy profile-mode redirect.
       afterFiles: [
         ...profileModeAliasRewrites,
+        {
+          source: '/:username',
+          has: [
+            {
+              type: 'query',
+              key: 'mode',
+              value: profileQueryModePattern,
+            },
+          ],
+          destination:
+            '/:username/profile-mode-render/:profileMode/__profile-mode-alias',
+        },
         {
           source: '/app/ov/:path*',
           destination: '/app/admin/:path*',

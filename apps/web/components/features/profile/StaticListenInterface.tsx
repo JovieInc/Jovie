@@ -9,6 +9,7 @@ import {
 } from '@/constants/app';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import { track } from '@/lib/analytics';
+import { getDSPDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
 import {
   type AvailableDSP,
   getAvailableDSPs,
@@ -38,7 +39,7 @@ interface StaticListenInterfaceProps {
  * Performance optimizations:
  * - Removed DOMPurify (~70KB) - SVG logos are trusted internal constants from DSP_CONFIGS
  * - Removed backspace keyboard listener - non-standard UX and adds event overhead
- * - Lazy loads deep-links module only on click
+ * - Loads with the already-lazy unified drawer, avoiding a nested runtime chunk
  */
 export const StaticListenInterface = React.memo(function StaticListenInterface({
   artist,
@@ -128,28 +129,15 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
         console.error('[StaticListenInterface] Failed to track click:', error);
       }
 
-      // Try deep linking with lazy import
-      try {
-        const { getDSPDeepLinkConfig, openDeepLink } = await import(
-          '@/lib/deep-links'
-        );
-        const deepLinkConfig = getDSPDeepLinkConfig(dsp.key);
-
-        if (deepLinkConfig) {
-          try {
-            await openDeepLink(dsp.url, deepLinkConfig);
-          } catch (error) {
-            console.debug('Deep link failed, using fallback:', error);
-            globalThis.open(dsp.url, '_blank', 'noopener,noreferrer');
-          }
-        } else {
+      const deepLinkConfig = getDSPDeepLinkConfig(dsp.key);
+      if (deepLinkConfig) {
+        try {
+          await openDeepLink(dsp.url, deepLinkConfig);
+        } catch (error) {
+          console.debug('Deep link failed, using fallback:', error);
           globalThis.open(dsp.url, '_blank', 'noopener,noreferrer');
         }
-      } catch (error) {
-        console.debug(
-          'Deep link module failed to load, using fallback:',
-          error
-        );
+      } else {
         globalThis.open(dsp.url, '_blank', 'noopener,noreferrer');
       }
     } catch (error) {
