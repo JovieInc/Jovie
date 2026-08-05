@@ -58,6 +58,15 @@ const mockUpsertRecording = vi.fn().mockResolvedValue({ id: 'recording-1' });
 const mockUpsertReleaseTrack = vi
   .fn()
   .mockResolvedValue({ id: 'release-track-1' });
+const mockReconcileCreditedArtistProfiles = vi.fn().mockResolvedValue({
+  candidates: 0,
+  conflicted: 0,
+  created: 0,
+  deferred: false,
+  metadataUnavailable: 0,
+  reused: 0,
+});
+const mockCaptureWarning = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@/lib/spotify', () => ({
   getSpotifyArtistAlbums: mockGetSpotifyArtistAlbums,
@@ -112,6 +121,15 @@ vi.mock('@/lib/discography/discovery', () => ({
   discoverLinksForRelease: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('@/lib/discography/collaborator-profile-reconciliation', () => ({
+  reconcileCreditedArtistProfiles: mockReconcileCreditedArtistProfiles,
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: vi.fn(),
+  captureWarning: mockCaptureWarning,
+}));
+
 describe('spotify-import', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -123,6 +141,15 @@ describe('spotify-import', () => {
     mockUpsertRelease.mockResolvedValue({ id: 'release-1' });
     mockUpsertRecording.mockResolvedValue({ id: 'recording-1' });
     mockUpsertReleaseTrack.mockResolvedValue({ id: 'release-track-1' });
+    mockReconcileCreditedArtistProfiles.mockResolvedValue({
+      candidates: 0,
+      conflicted: 0,
+      created: 0,
+      deferred: false,
+      metadataUnavailable: 0,
+      reused: 0,
+    });
+    mockCaptureWarning.mockResolvedValue(undefined);
     mockSafeParse.mockImplementation((id: unknown) => ({
       success: typeof id === 'string' && id.length > 0,
     }));
@@ -176,6 +203,33 @@ describe('spotify-import', () => {
 
       expect(result.success).toBe(true);
       expect(result.imported).toBe(0);
+      expect(mockReconcileCreditedArtistProfiles).toHaveBeenCalledWith(
+        'profile-123',
+        '6Ghvu1VvMGScGpOUJBAHNH'
+      );
+    });
+
+    it('keeps catalog import available and reports reconciliation failures', async () => {
+      const reconciliationError = new Error('identity conflict');
+      mockReconcileCreditedArtistProfiles.mockRejectedValueOnce(
+        reconciliationError
+      );
+
+      const { importReleasesFromSpotify } = await import(
+        '@/lib/discography/spotify-import'
+      );
+
+      const result = await importReleasesFromSpotify(
+        'profile-123',
+        '6Ghvu1VvMGScGpOUJBAHNH'
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockCaptureWarning).toHaveBeenCalledWith(
+        'Credited artist profile reconciliation could not complete',
+        reconciliationError,
+        { source: 'spotify_import', creatorProfileId: 'profile-123' }
+      );
     });
 
     it('should truncate releases when exceeding max limit', async () => {
