@@ -1057,7 +1057,7 @@ export async function runCommand(command, args) {
 async function runCommands(commands, concurrency = 1) {
   const workerCount = Math.max(
     1,
-    Math.min(commands.length, Number.parseInt(concurrency, 10) || 1)
+    Math.min(commands.length, Number.parseInt(String(concurrency), 10) || 1)
   );
   let cursor = 0;
   let failureStatus = 0;
