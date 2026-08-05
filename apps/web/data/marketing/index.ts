@@ -35,6 +35,31 @@ export {
   resolveComposition,
 } from './composition';
 export type {
+  MarketingCopyAction,
+  MarketingCopyAuditIssue,
+  MarketingCopyClaim,
+  MarketingCopyInstructionTokens,
+  MarketingCopyLineBinding,
+  MarketingCopyLineRole,
+  MarketingCopyOutcome,
+  MarketingCopyPageBrief,
+  MarketingCopyPageDraft,
+  MarketingCopySectionBrief,
+  MarketingCopySectionDraft,
+  MarketingCopySemanticAudit,
+  MarketingCopySemanticAuditOptions,
+  MarketingCopySemanticEnforcement,
+  MarketingCopyTasteTag,
+  MarketingCopyVisibleCopy,
+} from './copy';
+export {
+  auditMarketingCopySemantics,
+  MARKETING_COPY_LINE_ROLES,
+  MARKETING_COPY_SEMANTIC_ENFORCEMENTS,
+  MARKETING_COPY_SPEC_VERSION,
+  MARKETING_COPY_TASTE_TAGS,
+} from './copy';
+export type {
   GrayscaleWireframeSpec,
   ModelUsageEstimate,
   ProposedSectionComment,
