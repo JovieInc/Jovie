@@ -52,23 +52,15 @@ describe('HomeTrustSection', () => {
     ).toHaveLength(1);
   });
 
-  it('accepts editorial label depth without weakening the accessible name', () => {
-    render(
-      <HomeTrustSection
-        ariaLabel='Music does not stop at distribution. Jovie keeps the next decision in view.'
-        label={
-          <span>
-            <span>Music does not stop at distribution.</span>
-            <span>Jovie keeps the next decision in view.</span>
-          </span>
-        }
-        presentation='inline-strip'
-      />
-    );
+  it('keeps the inline strip on the canonical trust copy', () => {
+    render(<HomeTrustSection presentation='inline-strip' />);
 
     expect(
+      screen.getByText('Trusted by artists and teams releasing on')
+    ).toBeInTheDocument();
+    expect(
       screen.getByRole('region', {
-        name: 'Music does not stop at distribution. Jovie keeps the next decision in view. major labels',
+        name: 'Trusted by artists and teams releasing on major labels',
       })
     ).toBeInTheDocument();
   });

@@ -46,20 +46,18 @@ export function HomepageClosedLoop({
             {/* ui-casing-allow: marketing display headline (DESIGN.md Text Casing exception) */}
             All your music working while you sleep
           </h2>
-          <p>
-            Jovie keeps your catalog and audience signal together, watches for
-            changes, and surfaces the release or fan moment worth acting on.
-          </p>
+          <p>One workspace for releases, audience, and the next action.</p>
         </div>
 
         <div className='homepage-closed-loop-story'>
           <figure className='homepage-closed-loop-proof'>
             <MarketingScreenshot
-              scenarioId='design-studio-shell-library-desktop'
-              altOverride='Jovie catalog workspace showing an artist release library'
+              scenarioId='dashboard-releases-sidebar-desktop'
+              altOverride='Jovie releases workspace with a selected release and detail rail'
               width={2880}
               height={1800}
-              title='Jovie catalog workspace'
+              priority
+              title='Jovie releases workspace'
             />
           </figure>
 

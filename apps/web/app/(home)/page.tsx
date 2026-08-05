@@ -42,12 +42,11 @@ const HomepageV2FinalCta = dynamic(
   { ssr: true }
 );
 const HERO_PRODUCT_IMAGES = {
-  product: getMarketingExportImage('dashboard-releases-desktop'),
+  // Use the canonical populated workspace state so the first product proof
+  // shows a real decision surface (including the detail rail), not an empty
+  // demo canvas.
+  product: getMarketingExportImage('dashboard-releases-sidebar-desktop'),
 };
-const DISTRIBUTION_SUPPORT_COPY = {
-  primary: 'Music does not stop at distribution.',
-  secondary: 'Jovie keeps the next decision in view.',
-} as const;
 const ARTIST_OUTCOME_CARDS = [
   {
     id: 'drive-streams',
@@ -229,16 +228,7 @@ function HomepageHero() {
         media={<HomepageHeroCommandCenter images={HERO_PRODUCT_IMAGES} />}
       />
       <div className='homepage-trust-section system-b-mounted-home-trust-strip-shell'>
-        <HomeTrustSection
-          ariaLabel={`${DISTRIBUTION_SUPPORT_COPY.primary} ${DISTRIBUTION_SUPPORT_COPY.secondary}`}
-          label={
-            <span className='homepage-trust-editorial-copy'>
-              <span>{DISTRIBUTION_SUPPORT_COPY.primary}</span>
-              <span>{DISTRIBUTION_SUPPORT_COPY.secondary}</span>
-            </span>
-          }
-          presentation='inline-strip'
-        />
+        <HomeTrustSection presentation='inline-strip' />
       </div>
     </>
   );

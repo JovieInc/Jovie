@@ -72,14 +72,14 @@ describe('homepage hero next-move contract (JOV-4475)', () => {
     );
 
     expect(pageSource).toContain(
-      "getMarketingExportImage('dashboard-releases-desktop')"
+      "getMarketingExportImage('dashboard-releases-sidebar-desktop')"
     );
     expect(pageSource).toContain('<HomepageHeroCommandCenter');
     expect(commandCenterSource).toContain('homepage-product-pane__image');
     expect(commandCenterSource).toContain(
-      'Jovie public demo showing the releases catalog'
+      'Jovie authenticated releases workspace with a selected release and detail rail'
     );
-    expect(commandCenterSource).not.toMatch(/authenticated releases/i);
+    expect(commandCenterSource).toMatch(/authenticated releases/i);
     expect(commandCenterSource).not.toMatch(/The Deep End|Deep End/);
     expect(pageSource).not.toMatch(
       /function HomepageHero\(\)[\s\S]*?The Deep End/

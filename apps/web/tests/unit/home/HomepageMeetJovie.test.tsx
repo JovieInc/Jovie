@@ -49,10 +49,12 @@ describe('HomepageMeetJovie', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: 'Jovie is the AI workspace for artists.',
+        name: 'Jovie is the AI workspace for artists. Built around your catalog, audience, and artist presence.',
       })
     ).toBeInTheDocument();
-    expect(screen.getByText('Meet Jovie')).toBeInTheDocument();
+    expect(screen.getByText('Meet Jovie')).toHaveClass(
+      'homepage-meet-jovie__eyebrow'
+    );
     expect(
       screen.getByText(
         'Built around your catalog, audience, and artist presence.'
