@@ -239,12 +239,18 @@ final class SentryObservabilityProvider: ObservabilityProvider {
 
 enum SentryEventNormalizer {
   private static let unknownContextPattern = #"\.\(unknown context at \$[0-9a-fA-F]+\)"#
+  private static let bareUnknownContextPattern = #"\(unknown context at \$[0-9a-fA-F]+\)"#
   private static let mobileAuthErrorName = "MobileAuthFinalizationStageError"
 
   static func normalizeUnknownContext(_ value: String) -> String {
-    value.replacingOccurrences(
+    let dottedContextRemoved = value.replacingOccurrences(
       of: unknownContextPattern,
       with: ".",
+      options: .regularExpression
+    )
+    return dottedContextRemoved.replacingOccurrences(
+      of: bareUnknownContextPattern,
+      with: "",
       options: .regularExpression
     )
   }
