@@ -33,6 +33,9 @@ const meta = {
   parameters: {
     layout: 'centered',
     backgrounds: { default: 'light' },
+    jovie: {
+      uncoveredProps: ['disabled'],
+    },
   },
   decorators: [
     Story => (
@@ -57,11 +60,11 @@ export const ProfileLandscape: Story = {
     layout: 'profile-landscape',
   },
   play: async ({ canvasElement }) => {
-    const previous = canvasElement.querySelector<HTMLButtonElement>(
-      'button[aria-label="Previous Item"]'
+    const first = canvasElement.querySelector<HTMLButtonElement>(
+      'button[aria-label="Go to item 1"]'
     );
-    if (!previous?.disabled) {
-      throw new Error('Previous carousel control must be disabled at rest');
+    if (first?.getAttribute('aria-current') !== 'true') {
+      throw new Error('First carousel dot must be selected at rest');
     }
   },
 };

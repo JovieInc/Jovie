@@ -232,7 +232,9 @@ describe('EntityCarousel profile geometry', () => {
 
     const image = screen.getByRole('img', { name: 'Release one' });
     expect(image.parentElement?.className).toContain('aspect-square');
-    expect(image.parentElement?.className).toMatch(/(?:^|\s)rounded(?:\s|$)/);
+    expect(image.parentElement?.className).toContain(
+      'rounded-(--profile-action-radius)'
+    );
     expect(image.parentElement?.className).toContain('border-0');
     expect(image.parentElement?.className).not.toContain('border-r');
 
@@ -266,7 +268,7 @@ describe('EntityCarousel profile geometry', () => {
     ).toBe(true);
   });
 
-  it('reveals restrained desktop controls for full-width landscape discovery', () => {
+  it('renders external dot controls for full-width landscape discovery', () => {
     render(<EntityCarousel items={items} layout='profile-landscape' />);
 
     const carousel = screen.getByTestId('entity-carousel');
@@ -282,16 +284,22 @@ describe('EntityCarousel profile geometry', () => {
       value: 320,
     });
 
-    const previous = screen.getByRole('button', { name: 'Previous Item' });
-    const next = screen.getByRole('button', { name: 'Next Item' });
+    const controls = screen.getByTestId('profile-carousel-controls');
+    const previousArrow = screen.getByRole('button', {
+      name: 'Previous Item',
+    });
+    const nextArrow = screen.getByRole('button', { name: 'Next Item' });
+    const previous = screen.getByRole('button', { name: 'Go to item 1' });
+    const next = screen.getByRole('button', { name: 'Go to item 2' });
     expect(carousel.parentElement).toHaveClass('h-fit');
-    expect(previous).toBeDisabled();
-    expect(next).toBeEnabled();
-    expect(previous.className).toContain(
-      '[@media(min-width:768px)_and_(hover:hover)_and_(pointer:fine)]:inline-flex'
-    );
-    expect(next.className).not.toContain('md:inline-flex');
-    expect(previous.className).toContain('group-hover/carousel:opacity-100');
+    expect(controls).not.toContainElement(carousel);
+    expect(carousel.nextElementSibling).toBe(controls);
+    expect(previousArrow).toBeDisabled();
+    expect(nextArrow).toBeEnabled();
+    expect(previous).toHaveAttribute('aria-current', 'true');
+    expect(next).not.toHaveAttribute('aria-current');
+    expect(previous).toHaveClass('h-11', 'w-11');
+    expect(next).toHaveClass('h-11', 'w-11');
     expect(screen.getByText('Item 1 of 2')).toBeInTheDocument();
 
     fireEvent.click(next);
@@ -300,8 +308,10 @@ describe('EntityCarousel profile geometry', () => {
       left: 320,
       behavior: 'smooth',
     });
-    expect(previous).toBeEnabled();
-    expect(next).toBeDisabled();
+    expect(previous).not.toHaveAttribute('aria-current');
+    expect(next).toHaveAttribute('aria-current', 'true');
+    expect(previousArrow).toBeEnabled();
+    expect(nextArrow).toBeDisabled();
     expect(screen.getByText('Item 2 of 2')).toBeInTheDocument();
   });
 
@@ -470,7 +480,7 @@ describe('EntityCarousel profile geometry', () => {
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
     const card = screen.getByTestId('entity-card-music');
     const media = card.querySelector('.aspect-square');
-    expect(media?.className).toMatch(/(?:^|\s)rounded(?:\s|$)/);
+    expect(media?.className).toContain('rounded-(--profile-action-radius)');
     expect(media?.className).toContain('border-0');
     expect(
       screen.getByRole('heading', {

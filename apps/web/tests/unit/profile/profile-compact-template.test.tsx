@@ -395,6 +395,35 @@ describe('ProfileCompactTemplate', () => {
     ).toHaveAttribute('href', `/${mockArtist.handle}`);
   });
 
+  it('keeps the home identity grid tight without shrinking interaction targets', () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[
+          {
+            id: 'instagram',
+            artist_id: mockArtist.id,
+            platform: 'instagram',
+            url: 'https://instagram.com/test-artist',
+            clicks: 0,
+            created_at: '2026-01-01T00:00:00.000Z',
+          },
+        ]}
+        contacts={[]}
+      />
+    );
+
+    const identity = screen.getByTestId('profile-hero-identity-block');
+    expect(identity).toHaveClass('py-1');
+    expect(
+      screen.getByRole('link', { name: `Go to ${mockArtist.name}'s profile` })
+    ).toHaveClass('min-h-11', 'items-center', 'py-0');
+    expect(
+      within(screen.getByTestId('profile-hero-social-row')).getByRole('link')
+    ).toHaveClass('h-11', 'w-11');
+  });
+
   it('keeps the artist photo in color with profile text over the image', async () => {
     render(
       <ProfileCompactTemplate

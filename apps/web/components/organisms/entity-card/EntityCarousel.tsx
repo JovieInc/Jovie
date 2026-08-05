@@ -66,7 +66,7 @@ export function EntityCarousel({
   const prefersReducedMotion = useReducedMotion();
   const [currentIndex, setCurrentIndex] = useState(0);
   const slotCount = items.length + (leading ? 1 : 0) + (trailing ? 1 : 0);
-  const showsDesktopControls = layout === 'profile-landscape' && slotCount > 1;
+  const showsProfileControls = layout === 'profile-landscape' && slotCount > 1;
 
   useEffect(() => {
     setCurrentIndex(index => Math.min(index, Math.max(slotCount - 1, 0)));
@@ -108,7 +108,7 @@ export function EntityCarousel({
 
   useEffect(() => {
     const track = trackRef.current;
-    if (!showsDesktopControls || !track) {
+    if (!showsProfileControls || !track) {
       snapStepRef.current = 0;
       return;
     }
@@ -139,7 +139,7 @@ export function EntityCarousel({
         scrollFrameRef.current = null;
       }
     };
-  }, [showsDesktopControls, slotCount]);
+  }, [showsProfileControls, slotCount]);
 
   useEffect(() => {
     if (!onCardImpression || items.length === 0) {
@@ -250,6 +250,11 @@ export function EntityCarousel({
     CARD_ITEM_CLASSNAME,
     isProfileLandscape && 'w-full'
   );
+  const visibleDotCount = Math.min(slotCount, 3);
+  const visibleDotStart = Math.min(
+    Math.max(currentIndex - 1, 0),
+    Math.max(slotCount - visibleDotCount, 0)
+  );
 
   return (
     <div
@@ -267,7 +272,7 @@ export function EntityCarousel({
         )}
         data-testid={dataTestId ?? 'entity-carousel'}
         data-layout={layout}
-        onScroll={showsDesktopControls ? handleScroll : undefined}
+        onScroll={showsProfileControls ? handleScroll : undefined}
       >
         {leading ? (
           <li
@@ -319,30 +324,60 @@ export function EntityCarousel({
         ) : null}
       </ul>
 
-      {showsDesktopControls ? (
-        <>
+      {showsProfileControls ? (
+        <div
+          className='mt-1 flex min-h-11 items-center justify-center gap-1 px-1'
+          data-testid='profile-carousel-controls'
+        >
           <button
             type='button'
             aria-label='Previous Item'
             disabled={currentIndex === 0}
             onClick={() => scrollToIndex(currentIndex - 1)}
-            className='absolute left-1 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-(--profile-pearl-border) bg-(--profile-pearl-bg) text-secondary-token opacity-0 shadow-(--profile-pearl-shadow) backdrop-blur-xl transition-opacity duration-subtle [@media(min-width:768px)_and_(hover:hover)_and_(pointer:fine)]:inline-flex hover:text-primary-token focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:pointer-events-none disabled:invisible group-focus-within/carousel:opacity-100 group-hover/carousel:opacity-100'
+            className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent hover:text-primary-token disabled:pointer-events-none disabled:opacity-30'
           >
             <ChevronLeft className='h-4 w-4' aria-hidden='true' />
           </button>
+          <nav
+            aria-label='Profile Items'
+            className='flex min-h-11 items-center justify-center gap-0.5'
+          >
+            {Array.from({ length: visibleDotCount }, (_, offset) => {
+              const index = visibleDotStart + offset;
+              const isCurrent = index === currentIndex;
+              return (
+                <button
+                  key={index}
+                  type='button'
+                  aria-label={`Go to item ${index + 1}`}
+                  aria-current={isCurrent ? 'true' : undefined}
+                  onClick={() => scrollToIndex(index)}
+                  className='flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                >
+                  <span
+                    aria-hidden='true'
+                    className={cn(
+                      'h-1.5 w-1.5 rounded-full bg-(--profile-pearl-border)',
+                      isCurrent && 'h-2 w-2 bg-(--profile-pearl-primary-bg)'
+                    )}
+                  />
+                </button>
+              );
+            })}
+          </nav>
           <button
             type='button'
             aria-label='Next Item'
             disabled={currentIndex === slotCount - 1}
             onClick={() => scrollToIndex(currentIndex + 1)}
-            className='absolute right-1 top-1/2 z-10 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-(--profile-pearl-border) bg-(--profile-pearl-bg) text-secondary-token opacity-0 shadow-(--profile-pearl-shadow) backdrop-blur-xl transition-opacity duration-subtle [@media(min-width:768px)_and_(hover:hover)_and_(pointer:fine)]:inline-flex hover:text-primary-token focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:pointer-events-none disabled:invisible group-focus-within/carousel:opacity-100 group-hover/carousel:opacity-100'
+            className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent hover:text-primary-token disabled:pointer-events-none disabled:opacity-30'
           >
             <ChevronRight className='h-4 w-4' aria-hidden='true' />
           </button>
           <span className='sr-only' aria-live='polite'>
             Item {currentIndex + 1} of {slotCount}
           </span>
-        </>
+        </div>
       ) : null}
     </div>
   );
