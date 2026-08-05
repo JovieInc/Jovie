@@ -12,7 +12,6 @@
     "dev:local": "node scripts/dev-fast.mjs",
     "dev:local:browse": "tsx scripts/drizzle-migrate.ts || echo '[dev:browse] drizzle:migrate failed - starting dev anyway (see error above)'; E2E_USE_TEST_AUTH_BYPASS=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 node scripts/dev-fast.mjs",
     "dev:local:playwright": "NEXT_PUBLIC_E2E_MODE=1 NEXT_DISABLE_TOOLBAR=1 node scripts/dev-fast.mjs -- --webpack",
-    "backfill:collaborator-profiles": "NODE_OPTIONS=--conditions=react-server tsx scripts/backfill-collaborator-profiles.ts",
     "validate-env": "tsx scripts/validate-env.ts",
     "check:signup-readiness": "tsx scripts/check-signup-readiness.ts",
     "seo:ratchet": "vitest run tests/unit/seo --config=vitest.config.mts",
