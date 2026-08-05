@@ -18,5 +18,6 @@ export function buildUnclaimedArtistHandle(artistId: string): string {
     throw new Error('Artist ID must be a UUID');
   }
 
-  return `a_${BigInt(`0x${hex}`).toString(36).padStart(25, '0')}`;
+  const encodedId = BigInt(`0x${hex}`).toString(36).padStart(25, '0');
+  return `a_${encodedId}`;
 }

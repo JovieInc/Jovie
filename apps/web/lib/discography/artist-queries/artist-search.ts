@@ -222,6 +222,47 @@ export async function getStructuredReleaseCollaborators(
   });
 }
 
+function projectStructuredReleaseCollaborator(
+  row: StructuredReleaseCollaboratorRow,
+  creatorProfileId: string,
+  ownerSpotifyId: string | null
+): StructuredReleaseCollaborator | null {
+  if (!isPublicArtistCollaboratorRole(row.role)) return null;
+
+  // Exact profile/Spotify identity excludes the profile owner. Names are not
+  // consulted because aliases and same-name artists are both legitimate.
+  if (
+    row.artistProfileId === creatorProfileId ||
+    (ownerSpotifyId && row.artistSpotifyId === ownerSpotifyId)
+  ) {
+    return null;
+  }
+
+  const name = (row.creditName ?? row.artistName).trim();
+  if (!name) return null;
+
+  const hasPublicProfile =
+    Boolean(row.artistProfileId) && row.profileIsPublic === true;
+  let profileState: StructuredReleaseCollaborator['profileState'] =
+    'unavailable';
+  if (hasPublicProfile) {
+    profileState = row.profileIsClaimed ? 'claimed' : 'unclaimed';
+  }
+
+  return {
+    artistId: row.artistId,
+    name,
+    href: hasPublicProfile ? artistProfileHref(row.artistId) : null,
+    profileState,
+    role: row.role,
+    releaseId: row.releaseId,
+    releaseTitle: row.releaseTitle,
+    releaseSlug: row.releaseSlug,
+    releaseDate: row.releaseDate,
+    position: row.position,
+  };
+}
+
 export function projectStructuredReleaseCollaborators(params: {
   readonly creatorProfileId: string;
   readonly ownerSpotifyId: string | null;
@@ -233,42 +274,18 @@ export function projectStructuredReleaseCollaborators(params: {
   const collaborators: StructuredReleaseCollaborator[] = [];
 
   for (const row of rows) {
-    if (!isPublicArtistCollaboratorRole(row.role)) continue;
-
-    // Exact profile/Spotify identity excludes the profile owner. Names are not
-    // consulted because aliases and same-name artists are both legitimate.
-    if (
-      row.artistProfileId === creatorProfileId ||
-      (ownerSpotifyId && row.artistSpotifyId === ownerSpotifyId)
-    ) {
-      continue;
-    }
-
-    const name = (row.creditName ?? row.artistName).trim();
-    if (!name) continue;
+    const collaborator = projectStructuredReleaseCollaborator(
+      row,
+      creatorProfileId,
+      ownerSpotifyId
+    );
+    if (!collaborator) continue;
 
     const edgeKey = `${row.releaseId}:${row.artistId}:${row.role}`;
     if (seenEdges.has(edgeKey)) continue;
     seenEdges.add(edgeKey);
 
-    const hasPublicProfile =
-      Boolean(row.artistProfileId) && row.profileIsPublic === true;
-    collaborators.push({
-      artistId: row.artistId,
-      name,
-      href: hasPublicProfile ? artistProfileHref(row.artistId) : null,
-      profileState: hasPublicProfile
-        ? row.profileIsClaimed
-          ? 'claimed'
-          : 'unclaimed'
-        : 'unavailable',
-      role: row.role,
-      releaseId: row.releaseId,
-      releaseTitle: row.releaseTitle,
-      releaseSlug: row.releaseSlug,
-      releaseDate: row.releaseDate,
-      position: row.position,
-    });
+    collaborators.push(collaborator);
 
     if (collaborators.length >= limit) break;
   }
