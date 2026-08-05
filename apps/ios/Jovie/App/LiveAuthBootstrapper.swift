@@ -38,9 +38,16 @@ enum MobileAuthReturnError: LocalizedError {
   }
 }
 
-private struct MobileAuthFinalizationStageError: LocalizedError {
+private struct MobileAuthFinalizationStageError: LocalizedError, CustomNSError {
   let stage: String
   let underlyingError: Error
+
+  static let errorDomain = "MobileAuthFinalizationStageError"
+  var errorCode: Int { 1 }
+
+  var errorUserInfo: [String: Any] {
+    [NSUnderlyingErrorKey: underlyingError as NSError]
+  }
 
   var errorDescription: String? {
     let message = underlyingError.localizedDescription.isEmpty

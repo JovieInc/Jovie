@@ -27,7 +27,8 @@ final class SentryObservabilityProvider: ObservabilityProvider {
       options.sendDefaultPii = false
       options.enableCaptureFailedRequests = false
       options.beforeSend = { event in
-        Self.redact(event: event)
+        Self.normalizeFingerprint(event: event)
+        return Self.redact(event: event)
       }
       options.beforeBreadcrumb = { breadcrumb in
         Self.redact(breadcrumb: breadcrumb)
@@ -176,6 +177,29 @@ final class SentryObservabilityProvider: ObservabilityProvider {
     return event
   }
 
+  private static func normalizeFingerprint(event: Event) {
+    guard let exceptions = event.exceptions else { return }
+
+    let types = exceptions.map { exception in
+      exception.type.map(SentryEventNormalizer.normalizeUnknownContext)
+    }
+    let values = exceptions.map { exception in
+      exception.value.map(SentryEventNormalizer.normalizeUnknownContext)
+    }
+
+    for (index, exception) in exceptions.enumerated() {
+      exception.type = types[index]
+      exception.value = values[index]
+    }
+
+    if let fingerprint = SentryEventNormalizer.mobileAuthFingerprint(
+      exceptionTypes: types,
+      exceptionValues: values
+    ) {
+      event.fingerprint = fingerprint
+    }
+  }
+
   private static func redact(breadcrumb: Breadcrumb) -> Breadcrumb? {
     if let data = breadcrumb.data {
       breadcrumb.data = ObservabilityRedactor.sanitizedContext(data)
@@ -210,6 +234,60 @@ final class SentryObservabilityProvider: ObservabilityProvider {
     }
 
     return span
+  }
+}
+
+enum SentryEventNormalizer {
+  private static let unknownContextPattern = #"\.\(unknown context at \$[0-9a-fA-F]+\)"#
+  private static let bareUnknownContextPattern = #"\(unknown context at \$[0-9a-fA-F]+\)"#
+  private static let mobileAuthErrorName = "MobileAuthFinalizationStageError"
+
+  static func normalizeUnknownContext(_ value: String) -> String {
+    let dottedContextRemoved = value.replacingOccurrences(
+      of: unknownContextPattern,
+      with: "",
+      options: .regularExpression
+    )
+    return dottedContextRemoved.replacingOccurrences(
+      of: bareUnknownContextPattern,
+      with: "",
+      options: .regularExpression
+    )
+  }
+
+  static func mobileAuthFingerprint(
+    exceptionTypes: [String?],
+    exceptionValues: [String?]
+  ) -> [String]? {
+    let normalizedTypes = exceptionTypes.compactMap { $0 }.map(normalizeUnknownContext)
+    guard normalizedTypes.contains(where: { $0.contains(mobileAuthErrorName) }) else {
+      return nil
+    }
+
+    guard let stage = exceptionValues
+      .compactMap({ $0 })
+      .compactMap(Self.authStage(from:))
+      .first,
+      let underlyingErrorClass = normalizedTypes.reversed().first(where: {
+        !$0.contains(mobileAuthErrorName)
+      })
+    else {
+      return nil
+    }
+
+    return [mobileAuthErrorName, stage, underlyingErrorClass]
+  }
+
+  private static func authStage(from value: String) -> String? {
+    let prefix = "Native auth "
+    let suffix = " failed:"
+    guard value.hasPrefix(prefix), let suffixRange = value.range(of: suffix) else {
+      return nil
+    }
+
+    let stageStart = value.index(value.startIndex, offsetBy: prefix.count)
+    guard stageStart < suffixRange.lowerBound else { return nil }
+    return String(value[stageStart..<suffixRange.lowerBound])
   }
 }
 
