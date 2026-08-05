@@ -16,10 +16,12 @@ parent lands. Graphite is not required and there is no second landing transport.
    recorded parent tip, prove its exact remote head lease and semantic ancestry,
    then mark it ready and apply `merge-queue`. Automation normally does this;
    humans can use `gh pr edit <pr> --add-label merge-queue` only after that proof.
-3. `merge-queue-autoenroll.yml` revalidates the PR's current state, `main` base,
-   hard-gate labels, terminal checks, and exact head SHA. It enrolls through
-   `scripts/merge-queue-backend.mjs` and proves authoritative queue state after
-   mutation. The label remains intent/audit evidence, never queue truth.
+3. Before labeling, the operator must verify the child targets `main` and that
+   its exact head is the rebased SHA. `merge-queue-autoenroll.yml` then
+   revalidates the PR's current state, hard-gate labels, terminal checks, and
+   exact head SHA. It enrolls through `scripts/merge-queue-backend.mjs` and
+   proves authoritative queue state after mutation. The label remains intent/
+   audit evidence, never queue truth.
 4. GitHub creates a synthetic `merge_group` head against current `main` and
    waits for the same required contexts on that exact combined SHA.
 5. GitHub squash-merges the green queue entry. `linear-sync-on-merge.yml`
