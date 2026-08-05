@@ -79,6 +79,7 @@ export const SEO_STATIC_ROUTE_MANIFEST: readonly SeoStaticRouteDefinition[] = [
       buildPublicProfileMetadata({
         profile: PROFILE_FIXTURE,
         genres: ['Pop'],
+        isClaimed: true,
       }),
   },
 ];

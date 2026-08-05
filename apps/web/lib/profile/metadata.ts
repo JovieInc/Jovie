@@ -18,6 +18,7 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import type { CreatorProfile } from '@/types/db';
+import { isUnclaimedStructuredCreditProfile } from './unclaimed-artist-profile';
 
 // ---------------------------------------------------------------------------
 // Sanitization
@@ -158,8 +159,11 @@ export interface PublicProfileMetadataInput {
     | 'location'
     | 'avatar_url'
     | 'is_verified'
+    | 'settings'
   >;
   readonly genres: string[] | null | undefined;
+  /** Canonical claim state derived from user_profile_claims by the caller. */
+  readonly isClaimed?: boolean;
 }
 
 /**
@@ -175,7 +179,7 @@ export interface PublicProfileMetadataInput {
 export function buildPublicProfileMetadata(
   input: PublicProfileMetadataInput
 ): Metadata {
-  const { profile, genres } = input;
+  const { profile, genres, isClaimed = true } = input;
 
   // Sanitize display_name and username independently so the fallback chain
   // never reintroduces unsanitized artist-provided text into metadata fields.
@@ -192,6 +196,8 @@ export function buildPublicProfileMetadata(
     profile.location,
     genres
   );
+  const isStructuredCreditUnclaimed =
+    !isClaimed && isUnclaimedStructuredCreditProfile(profile.settings);
 
   const baseKeywords = [
     artistName,
@@ -218,11 +224,11 @@ export function buildPublicProfileMetadata(
       canonical: canonicalUrl,
     },
     robots: {
-      index: true,
-      follow: true,
+      index: !isStructuredCreditUnclaimed,
+      follow: !isStructuredCreditUnclaimed,
       googleBot: {
-        index: true,
-        follow: true,
+        index: !isStructuredCreditUnclaimed,
+        follow: !isStructuredCreditUnclaimed,
         'max-video-preview': -1,
         'max-image-preview': 'large',
         'max-snippet': -1,

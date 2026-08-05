@@ -1,7 +1,9 @@
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { Badge } from '@/components/atoms/Badge';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ProfileAboutShare } from '@/features/profile/ProfileAboutShare';
+import { normalizePlatformKey } from '@/lib/dsp-registry';
 import type { ProfileAeoContent as ProfileAeoContentModel } from '@/lib/profile/aeo-content';
 import { publicLinkAriaLabel } from '@/lib/utils/public-url';
 import { EntityMentionText } from './EntityMentionText';
@@ -38,16 +40,24 @@ export function ProfileAeoContent({
 
           {content.facts.length > 0 ? (
             <dl
-              className='profile-aeo-content__facts flex flex-col gap-3 border-y py-4 sm:flex-row sm:flex-wrap sm:gap-x-10 sm:gap-y-4'
+              className='profile-aeo-content__facts grid grid-cols-2 gap-2 border-y py-4 sm:grid-cols-3 sm:gap-3 lg:grid-cols-2'
               data-testid='profile-about-facts'
             >
               {content.facts.map(fact => (
-                <div key={fact.label} className='space-y-1'>
+                <div key={fact.label} className='min-w-0 space-y-1.5'>
                   <dt className='profile-aeo-content__fact-label text-xs font-medium'>
                     {fact.label}
                   </dt>
-                  <dd className='profile-aeo-content__fact-value text-mid font-medium'>
-                    {fact.value}
+                  <dd className='min-w-0'>
+                    <Badge
+                      variant='outline'
+                      size='md'
+                      className='profile-aeo-content__fact-value w-full max-w-full justify-start border-(--profile-aeo-border) bg-transparent sm:w-auto'
+                    >
+                      <span className='min-w-0 truncate' title={fact.value}>
+                        {fact.value}
+                      </span>
+                    </Badge>
                   </dd>
                 </div>
               ))}
@@ -66,13 +76,20 @@ export function ProfileAeoContent({
                       href={link.url}
                       target='_blank'
                       rel='noopener noreferrer'
-                      className='profile-aeo-content__link inline-flex min-h-11 items-center gap-2 text-sm font-medium transition-colors duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--profile-aeo-text)'
+                      className='profile-aeo-content__link inline-flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--profile-aeo-text) focus-visible:ring-offset-2 focus-visible:ring-offset-(--system-b-cinematic-black)'
                     >
                       <SocialIcon
-                        platform={link.platform}
-                        className='h-4 w-4'
+                        platform={
+                          normalizePlatformKey(link.platform) === 'netease'
+                            ? 'neteasemusic'
+                            : link.platform
+                        }
+                        className='h-5 w-5'
                       />
-                      {link.label}
+                      <span className='sr-only'>
+                        Listen to {content.artistName} on {link.label} (opens in
+                        a new tab)
+                      </span>
                     </a>
                   </li>
                 ))}
@@ -137,7 +154,7 @@ export function ProfileAeoContent({
                   <span aria-hidden='true'> </span>
                   <a
                     href={item.source.href}
-                    className='profile-aeo-content__source inline-flex font-medium underline underline-offset-4 transition-colors duration-subtle'
+                    className='profile-aeo-content__source -my-2.5 inline-flex min-h-11 items-center py-2.5 font-medium underline underline-offset-4 transition-colors duration-subtle'
                   >
                     Source: {item.source.label}
                   </a>
@@ -167,7 +184,7 @@ export function ProfileAeoContent({
 
               <div className='flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between'>
                 <p className='profile-aeo-claim-card__note text-xs font-medium'>
-                  Free · Spotify verified
+                  Free · Claim with Spotify
                 </p>
                 <Link
                   href={claimHref}

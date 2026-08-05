@@ -76,6 +76,9 @@ export interface BottomTabBarProps {
   /** Called when the user taps a primary tab. */
   readonly onTabSelect: (mode: ProfilePrimaryTab) => void;
 
+  /** Whether the Alerts destination is available for this profile. */
+  readonly showAlertsTab?: boolean;
+
   /** Optional extra className applied to the outermost wrapper. */
   readonly className?: string;
 }
@@ -99,9 +102,12 @@ export function BottomTabBar({
   hasTourDates: _hasTourDates,
   isMenuOpen = false,
   onTabSelect,
+  showAlertsTab = true,
   className,
 }: BottomTabBarProps) {
-  const visibleTabs = ALL_PRIMARY_TABS;
+  const visibleTabs = showAlertsTab
+    ? ALL_PRIMARY_TABS
+    : ALL_PRIMARY_TABS.filter(tab => tab.mode !== 'subscribe');
   const columnCount = visibleTabs.length;
 
   return (

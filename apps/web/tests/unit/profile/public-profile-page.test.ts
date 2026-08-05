@@ -303,7 +303,7 @@ describe('Public Profile Page Logic', () => {
 
     it('offers the editorial AEO claim card only for unclaimed direct-claim profiles', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        '!profile.is_claimed && directClaimSupported'
+        '!isClaimed && directClaimSupported'
       );
       expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('/claim?next=auth');
     });

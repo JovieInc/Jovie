@@ -4,6 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
+import { projectStructuredReleaseCollaborators } from '@/lib/discography/artist-queries/artist-search';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import {
   buildProfileAeoContent,
@@ -114,6 +115,20 @@ function buildContent(): ProfileAeoContentModel {
         releaseDate: '2025-09-01T00:00:00.000Z',
         artworkUrl: null,
         artistNames: ['DJ Test'],
+      },
+    ],
+    releaseCollaborators: [
+      {
+        artistId: 'f5441adb-6789-449a-9553-ab7460c9c61c',
+        name: 'Guest Vocalist',
+        href: '/artists/f5441adb-6789-449a-9553-ab7460c9c61c',
+        profileState: 'unclaimed',
+        role: 'featured_artist',
+        releaseId: 'release-1',
+        releaseTitle: 'Neon Circuit',
+        releaseSlug: 'neon-circuit',
+        releaseDate: new Date('2026-05-01T00:00:00.000Z'),
+        position: 1,
       },
     ],
     tourDates,
@@ -380,16 +395,36 @@ describe('Profile AEO content', () => {
     expect(facts).toHaveTextContent('Active Since');
     expect(facts).toHaveTextContent('Hometown');
     expect(facts).toHaveTextContent('Based In');
+    expect(facts.querySelectorAll('dt')).toHaveLength(4);
+    expect(facts.querySelectorAll('dd')).toHaveLength(4);
+    for (const definition of facts.querySelectorAll('dd')) {
+      expect(definition.firstElementChild).toHaveClass(
+        'profile-aeo-content__fact-value'
+      );
+    }
 
     const listen = screen.getByTestId('profile-about-listen');
     expect(listen).toBeVisible();
-    const spotifyLink = screen.getByRole('link', { name: 'Spotify' });
+    const spotifyLink = screen.getByRole('link', {
+      name: 'Listen to DJ Test on Spotify (opens in a new tab)',
+    });
     expect(spotifyLink).toHaveAttribute(
       'href',
       'https://open.spotify.com/artist/test'
     );
     expect(spotifyLink).toHaveAttribute('target', '_blank');
     expect(spotifyLink).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(spotifyLink).toHaveClass('h-11', 'w-11');
+    expect(spotifyLink).not.toHaveTextContent(/^Spotify$/);
+
+    const appleMusicLink = screen.getByRole('link', {
+      name: 'Listen to DJ Test on Apple Music (opens in a new tab)',
+    });
+    expect(appleMusicLink).toHaveAttribute(
+      'href',
+      'https://music.apple.com/artist/test'
+    );
+    expect(appleMusicLink).toHaveClass('h-11', 'w-11');
 
     const follow = screen.getByTestId('profile-about-follow');
     expect(follow).toBeVisible();
@@ -398,6 +433,87 @@ describe('Profile AEO content', () => {
     ).toHaveAttribute('href', 'https://instagram.com/djtest');
 
     expect(screen.getByTestId('profile-about-share')).toBeVisible();
+  });
+
+  it('keeps every canonical music service icon-only, named, and 44px', () => {
+    const services = [
+      ['soundcloud', 'SoundCloud', 'https://soundcloud.com/dj-test'],
+      ['spotify', 'Spotify', 'https://open.spotify.com/artist/test'],
+      ['apple_music', 'Apple Music', 'https://music.apple.com/artist/test'],
+      [
+        'youtube_music',
+        'YouTube Music',
+        'https://music.youtube.com/channel/test',
+      ],
+      ['amazon_music', 'Amazon Music', 'https://music.amazon.com/artists/test'],
+      ['tidal', 'Tidal', 'https://tidal.com/browse/artist/test'],
+      ['deezer', 'Deezer', 'https://www.deezer.com/artist/test'],
+      ['netease', 'NetEase Music', 'https://music.163.com/artist?id=1'],
+      ['qq_music', 'QQ Music', 'https://y.qq.com/n/ryqq/singer/test'],
+    ] as const;
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        spotify_url: undefined,
+        apple_music_url: undefined,
+        youtube_url: undefined,
+      },
+      socialLinks: services.map(([platform, , url], index) => ({
+        id: `service-${index}`,
+        artist_id: baseArtist.id,
+        platform,
+        url,
+        clicks: 0,
+        created_at: '2024-01-01T00:00:00.000Z',
+      })),
+      now,
+    });
+
+    expect(content.listenLinks.map(link => link.label)).toEqual(
+      services.map(([, label]) => label)
+    );
+
+    render(<ProfileAeoContent content={content} />);
+
+    for (const [, label, url] of services) {
+      const accessibleName = `Listen to DJ Test on ${label} (opens in a new tab)`;
+      const link = screen.getByRole('link', { name: accessibleName });
+      expect(link).toHaveAttribute('href', url);
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(link).toHaveClass('h-11', 'w-11');
+      expect(link.querySelector('.sr-only')).toHaveTextContent(accessibleName);
+      expect(link.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+      expect(link.querySelector('svg')).toHaveAttribute('fill', 'currentColor');
+    }
+  });
+
+  it('keeps long localized fact values inside the semantic badge grid', () => {
+    const longLocation =
+      '東京都渋谷区神宮前・Berlin Kreuzberg・مدينة لوس أنجلوس الطويلة';
+    const content = buildProfileAeoContent({
+      artist: {
+        ...baseArtist,
+        hometown: longLocation,
+        location: null,
+      },
+      genres: ['música electrónica experimental de larga duración'],
+      now,
+    });
+
+    render(<ProfileAeoContent content={content} />);
+
+    const facts = screen.getByTestId('profile-about-facts');
+    const locationValue = screen.getByTitle(longLocation);
+    expect(facts.tagName).toBe('DL');
+    expect(facts).toHaveClass(
+      'grid-cols-2',
+      'sm:grid-cols-3',
+      'lg:grid-cols-2'
+    );
+    expect(locationValue.parentElement).toHaveClass('max-w-full');
+    expect(locationValue).toHaveClass('min-w-0', 'truncate');
+    expect(locationValue.closest('dd')).not.toBeNull();
   });
 
   it('hides the facts, listen, and follow sections when there is no data', () => {
@@ -491,14 +607,19 @@ describe('Profile AEO content', () => {
       screen.getByRole('heading', { name: 'About DJ Test' })
     ).toBeVisible();
     expect(screen.getByText('Where is DJ Test from?')).toBeVisible();
-    expect(
-      screen.getByRole('link', { name: 'Source: Jovie release page' })
-    ).toHaveAttribute('href', '/dj-test/neon-circuit');
+    const releaseSource = screen.getByRole('link', {
+      name: 'Source: Jovie release page',
+    });
+    expect(releaseSource).toHaveAttribute('href', '/dj-test/neon-circuit');
+    expect(releaseSource).toHaveClass('min-h-11');
 
     const html = renderToStaticMarkup(<ProfileAeoContent content={content} />);
     expect(html).toContain('data-testid="profile-aeo-content"');
     expect(html).toContain('Where can I buy DJ Test merch?');
     expect(html).toContain('Source: Official merch card');
+    expect(
+      screen.getByRole('link', { name: 'Guest Vocalist' })
+    ).toHaveAttribute('href', '/artists/f5441adb-6789-449a-9553-ab7460c9c61c');
   });
 
   it('links entity mentions in the description while keeping plain-text paragraphs', () => {
@@ -566,8 +687,167 @@ describe('Profile AEO content', () => {
     }
   });
 
+  it('builds collaborator prose directly from exact release-credit edges', () => {
+    const creditRows = [
+      {
+        artistId: 'f5441adb-6789-449a-9553-ab7460c9c61c',
+        name: 'Austin Leeds',
+        releaseId: '353a7c04-b5bb-486e-996d-d23caced7f93',
+        releaseTitle: 'Take Me Over (Austin Leeds Remix)',
+        releaseSlug: 'take-me-over-austin-leeds-remix',
+      },
+      {
+        artistId: '3cefe948-7521-465f-813a-95ae15e3141e',
+        name: 'Vigel',
+        releaseId: 'b01379fe-be8f-498e-86b5-888509c2f907',
+        releaseTitle: 'Seaside Heights',
+        releaseSlug: 'seaside-heights-3',
+      },
+      {
+        artistId: '137bafa6-46b7-4c5c-a08c-654875a694bf',
+        name: 'Lynx',
+        releaseId: '7f2f25b8-bad3-4096-a754-288645b8ab67',
+        releaseTitle: 'Wheels Up',
+        releaseSlug: 'wheels-up',
+      },
+      {
+        artistId: '3836027a-8351-4c0b-8922-c3259387bbf8',
+        name: 'Bowles',
+        releaseId: '86360da0-e045-44a0-9fee-45041b09e7b0',
+        releaseTitle: 'The Sound',
+        releaseSlug: 'the-sound',
+      },
+    ].map((credit, position) => ({
+      ...credit,
+      artistName: credit.name,
+      artistSpotifyId: `spotify-collaborator-${position}`,
+      artistProfileId: `profile-collaborator-${position}`,
+      profileIsPublic: true,
+      profileIsClaimed: false,
+      creditName: null,
+      role: 'main_artist' as const,
+      releaseDate: new Date(`2026-0${position + 1}-01T00:00:00.000Z`),
+      position,
+    }));
+    const credits = projectStructuredReleaseCollaborators({
+      creatorProfileId: 'owner-profile',
+      ownerSpotifyId: 'spotify-owner',
+      rows: creditRows,
+      limit: 4,
+    });
+
+    const content = buildProfileAeoContent({
+      artist: baseArtist,
+      releaseCollaborators: credits,
+      now,
+    });
+    const paragraph = content.description.at(-1);
+
+    expect(paragraph).toBe(
+      'Collaborators credited include Austin Leeds on "Take Me Over (Austin Leeds Remix)", Vigel on "Seaside Heights", Lynx on "Wheels Up", and Bowles on "The Sound".'
+    );
+    expect(paragraph).not.toContain(
+      'Lynx on "Take Me Over (Austin Leeds Remix)"'
+    );
+    expect(paragraph).not.toContain('Bowles on "Seaside Heights"');
+
+    const segments = content.descriptionSegments.at(-1) ?? [];
+    for (const credit of credits) {
+      expect(segments).toContainEqual({
+        type: 'artist',
+        text: credit.name,
+        href: credit.href,
+      });
+      expect(segments).toContainEqual({
+        type: 'release',
+        text: credit.releaseTitle,
+        href: `/dj-test/${credit.releaseSlug}`,
+      });
+    }
+  });
+
+  it('keeps same-name collaborators distinct by stable artist ID', () => {
+    const content = buildProfileAeoContent({
+      artist: baseArtist,
+      releaseCollaborators: [
+        {
+          artistId: '57d7fa47-5df1-40d9-b32c-c6e0e76ae024',
+          name: 'Alex Lee',
+          href: '/artists/57d7fa47-5df1-40d9-b32c-c6e0e76ae024',
+          profileState: 'claimed',
+          role: 'featured_artist',
+          releaseId: 'release-alex-one',
+          releaseTitle: 'Northbound',
+          releaseSlug: 'northbound',
+          releaseDate: now,
+          position: 1,
+        },
+        {
+          artistId: 'e061a679-466c-465a-a545-64a7e39aa3c6',
+          name: 'Alex Lee',
+          href: '/artists/e061a679-466c-465a-a545-64a7e39aa3c6',
+          profileState: 'unclaimed',
+          role: 'main_artist',
+          releaseId: 'release-alex-two',
+          releaseTitle: 'Southbound',
+          releaseSlug: 'southbound',
+          releaseDate: now,
+          position: 0,
+        },
+      ],
+      now,
+    });
+
+    const artistSegments = (content.descriptionSegments.at(-1) ?? []).filter(
+      segment => segment.type === 'artist'
+    );
+    expect(artistSegments).toEqual([
+      {
+        type: 'artist',
+        text: 'Alex Lee',
+        href: '/artists/57d7fa47-5df1-40d9-b32c-c6e0e76ae024',
+      },
+      {
+        type: 'artist',
+        text: 'Alex Lee',
+        href: '/artists/e061a679-466c-465a-a545-64a7e39aa3c6',
+      },
+    ]);
+  });
+
+  it('renders unavailable or private collaborator identities as plain text', () => {
+    const content = buildProfileAeoContent({
+      artist: baseArtist,
+      releaseCollaborators: [
+        {
+          artistId: 'f5441adb-6789-449a-9553-ab7460c9c61c',
+          name: 'Private Artist',
+          href: null,
+          profileState: 'unavailable',
+          role: 'featured_artist',
+          releaseId: '353a7c04-b5bb-486e-996d-d23caced7f93',
+          releaseTitle: 'Quiet Signal',
+          releaseSlug: 'quiet-signal',
+          releaseDate: now,
+          position: 1,
+        },
+      ],
+      now,
+    });
+
+    render(<ProfileAeoContent content={content} />);
+    expect(screen.getByTestId('profile-aeo-content')).toHaveTextContent(
+      'Private Artist'
+    );
+    expect(screen.queryByRole('link', { name: 'Private Artist' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Quiet Signal' })).toHaveAttribute(
+      'href',
+      '/dj-test/quiet-signal'
+    );
+  });
+
   it('defaults to plain-text segments when no entity context is provided', () => {
-    const content = buildContent();
+    const content = buildProfileAeoContent({ artist: baseArtist, now });
 
     expect(content.descriptionSegments).toHaveLength(
       content.description.length
@@ -594,7 +874,7 @@ describe('Profile AEO content', () => {
         name: 'jov.ie/you',
       })
     ).toBeVisible();
-    expect(screen.getByText('Free · Spotify verified')).toBeVisible();
+    expect(screen.getByText('Free · Claim with Spotify')).toBeVisible();
     expect(
       screen.getByRole('link', {
         name: 'Claim the DJ Test profile and sign up for Jovie',

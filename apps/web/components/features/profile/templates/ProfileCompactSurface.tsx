@@ -198,6 +198,7 @@ interface ProfileCompactSurfaceProps {
   readonly hideBackButton?: boolean;
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
+  readonly allowFanCapture?: boolean;
   readonly headerSocialLinksOverride?: readonly LegacySocialLink[];
   readonly renderInteractiveOverlays?: boolean;
   readonly renderSemanticHeading?: boolean;
@@ -291,6 +292,7 @@ export function ProfileCompactSurface({
   dataTestId,
   hideBackButton = false,
   hideMoreMenu = false,
+  allowFanCapture = true,
   headerSocialLinksOverride,
   renderInteractiveOverlays = true,
   renderSemanticHeading = true,
@@ -328,7 +330,10 @@ export function ProfileCompactSurface({
     drawerView,
   });
   const hasTourDates = tourDates.length > 0;
-  const activeVisiblePrimaryTab = activePrimaryTab;
+  const activeVisiblePrimaryTab =
+    !allowFanCapture && activePrimaryTab === 'subscribe'
+      ? 'profile'
+      : activePrimaryTab;
   const currentAnalyticsTab = mapPrimaryTabToAnalyticsTab(
     activeVisiblePrimaryTab
   );
@@ -528,7 +533,9 @@ export function ProfileCompactSurface({
   );
   const homeAlertsSubscribed = isSubscribed || showRecentActivationRow;
   const shouldRenderInteractiveOverlays =
-    renderMode === 'interactive' && renderInteractiveOverlays;
+    renderMode === 'interactive' &&
+    renderInteractiveOverlays &&
+    allowFanCapture;
   const homeLatestRelease =
     latestRelease ?? toHomeLatestRelease(getNewestPublicRelease(releases));
   const homeProfileSettings = homeLatestRelease
@@ -833,6 +840,7 @@ export function ProfileCompactSurface({
                 renderMode={renderMode}
                 onPlayClick={onPlayClick}
                 onAlertsClick={openNotifications}
+                showAlertsCard={allowFanCapture}
                 isSubscribed={homeAlertsSubscribed}
                 profilePacAssignment={profilePacAssignment}
                 viewerLocation={viewerLocation}
@@ -881,6 +889,7 @@ export function ProfileCompactSurface({
               }
               hasTourDates={hasTourDates}
               isMenuOpen={isMenuActive}
+              showAlertsTab={allowFanCapture}
               onTabSelect={handleTabSelect}
             />
           ) : null}

@@ -9,6 +9,7 @@ interface PublicClaimBannerProps {
   readonly profileHandle: string;
   readonly displayName: string;
   readonly directClaimSupported: boolean;
+  readonly claimRequiresVerification?: boolean;
   readonly isClaimed: boolean;
   readonly visitorState: ProfileVisitorState;
 }
@@ -90,6 +91,7 @@ export function PublicClaimBanner({
   profileHandle,
   displayName,
   directClaimSupported,
+  claimRequiresVerification = false,
   isClaimed,
   visitorState,
 }: PublicClaimBannerProps) {
@@ -105,6 +107,7 @@ export function PublicClaimBanner({
       visitorState,
       claimSearchParam,
       directClaimSupported,
+      claimRequiresVerification,
       isClaimed,
     }
   );

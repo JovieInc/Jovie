@@ -19,7 +19,7 @@ const COPY: Record<
   { body: string; ctaLabel: string | null }
 > = {
   organic: {
-    body: 'Is this your profile? Claim it with Spotify in about a minute.',
+    body: 'This profile is unclaimed. Is it yours? Claim it with Spotify.',
     ctaLabel: 'Claim Profile',
   },
   claim_intent: {
@@ -31,7 +31,7 @@ const COPY: Record<
     ctaLabel: 'Continue Claim',
   },
   unsupported: {
-    body: 'This profile needs a claim link before it can be claimed.',
+    body: 'This profile is unclaimed. Verified ownership is required before it can be claimed.',
     ctaLabel: null,
   },
 };
@@ -85,7 +85,7 @@ export function ClaimBanner({
           {ctaHref && resolvedCtaLabel ? (
             <Link
               href={ctaHref}
-              className='inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-btn-primary text-btn-primary-foreground font-semibold text-xs sm:text-sm shadow-sm ring-1 ring-subtle hover:opacity-95 transition-opacity focus-ring-transparent-offset'
+              className='inline-flex min-h-11 items-center gap-2 rounded-full bg-btn-primary px-3.5 py-1.5 text-xs font-semibold text-btn-primary-foreground shadow-sm ring-1 ring-subtle transition-opacity hover:opacity-95 focus-ring-transparent-offset sm:text-sm'
               data-testid='claim-banner-cta'
               aria-label={`${resolvedCtaLabel} for ${name}`}
               onClick={() => {

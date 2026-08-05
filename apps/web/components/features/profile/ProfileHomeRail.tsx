@@ -47,6 +47,7 @@ interface ProfileHomeRailProps {
   readonly previewActionLabel?: string;
   readonly onPlayClick?: () => void;
   readonly onAlertsClick?: (context: NotificationSourceContext) => void;
+  readonly showAlertsCard?: boolean;
   readonly isSubscribed?: boolean;
   readonly profilePacAssignment?: ProfilePacAssignment;
   readonly viewerLocation?: UserLocation | null;
@@ -173,6 +174,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   tourDates = [],
   renderMode = 'interactive',
   onAlertsClick,
+  showAlertsCard = true,
   isSubscribed = false,
   profilePacAssignment = DEFAULT_PROFILE_PAC_ASSIGNMENT,
   viewerLocation,
@@ -358,21 +360,22 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
     upcomingTourDates[0] ??
     null;
 
-  const alertsCard = isSubscribed ? null : (
-    <HomeAlertsCard
-      artist={artist}
-      onAlertsClick={onAlertsClick}
-      renderMode={renderMode}
-      sourceContext={{
-        artistId: artist.id,
-        profileId: artist.id,
-        profileSlug: artist.handle,
-        currentTab: 'home',
-        ctaLocation: 'home_alerts_card',
-        intent: 'general_alerts',
-      }}
-    />
-  );
+  const alertsCard =
+    !showAlertsCard || isSubscribed ? null : (
+      <HomeAlertsCard
+        artist={artist}
+        onAlertsClick={onAlertsClick}
+        renderMode={renderMode}
+        sourceContext={{
+          artistId: artist.id,
+          profileId: artist.id,
+          profileSlug: artist.handle,
+          currentTab: 'home',
+          ctaLocation: 'home_alerts_card',
+          intent: 'general_alerts',
+        }}
+      />
+    );
 
   // One screen, one primary focus: the carousel IS the home surface. The PAC
   // card is the featured first card; the alerts card is the last card. Both
