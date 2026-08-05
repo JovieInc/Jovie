@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 describe('Vercel source contract', () => {
-  it('keeps the apps/docs package in the jovie-docs source upload', () => {
+  it('keeps the docs build config and root route in the source upload', () => {
     const ignored = execFileSync(
       'git',
       [
@@ -12,6 +12,8 @@ describe('Vercel source contract', () => {
         '-ci',
         '--exclude-from=.vercelignore',
         'apps/docs/package.json',
+        'apps/docs/next.config.mjs',
+        'apps/docs/app/page.mdx',
       ],
       { encoding: 'utf8' }
     );
