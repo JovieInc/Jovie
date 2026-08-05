@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { ProfileMode } from '@/features/profile/contracts';
 import type { PublicRelease } from '@/features/profile/releases/types';
 import { ProfileCompactTemplate } from '@/features/profile/templates/ProfileCompactTemplate';
@@ -25,6 +26,10 @@ export interface StaticArtistPageProps {
   readonly showBackButton: boolean;
   readonly showTourButton?: boolean;
   readonly showFooter?: boolean;
+  /** Optional claim-safe banner rendered by the compact shell layer. */
+  readonly profileBanner?: ReactNode;
+  /** Whether fan-capture actions are available for this profile. */
+  readonly allowFanCapture?: boolean;
   readonly enableDynamicEngagement?: boolean;
   readonly latestRelease?: DiscogRelease | null;
   readonly photoDownloadSizes?: AvatarSize[];
