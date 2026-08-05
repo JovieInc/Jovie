@@ -37,7 +37,7 @@ function evidence(overrides = {}) {
 
 function client({ rereads = [], addCommentError = null } = {}) {
   const queue = [...rereads];
-  const calls = { addComment: [], fetchIssue: 0 };
+  const calls = { addComment: [], fetchIssue: 0, setIssueLabels: [] };
   return {
     calls,
     async addComment(id, body) {
@@ -49,6 +49,13 @@ function client({ rereads = [], addCommentError = null } = {}) {
       calls.fetchIssue += 1;
       return queue.shift();
     },
+    async fetchTeamLabel() {
+      return { id: 'plan-approved-id', name: 'plan-approved' };
+    },
+    async setIssueLabels(id, labelIds) {
+      calls.setIssueLabels.push({ id, labelIds });
+      return { issueUpdate: { success: true } };
+    },
   };
 }
 
@@ -56,8 +63,14 @@ describe('plan-gate/v1', () => {
   it('approves a verified concrete bounded issue and verifies the receipt by reread', async () => {
     const original = issue();
     const receipt = planGate.buildPlanGateReceipt(original, evidence());
-    const after = issue({ comments: { nodes: [{ body: receipt }] } });
-    const fake = client({ rereads: [after] });
+    const afterReceipt = issue({ comments: { nodes: [{ body: receipt }] } });
+    const afterLabel = issue({
+      comments: { nodes: [{ body: receipt }] },
+      labels: { nodes: [{ id: 'plan-approved-id', name: 'plan-approved' }] },
+    });
+    const fake = client({
+      rereads: [afterReceipt, afterLabel, afterLabel],
+    });
 
     const result = await planGate.approvePlan({
       issue: original,
@@ -69,7 +82,8 @@ describe('plan-gate/v1', () => {
     assert.equal(result.receipt, receipt);
     assert.match(receipt, /<!-- plan-gate\/v1 -->/);
     assert.equal(fake.calls.addComment.length, 1);
-    assert.equal(fake.calls.fetchIssue, 1);
+    assert.equal(fake.calls.setIssueLabels.length, 1);
+    assert.equal(fake.calls.fetchIssue, 3);
   });
 
   it('is an idempotent no-op for the same stable receipt', async () => {
@@ -77,7 +91,12 @@ describe('plan-gate/v1', () => {
     const receipt = planGate.buildPlanGateReceipt(original, evidence());
     const fake = client();
     const result = await planGate.approvePlan({
-      issue: issue({ comments: { nodes: [{ body: receipt }] } }),
+      issue: issue({
+        comments: { nodes: [{ body: receipt }] },
+        labels: {
+          nodes: [{ id: 'plan-approved-id', name: 'plan-approved' }],
+        },
+      }),
       evidence: evidence(),
       client: fake,
     });
@@ -85,6 +104,7 @@ describe('plan-gate/v1', () => {
     assert.equal(result.status, 'already-approved');
     assert.equal(result.receipt, receipt);
     assert.deepEqual(fake.calls.addComment, []);
+    assert.deepEqual(fake.calls.setIssueLabels, []);
     assert.equal(fake.calls.fetchIssue, 0);
   });
 
@@ -127,6 +147,19 @@ describe('plan-gate/v1', () => {
     assert.equal(result.status, 'rejected');
     assert.match(result.reason, /rollback/);
     assert.equal(fake.calls.addComment.length, 0);
+  });
+
+  it('rejects a forged or stale plan receipt', () => {
+    const original = issue();
+    const receipt = planGate
+      .buildPlanGateReceipt(original, evidence())
+      .replace(/"fingerprint":"[a-f0-9]+"/, '"fingerprint":"forged"');
+    assert.equal(
+      planGate.planGateReceipt(
+        issue({ comments: { nodes: [{ body: receipt }] } })
+      ),
+      null
+    );
   });
 
   it('propagates transport failure as a blocked operation', async () => {

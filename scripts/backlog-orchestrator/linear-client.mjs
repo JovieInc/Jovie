@@ -257,6 +257,7 @@ export async function fetchTeamTriageIssues(teamId, maxResults = 1000) {
               assignee { id name }
               creator { id name }
               labels { nodes { id name } }
+              project { id name slugId }
               parent { id identifier title }
               children { nodes { id identifier title } }
               relations {
@@ -314,6 +315,7 @@ export async function fetchTeamActiveIssues(teamId, maxResults = 1000) {
               assignee { id name }
               creator { id name }
               labels { nodes { id name } }
+              project { id name slugId }
               parent { id identifier title }
               children { nodes { id identifier title } }
               relations { nodes { type relatedIssue { id identifier title } } }
@@ -378,6 +380,92 @@ export async function fetchTeamInProgressIssues(teamId, maxResults = 1000) {
     cursor = edge.pageInfo.endCursor;
   }
   return issues;
+}
+
+/**
+ * Fetch the narrow deterministic gate pool. Filtering on readiness labels keeps
+ * the five-minute control-plane poll bounded instead of scanning the backlog.
+ */
+export async function fetchTeamGateCandidates(teamId, maxResults = 500) {
+  const issues = [];
+  let cursor = null;
+  while (issues.length < maxResults) {
+    const data = await graphql(
+      `
+      query($teamId: String!, $cursor: String) {
+        team(id: $teamId) {
+          issues(
+            first: 50,
+            after: $cursor,
+            filter: {
+              state: { name: { in: ["Triage", "Backlog", "Todo"] } },
+              labels: { some: { name: { in: ["ready-for-intake", "agent-ready"] } } }
+            }
+          ) {
+            nodes {
+              id identifier title description url createdAt updatedAt priority estimate
+              assignee { id name }
+              creator { id name }
+              labels { nodes { id name } }
+              project { id name slugId }
+              parent { id identifier title }
+              children { nodes { id identifier title } }
+              relations { nodes { type relatedIssue { id identifier title } } }
+              state { id name type }
+              comments { nodes { id body createdAt } }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }
+    `,
+      { teamId, cursor }
+    );
+    const edge = data.team.issues;
+    issues.push(...edge.nodes);
+    if (!edge.pageInfo.hasNextPage) break;
+    cursor = edge.pageInfo.endCursor;
+  }
+  return issues.slice(0, maxResults);
+}
+
+/** Fetch possible machine-admission intents for authoritative capacity checks. */
+export async function fetchTeamSymphonyIssues(teamId, maxResults = 100) {
+  const issues = [];
+  let cursor = null;
+  while (issues.length < maxResults) {
+    const data = await graphql(
+      `
+      query($teamId: String!, $cursor: String) {
+        team(id: $teamId) {
+          issues(
+            first: 50,
+            after: $cursor,
+            filter: {
+              state: { name: { in: ["Todo", "In Progress", "In Review"] } },
+              labels: { some: { name: { eq: "symphony" } } }
+            }
+          ) {
+            nodes {
+              id identifier title updatedAt
+              assignee { id name }
+              labels { nodes { id name } }
+              state { id name type }
+              comments { nodes { id body createdAt } }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }
+    `,
+      { teamId, cursor }
+    );
+    const edge = data.team.issues;
+    issues.push(...edge.nodes);
+    if (!edge.pageInfo.hasNextPage) break;
+    cursor = edge.pageInfo.endCursor;
+  }
+  return issues.slice(0, maxResults);
 }
 
 /**
