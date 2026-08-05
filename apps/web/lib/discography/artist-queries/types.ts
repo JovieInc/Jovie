@@ -35,6 +35,8 @@ export interface StructuredReleaseCollaborator {
   /** Stable registry route when a public claimed or unclaimed profile exists. */
   readonly href: string | null;
   readonly profileState: 'claimed' | 'unclaimed' | 'unavailable';
+  /** True only when the exact provider identity can drive reconciliation. */
+  readonly reconciliationEligible?: boolean;
   readonly role: PublicArtistCollaboratorRole;
   readonly releaseId: string;
   readonly releaseTitle: string;

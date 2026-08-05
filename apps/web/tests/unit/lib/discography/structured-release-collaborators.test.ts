@@ -112,6 +112,23 @@ describe('structured release collaborator projection', () => {
     expect(result[0]).toMatchObject({
       href: null,
       profileState: 'unavailable',
+      reconciliationEligible: true,
+    });
+  });
+
+  it('does not mark name-only credits as reconciliation candidates', () => {
+    const result = project([
+      row({
+        artistSpotifyId: null,
+        artistProfileId: null,
+        profileIsPublic: null,
+        profileIsClaimed: null,
+      }),
+    ]);
+
+    expect(result[0]).toMatchObject({
+      profileState: 'unavailable',
+      reconciliationEligible: false,
     });
   });
 
