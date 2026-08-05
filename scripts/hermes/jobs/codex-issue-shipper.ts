@@ -67,6 +67,7 @@ import {
   routeForAgent,
   type ShipperConfig,
   SpawnEagainError,
+  selectDispatchBatch,
   shouldEscalateRetry,
   worktreeHasWork,
 } from '../lib/codex-issue-shipper';
@@ -1724,6 +1725,8 @@ async function runShipper(): Promise<void> {
       async () => {
         recoverStaleJobs(config);
         let controlLabelsEnsured = false;
+        const attemptedIssueNumbers = new Set<number>();
+        let remainingDispatchBudget = config.maxIssuesPerRun;
 
         for (;;) {
           const openCodexPrCount = countOpenCodexPrs(config);
@@ -1744,7 +1747,12 @@ async function runShipper(): Promise<void> {
             labelNames(issue).includes(EPIC_LABEL)
           ).length;
           const capacity = systemCapacity(config, openCodexPrCount);
-          const batch = plans.slice(0, capacity.allowedAgents);
+          const batch = selectDispatchBatch({
+            plans,
+            attemptedIssueNumbers,
+            capacity: capacity.allowedAgents,
+            remainingBudget: remainingDispatchBudget,
+          });
 
           logJobEvent({
             job: JOB,
@@ -1770,8 +1778,16 @@ async function runShipper(): Promise<void> {
           if (batch.length === 0) {
             logJobEvent({
               job: JOB,
-              event: 'capacity_throttled',
+              event:
+                remainingDispatchBudget === 0 ||
+                plans.every(plan =>
+                  attemptedIssueNumbers.has(plan.issue.number)
+                )
+                  ? 'dispatch_budget_exhausted'
+                  : 'capacity_throttled',
               capacity,
+              attemptedIssueNumbers: [...attemptedIssueNumbers],
+              remainingDispatchBudget,
             });
             return;
           }
@@ -1797,6 +1813,10 @@ async function runShipper(): Promise<void> {
           }
 
           await dispatchBatch(config, batch);
+          for (const plan of batch) {
+            attemptedIssueNumbers.add(plan.issue.number);
+          }
+          remainingDispatchBudget -= batch.length;
         }
       },
       // Machine-global lock: profile-scoped HERMES_HOME must not yield two

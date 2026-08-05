@@ -605,6 +605,20 @@ export function buildDispatchPlans(
   });
 }
 
+export function selectDispatchBatch(args: {
+  readonly plans: ReadonlyArray<DispatchPlan>;
+  readonly attemptedIssueNumbers: ReadonlySet<number>;
+  readonly capacity: number;
+  readonly remainingBudget: number;
+}): ReadonlyArray<DispatchPlan> {
+  const limit = Math.max(0, Math.min(args.capacity, args.remainingBudget));
+  if (limit === 0) return [];
+
+  return args.plans
+    .filter(plan => !args.attemptedIssueNumbers.has(plan.issue.number))
+    .slice(0, limit);
+}
+
 export function buildGbrainCaptureText(issue: GithubIssue): string {
   return [
     `# Codex Issue Shipper Dispatch: GitHub #${issue.number}`,
