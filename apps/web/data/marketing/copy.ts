@@ -1,3 +1,6 @@
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
+
 /**
  * Meaning-first marketing copy contracts.
  *
@@ -21,6 +24,8 @@ export const MARKETING_COPY_TASTE_TAGS = [
 ] as const;
 
 export type MarketingCopyTasteTag = (typeof MARKETING_COPY_TASTE_TAGS)[number];
+
+const MARKETING_COPY_TASTE_TAG_SET = new Set<string>(MARKETING_COPY_TASTE_TAGS);
 
 export interface MarketingCopyClaim {
   readonly id: string;
@@ -605,4 +610,482 @@ export function auditMarketingCopySemantics(
     issueCounts,
     issues,
   };
+}
+
+interface CopyPatternRule {
+  readonly code: string;
+  readonly pattern: RegExp;
+  readonly message: string;
+  readonly headlineOnly?: boolean;
+}
+
+/**
+ * Small, explainable anti-slop layer. These are review signals, not a thesaurus
+ * or a global word ban: a truthful, outcome-bound line can still use any word.
+ */
+const COPY_PATTERN_RULES: readonly CopyPatternRule[] = [
+  {
+    code: 'artifact-language',
+    pattern:
+      /\b(?:mockups?|concept renders?|screenshots?|registry-backed|captured from|annotated|design artifact)\b/i,
+    message: 'Sell the product outcome, never the marketing artifact.',
+  },
+  {
+    code: 'ai-vocabulary',
+    pattern:
+      /\b(?:delve|crucial|robust|comprehensive|nuanced|multifaceted|furthermore|moreover|additionally|pivotal|landscape|tapestry|underscore|foster|showcase|intricate|vibrant|fundamental|significant|interplay)\b/i,
+    message:
+      'Replace stock model vocabulary with plain, product-specific words.',
+  },
+  {
+    code: 'marketing-slop',
+    pattern:
+      /\b(?:seamless(?:ly)?|unlock(?:s|ed|ing)?|elevat(?:e|es|ed|ing)|reimagin(?:e|es|ed|ing)|empower(?:s|ed|ing)?|leverage|cutting-edge|game-changing|world-class|supercharge(?:s|d|ing)?|all-in-one|ecosystem)\b/i,
+    message: 'Replace generic promotion with a concrete action or consequence.',
+  },
+  {
+    code: 'formulaic-contrast',
+    pattern: /\b(?:not|more than) (?:just|only)\b/i,
+    message:
+      'State the stronger idea directly instead of using a stock contrast.',
+  },
+  {
+    code: 'formulaic-range',
+    pattern: /\bfrom .{1,60} to\b/i,
+    message: 'Name the exact moments without a generic from-X-to-Y frame.',
+  },
+  {
+    code: 'filler-intro',
+    pattern: /\b(?:in today'?s|when it comes to|at the end of the day)\b/i,
+    message: 'Delete the introduction and lead with the point.',
+  },
+  {
+    code: 'vague-attribution',
+    pattern: /\b(?:experts say|studies show|many believe|industry leaders)\b/i,
+    message: 'Name the source or remove the attribution.',
+  },
+  {
+    code: 'chat-residue',
+    pattern:
+      /\b(?:as an ai|here is a revised|option [abc]:|i cannot assist)\b/i,
+    message: 'Remove model or drafting residue.',
+  },
+  {
+    code: 'dash-habit',
+    pattern: /[—–]/,
+    message: 'Use a period, comma, or colon. Do not use an em or en dash.',
+  },
+  {
+    code: 'generic-heading',
+    pattern: /^(?:built|designed) (?:for|to|around)\b/i,
+    message: 'Lead with the customer consequence, not a generic construction.',
+    headlineOnly: true,
+  },
+  {
+    code: 'rhetorical-heading',
+    pattern: /\?\s*$/,
+    message: 'Answer the question in the heading instead of asking it.',
+    headlineOnly: true,
+  },
+];
+
+function findDuplicates(values: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const value of values) {
+    if (seen.has(value)) duplicates.add(value);
+    seen.add(value);
+  }
+  return [...duplicates];
+}
+
+export function normalizeMarketingCopyVisibleCopy(
+  copy: MarketingCopyVisibleCopy
+): string {
+  return [copy.headline, copy.body ?? '', ...(copy.supportingText ?? [])]
+    .map(normalizeText)
+    .join('|');
+}
+
+function auditCopyPatterns(
+  sectionId: string,
+  value: string,
+  headline: boolean
+): MarketingCopyAuditIssue[] {
+  return COPY_PATTERN_RULES.filter(
+    rule => (!rule.headlineOnly || headline) && rule.pattern.test(value)
+  ).map(rule => ({
+    code: rule.code,
+    sectionId,
+    message: `${rule.message} Found in: "${value}"`,
+  }));
+}
+
+/** Integrity fingerprint for the exact brief, evidence, candidate, and control reviewed. */
+export function createMarketingCopyReviewDigest(
+  brief: MarketingCopyPageBrief,
+  draft: MarketingCopyPageDraft
+): string {
+  const canonical = JSON.stringify({
+    schemaVersion: MARKETING_COPY_SPEC_VERSION,
+    brief,
+    draft: {
+      pageId: draft.pageId,
+      route: draft.route,
+      sections: draft.sections.map(section => ({
+        sectionId: section.sectionId,
+        candidateId: section.candidateId,
+        control: section.control,
+        headline: section.headline,
+        body: section.body,
+        supportingText: section.supportingText,
+        claimIds: section.claimIds,
+        lineBindings: section.lineBindings,
+        meaningTrace: section.meaningTrace,
+        tasteTags: section.tasteTags,
+      })),
+    },
+  });
+  return `marketing-copy/${MARKETING_COPY_SPEC_VERSION}/sha256/${bytesToHex(
+    sha256(new TextEncoder().encode(canonical))
+  )}`;
+}
+
+/** Structural, meaning, compression, and anti-slop audit for a whole page. */
+export function auditMarketingCopyPage(
+  brief: MarketingCopyPageBrief,
+  draft: MarketingCopyPageDraft
+): readonly MarketingCopyAuditIssue[] {
+  const issues: MarketingCopyAuditIssue[] = [];
+  const claimsById = new Map(brief.claims.map(claim => [claim.id, claim]));
+  const briefIds = brief.sections.map(section => section.sectionId);
+  const draftIds = draft.sections.map(section => section.sectionId);
+
+  if (
+    !brief.pageId.trim() ||
+    !brief.route.trim() ||
+    !brief.audience.trim() ||
+    !brief.objective.trim()
+  ) {
+    issues.push(
+      issue(
+        'invalid-page-brief',
+        undefined,
+        'The page brief needs a page ID, route, audience, and measurable objective.'
+      )
+    );
+  }
+  if (brief.pageId !== draft.pageId || brief.route !== draft.route) {
+    issues.push(
+      issue(
+        'page-mismatch',
+        undefined,
+        'The copy draft must target the same page and route as its brief.'
+      )
+    );
+  }
+
+  for (const duplicate of findDuplicates(brief.claims.map(claim => claim.id))) {
+    issues.push(
+      issue(
+        'duplicate-claim',
+        undefined,
+        `Claim ${duplicate} appears more than once in the registry.`
+      )
+    );
+  }
+  for (const claim of brief.claims) {
+    if (!claim.id.trim() || words(claim.statement).length < 3) {
+      issues.push(
+        issue(
+          'invalid-claim',
+          undefined,
+          'Every claim needs a stable ID and a meaningful statement.'
+        )
+      );
+    }
+    if (
+      claim.evidence.length === 0 ||
+      claim.evidence.some(evidence => !evidence.trim())
+    ) {
+      issues.push(
+        issue(
+          'missing-claim-evidence',
+          undefined,
+          `Claim ${claim.id || '(missing ID)'} needs direct evidence references.`
+        )
+      );
+    }
+  }
+  for (const duplicate of findDuplicates(briefIds)) {
+    issues.push(
+      issue(
+        'duplicate-brief-section',
+        duplicate,
+        `Section ${duplicate} appears more than once in the brief.`
+      )
+    );
+  }
+  for (const duplicate of findDuplicates(draftIds)) {
+    issues.push(
+      issue(
+        'duplicate-draft-section',
+        duplicate,
+        `Section ${duplicate} appears more than once in the draft.`
+      )
+    );
+  }
+  if (briefIds.join('|') !== draftIds.join('|')) {
+    issues.push(
+      issue(
+        'story-order',
+        undefined,
+        `Draft story order must be ${briefIds.join(' -> ')}.`
+      )
+    );
+  }
+  for (const duplicate of findDuplicates(
+    draft.sections.map(section => normalizeText(section.headline))
+  )) {
+    issues.push(
+      issue(
+        'duplicate-headline',
+        undefined,
+        `A page headline repeats the same idea: "${duplicate}".`
+      )
+    );
+  }
+
+  for (const sectionBrief of brief.sections) {
+    const section = draft.sections.find(
+      candidate => candidate.sectionId === sectionBrief.sectionId
+    );
+    if (!section) {
+      issues.push(
+        issue(
+          'missing-section',
+          sectionBrief.sectionId,
+          `Missing copy for section ${sectionBrief.sectionId}.`
+        )
+      );
+      continue;
+    }
+    if (
+      !sectionBrief.storyBeat.trim() ||
+      !sectionBrief.sectionJob.trim() ||
+      !sectionBrief.customerOutcome.trim() ||
+      !sectionBrief.messageSubject.trim() ||
+      !sectionBrief.visualEvidence.trim() ||
+      sectionBrief.headlineWordLimit < 1
+    ) {
+      issues.push(
+        issue(
+          'invalid-section-brief',
+          section.sectionId,
+          'Every section needs a story beat, job, customer outcome, message subject, visual evidence, and positive headline budget.'
+        )
+      );
+    }
+    if (
+      normalizeText(sectionBrief.messageSubject) ===
+      normalizeText(sectionBrief.visualEvidence)
+    ) {
+      issues.push(
+        issue(
+          'visual-is-message',
+          section.sectionId,
+          'Separate what the visual shows from what the section means.'
+        )
+      );
+    }
+    if (!section.candidateId.trim()) {
+      issues.push(
+        issue(
+          'missing-candidate-id',
+          section.sectionId,
+          'Every candidate needs a stable ID.'
+        )
+      );
+    }
+    if (
+      section.tasteTags.length === 0 ||
+      section.tasteTags.some(
+        tag => !tag.trim() || !MARKETING_COPY_TASTE_TAG_SET.has(tag)
+      )
+    ) {
+      issues.push(
+        issue(
+          'invalid-taste-tags',
+          section.sectionId,
+          'Taste tags must be non-empty values from the marketing copy schema.'
+        )
+      );
+    }
+    for (const duplicate of findDuplicates(section.tasteTags)) {
+      issues.push(
+        issue(
+          'duplicate-taste-tag',
+          section.sectionId,
+          `Taste tag ${duplicate} appears more than once.`
+        )
+      );
+    }
+    if (!section.control?.headline?.trim()) {
+      issues.push(
+        issue(
+          'missing-control',
+          section.sectionId,
+          'Every candidate needs complete visible control copy.'
+        )
+      );
+    } else if (
+      normalizeMarketingCopyVisibleCopy(section.control) ===
+      normalizeMarketingCopyVisibleCopy(section)
+    ) {
+      issues.push(
+        issue(
+          'no-op-candidate',
+          section.sectionId,
+          'The candidate must differ from its control copy.'
+        )
+      );
+    }
+
+    const headlineWords = words(section.headline).length;
+    if (headlineWords > sectionBrief.headlineWordLimit) {
+      issues.push(
+        issue(
+          'headline-budget',
+          section.sectionId,
+          `Headline has ${headlineWords} words; the limit is ${sectionBrief.headlineWordLimit}.`
+        )
+      );
+    }
+    for (const signalGroup of sectionBrief.headlineSignals) {
+      if (
+        !signalGroup.some(signal =>
+          normalizeText(section.headline).includes(normalizeText(signal))
+        )
+      ) {
+        issues.push(
+          issue(
+            'headline-intent',
+            section.sectionId,
+            `Headline does not carry the required meaning signal: ${signalGroup.join(' | ')}.`
+          )
+        );
+      }
+    }
+    if (sectionBrief.bodyWordLimit !== undefined) {
+      if (!section.body) {
+        issues.push(
+          issue(
+            'missing-body',
+            section.sectionId,
+            'This section brief requires one supporting line.'
+          )
+        );
+      } else {
+        const bodyWords = words(section.body).length;
+        if (bodyWords > sectionBrief.bodyWordLimit) {
+          issues.push(
+            issue(
+              'body-budget',
+              section.sectionId,
+              `Body has ${bodyWords} words; the limit is ${sectionBrief.bodyWordLimit}.`
+            )
+          );
+        }
+        for (const signalGroup of sectionBrief.bodySignals ?? []) {
+          if (
+            !signalGroup.some(signal =>
+              normalizeText(section.body ?? '').includes(normalizeText(signal))
+            )
+          ) {
+            issues.push(
+              issue(
+                'body-intent',
+                section.sectionId,
+                `Body does not carry the required meaning signal: ${signalGroup.join(' | ')}.`
+              )
+            );
+          }
+        }
+        const headlineMeaning = new Set(meaningfulWords(section.headline));
+        const bodyMeaning = new Set(meaningfulWords(section.body));
+        if (
+          headlineMeaning.size > 0 &&
+          [...headlineMeaning].filter(word => bodyMeaning.has(word)).length /
+            headlineMeaning.size >=
+            0.8
+        ) {
+          issues.push(
+            issue(
+              'redundant-support',
+              section.sectionId,
+              'The body repeats the headline instead of adding proof or consequence.'
+            )
+          );
+        }
+      }
+    }
+    const allowedClaims = new Set(sectionBrief.allowedClaimIds);
+    if (section.claimIds.length === 0) {
+      issues.push(
+        issue(
+          'missing-claim',
+          section.sectionId,
+          'Every section must cite at least one verified product claim.'
+        )
+      );
+    }
+    for (const claimId of section.claimIds) {
+      if (!claimsById.has(claimId)) {
+        issues.push(
+          issue(
+            'unknown-claim',
+            section.sectionId,
+            `Claim ${claimId} is not in the page claim registry.`
+          )
+        );
+      } else if (!allowedClaims.has(claimId)) {
+        issues.push(
+          issue(
+            'claim-out-of-scope',
+            section.sectionId,
+            `Claim ${claimId} is not allowed for this section job.`
+          )
+        );
+      }
+    }
+    if (words(section.meaningTrace).length < 5) {
+      issues.push(
+        issue(
+          'thin-meaning-trace',
+          section.sectionId,
+          'Explain how the candidate creates the intended customer belief.'
+        )
+      );
+    }
+    const visibleText = [
+      section.headline,
+      section.body ?? '',
+      ...(section.supportingText ?? []),
+    ].filter(Boolean);
+    for (const [index, value] of visibleText.entries()) {
+      issues.push(...auditCopyPatterns(section.sectionId, value, index === 0));
+      for (const phrase of sectionBrief.forbiddenPhrases ?? []) {
+        if (normalizeText(value).includes(normalizeText(phrase))) {
+          issues.push(
+            issue(
+              'section-forbidden-phrase',
+              section.sectionId,
+              `Remove section-specific phrase "${phrase}" from "${value}".`
+            )
+          );
+        }
+      }
+    }
+  }
+  return issues;
 }
