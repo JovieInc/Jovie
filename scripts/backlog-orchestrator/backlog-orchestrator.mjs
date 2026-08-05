@@ -42,9 +42,33 @@ import * as workstreamer from './workstreamer.mjs';
 // ----- Config -----
 const CACHE_FILE = resolve(__dirname, '.orchestrator-cache.json');
 
-const TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8'; // JOV team
-const BACKLOG_STATE_ID = '1551ed21-7743-4573-82d8-8949410d3b8d'; // Backlog
-const TODO_STATE_ID = 'c6c00506-dc9f-4910-8ff7-3874dd77174c'; // Todo
+const TEAM_CONFIGS = Object.freeze([
+  Object.freeze({
+    key: 'JOV',
+    id: 'bdc09edc-f91c-4a06-b308-74b4fcf093f8',
+    intakeStates: ['Triage'],
+    backlogStateId: '1551ed21-7743-4573-82d8-8949410d3b8d',
+    todoStateId: 'c6c00506-dc9f-4910-8ff7-3874dd77174c',
+    healthUrl: 'https://jov.ie/api/health',
+    healthKind: 'json-status',
+  }),
+  Object.freeze({
+    key: 'LYB',
+    id: '119e4dea-db83-4718-885a-70869d74445e',
+    intakeStates: ['Backlog'],
+    backlogStateId: '63ced43e-ab22-48e8-9dcc-a2ce54ee6da9',
+    todoStateId: '4b318cc8-0a57-489c-8370-b780e11cff7f',
+    healthUrl: 'https://logyourbody.com',
+    healthKind: 'http-ok',
+  }),
+]);
+
+function teamForIdentifier(identifier) {
+  const key = /^([A-Za-z][A-Za-z0-9]*)-\d+$/.exec(identifier || '')?.[1];
+  return TEAM_CONFIGS.find(
+    team => team.key === String(key || '').toUpperCase()
+  );
+}
 
 // ----- Cache -----
 function loadCache() {
@@ -120,6 +144,9 @@ async function runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun) {
     : JSON.parse(evidenceJson);
   const issue = await linear.fetchIssue(issueArg);
   if (!issue) throw new Error(`Issue ${issueArg} not found`);
+  const team = teamForIdentifier(issue.identifier);
+  if (!team)
+    throw new Error(`Issue ${issue.identifier} has no repository route`);
   const reason = planGate.validatePlanCandidate(issue, evidence);
   if (isDryRun) {
     console.log(
@@ -139,13 +166,29 @@ async function runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun) {
     issue,
     evidence,
     client: linear,
-    teamId: TEAM_ID,
+    teamId: team.id,
   });
   console.log(JSON.stringify(receipt, null, 2));
 }
 
-async function admissionPreflight() {
-  const productionRed = await scorer.isProductionRed();
+async function isTeamProductionRed(team) {
+  try {
+    const response = await fetch(team.healthUrl, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return true;
+    if (team.healthKind === 'json-status') {
+      const data = await response.json();
+      return data.status !== 'ok';
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+async function admissionPreflight(team) {
+  const productionRed = await isTeamProductionRed(team);
   if (productionRed) {
     return {
       open: false,
@@ -153,7 +196,7 @@ async function admissionPreflight() {
       load: { count: 0, identifiers: [] },
     };
   }
-  const symphonyIssues = await linear.fetchTeamSymphonyIssues(TEAM_ID);
+  const symphonyIssues = await linear.fetchTeamSymphonyIssues(team.id);
   const load = deterministicGates.admissionIntentLoad(symphonyIssues);
   return {
     open: load.count < admitter.MAX_CONCURRENT_SHIPPING,
@@ -166,50 +209,78 @@ async function admissionPreflight() {
 }
 
 async function runGateNext(isDryRun, issueArg) {
-  const preflight = await admissionPreflight();
+  const teams = issueArg
+    ? [teamForIdentifier(issueArg)].filter(Boolean)
+    : TEAM_CONFIGS;
+  if (teams.length === 0)
+    throw new Error(`Issue ${issueArg} has no repository route`);
+  const results = [];
+  for (const team of teams) {
+    try {
+      results.push(await runTeamGateNext(team, isDryRun, issueArg));
+    } catch (error) {
+      results.push({
+        team: team.key,
+        status: 'blocked',
+        stage: 'team-error',
+        reason: error.message,
+        mutations: 0,
+      });
+    }
+  }
+  console.log(
+    JSON.stringify(
+      {
+        schema: 'deterministic-gates/run/v2',
+        status: results.some(result => result.status === 'admitted')
+          ? 'admitted'
+          : results.some(result => result.status === 'would-admit')
+            ? 'would-admit'
+            : 'blocked',
+        teams: results,
+        mutations: isDryRun
+          ? 0
+          : results.some(result => result.mutations === 'verified')
+            ? 'verified'
+            : 0,
+      },
+      null,
+      2
+    )
+  );
+}
+
+async function runTeamGateNext(team, isDryRun, issueArg) {
+  const preflight = await admissionPreflight(team);
   if (!preflight.open) {
-    console.log(
-      JSON.stringify(
-        {
-          schema: 'deterministic-gates/run/v1',
-          status: 'blocked',
-          stage: 'preflight',
-          reason: preflight.reason,
-          active: preflight.load.identifiers,
-          mutations: 0,
-        },
-        null,
-        2
-      )
-    );
-    return;
+    return {
+      team: team.key,
+      status: 'blocked',
+      stage: 'preflight',
+      reason: preflight.reason,
+      active: preflight.load.identifiers,
+      mutations: 0,
+    };
   }
 
   const issues = issueArg
     ? [await linear.fetchIssue(issueArg)].filter(Boolean)
-    : await linear.fetchTeamGateCandidates(TEAM_ID);
+    : await linear.fetchTeamGateCandidates(team.id);
   const selection = deterministicGates.selectDeterministicPlanCandidate(
     issues,
     { issueIdentifier: issueArg }
   );
   if (!selection.selected) {
-    console.log(
-      JSON.stringify(
-        {
-          schema: 'deterministic-gates/run/v1',
-          status: 'blocked',
-          stage: 'selection',
-          reason: issueArg
-            ? 'requested issue is not eligible'
-            : 'no eligible issue',
-          decisions: selection.decisions,
-          mutations: 0,
-        },
-        null,
-        2
-      )
-    );
-    return;
+    return {
+      team: team.key,
+      status: 'blocked',
+      stage: 'selection',
+      reason: issueArg
+        ? 'requested issue is not eligible'
+        : 'no eligible issue',
+      decisions: selection.decisions,
+      mutations: 0,
+    };
   }
 
   const selected = selection.selected;
@@ -217,58 +288,44 @@ async function runGateNext(isDryRun, issueArg) {
   const planReason =
     plan.reason || planGate.validatePlanCandidate(selected, plan.evidence);
   if (planReason) {
-    console.log(
-      JSON.stringify(
-        {
-          schema: 'deterministic-gates/run/v1',
-          status: 'blocked',
-          stage: 'plan',
-          issue: selected.identifier,
-          reason: planReason,
-          mutations: 0,
-        },
-        null,
-        2
-      )
-    );
-    return;
+    return {
+      team: team.key,
+      status: 'blocked',
+      stage: 'plan',
+      issue: selected.identifier,
+      reason: planReason,
+      mutations: 0,
+    };
   }
 
   if (isDryRun) {
-    console.log(
-      JSON.stringify(
-        {
-          schema: 'deterministic-gates/run/v1',
-          status: 'would-admit',
-          issue: selected.identifier,
-          plan: plan.evidence,
-          mutations: 0,
-        },
-        null,
-        2
-      )
-    );
-    return;
+    return {
+      team: team.key,
+      status: 'would-admit',
+      issue: selected.identifier,
+      plan: plan.evidence,
+      mutations: 0,
+    };
   }
 
   const planResult = await planGate.approvePlan({
     issue: selected,
     evidence: plan.evidence,
     client: linear,
-    teamId: TEAM_ID,
+    teamId: team.id,
   });
   if (planResult.status === 'rejected')
     throw new Error(`plan gate rejected: ${planResult.reason}`);
 
   let current = await linear.fetchIssue(selected.identifier);
-  const finalPreflight = await admissionPreflight();
+  const finalPreflight = await admissionPreflight(team);
   if (!finalPreflight.open)
     throw new Error(`admission preflight blocked: ${finalPreflight.reason}`);
 
   const admissionResult = await admissionGate.approveAdmission({
     issue: current,
     client: linear,
-    teamId: TEAM_ID,
+    teamId: team.id,
   });
   if (admissionResult.status === 'rejected')
     throw new Error(`admission gate rejected: ${admissionResult.reason}`);
@@ -283,8 +340,8 @@ async function runGateNext(isDryRun, issueArg) {
     issue: current,
     classification,
     client: linear,
-    teamId: TEAM_ID,
-    todoStateId: TODO_STATE_ID,
+    teamId: team.id,
+    todoStateId: team.todoStateId,
   });
   if (!['admitted', 'already-admitted'].includes(lease.status))
     throw new Error(`lease rejected: ${lease.reason}`);
@@ -302,27 +359,30 @@ async function runGateNext(isDryRun, issueArg) {
   )
     throw new Error('final gate-and-lease verification failed');
 
-  console.log(
-    JSON.stringify(
-      {
-        schema: 'deterministic-gates/run/v1',
-        status: 'admitted',
-        issue: selected.identifier,
-        planGate: planResult.status,
-        admissionGate: admissionResult.status,
-        lease: lease.status,
-        active: load.identifiers,
-        mutations: 'verified',
-      },
-      null,
-      2
-    )
-  );
+  return {
+    team: team.key,
+    status: 'admitted',
+    issue: selected.identifier,
+    planGate: planResult.status,
+    admissionGate: admissionResult.status,
+    lease: lease.status,
+    active: load.identifiers,
+    mutations: 'verified',
+  };
 }
 
 async function runAudit(cache, isDryRun) {
   console.log('Scanning Linear backlog...');
-  const allIssues = await linear.fetchTeamActiveIssues(TEAM_ID);
+  const teamFetches = await Promise.allSettled(
+    TEAM_CONFIGS.map(team => linear.fetchTeamActiveIssues(team.id))
+  );
+  const allIssues = teamFetches.flatMap((result, index) => {
+    if (result.status === 'fulfilled') return result.value;
+    console.error(
+      `Failed to fetch ${TEAM_CONFIGS[index].key}: ${result.reason.message}`
+    );
+    return [];
+  });
   console.log(`Fetched ${allIssues.length} issues`);
 
   const classifications = [];
@@ -386,40 +446,113 @@ async function runAudit(cache, isDryRun) {
 }
 
 async function runReconcile(cache, isDryRun, issueArg) {
-  let issues;
   if (issueArg) {
     const issue = await linear.fetchIssue(issueArg);
-    issues = issue ? [issue] : [];
     if (!issue) {
       console.log(`Issue ${issueArg} not found`);
       return;
     }
-  } else {
-    console.log('Fetching Triage issues...');
-    issues = await linear.fetchTeamTriageIssues(TEAM_ID);
+    const team = teamForIdentifier(issue.identifier);
+    if (!team)
+      throw new Error(`Issue ${issue.identifier} has no repository route`);
+    console.log('Processing 1 issue');
+    const receipt = await reconciler.reconcileIssues({
+      issues: [issue],
+      client: linear,
+      isDryRun,
+      backlogStateId: team.backlogStateId,
+    });
+    console.log('Reconciliation receipt:');
+    console.log(JSON.stringify(receipt, null, 2));
+    console.log('Reconciliation complete.');
+    return;
   }
 
-  console.log(`Processing ${issues.length} issues`);
-
-  const receipt = await reconciler.reconcileIssues({
-    issues,
-    client: linear,
-    isDryRun,
-    backlogStateId: BACKLOG_STATE_ID,
-  });
-
+  console.log('Fetching Triage issues for JOV and LYB...');
+  const teamReceipts = [];
+  for (const team of TEAM_CONFIGS) {
+    try {
+      const issues = await linear.fetchTeamTriageIssues(
+        team.id,
+        1000,
+        team.intakeStates
+      );
+      const receipt = await reconciler.reconcileIssues({
+        issues,
+        client: linear,
+        isDryRun,
+        backlogStateId: team.backlogStateId,
+      });
+      teamReceipts.push({ team: team.key, status: 'ok', ...receipt });
+    } catch (error) {
+      teamReceipts.push({
+        team: team.key,
+        status: 'failed',
+        error: error.message,
+        issueCount: 0,
+        classified: 0,
+        skipped: 0,
+        wouldMove: 0,
+        mutations: 0,
+      });
+    }
+  }
+  const totals = teamReceipts.reduce(
+    (sum, receipt) => ({
+      issueCount: sum.issueCount + receipt.issueCount,
+      classified: sum.classified + receipt.classified,
+      skipped: sum.skipped + receipt.skipped,
+      wouldMove: sum.wouldMove + receipt.wouldMove,
+      mutations: sum.mutations + receipt.mutations,
+    }),
+    { issueCount: 0, classified: 0, skipped: 0, wouldMove: 0, mutations: 0 }
+  );
+  console.log(`Processing ${totals.issueCount} issues`);
   console.log('Reconciliation receipt:');
-  console.log(JSON.stringify(receipt, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        schema: 'backlog-orchestrator/reconcile-multiteam/v1',
+        mode: isDryRun ? 'dry-run' : 'mutating',
+        ...totals,
+        teams: teamReceipts,
+      },
+      null,
+      2
+    )
+  );
   console.log('Reconciliation complete.');
 }
 
 async function runAdmitNext(cache, isDryRun) {
   console.log('Checking admission eligibility...');
+  const teamResults = [];
+  for (const team of TEAM_CONFIGS) {
+    try {
+      teamResults.push(await runTeamAdmitNext(team, isDryRun));
+    } catch (error) {
+      teamResults.push({
+        team: team.key,
+        status: 'blocked',
+        reason: error.message,
+        mutations: 0,
+      });
+    }
+  }
 
+  const result = { teams: teamResults };
+  saveCache({
+    ...cache,
+    lastAdmit: { at: new Date().toISOString(), result },
+  });
+  return result;
+}
+
+async function runTeamAdmitNext(team, isDryRun) {
   // Release only provably stale machine leases before ordinary admission. This
   // is intentionally scoped to unassigned In Progress issues; it never touches
   // Tim-assigned or otherwise ambiguous work.
-  const inProgressIssues = await linear.fetchTeamInProgressIssues(TEAM_ID);
+  const inProgressIssues = await linear.fetchTeamInProgressIssues(team.id);
   if (isDryRun) {
     const planned = inProgressIssues
       .map(issue => ({
@@ -432,6 +565,7 @@ async function runAdmitNext(cache, isDryRun) {
     const staleLeaseResult = await staleLeaseGuard.sweepStaleLeases({
       issues: inProgressIssues,
       client: linear,
+      todoStateId: team.todoStateId,
     });
     console.log(
       `Stale-lease sweep: recovered ${staleLeaseResult.recovered.length}, ` +
@@ -439,7 +573,7 @@ async function runAdmitNext(cache, isDryRun) {
     );
   }
 
-  const allIssues = await linear.fetchTeamActiveIssues(TEAM_ID);
+  const allIssues = await linear.fetchTeamActiveIssues(team.id);
   const classifications = [];
   for (const issue of allIssues) {
     const stored = classifier.parseStoredClassification(issue);
@@ -459,6 +593,7 @@ async function runAdmitNext(cache, isDryRun) {
     workstreams,
     {
       currentlyShipping: state.count,
+      productionRed: await isTeamProductionRed(team),
     }
   );
 
@@ -471,8 +606,8 @@ async function runAdmitNext(cache, isDryRun) {
         issue: item.issue,
         classification: item,
         client: linear,
-        teamId: TEAM_ID,
-        todoStateId: TODO_STATE_ID,
+        teamId: team.id,
+        todoStateId: team.todoStateId,
       });
       console.log(`  ${receipt.status}: ${item.identifier}`);
     } catch (err) {
@@ -486,14 +621,7 @@ async function runAdmitNext(cache, isDryRun) {
     console.log('  (dry-run — no mutations performed)');
   }
 
-  // Update cache
-  const newCache = {
-    ...cache,
-    lastAdmit: { at: new Date().toISOString(), result },
-  };
-  saveCache(newCache);
-
-  return result;
+  return { team: team.key, ...result };
 }
 
 main().catch(err => {

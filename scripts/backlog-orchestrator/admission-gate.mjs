@@ -53,8 +53,8 @@ function isTimOwned(issue) {
 }
 
 export function validateAdmissionCandidate(issue) {
-  if (!issue?.id || !/^JOV-\d+$/.test(issue.identifier || ''))
-    return 'not-concrete-jovie-issue';
+  if (!issue?.id || !/^(?:JOV|LYB)-\d+$/.test(issue.identifier || ''))
+    return 'not-concrete-routed-issue';
   if (!ALLOWED_STATES.has(issue.state?.name || issue.state))
     return 'ambiguous-or-active-state';
   if (isTimOwned(issue)) return 'tim-owned';

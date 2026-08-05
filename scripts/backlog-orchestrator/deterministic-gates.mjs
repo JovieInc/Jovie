@@ -24,14 +24,35 @@ const PROTECTED_LABELS = new Set([
   'tim-owned',
   'type:epic',
 ]);
-export const SYMPHONY_PROJECT = {
-  name: 'Infra & CI/CD',
-  slugId: '82c6fbd42405',
-};
+export const TEAM_ROUTES = Object.freeze({
+  JOV: Object.freeze({
+    key: 'JOV',
+    name: 'Jovie',
+    repo: 'JovieInc/Jovie',
+  }),
+  LYB: Object.freeze({
+    key: 'LYB',
+    name: 'LYB',
+    repo: 'JovieInc/LogYourBody',
+  }),
+});
 const PROHIBITED_TEXT =
   /credential|secret|password|api[ -]?key|access token|private key|billing|payment|checkout|database migration|schema migration|production deploy|publish externally|delete (?:customer|production|user) data|destructive|synthetic|bundle|workstream|batch|epic-only/i;
-const ACTIVE_PR = /github\.com\/JovieInc\/Jovie\/pull\/\d+/i;
 const MAX_CANDIDATE_AGE_DAYS = 60;
+
+export function teamRouteForIssue(issue) {
+  const key =
+    issue?.team?.key ||
+    /^([A-Za-z][A-Za-z0-9]*)-\d+$/.exec(issue?.identifier || '')?.[1];
+  return TEAM_ROUTES[String(key || '').toUpperCase()] || null;
+}
+
+function activePullRequestPattern(route) {
+  return new RegExp(
+    `github\\.com/${route.repo.replace('/', '\\/')}\\/pull\\/\\d+`,
+    'i'
+  );
+}
 
 function labelsOf(issue) {
   return (issue?.labels?.nodes || issue?.labels || [])
@@ -87,18 +108,12 @@ export function validateDeterministicPlanCandidate(
   issue,
   { now = new Date().toISOString() } = {}
 ) {
-  if (!issue?.id || !/^JOV-\d+$/.test(issue.identifier || ''))
-    return 'not-concrete-jovie-issue';
+  if (!issue?.id || !teamRouteForIssue(issue))
+    return 'not-concrete-routed-issue';
   if (!['Triage', 'Backlog', 'Todo'].includes(issue.state?.name || issue.state))
     return 'inactive-or-active-state';
   if (isTimOwned(issue)) return 'tim-owned';
   if (issue.assignee) return 'already-assigned';
-  if (
-    issue.project?.name !== SYMPHONY_PROJECT.name ||
-    issue.project?.slugId !== SYMPHONY_PROJECT.slugId
-  )
-    return 'project-not-allowlisted';
-
   const labels = labelsOf(issue);
   if (!labels.some(label => READY_LABELS.has(label)))
     return 'readiness-label-missing';
@@ -110,7 +125,12 @@ export function validateDeterministicPlanCandidate(
 
   const text = `${issue.title || ''}\n${issue.description || ''}`;
   if (PROHIBITED_TEXT.test(text)) return 'sensitive-or-external-work';
-  if (commentsOf(issue).some(comment => ACTIVE_PR.test(commentBody(comment))))
+  const route = teamRouteForIssue(issue);
+  if (
+    commentsOf(issue).some(comment =>
+      activePullRequestPattern(route).test(commentBody(comment))
+    )
+  )
     return 'active-pull-request';
 
   const createdAt = new Date(issue.createdAt || 0).getTime();
@@ -140,14 +160,15 @@ export function buildDeterministicPlanEvidence(issue) {
   const acceptance = cleanList(
     section(issue.description, ['Acceptance criteria'])
   );
+  const route = teamRouteForIssue(issue);
   return {
     reason: null,
     evidence: {
       verified: true,
       concrete: true,
       bounded: true,
-      repo: 'JovieInc/Jovie',
-      project: issue.project.name,
+      repo: route.repo,
+      project: issue.project?.name || route.name,
       owner: 'Gem',
       scope: scope.slice(0, 1800),
       acceptance,

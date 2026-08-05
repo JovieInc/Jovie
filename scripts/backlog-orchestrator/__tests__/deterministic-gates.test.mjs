@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import * as admissionGate from '../admission-gate.mjs';
+import * as admitter from '../admitter.mjs';
 import * as deterministicGates from '../deterministic-gates.mjs';
 import * as planGate from '../plan-gate.mjs';
 
@@ -38,18 +39,22 @@ Normalize the unstable token before sending the event.
 }
 
 function plannedIssue(overrides = {}) {
-  const base = issue();
+  const seed = {};
+  if (overrides.identifier !== undefined)
+    seed.identifier = overrides.identifier;
+  if (overrides.project !== undefined) seed.project = overrides.project;
+  const base = issue(seed);
   const { evidence } = deterministicGates.buildDeterministicPlanEvidence(base);
   const receipt = planGate.buildPlanGateReceipt(base, evidence);
   return issue({
-    labels: {
+    ...overrides,
+    labels: overrides.labels || {
       nodes: [
         ...base.labels.nodes,
         { id: 'plan-id', name: planGate.PLAN_APPROVED_LABEL },
       ],
     },
-    comments: { nodes: [{ body: receipt }] },
-    ...overrides,
+    comments: overrides.comments || { nodes: [{ body: receipt }] },
   });
 }
 
@@ -69,9 +74,34 @@ describe('deterministic no-model gates', () => {
     );
   });
 
-  it('fails closed on project, ownership, epic, sensitive, stale, and incomplete work', () => {
+  it('routes LYB evidence to LogYourBody without requiring a Linear project', () => {
+    const candidate = issue({
+      identifier: 'LYB-12',
+      project: null,
+    });
+    const result = deterministicGates.buildDeterministicPlanEvidence(candidate);
+    assert.equal(result.reason, null);
+    assert.equal(result.evidence.repo, 'JovieInc/LogYourBody');
+    assert.equal(result.evidence.project, 'LYB');
+    assert.equal(admitter.isConcreteJovieIssue(candidate), true);
+    assert.equal(
+      planGate.validatePlanCandidate(candidate, result.evidence),
+      null
+    );
+    assert.equal(
+      admissionGate.validateAdmissionCandidate(
+        plannedIssue({
+          identifier: 'LYB-12',
+          project: null,
+        })
+      ),
+      null
+    );
+  });
+
+  it('fails closed on team routing, ownership, epic, sensitive, stale, and incomplete work', () => {
     const cases = [
-      issue({ project: { name: 'LogYourBody' } }),
+      issue({ identifier: 'OPS-1' }),
       issue({ assignee: { id: 'tim', name: 'Tim White' } }),
       issue({ labels: { nodes: [{ name: 'type:epic' }] } }),
       issue({ title: 'Rotate a production credential' }),
