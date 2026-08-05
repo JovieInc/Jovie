@@ -9,13 +9,19 @@ parent lands. Graphite is not required and there is no second landing transport.
 
 ## How a PR lands
 
-1. Open a PR against `main`. Source CI emits the required aggregate contexts.
-2. Apply `merge-queue` when the PR is ready. Automation normally does this;
-   humans can use `gh pr edit <pr> --add-label merge-queue`.
-3. `merge-queue-autoenroll.yml` revalidates the PR's current state, hard-gate
-   labels, terminal checks, and exact head SHA. It enrolls through
-   `scripts/merge-queue-backend.mjs` and proves authoritative queue state after
-   mutation. The label remains intent/audit evidence, never queue truth.
+1. Open a root PR against `main`. A dependent child may instead target its
+   immediate parent while both are open, but it must remain draft and must not
+   receive `merge-queue` while that parent base is live.
+2. After the parent lands, retarget the child to `main`, rebase it from the
+   recorded parent tip, prove its exact remote head lease and semantic ancestry,
+   then mark it ready and apply `merge-queue`. Automation normally does this;
+   humans can use `gh pr edit <pr> --add-label merge-queue` only after that proof.
+3. Before labeling, the operator must verify the child targets `main` and that
+   its exact head is the rebased SHA. `merge-queue-autoenroll.yml` then
+   revalidates the PR's current state, hard-gate labels, terminal checks, and
+   exact head SHA. It enrolls through `scripts/merge-queue-backend.mjs` and
+   proves authoritative queue state after mutation. The label remains intent/
+   audit evidence, never queue truth.
 4. GitHub creates a synthetic `merge_group` head against current `main` and
    waits for the same required contexts on that exact combined SHA.
 5. GitHub squash-merges the green queue entry. `linear-sync-on-merge.yml`

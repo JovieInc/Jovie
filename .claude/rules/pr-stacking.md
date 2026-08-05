@@ -67,18 +67,32 @@ git push -u origin feat/x-02
 gh pr create --draft --base feat/x-01 --head feat/x-02
 ```
 
+Keep every dependent child draft and unenrolled while its immediate-parent base
+is still open. Only mark the child ready and add `merge-queue` after its parent
+has landed, the child targets `main`, and the rebase and fresh checks below pass.
+
 Record every branch, PR number, immediate-parent base, and exact head SHA. When
-the parent merges, keep its old tip for the rebase boundary, then:
+the parent merges, keep both the old parent tip and the recorded child remote
+tip for the rebase boundary and force-with-lease, then:
 
 ```bash
+child_branch=feat/x-02
+pr_number=123
+old_parent_tip=RECORDED_PARENT_SHA
+old_child_tip=RECORDED_CHILD_SHA
+remote_child_tip=$(git ls-remote origin "refs/heads/$child_branch" | awk '{print $1}')
+test "$remote_child_tip" = "$old_child_tip"
 git fetch origin main
-gh pr edit <child> --base main
-git rebase --onto origin/main <old-parent-tip> <child-branch>
-git push --force-with-lease origin <child-branch>
+gh pr edit "$pr_number" --base main
+git rebase --onto origin/main "$old_parent_tip" "$child_branch"
+git push --force-with-lease="refs/heads/$child_branch:$old_child_tip" origin "$child_branch"
+git merge-base --is-ancestor origin/main "$child_branch"
+test "$(git ls-remote origin "refs/heads/$child_branch" | awk '{print $1}')" = "$(git rev-parse "$child_branch")"
 ```
 
-Prove the child remote head was unchanged before rebasing, inspect ancestry and
-the semantic diff, and wait for the fresh source checks before queue enrollment.
-Keep the parent branch until the child has converged. Land one layer at a time
-through GitHub's native merge queue; never bypass it or create a second landing
-transport. See also [`ci-branching.md`](ci-branching.md).
+The first equality is the pre-rebase remote-head proof; the explicit lease makes
+the push fail closed if another writer moved the branch. Inspect the semantic
+diff, wait for fresh source checks, then enroll. Keep the parent branch until the
+child has converged. Land one layer at a time through GitHub's native merge
+queue; never bypass it or create a second landing transport. See also
+[`ci-branching.md`](ci-branching.md).
