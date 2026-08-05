@@ -178,7 +178,7 @@ async function isTeamProductionRed(team) {
     });
     if (!response.ok) return true;
     if (team.healthKind === 'json-status') {
-      const data = await response.json();
+      const data = /** @type {{ status?: string }} */ (await response.json());
       return data.status !== 'ok';
     }
     return false;
