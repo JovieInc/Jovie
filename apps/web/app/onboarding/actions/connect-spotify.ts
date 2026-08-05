@@ -210,6 +210,25 @@ async function getOwnedProfile(profileId: string, clerkUserId: string) {
   return profile;
 }
 
+function getDirectClaimValidationMessage(params: {
+  readonly expectedSpotifyArtistId: string | null | undefined;
+  readonly isAwaitingMatch: boolean;
+  readonly isStructuredCreditProfile: boolean;
+  readonly selectedSpotifyArtistId: string;
+}): string | null {
+  if (!params.isAwaitingMatch) return null;
+  if (params.isStructuredCreditProfile) {
+    return SPOTIFY_UNCLAIMED_PROFILE_MESSAGE;
+  }
+  if (!params.expectedSpotifyArtistId) {
+    return 'This profile needs a claim link before it can be claimed.';
+  }
+  if (params.expectedSpotifyArtistId !== params.selectedSpotifyArtistId) {
+    return 'Please choose the Spotify artist already attached to this profile.';
+  }
+  return null;
+}
+
 export async function connectOnboardingSpotifyArtist(
   params: ConnectOnboardingSpotifyArtistParams
 ): Promise<ConnectOnboardingSpotifyArtistResult> {
@@ -239,39 +258,20 @@ export async function connectOnboardingSpotifyArtist(
     pendingClaim?.mode === 'direct_profile' &&
     pendingClaim.creatorProfileId === profile.id &&
     profile.isClaimed !== true;
+  const directClaimValidationMessage = getDirectClaimValidationMessage({
+    expectedSpotifyArtistId: pendingClaim?.expectedSpotifyArtistId,
+    isAwaitingMatch: isDirectClaimAwaitingMatch,
+    isStructuredCreditProfile: isUnclaimedStructuredCreditProfile(
+      profile.settings
+    ),
+    selectedSpotifyArtistId: params.spotifyArtistId,
+  });
 
-  if (
-    isDirectClaimAwaitingMatch &&
-    isUnclaimedStructuredCreditProfile(profile.settings)
-  ) {
+  if (directClaimValidationMessage) {
     return {
       success: false,
       importing: false,
-      message: SPOTIFY_UNCLAIMED_PROFILE_MESSAGE,
-      imported: 0,
-      artistName: params.artistName,
-    };
-  }
-
-  if (isDirectClaimAwaitingMatch && !pendingClaim.expectedSpotifyArtistId) {
-    return {
-      success: false,
-      importing: false,
-      message: 'This profile needs a claim link before it can be claimed.',
-      imported: 0,
-      artistName: params.artistName,
-    };
-  }
-
-  if (
-    isDirectClaimAwaitingMatch &&
-    pendingClaim.expectedSpotifyArtistId !== params.spotifyArtistId
-  ) {
-    return {
-      success: false,
-      importing: false,
-      message:
-        'Please choose the Spotify artist already attached to this profile.',
+      message: directClaimValidationMessage,
       imported: 0,
       artistName: params.artistName,
     };
