@@ -155,8 +155,6 @@ export function StaticArtistPage({
       merchCards={viewModel.merchCards}
       hideJovieBranding={hideJovieBranding}
       hideMoreMenu={hideMoreMenu}
-      profileBanner={profileBanner}
-      allowFanCapture={allowFanCapture}
       showClaimFooter={showClaimFooter}
       claimFooterHref={claimFooterHref}
     />

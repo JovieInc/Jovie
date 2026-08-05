@@ -91,8 +91,6 @@ interface ProfileCompactTemplateProps {
   readonly merchCards?: readonly PublicMerchCard[];
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
-  readonly profileBanner?: ReactNode;
-  readonly allowFanCapture?: boolean;
   readonly visualVariant?: 'default';
   /** Desktop spare-space claim footer (JOV-3544). */
   readonly showClaimFooter?: boolean;
@@ -237,8 +235,6 @@ export function ProfileCompactTemplate({
   merchCards = [],
   hideJovieBranding = false,
   hideMoreMenu = false,
-  profileBanner,
-  allowFanCapture = true,
   visualVariant = 'default',
   showClaimFooter = false,
   claimFooterHref = null,

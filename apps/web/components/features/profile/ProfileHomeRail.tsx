@@ -49,7 +49,6 @@ interface ProfileHomeRailProps {
   readonly onAlertsClick?: (context: NotificationSourceContext) => void;
   readonly showAlertsCard?: boolean;
   readonly isSubscribed?: boolean;
-  readonly showAlertsCard?: boolean;
   readonly profilePacAssignment?: ProfilePacAssignment;
   readonly viewerLocation?: UserLocation | null;
   readonly resolveNearbyTour?: boolean;
@@ -177,7 +176,6 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   onAlertsClick,
   showAlertsCard = true,
   isSubscribed = false,
-  showAlertsCard = true,
   profilePacAssignment = DEFAULT_PROFILE_PAC_ASSIGNMENT,
   viewerLocation,
   resolveNearbyTour = true,

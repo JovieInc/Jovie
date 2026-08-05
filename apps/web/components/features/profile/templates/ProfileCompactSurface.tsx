@@ -200,7 +200,6 @@ interface ProfileCompactSurfaceProps {
   readonly hideBackButton?: boolean;
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
-  readonly allowFanCapture?: boolean;
   readonly headerSocialLinksOverride?: readonly LegacySocialLink[];
   readonly renderInteractiveOverlays?: boolean;
   readonly renderSemanticHeading?: boolean;
@@ -295,7 +294,6 @@ export function ProfileCompactSurface({
   dataTestId,
   hideBackButton = false,
   hideMoreMenu = false,
-  allowFanCapture = true,
   headerSocialLinksOverride,
   renderInteractiveOverlays = true,
   renderSemanticHeading = true,
