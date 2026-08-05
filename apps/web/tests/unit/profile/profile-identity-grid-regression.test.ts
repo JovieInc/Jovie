@@ -22,7 +22,7 @@ describe('public profile identity grid', () => {
   });
 
   it('aligns name, metadata, location, and actions to one compact grid', () => {
-    expect(SURFACE).toContain('grid min-w-0 gap-1 [overflow-wrap:anywhere]');
+    expect(SURFACE).toContain('grid min-w-0 gap-0.5 [overflow-wrap:anywhere]');
     expect(SURFACE).toContain(
       'grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2'
     );
