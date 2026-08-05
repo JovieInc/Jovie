@@ -23,8 +23,11 @@ const hoisted = vi.hoisted(() => {
   const readPendingClaimContextMock = vi.fn().mockResolvedValue(null);
   const clearPendingClaimContextMock = vi.fn().mockResolvedValue(undefined);
   const claimPrebuiltProfileForUserMock = vi.fn().mockResolvedValue(undefined);
+  const executeMock = vi.fn().mockResolvedValue(undefined);
   const withDbSessionTxMock = vi.fn(async callback =>
     callback({
+      execute: executeMock,
+      select: selectMock,
       update: updateMock,
     })
   );
@@ -79,6 +82,7 @@ const hoisted = vi.hoisted(() => {
     finalizePostOnboardingMock,
     cookiesMock,
     cookiesSetMock,
+    executeMock,
     updateMock,
     updateSetArgs,
     withDbSessionTxMock,
@@ -99,6 +103,7 @@ vi.mock('drizzle-orm', () => ({
   and: vi.fn(),
   eq: vi.fn(),
   ne: vi.fn(),
+  sql: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/cached', () => ({
@@ -213,7 +218,8 @@ function queueOwnedProfile(settings: Record<string, unknown> = {}) {
 }
 
 function queueNoExistingClaim() {
-  hoisted.selectResults.push([]);
+  // One preflight read and one transaction-locked recheck.
+  hoisted.selectResults.push([], []);
 }
 
 function queueLatestSettings(settings: Record<string, unknown> = {}) {
@@ -449,6 +455,118 @@ describe('connectOnboardingSpotifyArtist', () => {
     expect(hoisted.claimPrebuiltProfileForUserMock).not.toHaveBeenCalled();
   });
 
+  it('rejects an exact-ID structured-credit profile without profile-specific proof', async () => {
+    queueOwnedProfile();
+    hoisted.selectResults.push([
+      {
+        id: 'credit_profile_456',
+        isClaimed: false,
+        settings: {
+          unclaimedArtistProfile: {
+            state: 'unclaimed',
+            source: 'structured_spotify_release_credit',
+            artistRegistryId: 'f5441adb-6789-449a-9553-ab7460c9c61c',
+            provider: 'spotify',
+            providerArtistId: 'artist_spotify_id',
+            ownershipVerified: false,
+            representationVerified: false,
+            consentObtained: false,
+          },
+        },
+      },
+    ]);
+
+    const { connectOnboardingSpotifyArtist } = await import(
+      '@/app/onboarding/actions/connect-spotify'
+    );
+    const result = await connectOnboardingSpotifyArtist({
+      artistName: 'Artist Name',
+      profileId: 'profile_123',
+      spotifyArtistId: 'artist_spotify_id',
+      spotifyArtistUrl: 'https://open.spotify.com/artist/artist_spotify_id',
+    });
+
+    expect(result).toEqual({
+      success: false,
+      importing: false,
+      message:
+        'This artist already has an unclaimed Jovie profile and requires verified ownership before it can be claimed.',
+      imported: 0,
+      artistName: 'Artist Name',
+    });
+    expect(hoisted.updateMock).not.toHaveBeenCalled();
+    expect(hoisted.withDbSessionTxMock).not.toHaveBeenCalled();
+    expect(hoisted.claimPrebuiltProfileForUserMock).not.toHaveBeenCalled();
+    expect(hoisted.syncReleasesFromSpotifyMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when duplicate exact-ID profiles already exist', async () => {
+    queueOwnedProfile();
+    hoisted.selectResults.push([
+      {
+        id: 'claimed_profile',
+        isClaimed: true,
+        settings: {},
+      },
+      {
+        id: 'unclaimed_profile',
+        isClaimed: false,
+        settings: {
+          unclaimedArtistProfile: {
+            state: 'unclaimed',
+            source: 'structured_spotify_release_credit',
+            artistRegistryId: 'f5441adb-6789-449a-9553-ab7460c9c61c',
+            provider: 'spotify',
+            providerArtistId: 'artist_spotify_id',
+            ownershipVerified: false,
+            representationVerified: false,
+            consentObtained: false,
+          },
+        },
+      },
+    ]);
+
+    const { connectOnboardingSpotifyArtist } = await import(
+      '@/app/onboarding/actions/connect-spotify'
+    );
+    const result = await connectOnboardingSpotifyArtist({
+      artistName: 'Artist Name',
+      profileId: 'profile_123',
+      spotifyArtistId: 'artist_spotify_id',
+      spotifyArtistUrl: 'https://open.spotify.com/artist/artist_spotify_id',
+    });
+
+    expect(result.success).toBe(false);
+    expect(hoisted.updateMock).not.toHaveBeenCalled();
+    expect(hoisted.withDbSessionTxMock).not.toHaveBeenCalled();
+    expect(hoisted.claimPrebuiltProfileForUserMock).not.toHaveBeenCalled();
+    expect(hoisted.syncReleasesFromSpotifyMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when an exact-ID profile wins after the preflight read', async () => {
+    queueOwnedProfile();
+    hoisted.selectResults.push(
+      [],
+      [{ id: 'concurrent_winner', isClaimed: false, settings: {} }]
+    );
+
+    const { connectOnboardingSpotifyArtist } = await import(
+      '@/app/onboarding/actions/connect-spotify'
+    );
+    const result = await connectOnboardingSpotifyArtist({
+      artistName: 'Artist Name',
+      profileId: 'profile_123',
+      spotifyArtistId: 'artist_spotify_id',
+      spotifyArtistUrl: 'https://open.spotify.com/artist/artist_spotify_id',
+    });
+
+    expect(result.success).toBe(false);
+    expect(hoisted.executeMock).toHaveBeenCalledOnce();
+    expect(hoisted.updateMock).not.toHaveBeenCalled();
+    expect(hoisted.claimPrebuiltProfileForUserMock).not.toHaveBeenCalled();
+    expect(hoisted.syncReleasesFromSpotifyMock).not.toHaveBeenCalled();
+  });
+
   it('rejects a direct-profile claim awaiting match when no expectedSpotifyArtistId is set yet', async () => {
     queueOwnedProfile();
     hoisted.readPendingClaimContextMock.mockResolvedValueOnce({
@@ -485,6 +603,49 @@ describe('connectOnboardingSpotifyArtist', () => {
     expect(hoisted.withDbSessionTxMock).not.toHaveBeenCalled();
     expect(hoisted.claimPrebuiltProfileForUserMock).not.toHaveBeenCalled();
     expect(hoisted.syncReleasesFromSpotifyMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a self-issued direct claim for an automatic unclaimed profile', async () => {
+    queueOwnedProfile({
+      unclaimedArtistProfile: {
+        state: 'unclaimed',
+        source: 'structured_spotify_release_credit',
+        artistRegistryId: 'f5441adb-6789-449a-9553-ab7460c9c61c',
+        provider: 'spotify',
+        providerArtistId: 'artist_spotify_id',
+        ownershipVerified: false,
+        representationVerified: false,
+        consentObtained: false,
+      },
+    });
+    hoisted.readPendingClaimContextMock.mockResolvedValueOnce({
+      mode: 'direct_profile',
+      creatorProfileId: 'profile_123',
+      username: 'artist',
+      expectedSpotifyArtistId: 'artist_spotify_id',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+
+    const { connectOnboardingSpotifyArtist } = await import(
+      '@/app/onboarding/actions/connect-spotify'
+    );
+    const result = await connectOnboardingSpotifyArtist({
+      artistName: 'Artist Name',
+      profileId: 'profile_123',
+      spotifyArtistId: 'artist_spotify_id',
+      spotifyArtistUrl: 'https://open.spotify.com/artist/artist_spotify_id',
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      message:
+        'This artist already has an unclaimed Jovie profile and requires verified ownership before it can be claimed.',
+    });
+    expect(hoisted.selectMock).toHaveBeenCalledTimes(1);
+    expect(hoisted.withDbSessionTxMock).not.toHaveBeenCalled();
+    expect(hoisted.claimPrebuiltProfileForUserMock).not.toHaveBeenCalled();
+    expect(hoisted.updateMock).not.toHaveBeenCalled();
   });
 
   it('rejects a direct-profile claim when the selected Spotify artist does not match the expected one', async () => {

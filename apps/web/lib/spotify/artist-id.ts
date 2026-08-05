@@ -27,3 +27,34 @@ export function extractSpotifyArtistId(value: string): string | null {
     return null;
   }
 }
+
+export type SpotifyArtistIdentityResolution =
+  | { readonly status: 'resolved'; readonly spotifyArtistId: string }
+  | { readonly status: 'missing' | 'conflict'; readonly spotifyArtistId: null };
+
+/**
+ * Resolve one exact Spotify artist identity from structured profile fields.
+ *
+ * Legacy profiles may only retain the active Spotify social-link URL, while
+ * newer profiles also populate spotify_id/spotify_url. Conflicting exact IDs
+ * fail closed so callers never choose an owner identity by display name.
+ */
+export function resolveSpotifyArtistIdentity(
+  values: readonly (string | null | undefined)[]
+): SpotifyArtistIdentityResolution {
+  const ids = new Set<string>();
+  for (const value of values) {
+    if (!value) continue;
+    const id = extractSpotifyArtistId(value);
+    if (id) ids.add(id);
+  }
+
+  if (ids.size === 0) {
+    return { status: 'missing', spotifyArtistId: null };
+  }
+  if (ids.size > 1) {
+    return { status: 'conflict', spotifyArtistId: null };
+  }
+
+  return { status: 'resolved', spotifyArtistId: [...ids][0]! };
+}
