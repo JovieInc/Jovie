@@ -815,15 +815,16 @@ describe('Profile AEO content', () => {
     ]);
   });
 
-  it('renders unavailable or private collaborator identities as plain text', () => {
+  it('links unavailable exact collaborator identities through the stable route', () => {
     const content = buildProfileAeoContent({
       artist: baseArtist,
       releaseCollaborators: [
         {
           artistId: 'f5441adb-6789-449a-9553-ab7460c9c61c',
           name: 'Private Artist',
-          href: null,
+          href: '/artists/f5441adb-6789-449a-9553-ab7460c9c61c',
           profileState: 'unavailable',
+          reconciliationEligible: true,
           role: 'featured_artist',
           releaseId: '353a7c04-b5bb-486e-996d-d23caced7f93',
           releaseTitle: 'Quiet Signal',
@@ -839,7 +840,9 @@ describe('Profile AEO content', () => {
     expect(screen.getByTestId('profile-aeo-content')).toHaveTextContent(
       'Private Artist'
     );
-    expect(screen.queryByRole('link', { name: 'Private Artist' })).toBeNull();
+    expect(
+      screen.getByRole('link', { name: 'Private Artist' })
+    ).toHaveAttribute('href', '/artists/f5441adb-6789-449a-9553-ab7460c9c61c');
     expect(screen.getByRole('link', { name: 'Quiet Signal' })).toHaveAttribute(
       'href',
       '/dj-test/quiet-signal'

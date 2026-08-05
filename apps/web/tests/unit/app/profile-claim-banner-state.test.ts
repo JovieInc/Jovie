@@ -43,16 +43,16 @@ describe('resolveClaimBannerState', () => {
     });
   });
 
-  it('keeps automatic credit profiles visibly unclaimed without a direct claim', () => {
+  it('offers verified ownership for automatic credit profiles with an exact Spotify identity', () => {
     expect(
       resolveClaimBannerState({
         visitorState: 'organic_unclaimed',
-        directClaimSupported: false,
+        directClaimSupported: true,
         claimRequiresVerification: true,
         isClaimed: false,
       })
     ).toEqual({
-      claimBannerVariant: 'unsupported',
+      claimBannerVariant: 'verified_claim',
       shouldShowClaimBanner: true,
     });
   });

@@ -92,7 +92,7 @@ export async function searchArtists(
  *
  * Only artists whose registry row links to a public creator profile are
  * returned — external collaborators without a Jovie account are excluded so
- * bio mentions of them stay plain text. The display name prefers the credit
+ * legacy bio mentions stay plain text. The display name prefers the credit
  * name (stage name) since that is what bios and release credits show.
  */
 export async function getCreditedArtistsWithProfiles(
@@ -243,6 +243,8 @@ function projectStructuredReleaseCollaborator(
 
   const hasPublicProfile =
     Boolean(row.artistProfileId) && row.profileIsPublic === true;
+  const hasPrivateProfileBinding =
+    Boolean(row.artistProfileId) && row.profileIsPublic !== true;
   let profileState: StructuredReleaseCollaborator['profileState'] =
     'unavailable';
   if (hasPublicProfile) {
@@ -252,7 +254,15 @@ function projectStructuredReleaseCollaborator(
   return {
     artistId: row.artistId,
     name,
-    href: hasPublicProfile ? artistProfileHref(row.artistId) : null,
+    // A structured Spotify identity has a canonical entity route even before
+    // its claim-safe profile row is materialized. The route self-heals the
+    // eligible unclaimed profile on first visit; names without an exact
+    // provider identity remain plain text rather than reserving a handle by
+    // display name alone.
+    href:
+      hasPublicProfile || (!hasPrivateProfileBinding && row.artistSpotifyId)
+        ? artistProfileHref(row.artistId)
+        : null,
     profileState,
     reconciliationEligible: Boolean(row.artistSpotifyId),
     role: row.role,

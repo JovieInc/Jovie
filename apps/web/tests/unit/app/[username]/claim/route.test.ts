@@ -117,7 +117,7 @@ describe('Claim route', () => {
     expect(response.headers.get('location')).toBe('http://localhost/');
   });
 
-  it('does not issue direct-claim proof for an automatic unclaimed profile', async () => {
+  it('starts a verified Spotify claim flow for an automatic unclaimed profile', async () => {
     mockGetProfileByUsername.mockResolvedValueOnce({
       id: 'profile_1',
       username: 'a_unclaimed',
@@ -146,10 +146,19 @@ describe('Claim route', () => {
     );
 
     expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe(
-      'http://localhost/a_unclaimed?claim=unsupported'
+    const location = response.headers.get('location') ?? '';
+    expect(location).toContain('http://localhost/signup?');
+    expect(location).toContain('handle=a_unclaimed');
+    expect(location).toContain('spotify_url=');
+    expect(location).toContain('artist_name=Austin+Leeds');
+    expect(mockWritePendingClaimContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'direct_profile',
+        creatorProfileId: 'profile_1',
+        username: 'a_unclaimed',
+        expectedSpotifyArtistId: 'spotify_123',
+      })
     );
-    expect(mockClearPendingClaimContext).toHaveBeenCalled();
-    expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
+    expect(mockClearPendingClaimContext).not.toHaveBeenCalled();
   });
 });

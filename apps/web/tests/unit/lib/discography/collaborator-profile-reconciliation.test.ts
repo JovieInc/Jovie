@@ -133,9 +133,10 @@ vi.mock('@/lib/profile/public-release-eligibility', () => ({
   publicReleaseEligibilitySqlPredicate: vi.fn(() => 'public-release-only'),
 }));
 
-const { reconcileCreditedArtistProfiles } = await import(
-  '@/lib/discography/collaborator-profile-reconciliation'
-);
+const {
+  ensureUnclaimedArtistProfileForEntity,
+  reconcileCreditedArtistProfiles,
+} = await import('@/lib/discography/collaborator-profile-reconciliation');
 
 const candidate = {
   artistId: 'f5441adb-6789-449a-9553-ab7460c9c61c',
@@ -161,6 +162,60 @@ describe('credited artist profile reconciliation', () => {
     hoisted.insertedValues.length = 0;
     hoisted.updatedValues.length = 0;
     hoisted.getSpotifyArtistsBatch.mockResolvedValue([]);
+  });
+
+  it('self-heals an eligible legacy entity route with one exact-ID unclaimed profile', async () => {
+    hoisted.dbSelectResults.push(
+      [
+        {
+          artistId: candidate.artistId,
+          name: candidate.name,
+          spotifyId: candidate.spotifyId,
+          imageUrl: null,
+          creatorProfileId: null,
+        },
+      ],
+      [{ usernameNormalized: 'a_eiqd46x3irj64dlgo8a3glau4' }]
+    );
+    hoisted.txSelectResults.push(
+      [
+        {
+          ...candidate,
+          creatorProfileId: null,
+          id: candidate.artistId,
+          metadata: {},
+        },
+      ],
+      [],
+      []
+    );
+    hoisted.txReturningResults.push(
+      [
+        {
+          id: 'created-profile',
+          usernameNormalized: 'a_eiqd46x3irj64dlgo8a3glau4',
+        },
+      ],
+      [{ id: candidate.artistId }]
+    );
+
+    const result = await ensureUnclaimedArtistProfileForEntity(
+      candidate.artistId
+    );
+
+    expect(result).toEqual({
+      status: 'created',
+      handle: 'a_eiqd46x3irj64dlgo8a3glau4',
+    });
+    expect(hoisted.getSpotifyArtistsBatch).toHaveBeenCalledWith([
+      candidate.spotifyId,
+    ]);
+    expect(hoisted.insertedValues[0]).toMatchObject({
+      isClaimed: false,
+      isPublic: true,
+      marketingOptOut: true,
+      spotifyId: candidate.spotifyId,
+    });
   });
 
   it('creates one claim-safe minimal profile for repeated exact-ID credits', async () => {

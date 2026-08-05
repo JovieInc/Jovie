@@ -95,7 +95,7 @@ describe('structured release collaborator projection', () => {
     expect(result[0]?.artistId).toBe(sameDisplayNameDifferentIdentity.artistId);
   });
 
-  it('keeps unavailable identities as plain-text candidates and excludes non-artist roles', () => {
+  it('links unavailable exact identities through the stable route and excludes non-artist roles', () => {
     const result = project([
       row({
         artistProfileId: null,
@@ -110,7 +110,7 @@ describe('structured release collaborator projection', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({
-      href: null,
+      href: `/artists/${result[0]?.artistId}`,
       profileState: 'unavailable',
       reconciliationEligible: true,
     });
@@ -127,6 +127,7 @@ describe('structured release collaborator projection', () => {
     ]);
 
     expect(result[0]).toMatchObject({
+      href: null,
       profileState: 'unavailable',
       reconciliationEligible: false,
     });

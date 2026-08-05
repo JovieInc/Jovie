@@ -283,11 +283,12 @@ async function ArtistPageContent({
   const isClaimed = creatorClerkId !== null;
   const requiresVerifiedOwnership =
     !isClaimed && isUnclaimedStructuredCreditProfile(profile.settings);
-  const directClaimSupported =
-    !requiresVerifiedOwnership &&
-    supportsDirectProfileClaim({
-      spotifyId: profile.spotify_id,
-    });
+  // Structured-credit profiles still expose a claim path when an exact
+  // Spotify identity exists. The route only seeds a pending flow; the
+  // onboarding Spotify action must match that exact ID before claiming.
+  const directClaimSupported = supportsDirectProfileClaim({
+    spotifyId: profile.spotify_id,
+  });
   const visitorState = getProfileVisitorState({
     profile: {
       id: profile.id,
@@ -473,7 +474,7 @@ async function ArtistPageContent({
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}
-        showClaimFooter={!isClaimed && !requiresVerifiedOwnership}
+        showClaimFooter={!isClaimed && directClaimSupported}
         claimFooterHref={`/${encodeURIComponent(artist.handle)}/claim?next=auth`}
         profileSettings={{
           showOldReleases: profileSettings.showOldReleases === true,

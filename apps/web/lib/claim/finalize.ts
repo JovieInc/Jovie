@@ -8,6 +8,10 @@ import {
   profileOwnershipLog,
   userProfileClaims,
 } from '@/lib/db/schema/profiles';
+import {
+  isUnclaimedStructuredCreditProfile,
+  markStructuredCreditProfileClaimed,
+} from '@/lib/profile/unclaimed-artist-profile';
 
 type ClaimOperationSource =
   | 'token_backed_onboarding'
@@ -19,6 +23,7 @@ interface ClaimTargetProfile {
   readonly userId: string | null;
   readonly usernameNormalized: string;
   readonly displayName: string | null;
+  readonly settings: Record<string, unknown> | null;
   readonly isClaimed: boolean | null;
   readonly claimedAt: Date | null;
   readonly onboardingCompletedAt: Date | null;
@@ -34,6 +39,7 @@ async function getClaimTargetProfile(
       userId: creatorProfiles.userId,
       usernameNormalized: creatorProfiles.usernameNormalized,
       displayName: creatorProfiles.displayName,
+      settings: creatorProfiles.settings,
       isClaimed: creatorProfiles.isClaimed,
       claimedAt: creatorProfiles.claimedAt,
       onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
@@ -229,6 +235,13 @@ export async function claimPrebuiltProfileForUser(
 
   await releaseOtherReservedProfiles(tx, params.userId, profile.id);
 
+  const claimSettings = isUnclaimedStructuredCreditProfile(profile.settings)
+    ? markStructuredCreditProfileClaimed(
+        (profile.settings ?? {}) as Record<string, unknown>,
+        now
+      )
+    : null;
+
   await tx
     .update(creatorProfiles)
     .set({
@@ -240,6 +253,7 @@ export async function claimPrebuiltProfileForUser(
       onboardingCompletedAt: params.finalizeOnboarding
         ? (profile.onboardingCompletedAt ?? now)
         : profile.onboardingCompletedAt,
+      ...(claimSettings ? { settings: claimSettings } : {}),
       updatedAt: now,
     })
     .where(eq(creatorProfiles.id, profile.id));

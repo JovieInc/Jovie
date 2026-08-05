@@ -4,6 +4,7 @@ export type ClaimBannerVariant =
   | 'organic'
   | 'claim_intent'
   | 'direct_in_progress'
+  | 'verified_claim'
   | 'unsupported';
 
 export function resolveClaimBannerState(params: {
@@ -27,7 +28,9 @@ export function resolveClaimBannerState(params: {
   let claimBannerVariant: ClaimBannerVariant | null = null;
 
   if (claimRequiresVerification) {
-    claimBannerVariant = 'unsupported';
+    claimBannerVariant = directClaimSupported
+      ? 'verified_claim'
+      : 'unsupported';
   } else if (
     visitorState === 'claim_intent_token' ||
     claimSearchParam === '1'

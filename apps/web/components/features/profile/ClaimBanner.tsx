@@ -30,6 +30,10 @@ const COPY: Record<
     body: 'Finish claiming this profile to connect Spotify and go live.',
     ctaLabel: 'Continue Claim',
   },
+  verified_claim: {
+    body: 'This profile is unclaimed. Verify ownership with the matching Spotify artist to claim it.',
+    ctaLabel: 'Verify & Claim',
+  },
   unsupported: {
     body: 'This profile is unclaimed. Verified ownership is required before it can be claimed.',
     ctaLabel: null,
