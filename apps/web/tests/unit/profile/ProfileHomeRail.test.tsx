@@ -154,6 +154,12 @@ describe('ProfileHomeRail', () => {
     const pacMedia = pacCard.querySelector('.aspect-square');
     expect(pacMedia?.className).toContain('self-stretch');
     expect(pacMedia?.className).toContain('w-auto');
+    expect(pacMedia?.className).toContain('rounded-(--profile-action-radius)');
+    expect(screen.getByRole('link', { name: 'Listen' })).toHaveClass(
+      'h-11',
+      'px-3',
+      'text-2xs'
+    );
     // The featured release renders once, inside the PAC card (not as a
     // duplicate plain catalog card).
     expect(screen.getAllByText('Never Say A Word')).toHaveLength(1);

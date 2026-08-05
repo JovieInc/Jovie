@@ -277,6 +277,8 @@ describe('EntityCard', () => {
       expect(cta).toHaveAttribute('href', '/tim/merch/m1');
       expect(cta.className).toContain('h-11');
       expect(cta.className).toContain('flex-none');
+      expect(cta.className).toContain('px-3');
+      expect(cta.className).toContain('text-2xs');
     });
 
     it('renders a target-less CTA as plain muted meta text, not button chrome', () => {

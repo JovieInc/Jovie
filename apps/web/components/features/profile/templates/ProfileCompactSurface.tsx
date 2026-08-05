@@ -694,11 +694,11 @@ export function ProfileCompactSurface({
 
           {isHomeMode ? (
             <div
-              className='profile-hero-identity-scrim relative z-10 shrink-0 px-(--page-pad) py-2'
+              className='profile-hero-identity-scrim relative z-10 shrink-0 px-(--page-pad) py-1'
               data-testid='profile-hero-identity-block'
             >
               <div
-                className='grid min-w-0 gap-1 [overflow-wrap:anywhere]'
+                className='grid min-w-0 gap-0.5 [overflow-wrap:anywhere]'
                 data-testid='profile-hero-identity-content'
               >
                 <IdentityHeading
@@ -712,7 +712,7 @@ export function ProfileCompactSurface({
                     href={profileHref}
                     prefetch={false}
                     aria-label={`Go to ${artist.name}'s profile`}
-                    className='inline-flex min-h-11 max-w-full min-w-0 flex-wrap items-start gap-1 rounded-md py-1 text-3xl font-semibold leading-8 tracking-normal text-(--profile-status-pill-fg) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-2xl [@media(max-height:760px)]:text-2xl'
+                    className='inline-flex min-h-11 max-w-full min-w-0 flex-wrap items-center gap-1 rounded-md py-0 text-3xl font-semibold leading-8 tracking-normal text-(--profile-status-pill-fg) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-2xl [@media(max-height:760px)]:text-2xl'
                   >
                     <span className='min-w-0 max-w-full [overflow-wrap:anywhere]'>
                       {artist.name}
@@ -821,12 +821,10 @@ export function ProfileCompactSurface({
             />
           ) : null}
 
-          {isHomeMode ? <div className='shrink-0 pb-2' /> : null}
+          {isHomeMode ? <div className='shrink-0 pb-1' /> : null}
 
           {allowFanCapture && showSubscriptionConfirmedBanner ? (
-            <div className='shrink-0 pb-3'>
-              <SubscriptionConfirmedBanner />
-            </div>
+            <SubscriptionConfirmedBanner />
           ) : null}
 
           <div

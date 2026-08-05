@@ -162,7 +162,7 @@ function PrimaryPill({
   ariaLabel?: string;
 }>) {
   const className = cn(
-    'inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full bg-white px-4 text-sm font-semibold text-black shadow-sm transition-opacity duration-subtle hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60'
+    'inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full bg-white px-3 text-2xs font-[590] leading-none text-black shadow-sm transition-opacity duration-subtle hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60'
   );
 
   if (href && href.startsWith('/')) {
@@ -826,7 +826,7 @@ export function ProfilePacCard({
           'relative aspect-square flex-none overflow-hidden bg-surface-2',
           isProfileLandscape
             ? cn(
-                'self-stretch w-auto rounded',
+                'self-stretch w-auto rounded-(--profile-action-radius)',
                 usesFullWidthCaptureLayout && 'invisible'
               )
             : 'w-full border-b border-subtle'

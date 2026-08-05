@@ -24,16 +24,18 @@ export function SubscriptionConfirmedBanner() {
   if (!visible) return null;
 
   return (
-    <output
-      aria-live='polite'
-      className='block w-full px-4 py-3 mb-4 rounded-xl bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 text-sm text-center animate-in fade-in slide-in-from-top-2 duration-slower'
-    >
-      <span className='inline-flex items-center gap-2'>
-        <Bell className='w-4 h-4' aria-hidden='true' />
-        <span className='font-medium'>
-          Notifications on! You&apos;ll receive updates from this artist.
+    <div className='shrink-0 pb-3'>
+      <output
+        aria-live='polite'
+        className='block w-full px-4 py-3 mb-4 rounded-xl bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 text-sm text-center animate-in fade-in slide-in-from-top-2 duration-slower'
+      >
+        <span className='inline-flex items-center gap-2'>
+          <Bell className='w-4 h-4' aria-hidden='true' />
+          <span className='font-medium'>
+            Notifications on! You&apos;ll receive updates from this artist.
+          </span>
         </span>
-      </span>
-    </output>
+      </output>
+    </div>
   );
 }

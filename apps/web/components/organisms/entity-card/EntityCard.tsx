@@ -115,7 +115,7 @@ function EntityCtaControl({
   }
 
   const className = cn(
-    'inline-flex shrink-0 items-center justify-center rounded-full border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
+    'inline-flex shrink-0 items-center justify-center rounded-full border border-(--linear-btn-primary-border) bg-btn-primary px-3 text-2xs font-[590] leading-none text-btn-primary-foreground transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
     // Landscape profile actions keep the native 44px touch-target floor.
     // Portrait unified cards retain their compact 36px action row.
     unified
@@ -247,7 +247,7 @@ export function EntityCard({
     ? cn(getProfileCardShapeClassName(shape), 'overflow-hidden')
     : null;
   const artClassName = isProfileLandscape
-    ? 'aspect-square self-stretch w-auto rounded'
+    ? 'aspect-square self-stretch w-auto rounded-(--profile-action-radius)'
     : isUnified
       ? // Unified anatomy: the art zone is a full-width square (album art is
         // square by default; non-square art object-covers the square zone).
@@ -522,7 +522,7 @@ export function EntityCard({
               ) : (
                 <span
                   className={cn(
-                    'inline-flex shrink-0 items-center justify-center rounded-full bg-btn-primary px-4 text-xs font-[560] text-btn-primary-foreground transition-colors duration-subtle group-hover:bg-btn-primary-hover',
+                    'inline-flex shrink-0 items-center justify-center rounded-full bg-btn-primary px-3 text-2xs font-[590] leading-none text-btn-primary-foreground transition-colors duration-subtle group-hover:bg-btn-primary-hover',
                     isProfileLandscape ? 'h-11 w-fit' : 'h-9 w-full'
                   )}
                 >
