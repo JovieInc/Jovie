@@ -58,7 +58,9 @@ const TEAM_CONFIGS = Object.freeze([
     intakeStates: ['Backlog'],
     backlogStateId: '63ced43e-ab22-48e8-9dcc-a2ce54ee6da9',
     todoStateId: '4b318cc8-0a57-489c-8370-b780e11cff7f',
-    healthUrl: 'https://logyourbody.com',
+    // Probe a small, direct production artifact. The redirecting homepage can
+    // spend almost the entire timeout downloading HTML and flap admission red.
+    healthUrl: 'https://www.logyourbody.com/robots.txt',
     healthKind: 'http-ok',
   }),
 ]);
