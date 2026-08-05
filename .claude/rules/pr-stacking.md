@@ -76,16 +76,18 @@ the parent merges, keep both the old parent tip and the recorded child remote
 tip for the rebase boundary and force-with-lease, then:
 
 ```bash
-old_parent_tip=<recorded-parent-tip>
-old_child_tip=<recorded-child-head>
-remote_child_tip=$(git ls-remote origin "refs/heads/<child-branch>" | awk '{print $1}')
+child_branch=feat/x-02
+pr_number=123
+old_parent_tip=RECORDED_PARENT_SHA
+old_child_tip=RECORDED_CHILD_SHA
+remote_child_tip=$(git ls-remote origin "refs/heads/$child_branch" | awk '{print $1}')
 test "$remote_child_tip" = "$old_child_tip"
 git fetch origin main
-gh pr edit <child> --base main
-git rebase --onto origin/main "$old_parent_tip" <child-branch>
-git push --force-with-lease="refs/heads/<child-branch>:$old_child_tip" origin <child-branch>
-git merge-base --is-ancestor origin/main <child-branch>
-test "$(git ls-remote origin "refs/heads/<child-branch>" | awk '{print $1}')" = "$(git rev-parse <child-branch>)"
+gh pr edit "$pr_number" --base main
+git rebase --onto origin/main "$old_parent_tip" "$child_branch"
+git push --force-with-lease="refs/heads/$child_branch:$old_child_tip" origin "$child_branch"
+git merge-base --is-ancestor origin/main "$child_branch"
+test "$(git ls-remote origin "refs/heads/$child_branch" | awk '{print $1}')" = "$(git rev-parse "$child_branch")"
 ```
 
 The first equality is the pre-rebase remote-head proof; the explicit lease makes
