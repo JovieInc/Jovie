@@ -193,6 +193,22 @@ modes, neverUse rules.
 - Content budgets: over-budget slot = check failure. Use `text-wrap: balance`.
 - CTA: `primaryCtaLabel` repeated verbatim throughout the page (one primary).
 
+### 4.5 Closed-loop generation
+
+Generated landing pages must move through the typed stages in
+`apps/web/data/marketing/generation.ts`: product truth, narrative, copy,
+section design, asset generation, adversarial review, then Taste admission.
+Select models by the required capability and current role score; page recipes
+must never name a provider or model. Narrative planning happens before copy and
+must give every section a unique question, responsibility, belief change, and
+evidence object. A failed stage may repair at most three times.
+
+Only one candidate may reach Taste. It needs one digest-bound passing receipt
+for every gate in `MARKETING_TASTE_GATE_IDS`, including independent visual
+review, product truth, design-system fidelity, responsive accessibility, and
+asset consent. The asset generator cannot review its own output. Automated
+review admits work for human taste; it never substitutes for that decision.
+
 ### Product callout assembly
 
 Use the shared callout library instead of creating one-off marketing chrome:
