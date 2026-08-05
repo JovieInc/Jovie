@@ -86,7 +86,9 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     usernameNormalized: 'usernameNormalized',
     updatedAt: 'updatedAt',
     avatarUrl: 'avatarUrl',
+    isClaimed: 'isClaimed',
     isPublic: 'isPublic',
+    settings: 'settings',
     id: 'id',
   },
 }));
@@ -216,6 +218,46 @@ describe('sitemap', () => {
       ).toBeDefined();
       expect(entry.lastModified).toBeInstanceOf(Date);
     }
+  });
+
+  it('excludes automatic unclaimed structured-credit profiles', async () => {
+    getBlogPosts.mockResolvedValue([]);
+    whereMock
+      .mockResolvedValueOnce([
+        {
+          username: 'claimed-artist',
+          updatedAt: new Date('2026-01-01'),
+          isClaimed: true,
+          settings: {},
+        },
+        {
+          username: 'a_unclaimed',
+          updatedAt: new Date('2026-01-01'),
+          isClaimed: false,
+          settings: {
+            unclaimedArtistProfile: {
+              state: 'unclaimed',
+              source: 'structured_spotify_release_credit',
+              artistRegistryId: 'f5441adb-6789-449a-9553-ab7460c9c61c',
+              provider: 'spotify',
+              providerArtistId: 'spotify-austin',
+              ownershipVerified: false,
+              representationVerified: false,
+              consentObtained: false,
+            },
+          },
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const { default: sitemap } = await import('../../app/sitemap');
+    const entries = await sitemap();
+    const urls = entries.map(entry => entry.url);
+
+    expect(urls).toContain('https://jov.ie/claimed-artist');
+    expect(urls).not.toContain('https://jov.ie/a_unclaimed');
   });
 
   it('is non-empty (at minimum static marketing pages are included)', async () => {
