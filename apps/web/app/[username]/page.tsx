@@ -45,6 +45,7 @@ import {
   buildPublicProfileMetadata,
   PROFILE_ERROR_METADATA,
 } from '@/lib/profile/metadata';
+import { schedulePublicCollaboratorProfileReconciliation } from '@/lib/profile/public-collaborator-reconciliation';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
 import { generateProfileStructuredData } from '@/lib/seo/structured-data';
@@ -354,6 +355,12 @@ async function ArtistPageContent({
   const tourDates = [...tourDatesRaw].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   );
+
+  schedulePublicCollaboratorProfileReconciliation({
+    creatorProfileId: profile.id,
+    ownerSpotifyId: ownerSpotifyIdentity.spotifyArtistId,
+    collaborators: releaseCollaborators,
+  });
 
   // Serialize releases for client (query returns newest-first via DESC NULLS LAST)
   const releases: PublicRelease[] = allReleases.map(r => ({

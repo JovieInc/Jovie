@@ -254,6 +254,7 @@ function projectStructuredReleaseCollaborator(
     name,
     href: hasPublicProfile ? artistProfileHref(row.artistId) : null,
     profileState,
+    reconciliationEligible: Boolean(row.artistSpotifyId),
     role: row.role,
     releaseId: row.releaseId,
     releaseTitle: row.releaseTitle,
