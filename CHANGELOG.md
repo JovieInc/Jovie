@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- [internal] **Desktop releases now fail closed on publication proof (JOV-4545):** production creates an exact-commit private draft first, verifies all five updater assets and checksums, and writes the release marker only after an independent published-asset check.
 - **Calendar keeps a usable seven-column month grid (JOV-4819):** the authenticated desktop calendar and its loading state now own explicit responsive grid geometry, preventing production builds from collapsing the month into a single narrow day column.
 - [internal] **Unused flag asset dependency removed:** `flag-icons` no longer installs 552 unused package files after the country selector moved its two live flags to owned local SVGs.
 - [internal] **Repository health rollout is evidence-gated:** the arbitrary 10,000-file failure becomes a visible exact-main compatibility baseline, while measured per-PR/area growth and tighter binary-churn checks launch in shadow with retained receipts, typed expiring exceptions, and validated promotion criteria. Existing payload and generated-output gates remain blocking.
