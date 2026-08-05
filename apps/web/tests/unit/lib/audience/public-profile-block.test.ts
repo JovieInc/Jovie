@@ -253,6 +253,59 @@ describe('public profile audience block helper', () => {
     expect(mocks.createFingerprintEdge).not.toHaveBeenCalled();
   });
 
+  it('collapses concurrent cold profile-state probes into one DB read', async () => {
+    process.env.NODE_ENV = 'production';
+    let releaseProfileProbe: (() => void) | undefined;
+    const profileRows = new Promise<unknown[]>(resolve => {
+      releaseProfileProbe = () => resolve([]);
+    });
+    mocks.select.mockImplementation(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          limit: vi.fn(() => profileRows),
+        })),
+      })),
+    }));
+
+    const first = checkProfileVisitorBlocked('tim', '1.2.3.4', 'Mozilla');
+    const second = checkProfileVisitorBlocked('tim', '5.6.7.8', 'Safari');
+
+    await vi.waitFor(() => expect(mocks.select).toHaveBeenCalledTimes(2));
+    releaseProfileProbe?.();
+
+    await expect(Promise.all([first, second])).resolves.toEqual([false, false]);
+    // One outer profile query plus its EXISTS subquery, not one pair per visit.
+    expect(mocks.select).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not let an older cold probe overwrite a concurrent block', async () => {
+    process.env.NODE_ENV = 'production';
+    mocks.createFingerprintEdge.mockResolvedValue('fingerprint-1');
+    let releaseProfileProbe: (() => void) | undefined;
+    const profileRows = new Promise<unknown[]>(resolve => {
+      releaseProfileProbe = () => resolve([]);
+    });
+    mocks.select.mockImplementation(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          limit: vi.fn(() => profileRows),
+        })),
+      })),
+    }));
+
+    const staleCheck = checkProfileVisitorBlocked('tim', '1.2.3.4', 'Mozilla');
+    await vi.waitFor(() => expect(mocks.select).toHaveBeenCalledTimes(2));
+
+    await markProfileHasAudienceBlocks('tim', 'fingerprint-1');
+    releaseProfileProbe?.();
+    await expect(staleCheck).resolves.toBe(false);
+
+    await expect(
+      checkProfileVisitorBlocked('tim', '1.2.3.4', 'Mozilla')
+    ).resolves.toBe(true);
+    expect(mocks.select).toHaveBeenCalledTimes(2);
+  });
+
   it('uses the has-blocks flag to skip the existence probe on repeat hits', async () => {
     process.env.NODE_ENV = 'production';
     mocks.createFingerprintEdge.mockResolvedValue('fingerprint-1');
@@ -268,8 +321,102 @@ describe('public profile audience block helper', () => {
       checkProfileVisitorBlocked('timwhite', '1.2.3.4', 'Mozilla')
     ).resolves.toBe(false);
 
-    expect(mocks.select.mock.calls.length - callsAfterFirst).toBe(1);
+    expect(mocks.select.mock.calls.length - callsAfterFirst).toBe(0);
     expect(mocks.createFingerprintEdge).toHaveBeenCalledTimes(2);
+  });
+
+  it('lets a has-blocks flag win over a stale negative flag', async () => {
+    process.env.NODE_ENV = 'production';
+    mocks.createFingerprintEdge.mockResolvedValue('fingerprint-1');
+    const redis = {
+      get: vi.fn(async (cacheKey: string) => {
+        if (cacheKey.includes(':visitor:')) return null;
+        return true;
+      }),
+      set: vi.fn().mockResolvedValue(undefined),
+      del: vi.fn().mockResolvedValue(undefined),
+    };
+    mocks.getRedis.mockReturnValue(redis);
+    mockAudienceBlockRows([{ blockId: 'block-1' }]);
+
+    await expect(
+      checkProfileVisitorBlocked('tim', '1.2.3.4', 'Mozilla')
+    ).resolves.toBe(true);
+
+    // The existence probe is skipped: only the exact fingerprint JOIN runs.
+    expect(mocks.select).toHaveBeenCalledTimes(1);
+  });
+
+  it('awaits and reuses the exact blocked-visitor cache decision', async () => {
+    process.env.NODE_ENV = 'production';
+    mocks.createFingerprintEdge.mockResolvedValue('fingerprint-1');
+    let releaseVisitorWrite: (() => void) | undefined;
+    const visitorWrite = new Promise<void>(resolve => {
+      releaseVisitorWrite = resolve;
+    });
+    const redis = {
+      get: vi.fn().mockResolvedValue(null),
+      set: vi.fn(async (cacheKey: string) => {
+        if (cacheKey.includes(':visitor:')) await visitorWrite;
+      }),
+      del: vi.fn().mockResolvedValue(undefined),
+    };
+    mocks.getRedis.mockReturnValue(redis);
+
+    let mutationSettled = false;
+    const mutation = markProfileHasAudienceBlocks('tim', 'fingerprint-1').then(
+      () => {
+        mutationSettled = true;
+      }
+    );
+    await Promise.resolve();
+    expect(mutationSettled).toBe(false);
+
+    releaseVisitorWrite?.();
+    await mutation;
+    expect(mutationSettled).toBe(true);
+
+    await expect(
+      checkProfileVisitorBlocked('tim', '1.2.3.4', 'Mozilla')
+    ).resolves.toBe(true);
+    expect(mocks.select).not.toHaveBeenCalled();
+    expect(redis.set).toHaveBeenCalledWith(
+      'proxy:audience-block:visitor:tim:fingerprint-1',
+      'blocked',
+      { ex: 60 }
+    );
+  });
+
+  it('never emits a visitor fingerprint in cache failure telemetry', async () => {
+    process.env.NODE_ENV = 'production';
+    mocks.createFingerprintEdge.mockResolvedValue('private-fingerprint');
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const redis = {
+      get: vi.fn(async (cacheKey: string) => {
+        if (cacheKey.includes(':visitor:')) throw new Error('redis offline');
+        return true;
+      }),
+      set: vi.fn().mockResolvedValue(undefined),
+      del: vi.fn().mockResolvedValue(undefined),
+    };
+    mocks.getRedis.mockReturnValue(redis);
+    mockAudienceBlockRows([]);
+
+    try {
+      await expect(
+        checkProfileVisitorBlocked('tim', '1.2.3.4', 'Mozilla')
+      ).resolves.toBe(false);
+
+      expect(warning).toHaveBeenCalledWith(
+        '[audience-block] Redis visitor cache read failed',
+        expect.objectContaining({ cacheKey: 'visitor:tim' })
+      );
+      expect(JSON.stringify(warning.mock.calls)).not.toContain(
+        'private-fingerprint'
+      );
+    } finally {
+      warning.mockRestore();
+    }
   });
 
   it('marks profiles with no active blocks as negative-cache safe', async () => {
