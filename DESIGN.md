@@ -151,6 +151,26 @@ Jovie copy should feel precise, calm, and inevitable.
 - Prefer clarity over warmth when they conflict
 - Prefer usefulness over personality when they conflict
 
+### Meaning Before Media
+
+- Brief the section before writing it: state its job, customer outcome, message
+  subject, visual evidence, and allowed product claims
+- Write the belief the visual must prove, not a caption for the visible object
+- Treat phones, screenshots, annotations, materials, and motion as evidence;
+  never sell the mockup, design treatment, or production process
+- Read only the display headlines in page order. They must form a complete
+  argument in which every line advances a different story beat
+- Reject a headline that could move to another section unchanged or survive an
+  unrelated product-noun swap
+- Cite product evidence for every public claim; compression never licenses an
+  invented implication
+- Bind every visible line to a registered customer outcome, product claim,
+  proof, or action. Brief adjectives and process instructions constrain the
+  work; they are not the message.
+- Use the deterministic gate and adversarial review in
+  [`docs/marketing/AGENT_GUIDE.md`](docs/marketing/AGENT_GUIDE.md#3-lock-meaning-before-writing)
+  before copy enters Taste Inbox
+
 ### Product Copy Rules
 
 - One clear line is better than a headline plus explanatory filler
@@ -184,6 +204,8 @@ The example above says one thing three times. Jovie should say it once.
 ### Anti-Patterns To Avoid
 
 - Generic AI-dashboard styling: oversized rounded cards, visible borders on every container, repeated chrome, and stacked explanatory copy
+- Generic marketing headings that describe the media (`A closer look`, `Built
+  for artists`, `One profile, annotated`) instead of the customer consequence
 - All-caps eyebrows or section labels as a default hierarchy tool
 - Long helper paragraphs inside cards when a short label or one sentence would do
 - Multiple nested surfaces whose only job is to create the feeling of "designed"
