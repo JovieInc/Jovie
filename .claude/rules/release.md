@@ -49,21 +49,32 @@ pnpm --filter @jovie/web run test:bug-to-test
 
 ### Branch Hygiene
 
-- Always rebase on main before pushing (not merge).
+- Root PRs and children being retargeted after a parent lands must rebase on
+  `main` before becoming ready or entering the queue (never merge `main` into a
+  branch). A dependent child may initially push its immediate-parent base while
+  draft; follow the native stacked-PR handoff in `pr-stacking.md` before readying.
 - **History Sanity Check:** Before starting work or rebasing, verify the branch shares a recent ancestor with `main`. Use `git merge-base main <branch>`. If the result is empty or the branch is >5,000 commits behind, it is a zombie; re-plant it onto a fresh `main` base instead of rebasing.
 
-- **Agent routine work:** `tim/jov-*` → `integration/loop-{domain}` → train PR → `main` (see [`.claude/rules/ci-branching.md`](ci-branching.md)). Do not open routine agent PRs directly to `main`.
+- **Agent routine waves:** `tim/jov-*` → `integration/loop-{domain}` → train PR →
+  `main` (see [`.claude/rules/ci-branching.md`](ci-branching.md)). An explicitly
+  authorized dependent stack is the exception: use the native root-to-`main`,
+  child-to-parent-draft, then retarget/rebase sequence in `pr-stacking.md`.
 - **Human / hotfix:** `hotfix/*` or `needs-human` labeled PRs may target `main` with full CI.
 - If a PR has been open >24h without progress, close it and re-create from fresh integration base or `main`.
 
 ### Incremental Shipping (Ship Fast, Fail Fast)
 
 - When a command produces multiple independent fixes, ship each as its own PR.
-- **Open a draft PR on first push** — CI runs immediately, giving early feedback.
+- **Open a draft PR on first push** — root PRs target `main`; dependent children
+  target their immediate parent and stay draft/unenrolled until retargeted.
+  Source CI begins when the PR targets `main` (or a supported integration base),
+  giving early feedback without violating stack order.
 - Push frequently — concurrency groups cancel stale CI runs automatically.
 - Run `/ship` when ready — it detects the draft PR and promotes it to ready-for-review.
-- CI runs in parallel on all PRs while the agent continues working.
-- This maximizes throughput: N PRs × parallel CI > 1 large PR × serial CI.
+- CI runs in parallel on eligible root/integration PRs while the agent continues
+  working; dependent children receive source CI after the parent lands and the
+  child is retargeted/rebased to `main`.
+- This preserves throughput without enrolling a child against an unlanded base.
 - If a PR fails CI, fix and push again; don't create a new PR.
 - Enable auto-merge only after the PR is marked ready (not while draft).
 
@@ -71,11 +82,14 @@ pnpm --filter @jovie/web run test:bug-to-test
 
 AI agents MUST follow the "draft PR first, commit often" pattern for all non-trivial work:
 
-1. **First commit on branch:** Push immediately and open a draft PR:
+1. **First commit on branch:** Push immediately and open a draft PR. For a root
+   layer, target `main`; for a dependent layer, target the immediate parent:
    ```bash
    git push -u origin <branch-name>
-   gh pr create --draft --base main --title "WIP: <description>" --body "Draft — CI feedback loop in progress"
+   gh pr create --draft --base <main-or-immediate-parent> --title "WIP: <description>" --body "Draft — CI feedback loop in progress"
    ```
+   Keep the dependent child draft and unenrolled until its parent lands; then
+   follow [`pr-stacking.md`](pr-stacking.md) to retarget, rebase, and verify.
 
 2. **Iterate on CI feedback:** Push frequently. Each push triggers CI with cancel-in-progress (stale runs are automatically cancelled). Check CI status:
    ```bash
