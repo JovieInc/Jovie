@@ -1,6 +1,6 @@
 # Documentation
 *.md
-docs/
+/docs/
 architecture/
 audits/
 ideation/
