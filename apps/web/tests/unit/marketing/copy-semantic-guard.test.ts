@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  auditMarketingCopyPage,
   auditMarketingCopySemantics,
+  createMarketingCopyReviewDigest,
   type MarketingCopyPageBrief,
   type MarketingCopyPageDraft,
 } from '@/data/marketing';
@@ -113,5 +115,62 @@ describe('meaning-first marketing copy guard', () => {
     );
     expect(result.status).toBe('advisory');
     expect(result.blocking).toBe(false);
+  });
+
+  it('passes a complete outcome-bound page through the structural audit', () => {
+    expect(
+      auditMarketingCopyPage(brief, draft('One profile for every fan'))
+    ).toEqual([]);
+  });
+
+  it('fingerprints the reviewed brief and candidate, so changed copy cannot reuse a receipt', () => {
+    const first = createMarketingCopyReviewDigest(
+      brief,
+      draft('One profile for every fan')
+    );
+    const second = createMarketingCopyReviewDigest(
+      brief,
+      draft('One profile for every release')
+    );
+    expect(first).toMatch(/^marketing-copy\/1\.1\.0\/sha256\/[a-f0-9]{64}$/);
+    expect(second).not.toBe(first);
+  });
+
+  it.each([
+    ['marketing-slop', 'Seamlessly unlock a world-class profile ecosystem.'],
+    ['formulaic-contrast', 'More than just a profile.'],
+    ['chat-residue', 'Here is a revised option A: your profile.'],
+    ['dash-habit', 'One profile — every fan.'],
+  ] as const)('flags %s in the anti-slop audit', (code, headline) => {
+    const issues = auditMarketingCopyPage(brief, draft(headline));
+    expect(issues.some(issue => issue.code === code)).toBe(true);
+  });
+
+  it('flags compression failures without banning truthful premium language', () => {
+    const briefWithBody: MarketingCopyPageBrief = {
+      ...brief,
+      sections: [{ ...brief.sections[0], bodyWordLimit: 30 }],
+    };
+    const issues = auditMarketingCopyPage(brief, {
+      ...draft('One profile for every fan'),
+      sections: [
+        {
+          ...draft('One profile for every fan').sections[0],
+          body: 'One profile for every fan, one profile for every fan, one profile for every fan.',
+        },
+      ],
+    });
+    expect(
+      auditMarketingCopyPage(briefWithBody, {
+        ...draft('One profile for every fan'),
+        sections: [
+          {
+            ...draft('One profile for every fan').sections[0],
+            body: 'One profile for every fan, one profile for every fan, one profile for every fan.',
+          },
+        ],
+      }).some(issue => issue.code === 'redundant-support')
+    ).toBe(true);
+    expect(issues.some(issue => issue.code === 'marketing-slop')).toBe(false);
   });
 });

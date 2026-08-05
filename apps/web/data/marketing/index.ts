@@ -53,7 +53,9 @@ export type {
   MarketingCopyVisibleCopy,
 } from './copy';
 export {
+  auditMarketingCopyPage,
   auditMarketingCopySemantics,
+  createMarketingCopyReviewDigest,
   MARKETING_COPY_LINE_ROLES,
   MARKETING_COPY_SEMANTIC_ENFORCEMENTS,
   MARKETING_COPY_SPEC_VERSION,
