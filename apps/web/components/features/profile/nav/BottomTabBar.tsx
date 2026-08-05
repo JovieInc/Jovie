@@ -109,9 +109,10 @@ export function BottomTabBar({
   showAlertsTab = true,
   className,
 }: BottomTabBarProps) {
-  const visibleTabs = showAlerts && showAlertsTab
-    ? ALL_PRIMARY_TABS
-    : ALL_PRIMARY_TABS.filter(tab => tab.mode !== 'subscribe');
+  const visibleTabs =
+    showAlerts && showAlertsTab
+      ? ALL_PRIMARY_TABS
+      : ALL_PRIMARY_TABS.filter(tab => tab.mode !== 'subscribe');
   const columnCount = visibleTabs.length;
 
   return (
