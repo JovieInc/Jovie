@@ -344,6 +344,7 @@ describe('buildPublicProfileMetadata', () => {
         },
       },
       genres: null,
+      isClaimed: false,
     });
     const robots = meta.robots as Record<string, unknown>;
     expect(robots).toMatchObject({ index: false, follow: false });

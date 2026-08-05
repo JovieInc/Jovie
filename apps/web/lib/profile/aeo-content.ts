@@ -476,33 +476,36 @@ function buildStructuredCollaboratorParagraph(
 
   entries.forEach((entry, entryIndex) => {
     if (entryIndex > 0) {
-      const separator =
-        entryIndex === entries.length - 1
-          ? entries.length === 2
-            ? ' and '
-            : ', and '
-          : ', ';
+      let separator = ', ';
+      if (entryIndex === entries.length - 1) {
+        separator = entries.length === 2 ? ' and ' : ', and ';
+      }
       segments.push({ type: 'text', text: separator });
     }
 
     segments.push(
       entry.href
         ? { type: 'artist', text: entry.name, href: entry.href }
-        : { type: 'text', text: entry.name }
+        : { type: 'text', text: entry.name },
+      { type: 'text', text: ' on ' }
     );
-    segments.push({ type: 'text', text: ' on ' });
 
     entry.releases.slice(0, 2).forEach((release, releaseIndex) => {
       if (releaseIndex > 0) {
         segments.push({ type: 'text', text: ' and ' });
       }
-      segments.push({ type: 'text', text: '"' });
-      segments.push({
-        type: 'release',
-        text: release.title,
-        href: profilePath(artistHandle, `/${encodeURIComponent(release.slug)}`),
-      });
-      segments.push({ type: 'text', text: '"' });
+      segments.push(
+        { type: 'text', text: '"' },
+        {
+          type: 'release',
+          text: release.title,
+          href: profilePath(
+            artistHandle,
+            `/${encodeURIComponent(release.slug)}`
+          ),
+        },
+        { type: 'text', text: '"' }
+      );
     });
   });
 

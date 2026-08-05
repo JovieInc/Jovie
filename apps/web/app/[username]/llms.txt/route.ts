@@ -90,21 +90,18 @@ export async function GET(_req: Request, { params }: RouteParams) {
 
   const lines: string[] = [];
 
-  lines.push(`# ${artistName}`);
-  lines.push('');
   lines.push(
+    `# ${artistName}`,
+    '',
     isClaimed
       ? `> ${artistName} — claimed artist profile on Jovie at ${profileUrl}`
-      : `> ${artistName} — unclaimed artist profile on Jovie at ${profileUrl}. Jovie has not verified ownership, representation, or consent for this profile.`
-  );
-  lines.push('');
-
-  lines.push('## Entity Identity');
-  lines.push('');
-  lines.push(`- **Canonical URL**: ${profileUrl}`);
-  lines.push(`- **Handle**: @${handle}`);
-  lines.push(`- **Claim status**: ${isClaimed ? 'Claimed' : 'Unclaimed'}`);
-  lines.push(
+      : `> ${artistName} — unclaimed artist profile on Jovie at ${profileUrl}. Jovie has not verified ownership, representation, or consent for this profile.`,
+    '',
+    '## Entity Identity',
+    '',
+    `- **Canonical URL**: ${profileUrl}`,
+    `- **Handle**: @${handle}`,
+    `- **Claim status**: ${isClaimed ? 'Claimed' : 'Unclaimed'}`,
     `- **Jovie verification**: ${profile.is_verified ? 'Verified' : 'Not verified'}`
   );
   if (profile.location) lines.push(`- **Location**: ${profile.location}`);

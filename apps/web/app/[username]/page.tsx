@@ -279,8 +279,9 @@ async function ArtistPageContent({
 
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
+  const isClaimed = creatorClerkId !== null;
   const requiresVerifiedOwnership =
-    !profile.is_claimed && isUnclaimedStructuredCreditProfile(profile.settings);
+    !isClaimed && isUnclaimedStructuredCreditProfile(profile.settings);
   const directClaimSupported =
     !requiresVerifiedOwnership &&
     supportsDirectProfileClaim({
@@ -290,7 +291,7 @@ async function ArtistPageContent({
     profile: {
       id: profile.id,
       username: artist.handle,
-      isClaimed: profile.is_claimed,
+      isClaimed,
       userClerkId: creatorClerkId,
       spotifyId: profile.spotify_id,
     },
@@ -447,7 +448,7 @@ async function ArtistPageContent({
             displayName={artist.name}
             directClaimSupported={directClaimSupported}
             claimRequiresVerification={requiresVerifiedOwnership}
-            isClaimed={profile.is_claimed}
+            isClaimed={isClaimed}
             visitorState={visitorState}
           />
         }
@@ -465,7 +466,7 @@ async function ArtistPageContent({
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}
-        showClaimFooter={!profile.is_claimed && !requiresVerifiedOwnership}
+        showClaimFooter={!isClaimed && !requiresVerifiedOwnership}
         claimFooterHref={`/${encodeURIComponent(artist.handle)}/claim?next=auth`}
         profileSettings={{
           showOldReleases: profileSettings.showOldReleases === true,
@@ -477,7 +478,7 @@ async function ArtistPageContent({
       <ProfileAeoContent
         content={aeoContent}
         claimHref={
-          !profile.is_claimed && directClaimSupported
+          !isClaimed && directClaimSupported
             ? `/${encodeURIComponent(artist.handle)}/claim?next=auth`
             : undefined
         }
@@ -524,7 +525,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   assertValidProfileUsername(username);
 
   const profileResult = await getProfileAndLinks(username);
-  const { profile, genres, status } = profileResult;
+  const { profile, genres, status, creatorClerkId } = profileResult;
 
   if (status === 'error') {
     return PROFILE_ERROR_METADATA;
@@ -534,5 +535,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     notFound();
   }
 
-  return buildPublicProfileMetadata({ profile, genres });
+  return buildPublicProfileMetadata({
+    profile,
+    genres,
+    isClaimed: creatorClerkId !== null,
+  });
 }

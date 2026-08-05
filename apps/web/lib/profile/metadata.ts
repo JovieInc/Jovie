@@ -159,10 +159,11 @@ export interface PublicProfileMetadataInput {
     | 'location'
     | 'avatar_url'
     | 'is_verified'
-    | 'is_claimed'
     | 'settings'
   >;
   readonly genres: string[] | null | undefined;
+  /** Canonical claim state derived from user_profile_claims by the caller. */
+  readonly isClaimed?: boolean;
 }
 
 /**
@@ -178,7 +179,7 @@ export interface PublicProfileMetadataInput {
 export function buildPublicProfileMetadata(
   input: PublicProfileMetadataInput
 ): Metadata {
-  const { profile, genres } = input;
+  const { profile, genres, isClaimed = true } = input;
 
   // Sanitize display_name and username independently so the fallback chain
   // never reintroduces unsanitized artist-provided text into metadata fields.
@@ -196,8 +197,7 @@ export function buildPublicProfileMetadata(
     genres
   );
   const isStructuredCreditUnclaimed =
-    profile.is_claimed !== true &&
-    isUnclaimedStructuredCreditProfile(profile.settings);
+    !isClaimed && isUnclaimedStructuredCreditProfile(profile.settings);
 
   const baseKeywords = [
     artistName,
