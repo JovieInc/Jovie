@@ -24,17 +24,26 @@ MAX_TIMEOUT_SECONDS = 30.0
 CONTROL_TIMEOUT_SECONDS = 10.0
 DEFAULT_GROK_MAX = 2
 MAX_GROK_MAX = 10
-SERVICE = "symphony-ui-pilot.service"
+SERVICES = ("symphony-ui-pilot.service", "symphony-lyb.service")
 LINEAR_API = "https://api.linear.app/graphql"
 LINEAR_ENV_PATH = "~/.config/symphony/linear.env"
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 DOTENV_ASSIGNMENT = re.compile(r"^(?:export[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 STATE_DIR_NAME = ".symphony-codex-auth-fallback"
-RUNTIME_NAMES = (
+LEGACY_RUNTIME_NAMES = (
     "symphony-codex-exhausted",
     "symphony-codex-exhausted.py",
     "symphony-grok-sidecar",
 )
+RUNTIME_NAMES = (
+    *LEGACY_RUNTIME_NAMES,
+    "grok-ship-one",
+)
+REQUIRED_ADMISSION_LABELS = frozenset(("symphony", "plan-approved", "admission-approved"))
+BLOCKED_ADMISSION_LABELS = frozenset(
+    ("human-review-required", "needs:human", "needs-human", "needs:decision", "needs-decision", "hold")
+)
+SUPPORTED_TEAMS = frozenset(("JOV", "LYB"))
 
 LINEAR_QUERY = """
 query {
@@ -44,7 +53,13 @@ query {
       labels: { name: { eq: "symphony" } }
       state: { name: { in: ["Todo", "In Progress"] } }
     }
-  ) { nodes { identifier } }
+  ) {
+    nodes {
+      identifier
+      team { key }
+      labels { nodes { name } }
+    }
+  }
 }
 """
 
@@ -202,8 +217,27 @@ def _linear_identifiers() -> list[str] | None:
     for node in nodes:
         if not isinstance(node, dict) or not isinstance(node.get("identifier"), str):
             return None
-        if IDENTIFIER.fullmatch(node["identifier"]):
-            identifiers.append(node["identifier"])
+        team = node.get("team")
+        label_connection = node.get("labels")
+        if not isinstance(team, dict) or not isinstance(label_connection, dict):
+            return None
+        team_key = team.get("key")
+        label_nodes = label_connection.get("nodes")
+        if not isinstance(team_key, str) or not isinstance(label_nodes, list):
+            return None
+        labels: set[str] = set()
+        for label in label_nodes:
+            if not isinstance(label, dict) or not isinstance(label.get("name"), str):
+                return None
+            labels.add(label["name"].strip().lower())
+        identifier = node["identifier"]
+        if (
+            IDENTIFIER.fullmatch(identifier)
+            and team_key.upper() in SUPPORTED_TEAMS
+            and REQUIRED_ADMISSION_LABELS.issubset(labels)
+            and BLOCKED_ADMISSION_LABELS.isdisjoint(labels)
+        ):
+            identifiers.append(identifier)
     return identifiers
 
 
@@ -225,16 +259,16 @@ def reconcile() -> int:
         if active:
             print("codex_not_exhausted recovery_deferred grok_ship_active", file=sys.stderr)
             return 0
-        if not _control(_systemctl("start", SERVICE)):
+        if not _control(_systemctl("start", *SERVICES)):
             print("codex_not_exhausted symphony_start_failed", file=sys.stderr)
             return 2
-        if not _control(_systemctl("is-active", "--quiet", SERVICE)):
+        if not _control(_systemctl("is-active", "--quiet", *SERVICES)):
             print("codex_not_exhausted symphony_not_active", file=sys.stderr)
             return 2
         print("codex_not_exhausted symphony_active idle", file=sys.stderr)
         return 0
 
-    if not _control(_systemctl("stop", SERVICE)):
+    if not _control(_systemctl("stop", *SERVICES)):
         print("codex_exhausted symphony_stop_failed", file=sys.stderr)
         return 2
     executable = _grok_ship_one_executable()
@@ -281,11 +315,17 @@ if not controller.is_file():
     raise SystemExit("symphony-codex-auth-fallback is not installed")
 os.execv(sys.executable, [sys.executable, str(controller), *sys.argv[1:]])
 '''.encode()
-    command = 'reconcile "$@"' if name == "symphony-grok-sidecar" else '"$@"'
-    return f'''#!/usr/bin/env bash
+    if name in ("symphony-codex-exhausted", "symphony-grok-sidecar"):
+        command = 'reconcile "$@"' if name == "symphony-grok-sidecar" else '"$@"'
+        return f'''#!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${{BASH_SOURCE[0]}}")" && pwd)"
 exec python3 "$SCRIPT_DIR/{STATE_DIR_NAME}/current/symphony-codex-exhausted.py" {command}
+'''.encode()
+    return f'''#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd -- "$(dirname -- "${{BASH_SOURCE[0]}}")" && pwd)"
+exec "$SCRIPT_DIR/{STATE_DIR_NAME}/current/{name}" "$@"
 '''.encode()
 
 
@@ -327,7 +367,12 @@ def _current_release(state: pathlib.Path, releases: pathlib.Path) -> pathlib.Pat
     if pathlib.PurePath(raw).is_absolute() or len(parts) != 2 or parts[0] != "releases":
         raise InstallValidationError("current target is invalid")
     release = releases / parts[1]
-    if release.parent != releases or not release.is_dir() or not all(_valid_runtime_file(release / n) for n in RUNTIME_NAMES):
+    if (
+        release.parent != releases
+        or not release.is_dir()
+        or not all(_valid_runtime_file(release / n) for n in LEGACY_RUNTIME_NAMES)
+        or any(_path_exists(release / n) and not _valid_runtime_file(release / n) for n in RUNTIME_NAMES)
+    ):
         raise InstallValidationError("current release is incomplete")
     return release
 
@@ -337,11 +382,14 @@ def _preflight_install(destination: pathlib.Path, contents: dict[str, bytes]) ->
     releases = state / "releases"
     current = _current_release(state, releases)
     installed = {n: destination / n for n in RUNTIME_NAMES if _path_exists(destination / n)}
-    if current is None and installed and len(installed) != len(RUNTIME_NAMES):
+    installed_names = set(installed)
+    if current is None and installed and installed_names not in (set(LEGACY_RUNTIME_NAMES), set(RUNTIME_NAMES)):
         raise InstallValidationError("legacy launcher set is partial")
     if any(not _valid_runtime_file(path) for path in installed.values()):
         raise InstallValidationError("installed launcher is invalid")
-    if current is not None and any(not _valid_runtime_file(current / n) for n in contents):
+    if current is not None and any(
+        _path_exists(current / name) and not _valid_runtime_file(current / name) for name in contents
+    ):
         raise InstallValidationError("current release is invalid")
 
 

@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+# Ship one already-admitted Linear issue through the bounded Grok fallback.
+set -euo pipefail
+
+ID="${1:?issue identifier required}"
+case "$ID" in
+  JOV-[0-9]*) TEAM=JOV; REPO=JovieInc/Jovie ;;
+  LYB-[0-9]*) TEAM=LYB; REPO=JovieInc/LogYourBody ;;
+  *) echo "unsupported issue identifier" >&2; exit 2 ;;
+esac
+
+export PATH="$HOME/.local/bin:$PATH:/usr/bin:/bin"
+set -a
+# shellcheck disable=SC1091
+[ -f "$HOME/.config/symphony/linear.env" ] && . "$HOME/.config/symphony/linear.env"
+set +a
+: "${LINEAR_API_KEY:?LINEAR_API_KEY is required}"
+
+BRANCH="grok/${ID}-fix"
+WS_ROOT="${GROK_SHIP_WS_ROOT:-$HOME/grok-ship-workspaces}/$TEAM"
+WS="$WS_ROOT/$ID"
+LOG_DIR="${GROK_SHIP_LOG_DIR:-$HOME/grok-ship-logs}"
+LOG="$LOG_DIR/$ID.log"
+COOLDOWN="$LOG_DIR/provider-cooldown-until"
+mkdir -p "$LOG_DIR" "$WS_ROOT"
+
+now="$(date +%s)"
+if [ -f "$COOLDOWN" ]; then
+  read -r unavailable_until < "$COOLDOWN" || unavailable_until=0
+  case "$unavailable_until" in (*[!0-9]*|'') unavailable_until=0 ;; esac
+  if [ "$unavailable_until" -gt "$now" ]; then
+    echo "$(date -u +%FT%TZ) $ID provider_cooldown" >> "$LOG"
+    exit 0
+  fi
+fi
+
+if [ "$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq 'length' 2>/dev/null || printf 0)" -gt 0 ]; then
+  echo "$(date -u +%FT%TZ) $ID open_pr_exists" >> "$LOG"
+  exit 0
+fi
+
+export ISSUE_ID="$ID"
+META="$(python3 - <<'PY'
+import json, os, sys, urllib.request
+
+identifier = os.environ["ISSUE_ID"]
+query = """
+query($id: String!) {
+  issue(id: $id) {
+    id identifier title description url
+    state { id name }
+    team { key states { nodes { id name } } }
+    labels { nodes { name } }
+  }
+}
+"""
+request = urllib.request.Request(
+    os.environ.get("LINEAR_API_URL", "https://api.linear.app/graphql"),
+    data=json.dumps({"query": query, "variables": {"id": identifier}}).encode(),
+    headers={"Authorization": os.environ["LINEAR_API_KEY"], "Content-Type": "application/json"},
+)
+with urllib.request.urlopen(request, timeout=20) as response:
+    payload = json.load(response)
+issue = (payload.get("data") or {}).get("issue")
+if payload.get("errors") or not isinstance(issue, dict):
+    raise SystemExit("issue lookup failed")
+team = issue.get("team") or {}
+labels = {str(node.get("name", "")).strip().lower() for node in (issue.get("labels") or {}).get("nodes", [])}
+required = {"symphony", "plan-approved", "admission-approved"}
+blocked = {"human-review-required", "needs:human", "needs-human", "needs:decision", "needs-decision", "hold"}
+if issue.get("identifier") != identifier or team.get("key", "").upper() != identifier.split("-", 1)[0]:
+    raise SystemExit("issue team mismatch")
+if not required.issubset(labels) or labels.intersection(blocked):
+    raise SystemExit("issue is not admitted")
+states = {str(node.get("name", "")).lower(): node.get("id") for node in team.get("states", {}).get("nodes", [])}
+if not states.get("in progress") or not states.get("in review"):
+    raise SystemExit("required workflow states missing")
+print(json.dumps({
+    "id": issue["id"], "title": issue.get("title") or identifier,
+    "description": (issue.get("description") or "")[:6000], "url": issue.get("url") or "",
+    "original_state_id": (issue.get("state") or {}).get("id"),
+    "original_state_name": (issue.get("state") or {}).get("name") or "",
+    "in_progress_state_id": states["in progress"], "in_review_state_id": states["in review"],
+}))
+PY
+)"
+
+json_value() {
+  python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get(sys.argv[2]) or "")' "$META" "$1"
+}
+
+TITLE="$(json_value title)"
+URL="$(json_value url)"
+DESC="$(json_value description)"
+ISSUE_UUID="$(json_value id)"
+ORIGINAL_STATE_ID="$(json_value original_state_id)"
+ORIGINAL_STATE_NAME="$(json_value original_state_name)"
+IN_PROGRESS_STATE_ID="$(json_value in_progress_state_id)"
+IN_REVIEW_STATE_ID="$(json_value in_review_state_id)"
+
+if [ ! -d "$WS/.git" ]; then
+  if [ -e "$WS" ] && [ -n "$(find "$WS" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]; then
+    echo "workspace exists without git: $WS" >&2
+    exit 2
+  fi
+  git clone --depth 1 "https://github.com/$REPO.git" "$WS"
+fi
+if [ -n "$(git -C "$WS" status --porcelain)" ]; then
+  echo "workspace has uncommitted changes: $WS" >&2
+  exit 2
+fi
+git -C "$WS" fetch --depth 1 origin main
+git -C "$WS" checkout -B "$BRANCH" origin/main
+
+update_state() {
+  local state_id="$1"
+  ISSUE_UUID="$ISSUE_UUID" STATE_ID="$state_id" python3 - <<'PY'
+import json, os, urllib.request
+query = "mutation($id:String!,$input:IssueUpdateInput!){issueUpdate(id:$id,input:$input){success}}"
+request = urllib.request.Request(
+    os.environ.get("LINEAR_API_URL", "https://api.linear.app/graphql"),
+    data=json.dumps({"query": query, "variables": {"id": os.environ["ISSUE_UUID"], "input": {"stateId": os.environ["STATE_ID"]}}}).encode(),
+    headers={"Authorization": os.environ["LINEAR_API_KEY"], "Content-Type": "application/json"},
+)
+with urllib.request.urlopen(request, timeout=20) as response:
+    payload = json.load(response)
+if payload.get("errors") or not ((payload.get("data") or {}).get("issueUpdate") or {}).get("success"):
+    raise SystemExit("state update failed")
+PY
+}
+
+changed_state=0
+original_state_lower="$(printf '%s' "$ORIGINAL_STATE_NAME" | tr '[:upper:]' '[:lower:]')"
+if [ "$original_state_lower" != "in progress" ]; then
+  update_state "$IN_PROGRESS_STATE_ID"
+  changed_state=1
+fi
+
+PROMPT="You are shipping admitted Linear issue $ID in $REPO.
+
+Title: $TITLE
+URL: $URL
+
+Description:
+$DESC
+
+Work only in this checkout. Make the smallest correct issue-scoped change. Do not weaken or skip gates.
+Create commits on $BRANCH, push normally, and open a draft PR to main with validation evidence and Fixes $ID.
+Do not merge. If blocked, write BLOCKER.md with the exact reason and exit. Start now."
+
+attempt_log="$(mktemp "$LOG_DIR/.${ID}.attempt.XXXXXX")"
+trap 'rm -f "$attempt_log"' EXIT
+echo "START $ID $(date -u +%FT%TZ) repo=$REPO" | tee -a "$LOG"
+set +e
+grok --always-approve --cwd "$WS" -p "$PROMPT" 2>&1 | tee -a "$LOG" "$attempt_log"
+rc=${PIPESTATUS[0]}
+set -e
+
+if grep -Eqi 'usage limit|rate limit|try again later' "$attempt_log"; then
+  temporary="$COOLDOWN.$$.tmp"
+  printf '%s\n' "$((now + 21600))" > "$temporary"
+  mv "$temporary" "$COOLDOWN"
+fi
+
+pr_count="$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq 'length' 2>/dev/null || printf 0)"
+if [ "$pr_count" -gt 0 ]; then
+  update_state "$IN_REVIEW_STATE_ID"
+  echo "END $ID rc=$rc pr=open $(date -u +%FT%TZ)" | tee -a "$LOG"
+  exit "$rc"
+fi
+
+if [ "$changed_state" -eq 1 ] && [ -n "$ORIGINAL_STATE_ID" ]; then
+  update_state "$ORIGINAL_STATE_ID"
+fi
+echo "END $ID rc=$rc pr=missing state=restored $(date -u +%FT%TZ)" | tee -a "$LOG"
+[ "$rc" -ne 0 ] && exit "$rc"
+exit 2

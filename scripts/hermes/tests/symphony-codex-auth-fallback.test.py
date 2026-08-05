@@ -19,17 +19,83 @@ SOURCE_DIR = ROOT / "scripts/hermes"
 CONTROLLER = SOURCE_DIR / "symphony-codex-exhausted.py"
 WRAPPER = SOURCE_DIR / "symphony-codex-exhausted"
 SIDECAR = SOURCE_DIR / "symphony-grok-sidecar"
-RUNTIME_NAMES = (WRAPPER.name, CONTROLLER.name, SIDECAR.name)
+GROK_SHIP = SOURCE_DIR / "grok-ship-one"
+RUNTIME_ARTIFACTS = (WRAPPER, CONTROLLER, SIDECAR, GROK_SHIP)
+RUNTIME_NAMES = tuple(path.name for path in RUNTIME_ARTIFACTS)
 
 
 class LinearHandler(http.server.BaseHTTPRequestHandler):
     requests: list[tuple[str | None, str]] = []
+    nodes = [
+        {
+            "identifier": identifier,
+            "team": {"key": identifier.split("-", 1)[0]},
+            "labels": {"nodes": [{"name": name} for name in labels]},
+        }
+        for identifier, labels in (
+            ("JOV-1", ("symphony", "plan-approved", "admission-approved")),
+            ("JOV-2", ("symphony", "plan-approved", "admission-approved")),
+            ("LYB-3", ("symphony", "plan-approved", "admission-approved")),
+            ("JOV-4", ("symphony", "needs:human")),
+            ("LYB-5", ("symphony", "plan-approved")),
+        )
+    ]
 
     def do_POST(self):  # noqa: N802 - stdlib handler API
         body = self.rfile.read(int(self.headers["Content-Length"])).decode()
         self.__class__.requests.append((self.headers.get("Authorization"), body))
-        payload = {"data": {"issues": {"nodes": [{"identifier": n} for n in ("JOV-1", "JOV-2", "JOV-3")]}}}
+        payload = {"data": {"issues": {"nodes": self.__class__.nodes}}}
         encoded = json.dumps(payload).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def log_message(self, *_args):
+        return
+
+
+class GrokLinearHandler(http.server.BaseHTTPRequestHandler):
+    requests: list[dict] = []
+
+    def do_POST(self):  # noqa: N802 - stdlib handler API
+        payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        self.__class__.requests.append(payload)
+        if "issueUpdate" in payload["query"]:
+            response = {"data": {"issueUpdate": {"success": True}}}
+        else:
+            identifier = payload["variables"]["id"]
+            team = identifier.split("-", 1)[0]
+            response = {
+                "data": {
+                    "issue": {
+                        "id": f"uuid-{identifier}",
+                        "identifier": identifier,
+                        "title": f"Ship {identifier}",
+                        "description": "Bounded admitted work.",
+                        "url": f"https://linear.example/{identifier}",
+                        "state": {"id": f"{team}-todo", "name": "Todo"},
+                        "team": {
+                            "key": team,
+                            "states": {
+                                "nodes": [
+                                    {"id": f"{team}-progress", "name": "In Progress"},
+                                    {"id": f"{team}-review", "name": "In Review"},
+                                ]
+                            },
+                        },
+                        "labels": {
+                            "nodes": [
+                                {"name": "symphony"},
+                                {"name": "plan-approved"},
+                                {"name": "admission-approved"},
+                            ]
+                        },
+                    }
+                }
+            }
+        encoded = json.dumps(response).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(encoded)))
@@ -54,10 +120,6 @@ class FallbackTests(unittest.TestCase):
         self.state = self.root / "state.json"
         self.state.write_text(json.dumps({"active": None, "cooldowns": {"jovie": 1}, "last_error": {}}))
         self.events = self.root / "events.log"
-        grok = self.home / ".local/bin/grok-ship-one"
-        grok.parent.mkdir(parents=True)
-        grok.write_text("#!/bin/sh\nexit 0\n")
-        grok.chmod(0o755)
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -129,7 +191,7 @@ class FallbackTests(unittest.TestCase):
     def distinct_source(self, label):
         source = self.root / f"source-{label}"
         source.mkdir()
-        for path in (WRAPPER, CONTROLLER, SIDECAR):
+        for path in RUNTIME_ARTIFACTS:
             target = source / path.name
             target.write_bytes(path.read_bytes() + f"\n# {label}-{path.name}\n".encode())
             target.chmod(0o755)
@@ -138,6 +200,14 @@ class FallbackTests(unittest.TestCase):
     def linear_url(self):
         LinearHandler.requests = []
         server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), LinearHandler)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.shutdown)
+        self.addCleanup(server.server_close)
+        return f"http://127.0.0.1:{server.server_port}/graphql"
+
+    def grok_linear_url(self):
+        GrokLinearHandler.requests = []
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), GrokLinearHandler)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.addCleanup(server.shutdown)
         self.addCleanup(server.server_close)
@@ -192,8 +262,8 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.events.read_text().splitlines(), [
             "systemctl --user list-units --type=service --state=active grok-ship-*.service --no-legend --no-pager",
-            "systemctl --user start symphony-ui-pilot.service",
-            "systemctl --user is-active --quiet symphony-ui-pilot.service",
+            "systemctl --user start symphony-ui-pilot.service symphony-lyb.service",
+            "systemctl --user is-active --quiet symphony-ui-pilot.service symphony-lyb.service",
         ])
         self.assertIn("idle", result.stderr)
 
@@ -225,10 +295,55 @@ class FallbackTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         events = self.events.read_text().splitlines()
-        self.assertEqual(events[0], "systemctl --user stop symphony-ui-pilot.service")
+        self.assertEqual(events[0], "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service")
         self.assertEqual(len([line for line in events if line.startswith("systemd-run")]), 2)
+        self.assertTrue(any("grok-ship-LYB-3" in line for line in events))
+        self.assertFalse(any("grok-ship-JOV-4" in line or "grok-ship-LYB-5" in line for line in events))
         self.assertNotIn("linear-secret", result.stdout + result.stderr + self.events.read_text())
         self.assertIn("first: 20", LinearHandler.requests[0][1])
+        self.assertIn("labels { nodes { name } }", LinearHandler.requests[0][1])
+
+    def test_managed_grok_worker_routes_jov_and_lyb_and_updates_team_states(self):
+        created = self.root / "pr-created"
+        self.command(
+            "git",
+            'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n',
+        )
+        self.command(
+            "gh",
+            '[ ! -f "$GROK_CREATED" ] && echo 0 || echo 1\n',
+        )
+        self.command(
+            "grok",
+            'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"\n'
+            'touch "$GROK_CREATED"\n',
+        )
+        destination = self.install_runtime()
+        linear_url = self.grok_linear_url()
+        workspace = self.root / "workspaces"
+        logs = self.root / "logs"
+        for identifier, repository in (("JOV-7", "JovieInc/Jovie"), ("LYB-8", "JovieInc/LogYourBody")):
+            created.unlink(missing_ok=True)
+            result = subprocess.run(
+                [destination / GROK_SHIP.name, identifier],
+                capture_output=True,
+                text=True,
+                env=self.env(
+                    GEM_EVENTS=self.events,
+                    GROK_CREATED=created,
+                    GROK_SHIP_WS_ROOT=workspace,
+                    GROK_SHIP_LOG_DIR=logs,
+                    LINEAR_API_KEY="linear-secret",
+                    LINEAR_API_URL=linear_url,
+                ),
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(f"git clone --depth 1 https://github.com/{repository}.git", self.events.read_text())
+            self.assertIn(f"--cwd {workspace / identifier.split('-', 1)[0] / identifier}", self.events.read_text())
+        mutations = [request["variables"]["input"]["stateId"] for request in GrokLinearHandler.requests if "issueUpdate" in request["query"]]
+        self.assertEqual(mutations, ["JOV-progress", "JOV-review", "LYB-progress", "LYB-review"])
 
     def test_linear_env_is_strict_and_malformed_auth_does_not_block_usable_path(self):
         self.command("codex-rotate", "echo GEM_MODEL_READY")
@@ -255,6 +370,19 @@ class FallbackTests(unittest.TestCase):
         result = self.run_install(destination, controller=invalid_source)
         self.assertEqual(result.returncode, 2)
         self.assertEqual(sentinel.read_text(), "keep")
+
+    def test_legacy_three_artifact_release_upgrades_atomically(self):
+        destination = self.root / "legacy-three"
+        release = destination / ".symphony-codex-auth-fallback/releases/legacy"
+        release.mkdir(parents=True)
+        for source in (WRAPPER, CONTROLLER, SIDECAR):
+            for target in (release / source.name, destination / source.name):
+                target.write_bytes(source.read_bytes())
+                target.chmod(0o755)
+        (destination / ".symphony-codex-auth-fallback/current").symlink_to("releases/legacy")
+        result = self.run_install(destination)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_complete_install(destination)
 
     def test_fresh_install_recovers_at_each_atomic_cutover(self):
         for replace_number in range(1, 5):
