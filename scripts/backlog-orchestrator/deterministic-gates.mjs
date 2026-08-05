@@ -79,19 +79,32 @@ function isTimOwned(issue) {
   );
 }
 
+function sectionHeader(line) {
+  const markdown = /^#{2,3}\s+(.+?)\s*$/.exec(line);
+  if (markdown) return { name: markdown[1].trim(), inline: '' };
+  const bold = /^\s*\*\*([^*]+?)\*\*\s*(?:[—:-]\s*)?(.*)$/.exec(line);
+  if (!bold) return null;
+  return {
+    name: bold[1].replace(/:\s*$/, '').trim(),
+    inline: bold[2].trim(),
+  };
+}
+
 function section(description, names) {
   const wanted = new Set(names.map(name => name.toLowerCase()));
   const lines = String(description || '').split('\n');
   const start = lines.findIndex(line => {
-    const match = /^#{2,3}\s+(.+?)\s*$/.exec(line);
-    return match && wanted.has(match[1].toLowerCase());
+    const header = sectionHeader(line);
+    return header && wanted.has(header.name.toLowerCase());
   });
   if (start < 0) return '';
-  const end = lines.findIndex(
-    (line, index) => index > start && /^#{2,3}\s+/.test(line)
-  );
-  return lines
-    .slice(start + 1, end < 0 ? undefined : end)
+  const end = lines.findIndex((line, index) => {
+    if (index <= start) return false;
+    return Boolean(sectionHeader(line));
+  });
+  const inline = sectionHeader(lines[start])?.inline;
+  return [inline, ...lines.slice(start + 1, end < 0 ? undefined : end)]
+    .filter(Boolean)
     .join('\n')
     .trim();
 }
@@ -143,9 +156,15 @@ export function validateDeterministicPlanCandidate(
   )
     return 'stale-or-invalid-created-at';
 
-  if (!section(issue.description, ['Proposed fix', 'Implementation plan']))
+  if (
+    !section(issue.description, [
+      'Proposed fix',
+      'Implementation plan',
+      'Scope',
+    ])
+  )
     return 'scope-section-missing';
-  if (!section(issue.description, ['Acceptance criteria']))
+  if (!section(issue.description, ['Acceptance', 'Acceptance criteria']))
     return 'acceptance-section-missing';
   return null;
 }
@@ -156,9 +175,10 @@ export function buildDeterministicPlanEvidence(issue) {
   const scope = section(issue.description, [
     'Implementation plan',
     'Proposed fix',
+    'Scope',
   ]);
   const acceptance = cleanList(
-    section(issue.description, ['Acceptance criteria'])
+    section(issue.description, ['Acceptance', 'Acceptance criteria'])
   );
   const route = teamRouteForIssue(issue);
   return {

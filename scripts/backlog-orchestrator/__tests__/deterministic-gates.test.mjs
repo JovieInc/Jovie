@@ -99,6 +99,24 @@ describe('deterministic no-model gates', () => {
     );
   });
 
+  it('accepts equivalent bold scope and acceptance sections used by LYB', () => {
+    const candidate = issue({
+      identifier: 'LYB-13',
+      project: null,
+      description: `**Problem** — The gesture uses the wrong denominator.
+
+**Proposed fix** — Divide by the rendered track width and clamp the result.
+
+**Acceptance** — Drag positions map linearly from zero to one.`,
+    });
+    const result = deterministicGates.buildDeterministicPlanEvidence(candidate);
+    assert.equal(result.reason, null);
+    assert.match(result.evidence.scope, /rendered track width/);
+    assert.deepEqual(result.evidence.acceptance, [
+      'Drag positions map linearly from zero to one.',
+    ]);
+  });
+
   it('fails closed on team routing, ownership, epic, sensitive, stale, and incomplete work', () => {
     const cases = [
       issue({ identifier: 'OPS-1' }),
