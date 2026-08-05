@@ -204,7 +204,13 @@ log "START account=$account lease_fd=$account_lock_fd args=$*"
 tmp_err=$(mktemp)
 trap 'rm -f "$tmp_err"' EXIT
 set +e
-"$REAL_CODEX" "$@" 2> >(tee -a "$tmp_err" >&2)
+# Codex CLI reports limits on stderr, while app-server reports the same
+# provider error inside its stdout JSON-RPC stream. Preserve both streams for
+# the caller and inspect both after exit so an exhausted account is quarantined
+# instead of returning repeated zero-token turns.
+"$REAL_CODEX" "$@" \
+  > >(tee -a "$tmp_err") \
+  2> >(tee -a "$tmp_err" >&2)
 rc=$?
 set -e
 
