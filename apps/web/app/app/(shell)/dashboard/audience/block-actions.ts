@@ -6,6 +6,7 @@ import { revalidateTag } from 'next/cache';
 import {
   markProfileHasAudienceBlocks,
   markProfileHasNoAudienceBlocks,
+  markProfileVisitorAllowed,
 } from '@/lib/audience/public-profile-block';
 import { getSessionContext } from '@/lib/auth/session';
 import { createAudienceDataTag } from '@/lib/cache/tags';
@@ -78,16 +79,18 @@ export async function blockAudienceMember(
     .onConflictDoNothing() // partial unique index prevents duplicates
     .returning({ id: audienceBlocks.id });
 
+  if (profileUsername) {
+    // Await the shared cache write before reporting success. Repeated block
+    // requests also repair a previously interrupted cache mutation.
+    await markProfileHasAudienceBlocks(profileUsername, m.fingerprint);
+  }
+
   if (!result[0]) {
-    // Already blocked — not an error, just a no-op
+    // Already blocked — not an error, just a no-op after cache reconciliation.
     return;
   }
 
   revalidateTag(createAudienceDataTag(profileId), 'max');
-
-  if (profileUsername) {
-    await markProfileHasAudienceBlocks(profileUsername);
-  }
 }
 
 /**
@@ -114,7 +117,10 @@ export async function unblockAudienceMember(blockId: string) {
         )
       )
     )
-    .returning({ profileId: audienceBlocks.creatorProfileId });
+    .returning({
+      fingerprint: audienceBlocks.fingerprint,
+      profileId: audienceBlocks.creatorProfileId,
+    });
 
   if (!result[0]) {
     throw new Error('Block not found');
@@ -141,9 +147,15 @@ export async function unblockAudienceMember(blockId: string) {
 
   if (profile?.username) {
     if (remainingBlocks.length === 0) {
-      await markProfileHasNoAudienceBlocks(profile.username);
+      await markProfileHasNoAudienceBlocks(
+        profile.username,
+        result[0].fingerprint
+      );
     } else {
-      await markProfileHasAudienceBlocks(profile.username);
+      await Promise.all([
+        markProfileHasAudienceBlocks(profile.username),
+        markProfileVisitorAllowed(profile.username, result[0].fingerprint),
+      ]);
     }
   }
 }

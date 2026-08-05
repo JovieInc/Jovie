@@ -206,7 +206,7 @@ export default async function middleware(
   if (isTestAuthBypassEnabled()) {
     const testBypassUserId = resolveTestBypassUserId(req.headers, req.cookies);
     if (testBypassUserId) {
-      return handleProxyRequest(req, testBypassUserId);
+      return handleProxyRequest(req, testBypassUserId, event);
     }
   }
 
@@ -227,7 +227,7 @@ export default async function middleware(
   //     signed-in marker. Public `/` navigation passes through unchanged;
   //     auth-page signed-in redirects are owned by the pages themselves via
   //     auth.api.getSession.
-  return handleProxyRequest(req, sessionCookie);
+  return handleProxyRequest(req, sessionCookie, event);
 }
 
 export const config = {
