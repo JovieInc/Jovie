@@ -101,6 +101,31 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = new Set([
+  '.husky/pre-push',
+  'scripts/automation-verify.sh',
+  'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
+  'scripts/backlog-orchestrator/admitter.mjs',
+  'scripts/backlog-orchestrator/backlog-orchestrator.mjs',
+  'scripts/backlog-orchestrator/deterministic-gates.mjs',
+  'scripts/hermes/codex-rotate',
+  'scripts/hermes/tests/codex-rotate.test.py',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/pre-push-gate.test.mjs',
+  'scripts/run-affected-tests.mjs',
+]);
+const SYMPHONY_THROUGHPUT_NODE_TESTS = [
+  'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
+];
+const SYMPHONY_THROUGHPUT_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/pre-push-gate.test.mjs',
+];
+const SYMPHONY_THROUGHPUT_PYTHON_TESTS = [
+  'scripts/hermes/tests/codex-rotate.test.py',
+];
 const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
   'apps/web/app/exp/shell-v1/page.tsx',
   'apps/web/components/jovie/components/ChatInput.tsx',
@@ -370,6 +395,22 @@ export function buildAffectedTestPlan(
   const files = unique(changedFiles.filter(Boolean)).sort();
   if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
     return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+  }
+  const isExactSymphonyThroughputControl =
+    files.length === SYMPHONY_THROUGHPUT_CONTROL_MANIFEST.size &&
+    files.every(file => SYMPHONY_THROUGHPUT_CONTROL_MANIFEST.has(file));
+  if (isExactSymphonyThroughputControl) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: SYMPHONY_THROUGHPUT_PYTHON_TESTS,
+      scriptVitestTests: SYMPHONY_THROUGHPUT_SCRIPT_TESTS,
+      nodeTests: SYMPHONY_THROUGHPUT_NODE_TESTS,
+    };
   }
 
   const prerequisiteTrainCornerCount = PREREQUISITE_TRAIN_CORNERS.filter(file =>
@@ -1038,6 +1079,9 @@ async function runCommands(commands, concurrency = 1) {
 
 export function buildSelectedTestCommands(plan, maxWorkers) {
   const commands = [];
+  if ((plan.nodeTests || []).length > 0) {
+    commands.push(['node', ['--test', ...plan.nodeTests]]);
+  }
   if (plan.scriptVitestTests.length > 0) {
     commands.push([
       'pnpm',
@@ -1074,6 +1118,9 @@ export function buildSelectedTestCommands(plan, maxWorkers) {
   }
   if (plan.pythonTests.length > 0) {
     commands.push(['python3', ['-m', 'pytest', ...plan.pythonTests, '-q']]);
+  }
+  for (const test of plan.pythonUnittestTests || []) {
+    commands.push(['python3', [test]]);
   }
   if (plan.selectedTests.length > 0) {
     commands.push([

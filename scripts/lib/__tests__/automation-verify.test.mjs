@@ -19,6 +19,21 @@ const script = readFileSync(
   'utf8'
 );
 
+const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
+  '.husky/pre-push',
+  'scripts/automation-verify.sh',
+  'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
+  'scripts/backlog-orchestrator/admitter.mjs',
+  'scripts/backlog-orchestrator/backlog-orchestrator.mjs',
+  'scripts/backlog-orchestrator/deterministic-gates.mjs',
+  'scripts/hermes/codex-rotate',
+  'scripts/hermes/tests/codex-rotate.test.py',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/pre-push-gate.test.mjs',
+  'scripts/run-affected-tests.mjs',
+];
+
 const PREREQUISITE_TRAIN_CORNERS = [
   'scripts/ci/neon-orphan-reaper.mjs',
   'apps/web/lib/testing/e2e-prebuilt-claim.ts',
@@ -365,6 +380,28 @@ describe('automation-verify affected scope', () => {
   it('selects related tests instead of the whole affected workspace package', () => {
     expect(script).toContain('node scripts/run-affected-tests.mjs');
     expect(script).not.toContain('turbo-local.mjs test --affected');
+  });
+
+  it('selects the complete Symphony throughput control-plane test lanes', () => {
+    const plan = buildAffectedTestPlan(SYMPHONY_THROUGHPUT_CONTROL_MANIFEST);
+    expect(plan).toMatchObject({
+      mode: 'selected',
+      nodeTests: [
+        'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
+        'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
+      ],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/pre-push-gate.test.mjs',
+      ],
+      pythonUnittestTests: ['scripts/hermes/tests/codex-rotate.test.py'],
+    });
+    expect(
+      buildAffectedTestPlan([
+        ...SYMPHONY_THROUGHPUT_CONTROL_MANIFEST,
+        'scripts/backlog-orchestrator/unknown.mjs',
+      ]).mode
+    ).toBe('full');
   });
 
   it('fails closed on an unresolved base and retains mandatory risk policy', () => {
