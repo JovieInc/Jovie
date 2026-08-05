@@ -10,17 +10,28 @@ export function resolveClaimBannerState(params: {
   visitorState: ProfileVisitorState;
   claimSearchParam?: string;
   directClaimSupported: boolean;
+  claimRequiresVerification?: boolean;
   isClaimed: boolean;
 }): {
   claimBannerVariant: ClaimBannerVariant | null;
   shouldShowClaimBanner: boolean;
 } {
-  const { visitorState, claimSearchParam, directClaimSupported, isClaimed } =
-    params;
+  const {
+    visitorState,
+    claimSearchParam,
+    directClaimSupported,
+    claimRequiresVerification = false,
+    isClaimed,
+  } = params;
 
   let claimBannerVariant: ClaimBannerVariant | null = null;
 
-  if (visitorState === 'claim_intent_token' || claimSearchParam === '1') {
+  if (claimRequiresVerification) {
+    claimBannerVariant = 'unsupported';
+  } else if (
+    visitorState === 'claim_intent_token' ||
+    claimSearchParam === '1'
+  ) {
     claimBannerVariant = 'claim_intent';
   } else if (visitorState === 'claim_intent_direct') {
     claimBannerVariant = 'direct_in_progress';

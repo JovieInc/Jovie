@@ -226,6 +226,8 @@ describe('buildPublicProfileMetadata', () => {
     location: null,
     avatar_url: null,
     is_verified: false,
+    is_claimed: true,
+    settings: null,
   };
 
   it('returns Metadata with title equal to username when display_name is null', () => {
@@ -321,6 +323,30 @@ describe('buildPublicProfileMetadata', () => {
     });
     const robots = meta.robots as Record<string, unknown>;
     expect(robots?.index).toBe(true);
+  });
+
+  it('sets noindex for an automatic structured-credit profile until claimed', () => {
+    const meta = buildPublicProfileMetadata({
+      profile: {
+        ...minimalProfile,
+        is_claimed: false,
+        settings: {
+          unclaimedArtistProfile: {
+            state: 'unclaimed',
+            source: 'structured_spotify_release_credit',
+            artistRegistryId: 'f5441adb-6789-449a-9553-ab7460c9c61c',
+            provider: 'spotify',
+            providerArtistId: 'spotify-austin',
+            ownershipVerified: false,
+            representationVerified: false,
+            consentObtained: false,
+          },
+        },
+      },
+      genres: null,
+    });
+    const robots = meta.robots as Record<string, unknown>;
+    expect(robots).toMatchObject({ index: false, follow: false });
   });
 
   it('includes genre keywords in keywords array', () => {

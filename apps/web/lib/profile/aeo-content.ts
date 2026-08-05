@@ -1,5 +1,6 @@
 import { BASE_URL } from '@/constants/app';
 import type { PublicRelease } from '@/features/profile/releases/types';
+import type { StructuredReleaseCollaborator } from '@/lib/discography/artist-queries';
 import {
   getRegistryEntry,
   isDspPlatform,
@@ -73,6 +74,8 @@ export interface BuildProfileAeoContentInput {
   readonly tourDates?: readonly TourDateViewModel[];
   readonly merchCards?: readonly PublicMerchCard[];
   readonly socialLinks?: readonly LegacySocialLink[];
+  /** Exact release-credit edges; never derived from prose or artistNames. */
+  readonly releaseCollaborators?: readonly StructuredReleaseCollaborator[];
   /**
    * Linkable entities for this profile (own releases with slugs, credited
    * artists resolved to Jovie handles). When omitted, descriptions render
@@ -215,26 +218,6 @@ function formatTourLocation(tourDate: TourDateViewModel): string {
   return location ? `${tourDate.venueName} in ${location}` : tourDate.venueName;
 }
 
-function sameArtistName(left: string, right: string): boolean {
-  return left.trim().toLowerCase() === right.trim().toLowerCase();
-}
-
-function getCollaborators(params: {
-  readonly artistName: string;
-  readonly artistHandle: string;
-  readonly releases: readonly PublicRelease[];
-}): string[] {
-  return dedupeStrings(
-    params.releases.flatMap(release => release.artistNames ?? [])
-  )
-    .filter(
-      name =>
-        !sameArtistName(name, params.artistName) &&
-        !sameArtistName(name, params.artistHandle)
-    )
-    .slice(0, 4);
-}
-
 function getUniqueGenres(
   artist: Artist,
   genres: readonly string[] | null | undefined
@@ -373,7 +356,6 @@ function buildDescription(params: {
   readonly releases: readonly PublicRelease[];
   readonly tourDates: readonly TourDateViewModel[];
   readonly merchCards: readonly PublicMerchCard[];
-  readonly collaborators: readonly string[];
   readonly now: Date;
 }): string[] {
   const {
@@ -383,7 +365,6 @@ function buildDescription(params: {
     releases,
     tourDates,
     merchCards,
-    collaborators,
     now,
   } = params;
   const origin = getOrigin(artist);
@@ -431,27 +412,6 @@ function buildDescription(params: {
     description.push(`Profile highlights: ${trimSentence(highlights)}`);
   }
 
-  if (collaborators.length > 0) {
-    const creditReleases = releases
-      .filter(release =>
-        (release.artistNames ?? []).some(
-          name =>
-            !sameArtistName(name, artist.name) &&
-            !sameArtistName(name, artist.handle)
-        )
-      )
-      .slice(0, 2)
-      .map(release => release.title)
-      .filter(Boolean);
-    const releaseContext =
-      creditReleases.length > 0
-        ? ` on ${formatList(creditReleases.map(title => `"${title}"`))}`
-        : '';
-    description.push(
-      `Collaborators credited${releaseContext} include ${formatList(collaborators)}.`
-    );
-  }
-
   const targetPlaylists = dedupeStrings(artist.target_playlists ?? []).slice(
     0,
     3
@@ -463,6 +423,94 @@ function buildDescription(params: {
   }
 
   return description;
+}
+
+interface StructuredCollaboratorParagraph {
+  readonly text: string;
+  readonly segments: readonly EntityMentionSegment[];
+}
+
+function buildStructuredCollaboratorParagraph(
+  artistHandle: string,
+  collaborators: readonly StructuredReleaseCollaborator[]
+): StructuredCollaboratorParagraph | null {
+  const grouped = new Map<
+    string,
+    {
+      name: string;
+      href: string | null;
+      releases: Array<{ id: string; title: string; slug: string }>;
+    }
+  >();
+
+  for (const collaborator of collaborators) {
+    const name = cleanText(collaborator.name);
+    const releaseTitle = cleanText(collaborator.releaseTitle);
+    const releaseSlug = cleanText(collaborator.releaseSlug);
+    if (!name || !releaseTitle || !releaseSlug) continue;
+
+    const existing = grouped.get(collaborator.artistId) ?? {
+      name,
+      href: collaborator.href,
+      releases: [],
+    };
+    if (
+      !existing.releases.some(release => release.id === collaborator.releaseId)
+    ) {
+      existing.releases.push({
+        id: collaborator.releaseId,
+        title: releaseTitle,
+        slug: releaseSlug,
+      });
+    }
+    grouped.set(collaborator.artistId, existing);
+    if (grouped.size >= 4) break;
+  }
+
+  const entries = [...grouped.values()];
+  if (entries.length === 0) return null;
+
+  const segments: EntityMentionSegment[] = [
+    { type: 'text', text: 'Collaborators credited include ' },
+  ];
+
+  entries.forEach((entry, entryIndex) => {
+    if (entryIndex > 0) {
+      const separator =
+        entryIndex === entries.length - 1
+          ? entries.length === 2
+            ? ' and '
+            : ', and '
+          : ', ';
+      segments.push({ type: 'text', text: separator });
+    }
+
+    segments.push(
+      entry.href
+        ? { type: 'artist', text: entry.name, href: entry.href }
+        : { type: 'text', text: entry.name }
+    );
+    segments.push({ type: 'text', text: ' on ' });
+
+    entry.releases.slice(0, 2).forEach((release, releaseIndex) => {
+      if (releaseIndex > 0) {
+        segments.push({ type: 'text', text: ' and ' });
+      }
+      segments.push({ type: 'text', text: '"' });
+      segments.push({
+        type: 'release',
+        text: release.title,
+        href: profilePath(artistHandle, `/${encodeURIComponent(release.slug)}`),
+      });
+      segments.push({ type: 'text', text: '"' });
+    });
+  });
+
+  segments.push({ type: 'text', text: '.' });
+  return {
+    text: segments.map(segment => segment.text).join(''),
+    segments,
+  };
 }
 
 function buildOriginFaq(artist: Artist): ProfileAeoFaqItem {
@@ -576,15 +624,11 @@ export function buildProfileAeoContent({
   tourDates = [],
   merchCards = [],
   socialLinks = [],
+  releaseCollaborators = [],
   entityMentions,
   now = new Date(),
 }: BuildProfileAeoContentInput): ProfileAeoContent {
   const uniqueGenres = getUniqueGenres(artist, genres);
-  const collaborators = getCollaborators({
-    artistName: artist.name,
-    artistHandle: artist.handle,
-    releases,
-  });
   const { listenLinks, followLinks } = buildLinkSections(artist, socialLinks);
 
   const description = buildDescription({
@@ -594,9 +638,15 @@ export function buildProfileAeoContent({
     releases,
     tourDates,
     merchCards,
-    collaborators,
     now,
   });
+  const collaboratorParagraph = buildStructuredCollaboratorParagraph(
+    artist.handle,
+    releaseCollaborators
+  );
+  if (collaboratorParagraph) {
+    description.push(collaboratorParagraph.text);
+  }
   const mentionContext: EntityMentionContext = entityMentions ?? {
     ownHandle: artist.handle,
   };
@@ -608,8 +658,10 @@ export function buildProfileAeoContent({
     listenLinks,
     followLinks,
     description,
-    descriptionSegments: description.map(paragraph =>
-      linkEntityMentions(paragraph, mentionContext)
+    descriptionSegments: description.map((paragraph, index) =>
+      collaboratorParagraph && index === description.length - 1
+        ? collaboratorParagraph.segments
+        : linkEntityMentions(paragraph, mentionContext)
     ),
     faqs: [
       buildOriginFaq(artist),

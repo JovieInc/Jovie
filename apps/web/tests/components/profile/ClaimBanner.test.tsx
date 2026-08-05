@@ -49,13 +49,14 @@ describe('ClaimBanner', () => {
     expect(screen.getByTestId('claim-banner')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Is this your profile? Claim it with Spotify in about a minute.'
+        'This profile is unclaimed. Is it yours? Claim it with Spotify.'
       )
     ).toBeInTheDocument();
     expect(screen.getByTestId('claim-banner-cta')).toHaveAttribute(
       'href',
       '/testartist/claim?next=auth'
     );
+    expect(screen.getByTestId('claim-banner-cta')).toHaveClass('min-h-11');
   });
 
   it('renders the claim-intent copy for token-backed visitors', () => {
@@ -80,7 +81,7 @@ describe('ClaimBanner', () => {
 
     expect(
       screen.getByText(
-        'This profile needs a claim link before it can be claimed.'
+        'This profile is unclaimed. Verified ownership is required before it can be claimed.'
       )
     ).toBeInTheDocument();
     expect(screen.queryByTestId('claim-banner-cta')).not.toBeInTheDocument();

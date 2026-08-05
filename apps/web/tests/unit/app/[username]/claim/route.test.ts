@@ -5,10 +5,14 @@ const {
   mockGetOptionalAuth,
   mockGetProfileByUsername,
   mockReadPendingClaimContext,
+  mockClearPendingClaimContext,
+  mockWritePendingClaimContext,
 } = vi.hoisted(() => ({
   mockGetOptionalAuth: vi.fn(),
   mockGetProfileByUsername: vi.fn(),
   mockReadPendingClaimContext: vi.fn(),
+  mockClearPendingClaimContext: vi.fn(),
+  mockWritePendingClaimContext: vi.fn(),
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -20,9 +24,9 @@ vi.mock('@/lib/auth/cached', () => ({
 }));
 
 vi.mock('@/lib/claim/context', () => ({
-  clearPendingClaimContext: vi.fn(),
+  clearPendingClaimContext: mockClearPendingClaimContext,
   readPendingClaimContext: mockReadPendingClaimContext,
-  writePendingClaimContext: vi.fn(),
+  writePendingClaimContext: mockWritePendingClaimContext,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -68,6 +72,7 @@ describe('Claim route', () => {
       spotifyId: 'spotify_123',
       spotifyUrl: 'https://open.spotify.com/artist/spotify_123',
       isClaimed: false,
+      settings: {},
     });
   });
 
@@ -110,5 +115,41 @@ describe('Claim route', () => {
     );
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe('http://localhost/');
+  });
+
+  it('does not issue direct-claim proof for an automatic unclaimed profile', async () => {
+    mockGetProfileByUsername.mockResolvedValueOnce({
+      id: 'profile_1',
+      username: 'a_unclaimed',
+      usernameNormalized: 'a_unclaimed',
+      displayName: 'Austin Leeds',
+      spotifyId: 'spotify_123',
+      spotifyUrl: 'https://open.spotify.com/artist/spotify_123',
+      isClaimed: false,
+      settings: {
+        unclaimedArtistProfile: {
+          state: 'unclaimed',
+          source: 'structured_spotify_release_credit',
+          artistRegistryId: 'f5441adb-6789-449a-9553-ab7460c9c61c',
+          provider: 'spotify',
+          providerArtistId: 'spotify_123',
+          ownershipVerified: false,
+          representationVerified: false,
+          consentObtained: false,
+        },
+      },
+    });
+
+    const response = await GET(
+      new NextRequest('http://localhost/a_unclaimed/claim?next=auth'),
+      { params: Promise.resolve({ username: 'a_unclaimed' }) }
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost/a_unclaimed?claim=unsupported'
+    );
+    expect(mockClearPendingClaimContext).toHaveBeenCalled();
+    expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
   });
 });

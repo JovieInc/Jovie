@@ -18,6 +18,7 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import type { CreatorProfile } from '@/types/db';
+import { isUnclaimedStructuredCreditProfile } from './unclaimed-artist-profile';
 
 // ---------------------------------------------------------------------------
 // Sanitization
@@ -158,6 +159,8 @@ export interface PublicProfileMetadataInput {
     | 'location'
     | 'avatar_url'
     | 'is_verified'
+    | 'is_claimed'
+    | 'settings'
   >;
   readonly genres: string[] | null | undefined;
 }
@@ -192,6 +195,9 @@ export function buildPublicProfileMetadata(
     profile.location,
     genres
   );
+  const isStructuredCreditUnclaimed =
+    profile.is_claimed !== true &&
+    isUnclaimedStructuredCreditProfile(profile.settings);
 
   const baseKeywords = [
     artistName,
@@ -218,11 +224,11 @@ export function buildPublicProfileMetadata(
       canonical: canonicalUrl,
     },
     robots: {
-      index: true,
-      follow: true,
+      index: !isStructuredCreditUnclaimed,
+      follow: !isStructuredCreditUnclaimed,
       googleBot: {
-        index: true,
-        follow: true,
+        index: !isStructuredCreditUnclaimed,
+        follow: !isStructuredCreditUnclaimed,
         'max-video-preview': -1,
         'max-image-preview': 'large',
         'max-snippet': -1,

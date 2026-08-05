@@ -43,6 +43,20 @@ describe('resolveClaimBannerState', () => {
     });
   });
 
+  it('keeps automatic credit profiles visibly unclaimed without a direct claim', () => {
+    expect(
+      resolveClaimBannerState({
+        visitorState: 'organic_unclaimed',
+        directClaimSupported: false,
+        claimRequiresVerification: true,
+        isClaimed: false,
+      })
+    ).toEqual({
+      claimBannerVariant: 'unsupported',
+      shouldShowClaimBanner: true,
+    });
+  });
+
   it('returns organic for direct-claim-supported public visitors', () => {
     expect(
       resolveClaimBannerState({

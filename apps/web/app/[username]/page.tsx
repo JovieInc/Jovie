@@ -6,6 +6,7 @@ import { Suspense } from 'react';
 // (ISR). The public profile route must stay ISR-cacheable; avoid any Dynamic
 // API (cookies(), headers()) in this RSC tree.
 
+import type { ProfileMode } from '@/components/features/profile/contracts';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import { BASE_URL } from '@/constants/app';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
@@ -20,7 +21,10 @@ import {
   supportsDirectProfileClaim,
 } from '@/lib/claim/visitor-state';
 import { toPublicContacts } from '@/lib/contacts/mapper';
-import { getCreditedArtistsWithProfiles } from '@/lib/discography/artist-queries';
+import {
+  getCreditedArtistsWithProfiles,
+  getStructuredReleaseCollaborators,
+} from '@/lib/discography/artist-queries';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { getEntityIdentityLinks } from '@/lib/entity/queries';
 import { DEFAULT_PROFILE_PAC_ASSIGNMENT } from '@/lib/flags/profile-pac';
@@ -42,7 +46,9 @@ import {
   PROFILE_ERROR_METADATA,
 } from '@/lib/profile/metadata';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
+import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
 import { generateProfileStructuredData } from '@/lib/seo/structured-data';
+import { resolveSpotifyArtistIdentity } from '@/lib/spotify/artist-id';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
@@ -80,10 +86,13 @@ export async function generateStaticParams() {
 interface Props {
   readonly params: Promise<{
     readonly username: string;
+    /** Private rewrite-only input; public requests never populate this. */
+    readonly __profileMode?: ProfileMode;
   }>;
 }
 
 interface ArtistPageContentProps {
+  readonly initialMode: ProfileMode;
   readonly username: string;
   readonly profileResult: PublicProfileLoaderResult;
 }
@@ -180,12 +189,35 @@ async function getCreditedArtistsForMentions(profileId: string) {
   }
 }
 
+async function getPublicReleaseCollaborators(
+  profileId: string,
+  ownerSpotifyId: string | null
+) {
+  if (!ownerSpotifyId) return [];
+
+  try {
+    return await getStructuredReleaseCollaborators(profileId, {
+      ownerSpotifyId,
+    });
+  } catch (error) {
+    logger.error(
+      'Error fetching structured public release collaborators',
+      {
+        error,
+        profileId,
+        route: '/[username]',
+      },
+      'public-profile'
+    );
+    return [];
+  }
+}
+
 async function ArtistPageContent({
+  initialMode,
   username,
   profileResult,
 }: Readonly<ArtistPageContentProps>) {
-  const initialMode = 'profile';
-
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
   const viewerCountryCode = null;
 
@@ -223,12 +255,37 @@ async function ArtistPageContent({
   const merchCardsPromise = getPublicMerchCards(profile.id);
   const entityLinksPromise = getEntityIdentityLinks(profile.id);
   const creditedArtistsPromise = getCreditedArtistsForMentions(profile.id);
+  const ownerSpotifyIdentity = resolveSpotifyArtistIdentity([
+    profile.spotify_id,
+    profile.spotify_url,
+    ...links.filter(link => link.platform === 'spotify').map(link => link.url),
+  ]);
+  const releaseCollaboratorsPromise = getPublicReleaseCollaborators(
+    profile.id,
+    ownerSpotifyIdentity.spotifyArtistId
+  );
+
+  if (ownerSpotifyIdentity.status !== 'resolved') {
+    logger.warn(
+      'Structured collaborator prose omitted without one exact owner identity',
+      {
+        creatorProfileId: profile.id,
+        identityStatus: ownerSpotifyIdentity.status,
+        route: '/[username]',
+      },
+      'public-profile'
+    );
+  }
 
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
-  const directClaimSupported = supportsDirectProfileClaim({
-    spotifyId: profile.spotify_id,
-  });
+  const requiresVerifiedOwnership =
+    !profile.is_claimed && isUnclaimedStructuredCreditProfile(profile.settings);
+  const directClaimSupported =
+    !requiresVerifiedOwnership &&
+    supportsDirectProfileClaim({
+      spotifyId: profile.spotify_id,
+    });
   const visitorState = getProfileVisitorState({
     profile: {
       id: profile.id,
@@ -279,6 +336,7 @@ async function ArtistPageContent({
     profilePacAssignment,
     entityLinks,
     creditedArtists,
+    releaseCollaborators,
   ] = await Promise.all([
     tourDatesPromise.catch(() => [] as TourDateViewModel[]),
     releasesPromise,
@@ -290,6 +348,7 @@ async function ArtistPageContent({
     getProfilePacAssignment(null).catch(() => DEFAULT_PROFILE_PAC_ASSIGNMENT),
     entityLinksPromise.catch(() => []),
     creditedArtistsPromise,
+    releaseCollaboratorsPromise,
   ]);
   const tourDates = [...tourDatesRaw].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
@@ -339,6 +398,7 @@ async function ArtistPageContent({
     tourDates,
     merchCards,
     socialLinks: links,
+    releaseCollaborators,
     entityMentions: entityMentionContext,
   });
 
@@ -369,13 +429,6 @@ async function ArtistPageContent({
       {isPublicNoAuthSmoke ? null : (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
       )}
-      <PublicClaimBanner
-        profileHandle={artist.handle}
-        displayName={artist.name}
-        directClaimSupported={directClaimSupported}
-        isClaimed={profile.is_claimed}
-        visitorState={visitorState}
-      />
       {/* Server-side pixel tracking */}
       {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
       <StaticArtistPage
@@ -388,6 +441,17 @@ async function ArtistPageContent({
         showBackButton={showBackButton}
         showPayButton={showPayButton}
         showTourButton={true}
+        profileBanner={
+          <PublicClaimBanner
+            profileHandle={artist.handle}
+            displayName={artist.name}
+            directClaimSupported={directClaimSupported}
+            claimRequiresVerification={requiresVerifiedOwnership}
+            isClaimed={profile.is_claimed}
+            visitorState={visitorState}
+          />
+        }
+        allowFanCapture={!requiresVerifiedOwnership}
         enableDynamicEngagement={creatorIsPro}
         latestRelease={latestRelease}
         photoDownloadSizes={photoDownloadSizes}
@@ -401,7 +465,7 @@ async function ArtistPageContent({
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}
-        showClaimFooter={!profile.is_claimed}
+        showClaimFooter={!profile.is_claimed && !requiresVerifiedOwnership}
         claimFooterHref={`/${encodeURIComponent(artist.handle)}/claim?next=auth`}
         profileSettings={{
           showOldReleases: profileSettings.showOldReleases === true,
@@ -426,7 +490,7 @@ async function ArtistPageContent({
 }
 
 export default async function ArtistPage({ params }: Readonly<Props>) {
-  const { username } = await params;
+  const { username, __profileMode: initialMode = 'profile' } = await params;
   assertValidProfileUsername(username);
 
   // Resolve a missing/private profile before the page-level Suspense boundary
@@ -442,7 +506,11 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
 
   return (
     <Suspense fallback={<ProfileLoading />}>
-      <ArtistPageContent username={username} profileResult={profileResult} />
+      <ArtistPageContent
+        initialMode={initialMode}
+        username={username}
+        profileResult={profileResult}
+      />
     </Suspense>
   );
 }

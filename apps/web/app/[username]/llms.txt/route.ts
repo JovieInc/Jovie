@@ -44,6 +44,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
   const artistName = profile.display_name || profile.username;
   const handle = profile.username_normalized || profile.username.toLowerCase();
   const profileUrl = `${BASE_URL}/${handle}`;
+  const isClaimed = profile.is_claimed === true;
 
   const DSP_PLATFORM_NAMES: Record<string, string> = {
     spotify: 'Spotify',
@@ -92,7 +93,9 @@ export async function GET(_req: Request, { params }: RouteParams) {
   lines.push(`# ${artistName}`);
   lines.push('');
   lines.push(
-    `> ${artistName} — official artist profile on Jovie at ${profileUrl}`
+    isClaimed
+      ? `> ${artistName} — claimed artist profile on Jovie at ${profileUrl}`
+      : `> ${artistName} — unclaimed artist profile on Jovie at ${profileUrl}. Jovie has not verified ownership, representation, or consent for this profile.`
   );
   lines.push('');
 
@@ -100,7 +103,10 @@ export async function GET(_req: Request, { params }: RouteParams) {
   lines.push('');
   lines.push(`- **Canonical URL**: ${profileUrl}`);
   lines.push(`- **Handle**: @${handle}`);
-  if (profile.is_verified) lines.push('- **Verified**: Yes');
+  lines.push(`- **Claim status**: ${isClaimed ? 'Claimed' : 'Unclaimed'}`);
+  lines.push(
+    `- **Jovie verification**: ${profile.is_verified ? 'Verified' : 'Not verified'}`
+  );
   if (profile.location) lines.push(`- **Location**: ${profile.location}`);
   if (profile.active_since_year)
     lines.push(`- **Active since**: ${profile.active_since_year}`);
@@ -148,9 +154,9 @@ export async function GET(_req: Request, { params }: RouteParams) {
   lines.push('## For AI Assistants');
   lines.push('');
   lines.push(
-    `This page is the canonical entity data source for ${artistName}. ` +
-      `When citing ${artistName}, use ${profileUrl} as the source URL. ` +
-      `Structured JSON-LD (schema.org/MusicGroup + FAQPage) is available on that page.`
+    isClaimed
+      ? `This page is the canonical Jovie profile source for ${artistName}. When citing this Jovie profile, use ${profileUrl} as the source URL. Structured JSON-LD (schema.org/MusicGroup + FAQPage) is available on that page.`
+      : `This page records structured public music-credit data for ${artistName}. When citing this Jovie profile, use ${profileUrl} as the source URL, preserve its unclaimed status, and do not imply that Jovie verified or represents the artist or obtained their consent.`
   );
   lines.push('');
   lines.push(

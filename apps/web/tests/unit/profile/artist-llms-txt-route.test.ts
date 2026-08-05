@@ -35,6 +35,7 @@ const baseProfile = {
   bio: 'Late-night club records.',
   location: 'Los Angeles, CA',
   is_verified: true,
+  is_claimed: true,
   is_public: true,
   active_since_year: 2018,
   spotify_url: 'https://open.spotify.com/artist/test',
@@ -131,6 +132,48 @@ describe('GET /{username}/llms.txt', () => {
     );
     const body = await res.text();
     expect(body).toContain('# DJ Test');
+  });
+
+  it('labels claimed profiles without implying more than the stored verification state', async () => {
+    mockGetProfileAndLinks.mockResolvedValueOnce({
+      profile: baseProfile,
+      links: [],
+      genres: null,
+      latestRelease: null,
+    });
+    const res = await GET(
+      new Request('https://jov.ie/djtest/llms.txt'),
+      makeParams('djtest')
+    );
+    const body = await res.text();
+    expect(body).toContain('claimed artist profile on Jovie');
+    expect(body).toContain('**Claim status**: Claimed');
+    expect(body).toContain('**Jovie verification**: Verified');
+  });
+
+  it('makes unclaimed identity and consent boundaries explicit', async () => {
+    mockGetProfileAndLinks.mockResolvedValueOnce({
+      profile: {
+        ...baseProfile,
+        is_claimed: false,
+        is_verified: false,
+      },
+      links: [],
+      genres: null,
+      latestRelease: null,
+    });
+    const res = await GET(
+      new Request('https://jov.ie/djtest/llms.txt'),
+      makeParams('djtest')
+    );
+    const body = await res.text();
+    expect(body).toContain('unclaimed artist profile on Jovie');
+    expect(body).toContain(
+      'Jovie has not verified ownership, representation, or consent'
+    );
+    expect(body).toContain('**Claim status**: Unclaimed');
+    expect(body).toContain('**Jovie verification**: Not verified');
+    expect(body).not.toContain('official artist profile');
   });
 
   it('includes DSP streaming links from profile columns', async () => {
