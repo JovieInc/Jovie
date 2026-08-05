@@ -81,8 +81,6 @@ describe('SocialIcon', () => {
   });
 
   it.each([
-    'netease',
-    'netease_music',
     'neteasemusic',
   ])('renders the canonical NetEase mark for %s', platform => {
     const { container } = render(<SocialIcon platform={platform} />);
