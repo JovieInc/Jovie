@@ -104,6 +104,7 @@ import {
 } from '@/lib/chat/tools/merch-tools';
 import { createProposeVideoRecordingTool } from '@/lib/chat/tools/propose-video-recording';
 import { createRetouchImageTool } from '@/lib/chat/tools/retouch-image';
+import { createManageTasksTool } from '@/lib/chat/tools/tasks';
 import {
   type ChatTurnSource,
   markChatTurnStreaming,
@@ -2109,6 +2110,9 @@ function buildChatTools(
       releases
     ),
     formatLyrics: createLyricsFormatTool(),
+    ...(resolvedProfileId
+      ? { manageTasks: createManageTasksTool(resolvedProfileId) }
+      : {}),
     ...(resolvedProfileId
       ? {
           createRelease: createReleaseTool(resolvedProfileId),
