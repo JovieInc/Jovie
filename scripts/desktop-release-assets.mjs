@@ -314,7 +314,9 @@ class GitHubClient {
     if (raw) {
       return Buffer.from(await response.arrayBuffer());
     }
-    return response.status === 204 ? null : response.json();
+    return response.status === 204
+      ? null
+      : /** @type {any} */ (await response.json());
   }
 
   async releaseByTag(tag, allowNotFound = false) {
