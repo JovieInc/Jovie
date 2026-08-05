@@ -2,7 +2,7 @@
 
 Status: Canon
 Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md)
-Last updated: 2026-07-17
+Last updated: 2026-08-03
 
 Marketing exists to create qualified demand that moves the current company bottleneck.
 
@@ -49,6 +49,15 @@ Unknown means measure first.
 ## Principles
 
 - Specific customer language beats clever copy.
+- Every section starts with the belief it must create and the customer outcome
+  it must make legible. Media is evidence for that message, not the message.
+- Brief/process/style language is never a customer benefit by itself. Every
+  visible line names the registered outcome, verified product claim, proof, or
+  action it serves; semantic role is evaluated in context rather than by
+  brittle word bans.
+- Display headlines must form a connected argument when read without the body
+  copy. A heading that can move between sections unchanged is not specific
+  enough.
 - Observed behavior beats brand preference.
 - Distribution work waits if production/activation is broken.
 - Start with low-risk audiences before high-profile outreach when product stability is uncertain.
@@ -71,10 +80,15 @@ Do not optimize for:
 
 Product defines the value promise. Design makes it legible. Voice makes it clear and truthful. Engineering ensures the promise can be fulfilled.
 
+The executable landing-page copy workflow is in
+[`docs/marketing/AGENT_GUIDE.md`](../docs/marketing/AGENT_GUIDE.md#3-lock-meaning-before-writing).
+
 ---
 
 ## Changelog
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-08-04 | Added outcome-bound semantic guard against prompt/meta-copy leakage; shadow legacy, delta new/changed copy. | Tim White direction |
+| 2026-08-03 | Added meaning-first section intent, headline-story, and evidence rules. | Tim White direction |
 | 2026-07-17 | Created as domain canon under `/canon`. | Tim White |

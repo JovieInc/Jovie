@@ -10,7 +10,7 @@ doc-freshness: docs/marketing/COMPOSITION_RULES.md
 > `maxContent`), and `composition.ts` (the filter pipeline). This file owns
 > the rationale. Agents: start at [`AGENT_GUIDE.md`](./AGENT_GUIDE.md).
 
-The composition rules cluster into eight laws, each with a reason and a
+The composition rules cluster into nine laws, each with a reason and a
 machine-checkable home.
 
 ## Law 1 — Hero is always first
@@ -147,6 +147,46 @@ accessible figure caption, group name, or meaningful image alt.
 **Home:** `MarketingSurfaceCard`, `MarketingScreenshot`,
 `ProductScreenshotFrame`, `MarketingStoryPrimitives`, screenshot registry, and
 the route's colocated responsive CSS.
+
+## Law 9 — Copy follows intent, not the visible object
+
+Every section declares a story beat, section job, customer outcome, message
+subject, visual evidence, allowed claims, meaning signals, and word budget
+before a model writes copy. The words explain the belief the section must
+create. The media proves that belief. A visible phone, card, interface, device,
+or material is never the default subject of the copy.
+
+Read the page as headlines only. Each line must advance the argument and do a
+different job. If two headings can swap places without changing the story, or
+if an unrelated product noun can replace Jovie's noun, rewrite them.
+
+Public promises cite a typed product claim. Candidates clear deterministic
+anti-slop and compression checks, then independent intent, truth, compression,
+and voice reviews across at least two models. Model agreement is not approval.
+Human taste decides what ships and feeds the next ranking pass.
+
+Instruction leakage is a distinct failure class. Process, style, audience, and
+product-category tokens from a brief may constrain a candidate, but cannot
+become the candidate's benefit by repetition. Every visible line declares its
+outcome/claim/action binding. The semantic guard catches meta-copy, prompt
+parroting, style-adjective substitution, audience/product mismatch,
+feature-soup, a wrong “built for X” noun, and headlines about layout or copy.
+It evaluates role and context rather than banning words: “adaptive” and
+“premium” can pass in outcome-bound body copy.
+
+Legacy pages run this guard in shadow mode so findings can be quantified without
+turning old debt into a surprise blocker. New or changed sections use delta
+mode, which is blocking only after the fixture suite demonstrates acceptable
+false-positive behavior. `createMarketingCopyTasteInboxItem` uses the delta
+path; the review digest includes the outcome registry, instruction tokens, and
+line bindings.
+
+**Reason:** visual-caption copy is usually accurate and strategically useless.
+Meaning-first briefs stop a model from mistaking the evidence for the message,
+while claim citations keep memorable lines inside product truth.
+
+**Home:** `apps/web/data/marketing/copy.ts` and the copy workflow in
+[`AGENT_GUIDE.md`](./AGENT_GUIDE.md).
 
 ## Page-class rules
 
