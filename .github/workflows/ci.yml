@@ -2214,6 +2214,16 @@ jobs:
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
+      - name: Run collaborator profile concurrency integration (ephemeral Neon)
+        # The fast Vitest config excludes tests/integration by design. Keep this
+        # real transaction/advisory-lock proof in the hosted manual public lane,
+        # before shard 0 publishes the shared seed marker to sibling jobs.
+        if: matrix.shard == 0
+        run: pnpm --filter=@jovie/web run test:integration:collaborator-profiles
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+
       - name: Seed public QA fixtures
         if: matrix.shard == 0
         run: pnpm --filter=@jovie/web run seed:test-data

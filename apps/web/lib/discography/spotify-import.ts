@@ -36,6 +36,7 @@ import {
   processRecordingArtistCredits,
   processReleaseArtistCredits,
 } from './artist-queries';
+import { reconcileCreditedArtistProfiles } from './collaborator-profile-reconciliation';
 import { discoverLinksForRelease } from './discovery';
 import {
   getReleasesForProfile,
@@ -191,6 +192,24 @@ function scheduleBackgroundDiscovery(task: () => Promise<void>): void {
     }
 
     throw error;
+  }
+}
+
+async function reconcileCollaboratorProfilesBestEffort(
+  creatorProfileId: string,
+  ownerSpotifyId: string
+): Promise<void> {
+  try {
+    await reconcileCreditedArtistProfiles(creatorProfileId, ownerSpotifyId);
+  } catch (error) {
+    // Catalog import remains available if profile reconciliation encounters a
+    // provider or identity conflict. The reconciliation is idempotent and will
+    // retry on the next import/backfill without guessing from artist names.
+    await captureWarning(
+      'Credited artist profile reconciliation could not complete',
+      error,
+      { source: 'spotify_import', creatorProfileId }
+    );
   }
 }
 
@@ -365,6 +384,10 @@ export async function importReleasesFromSpotify(
           });
 
         if (spotifyAlbums.length === 0) {
+          await reconcileCollaboratorProfilesBestEffort(
+            creatorProfileId,
+            spotifyArtistId
+          );
           result.success = true;
           result.releases = await getReleasesForProfile(creatorProfileId, {
             includeDrafts: true,
@@ -454,6 +477,13 @@ export async function importReleasesFromSpotify(
           fullAlbumMap,
           effectiveMaxTracksPerRelease,
           result
+        );
+
+        // Credits are now authoritative and current. Reconcile collaborator
+        // profiles from those structured rows rather than parsing release copy.
+        await reconcileCollaboratorProfilesBestEffort(
+          creatorProfileId,
+          spotifyArtistId
         );
 
         // 4. Sync profile genres from release data (best-effort)

@@ -62,6 +62,7 @@
     "evals:live:http:model-error": "bash scripts/run-live-promptfoo-http-model-error-evals.sh",
     "test": "NODE_OPTIONS=--max-old-space-size=8192 node scripts/vitest-wrapper.mjs",
     "test:ci": "NODE_OPTIONS=--max-old-space-size=8192 vitest run --pool=forks --maxWorkers=2",
+    "test:integration:collaborator-profiles": "vitest run --config=vitest.config.ci.mts tests/integration/collaborator-profile-concurrency.test.ts --pool=forks --maxWorkers=1 --hookTimeout=60000",
     "test:coverage": "vitest run --coverage",
     "test:truth": "node scripts/test-truth-guard.mjs",
     "test:bug-to-test": "tsx scripts/check-bug-to-test-rule.ts",
