@@ -83,6 +83,29 @@ export type {
 } from './designGaps';
 export { getProposedSection, PROPOSED_SECTIONS } from './designGaps';
 export type {
+  MarketingCreativeRole,
+  MarketingGateReceipt,
+  MarketingGenerationFinding,
+  MarketingGenerationStage,
+  MarketingModelCandidate,
+  MarketingModelCapability,
+  MarketingNarrativePlan,
+  MarketingNarrativeSectionPlan,
+  MarketingTasteGateId,
+} from './generation';
+export {
+  auditMarketingNarrativePlan,
+  auditMarketingTasteAdmission,
+  MARKETING_CREATIVE_ROLES,
+  MARKETING_GENERATION_SPEC_VERSION,
+  MARKETING_GENERATION_STAGES,
+  MARKETING_MODEL_CAPABILITIES,
+  MARKETING_ROLE_REQUIREMENTS,
+  MARKETING_STAGE_ATTEMPT_LIMITS,
+  MARKETING_TASTE_GATE_IDS,
+  selectMarketingModelCandidate,
+} from './generation';
+export type {
   ArcBeat,
   CtaCadence,
   MarketingRecipe,
