@@ -91,8 +91,8 @@ export async function isProductionRed() {
     const data = /** @type {any} */ (await resp.json());
     return data.status !== 'ok';
   } catch {
-    // If we can't check, assume safe (fail open for local)
-    return false;
+    // Admission is a mutation boundary: unavailable production evidence blocks.
+    return true;
   }
 }
 

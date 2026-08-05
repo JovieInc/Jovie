@@ -11,6 +11,7 @@ import { createHash } from 'node:crypto';
 export const PLAN_GATE_SCHEMA = 'plan-gate/v1';
 export const PLAN_GATE_PREFIX = '<!-- plan-gate/v1 -->';
 export const PLAN_GATE_SUFFIX = '<!--/plan-gate-->';
+export const PLAN_APPROVED_LABEL = 'plan-approved';
 
 const ALLOWED_STATES = new Set(['Triage', 'Backlog', 'Todo']);
 const PROTECTED_LABELS = new Set([
@@ -171,20 +172,68 @@ function hasReceipt(issue, receipt) {
   return commentsOf(issue).some(comment => commentBody(comment) === receipt);
 }
 
+export function planGateReceipt(issue) {
+  const body = commentsOf(issue)
+    .map(commentBody)
+    .find(
+      value =>
+        value.startsWith(`${PLAN_GATE_PREFIX}\n`) &&
+        value.endsWith(`\n${PLAN_GATE_SUFFIX}`)
+    );
+  if (!body) return null;
+  try {
+    const payload = JSON.parse(
+      body.slice(
+        `${PLAN_GATE_PREFIX}\n`.length,
+        -`\n${PLAN_GATE_SUFFIX}`.length
+      )
+    );
+    if (
+      payload?.schema !== PLAN_GATE_SCHEMA ||
+      payload?.issue !== issue?.identifier ||
+      !payload?.fingerprint ||
+      !payload?.evidence ||
+      validatePlanCandidate(issue, payload.evidence) ||
+      planGateFingerprint(issue, payload.evidence) !== payload.fingerprint
+    )
+      return null;
+    return { body, payload };
+  } catch {
+    return null;
+  }
+}
+
 function mutationSucceeded(result) {
-  return result?.success === true || result?.commentCreate?.success === true;
+  return (
+    result?.success === true ||
+    result?.commentCreate?.success === true ||
+    result?.issueUpdate?.success === true
+  );
+}
+
+function hasLabel(issue, name) {
+  return labelsOf(issue).includes(name.toLowerCase());
+}
+
+function labelIds(issue, labelId) {
+  return [
+    ...new Set([
+      ...(issue?.labels?.nodes || []).map(label => label.id).filter(Boolean),
+      labelId,
+    ]),
+  ];
 }
 
 /**
  * Write exactly one plan receipt, or return an idempotent no-op. The client is
  * injected so this boundary remains unit-testable without touching Linear.
  */
-export async function approvePlan({ issue, evidence, client }) {
+export async function approvePlan({ issue, evidence, client, teamId = null }) {
   const reason = validatePlanCandidate(issue, evidence);
   if (reason) return { status: 'rejected', reason };
 
   const receipt = buildPlanGateReceipt(issue, evidence);
-  if (hasReceipt(issue, receipt)) {
+  if (hasReceipt(issue, receipt) && hasLabel(issue, PLAN_APPROVED_LABEL)) {
     return {
       status: 'already-approved',
       identifier: issue.identifier,
@@ -193,16 +242,43 @@ export async function approvePlan({ issue, evidence, client }) {
     };
   }
 
-  const result = await client.addComment(issue.id, receipt);
-  if (!mutationSucceeded(result))
-    throw new Error('plan-gate-receipt-mutation-failed');
+  let current = issue;
+  let mutated = false;
+  if (!hasReceipt(current, receipt)) {
+    const result = await client.addComment(current.id, receipt);
+    if (!mutationSucceeded(result))
+      throw new Error('plan-gate-receipt-mutation-failed');
+    mutated = true;
+    current = await client.fetchIssue(current.identifier);
+    if (!current || !hasReceipt(current, receipt))
+      throw new Error('plan-gate-receipt-verification-failed');
+  }
 
-  const reread = await client.fetchIssue(issue.identifier);
-  if (!reread || !hasReceipt(reread, receipt))
-    throw new Error('plan-gate-receipt-verification-failed');
+  if (!hasLabel(current, PLAN_APPROVED_LABEL)) {
+    const label = await client.fetchTeamLabel?.(teamId, PLAN_APPROVED_LABEL);
+    if (!label?.id) throw new Error('plan-approved-label-not-found');
+    const result = await client.setIssueLabels(
+      current.id,
+      labelIds(current, label.id)
+    );
+    if (!mutationSucceeded(result))
+      throw new Error('plan-gate-label-mutation-failed');
+    mutated = true;
+    current = await client.fetchIssue(current.identifier);
+    if (!current || !hasLabel(current, PLAN_APPROVED_LABEL))
+      throw new Error('plan-gate-label-verification-failed');
+  }
+
+  const reread = await client.fetchIssue(current.identifier);
+  if (
+    !reread ||
+    !hasReceipt(reread, receipt) ||
+    !hasLabel(reread, PLAN_APPROVED_LABEL)
+  )
+    throw new Error('plan-gate-final-verification-failed');
 
   return {
-    status: 'approved',
+    status: mutated ? 'approved' : 'already-approved',
     identifier: reread.identifier,
     fingerprint: planGateFingerprint(issue, evidence),
     receipt,

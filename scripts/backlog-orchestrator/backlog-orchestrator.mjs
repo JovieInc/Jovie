@@ -14,6 +14,7 @@
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs reconcile --dry-run
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs audit
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs admit-next
+ *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs gate-next
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs approve-plan --issue=JOV-123 --evidence-file=/path/evidence.json
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs report
  */
@@ -27,7 +28,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Keep the complete control-plane dependency closure visible to source sync and
 // module tooling. These are canonical sibling modules, not host-only copies.
 import * as admitter from './admitter.mjs';
+import * as admissionGate from './admission-gate.mjs';
 import * as classifier from './classifier.mjs';
+import * as deterministicGates from './deterministic-gates.mjs';
 import * as linear from './linear-client.mjs';
 import * as planGate from './plan-gate.mjs';
 import * as reconciler from './reconcile.mjs';
@@ -81,6 +84,8 @@ Usage:
   node backlog-orchestrator.mjs reconcile --issue=JOV-123  Single issue
   node backlog-orchestrator.mjs audit                Full backlog audit (shadow)
   node backlog-orchestrator.mjs admit-next            Admit next work item
+  node backlog-orchestrator.mjs gate-next             Plan, approve, and admit one safe issue
+  node backlog-orchestrator.mjs gate-next --dry-run   Show the next issue without mutations
   node backlog-orchestrator.mjs approve-plan --issue=JOV-123 --evidence-file=/path/evidence.json
   node backlog-orchestrator.mjs report                Generate shadow report
 `);
@@ -95,6 +100,8 @@ Usage:
     await runReconcile(cache, isDryRun, issueArg);
   } else if (command === 'admit-next') {
     await runAdmitNext(cache, isDryRun);
+  } else if (command === 'gate-next') {
+    await runGateNext(isDryRun, issueArg);
   } else if (command === 'approve-plan') {
     await runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun);
   } else {
@@ -132,8 +139,179 @@ async function runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun) {
     issue,
     evidence,
     client: linear,
+    teamId: TEAM_ID,
   });
   console.log(JSON.stringify(receipt, null, 2));
+}
+
+async function admissionPreflight() {
+  const productionRed = await scorer.isProductionRed();
+  if (productionRed) {
+    return {
+      open: false,
+      reason: 'production health is red or unavailable',
+      load: { count: 0, identifiers: [] },
+    };
+  }
+  const symphonyIssues = await linear.fetchTeamSymphonyIssues(TEAM_ID);
+  const load = deterministicGates.admissionIntentLoad(symphonyIssues);
+  return {
+    open: load.count < admitter.MAX_CONCURRENT_SHIPPING,
+    reason:
+      load.count < admitter.MAX_CONCURRENT_SHIPPING
+        ? 'open'
+        : `at capacity (${load.count}/${admitter.MAX_CONCURRENT_SHIPPING})`,
+    load,
+  };
+}
+
+async function runGateNext(isDryRun, issueArg) {
+  const preflight = await admissionPreflight();
+  if (!preflight.open) {
+    console.log(
+      JSON.stringify(
+        {
+          schema: 'deterministic-gates/run/v1',
+          status: 'blocked',
+          stage: 'preflight',
+          reason: preflight.reason,
+          active: preflight.load.identifiers,
+          mutations: 0,
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
+  const issues = issueArg
+    ? [await linear.fetchIssue(issueArg)].filter(Boolean)
+    : await linear.fetchTeamGateCandidates(TEAM_ID);
+  const selection = deterministicGates.selectDeterministicPlanCandidate(
+    issues,
+    { issueIdentifier: issueArg }
+  );
+  if (!selection.selected) {
+    console.log(
+      JSON.stringify(
+        {
+          schema: 'deterministic-gates/run/v1',
+          status: 'blocked',
+          stage: 'selection',
+          reason: issueArg ? 'requested issue is not eligible' : 'no eligible issue',
+          decisions: selection.decisions,
+          mutations: 0,
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
+  const selected = selection.selected;
+  const plan = deterministicGates.buildDeterministicPlanEvidence(selected);
+  const planReason =
+    plan.reason || planGate.validatePlanCandidate(selected, plan.evidence);
+  if (planReason) {
+    console.log(
+      JSON.stringify(
+        {
+          schema: 'deterministic-gates/run/v1',
+          status: 'blocked',
+          stage: 'plan',
+          issue: selected.identifier,
+          reason: planReason,
+          mutations: 0,
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
+  if (isDryRun) {
+    console.log(
+      JSON.stringify(
+        {
+          schema: 'deterministic-gates/run/v1',
+          status: 'would-admit',
+          issue: selected.identifier,
+          plan: plan.evidence,
+          mutations: 0,
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
+  const planResult = await planGate.approvePlan({
+    issue: selected,
+    evidence: plan.evidence,
+    client: linear,
+    teamId: TEAM_ID,
+  });
+  if (planResult.status === 'rejected')
+    throw new Error(`plan gate rejected: ${planResult.reason}`);
+
+  let current = await linear.fetchIssue(selected.identifier);
+  const finalPreflight = await admissionPreflight();
+  if (!finalPreflight.open)
+    throw new Error(`admission preflight blocked: ${finalPreflight.reason}`);
+
+  const admissionResult = await admissionGate.approveAdmission({
+    issue: current,
+    client: linear,
+    teamId: TEAM_ID,
+  });
+  if (admissionResult.status === 'rejected')
+    throw new Error(`admission gate rejected: ${admissionResult.reason}`);
+
+  current = await linear.fetchIssue(selected.identifier);
+  const classification = classifier.classifyDeterministic(current, [current]);
+  classification.issue = current;
+  classification.labels = current.labels.nodes.map(label => label.name);
+  const lease = await admitter.admitIssue({
+    issue: current,
+    classification,
+    client: linear,
+    teamId: TEAM_ID,
+    todoStateId: TODO_STATE_ID,
+  });
+  if (!['admitted', 'already-admitted'].includes(lease.status))
+    throw new Error(`lease rejected: ${lease.reason}`);
+
+  const verified = await linear.fetchIssue(selected.identifier);
+  const evidence = admitter.hasAdmissionEvidence(verified);
+  const load = deterministicGates.admissionIntentLoad([verified]);
+  if (
+    verified.state?.name !== 'Todo' ||
+    !evidence.eligible ||
+    !verified.labels.nodes.some(label => label.name === admitter.SYMPHONY_LABEL) ||
+    load.count !== 1
+  )
+    throw new Error('final gate-and-lease verification failed');
+
+  console.log(
+    JSON.stringify(
+      {
+        schema: 'deterministic-gates/run/v1',
+        status: 'admitted',
+        issue: selected.identifier,
+        planGate: planResult.status,
+        admissionGate: admissionResult.status,
+        lease: lease.status,
+        active: load.identifiers,
+        mutations: 'verified',
+      },
+      null,
+      2
+    )
+  );
 }
 
 async function runAudit(cache, isDryRun) {
