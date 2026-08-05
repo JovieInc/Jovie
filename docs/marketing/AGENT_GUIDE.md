@@ -8,11 +8,12 @@ doc-freshness: docs/marketing/AGENT_GUIDE.md
 > This is your SOLE entrypoint. The contract: a composition needs ONLY this
 > file + `apps/web/data/marketing/` (the typed registry). Other docs
 > (`ARCHITECTURE.md`, `SECTION_CATALOG.md`, `RECIPE_CATALOG.md`,
-> `COMPOSITION_RULES.md`) are optional commentary.
+> `COMPOSITION_RULES.md`) are optional commentary. Copy generation follows the
+> typed contract below.
 
 spec-version: 1.0.0 · registry: `apps/web/data/marketing/index.ts`.
 
-## The 3-step procedure
+## The 4-step procedure
 
 ### 1. Receive a Brief
 
@@ -78,7 +79,99 @@ component paths are tagged `wip` and listed in
 
 Local: `pnpm --filter web storybook` → browse the `Marketing/` tree.
 
-### 3. Render the sections
+### 3. Lock meaning before writing
+
+For every rendered section, create a `MarketingCopySectionBrief` before
+generating words. Declare the story beat, section job, customer outcome,
+message subject, visual evidence, allowed claim IDs, meaning signals, and word
+budget.
+
+The customer outcome is a registry record, not a prompt adjective. Every
+visible line (headline, body, label, proof line, and CTA) must declare the
+outcome, verified claim, or concrete action it serves through
+`MarketingCopyLineBinding`. Process/style/audience tokens in a brief constrain
+the writer; they do not become a benefit merely because they appear in the
+brief. A line such as “One concise heading, built for athletes” is a failure:
+it sells the instruction and the wrong audience, not Jovie. The semantic guard
+must pass in delta mode before new or changed copy enters Taste Inbox.
+
+Use shadow mode for untouched legacy pages. Shadow findings are advisory and
+must be counted, not used to block today's unrelated PRs. Delta mode is
+blocking only for the changed sections, after fixture evidence demonstrates an
+acceptable false-positive rate. This is a semantic-role check, not a brittle
+word ban: “adaptive” or “premium” can remain when the sentence is outcome-bound
+and product-truthful.
+Pass `changedSectionIds` to the Taste Inbox producer when a page contains
+untouched legacy sections; never convert those legacy findings into a new-copy
+blocker by accident.
+
+Use `MarketingCopyOutcome` for customer changes and `MarketingCopyAction` for
+real user verbs. Claim IDs remain the product-truth/proof boundary; free-form
+action labels do not satisfy the gate unless their action record is registered
+in the brief.
+
+The message subject and visual evidence are deliberately separate. Write the
+customer belief the section exists to create. Do not caption the phone, card,
+band, screenshot, animation, or other visible object.
+
+Every public promise cites a `MarketingCopyClaim` with direct product or
+verified-data evidence. Then:
+
+1. Generate candidates against the section job and allowed claims.
+2. Compress until every remaining word carries meaning or cadence.
+3. Run `auditMarketingCopyPage(brief, draft)`.
+4. Run `auditMarketingCopySemantics(brief, draft, { enforcement: 'delta' })`.
+   Resolve every `meta-copy`, `brief-parroting`, `style-adjective-substitution`,
+   `audience-product-category-mismatch`, `generic-feature-soup`,
+   `built-for-wrong-noun`, and `headline-layout-copy` finding before review.
+5. Run independent intent, truth, compression, and voice reviews with unique
+   execution receipts across at least two models. Receipts cite every candidate
+   ID and the exact review digest. The digest binds the section brief, claims,
+   evidence, control, and candidate; changing any of them invalidates every
+   receipt. The truth receipt must cover every cited claim ID.
+6. Use `createMarketingCopyTasteInboxItem()` for Tim’s approval. Model
+   agreement cannot promote copy.
+
+The complete visible control and candidate must include every rendered label,
+field state, CTA, and supporting line. Hidden draft fields do not count. An
+`edited` taste decision carries the complete edited copy and must change it.
+Taste decisions carry stable IDs and are applied once. Persisted taste profiles
+reject unknown schema versions, malformed or unsafe counts, and duplicate
+decision receipts; they are never silently coerced.
+
+Compression order: lead with why, delete the introduction, replace abstraction
+with the real action, remove repeated meaning, read aloud, and stop only when
+one more cut would remove meaning or cadence.
+
+Canonical adaptive-profile fixture: `One Profile. For Every Fan.` The supporting
+line must explain the real behavior: show the release, link, or action that
+fits where the fan came from and what they came to do. The heading is allowed
+because it names the customer outcome; it does not describe the profile
+component or the writing brief.
+
+The anti-slop gate rejects artifact-selling, stock promotion (`seamless`,
+`unlock`, `elevate`, `world-class`, `all-in-one`), “not just X,” generic
+`from X to Y`, vague attribution, rhetorical headings, repeated conclusions,
+formulaic threes, chat residue, and em-dash cadence. Run the subject-swap test:
+if an unrelated product noun fits without weakening the line, rewrite it.
+
+Research basis: Apple’s public guidance says to make writing meaningful, clear,
+direct, benefit-led, filler-free, spoken aloud, and reviewed with people. See
+[Design principles](https://developer.apple.com/design/human-interface-guidelines/designing-for-ios),
+[Make a big impact with small writing changes](https://developer.apple.com/videos/play/wwdc2025/340/),
+and [Writing for interfaces](https://developer.apple.com/videos/play/wwdc2022/10037/).
+The slop filter also uses maintained editorial signals from
+[Signs of AI writing](https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing)
+and Last 30 Days practitioner research: generic sameness, template rhythm,
+invented significance, and prose that outlives its idea.
+
+Typed authority: `apps/web/data/marketing/copy.ts`. The Artist Profiles brief,
+claim evidence, and rendered-copy adapter live with its copy in
+`apps/web/data/artistProfileCopy.ts`. The Taste Inbox producer is live; shared
+consumer ingestion and experiment ranking remain JOV-4796 and must not be
+described as shipped.
+
+### 4. Render the sections
 
 Each `sections[i]` gives you `{sectionId, variantId, ctaPosition, proofVerified,
 degradationRung}`. Look up the section + variant in `MARKETING_SECTIONS`
@@ -280,7 +373,8 @@ are reverse-engineered FROM code, not the reverse.
 - `ARCHITECTURE.md` — master spec + grammar + naming/versioning/precedence/evolution.
 - `SECTION_CATALOG.md` — per-section rationale + exemplar.
 - `RECIPE_CATALOG.md` — per-recipe rationale + arc + decision tree.
-- `COMPOSITION_RULES.md` — composition-rule rationale (7 laws + page-class rules).
+- `COMPOSITION_RULES.md` — composition-rule rationale (9 laws + page-class rules).
+- `AGENT_GUIDE.md` (this file) — meaning-first copy, evidence, panel, Taste
+  Inbox workflow, and sole entrypoint.
 - `DESIGN_GAPS.md` — proposed-section review, conversion workflow, migration matrix.
 - `MODEL_USAGE.md` — model-role and cost evidence ledger.
-- `AGENT_GUIDE.md` (this file) — sole entrypoint.
