@@ -178,7 +178,7 @@ final class SentryObservabilityProvider: ObservabilityProvider {
   }
 
   private static func normalizeFingerprint(event: Event) {
-    guard let exceptions = event.exceptions as? [SentryException] else { return }
+    guard let exceptions = event.exceptions else { return }
 
     let types = exceptions.map { exception in
       exception.type.map(SentryEventNormalizer.normalizeUnknownContext)
