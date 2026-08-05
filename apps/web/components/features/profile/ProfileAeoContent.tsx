@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Badge } from '@/components/atoms/Badge';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ProfileAboutShare } from '@/features/profile/ProfileAboutShare';
+import { normalizePlatformKey } from '@/lib/dsp-registry';
 import type { ProfileAeoContent as ProfileAeoContentModel } from '@/lib/profile/aeo-content';
 import { publicLinkAriaLabel } from '@/lib/utils/public-url';
 import { EntityMentionText } from './EntityMentionText';
@@ -78,7 +79,11 @@ export function ProfileAeoContent({
                       className='profile-aeo-content__link inline-flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--profile-aeo-text) focus-visible:ring-offset-2 focus-visible:ring-offset-(--system-b-cinematic-black)'
                     >
                       <SocialIcon
-                        platform={link.platform}
+                        platform={
+                          normalizePlatformKey(link.platform) === 'netease'
+                            ? 'neteasemusic'
+                            : link.platform
+                        }
                         className='h-5 w-5'
                       />
                       <span className='sr-only'>

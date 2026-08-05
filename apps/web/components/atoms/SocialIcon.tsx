@@ -291,8 +291,7 @@ const ICON_DATA: Record<string, { hex: string; path: string }> = {
 };
 
 function normalizePlatformKey(platform: string): string {
-  const normalized = platform.toLowerCase().replaceAll(/[\s_-]+/g, '');
-  return normalized === 'netease' ? 'neteasemusic' : normalized;
+  return platform.toLowerCase().replaceAll(/[\s_-]+/g, '');
 }
 
 /**
