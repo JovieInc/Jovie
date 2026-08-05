@@ -24,14 +24,35 @@ const PROTECTED_LABELS = new Set([
   'tim-owned',
   'type:epic',
 ]);
-export const SYMPHONY_PROJECT = {
-  name: 'Infra & CI/CD',
-  slugId: '82c6fbd42405',
-};
+export const TEAM_ROUTES = Object.freeze({
+  JOV: Object.freeze({
+    key: 'JOV',
+    name: 'Jovie',
+    repo: 'JovieInc/Jovie',
+  }),
+  LYB: Object.freeze({
+    key: 'LYB',
+    name: 'LYB',
+    repo: 'JovieInc/LogYourBody',
+  }),
+});
 const PROHIBITED_TEXT =
   /credential|secret|password|api[ -]?key|access token|private key|billing|payment|checkout|database migration|schema migration|production deploy|publish externally|delete (?:customer|production|user) data|destructive|synthetic|bundle|workstream|batch|epic-only/i;
-const ACTIVE_PR = /github\.com\/JovieInc\/Jovie\/pull\/\d+/i;
 const MAX_CANDIDATE_AGE_DAYS = 60;
+
+export function teamRouteForIssue(issue) {
+  const key =
+    issue?.team?.key ||
+    /^([A-Za-z][A-Za-z0-9]*)-\d+$/.exec(issue?.identifier || '')?.[1];
+  return TEAM_ROUTES[String(key || '').toUpperCase()] || null;
+}
+
+function activePullRequestPattern(route) {
+  return new RegExp(
+    `github\\.com/${route.repo.replace('/', '\\/')}\\/pull\\/\\d+`,
+    'i'
+  );
+}
 
 function labelsOf(issue) {
   return (issue?.labels?.nodes || issue?.labels || [])
@@ -58,19 +79,32 @@ function isTimOwned(issue) {
   );
 }
 
+function sectionHeader(line) {
+  const markdown = /^#{2,3}\s+(.+?)\s*$/.exec(line);
+  if (markdown) return { name: markdown[1].trim(), inline: '' };
+  const bold = /^\s*\*\*([^*]+?)\*\*\s*(?:[—:-]\s*)?(.*)$/.exec(line);
+  if (!bold) return null;
+  return {
+    name: bold[1].replace(/:\s*$/, '').trim(),
+    inline: bold[2].trim(),
+  };
+}
+
 function section(description, names) {
   const wanted = new Set(names.map(name => name.toLowerCase()));
   const lines = String(description || '').split('\n');
   const start = lines.findIndex(line => {
-    const match = /^#{2,3}\s+(.+?)\s*$/.exec(line);
-    return match && wanted.has(match[1].toLowerCase());
+    const header = sectionHeader(line);
+    return header && wanted.has(header.name.toLowerCase());
   });
   if (start < 0) return '';
-  const end = lines.findIndex(
-    (line, index) => index > start && /^#{2,3}\s+/.test(line)
-  );
-  return lines
-    .slice(start + 1, end < 0 ? undefined : end)
+  const end = lines.findIndex((line, index) => {
+    if (index <= start) return false;
+    return Boolean(sectionHeader(line));
+  });
+  const inline = sectionHeader(lines[start])?.inline;
+  return [inline, ...lines.slice(start + 1, end < 0 ? undefined : end)]
+    .filter(Boolean)
     .join('\n')
     .trim();
 }
@@ -87,18 +121,12 @@ export function validateDeterministicPlanCandidate(
   issue,
   { now = new Date().toISOString() } = {}
 ) {
-  if (!issue?.id || !/^JOV-\d+$/.test(issue.identifier || ''))
-    return 'not-concrete-jovie-issue';
+  if (!issue?.id || !teamRouteForIssue(issue))
+    return 'not-concrete-routed-issue';
   if (!['Triage', 'Backlog', 'Todo'].includes(issue.state?.name || issue.state))
     return 'inactive-or-active-state';
   if (isTimOwned(issue)) return 'tim-owned';
   if (issue.assignee) return 'already-assigned';
-  if (
-    issue.project?.name !== SYMPHONY_PROJECT.name ||
-    issue.project?.slugId !== SYMPHONY_PROJECT.slugId
-  )
-    return 'project-not-allowlisted';
-
   const labels = labelsOf(issue);
   if (!labels.some(label => READY_LABELS.has(label)))
     return 'readiness-label-missing';
@@ -110,7 +138,12 @@ export function validateDeterministicPlanCandidate(
 
   const text = `${issue.title || ''}\n${issue.description || ''}`;
   if (PROHIBITED_TEXT.test(text)) return 'sensitive-or-external-work';
-  if (commentsOf(issue).some(comment => ACTIVE_PR.test(commentBody(comment))))
+  const route = teamRouteForIssue(issue);
+  if (
+    commentsOf(issue).some(comment =>
+      activePullRequestPattern(route).test(commentBody(comment))
+    )
+  )
     return 'active-pull-request';
 
   const createdAt = new Date(issue.createdAt || 0).getTime();
@@ -123,9 +156,15 @@ export function validateDeterministicPlanCandidate(
   )
     return 'stale-or-invalid-created-at';
 
-  if (!section(issue.description, ['Proposed fix', 'Implementation plan']))
+  if (
+    !section(issue.description, [
+      'Proposed fix',
+      'Implementation plan',
+      'Scope',
+    ])
+  )
     return 'scope-section-missing';
-  if (!section(issue.description, ['Acceptance criteria']))
+  if (!section(issue.description, ['Acceptance', 'Acceptance criteria']))
     return 'acceptance-section-missing';
   return null;
 }
@@ -136,18 +175,20 @@ export function buildDeterministicPlanEvidence(issue) {
   const scope = section(issue.description, [
     'Implementation plan',
     'Proposed fix',
+    'Scope',
   ]);
   const acceptance = cleanList(
-    section(issue.description, ['Acceptance criteria'])
+    section(issue.description, ['Acceptance', 'Acceptance criteria'])
   );
+  const route = teamRouteForIssue(issue);
   return {
     reason: null,
     evidence: {
       verified: true,
       concrete: true,
       bounded: true,
-      repo: 'JovieInc/Jovie',
-      project: issue.project.name,
+      repo: route.repo,
+      project: issue.project?.name || route.name,
       owner: 'Gem',
       scope: scope.slice(0, 1800),
       acceptance,

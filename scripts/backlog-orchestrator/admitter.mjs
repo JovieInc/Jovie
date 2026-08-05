@@ -1,9 +1,9 @@
 /**
  * Deterministic admission boundary for Symphony.
  *
- * Workstream bundles are useful reports, but only one concrete JOV issue may
- * cross this boundary. Admission is fail-closed on ownership, plan evidence,
- * and mutation read-back.
+ * Workstream bundles are useful reports, but only one concrete issue per
+ * routed product team may cross this boundary. Admission is fail-closed on
+ * ownership, plan evidence, and mutation read-back.
  */
 
 import { isProductionRed, scoreIssue } from './scorer.mjs';
@@ -48,7 +48,7 @@ function commentText(issue) {
 }
 
 export function isConcreteJovieIssue(issue) {
-  return Boolean(issue?.id && /^JOV-\d+$/.test(issue.identifier || ''));
+  return Boolean(issue?.id && /^(?:JOV|LYB)-\d+$/.test(issue.identifier || ''));
 }
 
 function isTimOwned(issue) {
@@ -194,7 +194,7 @@ export async function admitIssue({
   now = new Date().toISOString(),
 }) {
   if (!isConcreteJovieIssue(issue))
-    return { status: 'rejected', reason: 'not-concrete-jovie-issue' };
+    return { status: 'rejected', reason: 'not-concrete-routed-issue' };
   if (!hasAdmissionEvidence(issue, classification).eligible) {
     return { status: 'rejected', reason: 'plan-or-admission-evidence-missing' };
   }

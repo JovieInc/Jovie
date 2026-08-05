@@ -228,21 +228,27 @@ export async function graphql(
 }
 
 /**
- * Fetch all issues in Triage state for a team.
+ * Fetch all issues in the configured deterministic intake states for a team.
+ * Jovie enables Linear's Triage state; new teams can use Backlog until that
+ * workspace-level feature is enabled without changing the control-plane path.
  * Paginates to get all results.
  */
-export async function fetchTeamTriageIssues(teamId, maxResults = 1000) {
+export async function fetchTeamTriageIssues(
+  teamId,
+  maxResults = 1000,
+  stateNames = ['Triage']
+) {
   const issues = [];
   let cursor = null;
   while (issues.length < maxResults) {
     const data = await graphql(
       `
-      query($teamId: String!, $cursor: String) {
+      query($teamId: String!, $cursor: String, $stateNames: [String!]!) {
         team(id: $teamId) {
           issues(
             first: 50,
             after: $cursor,
-            filter: { state: { name: { eq: "Triage" } } }
+            filter: { state: { name: { in: $stateNames } } }
           ) {
             nodes {
               id
@@ -274,7 +280,7 @@ export async function fetchTeamTriageIssues(teamId, maxResults = 1000) {
         }
       }
     `,
-      { teamId, cursor }
+      { teamId, cursor, stateNames }
     );
     const edge = data.team.issues;
     issues.push(...edge.nodes);

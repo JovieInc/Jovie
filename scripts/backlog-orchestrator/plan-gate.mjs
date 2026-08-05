@@ -27,6 +27,15 @@ const CREDENTIAL_PATTERN =
   /credential|secret|password|api[ -]?key|access token|private key/i;
 const SYNTHETIC_PATTERN = /synthetic|bundle|workstream|batch|epic-only/i;
 const TIM_PATTERN = /tim(?:\s|-|_)*white|itstimwhite|^tim$/i;
+const REPO_BY_TEAM = Object.freeze({
+  JOV: 'JovieInc/Jovie',
+  LYB: 'JovieInc/LogYourBody',
+});
+
+function canonicalRepoForIssue(issue) {
+  const key = /^([A-Za-z][A-Za-z0-9]*)-\d+$/.exec(issue?.identifier || '')?.[1];
+  return REPO_BY_TEAM[String(key || '').toUpperCase()] || null;
+}
 
 function labelsOf(issue) {
   return (issue?.labels?.nodes || issue?.labels || [])
@@ -89,8 +98,8 @@ function issueText(issue) {
 
 /** Return a stable reason when a candidate cannot cross the plan boundary. */
 export function validatePlanCandidate(issue, evidence) {
-  if (!issue?.id || !/^JOV-\d+$/.test(issue.identifier || ''))
-    return 'not-concrete-jovie-issue';
+  const canonicalRepo = canonicalRepoForIssue(issue);
+  if (!issue?.id || !canonicalRepo) return 'not-concrete-routed-issue';
   if (!evidence || evidence.verified !== true) return 'evidence-not-verified';
   if (evidence.concrete !== true) return 'evidence-not-concrete';
   if (evidence.bounded !== true) return 'evidence-not-bounded';
@@ -126,7 +135,7 @@ export function validatePlanCandidate(issue, evidence) {
   if (hasActivePullRequest(issue)) return 'active-pull-request';
   if (evidence.synthetic === true || evidence.ambiguous === true)
     return 'synthetic-or-ambiguous-evidence';
-  if (evidence.repo !== 'JovieInc/Jovie') return 'repo-not-canonical';
+  if (evidence.repo !== canonicalRepo) return 'repo-not-canonical';
   if (issue.project?.name && issue.project.name !== evidence.project)
     return 'project-mismatch';
   return null;
