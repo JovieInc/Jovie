@@ -97,6 +97,37 @@ final class RecordingObservabilityProvider: ObservabilityProvider {
 @Suite(.serialized)
 @MainActor
 struct ObservabilityTests {
+  @Test(arguments: [
+    "Jovie.(unknown context at $104d1ab9c).MobileAuthFinalizationStageError",
+    "Jovie.(unknown context at $10ABCDEF).MobileAuthFinalizationStageError",
+    "Jovie.(unknown context at $7fff1234).MobileAuthFinalizationStageError",
+  ])
+  func normalizesSwiftUnknownContextAddresses(_ value: String) {
+    #expect(
+      SentryEventNormalizer.normalizeUnknownContext(value)
+        == "Jovie.MobileAuthFinalizationStageError"
+    )
+  }
+
+  @Test func fingerprintsMobileAuthByStageAndUnderlyingErrorClass() {
+    #expect(
+      SentryEventNormalizer.mobileAuthFingerprint(
+        exceptionTypes: [
+          "Jovie.(unknown context at $104d1ab9c).MobileAuthFinalizationStageError",
+          "APIClient.AuthExchangeError",
+        ],
+        exceptionValues: [
+          "Native auth exchange failed: OTT user mismatch",
+          "OTT user mismatch",
+        ]
+      ) == [
+        "MobileAuthFinalizationStageError",
+        "exchange",
+        "APIClient.AuthExchangeError",
+      ]
+    )
+  }
+
   @Test func facadeCanUseNoopProvider() {
     Observability.useProviderForTesting(NoopObservabilityProvider())
     defer { Observability.resetForTesting() }
