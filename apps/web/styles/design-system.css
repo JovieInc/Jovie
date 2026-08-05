@@ -46,6 +46,7 @@
   --profile-drawer-radius-desktop: 20px;
   --profile-action-radius: 14px;
   --profile-notification-icon-size: 17px;
+  --profile-hero-identity-min-height: calc(var(--space-24) + var(--space-2));
   --app-dialog-radius: var(--profile-inner-radius);
   --app-shell-sidebar-floating-radius: 14px;
   --page-pad: clamp(16px, 4vw, 32px);
@@ -55,9 +56,10 @@
   --cover-height: clamp(220px, 34svh, 400px);
   --content-max: 720px;
   --profile-bottom-nav-height: calc(
-    3.125rem +
+    var(--space-12) +
+    var(--space-2-5) +
     max(10px, env(safe-area-inset-bottom)) +
-    14px
+    var(--space-2)
   );
 
   /* DS_FOUNDATION_V1: canonical semantic aliases (do not redefine downstream) */
@@ -339,12 +341,8 @@
 }
 
 :where(.profile-hero-identity-scrim) {
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(0, 0, 0, 0.2) 28%,
-    rgba(0, 0, 0, 0.5) 100%
-  );
+  min-height: var(--profile-hero-identity-min-height);
+  background: var(--profile-stage-bg);
 }
 
 /* Single hero legibility gradient, limited to the bottom ~55% of the cover so
@@ -361,6 +359,20 @@
     transparent 0%,
     rgba(3, 4, 6, 0.42) 52%,
     rgba(5, 6, 8, 0.9) 86%,
+    var(--profile-stage-bg) 100%
+  );
+}
+
+/* The public compact hero reserves identity outside the image, so it needs
+   only a shallow media-edge transition. This modifier preserves the shared
+   legacy class contract while ensuring the live surface never lays a tall
+   scrim across the subject. */
+:where(.profile-cover-home-gradient--face-safe) {
+  height: var(--space-8);
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in oklab, var(--profile-stage-bg) 44%, transparent) 54%,
     var(--profile-stage-bg) 100%
   );
 }
@@ -653,6 +665,37 @@
    viewport (--cover-height, clamp(220px, 34svh, 400px)). The hero never
    shrink-wraps; media crops via object-cover and the carousel below owns the
    remaining viewport height. */
+/* The fixed token remains the minimum crop-safe media height. On the home
+   surface, the shell gives every additional vertical pixel to the real hero
+   instead of leaving an ownerless flex region below the primary card. The
+   content column stays intrinsic, so the card and dock never stretch and no
+   fake spacer participates in the layout. */
+:where(
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+    > .profile-home-fluid-hero
+) {
+  flex: 1 1 auto;
+  min-height: var(--cover-height);
+  height: auto;
+  /* The base declaration preserves the established media floor; this
+     supported calc also reserves the non-overlay identity band. */
+  min-height: calc(
+    var(--cover-height) +
+    var(--profile-hero-identity-min-height)
+  );
+}
+
+:where(
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+    > .profile-home-content-column,
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+    .profile-home-content-scroll,
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+    [data-testid="profile-home-rail"]
+) {
+  flex: 0 0 auto;
+}
+
 /* Query-mode profile URLs are served from the ISR home shell, then hydrate into
    the requested mode from window.location. Match the mode header on first paint
    so hydration does not move the compact profile frame. */
@@ -942,10 +985,17 @@ html[data-profile-initial-mode]
   --profile-composer-border: rgba(255, 255, 255, 0.8);
   --profile-composer-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.68), 0 18px 42px rgba(15, 17, 24, 0.12);
-  --profile-dock-bg: rgba(247, 247, 249, 0.78);
-  --profile-dock-border: rgba(255, 255, 255, 0.82);
+  --profile-dock-bg: rgba(247, 247, 249, 0.58);
+  --profile-dock-border: rgba(255, 255, 255, 0.72);
   --profile-dock-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.66), 0 18px 42px rgba(15, 17, 24, 0.12);
+  --profile-dock-active-bg: rgba(255, 255, 255, 0.54);
+  --profile-dock-active-border: rgba(255, 255, 255, 0.72);
+  --profile-dock-active-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  --profile-dock-active-fg: rgba(12, 12, 15, 0.94);
+  --profile-dock-inactive-fg: rgba(12, 12, 15, 0.56);
+  --profile-dock-solid-bg: rgb(247, 247, 249);
+  --profile-dock-solid-border: rgba(12, 12, 15, 0.24);
 
   /* Skeleton/loading states — base fill matches surface-1 */
   --color-skeleton-base: var(--color-bg-surface-1);
@@ -1226,10 +1276,17 @@ html[data-profile-initial-mode]
   --profile-composer-border: rgba(255, 255, 255, 0.1);
   --profile-composer-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 16px 40px rgba(0, 0, 0, 0.28);
-  --profile-dock-bg: rgba(18, 20, 26, 0.76);
-  --profile-dock-border: rgba(255, 255, 255, 0.08);
+  --profile-dock-bg: rgba(30, 32, 40, 0.52);
+  --profile-dock-border: rgba(255, 255, 255, 0.18);
   --profile-dock-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 20px 44px rgba(0, 0, 0, 0.32);
+    inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 14px 34px rgba(0, 0, 0, 0.3);
+  --profile-dock-active-bg: rgba(255, 255, 255, 0.16);
+  --profile-dock-active-border: rgba(255, 255, 255, 0.14);
+  --profile-dock-active-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  --profile-dock-active-fg: rgba(255, 255, 255, 0.98);
+  --profile-dock-inactive-fg: rgba(255, 255, 255, 0.58);
+  --profile-dock-solid-bg: rgb(24, 26, 32);
+  --profile-dock-solid-border: rgba(255, 255, 255, 0.28);
 
   /* Skeleton/loading states — base fill matches surface-1 */
   --color-skeleton-base: var(--color-bg-surface-1);
@@ -1270,6 +1327,151 @@ html[data-profile-initial-mode]
   --color-bg-selected: var(--noir-ion-selected);
   --color-bg-selected-strong: var(--noir-ion-selected-strong);
   --color-border-interactive: var(--noir-ion-border-interactive);
+}
+
+/* Public-profile navigation is one distinct functional glass layer. It floats
+   over the stable content reservation; child states are tint/selection only
+   and never add another backdrop-filter. */
+:where(.profile-floating-tab-bar) {
+  position: absolute;
+  z-index: 30;
+  right: var(--page-pad);
+  bottom: 0;
+  left: var(--page-pad);
+  pointer-events: none;
+}
+
+:where(.profile-liquid-glass-nav) {
+  height: calc(var(--space-12) + var(--space-2-5));
+  pointer-events: auto;
+  border-color: var(--profile-dock-border);
+  border-radius: var(--radius-full);
+  background: var(--liquid-glass-highlight), var(--profile-dock-bg);
+  box-shadow: var(--profile-dock-shadow);
+}
+
+:where(.profile-liquid-glass-nav__grid) {
+  height: calc(var(--space-10) + var(--space-2-5));
+  margin-block: 0;
+}
+
+:where(.profile-liquid-glass-nav__item) {
+  flex-direction: column;
+  gap: var(--space-0-5);
+  border: var(--space-px) solid transparent;
+  border-radius: var(--radius-full);
+  color: var(--profile-dock-inactive-fg);
+  transition:
+    color var(--duration-subtle) var(--ease-subtle),
+    background-color var(--duration-subtle) var(--ease-subtle),
+    border-color var(--duration-subtle) var(--ease-subtle),
+    box-shadow var(--duration-subtle) var(--ease-subtle);
+}
+
+:where(.profile-liquid-glass-nav__item[aria-current="page"]) {
+  border-color: var(--profile-dock-active-border);
+  background: var(--profile-dock-active-bg);
+  color: var(--profile-dock-active-fg);
+  box-shadow: var(--profile-dock-active-shadow);
+}
+
+:where(.profile-liquid-glass-nav__icon) {
+  color: inherit;
+}
+
+/* Deliberately overrides the retained sr-only utility: visible labels make the
+   four navigation destinations immediate while their accessible names remain
+   unchanged. */
+:where(.profile-liquid-glass-nav__label) {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  border: 0;
+  color: inherit;
+  font-size: var(--text-2xs);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+@media (hover: hover) {
+  :where(.profile-liquid-glass-nav__item:not([aria-current="page"]):hover) {
+    color: var(--profile-dock-active-fg);
+  }
+}
+
+/* Safari/Media Queries 5 plus a deterministic manual hook for testability and
+   clients that expose the OS preference outside CSS. */
+@media (prefers-reduced-transparency: reduce) {
+  :where(.profile-liquid-glass-nav) {
+    border-color: var(--profile-dock-solid-border);
+    background: var(--profile-dock-solid-bg);
+    --tw-backdrop-blur: initial;
+    --tw-backdrop-saturate: initial;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Keep the nav class outside :where() here so the deterministic hooks outrank
+   Tailwind's backdrop utility custom properties even if layer order changes. */
+:root[data-reduced-transparency="true"] .profile-liquid-glass-nav,
+:root.high-contrast .profile-liquid-glass-nav {
+  border-color: var(--profile-dock-solid-border);
+  background: var(--profile-dock-solid-bg);
+  --tw-backdrop-blur: initial;
+  --tw-backdrop-saturate: initial;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+@media (prefers-contrast: more) {
+  :where(.profile-liquid-glass-nav) {
+    border-color: var(--profile-dock-solid-border);
+    background: var(--profile-dock-solid-bg);
+    --tw-backdrop-blur: initial;
+    --tw-backdrop-saturate: initial;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (forced-colors: active) {
+  :where(.profile-liquid-glass-nav) {
+    border-color: CanvasText;
+    background: Canvas;
+    box-shadow: none;
+    --tw-backdrop-blur: initial;
+    --tw-backdrop-saturate: initial;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  :where(.profile-liquid-glass-nav__item) {
+    color: CanvasText;
+    forced-color-adjust: auto;
+  }
+
+  :where(.profile-liquid-glass-nav__item[aria-current="page"]) {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(
+    .profile-liquid-glass-nav,
+    .profile-liquid-glass-nav__item,
+    .profile-liquid-glass-nav__icon
+  ) {
+    transition: none;
+  }
 }
 
 /* ============================================
@@ -1988,6 +2190,7 @@ html[data-profile-initial-mode]
 }
 
 html:not(.dark) .profile-intent-page :where(a, button, span),
+html:not(.dark) [data-testid="profile-menu-drawer"] :where(a, button, span),
 html:not(.dark) [data-testid^="profile-mode-drawer"] :where(a, button, span) {
   transition: none !important;
 }

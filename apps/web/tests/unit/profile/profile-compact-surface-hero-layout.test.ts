@@ -81,4 +81,13 @@ describe('ProfileCompactSurface home hero layout', () => {
       /html\[data-profile-initial-mode\][\s\S]{0,200}--cover-height:\s*calc\(3\.5rem/
     );
   });
+
+  it('eagerly loads the first visible home-card artwork', () => {
+    const contents = readFileSync(PROFILE_COMPACT_SURFACE, 'utf8');
+
+    expect(contents).toMatch(
+      /<ProfileHomeRail[\s\S]{0,900}pacArtPriority\s*\/>/
+    );
+    expect(contents).not.toMatch(/pacArtPriority=\{!resolvedHeroImageUrl\}/);
+  });
 });
