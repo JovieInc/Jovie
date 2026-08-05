@@ -41,6 +41,7 @@ import {
   RETRY_RELEASE_COMMENT_HEADER,
   routeForAgent,
   SpawnEagainError,
+  selectDispatchBatch,
   selectTaskRoute,
   shellQuote,
   shouldEscalateRetry,
@@ -259,6 +260,41 @@ describe('codex issue shipper planner', () => {
 
     expect(plans).toHaveLength(2);
     expect(plans.map(plan => plan.issue.number)).toEqual([1, 2]);
+  });
+
+  it('bounds a run and never retries an issue already attempted in that run', () => {
+    const plans = buildDispatchPlans(
+      [
+        issue({ number: 1, title: 'Fix docs typo' }),
+        issue({ number: 2, title: 'Update README' }),
+      ],
+      config
+    );
+
+    expect(
+      selectDispatchBatch({
+        plans,
+        attemptedIssueNumbers: new Set([1]),
+        capacity: 5,
+        remainingBudget: 1,
+      }).map(plan => plan.issue.number)
+    ).toEqual([2]);
+    expect(
+      selectDispatchBatch({
+        plans,
+        attemptedIssueNumbers: new Set([1, 2]),
+        capacity: 5,
+        remainingBudget: 1,
+      })
+    ).toEqual([]);
+    expect(
+      selectDispatchBatch({
+        plans,
+        attemptedIssueNumbers: new Set(),
+        capacity: 5,
+        remainingBudget: 0,
+      })
+    ).toEqual([]);
   });
 
   it('defaults to grok composer with resource guardrails', () => {
