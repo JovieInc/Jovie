@@ -73,6 +73,8 @@ interface ProfileCompactTemplateProps {
     readonly showOldReleases?: boolean;
   } | null;
   readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
+  readonly profileBanner?: ReactNode;
+  readonly allowFanCapture?: boolean;
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
   readonly alertOptInVariant?: ProfileAlertOptInVariant;
@@ -217,6 +219,8 @@ export function ProfileCompactTemplate({
   latestRelease,
   profileSettings,
   featuredPlaylistFallback,
+  profileBanner,
+  allowFanCapture = true,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   alertOptInVariant = 'button',
@@ -239,6 +243,16 @@ export function ProfileCompactTemplate({
   showClaimFooter = false,
   claimFooterHref = null,
 }: ProfileCompactTemplateProps) {
+  const hasContacts = contacts.some(contact => contact.channels.length > 0);
+  const hasTip =
+    showPayButton && socialLinks.some(link => link.platform === 'venmo');
+  const hasReleases = (releases?.length ?? 0) >= 2;
+  const initialDrawerView = resolveDrawerView(
+    mode,
+    { hasContacts, hasTip, hasReleases },
+    'compact'
+  );
+
   // alertOptInVariant starts as the ISR-rendered default ('button').
   // AnonCookieBootstrap resolves the per-user Statsig variant on mount and
   // updates this state, so real visitors see their assigned experiment variant.
@@ -246,8 +260,10 @@ export function ProfileCompactTemplate({
     useState<ProfileAlertOptInVariant>(alertOptInVariant);
   const [resolvedProfilePacAssignment, setResolvedProfilePacAssignment] =
     useState<ProfilePacAssignment>(profilePacAssignment);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerView, setDrawerView] = useState<DrawerView>('menu');
+  const [drawerOpen, setDrawerOpen] = useState(initialDrawerView !== null);
+  const [drawerView, setDrawerView] = useState<DrawerView>(
+    initialDrawerView ?? 'menu'
+  );
   const [drawerPresentation, setDrawerPresentation] =
     useState<ProfileSurfacePresentation>(getInitialDrawerPresentation);
   const [isDesktopLayout, setIsDesktopLayout] = useState(
@@ -259,8 +275,8 @@ export function ProfileCompactTemplate({
   const revealNotificationsRef = useRef<(() => void) | null>(null);
   const closeResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const compactShellRef = useRef<HTMLDivElement | null>(null);
-  const drawerOpenRef = useRef(false);
-  const drawerViewRef = useRef<DrawerView>('menu');
+  const drawerOpenRef = useRef(initialDrawerView !== null);
+  const drawerViewRef = useRef<DrawerView>(initialDrawerView ?? 'menu');
   const lastPrimaryModeRef = useRef<ProfileMode>('profile');
   const initialLocationModeAlignedRef = useRef(false);
   const suppressNextHistorySyncRef = useRef(true);
@@ -486,12 +502,6 @@ export function ProfileCompactTemplate({
     showSuccess,
   ]);
 
-  const hasContacts = contacts.some(contact => contact.channels.length > 0);
-  const hasTip = useMemo(
-    () => showPayButton && socialLinks.some(link => link.platform === 'venmo'),
-    [showPayButton, socialLinks]
-  );
-  const hasReleases = (releases?.length ?? 0) >= 2;
   const searchSuffix = useMemo(() => {
     if (!initialSource) {
       return '';
@@ -777,7 +787,12 @@ export function ProfileCompactTemplate({
             data-testid='profile-compact-shell'
           >
             {profileBanner ? (
-              <div className='shrink-0'>{profileBanner}</div>
+              <div
+                className='relative z-20 w-full shrink-0'
+                data-testid='profile-shell-banner'
+              >
+                {profileBanner}
+              </div>
             ) : null}
             <div className='relative min-h-0 flex-1'>
               <ProfileCompactSurface

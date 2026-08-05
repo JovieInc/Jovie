@@ -10,18 +10,18 @@
  */
 
 /**
- * Fixed height of the bottom tab bar, in rem.
- * Equates to 50px at the default 16px base font size.
+ * Fixed height of the bottom tab bar material, in rem.
+ * Equates to 58px at the default 16px base font size.
  *
  * Used in content padding via `--profile-bottom-nav-height`.
  * and in any layout calculation that needs the tab bar footprint.
  */
-export const TAB_BAR_HEIGHT_REM = '3.125rem' as const;
+export const TAB_BAR_HEIGHT_REM = '3.625rem' as const;
 
 /**
  * Canonical Tailwind padding class for content rendered below the tab bar.
- * Combines the fixed tab bar height, device safe-area inset, and 14px of
- * breathing room so content is not obscured on gesture-nav devices.
+ * Combines the fixed tab bar height, device safe-area inset, and 8px of
+ * breathing room so floating glass never obscures interactive content.
  *
  * Spec: docs/public-profile-surface-spec.md §2.6
  *

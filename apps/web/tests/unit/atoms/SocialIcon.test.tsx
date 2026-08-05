@@ -80,6 +80,17 @@ describe('SocialIcon', () => {
     expect(svg).toHaveAttribute('fill', 'currentColor');
   });
 
+  it.each([
+    'netease',
+    'netease_music',
+    'neteasemusic',
+  ])('renders the canonical NetEase mark for %s', platform => {
+    const { container } = render(<SocialIcon platform={platform} />);
+    const svg = container.querySelector('svg');
+    expect(svg).toHaveAttribute('fill', 'currentColor');
+    expect(svg).not.toHaveAttribute('stroke', 'currentColor');
+  });
+
   it('has no accessibility violations when aria-hidden', async () => {
     const { container } = render(
       <SocialIcon platform='instagram' aria-hidden={true} />

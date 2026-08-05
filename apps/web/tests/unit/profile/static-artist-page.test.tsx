@@ -22,6 +22,7 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
         props.showSubscriptionConfirmedBanner
       ),
       'data-hide-more-menu': String(props.hideMoreMenu),
+      'data-has-profile-banner': String(Boolean(props.profileBanner)),
       'data-mount-id': mountIdRef.current,
     });
   },
@@ -86,6 +87,29 @@ describe('StaticArtistPage', () => {
     );
 
     expect(screen.getByTestId('profile-compact-template')).toBeInTheDocument();
+  });
+
+  it('passes the profile banner into the fixed compact shell', async () => {
+    const { StaticArtistPage } = await import(
+      '@/features/profile/StaticArtistPage'
+    );
+
+    render(
+      <StaticArtistPage
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Artist'
+        showBackButton={false}
+        profileBanner={<div>Unclaimed</div>}
+      />
+    );
+
+    expect(screen.getByTestId('profile-compact-template')).toHaveAttribute(
+      'data-has-profile-banner',
+      'true'
+    );
   });
 
   it('renders the compact preview presentation when requested', async () => {
