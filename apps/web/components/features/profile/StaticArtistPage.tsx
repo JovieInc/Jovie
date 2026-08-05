@@ -67,6 +67,8 @@ export function StaticArtistPage({
   showBackButton,
   showTourButton,
   showFooter,
+  profileBanner,
+  allowFanCapture = true,
   latestRelease,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
@@ -151,6 +153,8 @@ export function StaticArtistPage({
       merchCards={viewModel.merchCards}
       hideJovieBranding={hideJovieBranding}
       hideMoreMenu={hideMoreMenu}
+      profileBanner={profileBanner}
+      allowFanCapture={allowFanCapture}
       showClaimFooter={showClaimFooter}
       claimFooterHref={claimFooterHref}
     />

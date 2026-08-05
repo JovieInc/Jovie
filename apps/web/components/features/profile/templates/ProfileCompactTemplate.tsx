@@ -2,6 +2,7 @@
 
 import {
   type CSSProperties,
+  type ReactNode,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -88,6 +89,8 @@ interface ProfileCompactTemplateProps {
   readonly merchCards?: readonly PublicMerchCard[];
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
+  readonly profileBanner?: ReactNode;
+  readonly allowFanCapture?: boolean;
   readonly visualVariant?: 'default';
   /** Desktop spare-space claim footer (JOV-3544). */
   readonly showClaimFooter?: boolean;
@@ -230,6 +233,8 @@ export function ProfileCompactTemplate({
   merchCards = [],
   hideJovieBranding = false,
   hideMoreMenu = false,
+  profileBanner,
+  allowFanCapture = true,
   visualVariant = 'default',
   showClaimFooter = false,
   claimFooterHref = null,
@@ -771,64 +776,72 @@ export function ProfileCompactTemplate({
             className='public-profile-compact-shell relative flex h-full min-w-0 w-full flex-col overflow-hidden bg-(--profile-content-bg) md:mx-auto md:rounded-(--profile-shell-card-radius) md:border md:border-(--profile-panel-border) md:shadow-(--profile-panel-shadow)'
             data-testid='profile-compact-shell'
           >
-            <ProfileCompactSurface
-              renderMode='interactive'
-              presentation={drawerPresentation}
-              artist={artist}
-              socialLinks={socialLinks}
-              contacts={contacts}
-              showPayButton={showPayButton}
-              latestRelease={latestRelease}
-              profileSettings={profileSettings}
-              featuredPlaylistFallback={featuredPlaylistFallback}
-              enableDynamicEngagement={enableDynamicEngagement}
-              subscribeTwoStep={subscribeTwoStep}
-              alertOptInVariant={resolvedAlertOptInVariant}
-              profilePacAssignment={resolvedProfilePacAssignment}
-              genres={genres}
-              pressPhotos={pressPhotos}
-              allowPhotoDownloads={allowPhotoDownloads}
-              photoDownloadSizes={photoDownloadSizes}
-              tourDates={tourDates}
-              showSubscriptionConfirmedBanner={showSubscriptionConfirmedBanner}
-              viewerCountryCode={viewerCountryCode}
-              merchCards={merchCards}
-              hideJovieBranding={hideJovieBranding}
-              hideMoreMenu={hideMoreMenu}
-              renderInteractiveOverlays
-              renderSemanticHeading={!isDesktopLayout}
-              drawerOpen={drawerOpen}
-              drawerView={drawerView}
-              activeMode={requestedMode}
-              onModeSelect={nextMode => {
-                clearCloseResetTimer();
-                setRequestedMode(nextMode);
-              }}
-              onDrawerOpenChange={handleDrawerOpenChange}
-              onDrawerViewChange={handleDrawerViewChange}
-              onBack={handleBack}
-              onOpenMenu={() => openDrawerMode('menu')}
-              onPlayClick={handlePlayClick}
-              onShare={handleShare}
-              profileHref={profileHref}
-              artistProfilesHref={APP_ROUTES.ARTIST_PROFILES}
-              isSubscribed={isSubscribed}
-              contentPrefs={contentPrefs}
-              onTogglePref={handleTogglePref}
-              onUnsubscribe={handleUnsubscribe}
-              isUnsubscribing={unsubMutation.isPending}
-              onManageNotifications={() => {
-                clearCloseResetTimer();
-                setRequestedMode('subscribe');
-              }}
-              onRegisterReveal={fn => {
-                revealNotificationsRef.current = fn;
-              }}
-              onRevealNotifications={() => {
-                revealNotificationsRef.current?.();
-              }}
-              releases={releases}
-            />
+            {profileBanner ? (
+              <div className='shrink-0'>{profileBanner}</div>
+            ) : null}
+            <div className='relative min-h-0 flex-1'>
+              <ProfileCompactSurface
+                renderMode='interactive'
+                presentation={drawerPresentation}
+                artist={artist}
+                socialLinks={socialLinks}
+                contacts={contacts}
+                showPayButton={showPayButton}
+                latestRelease={latestRelease}
+                profileSettings={profileSettings}
+                featuredPlaylistFallback={featuredPlaylistFallback}
+                enableDynamicEngagement={enableDynamicEngagement}
+                subscribeTwoStep={subscribeTwoStep}
+                alertOptInVariant={resolvedAlertOptInVariant}
+                profilePacAssignment={resolvedProfilePacAssignment}
+                genres={genres}
+                pressPhotos={pressPhotos}
+                allowPhotoDownloads={allowPhotoDownloads}
+                photoDownloadSizes={photoDownloadSizes}
+                tourDates={tourDates}
+                showSubscriptionConfirmedBanner={
+                  showSubscriptionConfirmedBanner
+                }
+                viewerCountryCode={viewerCountryCode}
+                merchCards={merchCards}
+                hideJovieBranding={hideJovieBranding}
+                hideMoreMenu={hideMoreMenu}
+                allowFanCapture={allowFanCapture}
+                renderInteractiveOverlays
+                renderSemanticHeading={!isDesktopLayout}
+                drawerOpen={drawerOpen}
+                drawerView={drawerView}
+                activeMode={requestedMode}
+                onModeSelect={nextMode => {
+                  clearCloseResetTimer();
+                  setRequestedMode(nextMode);
+                }}
+                onDrawerOpenChange={handleDrawerOpenChange}
+                onDrawerViewChange={handleDrawerViewChange}
+                onBack={handleBack}
+                onOpenMenu={() => openDrawerMode('menu')}
+                onPlayClick={handlePlayClick}
+                onShare={handleShare}
+                profileHref={profileHref}
+                artistProfilesHref={APP_ROUTES.ARTIST_PROFILES}
+                isSubscribed={isSubscribed}
+                contentPrefs={contentPrefs}
+                onTogglePref={handleTogglePref}
+                onUnsubscribe={handleUnsubscribe}
+                isUnsubscribing={unsubMutation.isPending}
+                onManageNotifications={() => {
+                  clearCloseResetTimer();
+                  setRequestedMode('subscribe');
+                }}
+                onRegisterReveal={fn => {
+                  revealNotificationsRef.current = fn;
+                }}
+                onRevealNotifications={() => {
+                  revealNotificationsRef.current?.();
+                }}
+                releases={releases}
+              />
+            </div>
           </div>
         }
       />

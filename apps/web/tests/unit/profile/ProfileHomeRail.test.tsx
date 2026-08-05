@@ -159,6 +159,26 @@ describe('ProfileHomeRail', () => {
     expect(screen.getAllByText('Never Say A Word')).toHaveLength(1);
   });
 
+  it('omits the alerts card when fan capture is unavailable', () => {
+    render(
+      <ProfileHomeRail
+        artist={makeArtist()}
+        latestRelease={makeRelease()}
+        profileSettings={{ showOldReleases: true }}
+        featuredPlaylistFallback={null}
+        tourDates={[]}
+        hasPlayableDestinations
+        renderMode='preview'
+        isSubscribed={false}
+        showAlertsCard={false}
+      />
+    );
+
+    expect(
+      screen.queryByTestId('profile-home-alerts-fallback-card')
+    ).not.toBeInTheDocument();
+  });
+
   it('renders alerts as the same compact landscape row (no gradient)', () => {
     render(
       <ProfileHomeRail

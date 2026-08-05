@@ -54,6 +54,17 @@ describe('BottomTabBar — tab rendering', () => {
     expect(screen.getByRole('button', { name: 'Alerts' })).toBeInTheDocument();
   });
 
+  it('omits Alerts when fan capture is unavailable', () => {
+    const { container } = render(
+      <BottomTabBar {...makeProps({ showAlertsTab: false })} />
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Alerts' })
+    ).not.toBeInTheDocument();
+    const grid = container.querySelector('[style*="grid-template-columns"]');
+    expect(grid?.getAttribute('style')).toContain('repeat(3,');
+  });
+
   it('does not render a More button', () => {
     render(<BottomTabBar {...makeProps()} />);
     expect(
