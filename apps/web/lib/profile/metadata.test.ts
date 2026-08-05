@@ -329,7 +329,6 @@ describe('buildPublicProfileMetadata', () => {
     const meta = buildPublicProfileMetadata({
       profile: {
         ...minimalProfile,
-        is_claimed: false,
         settings: {
           unclaimedArtistProfile: {
             state: 'unclaimed',
