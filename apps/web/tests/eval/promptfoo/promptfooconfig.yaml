@@ -1548,6 +1548,7 @@ tests:
           - generateCanvasPlan
           - generateReleasePitch
           - importBioFromUrl
+          - findMerchSources
           - manageTasks
           - markCanvasUploaded
           - openBillingPortal
@@ -2737,6 +2738,26 @@ tests:
       toolInput:
         intent: create
         title: "Pitch Neon Reef to Spotify"
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaValid
+      - type: javascript
+        value: file://assertions.cjs:assertToolExecuted
+
+  - description: Tool contract accepts paid merch source discovery
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Help me choose a title for merch."
+      target: tool-contract
+      toolName: findMerchSources
+      mode: app
+      plan: pro
+      toolInput: {}
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend

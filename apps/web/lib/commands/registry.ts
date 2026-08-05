@@ -33,6 +33,8 @@ export const HIDDEN_TOOLS: Readonly<Record<string, string>> = {
     'Conversational merch creation is gated by plan and rollout flags before broader slash exposure.',
   createMerchAlternativeItem:
     'Follow-up from a saved merch card; shown as card/menu actions once a source design exists.',
+  findMerchSources:
+    'Merch source discovery is a conversational prerequisite for merch creation, not a root slash command.',
   createPromoStrategy: 'Pro-only; surfaced via the release detail surface.',
   createRelease: 'Surfaced in the releases dashboard; chat tool is a fallback.',
   deleteOrArchiveMerchCard:
