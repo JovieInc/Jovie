@@ -74,6 +74,28 @@ describe('deterministic no-model gates', () => {
     );
   });
 
+  it('treats agent-ready as explicit machine-execution authorization', () => {
+    const candidate = issue({
+      labels: { nodes: [{ id: 'agent-ready-id', name: 'agent-ready' }] },
+    });
+    assert.equal(
+      deterministicGates.validateDeterministicPlanCandidate(candidate),
+      null
+    );
+  });
+
+  it('still requires execution evidence for generic ready-for-intake work', () => {
+    const candidate = issue({
+      labels: {
+        nodes: [{ id: 'ready-id', name: 'ready-for-intake' }],
+      },
+    });
+    assert.equal(
+      deterministicGates.validateDeterministicPlanCandidate(candidate),
+      'execution-evidence-label-missing'
+    );
+  });
+
   it('routes LYB evidence to LogYourBody without requiring a Linear project', () => {
     const candidate = issue({
       identifier: 'LYB-12',

@@ -29,7 +29,8 @@ case "$SCOPE" in
     # module graph instead, while retaining the deterministic risk-policy gate.
     node scripts/run-affected-tests.mjs \
       --base "$BASE_REF" \
-      --max-workers "${AUTOMATION_VERIFY_MAX_WORKERS:-2}"
+      --max-workers "${AUTOMATION_VERIFY_MAX_WORKERS:-2}" \
+      --shard-concurrency "${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-1}"
     pnpm ci:harness:check
     ;;
   full)

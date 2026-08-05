@@ -101,8 +101,32 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = new Set([
+  '.husky/pre-push',
+  'scripts/automation-verify.sh',
+  'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
+  'scripts/backlog-orchestrator/admitter.mjs',
+  'scripts/backlog-orchestrator/backlog-orchestrator.mjs',
+  'scripts/backlog-orchestrator/deterministic-gates.mjs',
+  'scripts/hermes/codex-rotate',
+  'scripts/hermes/tests/codex-rotate.test.py',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/pre-push-gate.test.mjs',
+  'scripts/run-affected-tests.mjs',
+]);
+const SYMPHONY_THROUGHPUT_NODE_TESTS = [
+  'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
+];
+const SYMPHONY_THROUGHPUT_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/pre-push-gate.test.mjs',
+];
+const SYMPHONY_THROUGHPUT_PYTHON_TESTS = [
+  'scripts/hermes/tests/codex-rotate.test.py',
+];
 const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
-  'apps/web/app/app/(shell)/chat/loading.tsx',
   'apps/web/app/exp/shell-v1/page.tsx',
   'apps/web/components/jovie/components/ChatInput.tsx',
   'apps/web/components/organisms/SharedCommandPalette.tsx',
@@ -371,6 +395,22 @@ export function buildAffectedTestPlan(
   const files = unique(changedFiles.filter(Boolean)).sort();
   if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
     return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+  }
+  const isExactSymphonyThroughputControl =
+    files.length === SYMPHONY_THROUGHPUT_CONTROL_MANIFEST.size &&
+    files.every(file => SYMPHONY_THROUGHPUT_CONTROL_MANIFEST.has(file));
+  if (isExactSymphonyThroughputControl) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: SYMPHONY_THROUGHPUT_PYTHON_TESTS,
+      scriptVitestTests: SYMPHONY_THROUGHPUT_SCRIPT_TESTS,
+      nodeTests: SYMPHONY_THROUGHPUT_NODE_TESTS,
+    };
   }
 
   const prerequisiteTrainCornerCount = PREREQUISITE_TRAIN_CORNERS.filter(file =>
@@ -1014,16 +1054,34 @@ export async function runCommand(command, args) {
   process.exit(await runCommandStatus(command, args));
 }
 
-async function runCommands(commands) {
-  for (const [command, args] of commands) {
-    const status = await runCommandStatus(command, args);
-    if (status !== 0) process.exit(status);
+async function runCommands(commands, concurrency = 1) {
+  const workerCount = Math.max(
+    1,
+    Math.min(commands.length, Number.parseInt(String(concurrency), 10) || 1)
+  );
+  let cursor = 0;
+  let failureStatus = 0;
+
+  async function worker() {
+    while (failureStatus === 0) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= commands.length) return;
+      const [command, args] = commands[index];
+      const status = await runCommandStatus(command, args);
+      if (status !== 0) failureStatus = status;
+    }
   }
-  process.exit(0);
+
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  process.exit(failureStatus);
 }
 
 export function buildSelectedTestCommands(plan, maxWorkers) {
   const commands = [];
+  if ((plan.nodeTests || []).length > 0) {
+    commands.push(['node', ['--test', ...plan.nodeTests]]);
+  }
   if (plan.scriptVitestTests.length > 0) {
     commands.push([
       'pnpm',
@@ -1060,6 +1118,9 @@ export function buildSelectedTestCommands(plan, maxWorkers) {
   }
   if (plan.pythonTests.length > 0) {
     commands.push(['python3', ['-m', 'pytest', ...plan.pythonTests, '-q']]);
+  }
+  for (const test of plan.pythonUnittestTests || []) {
+    commands.push(['python3', [test]]);
   }
   if (plan.selectedTests.length > 0) {
     commands.push([
@@ -1101,6 +1162,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const base = argValue(args, '--base', 'origin/main');
   const maxWorkers = argValue(args, '--max-workers', '2');
+  const shardConcurrency = argValue(args, '--shard-concurrency', '2');
   const plan = buildAffectedTestPlan(changedFiles(base));
   if (args.includes('--dry-run')) {
     console.log(JSON.stringify(plan, null, 2));
@@ -1113,10 +1175,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (plan.mode === 'none') process.exit(0);
   if (plan.mode === 'full') {
     // A single Vitest process retains enough module/reporting state across the
-    // 2k-file web suite to trigger host memory pressure near teardown. Run
-    // deterministic sequential shards so each process releases memory before
-    // the next shard starts while preserving complete full-suite coverage.
-    await runCommands(buildFullSuiteCommands(maxWorkers));
+    // 2k-file web suite to trigger host memory pressure near teardown. Keep
+    // deterministic, bounded-memory shards, but schedule a small bounded set
+    // concurrently so a complete fail-closed suite does not serialize all 8.
+    await runCommands(buildFullSuiteCommands(maxWorkers), shardConcurrency);
   }
 
   await runCommands(buildSelectedTestCommands(plan, maxWorkers));

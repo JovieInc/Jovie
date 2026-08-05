@@ -19,6 +19,21 @@ const script = readFileSync(
   'utf8'
 );
 
+const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
+  '.husky/pre-push',
+  'scripts/automation-verify.sh',
+  'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
+  'scripts/backlog-orchestrator/admitter.mjs',
+  'scripts/backlog-orchestrator/backlog-orchestrator.mjs',
+  'scripts/backlog-orchestrator/deterministic-gates.mjs',
+  'scripts/hermes/codex-rotate',
+  'scripts/hermes/tests/codex-rotate.test.py',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/pre-push-gate.test.mjs',
+  'scripts/run-affected-tests.mjs',
+];
+
 const PREREQUISITE_TRAIN_CORNERS = [
   'scripts/ci/neon-orphan-reaper.mjs',
   'apps/web/lib/testing/e2e-prebuilt-claim.ts',
@@ -127,7 +142,6 @@ const SCANNER_LOAD_REPAIR_MANIFEST = [
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
 const AUTHENTICATED_A11Y_REPAIR_CORE = [
-  'apps/web/app/app/(shell)/chat/loading.tsx',
   'apps/web/app/exp/shell-v1/page.tsx',
   'apps/web/components/jovie/components/ChatInput.tsx',
   'apps/web/components/organisms/SharedCommandPalette.tsx',
@@ -368,6 +382,28 @@ describe('automation-verify affected scope', () => {
     expect(script).not.toContain('turbo-local.mjs test --affected');
   });
 
+  it('selects the complete Symphony throughput control-plane test lanes', () => {
+    const plan = buildAffectedTestPlan(SYMPHONY_THROUGHPUT_CONTROL_MANIFEST);
+    expect(plan).toMatchObject({
+      mode: 'selected',
+      nodeTests: [
+        'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
+        'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
+      ],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/pre-push-gate.test.mjs',
+      ],
+      pythonUnittestTests: ['scripts/hermes/tests/codex-rotate.test.py'],
+    });
+    expect(
+      buildAffectedTestPlan([
+        ...SYMPHONY_THROUGHPUT_CONTROL_MANIFEST,
+        'scripts/backlog-orchestrator/unknown.mjs',
+      ]).mode
+    ).toBe('full');
+  });
+
   it('fails closed on an unresolved base and retains mandatory risk policy', () => {
     expect(script).toContain(
       'git rev-parse --verify --quiet "${BASE_REF}^{commit}"'
@@ -378,6 +414,9 @@ describe('automation-verify affected scope', () => {
   it('bounds local test fanout', () => {
     expect(script).toContain(
       '--max-workers "${AUTOMATION_VERIFY_MAX_WORKERS:-2}"'
+    );
+    expect(script).toContain(
+      '--shard-concurrency "${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-1}"'
     );
   });
 
@@ -644,7 +683,7 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
-  it('splits the full web suite into sequential bounded-memory shards', () => {
+  it('splits the full web suite into bounded-memory shards', () => {
     const commands = buildFullSuiteCommands('2', 2);
 
     expect(commands).toEqual([

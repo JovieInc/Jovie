@@ -774,6 +774,22 @@ describe('entrypoint contract', () => {
 });
 
 describe('deterministic Symphony admission boundary', () => {
+  it('uses a bounded two-slot JOV cap while preserving one LYB slot', () => {
+    assert.equal(admitter.maxConcurrentShippingForTeam('JOV', {}), 2);
+    assert.equal(admitter.maxConcurrentShippingForTeam('LYB', {}), 1);
+    assert.equal(
+      admitter.maxConcurrentShippingForTeam('JOV', {
+        SYMPHONY_MAX_CONCURRENT_SHIPPING_JOV: '3',
+      }),
+      3
+    );
+    assert.equal(
+      admitter.maxConcurrentShippingForTeam('JOV', {
+        SYMPHONY_MAX_CONCURRENT_SHIPPING_JOV: '99',
+      }),
+      2
+    );
+  });
   function admissionIssue(overrides = {}) {
     return makeIssue({
       id: overrides.id || `${overrides.identifier || 'JOV-900'}-id`,

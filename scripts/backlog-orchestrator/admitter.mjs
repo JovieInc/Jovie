@@ -1,17 +1,29 @@
 /**
  * Deterministic admission boundary for Symphony.
  *
- * Workstream bundles are useful reports, but only one concrete issue per
- * routed product team may cross this boundary. Admission is fail-closed on
- * ownership, plan evidence, and mutation read-back.
+ * Workstream bundles are useful reports, but only a bounded number of concrete
+ * issues per routed product team may cross this boundary. Admission is
+ * fail-closed on ownership, plan evidence, and mutation read-back.
  */
 
 import { isProductionRed, scoreIssue } from './scorer.mjs';
 
 export const MAX_CONCURRENT_SHIPPING = 1;
+const MAX_CONCURRENT_SHIPPING_BY_TEAM = Object.freeze({ JOV: 2, LYB: 1 });
 export const SYMPHONY_LABEL = 'symphony';
 export const TODO_STATE_ID = 'c6c00506-dc9f-4910-8ff7-3874dd77174c';
 export const ADMISSION_RECEIPT_PREFIX = '<!-- symphony-admission:v1 ';
+
+export function maxConcurrentShippingForTeam(teamKey, env = process.env) {
+  const key = String(teamKey || '').toUpperCase();
+  const configured = Number.parseInt(
+    env[`SYMPHONY_MAX_CONCURRENT_SHIPPING_${key}`] || '',
+    10
+  );
+  if (Number.isInteger(configured) && configured > 0 && configured <= 8)
+    return configured;
+  return MAX_CONCURRENT_SHIPPING_BY_TEAM[key] || MAX_CONCURRENT_SHIPPING;
+}
 
 const PROTECTED_LABELS = new Set([
   'human-review-required',
@@ -117,13 +129,15 @@ export async function selectNextToAdmit(
   workstreams,
   state = {}
 ) {
+  const maxConcurrentShipping =
+    state.maxConcurrentShipping || MAX_CONCURRENT_SHIPPING;
   const prodRed = state.productionRed ?? (await isProductionRed());
   if (prodRed)
     return { admit: [], reason: 'production is red — blocking admission' };
-  if ((state.currentlyShipping || 0) >= MAX_CONCURRENT_SHIPPING) {
+  if ((state.currentlyShipping || 0) >= maxConcurrentShipping) {
     return {
       admit: [],
-      reason: `at capacity (${state.currentlyShipping}/${MAX_CONCURRENT_SHIPPING})`,
+      reason: `at capacity (${state.currentlyShipping}/${maxConcurrentShipping})`,
     };
   }
 

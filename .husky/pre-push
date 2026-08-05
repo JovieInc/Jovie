@@ -7,6 +7,9 @@ set -e  # Required: ensures pre-push-gate.sh failure actually blocks pushes
 # shard memory; standalone runs keep 2 and either way
 # AUTOMATION_VERIFY_MAX_WORKERS overrides.
 export AUTOMATION_VERIFY_MAX_WORKERS="${AUTOMATION_VERIFY_MAX_WORKERS:-1}"
+# Keep developer-machine pushes conservative. Dedicated orchestration hosts may
+# raise bounded shard concurrency after proving memory and timeout headroom.
+export AUTOMATION_VERIFY_SHARD_CONCURRENCY="${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-1}"
 
 # NOTE: git holds the ssh receive-pack connection open across this hook.
 # GitHub kills it after ~10 idle minutes, and a long gate then surfaces as

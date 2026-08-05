@@ -4,7 +4,6 @@ import { ADMISSION_APPROVED_LABEL } from './admission-gate.mjs';
 import { ADMISSION_RECEIPT_PREFIX, SYMPHONY_LABEL } from './admitter.mjs';
 import { PLAN_APPROVED_LABEL } from './plan-gate.mjs';
 
-const READY_LABELS = new Set(['ready-for-intake', 'agent-ready']);
 const REQUIRED_EXECUTION_LABELS = new Set(['automated', 'testing']);
 const PROTECTED_LABELS = new Set([
   'blocked',
@@ -128,9 +127,16 @@ export function validateDeterministicPlanCandidate(
   if (isTimOwned(issue)) return 'tim-owned';
   if (issue.assignee) return 'already-assigned';
   const labels = labelsOf(issue);
-  if (!labels.some(label => READY_LABELS.has(label)))
-    return 'readiness-label-missing';
-  if (!labels.some(label => REQUIRED_EXECUTION_LABELS.has(label)))
+  const isAgentReady = labels.includes('agent-ready');
+  const isReadyForIntake = labels.includes('ready-for-intake');
+  if (!isAgentReady && !isReadyForIntake) return 'readiness-label-missing';
+  // `agent-ready` is the explicit machine-execution authorization used by the
+  // dispatcher and Symphony. Generic `ready-for-intake` work still needs a
+  // separate execution-evidence label before the no-model gate may admit it.
+  if (
+    !isAgentReady &&
+    !labels.some(label => REQUIRED_EXECUTION_LABELS.has(label))
+  )
     return 'execution-evidence-label-missing';
   if (labels.some(label => PROTECTED_LABELS.has(label)))
     return 'protected-or-human-review';
