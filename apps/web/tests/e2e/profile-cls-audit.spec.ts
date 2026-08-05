@@ -192,37 +192,14 @@ test.describe('Profile CLS Audit @nightly', () => {
 
     await installInteractionClsObserver(page);
 
-    // Open listen drawer — try clicking Listen button, fall back to query param
-    const listenButton = page.locator('[data-testid="listen-button"]').first();
-    const hasListenButton = await listenButton
-      .isVisible({ timeout: 5_000 })
-      .catch(() => false);
-
-    if (hasListenButton) {
-      await listenButton.click();
-    } else {
-      // Try text-based selector
-      const textButton = page
-        .locator('button, a')
-        .filter({ hasText: /listen/i })
-        .first();
-      const hasTextButton = await textButton
-        .isVisible({ timeout: 5_000 })
-        .catch(() => false);
-
-      if (hasTextButton) {
-        await textButton.click();
-      } else {
-        // Navigate with query param to trigger listen mode
-        await smokeNavigate(page, `/${TEST_PROFILES.DUALIPA}?mode=listen`);
-        await waitForHydration(page);
-      }
-    }
+    // Exercise the canonical mobile tab transition. Broad text matching can
+    // select a release-card "Listen" link and silently leave the profile shell.
+    await page.getByRole('button', { name: 'Music', exact: true }).click();
 
     // Wait for drawer content to appear — fail if the transition never happens
     const drawerLocator = page
       .locator(
-        '[role="dialog"], [data-testid="listen-drawer"], [data-state="open"]'
+        '[role="dialog"], [data-testid="listen-drawer"], [data-testid="profile-mode-drawer-listen"], [data-testid="profile-mode-drawer-releases"], [data-state="open"]'
       )
       .first();
     const drawerAppeared = await drawerLocator
@@ -236,19 +213,18 @@ test.describe('Profile CLS Audit @nightly', () => {
       return;
     }
 
-    // Close the drawer
-    await page.keyboard.press('Escape');
+    // Return through the canonical tab control. The compact profile surface is
+    // a persistent mode view, not a modal that Escape is expected to dismiss.
+    await page.getByRole('button', { name: 'Home', exact: true }).click();
 
     // Wait for drawer to close and layout to settle
     await page
       .locator(
-        '[role="dialog"], [data-testid="listen-drawer"], [data-state="open"]'
+        '[role="dialog"], [data-testid="listen-drawer"], [data-testid="profile-mode-drawer-listen"], [data-testid="profile-mode-drawer-releases"], [data-state="open"]'
       )
       .first()
       .waitFor({ state: 'hidden', timeout: 5_000 })
-      .catch(() => {
-        // Drawer may already be closed
-      });
+      .catch(() => undefined);
 
     const cls = await collectInteractionCls(page);
 
