@@ -245,7 +245,7 @@ enum SentryEventNormalizer {
   static func normalizeUnknownContext(_ value: String) -> String {
     let dottedContextRemoved = value.replacingOccurrences(
       of: unknownContextPattern,
-      with: ".",
+      with: "",
       options: .regularExpression
     )
     return dottedContextRemoved.replacingOccurrences(
