@@ -18,6 +18,7 @@ import { joviePlaylists } from '@/lib/db/schema/playlists';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
+import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
 
 export const revalidate = 3600;
 
@@ -26,6 +27,8 @@ type SitemapCatalog = {
     username: string;
     updatedAt: Date | null;
     avatarUrl: string | null;
+    isClaimed: boolean | null;
+    settings: unknown;
   }>;
   releases: Array<{
     username: string;
@@ -58,6 +61,8 @@ const getSitemapCatalog = unstable_cache(
             username: creatorProfiles.username,
             updatedAt: creatorProfiles.updatedAt,
             avatarUrl: creatorProfiles.avatarUrl,
+            isClaimed: creatorProfiles.isClaimed,
+            settings: creatorProfiles.settings,
           })
           .from(creatorProfiles)
           .where(eq(creatorProfiles.isPublic, true)),
@@ -125,7 +130,16 @@ const getSitemapCatalog = unstable_cache(
           ),
       ]);
 
-      return { profiles, releases, tracks, playlists };
+      return {
+        profiles: profiles.filter(
+          profile =>
+            profile.isClaimed === true ||
+            !isUnclaimedStructuredCreditProfile(profile.settings)
+        ),
+        releases,
+        tracks,
+        playlists,
+      };
     } catch (error) {
       Sentry.captureException(error);
       return { profiles: [], releases: [], tracks: [], playlists: [] };
