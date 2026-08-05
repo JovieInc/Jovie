@@ -108,6 +108,28 @@ class CodexRotateTests(unittest.TestCase):
         self.assertEqual(state["cooldowns"]["account-a"], 1893553445)
         self.assertEqual(state["last_error"]["account-a"]["reason"], "limit_or_auth")
 
+    def test_app_server_stdout_limit_quarantines_zero_exit_account(self):
+        limited = self.root / "limited-app-server"
+        limited.write_text(
+            "#!/usr/bin/env bash\n"
+            "echo '{\"type\":\"error\",\"message\":\"usage limit; try again at 2030-01-02T03:04:05Z\"}'\n"
+            "exit 0\n"
+        )
+        limited.chmod(0o755)
+        result = subprocess.run(
+            [str(LAUNCHER), "app-server"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            env=self.env(CODEX_REAL_BIN=limited),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 75)
+        self.assertIn('"type":"error"', result.stdout)
+        state = json.loads((self.accounts / "state.json").read_text())
+        self.assertEqual(state["cooldowns"]["account-a"], 1893553445)
+        self.assertEqual(state["last_error"]["account-a"]["reason"], "limit_or_auth")
+
 
 if __name__ == "__main__":
     unittest.main()
