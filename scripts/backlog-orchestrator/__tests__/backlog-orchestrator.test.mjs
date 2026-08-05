@@ -19,6 +19,21 @@ const reporter = await import('../reporter.mjs');
 const staleLease = await import('../stale-lease-guard.mjs');
 const admitter = await import('../admitter.mjs');
 
+describe('team production health contract', () => {
+  it('uses a direct bounded LYB artifact instead of the redirecting homepage', async () => {
+    const source = await readFile(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs'),
+      'utf8'
+    );
+
+    assert.match(
+      source,
+      /healthUrl: 'https:\/\/www\.logyourbody\.com\/robots\.txt'/
+    );
+    assert.doesNotMatch(source, /healthUrl: 'https:\/\/logyourbody\.com'/);
+  });
+});
+
 function makeIssue(overrides = {}) {
   return {
     id: 'test-id',
