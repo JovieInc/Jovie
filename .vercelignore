@@ -57,6 +57,9 @@ scripts/
 *.cjs
 cleanup_old_branches*.sh
 
+# The docs project needs its Nextra wrapper to compile MDX app routes.
+!apps/docs/next.config.mjs
+
 # Build-critical web postbuild script
 !apps/web/scripts/
 !apps/web/scripts/sync-standalone-assets.mjs
