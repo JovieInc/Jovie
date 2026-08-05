@@ -1150,6 +1150,10 @@ export function buildFullSuiteCommands(maxWorkers, shardCount = 8) {
       'exec',
       'vitest',
       'run',
+      // Keep successful full-suite output compact for automation sessions.
+      // Vitest's dot reporter still prints complete failure diagnostics while
+      // avoiding thousands of passing file names in the agent transcript.
+      '--reporter=dot',
       '--shard',
       `${index + 1}/${shardCount}`,
       '--maxWorkers',
