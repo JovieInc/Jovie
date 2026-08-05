@@ -35,7 +35,10 @@ import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { refreshFeaturedPlaylistFallbackCandidate } from '@/lib/profile/featured-playlist-fallback';
 import { lockSpotifyProfileIdentity } from '@/lib/profile/spotify-profile-identity';
-import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
+import {
+  isUnclaimedStructuredCreditProfile,
+  markStructuredCreditProfileClaimed,
+} from '@/lib/profile/unclaimed-artist-profile';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { finalizePostOnboarding } from './post-onboarding';
 
@@ -213,13 +216,9 @@ async function getOwnedProfile(profileId: string, clerkUserId: string) {
 function getDirectClaimValidationMessage(params: {
   readonly expectedSpotifyArtistId: string | null | undefined;
   readonly isAwaitingMatch: boolean;
-  readonly isStructuredCreditProfile: boolean;
   readonly selectedSpotifyArtistId: string;
 }): string | null {
   if (!params.isAwaitingMatch) return null;
-  if (params.isStructuredCreditProfile) {
-    return SPOTIFY_UNCLAIMED_PROFILE_MESSAGE;
-  }
   if (!params.expectedSpotifyArtistId) {
     return 'This profile needs a claim link before it can be claimed.';
   }
@@ -261,9 +260,6 @@ export async function connectOnboardingSpotifyArtist(
   const directClaimValidationMessage = getDirectClaimValidationMessage({
     expectedSpotifyArtistId: pendingClaim?.expectedSpotifyArtistId,
     isAwaitingMatch: isDirectClaimAwaitingMatch,
-    isStructuredCreditProfile: isUnclaimedStructuredCreditProfile(
-      profile.settings
-    ),
     selectedSpotifyArtistId: params.spotifyArtistId,
   });
 
@@ -303,12 +299,15 @@ export async function connectOnboardingSpotifyArtist(
 
   try {
     if (isDirectClaimAwaitingMatch) {
-      const claimedSettings = {
-        ...currentSettings,
-        spotifyArtistName: params.artistName,
-        spotifyImportStatus: 'importing',
-        spotifyImportTotal: 0,
-      };
+      const claimedSettings = markStructuredCreditProfileClaimed(
+        {
+          ...currentSettings,
+          spotifyArtistName: params.artistName,
+          spotifyImportStatus: 'importing',
+          spotifyImportTotal: 0,
+        },
+        new Date()
+      );
 
       await withDbSessionTx(
         async tx => {

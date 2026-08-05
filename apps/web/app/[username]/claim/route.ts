@@ -15,7 +15,6 @@ import {
   markLeadClaimPageViewedFromToken,
   setLeadAttributionCookieFromToken,
 } from '@/lib/leads/funnel-events';
-import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
 import { hashClaimToken } from '@/lib/security/claim-token';
 import {
   getProfileByUsername,
@@ -163,18 +162,6 @@ export async function GET(
       return redirectTo(request, `/${profile.usernameNormalized}`);
     }
 
-    // Automatic structured-credit profiles are public identity records, not
-    // proof that the visitor controls the artist. A direct-profile cookie can
-    // be self-issued from this public route, so it must never authorize these
-    // profiles. A verified/token-backed claim path can be added separately.
-    if (isUnclaimedStructuredCreditProfile(profile.settings)) {
-      await clearPendingClaimContext();
-      return redirectTo(
-        request,
-        `/${profile.usernameNormalized}?claim=unsupported`
-      );
-    }
-
     if (
       existingPendingClaim &&
       existingPendingClaim.creatorProfileId === profile.id &&
@@ -191,6 +178,9 @@ export async function GET(
       );
     }
 
+    // Structured-credit profiles may enter the same direct flow, but the
+    // pending cookie is only a routing hint. `connectOnboardingSpotifyArtist`
+    // must still prove the exact Spotify ID before ownership is finalized.
     if (!profile.spotifyId) {
       return redirectTo(
         request,

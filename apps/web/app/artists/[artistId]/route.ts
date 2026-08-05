@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { artists } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { ensureUnclaimedArtistProfileForEntity } from '@/lib/discography/collaborator-profile-reconciliation';
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return new Response(null, { status: 404, headers: NO_STORE_HEADERS });
   }
 
-  const [resolved] = await db
+  let [resolved] = await db
     .select({ username: creatorProfiles.usernameNormalized })
     .from(artists)
     .innerJoin(
@@ -35,6 +36,23 @@ export async function GET(request: NextRequest, context: RouteContext) {
     )
     .where(and(eq(artists.id, artistId), eq(creatorProfiles.isPublic, true)))
     .limit(1);
+
+  if (!resolved?.username) {
+    // Legacy catalogs can contain an exact structured credit before the
+    // importer/backfill has materialized its public profile. The ensure path
+    // is identity-bound to this UUID and only accepts an eligible public
+    // release-credit edge; it never creates a name-reserved profile.
+    await ensureUnclaimedArtistProfileForEntity(artistId);
+    [resolved] = await db
+      .select({ username: creatorProfiles.usernameNormalized })
+      .from(artists)
+      .innerJoin(
+        creatorProfiles,
+        eq(artists.creatorProfileId, creatorProfiles.id)
+      )
+      .where(and(eq(artists.id, artistId), eq(creatorProfiles.isPublic, true)))
+      .limit(1);
+  }
 
   if (!resolved?.username) {
     return new Response(null, { status: 404, headers: NO_STORE_HEADERS });

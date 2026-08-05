@@ -3,12 +3,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const hoisted = vi.hoisted(() => ({
   result: [] as Array<{ username: string }>,
   select: vi.fn(),
+  ensureUnclaimedArtistProfileForEntity: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
     select: hoisted.select,
   },
+}));
+
+vi.mock('@/lib/discography/collaborator-profile-reconciliation', () => ({
+  ensureUnclaimedArtistProfileForEntity:
+    hoisted.ensureUnclaimedArtistProfileForEntity,
 }));
 
 function makeQuery() {
@@ -33,6 +39,7 @@ function context(artistId: string) {
 describe('GET /artists/[artistId]', () => {
   beforeEach(() => {
     hoisted.result = [];
+    hoisted.ensureUnclaimedArtistProfileForEntity.mockReset();
     hoisted.select.mockReset().mockReturnValue(makeQuery());
   });
 
@@ -91,5 +98,32 @@ describe('GET /artists/[artistId]', () => {
 
     expect(response.status).toBe(404);
     expect(response.headers.get('Location')).toBeNull();
+    expect(hoisted.ensureUnclaimedArtistProfileForEntity).toHaveBeenCalledWith(
+      artistId
+    );
+  });
+
+  it('rechecks the stable binding after an eligible unclaimed profile is ensured', async () => {
+    const artistId = 'f5441adb-6789-449a-9553-ab7460c9c61c';
+    const firstQuery = makeQuery();
+    firstQuery.limit.mockResolvedValueOnce([]);
+    const secondQuery = makeQuery();
+    secondQuery.limit.mockResolvedValueOnce([{ username: 'a_unclaimed' }]);
+    hoisted.select
+      .mockReset()
+      .mockReturnValueOnce(firstQuery)
+      .mockReturnValueOnce(secondQuery);
+    hoisted.ensureUnclaimedArtistProfileForEntity.mockResolvedValueOnce({
+      status: 'created',
+      handle: 'a_unclaimed',
+    });
+
+    const response = await GET(
+      new Request(`https://jov.ie/artists/${artistId}`) as never,
+      context(artistId)
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('Location')).toBe('https://jov.ie/a_unclaimed');
   });
 });

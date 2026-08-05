@@ -43,6 +43,11 @@ export interface CollaboratorProfileReconciliationResult {
   readonly metadataUnavailable: number;
 }
 
+export interface UnclaimedArtistProfileEnsureResult {
+  readonly status: 'created' | 'reused' | 'conflicted' | 'unavailable';
+  readonly handle: string | null;
+}
+
 interface CandidateOutcome {
   readonly status: 'created' | 'reused' | 'conflicted';
   readonly handle?: string;
@@ -357,6 +362,98 @@ async function reconcileCandidate(
     },
     { isolationLevel: 'serializable' }
   );
+}
+
+/**
+ * Ensure one exact structured-credit entity has a public, claim-safe profile.
+ *
+ * The public `/artists/:artistId` route uses this bounded path when an older
+ * catalog was rendered before the importer/backfill could materialize the
+ * profile. Eligibility is still derived from a public release-credit edge;
+ * arbitrary registry rows and name-only identities are never promoted.
+ */
+export async function ensureUnclaimedArtistProfileForEntity(
+  artistId: string
+): Promise<UnclaimedArtistProfileEnsureResult> {
+  const [candidate] = await db
+    .select({
+      artistId: artists.id,
+      name: artists.name,
+      spotifyId: artists.spotifyId,
+      imageUrl: artists.imageUrl,
+      creatorProfileId: artists.creatorProfileId,
+    })
+    .from(releaseArtists)
+    .innerJoin(discogReleases, eq(releaseArtists.releaseId, discogReleases.id))
+    .innerJoin(artists, eq(releaseArtists.artistId, artists.id))
+    .innerJoin(
+      creatorProfiles,
+      eq(discogReleases.creatorProfileId, creatorProfiles.id)
+    )
+    .where(
+      and(
+        eq(artists.id, artistId),
+        isNull(artists.creatorProfileId),
+        isNotNull(artists.spotifyId),
+        eq(creatorProfiles.isPublic, true),
+        inArray(releaseArtists.role, PUBLIC_ARTIST_COLLABORATOR_ROLES),
+        publicReleaseEligibilitySqlPredicate()
+      )
+    )
+    .limit(1);
+
+  if (!candidate?.spotifyId || candidate.creatorProfileId) {
+    return { status: 'unavailable', handle: null };
+  }
+
+  const [spotifyArtist] = await getSpotifyArtistsBatch([candidate.spotifyId]);
+  let outcome: CandidateOutcome;
+  try {
+    outcome = await reconcileCandidate(
+      {
+        artistId: candidate.artistId,
+        name: candidate.name,
+        spotifyId: candidate.spotifyId,
+        imageUrl: candidate.imageUrl,
+      },
+      spotifyArtist
+    );
+  } catch (error) {
+    await captureWarning(
+      'Structured artist entity profile ensure failed closed',
+      error,
+      { source: 'public_artist_entity_route', artistId }
+    );
+    return { status: 'conflicted', handle: null };
+  }
+
+  if (outcome.status === 'conflicted') {
+    return { status: 'conflicted', handle: outcome.handle ?? null };
+  }
+
+  const [resolved] = await db
+    .select({ usernameNormalized: creatorProfiles.usernameNormalized })
+    .from(artists)
+    .innerJoin(
+      creatorProfiles,
+      eq(artists.creatorProfileId, creatorProfiles.id)
+    )
+    .where(and(eq(artists.id, artistId), eq(creatorProfiles.isPublic, true)))
+    .limit(1);
+
+  if (!resolved?.usernameNormalized) {
+    return { status: 'unavailable', handle: null };
+  }
+
+  await invalidateProfileCache(resolved.usernameNormalized).catch(() => {
+    // The route still has a committed identity binding; cache refresh is
+    // best-effort when this helper runs outside a Next request context.
+  });
+
+  return {
+    status: outcome.status,
+    handle: resolved.usernameNormalized,
+  };
 }
 
 function recordCandidateOutcome(

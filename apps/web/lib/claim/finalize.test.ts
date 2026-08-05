@@ -47,6 +47,7 @@ interface ProfileRowOverrides {
   userId?: string | null;
   usernameNormalized?: string;
   displayName?: string | null;
+  settings?: Record<string, unknown> | null;
   isClaimed?: boolean | null;
   claimedAt?: Date | null;
   onboardingCompletedAt?: Date | null;
@@ -58,6 +59,7 @@ function profileRow(overrides: ProfileRowOverrides = {}) {
     userId: null,
     usernameNormalized: 'artistname',
     displayName: 'Old Name',
+    settings: null,
     isClaimed: false,
     claimedAt: null,
     onboardingCompletedAt: null,
@@ -308,6 +310,44 @@ describe('claimPrebuiltProfileForUser', () => {
     });
     expect(mocks.updateSetMock.mock.calls[2]?.[0]).toMatchObject({
       userStatus: 'onboarding_incomplete',
+    });
+  });
+
+  it('transitions structured-credit ownership metadata when the exact profile is claimed', async () => {
+    const mocks = createTxMock([
+      [
+        profileRow({
+          settings: {
+            unclaimedArtistProfile: {
+              state: 'unclaimed',
+              source: 'structured_spotify_release_credit',
+              artistRegistryId: 'f5441adb-6789-449a-9553-ab7460c9c61c',
+              provider: 'spotify',
+              providerArtistId: 'artist_spotify_id',
+              ownershipVerified: false,
+              representationVerified: false,
+              consentObtained: false,
+            },
+          },
+        }),
+      ],
+      [],
+    ]);
+
+    await claimPrebuiltProfileForUser(mocks.tx, {
+      ...baseParams,
+      finalizeOnboarding: true,
+    });
+
+    expect(mocks.updateSetMock.mock.calls[1]?.[0]).toMatchObject({
+      settings: {
+        unclaimedArtistProfile: expect.objectContaining({
+          state: 'claimed',
+          ownershipVerified: true,
+          consentObtained: true,
+          claimedAt: FIXED_NOW.toISOString(),
+        }),
+      },
     });
   });
 

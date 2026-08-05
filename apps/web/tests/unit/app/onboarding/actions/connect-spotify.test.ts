@@ -605,7 +605,7 @@ describe('connectOnboardingSpotifyArtist', () => {
     expect(hoisted.syncReleasesFromSpotifyMock).not.toHaveBeenCalled();
   });
 
-  it('rejects a self-issued direct claim for an automatic unclaimed profile', async () => {
+  it('allows an exact-ID verified claim for an automatic unclaimed profile', async () => {
     queueOwnedProfile({
       unclaimedArtistProfile: {
         state: 'unclaimed',
@@ -626,6 +626,25 @@ describe('connectOnboardingSpotifyArtist', () => {
       issuedAt: Date.now(),
       expiresAt: Date.now() + 60_000,
     });
+    queueNoExistingClaim();
+    queueLatestSettings({
+      unclaimedArtistProfile: {
+        state: 'claimed',
+        source: 'structured_spotify_release_credit',
+        artistRegistryId: 'f5441adb-6789-449a-9553-ab7460c9c61c',
+        provider: 'spotify',
+        providerArtistId: 'artist_spotify_id',
+        ownershipVerified: true,
+        representationVerified: false,
+        consentObtained: true,
+      },
+    });
+    hoisted.syncReleasesFromSpotifyMock.mockResolvedValue({
+      imported: 0,
+      releases: [],
+      success: true,
+      total: 0,
+    });
 
     const { connectOnboardingSpotifyArtist } = await import(
       '@/app/onboarding/actions/connect-spotify'
@@ -638,14 +657,18 @@ describe('connectOnboardingSpotifyArtist', () => {
     });
 
     expect(result).toMatchObject({
-      success: false,
-      message:
-        'This artist already has an unclaimed Jovie profile and requires verified ownership before it can be claimed.',
+      success: true,
+      importing: false,
     });
-    expect(hoisted.selectMock).toHaveBeenCalledTimes(1);
-    expect(hoisted.withDbSessionTxMock).not.toHaveBeenCalled();
-    expect(hoisted.claimPrebuiltProfileForUserMock).not.toHaveBeenCalled();
-    expect(hoisted.updateMock).not.toHaveBeenCalled();
+    expect(hoisted.withDbSessionTxMock).toHaveBeenCalledOnce();
+    expect(hoisted.claimPrebuiltProfileForUserMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        source: 'direct_profile_spotify_match',
+        creatorProfileId: 'profile_123',
+      })
+    );
+    expect(hoisted.syncReleasesFromSpotifyMock).toHaveBeenCalledOnce();
   });
 
   it('rejects a direct-profile claim when the selected Spotify artist does not match the expected one', async () => {
