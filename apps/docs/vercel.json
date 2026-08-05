@@ -1,0 +1,7 @@
+{
+  "framework": "nextjs",
+  "installCommand": "cd ../.. && corepack enable && corepack pnpm install",
+  "buildCommand": "corepack pnpm run build",
+  "ignoreCommand": "bash -c 'R=$VERCEL_GIT_COMMIT_REF;if [[ $R == main || $R == production ]]; then exit 1; fi;cd ../.. && npx turbo-ignore @jovie/docs'",
+  "outputDirectory": ".next"
+}
