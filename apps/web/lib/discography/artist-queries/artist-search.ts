@@ -11,12 +11,15 @@ import {
   eq,
   ilike,
   inArray,
+  isNull,
+  ne,
   notInArray,
   or,
 } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   type Artist,
+  type ArtistRole,
   artists,
   discogReleases,
   discogTracks,
@@ -24,7 +27,33 @@ import {
   trackArtists,
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import type { CollaboratorInfo, CreditedArtistWithProfile } from './types';
+import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
+import {
+  isPublicArtistCollaboratorRole,
+  PUBLIC_ARTIST_COLLABORATOR_ROLES,
+} from '../artist-credit-policy';
+import { artistProfileHref } from '../artist-profile-routing';
+import type {
+  CollaboratorInfo,
+  CreditedArtistWithProfile,
+  StructuredReleaseCollaborator,
+} from './types';
+
+export interface StructuredReleaseCollaboratorRow {
+  readonly artistId: string;
+  readonly artistName: string;
+  readonly artistSpotifyId: string | null;
+  readonly artistProfileId: string | null;
+  readonly profileIsPublic: boolean | null;
+  readonly profileIsClaimed: boolean | null;
+  readonly creditName: string | null;
+  readonly role: ArtistRole;
+  readonly position: number;
+  readonly releaseId: string;
+  readonly releaseTitle: string;
+  readonly releaseSlug: string;
+  readonly releaseDate: Date | null;
+}
 
 /**
  * Search artists by name
@@ -129,6 +158,122 @@ export async function getCreditedArtistsWithProfiles(
     if (merged.length >= limit) break;
   }
   return merged;
+}
+
+/**
+ * Structured performing-artist credits for public profile prose.
+ *
+ * Identity and dedupe are registry-ID based. Display names are never used to
+ * decide who owns a profile, and every result retains its exact release edge.
+ */
+export async function getStructuredReleaseCollaborators(
+  creatorProfileId: string,
+  options: { ownerSpotifyId: string; limit?: number }
+): Promise<StructuredReleaseCollaborator[]> {
+  const limit = Math.max(1, Math.min(options?.limit ?? 24, 100));
+  const rows = await db
+    .select({
+      artistId: artists.id,
+      artistName: artists.name,
+      artistSpotifyId: artists.spotifyId,
+      artistProfileId: artists.creatorProfileId,
+      profileIsPublic: creatorProfiles.isPublic,
+      profileIsClaimed: creatorProfiles.isClaimed,
+      creditName: releaseArtists.creditName,
+      role: releaseArtists.role,
+      position: releaseArtists.position,
+      releaseId: discogReleases.id,
+      releaseTitle: discogReleases.title,
+      releaseSlug: discogReleases.slug,
+      releaseDate: discogReleases.releaseDate,
+    })
+    .from(releaseArtists)
+    .innerJoin(discogReleases, eq(releaseArtists.releaseId, discogReleases.id))
+    .innerJoin(artists, eq(releaseArtists.artistId, artists.id))
+    .leftJoin(creatorProfiles, eq(artists.creatorProfileId, creatorProfiles.id))
+    .where(
+      and(
+        eq(discogReleases.creatorProfileId, creatorProfileId),
+        inArray(releaseArtists.role, PUBLIC_ARTIST_COLLABORATOR_ROLES),
+        or(
+          isNull(artists.creatorProfileId),
+          ne(artists.creatorProfileId, creatorProfileId)
+        ),
+        or(
+          isNull(artists.spotifyId),
+          ne(artists.spotifyId, options.ownerSpotifyId)
+        ),
+        publicReleaseEligibilitySqlPredicate()
+      )
+    )
+    .orderBy(
+      drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`,
+      discogReleases.id,
+      releaseArtists.position,
+      artists.id
+    )
+    .limit(limit * 4);
+
+  return projectStructuredReleaseCollaborators({
+    creatorProfileId,
+    ownerSpotifyId: options.ownerSpotifyId,
+    rows,
+    limit,
+  });
+}
+
+export function projectStructuredReleaseCollaborators(params: {
+  readonly creatorProfileId: string;
+  readonly ownerSpotifyId: string | null;
+  readonly rows: readonly StructuredReleaseCollaboratorRow[];
+  readonly limit: number;
+}): StructuredReleaseCollaborator[] {
+  const { creatorProfileId, ownerSpotifyId, rows, limit } = params;
+  const seenEdges = new Set<string>();
+  const collaborators: StructuredReleaseCollaborator[] = [];
+
+  for (const row of rows) {
+    if (!isPublicArtistCollaboratorRole(row.role)) continue;
+
+    // Exact profile/Spotify identity excludes the profile owner. Names are not
+    // consulted because aliases and same-name artists are both legitimate.
+    if (
+      row.artistProfileId === creatorProfileId ||
+      (ownerSpotifyId && row.artistSpotifyId === ownerSpotifyId)
+    ) {
+      continue;
+    }
+
+    const name = (row.creditName ?? row.artistName).trim();
+    if (!name) continue;
+
+    const edgeKey = `${row.releaseId}:${row.artistId}:${row.role}`;
+    if (seenEdges.has(edgeKey)) continue;
+    seenEdges.add(edgeKey);
+
+    const hasPublicProfile =
+      Boolean(row.artistProfileId) && row.profileIsPublic === true;
+    collaborators.push({
+      artistId: row.artistId,
+      name,
+      href: hasPublicProfile ? artistProfileHref(row.artistId) : null,
+      profileState: hasPublicProfile
+        ? row.profileIsClaimed
+          ? 'claimed'
+          : 'unclaimed'
+        : 'unavailable',
+      role: row.role,
+      releaseId: row.releaseId,
+      releaseTitle: row.releaseTitle,
+      releaseSlug: row.releaseSlug,
+      releaseDate: row.releaseDate,
+      position: row.position,
+    });
+
+    if (collaborators.length >= limit) break;
+  }
+
+  return collaborators;
 }
 
 /**

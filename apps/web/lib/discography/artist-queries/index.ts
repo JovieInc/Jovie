@@ -23,6 +23,7 @@ export {
 export {
   getCreditedArtistsWithProfiles,
   getFrequentCollaborators,
+  getStructuredReleaseCollaborators,
   searchArtists,
 } from './artist-search';
 // Recording-artist operations
@@ -52,4 +53,5 @@ export type {
   CollaboratorInfo,
   CreditedArtistWithProfile,
   FindOrCreateArtistInput,
+  StructuredReleaseCollaborator,
 } from './types';
