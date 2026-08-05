@@ -1089,3 +1089,494 @@ export function auditMarketingCopyPage(
   }
   return issues;
 }
+
+export const MARKETING_COPY_REVIEW_ROLES = [
+  'intent',
+  'truth',
+  'compression',
+  'voice',
+] as const;
+
+export type MarketingCopyReviewRole =
+  (typeof MARKETING_COPY_REVIEW_ROLES)[number];
+
+export interface MarketingCopyPanelReview {
+  readonly reviewerId: string;
+  readonly provider: string;
+  readonly model: string;
+  readonly executionId: string;
+  readonly role: MarketingCopyReviewRole;
+  readonly verdict: 'pass' | 'fail';
+  readonly notes: readonly string[];
+  readonly reviewedSectionIds: readonly string[];
+  readonly reviewedCandidateIds: readonly string[];
+  readonly reviewedClaimIds?: readonly string[];
+  readonly reviewDigest: string;
+}
+
+function missingValues(
+  required: readonly string[],
+  received: readonly string[]
+): string[] {
+  const receivedSet = new Set(received);
+  return [...new Set(required)].filter(value => !receivedSet.has(value));
+}
+
+export function auditMarketingCopyPanel(
+  reviews: readonly MarketingCopyPanelReview[],
+  brief: MarketingCopyPageBrief,
+  draft: MarketingCopyPageDraft
+): readonly MarketingCopyAuditIssue[] {
+  const issues: MarketingCopyAuditIssue[] = [];
+  const roleCounts = new Map<MarketingCopyReviewRole, number>();
+  const reviewerIds = reviews.map(review => review.reviewerId.trim());
+  const executionIds = reviews.map(review => review.executionId.trim());
+  const models = new Set(
+    reviews
+      .filter(review => review.provider.trim() && review.model.trim())
+      .map(review => `${review.provider.trim()}/${review.model.trim()}`)
+  );
+  const expectedSectionIds = draft.sections.map(section => section.sectionId);
+  const expectedCandidateIds = draft.sections.map(
+    section => section.candidateId
+  );
+  const expectedClaimIds = draft.sections.flatMap(section => section.claimIds);
+  const expectedReviewDigest = createMarketingCopyReviewDigest(brief, draft);
+
+  for (const review of reviews) {
+    roleCounts.set(review.role, (roleCounts.get(review.role) ?? 0) + 1);
+    if (
+      !review.reviewerId.trim() ||
+      !review.provider.trim() ||
+      !review.model.trim() ||
+      !review.executionId.trim() ||
+      !review.reviewDigest.trim() ||
+      review.notes.length === 0 ||
+      review.notes.some(note => !note.trim())
+    ) {
+      issues.push({
+        code: 'invalid-panel-receipt',
+        message: `The ${review.role} review needs a complete execution receipt and substantive notes.`,
+      });
+    }
+    const missingSections = missingValues(
+      expectedSectionIds,
+      review.reviewedSectionIds
+    );
+    if (missingSections.length > 0) {
+      issues.push({
+        code: 'incomplete-panel-scope',
+        message: `${review.reviewerId || review.role} did not review: ${missingSections.join(', ')}.`,
+      });
+    }
+    const missingCandidates = missingValues(
+      expectedCandidateIds,
+      review.reviewedCandidateIds
+    );
+    if (missingCandidates.length > 0) {
+      issues.push({
+        code: 'incomplete-candidate-scope',
+        message: `${review.reviewerId || review.role} did not review candidate IDs: ${missingCandidates.join(', ')}.`,
+      });
+    }
+    if (review.reviewDigest !== expectedReviewDigest) {
+      issues.push({
+        code: 'stale-panel-receipt',
+        message: `${review.reviewerId || review.role} reviewed a different brief or copy digest.`,
+      });
+    }
+    if (review.role === 'truth') {
+      const missingClaims = missingValues(
+        expectedClaimIds,
+        review.reviewedClaimIds ?? []
+      );
+      if (missingClaims.length > 0) {
+        issues.push({
+          code: 'incomplete-truth-scope',
+          message: `The truth review did not attest to: ${missingClaims.join(', ')}.`,
+        });
+      }
+    }
+    if (review.verdict === 'fail') {
+      issues.push({
+        code: 'panel-rejection',
+        message: `${review.reviewerId || review.role} rejected the copy: ${review.notes.join(' ')}`,
+      });
+    }
+  }
+
+  for (const role of MARKETING_COPY_REVIEW_ROLES) {
+    const count = roleCounts.get(role) ?? 0;
+    if (count === 0) {
+      issues.push({
+        code: 'missing-panel-role',
+        message: `The adversarial panel is missing the ${role} review.`,
+      });
+    } else if (count > 1) {
+      issues.push({
+        code: 'duplicate-panel-role',
+        message: `The adversarial panel has more than one ${role} verdict.`,
+      });
+    }
+  }
+  if (new Set(reviewerIds).size !== reviewerIds.length) {
+    issues.push({
+      code: 'duplicate-panel-reviewer',
+      message: 'Each panel role needs an independent reviewer ID.',
+    });
+  }
+  if (new Set(executionIds).size !== executionIds.length) {
+    issues.push({
+      code: 'duplicate-panel-execution',
+      message: 'Each panel role needs a unique execution receipt.',
+    });
+  }
+  if (models.size < 2) {
+    issues.push({
+      code: 'single-model-panel',
+      message: 'The adversarial panel must use at least two distinct models.',
+    });
+  }
+
+  return issues;
+}
+
+export interface MarketingCopyTasteInboxItem {
+  readonly schemaVersion: typeof MARKETING_COPY_SPEC_VERSION;
+  readonly kind: 'marketing-copy';
+  readonly queue: 'tim-taste';
+  readonly status: 'needs-human-taste';
+  readonly pageId: string;
+  readonly route: string;
+  readonly objective: string;
+  readonly createdAt: string;
+  readonly outcomes: readonly MarketingCopyOutcome[];
+  readonly sections: readonly {
+    readonly sectionId: string;
+    readonly storyBeat: string;
+    readonly sectionJob: string;
+    readonly customerOutcome: string;
+    readonly control: MarketingCopyVisibleCopy;
+    readonly candidate: MarketingCopyVisibleCopy & {
+      readonly candidateId: string;
+      readonly meaningTrace: string;
+      readonly claimIds: readonly string[];
+      readonly lineBindings?: readonly MarketingCopyLineBinding[];
+      readonly tasteTags: readonly MarketingCopyTasteTag[];
+    };
+  }[];
+  readonly panel: readonly MarketingCopyPanelReview[];
+}
+
+export interface MarketingCopyTasteDecision {
+  readonly decisionId: string;
+  readonly reviewer: string;
+  readonly decidedAt: string;
+  readonly sections: readonly {
+    readonly sectionId: string;
+    readonly candidateId: string;
+    readonly outcome: 'approved' | 'rejected' | 'edited';
+    readonly editedCopy?: MarketingCopyVisibleCopy;
+    readonly note?: string;
+  }[];
+}
+
+export interface MarketingCopyTasteSignal {
+  readonly approved: number;
+  readonly rejected: number;
+  readonly edited: number;
+}
+
+export interface MarketingCopyTasteProfile {
+  readonly schemaVersion: typeof MARKETING_COPY_SPEC_VERSION;
+  readonly appliedDecisionIds: readonly string[];
+  readonly signals: Readonly<
+    Record<MarketingCopyTasteTag, MarketingCopyTasteSignal>
+  >;
+}
+
+export function createMarketingCopyTasteInboxItem(input: {
+  readonly brief: MarketingCopyPageBrief;
+  readonly draft: MarketingCopyPageDraft;
+  readonly reviews: readonly MarketingCopyPanelReview[];
+  readonly createdAt: string;
+  readonly changedSectionIds?: readonly string[];
+}): MarketingCopyTasteInboxItem {
+  const issues = [
+    ...auditMarketingCopyPage(input.brief, input.draft),
+    ...auditMarketingCopySemantics(input.brief, input.draft, {
+      enforcement: 'delta',
+      changedSectionIds: input.changedSectionIds,
+    }).issues,
+    ...auditMarketingCopyPanel(input.reviews, input.brief, input.draft),
+  ];
+  if (issues.length > 0) {
+    throw new Error(
+      `Marketing copy cannot enter Taste Inbox:\n${issues.map(issue => `- ${issue.code}: ${issue.message}`).join('\n')}`
+    );
+  }
+
+  const briefById = new Map(
+    input.brief.sections.map(section => [section.sectionId, section])
+  );
+  return {
+    schemaVersion: MARKETING_COPY_SPEC_VERSION,
+    kind: 'marketing-copy',
+    queue: 'tim-taste',
+    status: 'needs-human-taste',
+    pageId: input.draft.pageId,
+    route: input.draft.route,
+    objective: input.brief.objective,
+    createdAt: input.createdAt,
+    outcomes: input.brief.outcomes ?? [],
+    sections: input.draft.sections.map(section => {
+      const sectionBrief = briefById.get(section.sectionId);
+      if (!sectionBrief) {
+        throw new Error(`Missing brief for ${section.sectionId}.`);
+      }
+      return {
+        sectionId: section.sectionId,
+        storyBeat: sectionBrief.storyBeat,
+        sectionJob: sectionBrief.sectionJob,
+        customerOutcome: sectionBrief.customerOutcome,
+        control: section.control,
+        candidate: {
+          candidateId: section.candidateId,
+          headline: section.headline,
+          body: section.body,
+          supportingText: section.supportingText,
+          meaningTrace: section.meaningTrace,
+          claimIds: section.claimIds,
+          lineBindings: section.lineBindings,
+          tasteTags: section.tasteTags,
+        },
+      };
+    }),
+    panel: input.reviews,
+  };
+}
+
+export function createEmptyMarketingCopyTasteProfile(): MarketingCopyTasteProfile {
+  return {
+    schemaVersion: MARKETING_COPY_SPEC_VERSION,
+    appliedDecisionIds: [],
+    signals: Object.fromEntries(
+      MARKETING_COPY_TASTE_TAGS.map(tag => [
+        tag,
+        { approved: 0, rejected: 0, edited: 0 },
+      ])
+    ) as Record<MarketingCopyTasteTag, MarketingCopyTasteSignal>,
+  };
+}
+
+function assertMarketingCopyTasteProfile(
+  profile: MarketingCopyTasteProfile
+): void {
+  if (profile.schemaVersion !== MARKETING_COPY_SPEC_VERSION) {
+    throw new Error(
+      `Unsupported marketing copy taste profile schema ${String(profile.schemaVersion)}.`
+    );
+  }
+  if (!profile.signals || typeof profile.signals !== 'object') {
+    throw new Error('Marketing copy taste profile signals are malformed.');
+  }
+  if (
+    !Array.isArray(profile.appliedDecisionIds) ||
+    profile.appliedDecisionIds.some(id => !isCanonicalTasteDecisionId(id)) ||
+    new Set(profile.appliedDecisionIds.map(normalizeTasteDecisionId)).size !==
+      profile.appliedDecisionIds.length
+  ) {
+    throw new Error(
+      'Marketing copy taste profile decision receipts are malformed.'
+    );
+  }
+  const signalRecord = profile.signals as Partial<
+    Record<MarketingCopyTasteTag, MarketingCopyTasteSignal>
+  >;
+  const expectedTags = new Set<string>(MARKETING_COPY_TASTE_TAGS);
+  if (
+    Object.keys(profile.signals).some(tag => !expectedTags.has(tag)) ||
+    Object.keys(profile.signals).length !== MARKETING_COPY_TASTE_TAGS.length
+  ) {
+    throw new Error(
+      'Marketing copy taste profile tags do not match the schema.'
+    );
+  }
+  for (const tag of MARKETING_COPY_TASTE_TAGS) {
+    const signal = signalRecord[tag];
+    if (
+      !signal ||
+      ![signal.approved, signal.rejected, signal.edited].every(
+        count => Number.isSafeInteger(count) && count >= 0
+      )
+    ) {
+      throw new Error(`Marketing copy taste signal ${tag} is malformed.`);
+    }
+  }
+}
+
+function normalizeTasteDecisionId(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function isCanonicalTasteDecisionId(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const normalized = normalizeTasteDecisionId(value);
+  return (
+    value === normalized && /^[a-z0-9]+(?:[._:/-][a-z0-9]+)*$/.test(normalized)
+  );
+}
+
+function assertMarketingCopyTasteInboxItem(
+  item: MarketingCopyTasteInboxItem
+): void {
+  if (item.schemaVersion !== MARKETING_COPY_SPEC_VERSION) {
+    throw new Error(
+      `Unsupported marketing copy Taste Inbox schema ${String(item.schemaVersion)}.`
+    );
+  }
+  for (const section of item.sections) {
+    const tags = section.candidate.tasteTags;
+    if (
+      !Array.isArray(tags) ||
+      tags.length === 0 ||
+      tags.some(
+        tag =>
+          typeof tag !== 'string' ||
+          !tag.trim() ||
+          !MARKETING_COPY_TASTE_TAG_SET.has(tag)
+      ) ||
+      new Set(tags).size !== tags.length
+    ) {
+      throw new Error(
+        `Taste Inbox candidate ${section.sectionId}/${section.candidate.candidateId} has malformed taste tags.`
+      );
+    }
+    const lineBindings = section.candidate.lineBindings ?? [];
+    const lineIds = lineBindings.map(binding => binding.lineId);
+    if (new Set(lineIds).size !== lineIds.length) {
+      throw new Error(
+        `Taste Inbox candidate ${section.sectionId}/${section.candidate.candidateId} has duplicate line bindings.`
+      );
+    }
+    const outcomeIds = new Set(item.outcomes.map(outcome => outcome.id));
+    for (const binding of lineBindings) {
+      if (binding.outcomeId && !outcomeIds.has(binding.outcomeId)) {
+        throw new Error(
+          `Taste Inbox candidate ${section.sectionId}/${section.candidate.candidateId} cites unknown outcome ${binding.outcomeId}.`
+        );
+      }
+    }
+  }
+}
+
+export function applyMarketingCopyTasteDecision(
+  profile: MarketingCopyTasteProfile,
+  item: MarketingCopyTasteInboxItem,
+  decision: MarketingCopyTasteDecision
+): MarketingCopyTasteProfile {
+  assertMarketingCopyTasteProfile(profile);
+  assertMarketingCopyTasteInboxItem(item);
+  if (!isCanonicalTasteDecisionId(decision.decisionId)) {
+    throw new Error(
+      'Taste decisions require a canonical lowercase stable decision ID.'
+    );
+  }
+  const decisionId = normalizeTasteDecisionId(decision.decisionId);
+  if (
+    profile.appliedDecisionIds
+      .map(normalizeTasteDecisionId)
+      .includes(decisionId)
+  ) {
+    throw new Error(
+      `Taste decision ${decision.decisionId} has already been applied.`
+    );
+  }
+  if (!decision.reviewer.trim()) {
+    throw new Error('Taste decisions require an authenticated reviewer ID.');
+  }
+  const decidedAt = new Date(decision.decidedAt);
+  if (
+    Number.isNaN(decidedAt.getTime()) ||
+    decidedAt.toISOString() !== decision.decidedAt
+  ) {
+    throw new Error('Taste decisions require a valid decision timestamp.');
+  }
+  if (decision.sections.length === 0) {
+    throw new Error('Taste decisions must include at least one section.');
+  }
+
+  const next = Object.fromEntries(
+    MARKETING_COPY_TASTE_TAGS.map(tag => [
+      tag,
+      {
+        approved: profile.signals[tag].approved,
+        rejected: profile.signals[tag].rejected,
+        edited: profile.signals[tag].edited,
+      },
+    ])
+  ) as Record<MarketingCopyTasteTag, MarketingCopyTasteSignal>;
+  const seen = new Set<string>();
+
+  for (const sectionDecision of decision.sections) {
+    const decisionKey = `${sectionDecision.sectionId}/${sectionDecision.candidateId}`;
+    if (seen.has(decisionKey)) {
+      throw new Error(`Duplicate taste decision for ${decisionKey}.`);
+    }
+    seen.add(decisionKey);
+    const section = item.sections.find(
+      candidate =>
+        candidate.sectionId === sectionDecision.sectionId &&
+        candidate.candidate.candidateId === sectionDecision.candidateId
+    );
+    if (!section) {
+      throw new Error(
+        `Taste decision references unknown candidate ${sectionDecision.sectionId}/${sectionDecision.candidateId}.`
+      );
+    }
+    if (sectionDecision.outcome === 'edited') {
+      if (!sectionDecision.editedCopy?.headline.trim()) {
+        throw new Error(
+          `Edited taste decision ${decisionKey} needs complete edited copy.`
+        );
+      }
+      if (
+        (section.candidate.body !== undefined &&
+          typeof sectionDecision.editedCopy.body !== 'string') ||
+        (section.candidate.supportingText !== undefined &&
+          !Array.isArray(sectionDecision.editedCopy.supportingText))
+      ) {
+        throw new Error(
+          `Edited taste decision ${decisionKey} must include the complete resulting visible copy.`
+        );
+      }
+      if (
+        normalizeMarketingCopyVisibleCopy(sectionDecision.editedCopy) ===
+        normalizeMarketingCopyVisibleCopy(section.candidate)
+      ) {
+        throw new Error(
+          `Edited taste decision ${decisionKey} must change visible copy.`
+        );
+      }
+    } else if (sectionDecision.editedCopy) {
+      throw new Error(
+        `${sectionDecision.outcome} taste decision ${decisionKey} cannot include edited copy.`
+      );
+    }
+    for (const tag of section.candidate.tasteTags) {
+      if (!Number.isSafeInteger(next[tag][sectionDecision.outcome] + 1)) {
+        throw new Error(`Marketing copy taste signal ${tag} would overflow.`);
+      }
+      next[tag] = {
+        ...next[tag],
+        [sectionDecision.outcome]: next[tag][sectionDecision.outcome] + 1,
+      };
+    }
+  }
+
+  return {
+    schemaVersion: MARKETING_COPY_SPEC_VERSION,
+    appliedDecisionIds: [...profile.appliedDecisionIds, decisionId],
+    signals: next,
+  };
+}
