@@ -102,7 +102,6 @@ const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
 const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
-  'apps/web/app/app/(shell)/chat/loading.tsx',
   'apps/web/app/exp/shell-v1/page.tsx',
   'apps/web/components/jovie/components/ChatInput.tsx',
   'apps/web/components/organisms/SharedCommandPalette.tsx',
@@ -1014,12 +1013,27 @@ export async function runCommand(command, args) {
   process.exit(await runCommandStatus(command, args));
 }
 
-async function runCommands(commands) {
-  for (const [command, args] of commands) {
-    const status = await runCommandStatus(command, args);
-    if (status !== 0) process.exit(status);
+async function runCommands(commands, concurrency = 1) {
+  const workerCount = Math.max(
+    1,
+    Math.min(commands.length, Number.parseInt(concurrency, 10) || 1)
+  );
+  let cursor = 0;
+  let failureStatus = 0;
+
+  async function worker() {
+    while (failureStatus === 0) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= commands.length) return;
+      const [command, args] = commands[index];
+      const status = await runCommandStatus(command, args);
+      if (status !== 0) failureStatus = status;
+    }
   }
-  process.exit(0);
+
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  process.exit(failureStatus);
 }
 
 export function buildSelectedTestCommands(plan, maxWorkers) {
@@ -1101,6 +1115,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const base = argValue(args, '--base', 'origin/main');
   const maxWorkers = argValue(args, '--max-workers', '2');
+  const shardConcurrency = argValue(args, '--shard-concurrency', '2');
   const plan = buildAffectedTestPlan(changedFiles(base));
   if (args.includes('--dry-run')) {
     console.log(JSON.stringify(plan, null, 2));
@@ -1113,10 +1128,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (plan.mode === 'none') process.exit(0);
   if (plan.mode === 'full') {
     // A single Vitest process retains enough module/reporting state across the
-    // 2k-file web suite to trigger host memory pressure near teardown. Run
-    // deterministic sequential shards so each process releases memory before
-    // the next shard starts while preserving complete full-suite coverage.
-    await runCommands(buildFullSuiteCommands(maxWorkers));
+    // 2k-file web suite to trigger host memory pressure near teardown. Keep
+    // deterministic, bounded-memory shards, but schedule a small bounded set
+    // concurrently so a complete fail-closed suite does not serialize all 8.
+    await runCommands(buildFullSuiteCommands(maxWorkers), shardConcurrency);
   }
 
   await runCommands(buildSelectedTestCommands(plan, maxWorkers));

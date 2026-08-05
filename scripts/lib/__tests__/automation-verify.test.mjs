@@ -127,7 +127,6 @@ const SCANNER_LOAD_REPAIR_MANIFEST = [
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
 const AUTHENTICATED_A11Y_REPAIR_CORE = [
-  'apps/web/app/app/(shell)/chat/loading.tsx',
   'apps/web/app/exp/shell-v1/page.tsx',
   'apps/web/components/jovie/components/ChatInput.tsx',
   'apps/web/components/organisms/SharedCommandPalette.tsx',
@@ -378,6 +377,9 @@ describe('automation-verify affected scope', () => {
   it('bounds local test fanout', () => {
     expect(script).toContain(
       '--max-workers "${AUTOMATION_VERIFY_MAX_WORKERS:-2}"'
+    );
+    expect(script).toContain(
+      '--shard-concurrency "${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-2}"'
     );
   });
 
@@ -644,7 +646,7 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
-  it('splits the full web suite into sequential bounded-memory shards', () => {
+  it('splits the full web suite into bounded-memory shards', () => {
     const commands = buildFullSuiteCommands('2', 2);
 
     expect(commands).toEqual([
