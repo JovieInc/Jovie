@@ -48,6 +48,14 @@ interface CandidateOutcome {
   readonly handle?: string;
 }
 
+interface CandidateReconciliationState {
+  conflicted: number;
+  created: number;
+  metadataUnavailable: number;
+  reused: number;
+  readonly handlesToInvalidate: Set<string>;
+}
+
 interface LockedRegistryArtist {
   readonly id: string;
   readonly metadata: Record<string, unknown> | null;
@@ -159,7 +167,7 @@ async function markArtistProfileConflict(
     .update(artists)
     .set({
       metadata: {
-        ...(artist.metadata ?? {}),
+        ...artist.metadata,
         [PROFILE_RECONCILIATION_CONFLICT_KEY]: {
           status: 'conflicted',
           reason,
@@ -197,7 +205,7 @@ async function reconcileCandidate(
         .for('update')
         .limit(1);
 
-      if (!lockedArtist || lockedArtist.spotifyId !== candidate.spotifyId) {
+      if (lockedArtist?.spotifyId !== candidate.spotifyId) {
         return { status: 'conflicted' };
       }
       if (lockedArtist.creatorProfileId) {
@@ -351,6 +359,61 @@ async function reconcileCandidate(
   );
 }
 
+function recordCandidateOutcome(
+  state: CandidateReconciliationState,
+  outcome: CandidateOutcome
+): void {
+  switch (outcome.status) {
+    case 'created':
+      state.created += 1;
+      break;
+    case 'reused':
+      state.reused += 1;
+      break;
+    case 'conflicted':
+      state.conflicted += 1;
+      break;
+  }
+  if (outcome.handle) state.handlesToInvalidate.add(outcome.handle);
+}
+
+async function reconcileCandidatePlan(
+  creatorProfileId: string,
+  plan: ReturnType<typeof buildCreditedArtistReconciliationPlan>
+): Promise<CandidateReconciliationState> {
+  const state: CandidateReconciliationState = {
+    created: 0,
+    reused: 0,
+    conflicted: 0,
+    metadataUnavailable: 0,
+    handlesToInvalidate: new Set<string>(),
+  };
+
+  for (const { candidate, spotifyArtist } of plan) {
+    if (!spotifyArtist) state.metadataUnavailable += 1;
+
+    try {
+      recordCandidateOutcome(
+        state,
+        await reconcileCandidate(candidate, spotifyArtist)
+      );
+    } catch (error) {
+      state.conflicted += 1;
+      await captureWarning(
+        'Credited artist profile reconciliation failed closed',
+        error,
+        {
+          creatorProfileId,
+          artistId: candidate.artistId,
+          spotifyId: candidate.spotifyId,
+        }
+      );
+    }
+  }
+
+  return state;
+}
+
 /**
  * Reconcile imported Spotify release credits into claim-safe Jovie profiles.
  *
@@ -385,34 +448,13 @@ export async function reconcileCreditedArtistProfiles(
     spotifyArtists
   );
 
-  let created = 0;
-  let reused = 0;
-  let conflicted = 0;
-  let metadataUnavailable = 0;
-  const handlesToInvalidate = new Set<string>();
-
-  for (const { candidate, spotifyArtist } of plan) {
-    if (!spotifyArtist) metadataUnavailable += 1;
-
-    try {
-      const outcome = await reconcileCandidate(candidate, spotifyArtist);
-      if (outcome.status === 'created') created += 1;
-      else if (outcome.status === 'reused') reused += 1;
-      else conflicted += 1;
-      if (outcome.handle) handlesToInvalidate.add(outcome.handle);
-    } catch (error) {
-      conflicted += 1;
-      await captureWarning(
-        'Credited artist profile reconciliation failed closed',
-        error,
-        {
-          creatorProfileId,
-          artistId: candidate.artistId,
-          spotifyId: candidate.spotifyId,
-        }
-      );
-    }
-  }
+  const {
+    conflicted,
+    created,
+    handlesToInvalidate,
+    metadataUnavailable,
+    reused,
+  } = await reconcileCandidatePlan(creatorProfileId, plan);
 
   const result = {
     candidates: plan.length,

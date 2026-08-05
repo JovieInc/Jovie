@@ -39,8 +39,7 @@ export function readStructuredCreditProfileMarker(
 ): StructuredCreditProfileMarker | null {
   const marker = asRecord(asRecord(settings)?.unclaimedArtistProfile);
   if (
-    !marker ||
-    marker.source !== STRUCTURED_CREDIT_SOURCE ||
+    marker?.source !== STRUCTURED_CREDIT_SOURCE ||
     marker.provider !== 'spotify' ||
     (marker.state !== 'unclaimed' && marker.state !== 'claimed') ||
     typeof marker.artistRegistryId !== 'string' ||
@@ -70,7 +69,7 @@ export function markStructuredCreditProfileClaimed(
   claimedAt: Date
 ): Record<string, unknown> {
   const marker = readStructuredCreditProfileMarker(settings);
-  if (!marker || marker.state !== 'unclaimed') return settings;
+  if (marker?.state !== 'unclaimed') return settings;
 
   return {
     ...settings,
