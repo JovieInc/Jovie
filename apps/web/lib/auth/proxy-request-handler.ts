@@ -1,4 +1,8 @@
-import { type NextRequest, NextResponse } from 'next/server';
+import {
+  type NextFetchEvent,
+  type NextRequest,
+  NextResponse,
+} from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   APP_SHELL_MODE_HEADER,
@@ -32,6 +36,36 @@ import { isReservedUsername } from '@/lib/validation/username-core';
 // Pre-compiled regex for bot detection (O(1) vs O(n) array iteration)
 const META_BOT_REGEX =
   /facebookexternalhit|facebot|facebook|instagram|whatsapp/i;
+
+// The public profile HTML can be cached at the edge; a cold audience lookup
+// must not hold that response behind a multi-second Redis/Neon recovery. The
+// full check keeps running through waitUntil and warms durable state, while the
+// visitor-facing path preserves the helper's established fail-open policy.
+const AUDIENCE_BLOCK_RESPONSE_BUDGET_MS = 150;
+
+async function resolveAudienceBlockWithinResponseBudget(
+  checkPromise: Promise<boolean>,
+  event?: Pick<NextFetchEvent, 'waitUntil'>
+): Promise<boolean> {
+  if (!event) return checkPromise;
+
+  const settledCheck = checkPromise.catch(() => false);
+  event.waitUntil(settledCheck.then(() => undefined));
+
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const responseBudget = new Promise<boolean>(resolve => {
+    timeoutId = setTimeout(
+      () => resolve(false),
+      AUDIENCE_BLOCK_RESPONSE_BUDGET_MS
+    );
+  });
+
+  try {
+    return await Promise.race([settledCheck, responseBudget]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
 
 /**
  * Fast bot detection using pre-compiled regex
@@ -77,7 +111,8 @@ function generateNonce(): string {
  */
 export async function handleProxyRequest(
   req: NextRequest,
-  userId: string | null
+  userId: string | null,
+  event?: Pick<NextFetchEvent, 'waitUntil'>
 ) {
   // Derive shell mode from the original public pathname before Next rewrites
   // `/app/ov/*` onto its physical route implementation. Never forward a
@@ -226,10 +261,9 @@ export async function handleProxyRequest(
       if (profileUsername) {
         const rawIp = getAudienceBlockIpFromHeaders(req.headers);
         const ua = req.headers.get('user-agent');
-        const isBlocked = await checkProfileVisitorBlocked(
-          profileUsername,
-          rawIp,
-          ua
+        const isBlocked = await resolveAudienceBlockWithinResponseBudget(
+          checkProfileVisitorBlocked(profileUsername, rawIp, ua),
+          event
         );
         if (isBlocked) {
           return NextResponse.redirect('https://jov.ie');

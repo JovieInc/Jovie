@@ -149,9 +149,11 @@ import {
   USER_STATES,
 } from './proxy-test-harness';
 
-function createFetchEvent() {
+function createFetchEvent(
+  waitUntil: (promise: Promise<unknown>) => void = () => {}
+) {
   return {
-    waitUntil: () => {},
+    waitUntil,
     passThroughOnException: () => {},
   } as unknown as import('next/server').NextFetchEvent;
 }
@@ -174,9 +176,10 @@ function createUnauthenticatedRequest(
 
 /** Call middleware and assert the result is a NextResponse (not undefined). */
 async function callMiddleware(
-  req: import('next/server').NextRequest
+  req: import('next/server').NextRequest,
+  event = createFetchEvent()
 ): Promise<NextResponse> {
-  const result = await middleware(req, createFetchEvent());
+  const result = await middleware(req, event);
   expect(result).toBeDefined();
   return result as NextResponse;
 }
@@ -287,6 +290,7 @@ describe('proxy.ts middleware', () => {
       '/dualipa/listen/__profile-mode-alias/resolve',
       '/tim/subscribe/__profile-mode-alias/resolve',
       '/tim/subscribe/__profile-mode-alias/resolve/qr',
+      '/tim/profile-mode-render/listen/__profile-mode-alias',
       `/tim/subscribe/__profile-mode-alias/resolve/${'q'.repeat(256)}`,
       '/tim/subscribe/__profile%2Dmode%2Dalias/resolve/qr',
       '/tim/subscribe/%5F%5Fprofile-mode-alias/resolve/qr',
@@ -741,6 +745,42 @@ describe('proxy.ts middleware', () => {
         'masked-ip',
         'Mozilla/5.0'
       );
+    });
+
+    it('applies the same audience block redirect to authenticated visitors', async () => {
+      mocks.checkProfileVisitorBlocked.mockResolvedValue(true);
+      const req = createAuthenticatedRequest('user_test', {
+        pathname: '/timwhite',
+        headers: { 'user-agent': 'Mozilla/5.0' },
+      });
+
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(307);
+      expect(res.headers.get('location')).toBe('https://jov.ie/');
+    });
+
+    it('bounds a cold audience lookup and keeps its reconciliation alive', async () => {
+      let resolveBlockCheck: ((blocked: boolean) => void) | undefined;
+      mocks.checkProfileVisitorBlocked.mockReturnValue(
+        new Promise<boolean>(resolve => {
+          resolveBlockCheck = resolve;
+        })
+      );
+      const backgroundWork: Promise<unknown>[] = [];
+      const event = createFetchEvent(promise => backgroundWork.push(promise));
+      const req = createUnauthenticatedRequest({ pathname: '/timwhite' });
+
+      const startedAt = performance.now();
+      const res = await callMiddleware(req, event);
+      const durationMs = performance.now() - startedAt;
+
+      expect(res.status).toBeLessThan(300);
+      expect(durationMs).toBeLessThan(250);
+      expect(backgroundWork).toHaveLength(1);
+
+      resolveBlockCheck?.(true);
+      await Promise.all(backgroundWork);
     });
 
     it('normalizes /sign-in to /signin', async () => {
