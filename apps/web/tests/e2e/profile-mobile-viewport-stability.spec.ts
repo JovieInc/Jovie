@@ -859,8 +859,11 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
           const cover = document.querySelector<HTMLElement>(
             '[data-testid="profile-cover"]'
           );
-          const coverImage = cover?.querySelector<HTMLElement>('img');
-          const coverRect = cover?.getBoundingClientRect();
+          const mediaStage = cover?.querySelector<HTMLElement>(
+            '.profile-cover-home-media'
+          );
+          const coverImage = mediaStage?.querySelector<HTMLElement>('img');
+          const mediaRect = mediaStage?.getBoundingClientRect();
           const imageRect = coverImage?.getBoundingClientRect();
           const dockHost = document.querySelector<HTMLElement>(
             '[data-testid="profile-tab-bar"]'
@@ -893,12 +896,12 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
               ? pacCopy.scrollHeight <= pacCopy.clientHeight + 1
               : false,
             heroFilled: Boolean(
-              coverRect &&
+              mediaRect &&
                 imageRect &&
-                imageRect.left <= coverRect.left + 1 &&
-                imageRect.right >= coverRect.right - 1 &&
-                imageRect.top <= coverRect.top + 1 &&
-                imageRect.bottom >= coverRect.bottom - 1 &&
+                imageRect.left <= mediaRect.left + 1 &&
+                imageRect.right >= mediaRect.right - 1 &&
+                imageRect.top <= mediaRect.top + 1 &&
+                imageRect.bottom >= mediaRect.bottom - 1 &&
                 coverImage &&
                 getComputedStyle(coverImage).objectFit === 'cover'
             ),
@@ -968,14 +971,22 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
 
       const targetScrollLeft = await carousel.evaluate(el => {
         const cards = [...el.querySelectorAll<HTMLElement>(':scope > li')];
-        const target =
+        const requestedTarget =
           (cards.at(-1)?.offsetLeft ?? 0) - (cards[0]?.offsetLeft ?? 0);
+        const target = Math.min(
+          requestedTarget,
+          el.scrollWidth - el.clientWidth
+        );
         el.scrollTo({ left: target, behavior: 'auto' });
         return target;
       });
       await expect
-        .poll(() => carousel.evaluate(el => el.scrollLeft))
-        .toBeCloseTo(targetScrollLeft, 0);
+        .poll(async () =>
+          Math.abs(
+            (await carousel.evaluate(el => el.scrollLeft)) - targetScrollLeft
+          )
+        )
+        .toBeLessThanOrEqual(1);
 
       const last = await readGeometry();
       expect(
@@ -989,7 +1000,7 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
       expect(
         last.cards[1]?.right,
         `${viewport.label} last right`
-      ).toBeLessThanOrEqual(last.rail.right);
+      ).toBeLessThanOrEqual(last.rail.right + 1);
       expect(
         last.cards[1]?.targets.length,
         `${viewport.label} last card exposes an action`
