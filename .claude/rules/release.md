@@ -9,8 +9,10 @@ PR discipline, ship validation, branch strategy, deploy flow, bot-review blockin
 - Max 40 files changed per PR (excluding lockfiles, generated files, snapshots, svg)
 - Max 800 lines of diff (additions + deletions) — enforced by `pr-size-guard.yml`
   (repo vars `PR_MAX_LINES`/`PR_MAX_FILES`); approved mechanical codemods use `big-pr`
-- If a task requires more, split into a `gt` stack with clear dependencies
-  (see [`.claude/rules/pr-stacking.md`](pr-stacking.md))
+- If a task requires more, split into a native GitHub stacked-PR sequence with
+  clear dependencies; push each layer normally, open children against their
+  immediate parent while draft, then retarget/rebase each child onto `main`
+  after its parent lands (see [`.claude/rules/pr-stacking.md`](pr-stacking.md))
 
 ### Pre-Push Gate
 
