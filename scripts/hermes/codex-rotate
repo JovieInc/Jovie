@@ -1,0 +1,221 @@
+#!/usr/bin/env bash
+# Concurrency-safe multi-account Codex launcher for Symphony.
+set -euo pipefail
+
+REAL_CODEX="${CODEX_REAL_BIN:-$HOME/.local/bin/codex}"
+ACCOUNTS_ROOT="${CODEX_ACCOUNTS_ROOT:-$HOME/.codex-accounts}"
+STATE_FILE="${CODEX_ACCOUNTS_STATE:-$ACCOUNTS_ROOT/state.json}"
+LOG_FILE="${CODEX_ROTATE_LOG:-$ACCOUNTS_ROOT/rotate.log}"
+LOCKS_DIR="${CODEX_ACCOUNT_LOCKS_DIR:-$ACCOUNTS_ROOT/locks}"
+WAIT_SECONDS="${CODEX_ACCOUNT_WAIT_SECONDS:-900}"
+DEFAULT_COOLDOWN_SECONDS="${CODEX_DEFAULT_COOLDOWN_SECONDS:-21600}"
+
+mkdir -p "$LOCKS_DIR"
+touch "$LOG_FILE"
+chmod 600 "$LOG_FILE" 2>/dev/null || true
+
+log() {
+  printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >>"$LOG_FILE"
+}
+
+if ! command -v flock >/dev/null 2>&1; then
+  log "ERROR flock unavailable"
+  echo "codex-rotate: flock is required for account leasing" >&2
+  exit 2
+fi
+
+if [[ ! -f "$STATE_FILE" ]]; then
+  printf '%s\n' '{"active":null,"cooldowns":{},"last_error":{}}' >"$STATE_FILE"
+  chmod 600 "$STATE_FILE"
+fi
+
+account_order() {
+  ACCOUNTS_ROOT="$ACCOUNTS_ROOT" STATE_FILE="$STATE_FILE" python3 - <<'PY'
+import json
+import os
+import time
+import fcntl
+from pathlib import Path
+
+root = Path(os.environ["ACCOUNTS_ROOT"])
+state_path = Path(os.environ["STATE_FILE"])
+with open(str(state_path) + ".lock", "a+") as lock:
+    fcntl.flock(lock, fcntl.LOCK_SH)
+    try:
+        state = json.loads(state_path.read_text())
+    except Exception:
+        state = {"active": None, "cooldowns": {}}
+accounts = sorted(
+    path.name
+    for path in root.iterdir()
+    if path.is_dir() and (path / "auth.json").is_file()
+)
+now = int(time.time())
+cooldowns = state.get("cooldowns") or {}
+ready = [name for name in accounts if int(cooldowns.get(name) or 0) <= now]
+if not ready and accounts:
+    ready = [min(accounts, key=lambda name: int(cooldowns.get(name) or 0))]
+active = state.get("active")
+if active in ready:
+    ready.remove(active)
+    ready.insert(0, active)
+print("\n".join(ready))
+PY
+}
+
+set_active() {
+  ACCOUNT="$1" STATE_FILE="$STATE_FILE" python3 - <<'PY'
+import json
+import os
+import fcntl
+from pathlib import Path
+
+path = Path(os.environ["STATE_FILE"])
+with open(str(path) + ".lock", "a+") as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    try:
+        state = json.loads(path.read_text())
+    except Exception:
+        state = {"active": None, "cooldowns": {}, "last_error": {}}
+    state["active"] = os.environ["ACCOUNT"]
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(state, indent=2) + "\n")
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, path)
+PY
+}
+
+mark_cooldown() {
+  ACCOUNT="$1" UNTIL="$2" STATE_FILE="$STATE_FILE" python3 - <<'PY'
+import json
+import os
+import time
+import fcntl
+from pathlib import Path
+
+path = Path(os.environ["STATE_FILE"])
+with open(str(path) + ".lock", "a+") as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    try:
+        state = json.loads(path.read_text())
+    except Exception:
+        state = {"active": None, "cooldowns": {}, "last_error": {}}
+    account = os.environ["ACCOUNT"]
+    until = int(os.environ["UNTIL"])
+    state.setdefault("cooldowns", {})[account] = until
+    state.setdefault("last_error", {})[account] = {
+        "reason": "limit_or_auth",
+        "at": int(time.time()),
+        "until": until,
+    }
+    if state.get("active") == account:
+        state["active"] = None
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(state, indent=2) + "\n")
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, path)
+PY
+}
+
+cooldown_until() {
+  ERROR_FILE="$1" DEFAULT_SECONDS="$DEFAULT_COOLDOWN_SECONDS" python3 - <<'PY'
+import os
+import re
+import time
+from datetime import datetime, timezone
+
+try:
+    from zoneinfo import ZoneInfo
+except Exception:
+    ZoneInfo = None
+
+text = open(os.environ["ERROR_FILE"], encoding="utf-8", errors="replace").read()
+patterns = [
+    r"try again at\s+([A-Za-z]{3,9}\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\s+\d{1,2}:\d{2}\s*[APMapm]{2})",
+    r"try again at\s+(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:?\d{2})?)",
+]
+match = next((found for pattern in patterns if (found := re.search(pattern, text, re.I))), None)
+fallback = int(time.time()) + int(os.environ["DEFAULT_SECONDS"])
+if match is None:
+    print(fallback)
+    raise SystemExit
+raw = re.sub(r"(\d+)(st|nd|rd|th)", r"\1", match.group(1)).replace(",", "")
+parsed = None
+for fmt in (
+    "%b %d %Y %I:%M %p",
+    "%B %d %Y %I:%M %p",
+    "%Y-%m-%dT%H:%M:%S%z",
+    "%Y-%m-%dT%H:%M:%S",
+    "%Y-%m-%d %H:%M:%S",
+):
+    try:
+        parsed = datetime.strptime(raw.strip(), fmt)
+        break
+    except ValueError:
+        continue
+if parsed is None:
+    print(fallback)
+    raise SystemExit
+if parsed.tzinfo is None:
+    parsed = parsed.replace(
+        tzinfo=ZoneInfo("America/Los_Angeles") if ZoneInfo else timezone.utc
+    )
+print(int(parsed.timestamp()))
+PY
+}
+
+started_at=$(date +%s)
+account=""
+account_lock_fd=""
+while [[ -z "$account" ]]; do
+  while IFS= read -r candidate; do
+    [[ -n "$candidate" ]] || continue
+    exec {candidate_fd}>"$LOCKS_DIR/$candidate.lock"
+    if flock -n "$candidate_fd"; then
+      account="$candidate"
+      account_lock_fd="$candidate_fd"
+      break
+    fi
+    exec {candidate_fd}>&-
+  done < <(account_order)
+
+  if [[ -n "$account" ]]; then
+    break
+  fi
+  if (( $(date +%s) - started_at >= WAIT_SECONDS )); then
+    log "WAIT_TIMEOUT seconds=$WAIT_SECONDS"
+    echo "codex-rotate: all account slots are busy" >&2
+    exit 75
+  fi
+  sleep 1
+done
+
+home="$ACCOUNTS_ROOT/$account"
+if [[ ! -f "$home/auth.json" || ! -f "$home/config.toml" ]]; then
+  log "ERROR incomplete account=$account"
+  echo "codex-rotate: account $account is missing auth.json or config.toml" >&2
+  exit 2
+fi
+
+set_active "$account"
+export CODEX_HOME="$home"
+log "START account=$account lease_fd=$account_lock_fd args=$*"
+
+tmp_err=$(mktemp)
+trap 'rm -f "$tmp_err"' EXIT
+set +e
+"$REAL_CODEX" "$@" 2> >(tee -a "$tmp_err" >&2)
+rc=$?
+set -e
+
+if grep -qiE 'usage limit|rate limit|429|token_invalidated|refresh token was revoked|token_expired|token is expired|session has ended|hit your usage limit' "$tmp_err"; then
+  until="$(cooldown_until "$tmp_err")"
+  mark_cooldown "$account" "$until"
+  log "COOLDOWN account=$account until=$until rc=$rc"
+  if [[ "$rc" -eq 0 ]]; then
+    rc=75
+  fi
+fi
+
+log "EXIT account=$account rc=$rc"
+exit "$rc"
