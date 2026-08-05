@@ -24,14 +24,18 @@ If you are an agent about to open a PR, read [Agent checklist](#agent-checklist)
   (`pr-size-guard`, repo vars `PR_MAX_LINES`/`PR_MAX_FILES`; mechanical codemods
   use `big-pr`). Independent changes are **sibling PRs off `main`** — parallel,
   never based on each other.
-- **Dependent work → a real `gt` stack** (`gt create` per step; restacks once;
-  children auto-retarget to `main` as bases land). **Never** hand-create N
-  base-on-base PRs — that ran 63 full CI pipelines for one diff and collapsed the
-  queue (#11689). One mechanical sweep = **one `big-pr` PR**
+- **Dependent work → a native GitHub stacked-PR sequence.** Push each layer
+  normally and open it against its immediate parent. After the parent lands,
+  retarget the child to `main`, rebase onto the new `origin/main`, push with
+  `--force-with-lease`, and wait for fresh checks before queue enrollment.
+  Record the branch, PR, base, and head SHA for every layer. Do not create an
+  uncontrolled base-on-base pile; one mechanical sweep = **one `big-pr` PR**
   ([`pr-stacking.md`](../.claude/rules/pr-stacking.md)).
-- **Always target `main`** (or a live integration branch), **never an ephemeral
-  stack-base branch** — when that base is deleted the PR shows a phantom
-  `CONFLICTING` (this bit #11589). If a PR's base is gone, retarget to `main`.
+- **Root PRs target `main`** (or a live integration branch). A dependent child
+  may temporarily target its immediate parent while that parent is open; once
+  the parent lands, retarget the child to `main` and rebase before enrollment.
+  Never leave a child targeting a deleted or unrelated ephemeral branch; if its
+  base is gone, retarget to `main` and prove the semantic tree.
 - **Integration branches are an option, not the default** — use only for a
   coordinated multi-agent wave on one domain, then one train PR
   ([`ci-branching.md`](../.claude/rules/ci-branching.md)).
@@ -197,8 +201,9 @@ never false-positive.**
 
 Before you open a PR:
 
-1. **Small + focused**, targeting `main`. Dependent? `gt` stack. Mechanical sweep?
-   one `big-pr` PR. Never base-on-base micro-PRs.
+1. **Small + focused**, targeting `main`. Dependent? Use the native GitHub
+   retarget/rebase sequence in [`pr-stacking.md`](../.claude/rules/pr-stacking.md).
+   Mechanical sweep? one `big-pr` PR. Never create an uncontrolled stack.
 2. **Don't add heavy CI to the PR path.** New scan/security/perf job → post-merge
    or nightly, not `pull_request`.
 3. **Taste-touching?** Add a screenshot to the body. The classifier applies

@@ -1,8 +1,8 @@
 # PR Stacking & Size
 
 > Part of the canonical [`docs/PR_FLOW.md`](../../docs/PR_FLOW.md). Default: small
-> sibling PRs to `main`; dependent work uses a `gt` stack; a mechanical sweep ships
-> as one `big-pr` PR — **never** N base-on-base micro-PRs (that collapsed the queue
+> sibling PRs to `main`; dependent work uses a native GitHub stack; a mechanical sweep ships
+> as one `big-pr` PR — **never** an uncontrolled N-deep base-on-base pile (that collapsed the queue
 > on 2026-06-22, #11689).
 
 Small, reviewable PRs that move through GitHub's native merge queue quickly.
@@ -33,15 +33,16 @@ parent lands, then to run the **full** source and combined-head pipeline. A
 and any one slow/failing/conflicted member stalls the whole chain. (This
 happened — June 2026, collapsed in #11689.) One `big-pr` PR = one CI run.
 
-Agents generating drift/token sweeps: emit a single PR per sweep. Do not call
-`gt create` once per component.
+Agents generating drift/token sweeps: emit a single PR per sweep. Do not create
+one stacked PR per component.
 
 ## Stack, don't pile
 
-- **Dependent work** (B needs A) → a **PR stack managed with the Graphite CLI**:
-  `gt create` per logical step, then `gt restack`/`gt submit`. Graphite manages
-  branch relationships and PR submission only; GitHub's native queue lands
-  each PR after its parent is on `main` and the child is retargeted/rebased.
+- **Dependent work** (B needs A) → a **native GitHub stacked-PR sequence**:
+  push each layer normally and open it against its immediate parent. After the
+  parent lands, retarget the child to `main`, rebase it onto the new `origin/main`,
+  and push with `--force-with-lease` before running fresh checks. Graphite is not
+  required and is not a landing transport.
 - **Independent work** in the same area → **sibling PRs** off `main`. They land
   in parallel and don't trigger each other's rebases.
 - **One PR = one logical change.** No drive-by refactors — pull them into their
@@ -57,11 +58,27 @@ Agents generating drift/token sweeps: emit a single PR per sweep. Do not call
 ## How
 
 ```bash
-gt create -m "feat(x): step 1"     # base
-gt create -m "feat(x): step 2"     # stacked on step 1
-gt submit --stack                  # opens/updates the whole stack
+git switch -c feat/x-01 origin/main
+git push -u origin feat/x-01
+gh pr create --draft --base main --head feat/x-01
+
+git switch -c feat/x-02 feat/x-01
+git push -u origin feat/x-02
+gh pr create --draft --base feat/x-01 --head feat/x-02
 ```
 
-After a parent lands, retarget/rebase the next child onto `main`, push its exact
-head, then apply `merge-queue`. The native controller owns enrollment and
-combined-head validation. See also [`ci-branching.md`](ci-branching.md).
+Record every branch, PR number, immediate-parent base, and exact head SHA. When
+the parent merges, keep its old tip for the rebase boundary, then:
+
+```bash
+git fetch origin main
+gh pr edit <child> --base main
+git rebase --onto origin/main <old-parent-tip> <child-branch>
+git push --force-with-lease origin <child-branch>
+```
+
+Prove the child remote head was unchanged before rebasing, inspect ancestry and
+the semantic diff, and wait for the fresh source checks before queue enrollment.
+Keep the parent branch until the child has converged. Land one layer at a time
+through GitHub's native merge queue; never bypass it or create a second landing
+transport. See also [`ci-branching.md`](ci-branching.md).

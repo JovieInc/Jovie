@@ -2,9 +2,10 @@
 
 `main` merges through GitHub's native merge queue. The live repository variable
 is `MERGE_QUEUE_BACKEND=native`, and ruleset `Main Branch Protection`
-(`10512119`) owns queue admission and combined-head validation. Graphite is a
-stack-construction CLI only: use `gt` to create, restack, and submit dependent
-PRs, never to enroll, validate, or land them.
+(`10512119`) owns queue admission and combined-head validation. Native GitHub is
+also the supported stack-construction path: dependent PRs may temporarily target
+their immediate parent, then are retargeted and rebased onto `main` after that
+parent lands. Graphite is not required and there is no second landing transport.
 
 ## How a PR lands
 

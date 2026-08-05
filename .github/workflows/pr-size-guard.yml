@@ -1,8 +1,9 @@
 name: PR Size Guard
 
 # Forces small, reviewable PRs — which forces stacking. A change too big to
-# review as one PR must be split into dependent PRs managed with the `gt` CLI
-# (`gt create` per logical step) or independent sibling PRs. Opt out for
+# review as one PR must be split into dependent PRs using native GitHub
+# stacked-PR discipline (each child retargeted and rebased after its parent
+# lands) or independent sibling PRs. Opt out for
 # approved mechanical codemods (token sweeps, renames, generated output) with
 # the `big-pr` label. Thresholds tunable via repo vars PR_MAX_LINES / PR_MAX_FILES.
 # Circular shared-CI repair trains may use `integration-train`, but only with a
