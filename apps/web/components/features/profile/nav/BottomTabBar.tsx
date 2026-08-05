@@ -68,6 +68,9 @@ export interface BottomTabBarProps {
    */
   readonly hasTourDates: boolean;
 
+  /** Whether the artist has an ownership-safe fan-capture surface. */
+  readonly showAlerts?: boolean;
+
   /**
    * Whether the header menu is currently open.
    */
@@ -100,12 +103,13 @@ export interface BottomTabBarProps {
 export function BottomTabBar({
   activeTab,
   hasTourDates: _hasTourDates,
+  showAlerts = true,
   isMenuOpen = false,
   onTabSelect,
   showAlertsTab = true,
   className,
 }: BottomTabBarProps) {
-  const visibleTabs = showAlertsTab
+  const visibleTabs = showAlerts && showAlertsTab
     ? ALL_PRIMARY_TABS
     : ALL_PRIMARY_TABS.filter(tab => tab.mode !== 'subscribe');
   const columnCount = visibleTabs.length;

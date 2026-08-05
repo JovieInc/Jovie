@@ -253,6 +253,7 @@ export function ProfileCompactSurface({
   latestRelease,
   profileSettings,
   featuredPlaylistFallback,
+  allowFanCapture = true,
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   alertOptInVariant = 'button',
@@ -326,11 +327,15 @@ export function ProfileCompactSurface({
     artistHandle: artist.handle,
   });
   const isDrawerOverlayActive = renderMode === 'interactive' && drawerOpen;
-  const activePrimaryTab = resolveActivePrimaryTab({
+  const requestedPrimaryTab = resolveActivePrimaryTab({
     mode: activeMode,
     drawerOpen: isDrawerOverlayActive,
     drawerView,
   });
+  const activePrimaryTab =
+    !allowFanCapture && requestedPrimaryTab === 'subscribe'
+      ? 'profile'
+      : requestedPrimaryTab;
   const hasTourDates = tourDates.length > 0;
   const activeVisiblePrimaryTab =
     !allowFanCapture && activePrimaryTab === 'subscribe'
@@ -890,6 +895,7 @@ export function ProfileCompactSurface({
                   : activeVisiblePrimaryTab
               }
               hasTourDates={hasTourDates}
+              showAlerts={allowFanCapture}
               isMenuOpen={isMenuActive}
               showAlertsTab={allowFanCapture}
               onTabSelect={handleTabSelect}
