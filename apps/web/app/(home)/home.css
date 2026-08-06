@@ -4111,6 +4111,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-meet-jovie__intro {
   color: var(--color-text-tertiary-token);
+  font-size: var(--homepage-section-copy-size);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--leading-relaxed);
+  text-wrap: pretty;
 }
 
 /* HOMEPAGE MEET JOVIE SYSTEM B END */
