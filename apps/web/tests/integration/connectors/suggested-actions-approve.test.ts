@@ -1,279 +1,539 @@
 /**
- * Integration tests for suggested_actions CAS approve flow.
+ * Integration tests for the suggested_actions approve/reject route handlers.
  *
- * Tests:
- * 1. Approve endpoint returns 200 on first call, 409 on second
- * 2. Reject endpoint returns 200 on first call, 409 on second
- * 3. Concurrent approve — exactly one workflow_runs row inserted + one Google event
+ * Unlike the unit suite at
+ * `apps/web/tests/unit/api/connectors/suggested-actions-approve-route.test.ts`
+ * (which mocks the workflow-enqueue module), this file invokes the real
+ * exported `POST` handlers end-to-end against mocked DB bindings:
  *
- * These tests use mocked DB interactions (no real database required).
- * The concurrent-approve test is the critical regression guard.
+ * - `enqueueApprovedActionWorkflow` and `recoverOrphanedApprovedAction` run for
+ *   real, so the persisted `workflowRuns` row — including the `stepOutputs`
+ *   layout with `approvalId` + `eventPayload` — is verified, not re-asserted
+ *   from a hand-written reimplementation.
+ * - The full response contract is pinned: auth gate (401), success bodies,
+ *   `Cache-Control: no-store` on every response, and the exact error shapes
+ *   for 404 / 409 / 500.
+ * - The concurrent-approve regression guard fires two real `POST` invocations
+ *   and asserts exactly one `workflow_runs` insert.
+ *
+ * Flagged in PR #8813 (CodeRabbit comment id:3252956030); tracked as JOV-2280.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
-// Mocks — must be declared before imports
+// Hoisted mocks — DB bindings record calls so tests can assert the exact rows
+// the real handlers persist.
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/db', () => {
-  const mockDb = {
-    update: vi.fn(),
-    insert: vi.fn(),
+const {
+  mockRequireAuth,
+  mockRecordInboxDecision,
+  mockCaptureError,
+  mockLoggerError,
+  dbMockState,
+  mockDbUpdate,
+  mockDbInsert,
+  mockDbSelect,
+} = vi.hoisted(() => {
+  const dbMockState = {
+    /** Resolved value for each successive `update(...).returning(...)` call. */
+    updateReturningQueue: [] as unknown[],
+    /** Resolved value for each successive `select(...)...limit(...)` call. */
+    selectResultQueue: [] as unknown[],
+    /** Every row passed to `insert(...).values(...)`, in call order. */
+    insertedRows: [] as Record<string, unknown>[],
+    /** Every value passed to `update(...).set(...)`, in call order. */
+    updateSetCalls: [] as Record<string, unknown>[],
+    /** When set, the next update `.returning()` rejects with this error. */
+    updateError: null as Error | null,
+    /** When set, the next insert `.returning()` rejects with this error. */
+    insertError: null as Error | null,
   };
-  return { db: mockDb };
+
+  const mockDbUpdate = vi.fn(() => ({
+    set: vi.fn((values: Record<string, unknown>) => {
+      dbMockState.updateSetCalls.push(values);
+      return {
+        where: vi.fn(() => ({
+          returning: vi.fn(() => {
+            if (dbMockState.updateError) {
+              return Promise.reject(dbMockState.updateError);
+            }
+            return Promise.resolve(
+              dbMockState.updateReturningQueue.shift() ?? []
+            );
+          }),
+        })),
+      };
+    }),
+  }));
+
+  const mockDbInsert = vi.fn(() => ({
+    values: vi.fn((row: Record<string, unknown>) => {
+      dbMockState.insertedRows.push(row);
+      return {
+        onConflictDoNothing: vi.fn(() => ({
+          returning: vi.fn(() => {
+            if (dbMockState.insertError) {
+              return Promise.reject(dbMockState.insertError);
+            }
+            return Promise.resolve([{ id: 'workflow-run-id' }]);
+          }),
+        })),
+      };
+    }),
+  }));
+
+  const mockDbSelect = vi.fn(() => ({
+    from: vi.fn(() => ({
+      where: vi.fn(() => ({
+        limit: vi.fn(() =>
+          Promise.resolve(dbMockState.selectResultQueue.shift() ?? [])
+        ),
+      })),
+    })),
+  }));
+
+  return {
+    mockRequireAuth: vi.fn(),
+    mockRecordInboxDecision: vi.fn(),
+    mockCaptureError: vi.fn(),
+    mockLoggerError: vi.fn(),
+    dbMockState,
+    mockDbUpdate,
+    mockDbInsert,
+    mockDbSelect,
+  };
 });
 
+// ---------------------------------------------------------------------------
+// Module mocks (declared before the route imports)
+// ---------------------------------------------------------------------------
+
+vi.mock('@/lib/auth/require-auth', () => ({
+  requireAuth: mockRequireAuth,
+}));
+
+vi.mock('@/lib/db', () => ({
+  db: {
+    update: mockDbUpdate,
+    insert: mockDbInsert,
+    select: mockDbSelect,
+  },
+}));
+
+vi.mock('@/lib/connectors/inbox-decision', () => ({
+  recordInboxDecision: mockRecordInboxDecision,
+}));
+
 vi.mock('@/lib/error-tracking', () => ({
-  captureError: vi.fn(),
+  captureError: mockCaptureError,
+}));
+
+// revalidateTag throws an invariant error when called outside a Next.js
+// request store; the CI integration setup does not stub it globally.
+vi.mock('next/cache', () => ({
+  revalidateTag: vi.fn(),
 }));
 
 vi.mock('@/lib/utils/logger', () => ({
   logger: {
     info: vi.fn(),
     warn: vi.fn(),
-    error: vi.fn(),
+    error: mockLoggerError,
   },
 }));
 
-vi.mock('@/lib/auth/require-auth', () => ({
-  requireAuth: vi
-    .fn()
-    .mockResolvedValue({ userId: 'test-user-id', error: null }),
-}));
-
 // ---------------------------------------------------------------------------
-// Module imports — after mocks
+// Import the real handlers after mocks are wired up
 // ---------------------------------------------------------------------------
 
-import { db } from '@/lib/db';
-import { suggestedActions, workflowRuns } from '@/lib/db/schema/connectors';
+import { POST as approvePOST } from '@/app/api/connectors/suggested-actions/[id]/approve/route';
+import { POST as rejectPOST } from '@/app/api/connectors/suggested-actions/[id]/reject/route';
 
 const USER_ID = 'user-uuid-0000-0000-0000-000000000001';
 const ACTION_ID = 'action-uuid-0000-0000-0000-000000000001';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const BOOKING_PAYLOAD = {
+  title: 'Album release call',
+  startsAt: '2026-08-01T18:00:00.000Z',
+  endsAt: '2026-08-01T19:00:00.000Z',
+  timeZone: 'America/Los_Angeles',
+};
 
-function setupCasMock(opts: { shouldSucceed: boolean }) {
-  const updateChain = {
-    set: vi.fn().mockReturnThis(),
-    where: vi.fn().mockReturnThis(),
-    returning: vi
-      .fn()
-      .mockResolvedValue(opts.shouldSucceed ? [{ id: ACTION_ID }] : []),
+/** Row shape the approve CAS update returns (`.returning({ id, payload, kind, signalType })`). */
+function casApprovedRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: ACTION_ID,
+    payload: BOOKING_PAYLOAD,
+    kind: 'calendar_booking',
+    signalType: null,
+    ...overrides,
   };
-  vi.mocked(db.update).mockReturnValue(
-    updateChain as unknown as ReturnType<typeof db.update>
-  );
-  return updateChain;
 }
 
-function setupInsertMock() {
-  const insertChain = {
-    values: vi.fn().mockResolvedValue([{ id: 'workflow-run-id' }]),
+/** Row shape the orphan-recovery select returns (full action row). */
+function approvedActionRow(overrides: Record<string, unknown> = {}) {
+  return {
+    ...casApprovedRow(),
+    status: 'approved',
+    userId: USER_ID,
+    ...overrides,
   };
-  vi.mocked(db.insert).mockReturnValue(
-    insertChain as unknown as ReturnType<typeof db.insert>
+}
+
+function makeRequest(path: string, body?: unknown) {
+  return new Request(`http://localhost${path}`, {
+    method: 'POST',
+    ...(body === undefined
+      ? {}
+      : {
+          body: JSON.stringify(body),
+          headers: { 'content-type': 'application/json' },
+        }),
+  });
+}
+
+function makeApproveRequest() {
+  return makeRequest(`/api/connectors/suggested-actions/${ACTION_ID}/approve`);
+}
+
+function makeRejectRequest(body?: unknown) {
+  return makeRequest(
+    `/api/connectors/suggested-actions/${ACTION_ID}/reject`,
+    body
   );
-  return insertChain;
+}
+
+function makeParams(id: string) {
+  return { params: Promise.resolve({ id }) };
+}
+
+function expectNoStore(response: Response) {
+  expect(response.headers.get('Cache-Control')).toBe('no-store');
 }
 
 // ---------------------------------------------------------------------------
-// Tests
+// Approve route — real POST handler, real enqueue/recovery, mocked DB
 // ---------------------------------------------------------------------------
 
-describe('CAS approve: approve → 200 first call, 409 second', () => {
+describe('POST approve (real handler)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    dbMockState.updateReturningQueue.length = 0;
+    dbMockState.selectResultQueue.length = 0;
+    dbMockState.insertedRows.length = 0;
+    dbMockState.updateSetCalls.length = 0;
+    dbMockState.updateError = null;
+    dbMockState.insertError = null;
+    mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
+    mockRecordInboxDecision.mockResolvedValue({ id: 'feedback-1' });
   });
 
-  it('first CAS update returns [row] → 200 outcome', async () => {
-    // Simulate successful CAS (row transitions from pending → accepted)
-    setupCasMock({ shouldSucceed: true });
-    setupInsertMock();
+  it('returns 401 and touches no DB bindings when unauthenticated', async () => {
+    mockRequireAuth.mockResolvedValue({
+      userId: null,
+      error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+    });
 
-    const updated = await db
-      .update(suggestedActions)
-      .set({ status: 'approved' as const, approvedAt: new Date() })
-      .where(
-        and(
-          eq(suggestedActions.id, ACTION_ID),
-          eq(suggestedActions.userId, USER_ID),
-          eq(suggestedActions.status, 'pending')
-        )
-      )
-      .returning();
+    const response = await approvePOST(
+      makeApproveRequest(),
+      makeParams(ACTION_ID)
+    );
 
-    expect(updated.length).toBe(1);
-    // After successful CAS, insert workflow_runs
-    await db.insert(workflowRuns).values({
-      kind: 'execute_approved_action',
+    expect(response.status).toBe(401);
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockDbSelect).not.toHaveBeenCalled();
+  });
+
+  it('first approve: 200 + no-store, CAS set shape, and workflow_runs row with stepOutputs.eventPayload', async () => {
+    dbMockState.updateReturningQueue.push([casApprovedRow()]);
+
+    const response = await approvePOST(
+      makeApproveRequest(),
+      makeParams(ACTION_ID)
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ ok: true, approvalId: ACTION_ID });
+    expectNoStore(response);
+
+    // CAS transition written by the real handler.
+    expect(dbMockState.updateSetCalls).toEqual([
+      { status: 'approved', approvedAt: expect.any(Date) },
+    ]);
+
+    // The real enqueueApprovedActionWorkflow persisted exactly one run row.
+    expect(dbMockState.insertedRows).toEqual([
+      {
+        kind: 'execute_approved_action',
+        userId: USER_ID,
+        status: 'queued',
+        currentStep: 'create_calendar_event',
+        stepOutputs: {
+          approvalId: ACTION_ID,
+          eventPayload: BOOKING_PAYLOAD,
+        },
+        runAt: expect.any(Date),
+      },
+    ]);
+
+    expect(mockRecordInboxDecision).toHaveBeenCalledWith({
+      suggestedActionId: ACTION_ID,
       userId: USER_ID,
-      status: 'queued' as const,
-      currentStep: 'create_calendar_event',
-      stepOutputs: { approvalId: ACTION_ID },
-      runAt: new Date(),
+      verdict: 'approved',
+      cardKind: 'calendar_booking',
+      surface: 'opportunity-inbox',
     });
-
-    expect(db.update).toHaveBeenCalledOnce();
-    expect(db.insert).toHaveBeenCalledOnce();
   });
 
-  it('second CAS update returns [] → 409 outcome (already decided)', async () => {
-    // Simulate failed CAS (row already transitioned)
-    setupCasMock({ shouldSucceed: false });
+  it('persists stepOutputs.eventPayload as null when the action row has no payload', async () => {
+    dbMockState.updateReturningQueue.push([casApprovedRow({ payload: null })]);
 
-    const updated = await db
-      .update(suggestedActions)
-      .set({ status: 'approved' as const, approvedAt: new Date() })
-      .where(
-        and(
-          eq(suggestedActions.id, ACTION_ID),
-          eq(suggestedActions.userId, USER_ID),
-          eq(suggestedActions.status, 'pending')
-        )
-      )
-      .returning();
+    const response = await approvePOST(
+      makeApproveRequest(),
+      makeParams(ACTION_ID)
+    );
 
-    expect(updated.length).toBe(0); // CAS missed → should return 409
-    // insert should NOT be called when CAS fails
-    expect(db.insert).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(dbMockState.insertedRows).toHaveLength(1);
+    expect(dbMockState.insertedRows[0].stepOutputs).toEqual({
+      approvalId: ACTION_ID,
+      eventPayload: null,
+    });
+  });
+
+  it('second approve after a completed first approve: recovery finds the run → 200 approved-pending-enqueue, no new insert', async () => {
+    dbMockState.updateReturningQueue.push([]); // CAS missed
+    dbMockState.selectResultQueue.push(
+      [approvedActionRow()], // action exists, approved, owned by caller
+      [{ id: 'existing-workflow-run-id' }] // workflow_runs row already present
+    );
+
+    const response = await approvePOST(
+      makeApproveRequest(),
+      makeParams(ACTION_ID)
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      ok: true,
+      approvalId: ACTION_ID,
+      status: 'approved-pending-enqueue',
+    });
+    expectNoStore(response);
+    expect(dbMockState.insertedRows).toHaveLength(0);
+  });
+
+  it('approve of an already-rejected action: 409 already-decided', async () => {
+    dbMockState.updateReturningQueue.push([]); // CAS missed
+    dbMockState.selectResultQueue.push([
+      approvedActionRow({ status: 'rejected' }),
+    ]);
+
+    const response = await approvePOST(
+      makeApproveRequest(),
+      makeParams(ACTION_ID)
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body).toEqual({ error: 'already-decided' });
+    expectNoStore(response);
+    expect(dbMockState.insertedRows).toHaveLength(0);
+  });
+
+  it('approve of an unknown action id: 404 not-found', async () => {
+    dbMockState.updateReturningQueue.push([]); // CAS missed
+    dbMockState.selectResultQueue.push([]); // recovery select finds nothing
+
+    const response = await approvePOST(
+      makeApproveRequest(),
+      makeParams(ACTION_ID)
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body).toEqual({ error: 'not-found' });
+    expectNoStore(response);
+  });
+
+  it('fails closed with 500 when the workflow_runs insert throws after CAS committed', async () => {
+    dbMockState.updateReturningQueue.push([casApprovedRow()]);
+    const insertError = new Error('workflow_runs insert failed');
+    dbMockState.insertError = insertError;
+
+    const response = await approvePOST(
+      makeApproveRequest(),
+      makeParams(ACTION_ID)
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({ error: 'internal-error' });
+    expectNoStore(response);
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      '[approve] Failed to approve suggested_action',
+      insertError
+    );
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'suggest-action approve failed',
+      insertError,
+      {
+        route: '/api/connectors/suggested-actions/[id]/approve',
+        approvalId: ACTION_ID,
+      }
+    );
   });
 });
 
-describe('CAS concurrent approve: exactly one workflow_runs row', () => {
+// ---------------------------------------------------------------------------
+// Concurrent approve — the core regression guard, now through the real handler
+// ---------------------------------------------------------------------------
+
+describe('concurrent approve (real handler): exactly one workflow_runs row', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    dbMockState.updateReturningQueue.length = 0;
+    dbMockState.selectResultQueue.length = 0;
+    dbMockState.insertedRows.length = 0;
+    dbMockState.updateSetCalls.length = 0;
+    dbMockState.updateError = null;
+    dbMockState.insertError = null;
+    mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
+    mockRecordInboxDecision.mockResolvedValue({ id: 'feedback-1' });
   });
 
-  it('two concurrent approvals: only one wins CAS, only one workflow row inserted', async () => {
-    // This is the core regression test for concurrent-approve safety.
-    // Simulate the race: two callers both see pending=true initially,
-    // but the DB CAS ensures only one update succeeds.
+  it('two concurrent POSTs: one wins the CAS and inserts, the loser recovers as already-queued', async () => {
+    // First CAS update wins, second misses. The loser's orphan recovery then
+    // sees the approved action and the winner's existing workflow run.
+    dbMockState.updateReturningQueue.push([casApprovedRow()], []);
+    dbMockState.selectResultQueue.push(
+      [approvedActionRow()],
+      [{ id: 'workflow-run-id' }]
+    );
 
-    let casSucceeded = false;
-    const workflowInserts: unknown[] = [];
-    let callNumber = 0;
+    const [winner, loser] = await Promise.all([
+      approvePOST(makeApproveRequest(), makeParams(ACTION_ID)),
+      approvePOST(makeApproveRequest(), makeParams(ACTION_ID)),
+    ]);
 
-    // Mock: first call wins CAS, second loses
-    const mockUpdateReturning = vi.fn().mockImplementation(async () => {
-      callNumber++;
-      // Simulate atomic CAS: only the first caller gets the row
-      if (!casSucceeded) {
-        casSucceeded = true;
-        return [{ id: ACTION_ID }];
-      }
-      return []; // second caller gets empty — CAS missed
+    // Both callers attempted the CAS transition.
+    expect(mockDbUpdate).toHaveBeenCalledTimes(2);
+
+    // Winner: direct approve. Loser: recovered, idempotent 200.
+    expect(winner.status).toBe(200);
+    expect(await winner.json()).toEqual({ ok: true, approvalId: ACTION_ID });
+    expect(loser.status).toBe(200);
+    expect(await loser.json()).toEqual({
+      ok: true,
+      approvalId: ACTION_ID,
+      status: 'approved-pending-enqueue',
     });
 
-    const updateChain = {
-      set: vi.fn().mockReturnThis(),
-      where: vi.fn().mockReturnThis(),
-      returning: mockUpdateReturning,
-    };
-    vi.mocked(db.update).mockReturnValue(
-      updateChain as unknown as ReturnType<typeof db.update>
-    );
-
-    const mockInsertValues = vi
-      .fn()
-      .mockImplementation(async (row: unknown) => {
-        workflowInserts.push(row);
-        return [{ id: `wf-${workflowInserts.length}` }];
-      });
-    const insertChain = { values: mockInsertValues };
-    vi.mocked(db.insert).mockReturnValue(
-      insertChain as unknown as ReturnType<typeof db.insert>
-    );
-
-    // Simulate two concurrent approve calls using the module-level db binding
-    // (not dynamic imports — avoids re-initialization races)
-    const approveOne = async () => {
-      const updated = await db
-        .update(suggestedActions)
-        .set({ status: 'approved' as const, approvedAt: new Date() })
-        .where(
-          and(
-            eq(suggestedActions.id, ACTION_ID),
-            eq(suggestedActions.userId, USER_ID),
-            eq(suggestedActions.status, 'pending')
-          )
-        )
-        .returning();
-
-      if (updated.length > 0) {
-        // Only insert workflow_runs if CAS succeeded
-        await db.insert(workflowRuns).values({
-          kind: 'execute_approved_action',
-          userId: USER_ID,
-          status: 'queued' as const,
-          currentStep: 'create_calendar_event',
-          stepOutputs: { approvalId: ACTION_ID },
-          runAt: new Date(),
-        });
-      }
-
-      return updated.length > 0;
-    };
-
-    // Fire both concurrently
-    const [result1, result2] = await Promise.all([approveOne(), approveOne()]);
-
-    // Exactly one call should succeed
-    const successCount = [result1, result2].filter(Boolean).length;
-    expect(successCount).toBe(1);
-
-    // Exactly one workflow_runs row should be inserted
-    expect(workflowInserts.length).toBe(1);
-
-    // Total CAS attempts: 2 (both tried)
-    expect(callNumber).toBe(2);
+    // Exactly one workflow_runs row was inserted across both requests.
+    expect(dbMockState.insertedRows).toHaveLength(1);
+    expect(dbMockState.insertedRows[0].stepOutputs).toEqual({
+      approvalId: ACTION_ID,
+      eventPayload: BOOKING_PAYLOAD,
+    });
   });
 });
 
-describe('CAS reject: dismiss → 200 first call, 409 second', () => {
+// ---------------------------------------------------------------------------
+// Reject route — real POST handler
+// ---------------------------------------------------------------------------
+
+describe('POST reject (real handler)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    dbMockState.updateReturningQueue.length = 0;
+    dbMockState.selectResultQueue.length = 0;
+    dbMockState.insertedRows.length = 0;
+    dbMockState.updateSetCalls.length = 0;
+    dbMockState.updateError = null;
+    dbMockState.insertError = null;
+    mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
+    mockRecordInboxDecision.mockResolvedValue({ id: 'feedback-1' });
   });
 
-  it('reject returns success on first call', async () => {
-    setupCasMock({ shouldSucceed: true });
+  it('returns 401 and touches no DB bindings when unauthenticated', async () => {
+    mockRequireAuth.mockResolvedValue({
+      userId: null,
+      error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+    });
 
-    const updated = await db
-      .update(suggestedActions)
-      .set({ status: 'rejected' as const })
-      .where(
-        and(
-          eq(suggestedActions.id, ACTION_ID),
-          eq(suggestedActions.userId, USER_ID),
-          eq(suggestedActions.status, 'pending')
-        )
-      )
-      .returning();
+    const response = await rejectPOST(
+      makeRejectRequest(),
+      makeParams(ACTION_ID)
+    );
 
-    expect(updated.length).toBe(1);
-    // reject should NOT insert a workflow_runs row
-    expect(db.insert).not.toHaveBeenCalled();
+    expect(response.status).toBe(401);
+    expect(mockDbUpdate).not.toHaveBeenCalled();
   });
 
-  it('reject returns 409 on second call (already decided)', async () => {
-    setupCasMock({ shouldSucceed: false });
+  it('first reject: 200 + no-store, rejected CAS transition, no workflow_runs insert', async () => {
+    dbMockState.updateReturningQueue.push([
+      { id: ACTION_ID, kind: 'calendar_booking' },
+    ]);
 
-    const updated = await db
-      .update(suggestedActions)
-      .set({ status: 'rejected' as const })
-      .where(
-        and(
-          eq(suggestedActions.id, ACTION_ID),
-          eq(suggestedActions.userId, USER_ID),
-          eq(suggestedActions.status, 'pending')
-        )
-      )
-      .returning();
+    const response = await rejectPOST(
+      makeRejectRequest({ reason: 'not relevant to me' }),
+      makeParams(ACTION_ID)
+    );
+    const body = await response.json();
 
-    expect(updated.length).toBe(0);
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ ok: true, approvalId: ACTION_ID });
+    expectNoStore(response);
+
+    // Real handler wrote the rejected transition; reject never enqueues work.
+    expect(dbMockState.updateSetCalls).toEqual([{ status: 'rejected' }]);
+    expect(dbMockState.insertedRows).toHaveLength(0);
+
+    expect(mockRecordInboxDecision).toHaveBeenCalledWith({
+      suggestedActionId: ACTION_ID,
+      userId: USER_ID,
+      verdict: 'rejected',
+      reason: 'not relevant to me',
+      cardKind: 'calendar_booking',
+      surface: 'opportunity-inbox',
+    });
+  });
+
+  it('reject without a JSON body still succeeds', async () => {
+    dbMockState.updateReturningQueue.push([
+      { id: ACTION_ID, kind: 'calendar_booking' },
+    ]);
+
+    const response = await rejectPOST(
+      makeRejectRequest(),
+      makeParams(ACTION_ID)
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockRecordInboxDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ verdict: 'rejected', reason: null })
+    );
+  });
+
+  it('second reject: 409 already-decided', async () => {
+    dbMockState.updateReturningQueue.push([]); // CAS missed
+
+    const response = await rejectPOST(
+      makeRejectRequest(),
+      makeParams(ACTION_ID)
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body).toEqual({ error: 'already-decided' });
+    expectNoStore(response);
+    expect(mockRecordInboxDecision).not.toHaveBeenCalled();
   });
 });
