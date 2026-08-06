@@ -26,6 +26,10 @@ test.describe('public investor brief', () => {
       page.getByRole('link', { name: 'Request A Meeting' }).first()
     ).toHaveAttribute('href', /mailto:t@meetjovie\.com/iu);
 
+    await expect(
+      page.getByRole('link', { name: 'Download Deck As PDF' })
+    ).toHaveAttribute('href', '/Jovie-Pitch-Deck.pdf');
+
     const appendix = page.getByTestId('pitch-appendix');
     await expect(appendix).not.toHaveAttribute('open', '');
     await expect(appendix).toContainText('Narrative Boundary');
