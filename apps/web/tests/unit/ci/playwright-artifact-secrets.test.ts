@@ -80,7 +80,7 @@ const protectedJobs: Record<string, string[]> = {
 const producerCounts: Record<string, number> = {
   'agent-tick.yml': 6,
   'canary-health-gate.yml': 1,
-  'ci.yml': 14,
+  'ci.yml': 15,
   'e2e-full-matrix.yml': 2,
   'nightly-testing-agent.yml': 2,
   'nightly-tests.yml': 4,
@@ -89,7 +89,7 @@ const producerCounts: Record<string, number> = {
   'production-release.yml': 3,
   'screenshots.yml': 1,
   'synthetic-monitoring.yml': 6,
-  'visual-regression.yml': 5,
+  'visual-regression.yml': 6,
 };
 
 function fixture(prefix = 'jovie-artifact-', parent = tmpdir()) {
