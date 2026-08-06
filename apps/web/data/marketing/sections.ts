@@ -1510,7 +1510,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         media: 'none',
         alignment: 'centered',
         chooseWhen:
-          'audience=general OR recipe=waitlist OR recipe=blog-landing (newsletter signup)',
+          'audience=general OR recipe=waitlist OR recipe=blog-landing OR recipe=newsletter-signup (newsletter signup)',
         status: 'unproven',
       },
     ],

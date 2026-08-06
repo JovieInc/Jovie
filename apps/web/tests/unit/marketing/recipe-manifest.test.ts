@@ -764,6 +764,35 @@ describe('marketing decision engine determinism (golden fixtures)', () => {
       },
       expectedRecipeId: 'blog-landing',
     },
+    // JOV-4067 (adversarial C1): subscribe conversion with intent≠blog-index →
+    // newsletter-signup (previously fell to seo)
+    {
+      name: 'general + subscribe + informational → newsletter-signup (NOT seo — C1)',
+      brief: {
+        targetAudience: 'general',
+        desiredConversion: 'subscribe',
+        intent: 'informational',
+      },
+      expectedRecipeId: 'newsletter-signup',
+    },
+    {
+      name: 'fan + subscribe → newsletter-signup (subscribe row precedes fan→seo fallthrough)',
+      brief: {
+        targetAudience: 'fan',
+        desiredConversion: 'subscribe',
+        intent: 'informational',
+      },
+      expectedRecipeId: 'newsletter-signup',
+    },
+    {
+      name: 'label + subscribe + category → newsletter-signup (no audience/intent row claims it)',
+      brief: {
+        targetAudience: 'label',
+        desiredConversion: 'subscribe',
+        intent: 'category',
+      },
+      expectedRecipeId: 'newsletter-signup',
+    },
     {
       name: 'general + feature → feature',
       brief: {

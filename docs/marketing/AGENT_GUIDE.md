@@ -1,5 +1,5 @@
 <!--
-spec-version: 1.0.0
+spec-version: 1.1.0
 doc-freshness: docs/marketing/AGENT_GUIDE.md
 -->
 # Marketing Agent Guide
@@ -11,7 +11,7 @@ doc-freshness: docs/marketing/AGENT_GUIDE.md
 > `COMPOSITION_RULES.md`) are optional commentary. Copy generation follows the
 > typed contract below.
 
-spec-version: 1.0.0 · registry: `apps/web/data/marketing/index.ts`.
+spec-version: 1.1.0 · registry: `apps/web/data/marketing/index.ts`.
 
 ## The 4-step procedure
 

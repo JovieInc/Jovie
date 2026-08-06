@@ -1,5 +1,5 @@
 <!--
-spec-version: 1.0.0
+spec-version: 1.1.0
 doc-freshness: docs/marketing/SECTION_CATALOG.md
 -->
 # Marketing Section Catalog
@@ -173,7 +173,8 @@ screenshot or icon; pure text = use `feature-grid` icon-list variant.
 ### #section-capture
 
 **Purpose:** Fan-capture as a PRODUCT DEMO, not just an email form. Phone-framed
-capture demo for artist recipes; email-only for waitlist/blog-landing.
+capture demo for artist recipes; email-only for waitlist/blog-landing/
+newsletter-signup.
 
 **Rationale:** Jovie delta (prior-art §3). Capture is a product demo showing
 the value of capture, with interaction states (submitting/success/error/
