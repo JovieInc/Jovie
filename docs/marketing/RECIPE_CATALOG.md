@@ -1,5 +1,5 @@
 <!--
-spec-version: 1.0.0
+spec-version: 1.1.0
 doc-freshness: docs/marketing/RECIPE_CATALOG.md
 -->
 # Marketing Recipe Catalog
@@ -10,9 +10,10 @@ doc-freshness: docs/marketing/RECIPE_CATALOG.md
 > Anchors `#recipe-{id}` are parity-asserted against the registry by the
 > manifest gate.
 
-11 recipes, two-tier (Design F10): `proven` (shipped reference route) vs `stub`
+12 recipes, two-tier (Design F10): `proven` (shipped reference route) vs `stub`
 (order + arc only; first implementation goes through human taste feedback
-then promotes). CI refuses `proven` without a reference route.
+then promotes). CI refuses `proven` without a reference route. (Charter's 11 +
+`newsletter-signup` stub per JOV-4067 / ARCHITECTURE.md §15.)
 
 ## #recipe-homepage (proven)
 
@@ -215,3 +216,24 @@ section means no blog).
 **Never:** with <3 blog posts (zero-proof analog for content); with capture as
 the primary conversion (blog-landing primary = read posts; capture = secondary
 newsletter signup).
+
+## #recipe-newsletter-signup (stub)
+
+**No reference route** (JOV-4067, adversarial C1). **Audience:** general.
+**Sections (4):** hero → capture → faq → cta.
+
+**Arc:** promise → subscribe → objection → action.
+
+**CTA cadence:** sparse, "Subscribe", hero-only (capture IS the conversion —
+no competing CTA).
+
+**Decision tree:** `conversion=subscribe AND intent≠blog-index` (standalone
+newsletter signup — blog-index+subscribe stays on blog-landing where capture
+is secondary; artist/agency/enterprise-buyer audiences keep their recipes).
+Before this recipe, subscribe with intent≠blog-index fell to seo. First
+implementation goes through taste feedback then promotes to proven.
+
+**Never:** for early-access waitlist (use waitlist — request-access conversion,
+different promise); with multiple competing CTAs (capture is the conversion —
+one input, one submit); without interaction states on capture (Design F2:
+submitting/success/error/already-subscribed).

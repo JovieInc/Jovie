@@ -1,5 +1,5 @@
 <!--
-spec-version: 1.0.0
+spec-version: 1.1.0
 doc-freshness: docs/marketing/ARCHITECTURE.md
 -->
 # Marketing Architecture
@@ -11,7 +11,7 @@ doc-freshness: docs/marketing/ARCHITECTURE.md
 > strategy. Agents: start at [`AGENT_GUIDE.md`](./AGENT_GUIDE.md) — it is the
 > sole entrypoint (≤400 lines). This file is reference.
 
-spec-version: 1.0.0 · registry: `apps/web/data/marketing/index.ts` ·
+spec-version: 1.1.0 · registry: `apps/web/data/marketing/index.ts` ·
 charter: `.context/marketing-architecture/GOAL.md` (amended, sole authority) ·
 reviews: CEO + Eng + Design + DX (all CLEAR, final gate A, 2026-07-06).
 
@@ -35,7 +35,7 @@ The contract for consumer agents:
 GOAL.md (charter) ──▶ research digests ──▶ typed registry (apps/web/data/marketing/)
                                                   │ owns ALL normative rules
                                                   │ - sections.ts: taxonomy + variants + chooseWhen + lifecycle
-                                                  │ - recipes.ts:  11 recipes + arc + ctaCadence + hierarchy
+                                                  │ - recipes.ts:  12 recipes + arc + ctaCadence + hierarchy
                                                   │ - composition.ts: resolveComposition(brief) → tuple (Zod)
                                                   │ - routeManifest.ts: route ⇔ recipeId | exempt
                                                   │
@@ -139,8 +139,9 @@ The load-bearing laws:
 
 ## 7. Recipe system
 
-11 recipes, two-tier (Design F10): proven (shipped reference route) vs stub
-(order + arc only; first implementation promotes).
+12 recipes, two-tier (Design F10): proven (shipped reference route) vs stub
+(order + arc only; first implementation promotes). Charter's 11 plus the
+`newsletter-signup` stub added per §15 (JOV-4067).
 
 | id | status | reference | audience |
 |---|---|---|---|
@@ -155,6 +156,7 @@ The load-bearing laws:
 | `waitlist` | stub | — | general |
 | `agency-lp` | stub | — | agency |
 | `enterprise` | stub | — | enterprise-buyer |
+| `newsletter-signup` | stub | — | general |
 
 Full per-recipe definitions (section order, arc, hierarchy, ctaCadence,
 substitutions, fallbacks, min/max content): see
@@ -176,7 +178,7 @@ Algorithm:
 4. Zero-proof filter: drop proof/trust sections without verified data.
 5. Ordering legality: drop sections whose `illegalAfter`/`requiresPrior` are violated.
 6. Variant selection: per section, walk variants; first match wins; no-match → `defaultVariant`.
-7. CTA position assignment: hero=primary, cta section=primary (terminal), capture=primary (waitlist/blog-landing).
+7. CTA position assignment: hero=primary, cta section=primary (terminal), capture=primary (waitlist/blog-landing/newsletter-signup).
 8. Trace: record every step for the AGENT_GUIDE worked example + failure messages.
 
 The output tuple (`MarketingComposition`) has an owned Zod schema (DX11):

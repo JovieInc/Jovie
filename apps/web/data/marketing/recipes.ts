@@ -12,6 +12,7 @@
  *             feedback (humanOptIn manifest field per DX2), then promotes to proven.
  *
  * Charter's 11 recipes are all kept (T1 resolution: keep all 11, two-tier).
+ * Post-charter stubs per ARCHITECTURE.md §15: newsletter-signup (JOV-4067).
  */
 
 import type { MarketingAudience, MarketingSectionId } from './sections';
@@ -27,7 +28,8 @@ export type RecipeId =
   | 'launch'
   | 'waitlist'
   | 'seo'
-  | 'blog-landing';
+  | 'blog-landing'
+  | 'newsletter-signup';
 
 export const MARKETING_RECIPE_IDS: readonly RecipeId[] = [
   'homepage',
@@ -41,6 +43,7 @@ export const MARKETING_RECIPE_IDS: readonly RecipeId[] = [
   'waitlist',
   'seo',
   'blog-landing',
+  'newsletter-signup',
 ] as const;
 
 export type RecipeStatus = 'proven' | 'stub';
@@ -1035,6 +1038,66 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
     neverUse: [
       'With <3 blog posts (zero-proof analog for content — omit the section means no blog)',
       'With capture as the primary conversion (blog-landing primary = read posts; capture = secondary newsletter signup)',
+    ],
+  },
+
+  // ── newsletter-signup (stub — JOV-4067, adversarial C1) ────────────────────
+  {
+    id: 'newsletter-signup',
+    label: 'Newsletter Signup',
+    status: 'stub',
+    audience: 'general',
+    // Stub: order + arc only; first implementation goes through taste feedback then promotes (Design F10).
+    // Standalone newsletter signup page — NOT early-access waitlist (that is the
+    // waitlist recipe, conversion=request-access). Before this recipe existed,
+    // conversion=subscribe with intent≠blog-index fell to seo (adversarial C1).
+    sectionOrder: ['hero', 'capture', 'faq', 'cta'],
+    arc: [
+      {
+        beat: 'promise',
+        feeling: 'what the newsletter gives me',
+        section: 'hero',
+      },
+      {
+        beat: 'subscribe',
+        feeling: 'one email, no commitment',
+        section: 'capture',
+      },
+      {
+        beat: 'objection',
+        feeling: 'frequency/unsubscribe questions answered',
+        section: 'faq',
+      },
+      { beat: 'action', feeling: 'subscribe now', section: 'cta' },
+    ],
+    hierarchy: {
+      oneBigIdea: 'Subscribe to the Jovie newsletter — one email worth opening',
+      seeFirst: 'hero',
+      second: 'capture',
+      third: 'faq',
+      emphasisBudget: {
+        maxDisplayScaleMoments: 1,
+        maxFullBleedBreaks: 1,
+        maxHeroWeightProofElements: 1,
+      },
+      aboveTheFoldContract: {
+        desktop: ['hero', 'capture'], // capture form visible without scroll
+        mobile: ['hero', 'capture'],
+      },
+    },
+    ctaCadence: {
+      strategy: 'sparse',
+      primaryLabel: 'Subscribe',
+      cadence: 'hero-only', // capture IS the conversion — no competing CTA
+    },
+    minContent: ['hero.headline', 'capture.inputSlot'],
+    maxContent: { maxSections: 5 },
+    chooseWhen:
+      'conversion=subscribe AND intent≠blog-index (standalone newsletter signup — blog-index+subscribe stays on blog-landing where capture is secondary)',
+    neverUse: [
+      'For early-access waitlist (use waitlist recipe — request-access conversion, different promise)',
+      'With multiple competing CTAs (capture is the conversion — one input, one submit)',
+      'Without interaction states on capture (Design F2: submitting/success/error/already-subscribed)',
     ],
   },
 ] as const;

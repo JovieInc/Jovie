@@ -140,6 +140,7 @@ export const MarketingCompositionSchema = z.object({
     'waitlist',
     'seo',
     'blog-landing',
+    'newsletter-signup',
   ] as const),
   sections: z.array(MarketingCompositionSectionSchema),
   primaryCtaLabel: z.string(),
@@ -265,7 +266,18 @@ const RECIPE_DECISION_TABLE: readonly {
     recipeId: 'homepage',
     reason: 'traffic=home or general+category',
   },
-  // 11. SEO — informational intent OR catch-all (fan audience falls here per J1 —
+  // 11. Newsletter signup — subscribe conversion (JOV-4067, adversarial C1).
+  //     blog-index+subscribe is claimed by blog-landing (row 6); artist/agency/
+  //     enterprise-buyer audiences are claimed by their rows above; intent-specific
+  //     rows (compare/price/launch/feature) and homepage keep precedence. Before
+  //     this row, subscribe with intent≠blog-index fell to seo.
+  {
+    when: b => b.desiredConversion === 'subscribe',
+    recipeId: 'newsletter-signup',
+    reason:
+      'conversion=subscribe (non-blog-index intent → standalone newsletter signup, not seo)',
+  },
+  // 12. SEO — informational intent OR catch-all (fan audience falls here per J1 —
   //     fan is a documented audience with no recipe yet; served by seo until fan-lp exists)
   {
     when: b => b.intent === 'informational' || b.targetAudience === 'fan',
@@ -634,7 +646,8 @@ function matchesVariant(
       return (
         brief.targetAudience === 'general' ||
         recipeId === 'waitlist' ||
-        recipeId === 'blog-landing'
+        recipeId === 'blog-landing' ||
+        recipeId === 'newsletter-signup'
       );
     }
     return false;
@@ -926,7 +939,7 @@ export function resolveComposition(input: unknown): MarketingComposition {
       } else if (sectionId === 'cta') {
         ctaPosition = 'primary'; // final CTA section is the closing primary
       } else if (sectionId === 'capture') {
-        ctaPosition = 'primary'; // capture is a conversion section (waitlist/blog-landing)
+        ctaPosition = 'primary'; // capture is a conversion section (waitlist/blog-landing/newsletter-signup)
       }
       return {
         sectionId,
@@ -994,4 +1007,4 @@ function pickDegradationRung(
 
 // Import the spec version from the barrel (avoids a circular import via index.ts)
 // We re-declare it here as the source of truth; index.ts re-exports.
-export const MARKETING_SPEC_VERSION = '1.0.0';
+export const MARKETING_SPEC_VERSION = '1.1.0';
