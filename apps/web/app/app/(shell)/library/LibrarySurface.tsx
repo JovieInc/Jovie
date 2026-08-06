@@ -62,6 +62,15 @@ import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
+import {
+  formatLibraryItemType,
+  formatLibraryStatus,
+  formatReleaseStatus,
+  formatReleaseType,
+  LIBRARY_CATALOG_TABLE_COLUMNS,
+  LibraryCatalogProvidersCell,
+  LibraryCatalogStatusCell,
+} from '@/components/features/library/library-catalog-columns';
 import { LibraryAssetSharePanel } from '@/components/features/library-asset-share/LibraryAssetSharePanel';
 import { LibraryAssetShareUrlCell } from '@/components/features/library-asset-share/LibraryAssetShareUrlCell';
 import { LibraryShareDropCreator } from '@/components/features/library-share/LibraryShareDropCreator';
@@ -98,17 +107,12 @@ import {
   TableContextMenu,
 } from '@/components/organisms/table/molecules/TableContextMenu';
 import { alignment } from '@/components/organisms/table/table.styles';
-import {
-  type DspAvatarItem,
-  DspAvatarStack,
-} from '@/components/shell/DspAvatarStack';
 import type { FilterPill } from '@/components/shell/pill-search.types';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterHeaderSearch } from '@/contexts/HeaderActionsContext';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
-import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
 import {
   formatLibraryApprovalStatus,
@@ -153,6 +157,7 @@ import {
 } from './library-entity-actions';
 import {
   LIBRARY_GRID_DENSITY_OPTIONS,
+  parseLibraryViewModeParam,
   useLibraryGridDensity,
   useLibraryViewMode,
 } from './library-grid-preferences';
@@ -320,25 +325,6 @@ function toggleSet<T>(set: ReadonlySet<T>, value: T): Set<T> {
     next.add(value);
   }
   return next;
-}
-
-function formatReleaseType(type: LibraryReleaseAsset['releaseType']): string {
-  return type.split('_').map(capitalizeFirst).join(' ');
-}
-
-function formatLibraryItemType(asset: LibraryReleaseAsset): string {
-  if (getLibraryItemKind(asset) === 'merch') {
-    return asset.productType?.trim() || 'Merch';
-  }
-  return formatReleaseType(asset.releaseType);
-}
-
-function formatReleaseStatus(status: LibraryReleaseAsset['status']): string {
-  return capitalizeFirst(status);
-}
-
-function formatLibraryStatus(asset: LibraryReleaseAsset): string {
-  return asset.itemStatusLabel ?? formatReleaseStatus(asset.status);
 }
 
 function assetMatchesFilters(
@@ -525,26 +511,6 @@ const ReleaseCell = memo(function ReleaseCell({
   );
 });
 
-const StatusCell = memo(function StatusCell({
-  asset,
-}: {
-  readonly asset: LibraryReleaseAsset;
-}) {
-  return (
-    <span
-      role='status'
-      className={cn(
-        'system-b-library-status-pill inline-flex h-6 w-fit max-w-full items-center truncate rounded-full border px-2 leading-4',
-        releaseStatusClasses(asset.status)
-      )}
-      data-testid={`library-release-status-${asset.id}`}
-      aria-label={`Release Status: ${formatLibraryStatus(asset)}`}
-    >
-      {formatLibraryStatus(asset)}
-    </span>
-  );
-});
-
 const ApprovalStatusCell = memo(function ApprovalStatusCell({
   asset,
 }: {
@@ -579,70 +545,6 @@ const ReleaseDateCell = memo(function ReleaseDateCell({
         ? formatLibraryReleaseDate(asset.releaseDate)
         : 'No date'}
     </span>
-  );
-});
-
-/**
- * Neutral fallback avatar color for provider keys missing from
- * `PROVIDER_CONFIG`. Points at a System B text token — no raw hex here.
- */
-const LIBRARY_DSP_FALLBACK_COLOR = 'var(--linear-text-quaternary)';
-
-/**
- * Map a library asset's provider links -> `DspAvatarItem[]` for the stacked
- * provider-logo affordance. Every link present on the asset renders `live`;
- * brand color + label come from the canonical `PROVIDER_CONFIG`.
- */
-function libraryProvidersToDspItems(
-  providers: LibraryReleaseAsset['providers']
-): DspAvatarItem[] {
-  return providers.map(provider => {
-    const config = PROVIDER_CONFIG[provider.key];
-    const label = config?.label ?? provider.label;
-    return {
-      id: provider.key,
-      label,
-      glyph: label.charAt(0).toUpperCase(),
-      color: config?.accent ?? LIBRARY_DSP_FALLBACK_COLOR,
-      status: 'live' as const,
-    };
-  });
-}
-
-const ProvidersCell = memo(function ProvidersCell({
-  asset,
-}: {
-  readonly asset: LibraryReleaseAsset;
-}) {
-  const items = libraryProvidersToDspItems(asset.providers);
-
-  if (items.length === 0) {
-    return (
-      <span
-        role='img'
-        aria-label='No Providers'
-        className='system-b-library-meta-text text-quaternary-token'
-      >
-        &mdash;
-      </span>
-    );
-  }
-
-  return <DspAvatarStack dsps={items} maxVisible={3} />;
-});
-
-const CatalogArtworkCell = memo(function CatalogArtworkCell({
-  asset,
-}: {
-  readonly asset: LibraryReleaseAsset;
-}) {
-  return (
-    <ArtworkFrame
-      size='thumbnail'
-      className='system-b-library-artwork-shell block h-9 w-9'
-    >
-      <LibraryMediaThumbnail asset={asset} size='row' />
-    </ArtworkFrame>
   );
 });
 
@@ -704,61 +606,13 @@ function createLibraryActionColumn(metaClassName: string) {
   });
 }
 
-// Slice 1 minimal catalog column set: status · artwork · title · artist · type.
-// Slice 2/3 adds BPM/key/energy/rating/waveform/DSP columns + the Tracks fold-in.
+// Dense Tracks-catalog table (JOV-4846): status · artwork · title · artist ·
+// type · BPM · key · energy · rating · length · waveform · DSP providers,
+// recreated from the /exp/shell-v1 Tracks table in the shared layer. The
+// action menu column is appended here because it needs this surface's
+// entity-action context.
 const LIBRARY_CATALOG_COLUMNS = [
-  libraryColumnHelper.display({
-    id: 'status',
-    header: 'Status',
-    cell: ({ row }) => <StatusCell asset={row.original} />,
-    size: 112,
-    minSize: 96,
-    meta: { className: alignment.workspaceSeamX },
-  }),
-  libraryColumnHelper.display({
-    id: 'artwork',
-    header: 'Artwork',
-    cell: ({ row }) => <CatalogArtworkCell asset={row.original} />,
-    size: 56,
-    minSize: 56,
-    enableSorting: false,
-    meta: { className: 'px-2' },
-  }),
-  libraryColumnHelper.accessor('title', {
-    id: 'title',
-    header: 'Title',
-    cell: ({ row }) => (
-      <span className='system-b-library-release-title block truncate'>
-        {row.original.title}
-      </span>
-    ),
-    minSize: 180,
-    size: 9999,
-    enableSorting: false,
-    meta: { className: 'px-2' },
-  }),
-  libraryColumnHelper.display({
-    id: 'releaseDate',
-    header: 'Date',
-    cell: ({ row }) => <ReleaseDateCell asset={row.original} />,
-    size: 112,
-    minSize: 96,
-    meta: { className: 'pl-2 pr-3' },
-  }),
-  libraryColumnHelper.accessor('artist', {
-    id: 'artist',
-    header: 'Artist',
-    cell: ({ row }) => (
-      <span className='system-b-library-meta-text block truncate text-tertiary-token'>
-        {row.original.artist}
-      </span>
-    ),
-    size: 160,
-    minSize: 120,
-    enableSorting: false,
-    meta: { className: 'hidden md:table-cell px-2' },
-  }),
-  createLibraryTypeColumn('hidden sm:table-cell pl-2 pr-3', 120, 96),
+  ...LIBRARY_CATALOG_TABLE_COLUMNS,
   createLibraryActionColumn('w-10 pl-1 pr-2'),
 ] as ColumnDef<LibraryReleaseAsset, unknown>[];
 
@@ -785,7 +639,7 @@ const LIBRARY_TABLE_COLUMNS = [
   libraryColumnHelper.display({
     id: 'status',
     header: 'Release',
-    cell: ({ row }) => <StatusCell asset={row.original} />,
+    cell: ({ row }) => <LibraryCatalogStatusCell asset={row.original} />,
     size: 112,
     minSize: 96,
     meta: { className: 'hidden md:table-cell px-2' },
@@ -802,7 +656,7 @@ const LIBRARY_TABLE_COLUMNS = [
   libraryColumnHelper.display({
     id: 'providers',
     header: 'Providers',
-    cell: ({ row }) => <ProvidersCell asset={row.original} />,
+    cell: ({ row }) => <LibraryCatalogProvidersCell asset={row.original} />,
     size: 120,
     minSize: 96,
     meta: { className: 'hidden md:table-cell px-2' },
@@ -2516,6 +2370,16 @@ export function LibrarySurface({
   useEffect(() => {
     setPreset(parseLibraryViewParam(searchParams.get('view')));
   }, [searchParams]);
+
+  // Deep-link view-mode override (e.g. the /app/tracks redirect lands on
+  // `/app/library?view=audio&mode=table`). A valid `mode` param wins over the
+  // persisted preference and is itself persisted so the choice sticks.
+  useEffect(() => {
+    const modeParam = parseLibraryViewModeParam(searchParams.get('mode'));
+    if (modeParam) {
+      setView(modeParam);
+    }
+  }, [searchParams, setView]);
 
   useEffect(() => {
     setSavedView(readPersistedLibrarySavedView());

@@ -36,12 +36,22 @@ describe('workspace page optical seam contract', () => {
 
   it('keeps Library leading columns on the shared table seam', () => {
     const librarySurface = read('app/app/(shell)/library/LibrarySurface.tsx');
+    // Dense catalog columns live in the shared table layer (JOV-4846); its
+    // leading status column keeps the same workspace seam.
+    const catalogColumns = read(
+      'components/features/library/library-catalog-columns.tsx'
+    );
 
     expect(librarySurface).toContain(
       "import { alignment } from '@/components/organisms/table/table.styles';"
     );
-    expect(librarySurface.match(/alignment\.workspaceSeamX/g)).toHaveLength(2);
+    const seamOccurrences = [
+      ...librarySurface.matchAll(/alignment\.workspaceSeamX/g),
+      ...catalogColumns.matchAll(/alignment\.workspaceSeamX/g),
+    ];
+    expect(seamOccurrences).toHaveLength(2);
     expect(librarySurface).not.toContain('pl-2.5');
+    expect(catalogColumns).not.toContain('pl-2.5');
   });
 
   it('keeps the dashboard title on the workspace seam ahead of the visual rail-control order', () => {

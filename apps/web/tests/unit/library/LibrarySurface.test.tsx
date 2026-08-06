@@ -329,10 +329,22 @@ describe('LibrarySurface', () => {
       resolve(process.cwd(), LIBRARY_SURFACE_SOURCE),
       'utf8'
     );
-
-    const statusPillClasses = source.match(
-      /system-b-library-status-pill inline-flex[^']*/gu
+    // The dense catalog status pill lives in the shared table layer
+    // (JOV-4846) — scan both sources so no pill loses the one-line contract.
+    const catalogSource = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/library/library-catalog-columns.tsx'
+      ),
+      'utf8'
     );
+
+    const statusPillClasses = [
+      ...source.matchAll(/system-b-library-status-pill inline-flex[^']*/gu),
+      ...catalogSource.matchAll(
+        /system-b-library-status-pill inline-flex[^']*/gu
+      ),
+    ].map(match => match[0]);
 
     expect(statusPillClasses).toHaveLength(4);
     for (const className of statusPillClasses ?? []) {
@@ -1115,9 +1127,6 @@ describe('LibrarySurface', () => {
       screen.getByRole('columnheader', { name: 'Title' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('columnheader', { name: 'Date' })
-    ).toBeInTheDocument();
-    expect(
       screen.getByRole('columnheader', { name: 'Artist' })
     ).toBeInTheDocument();
     expect(
@@ -1138,6 +1147,96 @@ describe('LibrarySurface', () => {
       screen.queryByTestId('library-catalog-row-release-1')
     ).not.toBeInTheDocument();
     expect(window.localStorage.getItem('jovie:library-view-mode')).toBe('list');
+  });
+
+  it('renders the full dense Tracks-catalog column set in table mode (JOV-4846)', () => {
+    renderLibrary([buildAsset()]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Table View' }));
+
+    // Full experiment column set: status · artwork · title · artist · type ·
+    // BPM · key · energy · rating · length · waveform · DSP providers.
+    for (const header of [
+      'Status',
+      'Artwork',
+      'Title',
+      'Artist',
+      'Type',
+      'BPM',
+      'Key',
+      'Energy',
+      'Rating',
+      'Length',
+      'Waveform',
+      'DSP Providers',
+    ]) {
+      expect(
+        screen.getByRole('columnheader', { name: header })
+      ).toBeInTheDocument();
+    }
+
+    // Production data populates the real fields.
+    expect(
+      screen.getByTestId('library-release-status-release-1')
+    ).toHaveTextContent('Released');
+    expect(
+      screen.getByTestId('library-catalog-length-release-1')
+    ).toHaveTextContent('3:32');
+    expect(
+      screen.getByTestId('library-catalog-waveform-release-1')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('View DSP Distribution Details')
+    ).toBeInTheDocument();
+
+    // Metrics the production schema does not carry render a stable em-dash
+    // placeholder — never fabricated values.
+    for (const metric of ['bpm', 'key', 'energy', 'rating']) {
+      expect(
+        screen.getByTestId(`library-catalog-${metric}-release-1`)
+      ).toHaveTextContent('—');
+    }
+  });
+
+  it('keeps asset-type tabs and smart filters working in table mode (JOV-4846)', () => {
+    renderLibrary([
+      buildAsset(),
+      buildAsset({
+        id: 'release-2',
+        title: 'Silent Artwork',
+        previewUrl: null,
+        assetKinds: ['artwork'],
+      }),
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Table View' }));
+    expect(
+      screen.getByTestId('library-catalog-row-release-1')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('library-catalog-row-release-2')
+    ).toBeInTheDocument();
+
+    // Audio tab keeps only the asset with a playable preview.
+    fireEvent.click(screen.getByRole('button', { name: /^Audio/ }));
+    expect(
+      screen.getByTestId('library-catalog-row-release-1')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('library-catalog-row-release-2')
+    ).not.toBeInTheDocument();
+  });
+
+  it('honors the mode=table deep-link param and persists it (JOV-4846)', () => {
+    navigationMock.searchParams = new URLSearchParams('view=audio&mode=table');
+    renderLibrary([buildAsset()]);
+
+    expect(
+      screen.getByTestId('library-catalog-row-release-1')
+    ).toBeInTheDocument();
+    expect(window.localStorage.getItem('jovie:library-view-mode')).toBe(
+      'table'
+    );
   });
 
   it('starts the persistent player from real production preview data', () => {
