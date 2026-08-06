@@ -98,11 +98,25 @@ export function useLibraryGridDensity(): {
   return { density: value, setDensity: setValue };
 }
 
-function parseLibraryViewMode(value: string | null): LibraryViewMode {
+export function parseLibraryViewMode(value: string | null): LibraryViewMode {
   if (value === 'grid' || value === 'list' || value === 'table') {
     return value;
   }
   return DEFAULT_LIBRARY_VIEW_MODE;
+}
+
+/**
+ * Parse a `?mode=` deep-link param (e.g. the /app/tracks redirect). Returns
+ * `null` when the param is absent or invalid so callers can distinguish "no
+ * override" from a real mode choice.
+ */
+export function parseLibraryViewModeParam(
+  value: string | null
+): LibraryViewMode | null {
+  if (value === 'grid' || value === 'list' || value === 'table') {
+    return value;
+  }
+  return null;
 }
 
 export function readLibraryViewMode(): LibraryViewMode {

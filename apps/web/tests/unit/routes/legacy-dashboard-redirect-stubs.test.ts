@@ -45,4 +45,16 @@ describe('legacy dashboard redirect stubs', () => {
       `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=earn#pay`
     );
   });
+
+  it('sends tracks traffic to the library table mode with the audio tab preselected (JOV-4846)', async () => {
+    const { default: TracksPage } = await import(
+      '../../../app/app/(shell)/tracks/page'
+    );
+
+    await TracksPage();
+
+    expect(redirectMock).toHaveBeenCalledWith(
+      `${APP_ROUTES.LIBRARY}?view=audio&mode=table`
+    );
+  });
 });

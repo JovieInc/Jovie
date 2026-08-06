@@ -41,7 +41,8 @@
     "/app/settings/delete-account",
     "/app/settings/profile",
     "/app/threads",
-    "/app/tipping"
+    "/app/tipping",
+    "/app/tracks"
   ],
-  "note": "Existing compatibility redirects at JOV-3772. This allowlist may shrink but no new page-level redirect stub may be added. Canonical routes render their page in the unified shell."
+  "note": "Existing compatibility redirects at JOV-3772. This allowlist may shrink but no new page-level redirect stub may be added. Exception: /app/tracks (JOV-4846) folds the retired Tracks surface into Library with table mode + audio tab preselected, mirroring the /app/dashboard/library fold-in. Canonical routes render their page in the unified shell."
 }

@@ -45,6 +45,8 @@ export const APP_ROUTES = {
   AUDIENCE: '/app/audience',
   EARNINGS: '/app/earnings',
   LIBRARY: '/app/library',
+  /** Legacy Tracks path. Keep as a redirect source only — Tracks folded into Library (JOV-4846). */
+  LEGACY_TRACKS: '/app/tracks',
   TASKS: '/app/tasks',
   CHAT: '/app/chat',
   CHAT_PROFILE_PANEL: '/app/chat?panel=profile',
