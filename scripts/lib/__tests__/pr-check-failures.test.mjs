@@ -81,6 +81,53 @@ describe('pr-check-failures', () => {
     ).toEqual(['enroll']);
   });
 
+  it('treats a red Fork PR Gate Controller receipt with SKIPPED twin as advisory (JOV-4782)', () => {
+    const required = [
+      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
+    ];
+    // pull_request-event run fails at create-github-app-token (no
+    // JOVIE_BOT_PRIVATE_KEY); pull_request_target run of the same job is
+    // SKIPPED for non-fork heads. The red controller receipt must not block
+    // enrollment when the required gates are green.
+    const controllerReceipts = [
+      {
+        bucket: 'fail',
+        state: 'FAILURE',
+        name: 'Fork PR Gate Controller',
+        workflow: 'Fork PR Gate',
+        startedAt: '2026-08-03T01:00:00Z',
+        completedAt: '2026-08-03T01:01:00Z',
+      },
+      {
+        bucket: 'skipping',
+        state: 'SKIPPED',
+        name: 'Fork PR Gate Controller',
+        workflow: 'Fork PR Gate',
+        startedAt: '2026-08-03T01:02:00Z',
+        completedAt: '2026-08-03T01:02:00Z',
+      },
+    ];
+
+    expect(
+      classifyQueueCheckBlockers([...required, ...controllerReceipts])
+    ).toEqual([]);
+
+    // The actual gate is the required `Fork PR Gate` commit status: it stays
+    // fail-closed, so the advisory receipt never smuggles a red fork gate.
+    expect(
+      classifyQueueCheckBlockers([
+        { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
+        { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
+        { bucket: 'fail', state: 'FAILURE', name: 'Fork PR Gate' },
+        { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
+        ...controllerReceipts,
+      ])
+    ).toEqual(['Fork PR Gate', 'Fork PR Gate (not successful)']);
+  });
+
   it('derives staged advisory evidence from the manifest and preserves safety gates', () => {
     const harness = JSON.parse(
       readFileSync(`${repoRoot}/.github/ci-harness/manifest.json`, 'utf8')
@@ -121,6 +168,8 @@ describe('pr-check-failures', () => {
     );
     expect(ADVISORY_CHECK_NAMES).toContain('SonarCloud Code Analysis');
     expect(ADVISORY_CHECK_NAMES).toContain('Vercel Agent Review');
+    expect(ADVISORY_CHECK_NAMES).toContain('Fork PR Gate Controller');
+    expect(ADVISORY_CHECK_NAMES).not.toContain('Fork PR Gate');
     expect(ADVISORY_CHECK_NAMES).not.toContain('Brand Scrub');
     expect(
       extractTerminalFailures([

@@ -70,6 +70,16 @@ export const ADVISORY_CHECK_NAMES = Object.freeze(
     // Folded into ci-fast's Structural Contract; retained for old PR heads
     // produced before the standalone workflow was retired from source events.
     'actionlint',
+    // The pull_request-event run of fork-pr-gate cannot mint a jovie-bot token
+    // (JOVIE_BOT_PRIVATE_KEY is only exposed to pull_request_target and
+    // merge_group runs, which succeed) and fails at create-github-app-token,
+    // leaving a red `Fork PR Gate Controller` check-run beside its SKIPPED
+    // twin. The controller job is an orchestration receipt: the actual gate is
+    // the required `Fork PR Gate` commit status, which stays fail-closed via
+    // REQUIRED_CHECK_NAMES (missing/not-successful still blocks). Advisory
+    // here is therefore equivalent to "only when the required four are green"
+    // — any red required gate blocks on its own. See JOV-4782.
+    'Fork PR Gate Controller',
     // Legacy evidence names can remain attached to already-open PR heads while
     // the manual-only job names roll out. They remain advisory for enrollment.
     'Lighthouse (public routes PR)',
