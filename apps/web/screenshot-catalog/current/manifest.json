@@ -179,8 +179,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-06T01:39:07.229Z",
-    "gitSha": "afbbc44f3e31132142d2dc99df0aeee727fbdfb3",
+    "capturedAt": "2026-08-06T09:10:22.946Z",
+    "gitSha": "726355895cc6f4e4c62d602f19d3d47df1feffac",
     "imagePath": "artist-profile-spec-wall-section-desktop.png"
   },
   {
@@ -192,8 +192,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-06T01:39:31.714Z",
-    "gitSha": "afbbc44f3e31132142d2dc99df0aeee727fbdfb3",
+    "capturedAt": "2026-08-06T09:10:47.376Z",
+    "gitSha": "726355895cc6f4e4c62d602f19d3d47df1feffac",
     "imagePath": "artist-profile-how-it-works-section-desktop.png"
   },
   {
@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-06T01:40:19.942Z",
-    "gitSha": "afbbc44f3e31132142d2dc99df0aeee727fbdfb3",
+    "capturedAt": "2026-08-06T09:11:35.560Z",
+    "gitSha": "726355895cc6f4e4c62d602f19d3d47df1feffac",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
@@ -677,8 +677,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-06T01:51:09.673Z",
-    "gitSha": "afbbc44f3e31132142d2dc99df0aeee727fbdfb3",
+    "capturedAt": "2026-08-06T09:22:25.258Z",
+    "gitSha": "726355895cc6f4e4c62d602f19d3d47df1feffac",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },
@@ -710,8 +710,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-06T01:51:37.743Z",
-    "gitSha": "afbbc44f3e31132142d2dc99df0aeee727fbdfb3",
+    "capturedAt": "2026-08-06T09:22:53.268Z",
+    "gitSha": "726355895cc6f4e4c62d602f19d3d47df1feffac",
     "imagePath": "dashboard-earnings-desktop.png"
   },
   {
