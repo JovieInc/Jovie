@@ -52,7 +52,7 @@ export default defineConfig({
     ? {}
     : {
         webServer: {
-          command: 'pnpm run storybook -- --no-open',
+          command: 'pnpm exec storybook dev -p 6006 --no-open',
           url: 'http://localhost:6006/iframe.html',
           reuseExistingServer: !isCI,
           timeout: 600_000,
