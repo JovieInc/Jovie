@@ -75,9 +75,9 @@ describe('library view mode preferences', () => {
     vi.unstubAllGlobals();
   });
 
-  it('defaults to list view when no preference is stored', () => {
+  it('defaults to grid view when no preference is stored', () => {
     expect(readLibraryViewMode()).toBe(DEFAULT_LIBRARY_VIEW_MODE);
-    expect(readLibraryViewMode()).toBe('list');
+    expect(readLibraryViewMode()).toBe('grid');
   });
 
   it('persists and reads grid, list, and table view modes', () => {
