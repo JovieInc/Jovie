@@ -230,6 +230,36 @@ function dedupeKey(platform: string, urlRaw: string): string {
 }
 
 /**
+ * Human-readable display names for known social platforms.
+ *
+ * Used ONLY as a last-resort row label when a link has neither an
+ * extractable handle nor a usable URL — never as a substitute for a real
+ * handle (a bare platform name masquerading as a handle was the original
+ * "YouTube YouTube YouTube" bug, JOV-2149 / JOV-4847).
+ */
+const PLATFORM_DISPLAY_NAMES: Record<string, string> = {
+  instagram: 'Instagram',
+  tiktok: 'TikTok',
+  youtube: 'YouTube',
+  x: 'X',
+  linktree: 'Linktree',
+  threads: 'Threads',
+  facebook: 'Facebook',
+  twitch: 'Twitch',
+  snapchat: 'Snapchat',
+};
+
+/**
+ * Display name for a platform id, used only when no handle/URL exists.
+ * Falls back to the platform id (or 'Link' for blank input) so the label
+ * is never empty.
+ */
+export function getSocialDisplayName(platform: string): string {
+  const id = platform.trim().toLowerCase();
+  return PLATFORM_DISPLAY_NAMES[id] ?? (id || 'Link');
+}
+
+/**
  * Deduplicate a list of links by `(platform, normalized-url)`.
  *
  * - Preserves the first occurrence of each unique key (input order stable).

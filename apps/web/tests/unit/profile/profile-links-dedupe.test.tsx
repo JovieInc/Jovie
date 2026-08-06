@@ -153,6 +153,35 @@ describe('ProfileLinkList — render-layer dedupe and label fallback', () => {
     expectNoBrokenStrings(container);
   });
 
+  it('falls back to the platform display name only when both handle and URL are missing', async () => {
+    // Last-resort case: no handle extractable AND no usable URL. The row must
+    // still render a human-readable label (the platform display name) rather
+    // than an empty string.
+    const links: PreviewPanelLink[] = [
+      makeLink({ id: '1', platform: 'youtube', url: '' }),
+    ];
+
+    const { container } = render(
+      <ProfileLinkList links={links} selectedCategory='social' />
+    );
+
+    expect(screen.getByText('YouTube')).toBeDefined();
+    expectNoBrokenStrings(container);
+  });
+
+  it('collapses duplicate rows that both lack handle and URL into one row', async () => {
+    const links: PreviewPanelLink[] = [
+      makeLink({ id: '1', platform: 'youtube', url: '' }),
+      makeLink({ id: '2', platform: 'youtube', url: '  ' }),
+    ];
+
+    render(<ProfileLinkList links={links} selectedCategory='social' />);
+
+    const rows = screen.getAllByTestId(/^sidebar-link-row-/);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent('YouTube');
+  });
+
   it('renders multiple platforms with no duplicates after a noisy fixture (regression)', async () => {
     // Recreates the production screenshot exactly: Instagram + TikTok +
     // YouTube × 3 (two dupes + one malformed handle-less URL).

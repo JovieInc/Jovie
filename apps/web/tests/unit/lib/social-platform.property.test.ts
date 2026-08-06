@@ -8,7 +8,11 @@
  */
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { dedupeLinks, extractHandleFromUrl } from '@/lib/utils/social-platform';
+import {
+  dedupeLinks,
+  extractHandleFromUrl,
+  getSocialDisplayName,
+} from '@/lib/utils/social-platform';
 
 const platformArb = fc.constantFrom(
   'youtube',
@@ -147,6 +151,26 @@ describe('dedupeLinks (property)', () => {
       },
     ];
     expect(dedupeLinks(links)).toHaveLength(1);
+  });
+});
+
+describe('getSocialDisplayName', () => {
+  it('returns the display name for known platforms regardless of casing', () => {
+    expect(getSocialDisplayName('youtube')).toBe('YouTube');
+    expect(getSocialDisplayName('YouTube')).toBe('YouTube');
+    expect(getSocialDisplayName(' instagram ')).toBe('Instagram');
+  });
+
+  it('falls back to the platform id for unknown platforms', () => {
+    expect(getSocialDisplayName('myspace')).toBe('myspace');
+  });
+
+  it('never returns an empty string for arbitrary input', () => {
+    fc.assert(
+      fc.property(fc.string({ maxLength: 40 }), raw => {
+        expect(getSocialDisplayName(raw).length).toBeGreaterThan(0);
+      })
+    );
   });
 });
 
