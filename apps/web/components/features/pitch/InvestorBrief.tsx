@@ -1,11 +1,12 @@
 import { Button } from '@jovie/ui';
-import { ArrowRight, Mail } from 'lucide-react';
+import { ArrowRight, Download, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { Logo } from '@/components/atoms/Logo';
 import { fundraisingRegistry } from '@/lib/investors/fundraising-registry';
 import { PitchEngagement } from './PitchEngagement';
 
 const CONTACT_EMAIL = 't@meetjovie.com';
+const PITCH_DECK_PDF_URL = '/Jovie-Pitch-Deck.pdf';
 
 const statusTone = {
   LIVE: 'text-accent-blue',
@@ -66,6 +67,18 @@ export function InvestorBrief({
           </Button>
           <Button asChild variant='secondary'>
             <a href='#brief'>Read The Brief</a>
+          </Button>
+          <Button asChild variant='secondary'>
+            <a
+              href={PITCH_DECK_PDF_URL}
+              download
+              target='_blank'
+              rel='noopener'
+              aria-label='Download Deck As PDF'
+            >
+              <Download className='size-4' aria-hidden='true' />
+              Download Deck
+            </a>
           </Button>
           <Button asChild variant='ghost'>
             <Link href='/investor-portal/closed-loop-creator'>
