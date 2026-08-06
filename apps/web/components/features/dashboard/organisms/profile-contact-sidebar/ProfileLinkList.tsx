@@ -19,7 +19,11 @@ import { PROVIDER_LABELS } from '@/features/dashboard/atoms/DspProviderIcon';
 import type { LinkSection } from '@/features/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
 import { cn } from '@/lib/utils';
-import { dedupeLinks, extractHandleFromUrl } from '@/lib/utils/social-platform';
+import {
+  dedupeLinks,
+  extractHandleFromUrl,
+  getSocialDisplayName,
+} from '@/lib/utils/social-platform';
 
 export type CategoryOption = LinkSection | 'all';
 
@@ -100,6 +104,15 @@ interface LinkItemProps {
 function LinkItem({ link, onRemove }: LinkItemProps) {
   const handle = extractHandleFromUrl(link.url);
 
+  // Fail-safe label: derive from the handle first, then the URL's hostname.
+  // The bare platform display name is the LAST resort, used only when no
+  // handle or URL exists at all — it must never masquerade as a handle.
+  const label = handle
+    ? `@${handle}`
+    : link.url?.trim()
+      ? formatDisplayHost(link.url)
+      : getSocialDisplayName(link.platform);
+
   const trailingContent =
     link.platform === 'website' && link.verificationStatus === 'verified' ? (
       <span className='ml-0.5 inline-flex align-middle'>
@@ -114,7 +127,7 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
   return (
     <SidebarLinkRow
       icon={<SocialIcon platform={link.platform} className='h-4 w-4' />}
-      label={handle ? `@${handle}` : formatDisplayHost(link.url)}
+      label={label}
       url={link.url}
       deepLinkPlatform={link.platform}
       isVisible={link.isVisible}
