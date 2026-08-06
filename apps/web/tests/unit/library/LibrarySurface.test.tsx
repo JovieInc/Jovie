@@ -13,6 +13,7 @@ import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LibrarySurface } from '@/app/app/(shell)/library/LibrarySurface';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
+import { LIBRARY_VIEW_MODE_STORAGE_KEY } from '@/app/app/(shell)/library/library-grid-preferences';
 import { LIBRARY_SAVED_VIEW_STORAGE_KEY } from '@/app/app/(shell)/library/library-saved-views';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import { APP_ROUTES } from '@/constants/routes';
@@ -255,6 +256,10 @@ describe('LibrarySurface', () => {
 
   beforeEach(() => {
     window.localStorage.clear();
+    // Grid is the shipped default view mode; most tests below exercise the
+    // list renderer, so seed the persisted preference explicitly instead of
+    // depending on the default.
+    window.localStorage.setItem(LIBRARY_VIEW_MODE_STORAGE_KEY, 'list');
     navigationMock.searchParams = new URLSearchParams();
     audioMock.playbackState = { ...audioMock.basePlaybackState };
     audioMock.toggleTrack.mockClear();
@@ -384,17 +389,20 @@ describe('LibrarySurface', () => {
     );
   });
 
-  it('defaults to list view on first load', () => {
+  it('defaults to grid view on first load', () => {
+    window.localStorage.removeItem(LIBRARY_VIEW_MODE_STORAGE_KEY);
     renderLibrary([buildAsset()]);
 
-    expect(screen.getByRole('table')).toBeInTheDocument();
-    expect(screen.getByText('Apr 28')).toHaveAttribute('title', 'Apr 28, 2026');
+    expect(screen.queryByRole('table')).toBeNull();
     expect(
-      screen.getByTestId('library-release-row-release-1')
+      screen.getByRole('button', { name: /View Take Me Over/u })
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /View Take Me Over/u })
-    ).toBeNull();
+      screen.getByTestId('library-grid-density-toggle')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('library-release-status-release-1')
+    ).toBeInTheDocument();
   });
 
   it('shows the card-size toggle in grid view and persists density preference', () => {
@@ -1086,7 +1094,7 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    // Defaults to list (header hidden, release rows present).
+    // Starts in list view (seeded preference; header hidden, release rows present).
     expect(
       screen.getByTestId('library-release-row-release-1')
     ).toBeInTheDocument();

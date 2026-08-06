@@ -7,7 +7,7 @@ export const LIBRARY_GRID_DENSITY_STORAGE_KEY = 'jovie:library-grid-density';
 export const LIBRARY_VIEW_MODE_STORAGE_KEY = 'jovie:library-view-mode';
 
 export const DEFAULT_LIBRARY_GRID_DENSITY: LibraryGridDensity = 'comfortable';
-export const DEFAULT_LIBRARY_VIEW_MODE: LibraryViewMode = 'list';
+export const DEFAULT_LIBRARY_VIEW_MODE: LibraryViewMode = 'grid';
 
 export const LIBRARY_GRID_DENSITY_OPTIONS: readonly {
   readonly value: LibraryGridDensity;
