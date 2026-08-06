@@ -279,6 +279,7 @@ describe('ProfileCompactTemplate', () => {
         readonly view: string;
         readonly presentation?: string;
         readonly onOpenChange?: (open: boolean) => void;
+        readonly onViewChange?: (view: string) => void;
       }) => (
         <div
           data-testid='mock-profile-unified-drawer'
@@ -292,6 +293,13 @@ describe('ProfileCompactTemplate', () => {
             onClick={() => props.onOpenChange?.(false)}
           >
             Close drawer
+          </button>
+          <button
+            type='button'
+            data-testid='mock-profile-unified-drawer-menu'
+            onClick={() => props.onViewChange?.('menu')}
+          >
+            Open menu
           </button>
         </div>
       )
@@ -1448,6 +1456,84 @@ describe('ProfileCompactTemplate', () => {
     });
 
     restoreViewport();
+  });
+
+  describe('drawer view stability under data churn (JOV-4848)', () => {
+    // Regression: the drawer open/close sync effect used to re-run whenever a
+    // data-derived capability (hasContacts/hasTip/hasReleases) flipped, so a
+    // background refetch that transiently emptied `contacts` closed the drawer
+    // and the resolving refetch re-opened it — an intermittent close/reopen
+    // cycle visible to the user. Drawer open state must be keyed to the
+    // requested mode (stable intent), never to data object identity or
+    // transient loading states.
+
+    function renderContactDrawer(contacts: PublicContact[]) {
+      return (
+        <ProfileCompactTemplate
+          mode='contact'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={contacts}
+        />
+      );
+    }
+
+    function drawerOpenHistory(): boolean[] {
+      return mockProfileUnifiedDrawer.mock.calls.map(
+        call => (call[0] as { readonly open: boolean }).open
+      );
+    }
+
+    it('keeps the drawer open across a refetch that transiently empties data', async () => {
+      const { rerender } = render(renderContactDrawer(mockContacts));
+
+      const drawer = () => screen.getByTestId('mock-profile-unified-drawer');
+      await waitFor(() => {
+        expect(drawer()).toHaveAttribute('data-open', 'true');
+        expect(drawer()).toHaveAttribute('data-view', 'contact');
+      });
+
+      // Background refetch transiently returns empty data (loading state).
+      rerender(renderContactDrawer([]));
+
+      // Refetch resolves with new object identities for the same entity.
+      rerender(renderContactDrawer(mockContacts.map(c => ({ ...c }))));
+
+      await waitFor(() => {
+        expect(drawer()).toHaveAttribute('data-open', 'true');
+        expect(drawer()).toHaveAttribute('data-view', 'contact');
+      });
+
+      // No render may have observed a closed drawer — no close/reopen cycle.
+      const history = drawerOpenHistory();
+      expect(history.length).toBeGreaterThan(0);
+      expect(history).not.toContain(false);
+    });
+
+    it('does not yank the in-drawer view back to the mode view when data churns', async () => {
+      const { rerender } = render(renderContactDrawer(mockContacts));
+
+      const drawer = () => screen.getByTestId('mock-profile-unified-drawer');
+      await waitFor(() => {
+        expect(drawer()).toHaveAttribute('data-view', 'contact');
+      });
+
+      // Visitor navigates inside the drawer to the root menu (a view with no
+      // associated profile mode).
+      fireEvent.click(screen.getByTestId('mock-profile-unified-drawer-menu'));
+      await waitFor(() => {
+        expect(drawer()).toHaveAttribute('data-view', 'menu');
+      });
+
+      // Data churn: refetch empties contacts, then resolves with fresh objects.
+      rerender(renderContactDrawer([]));
+      rerender(renderContactDrawer(mockContacts.map(c => ({ ...c }))));
+
+      // The drawer stays open and the visitor's chosen view is preserved.
+      expect(drawer()).toHaveAttribute('data-open', 'true');
+      expect(drawer()).toHaveAttribute('data-view', 'menu');
+      expect(drawerOpenHistory()).not.toContain(false);
+    });
   });
 
   describe('hydration-safe profile mode sync', () => {

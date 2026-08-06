@@ -273,6 +273,7 @@ export function ProfileCompactTemplate({
   const compactShellRef = useRef<HTMLDivElement | null>(null);
   const drawerOpenRef = useRef(initialDrawerView !== null);
   const drawerViewRef = useRef<DrawerView>(initialDrawerView ?? 'menu');
+  const lastSyncedModeRef = useRef<ProfileMode | null>(null);
   const lastPrimaryModeRef = useRef<ProfileMode>('profile');
   const initialLocationModeAlignedRef = useRef(false);
   const suppressNextHistorySyncRef = useRef(true);
@@ -557,8 +558,23 @@ export function ProfileCompactTemplate({
   }, [requestedMode]);
 
   useEffect(() => {
+    // Drawer open/close sync is keyed to the requested *mode* (stable visitor
+    // intent), not to data. `resolveInitialView` also depends on data-derived
+    // capabilities (hasContacts/hasTip/hasReleases), so a background refetch
+    // that transiently empties data re-runs this effect. Without the
+    // mode-change gate that churn would close an open drawer (and the
+    // resolving refetch would re-open it / yank the view back) — the
+    // intermittent open/close bug from JOV-4848. When only data changed, an
+    // already-open drawer must be left untouched; render-time fallbacks own
+    // missing data (same pattern as the JOV-2150 no-flicker fix).
+    const modeChanged = lastSyncedModeRef.current !== requestedMode;
+    lastSyncedModeRef.current = requestedMode;
+
     const resolved = resolveInitialView(requestedMode);
     if (resolved) {
+      if (!modeChanged && drawerOpenRef.current) {
+        return;
+      }
       clearCloseResetTimer();
       drawerViewRef.current = resolved;
       setDrawerView(resolved);
@@ -576,6 +592,10 @@ export function ProfileCompactTemplate({
       drawerOpenRef.current &&
       drawerViewRef.current === 'menu'
     ) {
+      return;
+    }
+
+    if (!modeChanged && drawerOpenRef.current) {
       return;
     }
 
