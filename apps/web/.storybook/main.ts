@@ -8,6 +8,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const config: StorybookConfig = {
   stories: [
+    // Local story matrices (e.g. the surface-elevation visual-regression
+    // matrix, JOV-2156) that are not tied to a single component directory.
+    './stories/**/*.stories.@(js|jsx|ts|tsx|mdx)',
     '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
     // packages/ui atoms — highest-reuse surface; must enter Chromatic/Storybook
     // (Phase 2 visual-testing coverage; see docs/VISUAL_TESTING_POLICY.md).

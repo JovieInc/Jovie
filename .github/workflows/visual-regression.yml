@@ -178,6 +178,33 @@ jobs:
           E2E_USE_TEST_AUTH_BYPASS=1 E2E_TEST_AUTH_PERSONA=admin \
             node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/admin-visual-regression.spec.ts \
             --config=playwright.config.ts --project=chromium --reporter=line $UPDATE_FLAG
+
+          # Surface elevation matrix (JOV-2156) — Storybook iframe screenshots,
+          # independent of the app server. Banned-combination baselines are the
+          # intentional "should look BROKEN" sanity check; functional
+          # assertions in the spec still fail the refresh run.
+          pnpm exec storybook dev -p 6006 --no-open &
+          STORYBOOK_PID=$!
+
+          STORYBOOK_READY=false
+          for _attempt in $(seq 1 150); do
+            if curl -sf http://localhost:6006/iframe.html > /dev/null 2>&1; then
+              STORYBOOK_READY=true
+              break
+            fi
+            sleep 2
+          done
+
+          if [ "$STORYBOOK_READY" = "false" ]; then
+            echo "::error::Storybook dev server failed to start within 300s."
+            exit 1
+          fi
+
+          STORYBOOK_BASE_URL=http://localhost:6006 \
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test tests/e2e/storybook-elevation.spec.ts \
+            --config=playwright.config.storybook.ts --project=chromium --reporter=line $UPDATE_FLAG
+
+          kill "$STORYBOOK_PID" 2>/dev/null || true
         env:
           BASE_URL: http://localhost:3100
           SMOKE_ONLY: '1'

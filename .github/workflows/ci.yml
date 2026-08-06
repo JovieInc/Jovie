@@ -1645,6 +1645,37 @@ jobs:
           HUD_KIOSK_TOKEN: layout-guard-ci
           HUD_AGENT_RUNS_FIXTURES: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+      # Surface-elevation matrix (JOV-2156): screenshot every allowed/banned
+      # surface nesting combination from .claude/rules/ui.md against Storybook
+      # in light + dark mode. Secret-free (Storybook aliases mock Clerk/auth);
+      # committed baselines gate the combined head — failures block the queue.
+      - name: Run surface elevation matrix (Storybook)
+        run: |
+          set -euo pipefail
+          cd apps/web
+
+          pnpm exec storybook dev -p 6006 --no-open &
+          STORYBOOK_PID=$!
+          trap 'kill "$STORYBOOK_PID" 2>/dev/null || true' EXIT
+
+          for attempt in $(seq 1 150); do
+            kill -0 "$STORYBOOK_PID" 2>/dev/null || {
+              echo "::error::Storybook dev server died"
+              exit 1
+            }
+            if curl -sf http://localhost:6006/iframe.html >/dev/null 2>&1; then
+              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+                pnpm exec playwright test tests/e2e/storybook-elevation.spec.ts \
+                  --config=playwright.config.storybook.ts --project=chromium --reporter=line
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Storybook dev server failed to start within 300s"
+          exit 1
+        env:
+          STORYBOOK_BASE_URL: http://localhost:6006
+          CI: true
       - name: Upload combined layout failure evidence
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
         continue-on-error: true
