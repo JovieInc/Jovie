@@ -60,20 +60,20 @@ const STORIES = [
     name: 'banned-drawer-card-inside-card',
   },
   {
-    id: 'design-system-elevation-matrix--banned-surface1-on-surface1-no-border',
-    name: 'banned-surface1-on-surface1-no-border',
+    id: 'design-system-elevation-matrix--banned-surface-1-on-surface-1-no-border',
+    name: 'banned-surface-1-on-surface-1-no-border',
   },
   {
-    id: 'design-system-elevation-matrix--banned-surface1-translucent',
-    name: 'banned-surface1-translucent',
+    id: 'design-system-elevation-matrix--banned-surface-1-translucent',
+    name: 'banned-surface-1-translucent',
   },
   {
     id: 'design-system-elevation-matrix--banned-card-stripped-elevation',
     name: 'banned-card-stripped-elevation',
   },
   {
-    id: 'design-system-elevation-matrix--banned-surface0-translucent',
-    name: 'banned-surface0-translucent',
+    id: 'design-system-elevation-matrix--banned-surface-0-translucent',
+    name: 'banned-surface-0-translucent',
   },
   {
     id: 'design-system-elevation-matrix--banned-content-surface-card',
@@ -121,7 +121,7 @@ test.describe('surface elevation matrix', () => {
   }) => {
     await openStory(
       page,
-      'design-system-elevation-matrix--banned-surface1-on-surface1-no-border',
+      'design-system-elevation-matrix--banned-surface-1-on-surface-1-no-border',
       'light'
     );
     const parent = page.getByTestId('surface-parent');
