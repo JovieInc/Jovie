@@ -2037,25 +2037,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
     0 40px 120px rgba(0, 0, 0, 0.55);
 }
 
-/* Cinematic stage light: a single hairline of light caught on the pane's top
-   edge, brightest at center and falling off before the corners. */
-.homepage-product-pane::after {
-  position: absolute;
-  inset: 0 0 auto;
-  z-index: 1;
-  height: 1px;
-  content: "";
-  background: linear-gradient(
-    90deg,
-    transparent 4%,
-    color-mix(in oklab, var(--system-b-text-primary) 26%, transparent) 32%,
-    color-mix(in oklab, var(--system-b-text-primary) 34%, transparent) 50%,
-    color-mix(in oklab, var(--system-b-text-primary) 26%, transparent) 68%,
-    transparent 96%
-  );
-  pointer-events: none;
-}
-
 .homepage-product-pane__image {
   display: block;
   width: 100%;
@@ -3859,7 +3840,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   margin-inline: auto;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   column-gap: clamp(var(--space-4), 2vw, var(--space-6));
-  row-gap: clamp(var(--space-12), 6vw, var(--space-20));
+  row-gap: clamp(var(--space-8), 4vw, var(--space-12));
 }
 
 .homepage-closed-loop-copy {
@@ -3891,7 +3872,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-closed-loop-copy > p:last-child {
   max-width: 34ch;
-  margin: var(--space-6) 0 0;
+  margin: var(--space-4) 0 0;
   color: var(--color-text-secondary-token);
   font-size: var(--homepage-section-copy-size);
   line-height: var(--leading-relaxed);
@@ -3903,7 +3884,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   grid-column: 7 / -1;
   display: grid;
   min-width: 0;
-  gap: var(--space-8);
+  gap: var(--space-6);
 }
 
 .homepage-closed-loop-visual {
@@ -4007,7 +3988,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   margin: 0;
   padding: 0;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-6);
+  gap: var(--space-4);
   list-style: none;
 }
 
@@ -4059,7 +4040,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 @media (max-width: 767px) {
   .homepage-closed-loop-inner {
     grid-template-columns: minmax(0, 1fr);
-    row-gap: var(--space-12);
+    row-gap: var(--space-8);
   }
 
   .homepage-closed-loop-copy,
@@ -4068,17 +4049,17 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-closed-loop-story {
-    gap: var(--space-6);
+    gap: var(--space-4);
   }
 
   .homepage-closed-loop-sequence {
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-6);
+    gap: var(--space-4);
   }
 
   .homepage-closed-loop-step {
     grid-template-columns: var(--space-8) minmax(0, 1fr);
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
 }
 /* HOMEPAGE CLOSED LOOP SYSTEM B END */
@@ -4087,11 +4068,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-meet-jovie {
   position: relative;
   overflow: clip;
-  padding-block: clamp(
-    var(--space-20),
-    8vw,
-    calc(var(--space-24) + var(--space-12))
-  );
+  padding-block: clamp(var(--space-16), 6vw, var(--space-24));
   background: var(--system-b-bg-page);
   color: var(--system-b-text-primary);
   font-family: var(--font-sans);
@@ -4106,8 +4083,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-meet-jovie__eyebrow {
-  margin: 0 0 var(--space-5);
-  color: var(--color-text-tertiary-token);
+  margin: 0 0 var(--space-4);
+  color: var(--system-b-accent-cyan);
   font-size: var(--ds-marketing-eyebrow-size);
   font-weight: var(--ds-marketing-eyebrow-weight);
   line-height: var(--ds-marketing-eyebrow-leading);
@@ -4115,7 +4092,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-meet-jovie__heading {
-  max-width: 18ch;
+  max-width: none;
   margin: 0;
   color: var(--color-text-primary-token);
   font-family:
@@ -4127,9 +4104,12 @@ body:has(.home-viewport)::-webkit-scrollbar {
   text-wrap: balance;
 }
 
+.homepage-meet-jovie__heading-primary,
 .homepage-meet-jovie__intro {
-  max-width: 38ch;
-  margin: var(--space-6) 0 0;
+  display: inline;
+}
+
+.homepage-meet-jovie__intro {
   color: var(--color-text-tertiary-token);
   font-size: var(--homepage-section-copy-size);
   font-weight: var(--font-weight-normal);
@@ -4230,13 +4210,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 /* HOMEPAGE ARTIST OUTCOMES SYSTEM B START */
 .homepage-artist-outcome {
-  --homepage-artist-outcome-copy-track: 34fr;
-  --homepage-artist-outcome-media-track: 66fr;
+  --homepage-artist-outcome-copy-track: 30fr;
+  --homepage-artist-outcome-media-track: 70fr;
 
   position: relative;
   display: grid;
   min-width: 0;
-  aspect-ratio: 0.68;
+  aspect-ratio: 0.76;
   overflow: hidden;
   border-radius: var(--radius-2xl);
   background: var(--system-b-primary-bg);
@@ -4287,7 +4267,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .homepage-artist-outcome__device {
   width: auto;
-  max-width: 78%;
+  max-width: 74%;
   height: calc(100% - var(--space-4));
   aspect-ratio: 9 / 19.5;
   padding: var(--space-2);

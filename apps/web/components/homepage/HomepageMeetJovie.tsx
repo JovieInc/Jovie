@@ -13,11 +13,13 @@ export function HomepageMeetJovie() {
           id='homepage-meet-jovie-heading'
         >
           {/* ui-casing-allow: marketing display headline (DESIGN.md Text Casing exception) */}
-          Jovie is the AI workspace for artists.
+          <span className='homepage-meet-jovie__heading-primary'>
+            Jovie is the AI workspace for artists.
+          </span>{' '}
+          <span className='homepage-meet-jovie__intro'>
+            Built around your catalog, audience, and artist presence.
+          </span>
         </h2>
-        <p className='homepage-meet-jovie__intro'>
-          Built around your catalog, audience, and artist presence.
-        </p>
       </div>
     </section>
   );

@@ -37,11 +37,11 @@ describe('HomepageClosedLoop', () => {
   it('uses one static product screenshot and no interactive state', () => {
     const { container } = render(<HomepageClosedLoop />);
 
-    expect(
-      screen.getByRole('img', {
-        name: 'Jovie catalog workspace showing an artist release library',
-      })
-    ).toBeInTheDocument();
+    const screenshot = screen.getByRole('img', {
+      name: 'Jovie releases workspace with a selected release and detail rail',
+    });
+
+    expect(screenshot).toBeInTheDocument();
     expect(container.querySelectorAll('svg')).toHaveLength(0);
     expect(container.querySelectorAll('button, input, a')).toHaveLength(0);
     expect(container.querySelector('style')).toBeNull();

@@ -203,7 +203,7 @@ test.describe('Homepage', () => {
     }
     await expect(commandCenter.locator('img')).toHaveAttribute(
       'src',
-      /releases-dashboard-full/
+      /releases-dashboard-sidebar/
     );
   });
 
