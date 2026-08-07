@@ -1,6 +1,9 @@
 export { ChatAvatarUploadCard } from './ChatAvatarUploadCard';
 export { ChatDropZoneOverlay } from './ChatDropZoneOverlay';
-export { ChatEmptyStateComposerRegion } from './ChatEmptyStateComposerRegion';
+export {
+  ChatEmptyStateComposerRegion,
+  ChatEmptyStateWelcome,
+} from './ChatEmptyStateComposerRegion';
 export { ChatEmptyStateOpportunityCards } from './ChatEmptyStateOpportunityCards';
 export { ChatFileChips } from './ChatFileChips';
 export { ChatInput } from './ChatInput';

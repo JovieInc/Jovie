@@ -179,7 +179,7 @@ describe('JovieChat empty state', () => {
     mockChatState.chipTray.chips = [];
   });
 
-  it('renders a stable docked composer without filler prompts when no skill is featured', () => {
+  it('renders a stable docked composer with the centered welcome when no skill is featured', () => {
     const { container, getByTestId, queryByTestId, queryByText } =
       renderWithQueryClient(<JovieChat profileId='profile-1' />);
 
@@ -192,10 +192,15 @@ describe('JovieChat empty state', () => {
     expect(emptyViewport.className).toContain('flex-1');
     expect(emptyViewport).toHaveAttribute('data-empty-affordance', 'none');
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
-    expect(queryByTestId('chat-empty-state-logo')).toBeNull();
-    expect(queryByTestId('chat-empty-state-greeting')).toBeNull();
+    // Clean start screen (JOV-4878): ambient brand logo + action-forward
+    // invitation centered above the docked composer.
+    expect(getByTestId('chat-empty-state-welcome')).toBeTruthy();
+    expect(getByTestId('chat-empty-state-logo')).toBeTruthy();
+    expect(getByTestId('chat-empty-state-greeting').textContent).toBe(
+      "What's next?"
+    );
     expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();
-    // No action cards and no featured skills: the composer stands alone.
+    // No action cards and no featured skills: welcome + docked composer only.
     expect(queryByTestId('chat-empty-state-action-card-slot')).toBeNull();
     expect(queryByTestId('chat-composer-dock')).toBeNull();
     expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
@@ -388,6 +393,10 @@ describe('JovieChat empty state', () => {
     expect(queryByTestId('chat-empty-state-action-card-slot')).toBeNull();
     expect(queryByTestId('chat-composer-dock')).toBeNull();
     expect(queryByTestId('chat-empty-state-top-signals')).toBeNull();
+    // Typing gives the composer full focus: welcome + logo hide too.
+    expect(queryByTestId('chat-empty-state-welcome')).toBeNull();
+    expect(queryByTestId('chat-empty-state-logo')).toBeNull();
+    expect(queryByTestId('chat-empty-state-greeting')).toBeNull();
     expect(getByTestId('chat-input')).toBeTruthy();
     expect(queryByText('Connect Your Music Catalog')).toBeNull();
     expect(queryByTestId('suggested-prompts-rail')).toBeNull();
@@ -410,6 +419,8 @@ describe('JovieChat empty state', () => {
     expect(getByTestId('chat-input')).toBeTruthy();
     expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
     expect(queryByTestId('suggested-prompts-rail')).toBeNull();
+    expect(queryByTestId('chat-empty-state-welcome')).toBeNull();
+    expect(queryByTestId('chat-empty-state-greeting')).toBeNull();
   });
 
   it('does not render first-session welcome copy in the empty state', () => {
@@ -491,9 +502,11 @@ describe('JovieChat empty state', () => {
 
     expect(getByTestId('chat-empty-state-opportunity-cards')).toBeTruthy();
     expect(getByText('Detroit listeners up 340%')).toBeTruthy();
-    // Pills stay hidden when opportunities are present.
+    // Pills and the welcome stay hidden when opportunities own the stage.
     expect(queryByTestId('suggested-prompts-rail')).toBeNull();
     expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
+    expect(queryByTestId('chat-empty-state-welcome')).toBeNull();
+    expect(queryByTestId('chat-empty-state-logo')).toBeNull();
   });
 
   it('enters pinned-card mode when an opportunity card is tapped', () => {
