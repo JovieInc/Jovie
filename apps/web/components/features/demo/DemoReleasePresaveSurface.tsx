@@ -82,28 +82,34 @@ export function DemoReleasePresaveSurface() {
               <SmartLinkProviderButton
                 label='Spotify'
                 iconPath={spotifyConfig?.iconPath}
+                iconColor={spotifyConfig?.color}
               />
               <SmartLinkProviderButton
                 label='Apple Music'
                 iconPath={appleConfig?.iconPath}
+                iconColor={appleConfig?.color}
                 href={THE_DEEP_END_APPLE_URL}
               />
               <SmartLinkProviderButton
                 label='YouTube Music'
                 iconPath={youtubeMusicConfig?.iconPath}
+                iconColor={youtubeMusicConfig?.color}
               />
               <SmartLinkProviderButton
                 label='SoundCloud'
                 iconPath={soundcloudConfig?.iconPath}
+                iconColor={soundcloudConfig?.color}
                 href={THE_DEEP_END_SOUNDCLOUD_URL}
               />
               <SmartLinkProviderButton
                 label='TIDAL'
                 iconPath={tidalConfig?.iconPath}
+                iconColor={tidalConfig?.color}
               />
               <SmartLinkProviderButton
                 label='Amazon Music'
                 iconPath={amazonMusicConfig?.iconPath}
+                iconColor={amazonMusicConfig?.color}
               />
             </div>
 

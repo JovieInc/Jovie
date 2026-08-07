@@ -95,6 +95,7 @@ export function PreSaveActions({
         <SmartLinkProviderButton
           label='Spotify'
           iconPath={spotifyConfig?.iconPath}
+          iconColor={spotifyConfig?.color}
           href={spotifyHref}
         />
       ) : null}
@@ -107,6 +108,7 @@ export function PreSaveActions({
               : 'Apple Music'
           }
           iconPath={appleConfig?.iconPath}
+          iconColor={appleConfig?.color}
           onClick={handleApplePreAdd}
         />
       ) : null}

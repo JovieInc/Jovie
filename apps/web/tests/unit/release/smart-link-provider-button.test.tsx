@@ -36,4 +36,25 @@ describe('SmartLinkProviderButton', () => {
     fireEvent.click(link);
     expect(onClick).toHaveBeenCalledTimes(1);
   });
+
+  it('renders the provider icon in its brand color when iconColor is given', () => {
+    render(
+      <SmartLinkProviderButton
+        label='Spotify'
+        iconPath='M12 0v24'
+        iconColor='var(--color-brand-spotify)'
+      />
+    );
+
+    const icon = document.querySelector('svg');
+    expect(icon).toHaveStyle({ color: 'var(--color-brand-spotify)' });
+    expect(icon).not.toHaveClass('text-muted-foreground');
+  });
+
+  it('falls back to muted foreground when iconColor is omitted', () => {
+    render(<SmartLinkProviderButton label='Spotify' iconPath='M12 0v24' />);
+
+    const icon = document.querySelector('svg');
+    expect(icon).toHaveClass('text-muted-foreground');
+  });
 });
