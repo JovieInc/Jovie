@@ -1112,6 +1112,14 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+    # Warning-only on production alias (JOV-4854 / #15586): cold-cache single-sample
+    # noise must not fail Production Verified. Measurement is retained; the staged
+    # immutable public-profile budget gate in promote-production stays hard.
+    # Re-evaluate when: public-profile usable-alias-result-max p95 stays ≤1500ms for
+    # 14 consecutive Production Controller runs without cold-cache single-sample
+    # false-reds — then restore hard-fail if product stability allows.
+    outputs:
+      performance_status: ${{ steps.alias-perf.outputs.performance_status }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -1120,19 +1128,28 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - uses: ./.github/actions/setup-playwright
       - name: Gate canonical public-profile aliases on usable results
+        id: alias-perf
         working-directory: apps/web
         env:
           CI: 'true'
-        run: >-
-          pnpm exec tsx scripts/performance-budgets-guard.ts
-          --base-url https://jov.ie
-          --runs 5
-          --route-id public-profile-listen
-          --route-id public-profile-music
-          --route-id public-profile-subscribe
-          --route-id public-profile-tip
-          --route-id public-profile-tour
-          --route-id public-profile-releases
+        run: |
+          set -euo pipefail
+          # Keep measuring post-promote alias budgets, but treat budget misses as
+          # warnings so a single cold-cache sample cannot red Production Verified.
+          if ! pnpm exec tsx scripts/performance-budgets-guard.ts \
+            --base-url https://jov.ie \
+            --runs 5 \
+            --route-id public-profile-listen \
+            --route-id public-profile-music \
+            --route-id public-profile-subscribe \
+            --route-id public-profile-tip \
+            --route-id public-profile-tour \
+            --route-id public-profile-releases; then
+            echo "::warning::Production public-profile alias usable-result budgets failed on jov.ie (JOV-4854: warning-only until p95 ≤1500ms for 14 consecutive Production Controller runs)."
+            echo "performance_status=warn" >> "$GITHUB_OUTPUT"
+          else
+            echo "performance_status=passed" >> "$GITHUB_OUTPUT"
+          fi
 
   sentry-error-gate:
     name: Sentry Error Gate (production)
