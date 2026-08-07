@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- [internal] **Production public-profile alias perf gate is warning-only (#15586 / JOV-4854):** post-promote `jov.ie` usable-result budgets still measure and emit `::warning::` / `performance_status=warn` on cold-cache noise, but no longer fail Production Verified; the immutable staged public-profile budget gate remains hard.
 - [internal] **Desktop releases now fail closed on publication proof (JOV-4545):** production creates an exact-commit private draft first, verifies all five updater assets and checksums, and writes the release marker only after an independent published-asset check.
 - **Calendar keeps a usable seven-column month grid (JOV-4819):** the authenticated desktop calendar and its loading state now own explicit responsive grid geometry, preventing production builds from collapsing the month into a single narrow day column.
 - [internal] **Unused flag asset dependency removed:** `flag-icons` no longer installs 552 unused package files after the country selector moved its two live flags to owned local SVGs.

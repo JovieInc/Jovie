@@ -1743,7 +1743,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verifyStep).toContain('EXPECTED_PRODUCTION_DEPLOYMENT_ID');
   });
 
-  it('makes canonical public-profile alias usable results release-gating', () => {
+  it('measures production public-profile alias budgets as warning-only (staged remains hard)', () => {
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const aliasGate = getJobBlock(
       workflow,
@@ -1755,14 +1755,39 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(aliasGate).toContain('setup-playwright');
     expect(aliasGate).toContain('--base-url https://jov.ie');
     expect(aliasGate).toContain('--runs 5');
+    // Post-promote production alias budgets must not fail the job on miss.
+    expect(aliasGate).toContain('id: alias-perf');
+    expect(aliasGate).toContain(
+      'if ! pnpm exec tsx scripts/performance-budgets-guard.ts'
+    );
+    expect(aliasGate).toContain(
+      'echo "performance_status=warn" >> "$GITHUB_OUTPUT"'
+    );
+    expect(aliasGate).toContain(
+      'echo "performance_status=passed" >> "$GITHUB_OUTPUT"'
+    );
+    expect(aliasGate).toContain('::warning::');
+    expect(aliasGate).toContain(
+      'performance_status: ${{ steps.alias-perf.outputs.performance_status }}'
+    );
+    expect(aliasGate).not.toContain('fail_performance_gate');
+    expect(aliasGate).not.toContain('continue-on-error: true');
+    expect(aliasGate).not.toMatch(
+      /if ! pnpm exec tsx scripts\/performance-budgets-guard\.ts[\s\S]*?exit 1/
+    );
     const promoteJob = getJobBlock(workflow, 'promote-production');
     const stagedPerformanceGate = getStepBlock(
       promoteJob,
       'Prove canonical navigation budgets on exact staged build'
     );
     expect(stagedPerformanceGate).toContain('--base-url "$deployment_url"');
+    // Immutable staged public-profile gate stays hard-fail.
     expect(stagedPerformanceGate).toContain(
       'Public-profile alias usable-result contract failed on the immutable staged deployment.'
+    );
+    expect(stagedPerformanceGate).toContain('fail_performance_gate');
+    expect(stagedPerformanceGate).toMatch(
+      /public-profile-releases \|\| \\\s*\n\s*fail_performance_gate/
     );
     for (const routeId of [
       'public-profile-listen',
@@ -1774,6 +1799,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     ]) {
       expect(aliasGate).toContain(`--route-id ${routeId}`);
     }
+    // Downstream still requires job successful completion (exit 0), not a perf pass.
     expect(releaseResult).toContain('production-public-profile-alias-gate,');
     expect(releaseResult).toContain(
       'production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}'
