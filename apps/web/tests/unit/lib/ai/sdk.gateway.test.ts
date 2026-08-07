@@ -64,6 +64,8 @@ describe('lib/ai/sdk gateway routing', () => {
     process.env.HELICONE_GATEWAY_BASE_URL =
       'https://helicone-proxy.example.workers.dev/v1/ai';
     delete process.env.HELICONE_API_KEY;
+    // Ambient Doppler/dev AI_GATEWAY_API_KEY must not leak into this case.
+    delete process.env.AI_GATEWAY_API_KEY;
 
     const { gateway } = await import('@/lib/ai/sdk');
     gateway('openai/gpt-4o-mini');
