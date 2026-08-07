@@ -76,7 +76,7 @@ export function AdminPage<
   const showMetaHeader = Boolean(description || actions);
 
   return (
-    <PageShell>
+    <PageShell frame='none' contentPadding='none'>
       <PageContent noPadding>
         <div
           className={cn(

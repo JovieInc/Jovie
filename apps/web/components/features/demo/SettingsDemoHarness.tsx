@@ -59,7 +59,12 @@ export function SettingsDemoHarness({
     );
   } else if (shell === 'page') {
     content = (
-      <PageShell maxWidth='wide' contentPadding='compact' data-testid={testId}>
+      <PageShell
+        frame='none'
+        maxWidth='wide'
+        contentPadding='compact'
+        data-testid={testId}
+      >
         {children}
       </PageShell>
     );

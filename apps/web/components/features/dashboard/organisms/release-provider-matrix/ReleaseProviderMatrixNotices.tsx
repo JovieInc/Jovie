@@ -173,7 +173,12 @@ export function ConnectedReleaseEmptyState({
     : 'Sync from Spotify to start generating smart links.';
 
   return (
-    <PageShell className='mt-2.5' data-testid='release-table-shell'>
+    <PageShell
+      frame='none'
+      contentPadding='none'
+      className='mt-2.5'
+      data-testid='release-table-shell'
+    >
       <DrawerSurfaceCard
         variant='card'
         className='flex min-h-53 flex-col items-center justify-center px-5 py-9 text-center'

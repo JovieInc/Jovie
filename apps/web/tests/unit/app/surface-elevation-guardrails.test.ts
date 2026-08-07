@@ -138,7 +138,11 @@ describe('surface elevation guardrails', () => {
     );
 
     expect(pageShell).toContain('AppShellContentPanel');
-    expect(pageShell).toContain("frame = 'none'");
+    // JOV-4867: PageShell is a pure compatibility adapter — it must not
+    // re-declare divergent defaults (the old `frame = 'none'` drift). The
+    // single authenticated content contract lives in AppShellContentPanel.
+    expect(pageShell).not.toContain("frame = 'none'");
+    expect(pageShell).not.toContain("contentPadding = 'none'");
     expect(dashboardPanel).toContain("frame = 'content-container'");
     expect(dashboardPanel).toContain("'none'");
     expect(settingsLayout).toContain('PageShell');

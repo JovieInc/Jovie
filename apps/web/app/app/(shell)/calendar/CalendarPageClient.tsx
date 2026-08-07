@@ -433,6 +433,7 @@ export function CalendarPageClient() {
   return (
     <PageShell
       data-testid='calendar-workspace'
+      frame='none'
       contentPadding='none'
       toolbar={
         <PageToolbar

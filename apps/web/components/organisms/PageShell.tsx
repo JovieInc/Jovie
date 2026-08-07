@@ -19,23 +19,15 @@ export interface PageShellProps
 }
 
 /**
- * PageShell - Standardized page container with rounded corners
+ * PageShell — compatibility adapter over {@link AppShellContentPanel}.
  *
- * Provides consistent layout structure across all dashboard and admin pages:
- * - Rounded corners (8px radius)
- * - Proper background surface
- * - Full height with overflow handling
- * - Optional outer padding
- *
- * Usage Pattern:
- * ```tsx
- * <PageShell>
- *   <PageHeader title="Page Title" />
- *   <div className="flex-1 min-h-0 overflow-auto">
- *     {content}
- *   </div>
- * </PageShell>
- * ```
+ * JOV-4867 (UI drift P1): the authenticated app has ONE content contract —
+ * `AppShellContentPanel`. `PageShell` no longer defines its own defaults; it
+ * forwards every prop so both names resolve to the same geometry
+ * (`frame='content-container'`, `contentPadding='default'`, `scroll='panel'`,
+ * `maxWidth='full'`, `surfaceMode='default'`). Callers that need the legacy
+ * unframed/unpadded look pass `frame='none'` / `contentPadding='none'`
+ * explicitly. Prefer `AppShellContentPanel` in new code.
  *
  * @example
  * ```tsx
@@ -46,44 +38,15 @@ export interface PageShellProps
  *         title="My Page"
  *         action={<Button>Action</Button>}
  *       />
- *       <div className="flex-1 min-h-0 p-6">
- *         Page content here
- *       </div>
+ *       <PageContent>Page content here</PageContent>
  *     </PageShell>
  *   );
  * }
  * ```
  */
-export function PageShell({
-  children,
-  toolbar,
-  maxWidth = 'full',
-  frame = 'none',
-  contentPadding = 'none',
-  surfaceMode = 'default',
-  scroll = 'panel',
-  className,
-  surfaceClassName,
-  contentClassName,
-  'data-testid': testId,
-  ...sectionProps
-}: PageShellProps) {
+export function PageShell({ children, ...panelProps }: PageShellProps) {
   return (
-    <AppShellContentPanel
-      toolbar={toolbar}
-      maxWidth={maxWidth}
-      frame={frame}
-      contentPadding={contentPadding}
-      surfaceMode={surfaceMode}
-      scroll={scroll}
-      className={className}
-      surfaceClassName={surfaceClassName}
-      contentClassName={contentClassName}
-      data-testid={testId}
-      {...sectionProps}
-    >
-      {children}
-    </AppShellContentPanel>
+    <AppShellContentPanel {...panelProps}>{children}</AppShellContentPanel>
   );
 }
 

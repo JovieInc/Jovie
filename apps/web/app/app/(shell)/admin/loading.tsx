@@ -6,7 +6,7 @@ import { AdminHealthDashboardSkeleton } from './_components/AdminHealthDashboard
  */
 export default function AdminLoading() {
   return (
-    <PageShell>
+    <PageShell frame='none' contentPadding='none'>
       <PageContent>
         <div className='flex h-full flex-col gap-4'>
           <AdminHealthDashboardSkeleton />

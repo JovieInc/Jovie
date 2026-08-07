@@ -2134,6 +2134,8 @@ export function TasksPageClient() {
         }
       />
       <PageShell
+        frame='none'
+        contentPadding='none'
         className='absolute inset-0 overflow-hidden'
         surfaceClassName='p-0'
         data-testid='tasks-workspace'

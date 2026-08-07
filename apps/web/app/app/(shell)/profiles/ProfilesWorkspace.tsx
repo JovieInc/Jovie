@@ -860,7 +860,11 @@ export function ProfilesWorkspace({
 
   if (!data) {
     return (
-      <PageShell data-testid='profiles-workspace'>
+      <PageShell
+        frame='none'
+        contentPadding='none'
+        data-testid='profiles-workspace'
+      >
         <EmptyState
           icon={<UserRound className='h-5 w-5' aria-hidden />}
           heading='No Artist Profile Selected'
@@ -878,6 +882,8 @@ export function ProfilesWorkspace({
 
   return (
     <PageShell
+      frame='none'
+      contentPadding='none'
       data-testid='profiles-workspace'
       surfaceMode='table'
       toolbar={

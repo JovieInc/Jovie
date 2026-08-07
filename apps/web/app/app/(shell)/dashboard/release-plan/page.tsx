@@ -34,6 +34,7 @@ export default function ReleasePlanPage() {
   return (
     <PageShell
       aria-label='Release Plan'
+      frame='none'
       contentPadding='default'
       className='h-full'
       data-testid='release-plan-shell'
@@ -54,7 +55,7 @@ export default function ReleasePlanPage() {
                 onClick={() => setPlan(generateDemoPlan())}
                 size='sm'
               >
-                Generate plan
+                Generate Plan
               </Button>
             }
             subtitleClassName='whitespace-normal'

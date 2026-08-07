@@ -62,6 +62,7 @@ export function CalendarRouteSkeleton() {
       aria-busy='true'
       aria-label='Loading Calendar'
       aria-live='polite'
+      frame='none'
       contentPadding='none'
       toolbar={
         <PageToolbar

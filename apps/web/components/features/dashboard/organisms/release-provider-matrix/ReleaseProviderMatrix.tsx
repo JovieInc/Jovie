@@ -22,12 +22,12 @@ import { instantiateReleaseTasks } from '@/app/app/(shell)/dashboard/releases/ta
 import { toast } from '@/components/feedback';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { DrawerLoadingSkeleton } from '@/components/molecules/drawer';
-import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
 import { PageShell } from '@/components/organisms/PageShell';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useTableMeta } from '@/contexts/TableMetaContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithPrompt } from '@/lib/chat/open-chat-with-prompt';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -536,7 +536,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   );
 
   // Empty selection for subheader export (simplified - no bulk selection)
-  const selectedIds = useRef(new Set<string>()).current;
+  const [selectedIds] = useState(() => new Set<string>());
 
   const handleArtistConnected = useCallback(
     (newReleases: ReleaseViewModel[], newArtistName: string) => {
@@ -760,7 +760,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Use ref to avoid infinite loop - rows array reference changes each render
   const rowsRef = useRef(rows);
-  rowsRef.current = rows;
+
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
 
   useEffect(() => {
     // Toggle function: close if open, open first release if closed
@@ -1028,7 +1031,12 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           onMatchStatusChange={handleMatchStatusChange}
         />
         {showEmptyState && (
-          <PageShell className='mt-2.5' data-testid='release-table-shell'>
+          <PageShell
+            frame='none'
+            contentPadding='none'
+            className='mt-2.5'
+            data-testid='release-table-shell'
+          >
             <Suspense fallback={null}>
               <ReleasesEmptyState
                 onConnectSpotify={() => setSpotifySearchOpen(true)}
@@ -1049,6 +1057,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         {showReleasesTable && (
           <QueryErrorBoundary>
             <PageShell
+              frame='none'
+              contentPadding='none'
               className='mt-2.5'
               data-testid='release-table-shell'
               toolbar={

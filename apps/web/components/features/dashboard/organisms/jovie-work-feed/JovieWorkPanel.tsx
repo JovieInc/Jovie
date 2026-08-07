@@ -10,7 +10,7 @@ export function JovieWorkPanel() {
   const profileId = selectedProfile?.id;
 
   return (
-    <PageShell data-testid='jovie-work-page'>
+    <PageShell frame='none' contentPadding='none' data-testid='jovie-work-page'>
       <div className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden'>
         <div className='flex flex-col gap-4 px-3 py-2.5 sm:px-4 sm:py-3.5'>
           <div className='space-y-1'>
