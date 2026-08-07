@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { ExternalLink, RefreshCw } from 'lucide-react';
 import { formatSourceFreshness, isSourceStale } from '@/lib/hud/source-trust';
 import type { HudMetricSourceTrust as HudMetricSourceTrustType } from '@/types/hud';
@@ -57,15 +58,17 @@ export function HudMetricSourceTrust({
         </p>
         <div className='flex shrink-0 items-center gap-2'>
           {onRetry && source.state === 'unavailable' ? (
-            <button
+            <Button
               type='button'
+              variant='link'
+              size='sm'
               onClick={onRetry}
               className='inline-flex items-center gap-1 text-2xs font-medium text-secondary-token transition-colors hover:text-primary-token'
               data-testid={`hud-source-retry-${source.key}`}
             >
               <RefreshCw className='h-3 w-3' aria-hidden='true' />
               Retry
-            </button>
+            </Button>
           ) : null}
           {source.dashboardUrl ? (
             <a

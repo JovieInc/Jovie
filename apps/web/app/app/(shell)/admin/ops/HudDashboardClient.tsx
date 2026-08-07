@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -302,13 +303,15 @@ function DeploymentActionsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button
           type='button'
+          variant='ghost'
+          size='icon'
           aria-label='Deployment Actions'
           className='flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-tertiary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-secondary-token focus-visible:bg-surface-1 focus-visible:outline-none'
         >
           <MoreHorizontal className='h-3.5 w-3.5' aria-hidden='true' />
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' sideOffset={6}>
         {run.url ? (
@@ -486,23 +489,27 @@ function AiOpsItemRow({
       <div className='flex shrink-0 items-center gap-1.5 text-right text-2xs text-tertiary-token'>
         <p>{formatDeploymentTime(item.updatedAt)}</p>
         {isDismissed && onUndismiss ? (
-          <button
+          <Button
             type='button'
+            variant='ghost'
+            size='sm'
             onClick={onUndismiss}
             aria-label='Restore Item'
             className='rounded px-1 py-0.5 text-2xs text-tertiary-token hover:text-primary-token'
           >
             Undo
-          </button>
+          </Button>
         ) : onDismiss ? (
-          <button
+          <Button
             type='button'
+            variant='ghost'
+            size='icon'
             onClick={onDismiss}
             aria-label='Dismiss Item'
             className='rounded p-0.5 text-tertiary-token hover:text-primary-token'
           >
             <X className='h-3.5 w-3.5' aria-hidden='true' />
-          </button>
+          </Button>
         ) : null}
       </div>
     </ShellListRowFrame>
@@ -617,8 +624,10 @@ function HermesDispatchControls({
         </select>
       </div>
       <div className='flex flex-wrap gap-2'>
-        <button
+        <Button
           type='button'
+          variant='ghost'
+          size='sm'
           onClick={() => void dispatchWorker(false)}
           disabled={isDispatching}
           className='inline-flex min-h-10 items-center gap-2 rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-3 text-app font-semibold text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:cursor-not-allowed disabled:opacity-60'
@@ -628,16 +637,18 @@ function HermesDispatchControls({
           ) : (
             <Rocket className='h-4 w-4' aria-hidden='true' />
           )}
-          Dispatch worker
-        </button>
-        <button
+          Dispatch Worker
+        </Button>
+        <Button
           type='button'
+          variant='ghost'
+          size='sm'
           onClick={() => void dispatchWorker(true)}
           disabled={isDispatching}
           className='inline-flex min-h-10 items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 text-app font-semibold text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
         >
-          Dry run
-        </button>
+          Dry Run
+        </Button>
       </div>
       {message ? (
         <p className='text-app leading-5 text-secondary-token'>{message}</p>

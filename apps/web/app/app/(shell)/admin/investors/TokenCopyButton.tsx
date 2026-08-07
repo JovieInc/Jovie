@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Check, Copy, Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -37,8 +38,10 @@ export function TokenCopyButton({ token }: Readonly<TokenCopyButtonProps>) {
       >
         {visibleToken}
       </code>
-      <button
+      <Button
         type='button'
+        variant='ghost'
+        size='icon'
         onClick={() => setIsRevealed(value => !value)}
         className='inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-tertiary-token transition-[color,opacity] hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         aria-label={
@@ -51,9 +54,11 @@ export function TokenCopyButton({ token }: Readonly<TokenCopyButtonProps>) {
         ) : (
           <Eye className='h-3 w-3' aria-hidden='true' />
         )}
-      </button>
-      <button
+      </Button>
+      <Button
         type='button'
+        variant='ghost'
+        size='icon'
         onClick={copyToken}
         className='inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-tertiary-token transition-[color,opacity] hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         aria-label='Copy Full Investor Token'
@@ -67,7 +72,7 @@ export function TokenCopyButton({ token }: Readonly<TokenCopyButtonProps>) {
         ) : (
           <Copy className='h-3 w-3' aria-hidden='true' />
         )}
-      </button>
+      </Button>
     </span>
   );
 }
