@@ -1,7 +1,7 @@
 'use client';
 
 import { TooltipProvider } from '@jovie/ui';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -131,5 +131,31 @@ describe('TableFilterDropdown', () => {
     expect(
       (submenuSurface as HTMLElement).querySelector('[data-menu-header]')
     ).toBeTruthy();
+  });
+
+  it("shows 'No options found' when the search filters options down to zero", () => {
+    render(
+      <TooltipProvider>
+        <TableFilterDropdown
+          categories={[
+            {
+              id: 'status',
+              label: 'Status',
+              iconName: 'Hash',
+              options: [{ id: 'todo', label: 'Todo' }],
+              selectedIds: [],
+              onToggle: vi.fn(),
+            },
+          ]}
+        />
+      </TooltipProvider>
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Search Status'), {
+      target: { value: 'zzz-no-match' },
+    });
+
+    expect(screen.getByText('No options found')).toBeInTheDocument();
+    expect(screen.queryByText('Todo')).not.toBeInTheDocument();
   });
 });
