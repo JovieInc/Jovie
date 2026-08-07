@@ -297,8 +297,7 @@ export default async function PlaylistPage({
             >
               <SocialIcon
                 platform='spotify'
-                // eslint-disable-next-line @jovie/no-hardcoded-theme-colors -- Spotify brand green on playlist CTA
-                className='h-5 w-5 text-[#1DB954]'
+                className='h-5 w-5 text-brand-spotify'
                 aria-hidden
               />
               Open in Spotify
@@ -341,8 +340,7 @@ export default async function PlaylistPage({
                       href={`https://open.spotify.com/track/${track.spotifyTrackId}`}
                       target='_blank'
                       rel='noopener noreferrer'
-                      // eslint-disable-next-line @jovie/no-hardcoded-theme-colors -- Spotify brand green on track play affordance
-                      className='flex-shrink-0 p-2 text-white/20 hover:text-[#1DB954]'
+                      className='flex-shrink-0 p-2 text-white/20 hover:text-brand-spotify'
                       aria-label={`Play ${track.trackName} on Spotify`}
                     >
                       <span className='sr-only'>

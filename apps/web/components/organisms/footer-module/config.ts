@@ -68,7 +68,7 @@ export function getVariantConfigs(
 export const FOOTER_LINK_CLASS_NAME = cn(
   'inline-flex h-7 items-center',
   'text-app leading-[19.5px] font-normal tracking-tight',
-  'transition-colors duration-100',
+  'transition-colors duration-fast',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
 );
 

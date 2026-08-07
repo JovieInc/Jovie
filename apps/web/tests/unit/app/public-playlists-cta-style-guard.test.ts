@@ -11,6 +11,6 @@ describe('public playlist CTA style guard', () => {
     expect(source).toContain(
       'text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90'
     );
-    expect(source).toContain("className='h-5 w-5 text-[#1DB954]'");
+    expect(source).toContain("className='h-5 w-5 text-brand-spotify'");
   });
 });
