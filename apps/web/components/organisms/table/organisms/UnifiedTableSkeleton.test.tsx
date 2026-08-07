@@ -26,16 +26,19 @@ describe('UnifiedTableSkeleton', () => {
     expect(screen.getByText('Count')).toBeInTheDocument();
   });
 
-  it('renders the requested number of skeleton rows', () => {
+  it('reserves at least the requested skeleton rows plus the empty-state min-height', () => {
     const { container } = render(
       <UnifiedTableSkeleton columns={COLUMNS} skeletonRows={5} />
     );
 
-    // Skeleton rows have fixed height and live inside <tbody>
+    // Skeleton rows have fixed height and live inside <tbody>.
+    // UnifiedTable reserves max(skeletonRows, ceil(220px / rowHeight)) rows
+    // so loading → empty → populated transitions do not shift layout
+    // (JOV-4869). Default rowHeight is 32px → ceil(220/32) = 7.
     const tbody = container.querySelector('tbody');
     expect(tbody).not.toBeNull();
     const rows = tbody?.querySelectorAll('tr') ?? [];
-    expect(rows.length).toBe(5);
+    expect(rows.length).toBe(7);
   });
 
   it('renders one <td> per column on every skeleton row', () => {
