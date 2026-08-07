@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { deriveChatRailContextTargets } from './chat-context-rail';
 import { resolveChatEmptyStateAffordance } from './chat-empty-state-contract';
 import { ChatDropZoneOverlay } from './components/ChatDropZoneOverlay';
+import { ChatEmptyStateWelcome } from './components/ChatEmptyStateComposerRegion';
 import { ChatEmptyStateOpportunityCards } from './components/ChatEmptyStateOpportunityCards';
 import { ChatPinnedOpportunityHeader } from './components/ChatPinnedOpportunityHeader';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
@@ -517,11 +518,12 @@ export function JovieChat({
   const showThreadView =
     conversationExists || conversationInProgress || pinnedOpportunity !== null;
   const showBottomComposer = showThreadView;
+  const composerHasIntent =
+    composerPickerOpen || Boolean(input.trim()) || chipTray.chips.length > 0;
   const emptyStateAffordance = resolveChatEmptyStateAffordance({
     conversationExists,
     conversationInProgress,
-    composerHasIntent:
-      composerPickerOpen || Boolean(input.trim()) || chipTray.chips.length > 0,
+    composerHasIntent,
     opportunityCardCount: showEmptyOpportunityCards
       ? pendingOpportunityCards.length
       : 0,
@@ -530,6 +532,14 @@ export function JovieChat({
   });
   const showEmptyActionCards = emptyStateAffordance === 'starter-actions';
   const showEmptyPromptRail = emptyStateAffordance === 'suggestion-pills';
+  // Clean start screen (JOV-4878): when the stage is otherwise bare, fill the
+  // scroll region above the docked composer with the centered welcome (ambient
+  // brand logo + invitation). Hidden while the composer has intent so the
+  // composer owns attention; geometry never shifts (composer stays docked).
+  const showEmptyWelcome =
+    !composerHasIntent &&
+    (emptyStateAffordance === 'none' ||
+      emptyStateAffordance === 'suggestion-pills');
   const shouldReservePickerClearance = showBottomComposer && composerPickerOpen;
   const messageViewportPaddingBottom = shouldReservePickerClearance
     ? CHAT_PICKER_THREAD_CLEARANCE
@@ -741,6 +751,9 @@ export function JovieChat({
                 <ChatEmptyStateComposerRegion
                   greetingName={displayName ?? username ?? null}
                   stableDocked
+                  showDockedWelcome={
+                    showEmptyWelcome && emptyStateAffordance === 'none'
+                  }
                   above={
                     showEmptyOpportunityCards ? (
                       <ChatEmptyStateOpportunityCards
@@ -760,9 +773,16 @@ export function JovieChat({
                       </div>
                     ) : showEmptyPromptRail ? (
                       <div
-                        className='mx-auto flex min-h-full w-full max-w-[46rem] items-end pb-3'
+                        className='mx-auto flex min-h-full w-full max-w-[46rem] flex-col items-center pb-3'
                         data-testid='chat-empty-state-soft-suggestions-slot'
                       >
+                        <div className='flex min-h-0 flex-1 flex-col items-center justify-center py-2 text-center'>
+                          {showEmptyWelcome ? (
+                            <ChatEmptyStateWelcome
+                              greetingName={displayName ?? username ?? null}
+                            />
+                          ) : null}
+                        </div>
                         <SuggestedPrompts
                           onSelect={handleSuggestedPrompt}
                           isFirstSession={isFirstSession}

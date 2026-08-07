@@ -16,19 +16,19 @@ describe('ChatEmptyStateComposerRegion', () => {
     expect(logo.getAttribute('aria-hidden')).toBe('true');
   });
 
-  it('greets by display name when provided', () => {
+  it('invites action by first name when provided', () => {
     render(
-      <ChatEmptyStateComposerRegion greetingName='Tim'>
+      <ChatEmptyStateComposerRegion greetingName='Tim White'>
         <div data-testid='composer-child' />
       </ChatEmptyStateComposerRegion>
     );
 
     expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
-      'Hi, Tim'
+      "What's next, Tim?"
     );
   });
 
-  it('falls back to a generic greeting without a display name', () => {
+  it('falls back to a generic invitation without a display name', () => {
     render(
       <ChatEmptyStateComposerRegion greetingName='  '>
         <div data-testid='composer-child' />
@@ -36,7 +36,7 @@ describe('ChatEmptyStateComposerRegion', () => {
     );
 
     expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
-      'Hi there'
+      "What's next?"
     );
   });
 
@@ -120,5 +120,45 @@ describe('ChatEmptyStateComposerRegion', () => {
       screen.getByTestId('chat-empty-state-composer-region')
     ).toHaveAttribute('data-layout', 'docked');
     expect(screen.getByTestId('chat-empty-state-above-scroll')).toBeTruthy();
+  });
+
+  it('fills the docked scroll region with the centered welcome when invited', () => {
+    render(
+      <ChatEmptyStateComposerRegion stableDocked showDockedWelcome>
+        <div data-testid='composer-child' />
+      </ChatEmptyStateComposerRegion>
+    );
+
+    const region = screen.getByTestId('chat-empty-state-composer-region');
+    expect(region).toHaveAttribute('data-layout', 'docked');
+    // Composer keeps its bottom-dock geometry — welcome never shifts it.
+    expect(
+      screen.getByTestId('chat-empty-state-centered-composer')
+    ).toHaveAttribute('data-dock', 'bottom');
+
+    const aboveScroll = screen.getByTestId('chat-empty-state-above-scroll');
+    expect(aboveScroll.className).not.toContain('absolute');
+    const welcome = screen.getByTestId('chat-empty-state-welcome');
+    expect(welcome.className).toContain('items-center');
+    expect(screen.getByTestId('chat-empty-state-logo')).toBeTruthy();
+    expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
+      "What's next?"
+    );
+  });
+
+  it('keeps the docked scroll region blank when the welcome is suppressed', () => {
+    render(
+      <ChatEmptyStateComposerRegion
+        stableDocked
+        showDockedWelcome
+        hideWelcomeHeader
+      >
+        <div data-testid='composer-child' />
+      </ChatEmptyStateComposerRegion>
+    );
+
+    expect(screen.queryByTestId('chat-empty-state-welcome')).toBeNull();
+    expect(screen.queryByTestId('chat-empty-state-logo')).toBeNull();
+    expect(screen.queryByTestId('chat-empty-state-greeting')).toBeNull();
   });
 });
