@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
 
@@ -108,9 +109,39 @@ def _exact_marker(output: bytes) -> bool:
     return any(line == READY_MARKER for line in output.decode(errors="replace").splitlines())
 
 
-def codex_canary_ready() -> tuple[bool, str]:
+def _read_state() -> dict | None:
     if not _known_account_state():
+        return None
+    try:
+        return json.loads(_state_path().read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return None
+
+
+def _account_off_cooldown(state: dict, now: int) -> bool:
+    """True when at least one recorded account's cooldown has expired."""
+    for raw in (state.get("cooldowns") or {}).values():
+        try:
+            until = int(raw or 0)
+        except (TypeError, ValueError):
+            continue
+        if until <= now:
+            return True
+    return False
+
+
+def codex_canary_ready() -> tuple[bool, str]:
+    # Primary signal: codex-rotate's cooldown state, which matches the live
+    # provider 429s. The live probe through codex-rotate is NOT trusted for the
+    # exhausted verdict: codex-rotate may answer via its kimi fallback even when
+    # every Codex account is capped, which would report ready and keep Symphony
+    # thrashing instead of launching the Grok sidecar.
+    state = _read_state()
+    if state is None:
         return False, "unknown_state"
+    cooldowns = state.get("cooldowns") or {}
+    if cooldowns and not _account_off_cooldown(state, int(time.time())):
+        return False, "all_accounts_cooldown"
     executable = _rotate_executable()
     if executable is None:
         return False, "executable_missing"
