@@ -73,6 +73,11 @@ describe('Icon', () => {
     }
   });
 
+  it('registers the Tasks primary navigation glyph (JOV-4866)', () => {
+    render(<Icon name='CheckSquare' data-testid='icon-CheckSquare' />);
+    expect(screen.getByTestId('icon-CheckSquare')).toBeInTheDocument();
+  });
+
   it('returns null for unknown icon', () => {
     const { container } = render(
       <Icon name={'NotRealIcon' as any} data-testid='icon' />
