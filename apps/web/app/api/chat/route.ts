@@ -139,10 +139,8 @@ import {
 import { formatLyricsForAppleMusic } from '@/lib/lyrics/format-lyrics-for-apple-music';
 import { formatMerchMoney } from '@/lib/merch/pricing';
 import {
-  createMerchGeneration,
   optimizeMerchCards,
   reorderMerchCards,
-  selectMerchDesign,
   showArtistPayouts,
   showMerchSales,
   updateMerchCardDetails,
@@ -1201,82 +1199,10 @@ function createGenerateAlbumArtTool(params: {
   });
 }
 
-function _createMerchGenerationTool(params: {
-  readonly profileId: string | null;
-  readonly clerkUserId: string;
-  readonly command: 'create_merch' | 'preview_merch_options';
-  readonly conversationId?: string | null;
-  readonly turnId?: string | null;
-}) {
-  return tool({
-    description:
-      'Generate exactly three premium merch design options for the current artist. Use for make merch, create a tee, create a hoodie, or make something that would sell.',
-    inputSchema: chatToolSchema({
-      prompt: z.string().max(500).optional(),
-      itemType: z.string().max(80).optional(),
-      makeLive: z.boolean().optional(),
-    }),
-    execute: async ({ prompt, itemType }) => {
-      if (!params.profileId) {
-        return { success: false as const, error: 'Profile ID required' };
-      }
-
-      const merchPrompt = [prompt, itemType ? `Item type: ${itemType}` : null]
-        .filter(Boolean)
-        .join('\n')
-        .trim();
-
-      const result = await createMerchGeneration({
-        profileId: params.profileId,
-        clerkUserId: params.clerkUserId,
-        prompt: merchPrompt || 'Make premium merch for this artist.',
-        command: params.command,
-        conversationId: params.conversationId ?? null,
-        turnId: params.turnId ?? null,
-      });
-
-      return {
-        ...result,
-        nextStep: 'Pick 1, 2, or 3. You can also tell me what to change.',
-      };
-    },
-  });
-}
-
-function _createSelectMerchDesignTool(params: {
-  readonly profileId: string | null;
-  readonly clerkUserId: string;
-}) {
-  return tool({
-    description:
-      'Select a merch option from a previous generation and create a Jovie merch card. Publish only when the artist asks to make it live.',
-    inputSchema: z
-      .object({
-        generationId: z.string().uuid(),
-        optionNumber: z.number().int().min(1).max(3).optional(),
-        optionId: z.string().uuid().optional(),
-        makeLive: z.boolean().optional(),
-      })
-      .refine(data => data.optionNumber !== undefined || data.optionId, {
-        message: 'Provide either optionNumber or optionId.',
-        path: ['optionNumber'],
-      }),
-    execute: async ({ generationId, optionNumber, optionId, makeLive }) => {
-      if (!params.profileId) {
-        return { success: false as const, error: 'Profile ID required' };
-      }
-
-      return selectMerchDesign({
-        generationId,
-        clerkUserId: params.clerkUserId,
-        optionId,
-        optionNumber,
-        publish: makeLive === true,
-      });
-    },
-  });
-}
-
+// JOV-4743: the legacy `_createMerchGenerationTool` / `_createSelectMerchDesignTool`
+// factories were removed — chat merch generation converges on the canonical
+// tools in `@/lib/chat/tools/merch-tools` (createMerchGenerateTool &
+// createMerchPreviewTool → generateMerchDesigns).
 function createMerchStatusTool(params: {
   readonly action: 'publish' | 'pause' | 'unpause' | 'archive';
   readonly profileId: string | null;

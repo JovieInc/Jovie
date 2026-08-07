@@ -5,6 +5,7 @@ import type {
   MerchPrintfulSnapshot,
   MerchShippingAddress,
 } from '@/lib/db/schema/merch';
+import type { MerchMockupStatus } from './generation-contract';
 
 export type MerchDesignCommand =
   | 'create_merch'
@@ -137,6 +138,13 @@ export interface MerchDesignPreview {
   readonly model_key?: string;
   readonly concept: string;
   readonly status: 'generating' | 'ready';
+  /**
+   * Truthful-mockup lifecycle (JOV-4743): candidates are `pending_mockup`
+   * until the real Printful product mockup exists (`mockup_ready`) or
+   * enrichment fails terminally (`mockup_failed`, blocks publish). Absent on
+   * pre-contract options.
+   */
+  readonly mockup_status?: MerchMockupStatus;
   /** Transparent (alpha) print-art preview. Present only when status is `ready`. */
   readonly preview_url?: string;
   readonly slots: MerchDesignSlots;
@@ -160,6 +168,12 @@ export interface MerchDesignCarouselResult {
   readonly generationId: string;
   readonly prompt?: string;
   readonly nextStep?: string;
+  /**
+   * Version of the canonical generation contract that produced these options
+   * (`MERCH_GENERATION_CONTRACT_VERSION`). Optional only for pre-contract
+   * fixtures/payloads; the canonical pipeline always sets it.
+   */
+  readonly contractVersion?: string;
   readonly designs: readonly MerchDesignPreview[];
 }
 

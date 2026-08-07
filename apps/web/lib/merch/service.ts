@@ -40,9 +40,13 @@ import {
   resolveMerchCatalogSelection,
 } from './catalog';
 import { MERCH_DEFAULT_PRINTFUL_PRODUCT } from './default-catalog';
+import {
+  MERCH_MOCKUP_FAILURE_PUBLISH_BLOCKER,
+  readOptionMockupStatus,
+} from './generation-contract';
 import { resolveArchivedMerchRestoreStatus } from './merch-lifecycle-policy';
+import { scheduleMerchMockupEnrichment } from './mockup-enrichment';
 import { isPrintfulMockupUrl, selectPreferredMockupUrl } from './mockup-urls';
-import { attachMockupsToDesignOption, generateProductMockups } from './mockups'; // HOT ZONE pipeline (gh-9803)
 import {
   buildMerchPresetPriceQuotes,
   buildMerchPricingSnapshot,
@@ -389,6 +393,10 @@ function getDesignOptionSellability(
   if (option.productionWarnings.length > 0) {
     reasons.push('Unresolved production warnings.');
   }
+  // JOV-4743: a terminal mockup failure is user-visible and blocks publish.
+  if (readOptionMockupStatus(option.qualityReview) === 'mockup_failed') {
+    reasons.push(MERCH_MOCKUP_FAILURE_PUBLISH_BLOCKER);
+  }
   return { sellable: reasons.length === 0, reasons };
 }
 
@@ -545,50 +553,37 @@ function calculateRankScore(
   );
 }
 
+/**
+ * Attaches truthful Printful mockups to options via the shared durable
+ * enrichment runner (JOV-4743) — scheduled with `after()`, retried within a
+ * budget, timed out, and persisted to a terminal `mockup_ready` /
+ * `mockup_failed` state on each option. No untracked fire-and-forget path.
+ */
 function attachPrintfulMockupsAsync(
   options: readonly MerchDesignOption[]
 ): void {
-  void Promise.allSettled(
-    options.map(async option => {
+  scheduleMerchMockupEnrichment(
+    options.flatMap(option => {
       const printFileUrl = option.printFileUrls[0];
       if (!printFileUrl) {
         logger.warn('[merch-pipeline] skipping mockups without print file', {
           optionId: option.id,
         });
-        return;
+        return [];
       }
-
-      try {
-        const { results, errors } = await generateProductMockups({
-          printFileUrl,
-          catalogProductId: option.printfulCatalogProductId,
-          catalogVariantIds: option.printfulCatalogVariantIds,
-          placements: option.placements,
-          technique: option.technique,
-          productTypes: [option.productType],
-        });
-        const mockupUrls = results.flatMap(result => result.mockupUrls);
-        if (mockupUrls.length > 0) {
-          await attachMockupsToDesignOption(option.id, mockupUrls);
-          logger.info('[merch-pipeline] Printful mockups attached', {
-            optionId: option.id,
-            mockupCount: mockupUrls.length,
-          });
-        } else if (errors.length > 0) {
-          logger.warn('[merch-pipeline] Printful mockup generation failed', {
-            optionId: option.id,
-            errors,
-          });
-        }
-      } catch (error) {
-        logger.warn(
-          '[merch-pipeline] mockup step failed (non-fatal for batch)',
-          {
-            optionId: option.id,
-            err: error instanceof Error ? error.message : String(error),
-          }
-        );
-      }
+      return [
+        {
+          optionId: option.id,
+          request: {
+            printFileUrl,
+            catalogProductId: option.printfulCatalogProductId,
+            catalogVariantIds: option.printfulCatalogVariantIds,
+            placements: option.placements,
+            technique: option.technique,
+            productTypes: [option.productType],
+          },
+        },
+      ];
     })
   );
 }
@@ -1118,6 +1113,15 @@ export async function selectMerchDesign(params: {
   }
 
   const cardSellability = getMerchCardSellability(card);
+  // JOV-4743: a terminal mockup failure on the selected option is a
+  // user-visible publish blocker even when the card's own economics pass.
+  const publishBlockers = [...cardSellability.reasons];
+  if (
+    readOptionMockupStatus(selected.qualityReview) === 'mockup_failed' &&
+    !publishBlockers.includes(MERCH_MOCKUP_FAILURE_PUBLISH_BLOCKER)
+  ) {
+    publishBlockers.push(MERCH_MOCKUP_FAILURE_PUBLISH_BLOCKER);
+  }
   const printfulMockupUrl =
     card.mockupUrls.find(isPrintfulMockupUrl) ??
     selected.mockupUrls.find(isPrintfulMockupUrl) ??
@@ -1133,9 +1137,8 @@ export async function selectMerchDesign(params: {
       card.status === 'live'
         ? publicMerchUrl(profile.usernameNormalized, card.id)
         : null,
-    publishBlockedReasons: cardSellability.sellable
-      ? undefined
-      : cardSellability.reasons,
+    publishBlockedReasons:
+      publishBlockers.length > 0 ? publishBlockers : undefined,
     product: {
       productType: card.productType,
       productName:
@@ -1146,7 +1149,7 @@ export async function selectMerchDesign(params: {
       mockupStatus: printfulMockupUrl ? 'ready' : 'pending',
       retailPrice: formatMerchMoney(card.retailPriceCents),
       artistProfit: formatMerchMoney(card.artistPayoutPerUnitEstimateCents),
-      publishEligible: cardSellability.sellable,
+      publishEligible: publishBlockers.length === 0,
     },
   };
 }
