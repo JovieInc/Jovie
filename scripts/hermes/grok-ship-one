@@ -39,51 +39,22 @@ if [ "$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --
   exit 0
 fi
 
-export ISSUE_ID="$ID"
-META="$(python3 - <<'PY'
-import json, os, sys, urllib.request
-
-identifier = os.environ["ISSUE_ID"]
-query = """
-query($id: String!) {
-  issue(id: $id) {
-    id identifier title description url
-    state { id name }
-    team { key states { nodes { id name } } }
-    labels { nodes { name } }
-  }
-}
-"""
-request = urllib.request.Request(
-    os.environ.get("LINEAR_API_URL", "https://api.linear.app/graphql"),
-    data=json.dumps({"query": query, "variables": {"id": identifier}}).encode(),
-    headers={"Authorization": os.environ["LINEAR_API_KEY"], "Content-Type": "application/json"},
-)
-with urllib.request.urlopen(request, timeout=20) as response:
-    payload = json.load(response)
-issue = (payload.get("data") or {}).get("issue")
-if payload.get("errors") or not isinstance(issue, dict):
-    raise SystemExit("issue lookup failed")
-team = issue.get("team") or {}
-labels = {str(node.get("name", "")).strip().lower() for node in (issue.get("labels") or {}).get("nodes", [])}
-required = {"symphony", "plan-approved", "admission-approved"}
-blocked = {"human-review-required", "needs:human", "needs-human", "needs:decision", "needs-decision", "hold"}
-if issue.get("identifier") != identifier or team.get("key", "").upper() != identifier.split("-", 1)[0]:
-    raise SystemExit("issue team mismatch")
-if not required.issubset(labels) or labels.intersection(blocked):
-    raise SystemExit("issue is not admitted")
-states = {str(node.get("name", "")).lower(): node.get("id") for node in team.get("states", {}).get("nodes", [])}
-if not states.get("in progress") or not states.get("in review"):
-    raise SystemExit("required workflow states missing")
-print(json.dumps({
-    "id": issue["id"], "title": issue.get("title") or identifier,
-    "description": (issue.get("description") or "")[:6000], "url": issue.get("url") or "",
-    "original_state_id": (issue.get("state") or {}).get("id"),
-    "original_state_name": (issue.get("state") or {}).get("name") or "",
-    "in_progress_state_id": states["in progress"], "in_review_state_id": states["in review"],
-}))
-PY
-)"
+# Single admission source of truth: delegate the admission decision to the
+# controller's check-admission command, which uses the SAME predicate as the
+# reconcile selector (required labels present, no blocked/needs-human/hold).
+# exit 0 = admitted (meta JSON on stdout); 1 = not admitted; 2 = unverifiable.
+if ADMISSION_OUT="$(symphony-codex-exhausted check-admission "$ID" 2>&1)"; then
+  META="$ADMISSION_OUT"
+else
+  admission_rc=$?
+  echo "$(date -u +%FT%TZ) $ID admission_rc=$admission_rc: $(printf '%s' "$ADMISSION_OUT" | tail -n 1)" >> "$LOG"
+  if [ "$admission_rc" -eq 2 ]; then
+    echo "admission verification failed (Linear unreachable or bundle not installed)" >&2
+    exit 2
+  fi
+  echo "issue is not admitted" >&2
+  exit 0
+fi
 
 json_value() {
   python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get(sys.argv[2]) or "")' "$META" "$1"
