@@ -84,6 +84,7 @@ export const APP_ROUTES = {
   /** Legacy admin root. Redirect-only; use OV or an ADMIN_* constant. */
   LEGACY_ADMIN: '/app/admin',
   ADMIN: '/app/ov',
+  ADMIN_CHAT: '/app/ov/chat',
   ADMIN_OPS: '/app/ov/ops',
   ADMIN_PEOPLE: '/app/ov/people',
   ADMIN_GROWTH: '/app/ov/growth',

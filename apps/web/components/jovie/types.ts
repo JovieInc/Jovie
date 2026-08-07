@@ -60,6 +60,12 @@ export interface JovieChatProps {
   readonly username?: string;
   /** Whether the user is in their first post-onboarding chat session */
   readonly isFirstSession?: boolean;
+  /**
+   * Operator (OV) chat mode (JOV-4810). When set to 'ov', the client tags
+   * each turn with `chatMode: 'ov'` and the server enforces an admin gate.
+   * Omitted = customer (artist) mode, byte-identical to previous behavior.
+   */
+  readonly chatMode?: 'ov';
   /** Whether profile setup is complete, used to suppress setup quick actions. */
   readonly isProfileComplete?: boolean;
   /** Contextual, production-backed actions surfaced in an empty thread */

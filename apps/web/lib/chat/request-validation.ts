@@ -29,6 +29,8 @@ export type ChatRequestBody = {
   modelRotationStep?: unknown;
   /** Pinned opportunity card (JOV-3933) — server injects into system prompt. */
   pinnedOpportunity?: unknown;
+  /** OV operator chat mode (JOV-4810) — admin-gated on the server. */
+  chatMode?: unknown;
 };
 
 type MessagePart = { type: string; text?: string };

@@ -77,6 +77,11 @@ interface UseJovieChatOptions {
     readonly primaryActionLabel?: string;
     readonly signalType?: string;
   } | null;
+  /**
+   * Operator (OV) chat mode (JOV-4810). When 'ov', every turn body includes
+   * `chatMode: 'ov'`; the server gates that mode on an admin role.
+   */
+  readonly chatMode?: 'ov';
 }
 
 /** Fast interval (ms) to poll for auto-generated title after first message. */
@@ -276,6 +281,7 @@ export function useJovieChat({
   onConversationCreate,
   username,
   pinnedOpportunity = null,
+  chatMode,
 }: UseJovieChatOptions) {
   const router = useRouter();
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -376,7 +382,7 @@ export function useJovieChat({
         onConversationCreate?.(nextConversationId, phase);
       }
     },
-    [activeConversationId, onConversationCreate]
+    [activeConversationId, onConversationCreate, setActiveConversationId]
   );
   const adoptServerConversationIdRef = useRef(adoptServerConversationId);
   useEffect(() => {
@@ -407,6 +413,7 @@ export function useJovieChat({
   // Create transport: prefer profileId for server-side fetching, fall back to artistContext
   const transport = useMemo(
     () =>
+      // eslint-disable-next-line react-hooks/refs -- refs are only read inside the fetch/prepareSendMessagesRequest closures at request time, never during render
       new DefaultChatTransport({
         api: '/api/chat',
         body: {
@@ -415,6 +422,7 @@ export function useJovieChat({
             ? { conversationId: activeConversationId }
             : {}),
           ...(pinnedOpportunity ? { pinnedOpportunity } : {}),
+          ...(chatMode === 'ov' ? { chatMode } : {}),
         },
         prepareSendMessagesRequest: ({ messages, body }) => {
           const staticBody =
@@ -475,6 +483,7 @@ export function useJovieChat({
       artistContext,
       activeConversationId,
       pinnedOpportunity,
+      chatMode,
       dispatchTimelineEvent,
     ]
   );
@@ -1060,7 +1069,7 @@ export function useJovieChat({
       setChatError(null);
       doSubmit(chatError.failedMessage);
     }
-  }, [chatError, doSubmit]);
+  }, [chatError, doSubmit, setChatError]);
 
   const rateLimitedSubmitter = useAsyncRateLimiter(
     async ({

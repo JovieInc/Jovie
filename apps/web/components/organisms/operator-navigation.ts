@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   type LucideIcon,
   Map,
+  MessageSquare,
   Share2,
   TrendingUp,
   Users,
@@ -24,6 +25,7 @@ import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
 
 const OPERATOR_ICON_BY_ID = {
   overview: LayoutDashboard,
+  chat: MessageSquare,
   ops: Gauge,
   people: Users,
   growth: FolderKanban,
