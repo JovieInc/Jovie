@@ -30,7 +30,7 @@ const BASE_CLASSES = [
   'border-(--pill-border) hover:border-(--pill-border-hover)',
   'bg-(--linear-app-content-surface) hover:bg-(--pill-bg-hover)',
   'text-secondary-token hover:text-primary-token',
-  'transition-[background-color,border-color,color,grid-template-columns,max-width,opacity,padding,margin] duration-180 ease-out',
+  'transition-[background-color,border-color,color,grid-template-columns,max-width,opacity,padding,margin] duration-subtle ease-out',
 ] as const;
 
 /**

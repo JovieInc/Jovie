@@ -61,8 +61,9 @@ const sidebarMenuButtonVariants = cva(
     'group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden',
     // Icon styling — 14px to match Linear's nav icon size
     '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-3.5 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
-    '[&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors [&>svg]:duration-0 [&>svg]:ease-interactive',
-    '[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon [&_[data-sidebar-icon]_svg]:transition-colors [&_[data-sidebar-icon]_svg]:duration-0 [&_[data-sidebar-icon]_svg]:ease-interactive',
+    // Icon color snaps instantly with the row (no transition — Linear: instant for icon colors)
+    '[&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon',
+    '[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon',
     'hover:[&>svg]:text-sidebar-item-foreground',
     'hover:[&_[data-sidebar-icon]_svg]:text-sidebar-item-foreground',
     'data-[active=true]:[&>svg]:text-sidebar-item-foreground',
