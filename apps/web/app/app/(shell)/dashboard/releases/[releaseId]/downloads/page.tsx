@@ -198,7 +198,9 @@ export default function PromoDownloadsPage() {
 
   return (
     <PageShell
-      aria-label='Promo downloads'
+      frame='none'
+      contentPadding='none'
+      aria-label='Promo Downloads'
       data-testid='release-downloads-shell'
     >
       <PageContent>
@@ -213,7 +215,7 @@ export default function PromoDownloadsPage() {
               <button
                 type='button'
                 aria-disabled={uploading || undefined}
-                aria-label='Drop or choose a promo download audio file'
+                aria-label='Drop Or Choose A Promo Download Audio File'
                 onClick={() => {
                   if (!uploading) {
                     fileInputRef.current?.click();
@@ -267,7 +269,7 @@ export default function PromoDownloadsPage() {
               onChange={handleFileSelect}
               disabled={uploading}
               className='sr-only'
-              aria-label='Upload promo download audio file'
+              aria-label='Upload Promo Download Audio File'
             />
             <output
               className='block min-h-9 border-t border-transparent px-3 py-2.5 text-xs sm:px-4'

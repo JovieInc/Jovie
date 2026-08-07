@@ -409,6 +409,7 @@ export function DashboardPay() {
     <>
       <h1 className='sr-only'>Earnings Dashboard</h1>
       <PageShell
+        frame='none'
         maxWidth='wide'
         contentPadding='compact'
         data-testid='dashboard-earnings-workspace'

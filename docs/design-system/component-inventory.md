@@ -63,3 +63,4 @@ This inventory records the current canonical component owners, known duplicates,
 
 - `apps/web/components/site/Container.tsx` is legacy for public surfaces and should remain only for storybook or internal-only cases until fully retired.
 - `apps/web/components/organisms/footer-module/Footer.tsx` is a public-profile/footer family, not the canonical public marketing/legal footer.
+- Authenticated shell geometry: `AppShellContentPanel` is the single content contract; `PageShell` is a no-defaults compatibility adapter (JOV-4867). Route-by-route mapping lives in [`app-shell-route-scaffold-matrix.md`](app-shell-route-scaffold-matrix.md).

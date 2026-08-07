@@ -67,10 +67,14 @@ vi.mock('@/components/organisms/PageShell', () => ({
   PageShell: ({
     children,
     toolbar,
+    frame: _frame,
+    contentPadding: _contentPadding,
     ...props
   }: {
     children: ReactNode;
     toolbar: ReactNode;
+    frame?: string;
+    contentPadding?: string;
   }) => (
     <div {...props}>
       <div data-testid='presence-toolbar'>{toolbar}</div>

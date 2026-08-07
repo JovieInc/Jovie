@@ -69,7 +69,11 @@ function TasksUpgradeContent({
 
 export function TasksWorkspaceUpgradeInterstitial() {
   return (
-    <PageShell data-testid='tasks-upgrade-interstitial'>
+    <PageShell
+      frame='none'
+      contentPadding='none'
+      data-testid='tasks-upgrade-interstitial'
+    >
       <NavigationDestinationReady destination='tasks' />
       <section className='flex min-h-0 flex-1 items-center justify-center px-6 py-6'>
         <TasksUpgradeContent

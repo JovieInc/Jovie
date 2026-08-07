@@ -847,6 +847,8 @@ export const DashboardAudienceTableUnified = memo(
         <AudienceTableStableProvider value={stableContextValue}>
           <AudienceTableVolatileProvider value={volatileContextValue}>
             <PageShell
+              frame='none'
+              contentPadding='none'
               className='overflow-hidden'
               data-testid={testId}
               surfaceMode='table'

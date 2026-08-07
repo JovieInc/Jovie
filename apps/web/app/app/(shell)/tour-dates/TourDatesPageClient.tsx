@@ -21,6 +21,8 @@ export function TourDatesPageClient({
   return (
     <ChatEntityPanelProvider resetKey={profileId}>
       <PageShell
+        frame='none'
+        contentPadding='none'
         surfaceMode='table'
         data-testid='tour-dates-page'
         contentClassName='min-h-0'

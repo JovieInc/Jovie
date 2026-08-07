@@ -149,7 +149,7 @@ export function AdminIngestContent({ history }: AdminIngestPageClientProps) {
 
 export function AdminIngestPageClient(props: AdminIngestPageClientProps) {
   return (
-    <PageShell>
+    <PageShell frame='none' contentPadding='none'>
       <PageContent>
         <AdminIngestContent {...props} />
       </PageContent>

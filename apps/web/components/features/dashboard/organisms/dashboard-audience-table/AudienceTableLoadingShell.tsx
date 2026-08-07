@@ -23,6 +23,8 @@ const AUDIENCE_LOADING_COLUMNS = buildAudienceMemberColumns('members');
 export function AudienceTableLoadingShell() {
   return (
     <PageShell
+      frame='none'
+      contentPadding='none'
       aria-busy='true'
       aria-label='Loading Audience'
       data-testid='dashboard-audience-loading'

@@ -82,7 +82,10 @@ export function DspPresenceView({
   // Shell integration: drawer toggle + right panel width
   const { setTableMeta } = useTableMeta();
   const itemsRef = useRef(data.items);
-  itemsRef.current = data.items;
+
+  useEffect(() => {
+    itemsRef.current = data.items;
+  }, [data.items]);
 
   useEffect(() => {
     const toggle = () => {
@@ -140,7 +143,12 @@ export function DspPresenceView({
 
   if (data.items.length === 0) {
     return (
-      <PageShell toolbar={toolbar} data-testid='dsp-presence-workspace'>
+      <PageShell
+        frame='none'
+        contentPadding='none'
+        toolbar={toolbar}
+        data-testid='dsp-presence-workspace'
+      >
         <div
           className='flex h-full min-h-0 flex-1 items-center justify-center p-8'
           data-testid='dsp-presence-content-panel'
@@ -166,7 +174,12 @@ export function DspPresenceView({
   }
 
   return (
-    <PageShell toolbar={toolbar} data-testid='dsp-presence-workspace'>
+    <PageShell
+      frame='none'
+      contentPadding='none'
+      toolbar={toolbar}
+      data-testid='dsp-presence-workspace'
+    >
       <div
         className='flex min-h-0 flex-1 overflow-hidden'
         data-testid='dsp-presence-content-panel'

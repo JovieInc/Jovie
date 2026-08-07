@@ -5,6 +5,8 @@ import { PageToolbar } from '@/components/organisms/table';
 export function TasksRouteSkeleton() {
   return (
     <PageShell
+      frame='none'
+      contentPadding='none'
       aria-label='Loading Tasks'
       aria-busy='true'
       aria-live='polite'
