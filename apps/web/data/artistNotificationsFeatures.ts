@@ -44,7 +44,9 @@ export const ARTIST_NOTIFICATIONS_SPEC_TILES: readonly MarketingFeatureTile[] =
       title: 'Capture once',
       body: 'A stream, QR scan, or profile visit can become a fan Jovie can reach again.',
       size: 'small',
-      accent: 'green',
+      // Distinct from the activate-creators tile in the homepage v2 power
+      // grid: each rendered feature's accent must be unique.
+      accent: 'purple',
       kicker: 'Audience capture',
       layoutClassName:
         'xl:col-start-10 xl:row-start-1 xl:col-span-3 xl:row-span-1',
