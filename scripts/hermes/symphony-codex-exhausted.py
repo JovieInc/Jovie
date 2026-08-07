@@ -23,8 +23,8 @@ DEFAULT_STATE = "~/.codex-accounts/state.json"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 MAX_TIMEOUT_SECONDS = 30.0
 CONTROL_TIMEOUT_SECONDS = 10.0
-DEFAULT_GROK_MAX = 2
-MAX_GROK_MAX = 10
+DEFAULT_GROK_MAX = 4  # Gem 16c/62GB safely runs 4 concurrent grok-ship workers (per-unit idempotent, active units skipped)
+MAX_GROK_MAX = 10  # hard ceiling; 10 only via explicit SYMPHONY_GROK_MAX (free-tier Build quota / dispatch risk above 4)
 SERVICES = ("symphony-ui-pilot.service", "symphony-lyb.service")
 LINEAR_API = "https://api.linear.app/graphql"
 LINEAR_ENV_PATH = "~/.config/symphony/linear.env"
@@ -41,8 +41,11 @@ RUNTIME_NAMES = (
     "grok-ship-one",
 )
 REQUIRED_ADMISSION_LABELS = frozenset(("symphony", "plan-approved", "admission-approved"))
+# Single source of truth for the Grok sidecar admission predicate. `blocked` is
+# included because human-review flags (needs-human / needs:human / blocked / hold)
+# must gate out of auto-ship; reconcile and grok-ship-one both use this set.
 BLOCKED_ADMISSION_LABELS = frozenset(
-    ("human-review-required", "needs:human", "needs-human", "needs:decision", "needs-decision", "hold")
+    ("human-review-required", "needs:human", "needs-human", "needs:decision", "needs-decision", "hold", "blocked")
 )
 SUPPORTED_TEAMS = frozenset(("JOV", "LYB"))
 
@@ -63,6 +66,21 @@ query {
   }
 }
 """
+
+SINGLE_ISSUE_QUERY = """
+query($id: String!) {
+  issue(id: $id) {
+    id identifier title description url
+    state { id name }
+    team { key states { nodes { id name } } }
+    labels { nodes { name } }
+  }
+}
+"""
+
+# Admission must mirror the list query: only Todo / In Progress issues are
+# eligible for pipe through the Grok sidecar.
+ADMITTED_STATES = frozenset(("todo", "in progress"))
 
 
 def _state_path() -> pathlib.Path:
@@ -171,14 +189,15 @@ def _control(command: list[str]) -> bool:
     return result is not None and result.returncode == 0
 
 
-def _active_grok_units() -> bool | None:
+def _active_grok_units() -> list[str] | None:
     result = _captured(
         _systemctl("list-units", "--type=service", "--state=active", "grok-ship-*.service", "--no-legend", "--no-pager"),
         CONTROL_TIMEOUT_SECONDS,
     )
     if result is None or result.returncode != 0:
         return None
-    return bool(result.stdout.strip())
+    decoded = result.stdout.decode(errors="replace")
+    return [line.split()[0] for line in decoded.splitlines() if line.strip()]
 
 
 def _grok_ship_one_executable() -> str | None:
@@ -224,6 +243,24 @@ def _linear_api_key_from_file() -> str | None:
     return key
 
 
+def admission_decision(team_key: str, identifier: str, labels: set[str]) -> tuple[bool, str]:
+    """Single admission predicate shared by reconcile listing, reconcile
+    pre-launch verification, and grok-ship-one's check-admission command.
+
+    An issue is admitted only when it is a supported-team identifier carrying
+    every required admission label and no blocked/human-review label.
+    """
+    if not IDENTIFIER.fullmatch(identifier):
+        return False, "invalid_identifier"
+    if team_key.upper() not in SUPPORTED_TEAMS:
+        return False, "unsupported_team"
+    if not REQUIRED_ADMISSION_LABELS.issubset(labels):
+        return False, "missing_admission_labels"
+    if not BLOCKED_ADMISSION_LABELS.isdisjoint(labels):
+        return False, "blocked"
+    return True, "admitted"
+
+
 def _linear_identifiers() -> list[str] | None:
     key = os.environ.get("LINEAR_API_KEY") or _linear_api_key_from_file()
     if not key:
@@ -262,14 +299,99 @@ def _linear_identifiers() -> list[str] | None:
                 return None
             labels.add(label["name"].strip().lower())
         identifier = node["identifier"]
-        if (
-            IDENTIFIER.fullmatch(identifier)
-            and team_key.upper() in SUPPORTED_TEAMS
-            and REQUIRED_ADMISSION_LABELS.issubset(labels)
-            and BLOCKED_ADMISSION_LABELS.isdisjoint(labels)
-        ):
+        ok, _reason = admission_decision(team_key, identifier, labels)
+        if ok:
             identifiers.append(identifier)
     return identifiers
+
+
+def _fetch_single_issue(identifier: str) -> dict | None:
+    key = os.environ.get("LINEAR_API_KEY") or _linear_api_key_from_file()
+    if not key:
+        return None
+    request = urllib.request.Request(
+        os.environ.get("LINEAR_API_URL", LINEAR_API),
+        data=json.dumps({"query": SINGLE_ISSUE_QUERY, "variables": {"id": identifier}}).encode(),
+        headers={"Authorization": key, "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=CONTROL_TIMEOUT_SECONDS) as response:
+            payload = json.load(response)
+    except (OSError, ValueError, TypeError, urllib.error.URLError):
+        return None
+    issue = (payload.get("data") or {}).get("issue")
+    if payload.get("errors") or not isinstance(issue, dict):
+        return None
+    return issue
+
+
+def _issue_meta(issue: dict, identifier: str) -> tuple[bool, str, dict | None]:
+    """Validate one issue against the shared admission predicate and, when
+    admitted, produce the meta record grok-ship-one needs to run.
+    """
+    team = issue.get("team")
+    label_connection = issue.get("labels")
+    state = issue.get("state")
+    if (
+        not isinstance(team, dict)
+        or not isinstance(label_connection, dict)
+        or not isinstance(state, dict)
+        or not isinstance(issue.get("identifier"), str)
+    ):
+        return False, "malformed_issue", None
+    team_key = team.get("key")
+    if not isinstance(team_key, str):
+        return False, "malformed_team", None
+    labels = {
+        str(node.get("name", "")).strip().lower()
+        for node in label_connection.get("nodes", [])
+        if isinstance(node, dict)
+    }
+    ok, reason = admission_decision(team_key, identifier, labels)
+    if not ok:
+        return False, reason, None
+    if issue["identifier"] != identifier:
+        return False, "identifier_mismatch", None
+    state_name = str(state.get("name") or "").strip().lower()
+    if state_name not in ADMITTED_STATES:
+        return False, "state_not_admitted", None
+    state_nodes = team.get("states")
+    states: dict[str, str] = {}
+    if isinstance(state_nodes, dict) and isinstance(state_nodes.get("nodes"), list):
+        for node in state_nodes["nodes"]:
+            if isinstance(node, dict) and isinstance(node.get("name"), str):
+                states[node["name"].strip().lower()] = str(node.get("id") or "")
+    if not states.get("in progress") or not states.get("in review"):
+        return False, "required_workflow_states_missing", None
+    meta = {
+        "id": issue.get("id"),
+        "title": issue.get("title") or identifier,
+        "description": (issue.get("description") or "")[:6000],
+        "url": issue.get("url") or "",
+        "original_state_id": state.get("id"),
+        "original_state_name": state.get("name") or "",
+        "in_progress_state_id": states["in progress"],
+        "in_review_state_id": states["in review"],
+    }
+    return True, "admitted", meta
+
+
+def check_admission(identifier: str) -> int:
+    """Standalone admission gate: exit 0 + meta JSON on stdout when the issue
+    passes the SAME predicate reconcile uses; exit 1 when not admitted; exit 2
+    when the verdict cannot be verified (auth/transport). grok-ship-one
+    delegates to this so there is exactly one admission source of truth.
+    """
+    issue = _fetch_single_issue(identifier)
+    if issue is None:
+        print("not admitted:admission_unverifiable", file=sys.stderr)
+        return 2
+    ok, reason, meta = _issue_meta(issue, identifier)
+    if not ok:
+        print(f"not admitted:{reason}", file=sys.stderr)
+        return 1
+    print(json.dumps(meta))
+    return 0
 
 
 def _grok_command(identifier: str, executable: str) -> list[str]:
@@ -310,11 +432,31 @@ def reconcile() -> int:
     if identifiers is None:
         print("codex_exhausted linear_query_failed", file=sys.stderr)
         return 2
+    active = _active_grok_units()
+    if active is None:
+        print("codex_exhausted grok_state_query_failed", file=sys.stderr)
+        return 2
+    remaining = _grok_limit() - len(active)
+    if remaining <= 0:
+        print(f"codex_exhausted {reason} grok_concurrency_full grok_started=0", file=sys.stderr)
+        return 0
     started = 0
     for identifier in identifiers:
-        if started >= _grok_limit():
+        if started >= remaining:
             break
         if _control(_systemctl("is-active", "--quiet", f"grok-ship-{identifier}")):
+            continue
+        # Re-verify admission immediately before launch: a label/state guard
+        # may have flagged the issue (blocked / needs-human) after the list
+        # query, and reconcile must never launch work grok-ship-one will
+        # reject. Same predicate as grok-ship-one's check-admission.
+        issue = _fetch_single_issue(identifier)
+        if issue is None:
+            print(f"codex_exhausted skip {identifier} admission_unverifiable", file=sys.stderr)
+            continue
+        ok, _reason, _meta = _issue_meta(issue, identifier)
+        if not ok:
+            print(f"codex_exhausted skip {identifier} not admitted", file=sys.stderr)
             continue
         if not _control(_grok_command(identifier, executable)):
             print("codex_exhausted grok_launch_failed", file=sys.stderr)
@@ -482,13 +624,24 @@ def install(destination_root: str | None) -> int:
 def main() -> int:
     default = "reconcile" if pathlib.Path(sys.argv[0]).name == "symphony-grok-sidecar" else "probe"
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", nargs="?", choices=("probe", "reconcile", "install"), default=default)
+    parser.add_argument(
+        "command",
+        nargs="?",
+        choices=("probe", "reconcile", "install", "check-admission"),
+        default=default,
+    )
+    parser.add_argument("identifier", nargs="?")
     parser.add_argument("--destination-root")
     args = parser.parse_args()
     if args.command == "install":
         return install(args.destination_root)
     if args.command == "reconcile":
         return reconcile()
+    if args.command == "check-admission":
+        if not args.identifier:
+            print("check-admission requires an issue identifier", file=sys.stderr)
+            return 2
+        return check_admission(args.identifier)
     ready, _ = codex_canary_ready()
     print("no" if ready else "yes")
     return 1 if ready else 0
