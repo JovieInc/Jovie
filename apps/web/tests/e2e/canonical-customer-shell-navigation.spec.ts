@@ -18,21 +18,21 @@ test.skip(
 );
 
 const CANONICAL_LABELS = [
-  'New Chat',
   'Inbox',
+  'New Chat',
   'Library',
   'Contacts',
-  'Connections',
   'Calendar',
+  'Tasks',
 ] as const;
 
 const CANONICAL_HREFS = [
-  APP_ROUTES.CHAT,
   APP_ROUTES.DASHBOARD,
+  APP_ROUTES.CHAT,
   APP_ROUTES.LIBRARY,
   APP_ROUTES.CONTACTS,
-  APP_ROUTES.PROFILES,
   APP_ROUTES.CALENDAR,
+  APP_ROUTES.TASKS,
 ] as const;
 
 const FORBIDDEN_LABELS = [
@@ -120,12 +120,13 @@ test('canonical six are stable at 375, 768, and 1440', async ({
     });
     await expect(expanded).toBeVisible();
     const expandedLinks = expanded.getByRole('link');
-    await expect(expandedLinks).toHaveCount(7);
+    await expect(expandedLinks).toHaveCount(8);
     expect(await linkContract(expandedLinks)).toEqual([
       ...CANONICAL_LABELS.map((label, index) => ({
         label,
         href: CANONICAL_HREFS[index],
       })),
+      { label: 'Presence', href: APP_ROUTES.PROFILES },
       { label: 'Settings', href: APP_ROUTES.SETTINGS },
     ]);
     for (const label of FORBIDDEN_LABELS) {

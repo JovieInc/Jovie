@@ -12,14 +12,15 @@ import {
 } from './config';
 
 const CANONICAL_NAVIGATION = [
-  ['chat', 'New Chat', APP_ROUTES.CHAT],
   ['inbox', 'Inbox', APP_ROUTES.DASHBOARD],
+  ['chat', 'New Chat', APP_ROUTES.CHAT],
+  ['library', 'Library', APP_ROUTES.LIBRARY],
   ['contacts', 'Contacts', APP_ROUTES.CONTACTS],
+  ['calendar', 'Calendar', APP_ROUTES.CALENDAR],
+  ['tasks', 'Tasks', APP_ROUTES.TASKS],
 ] as const;
 
 const ARTIST_NAVIGATION = [
-  ['library', 'Library', APP_ROUTES.LIBRARY],
-  ['calendar', 'Calendar', APP_ROUTES.CALENDAR],
   ['profiles', 'Presence', APP_ROUTES.PROFILES],
 ] as const;
 
@@ -30,9 +31,11 @@ function toContract(
 }
 
 describe('canonical customer shell navigation', () => {
-  it('keeps global actions separate from artist-scoped destinations', () => {
+  it('keeps the canonical primary six in the DESIGN.md order', () => {
     expect(toContract(primaryNavigation)).toEqual(CANONICAL_NAVIGATION);
-    expect(primaryNavigation[0].tone).toBe('secondary');
+    expect(primaryNavigation.find(item => item.id === 'chat')?.tone).toBe(
+      'secondary'
+    );
     expect(primaryNavigation.every(item => item.tier === 'core')).toBe(true);
   });
 
@@ -45,7 +48,7 @@ describe('canonical customer shell navigation', () => {
     );
   });
 
-  it('keeps artist-scoped destinations together for the artist group shell', () => {
+  it('keeps Presence as the single contextual artist-group destination', () => {
     expect(toContract(artistNavigation)).toEqual(ARTIST_NAVIGATION);
   });
 
@@ -81,7 +84,7 @@ describe('canonical customer shell navigation', () => {
     );
   });
 
-  it('excludes retired primary destinations while preserving contextual Task routes', () => {
+  it('keeps retired primary destinations out while Tasks returns as primary and Presence stays contextual', () => {
     const ids = primaryNavigation.map(item => item.id);
     const labels = primaryNavigation.map(item => item.name);
 
@@ -91,19 +94,14 @@ describe('canonical customer shell navigation', () => {
         'touring',
         'audience',
         'releases',
-        'tasks',
         'profiles',
       ])
     );
     expect(labels).not.toEqual(
-      expect.arrayContaining([
-        'Search',
-        'Touring',
-        'Audience',
-        'Releases',
-        'Tasks',
-      ])
+      expect.arrayContaining(['Search', 'Touring', 'Audience', 'Releases'])
     );
+    expect(ids).toContain('tasks');
+    expect(artistNavigation.map(item => item.id)).toEqual(['profiles']);
     expect(APP_ROUTES.TOUR_DATES).toBe('/app/tour-dates');
     expect(APP_ROUTES.AUDIENCE).toBe('/app/audience');
     expect(APP_ROUTES.PROFILES).toBe('/app/profiles');

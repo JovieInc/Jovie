@@ -656,6 +656,7 @@ or mutually exclusive surfaces, not additions to this primary six-item IA.
 | Primary | Contacts | `/app/contacts` | Opens the artist contact workspace |
 | Primary | Calendar | `/app/calendar` | Opens release dates, events, and calendar moments |
 | Primary | Tasks | `/app/tasks` | Opens the task workspace |
+| Contextual | Presence | `/app/profiles` | Artist-scoped presence monitoring rendered in the artist group (`artistNavigation`), never the primary rail |
 
 Any permanent IA change must update `primaryNavigation`, its exact structure
 test, this table, and the route coverage test in the same change. Desktop and

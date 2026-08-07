@@ -1644,6 +1644,36 @@ const CREATOR_SHELL_ROUTES = [
     seedProfile: 'active-user',
   },
   {
+    id: 'creator-tasks-warm',
+    group: 'creator-shell',
+    surface: 'creator-app',
+    path: APP_ROUTES.TASKS,
+    navigationItemId: 'tasks',
+    warmNavigationStartPath: APP_ROUTES.DASHBOARD,
+    requiresAuth: true,
+    warmupStrategy: 'authenticated-shell',
+    measureMode: 'warm-navigation',
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"]'],
+      content: [
+        '[data-testid="tasks-workspace"]',
+        '[data-testid="tasks-upgrade-interstitial"]',
+        '[data-testid="release-plan-upgrade-interstitial"]',
+      ],
+      navTrigger: [
+        `a[href="${APP_ROUTES.TASKS}"]`,
+        `a[href^="${APP_ROUTES.TASKS}?"]`,
+      ],
+    },
+    timings: [
+      { metric: 'warm-shell-response', budget: 100 },
+      { metric: 'skeleton-to-content', budget: 1000 },
+    ],
+    resourceSizes: RELEASES_RESOURCE_BUDGETS,
+    priority: 14,
+    seedProfile: 'active-user',
+  },
+  {
     id: 'creator-tasks',
     group: 'creator-shell',
     surface: 'creator-app',
