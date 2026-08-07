@@ -1732,7 +1732,7 @@ function NoResults({ onReset }: { readonly onReset: () => void }) {
           )}
         >
           Reset View
-        </Button>
+        </button>
       }
     />
   );
