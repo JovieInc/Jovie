@@ -155,6 +155,7 @@ function ReleasePopoverContent({
               key={provider}
               label={DSP_LABELS[provider]}
               iconPath={config.iconPath}
+              iconColor={config.color}
               href={`${releaseHref}?dsp=${provider}`}
               className='bg-surface-1 ring-(--linear-border-subtle) hover:bg-hover'
             />

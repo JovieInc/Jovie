@@ -203,6 +203,10 @@ export function AutomaticReleaseSmartlinksSection() {
                             DSP_LOGO_CONFIG[key as keyof typeof DSP_LOGO_CONFIG]
                               ?.iconPath
                           }
+                          iconColor={
+                            DSP_LOGO_CONFIG[key as keyof typeof DSP_LOGO_CONFIG]
+                              ?.color
+                          }
                           className='bg-surface-1 ring-(--linear-border-subtle) hover:bg-hover'
                         />
                       );

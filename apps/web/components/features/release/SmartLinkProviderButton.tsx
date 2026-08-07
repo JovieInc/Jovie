@@ -4,6 +4,8 @@ import { cn } from '@/lib/utils';
 interface SmartLinkProviderButtonProps {
   readonly label: string;
   readonly iconPath?: string;
+  /** Brand color for the provider icon. Falls back to muted foreground. */
+  readonly iconColor?: string;
   /** Custom icon element — used instead of iconPath when provided */
   readonly icon?: ReactNode;
   readonly href?: string;
@@ -21,6 +23,7 @@ interface SmartLinkProviderButtonProps {
 export function SmartLinkProviderButton({
   label,
   iconPath,
+  iconColor,
   icon,
   href,
   onClick,
@@ -36,7 +39,11 @@ export function SmartLinkProviderButton({
           <svg
             viewBox='0 0 24 24'
             fill='currentColor'
-            className='h-5 w-5 shrink-0 text-muted-foreground'
+            className={cn(
+              'h-5 w-5 shrink-0',
+              iconColor ? undefined : 'text-muted-foreground'
+            )}
+            style={iconColor ? { color: iconColor } : undefined}
             aria-hidden='true'
           >
             <path d={iconPath} />

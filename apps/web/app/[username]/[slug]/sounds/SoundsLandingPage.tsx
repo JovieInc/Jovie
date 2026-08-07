@@ -194,6 +194,7 @@ export function SoundsLandingPage({
                   onClick={() => handleProviderClick(provider.key)}
                   label={logoConfig?.name ?? provider.label}
                   iconPath={logoConfig?.iconPath}
+                  iconColor={logoConfig?.color}
                 />
               );
             })}

@@ -186,6 +186,7 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
                 }}
                 label={isSelected ? `Opening ${dsp.name}...` : dsp.name}
                 iconPath={logoConfig?.iconPath}
+                iconColor={logoConfig?.color}
                 className={cn(providerButtonClassName, buttonClassName)}
               />
             );
