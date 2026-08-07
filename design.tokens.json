@@ -1,0 +1,164 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "$version": 1,
+  "name": "Jovie System B (Noir Ion)",
+  "$description": "Canonical Jovie design tokens, dark-first. Source of truth: apps/web/styles/design-system.css. Export generated 2026-08-07. Used by importers (e.g. Magic Patterns) instead of scraping raw repo colors.",
+  "color": {
+    "surface.canvas": {
+      "$value": "#030407",
+      "$type": "color"
+    },
+    "surface.shell": {
+      "$value": "#06080d",
+      "$type": "color"
+    },
+    "surface.panel": {
+      "$value": "#0a0d16",
+      "$type": "color"
+    },
+    "surface.card": {
+      "$value": "#0f1420",
+      "$type": "color"
+    },
+    "surface.elevated": {
+      "$value": "#151b2a",
+      "$type": "color"
+    },
+    "surface.floating": {
+      "$value": "#1b2436",
+      "$type": "color"
+    },
+    "surface.bgBase": {
+      "$value": "#030407",
+      "$type": "color"
+    },
+    "surface.bgPage": {
+      "$value": "#030407",
+      "$type": "color"
+    },
+    "surface.surface0": {
+      "$value": "#06080d",
+      "$type": "color"
+    },
+    "surface.surface1": {
+      "$value": "var(--linear-bg-surface-1)",
+      "$type": "color"
+    },
+    "surface.surface2": {
+      "$value": "#151b2a",
+      "$type": "color"
+    },
+    "surface.surface3": {
+      "$value": "#1b2436",
+      "$type": "color"
+    },
+    "text.primary": {
+      "$value": "#f7f8f8",
+      "$type": "color"
+    },
+    "text.secondary": {
+      "$value": "#d0d6e0",
+      "$type": "color"
+    },
+    "text.tertiary": {
+      "$value": "#8a8f98",
+      "$type": "color"
+    },
+    "text.quaternary": {
+      "$value": "#62666d",
+      "$type": "color"
+    },
+    "text.disabled": {
+      "$value": "oklch(40% 0.006 282)",
+      "$type": "color"
+    },
+    "border.subtle": {
+      "$value": "oklch(100% 0 0 / 15%)",
+      "$type": "color"
+    },
+    "border.default": {
+      "$value": "oklch(100% 0 0 / 25%)",
+      "$type": "color"
+    },
+    "border.strong": {
+      "$value": "oklch(100% 0 0 / 40%)",
+      "$type": "color"
+    },
+    "border.focus": {
+      "$value": "#11afff",
+      "$type": "color"
+    },
+    "accent.ion": {
+      "$value": "#11afff",
+      "$type": "color"
+    },
+    "accent.focusRing": {
+      "$value": "rgba(17, 175, 255, 0.72)",
+      "$type": "color"
+    },
+    "accent.selected": {
+      "$value": "rgba(17, 175, 255, 0.1)",
+      "$type": "color"
+    },
+    "accent.ultra": {
+      "$value": "#a982ff",
+      "$type": "color"
+    },
+    "accent.pulse": {
+      "$value": "#ff48d2",
+      "$type": "color"
+    },
+    "accent.aqua": {
+      "$value": "#24f6d2",
+      "$type": "color"
+    },
+    "accent.mint": {
+      "$value": "#39e58c",
+      "$type": "color"
+    },
+    "accent.gold": {
+      "$value": "#ffc857",
+      "$type": "color"
+    },
+    "accent.flare": {
+      "$value": "#ff677d",
+      "$type": "color"
+    },
+    "status.success": {
+      "$value": "#39e58c",
+      "$type": "color"
+    },
+    "status.warning": {
+      "$value": "#ffc857",
+      "$type": "color"
+    },
+    "status.error": {
+      "$value": "#ff677d",
+      "$type": "color"
+    },
+    "feature.analytics": {
+      "$value": "#11afff",
+      "$type": "color"
+    },
+    "feature.conversion": {
+      "$value": "#a982ff",
+      "$type": "color"
+    },
+    "feature.beauty": {
+      "$value": "#ff48d2",
+      "$type": "color"
+    },
+    "feature.links": {
+      "$value": "#24f6d2",
+      "$type": "color"
+    },
+    "feature.speed": {
+      "$value": "#39e58c",
+      "$type": "color"
+    },
+    "feature.pro": {
+      "$value": "#ffc857",
+      "$type": "color"
+    }
+  }
+}
