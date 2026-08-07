@@ -837,6 +837,7 @@ export function buildAgentCommand(
         String(route.maxTurns),
         '--permission-mode',
         config.grokPermissionMode,
+        '--always-approve',
         '--no-alt-screen',
       ],
     };

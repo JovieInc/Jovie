@@ -702,6 +702,7 @@ describe('codex issue shipper prompt', () => {
       '50',
       '--permission-mode',
       'auto',
+      '--always-approve',
       '--no-alt-screen',
     ]);
     expect(command.args).not.toContain('--sandbox');
