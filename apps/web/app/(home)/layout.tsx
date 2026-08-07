@@ -1,9 +1,7 @@
 import './home.css';
 import '../../components/marketing/MarketingSnapRail.css';
-import { SkipToContent } from '@/components/atoms/SkipToContent';
 import { HomeScrollWatcher } from '@/components/homepage/HomeScrollWatcher';
-import { MarketingFooter } from '@/components/site/MarketingFooter';
-import { MarketingHeader } from '@/components/site/MarketingHeader';
+import { PublicPageShell } from '@/components/site/PublicPageShell';
 
 export const revalidate = false;
 
@@ -12,27 +10,27 @@ export default function HomeLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // The homepage composes the shared PublicPageShell as an intentional
+  // variant: homepage header chrome (icon logo, no center nav), minimal
+  // footer, and no fixed-header main offset.
   // Dual min-h-svh is intentional (Lovable-style hero shell): the outer
   // container is at least viewport height, AND main holds the hero at full
   // viewport height on its own. Header sits in flow above, footer below the
   // fold. Scrolling reveals the footer; the hero is the first paint.
   return (
-    <div className='home-viewport dark flex min-h-svh flex-col overflow-x-clip bg-base text-primary-token'>
-      <SkipToContent />
+    <PublicPageShell
+      className='home-viewport dark min-h-svh overflow-x-clip bg-base text-primary-token'
+      footerClassName='system-b-mounted-home-footer'
+      footerVariant='minimal'
+      headerVariant='homepage'
+      logoSize='sm'
+      logoVariant='icon'
+      mainClassName='min-h-svh'
+      mainOffset={false}
+      showHomepageCenterNav={false}
+    >
       <HomeScrollWatcher />
-      <MarketingHeader
-        logoSize='sm'
-        logoVariant='icon'
-        showHomepageCenterNav={false}
-        variant='homepage'
-      />
-      <main id='main-content' className='flex min-h-svh flex-1 flex-col'>
-        {children}
-      </main>
-      <MarketingFooter
-        variant='minimal'
-        className='system-b-mounted-home-footer'
-      />
-    </div>
+      {children}
+    </PublicPageShell>
   );
 }
