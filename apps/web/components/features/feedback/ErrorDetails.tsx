@@ -3,6 +3,7 @@
 import { Copy } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from '@/components/feedback';
+import { RECOVERY_COPY } from './recovery-contract';
 
 /**
  * Generate a short reference ID for errors without a Next.js digest.
@@ -94,7 +95,7 @@ export function ErrorDetails({
             type='button'
             onClick={handleCopy}
             className='inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium text-tertiary-token hover:text-primary-token hover:bg-surface-2 transition-colors duration-normal ease-interactive'
-            aria-label='Copy error details to clipboard'
+            aria-label='Copy Error Details To Clipboard'
           >
             <Copy className='h-3.5 w-3.5' aria-hidden='true' />
             Copy error details
@@ -134,7 +135,7 @@ export function ErrorDetails({
         data-focus-treatment='underline-only'
         className='cursor-pointer list-none text-center text-xs text-quaternary-token transition-colors duration-normal ease-interactive hover:text-tertiary-token'
       >
-        Error Details
+        {RECOVERY_COPY.detailsLabel}
       </summary>
       <div className='pt-3'>{content}</div>
     </details>

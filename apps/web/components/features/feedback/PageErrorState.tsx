@@ -2,12 +2,13 @@
 
 import { Button } from '@jovie/ui';
 import { ErrorDetails } from './ErrorDetails';
+import { RECOVERY_COPY } from './recovery-contract';
 
 interface PageErrorStateProps {
   readonly title?: string;
   readonly message: string;
   readonly error?: Error & { digest?: string };
-  /** Label for the primary action button (default: "Retry") */
+  /** Label for the primary action button (default: "Try again") */
   readonly actionLabel?: string;
   /** Custom handler for the primary action (default: reload page) */
   readonly onRetry?: () => void;
@@ -36,10 +37,10 @@ interface PageErrorStateProps {
  * />
  */
 export function PageErrorState({
-  title = 'Something went wrong',
+  title = RECOVERY_COPY.title,
   message,
   error,
-  actionLabel = 'Retry',
+  actionLabel = RECOVERY_COPY.retryLabel,
   onRetry,
   extraContext,
 }: PageErrorStateProps) {

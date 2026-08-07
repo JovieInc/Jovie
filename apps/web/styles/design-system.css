@@ -2345,8 +2345,24 @@ html:not(.dark) .smart-link-powered-by {
   color: var(--system-b-text-primary);
 }
 
-:where(.system-b-error-fallback__digest) {
+:where(.system-b-error-fallback__details) {
   margin: var(--space-5) 0 0;
+}
+
+:where(.system-b-error-fallback__details-summary) {
+  cursor: pointer;
+  color: var(--color-text-quaternary-token);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  transition: color var(--system-b-duration-fast) var(--system-b-ease);
+}
+
+:where(.system-b-error-fallback__details-summary:hover) {
+  color: var(--color-text-tertiary-token);
+}
+
+:where(.system-b-error-fallback__digest) {
+  margin: var(--space-2) 0 0;
   color: var(--color-text-quaternary-token);
   font-size: var(--text-xs);
   line-height: var(--leading-normal);

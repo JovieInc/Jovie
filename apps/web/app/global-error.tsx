@@ -3,6 +3,7 @@
 import './globals.css';
 import { useEffect } from 'react';
 import { SystemBErrorFallback } from '@/components/providers/SystemBErrorFallback';
+import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
 
 /**
  * Global error page for Next.js App Router.
@@ -45,7 +46,11 @@ export default function GlobalError({
             description='An unexpected error occurred.'
             digest={error.digest}
             actions={[
-              { type: 'button', label: 'Try Again', onClick: reset },
+              {
+                type: 'button',
+                label: RECOVERY_COPY.retryLabel,
+                onClick: reset,
+              },
               {
                 type: 'link',
                 label: 'Go Home',

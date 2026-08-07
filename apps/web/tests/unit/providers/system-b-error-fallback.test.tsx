@@ -34,20 +34,19 @@ describe('SystemBErrorFallback', () => {
         description='An unexpected error occurred.'
         digest='digest-1'
         actions={[
-          { type: 'button', label: 'Try Again', onClick: reset },
+          { type: 'button', label: 'Try again', onClick: reset },
           { type: 'link', label: 'Go Home', href: '/', variant: 'secondary' },
         ]}
       />
     );
 
     expect(
-      screen.getByRole('heading', { name: 'Something Went Wrong' })
+      screen.getByRole('heading', { name: 'Something went wrong' })
     ).toBeInTheDocument();
     expect(
       screen.getByText('An unexpected error occurred.')
     ).toBeInTheDocument();
-    expect(screen.getByText('Error ID: digest-1')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Try Again' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Try again' })).toHaveAttribute(
       'data-variant',
       'primary'
     );
@@ -55,6 +54,22 @@ describe('SystemBErrorFallback', () => {
       'href',
       '/'
     );
+  });
+
+  it('keeps the error digest behind an opt-in support disclosure', () => {
+    render(
+      <SystemBErrorFallback
+        description='An unexpected error occurred.'
+        digest='digest-1'
+        actions={[{ type: 'button', label: 'Try again', onClick: () => {} }]}
+      />
+    );
+
+    const disclosure = screen.getByText('Error details').closest('details');
+    expect(disclosure).not.toBeNull();
+    expect(disclosure).not.toHaveAttribute('open');
+    const digest = screen.getByText('Error ID: digest-1');
+    expect(disclosure).toContainElement(digest);
   });
 
   it('keeps the shared primitive free of local visual token drift', async () => {

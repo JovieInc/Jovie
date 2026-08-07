@@ -150,4 +150,5 @@ These states apply across families and were previously undocumented.
 2. Disabled controls must set **both** `disabled` / `aria-disabled` and the disabled-visual tokens — never rely on opacity alone.
 3. Loading skeletons are `aria-hidden` placeholders; parent wrappers (`LoadingSkeleton`, async blocks) own `aria-busy`.
 4. Inline offline is for **in-context** recovery; full-page offline/error uses `EmptyState` or `PageErrorState`.
-5. When adding a new state, update this matrix **and** add a Storybook story before shipping.
+5. Error/recovery presenters (`SystemBErrorFallback`, `PublicPageErrorFallback`, `PageErrorState`, `ErrorBanner`, chat inline error cards) take copy from the RecoveryState contract (`apps/web/components/features/feedback/recovery-contract.ts`) — one `Try again` recovery action; error digests render only behind an opt-in details disclosure, never in the default tree.
+6. When adding a new state, update this matrix **and** add a Storybook story before shipping.

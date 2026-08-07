@@ -10,6 +10,7 @@ import { LyricsRouteSkeleton } from '@/components/shell/LyricsRouteSkeleton';
 import { TasksRouteSkeleton } from '@/components/shell/TasksRouteSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
+import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
 import {
   APP_SHELL_MODE_HEADER,
   parseTrustedAppShellMode,
@@ -179,7 +180,7 @@ export default async function AppShellLayout({
             description='We could not load your workspace data. Try again, or return to Jovie.'
             actions={[
               {
-                label: 'Retry',
+                label: RECOVERY_COPY.retryLabel,
                 href: APP_ROUTES.DASHBOARD,
                 variant: 'primary',
               },

@@ -52,19 +52,26 @@ describe('PublicPageErrorFallback', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: 'Something Went Wrong',
+        name: 'Something went wrong',
       })
     ).toBeInTheDocument();
     expect(screen.getByText('Try refreshing the page.')).toBeInTheDocument();
-    expect(screen.getByText('Error ID: abc123')).toBeInTheDocument();
+    // Digest stays out of the default tree: it lives behind the opt-in
+    // support disclosure.
+    const digest = screen.getByText('Error ID: abc123');
+    const disclosure = digest.closest('details');
+    expect(disclosure).not.toBeNull();
+    expect(disclosure).not.toHaveAttribute('open');
     expect(screen.getByRole('alert')).toHaveClass(
       'dark',
       'system-b-error-fallback'
     );
     expect(screen.getAllByRole('button')).toHaveLength(1);
-    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Try again' })
+    ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
     expect(refreshMock).toHaveBeenCalledTimes(1);
   });

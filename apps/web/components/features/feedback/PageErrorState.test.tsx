@@ -20,13 +20,15 @@ describe('PageErrorState', () => {
     expect(
       screen.getByRole('heading', { name: 'Unable to Load Dashboard' })
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
-    const summary = screen.getByText('Error Details');
+    expect(
+      screen.getByRole('button', { name: 'Try again' })
+    ).toBeInTheDocument();
+    const summary = screen.getByText('Error details');
     const details = summary.closest('details');
     expect(document.querySelectorAll('details')).toHaveLength(1);
     expect(details).not.toHaveAttribute('open');
     expect(
-      details?.querySelector('[aria-label="Copy error details to clipboard"]')
+      details?.querySelector('[aria-label="Copy Error Details To Clipboard"]')
     ).not.toBeNull();
     expect(document.querySelector('.lucide-triangle-alert')).toBeNull();
 
@@ -51,7 +53,7 @@ describe('PageErrorState', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
@@ -66,12 +68,12 @@ describe('PageErrorState', () => {
       />
     );
 
-    const details = screen.getByText('Error Details').closest('details');
+    const details = screen.getByText('Error details').closest('details');
     expect(details).not.toHaveAttribute('open');
     expect(screen.getAllByText(longMessage)).toHaveLength(1);
     expect(details).not.toHaveTextContent(longMessage);
     expect(
-      details?.querySelector('[aria-label="Copy error details to clipboard"]')
+      details?.querySelector('[aria-label="Copy Error Details To Clipboard"]')
     ).not.toBeNull();
   });
 
@@ -84,7 +86,7 @@ describe('PageErrorState', () => {
       />
     );
 
-    const details = screen.getByText('Error Details').closest('details');
+    const details = screen.getByText('Error details').closest('details');
     expect(details).toHaveTextContent('Request timed out after 30 seconds.');
   });
 });

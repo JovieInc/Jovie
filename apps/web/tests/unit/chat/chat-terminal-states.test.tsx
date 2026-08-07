@@ -89,7 +89,9 @@ describe('chat terminal states', () => {
       expect(
         screen.getByText('Image provider unavailable.')
       ).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Try again' })
+      ).toBeInTheDocument();
     });
 
     it('renders a failed pitch artifact card with retry', () => {
@@ -113,7 +115,9 @@ describe('chat terminal states', () => {
       ).toBeInTheDocument();
       expect(screen.getByText('Pitch Generation Failed')).toBeInTheDocument();
       expect(screen.getByText('Pitch model timed out.')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Try again' })
+      ).toBeInTheDocument();
     });
   });
 

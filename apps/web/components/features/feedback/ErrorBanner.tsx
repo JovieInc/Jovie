@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from '@/components/feedback';
 import { cn } from '@/lib/utils';
+import { RECOVERY_COPY } from './recovery-contract';
 
 export interface ErrorBannerAction {
   readonly label: string;
@@ -149,7 +150,9 @@ export function ErrorBanner({
               onClick={() => setShowDetails(!showDetails)}
               className='h-auto text-xs text-red-100/70 hover:text-red-100 dark:text-red-200/70 dark:hover:text-red-200 underline decoration-dotted'
             >
-              {showDetails ? 'Hide Error Details' : 'Show Error Details'}
+              {showDetails
+                ? `Hide ${RECOVERY_COPY.detailsLabel}`
+                : `Show ${RECOVERY_COPY.detailsLabel}`}
             </Button>
 
             {showDetails && (

@@ -30,7 +30,6 @@ function DefaultErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
       title='Something went wrong'
       message={errorWithDigest.message || 'An unexpected error occurred'}
       error={errorWithDigest}
-      actionLabel='Try again'
       onRetry={resetErrorBoundary}
       extraContext={{ Context: 'Query' }}
     />
