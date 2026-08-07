@@ -23,7 +23,7 @@
 - Production release result / Production Verified: failure → no generation marker
 - Incident class: `controller_completed_without_marker`
 
-## Live state (investigation, 2026-08-07)
+## Live state (investigation probes, 2026-08-07T05:19:00Z)
 ```
 main HEAD: c25d2cdb2bbaf067fe182460d945c6001638d613
 jov.ie/api/version:         {"buildId":"4c47adc"}
@@ -31,7 +31,11 @@ staging.jov.ie/api/version: {"buildId":"c25d2cd"}
 jov.ie/api/health:          {"status":"ok"}
 ```
 
-Production serves the durable-fix SHA `4c47adc` (PR #15589), not the incident SHA `09b87bc`. Staging may lead on docs-only main HEAD (`c25d2cd` from #15590). Recovery for the marker gap is **already complete** via successor Production Verified on `4c47adc` — no re-promote of `09b87bc` is required.
+**buildId provenance:** production `4c47adc` maps to full SHA `4c47adce9b9d01d8c68832db604299e1160c767d` (PR #15589 — post-promote alias gate warning-only).
+
+**Ancestry (no-rerun proof):** `git merge-base --is-ancestor 09b87bc500b2470188565cc19c91eddd74b34cfe origin/main` → true. Incident SHA is a historical ancestor of current main; re-running its controller generation would re-enter the sole `production-mutation` lease for a superseded commit.
+
+Production serves the durable-fix SHA `4c47adc`, not the incident SHA `09b87bc`. Staging may lead on docs-only main HEAD (`c25d2cd` from #15590). Recovery for the marker gap is **already complete** via successor Production Verified on `4c47adc` — no re-promote of `09b87bc` is required.
 
 ## Durable fix already shipped
 - Issue #15586 (closed) — same root cause (post-promote jov.ie alias max budget cold-cache noise)
