@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import textwrap
 import threading
+import time
 import unittest
 
 
@@ -219,6 +220,43 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual((result.stdout, result.returncode), ("yes\n", 0))
         self.assertNotIn("token_invalidated", result.stdout + result.stderr)
         self.assertNotIn("SECRET", result.stdout + result.stderr)
+
+    def test_all_accounts_cooldown_is_exhausted_despite_kimi_fallback_probe(self):
+        # Both accounts are capped; codex-rotate's kimi fallback would answer the
+        # live probe with GEM_MODEL_READY anyway. The canary must decide from the
+        # cooldown state alone and never consult the probe for this verdict.
+        future = int(time.time()) + 3600
+        self.state.write_text(json.dumps({
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future},
+            "last_error": {},
+        }))
+        kimi_canary = self.command("codex-rotate", "echo GEM_MODEL_READY")
+        result = self.run_controller(GEM_CODEX_ROTATE_BIN=kimi_canary)
+        self.assertEqual((result.stdout, result.returncode), ("yes\n", 0))
+
+    def test_kimi_fallback_cannot_mask_cooldown_exhaustion_in_sidecar(self):
+        future = int(time.time()) + 3600
+        self.state.write_text(json.dumps({
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future},
+            "last_error": {},
+        }))
+        kimi_canary = self.command("codex-rotate", "echo GEM_MODEL_READY")
+        self.command("systemctl", "printf 'systemctl %s\\n' \"$*\" >> \"$GEM_EVENTS\"; [ \"$2\" = is-active ] && exit 1; exit 0")
+        self.command("systemd-run", "printf 'systemd-run %s\\n' \"$*\" >> \"$GEM_EVENTS\"")
+        result = subprocess.run(
+            [self.install_runtime() / "symphony-grok-sidecar"], capture_output=True, text=True,
+            env=self.env(GEM_CODEX_ROTATE_BIN=kimi_canary, GEM_EVENTS=self.events,
+                         LINEAR_API_KEY="linear-secret", LINEAR_API_URL=self.linear_url()),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        events = self.events.read_text().splitlines()
+        self.assertEqual(events[0], "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service")
+        self.assertTrue(any(line.startswith("systemd-run") for line in events), events)
+        self.assertIn("codex_exhausted", result.stderr)
+        self.assertNotIn("codex_not_exhausted", result.stderr)
 
     def test_live_canary_requires_luna_and_exact_marker(self):
         canary = self.command("codex-rotate", "printf '%s\\n' \"$*\" > \"$GEM_EVENTS\"; printf 'GEM_MODEL_READY\\n'")
