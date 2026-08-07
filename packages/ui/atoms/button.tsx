@@ -25,11 +25,22 @@ const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
   link: 'h-auto border-0 bg-transparent p-0 text-primary underline-offset-4 shadow-none hover:underline',
 };
 
+// 44px minimum hit target for icon buttons below 44px (WCAG 2.5.5 / Apple HIG),
+// rendered as an invisible pseudo-element so layout stays compact.
+const ICON_HIT_TARGET_44 =
+  'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
+
 const BUTTON_SIZE_CLASSES: Record<ButtonSize, string> = {
   sm: 'h-7 px-2.5 text-xs before:absolute before:left-1/2 before:top-1/2 before:h-10 before:min-w-10 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
   md: 'h-9 px-3 text-[13px] before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
   lg: 'h-11 px-5 text-sm before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
-  icon: 'h-9 w-9 px-0 before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
+  icon: `h-9 w-9 px-0 ${ICON_HIT_TARGET_44}`,
+  'icon-xs': `h-6 w-6 px-0 ${ICON_HIT_TARGET_44}`,
+  'icon-sm': `h-7 w-7 px-0 ${ICON_HIT_TARGET_44}`,
+  'icon-md': `h-8 w-8 px-0 ${ICON_HIT_TARGET_44}`,
+  'icon-lg': `h-10 w-10 px-0 ${ICON_HIT_TARGET_44}`,
+  // 44px container already satisfies the hit target.
+  'icon-xl': 'h-11 w-11 px-0',
 };
 
 const buttonVariants = cva(
@@ -46,7 +57,17 @@ const buttonVariants = cva(
     compoundVariants: [
       {
         variant: 'link',
-        size: ['sm', 'md', 'lg', 'icon'],
+        size: [
+          'sm',
+          'md',
+          'lg',
+          'icon',
+          'icon-xs',
+          'icon-sm',
+          'icon-md',
+          'icon-lg',
+          'icon-xl',
+        ],
         className:
           'h-auto min-h-0 w-auto min-w-0 px-0 py-0 before:hidden disabled:opacity-60',
       },
