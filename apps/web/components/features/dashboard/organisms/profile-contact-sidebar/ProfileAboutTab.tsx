@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import {
   Calendar,
   Check,
@@ -96,7 +96,9 @@ function EditableBio({
 
   if (!editing) {
     return (
-      <button
+      <Button
+        variant='ghost'
+        size='sm'
         type='button'
         aria-label='Edit Bio'
         onClick={() => {
@@ -112,7 +114,7 @@ function EditableBio({
         ) : (
           <p className='text-app text-tertiary-token'>Click to add a bio...</p>
         )}
-      </button>
+      </Button>
     );
   }
 
@@ -154,7 +156,9 @@ function LocationField({
           onSelect={onChange}
           placeholder={`Change ${addLabel.toLowerCase()}`}
           trigger={
-            <button
+            <Button
+              variant='ghost'
+              size='sm'
               type='button'
               className='flex items-center gap-2 rounded-lg px-1.5 py-1 text-xs text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
             >
@@ -163,7 +167,7 @@ function LocationField({
                 aria-hidden='true'
               />
               <span className='capitalize'>{label(value)}</span>
-            </button>
+            </Button>
           }
         />
       );
@@ -183,13 +187,15 @@ function LocationField({
         onSelect={onChange}
         placeholder={`Add your ${addLabel.toLowerCase()}`}
         trigger={
-          <button
+          <Button
+            variant='ghost'
+            size='sm'
             type='button'
             className='flex items-center gap-2 rounded-lg px-1.5 py-1 text-xs text-tertiary-token transition-colors hover:bg-surface-0 hover:text-secondary-token'
           >
             <Icon className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
             <span>Add your {addLabel.toLowerCase()}</span>
-          </button>
+          </Button>
         }
       />
     );
@@ -325,27 +331,31 @@ function PressPhotosSection({
       {/* First-import banner */}
       {draftPhotos.length > 0 && !bannerDismissed && (
         <div className='relative rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 px-3 py-2'>
-          <button
+          <Button
+            variant='ghost'
+            size='icon'
             type='button'
             onClick={() => setBannerDismissed(true)}
             className='absolute top-1.5 right-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full text-tertiary-token hover:text-default'
             aria-label='Dismiss'
           >
             <X className='h-3 w-3' />
-          </button>
+          </Button>
           <p className='pr-5 text-2xs text-secondary-token'>
             We found {draftPhotos.length} photo
             {draftPhotos.length > 1 ? 's' : ''} from your streaming profiles.
             Approve the ones you want on your public profile.
           </p>
           {draftPhotos.length >= 2 && onApprove && (
-            <button
+            <Button
+              variant='link'
+              size='sm'
               type='button'
               onClick={handleApproveAll}
               className='mt-1.5 text-2xs font-medium text-accent hover:underline'
             >
-              Approve all
-            </button>
+              Approve All
+            </Button>
           )}
         </div>
       )}
@@ -381,7 +391,9 @@ function PressPhotosSection({
                 </span>
                 {/* Delete button */}
                 {onDelete && (
-                  <button
+                  <Button
+                    variant='ghost'
+                    size='icon'
                     type='button'
                     onClick={() => handleDelete(photo.id)}
                     disabled={deletingPhotoId === photo.id}
@@ -393,11 +405,13 @@ function PressPhotosSection({
                     ) : (
                       <X className='h-3 w-3' />
                     )}
-                  </button>
+                  </Button>
                 )}
                 {/* Approve button */}
                 {onApprove && (
-                  <button
+                  <Button
+                    variant='ghost'
+                    size='sm'
                     type='button'
                     onClick={() => handleApprove(photo.id)}
                     disabled={approvingPhotoId === photo.id}
@@ -412,7 +426,7 @@ function PressPhotosSection({
                         Approve
                       </>
                     )}
-                  </button>
+                  </Button>
                 )}
               </div>
             ))}
@@ -443,7 +457,9 @@ function PressPhotosSection({
                   {photo.status}
                 </span>
                 {onDelete && (
-                  <button
+                  <Button
+                    variant='ghost'
+                    size='icon'
                     type='button'
                     onClick={() => handleDelete(photo.id)}
                     disabled={deletingPhotoId === photo.id}
@@ -455,7 +471,7 @@ function PressPhotosSection({
                     ) : (
                       <X className='h-3 w-3' />
                     )}
-                  </button>
+                  </Button>
                 )}
               </div>
             ))}
@@ -484,7 +500,9 @@ function PressPhotosSection({
                   className='object-cover'
                 />
                 {onDelete && (
-                  <button
+                  <Button
+                    variant='ghost'
+                    size='icon'
                     type='button'
                     onClick={() => handleDelete(photo.id)}
                     disabled={deletingPhotoId === photo.id}
@@ -496,7 +514,7 @@ function PressPhotosSection({
                     ) : (
                       <X className='h-3.5 w-3.5' />
                     )}
-                  </button>
+                  </Button>
                 )}
               </div>
             ))}
@@ -672,16 +690,18 @@ export function ProfileAboutTab({
                 >
                   {genre}
                   {onGenresChange && (
-                    <button
+                    <Button
+                      variant='ghost'
+                      size='icon'
                       type='button'
                       onClick={() =>
                         onGenresChange(genres.filter(g => g !== genre))
                       }
-                      className='ml-0.5 hover:text-primary-token transition-colors'
+                      className='ml-0.5 h-auto w-auto p-0 hover:text-primary-token transition-colors'
                       aria-label={`Remove ${genre}`}
                     >
                       <X className='h-3 w-3' />
-                    </button>
+                    </Button>
                   )}
                 </Badge>
               ))}
@@ -690,13 +710,15 @@ export function ProfileAboutTab({
                   selected={genres}
                   onChange={onGenresChange}
                   trigger={
-                    <button
+                    <Button
+                      variant='ghost'
+                      size='sm'
                       type='button'
                       className='inline-flex items-center gap-0.5 rounded-full border border-dashed border-subtle px-2.5 py-0.5 text-2xs font-medium text-tertiary-token transition-colors hover:border-secondary-token hover:text-secondary-token'
                     >
                       <Plus className='h-3 w-3' />
                       Add
-                    </button>
+                    </Button>
                   }
                 />
               )}
@@ -707,13 +729,15 @@ export function ProfileAboutTab({
               selected={[]}
               onChange={onGenresChange}
               trigger={
-                <button
+                <Button
+                  variant='ghost'
+                  size='sm'
                   type='button'
                   className='flex items-center gap-1.5 text-xs text-tertiary-token transition-colors hover:text-secondary-token'
                 >
                   <Plus className='h-3.5 w-3.5' />
                   <span>Add genres</span>
-                </button>
+                </Button>
               }
             />
           )}

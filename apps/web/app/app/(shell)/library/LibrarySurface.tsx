@@ -473,7 +473,9 @@ const ReleaseCell = memo(function ReleaseCell({
       >
         <LibraryMediaThumbnail asset={asset} size='row' />
         {hasPreview ? (
-          <button
+          <Button
+            variant='ghost'
+            size='icon'
             type='button'
             onClick={event => onTogglePreview(asset, event)}
             onKeyDown={event => event.stopPropagation()}
@@ -496,7 +498,7 @@ const ReleaseCell = memo(function ReleaseCell({
             ) : (
               <PlayCircle className='h-3.5 w-3.5' strokeWidth={2.25} />
             )}
-          </button>
+          </Button>
         ) : null}
       </ArtworkFrame>
       <span className='min-w-0'>
@@ -1510,7 +1512,9 @@ const AssetCard = memo(function AssetCard({
         </button>
       </Button>
       {hasPreview ? (
-        <button
+        <Button
+          variant='ghost'
+          size='icon'
           type='button'
           onClick={event => onTogglePreview(asset, event)}
           aria-label={
@@ -1536,7 +1540,7 @@ const AssetCard = memo(function AssetCard({
           <span className='sr-only'>
             {isPreviewPlaying ? 'Pause Preview' : 'Play Preview'}
           </span>
-        </button>
+        </Button>
       ) : null}
     </article>
   );
@@ -1719,7 +1723,9 @@ function NoResults({ onReset }: { readonly onReset: () => void }) {
       description='No library items match the selected view or filters.'
       className='min-h-75'
       action={
-        <button
+        <Button
+          variant='ghost'
+          size='sm'
           type='button'
           onClick={onReset}
           className={cn(
@@ -1728,7 +1734,7 @@ function NoResults({ onReset }: { readonly onReset: () => void }) {
           )}
         >
           Reset View
-        </button>
+        </Button>
       }
     />
   );
@@ -1779,7 +1785,9 @@ function PreviewActionButton({
   const label = isPreviewPlaying ? 'Pause Preview' : 'Play Preview';
 
   return (
-    <button
+    <Button
+      variant='ghost'
+      size='sm'
       type='button'
       onClick={event => onTogglePreview(asset, event)}
       aria-label={`${label} for ${asset.title}`}
@@ -1799,7 +1807,7 @@ function PreviewActionButton({
         <PlayCircle className='h-3 w-3' strokeWidth={2.25} />
       )}
       {compact ? <span className='sr-only'>{label}</span> : label}
-    </button>
+    </Button>
   );
 }
 

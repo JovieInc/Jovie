@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import * as Switch from '@radix-ui/react-switch';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { RotateCcw } from 'lucide-react';
@@ -102,8 +103,10 @@ function FlagEnvCell({
           />
         </Switch.Root>
         {/* Reserve the reset slot in every cell so toggling never shifts layout. */}
-        <button
+        <Button
           type='button'
+          variant='ghost'
+          size='icon'
           onClick={onClear}
           disabled={pending || !overridden}
           title={overridden ? 'Reset to default' : undefined}
@@ -116,12 +119,12 @@ function FlagEnvCell({
               : 'flag-reset-slot'
           }
           data-overridden={overridden ? 'true' : 'false'}
-          className={`shrink-0 text-quaternary-token transition-opacity hover:text-secondary-token ${
+          className={`h-auto w-auto shrink-0 p-0 text-quaternary-token transition-opacity hover:text-secondary-token ${
             overridden ? 'opacity-100' : 'pointer-events-none opacity-0'
           }`}
         >
           <RotateCcw size={11} aria-hidden />
-        </button>
+        </Button>
       </div>
       <span
         className='whitespace-nowrap text-2xs leading-none text-secondary-token'
@@ -161,8 +164,10 @@ function FlagNameCell({
       <span className='block truncate font-medium text-primary-token'>
         {name}
       </span>
-      <button
+      <Button
         type='button'
+        variant='link'
+        size='sm'
         onClick={handleCopyKey}
         title='Copy flag key'
         aria-label={`Copy flag key ${flagKey}`}
@@ -170,7 +175,7 @@ function FlagNameCell({
         className='block max-w-full cursor-pointer truncate font-mono text-xs text-tertiary-token transition-colors hover:text-secondary-token'
       >
         {flagKey}
-      </button>
+      </Button>
       <span className='line-clamp-2 block text-xs leading-snug text-secondary-token'>
         {description}
       </span>
