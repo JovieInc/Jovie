@@ -5,7 +5,7 @@ import { Clock3, Link2, Sparkles, Waves } from 'lucide-react';
 import Image from 'next/image';
 import { type ReactNode, useMemo } from 'react';
 import {
-  DrawerEmptyState,
+  DrawerInlineNote,
   DrawerSection,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
@@ -76,7 +76,7 @@ export function AlgorithmHealthPanel({
   if (query.isError || !query.data) {
     return (
       <DrawerSection title='Algorithm Health' collapsible={false}>
-        <DrawerEmptyState
+        <DrawerInlineNote
           message='Algorithm health could not be loaded right now.'
           tone='error'
           testId='algorithm-health-error'

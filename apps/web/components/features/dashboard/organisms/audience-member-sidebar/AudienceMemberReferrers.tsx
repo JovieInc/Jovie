@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { toast } from '@/components/feedback';
-import { DrawerEmptyState } from '@/components/molecules/drawer';
+import { DrawerInlineNote } from '@/components/molecules/drawer';
 import { BASE_URL } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { formatTimeAgo } from '@/lib/utils/audience';
@@ -116,7 +116,7 @@ export function AudienceMemberReferrers({
 
   if (sources.length === 0) {
     return (
-      <DrawerEmptyState className='min-h-22' message='No source data yet.' />
+      <DrawerInlineNote className='min-h-22' message='No source data yet.' />
     );
   }
 

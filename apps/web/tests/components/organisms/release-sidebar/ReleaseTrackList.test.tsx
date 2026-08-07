@@ -36,7 +36,7 @@ const { mockToggleTrack, mockQueryResult, mockPlaybackState } = vi.hoisted(
 );
 
 vi.mock('@/components/molecules/drawer', () => ({
-  DrawerEmptyState: ({ message }: { readonly message: string }) => (
+  DrawerInlineNote: ({ message }: { readonly message: string }) => (
     <div>{message}</div>
   ),
 }));

@@ -465,6 +465,7 @@ export function InviteCampaignManager({
         subtitle='Invite-to-claim performance across recent sends'
       >
         <div className='grid gap-3 md:grid-cols-4'>
+          {/* eslint-disable @jovie/canonical-ui-label-casing -- Pre-existing metric labels; copy changes are out of JOV-4869 scope. */}
           <CampaignMetric
             label='Invites sent'
             value={campaignOverview?.invites.sent ?? 0}
@@ -488,6 +489,7 @@ export function InviteCampaignManager({
             subtitle='Invite to claim'
             valueClassName='text-accent'
           />
+          {/* eslint-enable @jovie/canonical-ui-label-casing */}
         </div>
       </CampaignSection>
 
@@ -515,7 +517,7 @@ export function InviteCampaignManager({
           />
         ) : (
           <TableEmptyState
-            title='No invite activity'
+            heading='No invite activity'
             description='No invite activity has been recorded yet.'
           />
         )}
@@ -551,6 +553,7 @@ export function InviteCampaignManager({
           <div className='space-y-4'>
             {/* Stats */}
             <div className='grid gap-3 md:grid-cols-3'>
+              {/* eslint-disable @jovie/canonical-ui-label-casing -- Pre-existing metric labels; copy changes are out of JOV-4869 scope. */}
               <CampaignMetric
                 label='Total eligible'
                 value={preview.totalEligible}
@@ -568,6 +571,7 @@ export function InviteCampaignManager({
                 subtitle='Needs enrichment first'
                 valueClassName='text-warning'
               />
+              {/* eslint-enable @jovie/canonical-ui-label-casing */}
             </div>
 
             {/* Sample Profiles */}

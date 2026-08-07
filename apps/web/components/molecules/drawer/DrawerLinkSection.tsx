@@ -3,7 +3,7 @@
 import { Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { DrawerEmptyState } from './DrawerEmptyState';
+import { DrawerInlineNote } from './DrawerInlineNote';
 import { DrawerSectionHeading } from './DrawerSectionHeading';
 
 export const DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME =
@@ -88,7 +88,7 @@ export function DrawerLinkSection({
 
       {/* Link items — full-bleed on mobile (no rounded corners) */}
       {isEmpty ? (
-        <DrawerEmptyState
+        <DrawerInlineNote
           message={emptyMessage}
           className='min-h-18'
           testId={emptyStateTestId}

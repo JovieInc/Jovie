@@ -1697,10 +1697,10 @@ function EmptyCatalog() {
       <NavigationDestinationReady destination='library' />
       <TableEmptyState
         icon={<Music2 className='h-5 w-5' strokeWidth={2.25} />}
-        title='No Library Items'
+        heading='No Library Items'
         description='Releases, merch, images, videos, and audio will appear here as they land.'
         className='m-3 min-h-90'
-        action={
+        actionSlot={
           <Link
             href={APP_ROUTES.RELEASES}
             className={cn(
@@ -1719,13 +1719,11 @@ function EmptyCatalog() {
 function NoResults({ onReset }: { readonly onReset: () => void }) {
   return (
     <TableEmptyState
-      title='No Assets Match'
+      heading='No Assets Match'
       description='No library items match the selected view or filters.'
       className='min-h-75'
-      action={
-        <Button
-          variant='ghost'
-          size='sm'
+      actionSlot={
+        <button
           type='button'
           onClick={onReset}
           className={cn(

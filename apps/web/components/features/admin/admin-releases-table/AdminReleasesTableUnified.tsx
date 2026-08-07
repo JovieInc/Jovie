@@ -89,12 +89,14 @@ function IssuesPills({ row }: { readonly row: AdminReleaseRow }) {
 
   if (row.missingArtwork) {
     issues.push({
+      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing pill label; copy change is out of JOV-4869 scope.
       label: 'No artwork',
       icon: <ImageIcon className='size-2.5' />,
     });
   }
   if (row.noProviders) {
     issues.push({
+      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing pill label; copy change is out of JOV-4869 scope.
       label: 'No providers',
       icon: <Link2Off className='size-2.5' />,
     });
@@ -104,6 +106,7 @@ function IssuesPills({ row }: { readonly row: AdminReleaseRow }) {
   }
   if (row.zeroTracks) {
     issues.push({
+      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing pill label; copy change is out of JOV-4869 scope.
       label: '0 tracks',
       icon: <Music className='size-2.5' />,
     });
@@ -256,6 +259,7 @@ function getContextMenuItems(release: AdminReleaseRow) {
   const items = [
     {
       id: 'view-release',
+      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing menu label; copy change is out of JOV-4869 scope.
       label: 'View on Jovie',
       icon: <ExternalLink className='size-3.5' />,
       onClick: () => {
@@ -264,6 +268,7 @@ function getContextMenuItems(release: AdminReleaseRow) {
     },
     {
       id: 'view-profile',
+      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing menu label; copy change is out of JOV-4869 scope.
       label: 'View profile',
       icon: <User className='size-3.5' />,
       onClick: () => {
@@ -327,12 +332,12 @@ export function AdminReleasesTableUnified({
 
   const emptyState = clientFilter ? (
     <TableEmptyState
-      title={`No releases match '${clientFilter}'`}
+      heading={`No releases match '${clientFilter}'`}
       description='Try a different search.'
     />
   ) : (
     <TableEmptyState
-      title='No releases found on the platform'
+      heading='No releases found on the platform'
       description='Releases will appear here once artists add them.'
     />
   );

@@ -299,7 +299,7 @@ export function AdminFeaturesTable({
           enableVirtualization={false}
           emptyState={
             <TableEmptyState
-              title='No feature flags'
+              heading='No feature flags'
               description='No runtime flags are registered.'
             />
           }

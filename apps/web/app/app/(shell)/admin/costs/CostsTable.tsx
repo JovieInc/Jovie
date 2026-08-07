@@ -46,6 +46,7 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
           meta: { className: 'min-w-70' },
         }),
         columnHelper.accessor('observed30dUsd', {
+          // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing label; numeric-leading "30d" suggestion is identical. Out of JOV-4869 scope.
           header: '30d Spend (USD)',
           cell: info => {
             const v = info.getValue();
@@ -128,7 +129,7 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
           columns={columns}
           emptyState={
             <TableEmptyState
-              title='No cost items'
+              heading='No cost items'
               description='Cost data is unavailable in this environment.'
             />
           }

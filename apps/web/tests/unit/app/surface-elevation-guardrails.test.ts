@@ -465,16 +465,16 @@ describe('surface elevation guardrails', () => {
     ).toHaveLength(0);
   });
 
-  it('does not nest DrawerEmptyState inside a card (card-within-card)', () => {
-    // DrawerEmptyState should use variant='flat', not variant='card'.
+  it('does not nest DrawerInlineNote inside a card (card-within-card)', () => {
+    // DrawerInlineNote should use variant='flat', not variant='card'.
     // It is always rendered inside an existing card container.
-    const matches = findMatches(/DrawerEmptyState[\s\S]*variant=['"]card['"]/, [
-      'components/molecules/drawer/DrawerEmptyState.tsx',
+    const matches = findMatches(/DrawerInlineNote[\s\S]*variant=['"]card['"]/, [
+      'components/molecules/drawer/DrawerInlineNote.tsx',
     ]);
 
     expect(
       matches,
-      'DrawerEmptyState should use variant="flat" to avoid card-within-card nesting'
+      'DrawerInlineNote should use variant="flat" to avoid card-within-card nesting'
     ).toHaveLength(0);
   });
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import { Icon } from '@/components/atoms/Icon';
-import { DrawerEmptyState } from '@/components/molecules/drawer';
+import { DrawerInlineNote } from '@/components/molecules/drawer';
 import { renderAudienceEventSentence } from '@/lib/audience/activity-grammar';
 import { formatTimeAgo } from '@/lib/utils/audience';
 import type { AudienceMember } from '@/types';
@@ -17,7 +17,7 @@ export function AudienceMemberActivityFeed({
 
   if (actions.length === 0) {
     return (
-      <DrawerEmptyState
+      <DrawerInlineNote
         className='min-h-26'
         message='Activity will appear here as this contact interacts with your profile.'
       />

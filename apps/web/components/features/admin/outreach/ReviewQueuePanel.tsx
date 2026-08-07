@@ -112,6 +112,7 @@ function createReviewQueueColumns(
       size: 92,
     }) as ColumnDef<ReviewLead, unknown>,
     reviewQueueColumnHelper.accessor('fitScore', {
+      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing column header; copy change is out of JOV-4869 scope.
       header: 'Fit score',
       cell: ({ getValue }) => (
         <span className='tabular-nums'>{getValue() ?? '-'}</span>
@@ -275,7 +276,7 @@ export function ReviewQueuePanel() {
           minWidth='980px'
           emptyState={
             <TableEmptyState
-              title={
+              heading={
                 loadError ? 'Unable to load manual review' : 'No leads pending'
               }
               description={loadError ?? 'No leads pending review'}

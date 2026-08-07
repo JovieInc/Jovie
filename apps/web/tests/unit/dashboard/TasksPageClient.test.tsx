@@ -545,21 +545,41 @@ vi.mock('@/components/organisms/table', () => ({
     </div>
   ),
   TableEmptyState: ({
-    title,
+    heading,
     description,
     action,
     secondaryAction,
   }: {
-    title: string;
+    heading: string;
     description?: string;
-    action?: React.ReactNode;
-    secondaryAction?: React.ReactNode;
+    action?:
+      | { label: string; onClick: () => void }
+      | { label: string; href: string };
+    secondaryAction?:
+      | { label: string; onClick: () => void }
+      | { label: string; href: string };
   }) => (
     <div>
-      <p>{title}</p>
+      <p>{heading}</p>
       {description ? <p>{description}</p> : null}
-      {action}
-      {secondaryAction}
+      {action ? (
+        'href' in action ? (
+          <a href={action.href}>{action.label}</a>
+        ) : (
+          <button type='button' onClick={action.onClick}>
+            {action.label}
+          </button>
+        )
+      ) : null}
+      {secondaryAction ? (
+        'href' in secondaryAction ? (
+          <a href={secondaryAction.href}>{secondaryAction.label}</a>
+        ) : (
+          <button type='button' onClick={secondaryAction.onClick}>
+            {secondaryAction.label}
+          </button>
+        )
+      ) : null}
     </div>
   ),
   UnifiedTable: (props: {

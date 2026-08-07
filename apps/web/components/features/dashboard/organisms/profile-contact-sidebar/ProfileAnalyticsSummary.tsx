@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { DrawerEmptyState } from '@/components/molecules/drawer';
+import { DrawerInlineNote } from '@/components/molecules/drawer';
 import { DrawerPropertyRow } from '@/components/molecules/drawer/DrawerPropertyRow';
 import { TimeRangeSelector } from '@/components/molecules/TimeRangeSelector';
 import { CANONICAL_METRICS } from '@/lib/analytics/metrics';
@@ -39,7 +39,7 @@ export function ProfileAnalyticsSummary() {
   }
 
   if (isError && !data) {
-    return <DrawerEmptyState message='No data yet.' />;
+    return <DrawerInlineNote message='No data yet.' />;
   }
 
   const profileViews = data?.profile_views ?? 0;

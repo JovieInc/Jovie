@@ -3,19 +3,24 @@
 import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
 import { cn } from '@/lib/utils';
 
-export interface DrawerEmptyStateProps {
+export interface DrawerInlineNoteProps {
   readonly message: string;
   readonly tone?: 'default' | 'error';
   readonly className?: string;
   readonly testId?: string;
 }
 
-export function DrawerEmptyState({
+/**
+ * Inline drawer note for one-line status/empty messages. This is NOT an
+ * empty-state variant — the canonical `EmptyState` molecule owns hierarchy
+ * empty states (icon, heading, CTA).
+ */
+export function DrawerInlineNote({
   message,
   tone = 'default',
   className,
   testId,
-}: DrawerEmptyStateProps) {
+}: DrawerInlineNoteProps) {
   return (
     <DrawerSurfaceCard
       variant='flat'

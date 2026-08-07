@@ -152,7 +152,7 @@ export function PromoDownloadsTable({
     return (
       <TableEmptyState
         icon={<Music className='h-6 w-6' aria-hidden='true' />}
-        title='No Downloads Yet'
+        heading='No Downloads Yet'
         description='Upload audio files to create an email-gated download page for this release.'
         className='max-w-none'
       />

@@ -3,7 +3,7 @@
 import { ChevronRight, Pause, Play } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { toast } from '@/components/feedback';
-import { DrawerEmptyState } from '@/components/molecules/drawer';
+import { DrawerInlineNote } from '@/components/molecules/drawer';
 import type { ReleaseSidebarTrack } from '@/lib/discography/types';
 import { useReleaseTracksQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -160,7 +160,7 @@ export function ReleaseTrackList({
 
   if (hasError) {
     return (
-      <DrawerEmptyState
+      <DrawerInlineNote
         className='min-h-12 px-0'
         message='Failed to load tracks.'
         tone='error'
@@ -170,7 +170,7 @@ export function ReleaseTrackList({
 
   if (!tracks || tracks.length === 0) {
     return (
-      <DrawerEmptyState
+      <DrawerInlineNote
         className='min-h-12 px-0'
         message='No track data available.'
       />
