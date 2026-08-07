@@ -1,7 +1,13 @@
 import 'server-only';
 
 /**
- * Phase-A merch design generation.
+ * Phase-A merch design generation — THE canonical generation pipeline for
+ * chat-driven merch (JOV-4743, see `@/lib/merch/generation-contract`).
+ *
+ * Every chat tool entry point (`createMerch`, `previewMerchOptions`) must call
+ * `generateMerchDesigns` so the versioned prompt/content contract (verified
+ * source + no-person rules), the qualityReview evidence payload, and the
+ * publish blockers apply identically everywhere.
  *
  * Generates N illustrated, transparent (alpha) print graphics for the artist via
  * the multi-model graphic engine, persists each as a merchDesignOption bound to
@@ -31,8 +37,13 @@ import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 import { resolveMerchCatalogSelection } from './catalog';
 import { MERCH_DEFAULT_PRINTFUL_PRODUCT } from './default-catalog';
+import {
+  MERCH_CANONICAL_PIPELINE_ID,
+  MERCH_GENERATION_CONTRACT_VERSION,
+  type MerchGenerationReceipt,
+} from './generation-contract';
 import { generatePrintGraphic } from './graphic-engine';
-import { attachMockupsToDesignOption, generateProductMockups } from './mockups';
+import { scheduleMerchMockupEnrichment } from './mockup-enrichment';
 import {
   buildMerchPricingSnapshot,
   calculateRecommendedSalePriceCents,
@@ -392,43 +403,57 @@ async function getRecentSelectedStrategyLabels(
 }
 
 /**
- * Fire-and-forget: render the fulfillment-accurate Printful mockup for each
- * design (the alpha graphic on the real default product) and attach it. The
- * selected card then prefers the truthful Printful photo over the alpha preview
- * (selectPreferredMockupUrl). Non-blocking and best-effort — a Printful outage
- * leaves the alpha art in place. Pop-color / multi-product curation is a
- * follow-up; this ships the truthful default-product mockup.
+ * Logs the batch-level production receipt: canonical path, contract version,
+ * per-option terminal mockup disposition, and final batch disposition.
  */
-function attachPrintfulMockupsAsync(
-  designs: readonly {
+function logMerchGenerationReceipt(receipt: MerchGenerationReceipt): void {
+  logger.info('[merch-generation] production receipt', { ...receipt });
+}
+
+/**
+ * Schedules durable, observable Printful mockup enrichment for the generated
+ * designs (JOV-4743). Each option stays `pending_mockup` until the truthful
+ * product mockup is attached (`mockup_ready`) or the retry budget/timeout is
+ * exhausted (`mockup_failed`, which blocks publish). Replaces the previous
+ * untracked fire-and-forget `Promise.allSettled` path.
+ */
+function schedulePrintfulMockupEnrichment(params: {
+  readonly generationId: string;
+  readonly profileId: string;
+  readonly startedAt: number;
+  readonly requestedDesignCount: number;
+  readonly designs: readonly {
     readonly optionId: string;
     readonly printFileUrl: string;
-  }[]
-): void {
-  void Promise.allSettled(
-    designs.map(async ({ optionId, printFileUrl }) => {
-      try {
-        const { results } = await generateProductMockups({
-          printFileUrl,
-          catalogProductId: MERCH_DEFAULT_PRINTFUL_PRODUCT.catalogProductId,
-          catalogVariantIds: Object.values(
-            MERCH_DEFAULT_PRINTFUL_PRODUCT.variantMap
-          ),
-          placements: MERCH_DEFAULT_PRINTFUL_PRODUCT.placements,
-          technique: MERCH_DEFAULT_PRINTFUL_PRODUCT.technique,
-          productTypes: [MERCH_DEFAULT_PRINTFUL_PRODUCT.productType],
-        });
-        const mockupUrls = results.flatMap(r => r.mockupUrls);
-        if (mockupUrls.length > 0) {
-          await attachMockupsToDesignOption(optionId, mockupUrls);
-        }
-      } catch (error) {
-        logger.warn('[merch-designs] printful mockup attach failed', {
-          optionId,
-          err: error instanceof Error ? error.message : String(error),
-        });
-      }
-    })
+  }[];
+}): void {
+  scheduleMerchMockupEnrichment(
+    params.designs.map(({ optionId, printFileUrl }) => ({
+      optionId,
+      request: {
+        printFileUrl,
+        catalogProductId: MERCH_DEFAULT_PRINTFUL_PRODUCT.catalogProductId,
+        catalogVariantIds: Object.values(
+          MERCH_DEFAULT_PRINTFUL_PRODUCT.variantMap
+        ),
+        placements: MERCH_DEFAULT_PRINTFUL_PRODUCT.placements,
+        technique: MERCH_DEFAULT_PRINTFUL_PRODUCT.technique,
+        productTypes: [MERCH_DEFAULT_PRINTFUL_PRODUCT.productType],
+      },
+    })),
+    outcomes => {
+      logMerchGenerationReceipt({
+        pipeline: MERCH_CANONICAL_PIPELINE_ID,
+        contractVersion: MERCH_GENERATION_CONTRACT_VERSION,
+        generationId: params.generationId,
+        profileId: params.profileId,
+        requestedDesignCount: params.requestedDesignCount,
+        readyDesignCount: params.designs.length,
+        mockups: outcomes,
+        disposition: 'ready',
+        durationMs: Date.now() - params.startedAt,
+      });
+    }
   );
 }
 
@@ -561,6 +586,11 @@ export async function generateMerchDesigns(params: {
               copyrightRisk: 'low',
               typography: 'generated',
               printFeasible: true,
+              // Canonical-pipeline evidence (JOV-4743): the truthful Printful
+              // mockup is pending until enrichment reaches a terminal state.
+              contractVersion: MERCH_GENERATION_CONTRACT_VERSION,
+              pipeline: MERCH_CANONICAL_PIPELINE_ID,
+              mockupStatus: 'pending_mockup',
             },
             learning: {
               styleLane: 'fashion_graphic_item',
@@ -585,6 +615,11 @@ export async function generateMerchDesigns(params: {
             model_key: graphic.modelKey,
             concept,
             status: 'ready',
+            // The alpha print art is ready; the truthful Printful product
+            // mockup is not — this candidate stays pending_mockup until the
+            // enrichment worker reaches a terminal state. Never presented as
+            // a finished product photo (JOV-4743).
+            mockup_status: 'pending_mockup',
             preview_url: previewUrl,
             slots: {
               artist_name: name,
@@ -632,12 +667,32 @@ export async function generateMerchDesigns(params: {
     readyDesignCount: ready.length,
   });
 
-  // Non-blocking: attach the truthful Printful product mockup to each design.
-  attachPrintfulMockupsAsync(
-    ready.flatMap(d =>
-      d.preview_url ? [{ optionId: d.id, printFileUrl: d.preview_url }] : []
-    )
+  // Durable + observable: attach the truthful Printful product mockup to each
+  // design and log the terminal production receipt when enrichment settles.
+  const enrichmentDesigns = ready.flatMap(d =>
+    d.preview_url ? [{ optionId: d.id, printFileUrl: d.preview_url }] : []
   );
+  if (enrichmentDesigns.length > 0) {
+    schedulePrintfulMockupEnrichment({
+      generationId,
+      profileId: params.profileId,
+      startedAt,
+      requestedDesignCount: count,
+      designs: enrichmentDesigns,
+    });
+  } else {
+    logMerchGenerationReceipt({
+      pipeline: MERCH_CANONICAL_PIPELINE_ID,
+      contractVersion: MERCH_GENERATION_CONTRACT_VERSION,
+      generationId,
+      profileId: params.profileId,
+      requestedDesignCount: count,
+      readyDesignCount: 0,
+      mockups: [],
+      disposition: 'failed',
+      durationMs: Date.now() - startedAt,
+    });
+  }
 
   await db
     .update(merchGenerationBatches)
@@ -651,6 +706,7 @@ export async function generateMerchDesigns(params: {
     success: true,
     generationId,
     prompt: params.prompt,
+    contractVersion: MERCH_GENERATION_CONTRACT_VERSION,
     nextStep: 'Pick one and I’ll put it on products.',
     designs: ready,
   };

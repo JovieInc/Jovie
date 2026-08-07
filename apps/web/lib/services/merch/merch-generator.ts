@@ -1,10 +1,18 @@
 import 'server-only';
 
 /**
- * Merch generator wrappers for chat tool execution.
+ * Merch generator compatibility adapters (JOV-4743).
  *
- * Keeps chat-layer plumbing thin by delegating all generation/selection logic
- * to the canonical merch service.
+ * The canonical, quality-gated generation pipeline for chat-driven merch is
+ * `generateMerchDesigns` in `@/lib/merch/design-generation` (see
+ * `@/lib/merch/generation-contract`). The live chat tools
+ * (`createMerch`, `previewMerchOptions`) call it directly via
+ * `@/lib/chat/tools/merch-tools`.
+ *
+ * `generateMerchFromConcept` / `previewMerchFromConcept` below are explicit
+ * compatibility adapters over the legacy deterministic `createMerchGeneration`
+ * path (still used by release-autopilot and the MCP route). They are covered
+ * by merch-generator.test.ts; do not wire new chat entry points through them.
  */
 
 import {
@@ -81,6 +89,10 @@ export interface ChatMerchGenerationInput {
  *
  * Thin wrapper over createMerchGeneration that enriches prompt text with
  * optional item type hints and routes request metadata.
+ *
+ * @deprecated Compatibility adapter for the legacy deterministic path. New
+ * chat entry points must use the canonical quality-gated pipeline
+ * (`generateMerchDesigns`) instead — see `@/lib/merch/generation-contract`.
  */
 export async function generateMerchFromConcept(
   input: ChatMerchGenerationInput
@@ -108,6 +120,10 @@ export async function generateMerchFromConcept(
  * This currently follows the same persisted generation flow as
  * generateMerchFromConcept, but marks the batch/turn as
  * preview_merch_options for downstream handling.
+ *
+ * @deprecated Compatibility adapter for the legacy deterministic path. New
+ * chat entry points must use the canonical quality-gated pipeline
+ * (`generateMerchDesigns`) instead — see `@/lib/merch/generation-contract`.
  */
 export async function previewMerchFromConcept(
   input: ChatMerchGenerationInput

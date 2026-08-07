@@ -7,13 +7,15 @@ import 'server-only';
  * artist chat. They wrap the merch generator service and return structured
  * payloads the chat UI renders as merch cards.
  *
- * Implementation strategy:
- * - generateMerchOptions: takes a design concept, calls the merch generator
- *   service, and returns merch generation options for the UI
- * - previewMerchOptions: same as generate but with preview semantics
+ * Implementation strategy (JOV-4743):
+ * - createMerch and previewMerchOptions share one executor that calls the
+ *   canonical, quality-gated generator (`generateMerchDesigns`, see
+ *   `@/lib/merch/generation-contract`) — there is no per-tool divergence.
  * - selectMerchOption: picks a design option and creates a merch card
  *
- * @see @/lib/services/merch/merch-generator.ts - Core generation logic
+ * @see @/lib/merch/design-generation.ts - Canonical generation pipeline
+ * @see @/lib/merch/generation-contract.ts - Versioned contract + receipt
+ * @see @/lib/services/merch/merch-generator.ts - Legacy compatibility adapters
  * @see @/lib/chat/tool-schemas.ts - Tool schema definitions
  * @see onboarding-tool-impls.ts - Similar pattern for onboarding tools
  */
@@ -127,6 +129,69 @@ export function createMerchSourceTool(params: {
 }
 
 /**
+ * Shared executor for both generation chat tools (JOV-4743).
+ *
+ * `createMerch` and `previewMerchOptions` differ only in the fallback prompt
+ * goal; everything else — the versioned prompt contract, the verified-source /
+ * no-person gate, and the canonical `generateMerchDesigns` pipeline with its
+ * quality evidence and publish blockers — is this single code path, so neither
+ * tool can drift or bypass the gate.
+ */
+async function executeCanonicalMerchGeneration(
+  params: {
+    readonly profileId: string | null;
+    readonly clerkUserId: string;
+    readonly conversationId?: string | null;
+    readonly turnId?: string | null;
+    readonly fallbackPrompt: string;
+  },
+  input: {
+    readonly prompt?: string;
+    readonly itemType?: string;
+    readonly source?: MerchSource;
+  }
+) {
+  if (!params.profileId) {
+    return { success: false as const, error: 'Profile ID required' };
+  }
+
+  const generationPrompt = buildMerchGenerationPrompt(
+    input.prompt,
+    input.itemType,
+    params.fallbackPrompt
+  );
+  const sourceResolution = await resolveVerifiedSource({
+    profileId: params.profileId,
+    prompt: generationPrompt.prompt,
+    source: input.source,
+  });
+  if ('error' in sourceResolution) {
+    return { success: false as const, error: sourceResolution.error };
+  }
+  if ('sourceSelection' in sourceResolution) {
+    return sourceResolution.sourceSelection;
+  }
+
+  const result = await generateMerchDesigns({
+    profileId: params.profileId,
+    clerkUserId: params.clerkUserId,
+    prompt: generationPrompt.prompt,
+    source: sourceResolution.source,
+    conversationId: params.conversationId ?? null,
+    turnId: params.turnId ?? null,
+  });
+  return {
+    ...result,
+    ...(generationPrompt.usedDefaultItemType
+      ? {
+          productTypeNotice:
+            'Started with a premium tee. You can switch the product after choosing a design.',
+        }
+      : {}),
+  };
+}
+
+/**
  * Creates the generate merch options chat tool.
  * Attached to the authenticated chat toolset when the artist has
  * merch creation access.
@@ -140,46 +205,14 @@ export function createMerchGenerateTool(params: {
   return tool({
     description: TOOL_SCHEMAS.createMerch.description,
     inputSchema: TOOL_SCHEMAS.createMerch.inputSchema,
-    execute: async ({ prompt, itemType, makeLive: _makeLive, source }) => {
-      if (!params.profileId) {
-        return { success: false as const, error: 'Profile ID required' };
-      }
-
-      const generationPrompt = buildMerchGenerationPrompt(
-        prompt,
-        itemType,
-        'Premium illustrated merch for this artist.'
-      );
-      const sourceResolution = await resolveVerifiedSource({
-        profileId: params.profileId,
-        prompt: generationPrompt.prompt,
-        source,
-      });
-      if ('error' in sourceResolution) {
-        return { success: false as const, error: sourceResolution.error };
-      }
-      if ('sourceSelection' in sourceResolution) {
-        return sourceResolution.sourceSelection;
-      }
-
-      const result = await generateMerchDesigns({
-        profileId: params.profileId,
-        clerkUserId: params.clerkUserId,
-        prompt: generationPrompt.prompt,
-        source: sourceResolution.source,
-        conversationId: params.conversationId ?? null,
-        turnId: params.turnId ?? null,
-      });
-      return {
-        ...result,
-        ...(generationPrompt.usedDefaultItemType
-          ? {
-              productTypeNotice:
-                'Started with a premium tee. You can switch the product after choosing a design.',
-            }
-          : {}),
-      };
-    },
+    execute: async ({ prompt, itemType, makeLive: _makeLive, source }) =>
+      executeCanonicalMerchGeneration(
+        {
+          ...params,
+          fallbackPrompt: 'Premium illustrated merch for this artist.',
+        },
+        { prompt, itemType, source }
+      ),
   });
 }
 
@@ -196,46 +229,14 @@ export function createMerchPreviewTool(params: {
   return tool({
     description: TOOL_SCHEMAS.previewMerchOptions.description,
     inputSchema: TOOL_SCHEMAS.previewMerchOptions.inputSchema,
-    execute: async ({ prompt, itemType, source }) => {
-      if (!params.profileId) {
-        return { success: false as const, error: 'Profile ID required' };
-      }
-
-      const generationPrompt = buildMerchGenerationPrompt(
-        prompt,
-        itemType,
-        'Premium illustrated merch concepts for this artist.'
-      );
-      const sourceResolution = await resolveVerifiedSource({
-        profileId: params.profileId,
-        prompt: generationPrompt.prompt,
-        source,
-      });
-      if ('error' in sourceResolution) {
-        return { success: false as const, error: sourceResolution.error };
-      }
-      if ('sourceSelection' in sourceResolution) {
-        return sourceResolution.sourceSelection;
-      }
-
-      const result = await generateMerchDesigns({
-        profileId: params.profileId,
-        clerkUserId: params.clerkUserId,
-        prompt: generationPrompt.prompt,
-        source: sourceResolution.source,
-        conversationId: params.conversationId ?? null,
-        turnId: params.turnId ?? null,
-      });
-      return {
-        ...result,
-        ...(generationPrompt.usedDefaultItemType
-          ? {
-              productTypeNotice:
-                'Started with a premium tee. You can switch the product after choosing a design.',
-            }
-          : {}),
-      };
-    },
+    execute: async ({ prompt, itemType, source }) =>
+      executeCanonicalMerchGeneration(
+        {
+          ...params,
+          fallbackPrompt: 'Premium illustrated merch concepts for this artist.',
+        },
+        { prompt, itemType, source }
+      ),
   });
 }
 
