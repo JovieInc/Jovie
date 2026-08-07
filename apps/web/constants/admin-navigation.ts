@@ -30,6 +30,7 @@ export type AdminOutreachQueue = (typeof adminOutreachQueues)[number];
 
 export type AdminWorkspaceId =
   | 'overview'
+  | 'chat'
   | 'ops'
   | 'people'
   | 'growth'
@@ -79,6 +80,13 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     href: APP_ROUTES.ADMIN,
     description:
       'Health dashboard — one signal per area linking to detail screens',
+    section: 'workspaces',
+  },
+  {
+    id: 'chat',
+    label: 'Chat',
+    href: APP_ROUTES.ADMIN_CHAT,
+    description: 'Operator chat surface on the signed-in artist profile',
     section: 'workspaces',
   },
   {

@@ -66,6 +66,7 @@ import {
   extractLastUserImageUrl,
   extractLastUserText,
 } from '@/lib/chat/message-text';
+import { canUseOvChatMode, parseChatMode } from '@/lib/chat/ov-mode';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
 import {
   updateOwnedReleaseGeneratedPitches,
@@ -667,12 +668,15 @@ function buildChatTurnMetadata(input: {
   readonly toolStepCapExhausted?: boolean;
   /** Resolved model id that produced the turn (feedback attribution). */
   readonly model?: string;
+  /** OV operator chat mode tag (JOV-4810); omitted for customer turns. */
+  readonly chatMode?: 'ov' | null;
 }) {
   return {
     conversationId: input.conversationId,
     turnId: input.turnId,
     requestId: input.requestId,
     ...(input.model ? { model: input.model } : {}),
+    ...(input.chatMode ? { chatMode: input.chatMode } : {}),
     ...(input.toolStepCapExhausted
       ? { toolStepCapExhausted: true as const }
       : {}),
@@ -2476,6 +2480,23 @@ export async function POST(req: Request) {
   const { body, uiMessages } = parsedRequest;
   const { profileId, conversationId } = body;
 
+  // OV chat mode (JOV-4810): only the literal 'ov' is valid, and it is an
+  // internal-tool surface — fail closed for non-admins before any turn work.
+  const chatModeResult = parseChatMode(body.chatMode);
+  if (!chatModeResult.ok) {
+    return NextResponse.json(
+      { error: 'Invalid chatMode', requestId },
+      { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
+    );
+  }
+  const chatMode = chatModeResult.chatMode;
+  if (chatMode === 'ov' && !(await canUseOvChatMode(userId))) {
+    return NextResponse.json(
+      { error: 'Admin role required for OV chat mode', requestId },
+      { status: 403, headers: { ...corsHeaders, 'x-request-id': requestId } }
+    );
+  }
+
   // Validate that either profileId or artistContext is provided
   if (
     !toNullableString(profileId) &&
@@ -3027,6 +3048,7 @@ export async function POST(req: Request) {
               turnId: reservedTurn.turnId,
               requestId,
               model: turn.selectedModel,
+              chatMode,
               toolStepCapExhausted: turn.turnSignals.toolStepCapExhausted,
             })
           : undefined,

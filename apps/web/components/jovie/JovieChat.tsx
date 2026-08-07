@@ -78,6 +78,7 @@ export function JovieChat({
   username,
   isFirstSession = false,
   isProfileComplete = false,
+  chatMode,
   actionCards,
   ambientOwnedByShell = false,
 }: JovieChatProps) {
@@ -128,6 +129,7 @@ export function JovieChat({
     onConversationCreate,
     username,
     pinnedOpportunity,
+    chatMode,
   });
 
   const visibleActionCards = useMemo(() => {
