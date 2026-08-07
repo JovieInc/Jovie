@@ -12,7 +12,6 @@ export {
   chatNavItem,
   contactsNavItem,
   customerNavVisibleCap,
-  dashboardHome,
   desktopMoreNavigation,
   desktopPrimaryNavigation,
   inboxNavItem,

@@ -50,13 +50,20 @@ describe('partitionCustomerNavigation', () => {
     });
 
     expect(partition.visible.map(item => item.id)).toEqual([
-      'chat',
       'inbox',
-      'contacts',
+      'chat',
+      'library',
     ]);
-    expect(partition.more).toEqual([]);
+    expect(partition.more.map(item => item.id)).toEqual([
+      'contacts',
+      'calendar',
+      'tasks',
+    ]);
     expect(partition.visible).toEqual(mobilePrimaryNavigation);
-    expect(mobileExpandedNavigation).toEqual(artistNavigation);
+    expect(mobileExpandedNavigation).toEqual([
+      ...partition.more,
+      ...artistNavigation,
+    ]);
   });
 
   it('keeps the full approved core set on the desktop rail with an empty More', () => {
@@ -111,17 +118,19 @@ describe('partitionCustomerNavigation', () => {
     expect(partition.more).toEqual([]);
   });
 
-  it('keeps the stable three-item mobile strip when a contextual route is active', () => {
+  it('keeps the stable three-item mobile strip when no route is active', () => {
     const partition = partitionCustomerNavigation(primaryNavigation, {
       visibleCap: CUSTOMER_NAV_CAPACITY.mobilePrimaryVisible,
       activeItemId: null,
     });
 
-    expect(partition.visible).toHaveLength(primaryNavigation.length);
+    expect(partition.visible).toHaveLength(
+      CUSTOMER_NAV_CAPACITY.mobilePrimaryVisible
+    );
     expect(partition.visible.map(item => item.id)).toEqual([
-      'chat',
       'inbox',
-      'contacts',
+      'chat',
+      'library',
     ]);
   });
 

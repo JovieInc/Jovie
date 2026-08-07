@@ -1,9 +1,9 @@
 import {
   Banknote,
   CalendarDays,
+  CheckSquare,
   Gauge,
   HandCoins,
-  Home,
   IdCard,
   Inbox,
   Lock,
@@ -26,16 +26,6 @@ import type { NavItem } from './types';
 // ---------------------------------------------------------------------------
 // Shared navigation items – single source of truth for sidebar + mobile
 // ---------------------------------------------------------------------------
-
-export const dashboardHome: NavItem = {
-  name: 'Home',
-  href: APP_ROUTES.CHAT,
-  id: 'overview',
-  icon: Home,
-  iconName: 'Home',
-  tier: 'core',
-  description: 'Start a new chat',
-};
 
 /** Named Inbox home. `/app` renders the opportunity card stack. */
 export const inboxNavItem: NavItem = {
@@ -99,17 +89,31 @@ export const calendarNavItem: NavItem = {
   description: 'See release dates, events, and calendar moments',
 };
 
-/** Destinations owned by the currently selected artist group. */
+export const tasksNavItem: NavItem = {
+  name: 'Tasks',
+  href: APP_ROUTES.TASKS,
+  id: 'tasks',
+  icon: CheckSquare,
+  iconName: 'CheckSquare',
+  tier: 'core',
+  description: 'Open the task workspace',
+};
+
+/**
+ * Contextual artist-scoped destinations rendered in the artist group, not the
+ * primary rail. Presence (`/app/profiles`) is the sole contextual entry per
+ * the JOV-4866 IA decision (Tasks is primary, Presence contextual).
+ */
 export const artistNavigation = [
-  libraryNavItem,
-  calendarNavItem,
   profilesNavItem,
 ] as const satisfies readonly NavItem[];
 
 /**
- * Founder-approved global customer shell IA. Artist-scoped destinations live
- * in `artistNavigation` so the desktop rail can render them under the artist
- * group while mobile keeps them in the expanded menu (JOV-4800).
+ * Founder-approved canonical customer shell IA (DESIGN.md "App IA & Page
+ * Scaffold"), realigned in JOV-4866: one ordered tuple — Inbox, Chat,
+ * Library, Contacts, Calendar, Tasks — shared by desktop, mobile, and the
+ * route coverage test. Presence (`/app/profiles`) is contextual and lives in
+ * `artistNavigation`.
  *
  * Capacity (JOV-4515): every entry here is `core` and must fit the desktop
  * primary rail. Mark new trial destinations `experimental` so they overflow
@@ -117,9 +121,12 @@ export const artistNavigation = [
  * permanent IA without an explicit product decision.
  */
 export const primaryNavigation = [
-  chatNavItem,
   inboxNavItem,
+  chatNavItem,
+  libraryNavItem,
   contactsNavItem,
+  calendarNavItem,
+  tasksNavItem,
 ] as const satisfies readonly NavItem[];
 
 export const settingsNavItem: NavItem = {

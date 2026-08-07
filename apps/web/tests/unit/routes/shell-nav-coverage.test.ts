@@ -31,10 +31,6 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Canonical library page for releases, merch, images, videos, and audio',
   '/app/audience':
     'Retained customer workspace reachable by direct links and shortcuts after primary navigation consolidation',
-  '/app/profiles':
-    'Retained customer workspace reachable by direct links after primary navigation consolidation',
-  '/app/tasks':
-    'Retained work-record workspace reached from release, Calendar, and artist-workspace contexts after primary navigation consolidation',
   '/app/tour-dates':
     'Retained customer workspace reachable by direct links and Settings after primary navigation consolidation',
   '/app/threads': 'Legacy all threads route redirects to chats',

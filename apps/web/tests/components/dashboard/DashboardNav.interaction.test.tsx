@@ -23,11 +23,12 @@ vi.mock('@/lib/queries/prefetch-dashboard', () => ({
 }));
 
 const PRIMARY_LABELS = [
-  'New Chat',
   'Inbox',
-  'Contacts',
+  'New Chat',
   'Library',
+  'Contacts',
   'Calendar',
+  'Tasks',
   'Presence',
 ] as const;
 
@@ -67,11 +68,11 @@ describe('DashboardNav interactions', () => {
     expect(searchSlot).toHaveClass('mt-1.5', 'mb-4', 'h-7', 'shrink-0');
     expect(screen.getAllByRole('button', { name: 'Search' })).toHaveLength(1);
     expect(
-      newChat.compareDocumentPosition(searchSlot!) &
+      inbox.compareDocumentPosition(searchSlot!) &
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     expect(
-      searchSlot!.compareDocumentPosition(inbox) &
+      searchSlot!.compareDocumentPosition(newChat) &
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
   });

@@ -17,11 +17,12 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
 }));
 
 const CANONICAL_NAV = [
-  ['New Chat', APP_ROUTES.CHAT],
   ['Inbox', APP_ROUTES.DASHBOARD],
-  ['Contacts', APP_ROUTES.CONTACTS],
+  ['New Chat', APP_ROUTES.CHAT],
   ['Library', APP_ROUTES.LIBRARY],
+  ['Contacts', APP_ROUTES.CONTACTS],
   ['Calendar', APP_ROUTES.CALENDAR],
+  ['Tasks', APP_ROUTES.TASKS],
   ['Presence', APP_ROUTES.PROFILES],
 ] as const;
 
@@ -91,21 +92,21 @@ describe('DashboardNav', () => {
     expect(queryByRole('link', { name: 'Settings' })).toBeNull();
   });
 
-  it('places the shell search slot after New Chat and before remaining navigation', () => {
+  it('places the shell search slot after Inbox and before remaining navigation', () => {
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
       navChildren: <button type='button'>Search</button>,
     });
 
-    const newChat = getByRole('link', { name: 'New Chat' });
-    const search = getByRole('button', { name: 'Search' });
     const inbox = getByRole('link', { name: 'Inbox' });
+    const search = getByRole('button', { name: 'Search' });
+    const newChat = getByRole('link', { name: 'New Chat' });
 
     expect(
-      newChat.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING
+      inbox.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     expect(
-      search.compareDocumentPosition(inbox) & Node.DOCUMENT_POSITION_FOLLOWING
+      search.compareDocumentPosition(newChat) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
     expect(search.parentElement).toHaveClass('h-7', 'shrink-0');
   });
@@ -374,7 +375,7 @@ describe('DashboardNav', () => {
       sidebarProps: { defaultOpen: false },
     });
 
-    expect(primaryLinks(container)).toHaveLength(6);
+    expect(primaryLinks(container)).toHaveLength(7);
     expect(getByRole('link', { name: 'New Chat' }).className).toContain(
       'group-data-[collapsible=icon]:justify-center'
     );
