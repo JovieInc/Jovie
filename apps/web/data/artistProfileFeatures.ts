@@ -12,7 +12,8 @@ export const ARTIST_PROFILE_SPEC_TILES: readonly ArtistProfileFeatureTile[] = [
     title: 'Audience Quality Filtering',
     body: 'Jovie identifies bots, your own team, and test traffic so your fan metrics measure actual fans.',
     size: 'large',
-    accent: 'blue',
+    // Distinct from the analytics tile: each feature's accent must be unique.
+    accent: 'gray',
     layoutClassName:
       'xl:col-start-1 xl:row-start-1 xl:col-span-5 xl:row-span-2',
     visual: 'audience-quality-filter',
