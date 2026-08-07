@@ -541,7 +541,7 @@ async function gotoDemoScene(
         .locator('body')
         .innerText({ timeout: 1_000 })
         .catch(() => '');
-      if (attempt === 2 || !bodyText.includes('Something Went Wrong')) {
+      if (attempt === 2 || !/something went wrong/i.test(bodyText)) {
         throw error;
       }
       console.warn(`[yc-demo] ${url} hit error page; retrying navigation...`);

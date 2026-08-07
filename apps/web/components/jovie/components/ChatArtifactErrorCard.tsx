@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
 
 interface ChatArtifactErrorCardProps {
   readonly title: string;
@@ -40,7 +41,7 @@ export function ChatArtifactErrorCard({
           onClick={() => submitRetryPrompt(retryPrompt)}
           className='mt-2 h-7 px-2 text-2xs'
         >
-          Retry
+          {RECOVERY_COPY.retryLabel}
         </Button>
       ) : null}
     </output>

@@ -21,7 +21,6 @@ export function DashboardErrorFallback({
         'An unexpected error occurred while loading your dashboard.'
       }
       error={errorWithDigest}
-      actionLabel='Retry'
       onRetry={resetErrorBoundary}
       extraContext={{ Context: 'Dashboard' }}
     />

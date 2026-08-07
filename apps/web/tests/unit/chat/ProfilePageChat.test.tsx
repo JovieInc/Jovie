@@ -143,7 +143,7 @@ describe('ProfilePageChat', () => {
     // Should have a retry button
     const retryButton = container.querySelector('button');
     expect(retryButton).not.toBeNull();
-    expect(retryButton?.textContent).toContain('Retry');
+    expect(retryButton?.textContent).toContain('Try again');
   });
 
   it('refreshes the app route instead of reloading the document from the error fallback', () => {

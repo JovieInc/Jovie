@@ -41,6 +41,7 @@ import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
+import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
 import { useClipboard } from '@/hooks/useClipboard';
 import { env } from '@/lib/env-client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -306,7 +307,7 @@ function ChatProfileFallback({
                 className='gap-2'
               >
                 <RefreshCw className='h-4 w-4' />
-                Retry
+                {RECOVERY_COPY.retryLabel}
               </Button>
             </>
           )}

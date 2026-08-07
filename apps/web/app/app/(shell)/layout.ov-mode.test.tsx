@@ -210,7 +210,7 @@ describe('AppShellLayout OV mode', () => {
       expect.objectContaining({
         title: 'Dashboard failed to load',
         actions: [
-          expect.objectContaining({ label: 'Retry', variant: 'primary' }),
+          expect.objectContaining({ label: 'Try again', variant: 'primary' }),
           expect.objectContaining({
             label: 'Return To Jovie',
             variant: 'secondary',

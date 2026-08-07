@@ -9,6 +9,7 @@ import { JovieChat } from '@/components/jovie/JovieChat';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
+import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
 
 function ProfilePageChatFallback() {
   const router = useRouter();
@@ -57,7 +58,7 @@ function ProfilePageChatInner() {
                 ariaLabel='Retry Loading Profile Chat'
                 onClick={() => router.refresh()}
                 icon={<RefreshCw className='h-4 w-4' />}
-                label='Retry'
+                label={RECOVERY_COPY.retryLabel}
               />
             </ContentSurfaceCard>
           </div>

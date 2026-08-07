@@ -534,7 +534,7 @@ describe('ChatPageClient', () => {
       'We hit a problem loading your profile. Please retry in a moment.'
     );
     const retryButton = Array.from(container.querySelectorAll('button')).find(
-      button => button.textContent?.trim() === 'Retry'
+      button => button.textContent?.trim() === 'Try again'
     );
     expect(retryButton).toBeDefined();
     expect(mockSentryAddBreadcrumb).toHaveBeenCalled();

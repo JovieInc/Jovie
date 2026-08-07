@@ -5,6 +5,7 @@ import {
   JOVIE_ICON_PATH,
   JOVIE_ICON_VIEW_BOX,
 } from '@/components/atoms/jovie-icon-path';
+import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
 
 type SystemBErrorFallbackAction =
   | {
@@ -23,6 +24,7 @@ type SystemBErrorFallbackAction =
 interface SystemBErrorFallbackProps {
   readonly title?: string;
   readonly description: string;
+  /** Support-path diagnostic. Rendered only behind an opt-in disclosure. */
   readonly digest?: string;
   readonly actions: readonly SystemBErrorFallbackAction[];
   readonly role?: 'alert';
@@ -37,7 +39,7 @@ function rootClassName(className: string | undefined): string {
 }
 
 export function SystemBErrorFallback({
-  title = 'Something Went Wrong',
+  title = RECOVERY_COPY.title,
   description,
   digest,
   actions,
@@ -100,7 +102,14 @@ export function SystemBErrorFallback({
         </div>
 
         {digest ? (
-          <p className='system-b-error-fallback__digest'>Error ID: {digest}</p>
+          <details className='system-b-error-fallback__details'>
+            <summary className='system-b-error-fallback__details-summary'>
+              {RECOVERY_COPY.detailsLabel}
+            </summary>
+            <p className='system-b-error-fallback__digest'>
+              Error ID: {digest}
+            </p>
+          </details>
         ) : null}
       </div>
     </div>

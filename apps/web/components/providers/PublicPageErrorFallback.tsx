@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
 import { captureErrorInSentry } from '@/lib/errors/capture';
 import { SystemBErrorFallback } from './SystemBErrorFallback';
 
@@ -24,7 +25,9 @@ export function PublicPageErrorFallback({
     <SystemBErrorFallback
       description='Try refreshing the page.'
       digest={error.digest}
-      actions={[{ type: 'button', label: 'Refresh', onClick: onRefresh }]}
+      actions={[
+        { type: 'button', label: RECOVERY_COPY.retryLabel, onClick: onRefresh },
+      ]}
       role='alert'
       ariaLive='assertive'
     />

@@ -56,7 +56,7 @@ describe('TableErrorFallback', () => {
   it('renders a copy details button', () => {
     render(<TableErrorFallback {...defaultProps} />);
     expect(
-      screen.getByRole('button', { name: 'Copy error details to clipboard' })
+      screen.getByRole('button', { name: 'Copy Error Details To Clipboard' })
     ).toBeInTheDocument();
   });
 
