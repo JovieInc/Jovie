@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- [internal] **Desktop System-B token contract aligns with web app-shell canon (JOV-4803):** the desktop tokens contract test now reads Noir Ion dark-mode anchors from `design-system.css` and the authenticated app-shell frame overrides from `system-b-app.css` instead of removed `--linear-*` tokens; no DMG publish in this PR.
 - [internal] **Production public-profile alias perf gate is warning-only (#15586 / JOV-4854):** post-promote `jov.ie` usable-result budgets still measure and emit `::warning::` / `performance_status=warn` on cold-cache noise, but no longer fail Production Verified; the immutable staged public-profile budget gate remains hard.
 - [internal] **Desktop releases now fail closed on publication proof (JOV-4545):** production creates an exact-commit private draft first, verifies all five updater assets and checksums, and writes the release marker only after an independent published-asset check.
 - **Calendar keeps a usable seven-column month grid (JOV-4819):** the authenticated desktop calendar and its loading state now own explicit responsive grid geometry, preventing production builds from collapsing the month into a single narrow day column.
