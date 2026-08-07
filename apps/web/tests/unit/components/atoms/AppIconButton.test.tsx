@@ -4,8 +4,16 @@ import { describe, expect, it, vi } from 'vitest';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 
 vi.mock('@jovie/ui', () => ({
-  Button: ({ children, ...props }: ComponentProps<'button'>) => (
-    <button type='button' {...props}>
+  IconButton: ({
+    children,
+    variant,
+    size,
+    ...props
+  }: ComponentProps<'button'> & {
+    readonly variant?: string;
+    readonly size?: string;
+  }) => (
+    <button type='button' data-variant={variant} data-size={size} {...props}>
       {children}
     </button>
   ),
@@ -25,7 +33,17 @@ describe('AppIconButton', () => {
     const button = screen.getByRole('button', { name: 'Open details' });
     expect(button).toBeInTheDocument();
     expect(button).toBeEnabled();
-    expect(button.className).toContain('rounded-full');
-    expect(button.className).toContain('shadow-none');
+  });
+
+  it('maps onto the canonical IconButton control variant at the sm size', () => {
+    render(
+      <AppIconButton ariaLabel='Open details'>
+        <span aria-hidden='true'>+</span>
+      </AppIconButton>
+    );
+
+    const button = screen.getByRole('button', { name: 'Open details' });
+    expect(button).toHaveAttribute('data-variant', 'control');
+    expect(button).toHaveAttribute('data-size', 'sm');
   });
 });

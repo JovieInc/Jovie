@@ -72,6 +72,18 @@ describe('InlineIconButton', () => {
     expect(handleClick).toHaveBeenCalledOnce();
   });
 
+  it('renders through the canonical inline variant contract (JOV-4871)', () => {
+    render(
+      <InlineIconButton aria-label='Canonical inline'>
+        <svg aria-hidden='true' />
+      </InlineIconButton>
+    );
+
+    const button = screen.getByRole('button', { name: 'Canonical inline' });
+    expect(button).toHaveAttribute('data-variant', 'ghost');
+    expect(button).toHaveAttribute('data-size', 'icon-lg');
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <InlineIconButton aria-label='Accessible inline icon'>

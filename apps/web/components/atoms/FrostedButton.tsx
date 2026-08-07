@@ -5,6 +5,8 @@ import Link from 'next/link';
 import React from 'react';
 import { cn } from '@/lib/utils';
 
+// @coverage-via apps/web/tests/unit/atoms/FrostedButton.test.tsx
+
 export interface FrostedButtonProps extends Omit<ButtonProps, 'variant'> {
   readonly href?: string;
   readonly external?: boolean;
@@ -30,10 +32,11 @@ export const FrostedButton = React.forwardRef<
     ref
   ) => {
     const variant = toneToVariant[tone];
+    // JOV-4871: no bespoke focus ring — the base Button canonical ring and
+    // reduced-motion policy apply unchanged.
     const frostedClasses = cn(
       'backdrop-blur-md transition-colors duration-subtle ease-out',
       'motion-reduce:transition-none',
-      'focus-visible:ring-offset-2 focus-visible:ring-ring focus-visible:ring-offset-background',
       className
     );
 

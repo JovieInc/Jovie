@@ -12,7 +12,17 @@ export const BUTTON_VARIANT_NAMES = [
   'link',
 ] as const;
 
-export const BUTTON_SIZE_NAMES = ['sm', 'md', 'lg', 'icon'] as const;
+export const BUTTON_SIZE_NAMES = [
+  'sm',
+  'md',
+  'lg',
+  'icon',
+  'icon-xs',
+  'icon-sm',
+  'icon-md',
+  'icon-lg',
+  'icon-xl',
+] as const;
 
 export type ButtonVariant = (typeof BUTTON_VARIANT_NAMES)[number];
 export type ButtonSize = (typeof BUTTON_SIZE_NAMES)[number];

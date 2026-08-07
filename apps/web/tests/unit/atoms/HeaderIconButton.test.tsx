@@ -76,6 +76,19 @@ describe('HeaderIconButton', () => {
     expect(ref.current?.getAttribute('aria-label')).toBe('Ref test');
   });
 
+  it('maps header sizes onto the canonical IconButton contract (JOV-4871)', () => {
+    render(
+      <HeaderIconButton ariaLabel='Canonical header' size='sm'>
+        <svg aria-hidden='true' />
+      </HeaderIconButton>
+    );
+
+    const button = screen.getByRole('button', { name: 'Canonical header' });
+    expect(button).toHaveAttribute('data-size', 'icon-sm');
+    // 44px hit target preserved below the 44px container size.
+    expect(button.className).toContain('before:h-11');
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <HeaderIconButton ariaLabel='Accessible button'>

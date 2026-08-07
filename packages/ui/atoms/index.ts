@@ -28,6 +28,16 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './dropdown-menu';
+export type { IconButtonProps } from './icon-button';
+export { IconButton, iconButtonVariants } from './icon-button';
+export {
+  ICON_BUTTON_FADE_CLASSNAME,
+  ICON_BUTTON_SIZE_NAMES,
+  ICON_BUTTON_VARIANT_NAMES,
+  ICON_BUTTON_VISIBLE_CLASSNAME,
+  type IconButtonSize,
+  type IconButtonVariant,
+} from './icon-button-contract';
 export type { KbdProps } from './kbd';
 export { Kbd } from './kbd';
 export {

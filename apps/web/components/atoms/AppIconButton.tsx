@@ -1,9 +1,12 @@
 'use client';
 
-import { Button, type ButtonProps, TooltipShortcut } from '@jovie/ui';
+import { IconButton, type IconButtonProps, TooltipShortcut } from '@jovie/ui';
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
+// Shared chrome for app-shell text/icon controls. Kept verbatim for the
+// text-control consumers; the icon-only path is the canonical `control`
+// variant on @jovie/ui IconButton (JOV-4871).
 export const APP_CONTROL_BUTTON_CLASS =
   'inline-flex h-app-control-sm items-center justify-center gap-1.5 rounded-pill border border-subtle bg-surface-1 px-app-control-x text-xs font-caption tracking-[-0.012em] text-secondary-token shadow-none transition-[background-color,color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-0 hover:text-primary-token hover:shadow-none focus-visible:border-focus focus-visible:bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 active:border-default active:bg-surface-1 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none';
 
@@ -17,8 +20,8 @@ type AppIconButtonLabelProps =
   | { readonly ariaLabel?: never; readonly 'aria-label': string };
 
 export type AppIconButtonProps = Omit<
-  ButtonProps,
-  'children' | 'size' | 'aria-label'
+  IconButtonProps,
+  'size' | 'variant' | 'aria-label' | 'ariaLabel'
 > &
   AppIconButtonLabelProps & {
     readonly children: React.ReactNode;
@@ -26,6 +29,13 @@ export type AppIconButtonProps = Omit<
     readonly tooltipShortcut?: string;
   };
 
+/**
+ * AppIconButton - compat wrapper over the canonical @jovie/ui IconButton
+ * (JOV-4871): `control` variant at the 28px app-control size, with optional
+ * tooltip. Focus ring and 44px hit target come from the base Button.
+ *
+ * @coverage-via apps/web/tests/unit/components/atoms/AppIconButton.test.tsx
+ */
 export const AppIconButton = React.forwardRef<
   HTMLButtonElement,
   AppIconButtonProps
@@ -36,7 +46,6 @@ export const AppIconButton = React.forwardRef<
     'aria-label': ariaLabelProp,
     tooltipLabel,
     tooltipShortcut,
-    variant = 'ghost',
     className,
     ...props
   },
@@ -45,16 +54,16 @@ export const AppIconButton = React.forwardRef<
   const resolvedAriaLabel = ariaLabel ?? ariaLabelProp;
 
   const button = (
-    <Button
+    <IconButton
       ref={ref}
-      variant={variant}
-      size='icon'
-      className={cn(APP_ICON_BUTTON_CLASS, className)}
+      variant='control'
+      size='sm'
+      className={className}
       aria-label={resolvedAriaLabel}
       {...props}
     >
       {children}
-    </Button>
+    </IconButton>
   );
 
   if (!tooltipLabel) return button;
