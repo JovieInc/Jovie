@@ -1,19 +1,9 @@
 'use client';
 
 import { PanelRight } from 'lucide-react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  memo,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { type ReactNode, useCallback, useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { getSidebarNavRowClassName } from '@/components/shell/SidebarNavItem';
-import { APP_ROUTES } from '@/constants/routes';
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
 import { AccountSettingsSection } from '@/features/dashboard/organisms/account-settings';
 import { DataPrivacySection } from '@/features/dashboard/organisms/DataPrivacySection';
@@ -52,116 +42,6 @@ interface SettingsSectionGroup {
   readonly sections: ReadonlyArray<SettingsSectionConfig>;
 }
 
-interface SettingsSidebarProps {
-  readonly groups: ReadonlyArray<SettingsSectionGroup>;
-  readonly activeSectionId?: string;
-  readonly useRouteLinks?: boolean;
-}
-
-function getFocusedSettingsHref(sectionId: string): string {
-  switch (sectionId) {
-    case 'account':
-      return APP_ROUTES.SETTINGS_APPEARANCE;
-    case 'billing':
-      return APP_ROUTES.SETTINGS_BILLING;
-    case 'usage':
-      return APP_ROUTES.SETTINGS_USAGE;
-    case 'data-privacy':
-      return APP_ROUTES.SETTINGS_DATA_PRIVACY;
-    case 'artist-profile':
-      return APP_ROUTES.SETTINGS_ARTIST_PROFILE;
-    case 'contacts':
-      return APP_ROUTES.SETTINGS_CONTACTS;
-    case 'touring':
-      return APP_ROUTES.SETTINGS_TOURING;
-    case 'audience-tracking':
-      return APP_ROUTES.SETTINGS_AUDIENCE;
-    case 'analytics':
-      return `${APP_ROUTES.SETTINGS}#analytics`;
-    case 'payments':
-      return `${APP_ROUTES.SETTINGS}#payments`;
-    default:
-      return APP_ROUTES.SETTINGS;
-  }
-}
-
-/**
- * Settings sidebar rows share the canonical shell nav-row chrome
- * (`getSidebarNavRowClassName`) so padding/density/active/hover stay
- * byte-identical to the main app sidebar. The only divergence is
- * structural: settings rows have no icon column, so the grid collapses
- * to a single column and the icon guide lines are hidden.
- *
- * Exported for the settings-vs-shell parity test
- * (tests/unit/sidebar-row-alignment.test.tsx).
- */
-export function getSettingsSidebarRowClassName(isActive: boolean): string {
-  return getSidebarNavRowClassName({
-    active: isActive,
-    className: 'grid-cols-[minmax(0,1fr)] text-left',
-  });
-}
-
-const SettingsSidebar = memo(
-  ({
-    groups,
-    activeSectionId,
-    useRouteLinks = false,
-  }: SettingsSidebarProps) => (
-    <aside className='h-fit'>
-      <div className='max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-xl border border-subtle bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm'>
-        {groups.map(group => (
-          <div key={group.id} className='mb-2 last:mb-0'>
-            <p className='mb-1 px-2.5 text-2xs font-medium tracking-tight text-tertiary-token'>
-              {group.label}
-            </p>
-            <nav aria-label={`${group.label} settings`}>
-              <ul className='space-y-1'>
-                {group.sections.map(section => {
-                  const isActive = section.id === activeSectionId;
-                  const href = useRouteLinks
-                    ? getFocusedSettingsHref(section.id)
-                    : `#${section.id}`;
-                  const rowClassName = getSettingsSidebarRowClassName(isActive);
-                  const rowContent = (
-                    <span className='min-w-0 truncate text-left justify-self-start'>
-                      {section.title}
-                    </span>
-                  );
-
-                  return (
-                    <li key={section.id}>
-                      {useRouteLinks ? (
-                        <Link
-                          href={href}
-                          aria-current={isActive ? 'page' : undefined}
-                          className={rowClassName}
-                        >
-                          {rowContent}
-                        </Link>
-                      ) : (
-                        <a
-                          href={href}
-                          aria-current={isActive ? 'page' : undefined}
-                          className={rowClassName}
-                        >
-                          {rowContent}
-                        </a>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </nav>
-          </div>
-        ))}
-      </div>
-    </aside>
-  )
-);
-
-SettingsSidebar.displayName = 'SettingsSidebar';
-
 /**
  * Mobile-only trigger to open the profile panel (tabs, links, analytics, share).
  * On desktop the panel is visible as an inline sidebar; on mobile the header
@@ -199,9 +79,6 @@ export function SettingsPolished({
   focusSection,
 }: SettingsPolishedProps) {
   const router = useRouter();
-  const [activeHashSectionId, setActiveHashSectionId] = useState<
-    string | undefined
-  >(undefined);
   const { data: billingData } = useBillingStatusQuery();
   const isPro = billingData?.isPro ?? false;
   const isGrowth = billingData?.plan === 'growth';
@@ -395,22 +272,6 @@ export function SettingsPolished({
     [sectionGroups]
   );
 
-  useEffect(() => {
-    if (focusSection) return;
-
-    const syncActiveSection = () => {
-      const nextHash = globalThis.location.hash.replace(/^#/, '');
-      setActiveHashSectionId(nextHash || undefined);
-    };
-
-    syncActiveSection();
-    globalThis.addEventListener('hashchange', syncActiveSection);
-
-    return () => {
-      globalThis.removeEventListener('hashchange', syncActiveSection);
-    };
-  }, [focusSection]);
-
   if (
     focusSection &&
     !allSections.some(section => section.id === focusSection)
@@ -427,17 +288,9 @@ export function SettingsPolished({
 
     return (
       <div
-        className='mx-auto grid w-full max-w-230 gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
+        className='mx-auto w-full max-w-230 pb-6'
         data-testid='settings-polished'
       >
-        <div className='lg:sticky lg:top-4 lg:self-start'>
-          <SettingsSidebar
-            groups={sectionGroups}
-            activeSectionId={focusSection}
-            useRouteLinks
-          />
-        </div>
-
         <div className='space-y-5 pb-5 sm:pb-6'>
           <SettingsSection
             id={section.id}
@@ -457,16 +310,9 @@ export function SettingsPolished({
   // Full settings view with Linear-style grouped navigation
   return (
     <div
-      className='mx-auto grid w-full max-w-230 gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
+      className='mx-auto w-full max-w-230 pb-6'
       data-testid='settings-polished'
     >
-      <div className='lg:sticky lg:top-4 lg:self-start'>
-        <SettingsSidebar
-          groups={sectionGroups}
-          activeSectionId={activeHashSectionId}
-        />
-      </div>
-
       <div className='space-y-4'>
         {sectionGroups.map(group => (
           <section
