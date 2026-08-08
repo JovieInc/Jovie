@@ -11,7 +11,7 @@
  * Sentry alert → this endpoint → GitHub repository_dispatch → sentry-autofix.yml
  */
 
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { env } from '@/lib/env';
@@ -29,12 +29,55 @@ export const runtime = 'nodejs';
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const DEDUPE_TTL_SECONDS = 60;
 const DISPATCH_TIMEOUT_MS = 10000;
+const MAX_CONTEXT_LENGTH = 256;
 
 /** Stack frame from Sentry payload */
 interface SentryFrame {
   filename?: string;
   function?: string;
   lineno?: number;
+}
+
+interface RootCauseContext {
+  project: string;
+  environment: string;
+  title: string;
+  culprit: string;
+  frames?: SentryFrame[];
+}
+
+function boundedString(value: unknown, maxLength = MAX_CONTEXT_LENGTH): string {
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    return '';
+  }
+
+  return String(value).trim().slice(0, maxLength);
+}
+
+function normalizeSignaturePart(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function buildRootCauseKey({
+  project,
+  environment,
+  title,
+  culprit,
+  frames,
+}: RootCauseContext): string {
+  const topFrame = frames?.[frames.length - 1];
+  const signature = [
+    project || 'unknown-project',
+    environment || 'unknown-environment',
+    title,
+    culprit,
+    boundedString(topFrame?.filename, 512),
+    boundedString(topFrame?.function, 256),
+  ]
+    .map(normalizeSignaturePart)
+    .join('|');
+
+  return `root-${createHash('sha256').update(signature).digest('hex').slice(0, 20)}`;
 }
 
 /**
@@ -74,7 +117,7 @@ export async function POST(request: NextRequest) {
   }
 
   let dedupeAcquired = false;
-  let issueIdForDedupe: string | null = null;
+  let dedupeKeyForClear: string | null = null;
 
   try {
     const body = await request.text();
@@ -111,13 +154,49 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const issueId = String(issue.id);
-    issueIdForDedupe = issueId;
+    const issueId = boundedString(issue.id, 64);
+    const event = payload.data?.event || payload.event || {};
+    const title = boundedString(issue.title) || 'Unknown error';
+    const culprit = boundedString(issue.culprit);
+    const message = boundedString(issue.metadata?.value || issue.message, 1000);
+    const url =
+      boundedString(issue.permalink, 1000) ||
+      `https://sentry.io/issues/${issueId}/`;
 
-    // Dedupe: acquire cross-instance lock before dispatch
+    // Extract stack trace from first exception if available.
+    const frames: SentryFrame[] | undefined =
+      issue.metadata?.stacktrace?.frames ||
+      issue.platform_context?.stacktrace?.frames ||
+      event.exception?.values?.[0]?.stacktrace?.frames;
+    const project = boundedString(
+      issue.project?.slug || payload.data?.project?.slug || payload.project
+    );
+    const environment = boundedString(
+      event.environment || issue.environment,
+      64
+    );
+    const release = boundedString(event.release || issue.release, 128);
+    const route = boundedString(event.transaction || culprit);
+    const level = boundedString(event.level || issue.level, 32);
+    const eventId = boundedString(event.event_id || event.id, 64);
+    const firstSeen = boundedString(issue.firstSeen, 64);
+    const lastSeen = boundedString(issue.lastSeen, 64);
+    const eventCount = boundedString(issue.count, 32);
+    const userCount = boundedString(issue.userCount, 32);
+    const dedupeKey = buildRootCauseKey({
+      project,
+      environment,
+      title,
+      culprit,
+      frames,
+    });
+    dedupeKeyForClear = dedupeKey;
+
+    // Dedupe equivalent reports by a bounded, non-PII root signature. The
+    // issue ID is still forwarded for direct Sentry linkage.
     const dedupeResult = await acquireRecentDispatch(
       'sentry',
-      issueId,
+      dedupeKey,
       DEDUPE_TTL_SECONDS
     );
     dedupeAcquired = dedupeResult.acquired;
@@ -137,17 +216,13 @@ export async function POST(request: NextRequest) {
     if (!dedupeAcquired) {
       logger.info('[Sentry Webhook] Duplicate dispatch suppressed', {
         issueId,
+        dedupeKey,
       });
       return NextResponse.json(
         { received: true, deduplicated: true },
         { headers: NO_STORE_HEADERS }
       );
     }
-
-    const title = issue.title || 'Unknown error';
-    const culprit = issue.culprit || '';
-    const message = issue.metadata?.value || issue.message || '';
-    const url = issue.permalink || `https://sentry.io/issues/${issueId}/`;
 
     if (isTransientInfraHttpIssue({ title, culprit })) {
       logger.info(
@@ -160,16 +235,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Extract stack trace from first exception if available
-    const frames: SentryFrame[] | undefined =
-      issue.metadata?.stacktrace?.frames ||
-      payload.data?.issue?.platform_context?.stacktrace?.frames;
     const stacktrace = frames
       ? frames
           .slice(-10)
           .map(
             (f: SentryFrame) =>
-              `  ${f.filename || '?'}:${f.lineno || '?'} in ${f.function || '?'}`
+              `  ${boundedString(f.filename, 512) || '?'}:${boundedString(f.lineno, 16) || '?'} in ${boundedString(f.function, 256) || '?'}`
           )
           .join('\n')
       : '';
@@ -192,11 +263,25 @@ export async function POST(request: NextRequest) {
           event_type: 'sentry-issue',
           client_payload: {
             issue_id: issueId,
+            dedupe_key: dedupeKey,
             title,
             culprit,
             message,
             url,
             stacktrace,
+            context: {
+              root_cause_fingerprint: dedupeKey,
+              environment,
+              release,
+              project,
+              route,
+              level,
+              event_id: eventId,
+              first_seen: firstSeen,
+              last_seen: lastSeen,
+              event_count: eventCount,
+              user_count: userCount,
+            },
           },
         }),
         timeoutMs: DISPATCH_TIMEOUT_MS,
@@ -210,7 +295,7 @@ export async function POST(request: NextRequest) {
         status: dispatchResponse.status,
         error: errorText,
       });
-      await clearRecentDispatch('sentry', issueId);
+      await clearRecentDispatch('sentry', dedupeKey);
       return NextResponse.json(
         { error: 'Dispatch failed' },
         { status: 502, headers: NO_STORE_HEADERS }
@@ -219,6 +304,7 @@ export async function POST(request: NextRequest) {
 
     logger.info('[Sentry Webhook] Dispatched autofix', {
       issueId,
+      dedupeKey,
       title,
       culprit,
     });
@@ -228,8 +314,8 @@ export async function POST(request: NextRequest) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    if (dedupeAcquired && issueIdForDedupe) {
-      await clearRecentDispatch('sentry', issueIdForDedupe);
+    if (dedupeAcquired && dedupeKeyForClear) {
+      await clearRecentDispatch('sentry', dedupeKeyForClear);
     }
 
     if (error instanceof ServerFetchTimeoutError) {

@@ -206,7 +206,10 @@ describe('POST /api/webhooks/sentry', () => {
 
     expect(response.status).toBe(502);
     expect(data).toEqual({ error: 'Dispatch timed out' });
-    expect(mockClearRecentDispatch).toHaveBeenCalledWith('sentry', '42');
+    expect(mockClearRecentDispatch).toHaveBeenCalledWith(
+      'sentry',
+      expect.stringMatching(/^root-[a-f0-9]{20}$/)
+    );
     expect(mockCaptureCriticalError).toHaveBeenCalledWith(
       'Sentry webhook dispatch timed out',
       expect.any(ServerFetchTimeoutError),
@@ -257,5 +260,96 @@ describe('POST /api/webhooks/sentry', () => {
       })
     );
     expect(mockServerFetch.mock.calls[0]?.[1]).not.toHaveProperty('retry');
+  });
+
+  it('enriches dispatches and deduplicates equivalent reports by root signature', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
+
+    const { POST } = await import('@/app/api/webhooks/sentry/route');
+    const makePayload = (issueId: string, environment: string) => ({
+      data: {
+        issue: {
+          id: issueId,
+          title: 'Database statement timed out',
+          culprit: 'POST /api/artist',
+          level: 'error',
+          firstSeen: '2026-08-07T18:00:00Z',
+          lastSeen: '2026-08-07T19:00:00Z',
+          count: '14',
+          userCount: 3,
+          project: { slug: 'jovie-web' },
+          metadata: {
+            value: 'canceling statement due to statement timeout',
+            stacktrace: {
+              frames: [
+                {
+                  filename: 'apps/web/app/api/artist/route.ts',
+                  function: 'POST',
+                  lineno: 88,
+                },
+              ],
+            },
+          },
+        },
+        event: {
+          event_id: `event-${issueId}`,
+          environment,
+          release: 'jovie@f863c92',
+          transaction: 'POST /api/artist',
+        },
+      },
+    });
+
+    for (const [issueId, environment] of [
+      ['101', 'production'],
+      ['202', 'production'],
+      ['303', 'development'],
+    ]) {
+      const body = JSON.stringify(makePayload(issueId, environment));
+      const response = await POST(
+        new Request('https://example.com/api/webhooks/sentry', {
+          method: 'POST',
+          headers: { 'sentry-hook-signature': sign(body) },
+          body,
+        }) as never
+      );
+      expect(response.status).toBe(200);
+    }
+
+    const dedupeKeys = mockAcquireRecentDispatch.mock.calls.map(
+      ([source, key]) => {
+        expect(source).toBe('sentry');
+        return key;
+      }
+    );
+    expect(dedupeKeys[0]).toMatch(/^root-[a-f0-9]{20}$/);
+    expect(dedupeKeys[1]).toBe(dedupeKeys[0]);
+    expect(dedupeKeys[2]).not.toBe(dedupeKeys[0]);
+
+    const firstDispatch = JSON.parse(
+      String(mockServerFetch.mock.calls[0]?.[1]?.body)
+    );
+    expect(Object.keys(firstDispatch.client_payload)).toHaveLength(8);
+    expect(firstDispatch.client_payload).toMatchObject({
+      issue_id: '101',
+      dedupe_key: dedupeKeys[0],
+      context: {
+        root_cause_fingerprint: dedupeKeys[0],
+        environment: 'production',
+        release: 'jovie@f863c92',
+        project: 'jovie-web',
+        route: 'POST /api/artist',
+        level: 'error',
+        event_id: 'event-101',
+        first_seen: '2026-08-07T18:00:00Z',
+        last_seen: '2026-08-07T19:00:00Z',
+        event_count: '14',
+        user_count: '3',
+      },
+    });
   });
 });
