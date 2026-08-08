@@ -7,6 +7,7 @@ import {
   buildAffectedTestPlan,
   buildFullSuiteCommands,
   buildSelectedTestCommands,
+  runCommandStatus,
 } from '../../run-affected-tests.mjs';
 
 const runner = readFileSync(
@@ -1420,4 +1421,34 @@ describe('automation-verify affected scope', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   }, 15000);
+
+  it('fails closed with a timeout and progress diagnostics for a stalled shard', async () => {
+    const diagnostics = [];
+    const startedAt = Date.now();
+    const status = await runCommandStatus(
+      process.execPath,
+      ['-e', 'setInterval(() => {}, 1000)'],
+      {
+        timeoutMs: 200,
+        progressIntervalMs: 25,
+        label: 'shard 1/8',
+        logger: message => diagnostics.push(message),
+      }
+    );
+
+    expect(status).toBe(124);
+    expect(Date.now() - startedAt).toBeLessThan(5000);
+    expect(diagnostics.join('\n')).toContain(
+      '[affected-tests] start shard 1/8'
+    );
+    expect(diagnostics.join('\n')).toContain(
+      '[affected-tests] progress shard 1/8'
+    );
+    expect(diagnostics.join('\n')).toContain(
+      '[affected-tests] timeout shard 1/8'
+    );
+    expect(diagnostics.join('\n')).toContain(
+      '[affected-tests] complete shard 1/8 status=124'
+    );
+  }, 10000);
 });
