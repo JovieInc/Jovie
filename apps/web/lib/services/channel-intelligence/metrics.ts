@@ -1,164 +1,88 @@
 /**
- * Channel-intelligence metric derivations (GH-10917 / JOV-3193).
+ * Winner metric helpers for channel intelligence (JOV-3193).
  *
- * Winner metric for the whole packaging epic:
- *   watch_minutes_per_impression
- *     = watch_minutes / impressions
- *     ≈ CTR × average_view_duration_minutes
+ * Primary metric: watch_minutes_per_impression
+ *   = watchMinutes / impressions
+ *   ≈ ctr × avg_view_duration_minutes
  *
- * Never rank or declare winners by CTR alone — a thumbnail that wins clicks
- * but loses retention must lose.
+ * Ranking MUST use this metric, never CTR alone. A thumbnail that wins clicks
+ * but loses retention must rank lower.
  */
 
-import type {
-  ChannelVideoMetrics,
-  DurationBucket,
-  RankedVideo,
-  TitleLengthBucket,
-} from './types';
+import type { ChannelVideoMetrics, LengthBucket } from './types';
 
-/** Minimum impressions before a video enters ranking / correlation sets. */
-export const MIN_IMPRESSIONS_FOR_RANKING = 100;
+/** Minimum impressions before a video enters ranking / correlation. */
+export const MIN_IMPRESSIONS_FOR_RANK = 100;
 
 /** Reach trend below this is treated as declining. */
 export const DECLINING_REACH_THRESHOLD = -0.1;
 
 /**
- * Title word-count buckets (aligned with packaging niche titleLengthBias):
- * short < 5, medium 5–10, long > 10.
+ * Content length buckets (seconds):
+ * short &lt; 3 min, medium 3–10 min, long &gt; 10 min.
  */
-export function titleLengthBucket(
-  wordCount: number | null | undefined
-): TitleLengthBucket | null {
-  if (wordCount == null || !Number.isFinite(wordCount) || wordCount < 0) {
-    return null;
+export const LENGTH_SHORT_MAX_SECONDS = 180;
+export const LENGTH_MEDIUM_MAX_SECONDS = 600;
+
+/**
+ * Computes watch_minutes_per_impression.
+ *
+ * Prefers Reporting-API watchMinutes / impressions. Falls back to
+ * CTR × avg view duration (minutes) when watch minutes are missing but
+ * impressions + CTR + AVD are present — same identity used in the packaging
+ * experiment engine.
+ */
+export function watchMinutesPerImpression(v: ChannelVideoMetrics): number {
+  if (v.impressions <= 0) return 0;
+
+  if (v.watchMinutes > 0) {
+    return v.watchMinutes / v.impressions;
   }
-  if (wordCount < 5) return 'short';
-  if (wordCount <= 10) return 'medium';
-  return 'long';
+
+  // Fallback: CTR × AVD(minutes) ≈ watch_minutes / impressions
+  if (v.ctr > 0 && v.avgViewDurationSeconds > 0) {
+    return v.ctr * (v.avgViewDurationSeconds / 60);
+  }
+
+  return 0;
 }
 
 /**
- * Video duration buckets (minutes of content):
- * short < 8 min, medium 8–20, long > 20.
- */
-export function durationBucket(
-  durationSeconds: number | null | undefined
-): DurationBucket | null {
-  if (
-    durationSeconds == null ||
-    !Number.isFinite(durationSeconds) ||
-    durationSeconds < 0
-  ) {
-    return null;
-  }
-  const minutes = durationSeconds / 60;
-  if (minutes < 8) return 'short';
-  if (minutes <= 20) return 'medium';
-  return 'long';
-}
-
-/**
- * Primary ranking metric: watch_minutes / impressions.
- * Falls back to CTR × AVD(minutes) when impressions are missing but CTR+AVD exist.
- */
-export function watchMinutesPerImpression(
-  metrics: Pick<
-    ChannelVideoMetrics,
-    'impressions' | 'watchMinutes' | 'ctr' | 'avgViewDurationSeconds'
-  >
-): number {
-  if (metrics.impressions > 0) {
-    return metrics.watchMinutes / metrics.impressions;
-  }
-  return ctrTimesAvgViewDurationMinutes(metrics);
-}
-
-/**
- * Product form of the winner metric: CTR × average_view_duration_minutes.
- * Used for display and to prove ranking is not CTR-only.
+ * CTR × average view duration in minutes — explicit form of the epic metric.
+ * Exposed for tests and callers that already hold CTR/AVD only.
  */
 export function ctrTimesAvgViewDurationMinutes(
-  metrics: Pick<ChannelVideoMetrics, 'ctr' | 'avgViewDurationSeconds'>
+  ctr: number,
+  avgViewDurationSeconds: number
 ): number {
-  if (metrics.ctr <= 0 || metrics.avgViewDurationSeconds <= 0) return 0;
-  return metrics.ctr * (metrics.avgViewDurationSeconds / 60);
+  if (ctr <= 0 || avgViewDurationSeconds <= 0) return 0;
+  return ctr * (avgViewDurationSeconds / 60);
 }
 
-export function isRankable(
-  metrics: Pick<ChannelVideoMetrics, 'impressions'>
-): boolean {
-  return metrics.impressions >= MIN_IMPRESSIONS_FOR_RANKING;
+export function lengthBucket(
+  durationSeconds: number | null | undefined
+): LengthBucket | null {
+  if (durationSeconds == null || durationSeconds < 0) return null;
+  if (durationSeconds < LENGTH_SHORT_MAX_SECONDS) return 'short';
+  if (durationSeconds <= LENGTH_MEDIUM_MAX_SECONDS) return 'medium';
+  return 'long';
 }
 
-export function isDeclining(
-  metrics: Pick<ChannelVideoMetrics, 'reachTrend'>
-): boolean {
-  return metrics.reachTrend < DECLINING_REACH_THRESHOLD;
+export function lengthBucketLabel(bucket: LengthBucket): string {
+  switch (bucket) {
+    case 'short':
+      return 'Short (<3 min)';
+    case 'medium':
+      return 'Medium (3–10 min)';
+    case 'long':
+      return 'Long (>10 min)';
+  }
 }
 
-export function meanWatchMinutesPerImpression(
-  videos: readonly Pick<
-    ChannelVideoMetrics,
-    'impressions' | 'watchMinutes' | 'ctr' | 'avgViewDurationSeconds'
-  >[]
-): number {
-  const rankable = videos.filter(isRankable);
-  if (rankable.length === 0) return 0;
-  const sum = rankable.reduce(
-    (acc, v) => acc + watchMinutesPerImpression(v),
-    0
-  );
-  return sum / rankable.length;
+export function isEligibleForRank(v: ChannelVideoMetrics): boolean {
+  return v.impressions >= MIN_IMPRESSIONS_FOR_RANK;
 }
 
-function toRanked(metrics: ChannelVideoMetrics, rank: number): RankedVideo {
-  return {
-    videoId: metrics.videoId,
-    title: metrics.title,
-    thumbnailUrl: metrics.thumbnailUrl,
-    publishedAt: metrics.publishedAt,
-    watchMinutesPerImpression: watchMinutesPerImpression(metrics),
-    ctrTimesAvgViewDurationMinutes: ctrTimesAvgViewDurationMinutes(metrics),
-    ctr: metrics.ctr,
-    avgViewDurationSeconds: metrics.avgViewDurationSeconds,
-    impressions: metrics.impressions,
-    views: metrics.views,
-    watchMinutes: metrics.watchMinutes,
-    reachTrend: metrics.reachTrend,
-    rank,
-  };
-}
-
-/** Rank by watch_minutes_per_impression descending (best first). */
-export function rankVideosByWatchMinutesPerImpression(
-  videos: readonly ChannelVideoMetrics[]
-): RankedVideo[] {
-  return videos
-    .filter(isRankable)
-    .slice()
-    .sort((a, b) => {
-      const wmpi = watchMinutesPerImpression(b) - watchMinutesPerImpression(a);
-      return wmpi !== 0 ? wmpi : b.impressions - a.impressions;
-    })
-    .map((video, index) => toRanked(video, index + 1));
-}
-
-/** Worst videos: ascending WMPI (not CTR). */
-export function rankWorstVideosByWatchMinutesPerImpression(
-  videos: readonly ChannelVideoMetrics[]
-): RankedVideo[] {
-  return rankVideosByWatchMinutesPerImpression(videos)
-    .slice()
-    .reverse()
-    .map((video, index) => ({ ...video, rank: index + 1 }));
-}
-
-/** Declining reach, weakest WMPI first among decliners. */
-export function rankDecliningVideos(
-  videos: readonly ChannelVideoMetrics[]
-): RankedVideo[] {
-  return rankWorstVideosByWatchMinutesPerImpression(
-    videos.filter(v => isRankable(v) && isDeclining(v))
-  );
+export function isDeclining(v: ChannelVideoMetrics): boolean {
+  return v.reachTrend < DECLINING_REACH_THRESHOLD;
 }

@@ -51,6 +51,14 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Here are your insights',
     errorTitle: "Couldn't load your insights",
   },
+  showChannelIntelligence: {
+    label: 'Channel intelligence',
+    uiHint: 'artifact',
+    renderer: 'artifact',
+    loadingTitle: 'Reading your channel metrics…',
+    successTitle: 'Channel intelligence ready',
+    errorTitle: "Couldn't load channel intelligence",
+  },
   proposeProfileEdit: {
     label: 'Profile',
     uiHint: 'artifact',

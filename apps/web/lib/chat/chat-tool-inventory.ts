@@ -34,6 +34,7 @@ export const CHAT_ROUTE_TOOL_IDS = [
   'openBillingPortal',
   // Paid-tier creative / profile tools
   'showTopInsights',
+  'showChannelIntelligence',
   'proposeProfileEdit',
   'importBioFromUrl',
   'checkCanvasStatus',
