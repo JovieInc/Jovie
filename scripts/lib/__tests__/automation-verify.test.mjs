@@ -1323,6 +1323,27 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
+  it('keeps a dashboard route-matrix contract repair on its targeted lane', () => {
+    const plan = buildAffectedTestPlan([
+      'apps/web/app/app/(shell)/contacts/ContactsPageClient.tsx',
+      'apps/web/components/features/dashboard/organisms/contacts-table/ContactsTable.tsx',
+      'apps/web/tests/e2e/canonical-customer-shell-navigation.spec.ts',
+      'apps/web/tests/e2e/utils/dashboard-route-matrix.ts',
+      'apps/web/tests/unit/app/contacts-page-client.test.tsx',
+      'apps/web/tests/unit/dashboard/ContactsTable.test.tsx',
+      'apps/web/tests/unit/routes/route-coverage.test.ts',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual(
+      expect.arrayContaining([
+        'apps/web/tests/unit/app/contacts-page-client.test.tsx',
+        'apps/web/tests/unit/dashboard/ContactsTable.test.tsx',
+        'apps/web/tests/unit/routes/route-coverage.test.ts',
+      ])
+    );
+  });
+
   it('classifies a deleted unknown source as full-suite work', () => {
     expect(buildAffectedTestPlan(['apps/web/lib/deleted.ts']).mode).toBe(
       'full'
