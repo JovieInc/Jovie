@@ -33,7 +33,6 @@ import {
   TableMetaProvider,
   useTableMeta,
 } from '@/contexts/TableMetaContext';
-import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatUsageIndicator';
 import { RightRailKeyboardHandler } from '@/hooks/RightRailKeyboardHandler';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useDashboardShortcuts } from '@/hooks/useDashboardShortcuts';
@@ -121,15 +120,8 @@ function AuthShellWrapperInner({
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
   const defaultHeaderAction = useMemo(
-    () => (
-      <>
-        {config.showChatUsageIndicator && !config.isDemoRoute ? (
-          <HeaderChatUsageIndicator />
-        ) : null}
-        {isElectron ? null : <UpdateAvailablePill />}
-      </>
-    ),
-    [config.isDemoRoute, config.showChatUsageIndicator, isElectron]
+    () => <>{isElectron ? null : <UpdateAvailablePill />}</>,
+    [isElectron]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
