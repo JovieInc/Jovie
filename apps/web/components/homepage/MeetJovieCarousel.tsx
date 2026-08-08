@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -62,22 +63,26 @@ export function ArtistProfileCardRow({
         aria-label='Artist Profile Preview Navigation'
         className='homepage-artist-profiles__carousel-controls'
       >
-        <button
+        <Button
           aria-label='Previous Artist Profile Preview'
           disabled={!scrollState.canGoPrevious}
           onClick={() => scrollRail('previous')}
+          size='icon'
           type='button'
+          variant='ghost'
         >
           <ChevronLeft aria-hidden='true' size={18} strokeWidth={1.9} />
-        </button>
-        <button
+        </Button>
+        <Button
           aria-label='Next Artist Profile Preview'
           disabled={!scrollState.canGoNext}
           onClick={() => scrollRail('next')}
+          size='icon'
           type='button'
+          variant='ghost'
         >
           <ChevronRight aria-hidden='true' size={18} strokeWidth={1.9} />
-        </button>
+        </Button>
       </nav>
       <div
         className='homepage-artist-profiles__row'

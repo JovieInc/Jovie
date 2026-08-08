@@ -117,12 +117,19 @@ describe('HomepageArtistProfiles', () => {
 
     const images = screen.getAllByRole('img');
     expect(images).toHaveLength(4);
-    expect(
-      screen.getByRole('button', { name: 'Previous Artist Profile Preview' })
-    ).toBeDisabled();
-    expect(
-      screen.getByRole('button', { name: 'Next Artist Profile Preview' })
-    ).toBeEnabled();
+    const previous = screen.getByRole('button', {
+      name: 'Previous Artist Profile Preview',
+    });
+    const next = screen.getByRole('button', {
+      name: 'Next Artist Profile Preview',
+    });
+
+    expect(previous).toBeDisabled();
+    expect(next).toBeEnabled();
+    expect(previous).toHaveAttribute('data-variant', 'ghost');
+    expect(previous).toHaveAttribute('data-size', 'icon');
+    expect(next).toHaveAttribute('data-variant', 'ghost');
+    expect(next).toHaveAttribute('data-size', 'icon');
 
     for (const [index, card] of CARDS.entries()) {
       expect(images[index].getAttribute('src')).toContain(
