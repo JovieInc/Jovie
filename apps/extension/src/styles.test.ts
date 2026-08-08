@@ -63,6 +63,17 @@ function getRules(source: string, selector: string) {
 }
 
 describe('extension sidepanel System B styles', () => {
+  it('logs only the final result for confirmed inserts', () => {
+    const confirmInsert = sidepanel.match(
+      /async function confirmInsert\([\s\S]*?(?=\nasync function )/
+    )?.[0];
+
+    expect(confirmInsert).toBeDefined();
+    expect(confirmInsert).not.toContain("result: 'pending'");
+    expect(confirmInsert).toContain("result: 'succeeded'");
+    expect(confirmInsert).toContain("result: 'failed'");
+  });
+
   it('declares a dedicated local System B bridge token source', () => {
     expect(tokenRootBlockMatch?.[0]).toContain('color-scheme: dark');
     expect(tokenRootBlockMatch?.[0]).toContain('--extension-system-b-bg-base');
@@ -75,7 +86,9 @@ describe('extension sidepanel System B styles', () => {
     expect(tokenRootBlockMatch?.[0]).toContain(
       '--extension-system-b-border-subtle'
     );
-    expect(tokenRootBlockMatch?.[0]).toContain('--extension-system-b-radius-lg');
+    expect(tokenRootBlockMatch?.[0]).toContain(
+      '--extension-system-b-radius-lg'
+    );
     expect(tokenRootBlockMatch?.[0]).toContain(
       '--extension-system-b-radius-pill'
     );
@@ -119,9 +132,7 @@ describe('extension sidepanel System B styles', () => {
   });
 
   it('keeps extension command buttons pill-shaped', () => {
-    const buttonRule = stylesWithoutComments.match(
-      /^\.button\s*{[\s\S]*?\n}/m
-    );
+    const buttonRule = stylesWithoutComments.match(/^\.button\s*{[\s\S]*?\n}/m);
 
     expect(buttonRule?.[0]).toContain(
       'border-radius: var(--extension-system-b-radius-pill)'
@@ -132,10 +143,9 @@ describe('extension sidepanel System B styles', () => {
   });
 
   it('reserves stable shell space for action and prompt docks', () => {
-    const actionTrayRule = getRules(
-      stylesWithoutComments,
-      '.action-tray'
-    ).find(rule => rule.includes('display: grid;'));
+    const actionTrayRule = getRules(stylesWithoutComments, '.action-tray').find(
+      rule => rule.includes('display: grid;')
+    );
     const oneActionRule = getRule(
       stylesWithoutComments,
       '.action-tray[data-action-count="1"]'
@@ -219,6 +229,8 @@ describe('extension sidepanel System B styles', () => {
       ])
     );
     expect(manifest.host_permissions).not.toContain('https://app.jov.ie/*');
-    expect(sidepanel).toContain("const DEFAULT_API_BASE_URL = 'https://jov.ie'");
+    expect(sidepanel).toContain(
+      "const DEFAULT_API_BASE_URL = 'https://jov.ie'"
+    );
   });
 });
