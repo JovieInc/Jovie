@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/HeaderNavFlyout.test.tsx
 'use client';
 
 import './HeaderNav.css';
@@ -82,7 +83,7 @@ function PublicAuthActions({
     return <MarketingSignInLink variant='ghost' />;
   }
   return (
-    <div className='flex items-center gap-1'>
+    <div className='flex items-center gap-2'>
       <Link
         href={APP_ROUTES.SIGNIN}
         className='btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap'

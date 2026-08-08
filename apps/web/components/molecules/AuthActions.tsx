@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/AuthActions.test.tsx
 'use client';
 
 import { getLinearPillClassName } from '@jovie/ui';
@@ -9,7 +10,7 @@ export function AuthActions() {
   const isAuthed = useIsAuthenticated();
 
   return (
-    <div className='flex items-center gap-1'>
+    <div className='flex items-center gap-2'>
       {isAuthed ? (
         <Link
           href={APP_ROUTES.DASHBOARD}

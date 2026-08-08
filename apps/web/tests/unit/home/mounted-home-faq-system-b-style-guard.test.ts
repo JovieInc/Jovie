@@ -82,6 +82,9 @@ describe('mounted homepage FAQ System B source contract', () => {
     ]) {
       expect(source).toContain(className);
     }
+
+    expect(source).toContain('text-lg font-semibold leading-snug');
+    expect(source).toContain('text-base leading-7 text-secondary-token');
   });
 
   it('keeps mounted FAQ shell CSS tokenized and grid-aligned', () => {

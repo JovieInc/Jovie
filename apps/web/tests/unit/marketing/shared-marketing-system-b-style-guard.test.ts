@@ -47,7 +47,7 @@ describe('shared marketing System B style guard', () => {
     expect(faqSource).not.toContain('marketing-h2-linear');
     expect(faqSource).toContain('system-b-marketing-section-heading');
     expect(accordionSource).not.toContain('style={{ visibility');
-    expect(accordionSource).toContain("'visible mt-1");
+    expect(accordionSource).toContain("'visible mt-2");
     expect(accordionSource).toContain("'invisible mt-0");
   });
 });

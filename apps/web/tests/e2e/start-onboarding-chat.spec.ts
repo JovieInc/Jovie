@@ -310,18 +310,30 @@ test.describe('canonical /start onboarding chat', () => {
     await waitForHydration(page);
     await expect(page.locator('[data-app-shell-frame="true"]')).toBeVisible();
     await expect(page.locator(CHAT_PANEL)).toBeVisible();
-    // The resolved empty state renders the intro + centered composer (no logo).
+    // The resolved empty state renders only its title and compact composer.
     await expect(
       page.getByTestId('chat-empty-state-centered-composer')
     ).toBeVisible();
     await expect(page.getByTestId('onboarding-empty-intro')).toBeVisible();
     await expect(
       page.getByTestId('onboarding-starter-suggestions')
-    ).toBeVisible();
-    await expect(page.getByTestId('onboarding-sign-in-skip')).toBeVisible();
+    ).toHaveCount(0);
+    await expect(page.getByTestId('onboarding-sign-in-skip')).toHaveCount(0);
     await expect(
       page.getByText(/remember this chat so we can pick up where we left off/i)
-    ).toBeVisible();
+    ).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/signin'
+    );
+    const emptyComposer = page.locator(COMPOSER_TEXTAREA);
+    await expect(emptyComposer).toHaveAttribute(
+      'aria-label',
+      'Chat Message Input'
+    );
+    await emptyComposer.fill('Plan my next release');
+    await expect(emptyComposer).toHaveValue('Plan my next release');
+    await emptyComposer.fill('');
     const mainBox = await page.locator('#main-content').boundingBox();
     const chatBox = await page.locator(CHAT_PANEL).boundingBox();
     expect(mainBox).not.toBeNull();

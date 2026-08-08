@@ -36,10 +36,9 @@ describe('HeaderNav flyout interactions', () => {
   it('renders static public auth actions without client auth state', () => {
     render(<HeaderNav authMode='public-static' />);
 
-    expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute(
-      'href',
-      '/signin'
-    );
+    const loginLink = screen.getByRole('link', { name: 'Log in' });
+    expect(loginLink).toHaveAttribute('href', '/signin');
+    expect(loginLink.parentElement).toHaveClass('gap-2');
     // Default public CTA (no publicCtaLabel override) remains Request Access.
     // Homepage MarketingHeader passes its own "Get started" label separately.
     expect(

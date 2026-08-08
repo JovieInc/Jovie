@@ -1,10 +1,11 @@
 'use client';
 
 import { Skeleton } from '@jovie/ui';
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
-import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { publicEnv } from '@/lib/env-public';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
@@ -174,7 +175,12 @@ export function OnboardingShell({
               className='absolute right-3 top-3 z-30 sm:right-4 sm:top-4'
               data-testid='onboarding-sign-in-header'
             >
-              <MarketingSignInLink variant='ghost' />
+              <Link
+                className='btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap'
+                href={APP_ROUTES.SIGNIN}
+              >
+                Sign in
+              </Link>
             </div>
             <OnboardingChat
               intentId={intentId}
