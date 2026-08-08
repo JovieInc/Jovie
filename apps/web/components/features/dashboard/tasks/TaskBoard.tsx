@@ -156,8 +156,10 @@ export function TaskBoard({
     }
   };
 
+  const columnCount = Math.max(columns.length, 1);
+
   if (isLoading) {
-    return <TaskBoardSkeleton />;
+    return <TaskBoardSkeleton columnCount={columnCount} />;
   }
 
   return (
@@ -172,7 +174,7 @@ export function TaskBoard({
         className='grid h-full min-h-0 min-w-0 gap-3 overflow-hidden px-3 pb-3 pt-1.5'
         data-testid='tasks-board'
         style={{
-          gridTemplateColumns: `repeat(${Math.max(columns.length, 1)}, minmax(0, 1fr))`,
+          gridTemplateColumns: getTaskBoardGridTemplate(columnCount),
         }}
       >
         {columns.map(column => (
@@ -479,15 +481,29 @@ const TaskBoardCard = memo(function TaskBoardCard({
   );
 });
 
-function TaskBoardSkeleton() {
+export function getTaskBoardGridTemplate(columnCount: number): string {
+  return `repeat(${Math.max(columnCount, 1)}, minmax(0, 1fr))`;
+}
+
+function TaskBoardSkeleton({
+  columnCount,
+}: Readonly<{
+  columnCount: number;
+}>) {
+  const skeletonColumnKeys = Array.from(
+    { length: Math.max(columnCount, 1) },
+    (_, index) => `skeleton-column-${index}`
+  );
+
   return (
     <div
-      className='grid h-full min-h-0 min-w-full gap-3 overflow-hidden px-3 pb-3 pt-1.5'
-      style={{ gridTemplateColumns: 'repeat(4, minmax(17.5rem, 1fr))' }}
+      className='grid h-full min-h-0 min-w-0 gap-3 overflow-hidden px-3 pb-3 pt-1.5'
+      data-testid='tasks-board-skeleton'
+      style={{ gridTemplateColumns: getTaskBoardGridTemplate(columnCount) }}
     >
-      {[0, 1, 2, 3].map(column => (
+      {skeletonColumnKeys.map(columnKey => (
         <div
-          key={column}
+          key={columnKey}
           className='flex h-full min-h-0 w-full min-w-0 flex-col rounded-xl border border-subtle bg-surface-0'
         >
           <div className='h-10 border-b border-subtle px-3 py-3'>
