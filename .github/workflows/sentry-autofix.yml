@@ -7,7 +7,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: sentry-autofix-${{ github.event.client_payload.issue_id }}
+  group: sentry-autofix-${{ github.event.client_payload.dedupe_key || github.event.client_payload.issue_id }}
   cancel-in-progress: false
 
 jobs:
@@ -32,9 +32,9 @@ jobs:
         id: dedup
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          ISSUE_ID: ${{ github.event.client_payload.issue_id }}
+          DEDUPE_KEY: ${{ github.event.client_payload.dedupe_key || github.event.client_payload.issue_id }}
         run: |
-          BRANCH="sentry-fix/${ISSUE_ID}"
+          BRANCH="sentry-fix/${DEDUPE_KEY}"
           if git ls-remote --heads "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "$BRANCH" | grep -q "$BRANCH"; then
             echo "Branch $BRANCH already exists — skipping"
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -52,9 +52,9 @@ jobs:
       - name: Create fix branch
         if: steps.dedup.outputs.skip != 'true'
         env:
-          ISSUE_ID: ${{ github.event.client_payload.issue_id }}
+          DEDUPE_KEY: ${{ github.event.client_payload.dedupe_key || github.event.client_payload.issue_id }}
         run: |
-          git checkout -b "sentry-fix/${ISSUE_ID}"
+          git checkout -b "sentry-fix/${DEDUPE_KEY}"
 
       - name: Setup Node.js and pnpm
         if: steps.dedup.outputs.skip != 'true'
@@ -100,6 +100,17 @@ jobs:
             **Culprit:** ${{ github.event.client_payload.culprit }}
             **Message:** ${{ github.event.client_payload.message }}
             **Sentry URL:** ${{ github.event.client_payload.url }}
+            **Root-cause fingerprint:** ${{ github.event.client_payload.context.root_cause_fingerprint }}
+            **Environment:** ${{ github.event.client_payload.context.environment }}
+            **Release:** ${{ github.event.client_payload.context.release }}
+            **Project:** ${{ github.event.client_payload.context.project }}
+            **Route / transaction:** ${{ github.event.client_payload.context.route }}
+            **Level:** ${{ github.event.client_payload.context.level }}
+            **Event ID:** ${{ github.event.client_payload.context.event_id }}
+            **First seen:** ${{ github.event.client_payload.context.first_seen }}
+            **Last seen:** ${{ github.event.client_payload.context.last_seen }}
+            **Event count:** ${{ github.event.client_payload.context.event_count }}
+            **Affected users:** ${{ github.event.client_payload.context.user_count }}
 
             **Automation Contract:**
             - verify_required: ${{ steps.contract.outputs.verify_required }}
@@ -111,19 +122,20 @@ jobs:
             ${{ github.event.client_payload.stacktrace }}
             ```
 
-            Instructions:
-            1. Investigate the error using the culprit file and stack trace
-            2. Fix the root cause of the bug
-            3. Run `pnpm biome check . --write` to auto-fix formatting
-            4. Run `pnpm turbo typecheck --filter=@jovie/web` to verify types pass
-            5. If validation fails, fix the issues and re-run
+            Work in these gated stages. Do not advance when the prior stage lacks evidence:
+            1. Inventory the supplied release, environment, route, recurrence, and stack evidence. If customer impact or the current release is ambiguous, make no code change and report the missing evidence.
+            2. Diagnose one root cause and state a narrow objective. Do not treat the title as proof.
+            3. Select one minimal, non-overlapping fix plan and define its regression proof.
+            4. Implement only that fix and add or update the regression test.
+            5. Run the repository formatter, the Jovie web typecheck, and the focused regression test; fix any failures before continuing.
             6. If simplify_bounded=true, run a small simplification pass on touched files only:
                - remove dead imports/locals
                - flatten obvious nested conditionals
                - improve unclear local variable names
                - do not change behavior/API contracts
                - skip sensitive paths (.github/, drizzle/migrations/, auth/billing/security-critical)
-            7. Use model_tier as guidance for depth/cost profile:
+            7. Record the source-blind verification result and leave production resolution pending until post-deploy recurrence evidence is available.
+            8. Use model_tier as guidance for depth/cost profile:
                - premium: thorough and comprehensive
                - economy: concise and targeted
 
@@ -139,11 +151,18 @@ jobs:
         id: create-pr
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          DEDUPE_KEY: ${{ github.event.client_payload.dedupe_key || github.event.client_payload.issue_id }}
           ISSUE_ID: ${{ github.event.client_payload.issue_id }}
           ERROR_TITLE: ${{ github.event.client_payload.title }}
           SENTRY_URL: ${{ github.event.client_payload.url }}
+          SENTRY_ENVIRONMENT: ${{ github.event.client_payload.context.environment }}
+          SENTRY_RELEASE: ${{ github.event.client_payload.context.release }}
+          SENTRY_ROUTE: ${{ github.event.client_payload.context.route }}
+          SENTRY_FINGERPRINT: ${{ github.event.client_payload.context.root_cause_fingerprint }}
+          SENTRY_LAST_SEEN: ${{ github.event.client_payload.context.last_seen }}
+          SENTRY_EVENT_COUNT: ${{ github.event.client_payload.context.event_count }}
         run: |
-          BRANCH="sentry-fix/${ISSUE_ID}"
+          BRANCH="sentry-fix/${DEDUPE_KEY}"
 
           # Check if there are changes to commit (tracked + untracked)
           if git diff --quiet && git diff --staged --quiet && [ -z "$(git status --porcelain)" ]; then
@@ -186,11 +205,19 @@ jobs:
           - **Error:** ${ERROR_TITLE}
           - **Sentry:** ${SENTRY_URL}
           - **Issue ID:** ${ISSUE_ID}
+          - **Root-cause fingerprint:** ${SENTRY_FINGERPRINT}
+          - **Environment:** ${SENTRY_ENVIRONMENT}
+          - **Release:** ${SENTRY_RELEASE}
+          - **Route:** ${SENTRY_ROUTE}
+          - **Last seen:** ${SENTRY_LAST_SEEN}
+          - **Event count:** ${SENTRY_EVENT_COUNT}
 
           ## Test plan
 
           - [ ] CI passes (Biome + TypeScript + tests)
           - [ ] Error no longer reproduces in production after deploy
+
+          This PR does not close the incident. Resolution requires post-deploy recurrence evidence for the affected release and environment.
 
           🤖 Generated with [Claude Code](https://claude.com/claude-code) via Sentry Autofix
           EOF
@@ -211,9 +238,9 @@ jobs:
         if: failure() && steps.dedup.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          ISSUE_ID: ${{ github.event.client_payload.issue_id }}
+          DEDUPE_KEY: ${{ github.event.client_payload.dedupe_key || github.event.client_payload.issue_id }}
         run: |
-          BRANCH="sentry-fix/${ISSUE_ID}"
+          BRANCH="sentry-fix/${DEDUPE_KEY}"
 
           # Check if branch was pushed
           if ! git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
