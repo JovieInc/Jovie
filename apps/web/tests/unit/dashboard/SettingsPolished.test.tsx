@@ -78,7 +78,7 @@ describe('SettingsPolished', () => {
     Element.prototype.scrollIntoView = vi.fn();
   });
 
-  it('renders settings sections and sidebar navigation', () => {
+  it('renders settings sections without a second in-content navigation', () => {
     const { container } = render(
       <SettingsPolished
         artist={{ id: 'artist_1' } as Artist}
@@ -86,9 +86,9 @@ describe('SettingsPolished', () => {
       />
     );
 
-    // Sidebar navigation should be rendered
-    const sidebar = screen.getByRole('complementary');
-    expect(sidebar).toBeInTheDocument();
+    // AuthShell owns Settings navigation. This content component must never
+    // recreate a second sidebar beside the global shell rail.
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
 
     // Account section should be rendered
     const firstSection = document.getElementById('account');
@@ -97,15 +97,12 @@ describe('SettingsPolished', () => {
       container.querySelectorAll('section[aria-label$="settings group"] > h3')
     ).toHaveLength(0);
     expect(screen.queryByText('ACCOUNT')).not.toBeInTheDocument();
-    expect(screen.getByText('Account', { selector: 'p' })).toBeVisible();
-
-    const accountNavLink = screen.getByRole('link', { name: 'Account' });
-    expect(accountNavLink.className).toContain('h-7');
-    expect(accountNavLink.className).toContain('px-2.5');
-    expect(accountNavLink.className).not.toContain('py-1');
+    expect(
+      screen.getByRole('heading', { name: 'Account', level: 2 })
+    ).toBeVisible();
   });
 
-  it('keeps the full settings navigation visible when a section is focused', () => {
+  it('renders only the focused section without recreating settings navigation', () => {
     render(
       <SettingsPolished
         artist={{ id: 'artist_1' } as Artist}
@@ -114,16 +111,8 @@ describe('SettingsPolished', () => {
       />
     );
 
-    expect(screen.getByRole('complementary')).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'Billing & Subscription' })
-    ).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Usage Stats' })).toBeVisible();
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
     expect(document.getElementById('contacts')).toBeTruthy();
     expect(document.getElementById('touring')).toBeNull();
-    expect(screen.getByRole('link', { name: 'Touring' })).toHaveAttribute(
-      'href',
-      '/app/settings/touring'
-    );
   });
 });
