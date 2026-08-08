@@ -156,6 +156,27 @@ describe('CircleIconButton', () => {
     expect(button).toHaveAttribute('type', 'button');
   });
 
+  it('maps legacy sizes onto the canonical IconButton contract (JOV-4871)', () => {
+    const { unmount } = render(
+      <CircleIconButton ariaLabel='Canonical default'>
+        <svg aria-hidden='true' />
+      </CircleIconButton>
+    );
+    expect(
+      screen.getByRole('button', { name: 'Canonical default' })
+    ).toHaveAttribute('data-size', 'icon-lg');
+    unmount();
+
+    render(
+      <CircleIconButton ariaLabel='Canonical large' size='lg'>
+        <svg aria-hidden='true' />
+      </CircleIconButton>
+    );
+    expect(
+      screen.getByRole('button', { name: 'Canonical large' })
+    ).toHaveAttribute('data-size', 'icon-xl');
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <CircleIconButton ariaLabel='Accessible circle button'>

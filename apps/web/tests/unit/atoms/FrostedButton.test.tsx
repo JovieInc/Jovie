@@ -83,6 +83,17 @@ describe('FrostedButton', () => {
     );
   });
 
+  it('adds no bespoke focus ring overrides (JOV-4871)', () => {
+    // The canonical ring comes from the real @jovie/ui Button (covered by
+    // packages/ui tests); this wrapper must not re-introduce drift.
+    render(<FrostedButton>Focus ring</FrostedButton>);
+    const button = screen.getByRole('button', { name: 'Focus ring' });
+    expect(button.className).not.toContain('focus-visible:ring-ring');
+    expect(button.className).not.toContain(
+      'focus-visible:ring-offset-background'
+    );
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(<FrostedButton>Accessible</FrostedButton>);
     await expectNoA11yViolations(container);

@@ -169,6 +169,17 @@ export {
   FormMessage,
   useFormField,
 } from './atoms/form';
+// IconButton
+export type { IconButtonProps } from './atoms/icon-button';
+export { IconButton, iconButtonVariants } from './atoms/icon-button';
+export {
+  ICON_BUTTON_FADE_CLASSNAME,
+  ICON_BUTTON_SIZE_NAMES,
+  ICON_BUTTON_VARIANT_NAMES,
+  ICON_BUTTON_VISIBLE_CLASSNAME,
+  type IconButtonSize,
+  type IconButtonVariant,
+} from './atoms/icon-button-contract';
 // Inline offline notice
 export type { InlineOfflineNoticeProps } from './atoms/inline-offline';
 export { InlineOfflineNotice } from './atoms/inline-offline';

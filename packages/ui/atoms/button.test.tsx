@@ -91,6 +91,34 @@ describe('Button', () => {
     }
   });
 
+  it('keeps a 44px hit target on every icon size (JOV-4871)', () => {
+    const iconSizes = {
+      icon: 'h-9',
+      'icon-xs': 'h-6',
+      'icon-sm': 'h-7',
+      'icon-md': 'h-8',
+      'icon-lg': 'h-10',
+      'icon-xl': 'h-11',
+    } as const;
+
+    for (const [size, container] of Object.entries(iconSizes) as [
+      keyof typeof iconSizes,
+      string,
+    ][]) {
+      const { unmount } = render(<Button size={size}>Icon {size}</Button>);
+      const btn = screen.getByRole('button', { name: `Icon ${size}` });
+      expect(btn.className).toContain(container);
+      if (size === 'icon-xl') {
+        // 44px container satisfies the hit target by construction.
+        expect(btn.className).not.toContain('before:h-11');
+      } else {
+        expect(btn.className).toContain('before:h-11');
+        expect(btn.className).toContain('before:w-11');
+      }
+      unmount();
+    }
+  });
+
   it('maps deprecated variants to canonical variants with a warning', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 

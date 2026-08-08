@@ -1,19 +1,27 @@
 'use client';
 
-import type { ButtonProps } from '@jovie/ui';
+import { IconButton, type IconButtonProps } from '@jovie/ui';
 import * as React from 'react';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
 
 export type HeaderIconButtonSize = 'xs' | 'sm' | 'md';
 
 export interface HeaderIconButtonProps
-  extends Omit<ButtonProps, 'children' | 'size' | 'variant' | 'aria-label'> {
+  extends Omit<
+    IconButtonProps,
+    'children' | 'size' | 'variant' | 'aria-label' | 'ariaLabel'
+  > {
   readonly children: React.ReactNode;
   readonly ariaLabel: string;
   readonly size?: HeaderIconButtonSize;
-  readonly variant?: ButtonProps['variant'];
 }
 
+/**
+ * HeaderIconButton - compat wrapper over the canonical @jovie/ui IconButton
+ * (JOV-4871): `control` variant at compact header sizes (24/28/32px), with
+ * the base Button 44px hit target preserved.
+ *
+ * @coverage-via apps/web/tests/unit/atoms/HeaderIconButton.test.tsx
+ */
 export const HeaderIconButton = React.forwardRef<
   HTMLButtonElement,
   HeaderIconButtonProps
@@ -21,21 +29,17 @@ export const HeaderIconButton = React.forwardRef<
   { children, ariaLabel, size = 'md', className, ...props },
   ref
 ) {
-  const SIZE_CLASS_MAP: Record<HeaderIconButtonSize, string> = {
-    xs: 'h-6 w-6 rounded-full [&_svg]:h-3 [&_svg]:w-3',
-    sm: 'h-7 w-7 rounded-full [&_svg]:h-3.5 [&_svg]:w-3.5',
-    md: 'h-8 w-8 rounded-full [&_svg]:h-4 [&_svg]:w-4',
-  };
-
   return (
-    <AppIconButton
+    <IconButton
       ref={ref}
-      className={[SIZE_CLASS_MAP[size], className].filter(Boolean).join(' ')}
+      variant='control'
+      size={size}
+      className={className}
       ariaLabel={ariaLabel}
       {...props}
     >
       {children}
-    </AppIconButton>
+    </IconButton>
   );
 });
 
