@@ -83,6 +83,7 @@ const FILTERS: ReadonlyArray<{
   { id: 'all', label: 'All Pages' },
   { id: 'dsp', label: DSP_FILTER_LABEL },
   { id: 'social', label: 'Social' },
+  { id: 'connector', label: 'Connectors' },
   { id: 'source', label: 'Sources' },
   { id: 'website', label: 'Websites' },
   { id: 'jovie', label: 'Jovie' },
