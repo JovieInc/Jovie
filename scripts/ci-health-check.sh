@@ -81,8 +81,8 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
 }
 
 # Compute the 24h cutoff for orphaned draft detection
-now_ms="$(date +%s%3N 2>/dev/null || python3 -c 'import time; print(int(time.time()*1000))')"
-orphan_cutoff_ms=$((now_ms - 24 * 3600 * 1000))
+now_s="$(date +%s)"
+orphan_cutoff_ms=$(( (now_s - 24 * 3600) * 1000 ))
 orphan_cutoff_iso="$(date -u -d @$((orphan_cutoff_ms / 1000)) +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || python3 -c "import datetime; print(datetime.datetime.utcfromtimestamp($orphan_cutoff_ms/1000).strftime('%Y-%m-%dT%H:%M:%SZ'))")"
 
 SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
