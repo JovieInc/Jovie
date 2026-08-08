@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HomepageElectricSeam } from '@/components/homepage/HomepageElectricSeam';
+import { MarketingElectricSeam } from '@/components/marketing/MarketingElectricSeam';
 
 vi.mock('@/lib/hooks/useReducedMotion', () => ({
   useReducedMotion: vi.fn(() => false),
@@ -8,13 +8,13 @@ vi.mock('@/lib/hooks/useReducedMotion', () => ({
 
 const { useReducedMotion } = await import('@/lib/hooks/useReducedMotion');
 
-describe('HomepageElectricSeam', () => {
+describe('MarketingElectricSeam', () => {
   beforeEach(() => {
     vi.mocked(useReducedMotion).mockReturnValue(false);
   });
 
   it('renders the decorative seam with traveling spark paths by default', () => {
-    const { getByTestId, container } = render(<HomepageElectricSeam />);
+    const { getByTestId, container } = render(<MarketingElectricSeam />);
 
     expect(getByTestId('homepage-electric-seam')).toHaveAttribute(
       'aria-hidden',
@@ -26,7 +26,7 @@ describe('HomepageElectricSeam', () => {
   });
 
   it('omits traveling spark paths when spark is false', () => {
-    const { container } = render(<HomepageElectricSeam spark={false} />);
+    const { container } = render(<MarketingElectricSeam spark={false} />);
 
     expect(container.querySelectorAll('path[stroke-dasharray]')).toHaveLength(
       0
@@ -36,7 +36,7 @@ describe('HomepageElectricSeam', () => {
 
   it('renders only the static final glow under reduced motion', () => {
     vi.mocked(useReducedMotion).mockReturnValue(true);
-    const { container } = render(<HomepageElectricSeam />);
+    const { container } = render(<MarketingElectricSeam />);
 
     expect(container.querySelectorAll('path[stroke-dasharray]')).toHaveLength(
       0
@@ -46,7 +46,7 @@ describe('HomepageElectricSeam', () => {
   });
 
   it('plays the spark animation exactly once with the cinematic seam duration', () => {
-    const { container } = render(<HomepageElectricSeam />);
+    const { container } = render(<MarketingElectricSeam />);
 
     for (const path of container.querySelectorAll('path[stroke-dasharray]')) {
       expect(path.getAttribute('style')).toContain(
@@ -59,7 +59,9 @@ describe('HomepageElectricSeam', () => {
   });
 
   it('uses a stable caller-provided id seed for filters and keyframes', () => {
-    const { container } = render(<HomepageElectricSeam idSeed='stable-seam' />);
+    const { container } = render(
+      <MarketingElectricSeam idSeed='stable-seam' />
+    );
 
     expect(container.querySelector('filter')?.getAttribute('id')).toBe(
       'homepage-electric-seam-spark-stable-seam'

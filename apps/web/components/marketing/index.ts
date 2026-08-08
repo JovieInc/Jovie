@@ -21,6 +21,9 @@ export type { MarketingContainerProps } from './MarketingContainer';
 export { MarketingContainer } from './MarketingContainer';
 export type { MarketingContentShellProps } from './MarketingContentShell';
 export { MarketingContentShell } from './MarketingContentShell';
+export { MarketingCtaPendingLabel } from './MarketingCtaPendingLabel';
+export type { MarketingElectricSeamProps } from './MarketingElectricSeam';
+export { MarketingElectricSeam } from './MarketingElectricSeam';
 export type { MarketingFeatureGridProps } from './MarketingFeatureGrid';
 export { MarketingFeatureGrid } from './MarketingFeatureGrid';
 export type {
@@ -35,6 +38,11 @@ export type { MarketingMetricCardProps } from './MarketingMetricCard';
 export { MarketingMetricCard } from './MarketingMetricCard';
 export type { MarketingPageShellProps } from './MarketingPageShell';
 export { MarketingPageShell } from './MarketingPageShell';
+export type {
+  MarketingPosterHeroCta,
+  MarketingPosterHeroProps,
+} from './MarketingPosterHero';
+export { MarketingPosterHero } from './MarketingPosterHero';
 export type { MarketingSectionFrameProps } from './MarketingSectionFrame';
 export { MarketingSectionFrame } from './MarketingSectionFrame';
 export type {

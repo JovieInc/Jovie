@@ -27,7 +27,7 @@ describe('homepage hero next-move contract (JOV-4475)', () => {
 
   it('demotes the live-profile path to a quiet ghost control in the poster hero', () => {
     const heroSource = readFileSync(
-      path.join(webRoot, 'components/homepage/HomepagePosterHero.tsx'),
+      path.join(webRoot, 'components/marketing/MarketingPosterHero.tsx'),
       'utf8'
     );
 
