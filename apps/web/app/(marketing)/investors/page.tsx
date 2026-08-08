@@ -1,6 +1,7 @@
 import { Button } from '@jovie/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { MarketingContainer } from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
@@ -13,8 +14,8 @@ export const metadata: Metadata = {
 
 export default function InvestorsPage() {
   return (
-    <main className='bg-base px-6 py-16 text-primary-token sm:px-8 lg:px-12'>
-      <div className='mx-auto flex max-w-5xl flex-col gap-10'>
+    <main className='bg-base py-16 text-primary-token sm:py-20 lg:py-24'>
+      <MarketingContainer width='page' className='flex flex-col gap-10'>
         <section className='max-w-3xl space-y-5'>
           <p className='text-sm font-medium tracking-tight text-muted-token'>
             Investor overview
@@ -107,7 +108,7 @@ export default function InvestorsPage() {
             </div>
           </div>
         </section>
-      </div>
+      </MarketingContainer>
     </main>
   );
 }
