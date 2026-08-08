@@ -112,6 +112,7 @@ export function OnboardingComposerAmbientMark() {
       <JovieMarkElectric
         size={560}
         idSeed='start-ambient-mark'
+        settledSpark
         className='absolute left-1/2 top-[4.5rem] -translate-x-1/2 opacity-[0.22] [mask-image:linear-gradient(142deg,transparent_0%,black_28%,black_78%,transparent_100%)] sm:top-[3rem]'
       />
     </div>

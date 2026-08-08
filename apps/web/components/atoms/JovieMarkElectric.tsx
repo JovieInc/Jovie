@@ -24,6 +24,12 @@ interface JovieMarkElectricProps {
    * fallbacks that still need the same visual idiom).
    */
   readonly spark?: boolean;
+  /**
+   * Keep a dim electric trace visible after the one-shot entrance spark.
+   * Used by the Start composer, where the mark remains ambient until the
+   * first message instead of resolving to an entirely monochrome outline.
+   */
+  readonly settledSpark?: boolean;
 }
 
 const ASPECT_RATIO = 1;
@@ -34,6 +40,7 @@ export function JovieMarkElectric({
   style,
   idSeed,
   spark = true,
+  settledSpark = false,
 }: JovieMarkElectricProps) {
   const reactId = useId();
   const safeId = (idSeed ?? reactId).replace(/[^a-zA-Z0-9_-]/g, '');
@@ -82,6 +89,19 @@ export function JovieMarkElectric({
           stroke='rgba(255,255,255,0.065)'
           strokeWidth='1.15'
         />
+        {settledSpark && (
+          <path
+            data-testid='jovie-mark-electric-settled-trace'
+            pathLength='1000'
+            d={JOVIE_ICON_PATH}
+            fill='none'
+            stroke='rgba(78,190,255,0.46)'
+            strokeWidth='2.2'
+            strokeDasharray='62 938'
+            strokeDashoffset='-580'
+            strokeLinecap='round'
+          />
+        )}
         {showSpark && (
           <>
             <path
