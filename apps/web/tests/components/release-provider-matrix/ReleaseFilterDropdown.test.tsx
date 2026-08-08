@@ -54,6 +54,15 @@ vi.mock('@jovie/ui', () => {
       children: React.ReactNode;
       [key: string]: unknown;
     }) => <button {...props}>{children}</button>,
+    IconButton: ({
+      children,
+      asChild: _,
+      ...props
+    }: {
+      children: React.ReactNode;
+      asChild?: boolean;
+      [key: string]: unknown;
+    }) => <button {...props}>{children}</button>,
     DropdownMenu: ({
       children,
       open,
@@ -129,6 +138,12 @@ vi.mock('@jovie/ui', () => {
       children: React.ReactNode;
       [key: string]: unknown;
     }) => <>{children}</>,
+    // Keep the narrow UI mock compatible with the icon-button contract. The
+    // release matrix reaches this module transitively through inline actions.
+    ICON_BUTTON_VISIBLE_CLASSNAME:
+      'p-0.5 opacity-60 hover:opacity-100 focus-visible:opacity-100',
+    ICON_BUTTON_FADE_CLASSNAME:
+      'p-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100',
     MENU_ITEM_BASE: 'menu-item-base',
     Slot,
   };
