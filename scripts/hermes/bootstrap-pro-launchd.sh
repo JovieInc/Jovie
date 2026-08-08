@@ -27,6 +27,8 @@ PRO_TEMPLATE_DIR="${REPO_ROOT}/scripts/hermes/launchd/pro"
 LAUNCHD_TEMPLATE_DIR="${REPO_ROOT}/scripts/hermes/launchd"
 SHIPPER_ENTRYPOINT_SRC="${REPO_ROOT}/scripts/hermes/shipper-gated-entrypoint.py"
 SHIPPER_ENTRYPOINT_DST="${HERMES_SCRIPTS}/shipper-gated-entrypoint.py"
+CODEX_LAUNCHER_SRC="${REPO_ROOT}/scripts/hermes/codex-launcher.sh"
+CODEX_LAUNCHER_DST="${HERMES_SCRIPTS}/codex-launcher.sh"
 CODEX_SHIPPER_PLIST_TEMPLATE="${LAUNCHD_TEMPLATE_DIR}/co.jovie.hermes.cron-codex-issue-shipper.plist.template"
 INSTALL_HELPER="${REPO_ROOT}/scripts/hermes/lib/install-launchd-artifacts.sh"
 
@@ -89,6 +91,7 @@ require_cmd plutil
 require_cmd shasum
 chmod +x "${REPO_ROOT}/scripts/hermes/ship-loop.sh"
 [[ -f "$SHIPPER_ENTRYPOINT_SRC" ]] || die "Missing shipper entrypoint: $SHIPPER_ENTRYPOINT_SRC"
+[[ -f "$CODEX_LAUNCHER_SRC" ]] || die "Missing Codex launcher: $CODEX_LAUNCHER_SRC"
 [[ -f "$CODEX_SHIPPER_PLIST_TEMPLATE" ]] || die "Missing codex shipper plist: $CODEX_SHIPPER_PLIST_TEMPLATE"
 
 mkdir -p "$HERMES_HOME/logs/launchd" "$HERMES_SCRIPTS" "$LAUNCH_AGENTS"
@@ -100,6 +103,13 @@ hermes_stage_artifact "$SHIPPER_ENTRYPOINT_SRC" \
 INSTALL_ARGS+=(
   "${LAUNCHD_STAGE}/shipper-gated-entrypoint.py"
   "$SHIPPER_ENTRYPOINT_DST"
+  755
+)
+hermes_stage_artifact "$CODEX_LAUNCHER_SRC" \
+  "${LAUNCHD_STAGE}/codex-launcher.sh" 755
+INSTALL_ARGS+=(
+  "${LAUNCHD_STAGE}/codex-launcher.sh"
+  "$CODEX_LAUNCHER_DST"
   755
 )
 

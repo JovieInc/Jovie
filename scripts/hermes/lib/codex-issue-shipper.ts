@@ -102,6 +102,7 @@ export interface ShipperConfig {
   readonly fallbackModel: string;
   readonly codexSandbox: CodexSandboxMode;
   readonly codexApprovalPolicy: CodexApprovalPolicy;
+  readonly codexReasoningEffort: CodexReasoningEffort;
   readonly claudePermissionMode: string;
   readonly grokPermissionMode: string;
   readonly agentTimeoutMs: number;
@@ -130,6 +131,12 @@ export type CodexApprovalPolicy =
   | 'on-failure'
   | 'on-request'
   | 'never';
+export type CodexReasoningEffort =
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'xhigh'
+  | 'max';
 
 export interface TaskRoute {
   readonly riskLevel: RiskLevel;
@@ -335,6 +342,11 @@ export function loadShipperConfig(
       env.HERMES_CODEX_SHIPPER_CODEX_APPROVAL_POLICY,
       ['untrusted', 'on-failure', 'on-request', 'never'],
       'on-request'
+    ),
+    codexReasoningEffort: parseEnum<CodexReasoningEffort>(
+      env.HERMES_CODEX_SHIPPER_CODEX_REASONING_EFFORT,
+      ['low', 'medium', 'high', 'xhigh', 'max'],
+      'max'
     ),
     claudePermissionMode:
       env.HERMES_CODEX_SHIPPER_CLAUDE_PERMISSION_MODE ?? 'auto',
@@ -814,6 +826,8 @@ export function buildAgentCommand(
         config.codexSandbox,
         '-m',
         route.sessionModel,
+        '-c',
+        `model_reasoning_effort="${config.codexReasoningEffort}"`,
         '--color',
         'never',
       ],

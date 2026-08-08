@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Launchd entrypoint for the codex issue shipper.
+"""Launchd entrypoint for the issue shipper.
 
-Fail-closed preflight gates (pause, gbrain, grok, primary-checkout freshness)
-run before execing the TypeScript shipper from the primary ~/Jovie checkout.
+Fail-closed preflight gates (pause, gbrain, selected provider,
+primary-checkout freshness) run before execing the TypeScript shipper from the
+primary ~/Jovie checkout.
 """
 from __future__ import annotations
 
@@ -134,7 +135,7 @@ def gbrain_alive(hermes_home: Path) -> bool:
                 gbrain_bin = str(candidate)
                 break
     if not gbrain_bin:
-        gbrain_bin = shutil.which("gbrain") or str(hermes_home() / "bin" / "gbrain")
+        gbrain_bin = shutil.which("gbrain") or str(hermes_home / "bin" / "gbrain")
     if not Path(gbrain_bin).is_file():
         return False
     try:
@@ -151,6 +152,13 @@ def gbrain_alive(hermes_home: Path) -> bool:
         return status not in ("", "error", "fail", "failed", "dead")
     except Exception:
         return False
+
+
+def _command_path(env_name: str, command: str) -> str | None:
+    override = os.environ.get(env_name, "").strip()
+    if override and Path(override).is_file():
+        return override
+    return shutil.which(command)
 
 
 def grok_alive() -> bool:
@@ -177,6 +185,52 @@ def grok_alive() -> bool:
                 return True
         except Exception:
             continue
+    return False
+
+
+def codex_alive() -> bool:
+    """Check existing Codex login without changing credentials or spending a turn."""
+    codex_bin = _command_path("HERMES_CODEX_BIN", "codex")
+    if not codex_bin:
+        return False
+    try:
+        proc = subprocess.run(
+            [codex_bin, "login", "status"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        output = f"{proc.stdout}\n{proc.stderr}".lower()
+        return proc.returncode == 0 and "logged in" in output
+    except Exception:
+        return False
+
+
+def claude_alive() -> bool:
+    claude_bin = _command_path("HERMES_CLAUDE_BIN", "claude")
+    if not claude_bin:
+        return False
+    try:
+        proc = subprocess.run(
+            [claude_bin, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        return proc.returncode == 0
+    except Exception:
+        return False
+
+
+def provider_alive(agent: str) -> bool:
+    if agent == "grok":
+        return grok_alive()
+    if agent == "codex":
+        return codex_alive()
+    if agent == "claude":
+        return claude_alive()
     return False
 
 
@@ -392,11 +446,12 @@ def main() -> int:
         )
         return 3
 
-    if not grok_alive():
+    agent = os.environ.get("HERMES_CODEX_SHIPPER_AGENT", "grok").strip().lower()
+    if not provider_alive(agent):
         notify_abort(
             hermes_home,
-            "grok_gate_abort",
-            "grok CLI is missing or unhealthy — refusing to dispatch blind",
+            f"{agent}_gate_abort",
+            f"{agent} CLI is missing or unhealthy — refusing to dispatch blind",
         )
         return 4
 

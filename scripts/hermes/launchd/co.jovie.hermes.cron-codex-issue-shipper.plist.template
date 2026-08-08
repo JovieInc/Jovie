@@ -11,11 +11,11 @@
     <key>WorkingDirectory</key>
     <string>{{JOVIE_REPO}}</string>
     <key>StartInterval</key>
-    <integer>900</integer>
+    <integer>300</integer>
     <key>ThrottleInterval</key>
     <integer>60</integer>
     <key>RunAtLoad</key>
-    <false/>
+    <true/>
     <key>KeepAlive</key>
     <dict>
         <key>SuccessfulExit</key>
@@ -23,8 +23,6 @@
         <key>Crashed</key>
         <true/>
     </dict>
-    <key>ThrottleInterval</key>
-    <integer>60</integer>
     <key>EnvironmentVariables</key>
     <dict>
         <key>HERMES_HOME</key>
@@ -36,7 +34,7 @@
         <key>HERMES_CODEX_SHIPPER_ISSUE_FETCH_LIMIT</key>
         <string>1000</string>
         <key>HERMES_CODEX_SHIPPER_MIN_FREE_MEMORY_MB</key>
-        <string>4096</string>
+        <string>256</string>
         <key>HERMES_CODEX_SHIPPER_MAX_LOAD_PER_CPU</key>
         <string>1.5</string>
         <key>HERMES_CODEX_SHIPPER_SINGLETON_LOCK_STALE_MS</key>
@@ -44,17 +42,19 @@
         <key>HERMES_CODEX_SHIPPER_INTEGRATION_THRESHOLD</key>
         <string>4</string>
         <key>HERMES_CODEX_SHIPPER_AGENT</key>
-        <string>grok</string>
+        <string>codex</string>
         <key>HERMES_CODEX_SHIPPER_SIMPLE_MODEL</key>
-        <string>grok-composer-2.5-fast</string>
+        <string>gpt-5.6-luna</string>
         <key>HERMES_CODEX_SHIPPER_STANDARD_MODEL</key>
-        <string>grok-composer-2.5-fast</string>
+        <string>gpt-5.6-luna</string>
         <key>HERMES_CODEX_SHIPPER_ESCALATION_MODEL</key>
-        <string>grok-composer-2.5-fast</string>
+        <string>gpt-5.6-terra</string>
         <key>HERMES_CODEX_SHIPPER_FALLBACK_MODEL</key>
-        <string>grok-composer-2.5-fast</string>
-        <key>HERMES_CODEX_SHIPPER_GROK_PERMISSION_MODE</key>
-        <string>auto</string>
+        <string>gpt-5.6-luna</string>
+        <key>HERMES_CODEX_SHIPPER_CODEX_APPROVAL_POLICY</key>
+        <string>never</string>
+        <key>HERMES_CODEX_SHIPPER_CODEX_REASONING_EFFORT</key>
+        <string>max</string>
         <key>PATH</key>
         <string>{{NODE_BIN_DIR}}:{{HOME}}/.bun/bin:{{HOME}}/.hermes/bin:{{HOME}}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     </dict>
