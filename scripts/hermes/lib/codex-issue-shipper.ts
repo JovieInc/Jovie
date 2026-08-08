@@ -131,12 +131,7 @@ export type CodexApprovalPolicy =
   | 'on-failure'
   | 'on-request'
   | 'never';
-export type CodexReasoningEffort =
-  | 'low'
-  | 'medium'
-  | 'high'
-  | 'xhigh'
-  | 'max';
+export type CodexReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 export interface TaskRoute {
   readonly riskLevel: RiskLevel;

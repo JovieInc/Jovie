@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildAgentCommand,
+  type GithubIssue,
   loadShipperConfig,
   selectTaskRoute,
-  type GithubIssue,
 } from '../codex-issue-shipper';
 
 const issue = (title: string, labels: string[] = []): GithubIssue => ({
@@ -53,8 +53,10 @@ describe('Codex shipper routing', () => {
       'gpt-5.6-luna'
     );
     expect(
-      selectTaskRoute(issue('Fix auth callback allow-list', ['security']), config)
-        .sessionModel
+      selectTaskRoute(
+        issue('Fix auth callback allow-list', ['security']),
+        config
+      ).sessionModel
     ).toBe('gpt-5.6-terra');
   });
 });
