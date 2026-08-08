@@ -458,21 +458,21 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   adaptive: {
     eyebrow: '',
-    headline: 'One adaptive profile. Four moments.',
+    headline: 'One profile.\nRight action.',
     alternateHeadlines: [
       'One profile for every release moment.',
       'One link, tuned to what matters right now.',
       'The same link, different job.',
     ],
-    body: 'Keep the same link everywhere. Jovie changes the leading action as the moment changes.',
+    body: '',
     contextCues: [
       'Release-aware',
       'Location-aware',
       'Service-aware',
       'Moment-aware',
     ],
-    productLabel: 'Same profile',
-    productDetail: 'Different job, exactly when it matters.',
+    productLabel: 'Choose the moment',
+    productDetail: 'The profile already knows the next action.',
     restingScreenshotAlt:
       "Jovie artist profile showing Tim White's live profile view.",
     restingScreenshotSrc: getMarketingExportImage(
@@ -481,9 +481,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     modes: [
       {
         id: 'upcoming-release',
-        label: 'Upcoming Release',
-        headline: 'Before a drop, your profile collects release alerts.',
-        description: 'Fans opt in once and hear from you when the song lands.',
+        label: 'Pre-save',
+        headline: 'Collect release alerts before it lands.',
+        description: 'Collect release alerts before it lands.',
         pathLabel: 'jov.ie/you',
         drawer: {
           title: 'The Deep End',
@@ -520,7 +520,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       },
       {
         id: 'release-day',
-        label: 'Release Day',
+        label: 'Out now',
         headline:
           'When the song is live, fans go straight to the right service.',
         description:
@@ -561,7 +561,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       },
       {
         id: 'touring',
-        label: 'Touring',
+        label: 'On tour',
         headline: "When you're on the road, nearby dates come first.",
         description: "When you're on the road, nearby dates come first.",
         pathLabel: 'jov.ie/you/tour',
@@ -599,7 +599,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       },
       {
         id: 'live-support',
-        label: 'Live Support',
+        label: 'Support',
         headline: 'At the merch table, one scan becomes support and capture.',
         description:
           'At the merch table, one scan becomes support and capture.',

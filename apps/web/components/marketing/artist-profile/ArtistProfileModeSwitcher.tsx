@@ -27,6 +27,7 @@ export function ArtistProfileModeSwitcher({
   const reducedMotion = useReducedMotion();
   const [activeIndex, setActiveIndex] = useState(0);
   const activeMode = adaptive.modes[activeIndex] ?? adaptive.modes[0];
+  const headlineLines = adaptive.headline.split('\n');
   const compactAccessibleContext = [phoneCaption, phoneSubcaption]
     .filter(Boolean)
     .join(' ');
@@ -65,11 +66,18 @@ export function ArtistProfileModeSwitcher({
           <>
             {/* ui-casing-allow: marketing display headline */}
             <h2 className={cn(SHELL_H2_CLASS, 'ap-mode-switcher__headline')}>
-              {adaptive.headline}
+              {headlineLines.map((line, index) => (
+                <span key={line} className='block'>
+                  {line}
+                  {index < headlineLines.length - 1 ? <br /> : null}
+                </span>
+              ))}
             </h2>
-            <p className={cn(SHELL_LEAD_CLASS, 'mt-6 max-w-xl')}>
-              {adaptive.body}
-            </p>
+            {adaptive.body ? (
+              <p className={cn(SHELL_LEAD_CLASS, 'mt-6 max-w-xl')}>
+                {adaptive.body}
+              </p>
+            ) : null}
           </>
         ) : null}
 
@@ -95,7 +103,7 @@ export function ArtistProfileModeSwitcher({
                   key={mode.id}
                   value={mode.id}
                   className={cn(
-                    'relative flex min-w-0 items-center justify-center px-2 text-center text-3xs font-semibold leading-tight text-tertiary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus data-[state=active]:text-primary-token sm:text-xs',
+                    'relative flex min-w-0 items-center justify-center whitespace-nowrap px-2 text-center text-2xs font-semibold leading-none text-tertiary-token transition-colors duration-subtle hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus data-[state=active]:text-primary-token sm:text-xs',
                     showIntroHeading
                       ? 'min-h-12 rounded-lg'
                       : 'min-h-11 rounded-full'
@@ -126,9 +134,7 @@ export function ArtistProfileModeSwitcher({
           </Tabs.List>
           <div
             className={cn(
-              showIntroHeading
-                ? 'mt-6 min-h-28 border-l border-subtle pl-5'
-                : 'mt-2.5 min-h-10 px-2'
+              showIntroHeading ? 'mt-6 min-h-20' : 'mt-2.5 min-h-10 px-2'
             )}
           >
             {adaptive.modes.map(mode => (
@@ -156,7 +162,7 @@ export function ArtistProfileModeSwitcher({
                     {mode.headline}
                   </p>
                   {showIntroHeading ? (
-                    <p className='mt-3 font-mono text-xs tracking-tight text-tertiary-token'>
+                    <p className='mt-2 font-mono text-xs tracking-tight text-tertiary-token'>
                       {mode.pathLabel}
                     </p>
                   ) : null}
@@ -165,52 +171,16 @@ export function ArtistProfileModeSwitcher({
             ))}
           </div>
         </Tabs.Root>
-
-        {showIntroHeading ? (
-          <ul
-            className='mt-7 flex flex-wrap gap-x-5 gap-y-2'
-            aria-label='Profile Context Signals'
-          >
-            {adaptive.contextCues.map(cue => (
-              <li
-                key={cue}
-                className='flex items-center gap-2 text-xs font-medium text-tertiary-token'
-              >
-                <span
-                  aria-hidden='true'
-                  className='h-1 w-1 rounded-full bg-secondary-token'
-                />
-                {cue}
-              </li>
-            ))}
-          </ul>
-        ) : null}
       </div>
 
       <div
         className={cn(
           'relative mx-auto w-full',
           showIntroHeading
-            ? 'max-w-lg rounded-3xl border border-subtle bg-surface-0 p-6 sm:p-8'
+            ? 'max-w-sm lg:max-w-md'
             : 'ap-mode-switcher__phone--compact order-1 mb-4'
         )}
       >
-        {showIntroHeading ? (
-          <div className='mb-5 flex min-h-13 items-center justify-between gap-4 lg:min-h-0'>
-            <div>
-              <p className='text-xs font-semibold text-primary-token'>
-                {adaptive.productLabel}
-              </p>
-              <p className='mt-1 text-xs text-tertiary-token'>
-                {adaptive.productDetail}
-              </p>
-            </div>
-            <span className='inline-flex min-h-11 items-center rounded-full border border-subtle bg-surface-1 px-3 py-1.5 font-mono text-3xs text-secondary-token lg:min-h-0'>
-              {activeMode.label}
-            </span>
-          </div>
-        ) : null}
-
         <div
           className={cn(
             'relative mx-auto w-full',
@@ -219,10 +189,19 @@ export function ArtistProfileModeSwitcher({
         >
           <ArtistProfilePhoneFrame className='relative z-10 max-w-none'>
             <div className='relative h-full w-full'>
+              {showIntroHeading ? (
+                <div
+                  aria-hidden='true'
+                  className='absolute inset-x-0 top-0 z-10 h-10 bg-surface-0'
+                />
+              ) : null}
               <AnimatePresence initial={false} mode='sync'>
                 <motion.div
                   key={activeMode.id}
-                  className='absolute inset-0'
+                  className={cn(
+                    'absolute inset-0',
+                    showIntroHeading ? 'top-10' : null
+                  )}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
