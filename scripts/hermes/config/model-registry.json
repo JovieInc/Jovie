@@ -23,7 +23,16 @@
       "cost_tier": "gateway-budgeted-paid",
       "executable_env": "GEM_DEEPSEEK_EXECUTABLE",
       "executable_default": "/home/timwhite/.local/bin/hermes",
-      "probe_argv": ["{executable}", "--profile", "gem-shipper", "--provider", "custom:vercel-ai-gateway", "--model", "{model}", "--help"],
+      "probe_argv": [
+        "{executable}",
+        "--profile",
+        "gem-shipper",
+        "--provider",
+        "custom:vercel-ai-gateway",
+        "--model",
+        "{model}",
+        "--help"
+      ],
       "cooldown_seconds": 1800
     },
     {
