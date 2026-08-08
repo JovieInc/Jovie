@@ -22,7 +22,6 @@ export interface AuthRouteConfig {
   isArtistProfileSettings: boolean;
   isChatRoute: boolean;
   isDemoRoute: boolean;
-  showChatUsageIndicator: boolean;
   isLyricsRoute: boolean;
 }
 
@@ -198,7 +197,6 @@ export function useAuthRouteConfig(
     isArtistProfileSettings,
     isChatRoute,
     isDemoRoute,
-    showChatUsageIndicator: isChatRoute,
     isLyricsRoute,
   };
 }
