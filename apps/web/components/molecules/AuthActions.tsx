@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/AuthActions.test.tsx
 'use client';
 
 import { getLinearPillClassName } from '@jovie/ui';

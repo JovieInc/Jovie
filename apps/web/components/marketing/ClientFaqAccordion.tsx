@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/home/mounted-home-faq-system-b-style-guard.test.ts
 'use client';
 
 import { Minus, Plus } from 'lucide-react';

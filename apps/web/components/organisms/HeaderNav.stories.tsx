@@ -23,6 +23,13 @@ type Story = StoryObj<typeof meta>;
 // Default story - shows the header navigation
 export const Default: Story = {};
 
+export const PublicStatic: Story = {
+  args: {
+    authMode: 'public-static',
+    publicCtaLabel: 'Get started',
+  },
+};
+
 // Mobile view story
 export const Mobile: Story = {
   parameters: {
