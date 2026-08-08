@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   type HomepageArtistProfileCards,
@@ -85,24 +85,10 @@ describe('HomepageArtistProfiles', () => {
       'homepage-artist-profiles__intro'
     );
     expect(
-      screen.getByRole('list', { name: 'Jovie Artist Profile Outcomes' })
+      screen.getByRole('tablist', { name: 'Artist Profile outcomes' })
     ).toBeInTheDocument();
-    expect(screen.getAllByRole('listitem')).toHaveLength(4);
-
-    for (const title of [
-      'Sell Out',
-      'Capture Fans',
-      'Get Paid',
-      'Drop Music',
-    ]) {
-      expect(
-        screen.getByRole('heading', { level: 3, name: title })
-      ).toBeInTheDocument();
-    }
-
-    for (const body of CARDS.map(card => card.body)) {
-      expect(screen.getByText(body)).toBeInTheDocument();
-    }
+    expect(screen.getAllByRole('tab')).toHaveLength(4);
+    expect(screen.getByRole('tabpanel')).toHaveTextContent('Sell Out');
   });
 
   it('preserves registry-backed image geometry with accessible carousel controls', () => {
@@ -115,32 +101,30 @@ describe('HomepageArtistProfiles', () => {
       screen.getByRole('link', { name: 'Explore Artist Profiles' })
     ).not.toHaveClass('bg-white');
 
-    const images = screen.getAllByRole('img');
-    expect(images).toHaveLength(4);
-    const previous = screen.getByRole('button', {
-      name: 'Previous Artist Profile Preview',
-    });
-    const next = screen.getByRole('button', {
-      name: 'Next Artist Profile Preview',
-    });
+    const selected = screen.getByRole('tab', { name: 'Sell Out' });
+    expect(selected).toHaveAttribute('aria-selected', 'true');
+    expect(selected).toHaveAttribute('data-variant', 'ghost');
+    expect(selected).toHaveAttribute('data-size', 'sm');
 
-    expect(previous).toBeDisabled();
-    expect(next).toBeEnabled();
-    expect(previous).toHaveAttribute('data-variant', 'ghost');
-    expect(previous).toHaveAttribute('data-size', 'icon');
-    expect(next).toHaveAttribute('data-variant', 'ghost');
-    expect(next).toHaveAttribute('data-size', 'icon');
+    const image = screen.getByRole('img');
+    expect(image.getAttribute('src')).toContain(
+      encodeURIComponent(CARDS[0].image.publicUrl)
+    );
+    expect(image).toHaveAttribute('alt', CARDS[0].image.alt);
+    expect(image).toHaveAttribute('width', String(CARDS[0].image.width));
+    expect(image).toHaveAttribute('height', String(CARDS[0].image.height));
+  });
 
-    for (const [index, card] of CARDS.entries()) {
-      expect(images[index].getAttribute('src')).toContain(
-        encodeURIComponent(card.image.publicUrl)
-      );
-      expect(images[index]).toHaveAttribute('alt', card.image.alt);
-      expect(images[index]).toHaveAttribute('width', String(card.image.width));
-      expect(images[index]).toHaveAttribute(
-        'height',
-        String(card.image.height)
-      );
-    }
+  it('makes each outcome an explicit selectable preview', () => {
+    render(<HomepageArtistProfiles cards={CARDS} />);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Get Paid' }));
+
+    expect(screen.getByRole('tab', { name: 'Get Paid' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.getByRole('tabpanel')).toHaveTextContent('Get Paid');
+    expect(screen.getByRole('img')).toHaveAttribute('alt', CARDS[2].image.alt);
   });
 });

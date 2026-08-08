@@ -66,9 +66,9 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
     }
 
     for (const className of [
-      'homepage-artist-profiles__row',
-      'homepage-artist-profiles__track',
-      'homepage-artist-profiles__card',
+      'homepage-artist-profiles__outcome-tabs',
+      'homepage-artist-profiles__outcome-tab',
+      'homepage-artist-profiles__stage',
       'homepage-artist-outcome',
       'homepage-artist-outcome__copy',
       'homepage-artist-outcome__media',

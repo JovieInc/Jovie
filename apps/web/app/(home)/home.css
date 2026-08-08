@@ -4191,22 +4191,32 @@ body:has(.home-viewport)::-webkit-scrollbar {
   margin: var(--space-16) auto 0;
 }
 
-.homepage-artist-profiles__carousel-controls {
+.homepage-artist-profiles__outcome-tabs {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: flex-start;
+  overflow-x: auto;
   gap: var(--space-2);
-  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
+  scrollbar-width: none;
 }
 
-.homepage-artist-profiles__carousel-controls button {
-  display: grid;
-  width: calc(var(--space-10) + var(--space-1));
-  height: calc(var(--space-10) + var(--space-1));
-  place-items: center;
-  border: var(--space-px) solid var(--system-b-app-frame-seam);
+.homepage-artist-profiles__outcome-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.homepage-artist-profiles__outcome-tab {
+  flex: none;
   border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--color-text-primary-token);
+}
+
+.homepage-artist-profiles__outcome-tab[aria-selected="true"] {
+  background: var(--system-b-bg-surface-1);
+  color: var(--system-b-text-primary);
+}
+
+.homepage-artist-profiles__outcome-tab:not([aria-selected="true"]) {
+  color: var(--color-text-tertiary-token);
   transition:
     background-color var(--ds-motion-subtle-duration)
     var(--ds-motion-subtle-easing),
@@ -4214,82 +4224,34 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 @media (hover: hover) {
-  .homepage-artist-profiles__carousel-controls button:not(:disabled):hover {
+  .homepage-artist-profiles__outcome-tab:not([aria-selected="true"]):hover {
     background: var(--system-b-bg-surface-1);
     color: var(--system-b-text-primary);
   }
 }
 
-.homepage-artist-profiles__carousel-controls button:disabled {
-  cursor: not-allowed;
-  opacity: 0.4;
-}
-
-.homepage-artist-profiles__carousel-controls button:focus-visible {
+.homepage-artist-profiles__outcome-tab:focus-visible {
   outline: var(--space-px) solid var(--system-b-text-primary);
   outline-offset: var(--space-1);
 }
 
-.homepage-artist-profiles__row {
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scroll-behavior: smooth;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
+.homepage-artist-profiles__stage {
+  min-height: clamp(42rem, 64vw, 56rem);
+  aspect-ratio: auto;
+  grid-template-columns: minmax(14rem, 0.8fr) minmax(20rem, 1.2fr);
+  grid-template-rows: 1fr;
 }
 
-.homepage-artist-profiles__row::-webkit-scrollbar {
-  display: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .homepage-artist-profiles__row {
-    scroll-behavior: auto;
-  }
-}
-
-.homepage-artist-profiles__track {
-  --homepage-artist-profiles-card-gap: clamp(
-    var(--space-4),
-    2vw,
-    var(--space-6)
-  );
-
-  display: flex;
-  margin: 0;
-  padding: 0;
-  gap: var(--homepage-artist-profiles-card-gap);
-  list-style: none;
-}
-
-.homepage-artist-profiles__card {
-  flex: 0 0 100%;
-  scroll-snap-align: start;
-}
-
-.homepage-artist-profiles__card {
-  min-height: min(46rem, 72vw);
-}
-
-.homepage-artist-profiles__select {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  cursor: pointer;
-  border: 0;
-  background: transparent;
-}
-
-.homepage-artist-profiles__card .homepage-artist-outcome__media {
+.homepage-artist-profiles__stage .homepage-artist-outcome__media {
   align-items: end;
 }
 
-.homepage-artist-profiles__card .homepage-artist-outcome__device {
-  width: min(31rem, 52%);
+.homepage-artist-profiles__stage .homepage-artist-outcome__device {
+  width: min(31rem, 88%);
   max-width: none;
-  height: auto;
+  height: min(47rem, 112%);
   min-height: 35rem;
-  margin-bottom: -18%;
+  margin-bottom: -20%;
 }
 
 @media (max-width: 900px) {
@@ -4302,8 +4264,17 @@ body:has(.home-viewport)::-webkit-scrollbar {
     margin-top: var(--space-10);
   }
 
-  .homepage-artist-profiles__card {
-    flex-basis: 100%;
+  .homepage-artist-profiles__stage {
+    min-height: clamp(39rem, 132vw, 48rem);
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(12rem, auto) 1fr;
+  }
+
+  .homepage-artist-profiles__stage .homepage-artist-outcome__device {
+    width: min(25rem, 78%);
+    height: min(42rem, 118%);
+    min-height: 32rem;
+    margin-bottom: -24%;
   }
 }
 /* HOMEPAGE ARTIST PROFILES SYSTEM B END */
