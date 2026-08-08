@@ -311,11 +311,6 @@ export interface ArtistProfileLandingCopy {
       readonly notificationBody: string;
     };
     readonly audienceRails: readonly (readonly ArtistProfileAudiencePill[])[];
-    readonly benefits: readonly {
-      readonly id: 'opt-in' | 'alerts' | 'ownership';
-      readonly label: string;
-      readonly detail: string;
-    }[];
   };
   readonly reactivation: {
     readonly headline: string;
@@ -422,7 +417,7 @@ export interface ArtistProfileLandingCopy {
  */
 export type ArtistProfileCaptureVisualCopy = Omit<
   ArtistProfileLandingCopy['capture'],
-  'action' | 'benefits' | 'journey'
+  'action' | 'journey'
 > & {
   readonly action: Omit<
     ArtistProfileLandingCopy['capture']['action'],
@@ -956,9 +951,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     playLabel: 'Play pay flow',
   },
   capture: {
-    headline: 'One fan moment. A relationship you keep.',
+    headline: 'Capture every fan.',
     subhead: 'One opt-in can become the next release listen.',
-    body: 'When a fan opts in, the next release or nearby show has a direct path back to them. Their permission turns one moment into an audience you can reach again.',
+    body: 'Jovie turns each opt-in into a fan you can reach for the next release or nearby show.',
     action: {
       title: 'Get updates',
       detail: 'Release and nearby-show alerts.',
@@ -1048,23 +1043,6 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           sentence: 'Diego F. paid from the sidewalk QR.',
         },
       ],
-    ],
-    benefits: [
-      {
-        id: 'opt-in',
-        label: 'Opt in once',
-        detail: 'A simple fan action starts the relationship.',
-      },
-      {
-        id: 'alerts',
-        label: 'Reach the moment',
-        detail: 'Release and nearby-show alerts arrive when they matter.',
-      },
-      {
-        id: 'ownership',
-        label: 'Keep the audience',
-        detail: 'The relationship belongs to the artist, not the click.',
-      },
     ],
   },
   reactivation: {

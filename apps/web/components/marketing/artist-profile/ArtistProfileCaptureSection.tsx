@@ -3,7 +3,6 @@ import type {
   ArtistProfileLandingCopy,
 } from '@/data/artistProfileCopy';
 import { ArtistProfileCaptureVisual } from '../MarketingStoryPrimitives';
-import { MarketingSurfaceCard } from '../MarketingSurfaceCard';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 import './ArtistProfileCaptureSection.css';
@@ -18,7 +17,7 @@ interface ArtistProfileCaptureSectionProps {
 function isEditorialCapture(
   capture: ArtistProfileCaptureSectionProps['capture']
 ): capture is ArtistProfileLandingCopy['capture'] {
-  return 'journey' in capture && 'benefits' in capture;
+  return 'journey' in capture;
 }
 
 export function ArtistProfileCaptureSection({
@@ -45,35 +44,15 @@ export function ArtistProfileCaptureSection({
 
   return (
     <ArtistProfileSectionShell className='ap-capture-loop bg-surface-0' id={id}>
-      <div className='ap-capture-loop__layout mx-auto grid max-w-public-content items-center gap-12 lg:grid-cols-[minmax(0,0.8fr)_minmax(30rem,1.2fr)] lg:gap-20'>
-        <div>
+      <div className='ap-capture-loop__layout mx-auto grid max-w-public-content items-center gap-12 lg:grid-cols-[minmax(0,0.58fr)_minmax(34rem,1.42fr)] lg:gap-16'>
+        <div className='ap-capture-loop__copy'>
           <ArtistProfileSectionHeader
             align='left'
             headline={capture.headline}
             body={capture.body}
-            className='max-w-3xl'
-            bodyClassName='max-w-xl'
+            className='max-w-xl'
+            bodyClassName='max-w-lg'
           />
-          <ol className='mt-9 border-t border-subtle'>
-            {capture.benefits.map((benefit, index) => (
-              <li
-                key={benefit.id}
-                className='grid grid-cols-[2rem_minmax(0,1fr)] gap-3 border-b border-subtle py-4'
-              >
-                <span className='font-mono text-3xs text-tertiary-token'>
-                  0{index + 1}
-                </span>
-                <div>
-                  <p className='text-sm font-semibold text-primary-token'>
-                    {benefit.label}
-                  </p>
-                  <p className='mt-1.5 text-app leading-relaxed text-secondary-token'>
-                    {benefit.detail}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
         </div>
 
         <figure
@@ -84,17 +63,10 @@ export function ArtistProfileCaptureSection({
             A focused Jovie fan opt-in accepts an email, confirms the fan, and
             turns that moment into an audience the artist can reach again.
           </figcaption>
-          <MarketingSurfaceCard
-            variant='product-callout'
-            glowTone='teal'
-            chrome='framed'
-            label='Fan Opt-in'
-            stateLabel='Illustrative fan activity'
-            className='ap-capture-loop__callout'
-            contentClassName='ap-capture-loop__callout-content'
-          >
-            <ArtistProfileCaptureVisual capture={capture} />
-          </MarketingSurfaceCard>
+          <ArtistProfileCaptureVisual
+            capture={capture}
+            className='ap-capture-loop__proof'
+          />
         </figure>
       </div>
     </ArtistProfileSectionShell>

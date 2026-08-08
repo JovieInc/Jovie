@@ -170,10 +170,9 @@ describe('artist profile landing family System B source contract', () => {
       ),
       'utf8'
     );
-    expect(capture).toContain('<MarketingSurfaceCard');
-    expect(capture).toContain("variant='product-callout'");
-    expect(capture).toContain("glowTone='teal'");
     expect(capture).toContain('<ArtistProfileCaptureVisual');
+    expect(capture).toContain("className='ap-capture-loop__proof'");
+    expect(capture).not.toContain('MarketingSurfaceCard');
     expect(capture).not.toContain('ArtistProfilePhoneFrame');
 
     const captureShared = readFileSync(
