@@ -5,6 +5,13 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
+// Full-suite shards are deliberately independent so one Vitest process cannot
+// retain the entire suite in memory. They still need a finite wall-clock
+// budget: an otherwise silent shard used to leave the pre-push gate running
+// indefinitely. Thirty minutes accommodates the slowest observed shard while
+// failing closed on a genuinely stuck process.
+const DEFAULT_SHARD_TIMEOUT_MS = 30 * 60 * 1000;
+const DEFAULT_PROGRESS_INTERVAL_MS = 60 * 1000;
 const GLOBAL_TEST_INPUTS = new Set([
   'package.json',
   'pnpm-lock.yaml',
@@ -1055,6 +1062,17 @@ function argValue(args, flag, fallback) {
   return index === -1 ? fallback : args[index + 1];
 }
 
+function positiveDurationMs(value, fallback) {
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function formatCommand(command, args) {
+  return [command, ...args]
+    .map(part => (/[\s]/.test(part) ? JSON.stringify(part) : part))
+    .join(' ');
+}
+
 function changedFiles(base) {
   return execFileSync(
     'git',
@@ -1069,30 +1087,75 @@ function changedFiles(base) {
     .filter(Boolean);
 }
 
-async function runCommandStatus(command, args) {
+export async function runCommandStatus(
+  command,
+  args,
+  {
+    timeoutMs = DEFAULT_SHARD_TIMEOUT_MS,
+    progressIntervalMs = DEFAULT_PROGRESS_INTERVAL_MS,
+    label = 'command',
+    logger = message => console.log(message),
+  } = {}
+) {
+  const commandText = formatCommand(command, args);
   const child = spawn(command, args, {
     cwd: REPO_ROOT,
     stdio: 'inherit',
     env: process.env,
     detached: process.platform !== 'win32',
   });
+  const startedAt = Date.now();
+  let timedOut = false;
+  let timedOutPid;
   const terminate = signal => {
     if (child.exitCode !== null) return;
     if (process.platform === 'win32') child.kill(signal);
-    else process.kill(-child.pid, signal);
+    else if (child.pid) process.kill(-child.pid, signal);
   };
+  logger(
+    `[affected-tests] start ${label} pid=${child.pid ?? 'unknown'} timeoutMs=${timeoutMs} command=${commandText}`
+  );
   const onInterrupt = () => terminate('SIGINT');
   const onTerminate = () => terminate('SIGTERM');
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
+  const progressTimer = setInterval(() => {
+    logger(
+      `[affected-tests] progress ${label} elapsedMs=${Date.now() - startedAt} pid=${child.pid ?? 'unknown'} command=${commandText}`
+    );
+  }, progressIntervalMs);
+  progressTimer.unref?.();
+  const timeoutTimer = setTimeout(() => {
+    timedOut = true;
+    timedOutPid = child.pid;
+    logger(
+      `[affected-tests] timeout ${label} elapsedMs=${Date.now() - startedAt} pid=${child.pid ?? 'unknown'} timeoutMs=${timeoutMs} command=${commandText}`
+    );
+    terminate('SIGTERM');
+  }, timeoutMs);
+  timeoutTimer.unref?.();
+  const killTimer = setTimeout(() => {
+    if (!timedOut || child.exitCode !== null) return;
+    logger(
+      `[affected-tests] timeout-escalation ${label} pid=${timedOutPid ?? 'unknown'} command=${commandText}`
+    );
+    terminate('SIGKILL');
+  }, timeoutMs + 5000);
+  killTimer.unref?.();
   const status = await new Promise(resolveStatus => {
     child.once('exit', (code, signal) =>
-      resolveStatus(code ?? (signal ? 128 : 1))
+      resolveStatus(timedOut ? 124 : (code ?? (signal ? 128 : 1)))
     );
     child.once('error', () => resolveStatus(1));
   });
+  clearInterval(progressTimer);
+  clearTimeout(timeoutTimer);
+  clearTimeout(killTimer);
   process.removeListener('SIGINT', onInterrupt);
   process.removeListener('SIGTERM', onTerminate);
+  logger(
+    `[affected-tests] complete ${label} status=${status} elapsedMs=${Date.now() - startedAt} pid=${child.pid ?? 'unknown'} command=${commandText}`
+  );
   return status;
 }
 
@@ -1100,7 +1163,7 @@ export async function runCommand(command, args) {
   process.exit(await runCommandStatus(command, args));
 }
 
-async function runCommands(commands, concurrency = 1) {
+async function runCommands(commands, concurrency = 1, options = {}) {
   const workerCount = Math.max(
     1,
     Math.min(commands.length, Number.parseInt(String(concurrency), 10) || 1)
@@ -1114,7 +1177,10 @@ async function runCommands(commands, concurrency = 1) {
       cursor += 1;
       if (index >= commands.length) return;
       const [command, args] = commands[index];
-      const status = await runCommandStatus(command, args);
+      const status = await runCommandStatus(command, args, {
+        ...options,
+        label: `${options.labelPrefix || 'command'} ${index + 1}/${commands.length}`,
+      });
       if (status !== 0) failureStatus = status;
     }
   }
@@ -1213,6 +1279,23 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const base = argValue(args, '--base', 'origin/main');
   const maxWorkers = argValue(args, '--max-workers', '2');
   const shardConcurrency = argValue(args, '--shard-concurrency', '2');
+  const shardTimeoutMs = positiveDurationMs(
+    argValue(
+      args,
+      '--shard-timeout-ms',
+      process.env.AFFECTED_TEST_SHARD_TIMEOUT_MS || DEFAULT_SHARD_TIMEOUT_MS
+    ),
+    DEFAULT_SHARD_TIMEOUT_MS
+  );
+  const progressIntervalMs = positiveDurationMs(
+    argValue(
+      args,
+      '--progress-interval-ms',
+      process.env.AFFECTED_TEST_PROGRESS_INTERVAL_MS ||
+        DEFAULT_PROGRESS_INTERVAL_MS
+    ),
+    DEFAULT_PROGRESS_INTERVAL_MS
+  );
   const plan = buildAffectedTestPlan(changedFiles(base));
   if (args.includes('--dry-run')) {
     console.log(JSON.stringify(plan, null, 2));
@@ -1228,8 +1311,16 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     // 2k-file web suite to trigger host memory pressure near teardown. Keep
     // deterministic, bounded-memory shards, but schedule a small bounded set
     // concurrently so a complete fail-closed suite does not serialize all 8.
-    await runCommands(buildFullSuiteCommands(maxWorkers), shardConcurrency);
+    await runCommands(buildFullSuiteCommands(maxWorkers), shardConcurrency, {
+      timeoutMs: shardTimeoutMs,
+      progressIntervalMs,
+      labelPrefix: 'shard',
+    });
   }
 
-  await runCommands(buildSelectedTestCommands(plan, maxWorkers));
+  await runCommands(buildSelectedTestCommands(plan, maxWorkers), 1, {
+    timeoutMs: shardTimeoutMs,
+    progressIntervalMs,
+    labelPrefix: 'selected',
+  });
 }
