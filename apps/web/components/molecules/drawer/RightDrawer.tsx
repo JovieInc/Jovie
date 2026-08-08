@@ -7,48 +7,16 @@ import { CommonDropdown } from '@jovie/ui';
 import React, { useEffect, useId, useRef, useState } from 'react';
 
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
+import {
+  getFocusableElements,
+  useModalFocusBoundary,
+} from '@/lib/a11y/modal-focus-boundary';
 import { cn } from '@/lib/utils';
 
 /**
  * Lock body scroll when a mobile drawer is open to prevent
  * background page from scrolling behind the overlay.
  */
-const FOCUSABLE_SELECTOR = [
-  'a[href]',
-  'area[href]',
-  'button:not([disabled])',
-  'input:not([disabled]):not([type="hidden"])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  'iframe',
-  'object',
-  'embed',
-  '[contenteditable="true"]',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',');
-
-function getFocusableElements(container: HTMLElement) {
-  return Array.from(
-    container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
-  ).filter(element => !element.hasAttribute('inert'));
-}
-
-function getDrawerBackgroundElements(drawer: HTMLElement) {
-  const background: HTMLElement[] = [];
-  let current: HTMLElement | null = drawer;
-
-  while (current?.parentElement) {
-    for (const sibling of Array.from(current.parentElement.children)) {
-      if (sibling !== current && sibling instanceof HTMLElement) {
-        background.push(sibling);
-      }
-    }
-    current = current.parentElement;
-  }
-
-  return background;
-}
-
 function useBodyScrollLock(isOpen: boolean, isMobile: boolean) {
   useEffect(() => {
     if (!isMobile || !isOpen) return;
@@ -149,56 +117,7 @@ function useMobileDrawerFocus(
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    const drawer = drawerRef.current;
-    if (!drawer || !isMobile || !isOpen || !isActive) return;
-
-    const background = getDrawerBackgroundElements(drawer);
-    const priorInertStates = background.map(element => ({
-      element,
-      wasInert: element.inert,
-    }));
-    for (const { element } of priorInertStates) {
-      element.inert = true;
-    }
-
-    return () => {
-      for (const { element, wasInert } of priorInertStates) {
-        element.inert = wasInert;
-      }
-    };
-  }, [drawerRef, isActive, isMobile, isOpen]);
-
-  useEffect(() => {
-    const drawer = drawerRef.current;
-    if (!drawer || !isMobile || !isOpen || !isActive) return;
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return;
-
-      const focusable = getFocusableElements(drawer);
-      if (focusable.length === 0) {
-        event.preventDefault();
-        drawer.focus();
-        return;
-      }
-
-      const first = focusable[0];
-      const last = focusable.at(-1);
-      if (!last) return;
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [drawerRef, isActive, isMobile, isOpen]);
+  useModalFocusBoundary(drawerRef, isMobile && isOpen && isActive);
 }
 
 function hasOpenModalDialog() {

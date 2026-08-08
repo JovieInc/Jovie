@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardMobileTabs } from '@/components/features/dashboard/organisms/DashboardMobileTabs';
@@ -156,6 +156,51 @@ describe('DashboardMobileTabs', () => {
         .getAllByRole('link')
         .map(link => link.getAttribute('href'))
     ).toEqual(before);
+  });
+
+  it('treats More as a modal mobile surface with contained focus and inert background', async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <button type='button'>Background action</button>
+        <DashboardMobileTabs />
+      </>
+    );
+
+    const more = screen.getByRole('button', { name: 'More options' });
+    await user.click(more);
+
+    const dialog = screen.getByRole('dialog', {
+      name: 'Expanded Navigation Menu',
+    });
+    const menu = within(dialog).getByRole('navigation', {
+      name: 'Expanded Navigation Menu',
+    });
+    const first = within(menu).getByRole('link', { name: 'Inbox' });
+    const last = within(dialog).getByRole('button', { name: 'Sign out' });
+    const background = screen.getByRole('button', {
+      name: 'Background action',
+    });
+
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(more).toHaveAttribute('aria-controls', dialog.id);
+    expect(first).toHaveFocus();
+    expect(background.inert).toBe(true);
+
+    last.focus();
+    await user.tab();
+    expect(first).toHaveFocus();
+
+    first.focus();
+    await user.tab({ shift: true });
+    expect(last).toHaveFocus();
+
+    await user.keyboard('{Escape}');
+    expect(
+      screen.queryByRole('dialog', { name: 'Expanded Navigation Menu' })
+    ).not.toBeInTheDocument();
+    expect(background.inert).toBeFalsy();
+    await waitFor(() => expect(more).toHaveFocus());
   });
 
   it('marks Inbox active only at the shell root', () => {
