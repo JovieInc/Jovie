@@ -38,7 +38,7 @@ describe('HeaderNav flyout interactions', () => {
 
     const loginLink = screen.getByRole('link', { name: 'Log in' });
     expect(loginLink).toHaveAttribute('href', '/signin');
-    expect(loginLink.parentElement).toHaveClass('gap-(--linear-gap-buttons)');
+    expect(loginLink.parentElement).toHaveClass('gap-2');
     // Default public CTA (no publicCtaLabel override) remains Request Access.
     // Homepage MarketingHeader passes its own "Get started" label separately.
     expect(
