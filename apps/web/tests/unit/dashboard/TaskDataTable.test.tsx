@@ -64,14 +64,17 @@ describe('TaskDataTable', () => {
     expect(table).toHaveAttribute('data-row-height', '56');
     expect(table).toHaveAttribute('data-skeleton-rows', '8');
     expect(table).toHaveAttribute('data-virtualized', 'false');
-    expect(TASK_DATA_TABLE_ROW_CLASSNAME).toContain(
-      'focus-within:!shadow-none'
-    );
+    expect(TASK_DATA_TABLE_ROW_CLASSNAME).toContain('group/row');
+    expect(TASK_DATA_TABLE_ROW_CLASSNAME).toContain('group/task-row');
+    expect(TASK_DATA_TABLE_ROW_CLASSNAME).not.toContain('!bg-transparent');
     expect(TASK_DATA_TABLE_ROW_CLASSNAME).not.toContain(
       'focus-visible:!ring-0'
     );
-    expect(TASK_DATA_TABLE_ROW_CLASSNAME).toContain(
-      'focus-visible:!shadow-none'
+    expect(TASK_DATA_TABLE_ROW_CLASSNAME).not.toContain(
+      'focus-visible:!bg-transparent'
+    );
+    expect(TASK_DATA_TABLE_ROW_CLASSNAME).not.toContain(
+      'focus-within:!bg-transparent'
     );
   });
 

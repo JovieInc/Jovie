@@ -2038,6 +2038,7 @@ export function TasksPageClient() {
         isLoading={isActiveListLoading}
         getRowId={row => row.id}
         onRowClick={row => openTaskDocument(row)}
+        isRowSelected={row => row.id === effectiveSelectedTaskId}
         getContextMenuItems={getTaskContextMenuItems}
         emptyState={
           <TaskEmptyState

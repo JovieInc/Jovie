@@ -88,7 +88,7 @@ describe('TaskListRow', () => {
       'data-selected',
       'true'
     );
-    expect(getByTestId('task-list-row-task-1').className).toContain(
+    expect(getByTestId('task-list-row-task-1').className).not.toContain(
       'system-b-shell-list-task-row-selected'
     );
     expect(getByText(mockTask.title)).toBeVisible();

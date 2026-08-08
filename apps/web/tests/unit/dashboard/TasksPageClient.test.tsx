@@ -654,6 +654,7 @@ function getLatestTableProps() {
     | {
         readonly data?: ReadonlyArray<TaskView>;
         readonly onRowClick?: (task: TaskView) => void;
+        readonly isRowSelected?: (task: TaskView, index: number) => boolean;
         readonly getRowClassName?: (task: TaskView, index: number) => string;
         readonly getContextMenuItems?: (task: TaskView) => ReadonlyArray<{
           readonly id?: string;
@@ -856,23 +857,19 @@ describe('TasksPageClient', () => {
     );
   });
 
-  it('leaves table shells unselected so the task row owns selection treatment', () => {
+  it('lets the shared table row own task interaction state', () => {
     renderPage();
 
+    expect(getLatestTableProps()?.isRowSelected?.(mockTaskTwo, 0)).toBe(false);
     expect(
       getLatestTableProps()?.getRowClassName?.(mockTaskTwo, 0)
-    ).not.toContain('system-b-table-row-selected');
-    expect(getLatestTableProps()?.getRowClassName?.(mockTaskTwo, 0)).toContain(
-      '!bg-transparent'
-    );
+    ).not.toContain('!bg-transparent');
 
     act(() => {
       getLatestTableProps()?.onRowClick?.(mockTaskTwo);
     });
 
-    expect(
-      getLatestTableProps()?.getRowClassName?.(mockTaskTwo, 0)
-    ).not.toContain('system-b-table-row-selected');
+    expect(getLatestTableProps()?.isRowSelected?.(mockTaskTwo, 0)).toBe(true);
   });
 
   it('resets the canonical detail selection when subview filters exclude the selected task', () => {
