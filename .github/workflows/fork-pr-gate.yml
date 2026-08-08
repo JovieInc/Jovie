@@ -11,7 +11,7 @@
 # reviews if CI passes. This workflow closes that gap with a required status
 # check that only blocks fork PRs.
 #
-# TRIGGER: PR opened/synchronized/reopened + review submitted (to re-evaluate)
+# TRIGGER: PR opened/synchronized/reopened/marked ready + review submitted (to re-evaluate)
 #
 # HOW IT WORKS:
 # 1. Detects if PR is from a fork
@@ -29,14 +29,14 @@ name: Fork PR Gate
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
   # pull_request_target gives the dependabot-gate job access to the Jovie Bot
   # App secrets (regular Actions secrets are hidden from dependabot's
   # pull_request context). The dependabot-gate only sets a status — it does
   # not check out fork code — so this trigger is safe.
   pull_request_target:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
   # Approval is a review event, not a pull_request synchronize event. This
   # workflow never checks out PR code, so re-evaluating metadata is safe.
