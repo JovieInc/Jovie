@@ -4,6 +4,17 @@ import { AudienceSourceCell } from '@/components/organisms/table';
 
 // SimpleTooltip requires TooltipProvider — mock it to render children directly
 vi.mock('@jovie/ui', () => ({
+  IconButton: ({
+    children,
+    asChild: _,
+    ...props
+  }: React.ComponentProps<'button'> & { asChild?: boolean }) => (
+    <button {...props}>{children}</button>
+  ),
+  ICON_BUTTON_VISIBLE_CLASSNAME:
+    'p-0.5 opacity-60 hover:opacity-100 focus-visible:opacity-100',
+  ICON_BUTTON_FADE_CLASSNAME:
+    'p-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100',
   SimpleTooltip: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
   ),

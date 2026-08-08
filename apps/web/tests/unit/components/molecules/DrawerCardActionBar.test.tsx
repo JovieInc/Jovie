@@ -12,6 +12,15 @@ vi.mock('@jovie/ui', () => ({
       {children}
     </button>
   ),
+  IconButton: ({
+    children,
+    asChild: _,
+    ...props
+  }: ComponentProps<'button'> & { asChild?: boolean }) => (
+    <button type='button' {...props}>
+      {children}
+    </button>
+  ),
 }));
 
 vi.mock('@/components/atoms/table-action-menu', () => ({
