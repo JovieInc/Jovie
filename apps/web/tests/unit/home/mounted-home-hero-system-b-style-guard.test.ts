@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const webRoot = path.resolve(__dirname, '../../..');
 const pagePath = 'app/(home)/page.tsx';
-const heroComponentPath = 'components/homepage/HomepagePosterHero.tsx';
+const heroComponentPath = 'components/marketing/MarketingPosterHero.tsx';
 const cssPath = 'app/(home)/home.css';
 
 const forbiddenPageChromePatterns = [
@@ -66,8 +66,8 @@ describe('mounted homepage hero System B source contract', () => {
       ).not.toMatch(pattern);
     }
 
-    // The homepage owns its approved poster composition so shared marketing
-    // hero routes cannot drift when this surface iterates.
+    // The homepage compatibility wrapper preserves the route API while the
+    // shared marketing primitive owns the stable poster composition.
     expect(pageSource).toContain('<HomepagePosterHero');
     expect(pageSource).toContain('<HomepageElectricSeam');
     expect(pageSource).toContain('homepage-trust-section');
