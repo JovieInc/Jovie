@@ -49,10 +49,10 @@ async function expectFullyInViewport(
 const MODE_TRANSITION_SETTLE_MS = 400;
 const GEOMETRY_TOLERANCE_PX = 1;
 const ARTIST_PROFILE_MODE_LABELS = [
-  'Upcoming Release',
-  'Release Day',
-  'Touring',
-  'Live Support',
+  'Pre-save',
+  'Out now',
+  'On tour',
+  'Support',
 ] as const;
 
 interface GeometrySnapshot {
@@ -176,7 +176,7 @@ test.describe('Artist Profiles Landing', () => {
 
     await expect(
       adaptiveSection.getByRole('heading', {
-        name: 'One adaptive profile. Four moments.',
+        name: 'One profile. Right action.',
       })
     ).toBeVisible();
     await expect(adaptiveSection.getByRole('tab')).toHaveCount(4);
@@ -186,26 +186,26 @@ test.describe('Artist Profiles Landing', () => {
     );
     const modes = [
       {
-        label: 'Upcoming Release',
-        headline: 'Before a drop, your profile collects release alerts.',
+        label: 'Pre-save',
+        headline: 'Collect release alerts before it lands.',
         screenshotAlt:
           'Jovie artist profile inviting fans to get release updates.',
       },
       {
-        label: 'Release Day',
+        label: 'Out now',
         headline:
           'When the song is live, fans go straight to the right service.',
         screenshotAlt:
           'Jovie artist profile showing a release-day listen view.',
       },
       {
-        label: 'Touring',
+        label: 'On tour',
         headline: "When you're on the road, nearby dates come first.",
         screenshotAlt:
           'Jovie artist profile showing nearby shows and ticket paths.',
       },
       {
-        label: 'Live Support',
+        label: 'Support',
         headline: 'At the merch table, one scan becomes support and capture.',
         screenshotAlt: 'Jovie artist profile showing direct support options.',
       },
@@ -253,7 +253,7 @@ test.describe('Artist Profiles Landing', () => {
       });
       const panelSlot = tabList.locator('xpath=following-sibling::*[1]');
       const upcomingRelease = adaptiveSection.getByRole('tab', {
-        name: 'Upcoming Release',
+        name: 'Pre-save',
       });
 
       await tabList.scrollIntoViewIfNeeded();
@@ -302,7 +302,7 @@ test.describe('Artist Profiles Landing', () => {
 
       await page.waitForTimeout(2500);
       await expect(
-        adaptiveSection.getByRole('tab', { name: 'Live Support' })
+        adaptiveSection.getByRole('tab', { name: 'Support' })
       ).toHaveAttribute('aria-selected', 'true');
     }
   });

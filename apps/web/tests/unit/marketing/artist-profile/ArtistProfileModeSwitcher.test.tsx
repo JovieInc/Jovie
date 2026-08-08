@@ -20,14 +20,14 @@ describe('ArtistProfileModeSwitcher', () => {
       <ArtistProfileModeSwitcher adaptive={ARTIST_PROFILE_COPY.adaptive} />
     );
 
-    expectSelectedTab('Upcoming Release');
+    expectSelectedTab('Pre-save');
 
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Touring' }), {
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'On tour' }), {
       button: 0,
       ctrlKey: false,
     });
 
-    expectSelectedTab('Touring');
+    expectSelectedTab('On tour');
   });
 
   it('keeps all four accessible modes in one reserved panel slot', () => {
@@ -36,7 +36,7 @@ describe('ArtistProfileModeSwitcher', () => {
     );
 
     const panelSlot = screen.getByRole('tabpanel').parentElement;
-    expect(panelSlot).toHaveClass('min-h-28');
+    expect(panelSlot).toHaveClass('min-h-20');
 
     for (const mode of ARTIST_PROFILE_COPY.adaptive.modes) {
       fireEvent.mouseDown(screen.getByRole('tab', { name: mode.label }), {
@@ -45,6 +45,25 @@ describe('ArtistProfileModeSwitcher', () => {
       });
       expectSelectedTab(mode.label);
       expect(screen.getByRole('tabpanel').parentElement).toBe(panelSlot);
+    }
+  });
+
+  it('uses compact one-line labels for every profile moment', () => {
+    render(
+      <ArtistProfileModeSwitcher adaptive={ARTIST_PROFILE_COPY.adaptive} />
+    );
+
+    expect(ARTIST_PROFILE_COPY.adaptive.modes.map(mode => mode.label)).toEqual([
+      'Pre-save',
+      'Out now',
+      'On tour',
+      'Support',
+    ]);
+
+    for (const mode of ARTIST_PROFILE_COPY.adaptive.modes) {
+      expect(screen.getByRole('tab', { name: mode.label })).toHaveClass(
+        'whitespace-nowrap'
+      );
     }
   });
 
@@ -72,11 +91,11 @@ describe('ArtistProfileModeSwitcher', () => {
       })
     ).toBeInTheDocument();
 
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Release Day' }), {
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Out now' }), {
       button: 0,
       ctrlKey: false,
     });
-    expectSelectedTab('Release Day');
+    expectSelectedTab('Out now');
     expect(
       screen.getByRole('img', {
         name: ARTIST_PROFILE_COPY.adaptive.modes[1].screenshotAlt,
