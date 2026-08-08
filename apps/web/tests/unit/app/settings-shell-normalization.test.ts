@@ -16,6 +16,17 @@ const UNIFIED_SIDEBAR = findSourceFile(
   resolve(process.cwd(), 'apps/web/components/organisms/UnifiedSidebar.tsx')
 );
 
+const SETTINGS_POLISHED = findSourceFile(
+  resolve(
+    process.cwd(),
+    'components/features/dashboard/organisms/SettingsPolished.tsx'
+  ),
+  resolve(
+    process.cwd(),
+    'apps/web/components/features/dashboard/organisms/SettingsPolished.tsx'
+  )
+);
+
 const RETARGETING_ROUTE_FILES = [
   findSourceFile(
     resolve(process.cwd(), 'app/app/(shell)/settings/retargeting-ads/page.tsx'),
@@ -188,6 +199,19 @@ describe('settings shell normalization', () => {
     expect(layoutSource).not.toContain('@/features/settings/SettingsSidebar');
     expect(layoutSource).not.toContain('<SettingsSidebar');
     expect(layoutSource).toContain('{children}');
+  });
+
+  it('keeps SettingsPolished content-only so it cannot restore duplicate navigation', () => {
+    expect(SETTINGS_POLISHED).toBeDefined();
+
+    if (!SETTINGS_POLISHED) {
+      throw new Error('Could not find SettingsPolished source');
+    }
+
+    const source = readFileSync(SETTINGS_POLISHED, 'utf8');
+    expect(source).not.toContain('const SettingsSidebar');
+    expect(source).not.toContain('<SettingsSidebar');
+    expect(source).not.toContain('getSettingsSidebarRowClassName');
   });
 
   it('keeps global settings navigation and deep links independent of the content layout on every viewport', () => {
