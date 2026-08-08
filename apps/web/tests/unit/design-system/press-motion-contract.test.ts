@@ -51,7 +51,7 @@ describe('shared press-motion contract', () => {
       'components/features/release/SmartLinkAudioPreview.tsx'
     );
     const homepagePosterHero = readWeb(
-      'components/homepage/HomepagePosterHero.tsx'
+      'components/marketing/MarketingPosterHero.tsx'
     );
     const captureShared = readWeb(
       'components/marketing/artist-profile/captureShared.tsx'
