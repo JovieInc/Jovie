@@ -14,8 +14,9 @@ name: PR Size Guard
 # coverage, and the fixed 2500-line / 60-file cap are fail-closed in
 # pr-size-guard-policy.mjs.
 
-# PR size can only change on a push (opened/synchronize/reopened), never on a
-# label event. This guard is a REQUIRED check, so re-running it on
+# PR size can only change on a source update (opened/synchronize/reopened) or
+# when a draft becomes ready for review, never on a label event. This guard is
+# a REQUIRED check, so re-running it on
 # labeled/unlabeled is not just wasteful: rapid label churn (the autonomous
 # merge loop does this constantly) cancels the in-flight run via
 # cancel-in-progress, leaving a CANCELLED/QUEUED run as the latest for a
@@ -32,7 +33,7 @@ name: PR Size Guard
 # pr-size-guard-label-override.yml posts a passing check-run override.
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
   # Active native-queue required-context producer. Labels and policy inputs can
   # change after a source status turns green, so revalidate every member of the
   # exact synthetic group before reproducing the required context on the head.

@@ -115,6 +115,23 @@ describe('merge_group workflow contract', () => {
     expect(CI_WORKFLOW).not.toContain('steps.graphite');
   });
 
+  it('re-emits every required source context when a draft becomes reviewable', () => {
+    const readyForReviewTrigger =
+      'types: [opened, synchronize, reopened, ready_for_review]';
+
+    // A synchronize that occurs while a PR is still a draft cannot be reused
+    // for branch protection. Every source producer must therefore subscribe
+    // to the ready_for_review event on the exact unchanged head.
+    expect(CI_WORKFLOW).toContain(readyForReviewTrigger);
+    expect(SIZE_GUARD_WORKFLOW).toContain(readyForReviewTrigger);
+    expect(FORK_GATE_WORKFLOW).toContain(
+      `pull_request:\n    ${readyForReviewTrigger}`
+    );
+    expect(FORK_GATE_WORKFLOW).toContain(
+      `pull_request_target:\n    ${readyForReviewTrigger}`
+    );
+  });
+
   it('quarantines fixed unit capacity until all named warm receipts exist', () => {
     const route = getJobBlock(CI_WORKFLOW, 'ci-unit-runner-route');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
