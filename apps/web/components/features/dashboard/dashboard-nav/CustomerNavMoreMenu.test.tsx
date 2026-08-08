@@ -70,4 +70,19 @@ describe('CustomerNavMoreMenu', () => {
       expect.stringMatching(/pointer|keyboard/)
     );
   });
+
+  it('keeps its label in the full grid track with a right-edge fade', () => {
+    render(
+      <ul>
+        <CustomerNavMoreMenu items={moreItems} isItemActive={() => false} />
+      </ul>
+    );
+
+    const label = screen.getByText('More');
+    expect(label.className).toContain('w-full');
+    expect(label.className).toContain('justify-self-stretch');
+    expect(label.className).toContain('overflow-hidden');
+    expect(label.className).toContain('mask-image:linear-gradient');
+    expect(label.className).not.toContain('justify-self-start');
+  });
 });

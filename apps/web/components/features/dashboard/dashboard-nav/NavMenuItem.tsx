@@ -29,6 +29,7 @@ import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import type { KeyboardShortcut } from '@/lib/keyboard-shortcuts';
 import { navigationInputMethodFromClick } from '@/lib/tracking/navigation-telemetry';
 import type { NavigationInputMethod } from '@/lib/tracking/navigation-telemetry-contract';
+import { cn } from '@/lib/utils';
 import type { NavItem } from './types';
 
 interface NavMenuItemProps {
@@ -300,7 +301,14 @@ export function NavMenuItem({
           aria-hidden='true'
         />
       )}
-      <span className='min-w-0 truncate text-left justify-self-start group-data-[collapsible=icon]:hidden'>
+      <span
+        className={cn(
+          'min-w-0 w-full justify-self-stretch truncate overflow-hidden whitespace-nowrap text-left',
+          '[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]',
+          '[mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]',
+          'group-data-[collapsible=icon]:hidden'
+        )}
+      >
         {item.name}
       </span>
       {item.badge != null ? (
