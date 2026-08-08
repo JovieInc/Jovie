@@ -4,10 +4,21 @@ This directory is a structured mirror of Linear's AgentOS initiative. Linear rem
 
 | File | Purpose |
 |------|---------|
-| `SYNC_MODEL.md` | Sync protocol spec — how issues move from Linear into this directory. Defined in JOV-1930. |
-| `backlog.json` | Machine-readable mirror of active AgentOS issues (schema defined in `SYNC_MODEL.md §3`) |
+| `SYNC_MODEL.md` | Sync protocol spec — how issues move from Linear into this directory (JOV-1930). |
+| `backlog.types.ts` | TypeScript shape for `backlog.json` (SYNC_MODEL §3; JOV-1932). |
+| `backlog.json` | Machine-readable mirror of active AgentOS issues (schema: `backlog.types.ts` / `SYNC_MODEL.md` §3). Do not hand-edit. |
 | `<project-slug>.md` | Per-project spec detail, one file per Linear project under the AgentOS initiative |
 
-<!-- TODO(JOV-1930): SYNC_MODEL.md is being defined in the parallel R1 task. Once that PR lands, update this README to link directly to SYNC_MODEL.md §3 for the backlog.json schema. -->
+## Sync + ops
 
-Sync operations are handled by the `/roadmap` command (JOV-1932).
+```bash
+pnpm roadmap sync              # regenerate backlog.json from Linear
+pnpm roadmap sync --check      # exit 1 if mirror drifts
+pnpm roadmap today --json      # active issues (Todo / In Progress / In Review)
+pnpm roadmap approved --json   # agent-owned, human-review gate cleared
+pnpm roadmap agent-brief JOV-N # structured agent brief
+pnpm roadmap add "Title" --dry-run
+pnpm roadmap expand JOV-N --dry-run
+```
+
+Skill: `.claude/skills/roadmap/SKILL.md` · CLI: `scripts/roadmap/roadmap.mjs` · Tests: `pnpm roadmap:test`

@@ -237,7 +237,9 @@
     "backlog:gate-next": "node scripts/backlog-orchestrator/backlog-orchestrator.mjs gate-next",
     "backlog:approve-plan": "node scripts/backlog-orchestrator/backlog-orchestrator.mjs approve-plan",
     "backlog:report": "node scripts/backlog-orchestrator/backlog-orchestrator.mjs report",
-    "backlog:test": "node --test scripts/backlog-orchestrator/__tests__/*.test.mjs"
+    "backlog:test": "node --test scripts/backlog-orchestrator/__tests__/*.test.mjs",
+    "roadmap": "node scripts/roadmap/roadmap.mjs",
+    "roadmap:test": "node --test scripts/roadmap/__tests__/*.test.mjs"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

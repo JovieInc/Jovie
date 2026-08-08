@@ -1,11 +1,4 @@
-# Changelog
-
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
-
-## [Unreleased]
+- [internal] **`/roadmap` Linear ops CLI (JOV-1932):** skill + `pnpm roadmap` parser for `add`, `expand`, `sync`, `today`, `approved`, and `agent-brief`, with isolated unit tests and `agentos/roadmap/backlog.types.ts`.
 - [internal] **Grok sidecar admission is one source of truth (JOV-4802):** reconcile no longer launches an issue that will fail grok-ship-one's check — `blocked` was added to the shared blocked-label gate, grok-ship-one now delegates its admission decision to the controller's `check-admission` predicate (exactly what reconcile uses), and reconcile re-verifies each issue immediately before launching so a `blocked`/`needs-human` guard landing after the list query can never be dispatched. Default `SYMPHONY_GROK_MAX` raised 2→4 with a live-concurrency cap so total grok ships never exceed the limit (Gem 16c/62GB).
 - [internal] **Desktop System-B token contract aligns with web app-shell canon (JOV-4803):** the desktop tokens contract test now reads Noir Ion dark-mode anchors from `design-system.css` and the authenticated app-shell frame overrides from `system-b-app.css` instead of removed `--linear-*` tokens; no DMG publish in this PR.
 - [internal] **Production public-profile alias perf gate is warning-only (#15586 / JOV-4854):** post-promote `jov.ie` usable-result budgets still measure and emit `::warning::` / `performance_status=warn` on cold-cache noise, but no longer fail Production Verified; the immutable staged public-profile budget gate remains hard.
