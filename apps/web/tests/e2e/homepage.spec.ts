@@ -552,6 +552,17 @@ test.describe('Homepage', () => {
     await expect.poll(() => previous.isDisabled()).toBe(true);
     await expect.poll(() => next.isEnabled()).toBe(true);
     await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await expect
+      .poll(async () => {
+        const state = await proofState();
+        return Boolean(
+          state &&
+            state.opacity < 1 &&
+            !identityTransforms.includes(state.logoTransform) &&
+            !identityTransforms.includes(state.panelTransform)
+        );
+      })
+      .toBe(true);
     const duringTransition = await proofState();
     expect(duringTransition?.opacity ?? 1).toBeLessThan(1);
     expect(duringTransition?.opacity ?? 0).toBeGreaterThanOrEqual(0.18);
