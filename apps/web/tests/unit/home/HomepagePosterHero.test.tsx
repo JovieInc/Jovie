@@ -1,35 +1,35 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  HomepagePosterHero,
-  type HomepagePosterHeroCta,
-} from '@/components/homepage/HomepagePosterHero';
 import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
 import { trackHomepageEvent } from '@/components/homepage/homepage-analytics';
+import {
+  MarketingPosterHero,
+  type MarketingPosterHeroCta,
+} from '@/components/marketing/MarketingPosterHero';
 
 vi.mock('@/components/homepage/homepage-analytics', () => ({
   trackHomepageEvent: vi.fn(),
 }));
 
-const primaryCta: HomepagePosterHeroCta = {
+const primaryCta: MarketingPosterHeroCta = {
   label: 'Enter Jovie',
   href: '/signup',
   eventName: 'homepage_poster_cta_clicked',
   eventProperties: { variant: 'A' },
 };
-const secondaryCta: HomepagePosterHeroCta = {
+const secondaryCta: MarketingPosterHeroCta = {
   label: 'See proof',
   href: '/artist-profiles',
 };
 
 function renderHero(
   trackedLinkComponent?: ComponentProps<
-    typeof HomepagePosterHero
+    typeof MarketingPosterHero
   >['trackedLinkComponent']
 ) {
   return render(
-    <HomepagePosterHero
+    <MarketingPosterHero
       headline='Your artist work, in motion'
       subtitle='A focused workspace for the next release.'
       primaryCta={primaryCta}
@@ -41,7 +41,7 @@ function renderHero(
   );
 }
 
-describe('HomepagePosterHero', () => {
+describe('MarketingPosterHero', () => {
   it('renders one accessible heading and one primary CTA', () => {
     renderHero();
 
