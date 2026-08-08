@@ -786,6 +786,13 @@ export function buildAffectedTestPlan(
     if (file.startsWith('apps/web/components/')) return true;
     if (file.startsWith('apps/web/app/')) return true;
     if (file.startsWith('packages/ui/')) return true;
+    // The route matrix is test infrastructure: it is imported by the
+    // targeted route-coverage tests and is not product source that warrants
+    // escalating every ordinary route-contract change to a full web suite.
+    // Keep this deliberately narrow; arbitrary Playwright utilities remain
+    // fail-closed until they have an explicit deterministic lane.
+    if (file === 'apps/web/tests/e2e/utils/dashboard-route-matrix.ts')
+      return true;
     if (file.startsWith('apps/web/tests/eval/promptfoo/')) return true;
     if (isInvestorNoteIngestionInput(file)) return true;
     if (isCiCancellationHealerInput(file)) return true;
