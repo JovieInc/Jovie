@@ -47,6 +47,16 @@ describe('mounted homepage footer CTA System B source contract', () => {
     expect(homeCss).not.toMatch(
       /--homepage-footer-cta-(top|bottom)|\\.home-viewport \\.marketing-footer-premium > div|homepage-final-cta-rays/
     );
+    expect(homeCss).toContain('min-height: calc(var(--space-24) * 4)');
+    expect(homeCss).toContain('margin-top: var(--space-12)');
+    expect(homeCss).toContain(
+      'padding-top: calc(var(--homepage-chapter-space) + var(--space-16))'
+    );
+    expect(homeCss).toContain(
+      'padding-bottom: calc(var(--homepage-chapter-space) + var(--space-12))'
+    );
+    expect(homeCss).toContain('min-height: calc(var(--space-24) * 3.25)');
+    expect(homeCss).toContain('margin-top: var(--space-8)');
     expect(css).toMatch(
       /(?=.*var\(--system-b-bg-page\))(?=.*var\(--color-text-primary-token\))(?=.*var\(--color-text-tertiary-token\))(?=.*var\(--system-b-app-frame-seam\))(?=.*var\(--homepage-page-gutter\))(?=.*var\(--ds-public-content-max\))(?=.*var\(--text-4xl\))(?=.*var\(--text-xs\))(?=.*var\(--space-)(?=.*\.home-viewport \.system-b-mounted-home-footer)(?=.*@media \(max-width: 767px\))(?=.*letter-spacing: 0;)/s
     );

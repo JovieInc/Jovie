@@ -8,9 +8,9 @@ import { HomepageMeetJovie } from '@/components/homepage/HomepageMeetJovie';
 
 const CARDS: HomepageArtistProfileCards = [
   {
-    id: 'drive-streams',
-    title: 'Drive Streams',
-    body: 'Put the latest release first.',
+    id: 'sell-out',
+    title: 'Sell Out',
+    body: 'Put your next show where fans can get tickets.',
     image: {
       publicUrl: '/artist-streams.png',
       width: 660,
@@ -40,6 +40,17 @@ const CARDS: HomepageArtistProfileCards = [
       alt: 'Jovie artist profile focused on artist payments',
     },
   },
+  {
+    id: 'drop-music',
+    title: 'Drop Music',
+    body: 'Give fans one link for the release before it lands.',
+    image: {
+      publicUrl: '/artist-presave.png',
+      width: 660,
+      height: 1368,
+      alt: 'Jovie artist profile focused on an upcoming release',
+    },
+  },
 ];
 
 describe('HomepageMeetJovie', () => {
@@ -49,17 +60,16 @@ describe('HomepageMeetJovie', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: 'Jovie is the AI workspace for artists. Built around your catalog, audience, and artist presence.',
+        name: 'Jovie is the AI workspace for artists. Built around your artist presence.',
       })
     ).toBeInTheDocument();
-    expect(screen.getByText('Meet Jovie')).toHaveClass(
-      'homepage-meet-jovie__eyebrow'
-    );
     expect(
-      screen.getByText(
-        'Built around your catalog, audience, and artist presence.'
-      )
-    ).toBeInTheDocument();
+      screen.getByText('Jovie is the AI workspace for artists.')
+    ).toHaveClass('homepage-meet-jovie__heading-primary');
+    expect(screen.getByText('Built around your artist presence.')).toHaveClass(
+      'homepage-meet-jovie__heading-secondary'
+    );
+    expect(screen.queryByText('Meet Jovie')).not.toBeInTheDocument();
     expect(container.querySelectorAll('img, ul, button')).toHaveLength(0);
   });
 });
@@ -71,12 +81,20 @@ describe('HomepageArtistProfiles', () => {
     expect(
       screen.getByRole('heading', { level: 2, name: 'Artist Profiles' })
     ).toBeInTheDocument();
+    expect(screen.getByText('Built to convert')).toHaveClass(
+      'homepage-artist-profiles__intro'
+    );
     expect(
       screen.getByRole('list', { name: 'Jovie Artist Profile Outcomes' })
     ).toBeInTheDocument();
-    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    expect(screen.getAllByRole('listitem')).toHaveLength(4);
 
-    for (const title of ['Drive Streams', 'Capture Fans', 'Get Paid']) {
+    for (const title of [
+      'Sell Out',
+      'Capture Fans',
+      'Get Paid',
+      'Drop Music',
+    ]) {
       expect(
         screen.getByRole('heading', { level: 3, name: title })
       ).toBeInTheDocument();
@@ -87,13 +105,31 @@ describe('HomepageArtistProfiles', () => {
     }
   });
 
-  it('preserves registry-backed image geometry without carousel controls', () => {
+  it('preserves registry-backed image geometry with accessible carousel controls', () => {
     render(<HomepageArtistProfiles cards={CARDS} />);
 
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Explore Artist Profiles' })
+    ).toHaveAttribute('href', '/artist-profiles');
+    expect(
+      screen.getByRole('link', { name: 'Explore Artist Profiles' })
+    ).not.toHaveClass('bg-white');
 
     const images = screen.getAllByRole('img');
-    expect(images).toHaveLength(3);
+    expect(images).toHaveLength(4);
+    const previous = screen.getByRole('button', {
+      name: 'Previous Artist Profile Preview',
+    });
+    const next = screen.getByRole('button', {
+      name: 'Next Artist Profile Preview',
+    });
+
+    expect(previous).toBeDisabled();
+    expect(next).toBeEnabled();
+    expect(previous).toHaveAttribute('data-variant', 'ghost');
+    expect(previous).toHaveAttribute('data-size', 'icon');
+    expect(next).toHaveAttribute('data-variant', 'ghost');
+    expect(next).toHaveAttribute('data-size', 'icon');
 
     for (const [index, card] of CARDS.entries()) {
       expect(images[index].getAttribute('src')).toContain(

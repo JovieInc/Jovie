@@ -6,13 +6,15 @@ import {
   HomepageArtistProfiles,
 } from '@/components/homepage/HomepageArtistProfiles';
 import { HomepageClosedLoop } from '@/components/homepage/HomepageClosedLoop';
-import { HomepageElectricSeam } from '@/components/homepage/HomepageElectricSeam';
 import { HomepageHeroCommandCenter } from '@/components/homepage/HomepageHeroCommandCenter';
 import { HomepageMeetJovie } from '@/components/homepage/HomepageMeetJovie';
-import { HomepagePosterHero } from '@/components/homepage/HomepagePosterHero';
 import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
 import { HERO_COPY } from '@/components/homepage/intent';
-import { FaqSection } from '@/components/marketing';
+import {
+  FaqSection,
+  MarketingElectricSeam,
+  MarketingPosterHero,
+} from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import {
@@ -49,10 +51,10 @@ const HERO_PRODUCT_IMAGES = {
 };
 const ARTIST_OUTCOME_CARDS = [
   {
-    id: 'drive-streams',
-    title: 'Drive Streams',
-    body: 'Put the latest release, pre-save, or countdown at the front of the profile.',
-    image: getMarketingExportImage('tim-white-profile-listen-mobile'),
+    id: 'sell-out',
+    title: 'Sell Out',
+    body: 'Put your next show or tour date where fans can get tickets.',
+    image: getMarketingExportImage('tim-white-profile-tour-mobile'),
   },
   {
     id: 'capture-fans',
@@ -65,6 +67,12 @@ const ARTIST_OUTCOME_CARDS = [
     title: 'Get Paid',
     body: 'Make direct support feel native to the artist profile.',
     image: getMarketingExportImage('tim-white-profile-pay-mobile'),
+  },
+  {
+    id: 'drop-music',
+    title: 'Drop Music',
+    body: 'Give fans one link for the release before it lands.',
+    image: getMarketingExportImage('tim-white-profile-presave-mobile'),
   },
 ] as const satisfies HomepageArtistProfileCards;
 
@@ -195,7 +203,7 @@ const FAQ_SCHEMA = buildFaqSchema([...HOMEPAGE_LAUNCH_COPY.faq]);
 function HomepageHero() {
   return (
     <>
-      <HomepagePosterHero
+      <MarketingPosterHero
         headingId='home-hero-heading'
         headline={HERO_COPY.headline}
         subtitle={HERO_COPY.subhead}
@@ -220,7 +228,7 @@ function HomepageHero() {
           },
         }}
         seam={
-          <HomepageElectricSeam
+          <MarketingElectricSeam
             idSeed='homepage-hero-electric-seam'
             className='homepage-poster-hero__electric-seam'
           />

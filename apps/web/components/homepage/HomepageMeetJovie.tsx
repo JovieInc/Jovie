@@ -6,7 +6,6 @@ export function HomepageMeetJovie() {
       data-testid='homepage-meet-jovie'
     >
       <div className='homepage-meet-jovie__inner'>
-        <p className='homepage-meet-jovie__eyebrow'>Meet Jovie</p>
         <h2
           className='homepage-meet-jovie__heading'
           data-homepage-section-heading
@@ -15,9 +14,9 @@ export function HomepageMeetJovie() {
           {/* ui-casing-allow: marketing display headline (DESIGN.md Text Casing exception) */}
           <span className='homepage-meet-jovie__heading-primary'>
             Jovie is the AI workspace for artists.
-          </span>{' '}
-          <span className='homepage-meet-jovie__intro'>
-            Built around your catalog, audience, and artist presence.
+          </span>
+          <span className='homepage-meet-jovie__heading-secondary'>
+            Built around your artist presence.
           </span>
         </h2>
       </div>

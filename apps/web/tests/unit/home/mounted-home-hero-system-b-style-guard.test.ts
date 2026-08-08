@@ -66,10 +66,10 @@ describe('mounted homepage hero System B source contract', () => {
       ).not.toMatch(pattern);
     }
 
-    // The homepage compatibility wrapper preserves the route API while the
-    // shared marketing primitive owns the stable poster composition.
-    expect(pageSource).toContain('<HomepagePosterHero');
-    expect(pageSource).toContain('<HomepageElectricSeam');
+    // The shared marketing primitive owns the stable composition while each
+    // route retains its own copy, media, analytics, and visual treatment.
+    expect(pageSource).toContain('<MarketingPosterHero');
+    expect(pageSource).toContain('<MarketingElectricSeam');
     expect(pageSource).toContain('homepage-trust-section');
     expect(pageSource).not.toMatch(/statsRow|stats=\{/);
 

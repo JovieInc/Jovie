@@ -50,9 +50,9 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
     for (const className of [
       'homepage-meet-jovie',
       'homepage-meet-jovie__inner',
-      'homepage-meet-jovie__eyebrow',
       'homepage-meet-jovie__heading',
-      'homepage-meet-jovie__intro',
+      'homepage-meet-jovie__heading-primary',
+      'homepage-meet-jovie__heading-secondary',
     ]) {
       expect(source).toContain(className);
     }
@@ -117,10 +117,14 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
       'HOMEPAGE MEET JOVIE SYSTEM B'
     );
 
-    for (const pattern of forbiddenCssPatterns) {
+    for (const pattern of forbiddenCssPatterns.filter(
+      pattern => pattern.source !== 'linear-gradient|radial-gradient'
+    )) {
       expect(css, `${cssPath} leaked ${pattern}`).not.toMatch(pattern);
     }
 
+    expect(css).toContain('background: linear-gradient(');
+    expect(css).toContain('var(--system-b-bg-surface-0)');
     expect(css).toContain('var(--system-b-bg-page)');
     expect(css).toContain('var(--color-text-primary-token)');
     expect(css).toContain('var(--color-text-tertiary-token)');
@@ -129,8 +133,71 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
     expect(css).toContain('var(--homepage-section-title-size)');
     expect(css).toContain('var(--space-');
     expect(css).toContain('var(--font-sans)');
-    expect(css).toContain('font-size: var(--homepage-section-copy-size)');
-    expect(css).toContain('text-wrap: pretty');
+    expect(css).toContain(
+      'border-top: var(--space-px) solid var(--homepage-chapter-rule)'
+    );
+    expect(css).toContain(
+      'border-radius: var(--radius-2xl) var(--radius-2xl) 0 0'
+    );
+    expect(css).toContain('var(--system-b-bg-surface-0)');
+    expect(css).toContain('homepage-meet-jovie__heading-primary');
+    expect(css).toContain('homepage-meet-jovie__heading-secondary');
+    expect(css).toContain('display: block');
+    expect(css).not.toContain('homepage-meet-jovie__eyebrow');
+    expect(css).not.toContain('font-size: var(--homepage-section-copy-size)');
+  });
+
+  it('keeps the proof transition layered, layout-stable, and motion-safe', () => {
+    const source = readFileSync(path.join(webRoot, cssPath), 'utf8');
+
+    expect(source).toContain('homepage-proof-logos-parallax');
+    expect(source).toContain('animation-range: cover 60% exit 96%');
+    expect(source).toContain('opacity: 1');
+    expect(source).toContain('opacity: 0.18');
+    expect(source).toContain(
+      'transform: translate3d(0, calc(var(--space-4) * -1), 0) scale(0.99)'
+    );
+    expect(source).toContain('homepage-meet-jovie-panel-glide');
+    expect(source).toContain('animation-timeline: view()');
+    expect(source).toContain('transform: translate3d(0, 0, 0)');
+    expect(source).toContain(
+      'transform: translate3d(0, calc(var(--space-16) * -1), 0)'
+    );
+    expect(source).toContain(
+      '.homepage-story-stack > .homepage-artist-profiles'
+    );
+    expect(source).toContain('border-top: 0');
+    expect(source).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.homepage-meet-jovie/
+    );
+    expect(source).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*?opacity: 1;[\s\S]*?transform: none;/
+    );
+    expect(source).toContain('.homepage-closed-loop-section::before');
+    expect(source).toContain('filter: blur(110px)');
+  });
+
+  it('keeps the Artist Profiles header as a same-scale two-line lockup', () => {
+    const css = extractCssBlock(
+      readFileSync(path.join(webRoot, cssPath), 'utf8'),
+      'HOMEPAGE ARTIST PROFILES SYSTEM B'
+    );
+
+    expect(css).toContain('justify-content: space-between');
+    expect(css).toContain('homepage-artist-profiles__lockup');
+    expect(css).toContain('margin: var(--space-1) 0 0');
+    expect(css).toContain('homepage-artist-profiles__action');
+
+    for (const token of [
+      'var(--homepage-section-title-size)',
+      'var(--font-weight-semibold)',
+      'var(--ds-marketing-title-leading)',
+      'var(--ds-marketing-title-tracking)',
+    ]) {
+      expect(
+        css.match(new RegExp(token.replace(/[()]/g, '\\$&'), 'g'))
+      ).toHaveLength(2);
+    }
   });
 
   it('keeps outcome card CSS tokenized', () => {
@@ -140,7 +207,10 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
     );
 
     for (const pattern of forbiddenCssPatterns) {
-      expect(css, `${cssPath} leaked ${pattern}`).not.toMatch(pattern);
+      expect(
+        css.replaceAll('box-shadow: none;', ''),
+        `${cssPath} leaked ${pattern}`
+      ).not.toMatch(pattern);
     }
 
     expect(css).toContain('var(--system-b-app-frame-seam)');
@@ -148,6 +218,17 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
     expect(css).toContain('var(--system-b-primary-bg)');
     expect(css).toContain('var(--space-');
     expect(css).toContain('var(--radius-2xl)');
+    expect(css).toContain('aspect-ratio: 9 / 16');
+    expect(css).toContain('--homepage-artist-outcome-copy-track: 1fr');
+    expect(css).toContain('--homepage-artist-outcome-media-track: 2fr');
+    expect(css).toContain('height: calc(100% - var(--space-4))');
+    expect(css).not.toContain('transform: translateY(33%)');
+    expect(css).toContain('object-fit: contain');
+    expect(css).toContain('background: var(--system-b-bg-surface-0)');
+    expect(css).toContain('box-shadow: none');
+    expect(css).not.toContain('!important');
+    expect(css).toContain('ap-phone-frame__overlay');
+    expect(css).toContain('ap-phone-frame__notch');
     expect(css).toContain('@media (max-width: 767px)');
   });
 });
