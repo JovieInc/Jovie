@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/home/HomepagePosterHero.test.tsx
 import { Button } from '@jovie/ui/atoms/button';
 import Link from 'next/link';
 import type { ElementType, ReactNode } from 'react';
