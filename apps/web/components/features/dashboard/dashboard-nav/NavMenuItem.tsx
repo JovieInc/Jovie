@@ -303,7 +303,7 @@ export function NavMenuItem({
       )}
       <span
         className={cn(
-          'min-w-0 w-full justify-self-stretch overflow-hidden whitespace-nowrap text-clip text-left',
+          'min-w-0 w-full justify-self-stretch truncate overflow-hidden whitespace-nowrap text-left',
           '[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]',
           '[mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]',
           'group-data-[collapsible=icon]:hidden'
