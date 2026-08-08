@@ -1,99 +1,14 @@
 .ap-opinionated__headline {
-  max-width: 12ch;
+  max-width: 13ch;
 }
 
-.marketing-snap-rail__scroller.ap-opinionated__comparison {
-  display: block;
-  padding-inline: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-  scroll-snap-type: x mandatory;
-}
-
-.marketing-snap-rail__scroller.ap-opinionated__comparison::-webkit-scrollbar {
-  display: none;
-}
-
-.ap-opinionated__comparison-pane {
-  scroll-snap-align: start;
-}
-
-.ap-opinionated__comparison-media {
-  position: relative;
-  height: clamp(22rem, 42vw, 34rem);
+.ap-opinionated__visual {
+  min-height: clamp(28rem, 48vw, 40rem);
   overflow: hidden;
-  background: var(--color-bg-surface-0);
-}
-
-.ap-opinionated__menu-preview {
-  width: min(20rem, 72%);
-  margin: 0 auto;
-  padding-top: clamp(2rem, 6vw, 4rem);
-}
-
-.ap-opinionated__menu-avatar {
-  width: 4rem;
-  height: 4rem;
-  margin: 0 auto;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-pill);
-  background: var(--color-bg-surface-2);
-}
-
-.ap-opinionated__menu-name {
-  width: 7rem;
-  height: 0.6rem;
-  margin: var(--space-4) auto var(--space-8);
-  border-radius: var(--radius-pill);
-  background: var(--color-border-default);
-}
-
-.ap-opinionated__menu-links {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.ap-opinionated__menu-link {
-  display: flex;
-  min-height: 3.25rem;
-  align-items: center;
-  justify-content: space-between;
-  padding-inline: var(--space-4);
-  border: 1px solid var(--color-border-subtle);
-  color: var(--color-text-secondary-token);
-  font-size: var(--text-xs);
 }
 
 @media (max-width: 47.99rem) {
-  .ap-opinionated__comparison-track {
-    width: 164vw;
-  }
-
-  .ap-opinionated__comparison-media {
-    height: 23.5rem;
-  }
-
-  .ap-opinionated__menu-preview {
-    width: min(17rem, 84%);
-    padding-top: var(--space-5);
-  }
-
-  .ap-opinionated__menu-avatar {
-    width: 3rem;
-    height: 3rem;
-  }
-
-  .ap-opinionated__menu-name {
-    height: 0.5rem;
-    margin: var(--space-3) auto var(--space-5);
-  }
-
-  .ap-opinionated__menu-links {
-    gap: var(--space-2);
-  }
-
-  .ap-opinionated__menu-link {
-    min-height: 2.75rem;
-    padding-inline: var(--space-3);
+  .ap-opinionated__visual {
+    min-height: 30rem;
   }
 }

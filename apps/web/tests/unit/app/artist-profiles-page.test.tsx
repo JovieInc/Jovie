@@ -131,9 +131,7 @@ vi.mock(
     }) => (
       <section>
         <h2>{opinionated.headline}</h2>
-        {opinionated.decisions.map(decision => (
-          <article key={decision.id}>{decision.action}</article>
-        ))}
+        <p>{opinionated.principle}</p>
       </section>
     ),
   })

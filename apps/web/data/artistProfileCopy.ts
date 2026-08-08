@@ -167,17 +167,9 @@ export interface ArtistProfileLandingCopy {
     readonly syntheticProofs: ArtistProfileOutcomeProof;
   };
   readonly opinionated: {
-    readonly eyebrow: string;
     readonly headline: string;
     readonly body: string;
     readonly principle: string;
-    readonly columns: readonly [string, string, string];
-    readonly decisions: readonly {
-      readonly id: 'release' | 'tour' | 'support';
-      readonly context: string;
-      readonly signal: string;
-      readonly action: string;
-    }[];
   };
   readonly outcomeDuo: {
     readonly marketingHeadline: string;
@@ -786,31 +778,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     },
   },
   opinionated: {
-    eyebrow: 'Opinionated by design',
-    headline: 'One clear action beats a wall of links.',
-    body: 'Fans should not have to choose from a wall of links. Jovie leads with the action that matters now.',
-    principle: 'One profile. One decision.',
-    columns: ['Moment', 'Jovie reads', 'Primary action'],
-    decisions: [
-      {
-        id: 'release',
-        context: 'Release is live',
-        signal: 'Latest music',
-        action: 'Listen',
-      },
-      {
-        id: 'tour',
-        context: 'Fan is nearby',
-        signal: 'Local date',
-        action: 'Tickets',
-      },
-      {
-        id: 'support',
-        context: 'Merch-table scan',
-        signal: 'Live moment',
-        action: 'Support',
-      },
-    ],
+    headline: 'Stop designing your link-in-bio.',
+    body: 'Jovie leads with the next action a fan needs—not a page of choices for you to keep redesigning. Make music. Jovie turns attention into action.',
+    principle: 'One profile. Built to convert.',
   },
   outcomeDuo: {
     // Two headlines by design: the /artist-profile page and the homepage
