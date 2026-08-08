@@ -222,6 +222,10 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
     expect(css).toContain('--homepage-artist-outcome-copy-track: 1fr');
     expect(css).toContain('--homepage-artist-outcome-media-track: 2fr');
     expect(css).toContain('height: calc(100% - var(--space-4))');
+    expect(css).toContain('width: min(22rem, 118%)');
+    expect(css).toContain(
+      'margin: var(--space-4) 0 calc(var(--space-24) * -1)'
+    );
     expect(css).not.toContain('transform: translateY(33%)');
     expect(css).toContain('object-fit: contain');
     expect(css).toContain('background: var(--system-b-bg-surface-0)');
