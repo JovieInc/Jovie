@@ -8,9 +8,11 @@ import {
   type SVGProps,
   useCallback,
   useEffect,
+  useId,
   useRef,
   useState,
 } from 'react';
+import { useModalFocusBoundary } from '@/lib/a11y/modal-focus-boundary';
 import { navigationInputMethodFromClick } from '@/lib/tracking/navigation-telemetry';
 import type { NavigationInputMethod } from '@/lib/tracking/navigation-telemetry-contract';
 import { cn } from '@/lib/utils';
@@ -258,7 +260,9 @@ export function LiquidGlassMenu({
   const [isExpanded, setIsExpanded] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const expandedMenuRef = useRef<HTMLElement>(null);
+  const expandedDialogRef = useRef<HTMLDivElement>(null);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const expandedDialogId = useId();
   const previousPathnameRef = useRef(pathname);
 
   const closeMenu = useCallback(() => {
@@ -277,6 +281,7 @@ export function LiquidGlassMenu({
   }, [closeMenuAndRestoreFocus, isExpanded]);
 
   useCloseOnEscapeOrOutside(menuRef, isExpanded, closeMenuAndRestoreFocus);
+  useModalFocusBoundary(expandedDialogRef, isExpanded);
 
   // Move keyboard focus into the menu as soon as it opens.
   useEffect(() => {
@@ -327,6 +332,12 @@ export function LiquidGlassMenu({
 
           {/* Expanded menu */}
           <div
+            ref={expandedDialogRef}
+            id={expandedDialogId}
+            role='dialog'
+            aria-modal='true'
+            aria-label={expandedNavigationLabel}
+            tabIndex={-1}
             className='relative z-50 mx-3 mb-2 overflow-hidden rounded-xl'
             style={{
               background: 'var(--liquid-glass-bg-solid)',
@@ -493,6 +504,7 @@ export function LiquidGlassMenu({
             onClick={toggleMenu}
             aria-label={isExpanded ? 'Close menu' : 'More options'}
             aria-expanded={isExpanded}
+            aria-controls={expandedDialogId}
             className={cn(
               'relative flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
               isExpanded
