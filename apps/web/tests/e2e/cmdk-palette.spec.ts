@@ -20,8 +20,7 @@ import {
   waitForHydration,
 } from './utils/smoke-test-utils';
 
-const PALETTE_INPUT =
-  'input[placeholder="Jump to a page, skill, release, or chat..."]';
+const PALETTE_INPUT = 'input[aria-label="Command Palette Search"]';
 
 test.describe('Command palette — Cmd+K contract', () => {
   test.beforeAll(() => {
