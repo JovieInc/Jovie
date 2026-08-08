@@ -68,7 +68,7 @@ describe('mounted homepage grid spine System B source contract', () => {
     const pageSource = readFileSync(path.join(webRoot, pagePath), 'utf8');
 
     for (const mount of [
-      '<HomepagePosterHero',
+      '<MarketingPosterHero',
       '<HomeTrustSection',
       '<HomepageMeetJovie',
       '<HomepageArtistProfiles',

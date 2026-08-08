@@ -288,12 +288,14 @@ test.describe('Homepage', () => {
     );
     const opportunity = page.getByTestId('homepage-opportunity-section');
     const workspace = page.getByTestId('homepage-workspace-section');
-    const outcomes = page.getByTestId('homepage-meet-jovie');
+    const meetJovie = page.getByTestId('homepage-meet-jovie');
+    const artistProfiles = page.getByTestId('homepage-artist-profiles');
     const closedLoop = page.getByTestId('homepage-closed-loop');
 
     await expect(opportunity).toBeVisible();
     await expect(workspace).toBeVisible();
-    await expect(outcomes).toBeVisible();
+    await expect(meetJovie).toBeVisible();
+    await expect(artistProfiles).toBeVisible();
     await expect(closedLoop).toBeVisible();
     const proofParallaxAnimation = await page.evaluate(() => {
       const supportsScrollTimeline = CSS.supports('animation-timeline: view()');
@@ -355,24 +357,31 @@ test.describe('Homepage', () => {
       0
     );
     await expect(
-      outcomes.getByRole('heading', { name: 'Meet Jovie' })
+      meetJovie.getByRole('heading', {
+        name: 'Jovie is the AI workspace for artists. Built around your artist presence.',
+      })
     ).toBeVisible();
-    for (const outcome of ['Drive Streams', 'Capture Fans', 'Get Paid']) {
+    for (const outcome of [
+      'Sell Out',
+      'Capture Fans',
+      'Get Paid',
+      'Drop Music',
+    ]) {
       await expect(
-        outcomes.getByRole('heading', { name: outcome })
+        artistProfiles.getByRole('heading', { name: outcome })
       ).toBeVisible();
     }
-    await outcomes.scrollIntoViewIfNeeded();
+    await artistProfiles.scrollIntoViewIfNeeded();
     await page.waitForFunction(() => {
       const section = document.querySelector(
-        '[data-testid="homepage-meet-jovie"]'
+        '[data-testid="homepage-artist-profiles"]'
       );
       if (!section) return false;
       return Array.from(
         section.querySelectorAll<HTMLImageElement>('img')
       ).every(img => img.complete && img.naturalWidth > 0);
     });
-    const profileImageQuality = await outcomes
+    const profileImageQuality = await artistProfiles
       .locator('img')
       .evaluateAll(images =>
         images.map(img => {
@@ -437,6 +446,26 @@ test.describe('Homepage', () => {
     page,
     browserName,
   }) => {
+    const proofState = () =>
+      page.evaluate(() => {
+        const logos = document.querySelector('.homepage-trust-logo-grid');
+        const panel = document.querySelector(
+          '[data-testid="homepage-meet-jovie"]'
+        );
+        if (!(logos instanceof HTMLElement) || !(panel instanceof HTMLElement))
+          return null;
+        const logoStyle = getComputedStyle(logos);
+        return {
+          opacity: Number.parseFloat(logoStyle.opacity),
+          logoTransform: logoStyle.transform,
+          panelTransform: getComputedStyle(panel).transform,
+        };
+      });
+    const identityTransforms = ['none', 'matrix(1, 0, 0, 1, 0, 0)'];
+    const atRest = await proofState();
+    expect(atRest?.opacity).toBe(1);
+    expect(identityTransforms).toContain(atRest?.logoTransform);
+
     if (browserName === 'chromium') {
       await page.evaluate(() => {
         const target = window as Window & { __homepageCls?: number };
@@ -476,8 +505,58 @@ test.describe('Homepage', () => {
     await profiles.scrollIntoViewIfNeeded();
     await expect(
       profiles.locator('.homepage-artist-outcome__device')
-    ).toHaveCount(3);
-    await expect(profiles.locator('img')).toHaveCount(3);
+    ).toHaveCount(4);
+    await expect(profiles.locator('img')).toHaveCount(4);
+    const profileRailGeometry = await profiles.evaluate(section => {
+      const rail = section.querySelector('.homepage-artist-profiles__row');
+      const cards = [
+        ...section.querySelectorAll<HTMLElement>(
+          '.homepage-artist-profiles__card'
+        ),
+      ];
+      if (!(rail instanceof HTMLElement) || cards.length !== 4) return null;
+
+      const railRect = rail.getBoundingClientRect();
+      const cardRects = cards.map(card => card.getBoundingClientRect());
+      return {
+        fullyVisible: cardRects.filter(
+          rect =>
+            rect.left >= railRect.left - 1 && rect.right <= railRect.right + 1
+        ).length,
+        fourthStartsPastRail: cardRects[3].left >= railRect.right,
+      };
+    });
+    expect(profileRailGeometry).toEqual({
+      fullyVisible: 3,
+      fourthStartsPastRail: true,
+    });
+    const previous = profiles.getByRole('button', {
+      name: 'Previous Artist Profile Preview',
+    });
+    const next = profiles.getByRole('button', {
+      name: 'Next Artist Profile Preview',
+    });
+    await expect(previous).toBeDisabled();
+    await expect(next).toBeEnabled();
+    await next.click();
+    await expect.poll(() => previous.isEnabled()).toBe(true);
+    await expect.poll(() => next.isDisabled()).toBe(true);
+    await previous.click();
+    await expect.poll(() => previous.isDisabled()).toBe(true);
+    await expect.poll(() => next.isEnabled()).toBe(true);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await next.click();
+    await expect.poll(() => previous.isEnabled()).toBe(true);
+    await expect.poll(() => next.isDisabled()).toBe(true);
+    await previous.click();
+    await expect.poll(() => previous.isDisabled()).toBe(true);
+    await expect.poll(() => next.isEnabled()).toBe(true);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    const duringTransition = await proofState();
+    expect(duringTransition?.opacity ?? 1).toBeLessThan(1);
+    expect(duringTransition?.opacity ?? 0).toBeGreaterThanOrEqual(0.18);
+    expect(identityTransforms).not.toContain(duringTransition?.logoTransform);
+    expect(identityTransforms).not.toContain(duringTransition?.panelTransform);
     await expect(
       page.getByTestId('homepage-closed-loop').getByRole('heading', {
         name: 'All your music working while you sleep',
@@ -497,22 +576,43 @@ test.describe('Homepage', () => {
     ] as const) {
       await page.setViewportSize({ width, height });
       await page.evaluate(() => document.fonts.ready);
-      const lines = await page
+      const headingLines = await page
         .locator(
           '.homepage-poster-hero__headline, [data-homepage-section-heading]'
         )
         .evaluateAll(headings =>
           headings.map(heading => {
             const style = getComputedStyle(heading);
-            return Math.ceil(
-              heading.getBoundingClientRect().height /
-                Number.parseFloat(style.lineHeight) -
-                0.05
-            );
+            return {
+              isMeetJovie: heading.classList.contains(
+                'homepage-meet-jovie__heading'
+              ),
+              lines: Math.ceil(
+                heading.getBoundingClientRect().height /
+                  Number.parseFloat(style.lineHeight) -
+                  0.05
+              ),
+            };
           })
         );
-      expect(Math.max(...lines)).toBeLessThanOrEqual(2);
+      expect(
+        Math.max(
+          ...headingLines
+            .filter(heading => !heading.isMeetJovie)
+            .map(heading => heading.lines)
+        )
+      ).toBeLessThanOrEqual(2);
+      expect(
+        headingLines.find(heading => heading.isMeetJovie)?.lines
+      ).toBeLessThanOrEqual(width >= 768 ? 2 : 4);
     }
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await gotoHomepage(page);
+    await profiles.scrollIntoViewIfNeeded();
+    const reduced = await proofState();
+    expect(reduced?.opacity).toBe(1);
+    expect(reduced?.logoTransform).toBe('none');
+    expect(reduced?.panelTransform).toBe('none');
   });
 
   test('mobile keeps hero and product proof inside the viewport with direct auth CTAs', async ({
