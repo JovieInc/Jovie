@@ -1743,7 +1743,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verifyStep).toContain('EXPECTED_PRODUCTION_DEPLOYMENT_ID');
   });
 
-  it('measures production public-profile alias budgets as warning-only (staged remains hard)', () => {
+  it('measures production public-profile alias budgets as warning-only', () => {
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const aliasGate = getJobBlock(
       workflow,
@@ -1781,14 +1781,16 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'Prove canonical navigation budgets on exact staged build'
     );
     expect(stagedPerformanceGate).toContain('--base-url "$deployment_url"');
-    // Immutable staged public-profile gate stays hard-fail.
-    expect(stagedPerformanceGate).toContain(
-      'Public-profile alias usable-result contract failed on the immutable staged deployment.'
+    const stagedPublicProfileGate = stagedPerformanceGate.slice(
+      stagedPerformanceGate.lastIndexOf(
+        'if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts'
+      )
     );
-    expect(stagedPerformanceGate).toContain('fail_performance_gate');
-    expect(stagedPerformanceGate).toMatch(
-      /public-profile-releases \|\| \\\s*\n\s*fail_performance_gate/
-    );
+    // Staged public-profile budgets are warning-only; the measurement remains enforced.
+    expect(stagedPublicProfileGate).not.toContain('fail_performance_gate');
+    expect(stagedPublicProfileGate).not.toContain('continue-on-error: true');
+    expect(stagedPublicProfileGate).toContain('performance_status=warn');
+    expect(stagedPublicProfileGate).toContain('::warning::');
     for (const routeId of [
       'public-profile-listen',
       'public-profile-music',
