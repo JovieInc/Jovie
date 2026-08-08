@@ -107,7 +107,10 @@ export { TableCheckboxCell } from './atoms/TableCheckboxCell';
 export type { TableCountBadgeProps } from './atoms/TableCountBadge';
 export { TableCountBadge } from './atoms/TableCountBadge';
 export type { TableEmptyStateProps } from './atoms/TableEmptyState';
-export { TableEmptyState } from './atoms/TableEmptyState';
+export {
+  TABLE_EMPTY_STATE_MIN_HEIGHT_PX,
+  TableEmptyState,
+} from './atoms/TableEmptyState';
 export type { TableHeaderCellProps } from './atoms/TableHeaderCell';
 export { TableHeaderCell } from './atoms/TableHeaderCell';
 export { TableIconButton } from './atoms/TableIconButton';

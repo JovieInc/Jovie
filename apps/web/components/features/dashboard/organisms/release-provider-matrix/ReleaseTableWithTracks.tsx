@@ -271,7 +271,7 @@ export function ReleaseTableWithTracks({
       return (
         <TableEmptyState
           icon={<Icon name='Disc3' className='h-6 w-6' />}
-          title='No releases found'
+          heading='No releases found'
           description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
           className='system-b-release-table-empty-state mx-4 my-3'
         />
@@ -330,7 +330,7 @@ export function ReleaseTableWithTracks({
       emptyState={
         <TableEmptyState
           icon={<Icon name='Disc3' className='h-6 w-6' />}
-          title='No releases found'
+          heading='No releases found'
           description='Use the toolbar to create a release, sync from Spotify, or clear filters.'
           className='system-b-release-table-empty-state m-3'
         />

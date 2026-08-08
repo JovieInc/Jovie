@@ -398,6 +398,7 @@ export function AdminFeedbackTable({
 
   // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
   const columns = useMemo<ColumnDef<FeedbackRow, any>[]>(
+    // eslint-disable-next-line react-hooks/refs -- Pre-existing pattern; ref only read inside column event handlers. Out of JOV-4869 scope.
     () => buildFeedbackColumns({ getContextMenuItems }),
     [getContextMenuItems]
   );
@@ -473,7 +474,9 @@ export function AdminFeedbackTable({
                 icon={
                   <MessageSquareText className='h-5 w-5' aria-hidden='true' />
                 }
-                title={loadError ? 'Feedback unavailable' : 'No feedback found'}
+                heading={
+                  loadError ? 'Feedback unavailable' : 'No feedback found'
+                }
                 description={
                   loadError
                     ? 'The feedback table could not load. Check the server logs before treating this as zero feedback.'

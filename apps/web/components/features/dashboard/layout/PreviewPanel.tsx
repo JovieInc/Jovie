@@ -19,8 +19,8 @@ import {
 import { toast } from '@/components/feedback';
 import {
   DrawerButton,
-  DrawerEmptyState,
   DrawerHeader,
+  DrawerInlineNote,
 } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -79,7 +79,7 @@ function PreviewPanelEmpty({
                 </p>
               </div>
 
-              <DrawerEmptyState message='Loading profile preview…' />
+              <DrawerInlineNote message='Loading profile preview…' />
 
               <div className='mx-auto w-full max-w-80'>
                 <div className={cn(LINEAR_SURFACE.sidebarCard, 'p-2.5')}>

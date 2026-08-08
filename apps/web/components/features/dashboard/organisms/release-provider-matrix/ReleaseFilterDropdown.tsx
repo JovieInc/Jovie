@@ -15,7 +15,7 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { DropdownEmptyState } from '@/components/molecules/DropdownEmptyState';
+import { DropdownEmptyRow } from '@/components/molecules/DropdownEmptyRow';
 import {
   ActiveFilterPill,
   FilterCheckboxItem,
@@ -54,9 +54,11 @@ const POPULARITY_OPTIONS: {
   label: string;
   iconName: string;
 }[] = [
+  /* eslint-disable @jovie/canonical-ui-label-casing -- Pre-existing filter labels; numeric ranges make the rule's suggestion identical. Out of JOV-4869 scope. */
   { id: 'low', label: 'Low (0-33)', iconName: 'SignalLow' },
   { id: 'med', label: 'Medium (34-66)', iconName: 'SignalMedium' },
   { id: 'high', label: 'High (67-100)', iconName: 'SignalHigh' },
+  /* eslint-enable @jovie/canonical-ui-label-casing */
 ];
 
 // ============================================================================
@@ -94,7 +96,7 @@ function VirtualizedLabelList({
   if (options.length === 0) {
     return (
       <div className='flex-1 overflow-y-auto'>
-        <DropdownEmptyState message={emptyMessage} />
+        <DropdownEmptyRow message={emptyMessage} />
       </div>
     );
   }
@@ -341,7 +343,7 @@ export function ReleaseFilterDropdown({
           {/* Categories List */}
           <div className='flex-1 overflow-y-auto p-1.5'>
             {filteredCategories.length === 0 ? (
-              <DropdownEmptyState message='No filters found' />
+              <DropdownEmptyRow message='No filters found' />
             ) : (
               <>
                 {/* Release Type Submenu */}

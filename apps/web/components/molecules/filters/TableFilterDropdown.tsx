@@ -14,7 +14,7 @@ import {
 } from '@jovie/ui';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { DropdownEmptyState } from '@/components/molecules/DropdownEmptyState';
+import { DropdownEmptyRow } from '@/components/molecules/DropdownEmptyRow';
 import {
   TOOLBAR_MENU_CONTENT_CLASS,
   TOOLBAR_MENU_HEADER_BADGE_CLASS,
@@ -116,7 +116,7 @@ function TableFilterSection<T extends string>({
 
       <div className='flex-1 overflow-y-auto px-1 pb-1'>
         {filteredOptions.length === 0 ? (
-          <DropdownEmptyState message='No options found' />
+          <DropdownEmptyRow message='No options found' />
         ) : (
           filteredOptions.map(option => (
             <FilterCheckboxItem
@@ -250,7 +250,7 @@ export function TableFilterDropdown<T extends string = string>({
         onCloseAutoFocus={event => event.preventDefault()}
       >
         {categories.length === 0 ? (
-          <DropdownEmptyState message={emptyMessage} />
+          <DropdownEmptyRow message={emptyMessage} />
         ) : (
           categories.map(category => (
             <TableFilterSubmenu

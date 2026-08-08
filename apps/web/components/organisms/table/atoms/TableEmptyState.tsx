@@ -1,48 +1,66 @@
 'use client';
 
 import { DrawerSurfaceCard } from '@/components/molecules/drawer';
-import { EmptyState } from '@/components/molecules/EmptyState';
+import {
+  EmptyState,
+  type EmptyStateProps,
+} from '@/components/molecules/EmptyState';
 import { cn } from '@/lib/utils';
 
-export interface TableEmptyStateProps {
-  /** Main title text */
-  readonly title: string;
+/**
+ * Stable min-height (px) reserved for table empty states so loading → empty →
+ * populated transitions do not shift layout (JOV-4869). Matches `min-h-55`.
+ */
+export const TABLE_EMPTY_STATE_MIN_HEIGHT_PX = 220;
+
+type TableEmptyStateActionProps =
+  | {
+      readonly action?: NonNullable<EmptyStateProps['action']>;
+      readonly actionSlot?: never;
+    }
+  | {
+      readonly action?: never;
+      /**
+       * A domain-owned CTA that cannot be represented by the structured action
+       * contract. Escape hatch only — prefer `action`.
+       */
+      readonly actionSlot?: React.ReactNode;
+    };
+
+export type TableEmptyStateProps = TableEmptyStateActionProps & {
+  /** Main heading text */
+  readonly heading: string;
   /** Optional description text */
   readonly description?: string;
   /** Optional icon to display */
   readonly icon?: React.ReactNode;
-  /**
-   * Primary action. Prefer a pre-built node for table-specific CTAs that
-   * already exist in toolbars; new call sites should pass structured
-   * `EmptyState` actions via the molecule directly when possible.
-   */
-  readonly action?: React.ReactNode;
-  /** Secondary action button/link */
-  readonly secondaryAction?: React.ReactNode;
+  /** Optional structured secondary action (rendered as a link-style Button) */
+  readonly secondaryAction?: NonNullable<EmptyStateProps['secondaryAction']>;
   /** Additional CSS classes */
   readonly className?: string;
-  /** If provided, wraps content in <tr><td colSpan={colSpan}> */
-  readonly colSpan?: number;
   readonly testId?: string;
-}
+};
 
 /**
- * Table-scoped empty state. Composes the canonical EmptyState molecule and
- * optionally wraps in a table row for `<tbody>` placement.
+ * Table-placement adapter for the canonical EmptyState molecule (JOV-4869).
+ * All actions flow through EmptyState's structured action contract;
+ * `actionSlot` is only for CTAs that cannot be represented structurally.
+ * The default `min-h-55` keeps loading → empty → populated transitions stable.
  */
 export function TableEmptyState({
-  title,
+  heading,
   description,
   icon,
   action,
+  actionSlot,
   secondaryAction,
   className,
-  colSpan,
   testId,
 }: TableEmptyStateProps) {
-  const hasLegacyActions = Boolean(action || secondaryAction);
+  // Preserve the canonical XOR: pass either a structured action or the slot.
+  const actionProps = action ? { action } : { actionSlot };
 
-  const content = (
+  return (
     <DrawerSurfaceCard
       variant='card'
       className={cn(
@@ -52,27 +70,13 @@ export function TableEmptyState({
     >
       <EmptyState
         icon={icon}
-        heading={title}
+        heading={heading}
         description={description}
+        secondaryAction={secondaryAction}
         testId={testId}
         className='py-4'
+        {...actionProps}
       />
-      {hasLegacyActions && (
-        <div className='flex items-center gap-3 pb-4'>
-          {action}
-          {secondaryAction}
-        </div>
-      )}
     </DrawerSurfaceCard>
   );
-
-  if (colSpan !== undefined) {
-    return (
-      <tr>
-        <td colSpan={colSpan}>{content}</td>
-      </tr>
-    );
-  }
-
-  return content;
 }

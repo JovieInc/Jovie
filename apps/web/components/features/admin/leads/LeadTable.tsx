@@ -259,6 +259,7 @@ export function LeadTable({
   const sortBy: AdminLeadsSortBy = 'createdAt';
   const [actioning, setActioning] = useState<ActioningState | null>(null);
   const actioningRef = useRef<ActioningState | null>(null);
+  // eslint-disable-next-line react-hooks/refs -- Pre-existing render-time ref sync; refactor is out of JOV-4869 scope.
   actioningRef.current = actioning;
 
   // Debounced URL sync (no navigation)
@@ -341,6 +342,7 @@ export function LeadTable({
 
   const columns = useMemo(
     () =>
+      // eslint-disable-next-line react-hooks/refs -- Pre-existing pattern; ref only read inside column event handlers. Out of JOV-4869 scope.
       buildLeadColumns({
         updateLeadStatus,
         actioningRef,
@@ -418,23 +420,18 @@ export function LeadTable({
         emptyState={
           isError ? (
             <TableEmptyState
-              title='Unable to load leads'
+              heading='Unable to load leads'
               description='Try again in a moment.'
               icon={<AlertTriangle className='h-4 w-4' />}
-              action={
-                <Button
-                  type='button'
-                  variant='secondary'
-                  size='sm'
-                  onClick={handleRetry}
-                >
-                  Retry
-                </Button>
-              }
+              action={{
+                label: 'Retry',
+                onClick: handleRetry,
+                variant: 'secondary',
+              }}
             />
           ) : (
             <TableEmptyState
-              title='No leads found'
+              heading='No leads found'
               description={getEmptyDescription(search, statusFilter)}
             />
           )

@@ -2,7 +2,7 @@
   "counts": {
     "button": 41,
     "palette": 4,
-    "emptyState": 9,
+    "emptyState": 7,
     "shell": 21
   },
   "allowedEmptyStatePaths": [
@@ -10,9 +10,7 @@
     "components/features/dashboard/organisms/tour-dates/TourDatesEmptyState.tsx",
     "components/features/dashboard/release-tasks/ReleaseTaskEmptyState.tsx",
     "components/features/opportunity-inbox/OpportunityInboxEmptyState.tsx",
-    "components/molecules/DropdownEmptyState.tsx",
     "components/molecules/EmptyState.tsx",
-    "components/molecules/drawer/DrawerEmptyState.tsx",
     "components/organisms/EmptyState.tsx",
     "components/organisms/table/atoms/TableEmptyState.tsx"
   ],

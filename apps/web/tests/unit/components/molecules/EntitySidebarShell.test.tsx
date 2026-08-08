@@ -240,6 +240,24 @@ describe('EntitySidebarShell', () => {
     );
   });
 
+  it('renders the empty message via the inline note when isEmpty is set', () => {
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Empty drawer'
+        isEmpty
+        emptyMessage='Select a release to view details.'
+      >
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    expect(
+      screen.getByText('Select a release to view details.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Body content')).not.toBeInTheDocument();
+  });
+
   it('renders raised identity before the ordered section stack', () => {
     render(
       <EntitySidebarShell

@@ -931,7 +931,7 @@ export function ProfilesWorkspace({
         }
         emptyState={
           <TableEmptyState
-            title='No Presence in This Category'
+            heading='No Presence in This Category'
             description='Try another filter.'
           />
         }

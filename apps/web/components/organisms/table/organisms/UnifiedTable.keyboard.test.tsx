@@ -1,6 +1,7 @@
 import type { ColumnDef } from '@tanstack/react-table';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TABLE_EMPTY_STATE_MIN_HEIGHT_PX } from '../atoms/TableEmptyState';
 import { UnifiedTable } from './UnifiedTable';
 
 type TestRow = { id: string; name: string };
@@ -129,5 +130,26 @@ describe('UnifiedTable keyboard interaction', () => {
     fireEvent.contextMenu(screen.getByTestId('row-one'));
 
     expect(await screen.findByPlaceholderText('Search actions')).toHaveFocus();
+  });
+
+  it('reserves at least the empty state min-height in skeleton rows while loading', () => {
+    const rowHeight = 32;
+
+    render(
+      <UnifiedTable
+        data={data}
+        columns={columns}
+        hideHeader
+        isLoading
+        skeletonRows={2}
+        rowHeight={rowHeight}
+        getRowId={row => row.id}
+        onRowClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getAllByRole('row')).toHaveLength(
+      Math.ceil(TABLE_EMPTY_STATE_MIN_HEIGHT_PX / rowHeight)
+    );
   });
 });

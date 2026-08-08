@@ -143,7 +143,7 @@ vi.mock('@/components/molecules/drawer', () => ({
   EntityHeaderCard: ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>
   ),
-  DrawerEmptyState: ({ message }: { message: string }) => <p>{message}</p>,
+  DrawerInlineNote: ({ message }: { message: string }) => <p>{message}</p>,
   DrawerSection: ({ children }: { children?: React.ReactNode }) => (
     <section>{children}</section>
   ),

@@ -7,7 +7,7 @@ import {
 } from '@jovie/ui';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { DropdownEmptyState } from '@/components/molecules/DropdownEmptyState';
+import { DropdownEmptyRow } from '@/components/molecules/DropdownEmptyRow';
 import {
   FilterCheckboxItem,
   FilterSearchInput,
@@ -140,7 +140,7 @@ export function FilterSubmenu<T extends string = string>({
 
         <div className='flex-1 overflow-y-auto p-1.5'>
           {filteredOptions.length === 0 ? (
-            <DropdownEmptyState message='No options found' />
+            <DropdownEmptyRow message='No options found' />
           ) : (
             filteredOptions.map(opt => (
               <FilterCheckboxItem

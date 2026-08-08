@@ -7,7 +7,7 @@
  */
 
 import { Icon } from '@/components/atoms/Icon';
-import { DrawerEmptyState } from '@/components/molecules/drawer';
+import { DrawerInlineNote } from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/audience';
 import type { AudienceMember } from '@/types';
@@ -20,7 +20,7 @@ interface AudienceMemberActionsProps
 
 export function AudienceMemberActions({ member }: AudienceMemberActionsProps) {
   if (member.latestActions.length === 0) {
-    return <DrawerEmptyState className='min-h-24' message='No actions yet.' />;
+    return <DrawerInlineNote className='min-h-24' message='No actions yet.' />;
   }
 
   return (

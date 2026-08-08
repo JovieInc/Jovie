@@ -7,7 +7,7 @@ vi.mock('@/components/atoms/Icon', () => ({
 }));
 
 vi.mock('@/components/molecules/drawer', () => ({
-  DrawerEmptyState: ({ message }: { message: string }) => (
+  DrawerInlineNote: ({ message }: { message: string }) => (
     <div data-testid='drawer-empty'>{message}</div>
   ),
 }));

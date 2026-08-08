@@ -264,7 +264,7 @@ function AgentOsBoard({
     return (
       <TableEmptyState
         icon={<GitPullRequestArrow className='size-5' />}
-        title='No AgentOS runs'
+        heading='No AgentOS runs'
         description='AgentRunArtifact records will appear here after a workflow emits them.'
       />
     );
@@ -568,7 +568,7 @@ export function AgentOsRunsPanel({
                 emptyState={
                   <TableEmptyState
                     icon={<GitPullRequestArrow className='size-5' />}
-                    title='No AgentOS runs'
+                    heading='No AgentOS runs'
                     description='AgentRunArtifact records will appear here after a workflow emits them.'
                   />
                 }

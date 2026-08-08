@@ -8,8 +8,8 @@ import { DrawerHeaderActions } from '@/components/molecules/drawer-header/Drawer
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
-import { DrawerEmptyState } from './DrawerEmptyState';
 import { DrawerHeader } from './DrawerHeader';
+import { DrawerInlineNote } from './DrawerInlineNote';
 import { DrawerSurfaceCard } from './DrawerSurfaceCard';
 
 export interface EntitySidebarShellProps {
@@ -288,7 +288,7 @@ export function EntitySidebarShell({
         {isEmpty ? (
           <div className={bodyClassName} data-scroll-strategy={scrollStrategy}>
             <DrawerSurfaceCard variant='card' className='p-4'>
-              <DrawerEmptyState message={emptyMessage} />
+              <DrawerInlineNote message={emptyMessage} />
             </DrawerSurfaceCard>
           </div>
         ) : (

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { toast } from '@/components/feedback';
 import {
-  DrawerEmptyState,
+  DrawerInlineNote,
   DrawerSurfaceCard,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
@@ -83,7 +83,7 @@ export function ProfileSmartLinkAnalytics({
         )}
 
         {!showSkeleton && isError && (
-          <DrawerEmptyState
+          <DrawerInlineNote
             className='min-h-13 px-0 py-0'
             message='Analytics unavailable'
           />

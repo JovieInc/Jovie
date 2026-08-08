@@ -35,10 +35,6 @@ export {
   type DrawerEditableTextFieldProps,
 } from './DrawerEditableTextField';
 export {
-  DrawerEmptyState,
-  type DrawerEmptyStateProps,
-} from './DrawerEmptyState';
-export {
   DRAWER_FIELD_HELPER_CLASSNAME,
   DRAWER_FIELD_LABEL_CLASSNAME,
   DrawerFormField,
@@ -55,6 +51,10 @@ export {
   DrawerInlineIconButton,
   type DrawerInlineIconButtonProps,
 } from './DrawerInlineIconButton';
+export {
+  DrawerInlineNote,
+  type DrawerInlineNoteProps,
+} from './DrawerInlineNote';
 export {
   DrawerInspectorCard,
   type DrawerInspectorCardProps,

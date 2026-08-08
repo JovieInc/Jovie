@@ -48,7 +48,7 @@ vi.mock('@/components/molecules/drawer', () => ({
       {children}
     </button>
   ),
-  DrawerEmptyState: ({ message }: { message: string }) => <div>{message}</div>,
+  DrawerInlineNote: ({ message }: { message: string }) => <div>{message}</div>,
   DrawerHeader: ({
     title,
     actions,

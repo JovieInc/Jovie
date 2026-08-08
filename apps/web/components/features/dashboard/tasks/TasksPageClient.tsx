@@ -923,7 +923,7 @@ function TaskEmptyState({
 }>) {
   return (
     <TableEmptyState
-      title={
+      heading={
         hasFilters ? 'No Tasks Match Your Filters' : 'Your Task List Is Empty'
       }
       description={
@@ -933,32 +933,18 @@ function TaskEmptyState({
       }
       className='min-h-90'
       action={
-        hasFilters ? (
-          <Button
-            type='button'
-            variant='secondary'
-            size='sm'
-            onClick={onClearFilters}
-          >
-            Clear Filters
-          </Button>
-        ) : (
-          <Button type='button' size='sm' onClick={onOpenComposer}>
-            New Task
-          </Button>
-        )
+        hasFilters
+          ? {
+              label: 'Clear Filters',
+              onClick: onClearFilters,
+              variant: 'secondary',
+            }
+          : { label: 'New Task', onClick: onOpenComposer }
       }
       secondaryAction={
-        hasFilters ? null : (
-          <Button
-            type='button'
-            variant='secondary'
-            size='sm'
-            onClick={onOpenReleases}
-          >
-            Set Up Release
-          </Button>
-        )
+        hasFilters
+          ? undefined
+          : { label: 'Set Up Release', onClick: onOpenReleases }
       }
     />
   );
@@ -972,14 +958,10 @@ function TaskErrorState({
   return (
     <div className='flex min-h-0 flex-1 items-center justify-center px-3 py-4'>
       <TableEmptyState
-        title="Couldn't Load Tasks"
+        heading="Couldn't Load Tasks"
         description='Try reloading the task list.'
         className='min-h-60 max-w-md'
-        action={
-          <Button type='button' variant='secondary' size='sm' onClick={onRetry}>
-            Retry
-          </Button>
-        }
+        action={{ label: 'Retry', onClick: onRetry, variant: 'secondary' }}
       />
     </div>
   );

@@ -24,6 +24,7 @@ import React, {
 } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { TABLE_EMPTY_STATE_MIN_HEIGHT_PX } from '../atoms/TableEmptyState';
 import { GroupedTableBody } from '../molecules/GroupedTableBody';
 import { LoadingTableBody } from '../molecules/LoadingTableBody';
 import {
@@ -654,6 +655,12 @@ export function UnifiedTable<TData>({
 
   // Loading state
   if (isLoading) {
+    // Reserve at least the empty state's stable min-height so loading → empty
+    // → populated transitions do not shift layout (JOV-4869).
+    const loadingRowCount = Math.max(
+      skeletonRows,
+      Math.ceil(TABLE_EMPTY_STATE_MIN_HEIGHT_PX / rowHeight)
+    );
     return (
       <div
         ref={setTableContainerRef}
@@ -665,7 +672,7 @@ export function UnifiedTable<TData>({
             <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
           )}
           <LoadingTableBody
-            rows={skeletonRows}
+            rows={loadingRowCount}
             columns={columnCount}
             columnConfig={skeletonColumnConfig}
             rowHeight={`${rowHeight}px`}

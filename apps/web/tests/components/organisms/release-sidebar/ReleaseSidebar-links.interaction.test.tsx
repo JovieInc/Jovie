@@ -135,7 +135,7 @@ vi.mock('@/components/molecules/drawer', () => ({
       {actions}
     </div>
   ),
-  DrawerEmptyState: ({ message }: { message: string }) => (
+  DrawerInlineNote: ({ message }: { message: string }) => (
     <p data-testid='empty-state'>{message}</p>
   ),
   DrawerSection: ({
