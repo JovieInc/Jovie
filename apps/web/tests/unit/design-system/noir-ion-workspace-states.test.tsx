@@ -142,6 +142,9 @@ describe('Noir Ion D — workspace state surfaces (JOV-4648)', () => {
       'true'
     );
     expect(
+      screen.getByRole('columnheader', { name: 'Workspace state' })
+    ).toBeInTheDocument();
+    expect(
       screen.getByText('Selected row').closest('[data-state]')
     ).toHaveAttribute('data-state', 'selected');
     expect(

@@ -76,13 +76,18 @@ describe('CHAT_ROUTE_TOOL_IDS inventory', () => {
     expect(() => assertChatToolsRegistered(tools)).not.toThrow();
   });
 
-  it('assertChatToolsRegistered fails closed on unregistered tools', () => {
+  it('assertChatToolsRegistered fails closed with sorted unregistered tools', () => {
     expect(() =>
-      assertChatToolsRegistered({
-        proposeAvatarUpload: {},
-        totallyFakeTool: {},
-      })
-    ).toThrow(/totallyFakeTool/);
+      assertChatToolsRegistered(
+        {
+          zetaTool: {},
+          alphaTool: {},
+        },
+        new Set()
+      )
+    ).toThrow(
+      'Chat tools missing from CHAT_ROUTE_TOOL_IDS: alphaTool, zetaTool.'
+    );
   });
 });
 

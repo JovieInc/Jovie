@@ -49,6 +49,11 @@ export function NoirIonWorkspaceStatesSpecimen() {
         className='w-full overflow-hidden rounded-lg border border-subtle'
         aria-label='Workspace State Specimen'
       >
+        <thead className='sr-only'>
+          <tr>
+            <th scope='col'>Workspace state</th>
+          </tr>
+        </thead>
         <tbody>
           <tr
             className={cn(
