@@ -17,13 +17,13 @@
     },
     {
       "id": "deepseek-v4-flash",
-      "provider": "openrouter",
+      "provider": "vercel-ai-gateway",
       "model": "deepseek/deepseek-v4-flash",
       "capabilities": ["mechanical", "code", "review", "semantic"],
-      "cost_tier": "cheap-paid",
+      "cost_tier": "gateway-budgeted-paid",
       "executable_env": "GEM_DEEPSEEK_EXECUTABLE",
-      "executable_default": "hermes",
-      "probe_argv": ["{executable}", "--help"],
+      "executable_default": "/home/timwhite/.local/bin/hermes",
+      "probe_argv": ["{executable}", "--profile", "gem-shipper", "--provider", "custom:vercel-ai-gateway", "--model", "{model}", "--help"],
       "cooldown_seconds": 1800
     },
     {
