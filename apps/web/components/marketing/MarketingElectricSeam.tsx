@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/home/HomepageElectricSeam.test.tsx
 'use client';
 
 import { type CSSProperties, useId } from 'react';
