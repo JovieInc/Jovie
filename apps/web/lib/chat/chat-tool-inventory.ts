@@ -90,7 +90,9 @@ export function assertChatToolsRegistered(
   }
 
   throw new Error(
-    `Chat tools missing from CHAT_ROUTE_TOOL_IDS: ${unregistered.sort().join(', ')}. ` +
+    `Chat tools missing from CHAT_ROUTE_TOOL_IDS: ${unregistered
+      .sort((a, b) => a.localeCompare(b))
+      .join(', ')}. ` +
       'Add them to apps/web/lib/chat/chat-tool-inventory.ts. ' +
       'Do not use PUBLIC_SKILL_REGISTRY/SKILL_REGISTRY as the chat tool inventory ' +
       '(that catalog is productized skills only).'
