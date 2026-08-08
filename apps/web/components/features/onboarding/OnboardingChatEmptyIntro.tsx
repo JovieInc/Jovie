@@ -2,6 +2,7 @@
 
 import { LoaderCircle } from 'lucide-react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 import {
   ONBOARDING_ENTRY_SUPPORT,
   ONBOARDING_ENTRY_TITLE,
@@ -92,6 +93,27 @@ export function OnboardingChatEmptyIntro({
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Start's blank composer gets its own ambient treatment rather than borrowing
+ * the generic chat logo. It is absolutely positioned so the mark never takes
+ * up layout space or shifts while the composer changes state.
+ */
+export function OnboardingComposerAmbientMark() {
+  return (
+    <div
+      aria-hidden='true'
+      className='pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[20rem] overflow-hidden sm:h-[24rem]'
+      data-testid='onboarding-start-ambient-mark'
+    >
+      <JovieMarkElectric
+        size={560}
+        idSeed='start-ambient-mark'
+        className='absolute left-1/2 top-[4.5rem] -translate-x-1/2 opacity-[0.22] [mask-image:linear-gradient(142deg,transparent_0%,black_28%,black_78%,transparent_100%)] sm:top-[3rem]'
+      />
     </div>
   );
 }

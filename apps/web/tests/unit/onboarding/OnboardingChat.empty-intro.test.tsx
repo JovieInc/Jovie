@@ -114,6 +114,7 @@ describe('OnboardingChat empty intro', () => {
     );
 
     expect(screen.getByTestId('onboarding-empty-intro')).toBeTruthy();
+    expect(screen.getByTestId('onboarding-start-ambient-mark')).toBeTruthy();
     expect(screen.getByText(ONBOARDING_ENTRY_TITLE)).toBeTruthy();
     expect(screen.queryByTestId('onboarding-sign-in-skip')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
@@ -133,6 +134,7 @@ describe('OnboardingChat empty intro', () => {
     );
 
     expect(screen.getByText('Getting This Ready')).toBeTruthy();
+    expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });
 

@@ -47,6 +47,7 @@ import { ChatProposeCheckoutCard } from './ChatProposeCheckoutCard';
 import { ChatProposeNextStepCard } from './ChatProposeNextStepCard';
 import {
   OnboardingChatEmptyIntro,
+  OnboardingComposerAmbientMark,
   type OnboardingEntryMode,
 } from './OnboardingChatEmptyIntro';
 import { OnboardingMessageRecoveryRow } from './OnboardingMessageRecoveryRow';
@@ -578,8 +579,12 @@ function OnboardingMessageRegion({
         }
         hideWelcomeHeader
       >
-        <div className='w-full' data-testid='onboarding-centered-composer'>
-          {onboardingComposerSurface}
+        <div
+          className='relative isolate w-full'
+          data-testid='onboarding-centered-composer'
+        >
+          {entryMode === 'blank' ? <OnboardingComposerAmbientMark /> : null}
+          <div className='relative z-10'>{onboardingComposerSurface}</div>
         </div>
       </ChatEmptyStateComposerRegion>
     );
