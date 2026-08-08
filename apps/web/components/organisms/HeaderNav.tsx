@@ -82,7 +82,7 @@ function PublicAuthActions({
     return <MarketingSignInLink variant='ghost' />;
   }
   return (
-    <div className='flex items-center gap-1'>
+    <div className='flex items-center gap-(--linear-gap-buttons)'>
       <Link
         href={APP_ROUTES.SIGNIN}
         className='btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap'

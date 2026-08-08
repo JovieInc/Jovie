@@ -42,19 +42,11 @@ describe('onboarding sign-in placement', () => {
     );
   });
 
-  it('removes the centered duplicate without changing the starter rail reservation', () => {
-    render(
-      <OnboardingChatEmptyIntro
-        composer={<div>Composer</div>}
-        mode='blank'
-        onSelectSuggestion={vi.fn()}
-      />
-    );
+  it('removes the centered duplicate and starter rail from the blank entry', () => {
+    render(<OnboardingChatEmptyIntro mode='blank' />);
 
     expect(screen.queryByText('Already have an account?')).toBeNull();
     expect(screen.queryByTestId('onboarding-sign-in-skip')).toBeNull();
-    expect(
-      screen.getByTestId('onboarding-starter-suggestions').parentElement
-    ).toHaveClass('min-h-[7.5rem]');
+    expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });
 });

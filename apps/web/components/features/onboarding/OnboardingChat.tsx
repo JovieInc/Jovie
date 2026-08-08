@@ -525,7 +525,6 @@ interface OnboardingMessageRegionProps {
   readonly onAttachAccount: (url: string) => void;
   readonly onNoneOfTheseArtists: () => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
-  readonly onSelectStarterSuggestion: (prompt: string) => void;
   readonly profileBuilderState: OnboardingProfileBuilderState;
   readonly shouldDockComposer: boolean;
   readonly entryMode: OnboardingEntryMode;
@@ -546,7 +545,6 @@ function OnboardingMessageRegion({
   onAttachAccount,
   onNoneOfTheseArtists,
   onSelectArtist,
-  onSelectStarterSuggestion,
   profileBuilderState,
   shouldDockComposer,
 }: OnboardingMessageRegionProps) {
@@ -572,14 +570,17 @@ function OnboardingMessageRegion({
 
   if (!hasConversationStarted) {
     return (
-      <ChatEmptyStateComposerRegion hideWelcomeHeader>
-        <OnboardingChatEmptyIntro
-          composer={onboardingComposerSurface}
-          mode={entryMode}
-          onSelectSuggestion={onSelectStarterSuggestion}
-          dimmed={composerPickerOpen}
-          isBusy={isBusy}
-        />
+      <ChatEmptyStateComposerRegion
+        above={
+          <div className='flex min-h-full items-center justify-center'>
+            <OnboardingChatEmptyIntro mode={entryMode} />
+          </div>
+        }
+        hideWelcomeHeader
+      >
+        <div className='w-full' data-testid='onboarding-centered-composer'>
+          {onboardingComposerSurface}
+        </div>
       </ChatEmptyStateComposerRegion>
     );
   }
@@ -1057,7 +1058,7 @@ export function OnboardingChat({
             hasConversationStarted || shouldDockComposer
               ? 'max-w-[44rem]'
               : 'max-w-[52rem]',
-            !shouldDockComposer && 'justify-center'
+            !shouldDockComposer && 'h-full justify-center'
           )}
         >
           {flowStatus}
@@ -1075,7 +1076,6 @@ export function OnboardingChat({
             onAttachAccount={handleAttachAccount}
             onNoneOfTheseArtists={handleNoneOfTheseArtists}
             onSelectArtist={handleArtistSelect}
-            onSelectStarterSuggestion={submitText}
             profileBuilderState={profileBuilderState}
             shouldDockComposer={shouldDockComposer}
           />

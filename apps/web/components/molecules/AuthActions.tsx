@@ -9,7 +9,7 @@ export function AuthActions() {
   const isAuthed = useIsAuthenticated();
 
   return (
-    <div className='flex items-center gap-1'>
+    <div className='flex items-center gap-(--linear-gap-buttons)'>
       {isAuthed ? (
         <Link
           href={APP_ROUTES.DASHBOARD}
