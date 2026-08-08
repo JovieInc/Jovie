@@ -16,7 +16,6 @@ const { previewPanelProviderMock, useAuthRouteConfigMock } = vi.hoisted(() => ({
     isTableRoute: false,
     isDemoRoute: false,
     isChatRoute: false,
-    showChatUsageIndicator: false,
     isLyricsRoute: false,
   })),
 }));
@@ -136,10 +135,6 @@ vi.mock('@/components/shell/ArtistProfileRailToggle', () => ({
   ArtistProfileRailToggle: () => null,
 }));
 
-vi.mock('@/features/dashboard/atoms/HeaderChatUsageIndicator', () => ({
-  HeaderChatUsageIndicator: () => null,
-}));
-
 // Static import is safe here: vi.mock() declarations are hoisted above imports
 // by Vitest, so all mocks are registered before this module resolves.
 import {
@@ -174,7 +169,6 @@ describe('AuthShellWrapper', () => {
       isTableRoute: false,
       isDemoRoute: false,
       isChatRoute: false,
-      showChatUsageIndicator: false,
       isLyricsRoute: false,
     });
   });
@@ -206,6 +200,30 @@ describe('AuthShellWrapper', () => {
     expect(
       screen.queryByLabelText(/Jovie usage: .* remaining/i)
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps routine usage out of the chat header', () => {
+    useAuthRouteConfigMock.mockReturnValue({
+      section: 'dashboard',
+      isArtistProfileSettings: false,
+      breadcrumbs: [],
+      showMobileTabs: false,
+      isTableRoute: false,
+      isDemoRoute: false,
+      isChatRoute: true,
+      isLyricsRoute: false,
+    });
+
+    render(
+      <AuthShellWrapper>
+        <div>chat content</div>
+      </AuthShellWrapper>
+    );
+
+    expect(
+      screen.queryByLabelText(/Jovie usage: .* remaining/i)
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('chat content')).toBeInTheDocument();
   });
 
   it('passes the server-resolved mode into route configuration', () => {
@@ -241,7 +259,6 @@ describe('AuthShellWrapper', () => {
       isTableRoute: false,
       isDemoRoute: false,
       isChatRoute: false,
-      showChatUsageIndicator: false,
       isLyricsRoute: false,
     });
 
@@ -266,7 +283,6 @@ describe('AuthShellWrapper', () => {
       isTableRoute: false,
       isDemoRoute: false,
       isChatRoute: true,
-      showChatUsageIndicator: true,
       isLyricsRoute: false,
     });
 
@@ -284,7 +300,7 @@ describe('AuthShellWrapper', () => {
 
   it.each([
     ['dashboard', {}],
-    ['chat', { isChatRoute: true, showChatUsageIndicator: true }],
+    ['chat', { isChatRoute: true }],
     ['admin', { section: 'admin' }],
   ])('does not mount stale release-transition copy at rest on %s routes', (_, overrides) => {
     useAuthRouteConfigMock.mockReturnValue({
@@ -295,7 +311,6 @@ describe('AuthShellWrapper', () => {
       isTableRoute: false,
       isDemoRoute: false,
       isChatRoute: false,
-      showChatUsageIndicator: false,
       isLyricsRoute: false,
       ...overrides,
     });
