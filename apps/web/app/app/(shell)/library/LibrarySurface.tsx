@@ -1722,18 +1722,11 @@ function NoResults({ onReset }: { readonly onReset: () => void }) {
       heading='No Assets Match'
       description='No library items match the selected view or filters.'
       className='min-h-75'
-      actionSlot={
-        <button
-          type='button'
-          onClick={onReset}
-          className={cn(
-            'system-b-library-action system-b-library-action--standard system-b-library-action--surface-0 inline-flex items-center border border-subtle',
-            LIBRARY_BUTTON_FOCUS_CLASS
-          )}
-        >
-          Reset View
-        </button>
-      }
+      action={{
+        label: 'Reset View',
+        onClick: onReset,
+        variant: 'ghost',
+      }}
     />
   );
 }
