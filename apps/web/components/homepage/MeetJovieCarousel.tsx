@@ -11,6 +11,7 @@ export function ArtistProfileCardRow({
   cards,
 }: Readonly<{ cards: HomepageArtistProfileCards }>) {
   const railRef = useRef<HTMLDivElement | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [scrollState, setScrollState] = useState({
     canGoPrevious: false,
     canGoNext: cards.length > 3,
@@ -51,11 +52,16 @@ export function ArtistProfileCardRow({
     const reducedMotion = window.matchMedia(
       '(prefers-reduced-motion: reduce)'
     ).matches;
-    rail.scrollBy({
-      left: direction === 'next' ? rail.clientWidth : -rail.clientWidth,
+    const nextIndex = Math.max(
+      0,
+      Math.min(cards.length - 1, selectedIndex + (direction === 'next' ? 1 : -1))
+    );
+    setSelectedIndex(nextIndex);
+    rail.scrollTo({
+      left: nextIndex * rail.clientWidth,
       behavior: reducedMotion ? 'auto' : 'smooth',
     });
-  }, []);
+  }, [cards.length, selectedIndex]);
 
   return (
     <div className='homepage-artist-profiles__carousel'>
@@ -93,11 +99,17 @@ export function ArtistProfileCardRow({
           aria-label='Jovie Artist Profile Outcomes'
           className='homepage-artist-profiles__track'
         >
-          {cards.map(card => (
+          {cards.map((card, index) => (
             <li
-              className='homepage-artist-outcome homepage-artist-profiles__card'
+              className={`homepage-artist-outcome homepage-artist-profiles__card${index === selectedIndex ? ' homepage-artist-profiles__card--selected' : ''}`}
               key={card.id}
             >
+              <button
+                aria-label={`Show ${card.title}`}
+                className='homepage-artist-profiles__select'
+                onClick={() => setSelectedIndex(index)}
+                type='button'
+              />
               <div className='homepage-artist-outcome__copy'>
                 <h3>{card.title}</h3>
                 <p>{card.body}</p>
