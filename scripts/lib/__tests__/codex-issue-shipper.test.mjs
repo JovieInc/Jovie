@@ -667,6 +667,7 @@ describe('codex issue shipper prompt', () => {
         fallbackModel: 'fallback-model',
         codexSandbox: 'workspace-write',
         codexApprovalPolicy: 'on-request',
+        codexReasoningEffort: 'max',
         claudePermissionMode: 'auto',
         grokPermissionMode: 'auto',
         agentTimeoutMs: 1000,
