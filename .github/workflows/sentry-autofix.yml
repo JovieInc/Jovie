@@ -127,7 +127,7 @@ jobs:
             2. Diagnose one root cause and state a narrow objective. Do not treat the title as proof.
             3. Select one minimal, non-overlapping fix plan and define its regression proof.
             4. Implement only that fix and add or update the regression test.
-            5. Run `pnpm biome check . --write` and `pnpm turbo typecheck --filter=@jovie/web`; run the focused regression test and fix any failures.
+            5. Run the repository formatter, the Jovie web typecheck, and the focused regression test; fix any failures before continuing.
             6. If simplify_bounded=true, run a small simplification pass on touched files only:
                - remove dead imports/locals
                - flatten obvious nested conditionals
