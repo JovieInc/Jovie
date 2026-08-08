@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MARKETING_RECIPES,
   MARKETING_SECTION_IDS,
+  MARKETING_SECTION_REGISTRY,
   type MarketingSectionId,
   type RecipeId,
 } from '@/data/marketing';
@@ -95,6 +96,12 @@ async function collectCatalogTitles(): Promise<{
   return { recipes, sections, shells, rawTitles };
 }
 
+function storyExportName(sectionId: string): string {
+  return sectionId.replace(/-([a-z])/g, (_, character: string) =>
+    character.toUpperCase()
+  );
+}
+
 describe('marketing Storybook catalog coverage (JOV-4420)', () => {
   it('covers every proven recipe under Marketing/Recipes/<recipeId>', async () => {
     const { recipes } = await collectCatalogTitles();
@@ -115,6 +122,22 @@ describe('marketing Storybook catalog coverage (JOV-4420)', () => {
     expect(
       missing,
       `Missing Storybook titles for sections: ${missing.join(', ')}. Add stories under MarketingSections.stories.tsx with name: '<sectionId>'.`
+    ).toEqual([]);
+  });
+
+  it('requires a real CSF story export for every registry entry', async () => {
+    const storyFile = join(STORYBOOK_DIR, 'MarketingSections.stories.tsx');
+    const storySource = await readFile(storyFile, 'utf8');
+    const missing = MARKETING_SECTION_REGISTRY.filter(
+      entry =>
+        !new RegExp(
+          `export\\s+const\\s+${storyExportName(entry.sectionId)}\\b`
+        ).test(storySource)
+    ).map(entry => entry.sectionId);
+
+    expect(
+      missing,
+      `Registry entries without real Storybook exports: ${missing.join(', ')}. A title/comment alone is not catalog coverage.`
     ).toEqual([]);
   });
 

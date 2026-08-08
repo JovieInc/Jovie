@@ -20,6 +20,7 @@
  */
 
 import { z } from 'zod';
+import { assertMarketingComposition } from './compositionValidation';
 import { getMarketingRecipe, type RecipeId } from './recipes';
 import {
   getMarketingSection,
@@ -29,6 +30,7 @@ import {
   MARKETING_SECTION_IDS,
   type MarketingSectionId,
 } from './sections';
+import { MARKETING_SPEC_VERSION } from './spec';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Brief — the inputs a future agent receives (charter success criterion)
@@ -952,7 +954,7 @@ export function resolveComposition(input: unknown): MarketingComposition {
   );
 
   // 8. CTA label + cadence from recipe
-  return {
+  return assertMarketingComposition({
     specVersion: MARKETING_SPEC_VERSION,
     recipeId,
     sections: compositionSections,
@@ -960,7 +962,7 @@ export function resolveComposition(input: unknown): MarketingComposition {
     secondaryCtaLabel: recipe.ctaCadence.secondaryLabel,
     ctaCadence: recipe.ctaCadence.cadence,
     trace,
-  };
+  });
 }
 
 /**
@@ -1005,6 +1007,4 @@ function pickDegradationRung(
   return 1; // non-asset sections default to rung 1
 }
 
-// Import the spec version from the barrel (avoids a circular import via index.ts)
-// We re-declare it here as the source of truth; index.ts re-exports.
-export const MARKETING_SPEC_VERSION = '1.1.0';
+export { MARKETING_SPEC_VERSION } from './spec';

@@ -190,6 +190,7 @@
     "perf:interactions": "tsx scripts/performance-interaction-audit.ts",
     "perf:queue": "doppler run --project jovie-web --config dev -- tsx scripts/performance-batch-queue.ts",
     "qa:routes": "tsx scripts/route-qa.ts",
+    "qa:marketing:route-health": "E2E_USE_TEST_AUTH_BYPASS=1 PUBLIC_NOAUTH_SMOKE=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_E2E_MODE=1 playwright test tests/e2e/marketing-route-health.spec.ts --project=marketing-route-health --reporter=line",
     "public:route-qa": "tsx scripts/public-route-qa.ts",
     "qa:public:exhaustive": "tsx scripts/public-surface-qa.ts",
     "qa:public:exhaustive:staging": "BASE_URL=https://staging.jov.ie E2E_SKIP_WEB_SERVER=1 tsx scripts/public-surface-qa.ts",

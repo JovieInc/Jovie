@@ -81,6 +81,16 @@ export interface RouteManifestEntry {
   readonly specVersion: string; // MARKETING_SPEC_VERSION at binding time
   /** Canonical URL the route serves (for cross-reference). */
   readonly url: string;
+  /**
+   * Concrete public path used by the pre-migration render gate. Exact routes
+   * default to `url`; wildcard routes and intentional legacy redirects must
+   * declare a fixture explicitly so CI never tests an unresolved glob.
+   */
+  readonly healthCheck?: {
+    readonly path: string;
+    readonly expected: 'page' | 'redirect';
+    readonly allowedFinalPaths?: readonly string[];
+  };
   /** noindex flag — true if the route is noindex today (e.g. /ai, /investors, /demo/video). */
   readonly noindex?: boolean;
   /** Alias-of — when this route is an alias of another (e.g. /artist-profile → /artist-profiles). */
@@ -100,7 +110,7 @@ export interface RouteManifestEntry {
 /**
  * The route manifest. Per JOV-4508 — 25 page.tsx under (marketing)/ after
  * retiring the legacy launch pricing visual fork, plus (home)/page.tsx and
- * app/waitlist/page.tsx = 27 entries.
+ * app/waitlist/page.tsx = 28 entries.
  *
  * Exemptions are sanctioned (carry linearId + approvedBy + prUrl) per DX2.
  * The baseline exemption count for the ratchet = current sanctioned count.
@@ -394,6 +404,10 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/compare/*',
+    healthCheck: {
+      path: '/compare/linktree',
+      expected: 'page',
+    },
   },
   {
     glob: '(marketing)/alternatives/[slug]/page.tsx',
@@ -413,6 +427,10 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/alternatives/*',
+    healthCheck: {
+      path: '/alternatives/linktree',
+      expected: 'page',
+    },
   },
   {
     glob: '(marketing)/blog/page.tsx',
@@ -445,6 +463,10 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/blog/category/*',
+    healthCheck: {
+      path: '/blog/category/artist-management',
+      expected: 'page',
+    },
   },
   // waitlist — stub recipe; route lives outside (marketing)/ but manifest binds it
   {
@@ -460,6 +482,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/waitlist',
+    healthCheck: {
+      path: '/waitlist',
+      expected: 'redirect',
+      allowedFinalPaths: ['/start'],
+    },
   },
 
   // ── Exemptions (sanctioned per DX2 — linearId + approvedBy + prUrl required) ──
@@ -499,6 +526,10 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/blog/*',
+    healthCheck: {
+      path: '/blog/the-contact-problem',
+      expected: 'page',
+    },
   },
   {
     glob: '(marketing)/blog/authors/[username]/page.tsx',
@@ -517,6 +548,10 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/blog/authors/*',
+    healthCheck: {
+      path: '/blog/authors/tim',
+      expected: 'page',
+    },
   },
   {
     glob: '(marketing)/changelog/page.tsx',
@@ -627,6 +662,10 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/renders/*',
+    healthCheck: {
+      path: '/renders/catalog',
+      expected: 'page',
+    },
   },
   {
     glob: '(marketing)/renders/surfaces/[surface]/page.tsx',
@@ -645,6 +684,10 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/renders/surfaces/*',
+    healthCheck: {
+      path: '/renders/surfaces/profile',
+      expected: 'page',
+    },
   },
 ] as const;
 
@@ -668,6 +711,68 @@ export function isExempt(glob: string): boolean {
 export function isRecipeRoute(glob: string): boolean {
   return MANIFEST_BY_GLOB[glob]?.recipeId !== undefined;
 }
+
+export interface MarketingRouteHealthTarget {
+  readonly glob: string;
+  readonly path: string;
+  readonly expected: 'page' | 'redirect';
+  readonly allowedFinalPaths: readonly string[];
+  readonly requiresSharedChrome: boolean;
+}
+
+/**
+ * Resolve the concrete route target used by the hard pre-migration gate.
+ * Wildcards cannot be handed to a browser, so they fail closed unless the
+ * manifest declares an explicit fixture path.
+ */
+export function getMarketingRouteHealthTarget(
+  entry: RouteManifestEntry
+): MarketingRouteHealthTarget {
+  const healthCheck = entry.healthCheck;
+  const path = healthCheck?.path ?? entry.url;
+
+  if (path.includes('*')) {
+    throw new Error(
+      `Marketing route ${entry.glob} has no concrete healthCheck.path; wildcard targets are not valid render evidence`
+    );
+  }
+  if (!path.startsWith('/')) {
+    throw new Error(
+      `Marketing route ${entry.glob} has an invalid healthCheck.path; use a concrete absolute path`
+    );
+  }
+
+  const expected = healthCheck?.expected ?? 'page';
+  const allowedFinalPaths = healthCheck?.allowedFinalPaths ?? [];
+  if (expected === 'redirect' && allowedFinalPaths.length === 0) {
+    throw new Error(
+      `Marketing route ${entry.glob} declares a redirect health check without an allowed final path`
+    );
+  }
+
+  if (
+    allowedFinalPaths.some(
+      finalPath => !finalPath.startsWith('/') || finalPath.includes('*')
+    )
+  ) {
+    throw new Error(
+      `Marketing route ${entry.glob} declares an invalid redirect target; use concrete absolute paths`
+    );
+  }
+
+  return {
+    glob: entry.glob,
+    path,
+    expected,
+    allowedFinalPaths,
+    // Exemptions remain render-gated, but their eventual shell migration is a
+    // separate workstream. Recipe routes must prove the shared shell now.
+    requiresSharedChrome: entry.recipeId !== undefined,
+  };
+}
+
+export const MARKETING_ROUTE_HEALTH_TARGETS: readonly MarketingRouteHealthTarget[] =
+  MARKETING_ROUTE_MANIFEST.map(getMarketingRouteHealthTarget);
 
 export interface RouteRecipeParityReport {
   readonly url: string;

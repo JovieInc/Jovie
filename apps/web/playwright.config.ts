@@ -127,6 +127,13 @@ export default defineConfig({
 
   projects: [
     {
+      name: 'marketing-route-health',
+      testMatch: /marketing-route-health\.spec\.ts/,
+      // This gate must exercise the anonymous public surface directly. It
+      // intentionally does not depend on the authenticated app setup project.
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
       name: 'auth-setup',
       testMatch: /auth\.setup\.ts/,
       // Ensure setup project never attempts to read persisted auth from disk.
@@ -181,6 +188,7 @@ export default defineConfig({
             E2E_FAST_ONBOARDING: '1',
             E2E_ALLOW_DEV_CSP: '1',
             E2E_WEB_SERVER_WARMUP: webServerWarmupProfile,
+            PUBLIC_NOAUTH_SMOKE: process.env.PUBLIC_NOAUTH_SMOKE || '0',
             ...(useTestAuthBypass
               ? {
                   NEXT_PUBLIC_CLERK_MOCK: '1',
