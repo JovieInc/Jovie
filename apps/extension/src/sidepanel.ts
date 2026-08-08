@@ -452,7 +452,9 @@ function renderShell(
   }
 
   shell.appendChild(main);
-  const promptDock = showPromptDock ? renderPromptDock({ hasActionDock }) : null;
+  const promptDock = showPromptDock
+    ? renderPromptDock({ hasActionDock })
+    : null;
   if (promptDock) {
     if (hasActionDock) {
       promptDock.classList.add('prompt-dock-stacked');
@@ -846,15 +848,6 @@ async function confirmInsert(
   entity: ExtensionEntitySummary,
   field: ExtensionEntityField
 ) {
-  await logAction(apiBaseUrl, {
-    action: 'insert',
-    entity,
-    fieldId: field.id,
-    pageUrl: currentTab.url,
-    pageTitle: currentTab.title,
-    result: 'pending',
-  });
-
   try {
     await insertValue(currentTabId, field);
     await logAction(apiBaseUrl, {
