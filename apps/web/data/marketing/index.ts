@@ -23,6 +23,20 @@
  */
 
 export type {
+  MarketingRegistryEntry,
+  MarketingRegistryKind,
+  MarketingSectionRegistryEntry,
+  MarketingShellRegistryEntry,
+} from './componentRegistry';
+export {
+  getMarketingRegistryEntry,
+  getMarketingSectionRegistryEntry,
+  MARKETING_COMPONENT_REGISTRY,
+  MARKETING_COMPOSITION_CONTRACT,
+  MARKETING_SECTION_REGISTRY,
+  MARKETING_SHELL_REGISTRY,
+} from './componentRegistry';
+export type {
   MarketingBrief,
   MarketingComposition,
   MarketingCompositionSection,
@@ -34,6 +48,15 @@ export {
   MarketingCompositionSectionSchema,
   resolveComposition,
 } from './composition';
+export type {
+  MarketingCompositionValidationCode,
+  MarketingCompositionValidationIssue,
+  MarketingCompositionValidationResult,
+} from './compositionValidation';
+export {
+  assertMarketingComposition,
+  validateMarketingComposition,
+} from './compositionValidation';
 export type {
   MarketingCopyAction,
   MarketingCopyAuditIssue,
@@ -121,16 +144,19 @@ export {
   MARKETING_RECIPES,
 } from './recipes';
 export type {
+  MarketingRouteHealthTarget,
   RouteManifestEntry,
   RouteRecipeParityReport,
 } from './routeManifest';
 export {
   DEPRECATION_RATCHET_BASELINE,
   EXEMPTION_RATCHET_BASELINE,
+  getMarketingRouteHealthTarget,
   getRouteManifestEntry,
   getRouteRecipeParity,
   isExempt,
   isRecipeRoute,
+  MARKETING_ROUTE_HEALTH_TARGETS,
   MARKETING_ROUTE_MANIFEST,
 } from './routeManifest';
 export type {

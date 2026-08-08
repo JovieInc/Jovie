@@ -199,8 +199,7 @@ is a committed vitest test that runs on every PR forever — not one-shot.
 
 ## 10. Lifecycle + versioning
 
-`MARKETING_SPEC_VERSION` lives in `composition.ts`, re-exported from `index.ts`,
-echoed into docs via the `spec-version:` freshness marker (this file's header).
+`MARKETING_SPEC_VERSION` lives in `apps/web/data/marketing/spec.ts`, is re-exported from `composition.ts` and `index.ts`, and is echoed via the `spec-version:` freshness marker.
 Spec-doc version drift fails Structural Contract doc-freshness (E13).
 
 | Bump type | When |

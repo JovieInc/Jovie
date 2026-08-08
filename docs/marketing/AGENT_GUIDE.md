@@ -79,6 +79,31 @@ component paths are tagged `wip` and listed in
 
 Local: `pnpm --filter web storybook` → browse the `Marketing/` tree.
 
+### 2.6. Registry, route-health, and Pencil gates
+
+Before composing, query `MARKETING_COMPONENT_REGISTRY` in
+`apps/web/data/marketing/`. New components must be registered and storied in
+the same change; route-local copies are not available to agents. Before Pencil
+import or visual migration, run:
+
+```bash
+pnpm --filter @jovie/web run qa:marketing:route-health
+```
+
+It follows `MARKETING_ROUTE_MANIFEST` and checks every concrete target for a
+successful response, no 404/boundary/auth wall/failed request/runtime or
+console error; recipe routes also prove shared header/footer. Wildcards need a
+fixture and `/waitlist → /start` is the only allowed redirect.
+
+It uses supported capture flags (`NEXT_DISABLE_TOOLBAR=1`,
+`NEXT_PUBLIC_E2E_MODE=1`, `PUBLIC_NOAUTH_SMOKE=1`) and asserts dev chrome is
+absent without weakening production/preview/local diagnostics.
+
+**Earliest safe Pencil handoff:** route-health and registry/Storybook gates pass;
+Pencil may use registered ids, but this is not page parity. **Full canonical
+migration:** all pages use the registry, exemptions are retired/approved, and
+token/motion/accessibility/responsive/visual parity is green.
+
 ### 3. Lock meaning before writing
 
 For every rendered section, create a `MarketingCopySectionBrief` before
@@ -368,8 +393,9 @@ registry sections.
 
 ## When the spec version bumps
 
-`MARKETING_SPEC_VERSION` lives in `composition.ts`, echoed into docs via the
-`spec-version:` freshness marker. When it bumps:
+`MARKETING_SPEC_VERSION` lives in `apps/web/data/marketing/spec.ts` (and is
+re-exported by `composition.ts`), echoed into docs via the `spec-version:`
+freshness marker. When it bumps:
 1. Read `ARCHITECTURE.md` §Lifecycle + §Extension Rules.
 2. If minor (addition): add the new section/recipe/variant + a golden-fixture
    brief that exercises it + the docs anchor.
