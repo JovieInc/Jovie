@@ -130,12 +130,12 @@ describe('artist profile landing family System B source contract', () => {
       'utf8'
     );
     expect(opinionated).toContain(
-      "ariaLabel='Static Menu And Adaptive Profile Comparison'"
+      "data-testid='artist-profile-opinionated-profile'"
     );
-    expect(opinionated).toContain('showMobileControls');
     expect(opinionated).toContain(
-      "instructions='Use the previous and next buttons, or swipe, to compare both approaches.'"
+      "className='ap-opinionated__visual relative'"
     );
+    expect(opinionated).not.toContain('MarketingSnapRail');
 
     const hero = readFileSync(
       resolve(

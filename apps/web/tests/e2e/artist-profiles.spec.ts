@@ -437,11 +437,12 @@ test.describe('Artist Profiles Landing', () => {
     );
     await expect(
       opinionatedSection.getByRole('heading', {
-        name: 'One clear action beats a wall of links.',
+        name: 'Stop designing your link-in-bio.',
       })
     ).toBeVisible();
-    await expect(opinionatedSection.getByText('Static Menu')).toBeVisible();
-    await expect(opinionatedSection.getByText('Adaptive Lead')).toBeVisible();
+    await expect(
+      opinionatedSection.getByTestId('artist-profile-opinionated-profile')
+    ).toBeVisible();
 
     const specWallSection = page.getByTestId(
       'artist-profile-section-spec-wall'
