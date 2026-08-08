@@ -27,14 +27,14 @@ import { formatHelp, parseRoadmapArgs } from './parse-args.mjs';
  *   stdout?: (s: string) => void,
  *   stderr?: (s: string) => void,
  * }} [deps]
- * @returns {Promise<{ exitCode: number, result?: unknown }>}
+ * @returns {Promise<{ exitCode: number, result?: any }>}
  */
 export async function runRoadmap(argv, deps = {}) {
   const stdout = deps.stdout ?? (s => process.stdout.write(`${s}\n`));
   const stderr = deps.stderr ?? (s => process.stderr.write(`${s}\n`));
 
   const parsed = parseRoadmapArgs(argv);
-  if (!parsed.ok) {
+  if (parsed.ok === false) {
     stderr(parsed.error);
     stderr(formatHelp());
     return { exitCode: 2 };
@@ -69,6 +69,7 @@ export async function runRoadmap(argv, deps = {}) {
   };
 
   try {
+    /** @type {any} */
     let result;
     switch (parsed.command) {
       case 'add':

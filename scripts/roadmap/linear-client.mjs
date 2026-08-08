@@ -46,6 +46,7 @@ export function createLinearClient(opts = {}) {
         `Linear API request failed (${resp.status} ${resp.statusText}): ${body}`
       );
     }
+    /** @type {{ data?: any, errors?: Array<{ message: string }> }} */
     const data = await resp.json();
     if (data.errors?.length) {
       throw new Error(
