@@ -159,7 +159,7 @@ export const logoCloud: Story = {
   name: 'logo-cloud',
   render: () => (
     <SectionFrame sectionId='logo-cloud'>
-      <HomeTrustSection presentation='inline-strip' />
+      <HomeTrustSection presentation='proof-moment' />
     </SectionFrame>
   ),
 };

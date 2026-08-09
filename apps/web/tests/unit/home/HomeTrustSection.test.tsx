@@ -64,4 +64,44 @@ describe('HomeTrustSection', () => {
       })
     ).toBeInTheDocument();
   });
+
+  it('renders the registered proof moment with named partner attribution', () => {
+    const { container } = render(
+      <HomeTrustSection presentation='proof-moment' />
+    );
+
+    expect(screen.getByTestId('homepage-trust')).toHaveAttribute(
+      'data-presentation',
+      'proof-moment'
+    );
+    expect(screen.getByText('Artist proof')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', {
+        level: 2,
+        name: 'Trusted by artists and teams releasing on',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('region', {
+        name: 'Trusted by artists and teams releasing on major labels',
+      })
+    ).toBeInTheDocument();
+
+    for (const partner of [
+      'AWAL',
+      'The Orchard',
+      'Universal Music Group',
+      'Armada Music',
+    ]) {
+      expect(screen.getByLabelText(partner)).toBeInTheDocument();
+    }
+    expect(screen.getByAltText('Black Hole Recordings')).toBeInTheDocument();
+    expect(
+      container.querySelector('.homepage-trust-proof-moment__logo-grid')
+    ).toBeTruthy();
+    expect(
+      container.querySelectorAll('.homepage-trust-proof-moment__logo-slot')
+    ).toHaveLength(5);
+    expect(container.querySelector('.homepage-trust-logo-grid')).toBeNull();
+  });
 });

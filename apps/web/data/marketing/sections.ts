@@ -534,6 +534,16 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     optionalInputs: ['caption'],
     variants: [
       {
+        id: 'proof-moment',
+        layout: 'contained',
+        media: 'none',
+        alignment: 'left',
+        chooseWhen:
+          'route=/ AND placement=early-proof (after hero) AND named label logos are verified',
+        exemplar: { route: '/', section: 'trust' },
+        status: 'active',
+      },
+      {
         id: 'inline-strip',
         layout: 'contained',
         media: 'none',
@@ -582,14 +592,14 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       }, // count of logos; over = reject
     ],
     responsiveContract:
-      'inline-strip: wrap row, center-align, no horizontal scroll; segmented-grid: 3→2→1 collapse at md/sm',
+      'proof-moment: fixed 3+2 desktop rows → 2+1+2 narrow rows, no horizontal scroll; inline-strip: wrap row, center-align, no horizontal scroll; segmented-grid: 3→2→1 collapse at md/sm',
     accessibility: {
       keyboard:
         'logos are decorative <img alt=""> if meaning is in caption; else alt=name',
       contrast: 'logos on dark canvas meet AA against tokens.surface-1',
       touchTarget: 'no interactive targets (decorative); if clickable, ≥44×44',
       reducedMotion:
-        'no motion (inline-strip is static by default; marquee banned per motion budget)',
+        'proof-moment: 420ms opacity/translate entrance becomes static; inline-strip: static by default; marquee banned',
     },
     component: 'components/features/home/HomeTrustSection',
     failureModes: [

@@ -5,6 +5,11 @@ import { describe, expect, it } from 'vitest';
 const webRoot = path.resolve(__dirname, '../../..');
 const trustPath = 'components/features/home/HomeTrustSection.tsx';
 const cssPath = 'app/(home)/home.css';
+const pagePath = 'app/(home)/page.tsx';
+const storyPath =
+  'components/marketing/storybook/MarketingSections.stories.tsx';
+const sectionRegistryPath = 'data/marketing/sections.ts';
+const variantRegistryPath = 'lib/sections/variants/logo-bar.tsx';
 
 const forbiddenTrustStripCssPatterns = [
   /#[0-9a-fA-F]{3,8}/,
@@ -46,6 +51,19 @@ describe('mounted homepage trust strip System B source contract', () => {
       'system-b-mounted-home-trust-strip-logo--umg',
       'system-b-mounted-home-trust-strip-logo--armada',
       'system-b-mounted-home-trust-strip-logo--black-hole',
+    ]) {
+      expect(trustSource).toContain(className);
+    }
+
+    for (const className of [
+      'homepage-trust-proof-moment',
+      'homepage-trust-proof-moment__inner',
+      'homepage-trust-proof-moment__copy',
+      'homepage-trust-proof-moment__eyebrow',
+      'homepage-trust-proof-moment__headline',
+      'homepage-trust-proof-moment__logo-grid',
+      'homepage-trust-proof-moment__logo-slot',
+      'homepage-trust-proof-moment__logo',
     ]) {
       expect(trustSource).toContain(className);
     }
@@ -93,5 +111,55 @@ describe('mounted homepage trust strip System B source contract', () => {
     expect(css).not.toMatch(
       /\.system-b-mounted-home-trust-strip \.system-b-mounted-home-trust-strip-label\s*\{[^}]*color: var\(--color-text-quaternary-token\)/
     );
+  });
+
+  it('registers and mounts one canonical proof-moment presentation', () => {
+    const page = readFileSync(path.join(webRoot, pagePath), 'utf8');
+    const story = readFileSync(path.join(webRoot, storyPath), 'utf8');
+    const sections = readFileSync(
+      path.join(webRoot, sectionRegistryPath),
+      'utf8'
+    );
+    const variants = readFileSync(
+      path.join(webRoot, variantRegistryPath),
+      'utf8'
+    );
+
+    expect(page).toContain("<HomeTrustSection presentation='proof-moment' />");
+    expect(story).toContain("<HomeTrustSection presentation='proof-moment' />");
+    expect(sections).toContain("id: 'proof-moment'");
+    expect(variants).toContain("id: 'home-trust-proof-moment'");
+    expect(variants).toContain("presentation='proof-moment'");
+  });
+
+  it('keeps proof-moment geometry, palette, and motion on canonical tokens', () => {
+    const css = extractTrustStripCss(
+      readFileSync(path.join(webRoot, cssPath), 'utf8')
+    );
+
+    expect(css).toContain('min-height: 31rem;');
+    expect(css).toContain('min-height: 36.5rem;');
+    expect(css).toContain(
+      'padding: var(--space-16) var(--space-10) var(--space-12);'
+    );
+    expect(css).toContain(
+      'padding: calc(var(--space-12) + var(--space-1)) var(--space-6)'
+    );
+    expect(css).toContain('max-width: 41.25rem;');
+    expect(css).toContain('max-width: 21.375rem;');
+    expect(css).toContain('font-size: var(--text-5xl);');
+    expect(css).toContain('font-size: calc(var(--text-4xl) + var(--space-1));');
+    expect(css).toContain('line-height: 1.04;');
+    expect(css).toContain('line-height: 1.02;');
+    expect(css).toContain('var(--system-b-bg-page)');
+    expect(css).toContain('var(--system-b-bg-surface-0)');
+    expect(css).toContain('var(--color-text-primary-token)');
+    expect(css).toContain('var(--color-text-tertiary-token)');
+    expect(css).toContain('var(--color-border-subtle)');
+    expect(css).toContain('var(--ds-motion-cinematic-duration)');
+    expect(css).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(css).toContain('animation: none;');
+    expect(css).toContain('transform: none;');
+    expect(css).not.toContain('animation-timeline:');
   });
 });
