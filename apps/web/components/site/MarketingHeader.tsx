@@ -14,11 +14,7 @@ import {
 import { MARKETING_NAV_LINKS } from '@/data/marketingNavigation';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
-export type MarketingHeaderVariant =
-  | 'landing'
-  | 'content'
-  | 'minimal'
-  | 'homepage';
+export type MarketingHeaderVariant = 'landing' | 'minimal' | 'homepage';
 export interface MarketingHeaderNavLink {
   readonly href: string;
   readonly label: string;
