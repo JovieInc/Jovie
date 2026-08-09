@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { MarketingContainer, MarketingHero } from '@/components/marketing';
+import { BlogCategoryContent } from '@/components/organisms/BlogCategoryContent';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { getCategoryBySlug } from '@/lib/blog/categories';
 import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
@@ -100,40 +100,20 @@ export default async function CategoryPage({
     <>
       <script type='application/ld+json'>{breadcrumbSchema}</script>
 
-      <div className='min-h-screen'>
-        {/* Hero */}
-        <MarketingHero variant='left'>
-          <p className='marketing-kicker mb-0 text-tertiary-token'>Blog</p>
-          <h1 className='marketing-h1-linear mb-6 mt-6 text-primary-token'>
-            {category.name}
-          </h1>
-          <p className='marketing-lead-linear max-w-[34rem] text-secondary-token'>
-            {category.description}
-          </p>
-        </MarketingHero>
-
-        {/* Posts Grid */}
-        <MarketingContainer width='page' className='pb-20 sm:pb-28'>
-          <div className='marketing-divider mb-10' />
-          {categoryPosts.length === 0 ? (
-            <p className='text-secondary-token'>
-              No posts in this category yet.
-            </p>
-          ) : (
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
-              {categoryPosts.map(post => {
-                const author = resolveAuthor(
-                  post,
-                  post.authorUsername
-                    ? profileMap.get(post.authorUsername.toLowerCase())
-                    : null
-                );
-                return <BlogCard key={post.slug} post={post} author={author} />;
-              })}
-            </div>
-          )}
-        </MarketingContainer>
-      </div>
+      <BlogCategoryContent
+        category={category}
+        hasPosts={categoryPosts.length > 0}
+      >
+        {categoryPosts.map(post => {
+          const author = resolveAuthor(
+            post,
+            post.authorUsername
+              ? profileMap.get(post.authorUsername.toLowerCase())
+              : null
+          );
+          return <BlogCard key={post.slug} post={post} author={author} />;
+        })}
+      </BlogCategoryContent>
     </>
   );
 }
