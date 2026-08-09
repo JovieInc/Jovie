@@ -13,6 +13,259 @@ const MAX_CONCURRENT_SHIPPING_BY_TEAM = Object.freeze({ JOV: 2, LYB: 1 });
 export const SYMPHONY_LABEL = 'symphony';
 export const TODO_STATE_ID = 'c6c00506-dc9f-4910-8ff7-3874dd77174c';
 export const ADMISSION_RECEIPT_PREFIX = '<!-- symphony-admission:v1 ';
+export const FLEET_GATE_SCHEMA = 'jovie-fleet-gate/v1';
+export const GEM_CONCURRENCY_EVIDENCE_SCHEMA = 'gem-concurrency-evidence/v1';
+export const FLEET_GATE_STATE = Object.freeze({
+  GREEN: 'GREEN',
+  AMBER: 'AMBER',
+  RED: 'RED',
+});
+export const FLEET_GATE_REASON = Object.freeze({
+  MAIN_NOT_GREEN: 'main-not-green',
+  MAIN_UNKNOWN: 'main-unknown',
+  CONTROLLER_FAILURE: 'controller-failure',
+  CONTROLLER_UNKNOWN: 'controller-unknown',
+  CONTROLLER_STALE: 'controller-stale',
+  QUEUE_UNKNOWN: 'queue-unknown',
+  QUEUE_ABOVE_TARGET: 'queue-above-target',
+  CREDENTIAL_COMPROMISE: 'credential-compromise',
+  UNSAFE_MIGRATION: 'unsafe-migration-or-data-corruption',
+  BROKEN_ISOLATION: 'broken-worktree-isolation',
+  REPOSITORY_CORRUPTION: 'repository-or-artifact-corruption',
+  SEVERE_INTEGRITY_INCIDENT: 'severe-integrity-incident',
+  INVALID_INTEGRITY_RECEIPT: 'invalid-integrity-receipt',
+});
+
+const SEVERE_INTEGRITY_REASONS = new Set([
+  FLEET_GATE_REASON.CREDENTIAL_COMPROMISE,
+  FLEET_GATE_REASON.UNSAFE_MIGRATION,
+  FLEET_GATE_REASON.BROKEN_ISOLATION,
+  FLEET_GATE_REASON.REPOSITORY_CORRUPTION,
+  FLEET_GATE_REASON.SEVERE_INTEGRITY_INCIDENT,
+]);
+const DEFAULT_GEM_CONCURRENCY = 4;
+const MAX_EVIDENCE_BACKED_GEM_CONCURRENCY = 8;
+const CONTROLLER_RECEIPT_MAX_AGE_MS = 10 * 60 * 1000;
+const CONCURRENCY_EVIDENCE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function typedReason(code, layer, severity, detail) {
+  return { code, layer, severity, detail };
+}
+
+function isFreshTimestamp(value, nowMs, maxAgeMs) {
+  const observedMs = Date.parse(value || '');
+  return (
+    Number.isFinite(observedMs) &&
+    observedMs <= nowMs + 60_000 &&
+    nowMs - observedMs <= maxAgeMs
+  );
+}
+
+/**
+ * Gem stays at four workers by default. Eight is accepted only from a recent,
+ * explicit evidence receipt with enough clean observations and no severe
+ * incidents. Missing, malformed, or stale evidence fails closed to four.
+ */
+export function resolveGemConcurrency(
+  evidence,
+  {
+    now = new Date().toISOString(),
+    maxAgeMs = CONCURRENCY_EVIDENCE_MAX_AGE_MS,
+  } = {}
+) {
+  const nowMs = Date.parse(now);
+  const eligibleForEight =
+    evidence?.schema === GEM_CONCURRENCY_EVIDENCE_SCHEMA &&
+    evidence?.target === MAX_EVIDENCE_BACKED_GEM_CONCURRENCY &&
+    evidence?.approved === true &&
+    Number.isInteger(evidence?.cleanRuns) &&
+    evidence.cleanRuns >= 20 &&
+    evidence?.severeIncidents === 0 &&
+    isFreshTimestamp(evidence?.observedAt, nowMs, maxAgeMs);
+
+  return {
+    maxConcurrent: eligibleForEight
+      ? MAX_EVIDENCE_BACKED_GEM_CONCURRENCY
+      : DEFAULT_GEM_CONCURRENCY,
+    evidenceAccepted: eligibleForEight,
+    reason: eligibleForEight
+      ? 'recent-approved-clean-run-evidence'
+      : 'default-four-until-eight-is-proven',
+  };
+}
+
+/**
+ * Work admission and promotion admission are intentionally independent.
+ * Ordinary main/controller failures are AMBER: isolated draft work continues,
+ * while ready/merge/deploy remains frozen. Only an explicit severe integrity
+ * incident is RED and blocks new pickup as well.
+ */
+export function evaluateFleetGate(
+  evidence = {},
+  {
+    now = new Date().toISOString(),
+    controllerMaxAgeMs = CONTROLLER_RECEIPT_MAX_AGE_MS,
+  } = {}
+) {
+  const nowMs = Date.parse(now);
+  const reasons = [];
+  const mainStatus = evidence?.main?.status || 'unknown';
+  const controllerStatus = evidence?.controller?.status || 'unknown';
+  const integrityStatus = evidence?.integrity?.status;
+  const integrityReason = evidence?.integrity?.reason;
+  const controllerReceiptPresent = Boolean(evidence?.observedAt);
+  const controllerFresh =
+    controllerReceiptPresent &&
+    isFreshTimestamp(evidence.observedAt, nowMs, controllerMaxAgeMs);
+
+  if (
+    integrityStatus === 'active' &&
+    SEVERE_INTEGRITY_REASONS.has(integrityReason)
+  ) {
+    reasons.push(
+      typedReason(
+        integrityReason,
+        'integrity',
+        'critical',
+        evidence?.integrity?.detail || 'Severe integrity incident is active.'
+      )
+    );
+  } else if (integrityStatus !== 'clear' && integrityStatus !== 'resolved') {
+    reasons.push(
+      typedReason(
+        FLEET_GATE_REASON.INVALID_INTEGRITY_RECEIPT,
+        'integrity',
+        'critical',
+        'Integrity state is malformed or not explicitly classified.'
+      )
+    );
+  }
+
+  const redReasons = reasons.filter(reason => reason.severity === 'critical');
+  if (redReasons.length === 0) {
+    if (!controllerFresh) {
+      reasons.push(
+        typedReason(
+          controllerReceiptPresent
+            ? FLEET_GATE_REASON.CONTROLLER_STALE
+            : FLEET_GATE_REASON.CONTROLLER_UNKNOWN,
+          'controller',
+          'warning',
+          controllerReceiptPresent
+            ? 'Controller receipt is stale; promotion is frozen until refreshed.'
+            : 'Controller receipt is unavailable; promotion is frozen until observed.'
+        )
+      );
+    } else if (controllerStatus !== 'green') {
+      reasons.push(
+        typedReason(
+          controllerStatus === 'failed'
+            ? FLEET_GATE_REASON.CONTROLLER_FAILURE
+            : FLEET_GATE_REASON.CONTROLLER_UNKNOWN,
+          'controller',
+          'warning',
+          'Controller is not green; isolated draft work remains permitted.'
+        )
+      );
+    }
+
+    if (mainStatus === 'red') {
+      reasons.push(
+        typedReason(
+          FLEET_GATE_REASON.MAIN_NOT_GREEN,
+          'promotion',
+          'warning',
+          'Main is not green; ready, merge, deploy, and promotion are frozen.'
+        )
+      );
+    } else if (mainStatus !== 'green') {
+      reasons.push(
+        typedReason(
+          FLEET_GATE_REASON.MAIN_UNKNOWN,
+          'promotion',
+          'warning',
+          'Main status is unknown; ready, merge, deploy, and promotion are frozen.'
+        )
+      );
+    }
+
+    const queueStatus = evidence?.queue?.status || 'unknown';
+    const eligiblePrs = evidence?.queue?.eligiblePrs;
+    const queueTarget = evidence?.queue?.target;
+    const queueShapeValid =
+      queueStatus === 'known' &&
+      Number.isInteger(eligiblePrs) &&
+      eligiblePrs >= 0 &&
+      Number.isInteger(queueTarget) &&
+      queueTarget >= 0;
+
+    if (!queueShapeValid) {
+      reasons.push(
+        typedReason(
+          FLEET_GATE_REASON.QUEUE_UNKNOWN,
+          'promotion',
+          'warning',
+          'Promotion queue state is missing, unknown, or malformed.'
+        )
+      );
+    } else if (eligiblePrs > queueTarget) {
+      reasons.push(
+        typedReason(
+          FLEET_GATE_REASON.QUEUE_ABOVE_TARGET,
+          'promotion',
+          'warning',
+          'Promotion queue is above its target.'
+        )
+      );
+    }
+  }
+
+  const state = redReasons.length
+    ? FLEET_GATE_STATE.RED
+    : reasons.length
+      ? FLEET_GATE_STATE.AMBER
+      : FLEET_GATE_STATE.GREEN;
+  const concurrency = resolveGemConcurrency(evidence.concurrencyEvidence, {
+    now,
+  });
+
+  return {
+    schema: FLEET_GATE_SCHEMA,
+    observedAt: evidence.observedAt || null,
+    evaluatedAt: now,
+    state,
+    reasons,
+    workAdmission: {
+      allowed: state !== FLEET_GATE_STATE.RED,
+      activities:
+        state === FLEET_GATE_STATE.RED
+          ? []
+          : [
+              'approved-issue-lease',
+              'isolated-implementation',
+              'tests',
+              'review',
+              'draft-pr',
+            ],
+    },
+    promotionAdmission: {
+      allowed: state === FLEET_GATE_STATE.GREEN,
+      activities:
+        state === FLEET_GATE_STATE.GREEN
+          ? ['ready-for-merge', 'merge', 'deploy', 'production-promotion']
+          : [],
+    },
+    ownership: {
+      controller: 'Gem',
+      implementation: 'Symphony',
+      directGemPickup: false,
+    },
+    concurrency: {
+      gem: concurrency,
+      symphonyImplementation: 1,
+    },
+  };
+}
 
 export function maxConcurrentShippingForTeam(teamKey, env = process.env) {
   const key = String(teamKey || '').toUpperCase();
@@ -131,13 +384,33 @@ export async function selectNextToAdmit(
 ) {
   const maxConcurrentShipping =
     state.maxConcurrentShipping || MAX_CONCURRENT_SHIPPING;
-  const prodRed = state.productionRed ?? (await isProductionRed());
-  if (prodRed)
-    return { admit: [], reason: 'production is red — blocking admission' };
+  const fleetGate =
+    state.fleetGate ||
+    evaluateFleetGate(
+      {
+        main: {
+          status:
+            (state.productionRed ?? (await isProductionRed())) === true
+              ? 'red'
+              : 'green',
+        },
+        controller: { status: 'green' },
+        integrity: { status: 'clear' },
+        observedAt: state.now || new Date().toISOString(),
+      },
+      { now: state.now || new Date().toISOString() }
+    );
+  if (!fleetGate.workAdmission.allowed)
+    return {
+      admit: [],
+      reason: `fleet gate ${fleetGate.state.toLowerCase()} — blocking pickup`,
+      fleetGate,
+    };
   if ((state.currentlyShipping || 0) >= maxConcurrentShipping) {
     return {
       admit: [],
       reason: `at capacity (${state.currentlyShipping}/${maxConcurrentShipping})`,
+      fleetGate,
     };
   }
 
@@ -168,6 +441,7 @@ export async function selectNextToAdmit(
   return {
     admit: [selected],
     reason: `selected: ${selected.identifier} (score ${selected.score})`,
+    fleetGate,
   };
 }
 
