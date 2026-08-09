@@ -8,6 +8,9 @@ This is the first, deliberately narrow Jovie integration with Vercel Eve.
 - The pilot returns structured, read-only capability boundaries.
 - It carries no user-data access, external-provider credentials, write scope,
   deployment configuration, or public channel.
+- When Jovie's `EVE_CORE_CHAT_MODE=shadow` bridge is explicitly configured, the
+  pilot can receive a bounded core-chat observation through Eve's authenticated
+  session API. Jovie's existing `streamText` path remains authoritative.
 
 ## What it does not change
 
@@ -28,9 +31,20 @@ isolated to this deploy unit; the monorepo root remains on its established Node
     pnpm run test
     pnpm run build
 
+## Core-chat bridge guardrails
+
+The bridge sends the latest user text (bounded to 4,000 characters) plus
+read-only routing metadata. It does not send the Jovie system prompt, user id,
+provider credentials, or tool implementations. Eve route auth remains required
+outside loopback development: the pilot's channel accepts the shared
+`EVE_CORE_CHAT_AUTH_TOKEN` bearer or its configured Vercel OIDC caller. Use
+HTTPS for non-loopback endpoints. Any transport or protocol failure is a
+fail-closed fallback to Jovie's existing chat stream.
+
 ## Promotion gate
 
-Before connecting this pilot to a real Jovie surface, add a Jovie-owned
-authenticated API boundary, scoped identity propagation, audit logs, explicit
-approval semantics for writes, and a production security review. Provider OAuth
-or Vercel Connect configuration is intentionally out of scope for this pilot.
+Before enabling the bridge outside a controlled development or preview
+environment, add a Jovie-owned authenticated API boundary, scoped identity
+propagation, audit logs, explicit approval semantics for writes, and a
+production security review. Provider OAuth or Vercel Connect configuration is
+intentionally out of scope for this pilot.

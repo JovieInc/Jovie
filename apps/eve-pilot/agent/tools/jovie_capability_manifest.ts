@@ -6,6 +6,7 @@ const requestedCapabilitySchema = z.enum([
   'release',
   'connector',
   'revenue_attribution',
+  'core_chat',
 ]);
 
 const capabilityCatalog = {
@@ -30,6 +31,11 @@ const capabilityCatalog = {
     summary: 'Describe how attribution must be reconciled.',
     approvalRequired:
       'Verified provider and distributor data with a Jovie event chain.',
+  },
+  core_chat: {
+    mode: 'read_only',
+    summary: 'Acknowledge a canonical Jovie chat turn in shadow mode.',
+    approvalRequired: 'No action is available from the Eve shadow observer.',
   },
 } as const;
 

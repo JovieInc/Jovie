@@ -79,6 +79,12 @@
       "ref": "baee8388b935746407dd7091b2403b66c979a6d7",
       "computedHash": "30c625c0033914291cfc40d4fbd8ddd9b57165a0ab1e798253b43fee1150c897"
     },
+    "eve": {
+      "source": "vercel/eve",
+      "sourceType": "github",
+      "skillPath": "skills/eve/SKILL.md",
+      "computedHash": "79a1e606ecf33eed33c1f3adc1cc266de391e19aa9237ca37e4f3aa3fba6b228"
+    },
     "last30days": {
       "source": "mvanhorn/last30days-skill",
       "sourceType": "github",
