@@ -124,13 +124,19 @@ function atomicWriteJson(path, value) {
   renameSync(temporary, path);
 }
 
+export function parseAdmissionHistory(value) {
+  const state = typeof value === 'string' ? JSON.parse(value) : value;
+  if (state?.schema !== ADMISSION_HISTORY_SCHEMA || !state?.teams)
+    throw new Error('invalid-admission-history');
+  return state;
+}
+
 function loadAdmissionHistory() {
   try {
-    const state = JSON.parse(readFileSync(ADMISSION_HISTORY_FILE, 'utf8'));
-    if (state?.schema !== ADMISSION_HISTORY_SCHEMA || !state?.teams)
-      throw new Error('invalid-admission-history');
-    return state;
-  } catch {
+    return parseAdmissionHistory(readFileSync(ADMISSION_HISTORY_FILE, 'utf8'));
+  } catch (error) {
+    if (error?.code !== 'ENOENT')
+      throw new Error('admission-history-unreadable', { cause: error });
     return { schema: ADMISSION_HISTORY_SCHEMA, teams: {} };
   }
 }
@@ -354,6 +360,8 @@ function incompleteAdmissionScan(error, now) {
       complete: false,
       ...(error?.coverage || {}),
       reason: error?.coverage?.reason || error?.code || 'transport-failed',
+      transportCode: error?.cause?.code || error?.code || 'UNKNOWN',
+      attempts: error?.cause?.attempts || error?.attempts || null,
     },
     counts: null,
     dispositions: [],

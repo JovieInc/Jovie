@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { admissionRunReceipt } from '../backlog-orchestrator.mjs';
+import {
+  admissionRunReceipt,
+  parseAdmissionHistory,
+} from '../backlog-orchestrator.mjs';
 
 const NOW = '2026-08-09T18:00:00.000Z';
 
@@ -19,6 +22,14 @@ function teamScan(team, counts) {
 }
 
 describe('aggregate Symphony admission receipt', () => {
+  it('fails closed on malformed durable retry history', () => {
+    assert.throws(() => parseAdmissionHistory('{not-json'));
+    assert.throws(
+      () => parseAdmissionHistory({ schema: 'wrong', teams: {} }),
+      /invalid-admission-history/
+    );
+  });
+
   it('closes the full multi-team denominator with zero unclassified', () => {
     const receipt = admissionRunReceipt(
       [
