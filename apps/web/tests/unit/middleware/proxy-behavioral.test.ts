@@ -693,7 +693,14 @@ describe('proxy.ts middleware', () => {
     });
 
     it('does not run the audience block lookup for reserved public routes', async () => {
-      const reservedRoutes = ['/start', '/pricing', '/about', '/investors'];
+      const reservedRoutes = [
+        '/start',
+        '/pricing',
+        '/about',
+        '/investors',
+        APP_ROUTES.ARTISTS,
+        APP_ROUTES.PLAYLISTS,
+      ];
 
       for (const pathname of reservedRoutes) {
         const req = createUnauthenticatedRequest({ pathname });

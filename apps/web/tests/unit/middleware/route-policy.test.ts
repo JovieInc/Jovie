@@ -20,7 +20,7 @@ import {
 
 describe('route-policy (proxy-routing)', () => {
   describe('public profile candidate classification (bugfix)', () => {
-    it('returns null for /start, /pricing, /about, /investors (never enter DB block lookup)', () => {
+    it('returns null for dedicated public routes (never enter DB block lookup)', () => {
       expect(getPublicProfileCandidate('/start')).toBeNull();
       expect(isPublicProfileAudienceBlockCandidate('/start')).toBe(false);
 
@@ -32,6 +32,12 @@ describe('route-policy (proxy-routing)', () => {
 
       expect(getPublicProfileCandidate('/investors')).toBeNull();
       expect(isPublicProfileAudienceBlockCandidate('/investors')).toBe(false);
+
+      expect(getPublicProfileCandidate('/artists')).toBeNull();
+      expect(isPublicProfileAudienceBlockCandidate('/artists')).toBe(false);
+
+      expect(getPublicProfileCandidate('/playlists')).toBeNull();
+      expect(isPublicProfileAudienceBlockCandidate('/playlists')).toBe(false);
     });
 
     it('returns null for other reserved APP_ROUTES and system segments', () => {
