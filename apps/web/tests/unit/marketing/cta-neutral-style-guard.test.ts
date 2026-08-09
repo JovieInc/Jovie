@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 const sourcePaths = {
   alternatives: 'app/(marketing)/alternatives/[slug]/page.tsx',
   checkout: 'app/onboarding/checkout/OnboardingCheckoutClient.tsx',
-  compare: 'app/(marketing)/compare/[slug]/page.tsx',
+  compare: 'components/organisms/ComparisonPageContent.tsx',
 } as const;
 
 function readSource(sourcePath: string) {
