@@ -844,6 +844,200 @@ describe('deterministic Symphony admission boundary', () => {
     };
   }
 
+  function fleetEvidence(overrides = {}) {
+    return {
+      main: { status: 'green' },
+      controller: { status: 'green' },
+      integrity: { status: 'clear' },
+      queue: { status: 'known', eligiblePrs: 1, target: 5 },
+      observedAt: '2026-08-09T05:00:00.000Z',
+      ...overrides,
+    };
+  }
+
+  it('treats ordinary main-red as AMBER and still admits approved draft work', async () => {
+    const now = '2026-08-09T05:01:00.000Z';
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({ main: { status: 'red' } }),
+      { now }
+    );
+    const issue = admissionIssue({ identifier: 'JOV-4900' });
+    const result = await admitter.selectNextToAdmit(
+      [classification(issue)],
+      [],
+      { currentlyShipping: 0, fleetGate }
+    );
+
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(fleetGate.workAdmission.allowed, true);
+    assert.equal(fleetGate.promotionAdmission.allowed, false);
+    assert.equal(result.admit[0].identifier, 'JOV-4900');
+  });
+
+  it('blocks pickup only for an explicit severe integrity failure', async () => {
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        integrity: {
+          status: 'active',
+          reason: 'broken-worktree-isolation',
+          detail: 'branch writes crossed workspace boundaries',
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+    const issue = admissionIssue({ identifier: 'JOV-4901' });
+    const result = await admitter.selectNextToAdmit(
+      [classification(issue)],
+      [],
+      { currentlyShipping: 0, fleetGate }
+    );
+
+    assert.equal(fleetGate.state, 'RED');
+    assert.equal(fleetGate.workAdmission.allowed, false);
+    assert.equal(fleetGate.promotionAdmission.allowed, false);
+    assert.equal(result.admit.length, 0);
+    assert.match(result.reason, /blocking pickup/);
+  });
+
+  it('recovers AMBER to GREEN and degrades stale controller state without stranding work', () => {
+    const now = '2026-08-09T05:20:00.000Z';
+    const amber = admitter.evaluateFleetGate(
+      fleetEvidence({ main: { status: 'red' } }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+    const green = admitter.evaluateFleetGate(fleetEvidence(), {
+      now: '2026-08-09T05:01:00.000Z',
+    });
+    const stale = admitter.evaluateFleetGate(fleetEvidence(), { now });
+
+    assert.equal(amber.state, 'AMBER');
+    assert.equal(green.state, 'GREEN');
+    assert.equal(green.workAdmission.allowed, true);
+    assert.equal(green.promotionAdmission.allowed, true);
+    assert.equal(stale.state, 'AMBER');
+    assert.equal(stale.workAdmission.allowed, true);
+    assert.equal(stale.promotionAdmission.allowed, false);
+    assert.ok(stale.reasons.some(reason => reason.code === 'controller-stale'));
+  });
+
+  it('keeps Gem at four unless recent clean evidence explicitly proves eight', () => {
+    const now = '2026-08-09T05:01:00.000Z';
+    const approved = {
+      schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
+      target: 8,
+      approved: true,
+      cleanRuns: 20,
+      severeIncidents: 0,
+      observedAt: '2026-08-09T05:00:00.000Z',
+    };
+    assert.equal(
+      admitter.resolveGemConcurrency(null, { now }).maxConcurrent,
+      4
+    );
+    assert.equal(
+      admitter.resolveGemConcurrency({ ...approved, cleanRuns: 19 }, { now })
+        .maxConcurrent,
+      4
+    );
+    assert.equal(
+      admitter.resolveGemConcurrency(approved, { now }).maxConcurrent,
+      8
+    );
+  });
+
+  it('versions the Gem controller and mechanically holds AMBER drafts from promotion', async () => {
+    const controller = resolve(
+      ORCHESTRATOR_DIR,
+      '../hermes/gem-priority-gate.py'
+    );
+    const workflow = resolve(
+      ORCHESTRATOR_DIR,
+      '../hermes/WORKFLOW.jovie-ui-pilot.md'
+    );
+    const runController = async (signals, consumer = 'fleet') => {
+      try {
+        const { stdout } = await execFileAsync(
+          'python3',
+          [
+            controller,
+            '--evaluate-json',
+            JSON.stringify(signals),
+            '--consumer',
+            consumer,
+          ],
+          { env: process.env }
+        );
+        return { exitCode: 0, receipt: JSON.parse(stdout) };
+      } catch (error) {
+        return {
+          exitCode: error.code,
+          receipt: JSON.parse(error.stdout),
+        };
+      }
+    };
+    const amber = await runController(
+      fleetEvidence({
+        main: { status: 'red', failedChecks: ['Production Synthetic Tests'] },
+      })
+    );
+    const controllerFailure = await runController(
+      fleetEvidence({ controller: { status: 'failed' } })
+    );
+    const severe = await runController(
+      fleetEvidence({
+        integrity: {
+          status: 'active',
+          reason: 'repository-or-artifact-corruption',
+        },
+      })
+    );
+    const recovered = await runController(
+      fleetEvidence({
+        integrity: {
+          status: 'resolved',
+          reason: 'repository-or-artifact-corruption',
+        },
+      }),
+      'promotion'
+    );
+    const workflowSource = await readFile(workflow, 'utf8');
+
+    assert.equal(amber.exitCode, 0);
+    assert.equal(amber.receipt.state, 'AMBER');
+    assert.equal(amber.receipt.workAdmission.allowed, true);
+    assert.equal(amber.receipt.promotionAdmission.allowed, false);
+    assert.equal(amber.receipt.ownership.directGemPickup, false);
+    assert.equal(controllerFailure.receipt.state, 'AMBER');
+    assert.equal(controllerFailure.receipt.workAdmission.allowed, true);
+    assert.equal(controllerFailure.receipt.promotionAdmission.allowed, false);
+    assert.equal(severe.exitCode, 2);
+    assert.equal(severe.receipt.state, 'RED');
+    assert.equal(severe.receipt.workAdmission.allowed, false);
+    assert.equal(recovered.exitCode, 0);
+    assert.equal(recovered.receipt.state, 'GREEN');
+    assert.equal(recovered.receipt.promotionAdmission.allowed, true);
+    assert.match(workflowSource, /Always open a draft PR first/);
+    assert.match(workflowSource, /including when the gate is `GREEN`/);
+    assert.match(workflowSource, /gh pr edit --add-label queue-deferred/);
+    assert.match(workflowSource, /only a fresh `GREEN` may/);
+    assert.match(workflowSource, /max_concurrent_agents: 1/);
+    assert.doesNotMatch(workflowSource, /Open a non-draft PR/);
+  });
+
+  it('runs stale-lease recovery before gate-next admission preflight', async () => {
+    const source = await readFile(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs'),
+      'utf8'
+    );
+    const start = source.indexOf('async function runTeamGateNext');
+    const end = source.indexOf('async function runAudit', start);
+    const body = source.slice(start, end);
+    assert.ok(start >= 0 && end > start);
+    assert.ok(
+      body.indexOf('recoverStaleLeases') < body.indexOf('admissionPreflight')
+    );
+  });
+
   it('rejects synthetic workstream bundles and admits no member', async () => {
     const real = admissionIssue({ identifier: 'JOV-4513' });
     const result = await admitter.selectNextToAdmit(

@@ -41,6 +41,12 @@ import * as workstreamer from './workstreamer.mjs';
 
 // ----- Config -----
 const CACHE_FILE = resolve(__dirname, '.orchestrator-cache.json');
+const FLEET_GATE_RECEIPT_FILE =
+  process.env.JOVIE_FLEET_GATE_RECEIPT ||
+  resolve(
+    process.env.GEM_WORKSPACE || '/home/timwhite/gem-workspace',
+    'state/gem-priority-gate/latest.json'
+  );
 
 const TEAM_CONFIGS = Object.freeze([
   Object.freeze({
@@ -189,13 +195,92 @@ async function isTeamProductionRed(team) {
   }
 }
 
-async function admissionPreflight(team) {
+function loadFleetGateReceipt(team) {
+  if (team.key !== 'JOV') return null;
+  try {
+    const receipt = JSON.parse(readFileSync(FLEET_GATE_RECEIPT_FILE, 'utf8'));
+    return receipt?.schema === admitter.FLEET_GATE_SCHEMA &&
+      receipt?.signals &&
+      typeof receipt.signals === 'object'
+      ? receipt
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fleetGateForTeam(team, now = new Date().toISOString()) {
   const productionRed = await isTeamProductionRed(team);
-  if (productionRed) {
+  const receipt = loadFleetGateReceipt(team);
+  const receiptMain = receipt?.signals?.main?.status;
+  return admitter.evaluateFleetGate(
+    {
+      main: {
+        status:
+          productionRed || receiptMain === 'red'
+            ? 'red'
+            : receiptMain === 'green'
+              ? 'green'
+              : 'unknown',
+      },
+      controller: {
+        status: receipt?.signals?.controller?.status || 'unknown',
+      },
+      integrity: receipt?.signals?.integrity || { status: 'clear' },
+      queue: receipt?.signals?.queue,
+      concurrencyEvidence: receipt?.signals?.concurrencyEvidence,
+      observedAt: receipt?.observedAt,
+    },
+    { now }
+  );
+}
+
+async function recoverStaleLeases(team, isDryRun) {
+  // Recovery is deliberately before work-admission checks. A stale or failed
+  // controller may freeze new pickup, but it must not strand a provably safe
+  // old lease and consume capacity forever.
+  const inProgressIssues = await linear.fetchTeamInProgressIssues(team.id);
+  if (isDryRun) {
+    const eligible = inProgressIssues
+      .map(issue => ({
+        identifier: issue.identifier,
+        decision: staleLeaseGuard.classifyStaleLease(issue),
+      }))
+      .filter(entry => entry.decision.eligible);
+    return {
+      schema: 'stale-lease-recovery/v1',
+      mode: 'dry-run',
+      recovered: [],
+      eligible: eligible.map(entry => entry.identifier),
+      skipped: inProgressIssues
+        .filter(
+          issue =>
+            !eligible.some(entry => entry.identifier === issue.identifier)
+        )
+        .map(issue => issue.identifier),
+      failed: [],
+    };
+  }
+  const result = await staleLeaseGuard.sweepStaleLeases({
+    issues: inProgressIssues,
+    client: linear,
+    todoStateId: team.todoStateId,
+  });
+  return {
+    schema: 'stale-lease-recovery/v1',
+    mode: 'mutating',
+    ...result,
+  };
+}
+
+async function admissionPreflight(team) {
+  const fleetGate = await fleetGateForTeam(team);
+  if (!fleetGate.workAdmission.allowed) {
     return {
       open: false,
-      reason: 'production health is red or unavailable',
+      reason: `fleet gate ${fleetGate.state.toLowerCase()} blocks pickup`,
       load: { count: 0, identifiers: [] },
+      fleetGate,
     };
   }
   const symphonyIssues = await linear.fetchTeamSymphonyIssues(team.id);
@@ -208,6 +293,7 @@ async function admissionPreflight(team) {
         ? 'open'
         : `at capacity (${load.count}/${maxConcurrentShipping})`,
     load,
+    fleetGate,
   };
 }
 
@@ -254,6 +340,7 @@ async function runGateNext(isDryRun, issueArg) {
 }
 
 async function runTeamGateNext(team, isDryRun, issueArg) {
+  const staleLeaseRecovery = await recoverStaleLeases(team, isDryRun);
   const preflight = await admissionPreflight(team);
   if (!preflight.open) {
     return {
@@ -262,6 +349,8 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
       stage: 'preflight',
       reason: preflight.reason,
       active: preflight.load.identifiers,
+      fleetGate: preflight.fleetGate,
+      staleLeaseRecovery,
       mutations: 0,
     };
   }
@@ -282,6 +371,8 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
         ? 'requested issue is not eligible'
         : 'no eligible issue',
       decisions: selection.decisions,
+      fleetGate: preflight.fleetGate,
+      staleLeaseRecovery,
       mutations: 0,
     };
   }
@@ -297,6 +388,8 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
       stage: 'plan',
       issue: selected.identifier,
       reason: planReason,
+      fleetGate: preflight.fleetGate,
+      staleLeaseRecovery,
       mutations: 0,
     };
   }
@@ -307,6 +400,8 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
       status: 'would-admit',
       issue: selected.identifier,
       plan: plan.evidence,
+      fleetGate: preflight.fleetGate,
+      staleLeaseRecovery,
       mutations: 0,
     };
   }
@@ -370,6 +465,8 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
     admissionGate: admissionResult.status,
     lease: lease.status,
     active: load.identifiers,
+    fleetGate: finalPreflight.fleetGate,
+    staleLeaseRecovery,
     mutations: 'verified',
   };
 }
@@ -552,29 +649,12 @@ async function runAdmitNext(cache, isDryRun) {
 }
 
 async function runTeamAdmitNext(team, isDryRun) {
-  // Release only provably stale machine leases before ordinary admission. This
-  // is intentionally scoped to unassigned In Progress issues; it never touches
-  // Tim-assigned or otherwise ambiguous work.
-  const inProgressIssues = await linear.fetchTeamInProgressIssues(team.id);
-  if (isDryRun) {
-    const planned = inProgressIssues
-      .map(issue => ({
-        identifier: issue.identifier,
-        decision: staleLeaseGuard.classifyStaleLease(issue),
-      }))
-      .filter(entry => entry.decision.eligible);
-    console.log(`Stale-lease sweep (dry-run): ${planned.length} eligible`);
-  } else {
-    const staleLeaseResult = await staleLeaseGuard.sweepStaleLeases({
-      issues: inProgressIssues,
-      client: linear,
-      todoStateId: team.todoStateId,
-    });
-    console.log(
-      `Stale-lease sweep: recovered ${staleLeaseResult.recovered.length}, ` +
-        `skipped ${staleLeaseResult.skipped.length}, failed ${staleLeaseResult.failed.length}`
-    );
-  }
+  const staleLeaseRecovery = await recoverStaleLeases(team, isDryRun);
+  console.log(
+    `Stale-lease sweep (${staleLeaseRecovery.mode}): recovered ` +
+      `${staleLeaseRecovery.recovered.length}, skipped ${staleLeaseRecovery.skipped.length}, ` +
+      `failed ${staleLeaseRecovery.failed.length}`
+  );
 
   const allIssues = await linear.fetchTeamActiveIssues(team.id);
   const classifications = [];
@@ -590,13 +670,14 @@ async function runTeamAdmitNext(team, isDryRun) {
 
   // Count live leases from the authoritative Linear active-issue snapshot.
   const state = scorer.currentShippingLoad(allIssues);
+  const fleetGate = await fleetGateForTeam(team);
 
   const result = await admitter.selectNextToAdmit(
     classifications,
     workstreams,
     {
       currentlyShipping: state.count,
-      productionRed: await isTeamProductionRed(team),
+      fleetGate,
       maxConcurrentShipping: admitter.maxConcurrentShippingForTeam(team.key),
     }
   );
@@ -625,7 +706,7 @@ async function runTeamAdmitNext(team, isDryRun) {
     console.log('  (dry-run — no mutations performed)');
   }
 
-  return { team: team.key, ...result };
+  return { team: team.key, staleLeaseRecovery, ...result };
 }
 
 main().catch(err => {
