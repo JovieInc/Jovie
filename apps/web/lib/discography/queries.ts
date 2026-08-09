@@ -32,6 +32,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { uuidSchema } from '@/lib/validation/schemas/base';
 import { resolveTrackProviderLinks } from './track-provider-links';
+import type { PreviewVerification } from './types';
 
 /**
  * Release data source types
@@ -43,6 +44,8 @@ export interface TrackSummary {
   totalDurationMs: number | null;
   primaryIsrc: string | null;
   primaryPreviewUrl: string | null;
+  /** Explicit media-QA state; older callers may omit it while migrating. */
+  primaryPreviewVerification?: PreviewVerification | null;
 }
 
 // Types for release data with provider links
@@ -148,6 +151,24 @@ function trackSummarySelectColumns() {
       drizzleSql<string>`(array_agg(NULLIF(BTRIM(${discogRecordings.previewUrl}), '') ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE NULLIF(BTRIM(${discogRecordings.previewUrl}), '') IS NOT NULL))[1]`.as(
         'primary_preview_url'
       ),
+    primaryPreviewVerification: drizzleSql<string>`(
+        array_agg(
+          CASE
+            WHEN NULLIF(BTRIM(${discogRecordings.audioUrl}), '') IS NOT NULL
+              THEN 'verified'
+            WHEN NULLIF(BTRIM(${discogRecordings.previewUrl}), '') IS NOT NULL
+              AND COALESCE(${discogRecordings.metadata}->'previewResolution'->>'status', '') = 'fallback'
+              THEN 'fallback'
+            WHEN NULLIF(BTRIM(${discogRecordings.previewUrl}), '') IS NOT NULL
+              THEN 'verified'
+            ELSE 'missing'
+          END
+          ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}
+        ) FILTER (
+          WHERE NULLIF(BTRIM(${discogRecordings.audioUrl}), '') IS NOT NULL
+             OR NULLIF(BTRIM(${discogRecordings.previewUrl}), '') IS NOT NULL
+        )
+      )[1]`.as('primary_preview_verification'),
   };
 }
 
@@ -155,12 +176,31 @@ function rowToTrackSummary(row: {
   totalDurationMs: number | null;
   primaryIsrc: string | null;
   primaryPreviewUrl: string | null;
+  primaryPreviewVerification: string | null;
 }): TrackSummary {
+  const previewVerification = isPreviewVerification(
+    row.primaryPreviewVerification
+  )
+    ? row.primaryPreviewVerification
+    : null;
+
   return {
     totalDurationMs: row.totalDurationMs ?? null,
     primaryIsrc: row.primaryIsrc ?? null,
     primaryPreviewUrl: row.primaryPreviewUrl ?? null,
+    primaryPreviewVerification: previewVerification,
   };
+}
+
+function isPreviewVerification(
+  value: string | null | undefined
+): value is PreviewVerification {
+  return (
+    value === 'verified' ||
+    value === 'fallback' ||
+    value === 'unknown' ||
+    value === 'missing'
+  );
 }
 
 /**

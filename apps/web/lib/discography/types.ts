@@ -175,6 +175,12 @@ export interface ReleaseViewModel {
   lyrics?: string;
   /** Preview audio URL (typically from the primary track) */
   previewUrl?: string | null;
+  /**
+   * Verification state for the primary preview. Consumers must not infer
+   * playability from `previewUrl` alone: a provider URL can be stale or only
+   * a fallback until the audio QA pipeline confirms it.
+   */
+  previewVerification?: PreviewVerification;
   previewCounts?: PreviewCounts;
   /**
    * Weekly engagement metric for the releases list: non-bot smart-link

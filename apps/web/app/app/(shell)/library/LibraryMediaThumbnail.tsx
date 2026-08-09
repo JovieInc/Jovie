@@ -13,7 +13,10 @@ import { LibraryArtworkHoverZoom } from './LibraryArtworkHoverZoom';
 import { LibraryAudioWaveformThumbnail } from './LibraryAudioWaveformThumbnail';
 import { LibraryVideoScrubThumbnail } from './LibraryVideoScrubThumbnail';
 import type { LibraryReleaseAsset } from './library-data';
-import { getLibraryItemKind } from './library-data';
+import {
+  getLibraryItemKind,
+  hasVerifiedLibraryAudioPreview,
+} from './library-data';
 import { scrubRatioFromPointer } from './library-thumbnail-utils';
 
 export type LibraryThumbnailSize = 'card' | 'row' | 'drawer';
@@ -72,7 +75,11 @@ export function LibraryMediaThumbnail({
   const compact = size === 'row';
   const itemKind = getLibraryItemKind(asset);
   const showVideoScrub = Boolean(asset.videoUrl);
-  const showAudioScrub = Boolean(asset.previewUrl) && !showVideoScrub;
+  // Compact rows already expose the row's playback affordance. Keep their
+  // artwork quiet; a waveform overlay belongs to larger cards only and only
+  // after the media QA pipeline verifies the preview.
+  const showAudioScrub =
+    !compact && hasVerifiedLibraryAudioPreview(asset) && !showVideoScrub;
   const hasScrubPreview = showVideoScrub || showAudioScrub;
   const showArtworkHoverZoom =
     !hasScrubPreview &&

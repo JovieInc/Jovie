@@ -1,4 +1,7 @@
-import type { ReleaseViewModel } from '@/lib/discography/types';
+import type {
+  PreviewVerification,
+  ReleaseViewModel,
+} from '@/lib/discography/types';
 import {
   DEFAULT_LIBRARY_APPROVAL_STATUS,
   type LibraryApprovalStatus,
@@ -51,6 +54,11 @@ export interface LibraryReleaseAsset {
   readonly artist: string;
   readonly artworkUrl: string | null;
   readonly previewUrl: string | null;
+  /**
+   * Preview playability is an explicit media-QA result. Consumers must not
+   * infer that a provider URL is playable from `previewUrl` alone.
+   */
+  readonly previewVerification?: PreviewVerification;
   readonly videoUrl: string | null;
   readonly waveformSeed: number;
   readonly smartLinkPath: string;
@@ -184,13 +192,16 @@ export function buildLibraryReleaseAssets(
     });
     const artworkUrl = normalizeHttpUrl(release.artworkUrl);
     const previewUrl = normalizeHttpUrl(release.previewUrl);
+    const previewVerification = release.previewVerification;
     const videoUrl = normalizeHttpUrl(release.canvasVideoUrl);
     const hasArtwork = Boolean(artworkUrl);
     const hasLyrics = Boolean(release.lyrics?.trim());
     const hasVideoLinks = Boolean(release.hasVideoLinks);
     const assetKinds: LibraryAssetKind[] = [];
     if (hasArtwork) assetKinds.push('artwork');
-    if (previewUrl) assetKinds.push('preview');
+    if (previewUrl && previewVerification === 'verified') {
+      assetKinds.push('preview');
+    }
     if (hasLyrics) assetKinds.push('lyrics');
     if (providers.length > 0) assetKinds.push('providers');
     if (hasVideoLinks) assetKinds.push('video');
@@ -201,6 +212,7 @@ export function buildLibraryReleaseAssets(
       artist: release.artistNames?.[0]?.trim() || 'Unknown Artist',
       artworkUrl,
       previewUrl,
+      ...(previewVerification ? { previewVerification } : {}),
       videoUrl,
       waveformSeed: hashLibraryWaveformSeed(release.id),
       smartLinkPath: release.smartLinkPath,
@@ -331,6 +343,17 @@ export function getLibraryItemKind(
   return asset.itemKind ?? 'release';
 }
 
+/**
+ * A preview URL is only a candidate until the audio QA pipeline verifies it.
+ * Keep this predicate shared so rows, cards, filters, and playback controls
+ * cannot drift into implying that stale/fallback URLs are playable.
+ */
+export function hasVerifiedLibraryAudioPreview(
+  asset: Pick<LibraryReleaseAsset, 'previewUrl' | 'previewVerification'>
+): boolean {
+  return Boolean(asset.previewUrl && asset.previewVerification === 'verified');
+}
+
 export function libraryAssetMatchesView(
   asset: LibraryReleaseAsset,
   view: LibraryView
@@ -345,7 +368,7 @@ export function libraryAssetMatchesView(
   if (view === 'merch') return itemKind === 'merch';
   if (view === 'images') return asset.assetKinds.includes('artwork');
   if (view === 'videos') return asset.assetKinds.includes('video');
-  return Boolean(asset.previewUrl);
+  return hasVerifiedLibraryAudioPreview(asset);
 }
 
 export function formatLibraryReleaseDate(value: string | null): string {

@@ -9,6 +9,7 @@ import {
   getLibraryAspectRatioClass,
   getLibraryAssetAspectRatio,
   getLibraryDrawerHeroClass,
+  hasVerifiedLibraryAudioPreview,
   LIBRARY_GRID_DENSITY_LAYOUT,
   libraryAssetMatchesView,
   normalizeLibraryVersionTitle,
@@ -43,6 +44,7 @@ describe('library data', () => {
       buildRelease({
         lyrics: 'Stored lyrics',
         previewUrl: 'https://example.com/preview.mp3',
+        previewVerification: 'verified',
         providers: [
           {
             key: 'spotify',
@@ -64,6 +66,7 @@ describe('library data', () => {
         artist: 'Test Artist',
         artworkUrl: 'https://example.com/art.jpg',
         previewUrl: 'https://example.com/preview.mp3',
+        previewVerification: 'verified',
         primaryIsrc: null,
         videoUrl: null,
         waveformSeed: expect.any(Number),
@@ -97,6 +100,28 @@ describe('library data', () => {
         totalDurationMs: null,
       },
     ]);
+  });
+
+  it('requires verified preview state before exposing audio playback', () => {
+    const [fallback] = buildLibraryReleaseAssets([
+      buildRelease({
+        previewUrl: 'https://example.com/preview.mp3',
+        previewVerification: 'fallback',
+      }),
+    ]);
+    const [verified] = buildLibraryReleaseAssets([
+      buildRelease({
+        previewUrl: 'https://example.com/preview.mp3',
+        previewVerification: 'verified',
+      }),
+    ]);
+
+    expect(hasVerifiedLibraryAudioPreview(fallback!)).toBe(false);
+    expect(fallback?.assetKinds).not.toContain('preview');
+    expect(libraryAssetMatchesView(fallback!, 'audio')).toBe(false);
+    expect(hasVerifiedLibraryAudioPreview(verified!)).toBe(true);
+    expect(verified?.assetKinds).toContain('preview');
+    expect(libraryAssetMatchesView(verified!, 'audio')).toBe(true);
   });
 
   it('maps canvas video URLs and deterministic waveform seeds for scrub previews', () => {

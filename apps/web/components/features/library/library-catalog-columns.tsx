@@ -5,6 +5,7 @@ import { memo, useMemo } from 'react';
 import { LibraryMediaThumbnail } from '@/app/app/(shell)/library/LibraryMediaThumbnail';
 import {
   formatLibraryDuration,
+  hasVerifiedLibraryAudioPreview,
   type LibraryReleaseAsset,
 } from '@/app/app/(shell)/library/library-data';
 import { libraryWaveformPeaks } from '@/app/app/(shell)/library/library-waveform-peaks';
@@ -203,7 +204,9 @@ const CATALOG_WAVEFORM_HEIGHT = 24;
  * empty/loading/populated states and view-mode switches never shift layout.
  * Peaks derive deterministically from the asset's waveform seed — the same
  * production source as the card scrub waveform. Decorative: row click already
- * opens the asset, so no seek interaction here.
+ * opens the asset, so no seek interaction here. If media QA has not verified a
+ * playable preview, keep the reserved cell and show an honest unavailable
+ * marker instead of a synthetic waveform.
  */
 export const LibraryCatalogWaveformCell = memo(
   function LibraryCatalogWaveformCell({
@@ -211,6 +214,7 @@ export const LibraryCatalogWaveformCell = memo(
   }: {
     readonly asset: LibraryReleaseAsset;
   }) {
+    const hasVerifiedPreview = hasVerifiedLibraryAudioPreview(asset);
     const peaks = useMemo(() => {
       const all = libraryWaveformPeaks(asset.waveformSeed);
       const stride = all.length / CATALOG_WAVEFORM_BAR_COUNT;
@@ -226,32 +230,45 @@ export const LibraryCatalogWaveformCell = memo(
     return (
       <div
         data-testid={`library-catalog-waveform-${asset.id}`}
-        aria-hidden='true'
+        data-audio-state={hasVerifiedPreview ? 'verified' : 'unavailable'}
+        {...(hasVerifiedPreview
+          ? { 'aria-hidden': true }
+          : {
+              role: 'img',
+              'aria-label': 'Audio preview unavailable',
+              title: 'Audio preview unavailable',
+            })}
         className='flex h-6 w-40 items-center text-quaternary-token'
       >
-        <svg
-          viewBox={`0 0 ${CATALOG_WAVEFORM_WIDTH} ${CATALOG_WAVEFORM_HEIGHT}`}
-          preserveAspectRatio='none'
-          aria-hidden='true'
-          className='block h-6 w-40'
-        >
-          {peaks.map((height, index) => {
-            const x = index * barStride + barStride / 2;
-            const half = Math.max(0.5, height * maxAmp);
-            return (
-              <line
-                key={x}
-                x1={x}
-                x2={x}
-                y1={CATALOG_WAVEFORM_HEIGHT / 2 - half}
-                y2={CATALOG_WAVEFORM_HEIGHT / 2 + half}
-                stroke='currentColor'
-                strokeWidth={Math.max(1, barStride * 0.4)}
-                strokeLinecap='round'
-              />
-            );
-          })}
-        </svg>
+        {hasVerifiedPreview ? (
+          <svg
+            viewBox={`0 0 ${CATALOG_WAVEFORM_WIDTH} ${CATALOG_WAVEFORM_HEIGHT}`}
+            preserveAspectRatio='none'
+            aria-hidden='true'
+            className='block h-6 w-40'
+          >
+            {peaks.map((height, index) => {
+              const x = index * barStride + barStride / 2;
+              const half = Math.max(0.5, height * maxAmp);
+              return (
+                <line
+                  key={x}
+                  x1={x}
+                  x2={x}
+                  y1={CATALOG_WAVEFORM_HEIGHT / 2 - half}
+                  y2={CATALOG_WAVEFORM_HEIGHT / 2 + half}
+                  stroke='currentColor'
+                  strokeWidth={Math.max(1, barStride * 0.4)}
+                  strokeLinecap='round'
+                />
+              );
+            })}
+          </svg>
+        ) : (
+          <span aria-hidden='true' className='text-tertiary-token'>
+            &mdash;
+          </span>
+        )}
       </div>
     );
   }

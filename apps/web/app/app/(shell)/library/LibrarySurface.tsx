@@ -142,6 +142,7 @@ import {
   getLibraryAspectRatioClass,
   getLibraryAssetAspectRatio,
   getLibraryItemKind,
+  hasVerifiedLibraryAudioPreview,
   LIBRARY_GRID_DENSITY_LAYOUT,
   type LibraryAssetKind,
   type LibraryGridDensity,
@@ -462,7 +463,7 @@ const ReleaseCell = memo(function ReleaseCell({
   const { playingPreviewId, onTogglePreview } = useContext(
     LibraryPreviewContext
   );
-  const hasPreview = Boolean(asset.previewUrl);
+  const hasPreview = hasVerifiedLibraryAudioPreview(asset);
   const isPreviewPlaying = playingPreviewId === asset.id;
 
   return (
@@ -1390,7 +1391,7 @@ const AssetCard = memo(function AssetCard({
   readonly onSelect: () => void;
   readonly onTogglePreview: LibraryPreviewToggle;
 }) {
-  const hasPreview = Boolean(asset.previewUrl);
+  const hasPreview = hasVerifiedLibraryAudioPreview(asset);
   const aspectRatio = getLibraryAssetAspectRatio(asset);
 
   return (
@@ -1761,7 +1762,7 @@ function PreviewActionButton({
   readonly disabledTabIndex?: number;
   readonly reserveSpace?: boolean;
 }) {
-  if (!asset.previewUrl) {
+  if (!hasVerifiedLibraryAudioPreview(asset)) {
     return reserveSpace ? (
       <span
         aria-hidden='true'
@@ -1827,7 +1828,7 @@ function LibraryAudioPanel({
               Audio
             </h3>
           </div>
-          {asset.previewUrl ? (
+          {hasVerifiedLibraryAudioPreview(asset) ? (
             <PreviewActionButton
               asset={asset}
               isPreviewPlaying={isPreviewPlaying}
@@ -2116,7 +2117,7 @@ function AssetDrawer({
                     title='Audio'
                     defaultOpen={false}
                     actions={
-                      current.previewUrl ? (
+                      hasVerifiedLibraryAudioPreview(current) ? (
                         <PreviewActionButton
                           asset={current}
                           isPreviewPlaying={isPreviewPlaying}
@@ -2390,6 +2391,7 @@ export function LibrarySurface({
     () =>
       stackLibraryReleaseVersions(assets).map((asset): LibraryReleaseAsset => {
         const previewUrl = audioOverrides[asset.id];
+        const hasPreviewOverride = Boolean(previewUrl);
         const approvalStatus =
           approvalStatusOverrides[asset.id] ?? asset.approvalStatus;
         const profileVisibility =
@@ -2400,12 +2402,12 @@ export function LibrarySurface({
           'active';
         const share = shareOverrides[asset.id] ?? asset.share ?? null;
         const assetKinds: readonly LibraryAssetKind[] =
-          previewUrl && !asset.assetKinds.includes('preview')
+          hasPreviewOverride && !asset.assetKinds.includes('preview')
             ? [...asset.assetKinds, 'preview']
             : asset.assetKinds;
 
         if (
-          !previewUrl &&
+          !hasPreviewOverride &&
           approvalStatus === asset.approvalStatus &&
           profileVisibility === asset.profileVisibility &&
           lifecycleStatus === (asset.lifecycleStatus ?? 'active') &&
@@ -2416,7 +2418,9 @@ export function LibrarySurface({
 
         return {
           ...asset,
-          ...(previewUrl ? { previewUrl } : {}),
+          ...(hasPreviewOverride
+            ? { previewUrl, previewVerification: 'verified' as const }
+            : {}),
           approvalStatus,
           profileVisibility,
           lifecycleStatus,
@@ -2503,12 +2507,12 @@ export function LibrarySurface({
         return;
       }
 
-      if (!asset.previewUrl) return;
+      if (!hasVerifiedLibraryAudioPreview(asset)) return;
 
       toggleTrack({
         id: asset.id,
         title: asset.title,
-        audioUrl: asset.previewUrl,
+        audioUrl: asset.previewUrl ?? undefined,
         releaseTitle: asset.title,
         artistName: asset.artist,
         artworkUrl: asset.artworkUrl,
