@@ -17,10 +17,15 @@ import {
 } from '@/lib/commands/registry';
 
 const pushMock = vi.fn();
+const prefetchMock = vi.fn();
 const CMD_LABEL = String.fromCodePoint(0x2318);
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: pushMock, replace: vi.fn() }),
+  useRouter: () => ({
+    push: pushMock,
+    prefetch: prefetchMock,
+    replace: vi.fn(),
+  }),
 }));
 
 vi.mock('next/image', () => ({

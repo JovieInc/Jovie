@@ -249,6 +249,31 @@ export function CmdKPalette({
     return ids;
   }, [filteredAdditional]);
 
+  // Warm only the route the user is currently about to choose. This keeps the
+  // palette responsive without eagerly loading every destination, and makes
+  // keyboard search (for example, `Presence` + Enter) benefit from the same
+  // warm route cache as pointer navigation.
+  const activeHref = useMemo(() => {
+    if (activeIndex === null) return null;
+    const item = flatItems[activeIndex];
+    if (!item || additionalIds.has(pickerItemKey(item))) return null;
+    if (item.kind === 'nav') return item.nav.href;
+    if (item.kind === 'skill') {
+      return `${APP_ROUTES.CHAT}?skill=${encodeURIComponent(item.skill.id)}`;
+    }
+    if (item.kind === 'prompt') return null;
+    return resolveEntityHref(item.entity);
+  }, [activeIndex, additionalIds, flatItems]);
+
+  const prefetchedHrefsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!open || !activeHref || prefetchedHrefsRef.current.has(activeHref)) {
+      return;
+    }
+    prefetchedHrefsRef.current.add(activeHref);
+    router.prefetch(activeHref);
+  }, [activeHref, open, router]);
+
   // Clamp selected index whenever the visible list changes.
   useEffect(() => {
     if (selectedIndex >= flatItems.length) {
@@ -276,14 +301,14 @@ export function CmdKPalette({
       }
 
       if (item.kind === 'nav') {
-        router.push(item.nav.href);
         handleClose();
+        router.push(item.nav.href);
         return;
       }
       if (item.kind === 'skill') {
         const url = `${APP_ROUTES.CHAT}?skill=${encodeURIComponent(item.skill.id)}`;
-        router.push(url);
         handleClose();
+        router.push(url);
         return;
       }
       if (item.kind === 'prompt') {
@@ -292,8 +317,8 @@ export function CmdKPalette({
       }
       const href = resolveEntityHref(item.entity);
       if (href) {
-        router.push(href);
         handleClose();
+        router.push(href);
       }
     },
     [flatItems, additionalIds, onAdditionalSelect, handleClose, router]
