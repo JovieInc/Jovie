@@ -1,6 +1,15 @@
 import { expect, test } from './setup';
 
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+const LEGAL_LAYOUT_ROUTES = [
+  { pathname: '/legal/cookies', title: 'Cookie Policy' },
+  { pathname: '/legal/dmca', title: 'DMCA Policy' },
+  { pathname: '/legal/terms', title: 'Terms of Service' },
+] as const;
+const LEGAL_LAYOUT_VIEWPORTS = [
+  { width: 390, height: 844, expectedContentPaddingTop: 64 },
+  { width: 1024, height: 1200, expectedContentPaddingTop: 80 },
+] as const;
 
 /**
  * Legal Pages Tests
@@ -20,6 +29,109 @@ test.describe('Legal Pages', () => {
 
   // Legal pages use heavy markdown rendering which can take 90s+ on first Turbopack compile
   test.setTimeout(300_000);
+
+  test('preserves shared header geometry at Pen desktop and narrow viewports', async ({
+    page,
+  }) => {
+    const consoleErrors: string[] = [];
+    const pageErrors: string[] = [];
+
+    page.on('console', message => {
+      if (message.type() === 'error') {
+        consoleErrors.push(message.text());
+      }
+    });
+    page.on('pageerror', error => pageErrors.push(error.message));
+
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+
+    for (const viewport of LEGAL_LAYOUT_VIEWPORTS) {
+      await page.setViewportSize(viewport);
+
+      for (const route of LEGAL_LAYOUT_ROUTES) {
+        const response = await page.goto(route.pathname, {
+          timeout: 180_000,
+          waitUntil: 'domcontentloaded',
+        });
+
+        expect(response?.status(), `${route.pathname} must return 200`).toBe(
+          200
+        );
+        await expect(page).toHaveURL(new RegExp(`${route.pathname}$`));
+        await expect(
+          page.getByRole('heading', { level: 1, name: route.title })
+        ).toBeVisible();
+
+        const metrics = await page.evaluate(() => {
+          const header = document.querySelector<HTMLElement>(
+            '[data-testid="header-nav"]'
+          );
+          const main = document.querySelector<HTMLElement>('#main-content');
+          const content = document.querySelector<HTMLElement>(
+            '.public-legal-content'
+          );
+
+          if (!header || !main || !content) {
+            throw new Error('Shared legal shell geometry anchors are missing');
+          }
+
+          const headerRect = header.getBoundingClientRect();
+          const mainRect = main.getBoundingClientRect();
+          const contentRect = content.getBoundingClientRect();
+          const mainStyle = getComputedStyle(main);
+          const contentStyle = getComputedStyle(content);
+
+          return {
+            bodyScrollWidth: document.body.scrollWidth,
+            contentPaddingTop: Number.parseFloat(contentStyle.paddingTop),
+            contentTop: contentRect.top,
+            documentScrollWidth: document.documentElement.scrollWidth,
+            headerBottom: headerRect.bottom,
+            headerHeight: headerRect.height,
+            innerWidth: window.innerWidth,
+            mainPaddingTop: Number.parseFloat(mainStyle.paddingTop),
+            mainTop: mainRect.top,
+            reducedMotion: matchMedia('(prefers-reduced-motion: reduce)')
+              .matches,
+            scrollBehavior: getComputedStyle(document.documentElement)
+              .scrollBehavior,
+          };
+        });
+
+        expect(metrics.headerHeight).toBeGreaterThan(0);
+        expect(
+          Math.abs(metrics.mainPaddingTop - metrics.headerHeight)
+        ).toBeLessThanOrEqual(1);
+        expect(metrics.contentTop).toBeGreaterThanOrEqual(
+          metrics.headerBottom - 1
+        );
+        expect(metrics.contentPaddingTop).toBe(
+          viewport.expectedContentPaddingTop
+        );
+        expect(metrics.mainTop).toBeLessThanOrEqual(metrics.headerBottom);
+        expect(metrics.documentScrollWidth).toBeLessThanOrEqual(
+          metrics.innerWidth + 1
+        );
+        expect(metrics.bodyScrollWidth).toBeLessThanOrEqual(
+          metrics.innerWidth + 1
+        );
+        expect(metrics.reducedMotion).toBe(true);
+        expect(metrics.scrollBehavior).toBe('auto');
+      }
+    }
+
+    expect(consoleErrors).toEqual([]);
+    expect(pageErrors).toEqual([]);
+  });
 
   test.describe('Privacy Policy', () => {
     test.beforeEach(async ({ page }) => {
