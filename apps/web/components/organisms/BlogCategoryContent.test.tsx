@@ -8,6 +8,7 @@ import { BlogCategoryContent } from './BlogCategoryContent';
 import {
   BLOG_CATEGORY_STORY_CATEGORY,
   BLOG_CATEGORY_STORY_POST,
+  BLOG_CATEGORY_STORY_RECEIPT,
 } from './BlogCategoryContent.stories';
 
 describe('BlogCategoryContent', () => {
@@ -94,6 +95,21 @@ describe('BlogCategoryContent', () => {
     );
     expect(storySource).toContain(
       "fixture: 'content/blog/the-contact-problem.md'"
+    );
+  });
+
+  it('keeps the Pen receipt on the commit that introduced the shared body', () => {
+    expect(BLOG_CATEGORY_STORY_RECEIPT).toEqual({
+      registryId: 'web-024-blog--category--[slug]',
+      route: '/blog/category/artist-management',
+      source: 'apps/web/components/organisms/BlogCategoryContent.tsx',
+      sourceExport: 'BlogCategoryContent',
+      storyExport: 'Web024ArtistManagement',
+      sourceSha: '916d0bddd91c065aa01b387adc2acd189391b040',
+      fixture: 'content/blog/the-contact-problem.md',
+    });
+    expect(BLOG_CATEGORY_STORY_RECEIPT.sourceSha).not.toBe(
+      '0892cccf39d72c62890ad4bc797cfd6f2d651af6'
     );
   });
 });
