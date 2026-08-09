@@ -47,7 +47,14 @@ describe('shared marketing System B style guard', () => {
     expect(faqSource).not.toContain('marketing-h2-linear');
     expect(faqSource).toContain('system-b-marketing-section-heading');
     expect(accordionSource).not.toContain('style={{ visibility');
-    expect(accordionSource).toContain("'visible mt-2");
-    expect(accordionSource).toContain("'invisible mt-0");
+    expect(accordionSource).toContain(
+      'mt-2 grid grid-rows-[1fr] overflow-hidden transition-opacity'
+    );
+    expect(accordionSource).toContain("'visible opacity-100'");
+    expect(accordionSource).toContain(
+      "'invisible pointer-events-none opacity-0'"
+    );
+    expect(accordionSource).not.toContain('grid-rows-[0fr]');
+    expect(accordionSource).not.toMatch(/(?:^|\s)mt-0(?=\s|['"])/);
   });
 });

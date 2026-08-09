@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { FaqSection } from '@/components/marketing';
 
@@ -15,11 +16,19 @@ const FAQ_ITEMS = [
 
 describe('FaqSection', () => {
   it('renders the default heading', () => {
-    render(<FaqSection items={FAQ_ITEMS} />);
+    const { container } = render(<FaqSection items={FAQ_ITEMS} />);
 
     expect(
       screen.getByRole('heading', { name: 'Frequently Asked Questions' })
     ).toBeInTheDocument();
+    expect(container.querySelector('.faq-section')).toHaveAttribute(
+      'data-pen-contract',
+      'pAAhw'
+    );
+    expect(container.querySelector('.faq-section')).toHaveAttribute(
+      'data-layout-contract',
+      'height-stable-disclosure'
+    );
   });
 
   it('keeps all answers collapsed on initial render', () => {
@@ -33,8 +42,48 @@ describe('FaqSection', () => {
 
       expect(trigger).toHaveAttribute('aria-expanded', 'false');
       expect(panel).toHaveAttribute('aria-hidden', 'true');
-      expect(panel).toHaveClass('invisible');
+      expect(panel).toHaveClass(
+        'invisible',
+        'mt-2',
+        'grid',
+        'grid-rows-[1fr]',
+        'pointer-events-none',
+        'opacity-0'
+      );
     }
+  });
+
+  it('keeps every answer slot mounted while disclosure visibility changes', () => {
+    render(<FaqSection items={FAQ_ITEMS} />);
+
+    const firstTrigger = screen.getByRole('button', {
+      name: FAQ_ITEMS[0].question,
+    });
+    const firstPanel = document.getElementById(
+      firstTrigger.getAttribute('aria-controls') ?? ''
+    );
+
+    expect(firstPanel).toHaveTextContent(FAQ_ITEMS[0].answer);
+    expect(firstPanel).toHaveClass(
+      'invisible',
+      'mt-2',
+      'grid',
+      'grid-rows-[1fr]',
+      'pointer-events-none',
+      'opacity-0'
+    );
+
+    fireEvent.click(firstTrigger);
+
+    expect(firstPanel).toHaveTextContent(FAQ_ITEMS[0].answer);
+    expect(firstPanel).toHaveClass(
+      'visible',
+      'mt-2',
+      'grid',
+      'grid-rows-[1fr]',
+      'opacity-100'
+    );
+    expect(firstPanel).not.toHaveClass('pointer-events-none');
   });
 
   it('opens one answer at a time', () => {
@@ -86,6 +135,49 @@ describe('FaqSection', () => {
     expect(panel).toHaveAttribute('aria-hidden', 'true');
     expect(panel).toHaveClass('invisible');
     expect(questionButton).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('supports wrapped arrow navigation plus Home and End', () => {
+    render(<FaqSection items={FAQ_ITEMS} />);
+
+    const firstTrigger = screen.getByRole('button', {
+      name: FAQ_ITEMS[0].question,
+    });
+    const secondTrigger = screen.getByRole('button', {
+      name: FAQ_ITEMS[1].question,
+    });
+
+    firstTrigger.focus();
+    fireEvent.keyDown(firstTrigger, { key: 'ArrowDown' });
+    expect(secondTrigger).toHaveFocus();
+
+    fireEvent.keyDown(secondTrigger, { key: 'ArrowDown' });
+    expect(firstTrigger).toHaveFocus();
+
+    fireEvent.keyDown(firstTrigger, { key: 'ArrowUp' });
+    expect(secondTrigger).toHaveFocus();
+
+    fireEvent.keyDown(secondTrigger, { key: 'Home' });
+    expect(firstTrigger).toHaveFocus();
+
+    fireEvent.keyDown(firstTrigger, { key: 'End' });
+    expect(secondTrigger).toHaveFocus();
+  });
+
+  it('keeps native Enter and Space disclosure controls', async () => {
+    const user = userEvent.setup();
+    render(<FaqSection items={FAQ_ITEMS} />);
+
+    const firstTrigger = screen.getByRole('button', {
+      name: FAQ_ITEMS[0].question,
+    });
+    firstTrigger.focus();
+
+    await user.keyboard('{Enter}');
+    expect(firstTrigger).toHaveAttribute('aria-expanded', 'true');
+
+    await user.keyboard(' ');
+    expect(firstTrigger).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('uses a custom heading when provided', () => {

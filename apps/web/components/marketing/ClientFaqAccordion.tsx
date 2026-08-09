@@ -2,7 +2,7 @@
 'use client';
 
 import { Minus, Plus } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +22,11 @@ export function ClientFaqAccordion({
 }: Readonly<ClientFaqAccordionProps>) {
   const sectionId = useId();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const triggerRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  const focusTrigger = (index: number) => {
+    triggerRefs.current[index]?.focus();
+  };
 
   return (
     <div className='faq-accordion mt-10 border-y border-border-primary'>
@@ -36,6 +41,9 @@ export function ClientFaqAccordion({
             className='faq-accordion__item border-b border-border-primary last:border-b-0'
           >
             <button
+              ref={element => {
+                triggerRefs.current[index] = element;
+              }}
               id={triggerId}
               type='button'
               aria-expanded={isOpen}
@@ -50,6 +58,21 @@ export function ClientFaqAccordion({
                     question: item.question,
                     index,
                   });
+                }
+              }}
+              onKeyDown={event => {
+                if (event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  focusTrigger((index + 1) % items.length);
+                } else if (event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  focusTrigger((index - 1 + items.length) % items.length);
+                } else if (event.key === 'Home') {
+                  event.preventDefault();
+                  focusTrigger(0);
+                } else if (event.key === 'End') {
+                  event.preventDefault();
+                  focusTrigger(items.length - 1);
                 }
               }}
             >
@@ -73,10 +96,10 @@ export function ClientFaqAccordion({
               aria-labelledby={triggerId}
               aria-hidden={!isOpen}
               className={cn(
-                'faq-accordion__panel grid overflow-hidden transition-[grid-template-rows,opacity,margin] duration-subtle ease-subtle motion-reduce:transition-none',
+                'faq-accordion__panel mt-2 grid grid-rows-[1fr] overflow-hidden transition-opacity duration-subtle ease-subtle motion-reduce:transition-none',
                 isOpen
-                  ? 'visible mt-2 grid-rows-[1fr] opacity-100'
-                  : 'invisible mt-0 grid-rows-[0fr] opacity-0'
+                  ? 'visible opacity-100'
+                  : 'invisible pointer-events-none opacity-0'
               )}
             >
               <div className='min-h-0 overflow-hidden'>

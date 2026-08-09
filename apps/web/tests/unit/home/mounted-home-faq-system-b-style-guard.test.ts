@@ -10,9 +10,8 @@ const cssPath = 'app/(home)/home.css';
 // Shared marketing components keep their existing token utilities for other
 // routes; the guard bans raw colors, gradients, shadows, and motion utilities
 // everywhere, and arbitrary-value utilities on FaqSection itself. The shared
-// accordion's pre-existing arbitrary values (leading-[1.35], grid-rows-[1fr],
-// transition-[...]) are the accordion's open/close mechanics and stay until the
-// coordinated shared-component teardown (see compare-system-b-style-guard).
+// accordion's constant grid-rows-[1fr] keeps the disclosure geometry stable;
+// only opacity and visibility may change between open and closed states.
 const forbiddenFaqSourcePatterns = [
   /#[0-9a-fA-F]{3,8}/,
   /rgba?\(/,
@@ -85,6 +84,14 @@ describe('mounted homepage FAQ System B source contract', () => {
 
     expect(source).toContain('text-lg font-semibold leading-snug');
     expect(source).toContain('text-base leading-7 text-secondary-token');
+    expect(source).toContain('mt-2 grid grid-rows-[1fr] overflow-hidden');
+    expect(source).toContain('transition-opacity');
+    expect(source).toContain('motion-reduce:transition-none');
+    expect(source).not.toContain('grid-rows-[0fr]');
+    expect(source).not.toMatch(/(?:^|\s)mt-0(?=\s|['"])/);
+    expect(source).not.toMatch(
+      /transition-\[[^\]]*(?:grid-template-rows|margin)/
+    );
   });
 
   it('keeps mounted FAQ shell CSS tokenized and grid-aligned', () => {
