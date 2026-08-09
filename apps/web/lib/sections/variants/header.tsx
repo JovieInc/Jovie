@@ -9,21 +9,20 @@ export const HEADER_VARIANTS: readonly SectionVariant[] = [
     description:
       'Standard landing-page header. Wraps `HeaderNav` with the public-static auth shell.',
     componentPath: 'components/site/MarketingHeader.tsx',
-    usedIn: ['/', '/(home)/*', '/pricing', '/artist-profile', 'most landings'],
+    usedIn: [
+      '/',
+      '/(home)/*',
+      '/pricing',
+      '/artist-profile',
+      '/blog',
+      '/blog/[slug]',
+      '/changelog',
+      '/support',
+      'most landings',
+    ],
     status: 'canonical',
     canonical: true,
     render: () => <MarketingHeader variant='landing' />,
-  },
-  {
-    id: 'marketing-header-content',
-    category: 'header',
-    label: 'Content (blog / changelog / support)',
-    description:
-      'Slimmer variant for long-form content surfaces. Same auth shell.',
-    componentPath: 'components/site/MarketingHeader.tsx',
-    usedIn: ['/blog', '/blog/[slug]', '/changelog', '/support'],
-    status: 'canonical',
-    render: () => <MarketingHeader variant='content' />,
   },
   {
     id: 'marketing-header-minimal',
