@@ -30,7 +30,7 @@ describe('ArtistProfileAdaptiveSection', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: ARTIST_PROFILE_COPY.adaptive.headline,
+        name: 'One profile. Right action.',
       })
     ).toBeInTheDocument();
     expect(
@@ -67,7 +67,7 @@ describe('ArtistProfileAdaptiveSection', () => {
     const adaptive = composition.sections.find(
       candidate => candidate.sectionId === 'feature-split'
     );
-    expect(adaptive?.variantId).toBe(ARTIST_PROFILE_ADAPTIVE_VARIANT);
+    expect(adaptive?.variantId).toBe('bordered-screenshot-left');
   });
 
   it('keeps the route wrapper and section catalog on the same shared body', () => {
