@@ -6,9 +6,9 @@
  * `eve` behind this interface (founder-directed, #12498; conditional-GO per
  * docs/spikes/eve-agent-sdk-fit.md and docs/MEMORY_ADR.md Addendum).
  * v0: thin, explicit, provenance-first. No social/write scopes.
- * Future: EveAgentAdapter implements AgentHarness lands in the build epic,
- * gated on the ai v6->v7 bump + an eve shake-out on a frozen pin; this stub
- * stays as the rollback. No real agent SDK is called yet (keeps deps minimal).
+ * The core-chat port is now defined separately so the Node 22 web app can
+ * call the Node 24 Eve pilot over its documented HTTP protocol. The existing
+ * memory adapter remains the rollback and owns all memory writes.
  *
  * Called only when FEATURE_MEMORY_STUDIO_SESSION_V0 enabled (caller gate).
  * Every output carries evidence links + confidence + user scoping.
@@ -25,6 +25,12 @@ import {
 } from '@/lib/memory/evidence';
 import type { MemoryScope, MemoryStore } from '@/lib/memory/types';
 import { logger } from '@/lib/utils/logger';
+import {
+  type CoreChatHarness,
+  type CoreChatHarnessInput,
+  type CoreChatHarnessResult,
+  makeCoreChatResult,
+} from './core-chat-harness';
 
 export interface StudioSessionInput {
   userId: string;
@@ -61,7 +67,7 @@ export interface StudioSessionResult {
   };
 }
 
-export interface AgentHarness {
+export interface AgentHarness extends CoreChatHarness {
   runStudioSessionMemoryLoop(
     input: StudioSessionInput
   ): Promise<StudioSessionResult>;
@@ -91,6 +97,15 @@ export class OpenAIAgentsAdapter implements AgentHarness {
 
   constructor(private readonly store: MemoryStore = defaultMemoryStore) {
     this.resolver = new MemoryIdentityResolver(store);
+  }
+
+  async runCoreChatTurn(
+    input: CoreChatHarnessInput
+  ): Promise<CoreChatHarnessResult> {
+    return makeCoreChatResult(input, {
+      status: 'disabled',
+      reason: 'feature_disabled',
+    });
   }
 
   async runStudioSessionMemoryLoop(

@@ -308,6 +308,11 @@ export const ServerEnvSchema = z.object({
   // AgentOS workflows are compile-ready but runtime-disabled by default.
   AGENT_OS_WORKFLOWS_ENABLED: z.enum(['true', 'false']).optional(),
 
+  // Eve core-chat shadow bridge. Off unless explicitly enabled and configured.
+  EVE_CORE_CHAT_MODE: z.enum(['off', 'shadow']).optional(),
+  EVE_CORE_CHAT_URL: z.string().url().optional(),
+  EVE_CORE_CHAT_AUTH_TOKEN: z.string().optional(),
+
   // xAI / Grok image generation
   XAI_API_KEY: z.string().optional(),
   ALBUM_ART_IMAGE_MODEL: z.string().optional(),
@@ -557,6 +562,9 @@ export const ENV_KEYS = [
   'LANGFUSE_BASE_URL',
   'JOVIE_ENABLE_LANGFUSE',
   'AGENT_OS_WORKFLOWS_ENABLED',
+  'EVE_CORE_CHAT_MODE',
+  'EVE_CORE_CHAT_URL',
+  'EVE_CORE_CHAT_AUTH_TOKEN',
   'XAI_API_KEY',
   'ALBUM_ART_IMAGE_MODEL',
   'ALBUM_ART_GENERATION_DAILY_LIMIT',

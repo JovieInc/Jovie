@@ -14,4 +14,14 @@ describe('jovie capability manifest tool', () => {
     });
     expect(result.approvalRequired).toContain('OAuth');
   });
+
+  it('registers core chat as a read-only shadow capability', () => {
+    expect(capabilityManifest('core_chat')).toMatchObject({
+      capability: 'core_chat',
+      mode: 'read_only',
+      externalAccess: false,
+      writePerformed: false,
+      pilot: true,
+    });
+  });
 });

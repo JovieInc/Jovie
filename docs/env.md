@@ -94,6 +94,31 @@ Helicone API key sent as the `Helicone-Auth` header when
 `HELICONE_GATEWAY_BASE_URL` is configured. Required for Helicone logging when
 the proxy is enabled.
 
+## Eve Core-Chat Shadow Bridge
+
+The Eve bridge is disabled by default. When enabled in `shadow` mode, the
+canonical `executeChatTurn` path sends a bounded, read-only observation to the
+isolated Node 24 Eve pilot and keeps Jovie's existing `streamText` response as
+the authoritative path. It does not send the system prompt, user id, provider
+credentials, or Jovie tool implementations.
+
+### `EVE_CORE_CHAT_MODE`
+
+Set to `shadow` to invoke Eve. Leave unset or set to `off` to skip the network
+call. Any Eve transport, auth, or protocol failure falls back to the existing
+Jovie stream.
+
+### `EVE_CORE_CHAT_URL`
+
+Absolute URL for the Eve pilot host. Local loopback hosts may use Eve's local
+development auth. Non-loopback hosts must use HTTPS and require
+`EVE_CORE_CHAT_AUTH_TOKEN` or the pilot's configured Vercel OIDC caller.
+
+### `EVE_CORE_CHAT_AUTH_TOKEN`
+
+Optional server-only bearer token for the Eve route. Keep it in the deployment
+secret manager, never in git or request bodies.
+
 ## Feature Flags (Statsig)
 
 ### `STATSIG_SERVER_SECRET`

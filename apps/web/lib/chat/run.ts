@@ -7,6 +7,13 @@ import {
   type ToolSet,
   type UIMessage,
 } from 'ai';
+import {
+  type CoreChatHarness,
+  type CoreChatHarnessTrace,
+  isCoreChatHarnessTrace,
+  makeCoreChatResult,
+} from '@/lib/agents/core-chat-harness';
+import { defaultCoreChatHarness } from '@/lib/agents/eve-agent-adapter';
 import { gateway, streamText } from '@/lib/ai/sdk';
 import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
@@ -173,6 +180,8 @@ export interface ExecuteChatTurnInput {
    * the caller passes the ONBOARDING_TOOLS palette.
    */
   tools: ToolSet;
+  /** Optional Eve core-chat port, primarily for deterministic harnesses. */
+  coreChatHarness?: CoreChatHarness;
   signal: AbortSignal;
   requestId: string;
   /** Telemetry hooks (Sentry in prod, no-op in eval/tests). */
@@ -203,6 +212,8 @@ export interface ExecuteChatTurnResult {
   systemPrompt: string;
   /** Names of tools registered for this turn (deterministic order). */
   toolNames: readonly string[];
+  /** Eve trace promise. The existing stream remains authoritative and starts immediately. */
+  coreChatTrace: Promise<CoreChatHarnessTrace>;
   /** Pre-converted model messages (the AI SDK input). */
   modelMessages: ModelMessage[];
   /** Terminal signals populated as the model stream finishes. */
@@ -243,6 +254,7 @@ export async function executeChatTurn(
     lockedTools,
     pinnedOpportunity,
     tools,
+    coreChatHarness = defaultCoreChatHarness,
     signal,
     requestId,
     resolvedProfileId,
@@ -311,6 +323,42 @@ export async function executeChatTurn(
     ? CHAT_MODEL_LIGHT
     : resolveRotatedChatModel(modelRotationStep);
 
+  const toolNames = Object.keys(tools).sort((a, b) => a.localeCompare(b));
+  const toolStepLimit = resolveChatToolStepLimit(
+    planLimits.booleans.aiCanUseTools
+  );
+  const turnSignals = { toolStepCapExhausted: false };
+
+  const disclosureProbeText =
+    lastUserText ?? extractLastUserText(uiMessages) ?? '';
+  const blockedForDisclosure =
+    disclosureProbeText.length > 0 &&
+    isPromptDisclosureRequest(disclosureProbeText);
+
+  const coreChatTrace = resolveCoreChatTrace({
+    harness: coreChatHarness,
+    input: {
+      requestId,
+      mode,
+      selectedModel,
+      toolNames,
+      userMessage: blockedForDisclosure ? null : disclosureProbeText || null,
+      signal,
+    },
+    blockedForDisclosure,
+  });
+
+  void coreChatTrace.then(trace => {
+    if (trace.status === 'disabled' && trace.reason === 'feature_disabled') {
+      return;
+    }
+    telemetry?.setTags?.({
+      chat_eve_available: String(trace.available),
+      chat_eve_status: trace.status,
+      chat_eve_reason: trace.reason,
+    });
+  });
+
   // Tag the request scope with chat-specific dimensions so all telemetry
   // events for this turn (errors, perf, breadcrumbs) are filterable
   // together. `chat_conversation_id` goes in `extra` (high cardinality);
@@ -328,18 +376,6 @@ export async function executeChatTurn(
       resolvedConversationId.slice(0, 120)
     );
   }
-
-  const toolNames = Object.keys(tools).sort((a, b) => a.localeCompare(b));
-  const toolStepLimit = resolveChatToolStepLimit(
-    planLimits.booleans.aiCanUseTools
-  );
-  const turnSignals = { toolStepCapExhausted: false };
-
-  const disclosureProbeText =
-    lastUserText ?? extractLastUserText(uiMessages) ?? '';
-  const blockedForDisclosure =
-    disclosureProbeText.length > 0 &&
-    isPromptDisclosureRequest(disclosureProbeText);
 
   const promptRegistry = resolveChatPromptRegistryEntry(mode);
   const langfuseTrace = await startChatTurnLangfuseTrace({
@@ -497,9 +533,42 @@ export async function executeChatTurn(
     selectedModel,
     systemPrompt,
     toolNames,
+    coreChatTrace,
     modelMessages,
     turnSignals,
   };
+}
+
+async function resolveCoreChatTrace(input: {
+  harness: CoreChatHarness;
+  input: Parameters<CoreChatHarness['runCoreChatTurn']>[0];
+  blockedForDisclosure: boolean;
+}): Promise<CoreChatHarnessTrace> {
+  if (input.blockedForDisclosure) {
+    return makeCoreChatResult(input.input, {
+      status: 'disabled',
+      reason: 'prompt_disclosure_blocked',
+    }).trace;
+  }
+
+  try {
+    const result = await input.harness.runCoreChatTurn(input.input);
+    if (
+      !isCoreChatHarnessTrace(result?.trace) ||
+      result.trace.requestId !== input.input.requestId
+    ) {
+      return makeCoreChatResult(input.input, {
+        status: 'fallback',
+        reason: 'harness_error',
+      }).trace;
+    }
+    return result.trace;
+  } catch {
+    return makeCoreChatResult(input.input, {
+      status: 'fallback',
+      reason: 'harness_error',
+    }).trace;
+  }
 }
 
 function wrapStreamResultWithLeakGuard<T extends ReturnType<typeof streamText>>(
