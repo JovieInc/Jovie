@@ -146,25 +146,28 @@ body:has(.home-viewport) {
   overscroll-behavior: auto;
 }
 
-/* Public profile pages — lock viewport on mobile, allow scroll on desktop. */
-html:has(.profile-viewport) {
+/* Public profile pages — lock viewport on mobile, allow scroll on desktop.
+   Require the profile viewport to be the route's direct body child. Marketing
+   and demo surfaces embed the same component inside phone frames; a broad
+   descendant selector would let that preview lock the outer document. */
+html:has(> body > .profile-viewport) {
   height: 100dvh;
   overflow: clip;
   overscroll-behavior: none;
 }
-body:has(.profile-viewport) {
+body:has(> .profile-viewport) {
   height: 100dvh;
   overflow: clip;
   overscroll-behavior: none;
 }
 @media (min-width: 768px) {
-  html:has(.profile-viewport) {
+  html:has(> body > .profile-viewport) {
     height: auto;
     min-height: 100%;
     overflow-y: auto;
     overscroll-behavior: auto;
   }
-  body:has(.profile-viewport) {
+  body:has(> .profile-viewport) {
     height: auto;
     min-height: 100%;
     overflow-x: clip;

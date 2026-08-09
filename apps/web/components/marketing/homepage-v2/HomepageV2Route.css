@@ -124,6 +124,17 @@
   animation-duration: 12s;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .homepage-v2-hero__phone-float,
+  .homepage-v2-hero__shot {
+    animation: none;
+  }
+
+  .homepage-v2-hero__shot {
+    transform: rotate(var(--drift-rotate, 0deg));
+  }
+}
+
 .homepage-v2-hero__shot-a-frame {
   border-radius: 1.15rem;
 }
