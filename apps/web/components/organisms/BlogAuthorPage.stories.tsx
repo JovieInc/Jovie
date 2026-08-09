@@ -92,19 +92,24 @@ const WEB_023_POSTS = [
   },
 ] as const satisfies readonly BlogPostSummary[];
 
+/** Merge commit that introduced the shared route/story body in PR #15711. */
+export const BLOG_AUTHOR_STORY_RECEIPT = {
+  registryId: 'web-023-blog--authors--[username]',
+  route: '/blog/authors/[username]',
+  sourcePath: 'apps/web/app/(marketing)/blog/authors/[username]/page.tsx',
+  bodyPath: 'apps/web/components/organisms/BlogAuthorPage.tsx',
+  sourceExport: 'BlogAuthorPage',
+  storyExport: 'Web023BlogAuthor',
+  sourceSha: '468cc374b544d64573403e5fa8e047303964e877',
+} as const;
+
 const meta = {
   title: 'Public Catalog/BlogAuthorPage',
   component: BlogAuthorPage,
   parameters: {
     layout: 'fullscreen',
     controls: { disable: true },
-    pen: {
-      registryId: 'web-023-blog--authors--[username]',
-      route: '/blog/authors/[username]',
-      sourcePath: 'apps/web/app/(marketing)/blog/authors/[username]/page.tsx',
-      bodyPath: 'apps/web/components/organisms/BlogAuthorPage.tsx',
-      sourceSha: '0892cccf39d72c62890ad4bc797cfd6f2d651af6',
-    },
+    pen: BLOG_AUTHOR_STORY_RECEIPT,
     docs: {
       description: {
         component:
@@ -119,13 +124,12 @@ type Story = StoryObj<typeof meta>;
 
 export const Web023BlogAuthor: Story = {
   name: 'web-023-blog--authors--[username] / Tim White',
-  render: () => (
-    <BlogAuthorPage
-      articleCount={WEB_023_POSTS.length}
-      authorHero={<BlogAuthorCard author={WEB_023_AUTHOR} variant='hero' />}
-      articleCards={WEB_023_POSTS.map(post => (
-        <BlogCard key={post.slug} post={post} author={WEB_023_AUTHOR} />
-      ))}
-    />
-  ),
+  args: {
+    articleCount: WEB_023_POSTS.length,
+    authorHero: <BlogAuthorCard author={WEB_023_AUTHOR} variant='hero' />,
+    articleCards: WEB_023_POSTS.map(post => (
+      <BlogCard key={post.slug} post={post} author={WEB_023_AUTHOR} />
+    )),
+  },
+  render: args => <BlogAuthorPage {...args} />,
 };

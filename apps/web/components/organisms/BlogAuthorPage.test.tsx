@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import { BlogAuthorPage } from './BlogAuthorPage';
+import { BLOG_AUTHOR_STORY_RECEIPT } from './BlogAuthorPage.stories';
 
 const readWebSource = (path: string) =>
   readFileSync(resolve(process.cwd(), path), 'utf8');
@@ -82,5 +83,20 @@ describe('BlogAuthorPage', () => {
     expect(storySource).toContain("slug: 'the-myspace-problem'");
     expect(storySource).toContain("slug: 'the-suno-playbook-teardown'");
     expect(storySource).not.toMatch(/images\.unsplash\.com\/placeholder/i);
+  });
+
+  it('keeps the Pen receipt on the shared-body introducing commit', () => {
+    expect(BLOG_AUTHOR_STORY_RECEIPT).toEqual({
+      registryId: 'web-023-blog--authors--[username]',
+      route: '/blog/authors/[username]',
+      sourcePath: 'apps/web/app/(marketing)/blog/authors/[username]/page.tsx',
+      bodyPath: 'apps/web/components/organisms/BlogAuthorPage.tsx',
+      sourceExport: 'BlogAuthorPage',
+      storyExport: 'Web023BlogAuthor',
+      sourceSha: '468cc374b544d64573403e5fa8e047303964e877',
+    });
+    expect(BLOG_AUTHOR_STORY_RECEIPT.sourceSha).not.toBe(
+      '0892cccf39d72c62890ad4bc797cfd6f2d651af6'
+    );
   });
 });
