@@ -135,6 +135,24 @@ const data: ProfilesWorkspaceData = {
   providerAvailable: true,
 };
 
+const dataWithConnector: ProfilesWorkspaceData = {
+  ...data,
+  rows: [
+    ...data.rows,
+    {
+      id: 'gmail',
+      rowType: 'connector',
+      kind: 'connector',
+      platform: 'gmail',
+      label: 'Gmail',
+      handle: 'artist@example.com',
+      url: '/app/settings/connectors',
+      status: 'connected',
+      monitoringState: 'active',
+    },
+  ],
+};
+
 function renderWorkspace(workspaceData: ProfilesWorkspaceData | null) {
   return render(
     <HeaderActionsProvider>
@@ -255,8 +273,24 @@ describe('ProfilesWorkspace', () => {
     expect(screen.queryByText('Jovie Profile')).not.toBeInTheDocument();
 
     expect(
-      screen.queryByRole('button', { name: 'Connectors' })
-    ).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'Connectors' })
+    ).toBeInTheDocument();
+  });
+
+  it('exposes connector rows through a dedicated filter', async () => {
+    const user = userEvent.setup();
+    renderWorkspace(dataWithConnector);
+
+    await user.click(screen.getByRole('button', { name: 'Connectors' }));
+
+    expect(screen.getByText('Gmail')).toBeInTheDocument();
+    expect(screen.queryByText('Spotify')).not.toBeInTheDocument();
+    expect(screen.queryByText('Instagram')).not.toBeInTheDocument();
+    expect(screen.queryByText('Jovie Profile')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Connectors' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
   });
 
   it('uses the row action registry to open connection-specific details', async () => {
