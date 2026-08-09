@@ -899,6 +899,32 @@ describe('deterministic Symphony admission boundary', () => {
     assert.match(result.reason, /blocking pickup/);
   });
 
+  it('fails closed at the integrity layer and only at promotion for malformed queue evidence', () => {
+    const now = '2026-08-09T05:01:00.000Z';
+    const invalidIntegrity = admitter.evaluateFleetGate(
+      fleetEvidence({ integrity: {} }),
+      { now }
+    );
+    const invalidQueue = admitter.evaluateFleetGate(
+      fleetEvidence({ queue: { status: 'known' } }),
+      { now }
+    );
+
+    assert.equal(invalidIntegrity.state, 'RED');
+    assert.equal(invalidIntegrity.workAdmission.allowed, false);
+    assert.ok(
+      invalidIntegrity.reasons.some(
+        reason => reason.code === 'invalid-integrity-receipt'
+      )
+    );
+    assert.equal(invalidQueue.state, 'AMBER');
+    assert.equal(invalidQueue.workAdmission.allowed, true);
+    assert.equal(invalidQueue.promotionAdmission.allowed, false);
+    assert.ok(
+      invalidQueue.reasons.some(reason => reason.code === 'queue-unknown')
+    );
+  });
+
   it('recovers AMBER to GREEN and degrades stale controller state without stranding work', () => {
     const now = '2026-08-09T05:20:00.000Z';
     const amber = admitter.evaluateFleetGate(
@@ -991,6 +1017,12 @@ describe('deterministic Symphony admission boundary', () => {
         },
       })
     );
+    const missingIntegritySignals = fleetEvidence();
+    delete missingIntegritySignals.integrity;
+    const invalidIntegrity = await runController(missingIntegritySignals);
+    const invalidQueue = await runController(
+      fleetEvidence({ queue: { status: 'known' } })
+    );
     const recovered = await runController(
       fleetEvidence({
         integrity: {
@@ -1013,6 +1045,17 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(severe.exitCode, 2);
     assert.equal(severe.receipt.state, 'RED');
     assert.equal(severe.receipt.workAdmission.allowed, false);
+    assert.equal(invalidIntegrity.exitCode, 2);
+    assert.equal(invalidIntegrity.receipt.state, 'RED');
+    assert.ok(
+      invalidIntegrity.receipt.reasons.some(
+        reason => reason.code === 'invalid-integrity-receipt'
+      )
+    );
+    assert.equal(invalidQueue.exitCode, 0);
+    assert.equal(invalidQueue.receipt.state, 'AMBER');
+    assert.equal(invalidQueue.receipt.workAdmission.allowed, true);
+    assert.equal(invalidQueue.receipt.promotionAdmission.allowed, false);
     assert.equal(recovered.exitCode, 0);
     assert.equal(recovered.receipt.state, 'GREEN');
     assert.equal(recovered.receipt.promotionAdmission.allowed, true);

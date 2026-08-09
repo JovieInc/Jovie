@@ -111,7 +111,7 @@ export function evaluateFleetGate(
   const reasons = [];
   const mainStatus = evidence?.main?.status || 'unknown';
   const controllerStatus = evidence?.controller?.status || 'unknown';
-  const integrityStatus = evidence?.integrity?.status || 'clear';
+  const integrityStatus = evidence?.integrity?.status;
   const integrityReason = evidence?.integrity?.reason;
   const controllerReceiptPresent = Boolean(evidence?.observedAt);
   const controllerFresh =
@@ -189,19 +189,26 @@ export function evaluateFleetGate(
       );
     }
 
-    if (evidence.queue?.status === 'unknown') {
+    const queueStatus = evidence?.queue?.status || 'unknown';
+    const eligiblePrs = evidence?.queue?.eligiblePrs;
+    const queueTarget = evidence?.queue?.target;
+    const queueShapeValid =
+      queueStatus === 'known' &&
+      Number.isInteger(eligiblePrs) &&
+      eligiblePrs >= 0 &&
+      Number.isInteger(queueTarget) &&
+      queueTarget >= 0;
+
+    if (!queueShapeValid) {
       reasons.push(
         typedReason(
           FLEET_GATE_REASON.QUEUE_UNKNOWN,
           'promotion',
           'warning',
-          'Promotion queue state is unknown.'
+          'Promotion queue state is missing, unknown, or malformed.'
         )
       );
-    } else if (
-      evidence.queue?.status === 'known' &&
-      Number(evidence.queue.eligiblePrs) > Number(evidence.queue.target)
-    ) {
+    } else if (eligiblePrs > queueTarget) {
       reasons.push(
         typedReason(
           FLEET_GATE_REASON.QUEUE_ABOVE_TARGET,

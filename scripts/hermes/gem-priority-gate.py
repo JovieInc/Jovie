@@ -229,10 +229,25 @@ def observe_queue(repo: str, target: int) -> dict[str, Any]:
 
 def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     reasons: list[dict[str, str]] = []
-    integrity = signals.get("integrity") or {"status": "clear"}
-    main = signals.get("main") or {"status": "unknown"}
-    controller = signals.get("controller") or {"status": "unknown"}
-    queue = signals.get("queue") or {"status": "unknown"}
+    integrity_value = signals.get("integrity")
+    integrity = (
+        integrity_value
+        if isinstance(integrity_value, dict)
+        else {
+            "status": "invalid",
+            "detail": "Integrity signal is missing or malformed.",
+        }
+    )
+    main_value = signals.get("main")
+    main = main_value if isinstance(main_value, dict) else {"status": "unknown"}
+    controller_value = signals.get("controller")
+    controller = (
+        controller_value
+        if isinstance(controller_value, dict)
+        else {"status": "unknown"}
+    )
+    queue_value = signals.get("queue")
+    queue = queue_value if isinstance(queue_value, dict) else {"status": "unknown"}
 
     if integrity.get("status") == "active" and integrity.get("reason") in SEVERE_REASONS:
         reasons.append(
@@ -272,16 +287,27 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
                     "Main is not green; ready, merge, deploy, and promotion are frozen.",
                 )
             )
-        if queue.get("status") != "known":
+        eligible_prs = queue.get("eligiblePrs")
+        queue_target = queue.get("target")
+        queue_shape_valid = (
+            queue.get("status") == "known"
+            and isinstance(eligible_prs, int)
+            and not isinstance(eligible_prs, bool)
+            and eligible_prs >= 0
+            and isinstance(queue_target, int)
+            and not isinstance(queue_target, bool)
+            and queue_target >= 0
+        )
+        if not queue_shape_valid:
             reasons.append(
                 typed_reason(
                     "queue-unknown",
                     "promotion",
                     "warning",
-                    "Promotion queue is unknown.",
+                    "Promotion queue is missing, unknown, or malformed.",
                 )
             )
-        elif int(queue.get("eligiblePrs") or 0) > int(queue.get("target") or 0):
+        elif eligible_prs > queue_target:
             reasons.append(
                 typed_reason(
                     "queue-above-target",
