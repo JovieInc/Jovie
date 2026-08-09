@@ -69,11 +69,14 @@ export const STORY_BLOG_POSTS: readonly StoryBlogPost[] = [
   },
 ] as const;
 
-export const STORY_PROSE_PARAGRAPHS = [
-  'Jovie is a release platform for independent musicians. One adaptive profile captures fans, routes them to the right listen path, and reactivates them when you drop again.',
-  'This Storybook prose block stands in for long-form SEO/editorial body content. Production blog bodies still render through the blog route; the registry marks that path as extract-pending.',
-  'Marketing pages remain fully static (revalidate = false) and dark-only (System A).',
-] as const;
+/** Sanitized, deterministic excerpt from content/blog/the-contact-problem.md. */
+export const STORY_PROSE_HTML = `
+  <p>When I fired my manager, the first thing I realized was not emotional. It was logistical.</p>
+  <h2 id="one-permanent-contact">One permanent contact</h2>
+  <p>What if you had one email that was yours forever? One permanent, professional address that belongs to your career, not to whoever is currently managing it.</p>
+  <blockquote><p>One email. Routes to the right people. Shows you everything. Survives every change.</p></blockquote>
+  <p><a href="/blog/the-contact-problem">Read the full article</a></p>
+`;
 
 /**
  * Registry component paths that are TBD / legacy and cannot render as
@@ -91,12 +94,6 @@ export const MARKETING_SECTION_STORY_GAPS = [
     sectionId: 'ownership',
     component: 'TBD — first implementer creates ArtistProfileOwnershipSection',
     storyStrategy: 'WIP placeholder with registry neverUse + requiredInputs',
-  },
-  {
-    sectionId: 'content-prose',
-    component:
-      'apps/web/app/(marketing)/blog/[slug]/BlogPostPage (extract pending)',
-    storyStrategy: 'MarketingContentShell prose fixture (not full blog page)',
   },
   {
     sectionId: 'cta',
