@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/marketing/support-route-header-contract.test.ts
 'use client';
 
 import { usePathname } from 'next/navigation';
