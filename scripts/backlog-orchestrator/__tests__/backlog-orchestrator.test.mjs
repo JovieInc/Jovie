@@ -1006,6 +1006,12 @@ describe('deterministic Symphony admission boundary', () => {
         main: { status: 'red', failedChecks: ['Production Synthetic Tests'] },
       })
     );
+    const amberPromotion = await runController(
+      fleetEvidence({
+        main: { status: 'red', failedChecks: ['Production Synthetic Tests'] },
+      }),
+      'promotion'
+    );
     const controllerFailure = await runController(
       fleetEvidence({ controller: { status: 'failed' } })
     );
@@ -1039,6 +1045,10 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(amber.receipt.workAdmission.allowed, true);
     assert.equal(amber.receipt.promotionAdmission.allowed, false);
     assert.equal(amber.receipt.ownership.directGemPickup, false);
+    assert.equal(amberPromotion.exitCode, 2);
+    assert.equal(amberPromotion.receipt.state, 'AMBER');
+    assert.equal(amberPromotion.receipt.workAdmission.allowed, true);
+    assert.equal(amberPromotion.receipt.promotionAdmission.allowed, false);
     assert.equal(controllerFailure.receipt.state, 'AMBER');
     assert.equal(controllerFailure.receipt.workAdmission.allowed, true);
     assert.equal(controllerFailure.receipt.promotionAdmission.allowed, false);
@@ -1065,6 +1075,208 @@ describe('deterministic Symphony admission boundary', () => {
     assert.match(workflowSource, /only a fresh `GREEN` may/);
     assert.match(workflowSource, /max_concurrent_agents: 1/);
     assert.doesNotMatch(workflowSource, /Open a non-draft PR/);
+  });
+
+  it('keeps the Gem drain on typed fleet admission and fail-closes exit-code mismatches', async () => {
+    const hermesDir = resolve(ORCHESTRATOR_DIR, '../hermes');
+    const consumer = await readFile(
+      resolve(hermesDir, 'gem-pr-drain.py'),
+      'utf8'
+    );
+    const contractProbe = `
+import json
+import pathlib
+import sys
+sys.path.insert(0, sys.argv[1])
+from gem_gate_contract import GateContractError, drain_state_dir, gate_state_dir, validate_gate_result
+
+receipt = {
+    "schema": "jovie-fleet-gate/v1",
+    "state": "AMBER",
+    "signals": {"main": {"status": "red"}},
+    "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "main red"}],
+    "workAdmission": {"allowed": True},
+    "promotionAdmission": {"allowed": False},
+    "ownership": {"directGemPickup": False},
+}
+validate_gate_result(0, json.dumps(receipt), "fleet")
+validate_gate_result(2, json.dumps(receipt), "promotion")
+try:
+    validate_gate_result(0, json.dumps(receipt), "promotion")
+except GateContractError:
+    pass
+else:
+    raise AssertionError("promotion exit 0 must fail when typed admission is false")
+assert gate_state_dir(pathlib.Path("/tmp/gem"), "JovieInc/Jovie") == pathlib.Path("/tmp/gem/state/gem-priority-gate")
+assert gate_state_dir(pathlib.Path("/tmp/gem"), "other/repo") != pathlib.Path("/tmp/gem/state/gem-priority-gate")
+assert gate_state_dir(pathlib.Path("/tmp/gem"), "other/repo").parent == pathlib.Path("/tmp/gem/state")
+assert gate_state_dir(pathlib.Path("/tmp/gem"), "foo/bar-baz") != gate_state_dir(pathlib.Path("/tmp/gem"), "foo-bar/baz")
+assert drain_state_dir(pathlib.Path("/tmp/gem"), "JovieInc/Jovie") == pathlib.Path("/tmp/gem/state/gem-pr-drain")
+assert drain_state_dir(pathlib.Path("/tmp/gem"), "other/repo") != pathlib.Path("/tmp/gem/state/gem-pr-drain")
+contradictory = dict(receipt, state="RED")
+try:
+    validate_gate_result(0, json.dumps(contradictory), "fleet")
+except GateContractError:
+    pass
+else:
+    raise AssertionError("RED plus work allowed must fail closed")
+`;
+
+    await execFileAsync('python3', ['-c', contractProbe, hermesDir]);
+    assert.match(consumer, /"--consumer",\s*"fleet"/);
+    assert.match(
+      consumer,
+      /validate_gate_result\(gate\.returncode, gate\.stdout, "fleet"\)/
+    );
+    assert.ok(
+      consumer.indexOf('if not gate["workAdmission"]["allowed"]') <
+        consumer.indexOf('authenticated, reason = auth_status()')
+    );
+
+    const workspace = await mkdtemp('/tmp/jovie-gem-drain-red-');
+    await mkdir(resolve(workspace, 'scripts'), { recursive: true });
+    await writeFile(
+      resolve(workspace, 'gem_repo_registry.py'),
+      `class Policy:
+    pr_drain = True
+    repo_class = "test"
+    default_branch = "main"
+def by_github(_repo):
+    return Policy()
+`
+    );
+    await writeFile(
+      resolve(workspace, 'scripts/gem-priority-gate.py'),
+      `import json
+receipt = {
+    "schema": "jovie-fleet-gate/v1",
+    "state": "RED",
+    "signals": {"main": {"status": "red"}},
+    "reasons": [{"code": "repository-or-artifact-corruption", "layer": "integrity", "severity": "critical", "detail": "test"}],
+    "workAdmission": {"allowed": False},
+    "promotionAdmission": {"allowed": False},
+    "ownership": {"directGemPickup": False},
+}
+print(json.dumps(receipt))
+raise SystemExit(2)
+`
+    );
+    const { stdout } = await execFileAsync(
+      'python3',
+      [resolve(hermesDir, 'gem-pr-drain.py'), '--dry-run'],
+      {
+        env: {
+          ...process.env,
+          GEM_WORKSPACE: workspace,
+          GEM_PR_DRAIN_REPO: 'JovieInc/Jovie',
+          PYTHONPATH: workspace,
+        },
+      }
+    );
+    const blocked = JSON.parse(stdout);
+    assert.equal(blocked.status, 'ok');
+    assert.equal(blocked.work_admission, 'blocked');
+    assert.deepEqual(blocked.selected, []);
+    assert.deepEqual(blocked.processed, []);
+
+    const updateProbe = `
+import importlib.util
+import json
+import pathlib
+import sys
+consumer = pathlib.Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location("gem_pr_drain", consumer)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+result = module.update_one({
+    "number": 1,
+    "mergeable_state": "behind",
+    "head": {"ref": "test"},
+    "labels": [],
+    "statusCheckRollup": [],
+})
+print(json.dumps(result))
+`;
+    const update = await execFileAsync(
+      'python3',
+      ['-c', updateProbe, resolve(hermesDir, 'gem-pr-drain.py')],
+      {
+        env: {
+          ...process.env,
+          GEM_WORKSPACE: workspace,
+          GEM_PR_DRAIN_REPO: 'JovieInc/Jovie',
+          PYTHONPATH: workspace,
+        },
+      }
+    );
+    const updateResult = JSON.parse(update.stdout);
+    assert.equal(updateResult.action, 'work_admission_blocked');
+    assert.equal(updateResult.result, 'skipped');
+
+    await writeFile(
+      resolve(workspace, 'scripts/gem-priority-gate.py'),
+      `import json
+receipt = {
+    "schema": "jovie-fleet-gate/v1",
+    "state": "AMBER",
+    "signals": {"main": {"status": "red"}},
+    "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "test"}],
+    "workAdmission": {"allowed": True},
+    "promotionAdmission": {"allowed": False},
+    "ownership": {"directGemPickup": False},
+}
+print(json.dumps(receipt))
+raise SystemExit(0)
+`
+    );
+    const allowedProbe = `
+import importlib.util
+import json
+import pathlib
+import sys
+consumer = pathlib.Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location("gem_pr_drain", consumer)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+calls = []
+def fake_run(*args, **kwargs):
+    calls.append(args)
+    return "{}"
+module.run = fake_run
+behind = module.update_one({
+    "number": 1,
+    "mergeable_state": "behind",
+    "head": {"ref": "test", "sha": "abc123"},
+    "labels": [],
+    "statusCheckRollup": [],
+})
+clean = module.update_one({
+    "number": 2,
+    "mergeable_state": "clean",
+    "head": {"ref": "test-2"},
+    "labels": [],
+    "statusCheckRollup": [],
+})
+print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
+`;
+    const allowed = await execFileAsync(
+      'python3',
+      ['-c', allowedProbe, resolve(hermesDir, 'gem-pr-drain.py')],
+      {
+        env: {
+          ...process.env,
+          GEM_WORKSPACE: workspace,
+          GEM_PR_DRAIN_REPO: 'JovieInc/Jovie',
+          PYTHONPATH: workspace,
+        },
+      }
+    );
+    const allowedResult = JSON.parse(allowed.stdout);
+    assert.equal(allowedResult.behind.action, 'api_update_branch');
+    assert.equal(allowedResult.behind.result, 'ok');
+    assert.ok(allowedResult.calls[0].includes('expected_head_sha=abc123'));
+    assert.equal(allowedResult.clean.action, 'controller_observe_only');
+    assert.equal(allowedResult.clean.reason, 'implementation_owner_symphony');
   });
 
   it('runs stale-lease recovery before gate-next admission preflight', async () => {
