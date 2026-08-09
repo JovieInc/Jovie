@@ -22,10 +22,15 @@ import {
 } from '@/contexts/HeaderActionsContext';
 
 const pushMock = vi.fn();
+const prefetchMock = vi.fn();
 const pathnameMock = vi.hoisted(() => vi.fn(() => '/app'));
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: pushMock, replace: vi.fn() }),
+  useRouter: () => ({
+    push: pushMock,
+    prefetch: prefetchMock,
+    replace: vi.fn(),
+  }),
   usePathname: () => pathnameMock(),
 }));
 
