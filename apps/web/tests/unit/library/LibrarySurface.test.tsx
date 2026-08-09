@@ -150,6 +150,7 @@ function buildAsset(
     artist: 'Tim White',
     artworkUrl: 'https://cdn.example.com/artwork.jpg',
     previewUrl: 'https://cdn.example.com/preview.mp3',
+    previewVerification: 'verified',
     videoUrl: null,
     waveformSeed: 17,
     smartLinkPath: '/tim/take-me-over',

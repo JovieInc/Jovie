@@ -22,6 +22,7 @@ function buildAsset(
     artist: 'Tim White',
     artworkUrl: 'https://cdn.example.com/artwork.jpg',
     previewUrl: 'https://cdn.example.com/preview.mp3',
+    previewVerification: 'verified',
     videoUrl: null,
     waveformSeed: 17,
     smartLinkPath: '/tim/take-me-over',
@@ -64,6 +65,33 @@ describe('LibraryMediaThumbnail', () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('library-video-scrub-thumbnail')
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not imply playback for an unverified preview URL', () => {
+    render(
+      <LibraryMediaThumbnail
+        asset={buildAsset({ previewVerification: 'fallback' })}
+        size='card'
+      />
+    );
+
+    expect(
+      screen.getByTestId('library-media-thumbnail-release-1')
+    ).toHaveAttribute('data-preview-mode', 'static');
+    expect(
+      screen.queryByTestId('library-audio-waveform-thumbnail')
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps compact verified artwork free of waveform chrome', () => {
+    render(<LibraryMediaThumbnail asset={buildAsset()} size='row' />);
+
+    expect(
+      screen.getByTestId('library-media-thumbnail-release-1')
+    ).toHaveAttribute('data-preview-mode', 'static');
+    expect(
+      screen.queryByTestId('library-audio-waveform-thumbnail')
     ).not.toBeInTheDocument();
   });
 
