@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { MarketingContainer } from '@/components/marketing';
+import { BlogAuthorPage } from '@/components/organisms/BlogAuthorPage';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { getBlogPosts } from '@/lib/blog/getBlogPosts';
 import { resolveAuthor } from '@/lib/blog/resolveAuthor';
@@ -115,29 +115,13 @@ export default async function AuthorPage({
       <script type='application/ld+json'>{personSchema}</script>
       <script type='application/ld+json'>{breadcrumbSchema}</script>
 
-      <div className='min-h-screen'>
-        {/* Author Hero */}
-        <MarketingContainer width='page' className='pb-12 pt-16 sm:pt-24'>
-          <div className='mx-auto max-w-3xl'>
-            <BlogAuthorCard author={author} variant='hero' />
-          </div>
-        </MarketingContainer>
-
-        {/* Author Posts */}
-        <MarketingContainer width='page' className='pb-20 sm:pb-28'>
-          <div className='marketing-divider mb-10' />
-          <h2 className='text-xl font-semibold tracking-tight text-primary-token mb-8'>
-            {authorPosts.length === 1
-              ? '1 article'
-              : `${authorPosts.length} articles`}
-          </h2>
-          <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
-            {authorPosts.map(post => (
-              <BlogCard key={post.slug} post={post} author={author} />
-            ))}
-          </div>
-        </MarketingContainer>
-      </div>
+      <BlogAuthorPage
+        articleCount={authorPosts.length}
+        authorHero={<BlogAuthorCard author={author} variant='hero' />}
+        articleCards={authorPosts.map(post => (
+          <BlogCard key={post.slug} post={post} author={author} />
+        ))}
+      />
     </>
   );
 }
