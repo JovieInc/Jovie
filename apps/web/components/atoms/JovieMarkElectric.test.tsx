@@ -39,6 +39,15 @@ describe('JovieMarkElectric', () => {
     expect(paths.length).toBe(0);
   });
 
+  it('can retain a static electric trace after the entrance animation', () => {
+    const { container } = render(<JovieMarkElectric settledSpark />);
+    expect(
+      container.querySelector(
+        '[data-testid="jovie-mark-electric-settled-trace"]'
+      )
+    ).not.toBeNull();
+  });
+
   it('omits the spark paths under prefers-reduced-motion', () => {
     vi.mocked(useReducedMotion).mockReturnValue(true);
     const { container } = render(<JovieMarkElectric />);
