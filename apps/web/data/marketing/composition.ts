@@ -624,13 +624,7 @@ function matchesVariant(
   }
   // spec-wall
   if (sectionId === 'spec-wall') {
-    if (variantId === 'bento') {
-      return false; // chosen at render time based on tiles.length and emphasis
-    }
-    if (variantId === 'dense-compact-grid') {
-      return true; // default
-    }
-    return false;
+    return variantId === 'visual-five';
   }
   // capture
   if (sectionId === 'capture') {
