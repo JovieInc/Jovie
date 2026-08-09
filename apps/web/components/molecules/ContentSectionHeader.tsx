@@ -5,6 +5,7 @@ export interface ContentSectionHeaderProps {
   readonly title: ReactNode;
   readonly subtitle?: ReactNode;
   readonly actions?: ReactNode;
+  readonly headingLevel?: 'h1' | 'h2';
   readonly density?: 'default' | 'compact';
   readonly variant?: 'default' | 'plain';
   readonly className?: string;
@@ -18,6 +19,7 @@ export function ContentSectionHeader({
   title,
   subtitle,
   actions,
+  headingLevel = 'h2',
   density = 'default',
   variant = 'default',
   className,
@@ -26,6 +28,8 @@ export function ContentSectionHeader({
   subtitleClassName,
   actionsClassName,
 }: Readonly<ContentSectionHeaderProps>) {
+  const Heading = headingLevel;
+
   return (
     <div
       className={cn(
@@ -38,14 +42,14 @@ export function ContentSectionHeader({
       )}
     >
       <div className={cn('min-w-0 flex-1 space-y-0', bodyClassName)}>
-        <h2
+        <Heading
           className={cn(
             'truncate text-xs font-semibold tracking-[-0.012em] text-primary-token',
             titleClassName
           )}
         >
           {title}
-        </h2>
+        </Heading>
         {subtitle ? (
           <p
             className={cn(

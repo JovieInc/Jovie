@@ -57,6 +57,7 @@ export default async function ArtistsPage() {
         <ContentSurfaceCard surface='details'>
           <ContentSectionHeader
             density='compact'
+            headingLevel='h1'
             title='All artists'
             subtitle='Discover public creator profiles across Jovie.'
           />
@@ -161,6 +162,7 @@ function renderFallback() {
       <ContentSurfaceCard surface='details' className='overflow-hidden'>
         <ContentSectionHeader
           density='compact'
+          headingLevel='h1'
           title='Profiles are loading'
           subtitle='Please check back shortly once the connection is available.'
         />
