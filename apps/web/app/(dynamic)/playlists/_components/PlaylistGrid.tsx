@@ -22,7 +22,7 @@ export function PlaylistGrid({
   if (playlists.length === 0) {
     return (
       <div className='mt-16 text-center'>
-        <p className='text-mid text-white/40'>{emptyMessage}</p>
+        <p className='text-mid text-tertiary-token'>{emptyMessage}</p>
       </div>
     );
   }
