@@ -2641,6 +2641,12 @@ body:has(.system-b-brand-page) .marketing-glass-header__cta:focus-visible {
   }
 }
 
+@media (min-width: 1024px) {
+  :where(.system-b-artist-notifications-hero-title) {
+    font-size: clamp(3.6rem, 6.25vw, 7.2rem);
+  }
+}
+
 :where(.system-b-artist-notifications-hero-title-line) {
   display: block;
   max-width: 100%;
