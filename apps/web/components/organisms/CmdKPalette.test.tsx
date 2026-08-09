@@ -1,12 +1,18 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { type ReactNode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { CmdKPalette } from './CmdKPalette';
 
 const pushMock = vi.fn();
+const prefetchMock = vi.fn();
+const onOpenChangeMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: pushMock, replace: vi.fn() }),
+  useRouter: () => ({
+    push: pushMock,
+    prefetch: prefetchMock,
+    replace: vi.fn(),
+  }),
 }));
 
 vi.mock('next/image', () => ({
@@ -44,7 +50,11 @@ vi.mock('@/lib/queries/useChatCapabilitiesQuery', () => ({
   }),
 }));
 
-function MainPlaneHarness() {
+function MainPlaneHarness({
+  onOpenChange = vi.fn(),
+}: {
+  onOpenChange?: (open: boolean) => void;
+}) {
   const [header, setHeader] = useState<ReactNode>(null);
 
   return (
@@ -53,7 +63,7 @@ function MainPlaneHarness() {
       <CmdKPalette
         profileId='profile-1'
         open
-        onOpenChange={vi.fn()}
+        onOpenChange={onOpenChange}
         presentation='main'
         onHeaderChange={setHeader}
       />
@@ -85,6 +95,31 @@ describe('CmdKPalette', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
 
     expect(pushMock).toHaveBeenCalledWith('/app/calendar');
+  });
+
+  it('prefetches the active route and closes before pushing it', async () => {
+    pushMock.mockClear();
+    prefetchMock.mockClear();
+    onOpenChangeMock.mockClear();
+
+    render(<MainPlaneHarness onOpenChange={onOpenChangeMock} />);
+
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    fireEvent.change(input, { target: { value: 'Calendar' } });
+
+    await waitFor(() => {
+      expect(prefetchMock).toHaveBeenCalledWith('/app/calendar');
+    });
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onOpenChangeMock).toHaveBeenCalledWith(false);
+    expect(pushMock).toHaveBeenCalledWith('/app/calendar');
+    expect(onOpenChangeMock.mock.invocationCallOrder[0]).toBeLessThan(
+      pushMock.mock.invocationCallOrder[0]
+    );
   });
 
   it('keeps dense table results keyboard-selectable before committing', () => {
