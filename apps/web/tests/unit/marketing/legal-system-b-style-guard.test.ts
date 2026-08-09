@@ -62,4 +62,12 @@ describe('legal pages System B source contract', () => {
       expect(page, `${pagePath} must render LegalPage`).toContain('<LegalPage');
     }
   });
+
+  it('keeps the fixed-header offset on main and legal spacing inside the content container', () => {
+    const layout = readFileSync(resolve(process.cwd(), sources[0]), 'utf8');
+
+    expect(layout).not.toContain('mainOffset={false}');
+    expect(layout).not.toContain('mainClassName=');
+    expect(layout).toContain("className='public-legal-content py-16 sm:py-20'");
+  });
 });
