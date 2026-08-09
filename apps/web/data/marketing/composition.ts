@@ -477,13 +477,10 @@ function matchesVariant(
   }
   // feature-grid
   if (sectionId === 'feature-grid') {
-    // No predicate on Brief — variant selection is content-driven at render time
-    // (items.length). Composition emits defaultVariant; render-time picks based
-    // on items.length. This is the bounded-taste layer (D1=B): variant within
-    // a section is structural, but the specific column count is content-driven.
-    // For determinism in the tuple, we emit defaultVariant and let the manifest
-    // gate assert the render-time variant is one of the legal set.
-    return variantId === '3-large'; // default
+    // The only shipped feature-grid body is the four-row artist outcomes
+    // ledger. Keep composition deterministic until another real component body
+    // is registered and proven.
+    return variantId === 'ledger-four';
   }
   // feature-split — A2 fix: occurrence index disambiguates repeated instances.
   //   artist-lp has two feature-split instances: occurrence=1 = adaptive beat

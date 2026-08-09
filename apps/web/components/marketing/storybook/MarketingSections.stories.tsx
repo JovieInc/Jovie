@@ -20,7 +20,10 @@ import { ArtistProfileLandingPage } from '@/components/marketing/artist-profile/
 import { ArtistProfileModeSwitcher } from '@/components/marketing/artist-profile/ArtistProfileModeSwitcher';
 import { ArtistProfileMonetizationSection } from '@/components/marketing/artist-profile/ArtistProfileMonetizationSection';
 import { ArtistProfileOpinionatedSection } from '@/components/marketing/artist-profile/ArtistProfileOpinionatedSection';
-import { ArtistProfileOutcomesCarousel } from '@/components/marketing/artist-profile/ArtistProfileOutcomesCarousel';
+import {
+  ARTIST_PROFILE_OUTCOMES_VARIANT,
+  ArtistProfileOutcomesCarousel,
+} from '@/components/marketing/artist-profile/ArtistProfileOutcomesCarousel';
 import { ArtistProfileSectionShell } from '@/components/marketing/artist-profile/ArtistProfileSectionShell';
 import {
   ArtistProfileReleaseCycleGallery,
@@ -80,14 +83,20 @@ type Story = StoryObj;
 
 function SectionFrame({
   sectionId,
+  variantId,
   children,
-}: Readonly<{ sectionId: MarketingSectionId; children: ReactNode }>) {
+}: Readonly<{
+  sectionId: MarketingSectionId;
+  variantId?: string;
+  children: ReactNode;
+}>) {
   const section = getMarketingSection(sectionId);
   return (
     <div
       className='bg-base text-primary-token'
       data-testid={`marketing-section-${sectionId}`}
       data-section-component={section.component}
+      data-section-variant={variantId}
       data-proof-class={section.proofClass}
     >
       <MarketingPageShell>{children}</MarketingPageShell>
@@ -158,7 +167,7 @@ export const hero: Story = {
 export const logoCloud: Story = {
   name: 'logo-cloud',
   render: () => (
-    <SectionFrame sectionId='logo-cloud'>
+    <SectionFrame sectionId='logo-cloud' variantId='proof-moment'>
       <HomeTrustSection presentation='proof-moment' />
     </SectionFrame>
   ),
@@ -167,7 +176,10 @@ export const logoCloud: Story = {
 export const featureGrid: Story = {
   name: 'feature-grid',
   render: () => (
-    <SectionFrame sectionId='feature-grid'>
+    <SectionFrame
+      sectionId='feature-grid'
+      variantId={ARTIST_PROFILE_OUTCOMES_VARIANT}
+    >
       <ArtistProfileOutcomesCarousel outcomes={ARTIST_PROFILE_COPY.outcomes} />
     </SectionFrame>
   ),

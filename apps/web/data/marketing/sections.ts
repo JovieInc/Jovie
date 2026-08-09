@@ -102,7 +102,7 @@ export type VariantAlignment = 'centered' | 'left';
  * A variant is a typed tuple over orthogonal axes (prior-art §4 recommendation),
  * NOT an arbitrary name. The variant id is DERIVED mechanically from the tuple
  * (kebab): `{layout}[-{media}[-{mediaPosition}]][-{columns}{density?}`.
- * Examples: `hero/centered-phone`, `feature-grid/3-large`, `feature-split/screenshot-right`.
+ * Examples: `hero/centered-phone`, `feature-grid/ledger-four`, `feature-split/screenshot-right`.
  * No surveyed system types its variants; this is the Jovie delta that prevents
  * the shadcn/Relume variant-explosion failure mode (245 heroes, 311 features).
  */
@@ -623,50 +623,16 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     optionalInputs: ['eyebrow', 'title', 'lede'],
     variants: [
       {
-        id: '3-large',
+        id: 'ledger-four',
         layout: 'contained',
         media: 'none',
-        columns: 3,
-        density: 'large',
-        alignment: 'centered',
-        chooseWhen:
-          'items.length=3 AND emphasis=high (breadth survey before depth)',
+        alignment: 'left',
+        chooseWhen: 'items.length=4 AND presentation=ordered-ledger',
         exemplar: { route: '/artist-profiles', section: 'outcomes' },
         status: 'active',
       },
-      {
-        id: '4-equal',
-        layout: 'contained',
-        media: 'none',
-        columns: 4,
-        density: 'large',
-        alignment: 'centered',
-        chooseWhen: 'items.length=4 AND emphasis=medium',
-        status: 'active',
-      },
-      {
-        id: '6-compact',
-        layout: 'contained',
-        media: 'none',
-        columns: 3,
-        density: 'compact',
-        alignment: 'centered',
-        chooseWhen: 'items.length=6 AND emphasis=low (icon list)',
-        status: 'active',
-      },
-      {
-        id: 'icon-list',
-        layout: 'contained',
-        media: 'none',
-        columns: 2,
-        density: 'icon-list',
-        alignment: 'left',
-        chooseWhen:
-          'items.length≥4 AND copy is short label-only (no body text)',
-        status: 'active',
-      },
     ],
-    defaultVariant: '3-large',
+    defaultVariant: 'ledger-four',
     proofClass: 'none',
     audienceLegality: [{ legal: true }],
     illegalAfter: [],
@@ -704,24 +670,25 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       },
     ],
     responsiveContract:
-      'columns:3 → 3→2→1 at md/sm; columns:4 → 4→2→1; columns:2 → 2→1; icon-list stays 2-col until sm then 1-col',
+      'ledger-four: four ordered outcome rows; each row collapses from index/title/body/result to index + stacked content below 48rem; no horizontal scroll',
     accessibility: {
       keyboard:
-        'cards are semantic <li> in <ul>; if interactive, Tab order follows visual order',
-      contrast: 'card title/body meet AA on tokens.surface-1',
+        'outcomes are semantic <li> rows in an aria-labelled <ol>; rows are static and add no tab stops',
+      contrast: 'outcome title/body/result meet AA on the section surface',
       touchTarget:
-        'no interactive targets unless card is a link (then ≥44×44 hit area)',
-      reducedMotion: 'no motion (static grid by default)',
+        'no interactive targets; if a future row becomes a link, its hit area must be ≥44×44',
+      reducedMotion: 'no motion (the ledger is static)',
     },
     component:
       'components/marketing/artist-profile/ArtistProfileOutcomesCarousel',
     failureModes: [
-      'Bespoke layout per card (B2B anti-pattern #8: one repeated template per section type is the invariant)',
+      'Substituting an unshipped generic card grid for the ordered outcomes ledger',
       'Feature-listing hero (this section is for breadth, not the hero claim)',
-      'Empty cells from odd item counts (use a variant whose columns divides items.length)',
+      'Silently truncating or padding a source set that is not exactly four outcomes',
     ],
     neverUse: [
       'With fabricated feature claims (copy must describe real capability)',
+      'With any count other than the four shipped artist outcome rows',
     ],
     status: 'approved',
   },
@@ -1487,7 +1454,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     component: 'components/marketing/artist-profile/ArtistProfileSpecWall',
     failureModes: [
       'Bespoke tile layout (one repeated template per section type — B2B anti-pattern #8)',
-      'Tiles without screenshots (Jovie delta: spec-wall tiles carry a screenshot or icon; pure text = use feature-grid icon-list variant)',
+      'Tiles without screenshots (Jovie delta: spec-wall tiles carry a screenshot or icon; feature-grid is reserved for the four-row artist outcome ledger)',
     ],
     neverUse: [
       'Immediately after hero or cta (illegalAfter)',
