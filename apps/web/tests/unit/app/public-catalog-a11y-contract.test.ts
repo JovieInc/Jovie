@@ -10,11 +10,13 @@ function read(relativePath: string) {
 
 describe('public catalog accessibility contract', () => {
   it('uses the registered header primitive as the Artists route h1', () => {
-    const source = read('app/artists/page.tsx');
+    const page = read('app/artists/page.tsx');
+    const directory = read('components/organisms/ArtistsDirectory.tsx');
     const story = read('components/molecules/ContentSectionHeader.stories.tsx');
 
-    expect(source.match(/headingLevel='h1'/g)).toHaveLength(2);
-    expect(source).not.toContain('<h1');
+    expect(page.match(/headingLevel='h1'/g)).toHaveLength(1);
+    expect(directory.match(/headingLevel='h1'/g)).toHaveLength(1);
+    expect(`${page}${directory}`).not.toContain('<h1');
     expect(story).toContain('export const RouteHeading');
     expect(story).toContain("headingLevel: 'h1'");
   });
