@@ -1,10 +1,9 @@
-import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { BASE_URL } from '@/constants/app';
 import { getBlogPosts } from '@/lib/blog/getBlogPosts';
 import { resolveAuthor } from '@/lib/blog/resolveAuthor';
 import type { ProfileData } from '@/lib/services/profile';
 import { getProfilesByUsernames } from '@/lib/services/profile';
-import { BlogCard } from './components/BlogCard';
+import { BlogFeed } from './BlogFeed';
 
 // Fully static - blog posts are read from filesystem at build time
 export const revalidate = false;
@@ -32,73 +31,15 @@ export default async function BlogIndexPage() {
     // Fallback to frontmatter-only author data if profile fetch fails
   }
 
-  const [featured, ...remaining] = posts;
+  const entries = posts.map(post => ({
+    post,
+    author: resolveAuthor(
+      post,
+      post.authorUsername
+        ? profileMap.get(post.authorUsername.toLowerCase())
+        : null
+    ),
+  }));
 
-  if (!featured) {
-    return (
-      <div className='min-h-screen'>
-        <MarketingHero variant='left'>
-          <p className='mb-0 text-sm font-medium text-tertiary-token'>Blog</p>
-          <h1 className='mb-6 mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
-            Blog
-          </h1>
-          <p className='max-w-xl text-lg leading-relaxed text-secondary-token'>
-            Posts coming soon.
-          </p>
-        </MarketingHero>
-      </div>
-    );
-  }
-
-  const featuredAuthor = resolveAuthor(
-    featured,
-    featured.authorUsername
-      ? profileMap.get(featured.authorUsername.toLowerCase())
-      : null
-  );
-
-  return (
-    <div className='min-h-screen'>
-      {/* Hero Section */}
-      <MarketingHero variant='left'>
-        <p className='mb-0 text-sm font-medium text-tertiary-token'>Blog</p>
-        <h1 className='mb-6 mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
-          Blog
-        </h1>
-        <p className='max-w-xl text-lg leading-relaxed text-secondary-token'>
-          Thoughts on product, strategy, and the craft of building tools for
-          artists.
-        </p>
-      </MarketingHero>
-
-      {/* Posts Grid */}
-      <MarketingContainer width='page' className='pb-20 sm:pb-28'>
-        <div className='marketing-divider mb-10' />
-
-        {/* Featured Post */}
-        <div className='mb-10'>
-          <BlogCard
-            post={featured}
-            author={featuredAuthor}
-            variant='featured'
-          />
-        </div>
-
-        {/* Remaining Posts Grid */}
-        {remaining.length > 0 && (
-          <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
-            {remaining.map(post => {
-              const author = resolveAuthor(
-                post,
-                post.authorUsername
-                  ? profileMap.get(post.authorUsername.toLowerCase())
-                  : null
-              );
-              return <BlogCard key={post.slug} post={post} author={author} />;
-            })}
-          </div>
-        )}
-      </MarketingContainer>
-    </div>
-  );
+  return <BlogFeed entries={entries} />;
 }
