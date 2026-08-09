@@ -575,6 +575,10 @@ body {
   --font-display:
     var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
   --font-body: var(--font-sans);
+  /* Canonical container widths — Tailwind v4 emits max-w-* utilities from
+     --container-* theme entries. Keep the values sourced from DS_FOUNDATION_V1. */
+  --container-public-content: var(--ds-public-content-max);
+  --container-prose-canonical: var(--ds-prose-max);
   --color-gray-50: #f9fafb;
   --color-gray-100: #f3f4f6;
   --color-gray-200: #e5e7eb;
