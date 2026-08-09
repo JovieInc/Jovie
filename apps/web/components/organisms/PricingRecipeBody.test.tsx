@@ -45,8 +45,11 @@ describe('PricingRecipeBody', () => {
     expect(screen.getByTestId('comparison-slot')).toBeVisible();
     expect(screen.getByText(expectedRequestAccessCopy)).toBeVisible();
     expect(
-      screen.getAllByRole('link', { name: 'Claim your profile' })
-    ).toHaveLength(2);
+      screen.getByRole('link', { name: 'Claim Your Profile' })
+    ).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Claim your profile' })
+    ).toBeVisible();
     expect(
       screen.getByRole('link', { name: 'Start Pro trial' })
     ).toHaveAttribute('href', '/signup?plan=pro');
