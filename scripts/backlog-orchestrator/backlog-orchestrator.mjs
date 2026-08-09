@@ -19,12 +19,13 @@
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs report
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+import * as admissionDisposition from './admission-disposition.mjs';
 import * as admissionGate from './admission-gate.mjs';
 // Keep the complete control-plane dependency closure visible to source sync and
 // module tooling. These are canonical sibling modules, not host-only copies.
@@ -41,6 +42,29 @@ import * as workstreamer from './workstreamer.mjs';
 
 // ----- Config -----
 const CACHE_FILE = resolve(__dirname, '.orchestrator-cache.json');
+const ADMISSION_STATE_DIR =
+  process.env.BACKLOG_ORCHESTRATOR_STATE_DIR ||
+  resolve(
+    process.env.GEM_WORKSPACE || '/home/timwhite/gem-workspace',
+    'state/backlog-orchestrator'
+  );
+const ADMISSION_HISTORY_FILE = resolve(
+  ADMISSION_STATE_DIR,
+  'admission-history.json'
+);
+const ADMISSION_SCAN_FILE = resolve(ADMISSION_STATE_DIR, 'latest.json');
+const ADMISSION_HISTORY_SCHEMA = 'symphony-admission-history/v1';
+const ADMISSION_RUN_SCHEMA = 'symphony-admission-run/v1';
+const ADMISSION_CANDIDATE_BUDGET = Math.min(
+  8,
+  Math.max(
+    1,
+    Number.parseInt(
+      process.env.SYMPHONY_ADMISSION_CANDIDATE_BUDGET || '4',
+      10
+    ) || 4
+  )
+);
 const FLEET_GATE_RECEIPT_FILE =
   process.env.JOVIE_FLEET_GATE_RECEIPT ||
   resolve(
@@ -91,6 +115,30 @@ function saveCache(cache) {
   writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2));
 }
 
+function atomicWriteJson(path, value) {
+  mkdirSync(dirname(path), { recursive: true });
+  const temporary = `${path}.${process.pid}.${Date.now()}.tmp`;
+  writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, {
+    mode: 0o600,
+  });
+  renameSync(temporary, path);
+}
+
+function loadAdmissionHistory() {
+  try {
+    const state = JSON.parse(readFileSync(ADMISSION_HISTORY_FILE, 'utf8'));
+    if (state?.schema !== ADMISSION_HISTORY_SCHEMA || !state?.teams)
+      throw new Error('invalid-admission-history');
+    return state;
+  } catch {
+    return { schema: ADMISSION_HISTORY_SCHEMA, teams: {} };
+  }
+}
+
+function saveAdmissionHistory(state) {
+  atomicWriteJson(ADMISSION_HISTORY_FILE, state);
+}
+
 // ----- Main -----
 async function main() {
   const args = process.argv.slice(2);
@@ -133,7 +181,7 @@ Usage:
   } else if (command === 'admit-next') {
     await runAdmitNext(cache, isDryRun);
   } else if (command === 'gate-next') {
-    await runGateNext(isDryRun, issueArg);
+    await runGateNext(isDryRun, issueArg, loadAdmissionHistory());
   } else if (command === 'approve-plan') {
     await runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun);
   } else {
@@ -297,7 +345,119 @@ async function admissionPreflight(team) {
   };
 }
 
-async function runGateNext(isDryRun, issueArg) {
+function incompleteAdmissionScan(error, now) {
+  return {
+    schema: admissionDisposition.ADMISSION_SCAN_SCHEMA,
+    status: 'incomplete',
+    generatedAt: now,
+    coverage: {
+      complete: false,
+      ...(error?.coverage || {}),
+      reason: error?.coverage?.reason || error?.code || 'transport-failed',
+    },
+    counts: null,
+    dispositions: [],
+    retry: {
+      automatic: true,
+      mode: 'restart-exhaustive-from-null',
+      trigger: 'next-scheduled-gate-run',
+    },
+  };
+}
+
+export function admissionRunReceipt(results, isDryRun, generatedAt) {
+  const scans = results.map(result => result.admissionScan).filter(Boolean);
+  const complete =
+    scans.length === results.length &&
+    scans.every(scan => scan.coverage?.complete === true && scan.counts);
+  const counts = scans.reduce(
+    (sum, scan) => {
+      if (!scan.counts) return sum;
+      for (const key of [
+        'totalEvaluated',
+        'eligible',
+        'queued',
+        'claimed',
+        'deferred',
+        'rejected',
+        'unclassified',
+      ])
+        sum[key] += scan.counts[key];
+      return sum;
+    },
+    {
+      totalEvaluated: 0,
+      eligible: 0,
+      queued: 0,
+      claimed: 0,
+      deferred: 0,
+      rejected: 0,
+      unclassified: 0,
+    }
+  );
+  const classified =
+    counts.eligible +
+    counts.queued +
+    counts.claimed +
+    counts.deferred +
+    counts.rejected;
+  const retryNeeded =
+    !complete ||
+    results.some(result =>
+      ['candidate-budget', 'team-error', 'transport'].includes(result.stage)
+    );
+  return {
+    schema: ADMISSION_RUN_SCHEMA,
+    generatedAt,
+    mode: isDryRun ? 'dry-run' : 'mutating',
+    status: results.some(result => result.status === 'admitted')
+      ? 'admitted'
+      : results.some(result => result.status === 'would-admit')
+        ? 'would-admit'
+        : complete
+          ? 'evaluated'
+          : 'incomplete',
+    coverage: { complete, teamCount: results.length },
+    counts,
+    invariant: {
+      classifiedSum: classified,
+      matchesTotal: complete && classified === counts.totalEvaluated,
+      unclassifiedZero: complete && counts.unclassified === 0,
+    },
+    retry: {
+      automatic: retryNeeded,
+      mode: !complete
+        ? 'restart-exhaustive-from-null'
+        : retryNeeded
+          ? 'resume-after-candidate-backoff'
+          : 'not-needed',
+      trigger: retryNeeded ? 'next-scheduled-gate-run' : null,
+    },
+    teams: results,
+    mutations: isDryRun
+      ? 0
+      : results.some(result => result.mutations === 'verified')
+        ? 'verified'
+        : 0,
+  };
+}
+
+function isLinearTransportFailure(error) {
+  return (
+    error instanceof linear.LinearTransportError ||
+    error instanceof linear.LinearPaginationError ||
+    ['AUTH', 'HTTP', 'NETWORK', 'RATE_LIMITED', 'SERVER', 'TIMEOUT'].includes(
+      error?.code
+    )
+  );
+}
+
+function storeTeamHistory(state, teamKey, history) {
+  state.teams = { ...state.teams, [teamKey]: history };
+  saveAdmissionHistory(state);
+}
+
+async function runGateNext(isDryRun, issueArg, admissionHistory) {
   const teams = issueArg
     ? [teamForIdentifier(issueArg)].filter(Boolean)
     : TEAM_CONFIGS;
@@ -306,40 +466,61 @@ async function runGateNext(isDryRun, issueArg) {
   const results = [];
   for (const team of teams) {
     try {
-      results.push(await runTeamGateNext(team, isDryRun, issueArg));
+      results.push(
+        await runTeamGateNext(team, isDryRun, issueArg, admissionHistory)
+      );
     } catch (error) {
       results.push({
         team: team.key,
         status: 'blocked',
         stage: 'team-error',
         reason: error.message,
+        admissionScan: incompleteAdmissionScan(error, new Date().toISOString()),
         mutations: 0,
       });
     }
   }
-  console.log(
-    JSON.stringify(
-      {
-        schema: 'deterministic-gates/run/v2',
-        status: results.some(result => result.status === 'admitted')
-          ? 'admitted'
-          : results.some(result => result.status === 'would-admit')
-            ? 'would-admit'
-            : 'blocked',
-        teams: results,
-        mutations: isDryRun
-          ? 0
-          : results.some(result => result.mutations === 'verified')
-            ? 'verified'
-            : 0,
-      },
-      null,
-      2
-    )
+  const receipt = admissionRunReceipt(
+    results,
+    isDryRun,
+    new Date().toISOString()
   );
+  if (!isDryRun) atomicWriteJson(ADMISSION_SCAN_FILE, receipt);
+  console.log(JSON.stringify(receipt, null, 2));
 }
 
-async function runTeamGateNext(team, isDryRun, issueArg) {
+async function runTeamGateNext(team, isDryRun, issueArg, admissionHistory) {
+  const now = new Date().toISOString();
+  let snapshot;
+  try {
+    snapshot = await linear.fetchTeamActiveIssueSnapshot(team.id);
+  } catch (error) {
+    return {
+      team: team.key,
+      status: 'blocked',
+      stage: 'coverage',
+      reason: error.message,
+      admissionScan: incompleteAdmissionScan(error, now),
+      mutations: 0,
+    };
+  }
+  let history = admissionHistory.teams?.[team.key] || {};
+  const scanOptions = { now, historyByIdentifier: history };
+  const buildScan = () => {
+    const scan = admissionDisposition.buildAdmissionScan(
+      snapshot.issues,
+      scanOptions
+    );
+    return {
+      ...scan,
+      coverage: {
+        ...scan.coverage,
+        complete: scan.coverage.complete && snapshot.coverage.complete === true,
+        transport: snapshot.coverage,
+      },
+    };
+  };
+  let admissionScan = buildScan();
   const staleLeaseRecovery = await recoverStaleLeases(team, isDryRun);
   const preflight = await admissionPreflight(team);
   if (!preflight.open) {
@@ -350,19 +531,19 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
       reason: preflight.reason,
       active: preflight.load.identifiers,
       fleetGate: preflight.fleetGate,
+      admissionScan,
       staleLeaseRecovery,
       mutations: 0,
     };
   }
 
-  const issues = issueArg
-    ? [await linear.fetchIssue(issueArg)].filter(Boolean)
-    : await linear.fetchTeamGateCandidates(team.id);
-  const selection = deterministicGates.selectDeterministicPlanCandidate(
-    issues,
-    { issueIdentifier: issueArg }
+  const issuesByIdentifier = new Map(
+    snapshot.issues.map(issue => [issue.identifier, issue])
   );
-  if (!selection.selected) {
+  const eligible = admissionDisposition
+    .eligibleOrder(admissionScan)
+    .filter(item => !issueArg || item.identifier === issueArg);
+  if (eligible.length === 0) {
     return {
       team: team.key,
       status: 'blocked',
@@ -370,119 +551,170 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
       reason: issueArg
         ? 'requested issue is not eligible'
         : 'no eligible issue',
-      decisions: selection.decisions,
       fleetGate: preflight.fleetGate,
-      staleLeaseRecovery,
-      mutations: 0,
-    };
-  }
-
-  const selected = selection.selected;
-  const plan = deterministicGates.buildDeterministicPlanEvidence(selected);
-  const planReason =
-    plan.reason || planGate.validatePlanCandidate(selected, plan.evidence);
-  if (planReason) {
-    return {
-      team: team.key,
-      status: 'blocked',
-      stage: 'plan',
-      issue: selected.identifier,
-      reason: planReason,
-      fleetGate: preflight.fleetGate,
+      admissionScan,
       staleLeaseRecovery,
       mutations: 0,
     };
   }
 
   if (isDryRun) {
+    const selected = issuesByIdentifier.get(eligible[0].identifier);
+    const plan = deterministicGates.buildDeterministicPlanEvidence(selected);
     return {
       team: team.key,
       status: 'would-admit',
       issue: selected.identifier,
       plan: plan.evidence,
       fleetGate: preflight.fleetGate,
+      admissionScan,
       staleLeaseRecovery,
       mutations: 0,
     };
   }
 
-  const planResult = await planGate.approvePlan({
-    issue: selected,
-    evidence: plan.evidence,
-    client: linear,
-    teamId: team.id,
-  });
-  if (planResult.status === 'rejected')
-    throw new Error(`plan gate rejected: ${planResult.reason}`);
+  const attempts = [];
+  for (const candidate of eligible.slice(0, ADMISSION_CANDIDATE_BUDGET)) {
+    const selected = issuesByIdentifier.get(candidate.identifier);
+    try {
+      const plan = deterministicGates.buildDeterministicPlanEvidence(selected);
+      const planReason =
+        plan.reason || planGate.validatePlanCandidate(selected, plan.evidence);
+      if (planReason) throw new Error(`plan rejected: ${planReason}`);
+      const planResult = await planGate.approvePlan({
+        issue: selected,
+        evidence: plan.evidence,
+        client: linear,
+        teamId: team.id,
+      });
+      if (planResult.status === 'rejected')
+        throw new Error(`plan gate rejected: ${planResult.reason}`);
 
-  let current = await linear.fetchIssue(selected.identifier);
-  const finalPreflight = await admissionPreflight(team);
-  if (!finalPreflight.open)
-    throw new Error(`admission preflight blocked: ${finalPreflight.reason}`);
+      let current = await linear.fetchIssue(selected.identifier);
+      const finalPreflight = await admissionPreflight(team);
+      if (!finalPreflight.open)
+        return {
+          team: team.key,
+          status: 'blocked',
+          stage: 'final-preflight',
+          reason: finalPreflight.reason,
+          fleetGate: finalPreflight.fleetGate,
+          admissionScan,
+          staleLeaseRecovery,
+          attempts,
+          mutations: 0,
+        };
+      const admissionResult = await admissionGate.approveAdmission({
+        issue: current,
+        client: linear,
+        teamId: team.id,
+      });
+      if (admissionResult.status === 'rejected')
+        throw new Error(`admission gate rejected: ${admissionResult.reason}`);
 
-  const admissionResult = await admissionGate.approveAdmission({
-    issue: current,
-    client: linear,
-    teamId: team.id,
-  });
-  if (admissionResult.status === 'rejected')
-    throw new Error(`admission gate rejected: ${admissionResult.reason}`);
+      current = await linear.fetchIssue(selected.identifier);
+      const classification = {
+        ...classifier.classifyDeterministic(current, [current]),
+        issue: current,
+        labels: current.labels.nodes.map(label => label.name),
+      };
+      const lease = await admitter.admitIssue({
+        issue: current,
+        classification,
+        client: linear,
+        teamId: team.id,
+        todoStateId: team.todoStateId,
+      });
+      if (!['admitted', 'already-admitted'].includes(lease.status))
+        throw new Error(`lease rejected: ${lease.reason}`);
 
-  current = await linear.fetchIssue(selected.identifier);
-  const classification = {
-    ...classifier.classifyDeterministic(current, [current]),
-    issue: current,
-    labels: current.labels.nodes.map(label => label.name),
-  };
-  const lease = await admitter.admitIssue({
-    issue: current,
-    classification,
-    client: linear,
-    teamId: team.id,
-    todoStateId: team.todoStateId,
-  });
-  if (!['admitted', 'already-admitted'].includes(lease.status))
-    throw new Error(`lease rejected: ${lease.reason}`);
+      const verified = await linear.fetchIssue(selected.identifier);
+      const evidence = admitter.hasAdmissionEvidence(verified);
+      const load = deterministicGates.admissionIntentLoad([verified]);
+      if (
+        verified.state?.name !== 'Todo' ||
+        !evidence.eligible ||
+        !verified.labels.nodes.some(
+          label => label.name === admitter.SYMPHONY_LABEL
+        ) ||
+        load.count !== 1
+      )
+        throw new Error('final gate-and-lease verification failed');
 
-  const verified = await linear.fetchIssue(selected.identifier);
-  const evidence = admitter.hasAdmissionEvidence(verified);
-  const load = deterministicGates.admissionIntentLoad([verified]);
-  if (
-    verified.state?.name !== 'Todo' ||
-    !evidence.eligible ||
-    !verified.labels.nodes.some(
-      label => label.name === admitter.SYMPHONY_LABEL
-    ) ||
-    load.count !== 1
-  )
-    throw new Error('final gate-and-lease verification failed');
+      history = admissionDisposition.clearAdmissionFailure(
+        history,
+        selected.identifier,
+        { now: new Date().toISOString() }
+      );
+      storeTeamHistory(admissionHistory, team.key, history);
+      return {
+        team: team.key,
+        status: 'admitted',
+        issue: selected.identifier,
+        planGate: planResult.status,
+        admissionGate: admissionResult.status,
+        lease: lease.status,
+        active: load.identifiers,
+        fleetGate: finalPreflight.fleetGate,
+        admissionScan,
+        staleLeaseRecovery,
+        attempts,
+        mutations: 'verified',
+      };
+    } catch (error) {
+      if (isLinearTransportFailure(error))
+        return {
+          team: team.key,
+          status: 'blocked',
+          stage: 'transport',
+          reason: error.message,
+          fleetGate: preflight.fleetGate,
+          admissionScan,
+          staleLeaseRecovery,
+          attempts,
+          mutations: 0,
+        };
+      history = admissionDisposition.recordAdmissionFailure(
+        history,
+        selected.identifier,
+        { now: new Date().toISOString(), reason: error.message }
+      );
+      storeTeamHistory(admissionHistory, team.key, history);
+      attempts.push({
+        issue: selected.identifier,
+        status: 'deferred',
+        reason: 'candidate-attempt-failed',
+        detail: error.message,
+      });
+    }
+  }
 
+  admissionScan = (() => {
+    scanOptions.historyByIdentifier = history;
+    return buildScan();
+  })();
   return {
     team: team.key,
-    status: 'admitted',
-    issue: selected.identifier,
-    planGate: planResult.status,
-    admissionGate: admissionResult.status,
-    lease: lease.status,
-    active: load.identifiers,
-    fleetGate: finalPreflight.fleetGate,
+    status: 'blocked',
+    stage: 'candidate-budget',
+    reason: 'eligible candidates exhausted after isolated failures',
+    fleetGate: preflight.fleetGate,
+    admissionScan,
     staleLeaseRecovery,
-    mutations: 'verified',
+    attempts,
+    mutations: 0,
   };
 }
 
 async function runAudit(cache, isDryRun) {
   console.log('Scanning Linear backlog...');
-  const teamFetches = await Promise.allSettled(
-    TEAM_CONFIGS.map(team => linear.fetchTeamActiveIssues(team.id))
+  const teamSnapshots = await Promise.all(
+    TEAM_CONFIGS.map(async team => ({
+      team,
+      snapshot: await linear.fetchTeamActiveIssueSnapshot(team.id),
+    }))
   );
-  const allIssues = teamFetches.flatMap((result, index) => {
-    if (result.status === 'fulfilled') return result.value;
-    console.error(
-      `Failed to fetch ${TEAM_CONFIGS[index].key}: ${result.reason.message}`
-    );
-    return [];
-  });
+  const allIssues = teamSnapshots.flatMap(result => result.snapshot.issues);
   console.log(`Fetched ${allIssues.length} issues`);
 
   const classifications = [];
@@ -524,6 +756,13 @@ async function runAudit(cache, isDryRun) {
         schema: 'backlog-orchestrator/audit/v1',
         mode: isDryRun ? 'dry-run' : 'shadow',
         issueCount: allIssues.length,
+        coverage: {
+          complete: true,
+          teams: teamSnapshots.map(({ team, snapshot }) => ({
+            team: team.key,
+            ...snapshot.coverage,
+          })),
+        },
         triageCount: allIssues.filter(issue => issue.state?.name === 'Triage')
           .length,
         classified: classifications.length,
@@ -709,17 +948,20 @@ async function runTeamAdmitNext(team, isDryRun) {
   return { team: team.key, staleLeaseRecovery, ...result };
 }
 
-main().catch(err => {
-  console.error(
-    'Failure receipt:',
-    JSON.stringify({
-      schema: 'backlog-orchestrator/failure/v1',
-      status: 'blocked',
-      code: err.code || 'UNKNOWN',
-      attempts: err.attempts,
-      message: err.message,
-    })
-  );
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch(err => {
+    console.error(
+      'Failure receipt:',
+      JSON.stringify({
+        schema: 'backlog-orchestrator/failure/v1',
+        status: 'blocked',
+        code: err.code || 'UNKNOWN',
+        attempts: err.attempts,
+        message: err.message,
+        coverage: err.coverage,
+      })
+    );
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
+}
