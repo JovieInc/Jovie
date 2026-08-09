@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { MarketingContentProse } from '@/components/marketing/MarketingContentProse';
 import { getMarketingSectionRegistryEntry } from '@/data/marketing';
+import { MarketingContentProse } from './MarketingContentProse';
 
 describe('MarketingContentProse', () => {
   it('renders sanitized long-form HTML inside the canonical prose width', () => {
