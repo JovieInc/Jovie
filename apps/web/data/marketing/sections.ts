@@ -1769,7 +1769,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       touchTarget: 'links ≥44×44 hit area at sm',
       reducedMotion: 'no motion',
     },
-    component: 'apps/web/app/(marketing)/blog/[slug]/BlogPostPage', // body render; first feature use requires component extraction
+    component: 'apps/web/components/marketing/MarketingContentProse',
     failureModes: [
       'Exceeding prose max-width (readability — 680px is the canonical per DESIGN.md)',
       'Missing heading hierarchy (a11y)',

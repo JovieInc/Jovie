@@ -7,7 +7,6 @@ import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPr
 import {
   FaqSection,
   MarketingContainer,
-  MarketingContentShell,
   MarketingHero,
   MarketingPageShell,
 } from '@/components/marketing';
@@ -30,6 +29,7 @@ import {
 import { ArtistProfileSpecWall } from '@/components/marketing/artist-profile/ArtistProfileSpecWall';
 import { CaptureActionPill } from '@/components/marketing/artist-profile/captureShared';
 import { HomepageV2FinalCta } from '@/components/marketing/homepage-v2/HomepageV2Ctas';
+import { MarketingContentProse } from '@/components/marketing/MarketingContentProse';
 import { MarketingSnapRail } from '@/components/marketing/MarketingSnapRail';
 import { ArtistProfileCaptureVisual } from '@/components/marketing/MarketingStoryPrimitives';
 import { MarketingSurfaceCard } from '@/components/marketing/MarketingSurfaceCard';
@@ -48,7 +48,7 @@ import {
   MARKETING_SECTION_STORY_GAPS,
   STORY_BLOG_POSTS,
   STORY_FAQ_ITEMS,
-  STORY_PROSE_PARAGRAPHS,
+  STORY_PROSE_HTML,
 } from './fixtures';
 import {
   MARKETING_STORY_DESCRIPTION,
@@ -479,19 +479,11 @@ export const ownership: Story = {
 
 export const contentProse: Story = {
   name: 'content-prose',
-  tags: ['wip'],
   render: () => (
     <SectionFrame sectionId='content-prose'>
-      <MarketingContentShell>
-        <h2 className='text-2xl font-semibold text-primary-token'>
-          Content Prose
-        </h2>
-        {STORY_PROSE_PARAGRAPHS.map(paragraph => (
-          <p key={paragraph.slice(0, 24)} className='mt-4'>
-            {paragraph}
-          </p>
-        ))}
-      </MarketingContentShell>
+      <MarketingContainer width='prose' className='py-16 sm:py-20 lg:py-24'>
+        <MarketingContentProse html={STORY_PROSE_HTML} />
+      </MarketingContainer>
     </SectionFrame>
   ),
 };

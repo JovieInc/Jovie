@@ -5,8 +5,8 @@ import { BlogTableOfContents } from '@/app/(marketing)/blog/components/BlogTable
 import { CategoryPill } from '@/app/(marketing)/blog/components/CategoryPill';
 import { PublicShareMenu } from '@/components/features/share/PublicShareMenu';
 import { MarketingContainer } from '@/components/marketing';
+import { MarketingContentProse } from '@/components/marketing/MarketingContentProse';
 import { Avatar } from '@/components/molecules/Avatar';
-import { BlogMarkdownReader } from '@/components/molecules/BlogMarkdownReader';
 import type { BlogPost, BlogPostSummary } from '@/lib/blog/getBlogPosts';
 import type { ResolvedAuthor } from '@/lib/blog/resolveAuthor';
 import { buildBlogShareContext } from '@/lib/share/context';
@@ -146,7 +146,7 @@ export function BlogPostPage({
           <div className='grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-12'>
             {/* Main content */}
             <div className='min-w-0'>
-              <BlogMarkdownReader html={post.html} />
+              <MarketingContentProse html={post.html} />
             </div>
 
             {/* TOC Sidebar */}
