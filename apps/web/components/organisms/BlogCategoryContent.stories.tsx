@@ -28,6 +28,17 @@ export const BLOG_CATEGORY_STORY_POST: StoryBlogPost = {
   readingTime: 5,
 };
 
+/** Merge commit that introduced the shared route/story body in PR #15708. */
+export const BLOG_CATEGORY_STORY_RECEIPT = {
+  registryId: 'web-024-blog--category--[slug]',
+  route: '/blog/category/artist-management',
+  source: 'apps/web/components/organisms/BlogCategoryContent.tsx',
+  sourceExport: 'BlogCategoryContent',
+  storyExport: 'Web024ArtistManagement',
+  sourceSha: '916d0bddd91c065aa01b387adc2acd189391b040',
+  fixture: 'content/blog/the-contact-problem.md',
+} as const;
+
 const meta = {
   title: 'Marketing/Routes/BlogCategory',
   component: BlogCategoryContent,
@@ -38,13 +49,7 @@ const meta = {
         component: `${MARKETING_STORY_DESCRIPTION} Shared production category shell for web-024-blog--category--[slug]. Route params, metadata, notFound handling, filesystem loading, profile enrichment, and the production BlogCard remain route-owned. The deterministic story supplies the existing fixture-safe card with fields from the checked-in Artist Management post.`,
       },
     },
-    pen: {
-      registryId: 'web-024-blog--category--[slug]',
-      route: '/blog/category/artist-management',
-      source: 'apps/web/components/organisms/BlogCategoryContent.tsx',
-      sourceSha: '0892cccf39d72c62890ad4bc797cfd6f2d651af6',
-      fixture: 'content/blog/the-contact-problem.md',
-    },
+    pen: BLOG_CATEGORY_STORY_RECEIPT,
   },
   tags: ['autodocs'],
   args: {
