@@ -1,8 +1,10 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { SUPPORT_FAQ_ITEMS, SupportPageContent } from './SupportPageContent';
+import { SUPPORT_STORY_RECEIPT } from './SupportPageContent.stories';
 
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
@@ -27,6 +29,12 @@ describe('SupportPageContent', () => {
       'Still Need Help?',
     ]);
     expect(screen.getAllByRole('article')).toHaveLength(3);
+    expect(screen.getAllByTestId('support-cta')).toHaveLength(1);
+    for (const action of screen.getAllByRole('link').filter(link =>
+      /^(Visit|Send email)$/.test(link.textContent?.trim() ?? '')
+    )) {
+      expect(action).toHaveClass('before:h-11', 'before:min-w-11');
+    }
     expect(
       screen.getByRole('link', { name: /send email to support team/i })
     ).toHaveAttribute('href', 'mailto:support@jov.ie');
@@ -93,12 +101,75 @@ describe('SupportPageContent', () => {
     expect(storySource).toContain(
       "source: 'apps/web/components/organisms/SupportPageContent.tsx'"
     );
+    expect(SUPPORT_STORY_RECEIPT).toEqual({
+      registryId: 'web-040-support',
+      route: '/support',
+      source: 'apps/web/components/organisms/SupportPageContent.tsx',
+      sourceExport: 'SupportPageContent',
+      storyExport: 'Web040Support',
+      sourceSha: '70cb3b51b852a25213911ffe78cc81c35a73f788',
+      proofScope: 'system-b-body-only',
+      implementation: 'exact-production-body',
+    });
     expect(storySource).toContain(
-      "sourceSha: '61690d2a4af920183f4a85366799ff0bafe4540b'"
+      "sourceSha: '70cb3b51b852a25213911ffe78cc81c35a73f788'"
     );
+    expect(storySource).toContain("proofScope: 'system-b-body-only'");
+    expect(storySource).toContain("sourceExport: 'SupportPageContent'");
+    expect(storySource).toContain("storyExport: 'Web040Support'");
     expect(storySource).toContain('export const Web040Support');
     expect(storySource).toContain(
-      'Section taxonomy and manifest evidence remain owner-stacked'
+      'story owns the shared body only'
+    );
+  });
+
+  it('binds the receipt to a full ancestral source with both exports', () => {
+    expect(SUPPORT_STORY_RECEIPT.sourceSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(SUPPORT_STORY_RECEIPT.sourceExport).toBe('SupportPageContent');
+    expect(SUPPORT_STORY_RECEIPT.storyExport).toBe('Web040Support');
+
+    try {
+      execFileSync('git', [
+        'cat-file',
+        '-e',
+        `${SUPPORT_STORY_RECEIPT.sourceSha}^{commit}`,
+      ]);
+    } catch {
+      expect(
+        execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
+          encoding: 'utf8',
+        }).trim()
+      ).toBe('true');
+      return;
+    }
+
+    expect(() =>
+      execFileSync('git', [
+        'merge-base',
+        '--is-ancestor',
+        SUPPORT_STORY_RECEIPT.sourceSha,
+        'HEAD',
+      ])
+    ).not.toThrow();
+
+    const sourceAtReceipt = execFileSync(
+      'git',
+      ['show', `${SUPPORT_STORY_RECEIPT.sourceSha}:${SUPPORT_STORY_RECEIPT.source}`],
+      { encoding: 'utf8' }
+    );
+    const storyAtReceipt = execFileSync(
+      'git',
+      [
+        'show',
+        `${SUPPORT_STORY_RECEIPT.sourceSha}:apps/web/components/organisms/SupportPageContent.stories.tsx`,
+      ],
+      { encoding: 'utf8' }
+    );
+    expect(sourceAtReceipt).toContain(
+      `export function ${SUPPORT_STORY_RECEIPT.sourceExport}`
+    );
+    expect(storyAtReceipt).toContain(
+      `export const ${SUPPORT_STORY_RECEIPT.storyExport}`
     );
   });
 });

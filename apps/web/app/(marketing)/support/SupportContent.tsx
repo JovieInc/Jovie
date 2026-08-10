@@ -78,7 +78,7 @@ export function SupportChannels() {
                   asChild
                   variant='ghost'
                   size='sm'
-                  className='mt-3 px-0'
+                  className='mt-3 px-0 before:h-11 before:min-w-11'
                   onClick={() =>
                     track(channel.event, { source: 'support_page' })
                   }
@@ -106,7 +106,7 @@ export function SupportChannels() {
 export function SupportCta() {
   return (
     <MarketingContainer width='prose' className='pb-24'>
-      <section>
+      <section data-testid='support-cta'>
         <h2 className='text-2xl font-semibold tracking-tight text-primary-token'>
           Still Need Help?
         </h2>
@@ -116,7 +116,7 @@ export function SupportCta() {
         <Button
           asChild
           variant='secondary'
-          className='mt-6'
+          className='mt-6 before:h-11 before:min-w-11'
           aria-label={`Send email to support team at ${SUPPORT_EMAIL}`}
           onClick={() =>
             track('Support Email Clicked', {
