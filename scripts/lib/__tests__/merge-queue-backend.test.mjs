@@ -210,8 +210,13 @@ describe('queue workflow mutation safety', () => {
     expect(enroll).toContain(
       'DRAIN_ADMISSION_HEAD: ${{ steps.admission.outputs.head_sha }}'
     );
+    expect(enroll).toContain("DRAIN_RECONCILE_QUEUE_DEFERRED: '0'");
+    expect(enroll).not.toContain("github.event_name == 'push' && '1' || '0'");
     expect(drain).toContain(
       'admission scope: maintenance-only (no new enrollment)'
+    );
+    expect(drain).toContain(
+      'no typed pressure-deferral provenance; owner release required'
     );
     expect(drain).toContain('"$expected_head" != "$DRAIN_ADMISSION_HEAD"');
     expect(drain).toContain('select((.n | tostring) == $admission_pr)');

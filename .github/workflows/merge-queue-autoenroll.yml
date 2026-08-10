@@ -151,10 +151,10 @@ jobs:
           # global dequeue/reconciliation authority but cannot admit a PR.
           DRAIN_ADMISSION_PR: ${{ steps.admission.outputs.pr_number }}
           DRAIN_ADMISSION_HEAD: ${{ steps.admission.outputs.head_sha }}
-          # Queue-pressure deferrals are temporary. Only the existing push on
-          # main controller run may reconcile an exact green auto-merge head;
-          # PR/CI events continue to honor queue-deferred as an explicit hold.
-          DRAIN_RECONCILE_QUEUE_DEFERRED: ${{ github.event_name == 'push' && '1' || '0' }}
+          # `queue-deferred` has no typed provenance separating a temporary
+          # pressure deferral from an explicit repair/human hold. Main-push
+          # maintenance must preserve it until an owner explicitly releases it.
+          DRAIN_RECONCILE_QUEUE_DEFERRED: '0'
         run: |
           if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]; then
             echo "::error::Merge Queue Auto-Enroll requires MERGE_QUEUE_BACKEND=native" >&2
