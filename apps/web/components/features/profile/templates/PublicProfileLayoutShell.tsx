@@ -18,6 +18,11 @@ interface PublicProfileLayoutShellProps {
   /** Desktop spare-space growth CTA (JOV-3544). */
   readonly claimFooterHref?: string | null;
   readonly showClaimFooter?: boolean;
+  /** True when this shell renders inside another page (marketing phone
+   *  preview, dashboard preview) instead of as the outer profile document.
+   *  Marks the viewport so the global html/body scroll lock in globals.css
+   *  skips it — only the real outer profile document may lock (JOV-4932). */
+  readonly embedded?: boolean;
 }
 
 export function PublicProfileLayoutShell({
@@ -30,6 +35,7 @@ export function PublicProfileLayoutShell({
   compactSurface,
   claimFooterHref = null,
   showClaimFooter = false,
+  embedded = false,
 }: Readonly<PublicProfileLayoutShellProps>) {
   // The background blur stage is 84px blurred and 28% opaque — a CSS radial
   // gradient using the artist accent color is visually identical and eliminates
@@ -38,7 +44,10 @@ export function PublicProfileLayoutShell({
   const hasAmbientBg = Boolean(heroImageUrl && !heroImageError);
   return (
     <div
-      className='profile-viewport relative h-dvh overflow-hidden bg-(--profile-stage-bg) text-primary-token md:h-auto md:min-h-dvh md:overflow-x-hidden md:overflow-y-auto'
+      className={cn(
+        'profile-viewport relative h-dvh overflow-hidden bg-(--profile-stage-bg) text-primary-token md:h-auto md:min-h-dvh md:overflow-x-hidden md:overflow-y-auto',
+        embedded && 'profile-viewport--embedded'
+      )}
       style={profileAccentStyle}
       data-testid='public-profile-layout-shell'
     >

@@ -80,4 +80,18 @@ describe('getCaptureDismissalStatus', () => {
 
     await expect(getCaptureDismissalStatus(ARTIST_ID)).resolves.toBeNull();
   });
+
+  it('never fetches for the demo profile (no backing artist row)', async () => {
+    // JOV-4932: demo previews (marketing phone mockups, dashboard previews)
+    // render the profile UI with the built-in demo id; the endpoint rejects
+    // it with 400 and pollutes production logs.
+    const { DEMO_PROFILE_ID } = await import('@/lib/demo-personas');
+    const fetchMock = mockFetchOnce({ suppressed: false });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      getCaptureDismissalStatus(DEMO_PROFILE_ID)
+    ).resolves.toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

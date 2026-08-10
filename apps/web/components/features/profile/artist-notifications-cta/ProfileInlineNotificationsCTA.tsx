@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useProfileNotifications } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
 import { useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
+import { DEMO_PROFILE_ID } from '@/lib/demo-personas';
 import type { ProfileAlertOptInVariant } from '@/lib/flags/contracts';
 import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-email';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
@@ -578,6 +579,9 @@ export function ProfileInlineNotificationsCTA({
     locallyDismissedArtistIdRef.current = artist.id;
     setCaptureSuppressedArtistId(artist.id);
     handleClose();
+    // Demo previews have no backing artist row — skip the production
+    // dismissal write, which would reject with 400 (JOV-4932).
+    if (artist.id === DEMO_PROFILE_ID) return;
     void fetch('/api/profile/capture-dismissal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

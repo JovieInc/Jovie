@@ -194,3 +194,24 @@
 .homepage-v2-proof__line {
   line-height: 1.6;
 }
+
+/* Pricing geometry ---------------------------------------------------------
+   The shared pricing shell is a 12-column grid (home.css); without an
+   explicit span the plan row auto-places into a single column track and the
+   three cards collapse to ~43px each at desktop widths (JOV-4932). The
+   full-row span also holds inside the single-column mobile shell, so the
+   stacked 390 layout is unchanged. */
+[data-testid="homepage-v2-pricing"] .system-b-mounted-home-pricing-plans {
+  grid-column: 1 / -1;
+}
+
+/* Reduced motion ------------------------------------------------------------
+   The hero float/drift loops are decorative; under prefers-reduced-motion the
+   homepage must contribute zero running or pending animations (JOV-4932).
+   Normal-motion durations above are untouched. */
+@media (prefers-reduced-motion: reduce) {
+  .homepage-v2-hero__phone-float,
+  .homepage-v2-hero__shot {
+    animation: none;
+  }
+}

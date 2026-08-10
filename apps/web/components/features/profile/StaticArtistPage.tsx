@@ -157,6 +157,7 @@ export function StaticArtistPage({
       hideMoreMenu={hideMoreMenu}
       showClaimFooter={showClaimFooter}
       claimFooterHref={claimFooterHref}
+      embeddedPreview={presentation === 'compact-preview'}
     />
   );
 }

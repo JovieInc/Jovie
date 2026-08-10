@@ -59,4 +59,21 @@ describe('useProfileVisitTracking', () => {
       });
     });
   });
+
+  it('skips visit + visit-token calls for the demo profile (JOV-4932)', async () => {
+    // Demo previews have no backing profile row — both audience endpoints
+    // reject demo-profile with 400 and visits would pollute analytics.
+    process.env.NEXT_PUBLIC_CI = 'false';
+    const { DEMO_PROFILE_ID } = await import('@/lib/demo-personas');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderHook(() => useProfileVisitTracking(DEMO_PROFILE_ID));
+
+    await waitFor(() => {
+      expect(mutateMock).not.toHaveBeenCalled();
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
 });

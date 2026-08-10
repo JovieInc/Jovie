@@ -18,6 +18,7 @@ vi.mock('@/features/profile/templates/ProfileCompactTemplate', () => ({
       'data-testid': 'profile-compact-template',
       'data-mode': props.mode,
       'data-artist-name': (props.artist as Artist)?.name,
+      'data-embedded-preview': String(props.embeddedPreview),
       'data-show-subscription-confirmed-banner': String(
         props.showSubscriptionConfirmedBanner
       ),
@@ -130,6 +131,51 @@ describe('StaticArtistPage', () => {
     );
 
     expect(screen.getByTestId('profile-compact-template')).toBeInTheDocument();
+  });
+
+  it('marks compact previews as embedded so the viewport lock skips them (JOV-4932)', async () => {
+    const { StaticArtistPage } = await import(
+      '@/features/profile/StaticArtistPage'
+    );
+
+    render(
+      <StaticArtistPage
+        presentation='compact-preview'
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Artist'
+        showBackButton={false}
+      />
+    );
+
+    expect(screen.getByTestId('profile-compact-template')).toHaveAttribute(
+      'data-embedded-preview',
+      'true'
+    );
+  });
+
+  it('keeps the live public profile as the outer (non-embedded) document', async () => {
+    const { StaticArtistPage } = await import(
+      '@/features/profile/StaticArtistPage'
+    );
+
+    render(
+      <StaticArtistPage
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Artist'
+        showBackButton={false}
+      />
+    );
+
+    expect(screen.getByTestId('profile-compact-template')).toHaveAttribute(
+      'data-embedded-preview',
+      'false'
+    );
   });
 
   it('forwards mode to the live compact presentation by default', async () => {

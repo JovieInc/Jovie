@@ -14,6 +14,7 @@
  */
 
 import { track } from '@/lib/analytics';
+import { DEMO_PROFILE_ID } from '@/lib/demo-personas';
 import { publicEnv } from '@/lib/env-public';
 import { getConsentState } from '@/lib/tracking/consent';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
@@ -111,6 +112,11 @@ export function trackPacClientEvent(
   extras?: PacEventExtras
 ): PacEventPayload | null {
   if (globalThis.window === undefined) return null;
+
+  // Demo previews render the PAC surface without a backing profile row; the
+  // first-party sink would reject the event with 400 and the GA4 path would
+  // pollute production analytics with a fake profile (JOV-4932).
+  if (context.profileId === DEMO_PROFILE_ID) return null;
 
   const payload: PacEventPayload = {
     event,
