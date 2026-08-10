@@ -26,6 +26,7 @@ import { SeekBar } from '@/components/atoms/SeekBar';
 import type { EntityCarouselLayout } from '@/components/organisms/entity-card';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
+import { DEMO_PROFILE_ID } from '@/lib/demo-personas';
 import type {
   ProfilePacAssignment,
   ProfilePacCopyArm,
@@ -505,6 +506,9 @@ export function ProfilePacCard({
       { dismiss_affordance: assignment.dismissAffordance },
       'dismissed'
     );
+    // Demo previews have no backing profile row — skip the production
+    // dismissal write, which would reject with 400 (JOV-4932).
+    if (artist.id === DEMO_PROFILE_ID) return;
     void fetch('/api/profile/capture-dismissal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

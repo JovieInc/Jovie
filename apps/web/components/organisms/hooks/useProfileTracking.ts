@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { DEMO_PROFILE_ID } from '@/lib/demo-personas';
 import { useTrackingMutation } from '@/lib/queries/useTrackingMutation';
 
 export function useTipPageTracking({
@@ -80,6 +81,10 @@ export function useProfileVisitTracking(
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!artistId) return;
+    // Demo previews have no backing profile row — the visit endpoints reject
+    // demo-profile with 400 and real visits would pollute audience analytics
+    // (JOV-4932).
+    if (artistId === DEMO_PROFILE_ID) return;
     if (process.env.NEXT_PUBLIC_CI === 'true') return;
     if (process.env.NEXT_PUBLIC_DEMO_RECORDING === '1') return;
     let cancelled = false;

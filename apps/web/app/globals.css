@@ -146,25 +146,28 @@ body:has(.home-viewport) {
   overscroll-behavior: auto;
 }
 
-/* Public profile pages — lock viewport on mobile, allow scroll on desktop. */
-html:has(.profile-viewport) {
+/* Public profile pages — lock viewport on mobile, allow scroll on desktop.
+   Only the outer profile document may lock: nested previews (marketing phone
+   mockups, dashboard previews) mark their viewport with
+   .profile-viewport--embedded so they cannot lock the host page (JOV-4932). */
+html:has(.profile-viewport):not(:has(.profile-viewport--embedded)) {
   height: 100dvh;
   overflow: clip;
   overscroll-behavior: none;
 }
-body:has(.profile-viewport) {
+body:has(.profile-viewport):not(:has(.profile-viewport--embedded)) {
   height: 100dvh;
   overflow: clip;
   overscroll-behavior: none;
 }
 @media (min-width: 768px) {
-  html:has(.profile-viewport) {
+  html:has(.profile-viewport):not(:has(.profile-viewport--embedded)) {
     height: auto;
     min-height: 100%;
     overflow-y: auto;
     overscroll-behavior: auto;
   }
-  body:has(.profile-viewport) {
+  body:has(.profile-viewport):not(:has(.profile-viewport--embedded)) {
     height: auto;
     min-height: 100%;
     overflow-x: clip;

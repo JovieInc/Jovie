@@ -9,6 +9,7 @@
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import type { CreatorProfile } from '@/lib/db/schema/profiles';
 import {
+  DEMO_PROFILE_ID,
   type DemoPersonaProfile,
   FOUNDER_DEMO_PERSONA,
   INTERNAL_DJ_DEMO_PERSONA,
@@ -22,7 +23,7 @@ const DEFAULT_PERSONA = INTERNAL_DJ_DEMO_PERSONA.profile;
  * fetched from the DB via getDemoCreator().
  */
 const DEFAULT_DEMO_PROFILE: CreatorProfile = {
-  id: 'demo-profile',
+  id: DEMO_PROFILE_ID,
   userId: 'demo-user-001',
   waitlistEntryId: null,
   creatorType: DEFAULT_PERSONA.creatorType,

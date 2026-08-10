@@ -1,6 +1,14 @@
 import type { ProviderKey } from '@/lib/discography/types';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
+/**
+ * Stable id of the built-in demo persona profile. It is never a real DB row,
+ * so production API endpoints keyed on a profile/artist id (capture-dismissal,
+ * PAC events) reject it with 400. Client emitters must skip calls carrying
+ * this id (JOV-4932).
+ */
+export const DEMO_PROFILE_ID = 'demo-profile';
+
 export interface DemoPersonaTrack {
   readonly title: string;
   readonly slug: string;

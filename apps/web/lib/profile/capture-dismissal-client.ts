@@ -8,6 +8,8 @@
  * duplicate fetches also double-counted sessions).
  */
 
+import { DEMO_PROFILE_ID } from '@/lib/demo-personas';
+
 export interface CaptureDismissalStatus {
   readonly suppressed?: boolean;
   readonly sessionCount?: number;
@@ -19,6 +21,10 @@ const statusCache = new Map<string, Promise<CaptureDismissalStatus | null>>();
 export function getCaptureDismissalStatus(
   artistId: string
 ): Promise<CaptureDismissalStatus | null> {
+  // Demo previews render the profile UI without a backing artist row; the
+  // endpoint would reject the lookup with 400 (JOV-4932).
+  if (artistId === DEMO_PROFILE_ID) return Promise.resolve(null);
+
   const cached = statusCache.get(artistId);
   if (cached) return cached;
 

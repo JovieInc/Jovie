@@ -24,6 +24,7 @@ vi.mock('@/lib/env-public', () => ({
   publicEnv: { NEXT_PUBLIC_E2E_MODE: undefined },
 }));
 
+import { DEMO_PROFILE_ID } from '@/lib/demo-personas';
 import {
   createPacPlayMilestoneTracker,
   getPacSessionId,
@@ -132,6 +133,20 @@ describe('PAC event schema (spec §8)', () => {
 
     expect(first?.session_id).toBe(getPacSessionId());
     expect(second?.session_id).toBe(first?.session_id);
+  });
+
+  it('skips emission entirely for the demo profile (JOV-4932)', () => {
+    // Demo previews render the PAC surface without a backing profile row;
+    // the first-party sink rejects demo-profile events with 400 and the GA4
+    // path would pollute production analytics with a fake profile.
+    const payload = trackPacClientEvent('pac_exposure', {
+      ...CONTEXT,
+      profileId: DEMO_PROFILE_ID,
+    });
+
+    expect(payload).toBeNull();
+    expect(mockTrack).not.toHaveBeenCalled();
+    expect(mockPostJsonBeacon).not.toHaveBeenCalled();
   });
 
   it('carries the current consent state on every payload', () => {
