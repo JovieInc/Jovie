@@ -31,7 +31,7 @@
       "drizzle-orm": "0.45.2",
       "jsdom": "26.1.0",
       "react": "19.2.7",
-      "react-dom": "19.2.7",
+      "react-dom": "19.2.8",
       "@modelcontextprotocol/sdk": ">=1.26.0",
       "hono": ">=4.12.31",
       "diff": ">=8.0.3",
