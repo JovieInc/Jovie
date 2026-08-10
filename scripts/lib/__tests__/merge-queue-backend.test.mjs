@@ -197,9 +197,11 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('workflow_dispatch)');
     expect(scope).toContain('push)');
     expect(scope).toContain('.pull_request.head.sha');
+    expect(scope).toContain('.pull_request.base.ref');
     expect(scope).toContain('.workflow_run.head_sha');
-    expect(scope).toContain('--json number,headRefOid');
-    expect(scope).toContain('No unique open PR owns workflow_run head');
+    expect(scope).toContain('--json number,headRefOid,baseRefName');
+    expect(scope).toContain('select(.baseRefName == "main")');
+    expect(scope).toContain('No unique open main PR owns workflow_run head');
     expect(scope).toContain('Untargeted manual dispatch; maintenance-only');
     expect(scope).toContain('Main push; maintenance-only');
     expect(enroll).toContain(
@@ -213,6 +215,27 @@ describe('queue workflow mutation safety', () => {
     );
     expect(drain).toContain('"$expected_head" != "$DRAIN_ADMISSION_HEAD"');
     expect(drain).toContain('select((.n | tostring) == $admission_pr)');
+  });
+
+  it('excludes stacked non-main PRs from admission and live eligibility', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const scope = workflowStep(workflow, 'Resolve exact admission scope');
+    const drain = readRepoFile('scripts/drain-pr-queue.sh');
+
+    expect(scope).toContain('PR targets $base_ref, not main; maintenance-only');
+    expect(scope).toContain('select(.baseRefName == "main")');
+    expect(drain).toContain('baseRefName,baseRefOid');
+    expect(drain).toContain(
+      'json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName"'
+    );
+    expect(drain).toContain('.baseRefName == "main"');
+    expect(drain).toContain('and (.base == "main")');
+    expect(drain).toContain('select(.base=="main")');
+    expect(drain).toContain('def main_target: .base == "main"');
+    expect(drain).toContain('select(main_target and hard_gated)');
+    expect(drain).toContain('select(main_target | not)');
   });
 
   it('revalidates the live head and hard gates before approval, then delegates enrollment', () => {

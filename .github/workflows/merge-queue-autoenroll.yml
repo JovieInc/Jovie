@@ -91,21 +91,27 @@ jobs:
 
           case "$EVENT_NAME" in
             pull_request)
-              pr_number="$(jq -er '.pull_request.number | tostring' "$GITHUB_EVENT_PATH")"
-              head_sha="$(jq -er '.pull_request.head.sha | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
+              base_ref="$(jq -er '.pull_request.base.ref' "$GITHUB_EVENT_PATH")"
+              if [[ "$base_ref" == "main" ]]; then
+                pr_number="$(jq -er '.pull_request.number | tostring' "$GITHUB_EVENT_PATH")"
+                head_sha="$(jq -er '.pull_request.head.sha | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
+              else
+                echo "PR targets $base_ref, not main; maintenance-only"
+              fi
               ;;
             workflow_run)
               head_sha="$(jq -er '.workflow_run.head_sha | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
-              prs_json="$(gh pr list -R "$REPO" --state open --limit 200 --json number,headRefOid)"
+              prs_json="$(gh pr list -R "$REPO" --state open --limit 200 --json number,headRefOid,baseRefName)"
               mapfile -t matching_prs < <(jq -r --arg head "$head_sha" '
                 .[]
+                | select(.baseRefName == "main")
                 | select(((.headRefOid // "") | ascii_downcase) == $head)
                 | .number
               ' <<<"$prs_json")
               if [[ "${#matching_prs[@]}" -eq 1 ]]; then
                 pr_number="${matching_prs[0]}"
               else
-                echo "No unique open PR owns workflow_run head $head_sha; maintenance-only"
+                echo "No unique open main PR owns workflow_run head $head_sha; maintenance-only"
                 head_sha=''
               fi
               ;;
