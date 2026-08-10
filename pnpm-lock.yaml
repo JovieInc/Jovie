@@ -17008,7 +17008,7 @@ snapshots:
     dependencies:
       '@ai-sdk/provider': 3.0.10
       '@standard-schema/spec': 1.1.0
-      eventsource-parser: 3.0.8
+      eventsource-parser: 3.1.0
       zod: 4.3.6
 
   '@ai-sdk/provider-utils@5.0.23(zod@4.3.6)':
@@ -17032,7 +17032,7 @@ snapshots:
     dependencies:
       json-schema: 0.4.0
 
-  '@ai-sdk/react@3.0.176(react@19.2.7)(zod@4.3.6)':
+  '@ai-sdk/react@3.0.176(react@19.2.8)(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider-utils': 4.0.26(zod@4.3.6)
       ai: 6.0.174(zod@4.3.6)
@@ -28378,7 +28378,7 @@ snapshots:
 
   eventsource@3.0.7:
     dependencies:
-      eventsource-parser: 3.0.8
+      eventsource-parser: 3.1.0
 
   exceljs@4.4.0:
     dependencies:
