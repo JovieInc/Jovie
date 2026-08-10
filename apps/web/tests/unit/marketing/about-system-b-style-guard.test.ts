@@ -10,7 +10,10 @@ import { describe, expect, it } from 'vitest';
  * styles / System A editorial type classes in the route's own source.
  */
 
-const sources = ['app/(marketing)/about/page.tsx'] as const;
+const sources = [
+  'app/(marketing)/about/page.tsx',
+  'components/organisms/AboutPageContent.tsx',
+] as const;
 
 const forbiddenRouteVisualPatterns = [
   /style=\{/,
