@@ -33,10 +33,14 @@ export function InvestorBrief({
 
       <nav className='sticky top-0 z-40 border-b border-subtle bg-base/90 backdrop-blur-md'>
         <div className='mx-auto flex h-14 max-w-6xl items-center justify-between px-5 sm:px-8'>
-          <Link href='/' aria-label='Jovie Home'>
+          <Link
+            aria-label='Jovie Home'
+            className='inline-flex min-h-11 items-center'
+            href='/'
+          >
             <Logo variant='word' tone='white' size='xs' />
           </Link>
-          <Button asChild variant='primary' size='sm'>
+          <Button asChild variant='primary' size='md'>
             <a
               href={`mailto:${CONTACT_EMAIL}?subject=Jovie%20Investor%20Meeting`}
               data-pitch-event='meeting_cta_clicked'
@@ -201,9 +205,9 @@ export function InvestorBrief({
       <section className='mx-auto max-w-4xl px-5 py-20 sm:px-8 lg:py-28'>
         <details
           data-pitch-section='founder-letter'
-          className='group border-y border-subtle py-8'
+          className='group border-y border-subtle'
         >
-          <summary className='flex cursor-pointer list-none items-center justify-between gap-6 text-xl font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/30'>
+          <summary className='flex min-h-11 cursor-pointer list-none items-center justify-between gap-6 py-8 text-xl font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/30'>
             Read The Founder Letter
             <ArrowRight
               className='size-5 transition-transform group-open:rotate-90'
@@ -228,8 +232,8 @@ export function InvestorBrief({
           </h2>
           <div className='mt-10 divide-y divide-subtle border-y border-subtle'>
             {registry.risks.map(risk => (
-              <details className='group py-6' key={risk.id}>
-                <summary className='flex cursor-pointer list-none items-center justify-between gap-6 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/30'>
+              <details className='group' key={risk.id}>
+                <summary className='flex min-h-11 cursor-pointer list-none items-center justify-between gap-6 py-6 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/30'>
                   {risk.question}
                   <ArrowRight
                     className='size-4 shrink-0 transition-transform group-open:rotate-90'
@@ -252,10 +256,10 @@ export function InvestorBrief({
 
       <section className='mx-auto max-w-4xl px-5 py-20 sm:px-8'>
         <details
-          className='group border-y border-subtle py-8'
+          className='group border-y border-subtle'
           data-testid='pitch-appendix'
         >
-          <summary className='flex cursor-pointer list-none items-center justify-between gap-6 text-xl font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/30'>
+          <summary className='flex min-h-11 cursor-pointer list-none items-center justify-between gap-6 py-8 text-xl font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/30'>
             Open The Appendix
             <ArrowRight
               className='size-5 transition-transform group-open:rotate-90'
