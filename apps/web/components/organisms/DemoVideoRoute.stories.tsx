@@ -11,7 +11,8 @@ const meta = {
       registryIds: ['web-028-demo--video', 'web-029-demovideo'],
       routes: ['/demo/video', '/demovideo'],
       source: 'apps/web/components/features/demo/DemoVideoPage.tsx',
-      sourceSha: '61690d2a4af920183f4a85366799ff0bafe4540b',
+      sourceExport: 'DemoVideoPage',
+      sourceSha: '409c25a77213f414ce86cad81042505ddc85ea96',
       implementation: 'exact-production-component',
     },
     docs: {
@@ -29,13 +30,21 @@ type Story = StoryObj<typeof meta>;
 export const Web028DemoVideo: Story = {
   name: 'web-028 /demo/video',
   parameters: {
-    pen: { registryId: 'web-028-demo--video', route: '/demo/video' },
+    pen: {
+      registryId: 'web-028-demo--video',
+      route: '/demo/video',
+      storyExport: 'Web028DemoVideo',
+    },
   },
 };
 
 export const Web029DemoVideoAlias: Story = {
   name: 'web-029 /demovideo',
   parameters: {
-    pen: { registryId: 'web-029-demovideo', route: '/demovideo' },
+    pen: {
+      registryId: 'web-029-demovideo',
+      route: '/demovideo',
+      storyExport: 'Web029DemoVideoAlias',
+    },
   },
 };
