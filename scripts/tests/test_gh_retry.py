@@ -241,7 +241,7 @@ class TestDrainPrQueueWiring:
                 set -euo pipefail
                 if [[ "$1 $2" == "pr list" ]]; then
                   cat <<'JSON'
-                [{"n":123,"t":"Red CI PR","draft":false,"m":"MERGEABLE","head":"codex/jov-123-red","L":[],"fail":[]}]
+                [{"n":123,"t":"Red CI PR","draft":false,"m":"MERGEABLE","head":"codex/jov-123-red","base":"main","L":[],"fail":[]}]
 JSON
                   exit 0
                 fi
@@ -277,7 +277,7 @@ JSON
                 set -euo pipefail
                 if [[ "$1 $2" == "pr list" ]]; then
                   cat <<'JSON'
-                [{{"n":456,"t":"Taste approved PR","draft":false,"m":"MERGEABLE","head":"codex/jov-456-taste","L":["needs-human","approved:taste"],"fail":[]}},{{"n":789,"t":"Human gated PR","draft":false,"m":"MERGEABLE","head":"codex/jov-789-human","L":["needs-human","merge-queue"],"fail":[]}},{{"n":102,"t":"Deferred PR","draft":false,"m":"MERGEABLE","head":"codex/jov-102-deferred","L":["queue-deferred","merge-queue"],"fail":[]}},{{"n":103,"t":"Draft PR","draft":true,"m":"MERGEABLE","head":"codex/jov-103-draft","L":["merge-queue"],"fail":[]}},{{"n":101,"t":"Target clean PR","draft":false,"m":"MERGEABLE","head":"codex/jov-101-clean","L":[],"fail":[]}},{{"n":104,"t":"Unrelated clean PR","draft":false,"m":"MERGEABLE","head":"codex/jov-104-clean","L":[],"fail":[]}}]
+                [{{"n":456,"t":"Taste approved PR","draft":false,"m":"MERGEABLE","head":"codex/jov-456-taste","base":"main","L":["needs-human","approved:taste"],"fail":[]}},{{"n":789,"t":"Human gated PR","draft":false,"m":"MERGEABLE","head":"codex/jov-789-human","base":"main","L":["needs-human","merge-queue"],"fail":[]}},{{"n":102,"t":"Deferred PR","draft":false,"m":"MERGEABLE","head":"codex/jov-102-deferred","base":"main","L":["queue-deferred","merge-queue"],"fail":[]}},{{"n":103,"t":"Draft PR","draft":true,"m":"MERGEABLE","head":"codex/jov-103-draft","base":"main","L":["merge-queue"],"fail":[]}},{{"n":101,"t":"Target clean PR","draft":false,"m":"MERGEABLE","head":"codex/jov-101-clean","base":"main","L":[],"fail":[]}},{{"n":104,"t":"Unrelated clean PR","draft":false,"m":"MERGEABLE","head":"codex/jov-104-clean","base":"main","L":[],"fail":[]}}]
 JSON
                   exit 0
                 fi
@@ -288,7 +288,7 @@ JSON
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
                   [[ "$3" == "101" ]]
-                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{admitted_head}"}}'
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{admitted_head}","baseRefName":"main"}}'
                   exit 0
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -363,7 +363,7 @@ JSON
                 #!/usr/bin/env bash
                 set -euo pipefail
                 if [[ "$1 $2" == "pr list" ]]; then
-                  echo '[{{"n":106,"t":"Head moved","draft":false,"m":"MERGEABLE","head":"codex/jov-106-moved","L":[],"fail":[]}}]'
+                  echo '[{{"n":106,"t":"Head moved","draft":false,"m":"MERGEABLE","head":"codex/jov-106-moved","base":"main","L":[],"fail":[]}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
@@ -371,7 +371,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
-                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{live_head}"}}'
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{live_head}","baseRefName":"main"}}'
                   exit 0
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -425,7 +425,7 @@ JSON
 JSON
                   else
                     cat <<'JSON'
-                [{{"n":700,"t":"Current deferred","draft":false,"m":"MERGEABLE","head":"codex/current-deferred","L":["queue-deferred"],"fail":[]}},{{"n":701,"t":"Stale deferred","draft":false,"m":"MERGEABLE","head":"codex/stale-deferred","L":["queue-deferred"],"fail":[]}},{{"n":702,"t":"Manual deferred","draft":false,"m":"MERGEABLE","head":"codex/manual-deferred","L":["queue-deferred"],"fail":[]}}]
+                [{{"n":700,"t":"Current deferred","draft":false,"m":"MERGEABLE","head":"codex/current-deferred","base":"main","L":["queue-deferred"],"fail":[]}},{{"n":701,"t":"Stale deferred","draft":false,"m":"MERGEABLE","head":"codex/stale-deferred","base":"main","L":["queue-deferred"],"fail":[]}},{{"n":702,"t":"Manual deferred","draft":false,"m":"MERGEABLE","head":"codex/manual-deferred","base":"main","L":["queue-deferred"],"fail":[]}}]
 JSON
                   fi
                   exit 0
@@ -433,15 +433,15 @@ JSON
                 if [[ "$1 $2" == "pr view" ]]; then
                   if [[ "$3" == "700" ]]; then
                     cat <<'JSON'
-                {{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefOid":"{head}","baseRefOid":"{main}","labels":[{{"name":"queue-deferred"}}],"autoMergeRequest":{{"enabledAt":"2026-07-30T00:00:00Z"}}}}
+                {{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefOid":"{head}","baseRefName":"main","baseRefOid":"{main}","labels":[{{"name":"queue-deferred"}}],"autoMergeRequest":{{"enabledAt":"2026-07-30T00:00:00Z"}}}}
 JSON
                   elif [[ "$3" == "701" ]]; then
                     cat <<'JSON'
-                {{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefOid":"{head}","baseRefOid":"{stale_base}","labels":[{{"name":"queue-deferred"}}],"autoMergeRequest":{{"enabledAt":"2026-07-30T00:00:00Z"}}}}
+                {{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefOid":"{head}","baseRefName":"main","baseRefOid":"{stale_base}","labels":[{{"name":"queue-deferred"}}],"autoMergeRequest":{{"enabledAt":"2026-07-30T00:00:00Z"}}}}
 JSON
                   else
                     cat <<'JSON'
-                {{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefOid":"{head}","baseRefOid":"{main}","labels":[{{"name":"queue-deferred"}}],"autoMergeRequest":null}}
+                {{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","headRefOid":"{head}","baseRefName":"main","baseRefOid":"{main}","labels":[{{"name":"queue-deferred"}}],"autoMergeRequest":null}}
 JSON
                   fi
                   exit 0
