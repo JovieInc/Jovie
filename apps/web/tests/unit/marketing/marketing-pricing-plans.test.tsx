@@ -71,7 +71,7 @@ describe('MarketingPricingPlans', () => {
 
     expect(
       screen.getByTestId('marketing-pricing-plan-free').parentElement
-    ).toHaveAttribute('data-variant', 'tier-cards-neutral');
+    ).toHaveAttribute('data-marketing-variant', 'tier-cards-neutral');
     for (const plan of ['free', 'pro', 'max']) {
       const card = screen.getByTestId(`marketing-pricing-plan-${plan}`);
       expect(card).toHaveAttribute('data-recommended', 'false');
@@ -88,7 +88,7 @@ describe('MarketingPricingPlans', () => {
 
     const proCard = screen.getByTestId('marketing-pricing-plan-pro');
     expect(proCard.parentElement).toHaveAttribute(
-      'data-variant',
+      'data-marketing-variant',
       'tier-cards-recommended'
     );
     expect(proCard).toHaveAttribute('data-recommended', 'true');
