@@ -51,3 +51,45 @@ test.describe('public investor brief', () => {
     expect(pdf.status()).toBe(200);
   });
 });
+
+const GEOMETRY_VIEWPORTS = [
+  { width: 1024, height: 900 },
+  { width: 390, height: 844 },
+] as const;
+
+test.describe('shared investor brief 44px target geometry', () => {
+  for (const viewport of GEOMETRY_VIEWPORTS) {
+    test(`keeps logo link, meeting CTA, and summaries ≥44px at ${viewport.width}x${viewport.height}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      const response = await page.goto('/pitch', {
+        waitUntil: 'domcontentloaded',
+      });
+      expect(response?.status()).toBe(200);
+
+      const targets = [
+        page.getByRole('link', { name: 'Jovie Home' }),
+        page.getByRole('link', { name: 'Request A Meeting' }).first(),
+        ...(await page.locator('summary').all()),
+      ];
+      expect(targets.length).toBeGreaterThanOrEqual(5);
+
+      for (const target of targets) {
+        // Effective hit height: the visible box or the Button primitive's
+        // ::before hit-area pseudo, whichever is taller.
+        const hitHeight = await target.evaluate(element => {
+          const rect = element.getBoundingClientRect();
+          const beforeHeight = Number.parseFloat(
+            getComputedStyle(element, '::before').height
+          );
+          return Math.max(
+            rect.height,
+            Number.isNaN(beforeHeight) ? 0 : beforeHeight
+          );
+        });
+        expect(hitHeight).toBeGreaterThanOrEqual(44);
+      }
+    });
+  }
+});

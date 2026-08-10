@@ -43,3 +43,50 @@ describe('shared investor brief routing', () => {
     expect(stickyBar).toContain("data-pitch-event='meeting_cta_clicked'");
   });
 });
+
+describe('shared InvestorBrief 44px target geometry (web-188 + web-195)', () => {
+  const componentPath = join(
+    process.cwd(),
+    'components/features/pitch/InvestorBrief.tsx'
+  );
+
+  it('wraps the Jovie Home wordmark link in a 44px hit target', () => {
+    const component = readFileSync(componentPath, 'utf8');
+
+    expect(component).toContain("aria-label='Jovie Home'");
+    expect(component).toContain(
+      "className='inline-flex min-h-11 items-center'"
+    );
+    // The wordmark Logo stays the only logo component — no duplicate header/logo.
+    expect(component).toContain(
+      "import { Logo } from '@/components/atoms/Logo'"
+    );
+  });
+
+  it('keeps the meeting CTA on the md Button size with its mailto and event', () => {
+    const component = readFileSync(componentPath, 'utf8');
+
+    expect(component).not.toContain("size='sm'");
+    expect(component).toContain("variant='primary' size='md'");
+    expect(
+      component.match(/data-pitch-event='meeting_cta_clicked'/gu)
+    ).toHaveLength(2);
+    expect(
+      component.match(/mailto:\$\{CONTACT_EMAIL\}/gu)?.length
+    ).toBeGreaterThanOrEqual(2);
+  });
+
+  it('moves disclosure padding onto each summary with a 44px floor', () => {
+    const component = readFileSync(componentPath, 'utf8');
+
+    // No vertical padding remains on the details rows themselves.
+    expect(component).not.toMatch(/<details[^>]*className='[^']*\bpy-\d/iu);
+
+    const summaries = component.match(/<summary\b[^>]*>/gu) ?? [];
+    expect(summaries).toHaveLength(3);
+    for (const summary of summaries) {
+      expect(summary).toContain('min-h-11');
+      expect(summary).toMatch(/\bpy-[68]\b/u);
+    }
+  });
+});
