@@ -16,12 +16,14 @@ describe('Storybook preview theme bootstrap', () => {
     expect(decorate).toBeTypeOf('function');
     if (!decorate) throw new Error('Storybook preview decorator is required');
 
-    const { container } = render(
-      decorate(
+    function DecoratedStory() {
+      return decorate(
         () => <div data-testid='story-body'>Story body</div>,
         {} as never
-      )
-    );
+      );
+    }
+
+    const { container } = render(<DecoratedStory />);
 
     expect(container.querySelector('script')).toBeNull();
     expect(container.querySelector('[data-testid="story-body"]')).toBeTruthy();
