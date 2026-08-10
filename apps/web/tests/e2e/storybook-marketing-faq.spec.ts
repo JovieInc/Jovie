@@ -62,9 +62,7 @@ async function readFaqGeometry(section: Locator): Promise<FaqGeometry> {
   const itemCount = await items.count();
 
   return {
-    heading: await readDocumentBox(
-      section.locator('.faq-section__heading')
-    ),
+    heading: await readDocumentBox(section.locator('.faq-section__heading')),
     accordion: await readDocumentBox(accordion),
     items: await Promise.all(
       Array.from({ length: itemCount }, (_, index) =>
