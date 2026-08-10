@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
-- [internal] **Storybook theme previews stay script-free:** the visual catalog resolves `next-themes` to its existing provider-compatible mock, preventing inline bootstrap scripts from rendering inside story roots while leaving production theme behavior unchanged.
+- [internal] **Pen contracts resolve back to canonical source components (JOV-4953):** registered marketing shells, production-backed sections, and recipes expose unique deterministic root identities; the shared atom manifest records Button, link, and brand/logo ownership; and normalization coverage proves one Button master can propagate to multiple CTA refs without replacing instance copy.
 - [internal] **Canonical blog stories now reuse production presentation safely:** browser-only Storybook bundles read blog and author contracts plus category slugs from browser-safe boundaries, so the real BlogFeed, BlogAuthorCard, and BlogCard render without pulling Node filesystem modules into the browser; category and author receipt fixtures are excluded from the story catalog.
 - **Frequently asked questions collapse cleanly again:** closed answers no longer reserve empty space, while mouse and keyboard disclosure actions expand only the selected answer.
 - **Changelog updates load in focused batches:** release notes now render inline code cleanly and let readers reveal older updates ten at a time instead of loading the full archive at once.

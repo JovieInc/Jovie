@@ -1,4 +1,6 @@
+// @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import './ArtistProfileOutcomesCarousel.css';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
@@ -21,7 +23,10 @@ export function ArtistProfileOutcomesCarousel({
   const ledgerRows = outcomes.landingCards.slice(0, 4);
 
   return (
-    <ArtistProfileSectionShell className='ap-outcomes'>
+    <ArtistProfileSectionShell
+      className='ap-outcomes'
+      penContractId={MARKETING_PEN_CONTRACT_IDS.section.featureGrid}
+    >
       <div className='mx-auto max-w-public-content'>
         <ArtistProfileSectionHeader
           align='left'

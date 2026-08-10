@@ -77,8 +77,9 @@ describe('artist profile landing family System B source contract', () => {
       ),
       'utf8'
     );
+    expect(route).toContain("className='artist-profiles-home-system'");
     expect(route).toContain(
-      "<MarketingPageShell className='artist-profiles-home-system'>"
+      'penContractId={MARKETING_PEN_CONTRACT_IDS.recipe.artistLp}'
     );
 
     const landing = readFileSync(

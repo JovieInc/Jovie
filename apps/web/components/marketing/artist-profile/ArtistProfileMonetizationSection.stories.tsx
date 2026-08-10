@@ -7,6 +7,11 @@ const meta = {
   component: ArtistProfileMonetizationSection,
   parameters: {
     layout: 'fullscreen',
+    jovie: {
+      // Internal MonetizationCard props are exercised through the canonical
+      // monetization fixture rather than supplied to the section itself.
+      uncoveredProps: ['cardId', 'textAnchor', 'visualSide'],
+    },
     pen: {
       registryId: 'section.monetization',
       penRoot: 'F3grtS',

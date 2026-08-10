@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 
 const mockUsePathname = vi.fn<() => string | null>(() => '/about');
 
@@ -34,6 +35,10 @@ describe('MarketingFooter', () => {
   it('renders the full marketing footer when the full-footer flag is enabled', () => {
     render(<MarketingFooter />);
 
+    expect(screen.getByTestId('marketing-footer')).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.shell.footer
+    );
     expect(screen.getByTestId('marketing-footer-cta')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
       'href',

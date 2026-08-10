@@ -4,6 +4,7 @@ import type { ElementType, ReactNode } from 'react';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { LandingCTAButton } from '@/components/features/landing/LandingCTAButton';
 import { APP_ROUTES } from '@/constants/routes';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 import { MarketingContainer } from './MarketingContainer';
 
@@ -125,6 +126,7 @@ function MarketingHeroShell({
 }: MarketingHeroShellProps) {
   return (
     <section
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.hero}
       className={cn(
         'relative w-full',
         'pt-20 pb-16 sm:pt-24 sm:pb-24 lg:pt-28 lg:pb-32',
@@ -189,6 +191,7 @@ function MarketingHeroContent({
 
   return (
     <section
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.hero}
       className={cn('marketing-hero', `marketing-hero--${layout}`, className)}
       aria-labelledby={headingId}
       data-testid={testId}
@@ -254,6 +257,7 @@ function MarketingHeroLanding({
 }: MarketingHeroLandingProps) {
   return (
     <section
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.hero}
       className='relative overflow-hidden pb-12 pt-[5.75rem] md:pb-16 md:pt-[6.25rem] lg:pb-20'
       data-testid={sectionTestId}
       aria-labelledby={headingId}

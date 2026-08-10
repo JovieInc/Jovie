@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { PublicPageShell } from './PublicPageShell';
 
 vi.mock('next/navigation', async importOriginal => {
@@ -12,12 +13,16 @@ vi.mock('next/navigation', async importOriginal => {
 
 describe('PublicPageShell', () => {
   it('renders children inside main#main-content with the header offset by default', () => {
-    render(
+    const { container } = render(
       <PublicPageShell>
         <p>route content</p>
       </PublicPageShell>
     );
 
+    expect(container.firstElementChild).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.shell.publicPage
+    );
     const main = document.getElementById('main-content');
     expect(main).toBeInTheDocument();
     expect(main).toHaveTextContent('route content');

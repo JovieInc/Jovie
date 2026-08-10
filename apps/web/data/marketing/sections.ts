@@ -1066,7 +1066,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       reducedMotion:
         'no motion (count-up animations banned per motion budget — show final value)',
     },
-    component: 'components/marketing/HomeStatQuoteSection', // legacy; first artist-recipe use requires humanOptIn
+    component: 'components/features/home/HomeStatQuoteSection', // legacy; first artist-recipe use requires humanOptIn
     failureModes: [
       'Unattributable or fabricated metrics (B2B anti-pattern #5: every observed metric was specific and attributable)',
       'Count-up animation (motion budget: static final value)',

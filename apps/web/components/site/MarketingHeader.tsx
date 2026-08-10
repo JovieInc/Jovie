@@ -12,6 +12,7 @@ import {
   FRONT_DOOR_CTA_LABEL,
   HOMEPAGE_FRONT_DOOR_CTA,
 } from '@/data/homepageLaunchCopy';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MARKETING_NAV_LINKS } from '@/data/marketingNavigation';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
@@ -189,6 +190,7 @@ export function MarketingHeader({
 
   return (
     <HeaderNav
+      penContractId={MARKETING_PEN_CONTRACT_IDS.shell.header}
       className={isArtistProfiles ? 'artist-profiles-home-header' : undefined}
       logoSize={isArtistProfiles ? 'sm' : logoSize}
       logoVariant={isArtistProfiles ? 'icon' : logoVariant}

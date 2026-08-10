@@ -1,5 +1,7 @@
+// @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
 import Image from 'next/image';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import ONBOARDING_DSP_CAPTURE from '@/screenshot-catalog/current/onboarding-dsp-desktop.png';
@@ -41,7 +43,9 @@ export function ArtistProfileHowItWorks({
   howItWorks,
 }: Readonly<ArtistProfileHowItWorksProps>) {
   return (
-    <ArtistProfileSectionShell>
+    <ArtistProfileSectionShell
+      penContractId={MARKETING_PEN_CONTRACT_IDS.section.howItWorks}
+    >
       <div className='mx-auto grid max-w-public-content items-start gap-12 lg:grid-cols-[minmax(18rem,0.72fr)_minmax(36rem,1.28fr)] lg:gap-16'>
         <div>
           <ArtistProfileSectionHeader

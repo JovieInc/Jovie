@@ -1,6 +1,8 @@
+// @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { MarketingContainer } from '@/components/marketing';
+import type { MarketingPenContractId } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 
 export interface MarketingTerminalCtaProps {
@@ -17,6 +19,7 @@ export interface MarketingTerminalCtaProps {
   readonly decoration?: ReactNode;
   readonly testId: string;
   readonly variant?: 'cinematic' | 'standard';
+  readonly penContractId: MarketingPenContractId;
 }
 
 const styles = {
@@ -63,6 +66,7 @@ export function MarketingTerminalCta({
   decoration,
   testId,
   variant = 'standard',
+  penContractId,
 }: Readonly<MarketingTerminalCtaProps>) {
   const variantStyles = styles[variant];
 
@@ -96,6 +100,7 @@ export function MarketingTerminalCta({
 
   return (
     <section
+      data-pen-contract={penContractId}
       data-testid={testId}
       className={cn(variantStyles.section, className)}
     >

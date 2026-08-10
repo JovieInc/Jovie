@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 import {
   ArmadaMusicLogo,
@@ -73,6 +74,7 @@ export function HomeTrustSection({
 
   return (
     <section
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.logoCloud}
       data-testid='homepage-trust'
       data-presentation={presentation}
       className={cn(

@@ -1,4 +1,6 @@
+// @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
 import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MarketingTerminalCta } from './MarketingTerminalCta';
 
 export interface MarketingFinalCTAProps {
@@ -33,6 +35,7 @@ export function MarketingFinalCTA({
 }: Readonly<MarketingFinalCTAProps>) {
   return (
     <MarketingTerminalCta
+      penContractId={MARKETING_PEN_CONTRACT_IDS.shell.finalCta}
       title={title}
       body={body}
       ctaLabel={ctaLabel}

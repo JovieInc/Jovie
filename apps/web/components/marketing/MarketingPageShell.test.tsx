@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MarketingPageShell } from './MarketingPageShell';
 
 describe('MarketingPageShell', () => {
@@ -13,6 +14,10 @@ describe('MarketingPageShell', () => {
     const content = screen.getByText('page content');
     expect(content).toBeInTheDocument();
     expect(content.parentElement?.className).toContain('relative');
+    expect(content.parentElement).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.shell.page
+    );
   });
 
   it('grows to fill the PublicPageShell main column instead of re-applying viewport height (JOV-4872)', () => {

@@ -1,3 +1,5 @@
+// @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
+import { MARKETING_CONTAINER_PEN_CONTRACT_BY_WIDTH } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 
 /**
@@ -37,6 +39,7 @@ export function MarketingContainer({
 }: MarketingContainerProps) {
   return (
     <div
+      data-pen-contract={MARKETING_CONTAINER_PEN_CONTRACT_BY_WIDTH[width]}
       className={cn(
         'mx-auto w-full px-6 sm:px-8 lg:px-10',
         widthClasses[width],

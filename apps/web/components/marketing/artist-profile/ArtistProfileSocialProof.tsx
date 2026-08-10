@@ -1,5 +1,7 @@
+// @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
 import Image from 'next/image';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import type { ArtistProfileSocialProofData } from '@/data/socialProof';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { MarketingSnapRail } from '../MarketingSnapRail';
@@ -48,7 +50,9 @@ export function ArtistProfileSocialProof({
   }
 
   return (
-    <ArtistProfileSectionShell>
+    <ArtistProfileSectionShell
+      penContractId={MARKETING_PEN_CONTRACT_IDS.section.socialProof}
+    >
       <ArtistProfileSectionHeader
         align='left'
         headline={socialProof.headline}

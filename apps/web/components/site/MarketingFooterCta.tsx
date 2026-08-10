@@ -4,6 +4,7 @@
 import { useId } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { HOMEPAGE_V2_COPY } from '@/data/homepageV2Copy';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MarketingTerminalCta } from './MarketingTerminalCta';
 
 const FOOTER_CTA_ARCS = [
@@ -44,6 +45,7 @@ export function MarketingFooterCta({
 
   return (
     <MarketingTerminalCta
+      penContractId={MARKETING_PEN_CONTRACT_IDS.shell.footerCta}
       variant='cinematic'
       testId='marketing-footer-cta'
       title={title}

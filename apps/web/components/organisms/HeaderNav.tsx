@@ -13,6 +13,7 @@ import { MobileNav } from '@/components/molecules/MobileNav';
 import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
 import { UserButton } from '@/components/organisms/user-button';
 import { APP_ROUTES } from '@/constants/routes';
+import type { MarketingPenContractId } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 
 // Linear header structure: full-width header with centered ~1000px content
@@ -41,6 +42,7 @@ export interface HeaderNavProps {
   readonly presentation?: 'default' | 'homepage-embedded' | 'marketing-glass';
   readonly flyoutMenus?: readonly HeaderFlyoutMenu[];
   readonly showContactLink?: boolean;
+  readonly penContractId?: MarketingPenContractId;
 }
 
 export interface HeaderFlyoutMenu {
@@ -298,6 +300,7 @@ export function HeaderNav({
   presentation = 'default',
   flyoutMenus,
   showContactLink = true,
+  penContractId,
 }: HeaderNavProps = {}) {
   const headerRef = useRef<HTMLElement | null>(null);
   const closeFlyoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -492,6 +495,7 @@ export function HeaderNav({
     <header
       ref={headerRef}
       data-testid='header-nav'
+      data-pen-contract={penContractId}
       data-presentation={presentation}
       data-scrolled={isScrolled ? 'true' : undefined}
       className={cn(

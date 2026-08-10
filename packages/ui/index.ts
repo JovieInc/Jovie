@@ -51,10 +51,15 @@ export { Badge, badgeVariants } from './atoms/badge';
 export type { ButtonProps } from './atoms/button';
 export { Button, buttonVariants } from './atoms/button';
 export {
+  BUTTON_PEN_CONTRACT,
   BUTTON_SIZE_NAMES,
   BUTTON_VARIANT_NAMES,
   type ButtonSize,
+  type ButtonSizeInput,
   type ButtonVariant,
+  type ButtonVariantInput,
+  normalizeButtonSizeContract,
+  normalizeButtonVariantContract,
 } from './atoms/button-contract';
 // Card
 export type {

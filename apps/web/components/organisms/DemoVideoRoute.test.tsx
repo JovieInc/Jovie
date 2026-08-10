@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { BUTTON_PEN_CONTRACT } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DemoVideoPage } from '@/components/features/demo/DemoVideoPage';
@@ -68,6 +69,15 @@ describe('DemoVideoPage route contract', () => {
     expect(screen.getByRole('link', { name: 'Try it free' })).toHaveAttribute(
       'href',
       APP_ROUTES.SIGNUP
+    );
+  });
+
+  it('renders the production CTA through the canonical Button asChild root', () => {
+    render(<DemoVideoPage />);
+
+    expect(screen.getByRole('link', { name: 'Try it free' })).toHaveAttribute(
+      'data-pen-contract',
+      BUTTON_PEN_CONTRACT.rootId
     );
   });
 

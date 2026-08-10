@@ -1,6 +1,7 @@
 import { Button } from '@jovie/ui';
 import { Check } from 'lucide-react';
 import Link from 'next/link';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import {
   getMarketingPlanCtaLabel,
   getMarketingPlanHref,
@@ -102,6 +103,7 @@ export function MarketingPricingPlans({
 
   return (
     <div
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.pricing}
       data-marketing-section='pricing'
       data-marketing-variant={variant}
       className={cn(
