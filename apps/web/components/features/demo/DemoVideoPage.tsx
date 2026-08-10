@@ -43,7 +43,7 @@ export function DemoVideoPage() {
         </a>
         <Button
           asChild
-          variant='whitePill'
+          variant='primary'
           className='h-12 px-8 text-sm font-semibold'
         >
           <Link href={APP_ROUTES.SIGNUP}>Try it free</Link>

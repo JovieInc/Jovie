@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
@@ -13,6 +14,11 @@ import demoVideoMeta, {
   Web028DemoVideo,
   Web029DemoVideoAlias,
 } from './DemoVideoRoute.stories';
+
+const DEMO_VIDEO_STORY_PATH =
+  'apps/web/components/organisms/DemoVideoRoute.stories.tsx';
+const DEMO_VIDEO_STORY_FIRST_CONTAINING_SHA =
+  '409c25a77213f414ce86cad81042505ddc85ea96';
 
 vi.mock('@/components/features/demo/DemoVideoPlayer', () => ({
   DemoVideoPlayer: ({
@@ -89,16 +95,78 @@ describe('DemoVideoPage route contract', () => {
       registryIds: ['web-028-demo--video', 'web-029-demovideo'],
       routes: ['/demo/video', '/demovideo'],
       source: 'apps/web/components/features/demo/DemoVideoPage.tsx',
-      sourceSha: '61690d2a4af920183f4a85366799ff0bafe4540b',
+      sourceExport: 'DemoVideoPage',
+      sourceSha: DEMO_VIDEO_STORY_FIRST_CONTAINING_SHA,
       implementation: 'exact-production-component',
     });
     expect(Web028DemoVideo.parameters?.pen).toEqual({
       registryId: 'web-028-demo--video',
       route: '/demo/video',
+      storyExport: 'Web028DemoVideo',
     });
     expect(Web029DemoVideoAlias.parameters?.pen).toEqual({
       registryId: 'web-029-demovideo',
       route: '/demovideo',
+      storyExport: 'Web029DemoVideoAlias',
     });
+  });
+
+  it('binds its receipt to an ancestor commit containing the source and story exports', () => {
+    const receipt = demoVideoMeta.parameters.pen;
+    const storyExport = Web028DemoVideo.parameters?.pen.storyExport;
+
+    expect(receipt.sourceSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(storyExport).toBe('Web028DemoVideo');
+
+    try {
+      execFileSync('git', ['cat-file', '-e', `${receipt.sourceSha}^{commit}`], {
+        stdio: 'pipe',
+      });
+    } catch {
+      expect(
+        execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
+          encoding: 'utf8',
+        }).trim()
+      ).toBe('true');
+      return;
+    }
+
+    expect(() =>
+      execFileSync(
+        'git',
+        ['merge-base', '--is-ancestor', receipt.sourceSha, 'HEAD'],
+        { stdio: 'pipe' }
+      )
+    ).not.toThrow();
+
+    const sourceAtReceipt = execFileSync(
+      'git',
+      ['show', `${receipt.sourceSha}:${receipt.source}`],
+      { encoding: 'utf8' }
+    );
+    const storyAtReceipt = execFileSync(
+      'git',
+      ['show', `${receipt.sourceSha}:${DEMO_VIDEO_STORY_PATH}`],
+      { encoding: 'utf8' }
+    );
+
+    expect(sourceAtReceipt).toContain(
+      `export function ${receipt.sourceExport}`
+    );
+    expect(storyAtReceipt).toContain(`export const ${storyExport}`);
+  });
+
+  it('uses the canonical primary CTA without a deprecated button alias', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'components/features/demo/DemoVideoPage.tsx'),
+      'utf8'
+    );
+
+    expect(source).toMatch(
+      /variant\s*=\s*(?:['"]primary['"]|\{\s*['"]primary['"]\s*\})/
+    );
+    expect(source).not.toMatch(
+      /variant\s*=\s*(?:['"]whitePill['"]|\{\s*['"]whitePill['"]\s*\})/
+    );
   });
 });
