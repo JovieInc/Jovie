@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- **Frequently asked questions collapse cleanly again:** closed answers no longer reserve empty space, while mouse and keyboard disclosure actions expand only the selected answer.
 - **Changelog updates load in focused batches:** release notes now render inline code cleanly and let readers reveal older updates ten at a time instead of loading the full archive at once.
 - [internal] **Eve is wired into the canonical chat as a guarded shadow observer:** the repo-local Vercel Eve skill is pinned, core chat can invoke the Node 24 pilot through a bounded read-only harness without delaying the authoritative `streamText` response, and deterministic contracts cover discovery, auth, runtime tracing, and fail-closed fallback.
 - [internal] **Grok sidecar admission is one source of truth (JOV-4802):** reconcile no longer launches an issue that will fail grok-ship-one's check — `blocked` was added to the shared blocked-label gate, grok-ship-one now delegates its admission decision to the controller's `check-admission` predicate (exactly what reconcile uses), and reconcile re-verifies each issue immediately before launching so a `blocked`/`needs-human` guard landing after the list query can never be dispatched. Default `SYMPHONY_GROK_MAX` raised 2→4 with a live-concurrency cap so total grok ships never exceed the limit (Gem 16c/62GB).

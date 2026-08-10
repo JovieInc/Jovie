@@ -95,15 +95,11 @@ export function ClientFaqAccordion({
               id={panelId}
               aria-labelledby={triggerId}
               aria-hidden={!isOpen}
-              className={cn(
-                'faq-accordion__panel mt-2 grid grid-rows-[1fr] overflow-hidden transition-opacity duration-subtle ease-subtle motion-reduce:transition-none',
-                isOpen
-                  ? 'visible opacity-100'
-                  : 'invisible pointer-events-none opacity-0'
-              )}
+              hidden={!isOpen}
+              className='faq-accordion__panel overflow-hidden'
             >
               <div className='min-h-0 overflow-hidden'>
-                <p className='faq-accordion__answer max-w-prose pb-7 pr-10 text-base leading-7 text-secondary-token'>
+                <p className='faq-accordion__answer max-w-prose pb-7 pr-10 pt-2 text-base leading-7 text-secondary-token'>
                   {item.answer}
                 </p>
               </div>

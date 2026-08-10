@@ -255,17 +255,15 @@ This is the subtraction principle applied specifically to container boundaries. 
 
 Before touching **any** component or surface, an agent **must** explicitly enumerate every possible visual state it can render (loading, empty, error, partial data, success, authenticated vs anonymous, with/without banners/status lines/status text, mobile vs desktop, collapsed vs expanded, first-message vs ongoing, securing/awaiting vs ready, etc.).
 
-For every state transition the component or page can undergo, the agent must verify that **no layout shift** occurs:
-- Content does not push or displace other content vertically or horizontally.
-- Containers do not unexpectedly resize or reflow.
-- Scroll position is preserved where users expect it.
-- Focus, selection, and caret positions are not disrupted.
+For every state transition, prevent **unexpected or uninitiated layout instability** and geometry changes unrelated to the state transition the user requested. Preserve scroll position, focus, selection, caret position, and hit targets unless changing one is the explicit interaction result.
 
-Where a transition would insert or remove content that affects layout height or position:
-- Reserve space in advance (min-height, skeleton loaders, empty placeholder elements with matching dimensions, or a dedicated fixed-status slot).
-- Or use height-preserving wrappers combined with opacity / visibility / scale / transform transitions only (never height or margin changes that cause reflow).
+Geometry changes are valid when they are the **direct, local, and deterministic result** of an explicit disclosure or navigation action and remain inside the declared interaction boundary. A collapsed accordion answer must have no footprint; opening it may move the following rows in that disclosure flow by exactly the opened panel's height.
 
-Add or update tests (Playwright layout guards, visual regression snapshots, bounding-box assertions on key containers, CLS metrics, or stability specs) for any non-trivial state changes or surfaces that render conditional UI.
+For an async, loading, error, or content change, reserve space or use an overlay when reflow is not the component's semantic behavior. Skeletons, fixed status slots, and stable media aspect ratios are appropriate for system-initiated changes, not for hiding the semantic expansion of a disclosure.
+
+No unrelated siblings outside the disclosure flow may jump because of animation mechanics. Animate only safe properties, keep geometry animation inside the declared boundary, and resolve height immediately under reduced motion. Instant height resolution is valid when it makes state ownership clearer.
+
+Add or update tests (Playwright layout guards, visual regression snapshots, bounding-box assertions on key containers, CLS metrics, or stability specs) for any non-trivial state changes. CLS excludes shifts shortly after qualifying user input, so browser metrics do not replace source guards that prove the change is bounded, local, deterministic, and owned by the requested state transition.
 
 This rule is non-negotiable and applies to **all product work** (including onboarding, chat, dashboards, marketing, and shell surfaces). Violations block design review and PR landing. See also `DESIGN.md` (visual stability section), `docs/TESTING_GUIDELINES.md` (risk-based visual QA), and `AGENTS.md` (verification).
 

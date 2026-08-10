@@ -895,21 +895,18 @@ Before editing or authoring any component, organism, feature surface, empty stat
    - First-message flow vs subsequent turns
    - Any progressive disclosure or progressive builder states
 
-2. For **every state transition**, verify **zero layout shift**:
-   - No vertical or horizontal push of sibling/parent content.
-   - Containers maintain stable dimensions (use `min-height`, grid-template, flex basis, or reserved slots).
-   - Scroll containers preserve user scroll position.
-   - No reflow that moves interactive elements (buttons, inputs, CTAs) under the cursor or changes hit targets.
+2. For **every state transition**, prevent unexpected or uninitiated layout instability and geometry changes unrelated to the state transition the user requested. Preserve scroll position, focus, selection, caret position, and hit targets unless changing one is the explicit result.
 
-3. When a transition would add/remove height-affecting content:
-   - **Reserve space in advance** (min-height on the status container, always-mounted placeholder div with matching metrics, skeleton that matches final height, or a fixed-status slot).
-   - Prefer **opacity/visibility/scale/transform-only** transitions inside a height-stable wrapper.
-   - Never rely on conditional `{cond ? <p>text</p> : null}` directly above/below variable-height siblings without a reserved slot.
+3. Geometry changes are valid when they are the **direct, local, and deterministic result** of an explicit disclosure or navigation action and remain inside the declared interaction boundary. A collapsed disclosure has no footprint; opening it may move following content inside that disclosure flow by exactly the opened panel's height.
 
-4. Add or update tests for non-trivial surfaces:
+4. For an async, loading, error, or content change, reserve space or use an overlay when reflow is not the component's semantic behavior. Skeletons, fixed status slots, and stable media aspect ratios protect system-initiated transitions without forcing interactive disclosures to look permanently expanded.
+
+5. No unrelated siblings outside the disclosure flow may jump because of animation mechanics. Animate only safe properties, keep geometry animation inside the declared boundary, and resolve height immediately under reduced motion. Instant height resolution is valid when it makes state ownership clearer.
+
+6. Add or update tests for non-trivial surfaces:
    - Playwright bounding-box assertions on key containers across states.
    - Visual regression (Chromatic / snapshot) covering the transitions.
-   - CLS / layout-shift metrics in performance tests where relevant.
+   - CLS / layout-shift metrics in performance tests where relevant. CLS excludes shifts shortly after qualifying user input, so source guards must also prove bounded, local, deterministic state ownership.
    - E2E that exercises the full state machine (e.g. `/start` onboarding first-token flow).
 
 This rule is non-negotiable. It directly implements the subtraction principle and DESIGN_V1 stability goals. Violations are blocked at design review and landing. Cross-references: `.claude/rules/ui.md` (Taste Rules), `docs/TESTING_GUIDELINES.md` (Risk-Based Testing), `AGENTS.md` (Verification).

@@ -266,7 +266,7 @@ These apply to EVERY composition; the registry does not restate them:
 - **Fully static** (`revalidate = false` — `.claude/rules/ui.md`).
 - **Copy-in-data files** (`apps/web/data/*Copy.ts` pattern — `.claude/rules/code-style.md`).
 - **One body face, one container width** (`page` | `prose`), spacing-only transitions.
-- **Layout-shift contract** (height-stable slots for state changes — `.claude/rules/ui.md`).
+- **Layout-stability contract** (system-initiated changes reserve/overlay; explicit disclosures collapse fully and own only bounded local geometry — `.claude/rules/ui.md`).
 - **Screenshot registry** (`lib/screenshots/registry.ts` — proof assets bind to `SCREENSHOT_SCENARIO_IDS`).
 
 ## Worked example (brief-01 from the golden fixtures)

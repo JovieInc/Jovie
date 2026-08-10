@@ -27,7 +27,7 @@ export function FaqSection({
     <section
       data-marketing-section='faq'
       data-pen-contract='pAAhw'
-      data-layout-contract='height-stable-disclosure'
+      data-layout-contract='bounded-local-disclosure'
       className={cn(
         'faq-section',
         className ?? 'mx-auto max-w-190 px-6 pb-24 sm:px-8 lg:px-10'

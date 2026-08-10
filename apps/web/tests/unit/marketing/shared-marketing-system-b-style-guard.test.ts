@@ -34,7 +34,7 @@ describe('shared marketing System B style guard', () => {
     expect(source).toContain('system-b-voice-demo-wave');
   });
 
-  it('keeps the FAQ fallback and visibility state on named primitives', () => {
+  it('keeps the FAQ disclosure bounded, collapsed, and tokenized', () => {
     const faqSource = readFileSync(
       resolve(process.cwd(), sharedSources.faq),
       'utf8'
@@ -46,15 +46,18 @@ describe('shared marketing System B style guard', () => {
 
     expect(faqSource).not.toContain('marketing-h2-linear');
     expect(faqSource).toContain('system-b-marketing-section-heading');
+    expect(faqSource).toContain(
+      "data-layout-contract='bounded-local-disclosure'"
+    );
     expect(accordionSource).not.toContain('style={{ visibility');
+    expect(accordionSource).toContain('hidden={!isOpen}');
+    expect(accordionSource).toContain('aria-hidden={!isOpen}');
     expect(accordionSource).toContain(
-      'mt-2 grid grid-rows-[1fr] overflow-hidden transition-opacity'
+      "className='faq-accordion__panel overflow-hidden'"
     );
-    expect(accordionSource).toContain("'visible opacity-100'");
-    expect(accordionSource).toContain(
-      "'invisible pointer-events-none opacity-0'"
+    expect(accordionSource).not.toContain('grid-rows-[');
+    expect(accordionSource).not.toMatch(
+      /transition-\[[^\]]*(?:grid-template-rows|height|margin)/
     );
-    expect(accordionSource).not.toContain('grid-rows-[0fr]');
-    expect(accordionSource).not.toMatch(/(?:^|\s)mt-0(?=\s|['"])/);
   });
 });

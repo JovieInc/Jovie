@@ -1,15 +1,16 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-const FAQ_STORY_ID = 'marketing-sections--faq';
+const FAQ_STORY_ID = 'marketing-sections-faqsection--default';
 const VIEWPORTS = [
   { label: 'desktop', width: 1024, height: 1200 },
   { label: 'narrow', width: 390, height: 844 },
 ] as const;
 
-interface StableGeometry {
+interface FaqGeometry {
+  readonly heading: Awaited<ReturnType<Locator['boundingBox']>>;
   readonly accordion: Awaited<ReturnType<Locator['boundingBox']>>;
-  readonly triggers: readonly Awaited<ReturnType<Locator['boundingBox']>>[];
-  readonly answers: readonly Awaited<ReturnType<Locator['boundingBox']>>[];
+  readonly items: readonly Awaited<ReturnType<Locator['boundingBox']>>[];
+  readonly panels: readonly Awaited<ReturnType<Locator['boundingBox']>>[];
 }
 
 async function openFaqStory(page: Page) {
@@ -22,44 +23,45 @@ async function openFaqStory(page: Page) {
   await expect(section).toBeVisible();
   await expect(section).toHaveAttribute(
     'data-layout-contract',
-    'height-stable-disclosure'
+    'bounded-local-disclosure'
   );
   return section;
 }
 
-async function readStableGeometry(section: Locator): Promise<StableGeometry> {
+async function readFaqGeometry(section: Locator): Promise<FaqGeometry> {
   const accordion = section.locator('.faq-accordion');
-  const triggers = accordion.getByRole('button');
-  const answers = accordion.locator('.faq-accordion__answer');
-  const triggerCount = await triggers.count();
+  const items = accordion.locator('.faq-accordion__item');
+  const panels = accordion.locator('.faq-accordion__panel');
+  const itemCount = await items.count();
 
   return {
+    heading: await section.locator('.faq-section__heading').boundingBox(),
     accordion: await accordion.boundingBox(),
-    triggers: await Promise.all(
-      Array.from({ length: triggerCount }, (_, index) =>
-        triggers.nth(index).boundingBox()
+    items: await Promise.all(
+      Array.from({ length: itemCount }, (_, index) =>
+        items.nth(index).boundingBox()
       )
     ),
-    answers: await Promise.all(
-      Array.from({ length: triggerCount }, (_, index) =>
-        answers.nth(index).boundingBox()
+    panels: await Promise.all(
+      Array.from({ length: itemCount }, (_, index) =>
+        panels.nth(index).boundingBox()
       )
     ),
   };
 }
 
-async function expectStableGeometry(
-  actual: StableGeometry,
-  expected: StableGeometry
+function requireBox(
+  box: Awaited<ReturnType<Locator['boundingBox']>>,
+  label: string
 ) {
-  expect(actual.accordion).toEqual(expected.accordion);
-  expect(actual.triggers).toEqual(expected.triggers);
-  expect(actual.answers).toEqual(expected.answers);
+  expect(box, `${label} has geometry`).not.toBeNull();
+  if (!box) throw new Error(`${label} has no geometry`);
+  return box;
 }
 
 test.describe('canonical marketing FAQ disclosure geometry', () => {
   for (const viewport of VIEWPORTS) {
-    test(`${viewport.label} keeps disclosure geometry and keyboard state stable`, async ({
+    test(`${viewport.label} keeps disclosure geometry local and keyboard state correct`, async ({
       page,
     }) => {
       await page.setViewportSize(viewport);
@@ -76,20 +78,68 @@ test.describe('canonical marketing FAQ disclosure geometry', () => {
           'false'
         );
         await expect(panels.nth(index)).toHaveAttribute('aria-hidden', 'true');
+        await expect(panels.nth(index)).toHaveAttribute('hidden', '');
+        await expect(panels.nth(index)).toHaveAttribute(
+          'aria-labelledby',
+          await triggers.nth(index).getAttribute('id')
+        );
       }
 
-      const collapsedGeometry = await readStableGeometry(section);
+      const collapsedGeometry = await readFaqGeometry(section);
+      expect(collapsedGeometry.panels).toEqual([null, null, null]);
+      await page.evaluate(
+        () =>
+          new Promise<void>(resolve => {
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+          })
+      );
+      expect(await readFaqGeometry(section)).toEqual(collapsedGeometry);
 
       await triggers.first().focus();
+      await page.keyboard.press('End');
+      await expect(triggers.nth(2)).toBeFocused();
+      await page.keyboard.press('Home');
+      await expect(triggers.first()).toBeFocused();
+      await page.keyboard.press('ArrowUp');
+      await expect(triggers.nth(2)).toBeFocused();
+      await page.keyboard.press('Home');
       await page.keyboard.press('ArrowDown');
       await expect(triggers.nth(1)).toBeFocused();
       await page.keyboard.press('Enter');
       await expect(triggers.nth(1)).toHaveAttribute('aria-expanded', 'true');
       await expect(panels.nth(1)).toHaveAttribute('aria-hidden', 'false');
+      await expect(panels.nth(1)).not.toHaveAttribute('hidden', '');
       await expect(panels.nth(1)).toHaveCSS('transition-duration', '0s');
-      await expectStableGeometry(
-        await readStableGeometry(section),
-        collapsedGeometry
+      const expandedGeometry = await readFaqGeometry(section);
+      const collapsedAccordion = requireBox(
+        collapsedGeometry.accordion,
+        'collapsed accordion'
+      );
+      const expandedAccordion = requireBox(
+        expandedGeometry.accordion,
+        'expanded accordion'
+      );
+      const openedPanel = requireBox(
+        expandedGeometry.panels[1],
+        'opened panel'
+      );
+      const collapsedFollowingItem = requireBox(
+        collapsedGeometry.items[2],
+        'collapsed following item'
+      );
+      const expandedFollowingItem = requireBox(
+        expandedGeometry.items[2],
+        'expanded following item'
+      );
+
+      expect(expandedGeometry.heading).toEqual(collapsedGeometry.heading);
+      expect(expandedFollowingItem.y - collapsedFollowingItem.y).toBeCloseTo(
+        openedPanel.height,
+        1
+      );
+      expect(expandedAccordion.height - collapsedAccordion.height).toBeCloseTo(
+        openedPanel.height,
+        1
       );
 
       await triggers.nth(2).click();
@@ -97,18 +147,17 @@ test.describe('canonical marketing FAQ disclosure geometry', () => {
       await expect(panels.nth(1)).toHaveAttribute('aria-hidden', 'true');
       await expect(triggers.nth(2)).toHaveAttribute('aria-expanded', 'true');
       await expect(panels.nth(2)).toHaveAttribute('aria-hidden', 'false');
-      await expectStableGeometry(
-        await readStableGeometry(section),
-        collapsedGeometry
+      await expect(panels.nth(1)).toHaveAttribute('hidden', '');
+      await expect(panels.nth(2)).not.toHaveAttribute('hidden', '');
+      expect((await readFaqGeometry(section)).heading).toEqual(
+        collapsedGeometry.heading
       );
 
       await page.keyboard.press('Space');
       await expect(triggers.nth(2)).toHaveAttribute('aria-expanded', 'false');
       await expect(panels.nth(2)).toHaveAttribute('aria-hidden', 'true');
-      await expectStableGeometry(
-        await readStableGeometry(section),
-        collapsedGeometry
-      );
+      await expect(panels.nth(2)).toHaveAttribute('hidden', '');
+      expect(await readFaqGeometry(section)).toEqual(collapsedGeometry);
 
       const horizontalOverflow = await page.evaluate(
         () => document.documentElement.scrollWidth - window.innerWidth
