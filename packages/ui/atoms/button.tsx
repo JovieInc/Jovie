@@ -44,7 +44,7 @@ const BUTTON_SIZE_CLASSES: Record<ButtonSize, string> = {
 };
 
 const buttonVariants = cva(
-  'relative inline-flex items-center justify-center rounded-full text-[13px] font-[510] tracking-normal transition-[background-color,border-color,color,box-shadow,opacity,transform] duration-normal ease-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) disabled:pointer-events-none disabled:opacity-[var(--state-disabled-opacity)] disabled:text-(--color-text-disabled-token)',
+  'relative inline-flex items-center justify-center rounded-full text-[13px] font-[510] tracking-normal transition-[background-color,border-color,color,box-shadow,opacity,transform] duration-normal ease-interactive motion-reduce:!transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) disabled:pointer-events-none disabled:opacity-[var(--state-disabled-opacity)] disabled:text-(--color-text-disabled-token)',
   {
     variants: {
       variant: {

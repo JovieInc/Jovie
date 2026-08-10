@@ -282,3 +282,157 @@ test('demovideo renders a stable non-empty initial visual', async ({
   expect(failedRequests).toEqual([]);
   expect(failedResponses).toEqual([]);
 });
+
+const MOTION_ACCEPTANCE_VIEWPORTS = [
+  { height: 768, label: 'desktop', width: 1024 },
+  { height: 844, label: 'mobile', width: 390 },
+] as const;
+
+type ElementMotionSnapshot = {
+  readonly box: { readonly height: number; readonly width: number };
+  readonly focusVisible: boolean;
+  readonly hasVisibleFocusStyle: boolean;
+  readonly reducedMotion: boolean;
+  readonly runningTransitions: readonly string[];
+  readonly transitionDuration: string;
+  readonly transitionProperty: string;
+  readonly transform: string;
+};
+
+async function getElementMotionSnapshot(
+  element: import('@playwright/test').Locator
+): Promise<ElementMotionSnapshot> {
+  return element.evaluate(node => {
+    const box = node.getBoundingClientRect();
+    const style = getComputedStyle(node);
+    const runningTransitions = document
+      .getAnimations({ subtree: true })
+      .filter(
+        animation =>
+          animation instanceof CSSTransition &&
+          (animation.playState === 'pending' ||
+            animation.playState === 'running')
+      )
+      .map(animation => {
+        const target = (animation.effect as KeyframeEffect | null)?.target;
+        const targetDescription =
+          target instanceof Element
+            ? `${target.tagName.toLowerCase()}.${target.className}`
+            : 'unknown';
+        return `${targetDescription}:${animation.transitionProperty}`;
+      });
+
+    return {
+      box: { height: box.height, width: box.width },
+      focusVisible: node.matches(':focus-visible'),
+      hasVisibleFocusStyle:
+        (style.outlineStyle !== 'none' && style.outlineWidth !== '0px') ||
+        style.boxShadow !== 'none',
+      reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      runningTransitions,
+      transitionDuration: style.transitionDuration,
+      transitionProperty: style.transitionProperty,
+      transform: style.transform,
+    };
+  });
+}
+
+function getMotionAcceptanceTargets(
+  page: import('@playwright/test').Page,
+  viewportLabel: (typeof MOTION_ACCEPTANCE_VIEWPORTS)[number]['label']
+) {
+  const headerTargets =
+    viewportLabel === 'desktop'
+      ? [
+          page.getByTestId('header-nav').getByRole('link', { name: 'Jovie' }),
+          page.getByTestId('header-nav').getByRole('button', {
+            name: /Features/u,
+          }),
+          page.getByTestId('header-nav').getByRole('button', {
+            name: /Resources/u,
+          }),
+          page.getByTestId('header-nav').getByRole('link', {
+            name: 'Pricing',
+          }),
+          page.getByTestId('header-nav').getByRole('link', {
+            name: 'Contact',
+          }),
+          page.getByTestId('header-nav').getByRole('link', {
+            name: 'Sign in',
+          }),
+          page.getByTestId('header-nav').getByRole('link', {
+            name: 'Start Free Trial',
+          }),
+        ]
+      : [
+          page.getByTestId('header-nav').getByRole('link', { name: 'Jovie' }),
+          page.getByTestId('header-nav').getByRole('button', {
+            name: 'Open menu',
+          }),
+        ];
+
+  return [
+    page.getByRole('link', { name: 'Download demo' }),
+    page.getByRole('link', { name: 'Try it free' }),
+    ...headerTargets,
+  ];
+}
+
+for (const viewport of MOTION_ACCEPTANCE_VIEWPORTS) {
+  test.describe(`demo video motion acceptance at ${viewport.width}px`, () => {
+    test.use({
+      reducedMotion: 'reduce',
+      viewport: { height: viewport.height, width: viewport.width },
+    });
+
+    test('focus starts no transitions and preserves geometry', async ({
+      page,
+    }) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.goto('/demo/video', { waitUntil: 'domcontentloaded' });
+      await waitForHydration(page);
+      await page.waitForTimeout(200);
+
+      for (const target of getMotionAcceptanceTargets(page, viewport.label)) {
+        await expect(target).toBeVisible();
+        const before = await getElementMotionSnapshot(target);
+
+        await target.focus();
+        await expect(target).toBeFocused();
+        const after = await getElementMotionSnapshot(target);
+
+        expect(after.reducedMotion).toBe(true);
+        expect(after.transitionProperty).toBe('none');
+        expect(after.runningTransitions).toEqual([]);
+        expect(after.box).toEqual(before.box);
+        expect(after.transform).toBe('none');
+        expect(after.focusVisible).toBe(true);
+        expect(after.hasVisibleFocusStyle).toBe(true);
+      }
+    });
+
+    test('normal motion keeps visible focus styling without geometry shifts', async ({
+      page,
+    }) => {
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await page.goto('/demo/video', { waitUntil: 'domcontentloaded' });
+      await waitForHydration(page);
+      await page.waitForTimeout(200);
+
+      for (const target of getMotionAcceptanceTargets(page, viewport.label)) {
+        await expect(target).toBeVisible();
+        const before = await getElementMotionSnapshot(target);
+
+        await target.focus();
+        await expect(target).toBeFocused();
+        const after = await getElementMotionSnapshot(target);
+
+        expect(after.reducedMotion).toBe(false);
+        expect(after.box).toEqual(before.box);
+        expect(after.transform).toBe('none');
+        expect(after.focusVisible).toBe(true);
+        expect(after.hasVisibleFocusStyle).toBe(true);
+      }
+    });
+  });
+}

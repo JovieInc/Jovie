@@ -331,6 +331,19 @@
   line-height: 1.32;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .header-nav :where(a, button),
+  .artist-profiles-home-header[data-presentation="homepage-embedded"] nav > div,
+  .marketing-glass-header__shell,
+  .marketing-glass-header__nav-link,
+  .marketing-glass-header__text-link,
+  .marketing-glass-header__cta,
+  .marketing-glass-header__flyout,
+  .marketing-glass-header__flyout-link {
+    transition: none;
+  }
+}
+
 @media (max-width: 767px) {
   .marketing-glass-header {
     --marketing-glass-top: 0.6rem;
