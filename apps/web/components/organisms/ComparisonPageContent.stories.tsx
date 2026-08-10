@@ -16,7 +16,7 @@ const meta = {
     pen: {
       registryId: 'web-027-compare--[slug]',
       route: '/compare/linktree',
-      sourceSha: '0892cccf39d72c62890ad4bc797cfd6f2d651af6',
+      sourceSha: 'da7ea056fe9df567fff098cdeb13e9b3785f707e',
     },
     docs: {
       description: {

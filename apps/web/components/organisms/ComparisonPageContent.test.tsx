@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
@@ -53,5 +54,45 @@ describe('ComparisonPageContent', () => {
     expect(storySource).toContain("getComparison('linktree')");
     expect(storySource).toContain('component: ComparisonPageContent');
     expect(storySource).toContain("registryId: 'web-027-compare--[slug]'");
+  });
+
+  it('records true provenance for the web-027 story sourceSha', () => {
+    const storyPath =
+      'apps/web/components/organisms/ComparisonPageContent.stories.tsx';
+    const storySource = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/organisms/ComparisonPageContent.stories.tsx'
+      ),
+      'utf8'
+    );
+
+    const match = storySource.match(/sourceSha: '([0-9a-f]{40})'/);
+    expect(match).not.toBeNull();
+    const sourceSha = match?.[1] as string;
+    expect(sourceSha).toBe('da7ea056fe9df567fff098cdeb13e9b3785f707e');
+
+    try {
+      execFileSync('git', ['cat-file', '-e', `${sourceSha}^{commit}`]);
+    } catch {
+      expect(
+        execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
+          encoding: 'utf8',
+        }).trim()
+      ).toBe('true');
+      return;
+    }
+
+    expect(() =>
+      execFileSync('git', ['merge-base', '--is-ancestor', sourceSha, 'HEAD'])
+    ).not.toThrow();
+
+    const storyAtReceipt = execFileSync(
+      'git',
+      ['show', `${sourceSha}:${storyPath}`],
+      { encoding: 'utf8' }
+    );
+    expect(storyAtReceipt).toContain('export const Web027CompareLinktree');
+    expect(storyAtReceipt).toContain("registryId: 'web-027-compare--[slug]'");
   });
 });
