@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { slugifyCategory } from '@/lib/blog/getBlogPosts';
+import { slugifyCategory } from '@/lib/blog/categories';
 
 export interface CategoryPillProps {
   readonly category: string;

@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { BlogFeed, type BlogFeedEntry } from '@/app/(marketing)/blog/BlogFeed';
-import type { BlogPostSummary } from '@/lib/blog/getBlogPosts';
+import type {
+  BlogPostSummary,
+  ResolvedAuthor,
+} from '@/lib/blog/presentation-contracts';
 import { STORY_BLOG_POSTS } from './fixtures';
 import {
   MARKETING_STORY_DESCRIPTION,
@@ -17,7 +20,7 @@ const entries: readonly BlogFeedEntry[] = STORY_BLOG_POSTS.map(post => ({
     name: post.author,
     avatarUrl: null,
     isVerified: false,
-  },
+  } satisfies ResolvedAuthor,
 }));
 
 const meta = {

@@ -1,11 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { BlogCard } from '@/app/(marketing)/blog/components/BlogCard';
 import type { BlogCategory } from '@/lib/blog/categories';
-import type { StoryBlogPost } from '../marketing/storybook/fixtures';
+import type {
+  BlogPostSummary,
+  ResolvedAuthor,
+} from '@/lib/blog/presentation-contracts';
 import {
   MARKETING_STORY_DESCRIPTION,
   marketingFullscreenParameters,
 } from '../marketing/storybook/marketingStoryMeta';
-import { StoryBlogCard } from '../marketing/storybook/StoryBlogCard';
 import { BlogCategoryContent } from './BlogCategoryContent';
 
 /** Parsed from the checked-in apps/web/content/blog/the-contact-problem.md. */
@@ -17,7 +20,7 @@ export const BLOG_CATEGORY_STORY_CATEGORY: BlogCategory = {
 };
 
 /** Exact public fields parsed from the checked-in blog post. */
-export const BLOG_CATEGORY_STORY_POST: StoryBlogPost = {
+export const BLOG_CATEGORY_STORY_POST: BlogPostSummary = {
   slug: 'the-contact-problem',
   title: 'The Contact Problem',
   date: '2026-03-18',
@@ -26,7 +29,15 @@ export const BLOG_CATEGORY_STORY_POST: StoryBlogPost = {
   excerpt:
     "When I fired my manager, the first thing I realized wasn't emotional. It was logistical.",
   readingTime: 5,
+  wordCount: 978,
+  tags: ['contact info', 'manager changes', 'booking agents', 'music industry'],
 };
+
+const BLOG_CATEGORY_STORY_AUTHOR = {
+  name: BLOG_CATEGORY_STORY_POST.author,
+  avatarUrl: null,
+  isVerified: false,
+} satisfies ResolvedAuthor;
 
 /** Merge commit that introduced the shared route/story body in PR #15708. */
 export const BLOG_CATEGORY_STORY_RECEIPT = {
@@ -42,11 +53,12 @@ export const BLOG_CATEGORY_STORY_RECEIPT = {
 const meta = {
   title: 'Marketing/Routes/BlogCategory',
   component: BlogCategoryContent,
+  excludeStories: /^BLOG_CATEGORY_STORY_/,
   parameters: {
     ...marketingFullscreenParameters,
     docs: {
       description: {
-        component: `${MARKETING_STORY_DESCRIPTION} Shared production category shell for web-024-blog--category--[slug]. Route params, metadata, notFound handling, filesystem loading, profile enrichment, and the production BlogCard remain route-owned. The deterministic story supplies the existing fixture-safe card with fields from the checked-in Artist Management post.`,
+        component: `${MARKETING_STORY_DESCRIPTION} Shared production category shell for web-024-blog--category--[slug]. Route params, metadata, notFound handling, filesystem loading, and profile enrichment remain route-owned. The deterministic story supplies checked-in Artist Management data to the same production BlogCard.`,
       },
     },
     pen: BLOG_CATEGORY_STORY_RECEIPT,
@@ -65,7 +77,10 @@ export const Web024ArtistManagement: Story = {
   name: 'web-024 /blog/category/artist-management',
   render: args => (
     <BlogCategoryContent {...args}>
-      <StoryBlogCard post={BLOG_CATEGORY_STORY_POST} />
+      <BlogCard
+        post={BLOG_CATEGORY_STORY_POST}
+        author={BLOG_CATEGORY_STORY_AUTHOR}
+      />
     </BlogCategoryContent>
   ),
 };

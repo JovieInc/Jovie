@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Avatar } from '@/components/molecules/Avatar';
-import type { ResolvedAuthor } from '@/lib/blog/resolveAuthor';
+import type { ResolvedAuthor } from '@/lib/blog/presentation-contracts';
 
 export interface BlogAuthorCardProps {
   readonly author: ResolvedAuthor;

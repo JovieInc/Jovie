@@ -1,6 +1,8 @@
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
-import type { BlogPostSummary } from '@/lib/blog/getBlogPosts';
-import type { ResolvedAuthor } from '@/lib/blog/resolveAuthor';
+import type {
+  BlogPostSummary,
+  ResolvedAuthor,
+} from '@/lib/blog/presentation-contracts';
 import { BlogCard } from './components/BlogCard';
 
 export interface BlogFeedEntry {

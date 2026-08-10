@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { BlogAuthorCard } from '@/app/(marketing)/blog/components/BlogAuthorCard';
 import { BlogCard } from '@/app/(marketing)/blog/components/BlogCard';
-import type { BlogPostSummary } from '@/lib/blog/getBlogPosts';
-import type { ResolvedAuthor } from '@/lib/blog/resolveAuthor';
+import type {
+  BlogPostSummary,
+  ResolvedAuthor,
+} from '@/lib/blog/presentation-contracts';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import { BlogAuthorPage } from './BlogAuthorPage';
 
@@ -106,6 +108,7 @@ export const BLOG_AUTHOR_STORY_RECEIPT = {
 const meta = {
   title: 'Public Catalog/BlogAuthorPage',
   component: BlogAuthorPage,
+  excludeStories: /^BLOG_AUTHOR_STORY_/,
   parameters: {
     layout: 'fullscreen',
     controls: { disable: true },

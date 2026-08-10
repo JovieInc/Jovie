@@ -1,9 +1,17 @@
-import { slugifyCategory } from './getBlogPosts';
-
 export interface BlogCategory {
   name: string;
   slug: string;
   description: string;
+}
+
+/** Convert a blog category label to its public route slug. */
+export function slugifyCategory(category: string): string {
+  return category
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9\s-]/g, '')
+    .replaceAll(/\s+/g, '-')
+    .replaceAll(/-+/g, '-')
+    .replaceAll(/^-|-$/g, '');
 }
 
 /** Known blog categories with descriptions for SEO */
