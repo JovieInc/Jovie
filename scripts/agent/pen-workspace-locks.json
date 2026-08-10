@@ -1,0 +1,11 @@
+{
+  "schema": "pen-workspace-locks/v1",
+  "profiles": {
+    "jovie-founder-design-studio": {
+      "canonical_path": "$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.pen",
+      "read_only_paths": [
+        "$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Marketing Workspace.pen"
+      ]
+    }
+  }
+}

@@ -25,6 +25,14 @@ Set `JOVIE_AGENT_PROFILE` before editing. Non-coding profiles (`default`, Chief,
 
 Before starting any task, agents must query gbrain for both the org chart and existing work in the area. Fetch `gbrain:agent-org-chart` when available, read `shared-skills/coordination-basics/SKILL.md` when present, and run a targeted ownership/current-priorities query for the task. If another agent owns the area, delegate through the coordination inbox instead of starting overlapping work. If gbrain is unreachable, stop and alert with a `system-blocker`; do not proceed without the coordination check.
 
+## Pen Workspace File Lock
+
+Before any Pen mutation, resolve one versioned workspace profile from [`scripts/agent/pen-workspace-locks.json`](scripts/agent/pen-workspace-locks.json) and establish one writer through the coordination preflight. The active editor path must match the profile's non-overridable canonical path before and after every mutation batch. Never create a document, use New/Open/Open Recent/Save As, rename, close, or switch documents during a run. Recovery files, backups, source-backed read-only files, and side files are evidence-only until a separately approved reconciliation.
+
+After each logical batch, explicitly save the existing locked document, verify the editor is clean when that state is exposed, re-read the intended roots, and emit a passing `pen-save-receipt/v1` with [`scripts/agent/pen-save-receipt.mjs`](scripts/agent/PEN_SAVE_RECEIPT.md). The receipt must bind hashed pre/post app-state, window-state, explicit-save-response, and root-readback evidence. Its strongest result is `saved_state_verified`; crash/restart durability remains `not_proven`. Autosave, a visible canvas change, an MCP success response, or an opaque backup alone is insufficient. A timeout makes mutation state unknown and prohibits retry.
+
+After any Pen/renderer/MCP restart, disconnect, crash indication, or unexpected active-path change, invalidate the writer and batch; do not save, discard, resume, or switch. If Pen displays Save/Don't Save, choose **Cancel**. If no dialog is displayed, leave Pen untouched. In either case, stop all mutations, preserve the active work, and report the lock failure. Never ask the founder to decide whether unknown agent work should be saved or discarded.
+
 ## Instruction Architecture
 
 - `AGENTS.md` → symlink to this file. Host wrappers (`CODEX.md`, Copilot, etc.) point here — never duplicate policy.
