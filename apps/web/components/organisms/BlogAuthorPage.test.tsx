@@ -4,7 +4,9 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import { BlogAuthorPage } from './BlogAuthorPage';
-import { BLOG_AUTHOR_STORY_RECEIPT } from './BlogAuthorPage.stories';
+import blogAuthorMeta, {
+  BLOG_AUTHOR_STORY_RECEIPT,
+} from './BlogAuthorPage.stories';
 
 const readWebSource = (path: string) =>
   readFileSync(resolve(process.cwd(), path), 'utf8');
@@ -71,6 +73,15 @@ describe('BlogAuthorPage', () => {
     );
     expect(storySource).toContain('component: BlogAuthorPage');
     expect(storySource).toContain(
+      "from '@/app/(marketing)/blog/components/BlogAuthorCard'"
+    );
+    expect(storySource).toContain(
+      "from '@/app/(marketing)/blog/components/BlogCard'"
+    );
+    expect(storySource).toContain('@/lib/blog/presentation-contracts');
+    expect(storySource).not.toContain('@/lib/blog/getBlogPosts');
+    expect(storySource).not.toContain('@/lib/blog/resolveAuthor');
+    expect(storySource).toContain(
       "registryId: 'web-023-blog--authors--[username]'"
     );
     expect(storySource).toContain("route: '/blog/authors/[username]'");
@@ -83,6 +94,14 @@ describe('BlogAuthorPage', () => {
     expect(storySource).toContain("slug: 'the-myspace-problem'");
     expect(storySource).toContain("slug: 'the-suno-playbook-teardown'");
     expect(storySource).not.toMatch(/images\.unsplash\.com\/placeholder/i);
+  });
+
+  it('excludes the receipt export without hiding the intended story', () => {
+    const excludeStories = blogAuthorMeta.excludeStories;
+
+    expect(excludeStories).toEqual(/^BLOG_AUTHOR_STORY_/);
+    expect(excludeStories.test('BLOG_AUTHOR_STORY_RECEIPT')).toBe(true);
+    expect(excludeStories.test('Web023BlogAuthor')).toBe(false);
   });
 
   it('keeps the Pen receipt on the shared-body introducing commit', () => {

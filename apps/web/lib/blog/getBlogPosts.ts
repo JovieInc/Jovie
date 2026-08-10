@@ -5,29 +5,20 @@ import { parseMarkdownFrontmatter } from '@/lib/docs/parseMarkdownFrontmatter';
 import { resolveAppContentPath } from '@/lib/filesystem-paths';
 import { validatePathTraversal } from '@/lib/security/path-traversal';
 import type { MarkdownDocument } from '@/types/docs';
+import type {
+  BlogPostMetadata,
+  BlogPostSummary,
+} from './presentation-contracts';
+
+export { slugifyCategory } from './categories';
+export type {
+  BlogPostMetadata,
+  BlogPostSummary,
+} from './presentation-contracts';
 
 const BLOG_DIRECTORY = resolveAppContentPath('blog');
 
-export interface BlogPostMetadata {
-  title: string;
-  date: string;
-  updatedDate?: string;
-  author: string;
-  authorUsername?: string;
-  authorTitle?: string;
-  authorProfile?: string;
-  category?: string;
-  tags: string[];
-  excerpt: string;
-  readingTime: number;
-  wordCount: number;
-}
-
 export interface BlogPost extends MarkdownDocument, BlogPostMetadata {
-  slug: string;
-}
-
-export interface BlogPostSummary extends BlogPostMetadata {
   slug: string;
 }
 
@@ -55,16 +46,6 @@ function parseTags(tagsString?: string): string[] {
     .split(',')
     .map(tag => tag.trim())
     .filter(Boolean);
-}
-
-/** Slugify a category name for URL use */
-export function slugifyCategory(category: string): string {
-  return category
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9\s-]/g, '')
-    .replaceAll(/\s+/g, '-')
-    .replaceAll(/-+/g, '-')
-    .replaceAll(/^-|-$/g, '');
 }
 
 /** Get related posts by category match, then by recency */

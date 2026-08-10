@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { Avatar } from '@/components/molecules/Avatar';
-import type { BlogPostSummary } from '@/lib/blog/getBlogPosts';
-import type { ResolvedAuthor } from '@/lib/blog/resolveAuthor';
+import type {
+  BlogPostSummary,
+  ResolvedAuthor,
+} from '@/lib/blog/presentation-contracts';
 import { CategoryPill } from './CategoryPill';
 
 export interface BlogCardProps {

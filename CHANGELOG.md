@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- [internal] **Canonical blog stories now reuse production presentation safely:** browser-only Storybook bundles read blog and author contracts plus category slugs from browser-safe boundaries, so the real BlogFeed, BlogAuthorCard, and BlogCard render without pulling Node filesystem modules into the browser; category and author receipt fixtures are excluded from the story catalog.
 - **Frequently asked questions collapse cleanly again:** closed answers no longer reserve empty space, while mouse and keyboard disclosure actions expand only the selected answer.
 - **Changelog updates load in focused batches:** release notes now render inline code cleanly and let readers reveal older updates ten at a time instead of loading the full archive at once.
 - [internal] **Eve is wired into the canonical chat as a guarded shadow observer:** the repo-local Vercel Eve skill is pinned, core chat can invoke the Node 24 pilot through a bounded read-only harness without delaying the authoritative `streamText` response, and deterministic contracts cover discovery, auth, runtime tracing, and fail-closed fallback.

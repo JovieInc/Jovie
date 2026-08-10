@@ -2,14 +2,21 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { BlogCard } from '@/app/(marketing)/blog/components/BlogCard';
 import { getBlogPosts } from '@/lib/blog/getBlogPosts';
-import { StoryBlogCard } from '../marketing/storybook/StoryBlogCard';
+import type { ResolvedAuthor } from '@/lib/blog/presentation-contracts';
 import { BlogCategoryContent } from './BlogCategoryContent';
-import {
+import blogCategoryMeta, {
   BLOG_CATEGORY_STORY_CATEGORY,
   BLOG_CATEGORY_STORY_POST,
   BLOG_CATEGORY_STORY_RECEIPT,
 } from './BlogCategoryContent.stories';
+
+const storyAuthor = {
+  name: BLOG_CATEGORY_STORY_POST.author,
+  avatarUrl: null,
+  isVerified: false,
+} satisfies ResolvedAuthor;
 
 describe('BlogCategoryContent', () => {
   it('renders the shipped category shell around the deterministic post', () => {
@@ -18,7 +25,7 @@ describe('BlogCategoryContent', () => {
         category={BLOG_CATEGORY_STORY_CATEGORY}
         hasPosts={true}
       >
-        <StoryBlogCard post={BLOG_CATEGORY_STORY_POST} />
+        <BlogCard post={BLOG_CATEGORY_STORY_POST} author={storyAuthor} />
       </BlogCategoryContent>
     );
 
@@ -65,6 +72,8 @@ describe('BlogCategoryContent', () => {
       category: sourcePost?.category,
       excerpt: sourcePost?.excerpt,
       readingTime: sourcePost?.readingTime,
+      wordCount: sourcePost?.wordCount,
+      tags: sourcePost?.tags,
     });
   });
 
@@ -91,11 +100,28 @@ describe('BlogCategoryContent', () => {
     expect(routeSource).not.toContain('marketing-kicker mb-0');
     expect(storySource).toContain('component: BlogCategoryContent');
     expect(storySource).toContain(
+      "from '@/app/(marketing)/blog/components/BlogCard'"
+    );
+    expect(storySource).toContain('<BlogCard');
+    expect(storySource).not.toContain('StoryBlogCard');
+    expect(storySource).toContain('excludeStories: /^BLOG_CATEGORY_STORY_/');
+    expect(storySource).toContain(
       "registryId: 'web-024-blog--category--[slug]'"
     );
     expect(storySource).toContain(
       "fixture: 'content/blog/the-contact-problem.md'"
     );
+  });
+
+  it('excludes fixture exports without hiding the intended stories', () => {
+    const excludeStories = blogCategoryMeta.excludeStories;
+
+    expect(excludeStories).toEqual(/^BLOG_CATEGORY_STORY_/);
+    expect(excludeStories.test('BLOG_CATEGORY_STORY_CATEGORY')).toBe(true);
+    expect(excludeStories.test('BLOG_CATEGORY_STORY_POST')).toBe(true);
+    expect(excludeStories.test('BLOG_CATEGORY_STORY_RECEIPT')).toBe(true);
+    expect(excludeStories.test('Web024ArtistManagement')).toBe(false);
+    expect(excludeStories.test('Empty')).toBe(false);
   });
 
   it('keeps the Pen receipt on the commit that introduced the shared body', () => {

@@ -1,15 +1,10 @@
 import type { ProfileData } from '@/lib/services/profile';
-import type { BlogPostMetadata } from './getBlogPosts';
+import type {
+  BlogPostMetadata,
+  ResolvedAuthor,
+} from './presentation-contracts';
 
-export interface ResolvedAuthor {
-  name: string;
-  title?: string;
-  avatarUrl: string | null;
-  profileUrl?: string;
-  isVerified: boolean;
-  bio?: string;
-  username?: string;
-}
+export type { ResolvedAuthor } from './presentation-contracts';
 
 export function resolveAuthor(
   post: BlogPostMetadata,
