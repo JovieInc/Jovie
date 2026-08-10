@@ -25,29 +25,54 @@ export type RenderedSectionBinding =
       readonly kind: 'approved-section';
       readonly sectionId: MarketingSectionId;
       readonly componentPath: string;
+      readonly variantId?: string;
     }
   | {
       readonly kind: 'proposal';
       readonly proposalId: ProposedSectionId;
     };
 
+const approvedBinding = (
+  componentPath: string,
+  sectionId: MarketingSectionId,
+  variantId?: string
+): RenderedSectionBinding => {
+  const section = getMarketingSection(sectionId);
+  if (section.status !== 'approved') {
+    throw new Error(
+      `Route manifest cannot bind non-approved section ${sectionId}`
+    );
+  }
+  if (variantId) {
+    const variant = section.variants.find(
+      candidate => candidate.id === variantId
+    );
+    if (variant?.status !== 'active') {
+      throw new Error(
+        `Route manifest cannot bind non-active variant ${sectionId}/${variantId}`
+      );
+    }
+  }
+  return {
+    kind: 'approved-section' as const,
+    sectionId,
+    componentPath,
+    ...(variantId ? { variantId } : {}),
+  };
+};
+
 const approvedBindings = (
   componentPath: string,
   ...sectionIds: readonly MarketingSectionId[]
 ): readonly RenderedSectionBinding[] =>
-  sectionIds.map(sectionId => {
-    const section = getMarketingSection(sectionId);
-    if (section.status !== 'approved') {
-      throw new Error(
-        `Route manifest cannot bind non-approved section ${sectionId}`
-      );
-    }
-    return {
-      kind: 'approved-section' as const,
-      sectionId,
-      componentPath,
-    };
-  });
+  sectionIds.map(sectionId => approvedBinding(componentPath, sectionId));
+
+const approvedVariantBinding = (
+  componentPath: string,
+  sectionId: MarketingSectionId,
+  variantId: string
+): RenderedSectionBinding =>
+  approvedBinding(componentPath, sectionId, variantId);
 
 /** A route entry — either bound to a recipe or exempt with a sanctioned reason. */
 export interface RouteManifestEntry {
@@ -134,45 +159,60 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/new/page.tsx',
     recipeId: 'homepage',
-    renderedSections: approvedBindings(
-      'components/marketing/homepage-v2/HomepageV2Route.tsx',
-      'hero',
-      'logo-cloud',
-      'feature-split',
-      'feature-split',
-      'feature-split',
-      'spec-wall',
-      'social-proof',
-      'pricing',
-      'cta'
-    ),
+    renderedSections: [
+      ...approvedBindings(
+        'components/marketing/homepage-v2/HomepageV2Route.tsx',
+        'hero',
+        'logo-cloud',
+        'feature-split',
+        'feature-split',
+        'feature-split',
+        'spec-wall',
+        'social-proof'
+      ),
+      approvedVariantBinding(
+        'apps/web/components/marketing/homepage-v2/HomepageV2Ctas.tsx',
+        'pricing',
+        'tier-cards-recommended'
+      ),
+      ...approvedBindings(
+        'components/marketing/homepage-v2/HomepageV2Route.tsx',
+        'cta'
+      ),
+    ],
     bindingEvidence: {
       status: 'verified',
       source: 'route audit 2026-07-11',
     },
     status: 'active',
-    specVersion: '1.0.0',
+    specVersion: '1.2.0',
     url: '/new',
     aliasOf: '/',
   },
   {
     glob: '(marketing)/pricing/page.tsx',
     recipeId: 'pricing',
-    renderedSections: approvedBindings(
-      'apps/web/app/(marketing)/pricing/page.tsx',
-      'hero',
-      'pricing',
-      'social-proof',
-      'comparison',
-      'cta'
-    ),
+    renderedSections: [
+      ...approvedBindings('apps/web/app/(marketing)/pricing/page.tsx', 'hero'),
+      approvedVariantBinding(
+        'apps/web/app/(marketing)/pricing/page.tsx',
+        'pricing',
+        'tier-cards-neutral'
+      ),
+      ...approvedBindings(
+        'apps/web/app/(marketing)/pricing/page.tsx',
+        'social-proof',
+        'comparison',
+        'cta'
+      ),
+    ],
     bindingEvidence: {
       status: 'verified',
       source: 'route audit 2026-07-11',
       notes: 'FAQ recipe beat is not rendered.',
     },
     status: 'active',
-    specVersion: '1.0.0',
+    specVersion: '1.2.0',
     url: '/pricing',
   },
   {

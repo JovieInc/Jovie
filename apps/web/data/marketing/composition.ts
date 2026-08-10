@@ -567,6 +567,9 @@ function matchesVariant(
   }
   // pricing
   if (sectionId === 'pricing') {
+    if (variantId === 'tier-cards-neutral') {
+      return recipeId === 'pricing';
+    }
     if (variantId === 'decision-assistant') {
       return false; // unproven; requires humanOptIn per DX2
     }
@@ -577,7 +580,7 @@ function matchesVariant(
       return brief.targetAudience === 'artist' && recipeId === 'artist-lp';
     }
     if (variantId === 'tier-cards-recommended') {
-      return true; // default
+      return recipeId !== 'pricing';
     }
     return false;
   }

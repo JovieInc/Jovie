@@ -133,7 +133,10 @@ export const pricing: Story = {
           <section aria-label='Plans' className='system-b-pricing-section'>
             <MarketingContainer width='page'>
               <div className='system-b-pricing-plans'>
-                <MarketingPricingPlans ctaVariant='secondary' mode='expanded' />
+                <MarketingPricingPlans
+                  mode='expanded'
+                  variant='tier-cards-neutral'
+                />
               </div>
             </MarketingContainer>
           </section>

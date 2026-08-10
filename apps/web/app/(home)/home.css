@@ -5459,7 +5459,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 /* Deliberate hierarchy, no glow: the recommended tier gets a flat surface
    shift and a filled badge; everything else stays on surface-0. */
 .home-viewport .system-b-mounted-home-pricing
-  .marketing-pricing-plan-card[data-testid="marketing-pricing-plan-pro"] {
+  .marketing-pricing-plan-card[data-recommended="true"] {
   background: var(--system-b-bg-surface-1);
 }
 
@@ -5501,7 +5501,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 .home-viewport
   .system-b-mounted-home-pricing
-  .marketing-pricing-plan-card[data-testid="marketing-pricing-plan-pro"]
+  .marketing-pricing-plan-card[data-recommended="true"]
   .marketing-pricing-plan-card__badge {
   border-color: var(--system-b-primary-bg);
   background: var(--system-b-primary-bg);

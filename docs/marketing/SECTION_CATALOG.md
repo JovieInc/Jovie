@@ -1,5 +1,5 @@
 <!--
-spec-version: 1.1.0
+spec-version: 1.2.0
 doc-freshness: docs/marketing/SECTION_CATALOG.md
 -->
 # Marketing Section Catalog
@@ -113,14 +113,17 @@ attributable (B2B C4). Count-up animations banned (motion budget — show final)
 
 ### #section-pricing
 
-**Purpose:** Tier cards above fold + one recommended tier + comparison matrix +
-FAQ-as-objection-handler + dual-path close (B2B C7).
+**Purpose:** Tier cards above fold + comparison matrix + FAQ-as-objection-handler
++ dual-path close (B2B C7). The dedicated pricing route keeps tiers equal-weight;
+homepage pricing may emphasize one recommended tier.
 
 **Rationale:** B2B C7 (remarkably uniform across 5 properties). Creator R8:
 no pricing table on artist LP — one-liner + link, cost-objection in CTA string
 (`one-liner-link` variant, embedded in `monetization`).
 
-**Exemplar:** `/pricing` (`tier-cards-recommended`).
+**Exemplars:** `/pricing` (`tier-cards-neutral`), `/new`
+(`tier-cards-recommended`, Pro emphasized). These are the only active full-card
+variants; unsupported card concepts remain unproven.
 
 ### #section-comparison
 

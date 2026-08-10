@@ -287,10 +287,18 @@ export const stats: Story = {
 
 export const pricing: Story = {
   name: 'pricing',
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Canonical section.pricing story for `/pricing`: the shared renderer in its equal-weight `tier-cards-neutral` variant.',
+      },
+    },
+  },
   render: () => (
     <SectionFrame sectionId='pricing'>
       <MarketingContainer width='page' className='py-16'>
-        <MarketingPricingPlans ctaVariant='secondary' mode='expanded' />
+        <MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />
       </MarketingContainer>
     </SectionFrame>
   ),

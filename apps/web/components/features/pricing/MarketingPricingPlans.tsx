@@ -7,41 +7,47 @@ import {
   getVisibleMarketingPricingPlans,
   isMarketingPlanActive,
   type MarketingPricingPlan,
-  type MarketingPricingPlanId,
 } from '@/data/marketingPricingPlans';
 import { cn } from '@/lib/utils';
 
 type MarketingPricingMode = 'compact' | 'expanded';
-type MarketingPricingCtaVariant = 'primary' | 'secondary';
+
+export const MARKETING_PRICING_VARIANTS = [
+  'tier-cards-neutral',
+  'tier-cards-recommended',
+] as const;
+
+export type MarketingPricingVariant =
+  (typeof MARKETING_PRICING_VARIANTS)[number];
+
+const RECOMMENDED_PLAN_ID = 'pro';
 
 function MarketingPricingPlanCard({
-  ctaVariant,
-  emphasizedPlanId,
   mode,
   plan,
+  variant,
 }: Readonly<{
-  ctaVariant: MarketingPricingCtaVariant;
-  emphasizedPlanId?: MarketingPricingPlanId;
   mode: MarketingPricingMode;
   plan: MarketingPricingPlan;
+  variant: MarketingPricingVariant;
 }>) {
   const active = isMarketingPlanActive(plan.id);
-  // When a plan is emphasized, it owns the single primary CTA for the section;
-  // every sibling demotes to a quiet ghost button.
-  const resolvedVariant = emphasizedPlanId
-    ? plan.id === emphasizedPlanId
-      ? 'primary'
-      : 'ghost'
-    : ctaVariant === 'primary'
-      ? 'primary'
+  const recommended =
+    variant === 'tier-cards-recommended' && plan.id === RECOMMENDED_PLAN_ID;
+  const buttonVariant = recommended
+    ? 'primary'
+    : variant === 'tier-cards-neutral'
+      ? 'secondary'
       : 'ghost';
 
   return (
     <article
       data-testid={`marketing-pricing-plan-${plan.id}`}
       data-plan-active={active ? 'true' : 'false'}
+      data-recommended={recommended ? 'true' : 'false'}
       className={cn(
         'marketing-pricing-plan-card',
+        recommended && 'marketing-pricing-plan-card--recommended',
         mode === 'expanded' && 'marketing-pricing-plan-card--expanded'
       )}
     >
@@ -60,7 +66,12 @@ function MarketingPricingPlanCard({
         {plan.cadence ? <span>{plan.cadence}</span> : null}
       </p>
 
-      <Button variant={resolvedVariant} size='md' asChild>
+      <Button
+        variant={buttonVariant}
+        size='lg'
+        className='marketing-pricing-plan-card__cta'
+        asChild
+      >
         <Link href={getMarketingPlanHref(plan.id)} prefetch={false}>
           {getMarketingPlanCtaLabel(plan)}
         </Link>
@@ -79,20 +90,20 @@ function MarketingPricingPlanCard({
 }
 
 export function MarketingPricingPlans({
-  ctaVariant = 'primary',
-  emphasizedPlanId,
   mode = 'compact',
   className,
+  variant,
 }: Readonly<{
-  ctaVariant?: MarketingPricingCtaVariant;
-  emphasizedPlanId?: MarketingPricingPlanId;
   mode?: MarketingPricingMode;
   className?: string;
+  variant: MarketingPricingVariant;
 }>) {
   const visiblePlans = getVisibleMarketingPricingPlans();
 
   return (
     <div
+      data-section-id='pricing'
+      data-variant={variant}
       className={cn(
         'marketing-pricing-plans',
         `marketing-pricing-plans--${mode}`,
@@ -101,11 +112,10 @@ export function MarketingPricingPlans({
     >
       {visiblePlans.map(plan => (
         <MarketingPricingPlanCard
-          ctaVariant={ctaVariant}
-          emphasizedPlanId={emphasizedPlanId}
           key={plan.id}
           mode={mode}
           plan={plan}
+          variant={variant}
         />
       ))}
     </div>
