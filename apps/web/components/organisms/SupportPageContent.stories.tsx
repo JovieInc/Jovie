@@ -5,6 +5,17 @@ import {
 } from '../marketing/storybook/marketingStoryMeta';
 import { SupportPageContent } from './SupportPageContent';
 
+export const SUPPORT_STORY_RECEIPT = {
+  registryId: 'web-040-support',
+  route: '/support',
+  source: 'apps/web/components/organisms/SupportPageContent.tsx',
+  sourceExport: 'SupportPageContent',
+  storyExport: 'Web040Support',
+  sourceSha: '70cb3b51b852a25213911ffe78cc81c35a73f788',
+  proofScope: 'system-b-body-only',
+  implementation: 'exact-production-body',
+} as const;
+
 const meta = {
   title: 'Marketing/Routes/Support',
   component: SupportPageContent,
@@ -12,14 +23,11 @@ const meta = {
     ...marketingFullscreenParameters,
     docs: {
       description: {
-        component: `${MARKETING_STORY_DESCRIPTION} Exact production presentation for web-040-support. Metadata, revalidation, FAQ and breadcrumb schema construction, and both JSON-LD scripts remain route-owned. Section taxonomy and manifest evidence remain owner-stacked and are not claimed by this story.`,
+        component: `${MARKETING_STORY_DESCRIPTION} Exact System B production body for web-040-support. This story owns the shared body only; route metadata, revalidation, FAQ and breadcrumb schema construction, JSON-LD scripts, section taxonomy, and manifest evidence remain route- or owner-stacked.`,
       },
     },
     pen: {
-      registryId: 'web-040-support',
-      route: '/support',
-      source: 'apps/web/components/organisms/SupportPageContent.tsx',
-      sourceSha: '61690d2a4af920183f4a85366799ff0bafe4540b',
+      ...SUPPORT_STORY_RECEIPT,
     },
   },
   tags: ['autodocs'],
