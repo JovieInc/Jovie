@@ -11,10 +11,11 @@ name: Merge Queue Auto-Enroll
 #   pull_request      — PR label changes, ready, reopen (eligibility change)
 #   workflow_run      — CI completion (green PRs are now enrollable)
 #   push (main)       — main moved → queued PRs may conflict or get stale
-#   workflow_dispatch — manual rescue if needed
+#   workflow_dispatch — maintenance-only unless exact PR + head are supplied
 #
 # Two jobs run (not at the same time — concurrency group serializes):
-#   enroll    — classify open PRs, enroll green ones, dequeue broken ones,
+#   enroll    — classify open PRs, enroll only the event-scoped exact head,
+#               dequeue broken ones,
 #               flag conflicts for the fix agent (no pytest/Python setup;
 #               drain regression tests run in CI Structural Contract instead)
 #   rebase    — mechanically rebase blocked agent PRs onto latest main
@@ -33,6 +34,15 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Optional exact PR number to admit; omit for maintenance-only'
+        required: false
+        type: string
+      head_sha:
+        description: 'Required exact 40-character head SHA when pr_number is set'
+        required: false
+        type: string
 
 concurrency:
   group: merge-queue-drain-mutex
@@ -67,6 +77,60 @@ jobs:
           persist-credentials: false
       - name: Verify GitHub CLI
         run: gh --version
+      - name: Resolve exact admission scope
+        id: admission
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          MANUAL_PR: ${{ inputs.pr_number || '' }}
+          MANUAL_HEAD: ${{ inputs.head_sha || '' }}
+        run: |
+          pr_number=''
+          head_sha=''
+
+          case "$EVENT_NAME" in
+            pull_request)
+              pr_number="$(jq -er '.pull_request.number | tostring' "$GITHUB_EVENT_PATH")"
+              head_sha="$(jq -er '.pull_request.head.sha | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
+              ;;
+            workflow_run)
+              head_sha="$(jq -er '.workflow_run.head_sha | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
+              prs_json="$(gh pr list -R "$REPO" --state open --limit 200 --json number,headRefOid)"
+              mapfile -t matching_prs < <(jq -r --arg head "$head_sha" '
+                .[]
+                | select(((.headRefOid // "") | ascii_downcase) == $head)
+                | .number
+              ' <<<"$prs_json")
+              if [[ "${#matching_prs[@]}" -eq 1 ]]; then
+                pr_number="${matching_prs[0]}"
+              else
+                echo "No unique open PR owns workflow_run head $head_sha; maintenance-only"
+                head_sha=''
+              fi
+              ;;
+            workflow_dispatch)
+              if [[ -z "$MANUAL_PR" && -z "$MANUAL_HEAD" ]]; then
+                echo 'Untargeted manual dispatch; maintenance-only'
+              elif [[ "$MANUAL_PR" =~ ^[1-9][0-9]*$ && "${MANUAL_HEAD,,}" =~ ^[0-9a-f]{40}$ ]]; then
+                pr_number="$MANUAL_PR"
+                head_sha="${MANUAL_HEAD,,}"
+              else
+                echo '::error::Targeted manual admission requires pr_number and an exact 40-character head_sha' >&2
+                exit 2
+              fi
+              ;;
+            push)
+              echo 'Main push; maintenance-only'
+              ;;
+            *)
+              echo "::error::Unsupported admission event: $EVENT_NAME" >&2
+              exit 2
+              ;;
+          esac
+
+          echo "pr_number=$pr_number" >>"$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >>"$GITHUB_OUTPUT"
       - name: Enroll clean PRs
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -76,6 +140,11 @@ jobs:
           MERGE_QUEUE_BACKEND: ${{ vars.MERGE_QUEUE_BACKEND }}
           DRAIN_MUTATION_AUTHORIZATION: merge-queue-autoenroll
           MERGE_QUEUE_NATIVE_AUTHORIZATION: merge-queue-autoenroll
+          # New admissions are event-scoped and pinned to the triggering
+          # published head. Main pushes and untargeted manual runs retain
+          # global dequeue/reconciliation authority but cannot admit a PR.
+          DRAIN_ADMISSION_PR: ${{ steps.admission.outputs.pr_number }}
+          DRAIN_ADMISSION_HEAD: ${{ steps.admission.outputs.head_sha }}
           # Queue-pressure deferrals are temporary. Only the existing push on
           # main controller run may reconcile an exact green auto-merge head;
           # PR/CI events continue to honor queue-deferred as an explicit hold.

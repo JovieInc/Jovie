@@ -183,6 +183,38 @@ describe('merge queue backend resolution', () => {
 });
 
 describe('queue workflow mutation safety', () => {
+  it('scopes each new admission to the triggering PR and exact published head', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const scope = workflowStep(workflow, 'Resolve exact admission scope');
+    const enroll = workflowStep(workflow, 'Enroll clean PRs');
+    const drain = readRepoFile('scripts/drain-pr-queue.sh');
+
+    expect(scope).toContain('case "$EVENT_NAME" in');
+    expect(scope).toContain('pull_request)');
+    expect(scope).toContain('workflow_run)');
+    expect(scope).toContain('workflow_dispatch)');
+    expect(scope).toContain('push)');
+    expect(scope).toContain('.pull_request.head.sha');
+    expect(scope).toContain('.workflow_run.head_sha');
+    expect(scope).toContain('--json number,headRefOid');
+    expect(scope).toContain('No unique open PR owns workflow_run head');
+    expect(scope).toContain('Untargeted manual dispatch; maintenance-only');
+    expect(scope).toContain('Main push; maintenance-only');
+    expect(enroll).toContain(
+      'DRAIN_ADMISSION_PR: ${{ steps.admission.outputs.pr_number }}'
+    );
+    expect(enroll).toContain(
+      'DRAIN_ADMISSION_HEAD: ${{ steps.admission.outputs.head_sha }}'
+    );
+    expect(drain).toContain(
+      'admission scope: maintenance-only (no new enrollment)'
+    );
+    expect(drain).toContain('"$expected_head" != "$DRAIN_ADMISSION_HEAD"');
+    expect(drain).toContain('select((.n | tostring) == $admission_pr)');
+  });
+
   it('revalidates the live head and hard gates before approval, then delegates enrollment', () => {
     const workflow = readRepoFile('.github/workflows/agent-pipeline.yml');
     const approval = workflowStep(workflow, 'Auto-approve PR');

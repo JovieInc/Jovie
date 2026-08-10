@@ -19,6 +19,8 @@
 #   DRAIN_MUTATION_AUTHORIZATION  required for every live mutation run
 #   DRAIN_EXPECT_GH  optional exact gh path assertion used by test fixtures
 #   DRAIN_MAX_SECONDS  hard wall-clock budget between GitHub calls (default 900)
+#   DRAIN_ADMISSION_PR / DRAIN_ADMISSION_HEAD  optional exact new-admission
+#     scope; when both are empty this run is maintenance-only
 #   MERGE_QUEUE_BACKEND  native (default); test-label-fixture is test-only
 set -euo pipefail
 
@@ -67,6 +69,16 @@ DRAIN_STARTED_AT="$SECONDS"
 # reconciliation before taking its normal snapshot. It never runs on a PR
 # event or a schedule, and it still requires the canonical source gates.
 DRAIN_RECONCILE_QUEUE_DEFERRED="${DRAIN_RECONCILE_QUEUE_DEFERRED:-0}"
+DRAIN_ADMISSION_PR="${DRAIN_ADMISSION_PR:-}"
+DRAIN_ADMISSION_HEAD="${DRAIN_ADMISSION_HEAD:-}"
+if [[ -z "$DRAIN_ADMISSION_PR" && -z "$DRAIN_ADMISSION_HEAD" ]]; then
+  : # Maintenance-only: global dequeue/reconciliation remains authorized.
+elif [[ "$DRAIN_ADMISSION_PR" =~ ^[1-9][0-9]*$ && "${DRAIN_ADMISSION_HEAD,,}" =~ ^[0-9a-f]{40}$ ]]; then
+  DRAIN_ADMISSION_HEAD="${DRAIN_ADMISSION_HEAD,,}"
+else
+  echo "::error::Refusing malformed admission scope; expected exact PR number + 40-character head SHA" >&2
+  exit 2
+fi
 
 # Keep one scheduled tick bounded. A single in-flight GitHub call may finish
 # after the deadline, but no subsequent per-PR operation is started.
@@ -223,9 +235,8 @@ reconcile_deferred_auto_merge_after_main_push() {
 # authoritative PR state immediately before mutation so a draft conversion or
 # a queue-deferred hold cannot be overwritten by this controller.
 enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
-  local n="$1" current head_oid json_fields
-  json_fields="state,isDraft,mergeable,labels"
-  [[ "$MERGE_QUEUE_BACKEND" == "native" ]] && json_fields+=",headRefOid"
+  local n="$1" current head_oid expected_head json_fields
+  json_fields="state,isDraft,mergeable,labels,headRefOid"
   if ! current="$(gh_retry pr view "$n" -R "$REPO" \
     --json "$json_fields" 2>/dev/null)"; then
     echo "    !! could not refresh #$n eligibility; refusing enrollment" >&2
@@ -244,6 +255,16 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
     echo "    ⏸ eligibility changed; refusing enrollment for #$n"
     return 2
   fi
+  head_oid="$(jq -r '.headRefOid // empty' <<<"$current")"
+  if [[ ! "$head_oid" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    echo "    !! missing exact head SHA for enrollment of #$n" >&2
+    return 1
+  fi
+  expected_head="$(printf '%s' "$head_oid" | tr '[:upper:]' '[:lower:]')"
+  if [[ "$n" != "$DRAIN_ADMISSION_PR" || "$expected_head" != "$DRAIN_ADMISSION_HEAD" ]]; then
+    echo "    ⏸ event admission scope no longer matches #$n at $expected_head; refusing enrollment"
+    return 2
+  fi
   if [[ "$DRY_RUN" == "1" ]]; then
     if [[ "$MERGE_QUEUE_BACKEND" == "test-label-fixture" ]]; then
       echo "    [dry-run] would +merge-queue on #$n"
@@ -254,12 +275,6 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
   fi
   # native-queue-transport:enrollment:start
   if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
-    head_oid="$(jq -r '.headRefOid // empty' <<<"$current")"
-    if [[ ! "$head_oid" =~ ^[0-9a-fA-F]{40}$ ]]; then
-      echo "    !! missing exact head SHA for native enrollment of #$n" >&2
-      return 1
-    fi
-    expected_head="$(printf '%s' "$head_oid" | tr '[:upper:]' '[:lower:]')"
     if ! node scripts/merge-queue-backend.mjs enroll "$n" "$head_oid" >/dev/null; then
       echo "    !! native enrollment/postcondition failed for #$n" >&2
       return 1
@@ -573,6 +588,11 @@ QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select(.q == true)] | length')
 ENROLL_SLOTS=$((MAX_QUEUE_DEPTH - QUEUED_NOW))
 [[ "$ENROLL_SLOTS" -lt 0 ]] && ENROLL_SLOTS=0
 echo "  queue depth: $QUEUED_NOW/$MAX_QUEUE_DEPTH ($ENROLL_SLOTS slots)"
+if [[ -z "$DRAIN_ADMISSION_PR" ]]; then
+  echo "  admission scope: maintenance-only (no new enrollment)"
+else
+  echo "  admission scope: #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD"
+fi
 ENROLLED_THIS_RUN=0
 while read -r pr; do
   stop_if_budget_exhausted && break
@@ -594,7 +614,8 @@ while read -r pr; do
     echo "::error::Failed to prove enrollment for #$n" >&2
     exit 1
   fi
-done < <(echo "$SNAP" | jq -c '.[]
+done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" '.[]
+  | select((.n | tostring) == $admission_pr)
   | select(.draft|not)
   | select(.m=="MERGEABLE")
   | select(.fail|length==0)
