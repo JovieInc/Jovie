@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { ArrowRight, CheckCircle2, Clock3, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
@@ -96,11 +97,6 @@ const OUTCOME_COPY: Record<WaitlistOutcomeViewProps['outcome'], OutcomeCopy> = {
   },
 };
 
-const PRIMARY_CTA_CLASS =
-  'inline-flex h-10 items-center justify-center gap-2 rounded-full bg-white px-4 text-app font-semibold text-black transition-colors hover:bg-white/90 focus-ring-themed dark:bg-white dark:text-black';
-const SECONDARY_BTN_CLASS =
-  'inline-flex h-10 items-center justify-center gap-2 rounded-full border border-white/[0.12] px-4 text-app font-semibold text-white/86 transition-colors hover:bg-white/[0.04] focus-ring-themed';
-
 function NextSteps({ email }: { readonly email?: string | null }) {
   const knownEmail = email?.trim() || null;
   const contactLine = knownEmail
@@ -138,10 +134,12 @@ function PrimaryCtaLink({
   readonly testId?: string;
 }) {
   return (
-    <Link href={href} className={PRIMARY_CTA_CLASS} data-testid={testId}>
-      {label}
-      <ArrowRight className='h-3.5 w-3.5' aria-hidden />
-    </Link>
+    <Button asChild variant='primary' size='lg'>
+      <Link href={href} data-testid={testId}>
+        {label}
+        <ArrowRight className='h-3.5 w-3.5' aria-hidden />
+      </Link>
+    </Button>
   );
 }
 
@@ -186,28 +184,25 @@ export function WaitlistOutcomeView({
           />
         ) : null}
         {canRetry ? (
-          <button
-            type='button'
-            onClick={onRetry}
-            className={SECONDARY_BTN_CLASS}
-          >
+          <Button type='button' onClick={onRetry} variant='secondary' size='lg'>
             Try Again
-          </button>
+          </Button>
         ) : null}
         {primaryHref || copy.showNextSteps ? null : (
-          <button
+          <Button
             type='button'
             onClick={() => {
               void signOut({ redirectUrl: APP_ROUTES.HOME });
             }}
+            variant='secondary'
+            size='lg'
             className={cn(
-              SECONDARY_BTN_CLASS,
               'text-white/74 hover:text-white',
               canRetry && 'sm:ml-auto'
             )}
           >
             Sign Out
-          </button>
+          </Button>
         )}
       </div>
     </section>
