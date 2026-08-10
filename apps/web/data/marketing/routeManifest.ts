@@ -393,7 +393,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     glob: '(marketing)/about/page.tsx',
     recipeId: 'seo',
     renderedSections: approvedBindings(
-      'apps/web/app/(marketing)/about/page.tsx',
+      'apps/web/components/organisms/AboutPageContent.tsx',
       'hero',
       'content-prose',
       'content-prose',
