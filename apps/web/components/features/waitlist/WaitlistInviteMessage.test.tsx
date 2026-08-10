@@ -55,7 +55,11 @@ describe('WaitlistInviteMessage', () => {
     expect(routeSource).not.toContain('function InviteMessage(');
 
     expect(storySource).toContain('component: WaitlistInviteMessage');
-    expect(storySource).toContain("registryId: 'web-213-waitlist-invite'");
+    expect(storyMeta.parameters.pen.registryId).toBe(
+      'web-213-waitlist--invite'
+    );
+    expect(storySource).toContain("registryId: 'web-213-waitlist--invite'");
+    expect(storySource).not.toContain("registryId: 'web-213-waitlist-invite'");
     expect(storySource).toContain("route: '/waitlist/invite'");
     expect(storySource).toContain("sourceExport: 'WaitlistInviteMessage'");
     expect(storySource).toContain("storyExport: 'Web213MissingToken'");

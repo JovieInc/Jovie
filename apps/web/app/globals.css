@@ -388,10 +388,16 @@ body:has(.hud-kiosk-viewport) {
 }
 
 [data-ui="cta-reveal"] .cta-reveal-support {
-  min-height: 20px;
+  min-height: 40px;
   transition:
     opacity var(--motion-reveal-duration-fast) var(--motion-reveal-ease),
     transform var(--motion-reveal-duration-fast) var(--motion-reveal-ease);
+}
+
+@media (min-width: 640px) {
+  [data-ui="cta-reveal"] .cta-reveal-support {
+    min-height: 20px;
+  }
 }
 
 [data-ui="cta-reveal"] .cta-reveal-support:empty {

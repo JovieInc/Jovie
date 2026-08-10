@@ -9,13 +9,13 @@ const meta = {
     docs: {
       description: {
         component:
-          'Exact missing-token presentation for web-213-waitlist-invite. The /waitlist/invite server route keeps token parsing, authentication, rate limiting, redemption, and redirects; this deterministic story supplies only copy already shipped by the route.',
+          'Exact missing-token presentation for web-213-waitlist--invite. The /waitlist/invite server route keeps token parsing, authentication, rate limiting, redemption, and redirects; this deterministic story supplies only copy already shipped by the route.',
       },
     },
     backgrounds: { default: 'dark' },
     viewport: { defaultViewport: 'desktop' },
     pen: {
-      registryId: 'web-213-waitlist-invite',
+      registryId: 'web-213-waitlist--invite',
       route: '/waitlist/invite',
       source: 'apps/web/components/features/waitlist/WaitlistInviteMessage.tsx',
       sourceExport: 'WaitlistInviteMessage',
