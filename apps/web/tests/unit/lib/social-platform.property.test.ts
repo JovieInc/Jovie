@@ -163,6 +163,9 @@ describe('getSocialDisplayName', () => {
 
   it('falls back to the platform id for unknown platforms', () => {
     expect(getSocialDisplayName('myspace')).toBe('myspace');
+    expect(getSocialDisplayName('__proto__')).toBe('__proto__');
+    expect(getSocialDisplayName('constructor')).toBe('constructor');
+    expect(getSocialDisplayName('toString')).toBe('tostring');
   });
 
   it('never returns an empty string for arbitrary input', () => {

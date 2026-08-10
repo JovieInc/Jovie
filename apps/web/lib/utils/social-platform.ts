@@ -256,7 +256,9 @@ const PLATFORM_DISPLAY_NAMES: Record<string, string> = {
  */
 export function getSocialDisplayName(platform: string): string {
   const id = platform.trim().toLowerCase();
-  return PLATFORM_DISPLAY_NAMES[id] ?? (id || 'Link');
+  return Object.hasOwn(PLATFORM_DISPLAY_NAMES, id)
+    ? PLATFORM_DISPLAY_NAMES[id]
+    : id || 'Link';
 }
 
 /**
