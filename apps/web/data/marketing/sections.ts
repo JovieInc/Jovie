@@ -1402,31 +1402,17 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     optionalInputs: ['eyebrow', 'title', 'lede'],
     variants: [
       {
-        id: 'dense-compact-grid',
+        id: 'visual-five',
         layout: 'contained',
-        media: 'none',
-        columns: 4,
-        density: 'compact',
-        alignment: 'centered',
+        media: 'screenshot',
+        alignment: 'left',
         chooseWhen:
-          'default for spec-wall; tiles.length≥8 AND each tile is a short label + screenshot/icon (Jovie delta: "Details That Matter")',
-        exemplar: { route: '/artist-profiles', section: 'specWall' },
-        status: 'active',
-      },
-      {
-        id: 'bento',
-        layout: 'contained',
-        media: 'none',
-        columns: 4,
-        density: 'large',
-        alignment: 'centered',
-        chooseWhen:
-          'tiles.length≥6 AND emphasis=high (bento grid, post-2023 pattern — prior-art §3, optional fold-into-feature-grid)',
-        exemplar: { route: '/new', section: 'power-grid' },
+          'tiles.length=5 AND every tile carries production visual media',
+        exemplar: { route: '/artist-notifications', section: 'specWall' },
         status: 'active',
       },
     ],
-    defaultVariant: 'dense-compact-grid',
+    defaultVariant: 'visual-five',
     proofClass: 'none',
     audienceLegality: [{ legal: true }],
     illegalAfter: ['hero', 'cta'],
@@ -1446,22 +1432,25 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       },
     ],
     responsiveContract:
-      'columns:4 → 4→2→1 at md/sm; columns:3 → 3→2→1; bento: fixed cell sizes with grid-area, collapse to 2-col at md, 1-col at sm',
+      'visual-five: one column by default, two columns at md, then the five production cards occupy their registered 12-column/4-row spans at xl',
     accessibility: {
       keyboard:
-        'tiles are <li> in <ul>; if interactive, Tab follows visual order',
-      contrast: 'tile title/body meet AA on tokens.surface-1',
-      touchTarget: 'no interactive targets unless tile is a link',
-      reducedMotion: 'no motion',
+        'five static <article> cards add no tab stops; document order matches reading order',
+      contrast:
+        'tile title/body and screenshot alternative labels meet AA on canonical surfaces',
+      touchTarget: 'no interactive targets in the registered visual-five body',
+      reducedMotion:
+        'production screenshots are static; no motion is introduced',
     },
     component: 'components/marketing/artist-profile/ArtistProfileSpecWall',
     failureModes: [
-      'Bespoke tile layout (one repeated template per section type — B2B anti-pattern #8)',
-      'Tiles without screenshots (Jovie delta: spec-wall tiles carry a screenshot or icon; feature-grid is reserved for the four-row artist outcome ledger)',
+      'Using the legacy text-only truth ledger as the registered spec-wall body',
+      'Rendering a visual tile without owned media and meaningful alternative text',
+      'Substituting a proxy grid instead of ArtistProfileSpecWall',
     ],
     neverUse: [
       'Immediately after hero or cta (illegalAfter)',
-      'Without a screenshot or icon per tile (use feature-grid instead)',
+      'With a count other than five or any tile missing production visual media',
     ],
     status: 'approved',
   },

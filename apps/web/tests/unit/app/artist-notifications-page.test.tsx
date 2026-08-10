@@ -1,9 +1,11 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import ArtistNotificationsPage from '@/app/(marketing)/artist-notifications/page';
+import { ARTIST_PROFILE_SPEC_WALL_VARIANT } from '@/components/marketing/artist-profile/ArtistProfileSpecWall';
 import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
 import { ARTIST_NOTIFICATIONS_SPEC_TILES } from '@/data/artistNotificationsFeatures';
 import { ARTIST_NOTIFICATIONS_SECTION_ORDER } from '@/data/artistNotificationsPageOrder';
+import { getMarketingSection } from '@/data/marketing';
 
 function expectArtistNotificationsSectionOrder() {
   const sectionTestIds = ARTIST_NOTIFICATIONS_SECTION_ORDER.map(
@@ -106,9 +108,35 @@ describe('ArtistNotificationsPage', () => {
     const specWallSection = within(
       screen.getByTestId('artist-notifications-section-spec-wall')
     );
+    expect(ARTIST_NOTIFICATIONS_SPEC_TILES).toHaveLength(5);
+    expect(getMarketingSection('spec-wall').component).toBe(
+      'components/marketing/artist-profile/ArtistProfileSpecWall'
+    );
+    expect(
+      specWallSection.getByTestId('artist-profile-spec-wall-grid')
+    ).toHaveAttribute(
+      'data-spec-wall-variant',
+      ARTIST_PROFILE_SPEC_WALL_VARIANT
+    );
+    const renderedSpecTiles = specWallSection.getAllByTestId(
+      'artist-profile-spec-tile'
+    );
+    expect(renderedSpecTiles).toHaveLength(5);
+    for (const tile of renderedSpecTiles) {
+      expect(tile).toHaveAttribute('data-spec-wall-tile-media', 'screenshot');
+    }
     for (const tile of ARTIST_NOTIFICATIONS_SPEC_TILES) {
+      expect(tile.visual).toBe('screenshot');
+      if (tile.visual !== 'screenshot') {
+        throw new Error(`expected screenshot tile: ${tile.id}`);
+      }
+      expect(tile.screenshotSrc).toBeTruthy();
+      expect(tile.screenshotAlt).toBeTruthy();
       expect(
         specWallSection.getByRole('heading', { name: tile.title })
+      ).toBeInTheDocument();
+      expect(
+        specWallSection.getByAltText(tile.screenshotAlt)
       ).toBeInTheDocument();
     }
     expect(

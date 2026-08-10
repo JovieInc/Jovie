@@ -30,7 +30,10 @@ import {
   ArtistProfileReleaseCycleGallery,
   ArtistProfileSocialProof,
 } from '@/components/marketing/artist-profile/ArtistProfileSocialProof';
-import { ArtistProfileSpecWall } from '@/components/marketing/artist-profile/ArtistProfileSpecWall';
+import {
+  ARTIST_PROFILE_SPEC_WALL_VARIANT,
+  ArtistProfileSpecWall,
+} from '@/components/marketing/artist-profile/ArtistProfileSpecWall';
 import { CaptureActionPill } from '@/components/marketing/artist-profile/captureShared';
 import { HomepageV2FinalCta } from '@/components/marketing/homepage-v2/HomepageV2Ctas';
 import { MarketingContentProse } from '@/components/marketing/MarketingContentProse';
@@ -40,8 +43,9 @@ import { MarketingSurfaceCard } from '@/components/marketing/MarketingSurfaceCar
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_ROUTES } from '@/constants/routes';
 import { getComparison } from '@/content/comparisons';
+import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
+import { ARTIST_NOTIFICATIONS_SPEC_TILES } from '@/data/artistNotificationsFeatures';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
-import { ARTIST_PROFILE_TRUTH_TILES } from '@/data/artistProfileFeatures';
 import {
   getMarketingSection,
   MARKETING_SECTION_IDS,
@@ -382,10 +386,13 @@ export const cta: Story = {
 export const specWall: Story = {
   name: 'spec-wall',
   render: () => (
-    <SectionFrame sectionId='spec-wall'>
+    <SectionFrame
+      sectionId='spec-wall'
+      variantId={ARTIST_PROFILE_SPEC_WALL_VARIANT}
+    >
       <ArtistProfileSpecWall
-        specWall={ARTIST_PROFILE_COPY.specWall}
-        truthTiles={ARTIST_PROFILE_TRUTH_TILES}
+        specWall={ARTIST_NOTIFICATIONS_COPY.specWall}
+        tiles={ARTIST_NOTIFICATIONS_SPEC_TILES}
       />
     </SectionFrame>
   ),
