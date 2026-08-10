@@ -102,7 +102,7 @@ export type VariantAlignment = 'centered' | 'left';
  * A variant is a typed tuple over orthogonal axes (prior-art §4 recommendation),
  * NOT an arbitrary name. The variant id is DERIVED mechanically from the tuple
  * (kebab): `{layout}[-{media}[-{mediaPosition}]][-{columns}{density?}`.
- * Examples: `hero/centered-phone`, `feature-grid/ledger-four`, `feature-split/screenshot-right`.
+ * Examples: `hero/centered-phone`, `feature-grid/ledger-four`, `feature-split/phone-right`.
  * No surveyed system types its variants; this is the Jovie delta that prevents
  * the shadcn/Relume variant-explosion failure mode (245 heroes, 311 features).
  */
@@ -246,7 +246,7 @@ export interface MarketingSection {
     readonly reducedMotion: string;
   };
   /** Reference to the shipped component path (E6/DX8 reconciliation). */
-  readonly component: string; // e.g. 'components/marketing/artist-profile/ArtistProfileHeroAdaptiveIntro'
+  readonly component: string; // e.g. 'components/marketing/artist-profile/ArtistProfileAdaptiveSection'
   /** Failure modes specific to this section. */
   readonly failureModes: readonly string[];
   /**
@@ -701,15 +701,24 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     optionalInputs: ['eyebrow', 'cta', 'bullets'],
     variants: [
       {
+        id: 'phone-right',
+        layout: 'split',
+        media: 'phone',
+        mediaPosition: 'right',
+        alignment: 'left',
+        chooseWhen:
+          'recipe=artist-lp AND occurrence=1 (adaptive profile mode switcher)',
+        exemplar: { route: '/artist-profiles', section: 'adaptive' },
+        status: 'active',
+      },
+      {
         id: 'screenshot-right',
         layout: 'split',
         media: 'screenshot',
         mediaPosition: 'right',
         alignment: 'left',
-        chooseWhen:
-          'default for feature-split; product-screenshot asset available',
-        exemplar: { route: '/artist-profiles', section: 'adaptive' },
-        status: 'active',
+        chooseWhen: 'product-screenshot asset available',
+        status: 'unproven',
       },
       {
         id: 'bordered-screenshot-left',
@@ -722,15 +731,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         status: 'active',
       },
       {
-        id: 'phone-right',
-        layout: 'split',
-        media: 'phone',
-        mediaPosition: 'right',
-        alignment: 'left',
-        chooseWhen: 'audience=artist AND media is a phone-framed profile',
-        status: 'unproven',
-      },
-      {
         id: 'video-background',
         layout: 'full-bleed',
         media: 'video',
@@ -741,7 +741,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         status: 'unproven',
       },
     ],
-    defaultVariant: 'screenshot-right',
+    defaultVariant: 'phone-right',
     proofClass: 'none',
     audienceLegality: [{ legal: true }],
     illegalAfter: [],
@@ -773,18 +773,21 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       },
     ],
     responsiveContract:
-      'split: stack media-below at md (≤768px); full-bleed: video hidden at sm, poster image fallback',
+      'phone-right: copy/tablist and phone form two columns at lg, then stack with the phone below the copy below lg; full-bleed video requires a static poster fallback',
     accessibility: {
-      keyboard: 'if CTA present, real <a>/<button> with focus ring',
-      contrast: 'text over media meets AA; if not, add tokens.surface-1 scrim',
-      touchTarget: 'CTA ≥44×44 at sm',
-      reducedMotion: 'video motion gated; static poster fallback required',
+      keyboard:
+        'mode controls use one labelled tablist with arrow-key semantics and one active tabpanel',
+      contrast: 'copy, tabs, and phone content meet AA on named surfaces',
+      touchTarget: 'mode tabs are ≥44px tall at narrow widths',
+      reducedMotion:
+        'active-tab and phone transitions become zero-duration; content remains available',
     },
-    component: 'components/marketing/artist-profile/ArtistProfileAdaptiveIntro',
+    component:
+      'components/marketing/artist-profile/ArtistProfileAdaptiveSection',
     failureModes: [
-      'Bespoke layout per section (one repeated template per section type is the invariant — B2B anti-pattern #8)',
-      'Media without alt/aria (a11y failure)',
-      'Two different primary CTAs across sibling feature-splits (one repeated primary label — B2B C6)',
+      'Wrapping the adaptive body in an unrelated hero or trust section',
+      'Rendering a second mode switcher or tablist in the same section story',
+      'Claiming a screenshot variant without a registered shipped component body',
     ],
     neverUse: [
       'As a problem-agitation section for audience=artist (creator R9: no problem beat in artist arc)',
@@ -1399,31 +1402,17 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     optionalInputs: ['eyebrow', 'title', 'lede'],
     variants: [
       {
-        id: 'dense-compact-grid',
+        id: 'visual-five',
         layout: 'contained',
-        media: 'none',
-        columns: 4,
-        density: 'compact',
-        alignment: 'centered',
+        media: 'screenshot',
+        alignment: 'left',
         chooseWhen:
-          'default for spec-wall; tiles.length≥8 AND each tile is a short label + screenshot/icon (Jovie delta: "Details That Matter")',
-        exemplar: { route: '/artist-profiles', section: 'specWall' },
-        status: 'active',
-      },
-      {
-        id: 'bento',
-        layout: 'contained',
-        media: 'none',
-        columns: 4,
-        density: 'large',
-        alignment: 'centered',
-        chooseWhen:
-          'tiles.length≥6 AND emphasis=high (bento grid, post-2023 pattern — prior-art §3, optional fold-into-feature-grid)',
-        exemplar: { route: '/new', section: 'power-grid' },
+          'tiles.length=5 AND every tile carries production visual media',
+        exemplar: { route: '/artist-notifications', section: 'specWall' },
         status: 'active',
       },
     ],
-    defaultVariant: 'dense-compact-grid',
+    defaultVariant: 'visual-five',
     proofClass: 'none',
     audienceLegality: [{ legal: true }],
     illegalAfter: ['hero', 'cta'],
@@ -1443,22 +1432,25 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       },
     ],
     responsiveContract:
-      'columns:4 → 4→2→1 at md/sm; columns:3 → 3→2→1; bento: fixed cell sizes with grid-area, collapse to 2-col at md, 1-col at sm',
+      'visual-five: one column by default, two columns at md, then the five production cards occupy their registered 12-column/4-row spans at xl',
     accessibility: {
       keyboard:
-        'tiles are <li> in <ul>; if interactive, Tab follows visual order',
-      contrast: 'tile title/body meet AA on tokens.surface-1',
-      touchTarget: 'no interactive targets unless tile is a link',
-      reducedMotion: 'no motion',
+        'five static <article> cards add no tab stops; document order matches reading order',
+      contrast:
+        'tile title/body and screenshot alternative labels meet AA on canonical surfaces',
+      touchTarget: 'no interactive targets in the registered visual-five body',
+      reducedMotion:
+        'production screenshots are static; no motion is introduced',
     },
     component: 'components/marketing/artist-profile/ArtistProfileSpecWall',
     failureModes: [
-      'Bespoke tile layout (one repeated template per section type — B2B anti-pattern #8)',
-      'Tiles without screenshots (Jovie delta: spec-wall tiles carry a screenshot or icon; feature-grid is reserved for the four-row artist outcome ledger)',
+      'Using the legacy text-only truth ledger as the registered spec-wall body',
+      'Rendering a visual tile without owned media and meaningful alternative text',
+      'Substituting a proxy grid instead of ArtistProfileSpecWall',
     ],
     neverUse: [
       'Immediately after hero or cta (illegalAfter)',
-      'Without a screenshot or icon per tile (use feature-grid instead)',
+      'With a count other than five or any tile missing production visual media',
     ],
     status: 'approved',
   },

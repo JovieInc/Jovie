@@ -416,7 +416,7 @@ function selectVariant(
  * occurrence is the 1-based index of this section id within the composition
  * (e.g. the 2nd feature-split in artist-lp has occurrence=2). Used to
  * disambiguate repeated section ids (A2 fix): 1st feature-split = adaptive
- * (screenshot-right), 2nd = reactivation (bordered-screenshot-left per
+ * (phone-right), 2nd = reactivation (bordered-screenshot-left per
  * shipped exemplar).
  */
 function matchesVariant(
@@ -484,7 +484,7 @@ function matchesVariant(
   }
   // feature-split — A2 fix: occurrence index disambiguates repeated instances.
   //   artist-lp has two feature-split instances: occurrence=1 = adaptive beat
-  //   → screenshot-right; occurrence=2 = reactivation beat → bordered-screenshot-left
+  //   → phone-right; occurrence=2 = reactivation beat → bordered-screenshot-left
   //   (per shipped exemplar). The occurrence index is deterministic and matches
   //   the shipped render order (codebase-baseline §2.4: adaptive then reactivation).
   if (sectionId === 'feature-split') {
@@ -492,11 +492,7 @@ function matchesVariant(
       return recipeId === 'launch' && brief.availableAssets.videoAsset;
     }
     if (variantId === 'phone-right') {
-      return (
-        brief.targetAudience === 'artist' &&
-        brief.availableAssets.phoneProfileAsset &&
-        occurrence === 1 // adaptive instance uses phone-right when phone asset; reactivation uses bordered-screenshot-left
-      );
+      return recipeId === 'artist-lp' && occurrence === 1;
     }
     if (variantId === 'bordered-screenshot-left') {
       // reactivation instance (2nd feature-split in artist-lp) OR launch comparison-adjacent
@@ -508,8 +504,11 @@ function matchesVariant(
       );
     }
     if (variantId === 'screenshot-right') {
-      // adaptive instance (1st feature-split in artist-lp) OR homepage/feature default
-      return occurrence === 1 && brief.availableAssets.productScreenshots;
+      return (
+        recipeId !== 'artist-lp' &&
+        occurrence === 1 &&
+        brief.availableAssets.productScreenshots
+      );
     }
     return false;
   }
@@ -625,13 +624,7 @@ function matchesVariant(
   }
   // spec-wall
   if (sectionId === 'spec-wall') {
-    if (variantId === 'bento') {
-      return false; // chosen at render time based on tiles.length and emphasis
-    }
-    if (variantId === 'dense-compact-grid') {
-      return true; // default
-    }
-    return false;
+    return variantId === 'visual-five';
   }
   // capture
   if (sectionId === 'capture') {
