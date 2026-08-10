@@ -28,17 +28,14 @@ interface MotionState {
   readonly boxShadow: string;
 }
 
-async function openFaqStory(
-  page: Page,
-  reducedMotion: 'reduce' | 'no-preference' = 'reduce'
-) {
+async function openFaqStory(page: Page) {
   await page.addInitScript(() => {
     // The isolated Storybook document starts shorter than the viewport. Keep
     // the scrollbar gutter stable so opening a semantic disclosure cannot
     // make the outer test canvas recenter or resize unrelated content.
     document.documentElement.style.scrollbarGutter = 'stable';
   });
-  await page.emulateMedia({ reducedMotion });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`/iframe.html?id=${FAQ_STORY_ID}&viewMode=story`, {
     waitUntil: 'networkidle',
   });
@@ -295,29 +292,6 @@ test.describe('canonical marketing FAQ disclosure geometry', () => {
         () => document.documentElement.scrollWidth - window.innerWidth
       );
       expect(horizontalOverflow).toBeLessThanOrEqual(0);
-    });
-
-    test(`${viewport.label} preserves normal-motion keyboard focus without transforms`, async ({
-      page,
-    }) => {
-      await page.setViewportSize(viewport);
-      const section = await openFaqStory(page, 'no-preference');
-      const firstTrigger = section.locator('.faq-accordion__trigger').first();
-
-      await page.keyboard.press('Tab');
-      await expect(firstTrigger).toBeFocused();
-      await page.waitForTimeout(200);
-
-      const focusedMotion = await readMotionState(firstTrigger);
-      expect(focusedMotion.transitionProperty).toContain('box-shadow');
-      expect(focusedMotion.transitionProperty).toContain('border-color');
-      expect(focusedMotion.transitionDuration).toContain('0.15s');
-      expect(focusedMotion.boxShadow).not.toBe('none');
-      expectNoTransform(focusedMotion);
-
-      await page.keyboard.press('Enter');
-      await expect(firstTrigger).toHaveAttribute('aria-expanded', 'true');
-      expectNoTransform(await readMotionState(firstTrigger));
     });
   }
 });

@@ -17,6 +17,15 @@ interface FaqLayout {
   readonly followingRow: DocumentBox;
 }
 
+interface MotionState {
+  readonly transitionDuration: string;
+  readonly transitionProperty: string;
+  readonly transform: string;
+  readonly translate: string;
+  readonly scale: string;
+  readonly boxShadow: string;
+}
+
 const ROUTES = [
   { label: 'about', path: '/about' },
   { label: 'support', path: '/support' },
@@ -107,6 +116,26 @@ async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   expect(widths.scroll).toBe(widths.client);
 }
 
+async function readMotionState(locator: Locator): Promise<MotionState> {
+  return locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      transitionDuration: style.transitionDuration,
+      transitionProperty: style.transitionProperty,
+      transform: style.transform,
+      translate: style.translate,
+      scale: style.scale,
+      boxShadow: style.boxShadow,
+    };
+  });
+}
+
+function expectNoTransform(state: MotionState): void {
+  expect(state.transform).toBe('none');
+  expect(state.translate).toBe('none');
+  expect(state.scale).toBe('none');
+}
+
 test.describe('public FAQ width invariance', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -178,5 +207,36 @@ test.describe('public FAQ width invariance', () => {
         await expectNoHorizontalOverflow(page);
       });
     }
+  }
+
+  for (const viewport of VIEWPORTS) {
+    test(`about ${viewport.label} preserves normal-motion keyboard focus without transforms`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await page.goto('/about', { waitUntil: 'networkidle' });
+
+      const section = page.locator('[data-pen-contract="pAAhw"]');
+      const triggers = section.locator('.faq-accordion__trigger');
+      await expect(section).toBeVisible();
+      await triggers.first().scrollIntoViewIfNeeded();
+      await triggers.first().focus();
+      await page.keyboard.press('ArrowDown');
+      await expect(triggers.nth(1)).toBeFocused();
+      await page.waitForTimeout(200);
+
+      const focusedMotion = await readMotionState(triggers.nth(1));
+      expect(focusedMotion.transitionProperty).toContain('box-shadow');
+      expect(focusedMotion.transitionProperty).toContain('border-color');
+      expect(focusedMotion.transitionDuration).toContain('0.15s');
+      expect(focusedMotion.boxShadow).not.toBe('none');
+      expectNoTransform(focusedMotion);
+
+      await page.keyboard.press('Enter');
+      await expect(triggers.nth(1)).toHaveAttribute('aria-expanded', 'true');
+      expectNoTransform(await readMotionState(triggers.nth(1)));
+      await expectNoHorizontalOverflow(page);
+    });
   }
 });
