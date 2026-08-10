@@ -35,9 +35,9 @@ export const LOGO_BAR_VARIANTS: readonly SectionVariant[] = [
     id: 'home-trust-inline',
     category: 'logo-bar',
     label: 'Trust strip — inline (no card)',
-    description: 'Bare horizontal strip. Used in the homepage hero.',
+    description: 'Bare horizontal strip for compact adaptive introductions.',
     componentPath: 'components/features/home/HomeTrustSection.tsx',
-    usedIn: ['/'],
+    usedIn: ['/artist-profile', '/artist-profiles'],
     status: 'canonical',
     render: () => (
       <div className='py-8 px-6'>
@@ -48,5 +48,16 @@ export const LOGO_BAR_VARIANTS: readonly SectionVariant[] = [
         />
       </div>
     ),
+  },
+  {
+    id: 'home-trust-proof-moment',
+    category: 'logo-bar',
+    label: 'Trust strip — artist proof moment',
+    description:
+      'Named label proof with a reserved, responsive 3+2 / 2+1+2 grid.',
+    componentPath: 'components/features/home/HomeTrustSection.tsx',
+    usedIn: ['/'],
+    status: 'canonical',
+    render: () => <HomeTrustSection presentation='proof-moment' />,
   },
 ];

@@ -280,7 +280,7 @@ test.describe('Homepage', () => {
   }) => {
     await expect(page.getByTestId('homepage-trust')).toHaveAttribute(
       'data-presentation',
-      'inline-strip'
+      'proof-moment'
     );
     await expect(page.getByTestId('homepage-story-stack')).toHaveAttribute(
       'data-proof-transition',
@@ -297,16 +297,13 @@ test.describe('Homepage', () => {
     await expect(meetJovie).toBeVisible();
     await expect(artistProfiles).toBeVisible();
     await expect(closedLoop).toBeVisible();
-    const proofParallaxAnimation = await page.evaluate(() => {
-      const supportsScrollTimeline = CSS.supports('animation-timeline: view()');
-      const logoGrid = document.querySelector('.homepage-trust-logo-grid');
-      return supportsScrollTimeline && logoGrid
-        ? getComputedStyle(logoGrid).animationName
-        : 'unsupported';
+    const proofGridAnimation = await page.evaluate(() => {
+      const logoGrid = document.querySelector(
+        '.homepage-trust-proof-moment__logo-grid'
+      );
+      return logoGrid ? getComputedStyle(logoGrid).animationName : null;
     });
-    if (proofParallaxAnimation !== 'unsupported') {
-      expect(proofParallaxAnimation).toBe('homepage-proof-logos-parallax');
-    }
+    expect(proofGridAnimation).toBe('none');
     await expect(
       page.getByRole('heading', {
         name: 'Release day is not the finish line.',
@@ -448,20 +445,42 @@ test.describe('Homepage', () => {
   }) => {
     const proofState = () =>
       page.evaluate(() => {
-        const logos = document.querySelector('.homepage-trust-logo-grid');
+        const logos = document.querySelector(
+          '.homepage-trust-proof-moment__logo-grid'
+        );
+        const firstLogo = document.querySelector(
+          '.homepage-trust-proof-moment__logo-slot'
+        );
         const panel = document.querySelector(
           '[data-testid="homepage-meet-jovie"]'
         );
-        if (!(logos instanceof HTMLElement) || !(panel instanceof HTMLElement))
+        if (
+          !(logos instanceof HTMLElement) ||
+          !(firstLogo instanceof HTMLElement) ||
+          !(panel instanceof HTMLElement)
+        )
           return null;
         const logoStyle = getComputedStyle(logos);
+        const firstLogoStyle = getComputedStyle(firstLogo);
         return {
           opacity: Number.parseFloat(logoStyle.opacity),
           logoTransform: logoStyle.transform,
+          firstLogoOpacity: Number.parseFloat(firstLogoStyle.opacity),
+          firstLogoTransform: firstLogoStyle.transform,
           panelTransform: getComputedStyle(panel).transform,
         };
       });
     const identityTransforms = ['none', 'matrix(1, 0, 0, 1, 0, 0)'];
+    await expect
+      .poll(async () => {
+        const state = await proofState();
+        return Boolean(
+          state &&
+            state.firstLogoOpacity === 1 &&
+            identityTransforms.includes(state.firstLogoTransform)
+        );
+      })
+      .toBe(true);
     const atRest = await proofState();
     expect(atRest?.opacity).toBe(1);
     expect(identityTransforms).toContain(atRest?.logoTransform);
@@ -556,17 +575,15 @@ test.describe('Homepage', () => {
       .poll(async () => {
         const state = await proofState();
         return Boolean(
-          state &&
-            state.opacity < 1 &&
-            !identityTransforms.includes(state.logoTransform) &&
-            !identityTransforms.includes(state.panelTransform)
+          state && !identityTransforms.includes(state.panelTransform)
         );
       })
       .toBe(true);
     const duringTransition = await proofState();
-    expect(duringTransition?.opacity ?? 1).toBeLessThan(1);
-    expect(duringTransition?.opacity ?? 0).toBeGreaterThanOrEqual(0.18);
-    expect(identityTransforms).not.toContain(duringTransition?.logoTransform);
+    expect(duringTransition?.opacity).toBe(1);
+    expect(identityTransforms).toContain(duringTransition?.logoTransform);
+    expect(duringTransition?.firstLogoOpacity).toBe(1);
+    expect(identityTransforms).toContain(duringTransition?.firstLogoTransform);
     expect(identityTransforms).not.toContain(duringTransition?.panelTransform);
     await expect(
       page.getByTestId('homepage-closed-loop').getByRole('heading', {
@@ -623,6 +640,8 @@ test.describe('Homepage', () => {
     const reduced = await proofState();
     expect(reduced?.opacity).toBe(1);
     expect(reduced?.logoTransform).toBe('none');
+    expect(reduced?.firstLogoOpacity).toBe(1);
+    expect(reduced?.firstLogoTransform).toBe('none');
     expect(reduced?.panelTransform).toBe('none');
   });
 

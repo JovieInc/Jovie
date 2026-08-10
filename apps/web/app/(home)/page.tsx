@@ -236,7 +236,7 @@ function HomepageHero() {
         media={<HomepageHeroCommandCenter images={HERO_PRODUCT_IMAGES} />}
       />
       <div className='homepage-trust-section system-b-mounted-home-trust-strip-shell'>
-        <HomeTrustSection presentation='inline-strip' />
+        <HomeTrustSection presentation='proof-moment' />
       </div>
     </>
   );
