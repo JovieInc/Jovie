@@ -92,6 +92,14 @@ const config: StorybookConfig = {
       alias: [
         // Must come before the generic '@' alias to avoid resolving to the real file.
         {
+          // The real provider renders an inline bootstrap script. That script is
+          // correct in the app shell, but React cannot execute it inside a
+          // Storybook story. Keep Storybook deterministic and script-free by
+          // resolving the existing provider-compatible mock here only.
+          find: 'next-themes',
+          replacement: require.resolve('./next-themes-mock.tsx'),
+        },
+        {
           find: '@/app/app/(shell)/dashboard/DashboardLayoutClient',
           replacement: require.resolve('./dashboard-layout-client-mock.tsx'),
         },
