@@ -67,7 +67,15 @@ describe('WaitlistSuccessView', () => {
     expect(routeSource).toContain('redirect(APP_ROUTES.UNAVAILABLE)');
     expect(routeSource).toContain('redirect(APP_ROUTES.DASHBOARD)');
     expect(routeSource).toContain('redirect(APP_ROUTES.START)');
-    expect(routeSource).toContain('return <WaitlistSuccessView />;');
+    expect(routeSource).toContain(
+      'if (access?.entryId && isWaitlistPendingStatus(access.status))'
+    );
+    expect(routeSource).toContain(
+      'return <WaitlistSuccessView email={authResult.context.email} />;'
+    );
+    expect(routeSource).toContain(
+      'return <WaitlistIntakeChat userEmail={authResult.context.email} />;'
+    );
 
     expect(storySource).toContain('component: WaitlistSuccessView');
     expect(storySource).toContain("registryId: 'web-214-waitlist'");

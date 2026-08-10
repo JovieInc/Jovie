@@ -204,7 +204,7 @@ export async function POST(request: Request) {
     }
 
     const result = await submitWaitlistAccessRequest({
-      clerkUserId: userId,
+      appUserId: userId,
       email,
       emailRaw,
       fullName,

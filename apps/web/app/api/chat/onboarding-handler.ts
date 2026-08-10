@@ -49,6 +49,7 @@ import {
 } from '@/lib/turnstile/verify';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
+import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 
 /** Existing Statsig kill switch for all `/api/chat` traffic. */
 const CHAT_DISABLED_GATE = 'ai_chat_disabled';
@@ -372,6 +373,14 @@ export async function tryHandleAnonymousOnboardingChat(
     );
   }
   const turnCount = uiMessages.filter(m => m.role === 'user').length;
+  const accessControlled = await isWaitlistGateEnabled().catch(error => {
+    // Fail closed: a settings outage must never grant anonymous instant access.
+    Sentry.captureException(error, {
+      tags: { context: 'onboarding_waitlist_gate' },
+      extra: { requestId },
+    });
+    return true;
+  });
 
   let conversationId: string;
   try {
@@ -401,6 +410,7 @@ export async function tryHandleAnonymousOnboardingChat(
   const onboardingState = createOnboardingTurnState({
     sessionId,
     turnCount,
+    accessControlled,
     messages: uiMessages,
   });
   const tools = buildOnboardingTools(onboardingState);
@@ -461,6 +471,7 @@ export async function tryHandleAnonymousOnboardingChat(
     const fallbackState = createOnboardingTurnState({
       sessionId,
       turnCount,
+      accessControlled,
       messages: uiMessages,
     });
     const turn: FallbackTurn = await decideFallbackTurn({

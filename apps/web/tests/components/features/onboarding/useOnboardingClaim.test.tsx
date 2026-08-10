@@ -120,6 +120,66 @@ describe('useOnboardingClaim', () => {
     expect(replaceMock).not.toHaveBeenCalled();
   });
 
+  it('routes to the waitlist receipt only when the claim returns a durable entry id', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        claimed: 1,
+        waitlist: {
+          entryId: 'entry-1',
+          status: 'waitlisted',
+          outcome: 'waitlisted_gate_on',
+        },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(renderClaimHarness(0));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('claimed')
+    );
+    expect(replaceMock).toHaveBeenCalledWith('/waitlist');
+    expect(replaceMock).not.toHaveBeenCalledWith('/onboarding/checkout');
+  });
+
+  it('routes missing durable artist data to the truthful waitlist intake', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        claimed: 1,
+        waitlistIntakeRequired: true,
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(renderClaimHarness(0));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('claimed')
+    );
+    expect(replaceMock).toHaveBeenCalledWith('/waitlist');
+    expect(replaceMock).not.toHaveBeenCalledWith('/onboarding/checkout');
+  });
+
+  it('fails closed without navigation when the waitlist write returns no receipt', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse(
+        {
+          error: 'Waitlist request could not be saved',
+          errorCode: 'WAITLIST_SAVE_FAILED',
+        },
+        { status: 500 }
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(renderClaimHarness(0));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('error')
+    );
+    expect(replaceMock).not.toHaveBeenCalled();
+  });
+
   it('fires exactly one POST per unique claimTrigger and does not fire again for the same trigger after completion', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ claimed: 0 }));
     vi.stubGlobal('fetch', fetchMock);

@@ -148,11 +148,9 @@ export function OnboardingShell({
     resetTurnstileVerification('Verify you are human to send');
   }, [resetTurnstileVerification]);
 
-  // Auto-claim any anonymous transcript onto the user the moment Clerk
-  // reports they're authenticated, then retry after completed chat turns.
-  // On success, this hook navigates away to
-  // /onboarding/checkout, so the rest of the shell never gets a chance to
-  // render a "now what?" state. Idle for unauthenticated visitors.
+  // Auto-claim any anonymous transcript once Better Auth reports the user is
+  // authenticated, then retry after completed chat turns. The claim receipt
+  // routes controlled-access users to /waitlist and admitted users to checkout.
   const claimStatus = useOnboardingClaim(claimTrigger);
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';
@@ -204,6 +202,11 @@ export function OnboardingShell({
               kind='status'
               message='Linking your conversation...'
               visible={isLinking}
+            />
+            <OnboardingShellStatus
+              kind='error'
+              message="We couldn't save your request. Refresh this page to try again."
+              visible={claimStatus === 'error'}
             />
           </div>
         }

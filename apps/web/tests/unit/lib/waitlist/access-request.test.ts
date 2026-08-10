@@ -69,7 +69,7 @@ function createTxMock() {
   const select = vi.fn(() => ({
     from: vi.fn((table: unknown) => ({
       where: vi.fn(() => {
-        // users select-by-clerkId resolves through `.limit(1)`
+        // users select-by-app-id resolves through `.limit(1)`
         const obj = {
           orderBy: vi.fn(() => ({
             limit: vi
@@ -143,7 +143,7 @@ function createTxMock() {
 }
 
 const baseInput = {
-  clerkUserId: 'clerk_123',
+  appUserId: '3a53ba3e-150c-4ab5-8e73-2d2499764e2c',
   email: 'Creator@Example.com',
   fullName: 'Test Creator',
   data: {
@@ -161,7 +161,10 @@ const baseInput = {
 describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    userRow = null;
+    userRow = {
+      id: baseInput.appUserId,
+      userStatus: 'waitlist_pending',
+    };
     insertedEntries.length = 0;
     updatedRows.length = 0;
     waitlistInsertReturnRows = [{ id: 'entry-new' }];
@@ -217,7 +220,9 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     expect(result.outcome).toBe('already_accepted');
     expect(userRow?.userStatus).toBe('waitlist_approved');
     expect(invalidateProxyUserStateCache).toHaveBeenCalledTimes(1);
-    expect(invalidateProxyUserStateCache).toHaveBeenCalledWith('clerk_123');
+    expect(invalidateProxyUserStateCache).toHaveBeenCalledWith(
+      baseInput.appUserId
+    );
     expect(notifySlackWaitlist).not.toHaveBeenCalled();
   });
 
@@ -242,6 +247,20 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
     expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
     expect(notifySlackWaitlist).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when the authenticated app user row is missing', async () => {
+    userRow = null;
+
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+
+    await expect(submitWaitlistAccessRequest(baseInput)).rejects.toThrow(
+      'Authenticated app user is missing'
+    );
+    expect(insertedEntries.some(entry => 'clerkId' in entry.vals)).toBe(false);
+    expect(notifySlackWaitlist).not.toHaveBeenCalled();
   });
 
   it('handles canonical email insert races as idempotent waitlist submissions', async () => {

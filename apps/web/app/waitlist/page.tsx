@@ -1,7 +1,13 @@
 import { redirect } from 'next/navigation';
+import { WaitlistIntakeChat } from '@/components/features/waitlist/WaitlistIntakeChat';
 import { WaitlistSuccessView } from '@/components/features/waitlist/WaitlistSuccessView';
 import { APP_ROUTES } from '@/constants/routes';
-import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
+import {
+  CanonicalUserState,
+  getWaitlistAccess,
+  resolveUserState,
+} from '@/lib/auth/gate';
+import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
 
 /**
  * Legacy /waitlist route.
@@ -33,9 +39,18 @@ export default async function WaitlistPage() {
     redirect(APP_ROUTES.START);
   }
 
-  // Authenticated visitors in WAITLIST_PENDING, NEEDS_WAITLIST_SUBMISSION,
-  // NEEDS_DB_USER, or any future state render the confirmation view in
-  // place. Redirecting them back to /start would loop through the proxy's
-  // needsWaitlist rewrite.
-  return <WaitlistSuccessView />;
+  // Resolve the entry directly even when the canonical auth state is briefly
+  // stale after signup. A real pending row is the only success condition;
+  // missing-user/submission states without that row fail closed below.
+  const access = authResult.context.email
+    ? await getWaitlistAccess(authResult.context.email)
+    : null;
+  if (access?.entryId && isWaitlistPendingStatus(access.status)) {
+    return <WaitlistSuccessView email={authResult.context.email} />;
+  }
+
+  // Redirecting these authenticated states to /start can loop through the
+  // proxy waitlist rewrite. Keep them here on the existing retryable intake;
+  // this surface renders success only after its own API receipt.
+  return <WaitlistIntakeChat userEmail={authResult.context.email} />;
 }

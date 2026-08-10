@@ -50,7 +50,8 @@ export type WaitlistAccessOutcome =
   | 'save_failed';
 
 export interface WaitlistAccessRequestInput {
-  readonly clerkUserId: string;
+  /** App `users.id` UUID returned by `getCachedAuth()`. */
+  readonly appUserId: string;
   readonly email: string;
   readonly emailRaw?: string;
   readonly fullName: string;
@@ -184,31 +185,25 @@ interface UpsertUserStatusResult {
 
 async function upsertUserStatus(params: {
   readonly tx: DbOrTransaction;
-  readonly clerkUserId: string;
+  readonly appUserId: string;
   readonly emailRaw: string;
   readonly entryId: string;
   readonly nextStatus: UserLifecycleStatus;
 }): Promise<UpsertUserStatusResult> {
-  const { tx, clerkUserId, emailRaw, entryId, nextStatus } = params;
+  const { tx, appUserId, emailRaw, entryId, nextStatus } = params;
   const email = normalizeEmail(emailRaw);
   const [existing] = await tx
     .select({ id: users.id, userStatus: users.userStatus })
     .from(users)
-    .where(eq(users.clerkId, clerkUserId))
+    .where(eq(users.id, appUserId))
     .limit(1);
 
   if (!existing) {
-    await tx.insert(users).values({
-      clerkId: clerkUserId,
-      email,
-      userStatus: nextStatus,
-      waitlistEntryId: entryId,
-    });
-    return {
-      previousStatus: null,
-      newStatus: nextStatus,
-      existed: false,
-    };
+    // Better Auth provisions the app user before this authenticated write.
+    // Never recreate it from the session identifier: `getCachedAuth().userId`
+    // is already `users.id`, and treating it as a legacy Clerk id can collide
+    // on the unique email and roll the entire waitlist transaction back.
+    throw new Error('Authenticated app user is missing');
   }
 
   // Use the canonical status-precedence rule: never downgrade a
@@ -254,7 +249,7 @@ async function tryApproveEntry(
 async function decideAccess(params: {
   readonly tx: DbOrTransaction;
   readonly entryId: string;
-  readonly clerkUserId: string;
+  readonly appUserId: string;
   readonly emailRaw: string;
   readonly email: string;
   readonly data: WaitlistRequestPayload;
@@ -267,7 +262,7 @@ async function decideAccess(params: {
 }> {
   const statusChange = await upsertUserStatus({
     tx: params.tx,
-    clerkUserId: params.clerkUserId,
+    appUserId: params.appUserId,
     emailRaw: params.emailRaw,
     entryId: params.entryId,
     nextStatus: 'waitlist_pending',
@@ -338,6 +333,7 @@ interface InternalTransactionResult {
   readonly outcome: WaitlistAccessOutcome;
   readonly approval: WaitlistApprovalResult | null;
   readonly statusChange: UpsertUserStatusResult;
+  readonly entryCreated: boolean;
 }
 
 async function handleExistingEntryResubmission(params: {
@@ -346,15 +342,15 @@ async function handleExistingEntryResubmission(params: {
     Awaited<ReturnType<typeof findLatestEntryByEmail>>
   >;
   readonly entryValues: ReturnType<typeof buildEntryValues>;
-  readonly clerkUserId: string;
+  readonly appUserId: string;
   readonly emailRaw: string;
 }): Promise<InternalTransactionResult> {
-  const { tx, existing, entryValues, clerkUserId, emailRaw } = params;
+  const { tx, existing, entryValues, appUserId, emailRaw } = params;
 
   if (isWaitlistApprovedStatus(existing.status)) {
     const statusChange = await upsertUserStatus({
       tx,
-      clerkUserId,
+      appUserId,
       emailRaw,
       entryId: existing.id,
       nextStatus: 'waitlist_approved',
@@ -365,6 +361,7 @@ async function handleExistingEntryResubmission(params: {
       outcome: 'already_accepted',
       approval: null,
       statusChange,
+      entryCreated: false,
     };
   }
 
@@ -389,7 +386,7 @@ async function handleExistingEntryResubmission(params: {
 
   const statusChange = await upsertUserStatus({
     tx,
-    clerkUserId,
+    appUserId,
     entryId: existing.id,
     emailRaw,
     nextStatus: 'waitlist_pending',
@@ -401,6 +398,7 @@ async function handleExistingEntryResubmission(params: {
     outcome: 'already_waitlisted',
     approval: null,
     statusChange,
+    entryCreated: false,
   };
 }
 
@@ -432,7 +430,7 @@ export async function submitWaitlistAccessRequest(
             tx,
             existing,
             entryValues,
-            clerkUserId: input.clerkUserId,
+            appUserId: input.appUserId,
             emailRaw,
           });
         }
@@ -461,7 +459,7 @@ export async function submitWaitlistAccessRequest(
               tx,
               existing: concurrentExisting,
               entryValues,
-              clerkUserId: input.clerkUserId,
+              appUserId: input.appUserId,
               emailRaw,
             });
           }
@@ -472,7 +470,7 @@ export async function submitWaitlistAccessRequest(
         const decision = await decideAccess({
           tx,
           entryId: entry.id,
-          clerkUserId: input.clerkUserId,
+          appUserId: input.appUserId,
           emailRaw,
           email: normalizedEmail,
           data: input.data,
@@ -504,7 +502,7 @@ export async function submitWaitlistAccessRequest(
           waitlistEntryId: entry.id,
           fromStatus: 'chat_started',
           toStatus: nextStatus,
-          actorUserId: input.clerkUserId,
+          actorUserId: input.appUserId,
           actorType: 'user',
           reason: decision.qualification.reasonCode,
           metadata: decision.qualification.details,
@@ -523,6 +521,7 @@ export async function submitWaitlistAccessRequest(
           outcome: decision.outcome,
           approval: decision.approval,
           statusChange: decision.statusChange,
+          entryCreated: true,
         };
       },
       { isolationLevel: 'serializable' }
@@ -549,7 +548,7 @@ export async function submitWaitlistAccessRequest(
     //
     // Only bust the cache when the userStatus row actually changed; otherwise
     // we'd thrash the cache on every idempotent re-assert.
-    await invalidateProxyUserStateCache(input.clerkUserId).catch(error => {
+    await invalidateProxyUserStateCache(input.appUserId).catch(error => {
       logger.warn(
         '[waitlist] Failed to invalidate proxy state on already_accepted',
         error
@@ -571,7 +570,9 @@ export async function submitWaitlistAccessRequest(
   // a returning user with a stale entry could both produce
   // `waitlisted_gate_on` despite no real state change.
   const isStatusFreshlyAssigned =
-    !result.statusChange.existed || statusActuallyChanged;
+    result.entryCreated ||
+    !result.statusChange.existed ||
+    statusActuallyChanged;
   if (isNewSignupOutcome && isStatusFreshlyAssigned) {
     notifySlackWaitlist(input.fullName, normalizedEmail).catch(error => {
       logger.warn('[waitlist] Slack notification failed', error);

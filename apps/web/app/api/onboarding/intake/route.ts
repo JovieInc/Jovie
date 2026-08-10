@@ -76,47 +76,15 @@ function deriveFullName(params: {
   return localPart || 'Jovie user';
 }
 
-async function ensureIntakeUser(params: {
-  readonly clerkUserId: string;
-  readonly email: string;
-}) {
+async function ensureIntakeUser(params: { readonly appUserId: string }) {
   const [existing] = await db
     .select({ id: users.id, userStatus: users.userStatus })
     .from(users)
-    .where(eq(users.clerkId, params.clerkUserId))
+    .where(eq(users.id, params.appUserId))
     .limit(1);
 
   if (existing) return existing;
-
-  // We never want this insert to overwrite fields on an existing row — in
-  // particular `userStatus` (a concurrent admin approval may have already set
-  // `waitlist_approved`, or a finished onboarding may have set `active`).
-  //
-  // Use `onConflictDoNothing()` to make the no-overwrite intent explicit and
-  // prevent any future accidental field additions from silently downgrading
-  // status. The status precedence helper (`isStatusUpgrade`) guards the
-  // re-select path defensively in case a future caller introduces a write
-  // here. See `lib/waitlist/status-precedence.ts`.
-  const [created] = await db
-    .insert(users)
-    .values({
-      clerkId: params.clerkUserId,
-      email: params.email,
-      userStatus: 'waitlist_pending',
-    })
-    .onConflictDoNothing()
-    .returning({ id: users.id, userStatus: users.userStatus });
-
-  if (created) return created;
-
-  const [conflicted] = await db
-    .select({ id: users.id, userStatus: users.userStatus })
-    .from(users)
-    .where(eq(users.clerkId, params.clerkUserId))
-    .limit(1);
-
-  if (!conflicted) throw new Error('Failed to create intake user');
-  return conflicted;
+  throw new Error('Authenticated app user is missing');
 }
 
 async function upsertOnboardingInterview(params: {
@@ -172,8 +140,8 @@ async function upsertOnboardingInterview(params: {
 
 export async function POST(request: Request) {
   try {
-    const { userId: clerkUserId } = await getCachedAuth();
-    if (!clerkUserId) {
+    const { userId: appUserId } = await getCachedAuth();
+    if (!appUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -181,7 +149,7 @@ export async function POST(request: Request) {
       const clientIP = extractClientIPFromRequest({ headers: request.headers });
       try {
         await enforceOnboardingRateLimit({
-          userId: clerkUserId,
+          userId: appUserId,
           ip: clientIP,
           checkIP: true,
         });
@@ -228,7 +196,7 @@ export async function POST(request: Request) {
       userUsername: clerkUser?.username,
       email,
     });
-    const dbUser = await ensureIntakeUser({ clerkUserId, email: emailRaw });
+    const dbUser = await ensureIntakeUser({ appUserId });
 
     const interviewResponses = {
       currentWorkflow: parsed.data.metadata.currentWorkflow ?? null,
@@ -267,7 +235,7 @@ export async function POST(request: Request) {
     }
 
     const access = await submitWaitlistAccessRequest({
-      clerkUserId,
+      appUserId,
       email,
       emailRaw,
       fullName,

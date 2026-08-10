@@ -296,6 +296,21 @@ function decideAccess(
   extraBand: AudienceBand | null,
   options?: { readonly forceTurnCap?: boolean }
 ): AccessDecision {
+  if (state.accessControlled) {
+    if (!state.spotifyArtistId) {
+      return {
+        kind: 'needs_more_info',
+        rationale: 'confirmed_artist_required_for_waitlist',
+        score: 0,
+      };
+    }
+    return {
+      kind: 'waitlist',
+      rationale: 'controlled_access_gate_enabled',
+      score: 100,
+    };
+  }
+
   const recordedAt = new Date().toISOString();
   const signals = state.signals.map(signal => ({ ...signal, recordedAt }));
   if (extraBand) {

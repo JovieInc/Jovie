@@ -2,6 +2,7 @@ import type { UIMessage } from 'ai';
 import { describe, expect, it, vi } from 'vitest';
 import { normalizeArtistMetrics } from '@/lib/onboarding/canonical-metrics';
 import {
+  buildOnboardingTools,
   createOnboardingTurnState,
   deriveOnboardingTurnStateFromMessages,
 } from './onboarding-tool-impls';
@@ -114,5 +115,48 @@ describe('onboarding tool state rehydration', () => {
       { audienceBand: 'over_500k' },
       { releaseStage: 'ongoing_rollout' },
     ]);
+  });
+});
+
+describe('proposeNextStep controlled access', () => {
+  it('keeps collecting information until a confirmed artist can be persisted', async () => {
+    const tools = buildOnboardingTools(
+      createOnboardingTurnState({
+        sessionId: 'session-controlled-empty',
+        turnCount: 3,
+        accessControlled: true,
+      })
+    );
+    const proposeNextStep = tools.proposeNextStep as unknown as {
+      execute: () => Promise<{ decision: { kind: string; rationale: string } }>;
+    };
+
+    const result = await proposeNextStep.execute();
+
+    expect(result.decision).toMatchObject({
+      kind: 'needs_more_info',
+      rationale: 'confirmed_artist_required_for_waitlist',
+    });
+  });
+
+  it('waitlists every anonymous visitor while the access gate is enabled', async () => {
+    const tools = buildOnboardingTools(
+      createOnboardingTurnState({
+        sessionId: 'session-controlled',
+        turnCount: 3,
+        accessControlled: true,
+        messages: [assistantMessage],
+      })
+    );
+    const proposeNextStep = tools.proposeNextStep as unknown as {
+      execute: () => Promise<{ decision: { kind: string; rationale: string } }>;
+    };
+
+    const result = await proposeNextStep.execute();
+
+    expect(result.decision).toMatchObject({
+      kind: 'waitlist',
+      rationale: 'controlled_access_gate_enabled',
+    });
   });
 });
