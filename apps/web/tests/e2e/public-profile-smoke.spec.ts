@@ -139,45 +139,132 @@ test.describe('public profile document semantics @regression', () => {
     await expect(page.getByTestId('not-found')).toHaveCount(0);
   });
 
-  test('a missing valid handle returns the branded profile 404', async ({
-    page,
-  }) => {
-    const response = await page.goto('/nonexistent-artist', {
-      waitUntil: 'domcontentloaded',
+  // JOV-4911: the shared missing-profile actions are pinned to the canonical
+  // 44px minimum at both the desktop (1024x900) and mobile (390x844) proof
+  // viewports, alongside document semantics and reduced-motion safety.
+  const MISSING_PROFILE_VIEWPORTS = [
+    { label: '1024x900', width: 1024, height: 900 },
+    { label: '390x844', width: 390, height: 844 },
+  ] as const;
+
+  for (const viewport of MISSING_PROFILE_VIEWPORTS) {
+    test(`a missing valid handle returns the branded profile 404 at ${viewport.label}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({
+        width: viewport.width,
+        height: viewport.height,
+      });
+      const response = await page.goto('/nonexistent-artist', {
+        waitUntil: 'domcontentloaded',
+      });
+
+      expect(response?.status()).toBe(404);
+      await expect(
+        page.getByRole('heading', { name: 'Profile not found' })
+      ).toBeVisible();
+      await expect(page.getByTestId('not-found')).toBeVisible();
+
+      // Exactly one canonical document skeleton.
+      await expect(page.locator('h1')).toHaveCount(1);
+      await expect(page.locator('main')).toHaveCount(1);
+      await expect(page.locator('header')).toHaveCount(1);
+      await expect(page.locator('footer')).toHaveCount(1);
+
+      const homeAction = page.getByRole('link', { name: 'Go home' });
+      const searchAction = page.getByRole('link', { name: 'Search artists' });
+
+      await expect(homeAction).toHaveAttribute('href', '/');
+      await expect(searchAction).toHaveAttribute('href', '/artist-profiles');
+
+      for (const action of [homeAction, searchAction]) {
+        const box = await action.boundingBox();
+        expect(
+          box,
+          'Missing-profile action has no rendered target'
+        ).not.toBeNull();
+        expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+        expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+      }
+
+      // Reach each action with the keyboard so :focus-visible heuristics
+      // apply, then assert the focus indicator is actually rendered.
+      const tabUntilFocused = async (
+        action: typeof homeAction,
+        maxTabs = 25
+      ) => {
+        for (let tab = 0; tab < maxTabs; tab++) {
+          if (await action.evaluate(node => node === document.activeElement))
+            return true;
+          await page.keyboard.press('Tab');
+        }
+        return action.evaluate(node => node === document.activeElement);
+      };
+
+      for (const action of [homeAction, searchAction]) {
+        expect(
+          await tabUntilFocused(action),
+          'Missing-profile action is not reachable by keyboard'
+        ).toBe(true);
+        const focusIndicator = await action.evaluate(node => {
+          const style = window.getComputedStyle(node);
+          return {
+            focusVisible: node.matches(':focus-visible'),
+            outlineStyle: style.outlineStyle,
+            outlineWidth: style.outlineWidth,
+            boxShadow: style.boxShadow,
+          };
+        });
+        expect(
+          focusIndicator.focusVisible,
+          'Missing-profile action must match :focus-visible on keyboard focus'
+        ).toBe(true);
+        const hasVisibleIndicator =
+          (focusIndicator.outlineStyle !== 'none' &&
+            focusIndicator.outlineWidth !== '0px') ||
+          focusIndicator.boxShadow !== 'none';
+        expect(
+          hasVisibleIndicator,
+          'Missing-profile action has no visible focus indicator'
+        ).toBe(true);
+      }
+
+      // Reduced-motion safety: duration tokens resolve to 0ms so the actions
+      // carry no running transition or animation.
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      for (const action of [homeAction, searchAction]) {
+        const motion = await action.evaluate(node => {
+          const style = window.getComputedStyle(node);
+          return {
+            transitionDuration: style.transitionDuration,
+            animationDuration: style.animationDuration,
+          };
+        });
+        const isZero = (value: string) =>
+          value
+            .split(',')
+            .every(entry => Number.parseFloat(entry.trim()) === 0);
+        expect(
+          isZero(motion.transitionDuration),
+          `transition-duration must be 0s under reduced motion (got ${motion.transitionDuration})`
+        ).toBe(true);
+        expect(
+          isZero(motion.animationDuration),
+          `animation-duration must be 0s under reduced motion (got ${motion.animationDuration})`
+        ).toBe(true);
+        const box = await action.boundingBox();
+        expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+        expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+      }
+      await page.emulateMedia({ reducedMotion: null });
+
+      const hasHorizontalOverflow = await page.evaluate(
+        () => document.documentElement.scrollWidth > window.innerWidth + 1
+      );
+      expect(hasHorizontalOverflow).toBe(false);
+      await expect(
+        page.locator('meta[name="robots"][content*="noindex"]')
+      ).toHaveCount(1);
     });
-
-    expect(response?.status()).toBe(404);
-    await expect(
-      page.getByRole('heading', { name: 'Profile not found' })
-    ).toBeVisible();
-    await expect(page.getByTestId('not-found')).toBeVisible();
-    const homeAction = page.getByRole('link', { name: 'Go home' });
-    const searchAction = page.getByRole('link', { name: 'Search artists' });
-
-    await expect(homeAction).toHaveAttribute('href', '/');
-    await expect(searchAction).toHaveAttribute('href', '/artist-profiles');
-
-    for (const action of [homeAction, searchAction]) {
-      const box = await action.boundingBox();
-      expect(
-        box,
-        'Missing-profile action has no rendered target'
-      ).not.toBeNull();
-      expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
-      expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
-    }
-
-    await homeAction.focus();
-    await expect(homeAction).toBeFocused();
-    await searchAction.focus();
-    await expect(searchAction).toBeFocused();
-
-    const hasHorizontalOverflow = await page.evaluate(
-      () => document.documentElement.scrollWidth > window.innerWidth + 1
-    );
-    expect(hasHorizontalOverflow).toBe(false);
-    await expect(
-      page.locator('meta[name="robots"][content*="noindex"]')
-    ).toHaveCount(1);
-  });
+  }
 });
