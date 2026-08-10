@@ -41,6 +41,18 @@ const shell = (
   storybookTitle,
 });
 
+/**
+ * Canonical shell ownership model (JOV-4940):
+ * one registry identity per reusable source concept, one source component per
+ * identity, and exactly one Storybook body per identity. No aliases.
+ *
+ * - `shell.container` owns `MarketingContainer`. Its width variants (page,
+ *   landing, prose) are stories of that single concept — including
+ *   `MarketingContainer/prose`, which is a container width variant, not a
+ *   separate shell identity.
+ * - `shell.prose` owns `MarketingContentShell`, the long-form content shell
+ *   that composes a prose-width container with marketing body defaults.
+ */
 export const MARKETING_SHELL_REGISTRY = [
   shell(
     'shell.public-page',
@@ -58,6 +70,16 @@ export const MARKETING_SHELL_REGISTRY = [
     'Marketing/Shells/MarketingFooter'
   ),
   shell(
+    'shell.footer-cta',
+    'apps/web/components/site/MarketingFooterCta',
+    'Marketing/Shells/MarketingFooterCta'
+  ),
+  shell(
+    'shell.final-cta',
+    'apps/web/components/site/MarketingFinalCTA',
+    'Marketing/Shells/MarketingFinalCTA'
+  ),
+  shell(
     'shell.page',
     'apps/web/components/marketing/MarketingPageShell',
     'Marketing/Shells/MarketingPageShell'
@@ -70,7 +92,7 @@ export const MARKETING_SHELL_REGISTRY = [
   shell(
     'shell.prose',
     'apps/web/components/marketing/MarketingContentShell',
-    'Marketing/Shells/MarketingContainer/prose'
+    'Marketing/Shells/MarketingContentShell'
   ),
 ] as const satisfies readonly MarketingShellRegistryEntry[];
 

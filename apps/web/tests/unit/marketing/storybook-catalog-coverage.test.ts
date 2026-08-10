@@ -14,6 +14,7 @@ import {
   MARKETING_RECIPES,
   MARKETING_SECTION_IDS,
   MARKETING_SECTION_REGISTRY,
+  MARKETING_SHELL_REGISTRY,
   type MarketingSectionId,
   type RecipeId,
 } from '@/data/marketing';
@@ -156,6 +157,27 @@ describe('marketing Storybook catalog coverage (JOV-4420)', () => {
     ];
     const missing = required.filter(id => !shells.has(id));
     expect(missing, `Missing shell stories: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  it('maps every shell registry identity to exactly one canonical story body', async () => {
+    const { shells, rawTitles } = await collectCatalogTitles();
+    for (const entry of MARKETING_SHELL_REGISTRY) {
+      const storyId = entry.storybookTitle.replace('Marketing/Shells/', '');
+      expect(shells.has(storyId), `${entry.id} story '${storyId}'`).toBe(true);
+      const occurrences = rawTitles.filter(
+        title => title === entry.storybookTitle
+      ).length;
+      expect(
+        occurrences,
+        `${entry.id} must resolve to exactly one story body, found ${occurrences}`
+      ).toBe(1);
+    }
+    // No duplicate concept ownership: two identities never share a story body.
+    const mapped = MARKETING_SHELL_REGISTRY.map(entry => entry.storybookTitle);
+    expect(new Set(mapped).size).toBe(mapped.length);
+    // MarketingContainer/prose is a container width-variant story, not a shell
+    // identity of its own (JOV-4940 canonical ownership).
+    expect(mapped).not.toContain('Marketing/Shells/MarketingContainer/prose');
   });
 
   it('documents stub recipes when present (optional coverage)', async () => {
