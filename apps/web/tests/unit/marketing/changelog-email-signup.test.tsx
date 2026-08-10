@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -11,6 +14,16 @@ import { ChangelogEmailSignup } from '@/app/(marketing)/changelog/ChangelogEmail
 
 const turnstileMock = vi.hoisted(() => ({
   provideToken: true,
+  failureMessage: null as string | null,
+  effectCount: 0,
+  unmountCount: 0,
+  onToken: null as ((token: string) => void) | null,
+  onStateChange: null as
+    | ((state: {
+        readonly status: 'verified' | 'error' | 'interactive';
+        readonly message?: string;
+      }) => void)
+    | null,
 }));
 
 vi.mock('@/lib/hooks/useReducedMotion', () => ({
@@ -20,14 +33,35 @@ vi.mock('@/lib/hooks/useReducedMotion', () => ({
 vi.mock('@/components/atoms/InvisibleTurnstile', () => ({
   InvisibleTurnstile: ({
     onToken,
+    onStateChange,
   }: {
     readonly onToken: (token: string) => void;
+    readonly onStateChange?: (state: {
+      readonly status: 'verified' | 'error' | 'interactive';
+      readonly message?: string;
+    }) => void;
   }) => {
     useEffect(() => {
+      turnstileMock.effectCount += 1;
+      turnstileMock.onToken = onToken;
+      turnstileMock.onStateChange = onStateChange ?? null;
+      if (turnstileMock.failureMessage) {
+        onStateChange?.({
+          status: 'error',
+          message: turnstileMock.failureMessage,
+        });
+        return;
+      }
       if (turnstileMock.provideToken) {
         onToken('test-turnstile-token');
+        onStateChange?.({ status: 'verified' });
       }
-    }, [onToken]);
+      return () => {
+        turnstileMock.unmountCount += 1;
+        turnstileMock.onToken = null;
+        turnstileMock.onStateChange = null;
+      };
+    }, [onStateChange, onToken]);
     return null;
   },
   isTurnstileClientBypassed: () => false,
@@ -39,6 +73,11 @@ describe('ChangelogEmailSignup', () => {
 
   beforeEach(() => {
     turnstileMock.provideToken = true;
+    turnstileMock.failureMessage = null;
+    turnstileMock.effectCount = 0;
+    turnstileMock.unmountCount = 0;
+    turnstileMock.onToken = null;
+    turnstileMock.onStateChange = null;
     global.fetch = vi.fn();
   });
 
@@ -58,6 +97,57 @@ describe('ChangelogEmailSignup', () => {
     await waitFor(() => {
       expect(screen.getByPlaceholderText('you@example.com')).toHaveFocus();
     });
+  });
+
+  it('keeps the Turnstile lifecycle stable while the parent rerenders', async () => {
+    render(<ChangelogEmailSignup />);
+
+    await waitFor(() => expect(turnstileMock.effectCount).toBe(1));
+    fireEvent.change(screen.getByPlaceholderText('you@example.com'), {
+      target: { value: 'artist@example.com' },
+    });
+
+    expect(turnstileMock.effectCount).toBe(1);
+  });
+
+  it('expands without stealing focus when Turnstile requires interaction', async () => {
+    const { container } = render(<ChangelogEmailSignup />);
+    const revealRoot = container.querySelector("[data-ui='cta-reveal']");
+    const input = screen.getByPlaceholderText('you@example.com');
+
+    act(() => turnstileMock.onStateChange?.({ status: 'interactive' }));
+    await act(async () => {
+      await new Promise(resolve => globalThis.setTimeout(resolve, 0));
+    });
+
+    expect(revealRoot).toHaveAttribute('data-visual-state', 'expanded');
+    expect(input).not.toHaveFocus();
+  });
+
+  it('preserves a Turnstile failure that arrives during blur collapse', async () => {
+    render(<ChangelogEmailSignup />);
+    const outsideButton = document.createElement('button');
+    document.body.appendChild(outsideButton);
+
+    fireEvent.click(screen.getByTestId('changelog-reveal-button'));
+    const input = screen.getByPlaceholderText('you@example.com');
+    await waitFor(() => expect(input).toHaveFocus());
+
+    outsideButton.focus();
+    act(() => {
+      turnstileMock.onToken?.('');
+      turnstileMock.onStateChange?.({
+        status: 'error',
+        message: 'Security check could not load.',
+      });
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Security check could not load.'
+    );
+    expect(screen.getByTestId('changelog-reveal-form')).toBeVisible();
+
+    outsideButton.remove();
   });
 
   it('collapses back to the CTA when the expanded shell blurs with an empty email', async () => {
@@ -106,6 +196,8 @@ describe('ChangelogEmailSignup', () => {
     await waitFor(() => {
       expect(screen.getByTestId('changelog-success-message')).toBeVisible();
     });
+    await waitFor(() => expect(turnstileMock.unmountCount).toBe(1));
+    expect(turnstileMock.onStateChange).toBeNull();
 
     expect(global.fetch).toHaveBeenCalledWith('/api/changelog/subscribe', {
       method: 'POST',
@@ -135,5 +227,68 @@ describe('ChangelogEmailSignup', () => {
       ).toBeVisible();
     });
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('surfaces challenge unavailability as an accessible failure state', async () => {
+    turnstileMock.provideToken = false;
+    turnstileMock.failureMessage =
+      'Security check could not load. Refresh the page and try again.';
+
+    render(<ChangelogEmailSignup />);
+
+    fireEvent.click(screen.getByTestId('changelog-reveal-button'));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(turnstileMock.failureMessage);
+    expect(
+      within(screen.getByTestId('changelog-reveal-form')).getByRole('button', {
+        name: 'Subscribe',
+      })
+    ).toBeDisabled();
+    expect(screen.getByPlaceholderText('you@example.com')).toHaveAttribute(
+      'aria-describedby',
+      'changelog-subscribe-status'
+    );
+    expect(screen.getByPlaceholderText('you@example.com')).not.toHaveAttribute(
+      'aria-invalid'
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('you@example.com'), {
+      target: { value: 'artist@example.com' },
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      turnstileMock.failureMessage
+    );
+    expect(
+      within(screen.getByTestId('changelog-reveal-form')).getByRole('button', {
+        name: 'Subscribe',
+      })
+    ).toBeDisabled();
+
+    act(() => {
+      turnstileMock.onToken?.('recovered-turnstile-token');
+      turnstileMock.onStateChange?.({ status: 'verified' });
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('changelog-reveal-form')).getByRole('button', {
+        name: 'Subscribe',
+      })
+    ).toBeEnabled();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('reserves two mobile lines for accessible security failures', () => {
+    const globalsCss = readFileSync(
+      resolve(process.cwd(), 'app/globals.css'),
+      'utf8'
+    );
+
+    expect(globalsCss).toMatch(
+      /\[data-ui="cta-reveal"\] \.cta-reveal-support \{[\s\S]*?min-height: 40px;/
+    );
+    expect(globalsCss).toMatch(
+      /@media \(min-width: 640px\) \{[\s\S]*?\.cta-reveal-support \{[\s\S]*?min-height: 20px;/
+    );
   });
 });

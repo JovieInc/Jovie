@@ -1,7 +1,6 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import Script from 'next/script';
 import { useEffect, useState } from 'react';
 import { isDemoRecordingClient } from '@/lib/demo-recording';
 import { env } from '@/lib/env-client';
@@ -31,6 +30,14 @@ const ALLOWED_PREFIXES = [
   '/alternatives',
 ] as const;
 
+export type InstantlyRuntimeState =
+  | 'suppressed-unconfigured'
+  | 'suppressed-passive-runtime'
+  | 'suppressed-route'
+  | 'suppressed-demo-recording'
+  | 'suppressed-no-consent'
+  | 'disabled-vendor-runtime-isolation';
+
 function isAllowedRoute(pathname: string | null): boolean {
   if (!pathname) return false;
   return ALLOWED_PREFIXES.some(prefix =>
@@ -42,18 +49,39 @@ function isAllowedRoute(pathname: string | null): boolean {
   );
 }
 
+export function resolveInstantlyRuntimeState({
+  hasPixelId,
+  isPassive,
+  isAllowed,
+  isDemo,
+  hasMarketingConsent,
+}: {
+  readonly hasPixelId: boolean;
+  readonly isPassive: boolean;
+  readonly isAllowed: boolean;
+  readonly isDemo: boolean;
+  readonly hasMarketingConsent: boolean;
+}): InstantlyRuntimeState {
+  if (!hasPixelId) return 'suppressed-unconfigured';
+  if (isPassive) return 'suppressed-passive-runtime';
+  if (!isAllowed) return 'suppressed-route';
+  if (isDemo) return 'suppressed-demo-recording';
+  if (!hasMarketingConsent) return 'suppressed-no-consent';
+  return 'disabled-vendor-runtime-isolation';
+}
+
 export function InstantlyPixel() {
   const pathname = usePathname();
   const pixelId = publicEnv.NEXT_PUBLIC_INSTANTLY_PIXEL_ID;
   const isPassive = env.IS_TEST || env.IS_E2E;
   const isAllowed = isAllowedRoute(pathname);
   const isDemo = isDemoRecordingClient();
-  const skip = !pixelId || isPassive || !isAllowed || isDemo;
+  const skipConsentListener = !pixelId || isPassive || !isAllowed || isDemo;
 
   const [allowed, setAllowed] = useState(false);
 
   useEffect(() => {
-    if (skip) return;
+    if (skipConsentListener) return;
     if (globalThis.window === undefined) return;
 
     // Sync consent state on mount (covers SSR → client transition)
@@ -81,17 +109,31 @@ export function InstantlyPixel() {
       globalThis.removeEventListener('jvconsent:ready', onReady);
       unsubConsent?.();
     };
-  }, [skip]);
+  }, [skipConsentListener]);
 
-  if (skip || !allowed) return null;
+  const runtimeState = resolveInstantlyRuntimeState({
+    hasPixelId: Boolean(pixelId),
+    isPassive,
+    isAllowed,
+    isDemo,
+    hasMarketingConsent: allowed,
+  });
 
-  return (
-    <Script
-      id='vtag-ai-js'
-      src='https://r2.leadsy.ai/tag.js'
-      strategy='lazyOnload'
-      data-pid={pixelId}
-      data-version='062024'
-    />
-  );
+  useEffect(() => {
+    const root = globalThis.document?.documentElement;
+    if (!root) return;
+
+    root.dataset.instantlyRuntime = runtimeState;
+    return () => {
+      if (root.dataset.instantlyRuntime === runtimeState) {
+        delete root.dataset.instantlyRuntime;
+      }
+    };
+  }, [runtimeState]);
+
+  // Fail closed. The vendor tag executes opaque cross-origin requests that
+  // cannot be contained by the app boundary. Keep the consent and route gates
+  // above so a future supported server-side integration inherits them, while
+  // exposing the bounded state through <html data-instantly-runtime="...">.
+  return null;
 }

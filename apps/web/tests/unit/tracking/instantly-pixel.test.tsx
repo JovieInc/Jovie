@@ -1,4 +1,4 @@
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, waitFor } from '@testing-library/react';
 import {
   afterEach,
   beforeAll,
@@ -11,8 +11,6 @@ import {
 
 // --- Shared mock state ---
 let _marketingAllowed = true;
-let _gpcEnabled = false;
-let _dntEnabled = false;
 let _isDemo = false;
 let _pathname = '/';
 let _isTest = false;
@@ -60,8 +58,6 @@ vi.mock('@/lib/tracking/consent', async importOriginal => {
   return {
     ...original,
     isMarketingAllowed: () => _marketingAllowed,
-    isGPCEnabled: () => _gpcEnabled,
-    isDNTEnabled: () => _dntEnabled,
   };
 });
 
@@ -77,14 +73,6 @@ function hasScript(container: HTMLElement): boolean {
   return container.querySelector('[data-testid="next-script"]') !== null;
 }
 
-function getScriptAttr(container: HTMLElement, attr: string): string | null {
-  return (
-    container
-      .querySelector('[data-testid="next-script"]')
-      ?.getAttribute(attr) ?? null
-  );
-}
-
 describe('InstantlyPixel', () => {
   beforeEach(() => {
     _pixelId = 'test-pixel-id';
@@ -93,143 +81,83 @@ describe('InstantlyPixel', () => {
     _isE2E = false;
     _isDemo = false;
     _marketingAllowed = true;
-    _gpcEnabled = false;
-    _dntEnabled = false;
     globalThis.JVConsent = undefined;
+    delete document.documentElement.dataset.instantlyRuntime;
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it('renders Script with correct attributes when all conditions are met', () => {
+  it('disables the opaque vendor runtime when consent and route gates pass', async () => {
     const { container } = render(<InstantlyPixel />);
-    expect(hasScript(container)).toBe(true);
-    expect(getScriptAttr(container, 'data-pid')).toBe('test-pixel-id');
-    expect(getScriptAttr(container, 'data-version')).toBe('062024');
-    expect(getScriptAttr(container, 'src')).toBe('https://r2.leadsy.ai/tag.js');
-    expect(getScriptAttr(container, 'strategy')).toBe('lazyOnload');
+    expect(hasScript(container)).toBe(false);
+    await waitFor(() =>
+      expect(document.documentElement.dataset.instantlyRuntime).toBe(
+        'disabled-vendor-runtime-isolation'
+      )
+    );
   });
 
-  it('returns null when NEXT_PUBLIC_INSTANTLY_PIXEL_ID is not set', () => {
+  it('reports an unconfigured integration without loading a script', () => {
     _pixelId = undefined;
     const { container } = render(<InstantlyPixel />);
     expect(hasScript(container)).toBe(false);
+    expect(document.documentElement.dataset.instantlyRuntime).toBe(
+      'suppressed-unconfigured'
+    );
   });
 
-  // --- Allowlist: routes that should NOT fire the pixel ---
-
-  it('returns null on /signin (auth surface — audit finding #8)', () => {
-    _pathname = '/signin';
+  it.each([
+    '/signin',
+    '/signup',
+    '/app/dashboard',
+    '/onboarding/handle',
+    '/billing/success',
+    '/sso-callback',
+    '/some-new-auth-route',
+  ])('fails closed on denied route %s', pathname => {
+    _pathname = pathname;
     const { container } = render(<InstantlyPixel />);
     expect(hasScript(container)).toBe(false);
+    expect(document.documentElement.dataset.instantlyRuntime).toBe(
+      'suppressed-route'
+    );
   });
 
-  it('returns null on /signup (auth surface — audit finding #8)', () => {
-    _pathname = '/signup';
-    const { container } = render(<InstantlyPixel />);
-    expect(hasScript(container)).toBe(false);
-  });
-
-  it('returns null on /app/dashboard route', () => {
-    _pathname = '/app/dashboard';
-    const { container } = render(<InstantlyPixel />);
-    expect(hasScript(container)).toBe(false);
-  });
-
-  it('returns null on /onboarding route', () => {
-    _pathname = '/onboarding/handle';
-    const { container } = render(<InstantlyPixel />);
-    expect(hasScript(container)).toBe(false);
-  });
-
-  it('returns null on /billing route', () => {
-    _pathname = '/billing/success';
-    const { container } = render(<InstantlyPixel />);
-    expect(hasScript(container)).toBe(false);
-  });
-
-  it('returns null on /sso-callback (not in allowlist)', () => {
-    _pathname = '/sso-callback';
-    const { container } = render(<InstantlyPixel />);
-    expect(hasScript(container)).toBe(false);
-  });
-
-  it('returns null on an unknown future route (fail-closed default)', () => {
-    _pathname = '/some-new-auth-route';
-    const { container } = render(<InstantlyPixel />);
-    expect(hasScript(container)).toBe(false);
-  });
-
-  it('does not treat /about-us as matching /about prefix', () => {
-    // /about-us is NOT in the allowlist; only /about and /about/* are allowed
+  it('does not treat a similarly named route as allowlisted', () => {
     _pathname = '/about-us';
     const { container } = render(<InstantlyPixel />);
     expect(hasScript(container)).toBe(false);
+    expect(document.documentElement.dataset.instantlyRuntime).toBe(
+      'suppressed-route'
+    );
   });
 
-  // --- Allowlist: routes that SHOULD fire the pixel ---
-
-  it('renders on / (home — exact match)', () => {
-    _pathname = '/';
-    const { container } = render(<InstantlyPixel />);
-    expect(hasScript(container)).toBe(true);
-  });
-
-  it('renders on /about', () => {
-    _pathname = '/about';
-    const { container } = render(<InstantlyPixel />);
-    expect(hasScript(container)).toBe(true);
-  });
-
-  it('renders on /blog/some-post (sub-path of allowed prefix)', () => {
-    _pathname = '/blog/some-post';
-    const { container } = render(<InstantlyPixel />);
-    expect(hasScript(container)).toBe(true);
-  });
-
-  it('renders on /changelog', () => {
-    _pathname = '/changelog';
-    const { container } = render(<InstantlyPixel />);
-    expect(hasScript(container)).toBe(true);
-  });
-
-  it('renders on /artist-profiles', () => {
-    _pathname = '/artist-profiles';
-    const { container } = render(<InstantlyPixel />);
-    expect(hasScript(container)).toBe(true);
-  });
-
-  it('returns null in test runtime', () => {
+  it('suppresses passive and demo-recording runtimes', () => {
     _isTest = true;
-    const { container } = render(<InstantlyPixel />);
+    const { container, unmount } = render(<InstantlyPixel />);
     expect(hasScript(container)).toBe(false);
-  });
+    expect(document.documentElement.dataset.instantlyRuntime).toBe(
+      'suppressed-passive-runtime'
+    );
 
-  it('returns null in demo recording mode', () => {
+    unmount();
+    _isTest = false;
     _isDemo = true;
-    const { container } = render(<InstantlyPixel />);
-    expect(hasScript(container)).toBe(false);
+    render(<InstantlyPixel />);
+    expect(document.documentElement.dataset.instantlyRuntime).toBe(
+      'suppressed-demo-recording'
+    );
   });
 
-  it('returns null when marketing consent is rejected', () => {
+  it('keeps rejection consent-gated without loading the vendor', () => {
     _marketingAllowed = false;
     const { container } = render(<InstantlyPixel />);
     expect(hasScript(container)).toBe(false);
-  });
-
-  it('returns null when GPC is enabled', () => {
-    _gpcEnabled = true;
-    // isMarketingAllowed checks GPC internally, but we mock it separately
-    _marketingAllowed = false;
-    const { container } = render(<InstantlyPixel />);
-    expect(hasScript(container)).toBe(false);
-  });
-
-  it('renders on public routes like /pricing', () => {
-    _pathname = '/pricing';
-    const { container } = render(<InstantlyPixel />);
-    expect(hasScript(container)).toBe(true);
+    expect(document.documentElement.dataset.instantlyRuntime).toBe(
+      'suppressed-no-consent'
+    );
   });
 });
 

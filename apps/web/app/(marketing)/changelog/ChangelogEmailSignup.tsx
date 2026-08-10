@@ -6,12 +6,14 @@ import { ArrowRight, Mail } from 'lucide-react';
 import {
   type FocusEvent,
   type FormEvent,
+  useCallback,
   useEffect,
   useRef,
   useState,
 } from 'react';
 import {
   InvisibleTurnstile,
+  type InvisibleTurnstileState,
   isTurnstileClientBypassed,
   isTurnstileClientConfigured,
 } from '@/components/atoms/InvisibleTurnstile';
@@ -24,6 +26,14 @@ type RevealVisualState =
   | 'submitting'
   | 'success'
   | 'error';
+
+const TURNSTILE_FAILURE_STATUSES = new Set([
+  'error',
+  'expired',
+  'timeout',
+  'unsupported',
+  'unconfigured',
+]);
 
 function getRevealVisualState(
   status: Status,
@@ -43,16 +53,19 @@ export function ChangelogEmailSignup() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileResetSignal, setTurnstileResetSignal] = useState(0);
+  const [turnstileInteractive, setTurnstileInteractive] = useState(false);
+  const turnstileFailureActiveRef = useRef(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const prefersReducedMotion = useReducedMotion();
   const turnstileRequired =
     isTurnstileClientConfigured() && !isTurnstileClientBypassed();
+  const [turnstileFailed, setTurnstileFailed] = useState(false);
 
   const visualState = getRevealVisualState(status, isExpanded);
 
   useEffect(() => {
-    if (!isExpanded || status === 'success') return;
+    if (!isExpanded || status === 'success' || turnstileInteractive) return;
 
     const timeoutId = globalThis.setTimeout(
       () => {
@@ -62,20 +75,59 @@ export function ChangelogEmailSignup() {
     );
 
     return () => globalThis.clearTimeout(timeoutId);
-  }, [isExpanded, prefersReducedMotion, status]);
+  }, [isExpanded, prefersReducedMotion, status, turnstileInteractive]);
 
   function expandComposer() {
     setIsExpanded(true);
   }
 
   function collapseComposerIfEmpty() {
-    if (status === 'submitting' || status === 'success') return;
+    if (
+      status === 'submitting' ||
+      status === 'success' ||
+      turnstileFailureActiveRef.current
+    )
+      return;
     if (email.trim()) return;
 
     setIsExpanded(false);
     setErrorMessage('');
     setStatus('idle');
   }
+
+  const handleTurnstileStateChange = useCallback(
+    (state: InvisibleTurnstileState) => {
+      if (state.status === 'interactive') {
+        setTurnstileInteractive(true);
+        setIsExpanded(true);
+        return;
+      }
+
+      if (!TURNSTILE_FAILURE_STATUSES.has(state.status)) {
+        if (state.status === 'verified' || state.status === 'bypassed') {
+          setTurnstileInteractive(false);
+          if (turnstileFailureActiveRef.current) {
+            turnstileFailureActiveRef.current = false;
+            setStatus('idle');
+            setErrorMessage('');
+          }
+          setTurnstileFailed(false);
+        }
+        return;
+      }
+
+      turnstileFailureActiveRef.current = true;
+      setTurnstileInteractive(false);
+      setTurnstileFailed(true);
+      setTurnstileToken('');
+      setStatus('error');
+      setErrorMessage(
+        state.message ?? 'Subscription is temporarily unavailable.'
+      );
+      setIsExpanded(true);
+    },
+    []
+  );
 
   function handleShellBlurCapture(_event: FocusEvent<HTMLDivElement>) {
     globalThis.setTimeout(() => {
@@ -126,7 +178,6 @@ export function ChangelogEmailSignup() {
 
       setStatus('success');
       setEmail('');
-      setTurnstileResetSignal(signal => signal + 1);
       setIsExpanded(true);
     } catch (err) {
       setStatus('error');
@@ -198,7 +249,7 @@ export function ChangelogEmailSignup() {
                 value={email}
                 onChange={e => {
                   setEmail(e.target.value);
-                  if (status === 'error') {
+                  if (status === 'error' && !turnstileFailed) {
                     setStatus('idle');
                     setErrorMessage('');
                   }
@@ -211,7 +262,12 @@ export function ChangelogEmailSignup() {
                 required
                 className='min-w-0 border-transparent bg-transparent shadow-none hover:border-transparent focus-visible:border-transparent'
                 disabled={status === 'submitting'}
-                aria-invalid={status === 'error' ? 'true' : undefined}
+                aria-invalid={
+                  status === 'error' && !turnstileFailed ? 'true' : undefined
+                }
+                aria-describedby={
+                  status === 'error' ? 'changelog-subscribe-status' : undefined
+                }
               />
 
               <Button
@@ -220,16 +276,23 @@ export function ChangelogEmailSignup() {
                 loading={status === 'submitting'}
                 disabled={
                   status === 'submitting' ||
+                  turnstileFailed ||
                   (turnstileRequired && !turnstileToken)
+                }
+                aria-describedby={
+                  status === 'error' ? 'changelog-subscribe-status' : undefined
                 }
               >
                 Subscribe
               </Button>
             </div>
-            <InvisibleTurnstile
-              onToken={setTurnstileToken}
-              resetSignal={turnstileResetSignal}
-            />
+            {status === 'success' ? null : (
+              <InvisibleTurnstile
+                onToken={setTurnstileToken}
+                onStateChange={handleTurnstileStateChange}
+                resetSignal={turnstileResetSignal}
+              />
+            )}
           </form>
 
           <div className='cta-reveal-panel cta-reveal-panel--status p-1'>
@@ -243,6 +306,7 @@ export function ChangelogEmailSignup() {
         </div>
 
         <p
+          id='changelog-subscribe-status'
           className='cta-reveal-support mt-3 text-sm text-accent-red'
           role={status === 'error' ? 'alert' : undefined}
         >
