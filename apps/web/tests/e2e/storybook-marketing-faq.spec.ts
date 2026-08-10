@@ -18,14 +18,27 @@ interface FaqGeometry {
   readonly panels: readonly Awaited<ReturnType<Locator['boundingBox']>>[];
 }
 
-async function openFaqStory(page: Page) {
+interface MotionState {
+  readonly animationDuration: string;
+  readonly transitionDuration: string;
+  readonly transitionProperty: string;
+  readonly transform: string;
+  readonly translate: string;
+  readonly scale: string;
+  readonly boxShadow: string;
+}
+
+async function openFaqStory(
+  page: Page,
+  reducedMotion: 'reduce' | 'no-preference' = 'reduce'
+) {
   await page.addInitScript(() => {
     // The isolated Storybook document starts shorter than the viewport. Keep
     // the scrollbar gutter stable so opening a semantic disclosure cannot
     // make the outer test canvas recenter or resize unrelated content.
     document.documentElement.style.scrollbarGutter = 'stable';
   });
-  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.emulateMedia({ reducedMotion });
   await page.goto(`/iframe.html?id=${FAQ_STORY_ID}&viewMode=story`, {
     waitUntil: 'networkidle',
   });
@@ -37,6 +50,44 @@ async function openFaqStory(page: Page) {
     'bounded-local-disclosure'
   );
   return section;
+}
+
+async function readMotionState(locator: Locator): Promise<MotionState> {
+  return locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      animationDuration: style.animationDuration,
+      transitionDuration: style.transitionDuration,
+      transitionProperty: style.transitionProperty,
+      transform: style.transform,
+      translate: style.translate,
+      scale: style.scale,
+      boxShadow: style.boxShadow,
+    };
+  });
+}
+
+async function countActiveAnimations(section: Locator): Promise<number> {
+  return section.evaluate(
+    element =>
+      element
+        .getAnimations({ subtree: true })
+        .filter(
+          animation => animation.playState === 'running' || animation.pending
+        ).length
+  );
+}
+
+function expectZeroDurations(value: string, label: string): void {
+  for (const duration of value.split(',')) {
+    expect(Number.parseFloat(duration), `${label}: ${value}`).toBe(0);
+  }
+}
+
+function expectNoTransform(state: MotionState): void {
+  expect(state.transform).toBe('none');
+  expect(state.translate).toBe('none');
+  expect(state.scale).toBe('none');
 }
 
 async function readDocumentBox(locator: Locator) {
@@ -143,12 +194,36 @@ test.describe('canonical marketing FAQ disclosure geometry', () => {
       await page.keyboard.press('Home');
       await page.keyboard.press('ArrowDown');
       await expect(triggers.nth(1)).toBeFocused();
+      const focusedReducedMotion = await readMotionState(triggers.nth(1));
+      expectZeroDurations(
+        focusedReducedMotion.animationDuration,
+        'focused trigger animation duration'
+      );
+      expectZeroDurations(
+        focusedReducedMotion.transitionDuration,
+        'focused trigger transition duration'
+      );
+      expectNoTransform(focusedReducedMotion);
+      expect(await countActiveAnimations(section)).toBe(0);
       await installInteractionClsObserver(page);
       await page.keyboard.press('Enter');
       await expect(triggers.nth(1)).toHaveAttribute('aria-expanded', 'true');
       await expect(panels.nth(1)).toHaveAttribute('aria-hidden', 'false');
       await expect(panels.nth(1)).not.toHaveAttribute('hidden', '');
       await expect(panels.nth(1)).toHaveCSS('transition-duration', '0s');
+      const openedReducedMotion = await readMotionState(triggers.nth(1));
+      expectZeroDurations(
+        openedReducedMotion.animationDuration,
+        'opened trigger animation duration'
+      );
+      expectZeroDurations(
+        openedReducedMotion.transitionDuration,
+        'opened trigger transition duration'
+      );
+      expectNoTransform(openedReducedMotion);
+      expect(await countActiveAnimations(section)).toBe(0);
+      await page.waitForTimeout(20);
+      expect(await countActiveAnimations(section)).toBe(0);
       const expandedGeometry = await readFaqGeometry(section);
       await settleLayout(page);
       // CLS excludes every shift shortly after qualifying input, including an
@@ -201,12 +276,48 @@ test.describe('canonical marketing FAQ disclosure geometry', () => {
       await expect(triggers.nth(2)).toHaveAttribute('aria-expanded', 'false');
       await expect(panels.nth(2)).toHaveAttribute('aria-hidden', 'true');
       await expect(panels.nth(2)).toHaveAttribute('hidden', '');
+      const closedReducedMotion = await readMotionState(triggers.nth(2));
+      expectZeroDurations(
+        closedReducedMotion.animationDuration,
+        'closed trigger animation duration'
+      );
+      expectZeroDurations(
+        closedReducedMotion.transitionDuration,
+        'closed trigger transition duration'
+      );
+      expectNoTransform(closedReducedMotion);
+      expect(await countActiveAnimations(section)).toBe(0);
+      await page.waitForTimeout(20);
+      expect(await countActiveAnimations(section)).toBe(0);
       expect(await readFaqGeometry(section)).toEqual(collapsedGeometry);
 
       const horizontalOverflow = await page.evaluate(
         () => document.documentElement.scrollWidth - window.innerWidth
       );
       expect(horizontalOverflow).toBeLessThanOrEqual(0);
+    });
+
+    test(`${viewport.label} preserves normal-motion keyboard focus without transforms`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      const section = await openFaqStory(page, 'no-preference');
+      const firstTrigger = section.locator('.faq-accordion__trigger').first();
+
+      await page.keyboard.press('Tab');
+      await expect(firstTrigger).toBeFocused();
+      await page.waitForTimeout(200);
+
+      const focusedMotion = await readMotionState(firstTrigger);
+      expect(focusedMotion.transitionProperty).toContain('box-shadow');
+      expect(focusedMotion.transitionProperty).toContain('border-color');
+      expect(focusedMotion.transitionDuration).toContain('0.15s');
+      expect(focusedMotion.boxShadow).not.toBe('none');
+      expectNoTransform(focusedMotion);
+
+      await page.keyboard.press('Enter');
+      await expect(firstTrigger).toHaveAttribute('aria-expanded', 'true');
+      expectNoTransform(await readMotionState(firstTrigger));
     });
   }
 });

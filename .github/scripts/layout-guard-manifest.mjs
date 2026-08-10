@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import { existsSync } from 'node:fs';
 
-export const REQUIRED_LAYOUT_GUARD_SPECS = ['tests/e2e/hud-scroll.spec.ts'];
+export const REQUIRED_LAYOUT_GUARD_SPECS = [
+  'tests/e2e/hud-scroll.spec.ts',
+  'tests/e2e/marketing-faq-width-invariance.spec.ts',
+];
 
 export const OPTIONAL_LAYOUT_GUARD_SPECS = [
   'tests/e2e/marketing-document-scroll.spec.ts',
