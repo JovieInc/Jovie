@@ -495,9 +495,10 @@ export function HeaderNav({
       data-presentation={presentation}
       data-scrolled={isScrolled ? 'true' : undefined}
       className={cn(
+        'header-nav',
         isMarketingGlass
           ? 'marketing-glass-header fixed top-0 left-0 right-0 w-full'
-          : 'fixed top-0 left-0 right-0 w-full transition-colors duration-subtle',
+          : 'fixed top-0 left-0 right-0 w-full transition-colors duration-subtle motion-reduce:transition-none',
         presentation === 'homepage-embedded' || isMarketingGlass
           ? 'border-b border-transparent'
           : 'border-b',

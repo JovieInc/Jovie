@@ -27,6 +27,12 @@ const strictSources = [
 
 const playerSource = 'components/features/demo/DemoVideoPlayer.tsx' as const;
 
+const sharedMotionSources = {
+  button: '../../packages/ui/atoms/button.tsx',
+  header: 'components/organisms/HeaderNav.css',
+  pill: '../../packages/ui/lib/linear-pill.ts',
+} as const;
+
 const forbiddenVisualPatterns = [
   /style=\{/,
   /#[0-9a-fA-F]{3,8}/,
@@ -80,5 +86,30 @@ describe('demovideo page System B source contract', () => {
     expect(source).toContain('text-primary-token');
     expect(source).toContain('border-subtle');
     expect(source).toContain('<DemoVideoPlayer');
+  });
+
+  it('disables demo actions and shared header transitions for reduced motion', () => {
+    const demoSource = readFileSync(
+      resolve(process.cwd(), strictSources[1]),
+      'utf8'
+    );
+    const buttonSource = readFileSync(
+      resolve(process.cwd(), sharedMotionSources.button),
+      'utf8'
+    );
+    const pillSource = readFileSync(
+      resolve(process.cwd(), sharedMotionSources.pill),
+      'utf8'
+    );
+    const headerSource = readFileSync(
+      resolve(process.cwd(), sharedMotionSources.header),
+      'utf8'
+    );
+
+    expect(demoSource).toContain('motion-reduce:!transition-none');
+    expect(buttonSource).toContain('motion-reduce:!transition-none');
+    expect(pillSource).toContain('motion-reduce:!transition-none');
+    expect(headerSource).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(headerSource).toContain('transition: none;');
   });
 });

@@ -36,7 +36,7 @@ export function DemoVideoPage() {
       <div className='mt-10 flex flex-wrap items-center justify-center gap-4'>
         <a
           href={downloadHref}
-          className='inline-flex h-12 items-center rounded-full border border-subtle px-8 text-sm font-semibold text-primary-token transition-colors hover:bg-(--color-cell-hover)'
+          className='inline-flex h-12 items-center rounded-full border border-subtle px-8 text-sm font-semibold text-primary-token transition-colors motion-reduce:!transition-none hover:bg-(--color-cell-hover)'
           download='jovie-demo.mp4'
         >
           Download demo

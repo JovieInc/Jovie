@@ -224,6 +224,16 @@ describe('Button', () => {
     );
   });
 
+  it('keeps normal focus transitions while disabling them for reduced motion', () => {
+    render(<Button>Press</Button>);
+    const btn = screen.getByRole('button');
+
+    expect(btn.className).toContain(
+      'transition-[background-color,border-color,color,box-shadow,opacity,transform]'
+    );
+    expect(btn.className).toContain('motion-reduce:!transition-none');
+  });
+
   it('uses raised control styling for secondary buttons', () => {
     render(<Button variant='secondary'>Press</Button>);
     const btn = screen.getByRole('button');
