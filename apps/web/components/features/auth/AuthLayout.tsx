@@ -278,7 +278,7 @@ export function AuthLayout({
         >
           <Link
             href='/'
-            className='inline-flex items-center justify-center text-white/45 transition-colors duration-subtle hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
+            className='inline-flex size-11 shrink-0 items-center justify-center text-white/45 transition-colors duration-subtle hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
             // ui-casing-allow: must match canonical sentence-case HOME_LINK_LABEL in useNormalizeClerkHomeLink
             aria-label='Go to homepage'
             tabIndex={isKeyboardVisible ? -1 : undefined}

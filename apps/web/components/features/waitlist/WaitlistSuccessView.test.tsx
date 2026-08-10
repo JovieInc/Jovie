@@ -25,6 +25,26 @@ describe('WaitlistSuccessView', () => {
     ).toHaveAttribute('href', '/start');
   });
 
+  it.each([
+    { label: 'desktop', width: 1024, height: 900 },
+    { label: 'mobile', width: 390, height: 844 },
+  ])('$label keeps the shared action target at 44px', ({ width, height }) => {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: width,
+    });
+    Object.defineProperty(window, 'innerHeight', {
+      configurable: true,
+      value: height,
+    });
+
+    render(<WaitlistSuccessView />);
+
+    const resume = screen.getByRole('link', { name: 'Resume At Start' });
+    expect(resume).toHaveAttribute('data-size', 'lg');
+    expect(resume).toHaveClass('h-11');
+  });
+
   it('keeps server state and redirects route-owned while the story uses the exact body', () => {
     const routeSource = readFileSync(
       resolve(process.cwd(), 'app/waitlist/page.tsx'),
@@ -62,5 +82,20 @@ describe('WaitlistSuccessView', () => {
     expect(storySource).not.toContain("recipeId: 'waitlist'");
     expect(storyMeta.component).toBe(WaitlistSuccessView);
     expect(Web214AuthenticatedPending.render).toBeTypeOf('function');
+
+    const outcomeSource = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/waitlist/WaitlistOutcomeView.tsx'
+      ),
+      'utf8'
+    );
+    expect(outcomeSource).not.toContain('PRIMARY_CTA_CLASS');
+    expect(outcomeSource).not.toContain('SECONDARY_BTN_CLASS');
+    expect(outcomeSource).toContain(
+      "<Button asChild variant='primary' size='lg'>"
+    );
+    expect(outcomeSource).toContain("variant='secondary'");
+    expect(outcomeSource).toContain("size='lg'");
   });
 });

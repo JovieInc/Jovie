@@ -9,6 +9,9 @@ vi.mock('@clerk/nextjs', () => ({
 }));
 
 vi.mock('@jovie/ui', () => ({
+  Button: ({ children }: { readonly children: ReactNode }) => (
+    <button type='button'>{children}</button>
+  ),
   DropdownMenu: ({ children }: { readonly children: ReactNode }) => children,
   DropdownMenuContent: ({ children }: { readonly children: ReactNode }) => (
     <div>{children}</div>
@@ -82,6 +85,7 @@ describe('AuthLayout', () => {
       'href',
       '/'
     );
+    expect(screen.getByLabelText('Go to homepage')).toHaveClass('size-11');
   });
 
   it('keeps the footer prompt opt-in through the auth shell contract', async () => {
