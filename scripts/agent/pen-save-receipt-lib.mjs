@@ -168,10 +168,20 @@ export function buildPenSaveReceipt(input = {}) {
   for (const [code, message, value] of chronology) {
     if (!value) block(code, message);
   }
-  if (chronology.every(([, , value]) => value)) {
-    const ordered = chronology.map(
-      ([, , value]) => value?.milliseconds ?? Number.NaN
-    );
+  if (
+    batchStartedAt &&
+    requestedAt &&
+    acknowledgedAt &&
+    postReadbackAt &&
+    recordedAt
+  ) {
+    const ordered = [
+      batchStartedAt.milliseconds,
+      requestedAt.milliseconds,
+      acknowledgedAt.milliseconds,
+      postReadbackAt.milliseconds,
+      recordedAt.milliseconds,
+    ];
     if (
       ordered.some((value, index) => index > 0 && value < ordered[index - 1])
     ) {
