@@ -268,25 +268,27 @@ JSON
         assert "Typecheck" in result.stdout
 
     def test_hard_gated_prs_dequeue_and_do_not_enqueue(self, tmp_path: Path) -> None:
+        admitted_head = "a" * 40
         fake_gh = tmp_path / "gh"
         fake_gh.write_text(
             textwrap.dedent(
-                """\
+                f"""\
                 #!/usr/bin/env bash
                 set -euo pipefail
                 if [[ "$1 $2" == "pr list" ]]; then
                   cat <<'JSON'
-                [{"n":456,"t":"Taste approved PR","draft":false,"m":"MERGEABLE","head":"codex/jov-456-taste","L":["needs-human","approved:taste"],"fail":[]},{"n":789,"t":"Human gated PR","draft":false,"m":"MERGEABLE","head":"codex/jov-789-human","L":["needs-human","merge-queue"],"fail":[]},{"n":102,"t":"Deferred PR","draft":false,"m":"MERGEABLE","head":"codex/jov-102-deferred","L":["queue-deferred","merge-queue"],"fail":[]},{"n":103,"t":"Draft PR","draft":true,"m":"MERGEABLE","head":"codex/jov-103-draft","L":["merge-queue"],"fail":[]},{"n":101,"t":"Clean PR","draft":false,"m":"MERGEABLE","head":"codex/jov-101-clean","L":[],"fail":[]}]
+                [{{"n":456,"t":"Taste approved PR","draft":false,"m":"MERGEABLE","head":"codex/jov-456-taste","L":["needs-human","approved:taste"],"fail":[]}},{{"n":789,"t":"Human gated PR","draft":false,"m":"MERGEABLE","head":"codex/jov-789-human","L":["needs-human","merge-queue"],"fail":[]}},{{"n":102,"t":"Deferred PR","draft":false,"m":"MERGEABLE","head":"codex/jov-102-deferred","L":["queue-deferred","merge-queue"],"fail":[]}},{{"n":103,"t":"Draft PR","draft":true,"m":"MERGEABLE","head":"codex/jov-103-draft","L":["merge-queue"],"fail":[]}},{{"n":101,"t":"Target clean PR","draft":false,"m":"MERGEABLE","head":"codex/jov-101-clean","L":[],"fail":[]}},{{"n":104,"t":"Unrelated clean PR","draft":false,"m":"MERGEABLE","head":"codex/jov-104-clean","L":[],"fail":[]}}]
 JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  [[ "$3" == "101" ]]
-                  echo '[{"name":"PR Ready","bucket":"pass","state":"SUCCESS"},{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}]'
+                  [[ "$3" == "101" || "$3" == "104" ]]
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
-                  echo '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[]}'
+                  [[ "$3" == "101" ]]
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{admitted_head}"}}'
                   exit 0
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -298,7 +300,13 @@ JSON
         fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
         result = _run_bash(
-            _drain_command(tmp_path, extra_env="DRY_RUN=1")
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_ADMISSION_PR=101 "
+                    f"DRAIN_ADMISSION_HEAD={admitted_head}"
+                ),
+            )
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
@@ -311,9 +319,82 @@ JSON
         assert "[dry-run] would +merge-queue on #789" not in result.stdout
         assert "[dry-run] would +merge-queue on #102" not in result.stdout
         assert "[dry-run] would +merge-queue on #103" not in result.stdout
+        assert "[dry-run] would +merge-queue on #104" not in result.stdout
         assert "=== SURFACE (human decision; not touched) ===" in result.stdout
         assert "#456" in result.stdout
         assert "#789" in result.stdout
+
+    def test_maintenance_only_run_cannot_admit_a_clean_pr(self, tmp_path: Path) -> None:
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{"n":105,"t":"Clean PR","draft":false,"m":"MERGEABLE","head":"codex/jov-105-clean","L":[],"fail":[]}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}]'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(_drain_command(tmp_path, extra_env="DRY_RUN=1"))
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "admission scope: maintenance-only" in result.stdout
+        assert "would +merge-queue" not in result.stdout
+
+    def test_exact_head_mismatch_refuses_targeted_admission(self, tmp_path: Path) -> None:
+        live_head = "a" * 40
+        event_head = "b" * 40
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":106,"t":"Head moved","draft":false,"m":"MERGEABLE","head":"codex/jov-106-moved","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{live_head}"}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_ADMISSION_PR=106 "
+                    f"DRAIN_ADMISSION_HEAD={event_head}"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "event admission scope no longer matches #106" in result.stdout
+        assert "would +merge-queue" not in result.stdout
 
     def test_main_push_releases_only_current_green_auto_merge_deferrals(
         self, tmp_path: Path

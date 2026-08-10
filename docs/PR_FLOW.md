@@ -96,10 +96,12 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 
 ## 3. Merge: autonomous, per-PR, self-healing
 
-- **Enrollment is automatic.** `merge-queue-autoenroll` revalidates every
-  mergeable, non-failing, non-taste PR at its exact head, enrolls it in GitHub's
-  native queue, then keeps `merge-queue` only as intent/audit evidence. You
-  don't merge by hand.
+- **Enrollment is automatic and event-scoped.** `merge-queue-autoenroll`
+  revalidates only the PR associated with the triggering PR/CI event at that
+  event's exact published head. Main-push and untargeted manual runs retain
+  global dequeue/reconciliation authority but cannot create new admissions.
+  Enrollment uses GitHub's native queue; `merge-queue` remains intent/audit
+  evidence only. You don't merge by hand.
 - **The queue tolerates transient state.** A PR is only dequeued on a real merge
   conflict, `needs-conflict-resolution`, or a **terminal** failing check
   (`FAILURE`/`ERROR`/`TIMED_OUT`/`ACTION_REQUIRED`). A `pending`/`queued`/`cancelled`
