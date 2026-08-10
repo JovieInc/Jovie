@@ -48,6 +48,34 @@ describe('web-171 library share drop source contract', () => {
     );
   });
 
+  it('renders smart-link and preview actions with canonical target geometry', () => {
+    const asset = WEB171_DROP_VIEW.assets[0];
+
+    render(
+      <LibraryShareDropSurface
+        view={{
+          ...WEB171_DROP_VIEW,
+          downloadsEnabled: true,
+          assets: [
+            {
+              ...asset,
+              includePreview: true,
+              previewUrl: 'https://cdn.example.test/preview.mp3',
+            },
+          ],
+        }}
+        initialUnlocked
+      />
+    );
+
+    expect(screen.getByRole('link', { name: 'Open smart link' })).toHaveClass(
+      'h-11'
+    );
+    expect(screen.getByRole('link', { name: 'Download preview' })).toHaveClass(
+      'h-11'
+    );
+  });
+
   it('keeps token lookup and passphrase access in the server route', () => {
     const route = readFileSync(
       resolve(process.cwd(), 'app/drop/[token]/page.tsx'),
@@ -70,5 +98,33 @@ describe('web-171 library share drop source contract', () => {
     expect(story).toContain('FOUNDER_DEMO_PERSONA.releases[0]');
     expect(story).toContain("token: 'drop-token'");
     expect(story).not.toContain('passphrase:');
+  });
+
+  it('uses canonical accessible actions and prioritizes only first artwork', () => {
+    const card = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/library-share/LibraryShareAssetCard.tsx'
+      ),
+      'utf8'
+    );
+    const layouts = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/features/library-share/LibraryShareAssetLayouts.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(card).toContain("import { Button } from '@jovie/ui'");
+    expect(
+      card.match(/<Button asChild variant='secondary' size='lg'>/g)
+    ).toHaveLength(2);
+    expect(card).toContain('priority={priorityArtwork}');
+    expect(card).not.toContain(
+      'font-medium text-primary-token transition-colors hover:bg-surface-1'
+    );
+    expect(layouts.match(/assets\.map\(\(asset, index\)/g)).toHaveLength(3);
+    expect(layouts.match(/priorityArtwork=\{index === 0\}/g)).toHaveLength(3);
   });
 });

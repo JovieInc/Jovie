@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { ArrowDownToLine, Disc3, FileText, PlayCircle } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -9,6 +10,7 @@ interface LibraryShareAssetCardProps {
   readonly asset: LibraryShareDropAsset;
   readonly downloadsEnabled: boolean;
   readonly layout: 'grid' | 'list' | 'reel';
+  readonly priorityArtwork?: boolean;
 }
 
 function formatReleaseDate(value: string | null): string {
@@ -27,6 +29,7 @@ export function LibraryShareAssetCard({
   asset,
   downloadsEnabled,
   layout,
+  priorityArtwork = false,
 }: LibraryShareAssetCardProps) {
   const isList = layout === 'list';
   const isReel = layout === 'reel';
@@ -58,6 +61,7 @@ export function LibraryShareAssetCard({
             fill
             sizes={isList ? '96px' : '(max-width: 768px) 100vw, 320px'}
             className='object-cover'
+            priority={priorityArtwork}
           />
         ) : (
           <div className='flex h-full w-full items-center justify-center text-tertiary-token'>
@@ -80,22 +84,19 @@ export function LibraryShareAssetCard({
         </div>
 
         <div className='flex flex-wrap items-center gap-2'>
-          <Link
-            href={asset.smartLinkPath}
-            className='inline-flex items-center gap-1.5 rounded-full border border-subtle px-3 py-1.5 text-xs font-medium text-primary-token transition-colors hover:bg-surface-1'
-          >
-            <PlayCircle className='h-3.5 w-3.5' strokeWidth={2.25} />
-            Open smart link
-          </Link>
+          <Button asChild variant='secondary' size='lg'>
+            <Link href={asset.smartLinkPath}>
+              <PlayCircle className='h-4 w-4' strokeWidth={2.25} />
+              Open smart link
+            </Link>
+          </Button>
           {asset.includePreview && asset.previewUrl && downloadsEnabled ? (
-            <a
-              href={asset.previewUrl}
-              download
-              className='inline-flex items-center gap-1.5 rounded-full border border-subtle px-3 py-1.5 text-xs font-medium text-primary-token transition-colors hover:bg-surface-1'
-            >
-              <ArrowDownToLine className='h-3.5 w-3.5' strokeWidth={2.25} />
-              Download preview
-            </a>
+            <Button asChild variant='secondary' size='lg'>
+              <a href={asset.previewUrl} download>
+                <ArrowDownToLine className='h-4 w-4' strokeWidth={2.25} />
+                Download preview
+              </a>
+            </Button>
           ) : null}
           {asset.includeLyrics && asset.lyrics ? (
             <span className='inline-flex items-center gap-1.5 rounded-full border border-subtle px-3 py-1.5 text-xs text-secondary-token'>

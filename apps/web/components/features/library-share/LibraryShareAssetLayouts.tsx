@@ -30,12 +30,13 @@ export function LibraryShareAssetLayouts({
         className='flex flex-col gap-3'
         data-testid='library-share-layout-list'
       >
-        {assets.map(asset => (
+        {assets.map((asset, index) => (
           <LibraryShareAssetCard
             key={asset.id}
             asset={asset}
             downloadsEnabled={downloadsEnabled}
             layout='list'
+            priorityArtwork={index === 0}
           />
         ))}
       </div>
@@ -48,12 +49,13 @@ export function LibraryShareAssetLayouts({
         className='flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory'
         data-testid='library-share-layout-reel'
       >
-        {assets.map(asset => (
+        {assets.map((asset, index) => (
           <LibraryShareAssetCard
             key={asset.id}
             asset={asset}
             downloadsEnabled={downloadsEnabled}
             layout='reel'
+            priorityArtwork={index === 0}
           />
         ))}
       </div>
@@ -65,12 +67,13 @@ export function LibraryShareAssetLayouts({
       className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'
       data-testid='library-share-layout-grid'
     >
-      {assets.map(asset => (
+      {assets.map((asset, index) => (
         <LibraryShareAssetCard
           key={asset.id}
           asset={asset}
           downloadsEnabled={downloadsEnabled}
           layout='grid'
+          priorityArtwork={index === 0}
         />
       ))}
     </div>
