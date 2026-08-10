@@ -58,7 +58,7 @@ export function Spinner({
         <span
           className={cn(
             'absolute inset-0 rounded-full border-2 border-current border-t-transparent',
-            'animate-spin motion-reduce:animate-[spin_1.2s_linear_infinite]',
+            'animate-spin motion-reduce:animate-none',
             'will-change-transform'
           )}
         />

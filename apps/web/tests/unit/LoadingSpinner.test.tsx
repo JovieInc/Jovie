@@ -57,7 +57,7 @@ describe('LoadingSpinner', () => {
       expect(backgroundRing).toHaveClass('motion-reduce:transition-none');
     });
 
-    it('spinning element uses slower animation for reduced motion users', () => {
+    it('spinning element keeps animate-spin under normal motion', () => {
       render(<LoadingSpinner />);
 
       const spinner = screen.getByRole('status');
@@ -69,8 +69,25 @@ describe('LoadingSpinner', () => {
         '.border-t-transparent'
       );
       expect(spinningElement).not.toBeNull();
-      // motion-reduce:animate-[spin_1.2s_linear_infinite] provides a slower, more comfortable animation
-      expect(spinningElement).toHaveClass(
+      expect(spinningElement).toHaveClass('animate-spin');
+    });
+
+    it('spinning element is static under reduced motion', () => {
+      render(<LoadingSpinner />);
+
+      const spinner = screen.getByRole('status');
+      const innerContainer = spinner.querySelector('[aria-hidden="true"]');
+      expect(innerContainer).not.toBeNull();
+
+      // The spinning element has border-t-transparent class
+      const spinningElement = innerContainer?.querySelector(
+        '.border-t-transparent'
+      );
+      expect(spinningElement).not.toBeNull();
+      // motion-reduce:animate-none fully disables the ring animation so no
+      // infinite CSS animation is running for reduced-motion users
+      expect(spinningElement).toHaveClass('motion-reduce:animate-none');
+      expect(spinningElement).not.toHaveClass(
         'motion-reduce:animate-[spin_1.2s_linear_infinite]'
       );
     });
