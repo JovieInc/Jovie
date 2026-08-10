@@ -1,11 +1,18 @@
+'use client';
+
 import { Badge } from '@jovie/ui/atoms/badge';
+import { Button } from '@jovie/ui/atoms/button';
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import type {
+  ChangelogInlineNode,
   ChangelogRelease,
   ChangelogSection,
 } from '@/lib/changelog-parser';
+import { parseChangelogInline } from '@/lib/changelog-parser';
 
-const INLINE_MARKDOWN_PATTERN = /(\*\*([^*\n]+)\*\*|`([^`\n]+)`)/g;
+const INITIAL_RELEASE_COUNT = 10;
+const RELEASE_BATCH_SIZE = 10;
 
 const SECTION_LABELS: Record<
   keyof ChangelogSection,
@@ -48,40 +55,33 @@ function formatDate(iso: string): string {
  * arbitrary HTML. React escapes every captured value, so changelog copy can
  * express emphasis and code while remaining safe for the public route.
  */
-function renderInlineMarkdown(value: string): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  let cursor = 0;
-
-  for (const match of value.matchAll(INLINE_MARKDOWN_PATTERN)) {
-    const index = match.index;
-    if (index > cursor) nodes.push(value.slice(cursor, index));
-
-    const [, token, strongText, codeText] = match;
-    if (strongText !== undefined) {
-      nodes.push(
-        <strong
-          key={`strong-${index}`}
-          className='font-medium text-primary-token'
-        >
-          {strongText}
-        </strong>
-      );
-    } else {
-      nodes.push(
+function renderInlineNodes(
+  nodes: readonly ChangelogInlineNode[],
+  keyPrefix: string
+): ReactNode[] {
+  return nodes.map((node, index) => {
+    const key = `${keyPrefix}-${index}`;
+    if (node.type === 'text') return node.value;
+    if (node.type === 'code') {
+      return (
         <code
-          key={`code-${index}`}
+          key={key}
           className='rounded-sm bg-surface-1 px-1 py-0.5 font-mono text-[0.92em] text-primary-token'
         >
-          {codeText}
+          {node.value}
         </code>
       );
     }
+    return (
+      <strong key={key} className='font-medium text-primary-token'>
+        {renderInlineNodes(node.children, key)}
+      </strong>
+    );
+  });
+}
 
-    cursor = index + token.length;
-  }
-
-  if (cursor < value.length) nodes.push(value.slice(cursor));
-  return nodes;
+function renderInlineMarkdown(value: string, keyPrefix: string): ReactNode[] {
+  return renderInlineNodes(parseChangelogInline(value), keyPrefix);
 }
 
 export interface ChangelogTimelineProps {
@@ -96,6 +96,10 @@ export interface ChangelogTimelineProps {
  * without copying the production timeline markup.
  */
 export function ChangelogTimeline({ releases }: ChangelogTimelineProps) {
+  const [requestedVisibleCount, setRequestedVisibleCount] = useState(
+    INITIAL_RELEASE_COUNT
+  );
+
   if (releases.length === 0) {
     return (
       <div className='max-w-3xl' data-reduced-motion='static'>
@@ -104,13 +108,21 @@ export function ChangelogTimeline({ releases }: ChangelogTimelineProps) {
     );
   }
 
+  const visibleCount = Math.min(requestedVisibleCount, releases.length);
+  const visibleReleases = releases.slice(0, visibleCount);
+  const remainingCount = releases.length - visibleCount;
+  const nextBatchCount = Math.min(RELEASE_BATCH_SIZE, remainingCount);
+  const hasProgressiveDisclosure = releases.length > INITIAL_RELEASE_COUNT;
+
   return (
     <div className='max-w-3xl' data-reduced-motion='static'>
-      <div className='space-y-10'>
-        {releases.map(release => (
+      <div id='changelog-release-list' className='space-y-10'>
+        {visibleReleases.map((release, releaseIndex) => (
           <article
             key={`${release.version}-${release.date ?? 'unreleased'}`}
             className='relative border-l-2 border-subtle pl-6'
+            aria-posinset={releaseIndex + 1}
+            aria-setsize={releases.length}
           >
             <div className='absolute -left-1.5 top-1 h-3 w-3 rounded-full bg-tertiary-token opacity-30' />
 
@@ -131,7 +143,10 @@ export function ChangelogTimeline({ releases }: ChangelogTimelineProps) {
 
             {release.summary && (
               <p className='text-sm leading-relaxed opacity-60 mb-4'>
-                {renderInlineMarkdown(release.summary)}
+                {renderInlineMarkdown(
+                  release.summary,
+                  `${release.version}-summary`
+                )}
               </p>
             )}
 
@@ -167,7 +182,10 @@ export function ChangelogTimeline({ releases }: ChangelogTimelineProps) {
                             }
                             className='text-sm leading-relaxed opacity-75'
                           >
-                            {renderInlineMarkdown(entry)}
+                            {renderInlineMarkdown(
+                              entry,
+                              `${release.version}-${key}-${seenCount}`
+                            )}
                           </li>
                         );
                       })}
@@ -179,6 +197,30 @@ export function ChangelogTimeline({ releases }: ChangelogTimelineProps) {
           </article>
         ))}
       </div>
+
+      {hasProgressiveDisclosure && (
+        <div className='mt-10 flex flex-wrap items-center gap-3 border-t border-subtle pt-6'>
+          {remainingCount > 0 && (
+            <Button
+              type='button'
+              variant='secondary'
+              size='md'
+              aria-controls='changelog-release-list'
+              onClick={() =>
+                setRequestedVisibleCount(current =>
+                  Math.min(current + RELEASE_BATCH_SIZE, releases.length)
+                )
+              }
+            >
+              Show {nextBatchCount} More Update
+              {nextBatchCount === 1 ? '' : 's'}
+            </Button>
+          )}
+          <span className='text-xs text-tertiary-token' aria-live='polite'>
+            Showing {visibleCount} of {releases.length} updates
+          </span>
+        </div>
+      )}
     </div>
   );
 }

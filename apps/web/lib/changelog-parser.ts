@@ -29,9 +29,120 @@ export interface ChangelogRelease {
   sections: ChangelogSection;
 }
 
+export type ChangelogInlineNode =
+  | { readonly type: 'text'; readonly value: string }
+  | { readonly type: 'code'; readonly value: string }
+  | {
+      readonly type: 'strong';
+      readonly children: readonly ChangelogInlineNode[];
+    };
+
 const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
 const SECTION_HEADING_RE = /^### (Added|Changed|Fixed|Removed)$/;
 const INTERNAL_MARKER_RE = /\[\s*internal\s*\]/i;
+
+function appendInlineText(nodes: ChangelogInlineNode[], value: string): void {
+  if (!value) return;
+  const previous = nodes.at(-1);
+  if (previous?.type === 'text') {
+    nodes[nodes.length - 1] = {
+      type: 'text',
+      value: previous.value + value,
+    };
+    return;
+  }
+  nodes.push({ type: 'text', value });
+}
+
+function backtickRunLength(value: string, start: number): number {
+  let end = start;
+  while (value[end] === '`') end += 1;
+  return end - start;
+}
+
+function findClosingBackticks(
+  value: string,
+  start: number,
+  fenceLength: number
+): number {
+  let cursor = start;
+  while (cursor < value.length) {
+    const next = value.indexOf('`', cursor);
+    if (next === -1) return -1;
+    const runLength = backtickRunLength(value, next);
+    if (runLength === fenceLength) return next;
+    cursor = next + runLength;
+  }
+  return -1;
+}
+
+function parseInlineNodes(
+  value: string,
+  allowStrong: boolean
+): ChangelogInlineNode[] {
+  const nodes: ChangelogInlineNode[] = [];
+  let cursor = 0;
+  let textStart = 0;
+
+  while (cursor < value.length) {
+    if (allowStrong && value.startsWith('**', cursor)) {
+      const closingStrong = value.indexOf('**', cursor + 2);
+      if (closingStrong !== -1) {
+        appendInlineText(nodes, value.slice(textStart, cursor));
+        nodes.push({
+          type: 'strong',
+          children: parseInlineNodes(
+            value.slice(cursor + 2, closingStrong),
+            false
+          ),
+        });
+        cursor = closingStrong + 2;
+        textStart = cursor;
+        continue;
+      }
+    }
+
+    if (value[cursor] === '`') {
+      const fenceLength = backtickRunLength(value, cursor);
+      const contentStart = cursor + fenceLength;
+      const closingBackticks = findClosingBackticks(
+        value,
+        contentStart,
+        fenceLength
+      );
+      appendInlineText(nodes, value.slice(textStart, cursor));
+
+      if (closingBackticks !== -1) {
+        nodes.push({
+          type: 'code',
+          value: value.slice(contentStart, closingBackticks),
+        });
+        cursor = closingBackticks + fenceLength;
+      } else {
+        // A malformed delimiter should never leak Markdown chrome to the UI.
+        cursor = contentStart;
+      }
+      textStart = cursor;
+      continue;
+    }
+
+    cursor += 1;
+  }
+
+  appendInlineText(nodes, value.slice(textStart));
+  return nodes;
+}
+
+/**
+ * Parse the safe inline subset supported by public changelog copy.
+ *
+ * Strong spans may contain code spans, including entries such as
+ * `**Public pitch deck at \`/pitch\`**`. Backtick fences are consumed even when
+ * malformed so raw Markdown delimiters never reach the rendered page.
+ */
+export function parseChangelogInline(value: string): ChangelogInlineNode[] {
+  return parseInlineNodes(value, true);
+}
 
 /** Try to parse a version heading; returns a new release or 'unreleased' sentinel. */
 function parseVersionHeading(

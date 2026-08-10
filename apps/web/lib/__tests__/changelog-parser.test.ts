@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseChangelog } from '../changelog-parser';
+import { parseChangelog, parseChangelogInline } from '../changelog-parser';
 
 const BASIC_CHANGELOG = `# Changelog
 
@@ -384,5 +384,36 @@ describe('parseChangelog', () => {
     expect(releases[0].sections.changed).not.toContain(
       'Reduced Sentry error noise'
     );
+  });
+});
+
+describe('parseChangelogInline', () => {
+  it('parses code nested inside strong changelog copy', () => {
+    expect(
+      parseChangelogInline('**Public pitch deck route at `/pitch`** is live.')
+    ).toEqual([
+      {
+        type: 'strong',
+        children: [
+          { type: 'text', value: 'Public pitch deck route at ' },
+          { type: 'code', value: '/pitch' },
+        ],
+      },
+      { type: 'text', value: ' is live.' },
+    ]);
+  });
+
+  it('supports matching multi-backtick fences', () => {
+    expect(parseChangelogInline('Use ``release:`status` `` safely.')).toEqual([
+      { type: 'text', value: 'Use ' },
+      { type: 'code', value: 'release:`status` ' },
+      { type: 'text', value: ' safely.' },
+    ]);
+  });
+
+  it('removes unmatched backtick delimiters from public copy', () => {
+    expect(parseChangelogInline('Visit `/pitch today')).toEqual([
+      { type: 'text', value: 'Visit /pitch today' },
+    ]);
   });
 });
