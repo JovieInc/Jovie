@@ -20,7 +20,12 @@ describe('onboarding funnel event contract', () => {
       'chat_started',
       'chat_completed',
       'qualified',
+      'waitlist_decision_rendered',
+      'waitlist_save_started',
+      'waitlist_save_failed',
+      'waitlist_intake_required',
       'waitlisted',
+      'waitlist_confirmation_viewed',
       'profile_created',
       'dashboard_loaded',
     ]);

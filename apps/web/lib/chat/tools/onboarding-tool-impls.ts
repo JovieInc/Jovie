@@ -62,6 +62,8 @@ import { logger } from '@/lib/utils/logger';
  */
 export interface OnboardingTurnState {
   sessionId: string;
+  /** DB-backed controlled-access state resolved once by the request handler. */
+  accessControlled: boolean;
   /** Set when confirmSpotifyArtist is called. */
   spotifyArtistId: string | null;
   /** Set after confirmSpotifyArtist enrichment. */
@@ -182,10 +184,12 @@ function restoreInterviewSignal(
 export function createOnboardingTurnState(input: {
   sessionId: string;
   turnCount: number;
+  accessControlled?: boolean;
   messages?: readonly UIMessage[];
 }): OnboardingTurnState {
   const state: OnboardingTurnState = {
     sessionId: input.sessionId,
+    accessControlled: input.accessControlled ?? false,
     spotifyArtistId: null,
     spotifyArtistName: null,
     spotifyImageUrl: null,
@@ -439,17 +443,42 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
       description: TOOL_SCHEMAS.proposeNextStep.description,
       inputSchema: TOOL_SCHEMAS.proposeNextStep.inputSchema,
       execute: async () => {
-        const decision = evaluateAccessSignal({
-          signal: collapseInterviewSignals(
-            state.signals.map(s => ({
-              ...s,
-              recordedAt: new Date().toISOString(),
-            }))
-          ),
-          spotifyFollowers: state.spotifyFollowers,
-          metrics: state.artistMetrics,
-          turnCount: state.turnCount,
-        });
+        // A durable waitlist request requires a public artist identity. Do not
+        // render the signup/terminal card before the confirmed Spotify artist
+        // has been restored into request-local state; the assistant must keep
+        // collecting the missing information instead.
+        if (state.accessControlled && !state.spotifyArtistId) {
+          return {
+            action: 'propose_next_step' as const,
+            decision: {
+              kind: 'needs_more_info' as const,
+              rationale: 'confirmed_artist_required_for_waitlist',
+              score: 0,
+            },
+            summary: 'More artist information is required before saving.',
+          };
+        }
+
+        // The existing DB-backed access gate is authoritative. While it is
+        // enabled, every anonymous visitor receives the same waitlist decision;
+        // audience scoring resumes only when controlled access is turned off.
+        const decision: AccessDecision = state.accessControlled
+          ? {
+              kind: 'waitlist',
+              rationale: 'controlled_access_gate_enabled',
+              score: 100,
+            }
+          : evaluateAccessSignal({
+              signal: collapseInterviewSignals(
+                state.signals.map(s => ({
+                  ...s,
+                  recordedAt: new Date().toISOString(),
+                }))
+              ),
+              spotifyFollowers: state.spotifyFollowers,
+              metrics: state.artistMetrics,
+              turnCount: state.turnCount,
+            });
         const payload: NextStepCardPayload = {
           action: 'propose_next_step',
           decision,

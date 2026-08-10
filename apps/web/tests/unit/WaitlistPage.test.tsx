@@ -1,9 +1,11 @@
 import { describe, expect, test, vi } from 'vitest';
 
-const { mockRedirect, mockResolveUserState } = vi.hoisted(() => ({
-  mockRedirect: vi.fn(),
-  mockResolveUserState: vi.fn(),
-}));
+const { mockGetWaitlistAccess, mockRedirect, mockResolveUserState } =
+  vi.hoisted(() => ({
+    mockGetWaitlistAccess: vi.fn(),
+    mockRedirect: vi.fn(),
+    mockResolveUserState: vi.fn(),
+  }));
 
 vi.mock('next/navigation', () => ({
   redirect: (...args: unknown[]) => {
@@ -22,6 +24,7 @@ vi.mock('@/lib/auth/gate', () => ({
     USER_CREATION_FAILED: 'USER_CREATION_FAILED',
     WAITLIST_PENDING: 'WAITLIST_PENDING',
   },
+  getWaitlistAccess: mockGetWaitlistAccess,
   resolveUserState: mockResolveUserState,
 }));
 
@@ -60,6 +63,10 @@ describe('WaitlistPage', () => {
       state: 'WAITLIST_PENDING',
       context: { email: 'artist@example.com' },
     });
+    mockGetWaitlistAccess.mockResolvedValue({
+      entryId: 'entry-1',
+      status: 'waitlisted',
+    });
 
     const { default: WaitlistPage } = await import('../../app/waitlist/page');
     const { WaitlistSuccessView } = await import(
@@ -70,5 +77,27 @@ describe('WaitlistPage', () => {
 
     expect(mockRedirect).not.toHaveBeenCalled();
     expect(result.type).toBe(WaitlistSuccessView);
+  });
+
+  test.each([
+    'WAITLIST_PENDING',
+    'NEEDS_WAITLIST_SUBMISSION',
+    'NEEDS_DB_USER',
+  ])('never renders saved confirmation for %s without a durable pending entry', async state => {
+    mockRedirect.mockClear();
+    mockResolveUserState.mockResolvedValue({
+      state,
+      context: { email: 'artist@example.com' },
+    });
+    mockGetWaitlistAccess.mockResolvedValue({ entryId: null, status: null });
+
+    const { default: WaitlistPage } = await import('../../app/waitlist/page');
+    const { WaitlistIntakeChat } = await import(
+      '@/components/features/waitlist/WaitlistIntakeChat'
+    );
+    const result = await WaitlistPage();
+
+    expect(mockRedirect).not.toHaveBeenCalled();
+    expect(result.type).toBe(WaitlistIntakeChat);
   });
 });

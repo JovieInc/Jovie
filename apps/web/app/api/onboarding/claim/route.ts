@@ -1,17 +1,34 @@
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { getCachedAuth } from '@/lib/auth/cached';
+import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
+import { decodeToolEvents } from '@/lib/chat/tool-events';
 import { db } from '@/lib/db';
-import { chatAuditLog, chatConversations } from '@/lib/db/schema/chat';
+import {
+  chatAuditLog,
+  chatConversations,
+  chatMessages,
+} from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
 import { materializeClaimedOnboardingProfile } from '@/lib/onboarding/claim-profile';
+import { deriveClaimedOnboardingStateFromMessageRows } from '@/lib/onboarding/claimed-state';
 import { isOnboardingOwnershipError } from '@/lib/onboarding/ownership-gate';
 import {
   clearOnboardingSessionCookie,
   getCurrentOnboardingSessionId,
 } from '@/lib/onboarding/session';
+import { normalizeEmail } from '@/lib/utils/email';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
+import { waitlistRequestSchema } from '@/lib/validation/schemas';
+import {
+  submitWaitlistAccessRequest,
+  type WaitlistAccessRequestResult,
+} from '@/lib/waitlist/access-request';
+import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
+import {
+  isWaitlistApprovedStatus,
+  isWaitlistPendingStatus,
+} from '@/lib/waitlist/state-machine';
 
 export const runtime = 'nodejs';
 
@@ -19,10 +36,194 @@ type ClaimedProfilePayload = Awaited<
   ReturnType<typeof materializeClaimedOnboardingProfile>
 >;
 
+class WaitlistPersistenceError extends Error {
+  readonly cause: unknown;
+
+  constructor(cause: unknown) {
+    super('Waitlist request could not be saved');
+    this.name = 'WaitlistPersistenceError';
+    this.cause = cause;
+  }
+}
+
+class WaitlistIntakeRequiredError extends Error {
+  constructor() {
+    super('A confirmed artist or social profile is required for waitlist');
+    this.name = 'WaitlistIntakeRequiredError';
+  }
+}
+
 function profilePayload(
   profile: ClaimedProfilePayload | null
 ): { profile: ClaimedProfilePayload } | Record<string, never> {
   return profile?.profileId ? { profile } : {};
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function deriveFullName(params: {
+  readonly userFullName: string | null | undefined;
+  readonly userUsername: string | null | undefined;
+  readonly email: string;
+}): string {
+  const fromUser = (params.userFullName ?? '').trim();
+  if (fromUser) return fromUser;
+
+  const fromUsername = (params.userUsername ?? '').trim();
+  if (fromUsername) return fromUsername;
+
+  return params.email.split('@')[0]?.trim() || 'Jovie user';
+}
+
+function hasWaitlistDecision(rows: readonly { toolCalls: unknown }[]): boolean {
+  const events = rows.flatMap(row => decodeToolEvents(row.toolCalls).events);
+  for (const event of events.toReversed()) {
+    if (event.toolName !== 'proposeNextStep' || event.state !== 'succeeded') {
+      continue;
+    }
+    const output = isRecord(event.output) ? event.output : null;
+    const decision = isRecord(output?.decision) ? output.decision : null;
+    return (
+      output?.action === 'propose_next_step' && decision?.kind === 'waitlist'
+    );
+  }
+  return false;
+}
+
+async function createWaitlistReceipt(params: {
+  readonly appUserId: string;
+  readonly messageRows: readonly { toolCalls: unknown }[];
+}): Promise<WaitlistAccessRequestResult> {
+  const currentUser = await getCachedCurrentUser();
+  const emailRaw = currentUser?.primaryEmailAddress?.emailAddress;
+  if (!emailRaw) throw new Error('Verified email is required for waitlist');
+
+  const state = deriveClaimedOnboardingStateFromMessageRows(params.messageRows);
+  // The scripted flow explicitly permits skipping social attachment after a
+  // Spotify artist is confirmed. Spotify is still a validated public artist
+  // profile, so it is the truthful durable fallback for that supported path.
+  const primarySocialUrl = state.socialLinks[0] ?? state.artist?.url;
+  if (!primarySocialUrl) {
+    throw new WaitlistIntakeRequiredError();
+  }
+
+  const email = normalizeEmail(emailRaw);
+  const waitlistData = waitlistRequestSchema.parse({
+    primaryGoal: null,
+    primarySocialUrl,
+    spotifyUrl: state.artist?.url ?? null,
+    spotifyArtistName: state.artist?.name ?? null,
+    heardAbout: 'onboarding_chat',
+    selectedPlan: null,
+  });
+
+  return submitWaitlistAccessRequest({
+    appUserId: params.appUserId,
+    email,
+    emailRaw,
+    fullName: deriveFullName({
+      userFullName: currentUser.fullName,
+      userUsername: currentUser.username,
+      email,
+    }),
+    data: waitlistData,
+    source: 'onboarding_chat_claim',
+  });
+}
+
+async function loadConversationMessageRows(conversationId: string) {
+  return db
+    .select({ toolCalls: chatMessages.toolCalls })
+    .from(chatMessages)
+    .where(eq(chatMessages.conversationId, conversationId))
+    .orderBy(chatMessages.createdAt);
+}
+
+async function createWaitlistReceiptOrThrow(params: {
+  readonly appUserId: string;
+  readonly messageRows: readonly { toolCalls: unknown }[];
+}) {
+  try {
+    return await createWaitlistReceipt(params);
+  } catch (error) {
+    if (error instanceof WaitlistIntakeRequiredError) throw error;
+    throw new WaitlistPersistenceError(error);
+  }
+}
+
+interface ClaimHandoff {
+  readonly profile: ClaimedProfilePayload | null;
+  readonly waitlist: WaitlistAccessRequestResult | null;
+  readonly waitlistIntakeRequired: boolean;
+}
+
+async function resolveClaimHandoff(params: {
+  readonly appUserId: string;
+  readonly conversationId: string;
+  readonly messageRows: readonly { toolCalls: unknown }[];
+  readonly mustWaitlist: boolean;
+  readonly ipAddress: string | null;
+  readonly userAgent: string | null;
+}): Promise<ClaimHandoff> {
+  if (!params.mustWaitlist) {
+    return {
+      profile: await materializeClaimedOnboardingProfile({
+        userId: params.appUserId,
+        conversationId: params.conversationId,
+        ipAddress: params.ipAddress,
+        userAgent: params.userAgent,
+      }),
+      waitlist: null,
+      waitlistIntakeRequired: false,
+    };
+  }
+
+  let waitlist: WaitlistAccessRequestResult;
+  try {
+    waitlist = await createWaitlistReceiptOrThrow({
+      appUserId: params.appUserId,
+      messageRows: params.messageRows,
+    });
+  } catch (error) {
+    if (error instanceof WaitlistIntakeRequiredError) {
+      return {
+        profile: null,
+        waitlist: null,
+        waitlistIntakeRequired: true,
+      };
+    }
+    throw error;
+  }
+
+  if (isWaitlistPendingStatus(waitlist.status)) {
+    return { profile: null, waitlist, waitlistIntakeRequired: false };
+  }
+  if (!isWaitlistApprovedStatus(waitlist.status)) {
+    throw new WaitlistPersistenceError(
+      new Error(`Unsupported waitlist status: ${waitlist.status}`)
+    );
+  }
+
+  return {
+    profile: await materializeClaimedOnboardingProfile({
+      userId: params.appUserId,
+      conversationId: params.conversationId,
+      ipAddress: params.ipAddress,
+      userAgent: params.userAgent,
+    }),
+    waitlist: null,
+    waitlistIntakeRequired: false,
+  };
+}
+
+function claimHandoffPayload(handoff: ClaimHandoff) {
+  return {
+    ...(handoff.waitlist ? { waitlist: handoff.waitlist } : {}),
+    ...(handoff.waitlistIntakeRequired ? { waitlistIntakeRequired: true } : {}),
+    ...profilePayload(handoff.profile),
+  };
 }
 
 /**
@@ -65,6 +266,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ claimed: 0 });
     }
 
+    const accessControlled = await isWaitlistGateEnabled().catch(
+      async error => {
+        await captureError('Onboarding claim gate lookup failed', error, {
+          route: '/api/onboarding/claim',
+          method: 'POST',
+        });
+        return true;
+      }
+    );
+    const ipAddress = extractClientIPFromRequest(req);
+    const userAgent = req.headers.get('user-agent') ?? null;
+
     // Look up all unclaimed conversations tied to this sessionId.
     const candidates = await db
       .select({
@@ -81,27 +294,62 @@ export async function POST(req: Request) {
       .orderBy(desc(chatConversations.createdAt));
 
     if (candidates.length === 0) {
+      // A committed first request can lose its response before the browser
+      // receives the cookie clear. Recover the same user's claimed transcript
+      // and rebuild the idempotent waitlist receipt instead of stalling.
+      const [alreadyClaimed] = await db
+        .select({ id: chatConversations.id })
+        .from(chatConversations)
+        .where(
+          and(
+            eq(chatConversations.sessionId, sessionId),
+            eq(chatConversations.userId, userId)
+          )
+        )
+        .orderBy(desc(chatConversations.createdAt))
+        .limit(1);
+
+      if (alreadyClaimed) {
+        const messageRows = await loadConversationMessageRows(
+          alreadyClaimed.id
+        );
+        const handoff = await resolveClaimHandoff({
+          appUserId: userId,
+          conversationId: alreadyClaimed.id,
+          messageRows,
+          mustWaitlist: accessControlled || hasWaitlistDecision(messageRows),
+          ipAddress,
+          userAgent,
+        });
+        await clearOnboardingSessionCookie();
+        return NextResponse.json({
+          claimed: 0,
+          conversationId: alreadyClaimed.id,
+          alreadyClaimed: true,
+          ...claimHandoffPayload(handoff),
+        });
+      }
+
       // Nothing to claim — clear the cookie so future visits start fresh.
       await clearOnboardingSessionCookie();
       return NextResponse.json({ claimed: 0 });
     }
 
     const [primary, ...others] = candidates;
-    const ipAddress = extractClientIPFromRequest(req);
-    const userAgent = req.headers.get('user-agent') ?? null;
     const otherIds = others.map(o => o.id);
 
     try {
-      // Compare-and-swap on the primary row FIRST. The WHERE clause only
+      const messageRows = await loadConversationMessageRows(primary.id);
+      const mustWaitlist = accessControlled || hasWaitlistDecision(messageRows);
+
+      // Compare-and-swap ownership before writing user-scoped waitlist data.
+      // The WHERE clause only
       // matches a row that is still unclaimed (userId IS NULL) and still has
       // this sessionId. .returning() lets us detect a concurrent claim from
       // another request — if zero rows update, somebody else won the race.
-      // We don't use db.transaction() per .claude/rules/db.md, so this CAS
-      // is the linearization point that makes the whole sequence safe:
-      //   - audit insert is harmless if the CAS later succeeds
-      //   - sibling batch is gated on the CAS having claimed primary
-      //   - the partial unique index (session_id WHERE user_id IS NOT NULL)
-      //     is still the catch-all for the cross-user case
+      // We don't use db.transaction() per .claude/rules/db.md, so this CAS is
+      // the ownership linearization point. A failed downstream waitlist write
+      // remains retryable through the same-user recovery branch above.
       const claimedPrimary = await db
         .update(chatConversations)
         .set({ userId, updatedAt: new Date() })
@@ -115,24 +363,55 @@ export async function POST(req: Request) {
         .returning({ id: chatConversations.id });
 
       if (claimedPrimary.length === 0) {
-        // Concurrent claim won — primary already has a userId set (likely
-        // a duplicate request from the same user retrying after a network
-        // blip). Treat as a soft success rather than a 409 because the same
-        // user winning twice should not error.
+        const [ownedByCurrentUser] = await db
+          .select({ id: chatConversations.id })
+          .from(chatConversations)
+          .where(
+            and(
+              eq(chatConversations.id, primary.id),
+              eq(chatConversations.userId, userId)
+            )
+          )
+          .limit(1);
+        if (!ownedByCurrentUser) {
+          return NextResponse.json(
+            {
+              error: 'Session already claimed',
+              errorCode: 'SESSION_ALREADY_CLAIMED',
+            },
+            { status: 409 }
+          );
+        }
+
+        const handoff = await resolveClaimHandoff({
+          appUserId: userId,
+          conversationId: primary.id,
+          messageRows,
+          mustWaitlist,
+          ipAddress,
+          userAgent,
+        });
         await clearOnboardingSessionCookie();
         return NextResponse.json({
           claimed: 0,
           conversationId: primary.id,
           alreadyClaimed: true,
+          ...claimHandoffPayload(handoff),
         });
       }
 
-      const profile = await materializeClaimedOnboardingProfile({
-        userId,
+      const handoff = await resolveClaimHandoff({
+        appUserId: userId,
         conversationId: primary.id,
+        messageRows,
+        mustWaitlist,
         ipAddress,
         userAgent,
       });
+
+      // Controlled-access visitors stop at the durable waitlist receipt. Only
+      // instant-access decisions may materialize a claimed/public profile and
+      // proceed to checkout.
 
       // Audit row records the claim event. Failure here is acceptable —
       // primary is already claimed, audit gap is a forensic loss but not a
@@ -180,7 +459,7 @@ export async function POST(req: Request) {
       return NextResponse.json({
         claimed: candidates.length,
         conversationId: primary.id,
-        ...profilePayload(profile),
+        ...claimHandoffPayload(handoff),
       });
     } catch (error) {
       // Ownership gate: unauthenticated / non-owner / missing conversation.
@@ -218,6 +497,27 @@ export async function POST(req: Request) {
       throw error;
     }
   } catch (error) {
+    if (error instanceof WaitlistPersistenceError) {
+      logger.error(
+        '[onboarding/claim] waitlist persistence failed',
+        error.cause
+      );
+      await captureError(
+        'Onboarding waitlist persistence failed',
+        error.cause,
+        {
+          route: '/api/onboarding/claim',
+          method: 'POST',
+        }
+      );
+      return NextResponse.json(
+        {
+          error: 'Waitlist request could not be saved',
+          errorCode: 'WAITLIST_SAVE_FAILED',
+        },
+        { status: 500 }
+      );
+    }
     logger.error('[onboarding/claim] failed', error);
     await captureError('Onboarding claim endpoint failed', error, {
       route: '/api/onboarding/claim',

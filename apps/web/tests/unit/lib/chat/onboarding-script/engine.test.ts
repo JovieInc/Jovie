@@ -64,10 +64,11 @@ function assistant(
   } as UIMessage;
 }
 
-function stateFor(messages: readonly UIMessage[]) {
+function stateFor(messages: readonly UIMessage[], accessControlled = false) {
   return createOnboardingTurnState({
     sessionId: SESSION,
     turnCount: messages.filter(m => m.role === 'user').length,
+    accessControlled,
     messages,
   });
 }
@@ -343,6 +344,25 @@ describe('decideFallbackTurn', () => {
     const actions = turn.toolEvents.map(event => event.output.action);
     expect(actions).toContain('propose_next_step');
     expect(actions).toContain('propose_checkout');
+  });
+
+  it('waitlists strong signals while controlled access is enabled', async () => {
+    const messages = [
+      ...baseThroughArtist(),
+      assistant('Handle locked.', [HANDLE_CONFIRMED, SOCIAL_ATTACHED]),
+      user('around 20k on instagram'),
+    ];
+    const turn = await decideFallbackTurn({
+      uiMessages: messages,
+      state: stateFor(messages, true),
+    });
+
+    expect(turn.line.stepId).toBe('waitlist');
+    expect(turn.toolEvents).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ toolName: 'proposeCheckout' }),
+      ])
+    );
   });
 
   it('waitlists only with meaningful signal after turn cap', async () => {

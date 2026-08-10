@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Hoisted mocks (must be before imports of SUT)
 const {
   mockGetCachedAuth,
+  mockGetCachedCurrentUser,
   mockGetCurrentOnboardingSessionId,
   mockClearOnboardingSessionCookie,
   mockDbSelect,
@@ -14,8 +15,11 @@ const {
   mockLoggerError,
   mockCaptureError,
   mockMaterializeClaimedOnboardingProfile,
+  mockSubmitWaitlistAccessRequest,
+  mockIsWaitlistGateEnabled,
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
+  mockGetCachedCurrentUser: vi.fn(),
   mockGetCurrentOnboardingSessionId: vi.fn(),
   mockClearOnboardingSessionCookie: vi.fn().mockResolvedValue(undefined),
   mockDbSelect: vi.fn(),
@@ -26,10 +30,21 @@ const {
   mockLoggerError: vi.fn(),
   mockCaptureError: vi.fn().mockResolvedValue(undefined),
   mockMaterializeClaimedOnboardingProfile: vi.fn(),
+  mockSubmitWaitlistAccessRequest: vi.fn(),
+  mockIsWaitlistGateEnabled: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
+  getCachedCurrentUser: mockGetCachedCurrentUser,
+}));
+
+vi.mock('@/lib/waitlist/access-request', () => ({
+  submitWaitlistAccessRequest: mockSubmitWaitlistAccessRequest,
+}));
+
+vi.mock('@/lib/waitlist/settings', () => ({
+  isWaitlistGateEnabled: mockIsWaitlistGateEnabled,
 }));
 
 vi.mock('@/lib/onboarding/session', () => ({
@@ -70,6 +85,11 @@ vi.mock('@/lib/db/schema/chat', () => ({
     ipAddress: 'chat_audit_log.ip_address',
     userAgent: 'chat_audit_log.user_agent',
   },
+  chatMessages: {
+    toolCalls: 'chat_messages.tool_calls',
+    conversationId: 'chat_messages.conversation_id',
+    createdAt: 'chat_messages.created_at',
+  },
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -105,12 +125,137 @@ function makeRequest(): Request {
 }
 
 function setupDbSelectForCandidates(
-  candidates: Array<{ id: string; createdAt: Date }>
+  candidates: Array<{ id: string; createdAt: Date }>,
+  messageRows: Array<{ toolCalls: unknown }> = []
 ) {
   const orderBy = vi.fn().mockResolvedValue(candidates);
   const where = vi.fn().mockReturnValue({ orderBy });
   const from = vi.fn().mockReturnValue({ where });
   mockDbSelect.mockReturnValueOnce({ from });
+
+  if (candidates.length > 0) {
+    const messageOrderBy = vi.fn().mockResolvedValue(messageRows);
+    const messageWhere = vi.fn().mockReturnValue({ orderBy: messageOrderBy });
+    const messageFrom = vi.fn().mockReturnValue({ where: messageWhere });
+    mockDbSelect.mockReturnValueOnce({ from: messageFrom });
+  } else {
+    const claimedLimit = vi.fn().mockResolvedValue([]);
+    const claimedOrderBy = vi.fn().mockReturnValue({ limit: claimedLimit });
+    const claimedWhere = vi.fn().mockReturnValue({ orderBy: claimedOrderBy });
+    const claimedFrom = vi.fn().mockReturnValue({ where: claimedWhere });
+    mockDbSelect.mockReturnValueOnce({ from: claimedFrom });
+  }
+}
+
+function waitlistDecisionMessageRows() {
+  return [
+    {
+      toolCalls: [
+        {
+          schemaVersion: 2,
+          toolCallId: 'social-1',
+          toolName: 'proposeSocialLink',
+          state: 'succeeded',
+          input: {},
+          output: {
+            action: 'propose_social_link',
+            url: 'https://instagram.com/test-creator',
+          },
+          uiHint: 'artifact',
+        },
+        {
+          schemaVersion: 2,
+          toolCallId: 'decision-1',
+          toolName: 'proposeNextStep',
+          state: 'succeeded',
+          input: {},
+          output: {
+            action: 'propose_next_step',
+            decision: { kind: 'waitlist', rationale: 'controlled', score: 30 },
+          },
+          uiHint: 'artifact',
+        },
+      ],
+    },
+  ];
+}
+
+function waitlistDecisionAfterSocialSkipRows() {
+  return [
+    {
+      toolCalls: [
+        {
+          schemaVersion: 2,
+          toolCallId: 'artist-1',
+          toolName: 'confirmSpotifyArtist',
+          state: 'succeeded',
+          input: {},
+          output: {
+            action: 'spotify_artist_confirmed',
+            spotifyArtistId: 'artist-1',
+            artist: {
+              id: 'artist-1',
+              name: 'Test Creator',
+              url: 'https://open.spotify.com/artist/artist-1',
+              imageUrl: null,
+              followers: 100,
+              popularity: 10,
+              genres: [],
+            },
+          },
+          uiHint: 'artifact',
+        },
+        {
+          schemaVersion: 2,
+          toolCallId: 'decision-1',
+          toolName: 'proposeNextStep',
+          state: 'succeeded',
+          input: {},
+          output: {
+            action: 'propose_next_step',
+            decision: { kind: 'waitlist', rationale: 'controlled', score: 100 },
+          },
+          uiHint: 'artifact',
+        },
+      ],
+    },
+  ];
+}
+
+function setupRecoveredClaim(
+  conversationId: string,
+  messageRows: Array<{ toolCalls: unknown }>
+) {
+  const candidatesOrderBy = vi.fn().mockResolvedValue([]);
+  const candidatesWhere = vi.fn().mockReturnValue({
+    orderBy: candidatesOrderBy,
+  });
+  mockDbSelect.mockReturnValueOnce({
+    from: vi.fn().mockReturnValue({ where: candidatesWhere }),
+  });
+
+  const claimedLimit = vi.fn().mockResolvedValue([{ id: conversationId }]);
+  const claimedOrderBy = vi.fn().mockReturnValue({ limit: claimedLimit });
+  const claimedWhere = vi.fn().mockReturnValue({ orderBy: claimedOrderBy });
+  mockDbSelect.mockReturnValueOnce({
+    from: vi.fn().mockReturnValue({ where: claimedWhere }),
+  });
+
+  const messagesOrderBy = vi.fn().mockResolvedValue(messageRows);
+  const messagesWhere = vi.fn().mockReturnValue({ orderBy: messagesOrderBy });
+  mockDbSelect.mockReturnValueOnce({
+    from: vi.fn().mockReturnValue({ where: messagesWhere }),
+  });
+}
+
+function setupOwnedConversation(conversationId: string, owned: boolean) {
+  const limit = vi
+    .fn()
+    .mockResolvedValue(owned ? [{ id: conversationId }] : []);
+  const where = vi.fn().mockReturnValue({ limit });
+  mockDbSelect.mockReturnValueOnce({
+    from: vi.fn().mockReturnValue({ where }),
+  });
 }
 
 function setupUpdateForPrimary(claimedRows: number) {
@@ -171,6 +316,17 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
       handle: null,
       status: 'skipped',
     });
+    mockGetCachedCurrentUser.mockResolvedValue({
+      fullName: 'Test Creator',
+      username: 'test-creator',
+      primaryEmailAddress: { emailAddress: 'creator@example.com' },
+    });
+    mockSubmitWaitlistAccessRequest.mockResolvedValue({
+      entryId: 'entry-1',
+      status: 'waitlisted',
+      outcome: 'waitlisted_gate_on',
+    });
+    mockIsWaitlistGateEnabled.mockResolvedValue(false);
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -217,6 +373,46 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     expect(mockClearOnboardingSessionCookie).toHaveBeenCalledTimes(1);
   });
 
+  it('recovers the durable waitlist receipt after a committed response is lost', async () => {
+    setupRecoveredClaim('conv_already_claimed', waitlistDecisionMessageRows());
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      claimed: 0,
+      alreadyClaimed: true,
+      conversationId: 'conv_already_claimed',
+      waitlist: { entryId: 'entry-1', status: 'waitlisted' },
+    });
+    expect(mockSubmitWaitlistAccessRequest).toHaveBeenCalledTimes(1);
+    expect(mockClearOnboardingSessionCookie).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers an approved handoff and materializes checkout after a response is lost', async () => {
+    setupRecoveredClaim(
+      'conv_approved_recovery',
+      waitlistDecisionMessageRows()
+    );
+    mockSubmitWaitlistAccessRequest.mockResolvedValue({
+      entryId: 'entry-approved',
+      status: 'approved',
+      outcome: 'already_accepted',
+    });
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      claimed: 0,
+      alreadyClaimed: true,
+      conversationId: 'conv_approved_recovery',
+    });
+    expect(mockMaterializeClaimedOnboardingProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: 'conv_approved_recovery' })
+    );
+  });
+
   it('claims the single (most recent) candidate, writes audit, clears cookie, returns claimed count', async () => {
     const appUserId = '3a53ba3e-150c-4ab5-8e73-2d2499764e2c';
     setupDbSelectForCandidates([
@@ -247,6 +443,145 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     expect(mockExtractClientIP).toHaveBeenCalled();
   });
 
+  it('persists a waitlist decision and returns its durable receipt without materializing a profile', async () => {
+    const appUserId = '3a53ba3e-150c-4ab5-8e73-2d2499764e2c';
+    setupDbSelectForCandidates(
+      [{ id: 'conv_waitlist', createdAt: new Date('2026-05-01') }],
+      waitlistDecisionMessageRows()
+    );
+    setupUpdateForPrimary(1);
+    setupInsertAudit(true);
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      claimed: 1,
+      conversationId: 'conv_waitlist',
+      waitlist: {
+        entryId: 'entry-1',
+        status: 'waitlisted',
+        outcome: 'waitlisted_gate_on',
+      },
+    });
+    expect(mockSubmitWaitlistAccessRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appUserId,
+        email: 'creator@example.com',
+        source: 'onboarding_chat_claim',
+        data: expect.objectContaining({
+          primarySocialUrl: 'https://instagram.com/test-creator',
+        }),
+      })
+    );
+    expect(mockMaterializeClaimedOnboardingProfile).not.toHaveBeenCalled();
+  });
+
+  it('rechecks the authoritative gate at claim time when the persisted decision is not waitlist', async () => {
+    const socialOnlyRows = [
+      {
+        toolCalls: waitlistDecisionMessageRows()[0]?.toolCalls.slice(0, 1),
+      },
+    ];
+    mockIsWaitlistGateEnabled.mockResolvedValue(true);
+    setupDbSelectForCandidates(
+      [{ id: 'conv_gate_toggled', createdAt: new Date('2026-05-01') }],
+      socialOnlyRows
+    );
+    setupUpdateForPrimary(1);
+    setupInsertAudit(true);
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      waitlist: { entryId: 'entry-1', status: 'waitlisted' },
+    });
+    expect(mockMaterializeClaimedOnboardingProfile).not.toHaveBeenCalled();
+  });
+
+  it('routes to truthful waitlist intake when the current gate is on but durable artist data is missing', async () => {
+    mockIsWaitlistGateEnabled.mockResolvedValue(true);
+    setupDbSelectForCandidates(
+      [{ id: 'conv_missing_artist', createdAt: new Date('2026-05-01') }],
+      []
+    );
+    setupUpdateForPrimary(1);
+    setupInsertAudit(true);
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      claimed: 1,
+      waitlistIntakeRequired: true,
+    });
+    expect(mockSubmitWaitlistAccessRequest).not.toHaveBeenCalled();
+    expect(mockMaterializeClaimedOnboardingProfile).not.toHaveBeenCalled();
+  });
+
+  it('uses the confirmed Spotify profile when the visitor skips social attachment', async () => {
+    setupDbSelectForCandidates(
+      [{ id: 'conv_social_skip', createdAt: new Date('2026-05-01') }],
+      waitlistDecisionAfterSocialSkipRows()
+    );
+    setupUpdateForPrimary(1);
+    setupInsertAudit(true);
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(200);
+    expect(mockSubmitWaitlistAccessRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          primarySocialUrl: 'https://open.spotify.com/artist/artist-1',
+        }),
+      })
+    );
+  });
+
+  it('continues profile onboarding when the canonical writer returns approved access', async () => {
+    setupDbSelectForCandidates(
+      [{ id: 'conv_approved', createdAt: new Date('2026-05-01') }],
+      waitlistDecisionMessageRows()
+    );
+    mockSubmitWaitlistAccessRequest.mockResolvedValue({
+      entryId: 'entry-approved',
+      status: 'approved',
+      outcome: 'already_accepted',
+    });
+    setupUpdateForPrimary(1);
+    setupInsertAudit(true);
+
+    const res = await POST(makeRequest());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).not.toHaveProperty('waitlist');
+    expect(mockMaterializeClaimedOnboardingProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: 'conv_approved' })
+    );
+  });
+
+  it('fails closed after ownership claim and leaves the cookie for a retry when the durable write fails', async () => {
+    setupDbSelectForCandidates(
+      [{ id: 'conv_waitlist', createdAt: new Date('2026-05-01') }],
+      waitlistDecisionMessageRows()
+    );
+    mockSubmitWaitlistAccessRequest.mockRejectedValue(new Error('db down'));
+    setupUpdateForPrimary(1);
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({
+      errorCode: 'WAITLIST_SAVE_FAILED',
+    });
+    expect(mockDbUpdate).toHaveBeenCalledTimes(1);
+    expect(mockClearOnboardingSessionCookie).not.toHaveBeenCalled();
+    expect(mockMaterializeClaimedOnboardingProfile).not.toHaveBeenCalled();
+  });
+
   it('handles multiple candidates: claims primary (recency order), detaches siblings, writes audit with discarded list', async () => {
     const c1 = { id: 'old_1', createdAt: new Date('2026-04-01') };
     const c2 = { id: 'newer', createdAt: new Date('2026-05-01') };
@@ -267,6 +602,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
   it('idempotent on concurrent claim race: CAS returns 0 rows → soft success with alreadyClaimed, clears cookie', async () => {
     setupDbSelectForCandidates([{ id: 'conv_1', createdAt: new Date() }]);
     setupUpdateForPrimary(0); // race lost
+    setupOwnedConversation('conv_1', true);
     const res = await POST(makeRequest());
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -276,6 +612,24 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
       conversationId: 'conv_1',
     });
     expect(mockClearOnboardingSessionCookie).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a concurrent claim owned by a different authenticated user before writing waitlist data', async () => {
+    setupDbSelectForCandidates(
+      [{ id: 'conv_cross_user', createdAt: new Date() }],
+      waitlistDecisionMessageRows()
+    );
+    setupUpdateForPrimary(0);
+    setupOwnedConversation('conv_cross_user', false);
+
+    const res = await POST(makeRequest());
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({
+      errorCode: 'SESSION_ALREADY_CLAIMED',
+    });
+    expect(mockSubmitWaitlistAccessRequest).not.toHaveBeenCalled();
+    expect(mockClearOnboardingSessionCookie).not.toHaveBeenCalled();
   });
 
   it('returns 409 SESSION_ALREADY_CLAIMED on unique constraint violation (session claimed by different user)', async () => {

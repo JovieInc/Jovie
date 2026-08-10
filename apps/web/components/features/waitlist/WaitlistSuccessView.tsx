@@ -1,6 +1,9 @@
 'use client';
 
+import { useEffect } from 'react';
 import { AuthLayout } from '@/features/auth';
+import { track } from '@/lib/analytics';
+import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import {
   type WaitlistDisplayOutcome,
   WaitlistOutcomeView,
@@ -18,6 +21,15 @@ export function WaitlistSuccessView({
   onRetry,
   email,
 }: Readonly<WaitlistSuccessViewProps>) {
+  useEffect(() => {
+    if (outcome !== 'save_failed' && outcome !== 'rate_limited') {
+      track(ONBOARDING_FUNNEL_EVENTS.WAITLIST_CONFIRMATION_VIEWED, {
+        surface: 'waitlist_receipt',
+        outcome,
+      });
+    }
+  }, [outcome]);
+
   return (
     <AuthLayout
       formTitle='Request Access'

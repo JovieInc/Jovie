@@ -11,21 +11,15 @@ import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
  * Auto-claim the anonymous onboarding conversation when the visitor
  * authenticates mid-flow (JOV-2132 PR 4).
  *
- * Fires on mount and after completed chat turns while Clerk reports the user
+ * Fires on mount and after completed chat turns while Better Auth reports the user
  * is signed in. Calls POST /api/onboarding/claim — the server reads the signed
  * `jovie_onboarding_session` cookie and attaches matching anonymous
  * conversations to the freshly created user.
  *
- * Handles the Clerk → DB user-mirror race: the claim endpoint returns
- * `{ retryAfterWebhook: true }` when Clerk has authenticated the user but
- * the Clerk webhook hasn't yet written them into our `users` table. We
- * retry up to 3 times with a 1.5s gap before giving up — the webhook
- * almost always lands in under 2s.
- *
- * On success (claimed >= 1) the hook navigates to `/onboarding/checkout`
- * so the existing post-claim path takes over. If the claim returned
- * `claimed: 0` (no anonymous conversation for this session), we stay put
- * and retry after later chat activity.
+ * On a durable pending receipt it navigates to `/waitlist`; admitted users
+ * continue to `/onboarding/checkout`. If the claim returns `claimed: 0`
+ * without an idempotent receipt, it stays put and retries after later chat
+ * activity.
  *
  * Duplicate-request guard (JOV-2203):
  * React 18+ re-runs effects whenever any dependency changes. Clerk's auth
@@ -49,6 +43,12 @@ interface ClaimResponse {
   readonly retryAfterWebhook?: boolean;
   readonly alreadyClaimed?: boolean;
   readonly errorCode?: string;
+  readonly waitlistIntakeRequired?: boolean;
+  readonly waitlist?: {
+    readonly entryId: string;
+    readonly status: string;
+    readonly outcome: string;
+  };
   readonly profile?: {
     readonly profileId: string | null;
     readonly handle: string | null;
@@ -86,6 +86,7 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
 
     const attemptClaim = async (attempt: number): Promise<void> => {
       setStatus('pending');
+      const startedAt = Date.now();
       let response: Response;
       try {
         response = await fetch('/api/onboarding/claim', {
@@ -122,6 +123,20 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
         return;
       }
 
+      if (!response.ok) {
+        markTriggerCompleted();
+        setStatus('error');
+        if (body.errorCode === 'WAITLIST_SAVE_FAILED') {
+          track(ONBOARDING_FUNNEL_EVENTS.WAITLIST_SAVE_FAILED, {
+            surface: 'start_chat',
+            duration_ms: Date.now() - startedAt,
+            http_status: response.status,
+            attempt,
+          });
+        }
+        return;
+      }
+
       if (body.retryAfterWebhook && attempt < MAX_RETRIES) {
         setStatus('retry-after-webhook');
         setTimeout(() => {
@@ -130,13 +145,32 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
         return;
       }
 
-      if (body.claimed && body.claimed > 0) {
+      const completeClaim = () => {
         markTriggerCompleted();
         claimedRef.current = true;
         setStatus('claimed');
         track(ONBOARDING_FUNNEL_EVENTS.AUTH_COMPLETED, {
           surface: 'start_chat',
         });
+        if (body.waitlistIntakeRequired) {
+          track(ONBOARDING_FUNNEL_EVENTS.WAITLIST_INTAKE_REQUIRED, {
+            surface: 'start_chat',
+            duration_ms: Date.now() - startedAt,
+          });
+          router.replace(APP_ROUTES.WAITLIST);
+          return;
+        }
+        if (body.waitlist?.entryId) {
+          track(ONBOARDING_FUNNEL_EVENTS.WAITLISTED, {
+            surface: 'start_chat',
+            entry_id: body.waitlist.entryId,
+            status: body.waitlist.status,
+            outcome: body.waitlist.outcome,
+            duration_ms: Date.now() - startedAt,
+          });
+          router.replace(APP_ROUTES.WAITLIST);
+          return;
+        }
         if (body.profile?.profileId) {
           track(ONBOARDING_FUNNEL_EVENTS.PROFILE_CREATED, {
             profile_id: body.profile.profileId,
@@ -147,26 +181,10 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
         }
         // Hand off to the existing /onboarding/checkout flow.
         router.replace(APP_ROUTES.ONBOARDING_CHECKOUT);
-        return;
-      }
+      };
 
-      if (body.alreadyClaimed) {
-        // Same user already claimed this transcript (typical retry case).
-        markTriggerCompleted();
-        claimedRef.current = true;
-        setStatus('claimed');
-        track(ONBOARDING_FUNNEL_EVENTS.AUTH_COMPLETED, {
-          surface: 'start_chat',
-        });
-        if (body.profile?.profileId) {
-          track(ONBOARDING_FUNNEL_EVENTS.PROFILE_CREATED, {
-            profile_id: body.profile.profileId,
-            handle: body.profile.handle ?? undefined,
-            method: 'chat_claim',
-            status: body.profile.status,
-          });
-        }
-        router.replace(APP_ROUTES.ONBOARDING_CHECKOUT);
+      if ((body.claimed && body.claimed > 0) || body.alreadyClaimed) {
+        completeClaim();
         return;
       }
 

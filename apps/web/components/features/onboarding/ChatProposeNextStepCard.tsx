@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthShell } from '@/features/auth';
 import { useAuthSafe, useCanRenderClerkUi } from '@/hooks/useClerkSafe';
@@ -20,8 +20,8 @@ import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
  *    client-flip commit ⑦: replaced Clerk `<SignUp />` prebuilt with the
  *    BA-backed `AuthShell`.)
  *
- *  - `waitlist` → confirmation message. Visitor's transcript is already
- *    saved; we'll email them when they're up.
+ *  - `waitlist` → verified signup, then the claim endpoint writes the durable
+ *    waitlist record. This card never renders a saved confirmation itself.
  *
  *  - `needs_more_info` → renders nothing visible. The LLM has been told to
  *    ask another sharp question; this card just acknowledges the tool was
@@ -47,6 +47,8 @@ export function ChatProposeNextStepCard({
   const { isSignedIn } = useAuthSafe();
   const canRenderClerkUi = useCanRenderClerkUi();
   const kind = payload.decision.kind;
+  const decisionTrackedRef = useRef(false);
+  const saveStartedTrackedRef = useRef(false);
 
   useEffect(() => {
     if (kind === 'instant_access') {
@@ -56,13 +58,24 @@ export function ChatProposeNextStepCard({
       });
     }
 
-    if (kind === 'waitlist') {
-      track(ONBOARDING_FUNNEL_EVENTS.WAITLISTED, {
+    if (kind === 'waitlist' && !decisionTrackedRef.current) {
+      decisionTrackedRef.current = true;
+      track(ONBOARDING_FUNNEL_EVENTS.WAITLIST_DECISION_RENDERED, {
         score: payload.decision.score,
         surface: 'start_chat',
       });
     }
   }, [kind, payload.decision.score]);
+
+  useEffect(() => {
+    if (kind === 'waitlist' && isSignedIn && !saveStartedTrackedRef.current) {
+      saveStartedTrackedRef.current = true;
+      track(ONBOARDING_FUNNEL_EVENTS.WAITLIST_SAVE_STARTED, {
+        score: payload.decision.score,
+        surface: 'start_chat',
+      });
+    }
+  }, [isSignedIn, kind, payload.decision.score]);
 
   // Memoise the auth surface so the inline form looks at home on the
   // dark onboarding canvas. AuthShell's `compact` mode renders the
@@ -74,14 +87,39 @@ export function ChatProposeNextStepCard({
   }
 
   if (kind === 'waitlist') {
-    // Never promise email delivery until the visitor has a confirmed email
-    // (sign-in/sign-up). Success language is the list confirmation only.
-    const waitlistBody = isSignedIn
-      ? `You're on the list. We'll email you when you're up. We can pick up right here.`
-      : `You're on the list. We pick up right here — nothing gets lost. Add an email at sign-in if you want a heads-up when access opens.`;
+    if (isSignedIn) {
+      return (
+        <div className='min-h-72 px-1 py-1'>
+          <p className='text-mid leading-7 text-primary-token'>
+            Saving your request to the waitlist now. Keep this page open until
+            the receipt appears.
+          </p>
+        </div>
+      );
+    }
+
+    if (!canRenderClerkUi) {
+      return (
+        <div className='min-h-72 px-1 py-1'>
+          <p className='text-mid leading-7 text-primary-token'>
+            Add a verified email to save this request. You are not on the list
+            until the confirmation appears.
+          </p>
+        </div>
+      );
+    }
+
     return (
-      <div className='px-1 py-1'>
-        <p className='text-mid leading-7 text-primary-token'>{waitlistBody}</p>
+      <div className='min-h-72 space-y-3 px-1 py-1'>
+        <p className='mb-3 text-mid leading-7 text-primary-token'>
+          Add a verified email to save this request. You are not on the list
+          until the confirmation appears.
+        </p>
+        <AuthShell
+          mode='sign-up'
+          compact
+          fallbackRedirectUrl={APP_ROUTES.START}
+        />
       </div>
     );
   }
