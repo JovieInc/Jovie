@@ -40,9 +40,18 @@ async function requireBox(
   locator: Locator,
   label: string
 ): Promise<DocumentBox> {
-  const box = await locator.boundingBox();
-  expect(box, `${label} has geometry`).not.toBeNull();
-  if (!box) throw new Error(`${label} has no geometry`);
+  const box = await locator.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    return {
+      x: rect.x + window.scrollX,
+      y: rect.y + window.scrollY,
+      width: rect.width,
+      height: rect.height,
+    };
+  });
+
+  expect(box.width, `${label} has width`).toBeGreaterThan(0);
+  expect(box.height, `${label} has height`).toBeGreaterThan(0);
   return box;
 }
 
