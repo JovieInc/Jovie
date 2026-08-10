@@ -1068,133 +1068,121 @@ body {
   }
   .marketing-pricing-plans {
     display: grid;
-    gap: clamp(0.85rem, 1.4vw, 1.1rem);
-  }
-  .marketing-pricing-plans--compact {
+    width: 100%;
+    min-width: 0;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .marketing-pricing-plans--expanded {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-4);
   }
   .marketing-pricing-plan-card {
     position: relative;
     display: flex;
+    min-width: 0;
     min-height: 24rem;
     flex-direction: column;
     overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 18px;
-    padding: clamp(1.2rem, 2vw, 1.55rem);
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 42%),
-      rgba(255, 255, 255, 0.02);
-    box-shadow:
-      0 28px 80px rgba(0, 0, 0, 0.24),
-      inset 0 1px 0 rgba(255, 255, 255, 0.055);
+    border: var(--space-px) solid var(--color-border-subtle);
+    border-radius: var(--radius-xl);
+    padding: clamp(var(--space-5), 2vw, var(--space-6));
+    background: var(--color-bg-surface-1);
+    box-shadow: var(--shadow-card);
+  }
+  .marketing-pricing-plans[data-variant="tier-cards-recommended"]
+    .marketing-pricing-plan-card[data-recommended="true"] {
+    border-color: var(--color-border-strong);
+    background: var(--color-bg-surface-2);
+    box-shadow: var(--shadow-card-elevated);
   }
   .marketing-pricing-plan-card__topline {
     position: absolute;
     inset: 0 0 auto;
-    height: 1px;
-    background: linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.18),
-      rgba(255, 255, 255, 0.16),
-      transparent
-    );
+    height: var(--space-px);
+    background: var(--color-border-strong);
   }
   .marketing-pricing-plan-card__header {
     display: grid;
-    min-height: 6.6rem;
+    min-height: calc(var(--space-20) + var(--space-6));
     grid-template-columns: minmax(0, 1fr);
     align-content: start;
-    gap: 0.8rem;
+    gap: var(--space-3);
   }
   .marketing-pricing-plan-card__name {
     margin: 0;
-    color: rgba(255, 255, 255, 0.94);
-    font-size: 1.05rem;
-    font-weight: 650;
-    line-height: 1.16;
+    color: var(--color-text-primary-token);
+    font-size: var(--text-lg);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--leading-tight);
   }
   .marketing-pricing-plan-card__body {
     max-width: 20rem;
-    margin: 0.5rem 0 0;
-    color: rgba(255, 255, 255, 0.58);
-    font-size: 13.5px;
-    line-height: 1.48;
+    margin: var(--space-2) 0 0;
+    color: var(--color-text-secondary-token);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
   }
   .marketing-pricing-plan-card__badge {
     display: inline-flex;
     width: fit-content;
-    min-height: 1.7rem;
+    min-height: var(--space-6);
     align-items: center;
     justify-content: center;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 999px;
-    padding-inline: 0.68rem;
-    background: rgba(255, 255, 255, 0.035);
-    color: rgba(255, 255, 255, 0.64);
-    font-size: 11px;
-    font-weight: 620;
+    border: var(--space-px) solid var(--color-border-subtle);
+    border-radius: var(--radius-pill);
+    padding-inline: var(--space-3);
+    background: var(--color-bg-surface-0);
+    color: var(--color-text-secondary-token);
+    font-size: var(--text-xs);
+    font-weight: var(--font-weight-medium);
     line-height: 1;
   }
+  .marketing-pricing-plans[data-variant="tier-cards-recommended"]
+    .marketing-pricing-plan-card[data-recommended="true"]
+    .marketing-pricing-plan-card__badge {
+    border-color: var(--system-b-primary-bg);
+    background: var(--system-b-primary-bg);
+    color: var(--system-b-primary-fg);
+  }
   .marketing-pricing-plan-card__price {
-    margin: 1.35rem 0 0;
-    color: rgba(255, 255, 255, 0.95);
-    font-size: clamp(2.25rem, 3.2vw, 2.85rem);
-    font-weight: 650;
-    line-height: 0.96;
-    letter-spacing: -0.045em;
+    margin: var(--space-5) 0 0;
+    color: var(--color-text-primary-token);
+    font-size: var(--text-4xl);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--leading-none);
+    letter-spacing: 0;
   }
   .marketing-pricing-plan-card__price span {
-    margin-left: 0.08em;
-    color: rgba(255, 255, 255, 0.55);
-    font-size: 0.48em;
-    font-weight: 560;
+    margin-left: var(--space-0-5);
+    color: var(--color-text-tertiary-token);
+    font-size: var(--text-sm);
+    font-weight: var(--font-weight-normal);
     letter-spacing: 0;
   }
   .marketing-pricing-plan-card__cta {
     width: 100%;
-    margin-top: 1.15rem;
+    margin-top: var(--space-5);
   }
   .marketing-pricing-plan-card__features {
     display: grid;
-    gap: 0.7rem;
-    margin: 1.35rem 0 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
-    padding: 1.1rem 0 0;
+    gap: var(--space-3);
+    margin: var(--space-6) 0 0;
+    border-top: var(--space-px) solid var(--color-border-subtle);
+    padding: var(--space-5) 0 0;
     list-style: none;
   }
   .marketing-pricing-plan-card__features li {
     display: grid;
-    grid-template-columns: 15px minmax(0, 1fr);
-    gap: 0.55rem;
+    grid-template-columns: var(--space-4) minmax(0, 1fr);
+    gap: var(--space-2);
     align-items: start;
-    color: rgba(255, 255, 255, 0.64);
-    font-size: 13px;
-    line-height: 1.42;
+    color: var(--color-text-secondary-token);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
   }
   .marketing-pricing-plan-card__features svg {
-    margin-top: 0.12rem;
-    color: rgba(255, 255, 255, 0.58);
-  }
-  @media (max-width: 1180px) {
-    .marketing-pricing-plans--compact {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-    .marketing-pricing-plans--expanded {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-  @media (max-width: 860px) {
-    .marketing-pricing-plans--compact {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+    margin-top: var(--space-0-5);
+    color: var(--color-text-tertiary-token);
   }
   @media (max-width: 700px) {
-    .marketing-pricing-plans--compact,
-    .marketing-pricing-plans--expanded {
+    .marketing-pricing-plans {
       grid-template-columns: minmax(0, 1fr);
     }
     .marketing-pricing-plan-card {

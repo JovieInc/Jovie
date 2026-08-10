@@ -146,7 +146,7 @@ export default function PricingPage() {
         headline='Pricing'
         subtitle='Artist profiles are free forever. Pro adds the release tools when you need them.'
         primaryCta={{
-          label: 'Claim your profile',
+          label: 'Claim Your Profile',
           href: `${APP_ROUTES.SIGNUP}?plan=free`,
         }}
         secondaryCta={{
@@ -170,7 +170,10 @@ export default function PricingPage() {
       <section aria-label='Plans' className='system-b-pricing-section'>
         <MarketingContainer width='page'>
           <div className='system-b-pricing-plans'>
-            <MarketingPricingPlans ctaVariant='secondary' mode='expanded' />
+            <MarketingPricingPlans
+              mode='expanded'
+              variant='tier-cards-neutral'
+            />
           </div>
         </MarketingContainer>
       </section>
@@ -186,7 +189,7 @@ export default function PricingPage() {
                 id='pricing-compare-heading'
                 className='system-b-pricing-section-title'
               >
-                Compare all features
+                Compare All Features
               </h2>
               <p className='system-b-pricing-section-body'>
                 See the plan matrix for notifications, analytics, contacts,

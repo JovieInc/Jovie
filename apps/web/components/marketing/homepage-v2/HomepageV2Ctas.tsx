@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/home/mounted-home-pricing-system-b-style-guard.test.ts
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
@@ -69,8 +70,8 @@ export function HomepageV2Pricing() {
           />
 
           <MarketingPricingPlans
-            emphasizedPlanId='pro'
             mode='compact'
+            variant='tier-cards-recommended'
             className='system-b-mounted-home-pricing-plans'
           />
         </div>

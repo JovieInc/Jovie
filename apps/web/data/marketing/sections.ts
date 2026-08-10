@@ -1088,6 +1088,18 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     optionalInputs: ['eyebrow', 'title', 'comparisonMatrix', 'faq'],
     variants: [
       {
+        id: 'tier-cards-neutral',
+        layout: 'contained',
+        media: 'none',
+        columns: 3,
+        density: 'large',
+        alignment: 'centered',
+        chooseWhen:
+          'recipe=pricing AND tiers.length≥2 (equal-weight tiers on the canonical pricing route)',
+        exemplar: { route: '/pricing', section: 'pricing' },
+        status: 'active',
+      },
+      {
         id: 'tier-cards-recommended',
         layout: 'contained',
         media: 'none',
@@ -1095,8 +1107,8 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         density: 'large',
         alignment: 'centered',
         chooseWhen:
-          'tiers.length≥2 AND one tier is recommended/highlighted (B2B C7: emphasized tier)',
-        exemplar: { route: '/pricing', section: 'pricing' },
+          'recipe=homepage AND tiers.length≥2 AND Pro is recommended/highlighted (B2B C7: emphasized tier)',
+        exemplar: { route: '/new', section: 'pricing' },
         status: 'active',
       },
       {
@@ -1107,8 +1119,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         density: 'large',
         alignment: 'centered',
         chooseWhen: 'tiers.length=2 (Standard vs Custom — Stripe-style)',
-        exemplar: { route: '/pricing', section: 'pricing' },
-        status: 'active',
+        status: 'unproven',
       },
       {
         id: 'decision-assistant',
@@ -1126,15 +1137,15 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         alignment: 'centered',
         chooseWhen:
           'audience=artist AND recipe=artist-lp (creator R8: no pricing table on artist LP; cost-objection resolved inside CTA string)',
-        exemplar: { route: '/artist-profiles', section: 'monetization' }, // artist LP embeds pricing as one line in monetization, not a pricing section
-        status: 'active',
+        status: 'unproven',
       },
     ],
     defaultVariant: 'tier-cards-recommended',
     proofClass: 'none', // pricing itself isn't proof; the proof beat between cards and matrix is gated separately
     audienceLegality: [{ legal: true }],
-    illegalAfter: ['hero'], // B2B C7: pricing never before value framing — at least a headline claim or logo strip first
-    requiresPrior: ['hero', 'feature-grid'], // pricing needs value framing first
+    // The canonical pricing recipe intentionally places tiers directly after
+    // its hero; that hero is the required value frame before price.
+    requiresPrior: ['hero'],
     contentBudgets: [
       {
         slot: 'tier-name',
@@ -1156,15 +1167,15 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       },
     ],
     responsiveContract:
-      'columns:3 → 3→1 at sm (no 2-col intermediate — comparison table below stays full-width); columns:2 → 2→1; comparison table: horizontal scroll at sm if needed',
+      'tier cards: 3 columns at 1024 and 1 column at 390 (no 2-col intermediate; minmax(0,1fr) prevents overflow); comparison table: horizontal scroll at sm if needed',
     accessibility: {
       keyboard:
-        'tier cards are <article>; "recommended" badge is aria-label; toggle (monthly/yearly) is a real <button> with aria-pressed',
+        'tier cards are <article>; the Pro-emphasized variant exposes a visible Recommended badge; every tier CTA is a semantic link',
       contrast:
-        'all pricing text meets AA; recommended tier uses accent only on the badge/CTA',
+        'all pricing text meets AA; neutral cards have equal visual weight, while the recommended tier uses accent only on the badge/CTA',
       touchTarget: 'CTA per tier ≥44×44 at sm',
       reducedMotion:
-        'toggle has no slide animation (instant swap with height-stable slot per layout-shift contract)',
+        'variant selection is static with no transition; card slots stay height-stable and add no motion',
     },
     component: 'components/features/pricing/MarketingPricingPlans',
     failureModes: [

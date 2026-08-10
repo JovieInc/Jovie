@@ -62,10 +62,12 @@ describe('mounted homepage pricing System B source contract', () => {
       );
     }
 
-    // The shared MarketingPricingPlans internals stay untouched; the homepage
-    // scopes its System B treatment through wrapper classes that only
-    // home.css (loaded under .home-viewport) styles.
+    // The homepage selects the Pro-emphasized state on the shared renderer and
+    // scopes its System B treatment through wrapper classes that only home.css
+    // (loaded under .home-viewport) styles.
     expect(source).toContain("data-testid='homepage-v2-pricing'");
+    expect(source).toContain("variant='tier-cards-recommended'");
+    expect(source).not.toContain('emphasizedPlanId');
     expect(source).toContain('homepage-pricing-shell');
     expect(source).toContain('homepage-pricing-copy');
     for (const className of [

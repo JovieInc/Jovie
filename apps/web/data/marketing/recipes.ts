@@ -302,7 +302,7 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
     ],
     hierarchy: {
       oneBigIdea:
-        'Jovie pricing is simple: one recommended tier, full comparison, no hidden fees',
+        'Jovie pricing is simple: three clear tiers, full comparison, no hidden fees',
       seeFirst: 'hero',
       second: 'pricing',
       third: 'comparison',
