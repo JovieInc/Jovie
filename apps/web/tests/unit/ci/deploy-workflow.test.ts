@@ -1147,7 +1147,7 @@ describe('deploy workflow Vercel env resolution', () => {
       'node .github/scripts/verify-main-release-readiness.mjs'
     );
     expect(readinessJob).toContain('QUEUE_PROVEN');
-    expect(readinessJob).toContain('Unit Tests (five shards)');
+    expect(readinessJob).toContain('Unit Tests (ten shards)');
     expect(readinessJob).toContain('Build + Layout');
     expect(readinessJob).toContain('Promptfoo Evals');
     expect(readinessJob).toContain('Golden Eval Set');

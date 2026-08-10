@@ -467,6 +467,7 @@ jobs:
       run_neon: ${{ steps.detect.outputs.run_neon || 'false' }}
       run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes || 'false' }}
+      is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -547,9 +548,11 @@ jobs:
               # A valid native merge-group can be a tree no-op when another PR
               # has already landed the same patch. Treat that state explicitly:
               # Path Changes succeeds with every optional lane disabled, while
-              # merge-group admission, ci-fast, unit, build/layout, secret,
-              # migration, and PR Ready still validate the exact combined head.
+              # merge-group admission, ci-fast, secret, migration, and PR Ready
+              # still validate the exact combined head. The typed no-op output
+              # lets only unit and build/layout skip their expensive work.
               echo "::notice::No tree changes vs merge_group base ${MERGE_GROUP_BASE_SHA}; continuing as an explicit no-op combined head."
+              echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"
               for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes; do
                 echo "$output=false" >> "$GITHUB_OUTPUT"
               done
@@ -1579,7 +1582,10 @@ jobs:
         needs.ci-merge-group-admission.result == 'success'
       ) &&
       (
-        github.event_name == 'merge_group' ||
+        (
+          github.event_name == 'merge_group' &&
+          needs.ci-path-changes.outputs.is_noop_merge_group != 'true'
+        ) ||
         (github.event_name == 'push' && github.ref == 'refs/heads/main')
       )
     runs-on: ubuntu-latest
@@ -3055,10 +3061,9 @@ jobs:
   ci-unit-tests:
     name: Unit Tests (${{ matrix.shard }})
     needs: [ci-path-changes, ci-merge-group-admission]
-    # Runs five shards on every merge-group combined head and direct-main
-    # fallback. The merge-group command remains --affected, but the matrix may
-    # never turn into a skipped placeholder. Source PRs defer unit evidence to
-    # the combined queue head.
+    # Runs ten shards on every non-empty merge-group combined head and the
+    # direct-main fallback. Only an exact typed empty-diff merge group skips the
+    # matrix; source PRs defer unit evidence to the combined queue head.
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
@@ -3067,7 +3072,10 @@ jobs:
         needs.ci-merge-group-admission.result == 'success'
       ) &&
       (
-        github.event_name == 'merge_group' ||
+        (
+          github.event_name == 'merge_group' &&
+          needs.ci-path-changes.outputs.is_noop_merge_group != 'true'
+        ) ||
         (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
         github.event_name == 'workflow_dispatch'
       )
@@ -4594,9 +4602,10 @@ jobs:
 
   ci-merge-group-ready:
     name: ${{ github.event_name == 'merge_group' && 'PR Ready' || 'PR Ready (merge-group inactive)' }}
-    # Combined heads require deterministic gates, five unit shards, one hosted
-    # build/layout workspace, and path-selected iOS evidence. Deep browser lanes
-    # never provision Neon from this event.
+    # Combined heads always require deterministic core gates and path-selected
+    # iOS evidence. Non-empty heads also require ten unit shards and one hosted
+    # build/layout workspace; only an exact typed no-op skips those heavy lanes.
+    # Deep browser lanes never provision Neon from this event.
     needs:
       [
         ci-path-changes,
@@ -4630,6 +4639,7 @@ jobs:
           GOLDEN_EVAL_RESULT="${{ needs.ci-golden-eval-set.result }}"
           SECRET_RESULT="${{ needs.ci-secret-scan.result }}"
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
+          NOOP_GROUP="${{ needs.ci-path-changes.outputs.is_noop_merge_group }}"
           RUN_IOS="${{ needs.ci-path-changes.outputs.run_ios }}"
           RUN_PROMPTFOO="${{ needs.ci-path-changes.outputs.run_promptfoo_evals }}"
           RUN_GOLDEN_EVAL="${{ needs.ci-path-changes.outputs.run_golden_eval_set }}"
@@ -4642,6 +4652,7 @@ jobs:
             echo "| Gate | Result |"
             echo "| --- | --- |"
             echo "| Path Changes | $PATH_RESULT |"
+            echo "| Typed no-op merge group | $NOOP_GROUP |"
             echo "| Merge Group Admission | $ADMISSION_RESULT |"
             echo "| CI Risk Classifier | $RISK_RESULT |"
             echo "| ci-fast | $FAST_RESULT |"
@@ -4662,8 +4673,7 @@ jobs:
             "CI Risk Classifier:$RISK_RESULT" \
             "ci-fast:$FAST_RESULT" \
             "Secret Scan:$SECRET_RESULT" \
-            "Migration Guard:$MIGRATION_RESULT" \
-            "Build + Layout:$BUILD_LAYOUT_RESULT"; do
+            "Migration Guard:$MIGRATION_RESULT"; do
             name="${gate%%:*}"
             result="${gate#*:}"
             if [[ "$result" != "success" ]]; then
@@ -4672,9 +4682,20 @@ jobs:
             fi
           done
 
-          if [[ "$UNIT_RESULT" != "success" ]]; then
-            echo "::error::Five affected Unit Test shards did not pass on the merge-group combined head (result: $UNIT_RESULT)"
-            exit 1
+          if [[ "$NOOP_GROUP" == "true" ]]; then
+            if [[ "$UNIT_RESULT" != "skipped" || "$BUILD_LAYOUT_RESULT" != "skipped" ]]; then
+              echo "::error::Typed no-op merge group must skip Unit Tests and Build + Layout (unit: $UNIT_RESULT, build: $BUILD_LAYOUT_RESULT)"
+              exit 1
+            fi
+          else
+            if [[ "$UNIT_RESULT" != "success" ]]; then
+              echo "::error::Unit Test shards did not pass on the non-empty merge-group combined head (result: $UNIT_RESULT)"
+              exit 1
+            fi
+            if [[ "$BUILD_LAYOUT_RESULT" != "success" ]]; then
+              echo "::error::Build + Layout did not pass on the non-empty merge-group combined head (result: $BUILD_LAYOUT_RESULT)"
+              exit 1
+            fi
           fi
 
           if [[ "$RUN_IOS" == "true" && "$IOS_RESULT" != "success" ]]; then
@@ -5381,7 +5402,7 @@ jobs:
             exit 0
           fi
 
-          # Direct/admin main fallback is intentionally unconditional: five unit
+          # Direct/admin main fallback is intentionally unconditional: ten unit
           # shards and the combined hosted build+layout may never be represented
           # by a skipped placeholder.
           for lane in \
@@ -5390,7 +5411,7 @@ jobs:
             "ci-fast:$FAST_RESULT" \
             "Secret Scan:$SECRET_RESULT" \
             "Migration Guard:$MIGRATION_RESULT" \
-            "Unit Tests (five shards):$UNIT_RESULT" \
+            "Unit Tests (ten shards):$UNIT_RESULT" \
             "Build + Layout:$BUILD_LAYOUT_RESULT"; do
             name="${lane%%:*}"
             result="${lane#*:}"

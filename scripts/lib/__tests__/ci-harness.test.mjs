@@ -513,7 +513,9 @@ describe('ci-harness manifest', () => {
     expect(mergeReady).not.toContain(
       'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
     );
-    expect(mergeReady).toContain('Five affected Unit Test shards did not pass');
+    expect(mergeReady).toContain(
+      'Unit Test shards did not pass on the non-empty merge-group combined head'
+    );
     expect(unitTests).toContain('run: echo "run_full_ci=true"');
   });
 
