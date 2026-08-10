@@ -67,6 +67,33 @@ describe('Button', () => {
     );
   });
 
+  it('renders an opaque server child through the canonical asChild contract', () => {
+    const serverElement = (
+      <a href='/signup' data-testid='server-button-child'>
+        Try it free
+      </a>
+    );
+    const payload = Promise.resolve(
+      serverElement
+    ) as Promise<React.ReactElement> & {
+      status: 'fulfilled';
+      value: React.ReactElement;
+    };
+    payload.status = 'fulfilled';
+    payload.value = serverElement;
+    const serverChild = {
+      $$typeof: Symbol.for('react.lazy'),
+      _payload: payload,
+    } as unknown as React.ReactNode;
+
+    render(<Button asChild>{serverChild}</Button>);
+
+    expect(screen.getByTestId('server-button-child')).toHaveAttribute(
+      'data-pen-contract',
+      BUTTON_PEN_CONTRACT.rootId
+    );
+  });
+
   it('defaults to the canonical primary md button contract', () => {
     render(<Button>Press</Button>);
     const btn = screen.getByRole('button');

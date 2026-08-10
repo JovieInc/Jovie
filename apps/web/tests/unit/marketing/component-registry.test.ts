@@ -383,6 +383,16 @@ describe('canonical marketing component registry', () => {
       ])
     );
   });
+
+  it('keeps section.cta unresolved until JOV-4954 converges the production shell root', () => {
+    expect(
+      MARKETING_COMPONENT_REGISTRY.find(entry => entry.id === 'section.cta')
+    ).toMatchObject({
+      sourceBacked: false,
+      unresolvedReason:
+        'A production shell root exists, but section.cta convergence is pending JOV-4954.',
+    });
+  });
 });
 
 describe('canonical shared source atom registry', () => {
@@ -435,6 +445,15 @@ describe('canonical shared source atom registry', () => {
       DESIGN_SYSTEM_COMPONENT_IDS
     );
     expect(validateDesignSystemComponentRegistry()).toEqual([]);
+  });
+
+  it('keeps atom.logo raw until it has a source-mapped Pen origin', () => {
+    expect(
+      DESIGN_SYSTEM_COMPONENT_REGISTRY.find(entry => entry.id === 'atom.logo')
+    ).toMatchObject({
+      penRootId: null,
+      referenceEligible: false,
+    });
   });
 
   it('gives every supported atom variant a deterministic unique address', () => {

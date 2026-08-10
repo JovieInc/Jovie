@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { MarketingContainer } from '@/components/marketing';
+import type { MarketingPenContractId } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 
 export interface MarketingTerminalCtaProps {
@@ -18,7 +19,7 @@ export interface MarketingTerminalCtaProps {
   readonly decoration?: ReactNode;
   readonly testId: string;
   readonly variant?: 'cinematic' | 'standard';
-  readonly penContractId: string;
+  readonly penContractId: MarketingPenContractId;
 }
 
 const styles = {

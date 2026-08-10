@@ -13,6 +13,7 @@ import { MobileNav } from '@/components/molecules/MobileNav';
 import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
 import { UserButton } from '@/components/organisms/user-button';
 import { APP_ROUTES } from '@/constants/routes';
+import type { MarketingPenContractId } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 
 // Linear header structure: full-width header with centered ~1000px content
@@ -41,7 +42,7 @@ export interface HeaderNavProps {
   readonly presentation?: 'default' | 'homepage-embedded' | 'marketing-glass';
   readonly flyoutMenus?: readonly HeaderFlyoutMenu[];
   readonly showContactLink?: boolean;
-  readonly penContractId?: string;
+  readonly penContractId?: MarketingPenContractId;
 }
 
 export interface HeaderFlyoutMenu {

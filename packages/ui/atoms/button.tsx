@@ -243,15 +243,19 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       'data-static': isStatic ? 'true' : undefined,
     };
 
-    // In asChild mode (Radix Slot), React.Children.only requires a single child.
+    // In asChild mode, Radix Slot owns the single-child validation.
     // Do NOT render additional wrappers/spinner here; apply styles/props to the child.
     if (asChild) {
-      const contractChild = React.cloneElement(
-        React.Children.only(children) as React.ReactElement<{
-          'data-pen-contract'?: string;
-        }>,
-        { 'data-pen-contract': BUTTON_PEN_CONTRACT.rootId }
-      );
+      // Next's server renderer can pass an opaque lazy child across the RSC
+      // boundary. Radix Slot resolves that representation itself, while
+      // React.Children.only rejects it before Slot gets the chance.
+      const contractChild = React.isValidElement<{
+        'data-pen-contract'?: string;
+      }>(children)
+        ? React.cloneElement(children, {
+            'data-pen-contract': BUTTON_PEN_CONTRACT.rootId,
+          })
+        : children;
 
       return (
         <Comp

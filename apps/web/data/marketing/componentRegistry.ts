@@ -306,7 +306,7 @@ const SECTION_RESOLUTIONS = {
     'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.faq}'
   ),
   cta: unresolved(
-    'The registered components/marketing/MarketingFooterCta path does not resolve; the site MarketingFooterCta is already a distinct shell identity, and JOV-4954 owns convergence without an alias.'
+    'A production shell root exists, but section.cta convergence is pending JOV-4954.'
   ),
   'spec-wall': sourceRoot(
     'apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx',

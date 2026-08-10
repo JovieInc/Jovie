@@ -109,10 +109,10 @@ export const DESIGN_SYSTEM_COMPONENT_REGISTRY = [
     storyExport: 'LogoSource',
     testSources: ['apps/web/tests/unit/Logo.test.tsx'],
     dependsOn: ['atom.brand-logo'],
-    penRootId: 'EXwUm',
+    penRootId: null,
     referenceEligible: false,
     penIdentityReason:
-      'Existing Pen logo root is not yet verified as a source-mapped reusable origin.',
+      'No source-mapped Pen logo atom root exists; keep raw until Pen promotion.',
     variantAxes: {
       variant: ['word', 'wordAlt', 'icon', 'full', 'fullAlt'],
       size: ['xs', 'sm', 'md', 'lg', 'xl'],
