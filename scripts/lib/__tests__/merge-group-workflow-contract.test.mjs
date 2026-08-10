@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -261,7 +262,9 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('BUILD_LAYOUT_RESULT');
     expect(aggregate).toContain('RUN_PROMPTFOO');
     expect(aggregate).toContain('RUN_GOLDEN_EVAL');
-    expect(aggregate).toContain('Five affected Unit Test shards did not pass');
+    expect(aggregate).toContain(
+      'Unit Test shards did not pass on the non-empty merge-group combined head'
+    );
     expect(aggregate).not.toContain(
       'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
     );
@@ -376,6 +379,12 @@ describe('merge_group workflow contract', () => {
       'continuing as an explicit no-op combined head'
     );
     expect(pathChanges).toContain(
+      "is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}"
+    );
+    expect(pathChanges).toContain(
+      'echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"'
+    );
+    expect(pathChanges).toContain(
       'for output in run_build run_test run_test_performance'
     );
     expect(pathChanges).toContain('echo "$output=false" >> "$GITHUB_OUTPUT"');
@@ -414,6 +423,128 @@ describe('merge_group workflow contract', () => {
     expect(mergeIdx).toBeGreaterThanOrEqual(0);
     expect(pushIdx).toBeGreaterThan(mergeIdx);
     expect(beforeAssignIdx).toBeGreaterThan(pushIdx);
+  });
+
+  it('short-circuits only expensive lanes for a typed empty-diff merge group', () => {
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
+    const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
+    const aggregate = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
+
+    expect(pathChanges).toContain(
+      "is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}"
+    );
+    for (const [name, job] of [
+      ['ci-unit-tests', units],
+      ['ci-build-layout', buildLayout],
+    ]) {
+      expect(job, name).toContain(
+        "needs.ci-path-changes.outputs.is_noop_merge_group != 'true'"
+      );
+      expect(job, name).toContain("github.event_name == 'merge_group'");
+    }
+
+    expect(aggregate).toContain(
+      'NOOP_GROUP="${{ needs.ci-path-changes.outputs.is_noop_merge_group }}"'
+    );
+    expect(aggregate).toContain(
+      'Typed no-op merge group must skip Unit Tests and Build + Layout'
+    );
+    expect(aggregate).toContain(
+      'Build + Layout did not pass on the non-empty merge-group combined head'
+    );
+
+    for (const jobId of [
+      'ci-merge-group-admission',
+      'ci-risk-classifier',
+      'ci-fast',
+      'ci-secret-scan',
+      'drizzle-migration-guard',
+    ]) {
+      expect(getJobBlock(CI_WORKFLOW, jobId), jobId).not.toContain(
+        "needs.ci-path-changes.outputs.is_noop_merge_group != 'true'"
+      );
+    }
+
+    const heavyGateStart = aggregate.indexOf(
+      '          if [[ "$NOOP_GROUP" == "true" ]]; then'
+    );
+    const heavyGateEnd = aggregate.indexOf(
+      '          if [[ "$RUN_IOS" == "true"',
+      heavyGateStart
+    );
+    expect(heavyGateStart).toBeGreaterThanOrEqual(0);
+    expect(heavyGateEnd).toBeGreaterThan(heavyGateStart);
+    const heavyGateScript = aggregate
+      .slice(heavyGateStart, heavyGateEnd)
+      .replace(/^ {10}/gm, '');
+
+    for (const testCase of [
+      {
+        name: 'typed no-op accepts both heavy lanes skipped',
+        noop: 'true',
+        unit: 'skipped',
+        build: 'skipped',
+        status: 0,
+      },
+      {
+        name: 'typed no-op rejects a unit success placeholder',
+        noop: 'true',
+        unit: 'success',
+        build: 'skipped',
+        status: 1,
+      },
+      {
+        name: 'typed no-op rejects a build success placeholder',
+        noop: 'true',
+        unit: 'skipped',
+        build: 'success',
+        status: 1,
+      },
+      {
+        name: 'non-empty group accepts both heavy lanes green',
+        noop: 'false',
+        unit: 'success',
+        build: 'success',
+        status: 0,
+      },
+      {
+        name: 'unset output fails closed as a non-empty group',
+        noop: '',
+        unit: 'skipped',
+        build: 'skipped',
+        status: 1,
+      },
+      {
+        name: 'malformed output fails closed as a non-empty group',
+        noop: 'TRUE',
+        unit: 'skipped',
+        build: 'skipped',
+        status: 1,
+      },
+    ]) {
+      const result = spawnSync(
+        'bash',
+        [
+          '-euo',
+          'pipefail',
+          '-c',
+          `NOOP_GROUP="$1"
+UNIT_RESULT="$2"
+BUILD_LAYOUT_RESULT="$3"
+${heavyGateScript}`,
+          'merge-group-heavy-gate',
+          testCase.noop,
+          testCase.unit,
+          testCase.build,
+        ],
+        { encoding: 'utf8' }
+      );
+      expect(
+        result.status,
+        `${testCase.name}\nstdout: ${result.stdout}\nstderr: ${result.stderr}`
+      ).toBe(testCase.status);
+    }
   });
 
   it('starts Build+Layout combined-head server with pinned loopback HOSTNAME (JOV-4446)', () => {
