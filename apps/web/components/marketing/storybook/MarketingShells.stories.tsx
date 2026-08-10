@@ -2,13 +2,13 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import {
   MarketingContainer,
   MarketingContentShell,
-  MarketingPageShell,
 } from '@/components/marketing';
 import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
+import { MarketingPageShell } from '../MarketingPageShell';
 import {
   MARKETING_STORY_DESCRIPTION,
   marketingFullscreenParameters,
@@ -69,7 +69,7 @@ export const MarketingPageShellDefault: Story = {
       <MarketingContainer width='page' className='py-16'>
         <ShellDemoBlock
           title='Marketing Page Shell'
-          body='Minimal min-h-screen wrapper used by artist-lp / homepage compositions when PublicPageShell lives in the layout.'
+          body='Minimal relative/grow wrapper used by artist-lp / homepage compositions when PublicPageShell lives in the layout.'
         />
       </MarketingContainer>
     </MarketingPageShell>
