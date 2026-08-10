@@ -544,8 +544,16 @@ jobs:
             git cat-file -e "${MERGE_GROUP_HEAD_SHA}^{commit}"
             CHANGED_FILES=$(git diff --name-only "$MERGE_GROUP_BASE_SHA...$MERGE_GROUP_HEAD_SHA")
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
-              echo "::error::Empty changed-file list vs merge_group base ${MERGE_GROUP_BASE_SHA}; refusing a false docs-only classification."
-              exit 1
+              # A valid native merge-group can be a tree no-op when another PR
+              # has already landed the same patch. Treat that state explicitly:
+              # Path Changes succeeds with every optional lane disabled, while
+              # merge-group admission, ci-fast, unit, build/layout, secret,
+              # migration, and PR Ready still validate the exact combined head.
+              echo "::notice::No tree changes vs merge_group base ${MERGE_GROUP_BASE_SHA}; continuing as an explicit no-op combined head."
+              for output in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios has_code_changes; do
+                echo "$output=false" >> "$GITHUB_OUTPUT"
+              done
+              exit 0
             fi
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             # Fail closed on base resolution: a failed fetch used to leave an

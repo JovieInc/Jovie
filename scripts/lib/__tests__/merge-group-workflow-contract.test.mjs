@@ -371,9 +371,14 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain(
       'git diff --name-only "$MERGE_GROUP_BASE_SHA...$MERGE_GROUP_HEAD_SHA"'
     );
+    expect(pathChanges).toContain('No tree changes vs merge_group base');
     expect(pathChanges).toContain(
-      'Empty changed-file list vs merge_group base'
+      'continuing as an explicit no-op combined head'
     );
+    expect(pathChanges).toContain(
+      'for output in run_build run_test run_test_performance'
+    );
+    expect(pathChanges).toContain('echo "$output=false" >> "$GITHUB_OUTPUT"');
     expect(pathChanges).toContain(
       'elif [[ "${{ github.event_name }}" == "push" ]]; then'
     );
