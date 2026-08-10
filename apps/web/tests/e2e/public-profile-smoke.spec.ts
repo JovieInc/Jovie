@@ -151,10 +151,31 @@ test.describe('public profile document semantics @regression', () => {
       page.getByRole('heading', { name: 'Profile not found' })
     ).toBeVisible();
     await expect(page.getByTestId('not-found')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Go home' })).toHaveAttribute(
-      'href',
-      '/'
+    const homeAction = page.getByRole('link', { name: 'Go home' });
+    const searchAction = page.getByRole('link', { name: 'Search artists' });
+
+    await expect(homeAction).toHaveAttribute('href', '/');
+    await expect(searchAction).toHaveAttribute('href', '/artist-profiles');
+
+    for (const action of [homeAction, searchAction]) {
+      const box = await action.boundingBox();
+      expect(
+        box,
+        'Missing-profile action has no rendered target'
+      ).not.toBeNull();
+      expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+      expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
+
+    await homeAction.focus();
+    await expect(homeAction).toBeFocused();
+    await searchAction.focus();
+    await expect(searchAction).toBeFocused();
+
+    const hasHorizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth + 1
     );
+    expect(hasHorizontalOverflow).toBe(false);
     await expect(
       page.locator('meta[name="robots"][content*="noindex"]')
     ).toHaveCount(1);

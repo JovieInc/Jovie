@@ -43,8 +43,13 @@ describe('public profile not-found System B source tokens', () => {
     const block = css.match(
       /SYSTEM B PUBLIC PROFILE NOT FOUND PRIMITIVES[\s\S]*?\/\* Inline entity links in public profile bio/
     )?.[0];
+    const sharedActionBlock = block?.match(
+      /:where\(\.system-b-public-profile-not-found-action\),[\s\S]*?\n\}/
+    )?.[0];
 
     expect(block).toBeTruthy();
+    expect(sharedActionBlock).toBeTruthy();
+    expect(css).toContain('--space-11: 2.75rem;');
     expect(block).toContain('var(--profile-stage-bg)');
     expect(block).toContain('var(--profile-stage-overlay)');
     expect(block).toContain('var(--system-b-header-height)');
@@ -55,6 +60,8 @@ describe('public profile not-found System B source tokens', () => {
     expect(block).toContain(
       'system-b-public-profile-not-found-action-secondary'
     );
+    expect(sharedActionBlock).toContain('min-height: var(--space-11)');
+    expect(sharedActionBlock).not.toContain('min-height: var(--space-10)');
     expect(block).toContain('var(--space-16)');
     expect(block).not.toMatch(hardcodedHashColorPattern);
     expect(block).not.toMatch(rawAlphaColorPattern);
