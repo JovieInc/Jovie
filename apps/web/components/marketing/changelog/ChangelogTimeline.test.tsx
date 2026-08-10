@@ -1,3 +1,6 @@
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ChangelogRelease } from '@/lib/changelog-parser';
@@ -92,5 +95,61 @@ describe('ChangelogTimeline', () => {
     expect(screen.getByText('v26.8.1')).toBeVisible();
     expect(screen.getByText('Showing 23 of 23 updates')).toBeVisible();
     expect(screen.queryByRole('button', { name: /More Updates/ })).toBeNull();
+  });
+});
+
+describe('web-026 changelog story provenance', () => {
+  const STORY_PATH =
+    'apps/web/components/marketing/changelog/ChangelogTimeline.stories.tsx';
+  const SOURCE_PATH =
+    'apps/web/components/marketing/changelog/ChangelogTimeline.tsx';
+
+  it('declares a valid ancestral sourceSha containing the story and both exports', () => {
+    const storySource = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/marketing/changelog/ChangelogTimeline.stories.tsx'
+      ),
+      'utf8'
+    );
+    expect(storySource).toContain("registryId: 'web-026-changelog'");
+    expect(storySource).toContain("contractId: 'V1OpUm'");
+    expect(storySource).toContain('export const Web026Changelog');
+
+    const match = storySource.match(/sourceSha: '([0-9a-f]{40})'/);
+    if (!match) {
+      throw new Error(
+        'ChangelogTimeline.stories.tsx must declare parameters.pen.sourceSha'
+      );
+    }
+    const sourceSha = match[1];
+
+    try {
+      execFileSync('git', ['cat-file', '-e', `${sourceSha}^{commit}`]);
+    } catch {
+      expect(
+        execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
+          encoding: 'utf8',
+        }).trim()
+      ).toBe('true');
+      return;
+    }
+
+    expect(() =>
+      execFileSync('git', ['merge-base', '--is-ancestor', sourceSha, 'HEAD'])
+    ).not.toThrow();
+
+    const storyAtReceipt = execFileSync(
+      'git',
+      ['show', `${sourceSha}:${STORY_PATH}`],
+      { encoding: 'utf8' }
+    );
+    const sourceAtReceipt = execFileSync(
+      'git',
+      ['show', `${sourceSha}:${SOURCE_PATH}`],
+      { encoding: 'utf8' }
+    );
+    expect(storyAtReceipt).toContain('export const Web026Changelog');
+    expect(sourceAtReceipt).toContain('export function ChangelogTimeline');
   });
 });
