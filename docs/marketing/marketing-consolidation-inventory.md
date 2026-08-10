@@ -105,8 +105,10 @@ Observed source signatures:
 
 - The shared chrome is real and reused: `PublicPageShell` owns
   `MarketingHeader`, `main#main-content`, `MarketingFooter`, and the skip link.
-- `MarketingPageShell` is intentionally only a relative/min-height wrapper;
-  it does not replace the layout shell. This is correct for pages under the
+- `MarketingPageShell` is intentionally only a relative/grow wrapper (JOV-4872:
+  no `min-h-screen` — the layout shell owns viewport height, and nesting it
+  double-applied the header offset as extra scroll height). It does not
+  replace the layout shell. This is correct for pages under the
   marketing layout, but must not be mistaken for a second header/footer.
 - `MarketingContainer` is the canonical centered grid (`page`/`landing` map to
   the public-content token; `prose` maps to the prose token). Local
