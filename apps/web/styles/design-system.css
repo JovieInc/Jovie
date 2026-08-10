@@ -1937,6 +1937,8 @@ html[data-profile-initial-mode]
   /* 32px */
   --space-10: 2.5rem;
   /* 40px */
+  --space-11: 2.75rem;
+  /* 44px */
   --space-12: 3rem;
   /* 48px */
   --space-16: 4rem;
@@ -2467,7 +2469,7 @@ html:not(.dark) .smart-link-powered-by {
 :where(.system-b-public-profile-not-found-action),
 :where(.system-b-public-profile-not-found-action-secondary) {
   display: inline-flex;
-  min-height: var(--space-10);
+  min-height: var(--space-11);
   align-items: center;
   justify-content: center;
   border-radius: var(--profile-action-radius);
