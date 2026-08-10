@@ -261,7 +261,7 @@ Geometry changes are valid when they are the **direct, local, and deterministic 
 
 For an async, loading, error, or content change, reserve space or use an overlay when reflow is not the component's semantic behavior. Skeletons, fixed status slots, and stable media aspect ratios are appropriate for system-initiated changes, not for hiding the semantic expansion of a disclosure.
 
-No unrelated siblings outside the disclosure flow may jump because of animation mechanics. Animate only safe properties, keep geometry animation inside the declared boundary, and resolve height immediately under reduced motion. Instant height resolution is valid when it makes state ownership clearer.
+No unrelated siblings outside the disclosure flow may jump because of animation mechanics. Animate only paint- or compositor-safe properties; semantic geometry changes should resolve directly. Under reduced motion, resolve height immediately and remove nonessential motion.
 
 Add or update tests (Playwright layout guards, visual regression snapshots, bounding-box assertions on key containers, CLS metrics, or stability specs) for any non-trivial state changes. CLS excludes shifts shortly after qualifying user input, so browser metrics do not replace source guards that prove the change is bounded, local, deterministic, and owned by the requested state transition.
 

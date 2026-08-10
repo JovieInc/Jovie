@@ -901,7 +901,7 @@ Before editing or authoring any component, organism, feature surface, empty stat
 
 4. For an async, loading, error, or content change, reserve space or use an overlay when reflow is not the component's semantic behavior. Skeletons, fixed status slots, and stable media aspect ratios protect system-initiated transitions without forcing interactive disclosures to look permanently expanded.
 
-5. No unrelated siblings outside the disclosure flow may jump because of animation mechanics. Animate only safe properties, keep geometry animation inside the declared boundary, and resolve height immediately under reduced motion. Instant height resolution is valid when it makes state ownership clearer.
+5. No unrelated siblings outside the disclosure flow may jump because of animation mechanics. Animate only paint- or compositor-safe properties; semantic geometry changes should resolve directly. Under reduced motion, resolve height immediately and remove nonessential motion.
 
 6. Add or update tests for non-trivial surfaces:
    - Playwright bounding-box assertions on key containers across states.

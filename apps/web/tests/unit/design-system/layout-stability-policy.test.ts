@@ -34,8 +34,9 @@ describe('layout stability policy', () => {
       expect(source).toMatch(/async, loading, error, or content change/i);
       expect(source).toMatch(/reserve space or use an overlay/i);
       expect(source).toMatch(/unrelated siblings outside the disclosure flow/i);
+      expect(source).toMatch(/paint- or compositor-safe properties/i);
       expect(source).toMatch(
-        /resolve height immediately under reduced motion/i
+        /under reduced motion, resolve height immediately/i
       );
     }
   });
