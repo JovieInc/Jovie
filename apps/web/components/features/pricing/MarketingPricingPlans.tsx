@@ -102,8 +102,8 @@ export function MarketingPricingPlans({
 
   return (
     <div
-      data-section-id='pricing'
-      data-variant={variant}
+      data-marketing-section='pricing'
+      data-marketing-variant={variant}
       className={cn(
         'marketing-pricing-plans',
         `marketing-pricing-plans--${mode}`,

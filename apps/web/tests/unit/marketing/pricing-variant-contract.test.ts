@@ -142,10 +142,33 @@ describe('section.pricing variant contract', () => {
       'components/features/pricing/MarketingPricingPlans.tsx'
     );
     expect(renderer).toContain("size='lg'");
-    expect(renderer).toContain('data-variant={variant}');
+    expect(renderer).toContain("data-marketing-section='pricing'");
+    expect(renderer).toContain('data-marketing-variant={variant}');
+    expect(renderer).not.toContain("data-section-id='pricing'");
+    expect(renderer).not.toContain('data-variant={variant}');
     expect(renderer).toContain(
       "data-recommended={recommended ? 'true' : 'false'}"
     );
     expect(renderer).not.toMatch(/\banimation\b|\btransition\b/);
+  });
+
+  it('keeps route, story, and registry pricing bindings on the canonical renderer', () => {
+    const registry = MARKETING_SECTION_REGISTRY.find(
+      entry => entry.id === 'section.pricing'
+    );
+    const route = readSource('app/(marketing)/pricing/page.tsx');
+    const sectionStory = readSource(
+      'components/marketing/storybook/MarketingSections.stories.tsx'
+    );
+
+    expect(registry?.source).toBe(
+      'components/features/pricing/MarketingPricingPlans'
+    );
+    expect(route).toContain(
+      "<MarketingPricingPlans\n              mode='expanded'\n              variant='tier-cards-neutral'"
+    );
+    expect(sectionStory).toContain(
+      "<MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />"
+    );
   });
 });
