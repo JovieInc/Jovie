@@ -30,9 +30,11 @@ describe('SupportPageContent', () => {
     ]);
     expect(screen.getAllByRole('article')).toHaveLength(3);
     expect(screen.getAllByTestId('support-cta')).toHaveLength(1);
-    for (const action of screen.getAllByRole('link').filter(link =>
-      /^(Visit|Send email)$/.test(link.textContent?.trim() ?? '')
-    )) {
+    for (const action of screen
+      .getAllByRole('link')
+      .filter(link =>
+        /^(Visit|Send email)$/.test(link.textContent?.trim() ?? '')
+      )) {
       expect(action).toHaveClass('before:h-11', 'before:min-w-11');
     }
     expect(
@@ -118,9 +120,7 @@ describe('SupportPageContent', () => {
     expect(storySource).toContain("sourceExport: 'SupportPageContent'");
     expect(storySource).toContain("storyExport: 'Web040Support'");
     expect(storySource).toContain('export const Web040Support');
-    expect(storySource).toContain(
-      'story owns the shared body only'
-    );
+    expect(storySource).toContain('story owns the shared body only');
   });
 
   it('binds the receipt to a full ancestral source with both exports', () => {
@@ -154,7 +154,10 @@ describe('SupportPageContent', () => {
 
     const sourceAtReceipt = execFileSync(
       'git',
-      ['show', `${SUPPORT_STORY_RECEIPT.sourceSha}:${SUPPORT_STORY_RECEIPT.source}`],
+      [
+        'show',
+        `${SUPPORT_STORY_RECEIPT.sourceSha}:${SUPPORT_STORY_RECEIPT.source}`,
+      ],
       { encoding: 'utf8' }
     );
     const storyAtReceipt = execFileSync(
