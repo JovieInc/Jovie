@@ -1,3 +1,5 @@
+// @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 import { ClientFaqAccordion } from './ClientFaqAccordion';
 
@@ -26,7 +28,7 @@ export function FaqSection({
   return (
     <section
       data-marketing-section='faq'
-      data-pen-contract='pAAhw'
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.faq}
       data-layout-contract='bounded-local-disclosure'
       className={cn(
         'faq-section',

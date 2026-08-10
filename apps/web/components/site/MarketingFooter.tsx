@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import {
   MARKETING_FOOTER_COLUMNS,
   MARKETING_LEGAL_LINKS,
@@ -111,6 +112,7 @@ export function MarketingFooter({
 
   return (
     <footer
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.shell.footer}
       className={cn(
         'marketing-footer-premium',
         isMinimal && 'system-b-mounted-home-footer',

@@ -6,10 +6,15 @@ import { cva } from 'class-variance-authority';
 import * as React from 'react';
 
 import {
+  BUTTON_PEN_CONTRACT,
   BUTTON_SIZE_NAMES,
   BUTTON_VARIANT_NAMES,
   type ButtonSize,
+  type ButtonSizeInput,
   type ButtonVariant,
+  type ButtonVariantInput,
+  normalizeButtonSizeContract,
+  normalizeButtonVariantContract,
 } from './button-contract';
 import { Spinner } from './spinner';
 
@@ -79,35 +84,6 @@ const buttonVariants = cva(
   }
 );
 
-type DeprecatedButtonVariant =
-  | 'accent'
-  | 'outline'
-  | 'destructive'
-  | 'frosted'
-  | 'frosted-ghost'
-  | 'frosted-outline'
-  | 'whitePill';
-type DeprecatedButtonSize = 'default' | 'xl' | 'hero';
-
-const DEPRECATED_VARIANT_ALIASES: Record<
-  DeprecatedButtonVariant,
-  ButtonVariant
-> = {
-  accent: 'primary',
-  outline: 'secondary',
-  destructive: 'primary',
-  frosted: 'secondary',
-  'frosted-ghost': 'ghost',
-  'frosted-outline': 'secondary',
-  whitePill: 'primary',
-};
-
-const DEPRECATED_SIZE_ALIASES: Record<DeprecatedButtonSize, ButtonSize> = {
-  default: 'md',
-  xl: 'lg',
-  hero: 'lg',
-};
-
 const DESTRUCTIVE_CLASSES: Record<ButtonVariant, string> = {
   primary:
     'border-error bg-error text-[var(--color-error-foreground)] hover:border-error/90 hover:bg-error/90',
@@ -146,55 +122,32 @@ function warnDeprecatedButtonValue(
   );
 }
 
-function isDeprecatedButtonVariant(
-  variant: ButtonVariant | DeprecatedButtonVariant
-): variant is DeprecatedButtonVariant {
-  return variant in DEPRECATED_VARIANT_ALIASES;
-}
-
-function isDeprecatedButtonSize(
-  size: ButtonSize | DeprecatedButtonSize
-): size is DeprecatedButtonSize {
-  return size in DEPRECATED_SIZE_ALIASES;
-}
-
 function normalizeButtonVariant({
   variant,
   destructive,
 }: {
-  readonly variant?: ButtonVariant | DeprecatedButtonVariant | null;
+  readonly variant?: ButtonVariantInput;
   readonly destructive: boolean;
 }): { readonly variant: ButtonVariant; readonly destructive: boolean } {
-  const requested = variant ?? 'primary';
-  if (!isDeprecatedButtonVariant(requested)) {
-    return { variant: requested, destructive };
+  const normalized = normalizeButtonVariantContract({ variant, destructive });
+  if (variant && variant !== normalized.variant) {
+    warnDeprecatedButtonValue('variant', variant, normalized.variant);
   }
-
-  const replacement = DEPRECATED_VARIANT_ALIASES[requested];
-  warnDeprecatedButtonValue('variant', requested, replacement);
-  return {
-    variant: replacement,
-    destructive: destructive || requested === 'destructive',
-  };
+  return normalized;
 }
 
-function normalizeButtonSize(
-  size?: ButtonSize | DeprecatedButtonSize | null
-): ButtonSize {
-  const requested = size ?? 'md';
-  if (!isDeprecatedButtonSize(requested)) {
-    return requested;
+function normalizeButtonSize(size?: ButtonSizeInput): ButtonSize {
+  const normalized = normalizeButtonSizeContract(size);
+  if (size && size !== normalized) {
+    warnDeprecatedButtonValue('size', size, normalized);
   }
-
-  const replacement = DEPRECATED_SIZE_ALIASES[requested];
-  warnDeprecatedButtonValue('size', requested, replacement);
-  return replacement;
+  return normalized;
 }
 
 export interface ButtonProps
   extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'size'> {
-  readonly variant?: ButtonVariant | DeprecatedButtonVariant | null;
-  readonly size?: ButtonSize | DeprecatedButtonSize | null;
+  readonly variant?: ButtonVariantInput;
+  readonly size?: ButtonSizeInput;
   readonly asChild?: boolean;
   readonly loading?: boolean;
   /** Enables subtle tactile compression for actions without another immediate cue. */
@@ -293,9 +246,20 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     // In asChild mode (Radix Slot), React.Children.only requires a single child.
     // Do NOT render additional wrappers/spinner here; apply styles/props to the child.
     if (asChild) {
+      const contractChild = React.cloneElement(
+        React.Children.only(children) as React.ReactElement<{
+          'data-pen-contract'?: string;
+        }>,
+        { 'data-pen-contract': BUTTON_PEN_CONTRACT.rootId }
+      );
+
       return (
-        <Comp {...sharedProps} {...props}>
-          {children}
+        <Comp
+          {...sharedProps}
+          {...props}
+          data-pen-contract={BUTTON_PEN_CONTRACT.rootId}
+        >
+          {contractChild}
         </Comp>
       );
     }
@@ -309,7 +273,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     };
 
     return (
-      <Comp {...sharedProps} {...buttonProps} {...props}>
+      <Comp
+        {...sharedProps}
+        {...buttonProps}
+        {...props}
+        data-pen-contract={BUTTON_PEN_CONTRACT.rootId}
+      >
         {loading && <ButtonLoadingSpinner />}
         <ButtonContent loading={loading}>{children}</ButtonContent>
       </Comp>

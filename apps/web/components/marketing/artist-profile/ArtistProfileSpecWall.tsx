@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
 import {
   BarChart2,
   Bot,
@@ -13,6 +14,7 @@ import {
 import Image from 'next/image';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import type { ArtistProfileTruthTile } from '@/data/artistProfileFeatures';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import type { MarketingFeatureTile } from '@/data/marketingFeatureTiles';
 import { cn } from '@/lib/utils';
 import './ArtistProfileSpecWall.css';
@@ -352,7 +354,10 @@ export function ArtistProfileSpecWall({
 }: Readonly<ArtistProfileSpecWallProps>) {
   if (truthTiles) {
     return (
-      <ArtistProfileSectionShell width='page'>
+      <ArtistProfileSectionShell
+        width='page'
+        penContractId={MARKETING_PEN_CONTRACT_IDS.section.specWall}
+      >
         <div className='mx-auto max-w-public-content'>
           <ArtistProfileSectionHeader
             align='left'
@@ -387,7 +392,11 @@ export function ArtistProfileSpecWall({
   }
 
   return (
-    <ArtistProfileSectionShell width='page' containerClassName='max-w-none'>
+    <ArtistProfileSectionShell
+      width='page'
+      containerClassName='max-w-none'
+      penContractId={MARKETING_PEN_CONTRACT_IDS.section.specWall}
+    >
       <div className='mx-auto max-w-public-content'>
         <ArtistProfileSectionHeader
           align='left'

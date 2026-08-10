@@ -1,8 +1,13 @@
+import {
+  MARKETING_PEN_CONTRACT_IDS,
+  type MarketingPenContractId,
+} from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 
 export interface MarketingPageShellProps {
   readonly className?: string;
   readonly children: React.ReactNode;
+  readonly penContractId?: MarketingPenContractId;
 }
 
 /**
@@ -25,6 +30,14 @@ export interface MarketingPageShellProps {
 export function MarketingPageShell({
   className,
   children,
+  penContractId = MARKETING_PEN_CONTRACT_IDS.shell.page,
 }: Readonly<MarketingPageShellProps>) {
-  return <div className={cn('relative grow', className)}>{children}</div>;
+  return (
+    <div
+      className={cn('relative grow', className)}
+      data-pen-contract={penContractId}
+    >
+      {children}
+    </div>
+  );
 }

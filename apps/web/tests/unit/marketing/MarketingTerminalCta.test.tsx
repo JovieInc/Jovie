@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 
 vi.mock('next/link', () => ({
   default: ({
@@ -34,7 +35,10 @@ describe('Marketing terminal CTA wrappers', () => {
       />
     );
 
-    expect(screen.getByTestId('marketing-final-cta')).toBeInTheDocument();
+    expect(screen.getByTestId('marketing-final-cta')).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.shell.finalCta
+    );
     expect(screen.getByRole('heading')).toHaveTextContent(
       'Release your next record.'
     );
@@ -59,6 +63,10 @@ describe('Marketing terminal CTA wrappers', () => {
     );
 
     const action = screen.getByRole('link', { name: 'Download for Mac' });
+    expect(screen.getByTestId('marketing-footer-cta')).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.shell.footerCta
+    );
     expect(action).toHaveAttribute('href', '/download');
     expect(action).toHaveAttribute('data-analytics-event', 'download_mac_dmg');
     expect(action).toHaveAttribute(

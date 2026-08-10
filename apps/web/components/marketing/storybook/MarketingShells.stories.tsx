@@ -1,13 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import {
-  MarketingContainer,
-  MarketingContentShell,
-} from '@/components/marketing';
+import { MarketingContainer } from '@/components/marketing/MarketingContainer';
+import { MarketingContentShell } from '@/components/marketing/MarketingContentShell';
 import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
+import { MarketingTerminalCta } from '@/components/site/MarketingTerminalCta';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MarketingPageShell } from '../MarketingPageShell';
 import {
   MARKETING_STORY_DESCRIPTION,
@@ -170,6 +170,21 @@ export const MarketingFinalCtaDefault: Story = {
       <MarketingFinalCTA
         title='Request private launch access.'
         body='One adaptive profile for every drop.'
+      />
+    </div>
+  ),
+};
+
+export const MarketingTerminalCtaDefault: Story = {
+  name: 'MarketingTerminalCta',
+  render: () => (
+    <div className='bg-base'>
+      <MarketingTerminalCta
+        title='A shared terminal call to action.'
+        ctaLabel='Request Access'
+        ctaHref='/signup'
+        testId='storybook-marketing-terminal-cta'
+        penContractId={MARKETING_PEN_CONTRACT_IDS.shell.finalCta}
       />
     </div>
   ),

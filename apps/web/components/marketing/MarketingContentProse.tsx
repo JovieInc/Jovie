@@ -1,4 +1,5 @@
 import { BlogMarkdownReader } from '@/components/molecules/BlogMarkdownReader';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 
 export interface MarketingContentProseProps {
@@ -21,6 +22,7 @@ export function MarketingContentProse({
   return (
     <section
       aria-label={ariaLabel}
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.contentProse}
       className={cn('w-full max-w-prose-canonical', className)}
       data-marketing-section='content-prose'
       data-testid='marketing-content-prose'

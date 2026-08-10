@@ -23,6 +23,9 @@
  */
 
 export type {
+  MarketingPenRegistryIssue,
+  MarketingPenRegistryIssueCode,
+  MarketingRecipeRegistryEntry,
   MarketingRegistryEntry,
   MarketingRegistryKind,
   MarketingSectionRegistryEntry,
@@ -33,8 +36,10 @@ export {
   getMarketingSectionRegistryEntry,
   MARKETING_COMPONENT_REGISTRY,
   MARKETING_COMPOSITION_CONTRACT,
+  MARKETING_RECIPE_REGISTRY,
   MARKETING_SECTION_REGISTRY,
   MARKETING_SHELL_REGISTRY,
+  validateMarketingPenRegistry,
 } from './componentRegistry';
 export type {
   MarketingBrief,
@@ -128,6 +133,12 @@ export {
   MARKETING_TASTE_GATE_IDS,
   selectMarketingModelCandidate,
 } from './generation';
+export type { MarketingPenContractId } from './penContracts';
+export {
+  MARKETING_CONTAINER_PEN_CONTRACT_BY_WIDTH,
+  MARKETING_PEN_CONTRACT_IDS,
+  marketingPenSelector,
+} from './penContracts';
 export type {
   ArcBeat,
   CtaCadence,

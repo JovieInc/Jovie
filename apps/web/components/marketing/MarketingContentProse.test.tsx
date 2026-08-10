@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { getMarketingSectionRegistryEntry } from '@/data/marketing';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MarketingContentProse } from './MarketingContentProse';
 
 describe('MarketingContentProse', () => {
@@ -11,6 +12,10 @@ describe('MarketingContentProse', () => {
 
     const section = screen.getByRole('region', { name: 'Article content' });
     expect(section).toHaveClass('w-full', 'max-w-prose-canonical');
+    expect(section).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.section.contentProse
+    );
     expect(section).toHaveAttribute('data-marketing-section', 'content-prose');
     expect(
       screen.getByRole('heading', { level: 2, name: 'Release rhythm' })

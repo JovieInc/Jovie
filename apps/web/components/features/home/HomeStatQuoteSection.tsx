@@ -5,6 +5,8 @@
  * Server component, fully static.
  */
 
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+
 const ACCENT = 'var(--geist-purple-solid)';
 const ARC_OFFSETS = [120, 200, 280, 360, 440, 520] as const;
 
@@ -21,7 +23,10 @@ export function HomeStatQuoteSection({
 }: HomeStatQuoteSectionProps = {}) {
   const id = 'sq-purple';
   return (
-    <section className='relative overflow-hidden bg-black dark:bg-black px-6 py-32 sm:py-40'>
+    <section
+      className='relative overflow-hidden bg-black dark:bg-black px-6 py-32 sm:py-40'
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.stats}
+    >
       <svg
         viewBox='0 0 1400 600'
         preserveAspectRatio='xMidYMid slice'

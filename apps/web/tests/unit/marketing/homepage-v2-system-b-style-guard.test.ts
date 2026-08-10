@@ -56,7 +56,10 @@ describe('homepage v2 (/new) System B source contract', () => {
       'utf8'
     );
 
-    expect(source).toContain('<MarketingPageShell>');
+    expect(source).toContain('<MarketingPageShell');
+    expect(source).toContain(
+      'penContractId={MARKETING_PEN_CONTRACT_IDS.recipe.homepage}'
+    );
     expect(source).toContain('MarketingContainer');
     expect(source).toContain('text-primary-token');
     expect(source).toContain('text-secondary-token');

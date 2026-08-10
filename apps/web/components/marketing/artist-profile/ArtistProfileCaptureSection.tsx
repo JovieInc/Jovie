@@ -1,7 +1,9 @@
+// @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
 import type {
   ArtistProfileCaptureVisualCopy,
   ArtistProfileLandingCopy,
 } from '@/data/artistProfileCopy';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { ArtistProfileCaptureVisual } from '../MarketingStoryPrimitives';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
@@ -26,7 +28,11 @@ export function ArtistProfileCaptureSection({
 }: Readonly<ArtistProfileCaptureSectionProps>) {
   if (!isEditorialCapture(capture)) {
     return (
-      <ArtistProfileSectionShell className='ap-capture-section--visual' id={id}>
+      <ArtistProfileSectionShell
+        className='ap-capture-section--visual'
+        id={id}
+        penContractId={MARKETING_PEN_CONTRACT_IDS.section.capture}
+      >
         <div className='mx-auto max-w-280'>
           <ArtistProfileSectionHeader
             align='center'
@@ -43,7 +49,11 @@ export function ArtistProfileCaptureSection({
   }
 
   return (
-    <ArtistProfileSectionShell className='ap-capture-loop bg-surface-0' id={id}>
+    <ArtistProfileSectionShell
+      className='ap-capture-loop bg-surface-0'
+      id={id}
+      penContractId={MARKETING_PEN_CONTRACT_IDS.section.capture}
+    >
       <div className='ap-capture-loop__layout mx-auto grid max-w-public-content items-center gap-12 lg:grid-cols-[minmax(0,0.58fr)_minmax(34rem,1.42fr)] lg:gap-16'>
         <div className='ap-capture-loop__copy'>
           <ArtistProfileSectionHeader

@@ -12,6 +12,7 @@ import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { cn } from '@/lib/utils';
@@ -213,6 +214,7 @@ export function ArtistProfileMonetizationSection({
       className='bg-base'
       containerClassName='!max-w-none !px-0'
       width='page'
+      penContractId={MARKETING_PEN_CONTRACT_IDS.section.monetization}
     >
       <div>
         <div className='ap-monetization__header mx-auto px-5 sm:px-6 lg:px-0'>

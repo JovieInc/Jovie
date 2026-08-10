@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
 import { ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -27,6 +28,7 @@ import {
   HOMEPAGE_V2_COPY,
   HOMEPAGE_V2_POWER_TILES,
 } from '@/data/homepageV2Copy';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
@@ -36,7 +38,9 @@ export { HomepageV2FinalCta, HomepageV2Pricing } from './HomepageV2Ctas';
 
 export function HomepageV2Route() {
   return (
-    <MarketingPageShell>
+    <MarketingPageShell
+      penContractId={MARKETING_PEN_CONTRACT_IDS.recipe.homepage}
+    >
       <HomepageV2Hero />
       <HomepageV2BelowHero />
     </MarketingPageShell>

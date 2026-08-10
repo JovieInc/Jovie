@@ -1,7 +1,9 @@
+// @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
 import { MarketingPageShell } from '@/components/marketing';
 import type { ArtistNotificationsLandingCopy } from '@/data/artistNotificationsCopy';
 import { ARTIST_NOTIFICATIONS_SPEC_TILES } from '@/data/artistNotificationsFeatures';
 import { ARTIST_NOTIFICATIONS_SECTION_TEST_IDS } from '@/data/artistNotificationsPageOrder';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { HomeTrustSection } from '@/features/home/HomeTrustSection';
 import { ArtistProfileCaptureSection } from '../artist-profile/ArtistProfileCaptureSection';
 import { ArtistProfileFaq } from '../artist-profile/ArtistProfileFaq';
@@ -19,7 +21,9 @@ export function ArtistNotificationsLanding({
   copy,
 }: Readonly<ArtistNotificationsLandingProps>) {
   return (
-    <MarketingPageShell>
+    <MarketingPageShell
+      penContractId={MARKETING_PEN_CONTRACT_IDS.recipe.feature}
+    >
       <main className='overflow-hidden bg-black dark:bg-black text-primary-token'>
         <div data-testid={ARTIST_NOTIFICATIONS_SECTION_TEST_IDS.hero}>
           <ArtistNotificationsHero hero={copy.hero} />

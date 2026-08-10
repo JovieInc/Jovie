@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 
 // Mock Clerk (MobileNav uses useAuthSafe which wraps Clerk hooks)
 vi.mock('@clerk/nextjs', () => ({
@@ -34,9 +35,18 @@ describe('HeaderNav flyout interactions', () => {
   });
 
   it('renders static public auth actions without client auth state', () => {
-    render(<HeaderNav authMode='public-static' />);
+    render(
+      <HeaderNav
+        authMode='public-static'
+        penContractId={MARKETING_PEN_CONTRACT_IDS.shell.header}
+      />
+    );
 
     expect(screen.getByTestId('header-nav')).toHaveClass('header-nav');
+    expect(screen.getByTestId('header-nav')).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.shell.header
+    );
     const loginLink = screen.getByRole('link', { name: 'Log in' });
     expect(loginLink).toHaveAttribute('href', '/signin');
     expect(loginLink.parentElement).toHaveClass('gap-2');

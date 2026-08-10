@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MarketingHero } from './MarketingHero';
 import marketingHeroMeta, {
   MARKETING_HERO_DEFAULT_PROPS,
@@ -19,6 +20,10 @@ describe('MarketingHero source-backed default story', () => {
 
     const heroRoots = container.querySelectorAll('section.marketing-hero');
     expect(heroRoots).toHaveLength(1);
+    expect(heroRoots[0]).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.section.hero
+    );
     expect(heroRoots[0]).toHaveAttribute(
       'aria-labelledby',
       MARKETING_HERO_DEFAULT_PROPS.headingId

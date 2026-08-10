@@ -1,3 +1,5 @@
+// @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 import { MarketingContainer } from './MarketingContainer';
 
@@ -17,7 +19,10 @@ export function MarketingContentShell({
   children,
 }: MarketingContentShellProps) {
   return (
-    <div className='py-16 sm:py-20 lg:py-24'>
+    <div
+      className='py-16 sm:py-20 lg:py-24'
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.shell.prose}
+    >
       <MarketingContainer width='prose'>
         <div
           className={cn(

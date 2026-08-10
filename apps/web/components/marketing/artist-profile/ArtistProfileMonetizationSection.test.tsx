@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { ArtistProfileMonetizationSection } from './ArtistProfileMonetizationSection';
 
 const MONETIZATION_CARDS = [
@@ -14,10 +15,15 @@ const MONETIZATION_CARDS = [
 
 describe('ArtistProfileMonetizationSection source contract', () => {
   it('renders the canonical four-card earning loop with stable semantics and copy', () => {
-    render(
+    const { container } = render(
       <ArtistProfileMonetizationSection
         monetization={ARTIST_PROFILE_COPY.monetization}
       />
+    );
+
+    expect(container.firstElementChild).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.section.monetization
     );
 
     expect(
@@ -67,6 +73,9 @@ describe('ArtistProfileMonetizationSection source contract', () => {
     );
     expect(storySource).toContain("registryId: 'section.monetization'");
     expect(storySource).toContain("penRoot: 'F3grtS'");
+    expect(storySource).toContain(
+      "uncoveredProps: ['cardId', 'textAnchor', 'visualSide']"
+    );
     expect(storySource).toContain("body: 'four-card-earning-loop-carousel'");
     expect(storySource).toContain(
       "routeMount: 'omitted-on-current-production-route'"

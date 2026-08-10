@@ -22,6 +22,9 @@ describe('support route header contract', () => {
     );
 
     expect(headerSource).not.toMatch(/\|\s*'content'/);
+    expect(headerSource).toContain(
+      'penContractId={MARKETING_PEN_CONTRACT_IDS.shell.header}'
+    );
     expect(registrySource).not.toContain('marketing-header-content');
     expect(landingStart).toBeGreaterThanOrEqual(0);
     expect(minimalStart).toBeGreaterThan(landingStart);

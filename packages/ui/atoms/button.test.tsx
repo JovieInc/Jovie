@@ -3,8 +3,8 @@ import path from 'node:path';
 import { render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-
 import { BUTTON_SIZE_NAMES, BUTTON_VARIANT_NAMES, Button } from './button';
+import { BUTTON_PEN_CONTRACT } from './button-contract';
 
 describe('Button', () => {
   afterEach(() => {
@@ -41,6 +41,30 @@ describe('Button', () => {
     render(<Button>Press</Button>);
     const btn = screen.getByRole('button', { name: /press/i });
     expect(btn).toBeInTheDocument();
+  });
+
+  it('keeps the canonical Pen identity on button and asChild roots', () => {
+    const { rerender } = render(
+      <Button data-pen-contract='caller-override'>Press</Button>
+    );
+
+    expect(screen.getByRole('button')).toHaveAttribute(
+      'data-pen-contract',
+      BUTTON_PEN_CONTRACT.rootId
+    );
+
+    rerender(
+      <Button asChild data-pen-contract='caller-override'>
+        <a href='/start' data-pen-contract='child-override'>
+          Start
+        </a>
+      </Button>
+    );
+
+    expect(screen.getByRole('link', { name: 'Start' })).toHaveAttribute(
+      'data-pen-contract',
+      BUTTON_PEN_CONTRACT.rootId
+    );
   });
 
   it('defaults to the canonical primary md button contract', () => {

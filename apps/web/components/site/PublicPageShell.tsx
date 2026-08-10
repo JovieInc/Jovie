@@ -1,5 +1,6 @@
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 import { MarketingFooter } from './MarketingFooter';
 import {
@@ -43,7 +44,10 @@ export function PublicPageShell({
   skipToContent = true,
 }: Readonly<PublicPageShellProps>) {
   return (
-    <div className={cn('flex min-h-screen flex-col', className)}>
+    <div
+      className={cn('flex min-h-screen flex-col', className)}
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.shell.publicPage}
+    >
       {skipToContent ? <SkipToContent /> : null}
       <MarketingHeader
         logoSize={logoSize}

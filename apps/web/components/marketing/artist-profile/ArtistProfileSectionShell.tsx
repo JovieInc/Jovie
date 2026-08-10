@@ -1,4 +1,6 @@
+// @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
 import type { ReactNode, Ref } from 'react';
+import type { MarketingPenContractId } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 import { MarketingContainer } from '../MarketingContainer';
 
@@ -11,6 +13,7 @@ interface ArtistProfileSectionShellProps {
   readonly className?: string;
   readonly containerClassName?: string;
   readonly children: ReactNode;
+  readonly penContractId?: MarketingPenContractId;
 }
 
 export function ArtistProfileSectionShell({
@@ -20,11 +23,13 @@ export function ArtistProfileSectionShell({
   className,
   containerClassName,
   children,
+  penContractId,
 }: Readonly<ArtistProfileSectionShellProps>) {
   return (
     <section
       ref={sectionRef}
       id={id}
+      data-pen-contract={penContractId}
       className={cn(
         // Shared rhythm keeps every landing-page chapter on the same vertical
         // cadence while each section controls only its own surface treatment.
