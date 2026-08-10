@@ -57,10 +57,12 @@ const BOOLEAN_FLAGS = new Map([
 ]);
 
 function usage() {
-  return `Usage: node scripts/agent/pen-save-receipt.mjs [facts]\n\n` +
+  return (
+    `Usage: node scripts/agent/pen-save-receipt.mjs [facts]\n\n` +
     `Required: --profile, active paths, title, writer, batch/timestamps, roots,\n` +
     `explicit save/clean/readback facts, and five evidence-file flags.\n` +
-    `The expected path is loaded from pen-workspace-locks.json, never caller supplied.\n`;
+    `The expected path is loaded from pen-workspace-locks.json, never caller supplied.\n`
+  );
 }
 
 function parseBoolean(flag, value) {
@@ -94,7 +96,10 @@ export function parseArgs(argv) {
 function resolveProfile(profileName) {
   const manifest = JSON.parse(readFileSync(PROFILE_PATH, 'utf8'));
   const profile = manifest.profiles?.[profileName];
-  if (!profile) throw new Error(`Unknown Pen workspace profile: ${profileName || '<missing>'}`);
+  if (!profile)
+    throw new Error(
+      `Unknown Pen workspace profile: ${profileName || '<missing>'}`
+    );
   const expandHome = path => path.replace(/^\$HOME(?=\/)/, homedir());
   const canonicalPath = expandHome(profile.canonical_path);
   return {
@@ -130,9 +135,14 @@ function loadEvidence(paths, protectedPaths) {
         throw new Error(`Evidence may not be a symbolic link: ${path}`);
       }
       if (!/\.(?:json|jsonl|log|txt)$/i.test(resolvedPath)) {
-        throw new Error(`Evidence must use a .json, .jsonl, .log, or .txt extension: ${path}`);
+        throw new Error(
+          `Evidence must use a .json, .jsonl, .log, or .txt extension: ${path}`
+        );
       }
-      const descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+      const descriptor = openSync(
+        path,
+        constants.O_RDONLY | constants.O_NOFOLLOW
+      );
       try {
         const stats = fstatSync(descriptor);
         if (!stats.isFile() || stats.size > 1_000_000 || stats.nlink !== 1) {

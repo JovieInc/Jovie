@@ -158,24 +158,33 @@ test('direct and symlink-resolved Pen evidence paths are rejected without readin
     homedir(),
     'Documents/Jovie/Jovie Marketing Workspace/Jovie Marketing Workspace.pen'
   );
-  assert.equal(isProtectedPenEvidencePath(CANONICAL, CANONICAL, [CANONICAL, catalog]), true);
   assert.equal(
-    isProtectedPenEvidencePath('/tmp/evidence.json', CANONICAL, [CANONICAL, catalog]),
+    isProtectedPenEvidencePath(CANONICAL, CANONICAL, [CANONICAL, catalog]),
     true
   );
-  assert.equal(isProtectedPenEvidencePath(catalog, catalog, [CANONICAL, catalog]), true);
   assert.equal(
-    isProtectedPenEvidencePath('/tmp/evidence.json', '/tmp/evidence.json', [CANONICAL, catalog]),
+    isProtectedPenEvidencePath('/tmp/evidence.json', CANONICAL, [
+      CANONICAL,
+      catalog,
+    ]),
+    true
+  );
+  assert.equal(
+    isProtectedPenEvidencePath(catalog, catalog, [CANONICAL, catalog]),
+    true
+  );
+  assert.equal(
+    isProtectedPenEvidencePath('/tmp/evidence.json', '/tmp/evidence.json', [
+      CANONICAL,
+      catalog,
+    ]),
     false
   );
   assert.equal(
-    matchesProtectedFileIdentity(
+    matchesProtectedFileIdentity({ dev: 10, ino: 20 }, [
       { dev: 10, ino: 20 },
-      [
-        { dev: 10, ino: 20 },
-        { dev: 10, ino: 21 },
-      ]
-    ),
+      { dev: 10, ino: 21 },
+    ]),
     true
   );
   assert.equal(
@@ -202,29 +211,52 @@ function writeEvidenceFiles(directory, activePath) {
 
 function cliArgs(activePath, files) {
   return [
-    '--profile', 'jovie-founder-design-studio',
-    '--active-path-before', activePath,
-    '--active-path-after', activePath,
-    '--document-title', 'Jovie Design Studio — canonical',
-    '--writer', 'agent-veronica',
-    '--batch-id', 'header-candidates-04',
-    '--batch-started-at', '2026-08-10T21:46:59.000Z',
-    '--root-id', 'dn0Es',
-    '--root-id', 'co5mw',
-    '--mutation-state', 'confirmed',
-    '--save-method', 'Cmd-S',
-    '--save-requested-at', '2026-08-10T21:47:00.000Z',
-    '--save-acknowledged-at', '2026-08-10T21:47:01.000Z',
-    '--save-acknowledged', 'true',
-    '--dirty-state', 'clean',
-    '--post-readback-at', '2026-08-10T21:47:02.000Z',
-    '--readback-verified', 'true',
-    '--recorded-at', '2026-08-10T21:47:03.000Z',
-    '--pre-app-state-evidence', files.preAppState,
-    '--post-app-state-evidence', files.postAppState,
-    '--window-state-evidence', files.windowState,
-    '--save-response-evidence', files.saveResponse,
-    '--readback-evidence', files.readback,
+    '--profile',
+    'jovie-founder-design-studio',
+    '--active-path-before',
+    activePath,
+    '--active-path-after',
+    activePath,
+    '--document-title',
+    'Jovie Design Studio — canonical',
+    '--writer',
+    'agent-veronica',
+    '--batch-id',
+    'header-candidates-04',
+    '--batch-started-at',
+    '2026-08-10T21:46:59.000Z',
+    '--root-id',
+    'dn0Es',
+    '--root-id',
+    'co5mw',
+    '--mutation-state',
+    'confirmed',
+    '--save-method',
+    'Cmd-S',
+    '--save-requested-at',
+    '2026-08-10T21:47:00.000Z',
+    '--save-acknowledged-at',
+    '2026-08-10T21:47:01.000Z',
+    '--save-acknowledged',
+    'true',
+    '--dirty-state',
+    'clean',
+    '--post-readback-at',
+    '2026-08-10T21:47:02.000Z',
+    '--readback-verified',
+    'true',
+    '--recorded-at',
+    '2026-08-10T21:47:03.000Z',
+    '--pre-app-state-evidence',
+    files.preAppState,
+    '--post-app-state-evidence',
+    files.postAppState,
+    '--window-state-evidence',
+    files.windowState,
+    '--save-response-evidence',
+    files.saveResponse,
+    '--readback-evidence',
+    files.readback,
   ];
 }
 
@@ -232,9 +264,13 @@ test('CLI loads canonical identity from the profile and binds evidence hashes', 
   const directory = mkdtempSync(join(tmpdir(), 'pen-save-receipt-'));
   try {
     const files = writeEvidenceFiles(directory, CANONICAL);
-    const result = spawnSync(process.execPath, [CLI, ...cliArgs(CANONICAL, files)], {
-      encoding: 'utf8',
-    });
+    const result = spawnSync(
+      process.execPath,
+      [CLI, ...cliArgs(CANONICAL, files)],
+      {
+        encoding: 'utf8',
+      }
+    );
     assert.equal(result.status, 0, result.stderr);
     const receipt = JSON.parse(result.stdout);
     assert.equal(receipt.verdict, 'saved_state_verified');
@@ -248,9 +284,13 @@ test('CLI blocks daily even when the caller supplies daily for every active path
   const directory = mkdtempSync(join(tmpdir(), 'pen-save-receipt-'));
   try {
     const files = writeEvidenceFiles(directory, DAILY);
-    const result = spawnSync(process.execPath, [CLI, ...cliArgs(DAILY, files)], {
-      encoding: 'utf8',
-    });
+    const result = spawnSync(
+      process.execPath,
+      [CLI, ...cliArgs(DAILY, files)],
+      {
+        encoding: 'utf8',
+      }
+    );
     assert.equal(result.status, 1, result.stderr);
     const receipt = JSON.parse(result.stdout);
     assert.equal(receipt.expected_path, CANONICAL);
@@ -267,9 +307,13 @@ test('CLI rejects hard-linked evidence before reading it', () => {
     const linkedEvidence = join(directory, 'pre-app-state-hardlink.txt');
     linkSync(files.preAppState, linkedEvidence);
     files.preAppState = linkedEvidence;
-    const result = spawnSync(process.execPath, [CLI, ...cliArgs(CANONICAL, files)], {
-      encoding: 'utf8',
-    });
+    const result = spawnSync(
+      process.execPath,
+      [CLI, ...cliArgs(CANONICAL, files)],
+      {
+        encoding: 'utf8',
+      }
+    );
     assert.equal(result.status, 2, result.stderr);
     assert.match(JSON.parse(result.stdout).error, /single-link regular file/);
   } finally {
