@@ -62,12 +62,11 @@ case "$MERGE_QUEUE_BACKEND" in
 esac
 DRAIN_MAX_SECONDS="${DRAIN_MAX_SECONDS:-900}"
 DRAIN_STARTED_AT="$SECONDS"
-# `queue-deferred` is deliberately a hard hold during a saturated queue. On a
-# later main push, though, leaving an otherwise current auto-merge request
-# permanently deferred turns a temporary admission decision into a stranded
-# PR. The existing event-driven controller may opt into this narrowly scoped
-# reconciliation before taking its normal snapshot. It never runs on a PR
-# event or a schedule, and it still requires the canonical source gates.
+# `queue-deferred` is a hard hold. It currently has no typed provenance that
+# distinguishes temporary queue pressure from a repair/human hold. A prior
+# main-push reconciliation removed explicit repair holds and its `unlabeled`
+# events immediately re-admitted those exact heads. Keep the compatibility flag
+# fail-closed until a typed, controller-owned deferral receipt exists.
 DRAIN_RECONCILE_QUEUE_DEFERRED="${DRAIN_RECONCILE_QUEUE_DEFERRED:-0}"
 DRAIN_ADMISSION_PR="${DRAIN_ADMISSION_PR:-}"
 DRAIN_ADMISSION_HEAD="${DRAIN_ADMISSION_HEAD:-}"
@@ -140,6 +139,10 @@ restore_deferred_hold() {  # restore_deferred_hold <num>
 # an unproven revision.
 reconcile_deferred_auto_merge_after_main_push() {
   [[ "$DRAIN_RECONCILE_QUEUE_DEFERRED" == "1" ]] || return 0
+
+  echo "=== RECONCILE (disabled; preserving queue-deferred holds) ==="
+  echo "  ~ no typed pressure-deferral provenance; owner release required"
+  return 0
 
   local main_oid candidates pr n expected_head before failures before_release after
   echo "=== RECONCILE (current auto-merge deferred PRs after main push) ==="
