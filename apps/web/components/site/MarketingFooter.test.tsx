@@ -85,6 +85,16 @@ describe('MarketingFooter', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('omits the terminal CTA on the support route', () => {
+    mockUsePathname.mockReturnValue('/support');
+
+    render(<MarketingFooter />);
+
+    expect(
+      screen.queryByTestId('marketing-footer-cta')
+    ).not.toBeInTheDocument();
+  });
+
   it('honors the expanded footer variant when the full-footer flag is enabled', () => {
     render(<MarketingFooter variant='expanded' />);
 
