@@ -383,7 +383,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--consumer", choices=("direct-gem", "fleet", "promotion"), default="direct-gem"
     )
-    parser.add_argument("--repo", default="itstimwhite/Jovie")
+    parser.add_argument(
+        "--repo",
+        default=os.environ.get("GEM_PRIORITY_GATE_REPO")
+        or os.environ.get("GEM_PR_DRAIN_REPO")
+        or "JovieInc/Jovie",
+    )
     parser.add_argument("--queue-target", type=int, default=5)
     parser.add_argument("--symphony-url", default="http://127.0.0.1:4041/api/v1/state")
     parser.add_argument(
