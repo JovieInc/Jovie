@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/marketing/MarketingTerminalCta.test.tsx
 'use client';
 
 import { useId } from 'react';
@@ -24,6 +25,7 @@ interface MarketingFooterCtaProps {
   readonly ctaHref?: string;
   readonly ctaAnalyticsEvent?: string;
   readonly ctaAnalyticsSource?: string;
+  readonly prefetch?: boolean;
 }
 
 export function MarketingFooterCta({
@@ -34,6 +36,7 @@ export function MarketingFooterCta({
   ctaHref = APP_ROUTES.SIGNUP,
   ctaAnalyticsEvent,
   ctaAnalyticsSource,
+  prefetch,
 }: Readonly<MarketingFooterCtaProps>) {
   const instanceId = useId().replace(/:/g, '-');
   const primaryGradientId = `marketing-footer-cta-primary-${instanceId}`;
@@ -49,6 +52,7 @@ export function MarketingFooterCta({
       ctaHref={ctaHref}
       ctaAnalyticsEvent={ctaAnalyticsEvent}
       ctaAnalyticsSource={ctaAnalyticsSource}
+      prefetch={prefetch}
       className={className}
       decoration={
         <>

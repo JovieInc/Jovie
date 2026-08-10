@@ -1,7 +1,25 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
+
+vi.mock('next/link', () => ({
+  default: ({
+    children,
+    href,
+    prefetch,
+    ...props
+  }: {
+    readonly children: React.ReactNode;
+    readonly href: string;
+    readonly prefetch?: boolean;
+    readonly [key: string]: unknown;
+  }) => (
+    <a href={href} data-prefetch={String(prefetch)} {...props}>
+      {children}
+    </a>
+  ),
+}));
 
 describe('Marketing terminal CTA wrappers', () => {
   it('keeps the final CTA copy and both conversion links while using the shared primitive', () => {
@@ -50,5 +68,20 @@ describe('Marketing terminal CTA wrappers', () => {
     expect(
       screen.getByTestId('marketing-footer-cta').querySelectorAll('a')
     ).toHaveLength(1);
+  });
+
+  it('forwards prefetch={false} to the underlying link for binary redirect targets', () => {
+    render(
+      <MarketingFooterCta
+        title='Ready to install Jovie?'
+        ctaLabel='Download for Mac'
+        ctaHref='/api/desktop/download'
+        prefetch={false}
+      />
+    );
+
+    const action = screen.getByRole('link', { name: 'Download for Mac' });
+    expect(action).toHaveAttribute('href', '/api/desktop/download');
+    expect(action).toHaveAttribute('data-prefetch', 'false');
   });
 });
