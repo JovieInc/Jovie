@@ -110,6 +110,7 @@ deferred_state_is_releasable() {  # state json <expected head> <expected base>
     and (.isDraft | not)
     and .mergeable == "MERGEABLE"
     and (.headRefOid // "") == $expected_head
+    and .baseRefName == "main"
     and (.baseRefOid // "") == $expected_base
     and .autoMergeRequest != null
     and ([.labels[].name] | index("queue-deferred")) != null
@@ -151,8 +152,9 @@ reconcile_deferred_auto_merge_after_main_push() {
   main_oid="$(printf '%s' "$main_oid" | tr '[:upper:]' '[:lower:]')"
 
   if ! candidates="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-    --json number,isDraft,mergeable,labels,headRefOid,baseRefOid --jq '
+    --json number,isDraft,mergeable,labels,headRefOid,baseRefName,baseRefOid --jq '
       [ .[] | select(.isDraft == false) | select(.mergeable == "MERGEABLE")
+        | select(.baseRefName == "main")
         | select([.labels[].name] | index("queue-deferred"))
         | { n: .number, head: (.headRefOid // ""), base: (.baseRefOid // "") } ]')"; then
     echo "  !! could not read deferred PR candidates; preserving holds" >&2
@@ -172,7 +174,7 @@ reconcile_deferred_auto_merge_after_main_push() {
     fi
 
     if ! before="$(gh_retry pr view "$n" -R "$REPO" \
-      --json state,isDraft,mergeable,headRefOid,baseRefOid,labels,autoMergeRequest 2>/dev/null)"; then
+      --json state,isDraft,mergeable,headRefOid,baseRefName,baseRefOid,labels,autoMergeRequest 2>/dev/null)"; then
       echo "    ~ could not read live state; preserving deferral"
       continue
     fi
@@ -190,7 +192,7 @@ reconcile_deferred_auto_merge_after_main_push() {
     # Re-read after checks so neither a new head nor a stronger hold can inherit
     # an old source-gate result.
     if ! before_release="$(gh_retry pr view "$n" -R "$REPO" \
-      --json state,isDraft,mergeable,headRefOid,baseRefOid,labels,autoMergeRequest 2>/dev/null)"; then
+      --json state,isDraft,mergeable,headRefOid,baseRefName,baseRefOid,labels,autoMergeRequest 2>/dev/null)"; then
       echo "    ~ could not re-read live state; preserving deferral"
       continue
     fi
@@ -209,12 +211,13 @@ reconcile_deferred_auto_merge_after_main_push() {
     fi
 
     if ! after="$(gh_retry pr view "$n" -R "$REPO" \
-      --json state,isDraft,mergeable,headRefOid,baseRefOid,labels,autoMergeRequest 2>/dev/null)" \
+      --json state,isDraft,mergeable,headRefOid,baseRefName,baseRefOid,labels,autoMergeRequest 2>/dev/null)" \
       || ! jq -e --arg expected_head "$expected_head" --arg expected_base "$main_oid" '
         .state == "OPEN"
         and (.isDraft | not)
         and .mergeable == "MERGEABLE"
         and (.headRefOid // "") == $expected_head
+        and .baseRefName == "main"
         and (.baseRefOid // "") == $expected_base
         and .autoMergeRequest != null
         and ([.labels[].name] | index("queue-deferred")) == null
@@ -236,7 +239,7 @@ reconcile_deferred_auto_merge_after_main_push() {
 # a queue-deferred hold cannot be overwritten by this controller.
 enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
   local n="$1" current head_oid expected_head json_fields
-  json_fields="state,isDraft,mergeable,labels,headRefOid"
+  json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName"
   if ! current="$(gh_retry pr view "$n" -R "$REPO" \
     --json "$json_fields" 2>/dev/null)"; then
     echo "    !! could not refresh #$n eligibility; refusing enrollment" >&2
@@ -246,6 +249,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
     .state == "OPEN"
     and (.isDraft | not)
     and .mergeable == "MERGEABLE"
+    and .baseRefName == "main"
     and ([.labels[].name] | any(
       . == "needs-human" or . == "hold" or . == "gated"
       or . == "queue-deferred" or . == "needs-conflict-resolution"
@@ -285,7 +289,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
     # compensate immediately if a gated/held label appeared while the queue
     # mutation was in flight.
     if ! current="$(gh_retry pr view "$n" -R "$REPO" \
-      --json state,isDraft,mergeable,labels,headRefOid 2>/dev/null)"; then
+      --json state,isDraft,mergeable,labels,headRefOid,baseRefName 2>/dev/null)"; then
       echo "    !! could not refresh #$n after native enrollment; compensating" >&2
       if ! dequeue_strict "$n"; then
         echo "    !! CRITICAL: could not compensate uncertain native enrollment for #$n" >&2
@@ -297,6 +301,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num>
       .state == "OPEN"
       and (.isDraft | not)
       and .mergeable == "MERGEABLE"
+      and .baseRefName == "main"
       and ((.headRefOid // "") | ascii_downcase) == $expected_head
       and ([.labels[].name] | any(
         . == "needs-human" or . == "hold" or . == "gated"
@@ -443,7 +448,7 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
 reconcile_deferred_auto_merge_after_main_push
 
 SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-  --json number,title,body,isDraft,mergeable,mergeStateStatus,labels,headRefName --jq '
+  --json number,title,body,isDraft,mergeable,mergeStateStatus,labels,headRefName,baseRefName --jq '
   [ .[] | {
     n: .number,
     t: (.title[0:48]),
@@ -451,6 +456,7 @@ SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
     m: .mergeable,
     ms: (.mergeStateStatus // "UNKNOWN"),
     head: .headRefName,
+    base: .baseRefName,
     body: (.body // ""),
     L: [.labels[].name],
     fail: []
@@ -490,6 +496,7 @@ while IFS= read -r pr; do
   fail="[]"
   if jq -e '
     (.draft | not)
+    and (.base == "main")
     and (.m == "MERGEABLE")
     and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "fast")) | not)
   ' <<<"$pr" >/dev/null; then
@@ -508,14 +515,16 @@ SNAP="$ENRICHED"
 echo "=== QUEUE SUMMARY ==="
 echo "$SNAP" | jq -r '
   def labels: (.L // []);
+  def main_target: .base == "main";
   def queued: .q == true;
   def hard_gated: labels | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred");
   [
-    "  CLEAN: " + ([.[] | select(queued and (.ms // "") == "CLEAN")] | length | tostring),
-    "  UNSTABLE: " + ([.[] | select(queued and (.ms // "") == "UNSTABLE")] | length | tostring),
-    "  BLOCKED: " + ([.[] | select(queued and (.ms // "") == "BLOCKED")] | length | tostring),
-    "  DIRTY: " + ([.[] | select(queued and (.ms // "") == "DIRTY")] | length | tostring),
-    "  hard-gated: " + ([.[] | select(hard_gated)] | length | tostring)
+    "  CLEAN: " + ([.[] | select(main_target and queued and (.ms // "") == "CLEAN")] | length | tostring),
+    "  UNSTABLE: " + ([.[] | select(main_target and queued and (.ms // "") == "UNSTABLE")] | length | tostring),
+    "  BLOCKED: " + ([.[] | select(main_target and queued and (.ms // "") == "BLOCKED")] | length | tostring),
+    "  DIRTY: " + ([.[] | select(main_target and queued and (.ms // "") == "DIRTY")] | length | tostring),
+    "  hard-gated: " + ([.[] | select(main_target and hard_gated)] | length | tostring),
+    "  non-main: " + ([.[] | select(main_target | not)] | length | tostring)
   ] | .[]'
 
 # --- DEQUEUE: hard-gated PRs must not occupy queue slots ---
@@ -618,6 +627,7 @@ done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" '.[]
   | select((.n | tostring) == $admission_pr)
   | select(.draft|not)
   | select(.m=="MERGEABLE")
+  | select(.base=="main")
   | select(.fail|length==0)
   | select(.q | not)
   | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or .=="needs-conflict-resolution" or .=="fast") | not)')
@@ -626,11 +636,13 @@ done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" '.[]
 echo "=== CONFLICT (needs rebase → fix agent) ==="
 echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
   | select(.m=="CONFLICTING")
+  | select(.base=="main")
   | select(.head|test($re))
   | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred") | not)
   | "  #\(.n)  \(.t)  [\(.head)]"'
 echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
   | select(.m=="CONFLICTING")
+  | select(.base=="main")
   | select(.head|test($re))
   | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred") | not) | .n' \
 | while read -r n; do [[ -n "$n" ]] && label "$n" needs-conflict-resolution; done
@@ -639,6 +651,7 @@ echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
 echo "=== BLOCKED (red checks → fix agent) ==="
 echo "$SNAP" | jq -r '.[]
   | select(.draft|not) | select(.m=="MERGEABLE") | select(.fail|length>0)
+  | select(.base=="main")
   | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred") | not)
   | "  #\(.n)  \(.t)  ✗ \(.fail|join(", "))"'
 
