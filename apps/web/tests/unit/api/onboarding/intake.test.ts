@@ -160,13 +160,6 @@ function selectRows(rows: Array<Record<string, unknown>>) {
   };
 }
 
-function insertUserRows(rows: Array<Record<string, unknown>>) {
-  const returning = vi.fn().mockResolvedValue(rows);
-  const onConflictDoNothing = vi.fn().mockReturnValue({ returning });
-  const values = vi.fn().mockReturnValue({ onConflictDoNothing });
-  return { values, onConflictDoNothing, returning };
-}
-
 function upsertInterviewRows(rows: Array<Record<string, unknown>>) {
   const returning = vi.fn().mockResolvedValue(rows);
   const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
@@ -362,46 +355,22 @@ describe('POST /api/onboarding/intake — Better Auth email gate', () => {
     expect(mockSubmitWaitlistAccessRequest).not.toHaveBeenCalled();
   });
 
-  it('creates the intake user without overwriting concurrent status fields', async () => {
+  it('fails closed instead of creating a duplicate user when the app user row is missing', async () => {
     mockCurrentUser.mockResolvedValue({
       fullName: 'New User',
       emailAddresses: [{ id: 'e1', emailAddress: 'new@example.com' }],
       primaryEmailAddress: { id: 'e1', emailAddress: 'new@example.com' },
     });
-    mockSubmitWaitlistAccessRequest.mockResolvedValue({
-      outcome: 'accepted',
-      status: 'active',
-      entryId: 'entry_new',
-    });
-
     mockDbSelect.mockReturnValueOnce(selectRows([]));
-    const userInsert = insertUserRows([
-      { id: 'new_user', userStatus: 'waitlist_pending' },
-    ]);
-    const interviewInsert = upsertInterviewRows([{ id: 'interview_new' }]);
-    mockDbInsert
-      .mockReturnValueOnce(userInsert)
-      .mockReturnValue(interviewInsert);
 
     const res = await POST(makeRequest(VALID_BODY));
 
-    expect(res.status).toBe(200);
-    expect(userInsert.values).toHaveBeenCalledWith({
-      clerkId: 'user_clerk_1',
-      email: 'new@example.com',
-      userStatus: 'waitlist_pending',
-    });
-    expect(userInsert.onConflictDoNothing).toHaveBeenCalled();
-    expect(mockSubmitWaitlistAccessRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        clerkUserId: 'user_clerk_1',
-        email: 'new@example.com',
-        emailRaw: 'new@example.com',
-      })
-    );
+    expect(res.status).toBe(500);
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockSubmitWaitlistAccessRequest).not.toHaveBeenCalled();
   });
 
-  it('re-selects the intake user when a concurrent insert wins the conflict', async () => {
+  it('uses the authenticated app user id for the canonical waitlist write', async () => {
     mockCurrentUser.mockResolvedValue({
       fullName: 'Racing User',
       emailAddresses: [{ id: 'e1', emailAddress: 'race@example.com' }],
@@ -413,24 +382,18 @@ describe('POST /api/onboarding/intake — Better Auth email gate', () => {
       entryId: 'entry_race',
     });
 
-    mockDbSelect
-      .mockReturnValueOnce(selectRows([]))
-      .mockReturnValueOnce(
-        selectRows([{ id: 'race_user', userStatus: 'waitlist_pending' }])
-      );
-    const userInsert = insertUserRows([]);
+    mockDbSelect.mockReturnValueOnce(
+      selectRows([{ id: 'user_clerk_1', userStatus: 'waitlist_pending' }])
+    );
     const interviewInsert = upsertInterviewRows([{ id: 'interview_race' }]);
-    mockDbInsert
-      .mockReturnValueOnce(userInsert)
-      .mockReturnValue(interviewInsert);
+    mockDbInsert.mockReturnValue(interviewInsert);
 
     const res = await POST(makeRequest(VALID_BODY));
 
     expect(res.status).toBe(200);
-    expect(mockDbSelect).toHaveBeenCalledTimes(2);
     expect(mockSubmitWaitlistAccessRequest).toHaveBeenCalledWith(
       expect.objectContaining({
-        clerkUserId: 'user_clerk_1',
+        appUserId: 'user_clerk_1',
         email: 'race@example.com',
       })
     );

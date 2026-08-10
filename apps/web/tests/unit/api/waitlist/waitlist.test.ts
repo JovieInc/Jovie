@@ -525,7 +525,11 @@ describe('Waitlist API', { timeout: 20_000 }, () => {
             orderBy: vi.fn().mockReturnValue({
               limit: vi.fn().mockResolvedValue(claimedEntry),
             }),
-            limit: vi.fn().mockResolvedValue([]),
+            limit: vi
+              .fn()
+              .mockResolvedValue([
+                { id: 'user_claimed', userStatus: 'active' },
+              ]),
           }),
         }),
       });
@@ -637,7 +641,11 @@ describe('Waitlist API', { timeout: 20_000 }, () => {
             orderBy: vi.fn().mockReturnValue({
               limit: vi.fn().mockResolvedValue([]),
             }),
-            limit: vi.fn().mockResolvedValue([]),
+            limit: vi
+              .fn()
+              .mockResolvedValue([
+                { id: 'user_auto', userStatus: 'waitlist_pending' },
+              ]),
           }),
         }),
       });
@@ -684,7 +692,11 @@ describe('Waitlist API', { timeout: 20_000 }, () => {
             orderBy: vi.fn().mockReturnValue({
               limit: vi.fn().mockResolvedValue([]),
             }),
-            limit: vi.fn().mockResolvedValue([]),
+            limit: vi
+              .fn()
+              .mockResolvedValue([
+                { id: 'user_no_slot', userStatus: 'waitlist_pending' },
+              ]),
           }),
         }),
       });
@@ -753,7 +765,11 @@ describe('Waitlist API', { timeout: 20_000 }, () => {
             orderBy: vi.fn().mockReturnValue({
               limit: vi.fn().mockResolvedValue([]),
             }),
-            limit: vi.fn().mockResolvedValue([]),
+            limit: vi
+              .fn()
+              .mockResolvedValue([
+                { id: 'user_noapproval', userStatus: 'waitlist_pending' },
+              ]),
           }),
         }),
       });
