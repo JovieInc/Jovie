@@ -27,11 +27,11 @@ describe('FaqSection', () => {
     );
     expect(container.querySelector('.faq-section')).toHaveAttribute(
       'data-layout-contract',
-      'height-stable-disclosure'
+      'bounded-local-disclosure'
     );
   });
 
-  it('keeps all answers collapsed on initial render', () => {
+  it('removes every closed answer from layout and the accessibility tree', () => {
     render(<FaqSection items={FAQ_ITEMS} />);
 
     for (const item of FAQ_ITEMS) {
@@ -41,19 +41,15 @@ describe('FaqSection', () => {
       );
 
       expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      expect(trigger).toHaveAttribute('aria-controls', panel?.id);
+      expect(panel).toHaveAttribute('aria-labelledby', trigger.id);
       expect(panel).toHaveAttribute('aria-hidden', 'true');
-      expect(panel).toHaveClass(
-        'invisible',
-        'mt-2',
-        'grid',
-        'grid-rows-[1fr]',
-        'pointer-events-none',
-        'opacity-0'
-      );
+      expect(panel).toHaveAttribute('hidden');
+      expect(panel).not.toBeVisible();
     }
   });
 
-  it('keeps every answer slot mounted while disclosure visibility changes', () => {
+  it('reveals the selected answer inside the declared disclosure boundary', () => {
     render(<FaqSection items={FAQ_ITEMS} />);
 
     const firstTrigger = screen.getByRole('button', {
@@ -64,26 +60,19 @@ describe('FaqSection', () => {
     );
 
     expect(firstPanel).toHaveTextContent(FAQ_ITEMS[0].answer);
-    expect(firstPanel).toHaveClass(
-      'invisible',
-      'mt-2',
-      'grid',
-      'grid-rows-[1fr]',
-      'pointer-events-none',
-      'opacity-0'
-    );
+    expect(firstPanel).toHaveAttribute('hidden');
+    expect(firstPanel).not.toBeVisible();
 
     fireEvent.click(firstTrigger);
 
+    expect(firstTrigger).toHaveAttribute('aria-expanded', 'true');
     expect(firstPanel).toHaveTextContent(FAQ_ITEMS[0].answer);
-    expect(firstPanel).toHaveClass(
-      'visible',
-      'mt-2',
-      'grid',
-      'grid-rows-[1fr]',
-      'opacity-100'
+    expect(firstPanel).not.toHaveAttribute('hidden');
+    expect(firstPanel).toHaveAttribute('aria-hidden', 'false');
+    expect(firstPanel).toBeVisible();
+    expect(screen.getByRole('region', { name: FAQ_ITEMS[0].question })).toBe(
+      firstPanel
     );
-    expect(firstPanel).not.toHaveClass('pointer-events-none');
   });
 
   it('opens one answer at a time', () => {
@@ -106,15 +95,15 @@ describe('FaqSection', () => {
     );
 
     expect(firstPanel).toHaveAttribute('aria-hidden', 'false');
-    expect(firstPanel).toHaveClass('visible');
+    expect(firstPanel).not.toHaveAttribute('hidden');
     expect(secondPanel).toHaveAttribute('aria-hidden', 'true');
-    expect(secondPanel).toHaveClass('invisible');
+    expect(secondPanel).toHaveAttribute('hidden');
 
     fireEvent.click(secondTrigger);
     expect(firstPanel).toHaveAttribute('aria-hidden', 'true');
-    expect(firstPanel).toHaveClass('invisible');
+    expect(firstPanel).toHaveAttribute('hidden');
     expect(secondPanel).toHaveAttribute('aria-hidden', 'false');
-    expect(secondPanel).toHaveClass('visible');
+    expect(secondPanel).not.toHaveAttribute('hidden');
   });
 
   it('closes an open answer when clicked again', () => {
@@ -129,11 +118,11 @@ describe('FaqSection', () => {
       questionButton.getAttribute('aria-controls') ?? ''
     );
     expect(panel).toHaveAttribute('aria-hidden', 'false');
-    expect(panel).toHaveClass('visible');
+    expect(panel).not.toHaveAttribute('hidden');
 
     fireEvent.click(questionButton);
     expect(panel).toHaveAttribute('aria-hidden', 'true');
-    expect(panel).toHaveClass('invisible');
+    expect(panel).toHaveAttribute('hidden');
     expect(questionButton).toHaveAttribute('aria-expanded', 'false');
   });
 

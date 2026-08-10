@@ -1306,14 +1306,14 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       },
     ],
     responsiveContract:
-      'single-column always; <details>/<summary> or accordion with height-stable slots (layout-shift contract)',
+      'single-column always; <details>/<summary> or one-open accordion; closed answers collapse fully and expanded geometry stays inside the bounded disclosure boundary',
     accessibility: {
       keyboard:
         '<details> is keyboard-operable by default; if custom accordion, Enter/Space toggles, arrow keys navigate',
       contrast: 'question/answer meet AA',
       touchTarget: 'summary ≥44×44 hit area',
       reducedMotion:
-        'no slide animation (instant open/close with reserved height)',
+        'height resolves immediately; no slide or geometry animation under reduced motion',
     },
     component: 'components/marketing/FaqSection',
     failureModes: [

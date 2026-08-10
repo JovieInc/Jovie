@@ -62,7 +62,7 @@ The smallest complete grammar required to describe every Jovie marketing page.
 | **spacing** | DESIGN.md (inherited) | `section-spacing-linear` tokens; spacing-only transitions; one container width (`page \| prose`). NOT restated. |
 | **hierarchy** | `recipes.ts` `PageHierarchyContract` | One big idea; seeFirst/second/third; emphasis budget (max 1 display-scale moment, 1 full-bleed break, 1 hero-weight proof element). |
 | **responsive** | `sections.ts` `responsiveContract` | A fixed contract per variant (Tailwind Plus stance): grid 3→2→1 collapse, split→stack at md, priority-based slot hiding. NOT per-breakpoint style overrides. |
-| **interaction** | `sections.ts` `accessibility` + capture states | Form-bearing sections require submitting/success/error/already-subscribed states with height-stable slots (layout-shift contract). |
+| **interaction** | `sections.ts` `accessibility` + capture states | Async form states reserve/overlay when reflow is not semantic; explicit disclosures collapse fully and own bounded local geometry. |
 | **animation** | Motion budget (charter design law #9, T2) | Scroll-reveal OFF by default; max 1 cinematic moment/page (hero media only); subtle tier elsewhere; reduced-motion mandatory. |
 | **visual rhythm** | `sections.ts` `contentBudgets` + emphasis budget | Per-slot character budgets per breakpoint; `text-wrap: balance` default; one accent reserved for conversion affordances. |
 | **content hierarchy** | `recipes.ts` `arc` + `hierarchy` + `minContent/maxContent` | Emotional arc per recipe (artist arc ≠ B2B arc); content density bounds. |
@@ -237,7 +237,7 @@ spec version bumps" (4-step procedure).
 | Logo Cloud / Metrics / Testimonials fake-proof rules | .claude/rules/ui.md | `sections.ts` `proofClass: 'trust'/'proof'` + `neverUse` | yes (zero-proof path) | MIGRATED — delete the marketing-specific fake-proof rules from ui.md |
 | Founder-first proof banned near top of artist pages | .claude/rules/ui.md | `social-proof` `neverUse` + `artist-lp` `neverUse` | yes (audience-gated legality) | MIGRATED — delete from ui.md |
 | Default marketing composition = one headline, one subhead, one visual | .claude/rules/ui.md | `recipes.ts` `PageHierarchyContract` + `hero` content budgets | yes | MIGRATED — delete the default-composition rule from ui.md |
-| Layout-shift contract (height-stable slots) | .claude/rules/ui.md | `capture` `accessibility` + `faq` `accessibility` + DESIGN.md | yes (interaction states) | STAYS in ui.md (applies app-wide); AGENT_GUIDE references |
+| Layout-stability contract (system-initiated stability + bounded semantic disclosure) | .claude/rules/ui.md | `capture` `accessibility` + `faq` `accessibility` + DESIGN.md | yes (interaction states) | STAYS in ui.md (applies app-wide); AGENT_GUIDE references |
 | Screenshot registry scenario IDs | `lib/screenshots/registry.ts` | `sections.ts` `MARKETING_DEGRADATION_LADDERS` sourceConstraint | yes (proof asset binding) | STAYS (system of record); registry references |
 | Copy-in-data files | .claude/rules/code-style.md | AGENT_GUIDE §Inherited | yes (composition assumes copy-in-data) | STAYS in code-style.md (applies app-wide) |
 

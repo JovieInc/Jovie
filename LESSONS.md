@@ -27,6 +27,12 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ## Testing
 
+### Layout-stability guards must model semantic ownership, not ban all reflow
+
+**Mistake:** The FAQ stability repair reserved every answer's full height and hid closed text with visibility/opacity. CLS stayed quiet, but every accordion row looked expanded because the source guard treated all geometry change as a defect.
+
+**Rule:** Prevent unexpected or system-initiated instability. An explicit disclosure may change geometry when the result is direct, local, deterministic, and confined to its declared flow. Closed panels must have no footprint. Pair CLS checks, which exclude shifts shortly after qualifying input, with source and bounding-box guards that prove state ownership.
+
 ### Route-level ordering tests must cover the real transaction entry point
 
 **Mistake:** Avatar theme extraction was moved outside one onboarding transaction, but the dashboard profile PUT path still performed retried image download and Sharp work inside `withDbSessionTx`.

@@ -10,8 +10,8 @@ const cssPath = 'app/(home)/home.css';
 // Shared marketing components keep their existing token utilities for other
 // routes; the guard bans raw colors, gradients, shadows, and motion utilities
 // everywhere, and arbitrary-value utilities on FaqSection itself. The shared
-// accordion's constant grid-rows-[1fr] keeps the disclosure geometry stable;
-// only opacity and visibility may change between open and closed states.
+// accordion uses the native hidden contract so closed answers have no layout
+// footprint. Expansion is direct and local to the declared FAQ boundary.
 const forbiddenFaqSourcePatterns = [
   /#[0-9a-fA-F]{3,8}/,
   /rgba?\(/,
@@ -84,13 +84,14 @@ describe('mounted homepage FAQ System B source contract', () => {
 
     expect(source).toContain('text-lg font-semibold leading-snug');
     expect(source).toContain('text-base leading-7 text-secondary-token');
-    expect(source).toContain('mt-2 grid grid-rows-[1fr] overflow-hidden');
-    expect(source).toContain('transition-opacity');
-    expect(source).toContain('motion-reduce:transition-none');
-    expect(source).not.toContain('grid-rows-[0fr]');
-    expect(source).not.toMatch(/(?:^|\s)mt-0(?=\s|['"])/);
+    expect(source).toContain('hidden={!isOpen}');
+    expect(source).toContain('aria-hidden={!isOpen}');
+    expect(source).toContain(
+      "className='faq-accordion__panel overflow-hidden'"
+    );
+    expect(source).not.toContain('grid-rows-[');
     expect(source).not.toMatch(
-      /transition-\[[^\]]*(?:grid-template-rows|margin)/
+      /transition-\[[^\]]*(?:grid-template-rows|height|margin)/
     );
   });
 

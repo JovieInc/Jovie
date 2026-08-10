@@ -30,6 +30,11 @@ export const Default: Story = {
         answer:
           'Yes. Jovie keeps the public surface grounded in real artist data.',
       },
+      {
+        question: 'What happens when my next release lands?',
+        answer:
+          'The same profile can foreground the release without replacing the links and audience context already there.',
+      },
     ],
   },
 };
