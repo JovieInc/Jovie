@@ -1,0 +1,135 @@
+/**
+ * ArtistProfileFaq — component-owned canonical layout/style contract.
+ *
+ * This block owns the System B FAQ treatment that used to live in the
+ * route-owned home stylesheet (`app/(home)/home.css`). The component now
+ * carries its own scoped tokens (same values as the artist profiles shell)
+ * so direct Storybook rendering and every route composite
+ * (`/artist-profile`, `/artist-profiles`, `/artist-notifications`) resolve
+ * the identical production pixels without importing any route stylesheet.
+ */
+.artist-profile-faq {
+  --ap-faq-page-gutter: clamp(var(--space-5), 2.2vw, var(--space-8));
+  --ap-faq-chapter-space: clamp(
+    calc(var(--space-24) + var(--space-2)),
+    8.5vw,
+    calc(var(--space-24) + var(--space-16))
+  );
+  --ap-faq-section-title-size: clamp(
+    var(--text-3xl),
+    3.6vw,
+    calc(var(--text-5xl) + var(--space-1))
+  );
+
+  position: relative;
+  overflow: clip;
+  padding-block: var(--ap-faq-chapter-space);
+  padding-inline: 0;
+  border-top: 0;
+  background: var(--system-b-bg-page);
+  color: var(--system-b-text-primary);
+}
+
+/* The shell stays neutral: the block sizes .faq-section to the shared
+   content column (ds-public-content-max inside the page gutters), so no
+   padding here. */
+.artist-profile-faq__inner {
+  width: min(
+    var(--ds-public-content-max),
+    calc(100% - var(--ap-faq-page-gutter) * 2)
+  );
+  max-width: none;
+  margin-inline: auto;
+  padding: 0;
+}
+
+.artist-profile-faq .faq-section__heading {
+  max-width: 12ch;
+  margin: 0;
+  color: var(--color-text-primary-token);
+  font-family: var(--font-sans);
+  font-size: var(--ap-faq-section-title-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--ds-marketing-title-leading);
+  letter-spacing: var(--ds-marketing-title-tracking);
+  text-wrap: balance;
+}
+
+.artist-profile-faq .faq-accordion {
+  margin-top: var(--space-12);
+  border-block: var(--space-px) solid var(--system-b-app-frame-seam);
+}
+
+.artist-profile-faq .faq-accordion__item {
+  border-bottom-color: var(--system-b-app-frame-seam);
+}
+
+.artist-profile-faq .faq-accordion__trigger {
+  padding-block: var(--space-6);
+  color: var(--color-text-primary-token);
+  font-family: var(--font-sans);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--leading-snug);
+  letter-spacing: 0;
+}
+
+/* Optically center the 16px plus/minus glyph on the trigger's first line,
+   and keep the icon quiet at rest — it only reaches full emphasis while
+   its row is open. */
+.artist-profile-faq .faq-accordion__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: calc((var(--text-lg) * var(--leading-snug) - var(--space-4)) / 2);
+  color: var(--color-text-tertiary-token);
+}
+
+.artist-profile-faq
+  .faq-accordion__trigger[aria-expanded="true"]
+  .faq-accordion__icon {
+  color: var(--color-text-primary-token);
+}
+
+.artist-profile-faq .faq-accordion__answer {
+  max-width: var(--ds-prose-max);
+  padding-bottom: var(--space-6);
+  color: var(--color-text-secondary-token);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .artist-profile-faq .faq-section__heading,
+  .artist-profile-faq .faq-accordion {
+    animation: artist-profile-faq-rise var(--ds-motion-cinematic-duration)
+      var(--ds-motion-cinematic-easing) both;
+  }
+
+  .artist-profile-faq .faq-accordion {
+    animation-delay: var(--ds-motion-subtle-duration);
+  }
+}
+
+@keyframes artist-profile-faq-rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-3));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 767px) {
+  /* Mobile cap: the marketing title ramp is fluid, so only the small-width
+     ceiling and the title-token leading need restating here. */
+  .artist-profile-faq .faq-section__heading {
+    font-size: var(--ap-faq-section-title-size);
+    line-height: var(--ds-marketing-title-leading);
+  }
+
+  .artist-profile-faq .faq-accordion {
+    margin-top: var(--space-10);
+  }
+}

@@ -232,8 +232,35 @@ describe('artist profile landing family System B source contract', () => {
       ),
       'utf8'
     );
-    expect(faq).toContain('homepage-faq-section');
-    expect(faq).toContain('homepage-story-heading');
+    // Self-contained contract: the component imports its own colocated
+    // stylesheet and owns its class names, so direct Storybook rendering and
+    // every route composite resolve identical pixels without the route-owned
+    // homepage stylesheet.
+    expect(faq).toContain("import './ArtistProfileFaq.css'");
+    expect(faq).toContain('artist-profile-faq');
+    expect(faq).not.toContain('homepage-faq-section');
+    expect(faq).not.toContain('homepage-story-heading');
+    expect(faq).not.toContain('home.css');
+
+    const faqStylesheet = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/marketing/artist-profile/ArtistProfileFaq.css'
+      ),
+      'utf8'
+    );
+    expect(faqStylesheet).toContain('.artist-profile-faq__inner');
+    expect(faqStylesheet).not.toContain('homepage-');
+
+    const sectionStories = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/marketing/storybook/MarketingSections.stories.tsx'
+      ),
+      'utf8'
+    );
+    expect(sectionStories).not.toContain('home.css');
+    expect(sectionStories).not.toContain('homepage-faq-section');
     expect(sectionHeader).toContain('text-secondary-token');
   });
 });
