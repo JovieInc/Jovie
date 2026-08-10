@@ -25,11 +25,19 @@ describe('Spinner', () => {
     expect(spinner).toHaveClass('custom-class');
   });
 
-  it('includes reduced-motion alternatives on animated ring', () => {
+  it('animates the ring under normal motion', () => {
     render(<Spinner />);
     const spinner = screen.getByRole('status');
     const animated = spinner.querySelector('.border-t-transparent');
-    expect(animated).toHaveClass(
+    expect(animated).toHaveClass('animate-spin');
+  });
+
+  it('renders a static ring under reduced motion', () => {
+    render(<Spinner />);
+    const spinner = screen.getByRole('status');
+    const animated = spinner.querySelector('.border-t-transparent');
+    expect(animated).toHaveClass('motion-reduce:animate-none');
+    expect(animated).not.toHaveClass(
       'motion-reduce:animate-[spin_1.2s_linear_infinite]'
     );
   });
