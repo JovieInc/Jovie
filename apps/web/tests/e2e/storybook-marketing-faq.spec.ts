@@ -19,6 +19,12 @@ interface FaqGeometry {
 }
 
 async function openFaqStory(page: Page) {
+  await page.addInitScript(() => {
+    // The isolated Storybook document starts shorter than the viewport. Keep
+    // the scrollbar gutter stable so opening a semantic disclosure cannot
+    // make the outer test canvas recenter or resize unrelated content.
+    document.documentElement.style.scrollbarGutter = 'stable';
+  });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`/iframe.html?id=${FAQ_STORY_ID}&viewMode=story`, {
     waitUntil: 'networkidle',
@@ -33,6 +39,22 @@ async function openFaqStory(page: Page) {
   return section;
 }
 
+async function readDocumentBox(locator: Locator) {
+  return locator.evaluate(element => {
+    if (element instanceof HTMLElement && element.hidden) return null;
+
+    const rect = element.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return null;
+
+    return {
+      x: rect.x + window.scrollX,
+      y: rect.y + window.scrollY,
+      width: rect.width,
+      height: rect.height,
+    };
+  });
+}
+
 async function readFaqGeometry(section: Locator): Promise<FaqGeometry> {
   const accordion = section.locator('.faq-accordion');
   const items = accordion.locator('.faq-accordion__item');
@@ -40,16 +62,18 @@ async function readFaqGeometry(section: Locator): Promise<FaqGeometry> {
   const itemCount = await items.count();
 
   return {
-    heading: await section.locator('.faq-section__heading').boundingBox(),
-    accordion: await accordion.boundingBox(),
+    heading: await readDocumentBox(
+      section.locator('.faq-section__heading')
+    ),
+    accordion: await readDocumentBox(accordion),
     items: await Promise.all(
       Array.from({ length: itemCount }, (_, index) =>
-        items.nth(index).boundingBox()
+        readDocumentBox(items.nth(index))
       )
     ),
     panels: await Promise.all(
       Array.from({ length: itemCount }, (_, index) =>
-        panels.nth(index).boundingBox()
+        readDocumentBox(panels.nth(index))
       )
     ),
   };
