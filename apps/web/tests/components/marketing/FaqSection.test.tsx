@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { FaqSection } from '@/components/marketing';
+import { FaqSection } from '@/components/marketing/FaqSection';
 
 const FAQ_ITEMS = [
   {
@@ -17,18 +17,28 @@ const FAQ_ITEMS = [
 describe('FaqSection', () => {
   it('renders the default heading', () => {
     const { container } = render(<FaqSection items={FAQ_ITEMS} />);
+    const section = container.querySelector('.faq-section');
 
     expect(
       screen.getByRole('heading', { name: 'Frequently Asked Questions' })
     ).toBeInTheDocument();
-    expect(container.querySelector('.faq-section')).toHaveAttribute(
-      'data-pen-contract',
-      'pAAhw'
-    );
-    expect(container.querySelector('.faq-section')).toHaveAttribute(
+    expect(section).toHaveClass('mx-auto', 'w-full', 'max-w-190');
+    expect(section).toHaveAttribute('data-pen-contract', 'pAAhw');
+    expect(section).toHaveAttribute(
       'data-layout-contract',
       'bounded-local-disclosure'
     );
+  });
+
+  it('preserves an explicit custom root class contract', () => {
+    const { container } = render(
+      <FaqSection items={FAQ_ITEMS} className='custom-faq-shell' />
+    );
+    const section = container.querySelector('.faq-section');
+
+    expect(section).toHaveClass('faq-section custom-faq-shell', {
+      exact: true,
+    });
   });
 
   it('removes every closed answer from layout and the accessibility tree', () => {

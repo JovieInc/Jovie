@@ -6,6 +6,7 @@ const webRoot = path.resolve(__dirname, '../../..');
 const faqSectionPath = 'components/marketing/FaqSection.tsx';
 const faqAccordionPath = 'components/marketing/ClientFaqAccordion.tsx';
 const cssPath = 'app/(home)/home.css';
+const designSystemPath = 'styles/design-system.css';
 
 // Shared marketing components keep their existing token utilities for other
 // routes; the guard bans raw colors, gradients, shadows, and motion utilities
@@ -43,6 +44,18 @@ function extractMountedFaqCss(source: string): string {
 
   expect(start, 'mounted FAQ CSS block exists').toBeGreaterThanOrEqual(0);
   expect(end, 'mounted FAQ CSS block is bounded').toBeGreaterThan(start);
+
+  return source.slice(start, end);
+}
+
+function extractFaqReducedMotionCss(source: string): string {
+  const start = source.indexOf('FAQ REDUCED MOTION START');
+  const end = source.indexOf('FAQ REDUCED MOTION END', start);
+
+  expect(start, 'FAQ reduced-motion CSS block exists').toBeGreaterThanOrEqual(
+    0
+  );
+  expect(end, 'FAQ reduced-motion CSS block is bounded').toBeGreaterThan(start);
 
   return source.slice(start, end);
 }
@@ -93,6 +106,32 @@ describe('mounted homepage FAQ System B source contract', () => {
     expect(source).not.toMatch(
       /transition-\[[^\]]*(?:grid-template-rows|height|margin)/
     );
+  });
+
+  it('resolves FAQ motion immediately without changing the focus affordance', () => {
+    const designSystem = readFileSync(
+      path.join(webRoot, designSystemPath),
+      'utf8'
+    );
+    const reducedMotion = extractFaqReducedMotionCss(designSystem);
+    const focusRuleStart = designSystem.indexOf(':where(:focus-visible)');
+    const reducedMotionStart = designSystem.indexOf('FAQ REDUCED MOTION START');
+    const focusRule = designSystem.slice(focusRuleStart, reducedMotionStart);
+
+    expect(focusRuleStart).toBeGreaterThanOrEqual(0);
+    expect(reducedMotionStart).toBeGreaterThan(focusRuleStart);
+    expect(focusRule).toContain('box-shadow:');
+    expect(focusRule).toContain('box-shadow 150ms');
+    expect(focusRule).toContain('border-color 150ms');
+    expect(focusRule).not.toContain('transform');
+
+    expect(reducedMotion).toContain(
+      '[data-marketing-section="faq"][data-layout-contract="bounded-local-disclosure"]'
+    );
+    expect(reducedMotion).toContain('animation-duration: 0s !important');
+    expect(reducedMotion).toContain('transition-duration: 0s !important');
+    expect(reducedMotion).not.toContain('0.01ms');
+    expect(reducedMotion).not.toContain('transform');
   });
 
   it('keeps mounted FAQ shell CSS tokenized and grid-aligned', () => {

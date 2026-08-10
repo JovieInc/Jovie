@@ -2207,6 +2207,25 @@ html:not(.dark) .smart-link-powered-by {
     border-color 150ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* FAQ REDUCED MOTION START
+   Disclosure geometry resolves directly. This scoped override follows the
+   global focus transition so keyboard focus stays visible without interpolation. */
+@media (prefers-reduced-motion: reduce) {
+  [data-marketing-section="faq"][data-layout-contract="bounded-local-disclosure"],
+  [data-marketing-section="faq"][data-layout-contract="bounded-local-disclosure"]::before,
+  [data-marketing-section="faq"][data-layout-contract="bounded-local-disclosure"]::after,
+  [data-marketing-section="faq"][data-layout-contract="bounded-local-disclosure"]
+    *,
+  [data-marketing-section="faq"][data-layout-contract="bounded-local-disclosure"]
+    *::before,
+  [data-marketing-section="faq"][data-layout-contract="bounded-local-disclosure"]
+    *::after {
+    animation-duration: 0s !important;
+    transition-duration: 0s !important;
+  }
+}
+/* FAQ REDUCED MOTION END */
+
 /* A quiet disclosure needs a keyboard cue without the global focus halo.
    This is deliberately declared after the fallback so it wins for pointer and
    keyboard focus alike; the underline is limited to :focus-visible. */
