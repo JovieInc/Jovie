@@ -7,18 +7,19 @@ interface ArtistProfileOutcomesCarouselProps {
   readonly outcomes: ArtistProfileLandingCopy['outcomes'];
 }
 
+export const ARTIST_PROFILE_OUTCOMES_VARIANT = 'ledger-four' as const;
+
 const OUTCOME_RESULTS = {
   'straight-to-listen': 'Listen Comes First',
   'local-dates-first': 'Nearby Show Leads',
   'support-without-friction': 'Support Stays Simple',
   'capture-the-fan': 'Fan Opts In',
-  'one-link-everywhere': 'One Link Stays',
 } as const;
 
 export function ArtistProfileOutcomesCarousel({
   outcomes,
 }: Readonly<ArtistProfileOutcomesCarouselProps>) {
-  const ledgerRows = outcomes.landingCards.slice(0, 4);
+  const ledgerRows = outcomes.landingCards;
 
   return (
     <ArtistProfileSectionShell className='ap-outcomes'>
@@ -38,6 +39,7 @@ export function ArtistProfileOutcomesCarousel({
         />
         <ol
           data-testid='artist-profile-outcomes-grid'
+          data-feature-grid-variant={ARTIST_PROFILE_OUTCOMES_VARIANT}
           className='ap-outcomes__ledger mt-10 border-t border-subtle'
           aria-label='Fan Outcomes'
         >

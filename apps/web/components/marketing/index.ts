@@ -1,4 +1,5 @@
 // Artist-profile landing sections (JOV-3502: design-sync entry set)
+export { ArtistProfileAdaptiveSection } from './artist-profile/ArtistProfileAdaptiveSection';
 export { ArtistProfileCaptureSection } from './artist-profile/ArtistProfileCaptureSection';
 export { ArtistProfileFaq } from './artist-profile/ArtistProfileFaq';
 export { ArtistProfileFinalCta } from './artist-profile/ArtistProfileFinalCta';

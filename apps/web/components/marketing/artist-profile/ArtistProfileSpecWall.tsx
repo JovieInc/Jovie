@@ -49,6 +49,8 @@ interface ArtistProfileSpecWallProps {
   readonly truthTiles?: readonly ArtistProfileTruthTile[];
 }
 
+export const ARTIST_PROFILE_SPEC_WALL_VARIANT = 'visual-five' as const;
+
 function ScreenshotCrop({
   alt,
   className,
@@ -266,6 +268,8 @@ function ArtistProfilePowerFeatureTile({
 }>) {
   return (
     <article
+      data-testid='artist-profile-spec-tile'
+      data-spec-wall-tile-media={tile.visual}
       className={cn(
         'relative min-h-52',
         tile.size === 'large' ? 'md:min-h-66' : 'md:min-h-52',
@@ -398,7 +402,16 @@ export function ArtistProfileSpecWall({
           bodyClassName='max-w-xl'
         />
 
-        <div className='mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-12 xl:grid-rows-4 xl:gap-4'>
+        <div
+          className='mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-12 xl:grid-rows-4 xl:gap-4'
+          data-testid='artist-profile-spec-wall-grid'
+          data-spec-wall-variant={
+            tiles?.length === 5 &&
+            tiles.every(tile => tile.visual === 'screenshot')
+              ? ARTIST_PROFILE_SPEC_WALL_VARIANT
+              : undefined
+          }
+        >
           {(tiles ?? []).map(tile => (
             <ArtistProfilePowerFeatureTile key={tile.id} tile={tile} />
           ))}

@@ -39,8 +39,7 @@ export interface ArtistProfileLandingOutcomeCard {
     | 'straight-to-listen'
     | 'local-dates-first'
     | 'support-without-friction'
-    | 'capture-the-fan'
-    | 'one-link-everywhere';
+    | 'capture-the-fan';
   readonly title: string;
   readonly description: string;
 }
@@ -676,12 +675,6 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         title: 'Stay Close',
         description:
           'A listen, a signup, or a support moment can become a real fan relationship instead of an anonymous click.',
-      },
-      {
-        id: 'one-link-everywhere',
-        title: 'Keep one link everywhere',
-        description:
-          'Bio, story, flyer, QR code, and release post all point to the same profile.',
       },
     ],
     syntheticProofs: {

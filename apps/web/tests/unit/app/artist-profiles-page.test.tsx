@@ -94,7 +94,7 @@ vi.mock(
       <section>
         <h2>{outcomes.headline}</h2>
         <div data-testid='artist-profile-outcomes-grid'>
-          {outcomes.landingCards.slice(0, 4).map(card => (
+          {outcomes.landingCards.map(card => (
             <article key={card.id} data-testid='artist-profile-outcome-card'>
               {card.title}
             </article>
