@@ -1,9 +1,9 @@
 import { TooltipProvider } from '@jovie/ui';
 import type { Preview } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ThemeProvider } from 'next-themes';
 import React from 'react';
 import { ToastProvider } from '../components/providers/ToastProvider';
+import { ThemeProvider } from './next-themes-mock';
 import '../app/globals.css';
 
 /**
