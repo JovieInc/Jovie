@@ -17,6 +17,12 @@ import { publicEnv } from '@/lib/env-public';
 
 const LOCAL_DEV_BYPASS_TOKEN = 'local-dev-turnstile-bypass';
 const TURNSTILE_LOAD_TIMEOUT_MS = 10_000;
+const TURNSTILE_MESSAGES = {
+  error: 'Security check unavailable. Refresh and try again.',
+  expired: 'Security check expired. Refresh and try again.',
+  timeout: 'Security check timed out. Refresh and try again.',
+  unsupported: 'Security check unsupported. Try another browser.',
+} as const;
 
 interface InvisibleTurnstileProps {
   readonly onToken: (token: string) => void;
@@ -99,19 +105,23 @@ export function InvisibleTurnstile({
     [clearLoadTimeout, onStateChange]
   );
 
+  const reportChallengeFailure = useCallback(
+    (status: keyof typeof TURNSTILE_MESSAGES) => {
+      setInteractiveChallengeVisible(false);
+      onToken('');
+      commitState({ status, message: TURNSTILE_MESSAGES[status] });
+    },
+    [commitState, onToken]
+  );
+
   const beginLoading = useCallback(() => {
     commitState({ status: 'loading' });
     clearLoadTimeout();
     loadTimeoutRef.current = globalThis.setTimeout(() => {
       loadTimeoutRef.current = null;
-      setInteractiveChallengeVisible(false);
-      onToken('');
-      commitState({
-        status: 'timeout',
-        message: 'Security check timed out. Refresh and try again.',
-      });
+      reportChallengeFailure('timeout');
     }, TURNSTILE_LOAD_TIMEOUT_MS);
-  }, [clearLoadTimeout, commitState, onToken]);
+  }, [clearLoadTimeout, commitState, reportChallengeFailure]);
 
   const clearWidget = useCallback(() => {
     const widgetId = widgetIdRef.current;
@@ -146,38 +156,10 @@ export function InvisibleTurnstile({
           onToken(token);
           commitState({ status: 'verified' });
         },
-        'expired-callback': () => {
-          setInteractiveChallengeVisible(false);
-          onToken('');
-          commitState({
-            status: 'expired',
-            message: 'Security check expired. Refresh and try again.',
-          });
-        },
-        'error-callback': () => {
-          setInteractiveChallengeVisible(false);
-          onToken('');
-          commitState({
-            status: 'error',
-            message: 'Security check unavailable. Refresh and try again.',
-          });
-        },
-        'timeout-callback': () => {
-          setInteractiveChallengeVisible(false);
-          onToken('');
-          commitState({
-            status: 'timeout',
-            message: 'Security check timed out. Refresh and try again.',
-          });
-        },
-        'unsupported-callback': () => {
-          setInteractiveChallengeVisible(false);
-          onToken('');
-          commitState({
-            status: 'unsupported',
-            message: 'Security check unsupported. Try another browser.',
-          });
-        },
+        'expired-callback': () => reportChallengeFailure('expired'),
+        'error-callback': () => reportChallengeFailure('error'),
+        'timeout-callback': () => reportChallengeFailure('timeout'),
+        'unsupported-callback': () => reportChallengeFailure('unsupported'),
         'before-interactive-callback': () => {
           setInteractiveChallengeVisible(true);
           commitState({ status: 'interactive' });
@@ -188,14 +170,16 @@ export function InvisibleTurnstile({
         },
       });
     } catch {
-      setInteractiveChallengeVisible(false);
-      onToken('');
-      commitState({
-        status: 'error',
-        message: 'Security check unavailable. Refresh and try again.',
-      });
+      reportChallengeFailure('error');
     }
-  }, [beginLoading, commitState, onToken, shouldBypass, siteKey]);
+  }, [
+    beginLoading,
+    commitState,
+    onToken,
+    reportChallengeFailure,
+    shouldBypass,
+    siteKey,
+  ]);
 
   const resetWidget = useCallback(() => {
     clearWidget();
@@ -257,24 +241,12 @@ export function InvisibleTurnstile({
         strategy='afterInteractive'
         onLoad={() => {
           if (!getTurnstile()) {
-            setInteractiveChallengeVisible(false);
-            onToken('');
-            commitState({
-              status: 'error',
-              message: 'Security check unavailable. Refresh and try again.',
-            });
+            reportChallengeFailure('error');
             return;
           }
           render();
         }}
-        onError={() => {
-          setInteractiveChallengeVisible(false);
-          onToken('');
-          commitState({
-            status: 'error',
-            message: 'Security check unavailable. Refresh and try again.',
-          });
-        }}
+        onError={() => reportChallengeFailure('error')}
       />
       <section
         ref={containerRef}
