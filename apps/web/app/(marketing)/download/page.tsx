@@ -407,6 +407,7 @@ export default function DownloadPage() {
           ctaHref={DOWNLOAD_URL}
           ctaAnalyticsEvent='download_mac_dmg'
           ctaAnalyticsSource='download_page_footer'
+          prefetch={false}
         />
 
         <MarketingContainer width='page' className='py-8'>
