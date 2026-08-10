@@ -1,4 +1,9 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import {
+  collectInteractionCls,
+  installInteractionClsObserver,
+  measureBufferedCls,
+} from '../helpers/cls-measurement';
 
 const FAQ_STORY_ID = 'marketing-sections-faqsection--default';
 const VIEWPORTS = [
@@ -14,6 +19,12 @@ interface FaqGeometry {
 }
 
 async function openFaqStory(page: Page) {
+  await page.addInitScript(() => {
+    // The isolated Storybook document starts shorter than the viewport. Keep
+    // the scrollbar gutter stable so opening a semantic disclosure cannot
+    // make the outer test canvas recenter or resize unrelated content.
+    document.documentElement.style.scrollbarGutter = 'stable';
+  });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`/iframe.html?id=${FAQ_STORY_ID}&viewMode=story`, {
     waitUntil: 'networkidle',
@@ -28,6 +39,22 @@ async function openFaqStory(page: Page) {
   return section;
 }
 
+async function readDocumentBox(locator: Locator) {
+  return locator.evaluate(element => {
+    if (element instanceof HTMLElement && element.hidden) return null;
+
+    const rect = element.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return null;
+
+    return {
+      x: rect.x + window.scrollX,
+      y: rect.y + window.scrollY,
+      width: rect.width,
+      height: rect.height,
+    };
+  });
+}
+
 async function readFaqGeometry(section: Locator): Promise<FaqGeometry> {
   const accordion = section.locator('.faq-accordion');
   const items = accordion.locator('.faq-accordion__item');
@@ -35,19 +62,28 @@ async function readFaqGeometry(section: Locator): Promise<FaqGeometry> {
   const itemCount = await items.count();
 
   return {
-    heading: await section.locator('.faq-section__heading').boundingBox(),
-    accordion: await accordion.boundingBox(),
+    heading: await readDocumentBox(section.locator('.faq-section__heading')),
+    accordion: await readDocumentBox(accordion),
     items: await Promise.all(
       Array.from({ length: itemCount }, (_, index) =>
-        items.nth(index).boundingBox()
+        readDocumentBox(items.nth(index))
       )
     ),
     panels: await Promise.all(
       Array.from({ length: itemCount }, (_, index) =>
-        panels.nth(index).boundingBox()
+        readDocumentBox(panels.nth(index))
       )
     ),
   };
+}
+
+async function settleLayout(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>(resolve => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      })
+  );
 }
 
 function requireBox(
@@ -79,6 +115,10 @@ test.describe('canonical marketing FAQ disclosure geometry', () => {
         );
         await expect(panels.nth(index)).toHaveAttribute('aria-hidden', 'true');
         await expect(panels.nth(index)).toHaveAttribute('hidden', '');
+        await expect(triggers.nth(index)).toHaveAttribute(
+          'aria-controls',
+          await panels.nth(index).getAttribute('id')
+        );
         await expect(panels.nth(index)).toHaveAttribute(
           'aria-labelledby',
           await triggers.nth(index).getAttribute('id')
@@ -87,12 +127,10 @@ test.describe('canonical marketing FAQ disclosure geometry', () => {
 
       const collapsedGeometry = await readFaqGeometry(section);
       expect(collapsedGeometry.panels).toEqual([null, null, null]);
-      await page.evaluate(
-        () =>
-          new Promise<void>(resolve => {
-            requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-          })
-      );
+      expect(await measureBufferedCls(page, 50)).toBe(0);
+      await installInteractionClsObserver(page);
+      await settleLayout(page);
+      expect(await collectInteractionCls(page, 50)).toBe(0);
       expect(await readFaqGeometry(section)).toEqual(collapsedGeometry);
 
       await triggers.first().focus();
@@ -105,12 +143,18 @@ test.describe('canonical marketing FAQ disclosure geometry', () => {
       await page.keyboard.press('Home');
       await page.keyboard.press('ArrowDown');
       await expect(triggers.nth(1)).toBeFocused();
+      await installInteractionClsObserver(page);
       await page.keyboard.press('Enter');
       await expect(triggers.nth(1)).toHaveAttribute('aria-expanded', 'true');
       await expect(panels.nth(1)).toHaveAttribute('aria-hidden', 'false');
       await expect(panels.nth(1)).not.toHaveAttribute('hidden', '');
       await expect(panels.nth(1)).toHaveCSS('transition-duration', '0s');
       const expandedGeometry = await readFaqGeometry(section);
+      await settleLayout(page);
+      // CLS excludes every shift shortly after qualifying input, including an
+      // accidental one. This zero only rules out non-recent-input shifts; the
+      // source contract and bounding boxes below prove local state ownership.
+      expect(await collectInteractionCls(page, 50)).toBe(0);
       const collapsedAccordion = requireBox(
         collapsedGeometry.accordion,
         'collapsed accordion'

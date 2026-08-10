@@ -1677,7 +1677,9 @@ jobs:
             }
             if curl -sf http://localhost:6006/iframe.html >/dev/null 2>&1; then
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                pnpm exec playwright test tests/e2e/storybook-elevation.spec.ts \
+                pnpm exec playwright test \
+                  tests/e2e/storybook-elevation.spec.ts \
+                  tests/e2e/storybook-marketing-faq.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line
               exit 0
             fi

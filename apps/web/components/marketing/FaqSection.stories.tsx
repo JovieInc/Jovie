@@ -4,10 +4,13 @@ import { FaqSection } from './FaqSection';
 const meta: Meta<typeof FaqSection> = {
   title: 'Marketing/Sections/FaqSection',
   component: FaqSection,
-  parameters: { layout: 'centered' },
+  // Disclosure geometry must be exercised in normal document flow. Storybook's
+  // centered layout re-centers the entire story whenever an answer opens,
+  // creating an unrelated outer-canvas shift that the component does not own.
+  parameters: { layout: 'fullscreen' },
   decorators: [
     Story => (
-      <div className='w-[min(42rem,calc(100vw-2rem))] bg-base p-6 text-primary-token'>
+      <div className='mx-auto w-[min(42rem,calc(100vw-2rem))] bg-base p-6 text-primary-token'>
         <Story />
       </div>
     ),

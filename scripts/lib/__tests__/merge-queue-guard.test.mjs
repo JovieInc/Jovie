@@ -464,6 +464,24 @@ describe('aggregate required checks', () => {
     expect(visualWorkflowYaml).not.toContain('vars.CI_FAST_RUNNER');
   });
 
+  it('runs FAQ disclosure geometry in the combined layout gate', () => {
+    const ciWorkflowYaml = readFileSync(
+      resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.ciWorkflow),
+      'utf8'
+    );
+    const combinedLayoutBlock = extractWorkflowJobBlock(
+      ciWorkflowYaml,
+      'ci-build-layout'
+    );
+
+    expect(combinedLayoutBlock).toMatch(
+      /tests\/e2e\/storybook-marketing-faq\.spec\.ts/
+    );
+    expect(combinedLayoutBlock).toMatch(
+      /--config=playwright\.config\.storybook\.ts/
+    );
+  });
+
   it('keeps merge-queue enroll hot path free of pytest/Python bootstrap (GH-13630)', () => {
     const autoenrollYaml = readFileSync(
       resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.autoenrollWorkflow),
