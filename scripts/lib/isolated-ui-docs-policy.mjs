@@ -287,7 +287,8 @@ function executableImportSources(content, filename) {
     } else if (
       ts.isCallExpression(node) &&
       (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
-        (ts.isIdentifier(node.expression) && node.expression.text === 'require'))
+        (ts.isIdentifier(node.expression) &&
+          node.expression.text === 'require'))
     ) {
       [specifier] = node.arguments;
     }
