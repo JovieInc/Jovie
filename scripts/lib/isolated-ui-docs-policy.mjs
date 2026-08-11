@@ -4,6 +4,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { dirname, extname, join, normalize } from 'node:path/posix';
 import { pathToFileURL } from 'node:url';
+import ts from 'typescript';
 
 export const ISOLATED_UI_DOCS_SCHEMA = 'jovie-isolated-ui-docs/v1';
 export const REQUIRED_ISOLATED_CHECKS = Object.freeze([
@@ -266,6 +267,40 @@ function allowedImportSource(source, file, files) {
   return false;
 }
 
+function executableImportSources(content, filename) {
+  const sourceFile = ts.createSourceFile(
+    filename,
+    content,
+    ts.ScriptTarget.Latest,
+    true
+  );
+  if (sourceFile.parseDiagnostics.length > 0) return null;
+  const sources = [];
+  let complete = true;
+  const visit = node => {
+    let specifier;
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      node.moduleSpecifier
+    ) {
+      specifier = node.moduleSpecifier;
+    } else if (
+      ts.isCallExpression(node) &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) && node.expression.text === 'require'))
+    ) {
+      [specifier] = node.arguments;
+    }
+    if (specifier) {
+      if (ts.isStringLiteralLike(specifier)) sources.push(specifier.text);
+      else complete = false;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return complete ? sources : null;
+}
+
 function semanticBlockers(file, files) {
   const blockers = [];
   const content = String(file.content || '');
@@ -273,12 +308,15 @@ function semanticBlockers(file, files) {
     blockers.push(`${file.filename}: exact source content is unavailable`);
     return blockers;
   }
-  const imports = [
-    ...content.matchAll(
-      /(?:import|export)\s+(?:[^'";]+?\s+from\s+)?['"]([^'"]+)['"]/g
-    ),
-    ...content.matchAll(/(?:import|require)\s*\(\s*['"]([^'"]+)['"]\s*\)/g),
-  ].map(match => match[1]);
+  const imports = EXECUTABLE_RE.test(file.filename)
+    ? executableImportSources(content, file.filename)
+    : [...content.matchAll(/@import\s+['"]([^'"]+)['"]/g)].map(
+        match => match[1]
+      );
+  if (imports === null) {
+    blockers.push(`${file.filename}: module syntax cannot be inspected safely`);
+    return blockers;
+  }
 
   for (const source of imports) {
     const denied = DENIED_PATHS.find(entry => entry.pattern.test(source));

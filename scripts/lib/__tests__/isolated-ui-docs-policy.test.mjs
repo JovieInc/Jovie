@@ -238,6 +238,29 @@ describe('isolated UI/docs promotion policy', () => {
     );
   });
 
+  it('rejects comment-separated imports that escape the pinned delta', () => {
+    const files = atomFiles();
+    files[0] = {
+      ...files[0],
+      content:
+        "import /* pinned-closure-bypass */ '../../../apps/web/app/actions/spotify.ts';\nexport const Badge = () => <span />;",
+    };
+    const result = evaluateIsolatedUiDocsDelta({
+      prNumber: 15817,
+      baseSha: BASE,
+      headSha: HEAD,
+      body: body(),
+      files,
+      checks: greenChecks(),
+      fleetGate: fleetGate(),
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.blockers).toContain(
+      'packages/ui/atoms/Badge.tsx: import ../../../apps/web/app/actions/spotify.ts is not presentation-only'
+    );
+  });
+
   it('rejects executable docs/assets and remote or executable CSS', () => {
     const result = evaluateIsolatedUiDocsDelta({
       prNumber: 15817,
