@@ -339,5 +339,4 @@ describe('isolated UI/docs promotion policy', () => {
       })
     ).toBe(false);
   });
-
 });
