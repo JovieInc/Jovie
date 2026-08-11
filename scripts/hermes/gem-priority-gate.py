@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Versioned Gem fleet gate with separate work and promotion admission.
 
-Gem observes main, queue, controller, and explicit integrity receipts. Symphony
-remains the only implementation owner, so the legacy direct Gem ship loop is
-held even while the fleet work-admission gate permits approved Linear leases.
+Gem observes main, production, queue, controller, and explicit integrity
+receipts. Symphony remains the only implementation owner, so the legacy direct
+Gem ship loop is held even while the fleet work-admission gate permits approved
+Linear leases.
 """
 
 from __future__ import annotations
@@ -83,23 +84,38 @@ def observe_main(repo: str) -> dict[str, Any]:
         if not sha:
             raise ValueError("main SHA missing")
         combined = gh_json(repo, f"commits/{sha}/status")
-        checks = gh_json(repo, f"commits/{sha}/check-runs?per_page=100")
-        failed: list[str] = []
-        pending: list[str] = []
-        for run in checks.get("check_runs", []):
-            name = str(run.get("name") or "unnamed-check")
-            if run.get("status") != "completed":
-                pending.append(name)
-            elif run.get("conclusion") not in {"success", "neutral", "skipped"}:
-                failed.append(name)
+        release_attempts: list[dict[str, Any]] = []
+        for page in range(1, 11):
+            checks = gh_json(repo, f"commits/{sha}/check-runs?per_page=100&page={page}")
+            page_runs = checks.get("check_runs", [])
+            release_attempts.extend(
+                run for run in page_runs if run.get("name") == "Main Release Ready"
+            )
+            if len(page_runs) < 100:
+                break
+        if not release_attempts:
+            raise ValueError("Main Release Ready check is missing")
+        release_attempts.sort(
+            key=lambda run: str(run.get("started_at") or run.get("completed_at") or ""),
+            reverse=True,
+        )
+        latest = release_attempts[0]
         combined_state = str(combined.get("state") or "unknown")
-        green = combined_state == "success" and not failed and not pending
+        if latest.get("status") != "completed":
+            status = "unknown"
+        else:
+            status = "green" if latest.get("conclusion") == "success" else "red"
         return {
-            "status": "green" if green else "red",
+            "status": status,
             "sha": sha,
             "combinedStatus": combined_state,
-            "failedChecks": sorted(set(failed)),
-            "pendingChecks": sorted(set(pending)),
+            "sourceGate": {
+                "name": "Main Release Ready",
+                "status": latest.get("status"),
+                "conclusion": latest.get("conclusion"),
+                "startedAt": latest.get("started_at"),
+                "completedAt": latest.get("completed_at"),
+            },
         }
     except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
         return {"status": "unknown", "error": f"github-observation-failed: {error}"}
@@ -123,6 +139,42 @@ def observe_controller(url: str) -> dict[str, Any]:
             "kind": "symphony",
             "url": url,
             "error": f"controller-observation-failed: {error}",
+        }
+
+
+def observe_production(url: str) -> dict[str, Any]:
+    try:
+        with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - configured health URL
+            if response.status < 200 or response.status >= 300:
+                return {"status": "red", "url": url, "httpStatus": response.status}
+            final_url = response.geturl()
+            if final_url.rstrip("/") != url.rstrip("/"):
+                return {
+                    "status": "red",
+                    "url": url,
+                    "finalUrl": final_url,
+                    "detail": "production health redirected away from the configured alias",
+                }
+            value = json.loads(response.read().decode("utf-8"))
+        if not isinstance(value, dict):
+            raise ValueError("production health was not an object")
+        return {
+            "status": "green" if value.get("status") == "ok" else "red",
+            "url": url,
+            "reportedStatus": value.get("status"),
+        }
+    except urllib.error.HTTPError as error:
+        return {
+            "status": "red",
+            "url": url,
+            "httpStatus": error.code,
+            "error": "production-observation-http-error",
+        }
+    except (OSError, ValueError, json.JSONDecodeError, urllib.error.URLError) as error:
+        return {
+            "status": "unknown",
+            "url": url,
+            "error": f"production-observation-failed: {error}",
         }
 
 
@@ -240,6 +292,12 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     )
     main_value = signals.get("main")
     main = main_value if isinstance(main_value, dict) else {"status": "unknown"}
+    production_value = signals.get("production")
+    production = (
+        production_value
+        if isinstance(production_value, dict)
+        else {"status": "unknown"}
+    )
     controller_value = signals.get("controller")
     controller = (
         controller_value
@@ -287,6 +345,17 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
                     "Main is not green; ready, merge, deploy, and promotion are frozen.",
                 )
             )
+        if production.get("status") != "green":
+            reasons.append(
+                typed_reason(
+                    "production-not-green"
+                    if production.get("status") == "red"
+                    else "production-unknown",
+                    "promotion",
+                    "warning",
+                    "Production is not green; deployment and production promotion are frozen.",
+                )
+            )
         eligible_prs = queue.get("eligiblePrs")
         queue_target = queue.get("target")
         queue_shape_valid = (
@@ -321,6 +390,38 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     state = "RED" if critical else "AMBER" if reasons else "GREEN"
     evidence = signals.get("concurrencyEvidence") or {}
     gem_concurrency = 8 if evidence.get("accepted") is True else DEFAULT_GEM_CONCURRENCY
+    eligible_prs = queue.get("eligiblePrs")
+    queue_target = queue.get("target")
+    queue_healthy = (
+        queue.get("status") == "known"
+        and isinstance(eligible_prs, int)
+        and not isinstance(eligible_prs, bool)
+        and eligible_prs >= 0
+        and isinstance(queue_target, int)
+        and not isinstance(queue_target, bool)
+        and queue_target >= 0
+        and eligible_prs <= queue_target
+    )
+    isolated_promotion_allowed = (
+        state == "AMBER"
+        and controller.get("status") == "green"
+        and main.get("status") == "green"
+        and production.get("status") == "red"
+        and integrity.get("status") in {"clear", "resolved"}
+        and queue_healthy
+        and all(reason["code"] == "production-not-green" for reason in reasons)
+    )
+    source_health_red = (
+        main.get("status") != "green" or production.get("status") != "green"
+    )
+    work_activities = (
+        []
+        if state == "RED"
+        else (
+            ([] if source_health_red else ["approved-issue-lease"])
+            + ["isolated-implementation", "tests", "review", "draft-pr"]
+        )
+    )
     return {
         "schema": SCHEMA,
         "observedAt": observed_at,
@@ -329,15 +430,24 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "reasons": reasons,
         "workAdmission": {
             "allowed": state != "RED",
-            "activities": []
-            if state == "RED"
-            else ["approved-issue-lease", "isolated-implementation", "tests", "review", "draft-pr"],
+            "activities": work_activities,
+            "newIssueLeaseAllowed": "approved-issue-lease" in work_activities,
         },
         "promotionAdmission": {
             "allowed": state == "GREEN",
             "activities": ["ready-for-merge", "merge", "deploy", "production-promotion"]
             if state == "GREEN"
             else [],
+        },
+        "isolatedPromotionAdmission": {
+            "allowed": isolated_promotion_allowed,
+            "activities": ["ready-for-merge", "native-merge-queue", "merge"]
+            if isolated_promotion_allowed
+            else [],
+            "deploymentsAllowed": False,
+            "scope": "exact-head-semantically-isolated-ui-docs",
+            "maxConcurrent": 1,
+            "authority": "canonical-merge-queue-controller",
         },
         "ownership": {
             "controller": "Gem",
@@ -390,6 +500,11 @@ def parse_args() -> argparse.Namespace:
         or "JovieInc/Jovie",
     )
     parser.add_argument("--queue-target", type=int, default=5)
+    parser.add_argument(
+        "--production-url",
+        default=os.environ.get("JOVIE_PRODUCTION_HEALTH_URL")
+        or "https://jov.ie/api/health",
+    )
     parser.add_argument("--symphony-url", default="http://127.0.0.1:4041/api/v1/state")
     parser.add_argument(
         "--state-dir",
@@ -419,6 +534,7 @@ def main() -> int:
         concurrency_path = args.concurrency_evidence or args.state_dir.parent / "concurrency.json"
         signals = {
             "main": observe_main(args.repo),
+            "production": observe_production(args.production_url),
             "controller": observe_controller(args.symphony_url),
             "integrity": observe_integrity(integrity_path),
             "queue": observe_queue(args.repo, args.queue_target),

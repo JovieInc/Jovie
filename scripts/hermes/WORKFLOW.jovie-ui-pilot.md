@@ -85,7 +85,7 @@ No description provided.
 The versioned Gem controller writes `/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json` with schema `jovie-fleet-gate/v1`. Read it before moving a Todo issue to In Progress, before push, and before changing a PR from draft to ready.
 
 - `GREEN`: pickup, isolated implementation, tests, review, draft PR, ready-for-merge, merge queue, deploy, and promotion may proceed through their normal independent gates.
-- `AMBER`: approved issue leasing, isolated implementation, tests, review, push, and draft PR creation may proceed. The PR must carry `queue-deferred`. Do not mark ready, merge, deploy, or promote.
+- `AMBER`: do not claim a new issue. An already-owned workspace may continue isolated implementation, tests, review, push, and draft PR creation. The PR must carry `queue-deferred`. Production-red/main-green may permit one existing UI/docs PR to become ready only when the canonical exact-head semantic classifier returns an allowed receipt; the native queue controller revalidates it. Deployment and production promotion remain frozen. Every other AMBER reason stays draft-only.
 - `RED`: a severe security/integrity incident is active. Do not pick up new work, change or push the branch, mark ready, merge, deploy, or promote. Record the typed gate reasons in `BLOCKER.md` and stop.
 - Missing, malformed, or more-than-10-minute-old controller state is `AMBER`, unless it contains an explicit active severe integrity reason, which remains `RED`. This prevents stale controller state from stranding a safe existing lease while still failing closed at the promotion layer.
 
@@ -93,12 +93,12 @@ Gem owns the controller and queue observation. Symphony is the only implementati
 
 ## Hard rules
 
-0. On `Todo`, evaluate the fleet receipt first. For `GREEN` or `AMBER`, immediately move the issue to `In Progress` and keep it there while coding. For `RED`, do not claim it. After a draft PR exists with a real commit, move to `In Review` using `gh` plus one Linear GraphQL mutation if needed. Never use an interactive connector approval path.
+0. On `Todo`, evaluate the fleet receipt first. Only `GREEN` with `workAdmission.newIssueLeaseAllowed=true` may claim new work and move it to `In Progress`. `AMBER` may continue an existing lease but may not create one; `RED` may not claim or continue. After a draft PR exists with a real commit, move to `In Review` using `gh` plus one Linear GraphQL mutation if needed. Never use an interactive connector approval path.
 1. Work only inside this workspace. Do not touch other paths and do not ask a human to perform routine follow-up.
 2. Prefer the smallest correct fix. No drive-by refactors.
 3. Do not weaken CI, delete tests, skip hooks, use `--no-verify`, or bypass a failed gate.
 4. Always open a draft PR first and immediately add `queue-deferred`, including when the gate is `GREEN`. A fresh `GREEN` receipt is required immediately before removing that hold and running `gh pr ready`. Under `AMBER`, leave both the hold and draft status in place. Under `RED`, stop before push.
-5. Never merge or deploy manually. A ready PR may enter the native merge queue only after normal checks and a fresh `GREEN` receipt.
+5. Never merge or deploy manually. A ready PR normally requires fresh `GREEN`. Under the sole production-red/main-green exception, one UI/docs PR may become ready only after `scripts/lib/isolated-ui-docs-policy.mjs evaluate-live` allows its exact current base/head/full diff and required checks. Labels and path-only classification are not eligibility evidence. The canonical native controller rechecks before enrollment; production remains frozen.
 6. By end of turn 2, have either a real non-empty commit on `codex/<issue>-fix` plus a draft PR, or a `BLOCKER.md` with the exact reason. Do not force-push or use the GitHub Contents API as a transport.
 7. Use default pre-push parallelism and allow the repository gate to finish. If an unrelated test fails after targeted validation, record the exact failure, leave the issue In Progress, and stop without pushing.
 8. Skip issues whose title or labels include `needs-decision`, `needs-human`, or `hold`; write `BLOCKER.md` and stop.
@@ -122,8 +122,8 @@ Maintain one persistent comment starting with `## Codex Workpad`. Include:
 4. Run the tightest relevant tests, lint, and typecheck. Record exact results.
 5. Before every push, reread the fleet receipt. `AMBER` may push a tested isolated branch; `RED` may not. Run `git diff --check origin/main...HEAD` and inspect `git diff --stat origin/main...HEAD`.
 6. Commit with `{{ issue.identifier }}` in the message, push, create a draft PR with summary, test evidence, visual proof when relevant, and `Fixes {{ issue.identifier }}`, then immediately run `gh pr edit --add-label queue-deferred`. This label is the mechanical auto-ready and merge-queue hold from the draft's birth.
-7. If the gate is `AMBER`, keep `queue-deferred` and keep the PR draft.
-8. If the gate is `GREEN`, normal review and CI may run. Immediately before `gh pr ready`, reread the receipt; only a fresh `GREEN` may remove `queue-deferred` and mark ready.
+7. If the gate is `AMBER`, keep `queue-deferred` and keep the PR draft unless this is the one exact production-red/main-green UI/docs exception and the live semantic classifier is allowed. Main-red, unknown, stale, or non-isolated changes always remain draft.
+8. If the gate is `GREEN`, normal review and CI may run. Immediately before `gh pr ready`, reread the receipt; a fresh `GREEN` may remove `queue-deferred` and mark ready. For the isolated exception, record the allowed classifier receipt before removing the mechanical hold and marking ready; the queue controller independently revalidates it.
 9. Move Linear to `In Review` only after the draft PR URL exists and local validation passed.
 10. If the gate transitions from `GREEN` to `AMBER`, add `queue-deferred` and leave or return the PR to draft. If it transitions to `RED`, stop and preserve the workspace for incident review.
 
@@ -135,6 +135,6 @@ If `gbrain` is available, write a short non-secret note with the change, proof, 
 
 - a draft PR is opened or updated with validation evidence
 - Linear is In Review only after the PR exists
-- `AMBER` remains draft plus `queue-deferred`
-- ready-for-merge requires a fresh `GREEN` receipt and normal review/CI
+- `AMBER` remains draft plus `queue-deferred`, except the one controller-proven production-red/main-green UI/docs admission
+- ready-for-merge requires a fresh `GREEN` receipt or the exact isolated exception, plus normal review/CI
 - no manual merge, deploy, gate bypass, duplicate Gem ownership, or committed secrets

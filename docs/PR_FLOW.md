@@ -121,6 +121,21 @@ dequeued through the native API and then have their audit label removed.
 Pending, queued, and cancelled check runs are not terminal failures, preventing
 dequeue/re-enroll loops during ordinary CI cancellation or main movement.
 
+### Fleet degradation policy
+
+The normal queue requires a fresh `GREEN` fleet receipt. When production is
+explicitly red but source `main` is green, the same controller may admit one
+exact-head UI/docs delta only after the semantic-isolation contract in
+`.github/MERGE_QUEUE.md` succeeds. All ordinary queue entries are held, and the
+production controller continues to reject deployment and promotion. Labels
+remain mechanical intent/hold signals and are never proof of isolation.
+
+When source `main` is red, no PR may merge and no deployment may start; UI/docs
+work may exist only as a draft. Unknown or stale production/main/controller/
+integrity evidence and severe integrity incidents admit nothing. The exception
+never permits business logic, auth, data, API, runtime, dependency, config, or
+control-plane changes, and a path-only classification is insufficient.
+
 ### Update Branch control-plane safety
 
 GitHub Update Branch is asynchronous: the branch Git ref can advance before the

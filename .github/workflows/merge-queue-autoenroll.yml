@@ -29,7 +29,7 @@ on:
   pull_request:
     types: [ready_for_review, reopened, labeled, unlabeled]
   workflow_run:
-    workflows: ['CI']
+    workflows: ['CI', 'Production Controller']
     types: [completed]
   push:
     branches: [main]
@@ -53,12 +53,96 @@ permissions:
   contents: write
 
 jobs:
+  fleet-policy:
+    name: Resolve fleet promotion policy
+    # The checked-in controller evaluates a fresh receipt on Gem, where the
+    # canonical integrity and Symphony state live. Unknown/unavailable evidence
+    # produces no new admission; this is not a second queue or mutator.
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    timeout-minutes: 5
+    outputs:
+      mode: ${{ steps.policy.outputs.mode }}
+      receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}
+    steps:
+      - name: Generate read-only Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: read
+          permission-pull-requests: read
+      - name: Checkout canonical main policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Evaluate fresh fleet policy
+        id: policy
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GEM_PRIORITY_GATE_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/jovie-fleet-gate.json"
+          set +e
+          python3 scripts/hermes/gem-priority-gate.py \
+            --dry-run --consumer fleet >"$receipt"
+          gate_rc=$?
+          set -e
+          jq -e '
+            .schema == "jovie-fleet-gate/v1" and
+            (.observedAt | type == "string") and
+            (.signals.main.sha | test("^[0-9a-f]{40}$")) and
+            (.signals.integrity.status | IN("clear", "resolved", "active", "invalid")) and
+            (.promotionAdmission.allowed | type == "boolean") and
+            (.isolatedPromotionAdmission.allowed | type == "boolean")
+          ' "$receipt" >/dev/null || {
+            echo '::error::Fleet gate emitted a malformed receipt.' >&2
+            exit 2
+          }
+          if [ "$gate_rc" -ne 0 ] && [ "$gate_rc" -ne 2 ]; then
+            echo "::error::Fleet gate exited unexpectedly: $gate_rc" >&2
+            exit 2
+          fi
+
+          mode=blocked
+          if jq -e '.state == "GREEN" and .promotionAdmission.allowed == true' "$receipt" >/dev/null; then
+            mode=normal
+          elif jq -e '
+            .state == "AMBER" and
+            .signals.main.status == "green" and
+            .signals.production.status == "red" and
+            .isolatedPromotionAdmission.allowed == true and
+            .isolatedPromotionAdmission.deploymentsAllowed == false
+          ' "$receipt" >/dev/null; then
+            mode=isolated-only
+          elif jq -e '
+            .signals.main.status == "red" and
+            (.signals.integrity.status | IN("clear", "resolved"))
+          ' "$receipt" >/dev/null; then
+            mode=draft-only
+          fi
+          receipt_b64="$(base64 -w0 <"$receipt")"
+          {
+            echo "mode=$mode"
+            echo "receipt_b64=$receipt_b64"
+          } >>"$GITHUB_OUTPUT"
+          echo "Fleet promotion mode: $mode"
+
   enroll:
+    needs: fleet-policy
     if: >-
       github.event_name != 'workflow_run' ||
       (
-        github.event.workflow_run.event == 'pull_request' &&
-        github.event.workflow_run.conclusion != 'cancelled'
+        github.event.workflow_run.conclusion != 'cancelled' &&
+        (
+          github.event.workflow_run.name == 'Production Controller' ||
+          github.event.workflow_run.event == 'pull_request' ||
+          github.event.workflow_run.event == 'push' ||
+          github.event.workflow_run.event == 'merge_group'
+        )
       )
     # API-only fleet controller. ubuntu-latest deterministically includes gh;
     # the heterogeneous self-hosted fast pool does not.
@@ -88,6 +172,7 @@ jobs:
         run: |
           pr_number=''
           head_sha=''
+          recover_holds=0
 
           case "$EVENT_NAME" in
             pull_request)
@@ -101,18 +186,26 @@ jobs:
               ;;
             workflow_run)
               head_sha="$(jq -er '.workflow_run.head_sha | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
-              prs_json="$(gh pr list -R "$REPO" --state open --limit 200 --json number,headRefOid,baseRefName)"
-              mapfile -t matching_prs < <(jq -r --arg head "$head_sha" '
-                .[]
-                | select(.baseRefName == "main")
-                | select(((.headRefOid // "") | ascii_downcase) == $head)
-                | .number
-              ' <<<"$prs_json")
-              if [[ "${#matching_prs[@]}" -eq 1 ]]; then
-                pr_number="${matching_prs[0]}"
-              else
-                echo "No unique open main PR owns workflow_run head $head_sha; maintenance-only"
+              workflow_name="$(jq -er '.workflow_run.name' "$GITHUB_EVENT_PATH")"
+              workflow_conclusion="$(jq -er '.workflow_run.conclusion' "$GITHUB_EVENT_PATH")"
+              if [[ "$workflow_name" == "Production Controller" ]]; then
+                echo "Production Controller completed; maintenance-only exact fleet-hold recovery signal"
+                [[ "$workflow_conclusion" == "success" ]] && recover_holds=1
                 head_sha=''
+              else
+                prs_json="$(gh pr list -R "$REPO" --state open --limit 200 --json number,headRefOid,baseRefName)"
+                mapfile -t matching_prs < <(jq -r --arg head "$head_sha" '
+                  .[]
+                  | select(.baseRefName == "main")
+                  | select(((.headRefOid // "") | ascii_downcase) == $head)
+                  | .number
+                ' <<<"$prs_json")
+                if [[ "${#matching_prs[@]}" -eq 1 ]]; then
+                  pr_number="${matching_prs[0]}"
+                else
+                  echo "No unique open main PR owns workflow_run head $head_sha; maintenance-only"
+                  head_sha=''
+                fi
               fi
               ;;
             workflow_dispatch)
@@ -135,8 +228,11 @@ jobs:
               ;;
           esac
 
-          echo "pr_number=$pr_number" >>"$GITHUB_OUTPUT"
-          echo "head_sha=$head_sha" >>"$GITHUB_OUTPUT"
+          {
+            echo "pr_number=$pr_number"
+            echo "head_sha=$head_sha"
+            echo "recover_holds=$recover_holds"
+          } >>"$GITHUB_OUTPUT"
       - name: Enroll clean PRs
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -151,6 +247,9 @@ jobs:
           # global dequeue/reconciliation authority but cannot admit a PR.
           DRAIN_ADMISSION_PR: ${{ steps.admission.outputs.pr_number }}
           DRAIN_ADMISSION_HEAD: ${{ steps.admission.outputs.head_sha }}
+          DRAIN_PROMOTION_MODE: ${{ needs.fleet-policy.outputs.mode }}
+          DRAIN_FLEET_GATE_B64: ${{ needs.fleet-policy.outputs.receipt_b64 }}
+          DRAIN_RECOVER_FLEET_HOLDS: ${{ needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.recover_holds == '1' && '1' || '0' }}
           # `queue-deferred` has no typed provenance separating a temporary
           # pressure deferral from an explicit repair/human hold. Main-push
           # maintenance must preserve it until an owner explicitly releases it.

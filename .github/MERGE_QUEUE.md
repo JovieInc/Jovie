@@ -132,6 +132,46 @@ entitlements, data writes, security/CSP, infra, routing, package manifests, CI,
 and broad refactors fail closed out of this lane. The policy lives in
 `scripts/lib/merge-queue-guard.mjs`.
 
+## Production-red isolated admission
+
+The canonical fleet gate separates source-main health from production health.
+There is one deliberately narrow exception to the normal `GREEN` promotion
+requirement:
+
+- If source `main` is explicitly green, production is explicitly red, the
+  controller/integrity/queue evidence is fresh and unambiguous, the existing
+  native queue may hold at most one semantically isolated UI/docs PR.
+- Production deployment and promotion remain frozen. Landing the source does
+  not assert, imply, or initiate a deployment.
+- If `main` is red, source merge and deployment are frozen. UI/docs work may be
+  preserved only as a draft. Unknown, stale, malformed, severe-integrity, or
+  mixed failure evidence admits nothing.
+
+Eligibility is computed by `scripts/lib/isolated-ui-docs-policy.mjs` inside the
+existing `merge-queue-autoenroll` controller. It is never inferred from labels
+or path matches alone. Each admission pins the exact PR number, current `main`
+base SHA, published head SHA, complete paginated file manifest, blob SHAs, and a
+deterministic diff digest. Every file must be in the small docs/assets/styles/
+UI-atom allowlist; semantic source inspection rejects auth, identity, data,
+database, API, billing, entitlement, runtime, dependency, configuration,
+server-action, network, storage, routing, and control-plane behavior. Deletes,
+renames, broad refactors, escaping imports, or ambiguity fail closed.
+
+UI changes additionally require an additive focused test delta, before/after
+visual evidence, focused-test, typecheck, and lint/Biome receipts. Docs-only
+changes require rendered-docs proof. The four live branch-protection contexts
+must be successful on the exact head. The controller re-evaluates the complete
+receipt immediately before and after native enrollment and compensates by
+dequeueing if mutable evidence changes during the operation. Ordinary queued
+PRs are held outside the native queue until production returns green; no second
+queue, alternate transport, label authority, or CI bypass exists. Before a
+fleet-driven dequeue, the controller writes a pending
+`jovie-fleet-queue-hold/v1` commit status on that exact head. Only a successful
+`Production Controller` completion under a fresh normal `GREEN` gate may
+consume those receipts and re-enroll the still-current heads through the same
+native preflight and postcondition checks. Main-push and untargeted manual runs
+cannot perform this recovery.
+
 ## Monitoring and troubleshooting
 
 - Queue state: GitHub's repository merge queue UI or

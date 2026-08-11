@@ -93,8 +93,7 @@ const DENIED_SOURCE_PATTERNS = [
 const DENIED_STYLE_PATTERNS = [
   {
     reason: 'remote or executable CSS import',
-    pattern:
-      /(?:@import\s+(?:url\(\s*)?['"]?(?:https?:|data:|javascript:|\/\/)|url\(\s*['"]?(?:https?:|data:|javascript:|\/\/))/i,
+    pattern: /@import\b|url\(\s*['"]?(?:https?:|data:|javascript:|\/\/)/i,
   },
   {
     reason: 'legacy executable CSS',
@@ -267,15 +266,18 @@ function styleBlockers(file) {
 }
 
 /**
- * @param {{
- *   prNumber?: number,
- *   baseSha?: string,
- *   headSha?: string,
- *   body?: string,
- *   files?: Array<Record<string, any>>,
- *   checks?: Array<Record<string, any>>,
- *   fleetGate?: Record<string, any>,
- * }} [input]
+ * @typedef {object} IsolatedUiDocsDeltaOptions
+ * @property {number} [prNumber]
+ * @property {string} [baseSha]
+ * @property {string} [headSha]
+ * @property {string} [body]
+ * @property {Array<any>} [files]
+ * @property {Array<any>} [checks]
+ * @property {any} [fleetGate]
+ */
+
+/**
+ * @param {IsolatedUiDocsDeltaOptions} [options]
  */
 export function evaluateIsolatedUiDocsDelta({
   prNumber,
@@ -320,10 +322,8 @@ export function evaluateIsolatedUiDocsDelta({
   if (totalChanges > MAX_CHANGED_LINES)
     blockers.push(`changed line count exceeds ${MAX_CHANGED_LINES}`);
 
-  /** @type {Array<Record<string, any> & { kind: string }>} */
   const classified = [];
   for (const input of files) {
-    /** @type {Record<string, any>} */
     const file = {
       ...input,
       filename: normalizePath(input.filename),
@@ -471,6 +471,10 @@ function decodeFleetGate(value) {
 
 function loadLiveDelta({ repo, prNumber, expectedHead }) {
   const pr = ghJson(['api', `repos/${repo}/pulls/${prNumber}`]);
+  if (Number(pr.changed_files) > MAX_CHANGED_FILES)
+    throw new Error(`changed file count exceeds ${MAX_CHANGED_FILES}`);
+  if (Number(pr.additions) + Number(pr.deletions) > MAX_CHANGED_LINES)
+    throw new Error(`changed line count exceeds ${MAX_CHANGED_LINES}`);
   const currentMain = ghJson(['api', `repos/${repo}/git/ref/heads/main`]).object
     ?.sha;
   const files = ghJson([

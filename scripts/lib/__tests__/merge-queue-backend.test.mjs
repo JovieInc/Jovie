@@ -218,7 +218,8 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain(
       'no typed pressure-deferral provenance; owner release required'
     );
-    expect(drain).toContain('"$expected_head" != "$DRAIN_ADMISSION_HEAD"');
+    expect(drain).toContain('"$n" != "$authorized_pr"');
+    expect(drain).toContain('"$expected_head" != "$authorized_head"');
     expect(drain).toContain('select((.n | tostring) == $admission_pr)');
   });
 

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   evaluateIsolatedUiDocsDelta,
@@ -6,6 +8,8 @@ import {
 
 const BASE = '1'.repeat(40);
 const HEAD = '2'.repeat(40);
+const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
+
 function fleetGate(overrides = {}) {
   return {
     schema: 'jovie-fleet-gate/v1',
@@ -246,6 +250,16 @@ describe('isolated UI/docs promotion policy', () => {
           patch: '@@ -0,0 +1 @@',
           content: '@import url("https://example.com/theme.css");',
         },
+        {
+          filename: 'packages/ui/atoms/badge-protocol-relative.css',
+          status: 'modified',
+          sha: '0'.repeat(40),
+          additions: 1,
+          deletions: 0,
+          changes: 1,
+          patch: '@@ -0,0 +1 @@',
+          content: 'background-image: url("//cdn.example.com/badge.png");',
+        },
         atomFiles()[1],
       ],
       checks: greenChecks(),
@@ -258,33 +272,9 @@ describe('isolated UI/docs promotion policy', () => {
         'docs/policy.mdx: not in the isolated UI/docs allowlist',
         'apps/web/public/runtime.svg: not in the isolated UI/docs allowlist',
         'packages/ui/atoms/badge.css: contains remote or executable CSS import',
+        'packages/ui/atoms/badge-protocol-relative.css: contains remote or executable CSS import',
       ])
     );
-  });
-
-  it('allows local CSS imports while rejecting remote import sources', () => {
-    const files = atomFiles();
-    files.push({
-      filename: 'packages/ui/atoms/badge.css',
-      status: 'modified',
-      sha: 'f'.repeat(40),
-      additions: 1,
-      deletions: 0,
-      changes: 1,
-      patch: '@@ -0,0 +1 @@',
-      content: '@import "./tokens.css";\n.badge { color: var(--badge-color); }',
-    });
-    const result = evaluateIsolatedUiDocsDelta({
-      prNumber: 15819,
-      baseSha: BASE,
-      headSha: HEAD,
-      body: body(),
-      files,
-      checks: greenChecks(),
-      fleetGate: fleetGate(),
-    });
-
-    expect(result.allowed).toBe(true);
   });
 
   it('rejects modified tests that remove or rewrite existing assertions', () => {
@@ -363,5 +353,58 @@ describe('isolated UI/docs promotion policy', () => {
         now: '2026-08-11T03:10:01.000Z',
       })
     ).toBe(false);
+  });
+
+  it('keeps one native controller, freezes deploy, and never treats labels as authority', () => {
+    const queueWorkflow = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/merge-queue-autoenroll.yml'),
+      'utf8'
+    );
+    const productionWorkflow = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/production-controller.yml'),
+      'utf8'
+    );
+    const drain = readFileSync(
+      resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
+      'utf8'
+    );
+    const policy = readFileSync(
+      resolve(REPO_ROOT, 'scripts/lib/isolated-ui-docs-policy.mjs'),
+      'utf8'
+    );
+
+    expect(queueWorkflow).toContain('fleet-policy:');
+    expect(queueWorkflow).toContain(
+      "workflows: ['CI', 'Production Controller']"
+    );
+    expect(queueWorkflow).toContain('DRAIN_PROMOTION_MODE:');
+    expect(queueWorkflow).toContain('DRAIN_RECOVER_FLEET_HOLDS:');
+    expect(queueWorkflow).toContain('merge-queue-drain-mutex');
+    expect(queueWorkflow).toContain('mode=isolated-only');
+    expect(productionWorkflow).toContain('fleet-promotion:');
+    expect(productionWorkflow).toContain(
+      "needs.fleet-promotion.outputs.deployment_allowed == 'true'"
+    );
+    expect(drain).toContain('MAX_QUEUE_DEPTH=1');
+    expect(drain).toContain(
+      'scripts/lib/isolated-ui-docs-policy.mjs evaluate-live'
+    );
+    expect(drain).toContain(
+      'timeout "${DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS}s"'
+    );
+    const isolatedClassification = drain.slice(
+      drain.indexOf('if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]'),
+      drain.indexOf('ENRICHED="[]"')
+    );
+    expect(isolatedClassification).toContain(
+      'stop_if_budget_exhausted && break'
+    );
+    expect(policy.indexOf('changed file count exceeds')).toBeLessThan(
+      policy.indexOf('pulls/${prNumber}/files?per_page=100')
+    );
+    expect(drain).toContain('.authority.labelsUsed == false');
+    expect(drain).toContain('.authority.deploymentAllowed == false');
+    expect(drain).toContain('jovie-fleet-queue-hold/v1');
+    expect(drain).toContain('Fleet holds may recover only under normal GREEN');
   });
 });

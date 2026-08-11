@@ -9,11 +9,14 @@ Run with:
 """
 from __future__ import annotations
 
+import base64
+import json
 import os
 import shutil
 import stat
 import subprocess
 import textwrap
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -186,6 +189,88 @@ class TestGhRetryHelper:
 
 
 class TestDrainPrQueueWiring:
+    def test_constrained_mode_refuses_missing_receipt_before_calling_gh(
+        self, tmp_path: Path
+    ) -> None:
+        called = tmp_path / "called"
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            f"#!/usr/bin/env bash\ntouch '{called}'\nexit 99\n",
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env="DRY_RUN=1 DRAIN_PROMOTION_MODE=isolated-only",
+            )
+        )
+
+        assert result.returncode == 2
+        assert "fresh typed fleet receipt" in result.stderr
+        assert not called.exists(), "drain invoked gh before receipt preflight"
+
+    def test_blocked_receipt_dry_run_dequeues_ordinary_native_intent(
+        self, tmp_path: Path
+    ) -> None:
+        queued_head = "9" * 40
+        receipt = {
+            "schema": "jovie-fleet-gate/v1",
+            "observedAt": datetime.now(timezone.utc).isoformat(),
+            "signals": {
+                "main": {"status": "unknown"},
+                "production": {"status": "unknown"},
+                "integrity": {"status": "unknown"},
+            },
+            "promotionAdmission": {"allowed": False},
+            "isolatedPromotionAdmission": {
+                "allowed": False,
+                "deploymentsAllowed": False,
+            },
+        }
+        encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":909,"t":"Ordinary queued PR","draft":false,"m":"MERGEABLE","head":"codex/jov-909","headOid":"{queued_head}","base":"main","L":["merge-queue"],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_PROMOTION_MODE=blocked "
+                    f"DRAIN_FLEET_GATE_B64={encoded}"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "fleet promotion constraint" in result.stdout
+        assert "would record jovie-fleet-queue-hold/v1" in result.stdout
+        assert "[dry-run] would -merge-queue on #909" in result.stdout
+        assert "queue depth: 0/0 (0 slots)" in result.stdout
+        assert "would +merge-queue" not in result.stdout
+
     def test_live_drain_refuses_before_calling_gh_when_fixture_path_mismatches(
         self, tmp_path: Path
     ) -> None:
