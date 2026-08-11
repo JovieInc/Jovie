@@ -1073,8 +1073,48 @@ describe('deterministic Symphony admission boundary', () => {
     assert.match(workflowSource, /including when the gate is `GREEN`/);
     assert.match(workflowSource, /gh pr edit --add-label queue-deferred/);
     assert.match(workflowSource, /only a fresh `GREEN` may/);
-    assert.match(workflowSource, /max_concurrent_agents: 1/);
+    assert.match(workflowSource, /max_concurrent_agents: 4/);
     assert.doesNotMatch(workflowSource, /Open a non-draft PR/);
+  });
+
+  it('stops and never redispatches an agent once its issue reaches In Review', async () => {
+    const workflow = resolve(
+      ORCHESTRATOR_DIR,
+      '../hermes/WORKFLOW.jovie-ui-pilot.md'
+    );
+    const workflowSource = await readFile(workflow, 'utf8');
+    const frontmatter = workflowSource.match(/^---\n([\s\S]*?)\n---\n/);
+    assert.ok(frontmatter, 'workflow frontmatter missing');
+    const activeStatesBlock = frontmatter[1].match(
+      /^ {2}active_states:\n((?: {4}- .+\n?)+)/m
+    );
+    assert.ok(activeStatesBlock, 'tracker.active_states missing');
+    const activeStates = [
+      ...activeStatesBlock[1].matchAll(/^ {4}- (.+)$/gm),
+    ].map(item => item[1].trim());
+
+    // Symphony only leases and dispatches issues whose Linear state is listed
+    // in tracker.active_states. With In Review absent, transitioning an issue
+    // to In Review makes it undispatchable: the runtime stops the lane's
+    // continuation turns, the implementation slot is released, and the issue
+    // is never redispatched (verified in production on 2026-08-11: active
+    // leases fell 4 -> 1 within one poll while the draft PRs stayed put).
+    assert.deepEqual(activeStates, ['Todo', 'In Progress']);
+    assert.ok(!activeStates.includes('In Review'));
+
+    // Capacity and lease invariants are preserved: four concurrent agents,
+    // each bound to one issue and one workspace.
+    assert.match(workflowSource, /max_concurrent_agents: 4/);
+
+    // The ownership boundary is documented: Symphony implements through
+    // draft PR / In Review; Gem + GitHub own review, fleet-gate promotion,
+    // queue, merge, deploy, and receipts, and keep the PR externally
+    // monitorable without holding a Symphony slot.
+    assert.match(
+      workflowSource,
+      /Gem \+ GitHub own everything after that point: review,/
+    );
+    assert.match(workflowSource, /externally monitorable/);
   });
 
   it('keeps the Gem drain on typed fleet admission and fail-closes exit-code mismatches', async () => {
