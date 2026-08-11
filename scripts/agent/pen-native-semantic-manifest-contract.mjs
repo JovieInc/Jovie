@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { isAbsolute } from 'node:path';
 
 export const PEN_NATIVE_SEMANTIC_MANIFEST_SCHEMA =
@@ -23,6 +24,76 @@ function digest(value) {
 
 function add(errors, code, message) {
   errors.push({ code, message });
+}
+
+function identifierList(value) {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const identifiers = value.map(text);
+  if (
+    identifiers.some(identifier => !identifier) ||
+    new Set(identifiers).size !== identifiers.length
+  ) {
+    return null;
+  }
+  return identifiers;
+}
+
+function canonicalNode(node) {
+  const childIds = identifierList(node?.child_ids);
+  const normalizedChildren =
+    Array.isArray(node?.child_ids) && node.child_ids.length === 0
+      ? []
+      : childIds;
+  if (
+    !record(node) ||
+    !text(node.id) ||
+    !text(node.type) ||
+    !text(node.name) ||
+    typeof node.reusable !== 'boolean' ||
+    (node.ref_id !== null && node.ref_id !== undefined && !text(node.ref_id)) ||
+    !digest(node.properties_sha256) ||
+    !normalizedChildren
+  ) {
+    return null;
+  }
+  return {
+    id: text(node.id),
+    type: text(node.type),
+    name: text(node.name),
+    reusable: node.reusable,
+    ref_id:
+      node.ref_id === null || node.ref_id === undefined
+        ? null
+        : text(node.ref_id),
+    child_ids: normalizedChildren,
+    properties_sha256: node.properties_sha256,
+  };
+}
+
+function canonicalManifest(manifest) {
+  const rootIds = identifierList(manifest?.root_ids);
+  if (!record(manifest) || !rootIds || !Array.isArray(manifest.nodes)) {
+    return null;
+  }
+  const nodes = manifest.nodes.map(canonicalNode);
+  if (nodes.length === 0 || nodes.some(node => !node)) return null;
+  return {
+    root_ids: rootIds,
+    root_count: manifest.root_count,
+    total_node_count: manifest.total_node_count,
+    reusable_count: manifest.reusable_count,
+    nodes: nodes
+      .map(node => node)
+      .sort((left, right) => left.id.localeCompare(right.id)),
+  };
+}
+
+export function hashPenSemanticManifest(manifest) {
+  const canonical = canonicalManifest(manifest);
+  if (!canonical) return null;
+  return createHash('sha256')
+    .update(JSON.stringify(canonical), 'utf8')
+    .digest('hex');
 }
 
 /**
@@ -63,14 +134,20 @@ export function validatePenNativeSemanticManifestReceipt(
     );
 
   const sourcePath = text(receipt.source_path);
-  const expectedPath = text(options.expectedPath ?? options.lockedExpectedPath);
+  const expectedPath = text(options.lockedExpectedPath);
   if (!penPath(sourcePath))
     add(
       errors,
       'source_path_invalid',
       'Source path must be an absolute .pen path.'
     );
-  if (expectedPath && sourcePath !== expectedPath)
+  if (!penPath(expectedPath))
+    add(
+      errors,
+      'locked_expected_path_missing',
+      'A trusted profile-locked expected path is required.'
+    );
+  else if (sourcePath !== expectedPath)
     add(
       errors,
       'source_path_mismatch',
@@ -138,6 +215,13 @@ export function validatePenNativeSemanticManifestReceipt(
     );
     return { valid: false, errors };
   }
+  if (nodes.length === 0 || roots.length === 0) {
+    add(
+      errors,
+      'manifest_empty',
+      'A complete manifest must contain at least one root and one node.'
+    );
+  }
   const byId = new Map();
   for (const node of nodes) {
     const id = text(node?.id);
@@ -166,18 +250,26 @@ export function validatePenNativeSemanticManifestReceipt(
         'node_properties_digest_invalid',
         'Every node requires a properties SHA-256 digest.'
       );
-    if (
-      !Array.isArray(node.child_ids) ||
-      new Set(node.child_ids).size !== node.child_ids.length
-    )
+    if (!Array.isArray(node.child_ids)) {
       add(
         errors,
         'node_children_invalid',
         'Every node requires unique ordered child_ids.'
       );
+    } else if (
+      node.child_ids.some(childId => !text(childId)) ||
+      new Set(node.child_ids.map(text)).size !== node.child_ids.length
+    ) {
+      add(
+        errors,
+        'node_children_invalid',
+        'Every child ID must be non-empty and unique.'
+      );
+    }
   }
   if (
     new Set(roots).size !== roots.length ||
+    roots.some(root => !text(root)) ||
     roots.some(root => !byId.has(root))
   )
     add(
@@ -198,7 +290,8 @@ export function validatePenNativeSemanticManifestReceipt(
     if (!node) return;
     visiting.add(id);
     reachable.add(id);
-    for (const childId of node.child_ids ?? []) {
+    const childIds = Array.isArray(node.child_ids) ? node.child_ids : [];
+    for (const childId of childIds) {
       if (!byId.has(childId))
         add(errors, 'child_id_missing', 'Every child ID must refer to a node.');
       else visit(childId);
@@ -228,24 +321,92 @@ export function validatePenNativeSemanticManifestReceipt(
       'reusable_count must match reusable nodes.'
     );
 
+  const expectedNodeIds = identifierList(options.lockedExpectedNodeIds);
+  if (!expectedNodeIds) {
+    add(
+      errors,
+      'locked_expected_node_ids_missing',
+      'Trusted complete node IDs are required to detect self-consistent omission.'
+    );
+  } else {
+    const actualNodeIds = [...byId.keys()].sort();
+    const lockedNodeIds = [...expectedNodeIds].sort();
+    if (JSON.stringify(actualNodeIds) !== JSON.stringify(lockedNodeIds)) {
+      add(
+        errors,
+        'locked_node_ids_mismatch',
+        'Manifest node IDs differ from the trusted complete inventory.'
+      );
+    }
+  }
+
+  const expectedRootIds = identifierList(options.lockedExpectedRootIds);
+  if (!expectedRootIds) {
+    add(
+      errors,
+      'locked_expected_root_ids_missing',
+      'Trusted ordered root IDs are required.'
+    );
+  } else if (
+    JSON.stringify(roots.map(text)) !== JSON.stringify(expectedRootIds)
+  ) {
+    add(
+      errors,
+      'locked_root_ids_mismatch',
+      'Manifest root IDs or root order differ from the trusted inventory.'
+    );
+  }
+
+  const computedManifestSha256 = hashPenSemanticManifest(manifest);
+  if (
+    computedManifestSha256 &&
+    receipt.canonical_manifest_sha256 !== computedManifestSha256
+  ) {
+    add(
+      errors,
+      'canonical_manifest_digest_mismatch',
+      'Canonical manifest digest does not bind the normalized semantic manifest.'
+    );
+  }
+
   return { valid: errors.length === 0, errors };
 }
 
 /** Produce a stable semantic diff without accessing either source artifact. */
 export function diffPenSemanticManifests(left, right) {
-  const leftNodes = new Map((left?.nodes ?? []).map(node => [node.id, node]));
-  const rightNodes = new Map((right?.nodes ?? []).map(node => [node.id, node]));
+  const leftCanonical = canonicalManifest(left);
+  const rightCanonical = canonicalManifest(right);
+  if (!leftCanonical || !rightCanonical) {
+    return {
+      valid: false,
+      typed_reasons: ['manifest_invalid'],
+      added: [],
+      removed: [],
+      changed: [],
+      roots_changed: false,
+    };
+  }
+  const leftNodes = new Map(
+    leftCanonical.nodes.map(node => [node.id, JSON.stringify(node)])
+  );
+  const rightNodes = new Map(
+    rightCanonical.nodes.map(node => [node.id, JSON.stringify(node)])
+  );
   const added = [...rightNodes.keys()].filter(id => !leftNodes.has(id)).sort();
   const removed = [...leftNodes.keys()]
     .filter(id => !rightNodes.has(id))
     .sort();
   const changed = [...leftNodes.keys()]
     .filter(id => rightNodes.has(id))
-    .filter(
-      id =>
-        leftNodes.get(id).properties_sha256 !==
-        rightNodes.get(id).properties_sha256
-    )
+    .filter(id => leftNodes.get(id) !== rightNodes.get(id))
     .sort();
-  return { added, removed, changed };
+  return {
+    valid: true,
+    added,
+    removed,
+    changed,
+    roots_changed:
+      JSON.stringify(leftCanonical.root_ids) !==
+      JSON.stringify(rightCanonical.root_ids),
+  };
 }

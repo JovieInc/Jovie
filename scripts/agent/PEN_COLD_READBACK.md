@@ -92,16 +92,21 @@ passing verdict alone are `unverified`.
 
 `pen-native-semantic-manifest-contract.mjs` is the repository-owned validator
 for a future separately reviewed Pen receipt. It validates, without opening a
-`.pen` file, that the native producer supplied an absolute locked source path,
-source-byte and canonical-manifest SHA-256 identities, runtime/build identity,
-zero execute/open/switch/output/save/backup/file-change activity, and a
-complete root-to-descendant graph. Every node must have stable identity,
-type/name, reusable/ref identity, ordered child IDs, and a properties digest;
-unreachable nodes, missing children, duplicate IDs, and cycles fail closed.
+`.pen` file, that the native producer supplied the exact profile-locked source
+path, source-byte identity, runtime/build identity, zero
+execute/open/switch/output/save/backup/file-change activity, and a complete
+root-to-descendant graph. The caller must also supply the trusted, versioned
+complete node inventory and ordered roots; absence or self-consistent omission
+fails closed. The validator recomputes the canonical-manifest SHA-256 over the
+normalized graph. Every node must have stable identity, type/name,
+reusable/ref identity, ordered child IDs, and a properties digest; unreachable
+nodes, missing children, malformed child lists, duplicate IDs, and cycles fail
+closed.
 
 `diffPenSemanticManifests` compares only native-produced semantic data by node
-ID and properties digest. It returns stable sorted `added`, `removed`, and
-`changed` IDs and never reads either source artifact. This boundary is not a
+ID and every normalized semantic field, including ordered children and ordered
+roots. It returns stable sorted `added`, `removed`, and `changed` IDs plus a
+root-order signal, and never reads either source artifact. This boundary is not a
 vendor inspector and is intentionally not wired to produce
 `cold_round_trip_verified`; the current promotion claim remains
 `live_readback_only` until Pen ships and Jovie separately reviews the native
