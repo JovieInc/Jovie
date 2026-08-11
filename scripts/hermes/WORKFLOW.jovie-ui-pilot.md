@@ -6,10 +6,16 @@ tracker:
     - symphony
     - plan-approved
     - admission-approved
+  # Ownership boundary (JOV-4973): Symphony owns implementation only, through
+  # draft PR and the transition to In Review. Once an issue reaches In Review
+  # its lane must stop and release its slot, so In Review is NOT an active
+  # state here. Gem + GitHub own everything after that point: review,
+  # fleet-gate promotion, merge queue, merge, deploy, and receipts. The draft
+  # PR remains externally monitorable by Gem/GitHub without consuming a
+  # Symphony implementation slot.
   active_states:
     - Todo
     - In Progress
-    - In Review
   terminal_states:
     - Done
     - Canceled

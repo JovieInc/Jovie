@@ -108,8 +108,11 @@ def test_workflow_admission_contract() -> None:
         "plan-approved",
         "admission-approved",
     ]
-    for state in ("Todo", "In Progress", "In Review"):
-        assert state in _list_items(tracker, "active_states")
+    # JOV-4973: In Review is deliberately NOT implementation-active. An issue
+    # transitioned to In Review stops its agent, releases its slot, and is
+    # never redispatched; Gem/GitHub own review, promotion, queue, merge,
+    # deploy, and receipts from there.
+    assert _list_items(tracker, "active_states") == ["Todo", "In Progress"]
     for state in ("Done", "Canceled"):
         assert state in _list_items(tracker, "terminal_states")
 
