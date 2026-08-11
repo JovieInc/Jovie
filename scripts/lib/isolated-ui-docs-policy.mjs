@@ -265,6 +265,20 @@ function styleBlockers(file) {
   );
 }
 
+/**
+ * @typedef {object} IsolatedUiDocsDeltaOptions
+ * @property {number} [prNumber]
+ * @property {string} [baseSha]
+ * @property {string} [headSha]
+ * @property {string} [body]
+ * @property {Array<any>} [files]
+ * @property {Array<any>} [checks]
+ * @property {any} [fleetGate]
+ */
+
+/**
+ * @param {IsolatedUiDocsDeltaOptions} [options]
+ */
 export function evaluateIsolatedUiDocsDelta({
   prNumber,
   baseSha,
