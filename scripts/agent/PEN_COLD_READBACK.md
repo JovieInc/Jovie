@@ -88,6 +88,25 @@ facts, explicit-save acknowledgement, ordered timestamps, evidence digests,
 `durability: not_proven`, and an explicit empty blocker list. A schema and
 passing verdict alone are `unverified`.
 
+## Native inspector receipt boundary
+
+`pen-native-semantic-manifest-contract.mjs` is the repository-owned validator
+for a future separately reviewed Pen receipt. It validates, without opening a
+`.pen` file, that the native producer supplied an absolute locked source path,
+source-byte and canonical-manifest SHA-256 identities, runtime/build identity,
+zero execute/open/switch/output/save/backup/file-change activity, and a
+complete root-to-descendant graph. Every node must have stable identity,
+type/name, reusable/ref identity, ordered child IDs, and a properties digest;
+unreachable nodes, missing children, duplicate IDs, and cycles fail closed.
+
+`diffPenSemanticManifests` compares only native-produced semantic data by node
+ID and properties digest. It returns stable sorted `added`, `removed`, and
+`changed` IDs and never reads either source artifact. This boundary is not a
+vendor inspector and is intentionally not wired to produce
+`cold_round_trip_verified`; the current promotion claim remains
+`live_readback_only` until Pen ships and Jovie separately reviews the native
+producer and receipt evidence.
+
 Legacy `pen-cold-readback/v1` component inventories are explicitly downgraded as
 `partial_component_evidence`. A forged v2 `cold_readback_verified` receipt cannot
 promote because the source contains no reviewed native inspector.
