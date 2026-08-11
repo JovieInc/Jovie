@@ -262,6 +262,31 @@ describe('isolated UI/docs promotion policy', () => {
     );
   });
 
+  it('allows local CSS imports while rejecting remote import sources', () => {
+    const files = atomFiles();
+    files.push({
+      filename: 'packages/ui/atoms/badge.css',
+      status: 'modified',
+      sha: 'f'.repeat(40),
+      additions: 1,
+      deletions: 0,
+      changes: 1,
+      patch: '@@ -0,0 +1 @@',
+      content: '@import "./tokens.css";\n.badge { color: var(--badge-color); }',
+    });
+    const result = evaluateIsolatedUiDocsDelta({
+      prNumber: 15819,
+      baseSha: BASE,
+      headSha: HEAD,
+      body: body(),
+      files,
+      checks: greenChecks(),
+      fleetGate: fleetGate(),
+    });
+
+    expect(result.allowed).toBe(true);
+  });
+
   it('rejects modified tests that remove or rewrite existing assertions', () => {
     const files = atomFiles();
     files[1] = {

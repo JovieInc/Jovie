@@ -93,7 +93,8 @@ const DENIED_SOURCE_PATTERNS = [
 const DENIED_STYLE_PATTERNS = [
   {
     reason: 'remote or executable CSS import',
-    pattern: /@import\b|url\(\s*['"]?(?:https?:|data:|javascript:)/i,
+    pattern:
+      /(?:@import\s+(?:url\(\s*)?['"]?(?:https?:|data:|javascript:|\/\/)|url\(\s*['"]?(?:https?:|data:|javascript:|\/\/))/i,
   },
   {
     reason: 'legacy executable CSS',
@@ -265,6 +266,17 @@ function styleBlockers(file) {
   );
 }
 
+/**
+ * @param {{
+ *   prNumber?: number,
+ *   baseSha?: string,
+ *   headSha?: string,
+ *   body?: string,
+ *   files?: Array<Record<string, any>>,
+ *   checks?: Array<Record<string, any>>,
+ *   fleetGate?: Record<string, any>,
+ * }} [input]
+ */
 export function evaluateIsolatedUiDocsDelta({
   prNumber,
   baseSha,
@@ -308,8 +320,10 @@ export function evaluateIsolatedUiDocsDelta({
   if (totalChanges > MAX_CHANGED_LINES)
     blockers.push(`changed line count exceeds ${MAX_CHANGED_LINES}`);
 
+  /** @type {Array<Record<string, any> & { kind: string }>} */
   const classified = [];
   for (const input of files) {
+    /** @type {Record<string, any>} */
     const file = {
       ...input,
       filename: normalizePath(input.filename),
