@@ -856,6 +856,12 @@ describe('deterministic Symphony admission boundary', () => {
     };
   }
 
+  function greenFleetGate() {
+    return admitter.evaluateFleetGate(fleetEvidence(), {
+      now: '2026-08-09T05:01:00.000Z',
+    });
+  }
+
   it('treats main-red as draft-only AMBER and blocks new issue pickup', async () => {
     const now = '2026-08-09T05:01:00.000Z';
     const fleetGate = admitter.evaluateFleetGate(
@@ -1413,7 +1419,7 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
           issueIds: ['JOV-4513'],
         },
       ],
-      { currentlyShipping: 0, productionRed: false }
+      { currentlyShipping: 0, fleetGate: greenFleetGate() }
     );
     assert.equal(result.admit.length, 0);
     assert.match(result.reason, /synthetic|no eligible/i);
@@ -1424,12 +1430,12 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
     const noLeases = await admitter.selectNextToAdmit(
       [classification(issue)],
       [],
-      { currentlyShipping: 0, productionRed: false }
+      { currentlyShipping: 0, fleetGate: greenFleetGate() }
     );
     const oneLease = await admitter.selectNextToAdmit(
       [classification(issue)],
       [],
-      { currentlyShipping: 1, productionRed: false }
+      { currentlyShipping: 1, fleetGate: greenFleetGate() }
     );
     assert.equal(noLeases.admit.length, 1);
     assert.equal(oneLease.admit.length, 0);
@@ -1448,7 +1454,7 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
     const result = await admitter.selectNextToAdmit(
       [classification(first), classification(second)],
       [],
-      { currentlyShipping: 0, productionRed: false }
+      { currentlyShipping: 0, fleetGate: greenFleetGate() }
     );
     assert.equal(result.admit.length, 1);
     assert.equal(result.admit[0].identifier, 'JOV-4396');
@@ -1467,9 +1473,25 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
     const result = await admitter.selectNextToAdmit(
       [classification(protectedIssue), classification(timOwned)],
       [],
-      { currentlyShipping: 0, productionRed: false }
+      { currentlyShipping: 0, fleetGate: greenFleetGate() }
     );
     assert.equal(result.admit.length, 0);
+  });
+
+  it('fails closed when the canonical fleet gate is unavailable', async () => {
+    const issue = admissionIssue({ identifier: 'JOV-4580' });
+    const result = await admitter.selectNextToAdmit(
+      [classification(issue)],
+      [],
+      { currentlyShipping: 0 }
+    );
+
+    assert.deepEqual(result.admit, []);
+    assert.equal(
+      result.reason,
+      'fleet gate unavailable — blocking new issue pickup'
+    );
+    assert.equal(result.fleetGate, null);
   });
 
   it('records an idempotent lease receipt without duplicate mutations', async () => {

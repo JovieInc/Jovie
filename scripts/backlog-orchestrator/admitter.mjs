@@ -6,7 +6,7 @@
  * fail-closed on ownership, plan evidence, and mutation read-back.
  */
 
-import { isProductionRed, scoreIssue } from './scorer.mjs';
+import { scoreIssue } from './scorer.mjs';
 
 export const MAX_CONCURRENT_SHIPPING = 1;
 const MAX_CONCURRENT_SHIPPING_BY_TEAM = Object.freeze({ JOV: 2, LYB: 1 });
@@ -442,23 +442,13 @@ export async function selectNextToAdmit(
 ) {
   const maxConcurrentShipping =
     state.maxConcurrentShipping || MAX_CONCURRENT_SHIPPING;
-  const fleetGate =
-    state.fleetGate ||
-    evaluateFleetGate(
-      {
-        main: { status: 'green' },
-        production: {
-          status:
-            (state.productionRed ?? (await isProductionRed())) === true
-              ? 'red'
-              : 'green',
-        },
-        controller: { status: 'green' },
-        integrity: { status: 'clear' },
-        observedAt: state.now || new Date().toISOString(),
-      },
-      { now: state.now || new Date().toISOString() }
-    );
+  const fleetGate = state.fleetGate;
+  if (!fleetGate)
+    return {
+      admit: [],
+      reason: 'fleet gate unavailable — blocking new issue pickup',
+      fleetGate: null,
+    };
   if (
     !fleetGate.workAdmission.allowed ||
     !fleetGate.workAdmission.activities.includes('approved-issue-lease')
