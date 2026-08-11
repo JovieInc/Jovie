@@ -11,8 +11,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-11T13:38:35.454Z",
-    "gitSha": "ac7452cabde19efc54ef0c03693a7dbc1b3c5c20",
+    "capturedAt": "2026-08-11T22:43:19.229Z",
+    "gitSha": "b877f13f5b2e802c92d7a7cccb70ca3b5173cba7",
     "imagePath": "marketing-home-desktop.png"
   },
   {
@@ -166,8 +166,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-11T10:04:47.877Z",
-    "gitSha": "3f2c500eb95ce934992d3eb1a9e8385d89054d8c",
+    "capturedAt": "2026-08-11T22:46:46.176Z",
+    "gitSha": "b877f13f5b2e802c92d7a7cccb70ca3b5173cba7",
     "imagePath": "artist-profile-opinionated-section-desktop.png"
   },
   {
@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-11T13:43:35.716Z",
-    "gitSha": "ac7452cabde19efc54ef0c03693a7dbc1b3c5c20",
+    "capturedAt": "2026-08-11T22:48:24.332Z",
+    "gitSha": "b877f13f5b2e802c92d7a7cccb70ca3b5173cba7",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
@@ -609,8 +609,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-11T13:52:34.270Z",
-    "gitSha": "ac7452cabde19efc54ef0c03693a7dbc1b3c5c20",
+    "capturedAt": "2026-08-11T22:57:29.021Z",
+    "gitSha": "b877f13f5b2e802c92d7a7cccb70ca3b5173cba7",
     "imagePath": "dashboard-releases-desktop.png",
     "publicExportPath": "releases-dashboard-full.png"
   },
@@ -626,8 +626,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-11T13:53:00.653Z",
-    "gitSha": "ac7452cabde19efc54ef0c03693a7dbc1b3c5c20",
+    "capturedAt": "2026-08-11T22:57:55.602Z",
+    "gitSha": "b877f13f5b2e802c92d7a7cccb70ca3b5173cba7",
     "imagePath": "dashboard-releases-sidebar-desktop.png",
     "publicExportPath": "releases-dashboard-sidebar.png"
   },
@@ -677,8 +677,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-11T13:54:19.531Z",
-    "gitSha": "ac7452cabde19efc54ef0c03693a7dbc1b3c5c20",
+    "capturedAt": "2026-08-11T22:59:15.036Z",
+    "gitSha": "b877f13f5b2e802c92d7a7cccb70ca3b5173cba7",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },
@@ -694,8 +694,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-11T13:54:43.189Z",
-    "gitSha": "ac7452cabde19efc54ef0c03693a7dbc1b3c5c20",
+    "capturedAt": "2026-08-11T22:59:38.945Z",
+    "gitSha": "b877f13f5b2e802c92d7a7cccb70ca3b5173cba7",
     "imagePath": "dashboard-analytics-desktop.png"
   },
   {
@@ -710,8 +710,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-11T13:54:47.123Z",
-    "gitSha": "ac7452cabde19efc54ef0c03693a7dbc1b3c5c20",
+    "capturedAt": "2026-08-11T22:59:43.104Z",
+    "gitSha": "b877f13f5b2e802c92d7a7cccb70ca3b5173cba7",
     "imagePath": "dashboard-earnings-desktop.png"
   },
   {
@@ -726,8 +726,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin"],
-    "capturedAt": "2026-08-11T13:55:10.643Z",
-    "gitSha": "ac7452cabde19efc54ef0c03693a7dbc1b3c5c20",
+    "capturedAt": "2026-08-11T23:00:06.831Z",
+    "gitSha": "b877f13f5b2e802c92d7a7cccb70ca3b5173cba7",
     "imagePath": "settings-profile-desktop.png"
   },
   {
@@ -742,8 +742,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-11T13:55:34.356Z",
-    "gitSha": "ac7452cabde19efc54ef0c03693a7dbc1b3c5c20",
+    "capturedAt": "2026-08-11T23:00:30.762Z",
+    "gitSha": "b877f13f5b2e802c92d7a7cccb70ca3b5173cba7",
     "imagePath": "settings-links-desktop.png"
   },
   {
