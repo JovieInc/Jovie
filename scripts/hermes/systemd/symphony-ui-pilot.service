@@ -1,0 +1,33 @@
+[Unit]
+Description=Jovie Symphony UI Pilot
+After=network-online.target
+Wants=network-online.target
+# Bounded restart policy (JOV-4962): restart bursts are capped so a
+# crash-looping runtime fails visibly instead of flapping forever.
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h/symphony-runtime/elixir
+Environment=PATH=%h/.local/share/mise/installs/erlang/28/bin:%h/.local/share/mise/installs/elixir/1.19.5-otp-28/bin:%h/.local/bin:/usr/bin:/bin
+Environment=CODEX_HOME=%h/.codex-accounts/meetjovie
+Environment=HOME=%h
+Environment=AUTOMATION_VERIFY_SHARD_CONCURRENCY=4
+EnvironmentFile=-%h/.config/symphony/linear.env
+# Refuse to start while another process already serves the pilot API: exactly
+# one listener may own 127.0.0.1:4041 and it must belong to this unit.
+ExecStartPre=/bin/sh -c "! curl -fsS -m 2 -o /dev/null http://127.0.0.1:4041/api/v1/state"
+ExecStart=%h/.local/bin/mise exec -- %h/symphony-runtime/elixir/bin/symphony --i-understand-that-this-will-be-running-without-the-usual-guardrails --logs-root %h/symphony-ui-pilot-logs --port 4041 %h/symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md
+# beam.smp exits 1 when it handles SIGTERM on stop; treat that as clean so a
+# supervised stop/restart does not leave the unit in Result=exit-code.
+SuccessExitStatus=0 1
+# Restart after any exit — clean or crash — except an explicit systemctl stop.
+# Bounded by StartLimitIntervalSec/StartLimitBurst in [Unit].
+Restart=always
+RestartSec=20
+StandardOutput=append:%h/symphony-ui-pilot-logs/stdout.log
+StandardError=append:%h/symphony-ui-pilot-logs/stdout.log
+
+[Install]
+WantedBy=default.target
