@@ -1335,6 +1335,18 @@ describe('DESIGN_OUTSIDE_VOICES resolver', () => {
     expect(content).toContain('Reading this as: <page kind> for <audience>');
     expect(content).toContain('Veronica uses this skill');
     expect(content).toContain('Ovie-facing agent prompts');
+    expect(content).toContain(
+      'Every rendered HTML artifact, spec, approval console, and review page is a Jovie'
+    );
+    expect(content).toContain(
+      'artifact-specific design system, rubric, or parallel standard.'
+    );
+    expect(content).toContain(
+      'Gem/OWL routes repo-backed internal surfaces through the existing Jovie'
+    );
+    expect(content).toContain(
+      'Rendered specs, approval consoles, review pages, and HTML artifacts count as UI'
+    );
   });
 
   test('design-canonical install artifacts are tracked for clean checkouts', () => {

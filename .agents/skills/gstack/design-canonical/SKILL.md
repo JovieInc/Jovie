@@ -437,6 +437,12 @@ design artifacts. Legacy skills such as `/design-review`, `/plan-design-review`,
 `/design-consultation`, `/design-shotgun`, and `/design-html` remain available for
 mode-specific execution, but they inherit this contract.
 
+Every rendered HTML artifact, spec, approval console, and review page is a Jovie
+surface, including internal-only tooling. These surfaces inherit the same tokens,
+components, prohibited patterns, accessibility, responsive behavior, brand-asset
+rules, provenance requirements, and visual QA as product and marketing UI. Do not
+create or apply an artifact-specific design system, rubric, or parallel standard.
+
 ## Compatibility Contract
 
 - `/design-review`: live product audit, fix loop, before/after verification.
@@ -457,6 +463,9 @@ specific workflow. Do not fork new design doctrine in legacy skills.
   Fable plans and delegates mechanical edits only after this contract is explicit.
 - Ovie-facing agent prompts should route design, taste, and visual QA requests here
   even when the app consumes local state rather than querying GBrain directly.
+- Gem/OWL routes repo-backed internal surfaces through the existing Jovie
+  design-system, accessibility, responsive, brand-integrity, and visual-QA checks.
+  This is enforcement of the existing canon, not a new review regime.
 - Coder agents include the design-read and checklist evidence in PRs whenever a
   diff touches UI, design prompts, design skills, or design-system docs.
 
@@ -488,6 +497,8 @@ rg -n "Veronica|Ovie|design-canonical|design-review|plan-design-review|design-sh
 For UI work, also inspect the target component, existing neighboring components,
 states, fixtures/tests, and screenshots if present. For skill/doc work, inspect
 the generated source template and any generated output rule before editing.
+Rendered specs, approval consoles, review pages, and HTML artifacts count as UI
+work even when they are internal or generated.
 
 ## Step 2: Canonical Principles
 
@@ -558,4 +569,5 @@ Verification: <exact commands and output>
 ```
 
 For non-UI skill/doc changes, state `UI evidence: not applicable` and provide
-file/component evidence instead.
+file/component evidence instead. This exception does not apply to a rendered spec,
+approval console, review page, or HTML artifact.
