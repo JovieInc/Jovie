@@ -963,9 +963,9 @@ ${fixtureCheckout}
       const doppler = readFileSync(join(workflowsRoot, file), 'utf8')
         .split('\n')
         .filter(line => line.includes('doppler run --'));
-      expect(doppler).toHaveLength(7);
+      expect(doppler).toHaveLength(6);
       const guarded = doppler.filter(line => line.includes(guardScriptName));
-      expect(guarded).toHaveLength(6);
+      expect(guarded).toHaveLength(5);
       expect(
         guarded.every(line =>
           line.includes(
