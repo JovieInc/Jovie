@@ -19,6 +19,8 @@
 #   DRAIN_MUTATION_AUTHORIZATION  required for every live mutation run
 #   DRAIN_EXPECT_GH  optional exact gh path assertion used by test fixtures
 #   DRAIN_MAX_SECONDS  hard wall-clock budget between GitHub calls (default 900)
+#   DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS  hard cap per exact-head isolation
+#     evaluator process (default 45)
 #   DRAIN_ADMISSION_PR / DRAIN_ADMISSION_HEAD  optional exact new-admission
 #     scope; when both are empty this run is maintenance-only
 #   DRAIN_PROMOTION_MODE  normal, isolated-only, draft-only, or blocked
@@ -64,6 +66,12 @@ case "$MERGE_QUEUE_BACKEND" in
     ;;
 esac
 DRAIN_MAX_SECONDS="${DRAIN_MAX_SECONDS:-900}"
+DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS="${DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS:-45}"
+if [[ ! "$DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] \
+  || (( DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS > DRAIN_MAX_SECONDS )); then
+  echo "::error::DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS must be positive and no larger than DRAIN_MAX_SECONDS" >&2
+  exit 2
+fi
 DRAIN_STARTED_AT="$SECONDS"
 # `queue-deferred` is a hard hold. It currently has no typed provenance that
 # distinguishes temporary queue pressure from a repair/human hold. A prior
@@ -698,6 +706,7 @@ fi
 if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
   CLASSIFIED="[]"
   while IFS= read -r pr; do
+    stop_if_budget_exhausted && break
     n="$(jq -r '.n' <<<"$pr")"
     head_oid="$(jq -r '.headOid // ""' <<<"$pr")"
     eligible=false
@@ -705,7 +714,8 @@ if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
       .q == true or ((.n | tostring) == $admission)
     ' <<<"$pr" >/dev/null && [[ "$head_oid" =~ ^[0-9a-f]{40}$ ]]; then
       set +e
-      isolation_receipt="$(node scripts/lib/isolated-ui-docs-policy.mjs evaluate-live \
+      isolation_receipt="$(timeout "${DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS}s" \
+        node scripts/lib/isolated-ui-docs-policy.mjs evaluate-live \
         --repo="$REPO" --pr="$n" --head="$head_oid" \
         --fleet-gate-b64="$DRAIN_FLEET_GATE_B64" 2>/dev/null)"
       isolation_rc=$?

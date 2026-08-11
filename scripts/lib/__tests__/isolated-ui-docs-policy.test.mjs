@@ -357,6 +357,10 @@ describe('isolated UI/docs promotion policy', () => {
       resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
       'utf8'
     );
+    const policy = readFileSync(
+      resolve(REPO_ROOT, 'scripts/lib/isolated-ui-docs-policy.mjs'),
+      'utf8'
+    );
 
     expect(queueWorkflow).toContain('fleet-policy:');
     expect(queueWorkflow).toContain(
@@ -373,6 +377,19 @@ describe('isolated UI/docs promotion policy', () => {
     expect(drain).toContain('MAX_QUEUE_DEPTH=1');
     expect(drain).toContain(
       'scripts/lib/isolated-ui-docs-policy.mjs evaluate-live'
+    );
+    expect(drain).toContain(
+      'timeout "${DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS}s"'
+    );
+    const isolatedClassification = drain.slice(
+      drain.indexOf('if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]'),
+      drain.indexOf('ENRICHED="[]"')
+    );
+    expect(isolatedClassification).toContain(
+      'stop_if_budget_exhausted && break'
+    );
+    expect(policy.indexOf('changed file count exceeds')).toBeLessThan(
+      policy.indexOf('pulls/${prNumber}/files?per_page=100')
     );
     expect(drain).toContain('.authority.labelsUsed == false');
     expect(drain).toContain('.authority.deploymentAllowed == false');

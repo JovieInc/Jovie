@@ -471,6 +471,10 @@ function decodeFleetGate(value) {
 
 function loadLiveDelta({ repo, prNumber, expectedHead }) {
   const pr = ghJson(['api', `repos/${repo}/pulls/${prNumber}`]);
+  if (Number(pr.changed_files) > MAX_CHANGED_FILES)
+    throw new Error(`changed file count exceeds ${MAX_CHANGED_FILES}`);
+  if (Number(pr.additions) + Number(pr.deletions) > MAX_CHANGED_LINES)
+    throw new Error(`changed line count exceeds ${MAX_CHANGED_LINES}`);
   const currentMain = ghJson(['api', `repos/${repo}/git/ref/heads/main`]).object
     ?.sha;
   const files = ghJson([
