@@ -1,9 +1,8 @@
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { ARTIST_PROFILE_SECTION_TEST_IDS } from '@/data/artistProfilePageOrder';
+import { ArtistProfileAdaptiveSection } from './ArtistProfileAdaptiveSection';
 import { ArtistProfileHero } from './ArtistProfileHero';
-import { ArtistProfileModeSwitcher } from './ArtistProfileModeSwitcher';
-import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
 import './ArtistProfileHeroAdaptiveIntro.css';
 
 interface ArtistProfileHeroAdaptiveIntroProps {
@@ -29,18 +28,8 @@ export function ArtistProfileHeroAdaptiveIntro({
         />
       </div>
 
-      <div
-        data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.adaptive}
-        className='ap-hero-intro__adaptive relative'
-      >
-        <ArtistProfileSectionShell
-          id='adaptive'
-          className='border-b border-subtle'
-        >
-          <div data-testid='artist-profile-adaptive-sequence'>
-            <ArtistProfileModeSwitcher adaptive={adaptive} />
-          </div>
-        </ArtistProfileSectionShell>
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.adaptive}>
+        <ArtistProfileAdaptiveSection adaptive={adaptive} />
       </div>
     </div>
   );

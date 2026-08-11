@@ -10,14 +10,13 @@ import {
   MarketingHero,
   MarketingPageShell,
 } from '@/components/marketing';
+import { ArtistProfileAdaptiveSection } from '@/components/marketing/artist-profile/ArtistProfileAdaptiveSection';
 import { ArtistProfileCaptureSection } from '@/components/marketing/artist-profile/ArtistProfileCaptureSection';
 import { ArtistProfileFaq } from '@/components/marketing/artist-profile/ArtistProfileFaq';
 import { ArtistProfileFinalCta } from '@/components/marketing/artist-profile/ArtistProfileFinalCta';
 import { ArtistProfileHero } from '@/components/marketing/artist-profile/ArtistProfileHero';
-import { ArtistProfileHeroAdaptiveIntro } from '@/components/marketing/artist-profile/ArtistProfileHeroAdaptiveIntro';
 import { ArtistProfileHowItWorks } from '@/components/marketing/artist-profile/ArtistProfileHowItWorks';
 import { ArtistProfileLandingPage } from '@/components/marketing/artist-profile/ArtistProfileLandingPage';
-import { ArtistProfileModeSwitcher } from '@/components/marketing/artist-profile/ArtistProfileModeSwitcher';
 import { ArtistProfileMonetizationSection } from '@/components/marketing/artist-profile/ArtistProfileMonetizationSection';
 import { ArtistProfileOpinionatedSection } from '@/components/marketing/artist-profile/ArtistProfileOpinionatedSection';
 import { ArtistProfileOutcomesCarousel } from '@/components/marketing/artist-profile/ArtistProfileOutcomesCarousel';
@@ -36,8 +35,9 @@ import { MarketingSurfaceCard } from '@/components/marketing/MarketingSurfaceCar
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_ROUTES } from '@/constants/routes';
 import { getComparison } from '@/content/comparisons';
+import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
+import { ARTIST_NOTIFICATIONS_SPEC_TILES } from '@/data/artistNotificationsFeatures';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
-import { ARTIST_PROFILE_TRUTH_TILES } from '@/data/artistProfileFeatures';
 import {
   getMarketingSection,
   MARKETING_SECTION_IDS,
@@ -177,14 +177,7 @@ export const featureSplit: Story = {
   name: 'feature-split',
   render: () => (
     <SectionFrame sectionId='feature-split'>
-      <ArtistProfileHeroAdaptiveIntro
-        hero={ARTIST_PROFILE_COPY.hero}
-        adaptive={ARTIST_PROFILE_COPY.adaptive}
-      />
-      <ArtistProfileModeSwitcher
-        adaptive={ARTIST_PROFILE_COPY.adaptive}
-        showIntroHeading={false}
-      />
+      <ArtistProfileAdaptiveSection adaptive={ARTIST_PROFILE_COPY.adaptive} />
     </SectionFrame>
   ),
 };
@@ -396,8 +389,8 @@ export const specWall: Story = {
   render: () => (
     <SectionFrame sectionId='spec-wall'>
       <ArtistProfileSpecWall
-        specWall={ARTIST_PROFILE_COPY.specWall}
-        truthTiles={ARTIST_PROFILE_TRUTH_TILES}
+        specWall={ARTIST_NOTIFICATIONS_COPY.specWall}
+        tiles={ARTIST_NOTIFICATIONS_SPEC_TILES}
       />
     </SectionFrame>
   ),

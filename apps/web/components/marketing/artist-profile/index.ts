@@ -1,3 +1,4 @@
+export { ArtistProfileAdaptiveSection } from './ArtistProfileAdaptiveSection';
 export { ArtistProfileAdaptiveSequence } from './ArtistProfileAdaptiveSequence';
 export { ArtistProfileCaptureSection } from './ArtistProfileCaptureSection';
 export { ArtistProfileFaq } from './ArtistProfileFaq';

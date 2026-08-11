@@ -251,8 +251,20 @@ const SECTION_RESOLUTIONS = {
       },
     ]
   ),
-  'feature-split': unresolved(
-    'The registered ArtistProfileAdaptiveIntro export does not exist on current main.'
+  'feature-split': sourceRoot(
+    'apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx',
+    'ArtistProfileAdaptiveSection',
+    MARKETING_PEN_CONTRACT_IDS.section.featureSplit,
+    'penContractId={MARKETING_PEN_CONTRACT_IDS.section.featureSplit}',
+    1,
+    [
+      {
+        source:
+          'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx',
+        binding: 'data-pen-contract={penContractId}',
+        occurrences: 1,
+      },
+    ]
   ),
   'how-it-works': sourceRoot(
     'apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx',

@@ -49,15 +49,18 @@ artist reaches, not customer logos — a semantic flip encoded as the
 
 ### #section-feature-grid
 
-**Purpose:** Breadth survey before depth. Headline + 3/4/6 cards, each one
-capability. The reader learns the scanning pattern once; variation is carried
-by content, not layout (B2B C3 — the "chapter" pattern).
+**Purpose:** Breadth survey before depth. Headline + one ordered outcomes
+ledger (`4-ledger`: four numbered rows, semantic `<ol>`). The reader learns the
+scanning pattern once; variation is carried by content, not layout (B2B C3 —
+the "chapter" pattern).
 
-**Rationale:** B2B C3 (one rigid template per section type). The GOAL's own
-example (`3-large / 4-equal / 6-compact / icon-list`) maps to Tailwind Plus
-exactly (prior-art §4).
+**Rationale:** B2B C3 (one rigid template per section type). The classic grid
+variants (`3-large / 4-equal / 6-compact / icon-list`) map to Tailwind Plus
+exactly (prior-art §4) but have no shipped exemplar on current main — they
+remain registered as `unproven`.
 
-**Exemplar:** `/artist-profiles` (`outcomes` section — "Built for Artists").
+**Exemplar:** `/artist-profiles` (`outcomes` section — "Built around fan
+outcomes.", `4-ledger` variant).
 
 ### #section-feature-split
 
@@ -65,10 +68,10 @@ exactly (prior-art §4).
 alternating. The most common "chapter" section type.
 
 **Rationale:** B2B C3, C8 (feature page = homepage grammar at depth). Subsumes
-the shipped `adaptive` and `reactivation` instances (E6 derivation).
+the shipped `adaptive` instance (E6 derivation).
 
-**Exemplar:** `/artist-profiles` (`adaptive` → `screenshot-right`;
-`reactivation` → `bordered-screenshot-left`).
+**Exemplar:** `/artist-profiles` (`adaptive` → `phone-right`; phone-framed
+profile mode switcher).
 
 ### #section-how-it-works
 
@@ -164,14 +167,16 @@ verbatim — not varied per section).
 
 ### #section-spec-wall
 
-**Purpose:** Dense compact feature grid — "Details That Matter." Tiles carry a
-screenshot or icon; pure text = use `feature-grid` icon-list variant.
+**Purpose:** Dense visual feature grid — "Details That Matter." Tiles carry a
+screenshot or icon; pure text = use `feature-grid` instead.
 
 **Rationale:** Jovie delta (prior-art §3). Closest industry name: Feature List
 / dense compact grid. Documented as a Jovie delta per charter delta #4.
 
-**Exemplar:** `/artist-profiles` (`specWall` — dense-compact-grid),
-`/new` (`power-grid` — bento).
+**Exemplar:** `/artist-notifications` (`spec-wall` — `5-screenshot-bento`,
+five screenshot-registry tiles), `/new` (`power-grid` — `bento`). The
+`dense-compact-grid` variant has no shipped exemplar on current main and is
+`unproven`.
 
 ### #section-capture
 
