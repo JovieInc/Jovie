@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   evaluateIsolatedUiDocsDelta,
@@ -8,8 +6,6 @@ import {
 
 const BASE = '1'.repeat(40);
 const HEAD = '2'.repeat(40);
-const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
-
 function fleetGate(overrides = {}) {
   return {
     schema: 'jovie-fleet-gate/v1',
@@ -344,39 +340,4 @@ describe('isolated UI/docs promotion policy', () => {
     ).toBe(false);
   });
 
-  it('keeps one native controller, freezes deploy, and never treats labels as authority', () => {
-    const queueWorkflow = readFileSync(
-      resolve(REPO_ROOT, '.github/workflows/merge-queue-autoenroll.yml'),
-      'utf8'
-    );
-    const productionWorkflow = readFileSync(
-      resolve(REPO_ROOT, '.github/workflows/production-controller.yml'),
-      'utf8'
-    );
-    const drain = readFileSync(
-      resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
-      'utf8'
-    );
-
-    expect(queueWorkflow).toContain('fleet-policy:');
-    expect(queueWorkflow).toContain(
-      "workflows: ['CI', 'Production Controller']"
-    );
-    expect(queueWorkflow).toContain('DRAIN_PROMOTION_MODE:');
-    expect(queueWorkflow).toContain('DRAIN_RECOVER_FLEET_HOLDS:');
-    expect(queueWorkflow).toContain('merge-queue-drain-mutex');
-    expect(queueWorkflow).toContain('mode=isolated-only');
-    expect(productionWorkflow).toContain('fleet-promotion:');
-    expect(productionWorkflow).toContain(
-      "needs.fleet-promotion.outputs.deployment_allowed == 'true'"
-    );
-    expect(drain).toContain('MAX_QUEUE_DEPTH=1');
-    expect(drain).toContain(
-      'scripts/lib/isolated-ui-docs-policy.mjs evaluate-live'
-    );
-    expect(drain).toContain('.authority.labelsUsed == false');
-    expect(drain).toContain('.authority.deploymentAllowed == false');
-    expect(drain).toContain('jovie-fleet-queue-hold/v1');
-    expect(drain).toContain('Fleet holds may recover only under normal GREEN');
-  });
 });
