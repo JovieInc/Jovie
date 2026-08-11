@@ -2,7 +2,9 @@
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { dirname, extname, join, normalize } from 'node:path/posix';
 import { pathToFileURL } from 'node:url';
+import ts from 'typescript';
 
 export const ISOLATED_UI_DOCS_SCHEMA = 'jovie-isolated-ui-docs/v1';
 export const REQUIRED_ISOLATED_CHECKS = Object.freeze([
@@ -105,6 +107,17 @@ const PRESENTATION_IMPORT_RE =
   /^(?:react(?:\/.*)?|next\/(?:image|link)|lucide-react|motion\/react|dompurify|class-variance-authority|clsx|tailwind-merge|@jovie\/ui(?:\/atoms(?:\/.*)?|\/lib\/utils)?|@radix-ui\/.*|@base-ui-components\/.*)$/;
 const TEST_IMPORT_RE =
   /^(?:vitest|node:(?:fs|path)|@testing-library\/.*|@storybook\/.*)$/;
+const LOCAL_IMPORT_EXTENSIONS = Object.freeze([
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.cjs',
+  '.ts',
+  '.tsx',
+  '.mts',
+  '.cts',
+  '.css',
+]);
 
 const SCREENSHOT_RE =
   /!\[[^\]]*]\([^)]+\)|<img\b|https?:\/\/\S+\.(?:png|jpe?g|gif|webp)/i;
@@ -207,8 +220,45 @@ function removedPatchLines(patch = '') {
     .filter(line => line.startsWith('-') && !line.startsWith('---'));
 }
 
-function allowedImportSource(source, file) {
-  if (source.startsWith('./')) return true;
+function resolvesToPinnedPresentationFile(source, file, files) {
+  if (!source.startsWith('.')) return false;
+  const resolved = normalize(join(dirname(file.filename), source));
+  if (
+    resolved === '..' ||
+    resolved.startsWith('../') ||
+    resolved.startsWith('/')
+  ) {
+    return false;
+  }
+
+  const candidates = new Set([resolved]);
+  if (!extname(resolved)) {
+    for (const extension of LOCAL_IMPORT_EXTENSIONS) {
+      candidates.add(`${resolved}${extension}`);
+      candidates.add(join(resolved, `index${extension}`));
+    }
+  }
+
+  return files.some(input => {
+    const filename = normalizePath(input.filename);
+    return (
+      candidates.has(filename) &&
+      (ATOM_RE.test(filename) ||
+        ATOM_TEST_RE.test(filename) ||
+        STYLE_RE.test(filename))
+    );
+  });
+}
+
+function containsPathTraversal(source) {
+  return source.split('/').some(segment => segment === '.' || segment === '..');
+}
+
+function allowedImportSource(source, file, files) {
+  if (source.startsWith('.')) {
+    return resolvesToPinnedPresentationFile(source, file, files);
+  }
+  if (containsPathTraversal(source)) return false;
   if (PRESENTATION_IMPORT_RE.test(source)) return true;
   if (file.kind === 'test' && TEST_IMPORT_RE.test(source)) return true;
   if (/^@\/components\/atoms(?:\/|$)/.test(source)) return true;
@@ -222,19 +272,59 @@ function allowedImportSource(source, file) {
   return false;
 }
 
-function semanticBlockers(file) {
+function executableImportSources(content, filename) {
+  const sourceFile = ts.createSourceFile(
+    filename,
+    content,
+    ts.ScriptTarget.Latest,
+    true
+  );
+  const parseDiagnostics = Reflect.get(sourceFile, 'parseDiagnostics');
+  if (!Array.isArray(parseDiagnostics) || parseDiagnostics.length > 0)
+    return null;
+  const sources = [];
+  let complete = true;
+  const visit = node => {
+    let specifier;
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      node.moduleSpecifier
+    ) {
+      specifier = node.moduleSpecifier;
+    } else if (
+      ts.isCallExpression(node) &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) &&
+          node.expression.text === 'require'))
+    ) {
+      [specifier] = node.arguments;
+    }
+    if (specifier) {
+      if (ts.isStringLiteralLike(specifier)) sources.push(specifier.text);
+      else complete = false;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return complete ? sources : null;
+}
+
+function semanticBlockers(file, files) {
   const blockers = [];
   const content = String(file.content || '');
   if (!content.trim()) {
     blockers.push(`${file.filename}: exact source content is unavailable`);
     return blockers;
   }
-  const imports = [
-    ...content.matchAll(
-      /(?:import|export)\s+(?:[^'";]+?\s+from\s+)?['"]([^'"]+)['"]/g
-    ),
-    ...content.matchAll(/(?:import|require)\s*\(\s*['"]([^'"]+)['"]\s*\)/g),
-  ].map(match => match[1]);
+  const imports = EXECUTABLE_RE.test(file.filename)
+    ? executableImportSources(content, file.filename)
+    : [...content.matchAll(/@import\s+['"]([^'"]+)['"]/g)].map(
+        match => match[1]
+      );
+  if (imports === null) {
+    blockers.push(`${file.filename}: module syntax cannot be inspected safely`);
+    return blockers;
+  }
 
   for (const source of imports) {
     const denied = DENIED_PATHS.find(entry => entry.pattern.test(source));
@@ -242,7 +332,7 @@ function semanticBlockers(file) {
       blockers.push(
         `${file.filename}: import ${source} reaches ${denied.reason}`
       );
-    if (!allowedImportSource(source, file)) {
+    if (!allowedImportSource(source, file, files)) {
       blockers.push(
         `${file.filename}: import ${source} is not presentation-only`
       );
@@ -364,7 +454,7 @@ export function evaluateIsolatedUiDocsDelta({
     }
     const classifiedFile = { ...file, kind };
     if (EXECUTABLE_RE.test(file.filename))
-      blockers.push(...semanticBlockers(classifiedFile));
+      blockers.push(...semanticBlockers(classifiedFile, files));
     if (kind === 'style') blockers.push(...styleBlockers(classifiedFile));
     classified.push(classifiedFile);
   }

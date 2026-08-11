@@ -704,7 +704,9 @@ fi
 # queue members plus the single event-scoped candidate. Positive labels are
 # deliberately absent from this authority; every unknown returns iso=false.
 if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
-  CLASSIFIED="[]"
+  # Preserve the complete authoritative snapshot. Budget-limited entries stay
+  # fail-closed instead of disappearing before the fleet-freeze pass.
+  CLASSIFIED="$(jq -c 'map(. + {iso: false})' <<<"$SNAP")"
   while IFS= read -r pr; do
     stop_if_budget_exhausted && break
     n="$(jq -r '.n' <<<"$pr")"
@@ -725,15 +727,15 @@ if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
         eligible=true
       fi
     fi
-    CLASSIFIED="$(jq -c --argjson pr "$pr" --argjson eligible "$eligible" \
-      '. + [$pr + {iso: $eligible}]' <<<"$CLASSIFIED")"
+    CLASSIFIED="$(jq -c --argjson n "$n" --argjson eligible "$eligible" \
+      'map(if .n == $n then . + {iso: $eligible} else . end)' <<<"$CLASSIFIED")"
   done < <(jq -c '.[]' <<<"$SNAP")
   SNAP="$CLASSIFIED"
 else
   SNAP="$(jq -c 'map(. + {iso: false})' <<<"$SNAP")"
 fi
 
-ENRICHED="[]"
+ENRICHED="$(jq -c 'map(. + {fail: ["required check status unavailable"]})' <<<"$SNAP")"
 while IFS= read -r pr; do
   stop_if_budget_exhausted && break
   n="$(jq -r '.n' <<<"$pr")"
@@ -751,21 +753,17 @@ while IFS= read -r pr; do
   if ! jq -e . <<<"$fail" >/dev/null 2>&1; then
     fail='["required check status unavailable"]'
   fi
-  ENRICHED="$(jq -c --argjson pr "$pr" --argjson fail "$fail" '. + [$pr + {fail: $fail}]' <<<"$ENRICHED")"
+  ENRICHED="$(jq -c --argjson n "$n" --argjson fail "$fail" \
+    'map(if .n == $n then . + {fail: $fail} else . end)' <<<"$ENRICHED")"
 done < <(jq -c '.[]' <<<"$SNAP")
 SNAP="$ENRICHED"
 
-# Unknown controller/queue/production evidence blocks new admissions, but does
-# not destructively erase already-queued intent. Existing entries are removed
-# only for the two explicit source/promotion holds or for RED/unknown integrity.
-# That keeps transient observation failures fail-closed without recreating the
-# historical healthy-but-idle dequeue churn.
+# Any non-normal promotion mode freezes existing native queue entries. The
+# isolated-only mode below may preserve exactly one freshly proven isolated
+# entry; draft-only and blocked modes preserve none. Ambiguous evidence must not
+# leave GitHub's autonomous queue free to merge previously admitted work.
 DRAIN_FREEZE_EXISTING_QUEUE=0
-if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" || "$DRAIN_PROMOTION_MODE" == "draft-only" ]]; then
-  DRAIN_FREEZE_EXISTING_QUEUE=1
-elif [[ "$DRAIN_PROMOTION_MODE" == "blocked" ]] && jq -e '
-  .state == "RED" or (.signals.integrity.status | IN("clear", "resolved") | not)
-' <<<"$FLEET_GATE_JSON" >/dev/null; then
+if [[ "$DRAIN_PROMOTION_MODE" != "normal" ]]; then
   DRAIN_FREEZE_EXISTING_QUEUE=1
 fi
 

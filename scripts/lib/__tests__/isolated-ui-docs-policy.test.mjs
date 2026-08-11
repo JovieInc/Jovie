@@ -215,6 +215,76 @@ describe('isolated UI/docs promotion policy', () => {
     );
   });
 
+  it('rejects relative imports that escape the pinned presentation delta', () => {
+    const files = atomFiles();
+    files[0] = {
+      ...files[0],
+      content:
+        "import { closeLinearIssue } from './../../lib/close-linear-issue';\nexport const Badge = () => <span>{closeLinearIssue}</span>;",
+    };
+    const result = evaluateIsolatedUiDocsDelta({
+      prNumber: 15816,
+      baseSha: BASE,
+      headSha: HEAD,
+      body: body(),
+      files,
+      checks: greenChecks(),
+      fleetGate: fleetGate(),
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.blockers).toContain(
+      'packages/ui/atoms/Badge.tsx: import ./../../lib/close-linear-issue is not presentation-only'
+    );
+  });
+
+  it('rejects comment-separated imports that escape the pinned delta', () => {
+    const files = atomFiles();
+    files[0] = {
+      ...files[0],
+      content:
+        "import /* pinned-closure-bypass */ '../../../apps/web/app/actions/spotify.ts';\nexport const Badge = () => <span />;",
+    };
+    const result = evaluateIsolatedUiDocsDelta({
+      prNumber: 15817,
+      baseSha: BASE,
+      headSha: HEAD,
+      body: body(),
+      files,
+      checks: greenChecks(),
+      fleetGate: fleetGate(),
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.blockers).toContain(
+      'packages/ui/atoms/Badge.tsx: import ../../../apps/web/app/actions/spotify.ts is not presentation-only'
+    );
+  });
+
+  it('rejects alias imports that traverse outside the pinned atom closure', () => {
+    const files = atomFiles();
+    files[0] = {
+      ...files[0],
+      filename: 'apps/web/components/atoms/AccountBadge.tsx',
+      content:
+        "import { closeLinearIssue } from '@/components/atoms/../../lib/hud/linear-actions';\nexport const AccountBadge = () => <span>{closeLinearIssue}</span>;",
+    };
+    const result = evaluateIsolatedUiDocsDelta({
+      prNumber: 15818,
+      baseSha: BASE,
+      headSha: HEAD,
+      body: body(),
+      files,
+      checks: greenChecks(),
+      fleetGate: fleetGate(),
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.blockers).toContain(
+      'apps/web/components/atoms/AccountBadge.tsx: import @/components/atoms/../../lib/hud/linear-actions is not presentation-only'
+    );
+  });
+
   it('rejects executable docs/assets and remote or executable CSS', () => {
     const result = evaluateIsolatedUiDocsDelta({
       prNumber: 15817,

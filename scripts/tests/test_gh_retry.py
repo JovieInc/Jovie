@@ -211,17 +211,24 @@ class TestDrainPrQueueWiring:
         assert "fresh typed fleet receipt" in result.stderr
         assert not called.exists(), "drain invoked gh before receipt preflight"
 
+    @pytest.mark.parametrize(
+        ("budget_env", "list_delay"),
+        [("", ""), ("DRAIN_MAX_SECONDS=1 DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS=1", "sleep 2")],
+    )
     def test_blocked_receipt_dry_run_dequeues_ordinary_native_intent(
-        self, tmp_path: Path
+        self, tmp_path: Path, budget_env: str, list_delay: str
     ) -> None:
         queued_head = "9" * 40
         receipt = {
             "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "signals": {
                 "main": {"status": "unknown"},
                 "production": {"status": "unknown"},
-                "integrity": {"status": "unknown"},
+                "controller": {"status": "unknown"},
+                "queue": {"status": "unknown"},
+                "integrity": {"status": "clear"},
             },
             "promotionAdmission": {"allowed": False},
             "isolatedPromotionAdmission": {
@@ -237,6 +244,7 @@ class TestDrainPrQueueWiring:
                 #!/usr/bin/env bash
                 set -euo pipefail
                 if [[ "$1 $2" == "pr list" ]]; then
+                  {list_delay}
                   echo '[{{"n":909,"t":"Ordinary queued PR","draft":false,"m":"MERGEABLE","head":"codex/jov-909","headOid":"{queued_head}","base":"main","L":["merge-queue"],"fail":[]}}]'
                   exit 0
                 fi
@@ -259,7 +267,7 @@ class TestDrainPrQueueWiring:
                 tmp_path,
                 extra_env=(
                     "DRY_RUN=1 DRAIN_PROMOTION_MODE=blocked "
-                    f"DRAIN_FLEET_GATE_B64={encoded}"
+                    f"DRAIN_FLEET_GATE_B64={encoded} {budget_env}"
                 ),
             )
         )
