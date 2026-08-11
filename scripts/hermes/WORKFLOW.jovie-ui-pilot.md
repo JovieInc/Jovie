@@ -37,9 +37,12 @@ hooks:
     fi
     git config push.negotiate true
 agent:
-  # Symphony is the single implementation owner. Gem's separate controller
-  # concurrency defaults to four and is not a license for duplicate pickup.
-  max_concurrent_agents: 1
+  # Approved throughput posture (JOV-4962): four concurrent agents. Symphony is
+  # the single implementation owner; admission and one-issue/one-workspace
+  # leases remain authoritative, so concurrency never duplicates ownership of
+  # an issue or workspace. Gem verification shard concurrency is a separate
+  # control and remains 4.
+  max_concurrent_agents: 4
   max_turns: 24
 codex:
   command: /home/timwhite/.local/bin/codex-rotate --config shell_environment_policy.inherit=all --config model="gpt-5.6-luna" app-server
