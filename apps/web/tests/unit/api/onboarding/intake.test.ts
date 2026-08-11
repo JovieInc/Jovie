@@ -120,10 +120,13 @@ const VALID_BODY = {
   metadata: {},
 };
 
-function makeRequest(body: unknown): Request {
+function makeRequest(
+  body: unknown,
+  headers: Record<string, string> = {}
+): Request {
   return new Request('http://localhost/api/onboarding/intake', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...headers },
     body: JSON.stringify(body),
   });
 }
@@ -580,5 +583,78 @@ describe('POST /api/onboarding/intake — Better Auth email gate', () => {
       expect.any(SyntaxError),
       expect.objectContaining({ route: '/api/onboarding/intake' })
     );
+  });
+
+  it('rejects a canary run header for a non-canary authenticated identity', async () => {
+    vi.stubEnv('E2E_PROD_SIGNUP_EMAIL_BASE', 'synthetic@e2e.example.com');
+    mockCurrentUser.mockResolvedValue({
+      primaryEmailAddress: { emailAddress: 'customer@example.com' },
+    });
+
+    const res = await POST(
+      makeRequest(VALID_BODY, {
+        'x-jovie-waitlist-canary-run-id': '123-1',
+      })
+    );
+
+    expect(res.status).toBe(403);
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockSubmitWaitlistAccessRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed canary run ids before persistence', async () => {
+    vi.stubEnv('E2E_PROD_SIGNUP_EMAIL_BASE', 'synthetic@e2e.example.com');
+    mockCurrentUser.mockResolvedValue({
+      primaryEmailAddress: {
+        emailAddress: 'synthetic+jovie-prod-waitlist-canary@e2e.example.com',
+      },
+    });
+
+    const res = await POST(
+      makeRequest(VALID_BODY, {
+        'x-jovie-waitlist-canary-run-id': '../../unsafe',
+      })
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockDbInsert).not.toHaveBeenCalled();
+  });
+
+  it('persists and forwards the canary marker only for the exact identity', async () => {
+    vi.stubEnv('E2E_PROD_SIGNUP_EMAIL_BASE', 'synthetic@e2e.example.com');
+    mockCurrentUser.mockResolvedValue({
+      fullName: 'Production Waitlist Canary',
+      primaryEmailAddress: {
+        emailAddress: 'synthetic+jovie-prod-waitlist-canary@e2e.example.com',
+      },
+    });
+    mockSubmitWaitlistAccessRequest.mockResolvedValue({
+      outcome: 'waitlisted_gate_on',
+      status: 'waitlisted',
+      entryId: 'entry_canary',
+    });
+    const { values } = setupSuccessfulIntakeDb();
+
+    const res = await POST(
+      makeRequest(VALID_BODY, {
+        'x-jovie-waitlist-canary-run-id': '123-1',
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockSubmitWaitlistAccessRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ syntheticRunId: '123-1' })
+    );
+    expect(values).toHaveBeenCalledTimes(2);
+    for (const [input] of values.mock.calls) {
+      expect(input.metadata.syntheticCanary).toMatchObject({
+        name: 'production-waitlist',
+        runId: '123-1',
+        communications: {
+          waitlistConfirmationEmail: 'suppressed-before-enqueue',
+          slack: 'suppressed',
+        },
+      });
+    }
   });
 });

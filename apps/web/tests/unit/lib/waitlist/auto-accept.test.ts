@@ -184,6 +184,7 @@ describe('runWaitlistAutoAccept', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
     candidateRows = [];
     suppressionRows = [];
     userRows = [];
@@ -228,6 +229,32 @@ describe('runWaitlistAutoAccept', () => {
       }
       return createCandidateQuery();
     });
+  });
+
+  it.each([
+    undefined,
+    'invalid+base@e2e.example.com',
+  ])('never approves the retained canary when base config is %s', async baseEmail => {
+    if (baseEmail) vi.stubEnv('E2E_PROD_SIGNUP_EMAIL_BASE', baseEmail);
+    candidateRows = [
+      {
+        id: 'canary-entry',
+        email: 'synthetic+jovie-prod-waitlist-canary@e2e.example.com',
+        status: 'waitlisted',
+      },
+    ];
+
+    const { runWaitlistAutoAccept } = await import(
+      '@/lib/waitlist/auto-accept'
+    );
+    const result = await runWaitlistAutoAccept({
+      now: new Date('2026-08-10T00:00:00Z'),
+    });
+
+    expect(result).toMatchObject({ scanned: 1, approved: 0, skipped: 1 });
+    expect(mockTryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+    expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
+    expect(mockEnqueueWaitlistApprovalInviteEmail).not.toHaveBeenCalled();
   });
 
   it('includes migrated legacy waitlist rows still stored with new status', async () => {

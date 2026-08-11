@@ -160,6 +160,7 @@ const baseInput = {
 // on CI shards). Raise describe timeout so the first case can pay that cost.
 describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
   beforeEach(() => {
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
     userRow = {
       id: baseInput.appUserId,
@@ -389,6 +390,129 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
       updatedRows.find(row => row.statusReason === 'already_waitlisted')
         ?.waitlistedAt
     ).toBe(originalWaitlistedAt);
+    expect(notifySlackWaitlist).not.toHaveBeenCalled();
+  });
+
+  it('suppresses email and Slack while audit-marking an exact canary write', async () => {
+    vi.stubEnv('E2E_PROD_SIGNUP_EMAIL_BASE', 'synthetic@e2e.example.com');
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+
+    const result = await submitWaitlistAccessRequest({
+      ...baseInput,
+      email: 'synthetic+jovie-prod-waitlist-canary@e2e.example.com',
+      syntheticRunId: '123-1',
+    });
+
+    expect(result).toMatchObject({
+      status: 'waitlisted',
+      outcome: 'waitlisted_gate_on',
+    });
+    expect(
+      insertedEntries.some(
+        entry => entry.vals.jobType === 'send_waitlist_email'
+      )
+    ).toBe(false);
+    expect(notifySlackWaitlist).not.toHaveBeenCalled();
+    expect(
+      insertedEntries.find(entry => entry.vals.waitlistEntryId === 'entry-new')
+        ?.vals.metadata
+    ).toMatchObject({
+      syntheticCanary: {
+        schemaVersion: 1,
+        name: 'production-waitlist',
+        runId: '123-1',
+        communications: {
+          waitlistConfirmationEmail: 'suppressed-before-enqueue',
+          slack: 'suppressed',
+        },
+      },
+    });
+  });
+
+  it('suppresses communications for the exact canary even without a run marker', async () => {
+    vi.stubEnv('E2E_PROD_SIGNUP_EMAIL_BASE', 'synthetic@e2e.example.com');
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+
+    await submitWaitlistAccessRequest({
+      ...baseInput,
+      email: 'synthetic+jovie-prod-waitlist-canary@e2e.example.com',
+    });
+
+    expect(
+      insertedEntries.some(
+        entry => entry.vals.jobType === 'send_waitlist_email'
+      )
+    ).toBe(false);
+    expect(notifySlackWaitlist).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    undefined,
+    'invalid+base@e2e.example.com',
+  ])('keeps the reserved namespace suppressed when base config is %s', async baseEmail => {
+    if (baseEmail) vi.stubEnv('E2E_PROD_SIGNUP_EMAIL_BASE', baseEmail);
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+
+    await submitWaitlistAccessRequest({
+      ...baseInput,
+      email: 'synthetic+jovie-prod-waitlist-canary@e2e.example.com',
+    });
+
+    expect(
+      insertedEntries.some(
+        entry => entry.vals.jobType === 'send_waitlist_email'
+      )
+    ).toBe(false);
+    expect(notifySlackWaitlist).not.toHaveBeenCalled();
+  });
+
+  it('writes a fresh audit receipt on an idempotent canary reassertion', async () => {
+    vi.stubEnv('E2E_PROD_SIGNUP_EMAIL_BASE', 'synthetic@e2e.example.com');
+    findLatestEntryByEmail.mockReturnValueOnce([
+      {
+        id: 'entry-retained',
+        status: 'waitlisted',
+        waitlistedAt: new Date('2026-08-10T00:00:00.000Z'),
+      },
+    ]);
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+
+    const result = await submitWaitlistAccessRequest({
+      ...baseInput,
+      email: 'synthetic+jovie-prod-waitlist-canary@e2e.example.com',
+      syntheticRunId: '123-2',
+    });
+
+    expect(result.outcome).toBe('already_waitlisted');
+    expect(
+      insertedEntries.find(
+        entry => entry.vals.reason === 'production_canary_reasserted'
+      )?.vals.metadata
+    ).toMatchObject({ syntheticCanary: { runId: '123-2' } });
+    expect(notifySlackWaitlist).not.toHaveBeenCalled();
+  });
+
+  it('rejects a synthetic run marker for every non-exact identity', async () => {
+    vi.stubEnv('E2E_PROD_SIGNUP_EMAIL_BASE', 'synthetic@e2e.example.com');
+    const { submitWaitlistAccessRequest } = await import(
+      '@/lib/waitlist/access-request'
+    );
+
+    await expect(
+      submitWaitlistAccessRequest({
+        ...baseInput,
+        syntheticRunId: '123-1',
+      })
+    ).rejects.toThrow('restricted to the exact canary email');
+    expect(insertedEntries).toHaveLength(0);
     expect(notifySlackWaitlist).not.toHaveBeenCalled();
   });
 });

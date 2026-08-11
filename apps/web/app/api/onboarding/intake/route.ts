@@ -2,12 +2,19 @@ import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
+import {
+  buildProductionWaitlistCanaryMarker,
+  isExactProductionWaitlistCanaryEmail,
+  PRODUCTION_WAITLIST_CANARY_RUN_HEADER,
+  parseProductionWaitlistCanaryRunId,
+} from '@/lib/canaries/production-waitlist';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import {
   type InterviewTranscriptEntry,
   userInterviews,
 } from '@/lib/db/schema/user-interviews';
+import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
 import {
   enforceOnboardingRateLimit,
@@ -191,6 +198,27 @@ export async function POST(request: Request) {
     }
 
     const email = normalizeEmail(emailRaw);
+    let syntheticRunId: string | null;
+    try {
+      syntheticRunId = parseProductionWaitlistCanaryRunId(
+        request.headers.get(PRODUCTION_WAITLIST_CANARY_RUN_HEADER)
+      );
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid canary run id' },
+        { status: 400 }
+      );
+    }
+    const isProductionCanary = isExactProductionWaitlistCanaryEmail(
+      email,
+      env.E2E_PROD_SIGNUP_EMAIL_BASE
+    );
+    if (syntheticRunId && !isProductionCanary) {
+      return NextResponse.json(
+        { error: 'Canary run id is restricted to the configured identity' },
+        { status: 403 }
+      );
+    }
     const fullName = deriveFullName({
       userFullName: clerkUser?.fullName,
       userUsername: clerkUser?.username,
@@ -215,6 +243,12 @@ export async function POST(request: Request) {
       problemStatement: interviewResponses.biggestBlocker,
       interviewScore: interviewScore.score,
       interviewSignals: interviewScore.signals,
+      ...(syntheticRunId
+        ? {
+            syntheticCanary:
+              buildProductionWaitlistCanaryMarker(syntheticRunId),
+          }
+        : {}),
     };
 
     let interviewId: string;
@@ -242,6 +276,7 @@ export async function POST(request: Request) {
       data: parsed.data.waitlist,
       source: 'onboarding_chat',
       interviewResponses,
+      syntheticRunId: syntheticRunId ?? undefined,
     });
 
     // Best-effort attach of the access decision to the interview row. The

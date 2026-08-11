@@ -11,6 +11,7 @@ import {
   lte,
   or,
 } from 'drizzle-orm';
+import { hasProductionWaitlistCanaryNamespace } from '@/lib/canaries/production-waitlist';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { emailSuppressions } from '@/lib/db/schema/suppression';
@@ -158,6 +159,7 @@ export async function runWaitlistAutoAccept(
   for (const candidate of candidates) {
     const normalizedEmail = candidate.email.trim().toLowerCase();
     if (
+      hasProductionWaitlistCanaryNamespace(normalizedEmail) ||
       suppressedEmailHashes.has(hashEmail(candidate.email)) ||
       blockedUserEmails.has(normalizedEmail)
     ) {
@@ -182,6 +184,7 @@ export async function runWaitlistAutoAccept(
 
             if (
               !lockedCandidate ||
+              hasProductionWaitlistCanaryNamespace(lockedCandidate.email) ||
               !AUTO_ACCEPT_ELIGIBLE_STATUSES.includes(
                 lockedCandidate.status as (typeof AUTO_ACCEPT_ELIGIBLE_STATUSES)[number]
               )

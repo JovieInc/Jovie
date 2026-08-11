@@ -54,6 +54,23 @@ export interface InterviewMetadata {
   interviewScore?: number | null;
   /** Signal names that contributed to interviewScore. */
   interviewSignals?: readonly string[] | null;
+  /** Redacted marker for a dedicated production waitlist canary traversal. */
+  syntheticCanary?: {
+    schemaVersion: 1;
+    name: 'production-waitlist';
+    runId: string;
+    communications: {
+      waitlistConfirmationEmail: 'suppressed-before-enqueue';
+      slack: 'suppressed';
+    };
+  } | null;
+  /** First-party receipt emitted by the rendered waitlist confirmation view. */
+  syntheticAnalyticsReceipt?: {
+    schemaVersion: 1;
+    name: 'production-waitlist';
+    runId: string;
+    event: 'waitlist_confirmation_viewed';
+  } | null;
 }
 
 export const userInterviews = pgTable(
