@@ -25,6 +25,8 @@ const HARDCODED_ROUTE_PATTERNS = [
 const ALLOWED_FILES = [
   'constants/routes.ts',
   'constants/routes.js',
+  // Closed-world route inventory: this module IS the route definition site.
+  'data/appScreens/registry.ts',
   '.test.ts',
   '.test.tsx',
   '.spec.ts',

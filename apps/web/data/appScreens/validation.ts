@@ -1,5 +1,6 @@
 import {
   APP_SCREEN_COMPONENT_REGISTRY,
+  APP_SCREEN_LEGACY_BODY_SOURCES,
   APP_SCREEN_RECIPE_REGISTRY,
   APP_SCREEN_REGISTRY,
   type AppScreenComponentRegistryEntry,
@@ -21,7 +22,15 @@ export type AppScreenValidationCode =
   | 'invalid-recipe-kind'
   | 'invalid-reference-kind'
   | 'route-source-mismatch'
-  | 'missing-error-boundary';
+  | 'missing-error-boundary'
+  | 'missing-story'
+  | 'unexpected-story'
+  | 'duplicate-story'
+  | 'unsafe-story'
+  | 'story-recipe-mismatch'
+  | 'story-component-mismatch'
+  | 'unresolved-concept'
+  | 'unexpected-redirect-receipt';
 
 export interface AppScreenValidationIssue {
   readonly code: AppScreenValidationCode;
@@ -43,6 +52,21 @@ const duplicates = (values: readonly string[]): readonly string[] => {
   }
   return [...repeated];
 };
+
+/** Browser-safe Storybook id shape (`<kind>--<story>`, lowercase, dashes). */
+const BROWSER_SAFE_STORY_ID =
+  /^[a-z0-9]+(?:-[a-z0-9]+)*--[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+const LEGACY_BODY_SOURCE_SET: ReadonlySet<string> = new Set(
+  APP_SCREEN_LEGACY_BODY_SOURCES
+);
+
+const sameComponentIds = (
+  left: readonly string[],
+  right: readonly string[]
+): boolean =>
+  left.length === right.length &&
+  left.every((value, index) => value === right[index]);
 
 export function validateAppScreenSystem({
   components = APP_SCREEN_COMPONENT_REGISTRY,
@@ -98,6 +122,11 @@ export function validateAppScreenSystem({
   }
 
   const referenceConceptCounts = new Map<string, number>();
+  const referenceConcepts = new Set<string>();
+  for (const screen of screens) {
+    if (screen.designReference) referenceConcepts.add(screen.conceptId);
+  }
+
   for (const screen of screens) {
     const recipe = recipesById.get(screen.recipeId);
     if (!recipe) {
@@ -126,12 +155,72 @@ export function validateAppScreenSystem({
         `${screen.route} does not match ${screen.source}`
       );
     }
+
     if (screen.designReference) {
       referenceConceptCounts.set(
         screen.conceptId,
         (referenceConceptCounts.get(screen.conceptId) ?? 0) + 1
       );
+      if (!screen.story) {
+        add(
+          'missing-story',
+          `design reference ${screen.id} has no Storybook story contract`
+        );
+      }
+    } else if (screen.story) {
+      add(
+        'unexpected-story',
+        `non-reference screen ${screen.id} must not carry a story contract`
+      );
     }
+
+    if (screen.story) {
+      if (!BROWSER_SAFE_STORY_ID.test(screen.story.id)) {
+        add(
+          'unsafe-story',
+          `story id '${screen.story.id}' on ${screen.id} is not browser-safe`
+        );
+      }
+      if (screen.story.recipeId !== screen.recipeId) {
+        add(
+          'story-recipe-mismatch',
+          `story ${screen.story.id} uses ${screen.story.recipeId} but ${screen.id} declares ${screen.recipeId}`
+        );
+      }
+      if (
+        recipe &&
+        !sameComponentIds(screen.story.componentIds, recipe.componentIds)
+      ) {
+        add(
+          'story-component-mismatch',
+          `story ${screen.story.id} does not use the declared components of ${screen.recipeId}`
+        );
+      }
+    }
+
+    if (screen.kind === 'alias' || screen.kind === 'legacy') {
+      if (screen.conceptId === screen.route) {
+        if (!LEGACY_BODY_SOURCE_SET.has(screen.source)) {
+          add(
+            'unresolved-concept',
+            `${screen.kind} screen ${screen.id} has no canonical concept mapping`
+          );
+        }
+      } else if (!referenceConcepts.has(screen.conceptId)) {
+        add(
+          'unresolved-concept',
+          `${screen.kind} screen ${screen.id} concept ${screen.conceptId} is not a design reference`
+        );
+      }
+    } else if (screen.redirectTo !== null) {
+      add(
+        'unexpected-redirect-receipt',
+        `${screen.kind} screen ${screen.id} must not carry a redirect receipt`
+      );
+    }
+  }
+  for (const id of duplicates(screens.map(entry => entry.story?.id ?? ''))) {
+    if (id) add('duplicate-story', `story id ${id} is used more than once`);
   }
   for (const [conceptId, count] of referenceConceptCounts) {
     if (count > 1) {

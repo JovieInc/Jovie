@@ -3,9 +3,11 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   APP_SCREEN_COMPONENT_REGISTRY,
+  APP_SCREEN_PEN_EXPORT_SCHEMA,
   APP_SCREEN_RECIPE_REGISTRY,
   APP_SCREEN_REGISTRY,
   type AppScreenRegistryEntry,
+  buildAppScreenPenExport,
   validateAppScreenSystem,
 } from '@/data/appScreens';
 
@@ -71,6 +73,114 @@ describe('authenticated app screen registry', () => {
     }
   });
 
+  it('assigns exactly 47 unique deterministic browser-safe story IDs', () => {
+    const references = APP_SCREEN_REGISTRY.filter(
+      entry => entry.designReference
+    );
+    // Source-of-truth pin: the Pen lane must derive this count from the
+    // export receipt, never hardcode it.
+    expect(references).toHaveLength(47);
+    const storyIds = references.map(entry => {
+      expect(entry.story, entry.route).not.toBeNull();
+      return entry.story?.id as string;
+    });
+    expect(new Set(storyIds).size).toBe(storyIds.length);
+    for (const storyId of storyIds) {
+      expect(
+        storyId,
+        `${storyId} must be browser-safe (<kind>--<story>, lowercase, dashes)`
+      ).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*--[a-z0-9]+(?:-[a-z0-9]+)*$/);
+    }
+    // Deterministic: rebuilding the story id from the concept is stable.
+    for (const entry of references) {
+      expect(entry.story?.recipeId).toBe(entry.recipeId);
+      const recipe = APP_SCREEN_RECIPE_REGISTRY.find(
+        r => r.id === entry.recipeId
+      );
+      expect(entry.story?.componentIds).toEqual(recipe?.componentIds);
+    }
+  });
+
+  it('resolves every alias/legacy route without a duplicate design body', () => {
+    const compatibility = APP_SCREEN_REGISTRY.filter(
+      entry => entry.kind === 'alias' || entry.kind === 'legacy'
+    );
+    expect(compatibility).toHaveLength(32);
+    const referenceConcepts = new Set(
+      APP_SCREEN_REGISTRY.filter(entry => entry.designReference).map(
+        entry => entry.conceptId
+      )
+    );
+    for (const entry of compatibility) {
+      expect(entry.designReference, entry.route).toBe(false);
+      expect(entry.story, entry.route).toBeNull();
+      if (entry.conceptId === entry.route) {
+        // Legacy-owned body: the only screen allowed to keep its own concept.
+        expect(entry.redirectTo, entry.route).toBeNull();
+      } else {
+        expect(
+          referenceConcepts.has(entry.conceptId),
+          `${entry.route} concept ${entry.conceptId} must be a design reference`
+        ).toBe(true);
+      }
+      const source = fs.readFileSync(path.join(repoRoot, entry.source), 'utf8');
+      if (/\b(?:permanentRedirect|redirect)\s*\(/.test(source)) {
+        expect(entry.redirectTo, entry.route).not.toBeNull();
+      }
+    }
+    // No alias/legacy concept may collide with a second design body.
+    const bodiesByConcept = new Map<string, number>();
+    for (const entry of APP_SCREEN_REGISTRY) {
+      if (!entry.designReference) continue;
+      bodiesByConcept.set(
+        entry.conceptId,
+        (bodiesByConcept.get(entry.conceptId) ?? 0) + 1
+      );
+    }
+    for (const count of bodiesByConcept.values()) {
+      expect(count).toBe(1);
+    }
+  });
+
+  it('emits a deterministic Pen export receipt with derived counts', () => {
+    const receipt = buildAppScreenPenExport({
+      hashSource: source => `sha256:${source.length}`,
+    });
+    expect(receipt.schema).toBe(APP_SCREEN_PEN_EXPORT_SCHEMA);
+    expect(receipt.counts).toEqual({
+      screens: APP_SCREEN_REGISTRY.length,
+      designReferences: 47,
+      components: APP_SCREEN_COMPONENT_REGISTRY.length,
+      recipes: APP_SCREEN_RECIPE_REGISTRY.length,
+    });
+    expect(receipt.screens).toHaveLength(APP_SCREEN_REGISTRY.length);
+    const routes = receipt.screens.map(screen => screen.route);
+    expect(new Set(routes).size).toBe(routes.length);
+    expect(routes).toEqual([...routes].sort((a, b) => a.localeCompare(b)));
+    for (const screen of receipt.screens) {
+      expect(screen.id).toMatch(/^screen\./);
+      expect(screen.sourceSha).toBe(`sha256:${screen.source.length}`);
+      expect(screen.componentIds.length).toBeGreaterThan(0);
+      if (screen.designReference) {
+        expect(screen.storyId, screen.route).toMatch(
+          /^app-screens-[a-z0-9-]+--reference$/
+        );
+        expect(screen.redirectTo).toBeNull();
+      } else {
+        expect(screen.storyId, screen.route).toBeNull();
+      }
+    }
+    // Rebuilding without hashes is identical apart from sourceSha.
+    const unhashed = buildAppScreenPenExport();
+    expect({
+      ...unhashed,
+      screens: unhashed.screens.map(screen => ({ ...screen, sourceSha: null })),
+    }).toEqual({
+      ...receipt,
+      screens: receipt.screens.map(screen => ({ ...screen, sourceSha: null })),
+    });
+  });
+
   it('fails closed on one-offs, duplicate concepts, and invalid composition', () => {
     const canonical = APP_SCREEN_REGISTRY.find(
       entry => entry.designReference
@@ -103,6 +213,130 @@ describe('authenticated app screen registry', () => {
         ],
       }).map(x => x.code)
     ).toContain('missing-recipe');
+  });
+
+  it('fails closed on missing, duplicated, or unsafe design-reference stories', () => {
+    const canonical = APP_SCREEN_REGISTRY.find(
+      entry => entry.designReference
+    ) as AppScreenRegistryEntry;
+    const story = canonical.story as NonNullable<
+      AppScreenRegistryEntry['story']
+    >;
+
+    // Missing story on a design reference.
+    expect(
+      validateAppScreenSystem({
+        screens: APP_SCREEN_REGISTRY.map(entry =>
+          entry.id === canonical.id ? { ...entry, story: null } : entry
+        ),
+      }).map(x => x.code)
+    ).toContain('missing-story');
+
+    // Duplicated story id across two design references.
+    const other = APP_SCREEN_REGISTRY.find(
+      entry => entry.designReference && entry.id !== canonical.id
+    ) as AppScreenRegistryEntry;
+    expect(
+      validateAppScreenSystem({
+        screens: APP_SCREEN_REGISTRY.map(entry =>
+          entry.id === other.id ? { ...entry, story } : entry
+        ),
+      }).map(x => x.code)
+    ).toContain('duplicate-story');
+
+    // Browser-unsafe story id.
+    expect(
+      validateAppScreenSystem({
+        screens: APP_SCREEN_REGISTRY.map(entry =>
+          entry.id === canonical.id
+            ? { ...entry, story: { ...story, id: 'App Screens/Main Body' } }
+            : entry
+        ),
+      }).map(x => x.code)
+    ).toContain('unsafe-story');
+
+    // Story that does not use its declared recipe/components.
+    const wrongRecipeId = APP_SCREEN_RECIPE_REGISTRY.find(
+      r => r.id !== canonical.recipeId
+    )?.id as AppScreenRegistryEntry['recipeId'];
+    expect(
+      validateAppScreenSystem({
+        screens: APP_SCREEN_REGISTRY.map(entry =>
+          entry.id === canonical.id
+            ? { ...entry, story: { ...story, recipeId: wrongRecipeId } }
+            : entry
+        ),
+      }).map(x => x.code)
+    ).toContain('story-recipe-mismatch');
+    expect(
+      validateAppScreenSystem({
+        screens: APP_SCREEN_REGISTRY.map(entry =>
+          entry.id === canonical.id
+            ? {
+                ...entry,
+                story: { ...story, componentIds: ['component.empty-state'] },
+              }
+            : entry
+        ),
+      }).map(x => x.code)
+    ).toContain('story-component-mismatch');
+
+    // Story contract on a non-reference screen.
+    const alias = APP_SCREEN_REGISTRY.find(
+      entry => entry.kind === 'alias'
+    ) as AppScreenRegistryEntry;
+    expect(
+      validateAppScreenSystem({
+        screens: APP_SCREEN_REGISTRY.map(entry =>
+          entry.id === alias.id ? { ...entry, story } : entry
+        ),
+      }).map(x => x.code)
+    ).toContain('unexpected-story');
+  });
+
+  it('fails closed when an alias/legacy route loses its canonical concept', () => {
+    const alias = APP_SCREEN_REGISTRY.find(
+      entry => entry.kind === 'alias'
+    ) as AppScreenRegistryEntry;
+
+    // Concept pointed at itself without being a registered legacy body.
+    expect(
+      validateAppScreenSystem({
+        screens: APP_SCREEN_REGISTRY.map(entry =>
+          entry.id === alias.id
+            ? { ...entry, conceptId: entry.route, redirectTo: null }
+            : entry
+        ),
+      }).map(x => x.code)
+    ).toContain('unresolved-concept');
+
+    // Concept pointed at a route that is not a design reference.
+    const nonReference = APP_SCREEN_REGISTRY.find(
+      entry => !entry.designReference && entry.id !== alias.id
+    ) as AppScreenRegistryEntry;
+    expect(
+      validateAppScreenSystem({
+        screens: APP_SCREEN_REGISTRY.map(entry =>
+          entry.id === alias.id
+            ? { ...entry, conceptId: nonReference.route }
+            : entry
+        ),
+      }).map(x => x.code)
+    ).toContain('unresolved-concept');
+
+    // Redirect receipt on a canonical screen.
+    const canonical = APP_SCREEN_REGISTRY.find(
+      entry => entry.designReference
+    ) as AppScreenRegistryEntry;
+    expect(
+      validateAppScreenSystem({
+        screens: APP_SCREEN_REGISTRY.map(entry =>
+          entry.id === canonical.id
+            ? { ...entry, redirectTo: '/app/elsewhere' }
+            : entry
+        ),
+      }).map(x => x.code)
+    ).toContain('unexpected-redirect-receipt');
   });
 
   it('keeps success, warning, and error on Mint, Gold, and Flare aliases', () => {
