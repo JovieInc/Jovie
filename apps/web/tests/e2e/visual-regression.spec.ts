@@ -386,7 +386,10 @@ test.describe('JOV-2081: Viewport matrix — homepage', () => {
         width: viewport.width,
         height: viewport.height,
       });
-      await page.goto('/', { waitUntil: 'networkidle', timeout: 60_000 });
+      await page.goto('/', {
+        waitUntil: 'domcontentloaded',
+        timeout: 60_000,
+      });
 
       if (isClerkRedirect(page.url())) {
         test.skip(true, 'Clerk handshake redirect');

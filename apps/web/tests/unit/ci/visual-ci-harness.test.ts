@@ -156,4 +156,43 @@ describe('visual CI harness', () => {
       'if [ "$mode" = "blocking" ] && [ "$status" -ne 0 ]'
     );
   });
+
+  it('does not gate homepage viewport screenshots on whole-page network idle', () => {
+    const source = readFileSync(
+      resolve(webWorkspace, 'tests/e2e/visual-regression.spec.ts'),
+      'utf8'
+    );
+    const blockStart = source.indexOf(
+      "test.describe('JOV-2081: Viewport matrix — homepage'"
+    );
+    const blockEnd = source.indexOf(
+      "test.describe('JOV-2081: Viewport matrix — /sign-up'",
+      blockStart
+    );
+
+    expect(blockStart).toBeGreaterThanOrEqual(0);
+    expect(blockEnd).toBeGreaterThan(blockStart);
+
+    const homepageViewportBlock = source.slice(blockStart, blockEnd);
+    const screenshotStart = homepageViewportBlock.indexOf(
+      'test(`homepage screenshot at ${viewport.label}px`'
+    );
+    const screenshotEnd = homepageViewportBlock.indexOf(
+      '\n    });',
+      screenshotStart
+    );
+
+    expect(screenshotStart).toBeGreaterThanOrEqual(0);
+    expect(screenshotEnd).toBeGreaterThan(screenshotStart);
+
+    const screenshotCase = homepageViewportBlock.slice(
+      screenshotStart,
+      screenshotEnd
+    );
+    expect(screenshotCase).toContain("waitUntil: 'domcontentloaded'");
+    expect(screenshotCase).not.toContain("waitUntil: 'networkidle'");
+    expect(screenshotCase).toContain(
+      "await expect(page.locator('h1').first()).toBeVisible"
+    );
+  });
 });
