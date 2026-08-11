@@ -363,7 +363,10 @@ export const ServerEnvSchema = z.object({
   E2E_USE_TEST_AUTH_BYPASS: z.string().optional(),
   E2E_CLERK_USER_ID: z.string().optional(),
   E2E_CLERK_USER_USERNAME: z.string().optional(),
+  // Production waitlist canary. The base address is shared with the OTP
+  // runner; the read token authorizes only the redacted canary receipt route.
   E2E_PROD_SIGNUP_EMAIL_BASE: z.string().email().optional(),
+  PRODUCTION_WAITLIST_CANARY_READ_TOKEN: z.string().min(32).optional(),
   E2E_PROD_SIGNUP_PASSWORD: z.string().optional(),
   E2E_PROD_MAILBOX_PROVIDER: z
     .enum(['gmail', 'cloudflare-email-routing'])
@@ -518,6 +521,7 @@ export const ENV_KEYS = [
   'SESSION_SECRET',
   'TURNSTILE_SECRET_KEY',
   'E2E_PROD_SIGNUP_EMAIL_BASE',
+  'PRODUCTION_WAITLIST_CANARY_READ_TOKEN',
   'E2E_PROD_SIGNUP_PASSWORD',
   'E2E_PROD_MAILBOX_PROVIDER',
   'E2E_PROD_MAILBOX_CLIENT_ID',

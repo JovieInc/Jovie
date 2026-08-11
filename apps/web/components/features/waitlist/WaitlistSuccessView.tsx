@@ -3,6 +3,10 @@
 import { useEffect } from 'react';
 import { AuthLayout } from '@/features/auth';
 import { track } from '@/lib/analytics';
+import {
+  PRODUCTION_WAITLIST_CANARY_RUN_HEADER,
+  PRODUCTION_WAITLIST_CANARY_STORAGE_KEY,
+} from '@/lib/canaries/production-waitlist-client';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import {
   type WaitlistDisplayOutcome,
@@ -27,6 +31,20 @@ export function WaitlistSuccessView({
         surface: 'waitlist_receipt',
         outcome,
       });
+
+      const syntheticRunId = globalThis.sessionStorage?.getItem(
+        PRODUCTION_WAITLIST_CANARY_STORAGE_KEY
+      );
+      if (syntheticRunId) {
+        void fetch('/api/canary/waitlist/receipt', {
+          method: 'POST',
+          headers: { [PRODUCTION_WAITLIST_CANARY_RUN_HEADER]: syntheticRunId },
+        }).finally(() => {
+          globalThis.sessionStorage?.removeItem(
+            PRODUCTION_WAITLIST_CANARY_STORAGE_KEY
+          );
+        });
+      }
     }
   }, [outcome]);
 

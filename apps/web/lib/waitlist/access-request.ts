@@ -3,10 +3,16 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
+import {
+  buildProductionWaitlistCanaryMarker,
+  hasProductionWaitlistCanaryNamespace,
+  isExactProductionWaitlistCanaryEmail,
+} from '@/lib/canaries/production-waitlist';
 import { type DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { withSerializableRetry } from '@/lib/db/serializable-retry';
+import { env } from '@/lib/env';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { notifySlackWaitlist } from '@/lib/notifications/providers/slack';
 import { normalizeEmail } from '@/lib/utils/email';
@@ -63,6 +69,8 @@ export interface WaitlistAccessRequestInput {
    * signup (`qualified_interview_signal`).
    */
   readonly interviewResponses?: InterviewResponses;
+  /** Validated by the authenticated intake route for the exact canary email. */
+  readonly syntheticRunId?: string;
 }
 
 export interface WaitlistAccessRequestResult {
@@ -344,8 +352,10 @@ async function handleExistingEntryResubmission(params: {
   readonly entryValues: ReturnType<typeof buildEntryValues>;
   readonly appUserId: string;
   readonly emailRaw: string;
+  readonly syntheticRunId?: string;
 }): Promise<InternalTransactionResult> {
-  const { tx, existing, entryValues, appUserId, emailRaw } = params;
+  const { tx, existing, entryValues, appUserId, emailRaw, syntheticRunId } =
+    params;
 
   if (isWaitlistApprovedStatus(existing.status)) {
     const statusChange = await upsertUserStatus({
@@ -392,6 +402,20 @@ async function handleExistingEntryResubmission(params: {
     nextStatus: 'waitlist_pending',
   });
 
+  if (syntheticRunId) {
+    await insertWaitlistAuditLog(tx, {
+      waitlistEntryId: existing.id,
+      fromStatus: existing.status,
+      toStatus: nextExistingStatus,
+      actorUserId: appUserId,
+      actorType: 'user',
+      reason: 'production_canary_reasserted',
+      metadata: {
+        syntheticCanary: buildProductionWaitlistCanaryMarker(syntheticRunId),
+      },
+    });
+  }
+
   return {
     entryId: existing.id,
     status: nextExistingStatus,
@@ -407,6 +431,18 @@ export async function submitWaitlistAccessRequest(
 ): Promise<WaitlistAccessRequestResult> {
   const normalizedEmail = normalizeEmail(input.email);
   const emailRaw = input.emailRaw ?? input.email;
+  const isExactProductionCanary = isExactProductionWaitlistCanaryEmail(
+    normalizedEmail,
+    env.E2E_PROD_SIGNUP_EMAIL_BASE
+  );
+  const suppressCanaryCommunications =
+    hasProductionWaitlistCanaryNamespace(normalizedEmail);
+  if (input.syntheticRunId && !isExactProductionCanary) {
+    throw new Error('Synthetic run id is restricted to the exact canary email');
+  }
+  const syntheticCanary = input.syntheticRunId
+    ? buildProductionWaitlistCanaryMarker(input.syntheticRunId)
+    : null;
 
   // Wrap the serializable transaction with bounded retry on transient
   // 40001/40P01 conflicts. This block must be idempotent; the transaction
@@ -432,6 +468,7 @@ export async function submitWaitlistAccessRequest(
             entryValues,
             appUserId: input.appUserId,
             emailRaw,
+            syntheticRunId: input.syntheticRunId,
           });
         }
 
@@ -461,6 +498,7 @@ export async function submitWaitlistAccessRequest(
               entryValues,
               appUserId: input.appUserId,
               emailRaw,
+              syntheticRunId: input.syntheticRunId,
             });
           }
 
@@ -505,10 +543,13 @@ export async function submitWaitlistAccessRequest(
           actorUserId: input.appUserId,
           actorType: 'user',
           reason: decision.qualification.reasonCode,
-          metadata: decision.qualification.details,
+          metadata: {
+            ...decision.qualification.details,
+            ...(syntheticCanary ? { syntheticCanary } : {}),
+          },
         });
 
-        if (nextStatus === 'waitlisted') {
+        if (nextStatus === 'waitlisted' && !suppressCanaryCommunications) {
           await enqueueWaitlistEmailJob(tx, {
             entryId: entry.id,
             type: 'waitlist_confirmation',
@@ -573,7 +614,11 @@ export async function submitWaitlistAccessRequest(
     result.entryCreated ||
     !result.statusChange.existed ||
     statusActuallyChanged;
-  if (isNewSignupOutcome && isStatusFreshlyAssigned) {
+  if (
+    isNewSignupOutcome &&
+    isStatusFreshlyAssigned &&
+    !suppressCanaryCommunications
+  ) {
     notifySlackWaitlist(input.fullName, normalizedEmail).catch(error => {
       logger.warn('[waitlist] Slack notification failed', error);
     });
