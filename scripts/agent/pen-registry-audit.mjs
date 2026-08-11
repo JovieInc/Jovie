@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 
+import { deriveCodeRegisteredIdentities } from './pen-code-registry.mjs';
 import {
   auditPenRegistryLedger,
   exitCodeForAudit,
@@ -11,21 +12,26 @@ import {
 
 function usage() {
   return (
-    `Usage: node scripts/agent/pen-registry-audit.mjs <ledger.json> [--render]\n\n` +
+    `Usage: node scripts/agent/pen-registry-audit.mjs <ledger.json> [--render] [--code-registry]\n\n` +
     `Audits a pen-registry-ledger/v1 export of the canonical Pen document.\n` +
     `Exit 0: ledger is singular and contradiction-free. Exit 1: audit failures.\n` +
     `Exit 2: malformed export or invocation. --render prints the mechanically\n` +
-    `generated visible ledger rows (only on a passing audit).\n`
+    `generated visible ledger rows (only on a passing audit). --code-registry\n` +
+    `derives the authoritative registered identities from the exact current\n` +
+    `code registry (apps/web/data/marketing/componentRegistry.ts) and fails\n` +
+    `the audit with registry-source-drift when the export disagrees.\n`
   );
 }
 
 function parseArgs(argv) {
-  const input = { render: false, ledgerPath: null };
+  const input = { render: false, codeRegistry: false, ledgerPath: null };
   for (let index = 2; index < argv.length; index++) {
     const arg = argv[index];
     if (arg === '--help' || arg === '-h') return { help: true, input };
     if (arg === '--render') {
       input.render = true;
+    } else if (arg === '--code-registry') {
+      input.codeRegistry = true;
     } else if (arg.startsWith('--')) {
       throw new Error(`Unknown argument: ${arg}`);
     } else if (input.ledgerPath === null) {
@@ -68,7 +74,17 @@ function main() {
       process.exitCode = 2;
       return;
     }
-    const receipt = auditPenRegistryLedger(ledger);
+    let codeIdentities;
+    if (input.codeRegistry) {
+      const derived = deriveCodeRegisteredIdentities();
+      codeIdentities = derived.ids;
+      process.stderr.write(
+        `code registry: ${derived.total} registered identities ` +
+          `(${derived.byKind.shell} shells, ${derived.byKind.section} sections, ` +
+          `${derived.byKind.recipe} recipes)\n`
+      );
+    }
+    const receipt = auditPenRegistryLedger(ledger, codeIdentities);
     process.stdout.write(`${JSON.stringify(receipt)}\n`);
     if (input.render && receipt.verdict === 'pass') {
       for (const line of renderLedgerLines(ledger)) {

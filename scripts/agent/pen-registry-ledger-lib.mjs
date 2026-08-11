@@ -238,8 +238,13 @@ function failure(code, registryId, detail) {
 /**
  * Audit a well-formed ledger export. Returns a `pen-registry-audit/v1`
  * receipt. Fail-closed: any contradiction makes verdict `fail`.
+ *
+ * `codeIdentities` (optional) is the registered-identity list derived from
+ * the exact current code registry. When provided, the export's claimed
+ * `registeredIdentities` must equal it exactly — the Pen document never
+ * defines the denominator; drift fails with `registry-source-drift`.
  */
-export function auditPenRegistryLedger(ledger) {
+export function auditPenRegistryLedger(ledger, codeIdentities) {
   const currentSourceSha = ledger.currentSourceSha;
   const failures = [];
   const records = ledger.records;
@@ -325,6 +330,42 @@ export function auditPenRegistryLedger(ledger) {
   }
 
   const registered = new Set(ledger.registeredIdentities);
+
+  if (codeIdentities !== undefined) {
+    if (
+      !Array.isArray(codeIdentities) ||
+      codeIdentities.some(id => !isNonEmptyString(id))
+    ) {
+      failures.push(
+        failure(
+          'registry-source-drift',
+          null,
+          'code-derived registered identities must be an array of non-empty strings'
+        )
+      );
+    } else {
+      const code = new Set(codeIdentities);
+      const staleInExport = [...registered].filter(id => !code.has(id));
+      const missingInExport = [...code].filter(id => !registered.has(id));
+      if (staleInExport.length > 0 || missingInExport.length > 0) {
+        failures.push(
+          failure(
+            'registry-source-drift',
+            null,
+            `export claims ${registered.size} registered identities but the ` +
+              `exact current code registry has ${code.size}` +
+              (staleInExport.length > 0
+                ? `; stale Pen-only rows: ${staleInExport.join(', ')}`
+                : '') +
+              (missingInExport.length > 0
+                ? `; unregistered code identities: ${missingInExport.join(', ')}`
+                : '')
+          )
+        );
+      }
+    }
+  }
+
   for (const record of records) {
     if (record.sourceBacked === false) continue;
     if (!registered.has(record.registryId)) {
@@ -373,6 +414,8 @@ export function auditPenRegistryLedger(ledger) {
     verdict: failures.length === 0 ? 'pass' : 'fail',
     currentSourceSha,
     registeredIdentities: registered.size,
+    codeRegisteredIdentities:
+      codeIdentities === undefined ? undefined : new Set(codeIdentities).size,
     denominator: {
       ...denominator,
       total: denominator.SAFE + denominator.PARTIAL + denominator.BLOCKED,

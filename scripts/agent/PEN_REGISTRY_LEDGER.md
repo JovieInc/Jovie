@@ -39,21 +39,43 @@ Status is computed from receipts, never asserted by hand:
 (PARTIAL where SAFE is entitled) and overclaiming (SAFE without full
 evidence) are both contradictions.
 
+## Registered identities come from code, not Pen
+
+The Pen document never defines the denominator. The authoritative registered
+identities are derived from the exact current code registry,
+`apps/web/data/marketing/componentRegistry.ts`
+(`MARKETING_COMPONENT_REGISTRY`). On exact current main this is **37
+identities** (8 shells + 17 sections + 12 recipes), including
+`shell.footer-cta` and `shell.final-cta`. Stale Pen-only roots —
+`shell.marketingfootercta`, `shell.marketingfinalcta`, and the
+`shell.marketingcontainer.prose` variant root (prose is a variant owned by
+`shell.container`, not a ninth shell identity) — are taxonomy drift, not
+registered identities, and must be rebound or archived without creating
+replacement roots.
+
+`scripts/agent/pen-code-registry.mjs` derives the list by importing the code
+registry with `tsx`; the audit CLI flag `--code-registry` compares the
+export's claimed `registeredIdentities` against it and fails with
+`registry-source-drift` on any disagreement. Never encode a fixed expected
+count in the Pen document; recompute from code.
+
 ## Mechanical workflow
 
 1. Export the registry roots and receipts from the canonical document into a
    `pen-registry-ledger/v1` JSON file (one record per registry identity,
    `registeredIdentities` listing every registry root).
-2. Run `node scripts/agent/pen-registry-audit.mjs <ledger.json>`. Exit 1 with
-   typed failures on: visible vs metadata status mismatch
+2. Run `node scripts/agent/pen-registry-audit.mjs <ledger.json> --code-registry`.
+   Exit 1 with typed failures on: visible vs metadata status mismatch
    (`visible-status-mismatch`), duplicate authoritative records
    (`duplicate-authoritative-record`), duplicated root nodes
    (`duplicate-root-node`), unentitled SAFE (`unsafe-safe`), silently retained
    stale proof (`stale-proof-retained`), status that does not recompute
    (`status-not-recomputable`), records for non-registered identities
-   (`unknown-registered-identity`), or a denominator that does not equal the
-   number of unique registered identities (`denominator-mismatch`). Exit 2
-   means the export itself is malformed.
+   (`unknown-registered-identity`), a denominator that does not equal the
+   number of unique registered identities (`denominator-mismatch`), or an
+   export whose registered identities disagree with the exact current code
+   registry (`registry-source-drift`). Exit 2 means the export itself is
+   malformed.
 3. Only on a passing audit, generate the visible ledger with
    `node scripts/agent/pen-registry-audit.mjs <ledger.json> --render` and
    write exactly those rows into the document. No manually duplicated status
@@ -70,3 +92,10 @@ denominator recompute) require the Pen writer lane on the canonical file.
 That lane is fail-closed until the single-writer preflight passes; see
 `PEN_SAVE_RECEIPT.md` and `pen-workspace-locks.json`. This CLI is the
 deterministic gate that lane must satisfy before and after any mutation.
+
+Promotion acceptance for the in-document repair: export the exact canonical
+node set (catalog root `ZiJW2`, ledger node `H8k0wk`), watch the current live
+state fail with typed contradictions, regenerate one visible ledger from one
+authoritative metadata record (37 rows, code-derived), then prove same-file
+Pen MCP readback. A fixture-only test pass does not establish the document
+is repaired.

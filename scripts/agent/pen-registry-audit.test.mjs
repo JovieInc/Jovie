@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { deriveCodeRegisteredIdentities } from './pen-code-registry.mjs';
 import {
   auditPenRegistryLedger,
   computeEntitledStatus,
@@ -415,7 +416,10 @@ test('render is deterministic and contains no hand-authored status strings', () 
 });
 
 function runCli(args) {
-  return spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8' });
+  return spawnSync(process.execPath, [CLI, ...args], {
+    encoding: 'utf8',
+    cwd: join(HERE, '..', '..'),
+  });
 }
 
 function withLedgerFile(value, fn) {
@@ -480,4 +484,90 @@ test('CLI exits 2 on malformed exports and bad invocations', () => {
   const help = runCli(['--help']);
   assert.equal(help.status, 0);
   assert.match(help.stdout, /Usage:/);
+});
+
+test('registry-source-drift: export identities must equal code-derived identities', () => {
+  const codeIdentities = ['section.faq', 'section.hero'];
+  const matching = auditPenRegistryLedger(ledger(), codeIdentities);
+  assert.equal(matching.verdict, 'pass');
+  assert.equal(matching.codeRegisteredIdentities, 2);
+
+  const drifted = auditPenRegistryLedger(
+    ledger({
+      registeredIdentities: [
+        'section.faq',
+        'section.hero',
+        'shell.marketingcontainer.prose',
+      ],
+    }),
+    codeIdentities
+  );
+  assert.equal(drifted.verdict, 'fail');
+  assert.ok(failureCodes(drifted).includes('registry-source-drift'));
+  const drift = drifted.failures.find(
+    entry => entry.code === 'registry-source-drift'
+  );
+  assert.match(drift.detail, /shell\.marketingcontainer\.prose/);
+});
+
+test('code registry derivation reads the exact current code: 37 identities', () => {
+  const derived = deriveCodeRegisteredIdentities({
+    cwd: join(HERE, '..', '..'),
+  });
+  assert.equal(derived.total, 37);
+  assert.deepEqual(derived.byKind, { shell: 8, section: 17, recipe: 12 });
+  assert.ok(derived.ids.includes('shell.footer-cta'));
+  assert.ok(derived.ids.includes('shell.final-cta'));
+  for (const stale of [
+    'shell.marketingfootercta',
+    'shell.marketingfinalcta',
+    'shell.marketingcontainer.prose',
+  ]) {
+    assert.ok(
+      !derived.ids.includes(stale),
+      `${stale} is a stale Pen-only root, not a code identity`
+    );
+  }
+});
+
+function blockedRecordFor(registryId, index) {
+  return record({
+    registryId,
+    rootNodeId: `root${index}`,
+    metadataStatus: 'BLOCKED',
+    visibleStatus: 'BLOCKED',
+    receipts: [],
+    blocker: 'awaiting receipts',
+  });
+}
+
+test('CLI --code-registry: live export drift fails, converged export passes', () => {
+  const cwd = join(HERE, '..', '..');
+  const derived = deriveCodeRegisteredIdentities({ cwd });
+  const converged = ledger({
+    registeredIdentities: derived.ids,
+    records: derived.ids.map((id, index) => blockedRecordFor(id, index)),
+  });
+  withLedgerFile(JSON.stringify(converged), path => {
+    const result = runCli([path, '--code-registry']);
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const receipt = JSON.parse(result.stdout);
+    assert.equal(receipt.verdict, 'pass');
+    assert.equal(receipt.registeredIdentities, 37);
+    assert.equal(receipt.codeRegisteredIdentities, 37);
+    assert.equal(receipt.denominator.total, 37);
+    assert.match(result.stderr, /37 registered identities/);
+  });
+
+  const drifted = ledger({
+    registeredIdentities: [...derived.ids, 'shell.marketingcontainer.prose'],
+    records: derived.ids.map((id, index) => blockedRecordFor(id, index)),
+  });
+  withLedgerFile(JSON.stringify(drifted), path => {
+    const result = runCli([path, '--code-registry']);
+    assert.equal(result.status, 1);
+    const receipt = JSON.parse(result.stdout);
+    assert.equal(receipt.verdict, 'fail');
+    assert.ok(failureCodes(receipt).includes('registry-source-drift'));
+  });
 });
