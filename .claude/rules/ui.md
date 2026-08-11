@@ -2,6 +2,11 @@
 
 Design system, component hierarchy, surfaces, taste rules. Always read `DESIGN.md` before making any visual decisions.
 
+This contract covers every rendered Jovie surface, including internal HTML
+artifacts, rendered specs, approval consoles, review pages, admin tools, and ops
+tools. Internal or generated output has no exemption and must not introduce a
+parallel design system or review standard.
+
 ## Component Architecture
 
 Components follow atomic design with feature-based grouping:
