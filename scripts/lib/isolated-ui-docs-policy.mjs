@@ -275,7 +275,8 @@ function executableImportSources(content, filename) {
     true
   );
   const parseDiagnostics = Reflect.get(sourceFile, 'parseDiagnostics');
-  if (!Array.isArray(parseDiagnostics) || parseDiagnostics.length > 0) return null;
+  if (!Array.isArray(parseDiagnostics) || parseDiagnostics.length > 0)
+    return null;
   const sources = [];
   let complete = true;
   const visit = node => {
