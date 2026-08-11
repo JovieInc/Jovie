@@ -49,6 +49,13 @@ describe('Marketing terminal CTA wrappers', () => {
       'href',
       '/pricing'
     );
+    expect(
+      screen.getByRole('link', { name: 'Request Access' })
+    ).toHaveAttribute('data-variant', 'primary');
+    expect(screen.getByRole('link', { name: 'See Pricing' })).toHaveAttribute(
+      'data-variant',
+      'tertiary'
+    );
   });
 
   it('keeps footer analytics and emits only one primary action by default', () => {

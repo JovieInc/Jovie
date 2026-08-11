@@ -327,6 +327,20 @@ describe('canonical marketing component registry', () => {
     }
   });
 
+  it('keeps terminal CTA actions on the canonical Button atom', () => {
+    const source = fs.readFileSync(
+      path.join(repoRoot, 'apps/web/components/site/MarketingTerminalCta.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("import { Button } from '@jovie/ui'");
+    expect(source).toContain("variant='primary'");
+    expect(source).toContain("variant='tertiary'");
+    expect(source.match(/asChild/g)).toHaveLength(2);
+    expect(source).not.toContain('public-action-primary');
+    expect(source).not.toContain('focus-visible:ring-white/40');
+  });
+
   it('keeps contract ids and Pen roots globally unique', () => {
     const ids = MARKETING_COMPONENT_REGISTRY.map(entry => entry.id);
     const roots = MARKETING_COMPONENT_REGISTRY.flatMap(entry => [
