@@ -95,10 +95,12 @@ for a future separately reviewed Pen receipt. It validates, without opening a
 `.pen` file, that the native producer supplied the exact profile-locked source
 path, source-byte identity, runtime/build identity, zero
 execute/open/switch/output/save/backup/file-change activity, and a complete
-root-to-descendant graph. The caller must also supply the trusted, versioned
-complete node inventory and ordered roots; absence or self-consistent omission
-fails closed. The validator recomputes the canonical-manifest SHA-256 over the
-normalized graph. Every node must have stable identity, type/name,
+root-to-descendant graph. The validator resolves the path, complete node
+inventory, and ordered roots only from `pen-workspace-locks.json`; receipt-side
+options cannot replace that authority. The production profile remains
+explicitly unavailable until a reviewed Pen-native inventory exists, so all
+receipts fail closed in the meantime. The validator recomputes the
+canonical-manifest SHA-256 over the normalized graph. Every node must have stable identity, type/name,
 reusable/ref identity, ordered child IDs, and a properties digest; unreachable
 nodes, missing children, malformed child lists, duplicate IDs, and cycles fail
 closed.

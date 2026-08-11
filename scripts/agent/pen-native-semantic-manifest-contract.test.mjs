@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import test, { after } from 'node:test';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   diffPenSemanticManifests,
@@ -10,11 +14,41 @@ import {
 
 const PATH = '/workspace/canonical.pen';
 const DIGEST = 'a'.repeat(64);
-const LOCKED_OPTIONS = {
-  lockedExpectedPath: PATH,
-  lockedExpectedNodeIds: ['root', 'child'],
-  lockedExpectedRootIds: ['root'],
-};
+const fixtureDirectory = mkdtempSync(join(tmpdir(), 'pen-manifest-authority-'));
+const fixtureModulePath = join(
+  fixtureDirectory,
+  'pen-native-semantic-manifest-contract.mjs'
+);
+writeFileSync(
+  fixtureModulePath,
+  readFileSync(
+    fileURLToPath(
+      new URL('./pen-native-semantic-manifest-contract.mjs', import.meta.url)
+    )
+  )
+);
+writeFileSync(
+  join(fixtureDirectory, 'pen-workspace-locks.json'),
+  JSON.stringify({
+    schema: 'pen-workspace-locks/v1',
+    profiles: {
+      fixture: {
+        canonical_path: PATH,
+        read_only_paths: [],
+        native_semantic_manifest_authority: {
+          status: 'available',
+          expected_source_path: PATH,
+          node_ids: ['root', 'child'],
+          root_ids: ['root'],
+        },
+      },
+    },
+  })
+);
+const fixtureContract = await import(pathToFileURL(fixtureModulePath).href);
+const validateFixtureReceipt =
+  fixtureContract.validatePenNativeSemanticManifestReceipt;
+after(() => rmSync(fixtureDirectory, { recursive: true, force: true }));
 
 function receipt(overrides = {}) {
   const nodes = [
@@ -39,6 +73,7 @@ function receipt(overrides = {}) {
   ];
   const result = {
     schema: PEN_NATIVE_SEMANTIC_MANIFEST_SCHEMA,
+    workspace_profile: 'fixture',
     verdict: 'verified',
     inspection_method: 'pen-native-non-evaluating',
     source_path: PATH,
@@ -79,10 +114,10 @@ function receipt(overrides = {}) {
 }
 
 test('accepts a complete native manifest and rejects incomplete traversal', () => {
-  assert.deepEqual(
-    validatePenNativeSemanticManifestReceipt(receipt(), LOCKED_OPTIONS),
-    { valid: true, errors: [] }
-  );
+  assert.deepEqual(validateFixtureReceipt(receipt()), {
+    valid: true,
+    errors: [],
+  });
 
   const truncated = receipt({
     semantic_manifest: {
@@ -91,10 +126,7 @@ test('accepts a complete native manifest and rejects incomplete traversal', () =
       total_node_count: 1,
     },
   });
-  const result = validatePenNativeSemanticManifestReceipt(
-    truncated,
-    LOCKED_OPTIONS
-  );
+  const result = validateFixtureReceipt(truncated);
   assert.equal(result.valid, false);
   assert.ok(result.errors.some(error => error.code === 'child_id_missing'));
 
@@ -112,10 +144,10 @@ test('accepts a complete native manifest and rejects incomplete traversal', () =
       ],
     },
   });
-  const omissionResult = validatePenNativeSemanticManifestReceipt(
-    selfConsistentOmission,
-    LOCKED_OPTIONS
-  );
+  const omissionResult = validateFixtureReceipt(selfConsistentOmission, {
+    lockedExpectedNodeIds: ['root'],
+    lockedExpectedRootIds: ['root'],
+  });
   assert.equal(omissionResult.valid, false);
   assert.ok(
     omissionResult.errors.some(
@@ -132,22 +164,19 @@ test('accepts a complete native manifest and rejects incomplete traversal', () =
       nodes: [],
     },
   });
-  const emptyResult = validatePenNativeSemanticManifestReceipt(
-    emptyManifest,
-    LOCKED_OPTIONS
-  );
+  const emptyResult = validateFixtureReceipt(emptyManifest);
   assert.equal(emptyResult.valid, false);
   assert.ok(emptyResult.errors.some(error => error.code === 'manifest_empty'));
 });
 
 test('rejects activity, nonzero event deltas, and identity mismatches', () => {
-  const result = validatePenNativeSemanticManifestReceipt(
+  const result = validateFixtureReceipt(
     receipt({
       source_path: '/tmp/recovery.pen',
       direct_file_read: true,
       event_deltas: { ...receipt().event_deltas, backup: 1 },
     }),
-    LOCKED_OPTIONS
+    { lockedExpectedPath: '/tmp/recovery.pen' }
   );
   assert.equal(result.valid, false);
   assert.deepEqual(
@@ -160,16 +189,20 @@ test('rejects activity, nonzero event deltas, and identity mismatches', () => {
   );
 });
 
-test('requires locked authority, binds the digest, and never throws on malformed children', () => {
-  const unlocked = validatePenNativeSemanticManifestReceipt(receipt());
-  assert.equal(unlocked.valid, false);
+test('requires repository authority, binds the digest, and never throws on malformed children', () => {
+  const unavailable = validatePenNativeSemanticManifestReceipt({
+    ...receipt(),
+    workspace_profile: 'jovie-founder-design-studio',
+  });
+  assert.equal(unavailable.valid, false);
   assert.ok(
-    unlocked.errors.some(error => error.code === 'locked_expected_path_missing')
+    unavailable.errors.some(
+      error => error.code === 'workspace_authority_unavailable'
+    )
   );
 
-  const forgedDigest = validatePenNativeSemanticManifestReceipt(
-    receipt({ canonical_manifest_sha256: 'f'.repeat(64) }),
-    LOCKED_OPTIONS
+  const forgedDigest = validateFixtureReceipt(
+    receipt({ canonical_manifest_sha256: 'f'.repeat(64) })
   );
   assert.equal(forgedDigest.valid, false);
   assert.ok(
@@ -180,13 +213,8 @@ test('requires locked authority, binds the digest, and never throws on malformed
 
   const malformed = receipt();
   Reflect.set(malformed.semantic_manifest.nodes[0], 'child_ids', {});
-  assert.doesNotThrow(() =>
-    validatePenNativeSemanticManifestReceipt(malformed, LOCKED_OPTIONS)
-  );
-  const malformedResult = validatePenNativeSemanticManifestReceipt(
-    malformed,
-    LOCKED_OPTIONS
-  );
+  assert.doesNotThrow(() => validateFixtureReceipt(malformed));
+  const malformedResult = validateFixtureReceipt(malformed);
   assert.equal(malformedResult.valid, false);
   assert.ok(
     malformedResult.errors.some(error => error.code === 'node_children_invalid')

@@ -1,10 +1,14 @@
 import { createHash } from 'node:crypto';
-import { isAbsolute } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { dirname, isAbsolute, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const PEN_NATIVE_SEMANTIC_MANIFEST_SCHEMA =
   'pen-native-semantic-manifest/v1';
 
 const SHA256 = /^[a-f0-9]{64}$/;
+const HERE = dirname(fileURLToPath(import.meta.url));
+const PROFILE_PATH = join(HERE, 'pen-workspace-locks.json');
 
 function text(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -36,6 +40,54 @@ function identifierList(value) {
     return null;
   }
   return identifiers;
+}
+
+function resolveWorkspaceAuthority(profileName) {
+  const name = text(profileName);
+  if (!name) {
+    return {
+      error: 'workspace_profile_missing',
+      message: 'A versioned workspace profile is required.',
+    };
+  }
+
+  let locks;
+  try {
+    locks = JSON.parse(readFileSync(PROFILE_PATH, 'utf8'));
+  } catch {
+    return {
+      error: 'workspace_authority_unavailable',
+      message: 'The versioned workspace authority could not be loaded.',
+    };
+  }
+
+  const profile = locks?.profiles?.[name];
+  if (!record(profile)) {
+    return {
+      error: 'workspace_profile_unknown',
+      message: 'The workspace profile is not registered.',
+    };
+  }
+
+  const authority = profile.native_semantic_manifest_authority;
+  const expectedPath = text(authority?.expected_source_path);
+  const expectedNodeIds = identifierList(authority?.node_ids);
+  const expectedRootIds = identifierList(authority?.root_ids);
+  if (
+    !record(authority) ||
+    authority.status !== 'available' ||
+    !penPath(expectedPath) ||
+    !expectedNodeIds ||
+    !expectedRootIds
+  ) {
+    return {
+      error: 'workspace_authority_unavailable',
+      message:
+        'The versioned profile has no reviewed complete semantic-manifest authority.',
+    };
+  }
+
+  return { expectedPath, expectedNodeIds, expectedRootIds };
 }
 
 function canonicalNode(node) {
@@ -101,10 +153,7 @@ export function hashPenSemanticManifest(manifest) {
  * This function never reads a document or computes a digest from document
  * bytes. It only validates facts produced inside Pen.
  */
-export function validatePenNativeSemanticManifestReceipt(
-  receipt,
-  options = {}
-) {
+export function validatePenNativeSemanticManifestReceipt(receipt) {
   const errors = [];
   if (!record(receipt)) {
     return {
@@ -133,21 +182,18 @@ export function validatePenNativeSemanticManifestReceipt(
       'Inspection must be Pen-native and non-evaluating.'
     );
 
+  const authority = resolveWorkspaceAuthority(receipt.workspace_profile);
+  if (authority.error) add(errors, authority.error, authority.message);
+
   const sourcePath = text(receipt.source_path);
-  const expectedPath = text(options.lockedExpectedPath);
+  const expectedPath = text(authority.expectedPath);
   if (!penPath(sourcePath))
     add(
       errors,
       'source_path_invalid',
       'Source path must be an absolute .pen path.'
     );
-  if (!penPath(expectedPath))
-    add(
-      errors,
-      'locked_expected_path_missing',
-      'A trusted profile-locked expected path is required.'
-    );
-  else if (sourcePath !== expectedPath)
+  if (expectedPath && sourcePath !== expectedPath)
     add(
       errors,
       'source_path_mismatch',
@@ -321,14 +367,8 @@ export function validatePenNativeSemanticManifestReceipt(
       'reusable_count must match reusable nodes.'
     );
 
-  const expectedNodeIds = identifierList(options.lockedExpectedNodeIds);
-  if (!expectedNodeIds) {
-    add(
-      errors,
-      'locked_expected_node_ids_missing',
-      'Trusted complete node IDs are required to detect self-consistent omission.'
-    );
-  } else {
+  const expectedNodeIds = authority.expectedNodeIds;
+  if (expectedNodeIds) {
     const actualNodeIds = [...byId.keys()].sort();
     const lockedNodeIds = [...expectedNodeIds].sort();
     if (JSON.stringify(actualNodeIds) !== JSON.stringify(lockedNodeIds)) {
@@ -340,14 +380,9 @@ export function validatePenNativeSemanticManifestReceipt(
     }
   }
 
-  const expectedRootIds = identifierList(options.lockedExpectedRootIds);
-  if (!expectedRootIds) {
-    add(
-      errors,
-      'locked_expected_root_ids_missing',
-      'Trusted ordered root IDs are required.'
-    );
-  } else if (
+  const expectedRootIds = authority.expectedRootIds;
+  if (
+    expectedRootIds &&
     JSON.stringify(roots.map(text)) !== JSON.stringify(expectedRootIds)
   ) {
     add(
