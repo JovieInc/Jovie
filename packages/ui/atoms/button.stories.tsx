@@ -197,7 +197,7 @@ export const ProductionPrimaryLgFixtures: Story = {
     <div className='flex flex-col gap-4 p-8'>
       <div>
         <h3 className='text-sm font-semibold mb-2'>
-          /download — leading-icon override
+          /download — label override (icon composed in source)
         </h3>
         <Button variant='primary' size='lg' className='gap-2 px-6'>
           <svg
@@ -219,7 +219,7 @@ export const ProductionPrimaryLgFixtures: Story = {
       </div>
       <div>
         <h3 className='text-sm font-semibold mb-2'>
-          Footer / final CTA — icon slot disabled
+          Footer / final CTA — label override
         </h3>
         <Button variant='primary' size='lg'>
           Get started
@@ -232,7 +232,7 @@ export const ProductionPrimaryLgFixtures: Story = {
     docs: {
       description: {
         story:
-          'Exact production-backed primary/lg selections that resolve to the same Pen master (button/primary/lg/idle) with independent label/icon overrides.',
+          'Exact production-backed primary/lg selections that resolve to the same Pen master (button/primary/lg/idle) with independent label overrides. The /download leading icon is source-composed child content: live Pen readback shows the master exposes no leading-icon slot, so icon overrides fail closed.',
       },
     },
   },

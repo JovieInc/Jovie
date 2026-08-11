@@ -67,9 +67,12 @@ export interface ButtonPenMaster {
  * back to another master.
  *
  * Receipts (canonical active Pen file, native save + CLI readback):
- * - `button/primary/lg/idle` → master `g3IC1`, label `iqbJo`,
- *   leadingIcon `M2rMD2`; production refs `NRxLZ` (/download) and `w0wvCh`
- *   (footer) persist with independent label/icon overrides.
+ * - `button/primary/lg/idle` → master `g3IC1`, label `iqbJo`; production refs
+ *   `NRxLZ` (/download) and `w0wvCh` (footer) persist with independent label
+ *   overrides. Live Pen readback shows `g3IC1` has no leading-icon
+ *   descendant, so no `leadingIcon` slot is declared and leading-icon
+ *   overrides fail closed until the Pen lane returns a verified same-root
+ *   icon descendant.
  */
 export const BUTTON_PEN_CONTRACT: {
   readonly rootByVariantKey: Readonly<
@@ -81,7 +84,6 @@ export const BUTTON_PEN_CONTRACT: {
       rootId: 'g3IC1',
       descendants: {
         label: 'iqbJo',
-        leadingIcon: 'M2rMD2',
       },
     },
   },

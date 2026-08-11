@@ -125,7 +125,6 @@ export const BUTTON_PEN_PROPAGATION_FIXTURES = [
     route: '/download',
     source: 'apps/web/app/(marketing)/download/page.tsx',
     label: 'Download for Mac',
-    leadingIcon: 'ArrowDownToLine',
     variant: 'primary',
     size: 'lg',
   },

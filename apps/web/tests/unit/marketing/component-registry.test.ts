@@ -614,7 +614,6 @@ describe('canonical shared source atom registry', () => {
       variant: 'primary',
       size: 'lg',
       label: 'Download for Mac',
-      leadingIcon: 'ArrowDownToLine',
     } as const;
 
     const master =
@@ -631,19 +630,32 @@ describe('canonical shared source atom registry', () => {
       variant: { destructive: 'false', size: 'lg', variant: 'primary' },
       overrides: [
         {
-          nodeId: master?.descendants.leadingIcon,
-          property: 'icon',
-          value: 'ArrowDownToLine',
-        },
-        {
           nodeId: master?.descendants.label,
           property: 'content',
           value: 'Download for Mac',
         },
-      ].sort((a, b) =>
-        `${a.nodeId}:${a.property}`.localeCompare(`${b.nodeId}:${b.property}`)
-      ),
+      ],
     });
+  });
+
+  it('fails closed for leading-icon overrides without a verified Pen slot', () => {
+    const master =
+      BUTTON_PEN_CONTRACT.rootByVariantKey['button/primary/lg/idle'];
+
+    // Live Pen readback shows master g3IC1 has no leading-icon descendant, so
+    // an icon override must throw instead of claiming an unproven slot.
+    expect(master?.descendants.leadingIcon).toBeUndefined();
+    expect(() =>
+      normalizeButtonPenRef({
+        componentId: 'atom.button',
+        variant: 'primary',
+        size: 'lg',
+        label: 'Download for Mac',
+        leadingIcon: 'ArrowDownToLine',
+      })
+    ).toThrow(
+      `Unsupported atom.button Pen override: button/primary/lg/idle master ${master?.rootId} has no leading-icon slot`
+    );
   });
 
   it('fails closed for selections without a source-backed Pen master', () => {
@@ -705,9 +717,9 @@ describe('canonical shared source atom registry', () => {
           ref.overrides.find(override => override.property === 'content')?.value
       )
     ).toEqual(['Download for Mac', 'Get started']);
-    // The /download instance keeps its leading-icon override while the footer
-    // instance disables the icon slot on the same master.
-    expect(refs[0]?.overrides).toHaveLength(2);
+    // Both instances carry only their independent label override; neither
+    // claims a leading-icon slot the Pen master does not expose.
+    expect(refs[0]?.overrides).toHaveLength(1);
     expect(refs[1]?.overrides).toHaveLength(1);
   });
 });
