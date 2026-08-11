@@ -4080,6 +4080,14 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 /* HOMEPAGE MEET JOVIE SYSTEM B START */
 .homepage-meet-jovie {
+  /* Founder-locked T1: keep the supporting line quieter than the shared
+     tertiary token without introducing a route-local raw color. */
+  --homepage-meet-jovie-secondary-color: color-mix(
+    in oklab,
+    var(--color-text-tertiary-token) 68%,
+    var(--system-b-bg-page)
+  );
+
   position: relative;
   z-index: 1;
   overflow: clip;
@@ -4122,7 +4130,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-meet-jovie__heading-secondary {
-  color: var(--color-text-tertiary-token);
+  color: var(--homepage-meet-jovie-secondary-color);
 }
 
 /* HOMEPAGE MEET JOVIE SYSTEM B END */

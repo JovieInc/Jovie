@@ -128,6 +128,8 @@ describe('mounted homepage Meet Jovie System B source contract', () => {
     expect(css).toContain('var(--system-b-bg-page)');
     expect(css).toContain('var(--color-text-primary-token)');
     expect(css).toContain('var(--color-text-tertiary-token)');
+    expect(css).toContain('--homepage-meet-jovie-secondary-color');
+    expect(css).toContain('var(--homepage-meet-jovie-secondary-color)');
     expect(css).toContain('var(--ds-public-content-max)');
     expect(css).toContain('var(--homepage-page-gutter)');
     expect(css).toContain('var(--homepage-section-title-size)');
