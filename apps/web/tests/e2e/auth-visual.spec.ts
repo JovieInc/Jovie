@@ -51,6 +51,12 @@ async function blockAnalytics(page: import('@playwright/test').Page) {
   );
 }
 
+async function neutralizeAuthScreenshotPointer(
+  page: import('@playwright/test').Page
+) {
+  await page.mouse.move(0, 0);
+}
+
 /**
  * Mask elements with content that changes on every load
  * (Clerk CSRF tokens, any time-based fields, etc.)
@@ -117,6 +123,7 @@ test.describe('Auth modal visual regression', () => {
           return;
         }
 
+        await neutralizeAuthScreenshotPointer(page);
         await expect(page).toHaveScreenshot(`modal-signin-${bp.name}.png`, {
           fullPage: false,
           maxDiffPixels: 200,
@@ -145,6 +152,7 @@ test.describe('Auth modal visual regression', () => {
           return;
         }
 
+        await neutralizeAuthScreenshotPointer(page);
         await expect(page).toHaveScreenshot(`modal-signup-${bp.name}.png`, {
           fullPage: false,
           maxDiffPixels: 200,
@@ -188,6 +196,7 @@ test.describe('/signin page visual regression', () => {
         .isVisible({ timeout: SNAPSHOT_TIMEOUT })
         .catch(() => false);
 
+      await neutralizeAuthScreenshotPointer(page);
       await expect(page).toHaveScreenshot(`signin-page-${bp.name}.png`, {
         fullPage: false,
         maxDiffPixels: 200,
@@ -228,6 +237,7 @@ test.describe('/signup page visual regression', () => {
         .isVisible({ timeout: SNAPSHOT_TIMEOUT })
         .catch(() => false);
 
+      await neutralizeAuthScreenshotPointer(page);
       await expect(page).toHaveScreenshot(`signup-page-${bp.name}.png`, {
         fullPage: false,
         maxDiffPixels: 200,

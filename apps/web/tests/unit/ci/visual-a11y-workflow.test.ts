@@ -221,6 +221,20 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(authVisualSpec).toContain('modal-signup-${bp.name}.png');
     expect(authVisualSpec).toContain('signin-page-${bp.name}.png');
     expect(authVisualSpec).toContain('signup-page-${bp.name}.png');
+    expect(authVisualSpec).toContain(
+      'async function neutralizeAuthScreenshotPointer'
+    );
+    expect(authVisualSpec).toContain('await page.mouse.move(0, 0);');
+
+    const authScreenshotSegments = authVisualSpec.split(
+      'await expect(page).toHaveScreenshot'
+    );
+    expect(authScreenshotSegments).toHaveLength(5);
+    for (const segmentBeforeScreenshot of authScreenshotSegments.slice(0, -1)) {
+      expect(segmentBeforeScreenshot.trimEnd()).toMatch(
+        /await neutralizeAuthScreenshotPointer\(page\);$/
+      );
+    }
     expect(getScreenshotArguments(newLandingSpec)).toEqual([]);
     expect(
       existsSync(resolve(newLandingSnapshotDir, 'landing-hero-mobile.png'))
