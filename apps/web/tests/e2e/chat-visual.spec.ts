@@ -14,7 +14,7 @@
  * @see apps/web/playwright.config.ts (snapshot config)
  */
 
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { ensureSignedInUser, hasClerkCredentials } from '../helpers/clerk-auth';
 import {
@@ -25,6 +25,10 @@ import {
 const COMPOSER_SURFACE = '[data-testid="chat-composer-surface"]';
 const COMPOSER_TEXTAREA = '[aria-label="Chat Message Input"]';
 const SLASH_MENU = '[data-testid="slash-command-menu"]';
+
+function getVisibleComposerSurface(page: Page) {
+  return page.locator(COMPOSER_SURFACE).filter({ visible: true });
+}
 
 test.describe('Chat composer visual regression', () => {
   test.beforeAll(() => {
@@ -37,13 +41,13 @@ test.describe('Chat composer visual regression', () => {
     await ensureSignedInUser(page);
     await smokeNavigateWithRetry(page, APP_ROUTES.CHAT, { timeout: 60_000 });
     await waitForHydration(page);
-    await expect(page.locator(COMPOSER_SURFACE)).toBeVisible({
+    await expect(getVisibleComposerSurface(page)).toBeVisible({
       timeout: 30_000,
     });
   });
 
   test('empty state', async ({ page }) => {
-    const surface = page.locator(COMPOSER_SURFACE);
+    const surface = getVisibleComposerSurface(page);
     await expect(surface).toHaveAttribute('data-surface-mode', 'empty', {
       timeout: 5_000,
     });
@@ -53,8 +57,8 @@ test.describe('Chat composer visual regression', () => {
   });
 
   test('typing state', async ({ page }) => {
-    await page.locator(COMPOSER_TEXTAREA).fill('Hello');
-    const surface = page.locator(COMPOSER_SURFACE);
+    const surface = getVisibleComposerSurface(page);
+    await surface.locator(COMPOSER_TEXTAREA).fill('Hello');
     await expect(surface).toHaveAttribute('data-surface-mode', 'typing', {
       timeout: 5_000,
     });
@@ -64,14 +68,14 @@ test.describe('Chat composer visual regression', () => {
   });
 
   test('root picker', async ({ page }) => {
-    const textarea = page.locator(COMPOSER_TEXTAREA);
+    const surface = getVisibleComposerSurface(page);
+    const textarea = surface.locator(COMPOSER_TEXTAREA);
     await textarea.click();
     await page.keyboard.press('/');
-    const surface = page.locator(COMPOSER_SURFACE);
     await expect(surface).toHaveAttribute('data-surface-mode', 'root', {
       timeout: 5_000,
     });
-    await expect(page.locator(SLASH_MENU)).toBeVisible({ timeout: 5_000 });
+    await expect(surface.locator(SLASH_MENU)).toBeVisible({ timeout: 5_000 });
     await expect(surface).toHaveScreenshot('composer-root.png', {
       maxDiffPixelRatio: 0.03,
     });
