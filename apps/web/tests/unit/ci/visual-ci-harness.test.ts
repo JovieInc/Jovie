@@ -195,4 +195,32 @@ describe('visual CI harness', () => {
       "await expect(page.locator('h1').first()).toBeVisible"
     );
   });
+
+  it('does not gate auth modal entry navigation on whole-page network idle', () => {
+    const source = readFileSync(
+      resolve(webWorkspace, 'tests/e2e/auth-visual.spec.ts'),
+      'utf8'
+    );
+    const helperStart = source.indexOf(
+      'async function openInterceptedAuthModal('
+    );
+    const helperEnd = source.indexOf('\n// --------', helperStart);
+
+    expect(helperStart).toBeGreaterThanOrEqual(0);
+    expect(helperEnd).toBeGreaterThan(helperStart);
+
+    const helper = source.slice(helperStart, helperEnd);
+    const gotoStart = helper.indexOf("await page.goto('/', {");
+    const gotoEnd = helper.indexOf('\n  });', gotoStart);
+
+    expect(gotoStart).toBeGreaterThanOrEqual(0);
+    expect(gotoEnd).toBeGreaterThan(gotoStart);
+
+    const gotoCall = helper.slice(gotoStart, gotoEnd);
+    expect(gotoCall).toContain("waitUntil: 'domcontentloaded'");
+    expect(gotoCall).not.toContain("waitUntil: 'networkidle'");
+    expect(source.match(/waitUntil: 'domcontentloaded'/g)).toHaveLength(3);
+    expect(source).not.toContain("waitUntil: 'networkidle'");
+    expect(helper).toContain("await page.waitForLoadState('networkidle'");
+  });
 });

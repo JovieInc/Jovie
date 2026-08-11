@@ -74,7 +74,7 @@ async function openInterceptedAuthModal(
   mode: 'signin' | 'signup'
 ) {
   await page.goto('/', {
-    waitUntil: 'networkidle',
+    waitUntil: 'domcontentloaded',
     timeout: NAV_TIMEOUT,
   });
 
@@ -168,7 +168,7 @@ test.describe('/signin page visual regression', () => {
       await page.setViewportSize({ width: bp.width, height: bp.height });
 
       await page.goto(APP_ROUTES.SIGNIN, {
-        waitUntil: 'networkidle',
+        waitUntil: 'domcontentloaded',
         timeout: NAV_TIMEOUT,
       });
 
@@ -210,7 +210,7 @@ test.describe('/signup page visual regression', () => {
       await page.setViewportSize({ width: bp.width, height: bp.height });
 
       await page.goto(APP_ROUTES.SIGNUP, {
-        waitUntil: 'networkidle',
+        waitUntil: 'domcontentloaded',
         timeout: NAV_TIMEOUT,
       });
 
