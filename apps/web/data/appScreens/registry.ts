@@ -37,14 +37,35 @@ export interface AppScreenRecipeRegistryEntry {
   readonly allowedKinds: readonly AppScreenKind[];
 }
 
+/**
+ * Deterministic Storybook body contract for one design-reference screen.
+ * The id is browser-safe (Storybook `sanitize`-compatible: lowercase
+ * alphanumerics and dashes, `<kind>--<story>`) and the recipe/components must
+ * match the screen's declared recipe exactly.
+ */
+export interface AppScreenStoryContract {
+  readonly id: string;
+  readonly recipeId: AppScreenRecipeId;
+  readonly componentIds: readonly AppScreenComponentId[];
+}
+
 export interface AppScreenRegistryEntry {
   readonly id: `screen.${string}`;
   readonly route: `/app${string}`;
   readonly source: string;
   readonly kind: AppScreenKind;
+  /**
+   * Canonical design concept this screen belongs to. Design references own
+   * their concept (`conceptId === route`); alias/legacy screens point at the
+   * canonical concept route instead of becoming a duplicate design body.
+   */
   readonly conceptId: string;
   readonly recipeId: AppScreenRecipeId;
   readonly designReference: boolean;
+  /** Redirect receipt: literal destination for redirect-only sources. */
+  readonly redirectTo: string | null;
+  /** Present exactly when `designReference` is true. */
+  readonly story: AppScreenStoryContract | null;
 }
 
 export const APP_SCREEN_COMPONENT_REGISTRY = [
@@ -310,6 +331,163 @@ const NON_REFERENCE_SOURCES = new Set<string>([
 
 const SOURCE_PREFIX = 'apps/web/app/app/(shell)';
 
+/**
+ * Explicit alias/legacy resolution table (JOV-4963). Every alias/legacy
+ * source resolves to exactly one canonical concept route plus, when the
+ * source redirects, the literal redirect receipt. The two legacy routes that
+ * still render their own unique body map to themselves with a null receipt so
+ * the mapping stays closed-world and source-honest.
+ */
+interface AppScreenConceptMapping {
+  readonly conceptId: `/app${string}`;
+  readonly redirectTo: string | null;
+}
+
+const ALIAS_LEGACY_CONCEPT_MAP: Readonly<
+  Record<string, AppScreenConceptMapping>
+> = {
+  'apps/web/app/app/(shell)/audience/page.tsx': {
+    conceptId: '/app/contacts',
+    redirectTo: '/app/contacts?tab=audience',
+  },
+  'apps/web/app/app/(shell)/contact/page.tsx': {
+    conceptId: '/app/settings/contacts',
+    redirectTo: '/app/settings/contacts',
+  },
+  'apps/web/app/app/(shell)/feature-flags/page.tsx': {
+    conceptId: '/app/admin/features',
+    redirectTo: '/app/ov/features',
+  },
+  'apps/web/app/app/(shell)/presence/page.tsx': {
+    conceptId: '/app/profiles',
+    redirectTo: '/app/profiles',
+  },
+  'apps/web/app/app/(shell)/profile/page.tsx': {
+    conceptId: '/app/chat',
+    redirectTo: '/app/chat?panel=profile',
+  },
+  'apps/web/app/app/(shell)/releases/page.tsx': {
+    conceptId: '/app/library',
+    redirectTo: '/app/library?view=releases',
+  },
+  'apps/web/app/app/(shell)/threads/page.tsx': {
+    conceptId: '/app/chats',
+    redirectTo: '/app/chats',
+  },
+  'apps/web/app/app/(shell)/tipping/page.tsx': {
+    conceptId: '/app/settings/artist-profile',
+    redirectTo: '/app/settings/artist-profile?tab=earn#pay',
+  },
+  'apps/web/app/app/(shell)/tracks/page.tsx': {
+    conceptId: '/app/library',
+    redirectTo: '/app/library?view=audio&mode=table',
+  },
+  'apps/web/app/app/(shell)/dashboard/audience/page.tsx': {
+    conceptId: '/app/contacts',
+    redirectTo: '/app/audience',
+  },
+  'apps/web/app/app/(shell)/dashboard/catalog-scan/page.tsx': {
+    conceptId: '/app/profiles',
+    redirectTo: '/app/presence',
+  },
+  'apps/web/app/app/(shell)/dashboard/chat/page.tsx': {
+    conceptId: '/app/chat',
+    redirectTo: '/app/chat',
+  },
+  'apps/web/app/app/(shell)/dashboard/contacts/page.tsx': {
+    conceptId: '/app/settings/contacts',
+    redirectTo: '/app/settings/contacts',
+  },
+  'apps/web/app/app/(shell)/dashboard/earnings/page.tsx': {
+    conceptId: '/app/settings/artist-profile',
+    redirectTo: '/app/settings/artist-profile?tab=earn#pay',
+  },
+  'apps/web/app/app/(shell)/dashboard/insights/page.tsx': {
+    conceptId: '/app/insights',
+    redirectTo: '/app/insights',
+  },
+  'apps/web/app/app/(shell)/dashboard/library/page.tsx': {
+    conceptId: '/app/library',
+    redirectTo: '/app/library',
+  },
+  'apps/web/app/app/(shell)/dashboard/links/page.tsx': {
+    conceptId: '/app/chat',
+    redirectTo: '/app/chat?panel=profile',
+  },
+  'apps/web/app/app/(shell)/dashboard/page.tsx': {
+    conceptId: '/app',
+    redirectTo: '/app',
+  },
+  'apps/web/app/app/(shell)/dashboard/presence/page.tsx': {
+    conceptId: '/app/profiles',
+    redirectTo: '/app/profiles',
+  },
+  'apps/web/app/app/(shell)/dashboard/profile/page.tsx': {
+    conceptId: '/app/chat',
+    redirectTo: '/app/chat?panel=profile',
+  },
+  // Flag-gated demo body with no canonical counterpart; owns its concept.
+  'apps/web/app/app/(shell)/dashboard/release-plan/page.tsx': {
+    conceptId: '/app/dashboard/release-plan',
+    redirectTo: null,
+  },
+  // Promo downloads body exists only at this legacy route; owns its concept.
+  'apps/web/app/app/(shell)/dashboard/releases/[releaseId]/downloads/page.tsx':
+    {
+      conceptId: '/app/dashboard/releases/[releaseId]/downloads',
+      redirectTo: null,
+    },
+  // Thin delegate to the canonical ReleaseTasksRoute component.
+  'apps/web/app/app/(shell)/dashboard/releases/[releaseId]/tasks/page.tsx': {
+    conceptId: '/app/releases/[releaseId]/tasks',
+    redirectTo: null,
+  },
+  // Thin delegate to the shared ReleasesRoute; canonical design lives on the
+  // library releases view (/app/releases redirects there).
+  'apps/web/app/app/(shell)/dashboard/releases/page.tsx': {
+    conceptId: '/app/library',
+    redirectTo: null,
+  },
+  'apps/web/app/app/(shell)/dashboard/tasks/page.tsx': {
+    conceptId: '/app/tasks',
+    redirectTo: '/app/tasks',
+  },
+  'apps/web/app/app/(shell)/dashboard/tipping/page.tsx': {
+    conceptId: '/app/settings/artist-profile',
+    redirectTo: '/app/settings/artist-profile?tab=earn#pay',
+  },
+  'apps/web/app/app/(shell)/dashboard/tour-dates/page.tsx': {
+    conceptId: '/app/tour-dates',
+    redirectTo: '/app/tour-dates',
+  },
+  'apps/web/app/app/(shell)/settings/admin/page.tsx': {
+    conceptId: '/app/settings/artist-profile',
+    redirectTo: '/app/settings/artist-profile',
+  },
+  'apps/web/app/app/(shell)/settings/appearance/page.tsx': {
+    conceptId: '/app/settings/account',
+    redirectTo: '/app/settings/account',
+  },
+  'apps/web/app/app/(shell)/settings/delete-account/page.tsx': {
+    conceptId: '/app/settings/data-privacy',
+    redirectTo: '/app/settings/data-privacy',
+  },
+  'apps/web/app/app/(shell)/settings/page.tsx': {
+    conceptId: '/app/settings/account',
+    redirectTo: '/app/settings/account',
+  },
+  'apps/web/app/app/(shell)/settings/profile/page.tsx': {
+    conceptId: '/app/settings/artist-profile',
+    redirectTo: '/app/settings/artist-profile',
+  },
+};
+
+/** Alias/legacy routes that still render their own unique body. */
+export const APP_SCREEN_LEGACY_BODY_SOURCES: readonly string[] = [
+  'apps/web/app/app/(shell)/dashboard/release-plan/page.tsx',
+  'apps/web/app/app/(shell)/dashboard/releases/[releaseId]/downloads/page.tsx',
+];
+
 export function appScreenSourceToRoute(source: string): `/app${string}` {
   const relative = source
     .slice(SOURCE_PREFIX.length)
@@ -349,21 +527,59 @@ function routeToId(route: string): `screen.${string}` {
   return `screen.${suffix || 'root'}`;
 }
 
+/**
+ * Deterministic, browser-safe Storybook story id for a design-reference
+ * screen. Shape matches Storybook's `sanitize` output (`<kind>--<story>`,
+ * lowercase alphanumerics and dashes only), e.g.
+ * `app-screens-settings-account--reference`.
+ */
+export function appScreenConceptToStoryId(conceptId: string): string {
+  const slug =
+    conceptId
+      .replace(/^\/app\/?/, '')
+      .replace(/\[([^\]]+)\]/g, 'by-$1')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'root';
+  return `app-screens-${slug}--reference`;
+}
+
+const RECIPE_BY_ID: Readonly<
+  Record<AppScreenRecipeId, AppScreenRecipeRegistryEntry>
+> = Object.fromEntries(
+  APP_SCREEN_RECIPE_REGISTRY.map(recipe => [recipe.id, recipe])
+);
+
 export const APP_SCREEN_REGISTRY: readonly AppScreenRegistryEntry[] =
   APP_SCREEN_SOURCES.map(source => {
     const route = appScreenSourceToRoute(source);
     const kind = classifyScreen(source);
+    const recipeId = recipeFor(source, kind);
+    const designReference =
+      kind !== 'alias' &&
+      kind !== 'legacy' &&
+      !NON_REFERENCE_SOURCES.has(source);
+    const mapping =
+      kind === 'alias' || kind === 'legacy'
+        ? ALIAS_LEGACY_CONCEPT_MAP[source]
+        : undefined;
+    const recipe = RECIPE_BY_ID[recipeId];
     return {
       id: routeToId(route),
       route,
       source,
       kind,
-      conceptId: route,
-      recipeId: recipeFor(source, kind),
-      designReference:
-        kind !== 'alias' &&
-        kind !== 'legacy' &&
-        !NON_REFERENCE_SOURCES.has(source),
+      conceptId: mapping?.conceptId ?? route,
+      recipeId,
+      designReference,
+      redirectTo: mapping?.redirectTo ?? null,
+      story: designReference
+        ? {
+            id: appScreenConceptToStoryId(mapping?.conceptId ?? route),
+            recipeId,
+            componentIds: recipe.componentIds,
+          }
+        : null,
     };
   });
 
