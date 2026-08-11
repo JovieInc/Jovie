@@ -35,6 +35,10 @@ const productionAliasVerifierPath = resolve(
   repoRoot,
   '.github/scripts/verify-production-alias.sh'
 );
+const productionMarkerRecoveryWorkflowPath = resolve(
+  repoRoot,
+  '.github/workflows/production-marker-recovery.yml'
+);
 const productionPromotionControllerPath = resolve(
   repoRoot,
   '.github/scripts/promote-production-deployment.sh'
@@ -4566,5 +4570,88 @@ describe('production promotion exact-artifact contract', () => {
     expect(markerState).toContain(
       '`production-generation-verified-recovery-${sha}`'
     );
+  });
+});
+
+describe('production marker recovery workflow (JOV-4965)', () => {
+  it('is a bounded manual path that never redeploys or mutates aliases', () => {
+    const workflow = readFileSync(productionMarkerRecoveryWorkflowPath, 'utf8');
+
+    expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).not.toContain('workflow_run:');
+    expect(workflow).not.toContain('push:');
+    expect(workflow).not.toContain('schedule:');
+    expect(workflow).toContain('group: production-mutation');
+    expect(workflow).toContain('cancel-in-progress: false');
+    expect(workflow).not.toContain('vercel promote');
+    expect(workflow).not.toContain('vercel alias');
+    expect(workflow).not.toContain('vercel deploy');
+    expect(workflow).not.toContain('vercel rollback');
+    expect(workflow).not.toContain('overwrite: true');
+  });
+
+  it('preserves the marker only after canonical ownership and exact probes pass', () => {
+    const workflow = readFileSync(productionMarkerRecoveryWorkflowPath, 'utf8');
+    const job = getJobBlock(workflow, 'recover-marker');
+    const validate = getStepBlock(job, 'Validate bounded recovery request');
+    const ownership = getStepBlock(
+      job,
+      'Verify canonical ownership and exact runtime probes'
+    );
+    const oauth = getStepBlock(
+      job,
+      'Re-probe production Better Auth OAuth runtime'
+    );
+    const preserve = getStepBlock(
+      job,
+      'Preserve recovered verified-generation marker'
+    );
+    const confirm = getStepBlock(
+      job,
+      'Confirm recovered marker classifies as verified'
+    );
+
+    const order = [
+      job.indexOf('Validate bounded recovery request'),
+      job.indexOf('Verify canonical ownership and exact runtime probes'),
+      job.indexOf('Re-probe production Better Auth OAuth runtime'),
+      job.indexOf('Preserve recovered verified-generation marker'),
+      job.indexOf('Upload recovered verified-generation marker'),
+      job.indexOf('Confirm recovered marker classifies as verified'),
+    ];
+    expect(order.every(index => index >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+
+    expect(validate).toContain('Centralized production rollback');
+    expect(validate).toContain('.conclusion == "skipped"');
+    expect(validate).toContain('Sentry Error Gate (production)');
+    expect(validate).toContain('Promote to Production');
+    expect(validate).toContain('recovery is not permitted');
+    expect(ownership).toContain('vercel inspect jov.ie --format=json');
+    expect(ownership).toContain(
+      'bash .github/scripts/verify-production-alias.sh'
+    );
+    expect(ownership).toContain('bounded marker recovery no longer applies');
+    expect(oauth).toContain('oauth-providers.spec.ts');
+    expect(oauth).toContain('refusing to preserve a marker');
+    expect(preserve).toContain('recoveredFromControllerRun');
+    expect(preserve).toContain('recoveredFromControllerAttempt');
+    expect(workflow).toContain(
+      'name: production-generation-verified-${{ inputs.sha }}'
+    );
+    expect(confirm).toContain('exact_recovered_generation_verified');
+  });
+
+  it('binds the recovered marker classifier to the exact source attempt', () => {
+    const markerState = readFileSync(productionMarkerStatePath, 'utf8');
+
+    expect(markerState).toContain('MARKER_RECOVERY_PATH');
+    expect(markerState).toContain('production-marker-recovery.yml');
+    expect(markerState).toContain('classifyRecoveredMarkerEntry');
+    expect(markerState).toContain('recoveredFromControllerRun');
+    expect(markerState).toContain('recoveredFromControllerAttempt');
+    expect(markerState).toContain("'exact_recovered_generation_verified'");
+    expect(markerState).toContain("run.event === 'workflow_dispatch'");
+    expect(markerState).toContain('unsafe_or_contradictory_rollback');
   });
 });

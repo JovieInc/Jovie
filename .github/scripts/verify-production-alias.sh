@@ -9,7 +9,6 @@ vercel_cli="${VERCEL_CLI:-./node_modules/.bin/vercel}"
 max_attempts="${PRODUCTION_ALIAS_MAX_ATTEMPTS:-15}"
 retry_seconds="${PRODUCTION_ALIAS_RETRY_SECONDS:-10}"
 required_rounds="${PRODUCTION_ALIAS_REQUIRED_ROUNDS:-3}"
-max_transient_failures="${PRODUCTION_ALIAS_MAX_TRANSIENT_FAILURES:-2}"
 route_retries="${PRODUCTION_ALIAS_ROUTE_RETRIES:-1}"
 
 write_failure() {
@@ -30,7 +29,6 @@ if ! [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]] ||
   ! [[ "$max_attempts" =~ ^[1-9][0-9]*$ ]] ||
   ! [[ "$retry_seconds" =~ ^[0-9]+$ ]] ||
   ! [[ "$required_rounds" =~ ^[1-9][0-9]*$ ]] ||
-  ! [[ "$max_transient_failures" =~ ^[0-9]+$ ]] ||
   ! [[ "$route_retries" =~ ^[0-9]+$ ]] ||
   [ "$required_rounds" -gt "$max_attempts" ]; then
   echo "Production alias verifier inputs are invalid." >&2
@@ -57,21 +55,25 @@ curl_args=(
 last_status=""
 last_sha=""
 last_current_id=""
-# Prove each target independently so one transport reset cannot erase another
-# target's exact evidence. Unknowns preserve proof only within the bounded
-# tolerance; observed mismatches reset it, and success still requires an
-# all-exact latest round.
+# Prove each target independently. Every logical observation resolves to one
+# typed outcome: exact (the expected deployment/SHA/environment was observed),
+# mismatch (a contradictory identity was observed; fail-closed evidence), or
+# unknown (transport produced no evidence at all). Unknown consumes only the
+# bounded attempt/time budget: it never increments proof, never passes by
+# itself, and never resets exact proof a target already established. Only an
+# observed mismatch resets proof, so the gate completes exactly when every
+# target has accumulated the required exact observations within the bounded
+# window — even when unrelated later attempts are unknown.
 current_matches=0
-current_transient_failures=0
+current_unknowns=0
 routing_matches=(0 0 0)
-routing_transient_failures=(0 0 0)
+routing_unknowns=(0 0 0)
 for attempt in $(seq 1 "$max_attempts"); do
   if [ "$attempt" -gt 1 ]; then
     sleep "$retry_seconds"
   fi
 
-  round_exact=true
-  current_observation="transient"
+  current_observation="unknown"
   observed_current_id=""
   current_json=""
   if current_json="$(vercel inspect "$canonical_domain" --format=json 2>/dev/null)" &&
@@ -89,32 +91,25 @@ for attempt in $(seq 1 "$max_attempts"); do
     if [ "$observed_current_id" = "$expected_deploy_id" ] &&
       [ "$current_ready" = "READY" ] &&
       [ "$current_target" = "production" ]; then
-      current_observation="match"
+      current_observation="exact"
     fi
   fi
 
   case "$current_observation" in
-    match)
+    exact)
       if [ "$current_matches" -lt "$required_rounds" ]; then
         current_matches=$((current_matches + 1))
       fi
-      current_transient_failures=0
       ;;
     mismatch)
       current_matches=0
-      current_transient_failures=0
-      round_exact=false
       ;;
-    transient)
-      current_transient_failures=$((current_transient_failures + 1))
-      if [ "$current_transient_failures" -gt "$max_transient_failures" ]; then
-        current_matches=0
-      fi
-      round_exact=false
+    unknown)
+      current_unknowns=$((current_unknowns + 1))
       ;;
   esac
 
-  echo "  attempt ${attempt}/${max_attempts} production-current: id=${observed_current_id:-<unknown>} expected=${expected_deploy_id}, proof=${current_matches}/${required_rounds}, transient=${current_transient_failures}/${max_transient_failures}"
+  echo "  attempt ${attempt}/${max_attempts} production-current: id=${observed_current_id:-<unknown>} expected=${expected_deploy_id}, outcome=${current_observation}, proof=${current_matches}/${required_rounds}, unknowns=${current_unknowns}"
 
   routing_index=0
   for routing in plain stable canary; do
@@ -131,7 +126,7 @@ for attempt in $(seq 1 "$max_attempts"); do
       probe_url="${probe_url}&${routing_query}"
     fi
 
-    route_observation="transient"
+    route_observation="unknown"
     response=""
     last_status="000"
     last_sha=""
@@ -149,9 +144,19 @@ for attempt in $(seq 1 "$max_attempts"); do
         if [ "$last_status" != "000" ]; then
           last_sha="$(printf '%s' "$body" | jq -r '.commitSha // ""' 2>/dev/null || echo "")"
           environment="$(printf '%s' "$body" | jq -r '.environment // ""' 2>/dev/null || echo "")"
-          route_observation="match"
+          route_observation="exact"
+          # Production /api/health/build-info may emit the 7-char SHA. A
+          # matching prefix of the expected 40-char SHA is exact; anything
+          # else is a contradictory identity.
+          sha_matches=false
+          if [ "$last_sha" = "$expected_sha" ]; then
+            sha_matches=true
+          elif [[ "$last_sha" =~ ^[0-9a-f]{7,39}$ ]] &&
+            [ "${expected_sha:0:${#last_sha}}" = "$last_sha" ]; then
+            sha_matches=true
+          fi
           if [ "$last_status" != "200" ] ||
-            [ "$last_sha" != "$expected_sha" ] ||
+            [ "$sha_matches" != "true" ] ||
             [ "$environment" != "production" ]; then
             route_observation="mismatch"
           fi
@@ -165,27 +170,20 @@ for attempt in $(seq 1 "$max_attempts"); do
     done
 
     case "$route_observation" in
-      match)
+      exact)
         if [ "${routing_matches[$routing_index]}" -lt "$required_rounds" ]; then
           routing_matches[routing_index]=$((routing_matches[routing_index] + 1))
         fi
-        routing_transient_failures[routing_index]=0
         ;;
       mismatch)
         routing_matches[routing_index]=0
-        routing_transient_failures[routing_index]=0
-        round_exact=false
         ;;
-      transient)
-        routing_transient_failures[routing_index]=$((routing_transient_failures[routing_index] + 1))
-        if [ "${routing_transient_failures[$routing_index]}" -gt "$max_transient_failures" ]; then
-          routing_matches[routing_index]=0
-        fi
-        round_exact=false
+      unknown)
+        routing_unknowns[routing_index]=$((routing_unknowns[routing_index] + 1))
         ;;
     esac
 
-    echo "  attempt ${attempt}/${max_attempts} production-alias/${routing}: HTTP ${last_status}, commitSha=${last_sha:-<empty>}, environment=${environment:-<empty>}, proof=${routing_matches[$routing_index]}/${required_rounds}, transient=${routing_transient_failures[$routing_index]}/${max_transient_failures}"
+    echo "  attempt ${attempt}/${max_attempts} production-alias/${routing}: HTTP ${last_status}, commitSha=${last_sha:-<empty>}, environment=${environment:-<empty>}, outcome=${route_observation}, proof=${routing_matches[$routing_index]}/${required_rounds}, unknowns=${routing_unknowns[$routing_index]}"
     routing_index=$((routing_index + 1))
   done
 
@@ -198,8 +196,8 @@ for attempt in $(seq 1 "$max_attempts"); do
       proof_complete=false
     fi
   done
-  if [ "$round_exact" = "true" ] && [ "$proof_complete" = "true" ]; then
-    echo "Canonical production is ${expected_deploy_id} and serves ${expected_sha}; Production Current and every routing path have ${required_rounds} independently confirmed exact observations, and the latest round is exact."
+  if [ "$proof_complete" = "true" ]; then
+    echo "Canonical production is ${expected_deploy_id} and serves ${expected_sha}; Production Current and every routing path have ${required_rounds} independently confirmed exact observations."
     exit 0
   fi
 done

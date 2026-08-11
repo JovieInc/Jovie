@@ -1,0 +1,306 @@
+name: Production Marker Recovery
+run-name: Production Marker Recovery ${{ inputs.sha }} from controller run ${{ inputs.controller_run }}
+
+on:
+  # Manual, bounded recovery for one exact deployed generation whose original
+  # Production Controller run ended without preserving the verified-generation
+  # marker (JOV-4965). This workflow never redeploys, never mutates aliases,
+  # and never rolls back: it re-proves the already-deployed generation and
+  # preserves the marker only while canonical production still owns it.
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Exact 40-hex main SHA of the deployed generation.
+        required: true
+        type: string
+      deployment_id:
+        description: Exact immutable production deployment ID (dpl_...).
+        required: true
+        type: string
+      controller_run:
+        description: Original Production Controller run ID that deployed the generation.
+        required: true
+        type: string
+      controller_attempt:
+        description: Exact attempt number of the original Production Controller run.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Share the repo-wide production FIFO so recovery can never race a live
+# release, promotion, or rollback for a newer generation.
+concurrency:
+  group: production-mutation
+  cancel-in-progress: false
+
+jobs:
+  recover-marker:
+    name: Recover exact verified-generation marker
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    env:
+      EXPECTED_SHA: ${{ inputs.sha }}
+      EXPECTED_DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+      SOURCE_CONTROLLER_RUN: ${{ inputs.controller_run }}
+      SOURCE_CONTROLLER_ATTEMPT: ${{ inputs.controller_attempt }}
+      REPO: ${{ github.repository }}
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Validate bounded recovery request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Recovery SHA must be a full 40-hex commit."
+            exit 1
+          }
+          [[ "$EXPECTED_DEPLOYMENT_ID" =~ ^dpl_[A-Za-z0-9]+$ ]] || {
+            echo "::error::Recovery deployment ID must be an exact dpl_ identifier."
+            exit 1
+          }
+          [[ "$SOURCE_CONTROLLER_RUN" =~ ^[1-9][0-9]*$ ]] &&
+            [[ "$SOURCE_CONTROLLER_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || {
+            echo "::error::Recovery source controller run and attempt must be exact positive integers."
+            exit 1
+          }
+
+          # The source attempt must be an exact Production Controller attempt
+          # for this generation on main.
+          run_json="$(gh api \
+            "repos/$REPO/actions/runs/$SOURCE_CONTROLLER_RUN/attempts/$SOURCE_CONTROLLER_ATTEMPT")"
+          jq -e \
+            --arg sha "$EXPECTED_SHA" \
+            --arg repo "$REPO" \
+            --argjson run_id "$SOURCE_CONTROLLER_RUN" \
+            --argjson run_attempt "$SOURCE_CONTROLLER_ATTEMPT" '
+              type == "object" and
+              .id == $run_id and
+              .run_attempt == $run_attempt and
+              .path == ".github/workflows/production-controller.yml" and
+              .event == "workflow_run" and
+              .head_sha == $sha and
+              .head_branch == "main" and
+              .head_repository.full_name == $repo and
+              .status == "completed"
+            ' >/dev/null <<<"$run_json" || {
+            echo "::error::Recovery source is not an exact completed Production Controller attempt for $EXPECTED_SHA."
+            exit 1
+          }
+
+          # The generation is recoverable only while it still owns production:
+          # promotion and the Sentry gate must have passed, and the centralized
+          # rollback must have been skipped — never executed.
+          jobs_json="$(gh api \
+            "repos/$REPO/actions/runs/$SOURCE_CONTROLLER_RUN/attempts/$SOURCE_CONTROLLER_ATTEMPT/jobs?per_page=100")"
+          jq -e --arg sha "$EXPECTED_SHA" '
+            type == "object" and
+            (.total_count | type == "number") and
+            (.jobs | type == "array") and
+            .total_count == (.jobs | length) and
+            all(.jobs[]; .head_sha == $sha and .head_branch == "main") and
+            ([.jobs[] | select(.name == "Production Release / Promote to Production" and .status == "completed" and .conclusion == "success")] | length) == 1 and
+            ([.jobs[] | select(.name == "Production Release / Sentry Error Gate (production)" and .status == "completed" and .conclusion == "success")] | length) == 1 and
+            ([.jobs[] | select(.name | endswith("Centralized production rollback"))] | length) == 1 and
+            ([.jobs[] | select(.name | endswith("Centralized production rollback")) | select(.status == "completed" and .conclusion == "skipped")] | length) == 1
+          ' >/dev/null <<<"$jobs_json" || {
+            echo "::error::Recovery source attempt lacks exact promotion, Sentry, and skipped-rollback evidence."
+            exit 1
+          }
+
+          # Recovery never overwrites durable truth: no verified marker for
+          # this exact generation may already exist.
+          for marker_name in \
+            "production-generation-verified-$EXPECTED_SHA" \
+            "production-generation-verified-recovery-$EXPECTED_SHA"; do
+            existing="$(gh api \
+              "repos/$REPO/actions/artifacts?name=$marker_name&per_page=100" \
+              --jq '.total_count')"
+            [ "$existing" = "0" ] || {
+              echo "::error::A verified marker already exists for $EXPECTED_SHA; recovery is not permitted."
+              exit 1
+            }
+          done
+
+      - name: Verify canonical ownership and exact runtime probes
+        timeout-minutes: 10
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          EXPECTED_COMMIT_SHA: ${{ inputs.sha }}
+          EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          PRODUCTION_ALIAS_MAX_ATTEMPTS: 8
+          PRODUCTION_ALIAS_REQUIRED_ROUNDS: 2
+          PRODUCTION_ALIAS_RETRY_SECONDS: 5
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Bounded precondition: recover only while the canonical alias still
+          # owns the exact deployment. A newer generation owning jov.ie refuses
+          # recovery outright; nothing is redeployed or re-aliased.
+          canonical_json="$(./node_modules/.bin/vercel inspect jov.ie --format=json \
+            --scope "$VERCEL_ORG_ID")"
+          jq -e '
+            type == "object" and
+            (.id | type == "string") and
+            (.readyState | type == "string") and
+            (.target | type == "string")
+          ' >/dev/null <<<"$canonical_json" || {
+            echo "::error::Canonical Vercel ownership response is malformed."
+            exit 1
+          }
+          canonical_id="$(jq -r '.id' <<<"$canonical_json")"
+          canonical_state="$(jq -r '.readyState | ascii_upcase' <<<"$canonical_json")"
+          canonical_target="$(jq -r '.target | ascii_downcase' <<<"$canonical_json")"
+          if [ "$canonical_id" != "$EXPECTED_DEPLOYMENT_ID" ] ||
+            [ "$canonical_state" != "READY" ] ||
+            [ "$canonical_target" != "production" ]; then
+            echo "::error::Canonical production is $canonical_id, not $EXPECTED_DEPLOYMENT_ID; bounded marker recovery no longer applies to $EXPECTED_SHA."
+            exit 1
+          fi
+
+          # Every logical route observation (plain, stable, canary) must reach
+          # its exact-proof count; transport unknowns are non-contradictory but
+          # never pass by themselves.
+          bash .github/scripts/verify-production-alias.sh
+
+      - uses: ./.github/actions/setup-playwright
+
+      - name: Re-probe production Better Auth OAuth runtime
+        env:
+          BASE_URL: https://jov.ie
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The original run's observational OAuth gate ended uncertain, so the
+          # marker may only be preserved after the exact runtime contract is
+          # re-proven against canonical production. Any non-pass refuses the
+          # marker; uncertainty is never converted into a pass.
+          cd apps/web
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          report="$RUNNER_TEMP/marker-recovery-oauth-report.json"
+          probe_status=0
+          CI=true SMOKE_ONLY=1 \
+            PLAYWRIGHT_JSON_OUTPUT_NAME="$report" \
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" \
+            --run -- pnpm exec playwright test tests/e2e/oauth-providers.spec.ts \
+            --project=chromium --no-deps --reporter=json || probe_status=$?
+          if [ "$probe_status" -eq 0 ] && jq -e '
+            def oauth_suites:
+              [.suites[]? | select(
+                type == "object" and
+                .title == "oauth-providers.spec.ts" and
+                .file == "oauth-providers.spec.ts"
+              )];
+            def oauth_specs:
+              oauth_suites[0].suites[0].specs;
+            type == "object" and (.suites | type == "array") and
+            (.suites | length) == 1 and
+            (oauth_suites | length) == 1 and
+            (oauth_suites[0].specs | type == "array") and
+            (oauth_suites[0].specs | length) == 0 and
+            (oauth_suites[0].suites | type == "array") and
+            (oauth_suites[0].suites | length) == 1 and
+            oauth_suites[0].suites[0].title == "candidate-bound Better Auth OAuth runtime @production-smoke" and
+            (oauth_specs | type == "array") and
+            (oauth_specs | map(.title)) == [
+              "google UI starts the exact Better Auth provider redirect",
+              "apple UI starts the exact Better Auth provider redirect"
+            ] and
+            all(oauth_specs[];
+              (.tests | type == "array") and
+              (.tests | length) == 1 and
+              (.tests[0].status == "expected" or .tests[0].status == "flaky") and
+              .tests[0].expectedStatus == "passed" and
+              .tests[0].projectName == "chromium" and
+              (.tests[0].results | type == "array") and
+              (.tests[0].results | length) > 0 and
+              .tests[0].results[-1].status == "passed"
+            ) and
+            (.errors | type == "array") and
+            (.errors | length) == 0 and
+            (.stats | type == "object") and
+            (.stats.unexpected // 0) == 0 and
+            (.stats.skipped // 0) == 0 and
+            ((.stats.expected // 0) + (.stats.flaky // 0) == 2)
+          ' >/dev/null "$report"; then
+            echo "✅ Recovery re-proved the exact Better Auth OAuth runtime contract on canonical production."
+            exit 0
+          fi
+          echo "::error::OAuth runtime re-probe did not produce exact passing evidence; refusing to preserve a marker for $EXPECTED_SHA."
+          exit 1
+
+      - name: Preserve recovered verified-generation marker
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Write-through: the payload is produced and uploaded only after
+          # every recovery gate above proved exact evidence, and the payload
+          # binds this recovery run plus the exact source controller attempt.
+          jq -n \
+            --arg sha "$EXPECTED_SHA" \
+            --arg deployment_id "$EXPECTED_DEPLOYMENT_ID" \
+            --arg controller_run "${{ github.run_id }}" \
+            --arg controller_attempt "${{ github.run_attempt }}" \
+            --arg source_run "$SOURCE_CONTROLLER_RUN" \
+            --arg source_attempt "$SOURCE_CONTROLLER_ATTEMPT" \
+            '{
+              sha: $sha,
+              deploymentId: $deployment_id,
+              controllerRun: $controller_run,
+              controllerAttempt: $controller_attempt,
+              authSmoke: "oauth-reprobed",
+              recoveredFromControllerRun: $source_run,
+              recoveredFromControllerAttempt: $source_attempt
+            }' > "$RUNNER_TEMP/production-generation-verified.json"
+          test -s "$RUNNER_TEMP/production-generation-verified.json" || {
+            echo "::error::Recovered marker write-through produced an empty file."
+            exit 1
+          }
+
+      - name: Upload recovered verified-generation marker
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-generation-verified-${{ inputs.sha }}
+          path: ${{ runner.temp }}/production-generation-verified.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Confirm recovered marker classifies as verified
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          controller_workflow_id="$(gh api \
+            "repos/$REPO/actions/workflows/production-controller.yml" --jq '.id')"
+          marker_state="$(node .github/scripts/production-marker-state.mjs \
+            --sha "$EXPECTED_SHA" \
+            --repo "$REPO" \
+            --controller-workflow-id "$controller_workflow_id")"
+          jq -e \
+            --arg deployment_id "$EXPECTED_DEPLOYMENT_ID" '
+              type == "object" and
+              .state == "verified" and
+              .reason == "exact_recovered_generation_verified" and
+              .deploymentId == $deployment_id
+            ' >/dev/null <<<"$marker_state" || {
+            echo "::error::Recovered marker did not classify as verified: $marker_state"
+            exit 1
+          }
+          echo "Recovered exact verified-generation marker for $EXPECTED_SHA ($EXPECTED_DEPLOYMENT_ID)."

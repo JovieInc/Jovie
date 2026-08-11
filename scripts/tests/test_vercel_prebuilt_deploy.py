@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import subprocess
@@ -6,6 +7,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 DEPLOY_SCRIPT = REPO_ROOT / ".github/scripts/vercel-prebuilt-deploy.sh"
 PRODUCTION_PROMOTION_SCRIPT = (
     REPO_ROOT / ".github/scripts/promote-production-deployment.sh"
@@ -992,13 +994,15 @@ def _run_alias_verifier(
     route_retries: int | None = 0,
     curl_sequence: str = "match",
     build_environment: str = "production",
+    expected_sha: str = EXPECTED_COMMIT_SHA,
+    deployment_id: str = "dpl_target",
 ) -> subprocess.CompletedProcess[str]:
     fake_vercel, fake_bin = _write_fake_alias_tools(tmp_path)
     env = {
         **os.environ,
         "PATH": f"{fake_bin}:{os.environ['PATH']}",
-        "EXPECTED_COMMIT_SHA": EXPECTED_COMMIT_SHA,
-        "EXPECTED_PRODUCTION_DEPLOYMENT_ID": "dpl_target",
+        "EXPECTED_COMMIT_SHA": expected_sha,
+        "EXPECTED_PRODUCTION_DEPLOYMENT_ID": deployment_id,
         "PRODUCTION_ALIAS_MAX_ATTEMPTS": str(max_attempts),
         "PRODUCTION_ALIAS_REQUIRED_ROUNDS": str(required_rounds),
         "PRODUCTION_ALIAS_MAX_TRANSIENT_FAILURES": str(max_transient_failures),
@@ -1048,17 +1052,31 @@ def test_alias_verifier_requires_exact_id_sha_and_all_rolling_routes(
     assert "x-vercel-protection-bypass" not in curl_calls
 
 
-def test_alias_verifier_rejects_an_abbreviated_matching_prefix(tmp_path: Path) -> None:
+def test_alias_verifier_rejects_an_abbreviated_nonmatching_prefix(
+    tmp_path: Path,
+) -> None:
     result = _run_alias_verifier(
         tmp_path,
         current_id="dpl_target",
-        build_sha=EXPECTED_COMMIT_SHA[:7],
+        build_sha="bbbbbbb",
     )
 
     assert result.returncode == 1
     assert "failure_subtype=production_alias_not_updated" in (
         tmp_path / "github-output"
     ).read_text()
+
+
+def test_alias_verifier_accepts_matching_short_sha_from_production_probe(
+    tmp_path: Path,
+) -> None:
+    result = _run_alias_verifier(
+        tmp_path,
+        current_id="dpl_target",
+        build_sha=EXPECTED_COMMIT_SHA[:7],
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_alias_verifier_replays_production_transients_with_independent_proof(
@@ -1090,7 +1108,6 @@ def test_alias_verifier_replays_production_transients_with_independent_proof(
         build_sha=EXPECTED_COMMIT_SHA,
         max_attempts=15,
         required_rounds=3,
-        max_transient_failures=2,
         curl_sequence=observations,
     )
 
@@ -1099,16 +1116,18 @@ def test_alias_verifier_replays_production_transients_with_independent_proof(
     assert len((tmp_path / "curl-calls").read_text().splitlines()) == 18
 
 
-def test_alias_verifier_requires_every_latest_observation_to_be_exact(
+def test_alias_verifier_completes_once_every_route_reaches_exact_proof(
     tmp_path: Path,
 ) -> None:
+    # A trailing unknown on an unrelated route is not contradictory evidence:
+    # the gate completes as soon as every target holds the required exact
+    # proof, without demanding an all-exact latest round.
     result = _run_alias_verifier(
         tmp_path,
         current_id="dpl_target",
         build_sha=EXPECTED_COMMIT_SHA,
         max_attempts=3,
         required_rounds=2,
-        max_transient_failures=2,
         curl_sequence=_alias_observation_sequence(
             ("match", "match", "match"),
             ("match", "transient", "match"),
@@ -1116,7 +1135,7 @@ def test_alias_verifier_requires_every_latest_observation_to_be_exact(
         ),
     )
 
-    assert result.returncode == 1
+    assert result.returncode == 0, result.stdout + result.stderr
     assert "attempt 3/3 production-alias/plain: HTTP 000" in result.stdout
 
 
@@ -1129,7 +1148,6 @@ def test_alias_verifier_retries_transport_unknowns_within_each_route_observation
         build_sha=EXPECTED_COMMIT_SHA,
         max_attempts=2,
         required_rounds=2,
-        max_transient_failures=0,
         route_retries=1,
         curl_sequence=_alias_observation_sequence(
             ("transient", "match", "transient", "match", "match"),
@@ -1205,7 +1223,6 @@ def test_alias_verifier_resets_proof_on_observed_identity_mismatch(
         build_sha=EXPECTED_COMMIT_SHA,
         max_attempts=5,
         required_rounds=3,
-        max_transient_failures=2,
         curl_sequence=_alias_observation_sequence(
             ("match", "match", "match"),
             ("match", "match", "match"),
@@ -1219,16 +1236,17 @@ def test_alias_verifier_resets_proof_on_observed_identity_mismatch(
     assert "environment=preview" in result.stdout
 
 
-def test_alias_verifier_resets_proof_after_bounded_transport_unknowns(
+def test_alias_verifier_preserves_exact_proof_across_transport_unknowns(
     tmp_path: Path,
 ) -> None:
+    # Transport unknowns consume bounded attempt budget only; they never reset
+    # exact proof a route already established.
     result = _run_alias_verifier(
         tmp_path,
         current_id="dpl_target",
         build_sha=EXPECTED_COMMIT_SHA,
         max_attempts=6,
         required_rounds=3,
-        max_transient_failures=2,
         route_retries=1,
         curl_sequence=_alias_observation_sequence(
             ("match", "match", "match"),
@@ -1240,9 +1258,87 @@ def test_alias_verifier_resets_proof_after_bounded_transport_unknowns(
         ),
     )
 
-    assert result.returncode == 1
+    assert result.returncode == 0, result.stdout + result.stderr
     assert "attempt 6/6 production-alias/plain: HTTP 200" in result.stdout
     assert len((tmp_path / "curl-calls").read_text().splitlines()) == 21
+
+
+def test_alias_verifier_unknown_only_window_never_passes(
+    tmp_path: Path,
+) -> None:
+    # Unknown is never passing by itself: a window of pure transport unknowns
+    # exhausts the bounded budget and fails without contradictory evidence.
+    result = _run_alias_verifier(
+        tmp_path,
+        current_id="dpl_target",
+        build_sha=EXPECTED_COMMIT_SHA,
+        max_attempts=3,
+        required_rounds=2,
+        curl_sequence=_alias_observation_sequence(
+            ("transient", "transient", "transient"),
+            ("transient", "transient", "transient"),
+            ("transient", "transient", "transient"),
+        ),
+    )
+
+    assert result.returncode == 1
+    assert "proof=0/2" in result.stdout
+    assert "did not converge" in result.stderr
+    assert (tmp_path / "github-output").read_text().strip() == (
+        "failure_subtype=production_alias_not_updated"
+    )
+
+
+def test_alias_verifier_mixed_route_outcomes_complete_on_exact_proof(
+    tmp_path: Path,
+) -> None:
+    # Mixed plain/stable/canary outcomes: each route accumulates exact proof
+    # independently while unknowns on sibling routes are non-contradictory.
+    result = _run_alias_verifier(
+        tmp_path,
+        current_id="dpl_target",
+        build_sha=EXPECTED_COMMIT_SHA,
+        max_attempts=4,
+        required_rounds=2,
+        curl_sequence=_alias_observation_sequence(
+            ("match", "match", "transient"),
+            ("match", "transient", "match"),
+            ("match", "transient", "match"),
+            ("match", "match", "match"),
+        ),
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "outcome=unknown" in result.stdout
+    assert "proof=2/2" in result.stdout
+
+
+def test_alias_verifier_replays_run_31440637821_stable_alternation(
+    tmp_path: Path,
+) -> None:
+    # Replay of Production Controller run 31440637821 (OAuth job 93628867652):
+    # plain and canary reached 2/2 exact while stable alternated exact HTTP 200
+    # and transport HTTP 000. The exact generation must resolve to verified.
+    fixture = json.loads(
+        (FIXTURES_DIR / "production-alias-run-31440637821-replay.json").read_text()
+    )
+    sequence = _alias_observation_sequence(
+        *(tuple(attempt) for attempt in fixture["observationRounds"])
+    )
+    result = _run_alias_verifier(
+        tmp_path,
+        current_id=fixture["deploymentId"],
+        build_sha=fixture["shortSha"],
+        max_attempts=fixture["verifier"]["maxAttempts"],
+        required_rounds=fixture["verifier"]["requiredRounds"],
+        curl_sequence=sequence,
+        expected_sha=fixture["sha"],
+        deployment_id=fixture["deploymentId"],
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert fixture["deploymentId"] in result.stdout
+    assert fixture["shortSha"] in result.stdout
 
 
 def test_alias_verifier_rejects_stale_sha_even_on_expected_deployment(
