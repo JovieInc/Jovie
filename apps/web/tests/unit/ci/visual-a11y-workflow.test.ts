@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
@@ -14,6 +14,22 @@ const visualRegressionWorkflowPath = resolve(
 const chatVisualSpecPath = resolve(
   repoRoot,
   'apps/web/tests/e2e/chat-visual.spec.ts'
+);
+const visualRegressionSpecPath = resolve(
+  repoRoot,
+  'apps/web/tests/e2e/visual-regression.spec.ts'
+);
+const authVisualSpecPath = resolve(
+  repoRoot,
+  'apps/web/tests/e2e/auth-visual.spec.ts'
+);
+const newLandingSpecPath = resolve(
+  repoRoot,
+  'apps/web/tests/e2e/new-landing.spec.ts'
+);
+const newLandingSnapshotDir = resolve(
+  repoRoot,
+  'apps/web/tests/e2e/__snapshots__/new-landing.spec.ts'
 );
 
 function getJobBlock(workflow: string, jobKey: string): string {
@@ -90,6 +106,32 @@ function getPageScopedLocatorCalls(source: string): string[] {
   return calls;
 }
 
+function getScreenshotArguments(source: string): string[] {
+  const sourceFile = ts.createSourceFile(
+    'visual-spec.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS
+  );
+  const argumentsFound: string[] = [];
+
+  function visit(node: ts.Node): void {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === 'toHaveScreenshot'
+    ) {
+      argumentsFound.push(node.arguments[0]?.getText(sourceFile) ?? '');
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return argumentsFound;
+}
+
 describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
   it('keeps source PR Ready fast and moves layout integration to merge_group', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
@@ -155,6 +197,37 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(
       chatVisualSpec.match(/getVisibleComposerSurface\(page\)/g)
     ).toHaveLength(4);
+  });
+
+  it('keeps auth screenshot baseline ownership non-overlapping', () => {
+    const visualRegressionSpec = readFileSync(visualRegressionSpecPath, 'utf8');
+    const authVisualSpec = readFileSync(authVisualSpecPath, 'utf8');
+    const newLandingSpec = readFileSync(newLandingSpecPath, 'utf8');
+
+    expect(
+      getScreenshotArguments(visualRegressionSpec).filter(argument =>
+        /signin|signup|route\.slice/.test(argument)
+      )
+    ).toEqual(['`${route.slice(1)}-dark.png`']);
+    expect(visualRegressionSpec).toContain(
+      "test.describe('JOV-2081: Viewport matrix — /sign-up'"
+    );
+    expect(visualRegressionSpec).toContain(
+      "test.describe('JOV-2081: Viewport matrix — /sign-in'"
+    );
+    expect(visualRegressionSpec).toContain('assertNoHorizontalScroll');
+    expect(visualRegressionSpec).toContain('assertPrimaryCtaVisible');
+    expect(authVisualSpec).toContain('modal-signin-${bp.name}.png');
+    expect(authVisualSpec).toContain('modal-signup-${bp.name}.png');
+    expect(authVisualSpec).toContain('signin-page-${bp.name}.png');
+    expect(authVisualSpec).toContain('signup-page-${bp.name}.png');
+    expect(getScreenshotArguments(newLandingSpec)).toEqual([]);
+    expect(
+      existsSync(resolve(newLandingSnapshotDir, 'landing-hero-mobile.png'))
+    ).toBe(false);
+    expect(
+      existsSync(resolve(newLandingSnapshotDir, 'landing-release-section.png'))
+    ).toBe(false);
   });
 
   it('preserves authenticated axe diagnostics when Playwright fails', () => {

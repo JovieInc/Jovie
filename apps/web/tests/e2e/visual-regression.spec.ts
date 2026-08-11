@@ -18,6 +18,8 @@ import { expect, test } from '@playwright/test';
  *
  * JOV-2081: Full viewport matrix (375, 768, 1024, 1280, 1440, 1728, 2560) added below
  * for homepage, /sign-up, and /sign-in with horizontal-scroll and CTA-clip guards.
+ * Full-page auth breakpoint screenshots stay in auth-visual.spec.ts. This spec
+ * retains only the distinct dark-mode auth baselines plus geometry guards.
  */
 
 // No auth — test public pages as anonymous visitor
@@ -102,101 +104,37 @@ test.describe('homepage visual regression', () => {
 });
 
 // ==========================================================================
-// 2. Auth pages — frequent regressions in light/dark mode visibility
+// 2. Auth pages — distinct dark-mode regression coverage
 // ==========================================================================
-test.describe('auth pages visual regression', () => {
+test.describe('auth pages dark-mode visual regression', () => {
   test.skip(
     shouldSkipAuthVisual,
     'E2E_SKIP_AUTH — Clerk secrets unavailable in visual CI'
   );
 
-  test('signin dark mode', async ({ page }) => {
-    await blockAnalytics(page);
-    await page.emulateMedia({ colorScheme: 'dark' });
-    await page.goto('/signin', {
-      waitUntil: 'networkidle',
-      timeout: 60_000,
+  for (const route of ['/signin', '/signup'] as const) {
+    test(`${route} dark mode`, async ({ page }) => {
+      await blockAnalytics(page);
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await page.goto(route, {
+        waitUntil: 'networkidle',
+        timeout: 60_000,
+      });
+
+      if (isClerkRedirect(page.url())) {
+        test.skip(true, 'Clerk handshake redirect');
+        return;
+      }
+
+      await expect(
+        page.locator('form, [data-clerk-component]').first()
+      ).toBeVisible({ timeout: 15_000 });
+
+      await expect(page).toHaveScreenshot(`${route.slice(1)}-dark.png`, {
+        fullPage: false,
+      });
     });
-
-    if (isClerkRedirect(page.url())) {
-      test.skip(true, 'Clerk handshake redirect');
-      return;
-    }
-
-    await expect(
-      page.locator('form, [data-clerk-component]').first()
-    ).toBeVisible({ timeout: 15_000 });
-
-    await expect(page).toHaveScreenshot('signin-dark.png', {
-      fullPage: false,
-    });
-  });
-
-  test('signin light mode', async ({ page }) => {
-    await blockAnalytics(page);
-    await page.emulateMedia({ colorScheme: 'light' });
-    await page.goto('/signin', {
-      waitUntil: 'networkidle',
-      timeout: 60_000,
-    });
-
-    if (isClerkRedirect(page.url())) {
-      test.skip(true, 'Clerk handshake redirect');
-      return;
-    }
-
-    await expect(
-      page.locator('form, [data-clerk-component]').first()
-    ).toBeVisible({ timeout: 15_000 });
-
-    await expect(page).toHaveScreenshot('signin-light.png', {
-      fullPage: false,
-    });
-  });
-
-  test('signup dark mode', async ({ page }) => {
-    await blockAnalytics(page);
-    await page.emulateMedia({ colorScheme: 'dark' });
-    await page.goto('/signup', {
-      waitUntil: 'networkidle',
-      timeout: 60_000,
-    });
-
-    if (isClerkRedirect(page.url())) {
-      test.skip(true, 'Clerk handshake redirect');
-      return;
-    }
-
-    await expect(
-      page.locator('form, [data-clerk-component]').first()
-    ).toBeVisible({ timeout: 15_000 });
-
-    await expect(page).toHaveScreenshot('signup-dark.png', {
-      fullPage: false,
-    });
-  });
-
-  test('signup light mode', async ({ page }) => {
-    await blockAnalytics(page);
-    await page.emulateMedia({ colorScheme: 'light' });
-    await page.goto('/signup', {
-      waitUntil: 'networkidle',
-      timeout: 60_000,
-    });
-
-    if (isClerkRedirect(page.url())) {
-      test.skip(true, 'Clerk handshake redirect');
-      return;
-    }
-
-    await expect(
-      page.locator('form, [data-clerk-component]').first()
-    ).toBeVisible({ timeout: 15_000 });
-
-    await expect(page).toHaveScreenshot('signup-light.png', {
-      fullPage: false,
-    });
-  });
+  }
 });
 
 // ==========================================================================
@@ -254,7 +192,7 @@ test.describe('pricing visual regression', () => {
 // Each test asserts:
 //   1. No horizontal scroll (scrollWidth <= innerWidth)
 //   2. Primary CTA buttons are visible and not clipped
-//   3. Screenshot baseline (fullPage: false = above-the-fold only)
+//   3. Homepage screenshot baseline (auth screenshots are owned by auth-visual)
 // ==========================================================================
 
 /** Canonical viewport widths per JOV-2081 */
@@ -466,29 +404,6 @@ test.describe('JOV-2081: Viewport matrix — /sign-up', () => {
 
       await assertPrimaryCtaVisible(page, viewport);
     });
-
-    test(`sign-up screenshot at ${viewport.label}px`, async ({ page }) => {
-      test.setTimeout(90_000);
-      await blockAnalytics(page);
-      await page.setViewportSize({
-        width: viewport.width,
-        height: viewport.height,
-      });
-      await page.goto('/signup', { waitUntil: 'networkidle', timeout: 60_000 });
-
-      if (isClerkRedirect(page.url())) {
-        test.skip(true, 'Clerk handshake redirect');
-        return;
-      }
-
-      await expect(
-        page.locator('form, [data-clerk-component]').first()
-      ).toBeVisible({ timeout: 15_000 });
-
-      await expect(page).toHaveScreenshot(`signup-${viewport.label}.png`, {
-        fullPage: false,
-      });
-    });
   }
 });
 
@@ -553,29 +468,6 @@ test.describe('JOV-2081: Viewport matrix — /sign-in', () => {
       ).toBeVisible({ timeout: 15_000 });
 
       await assertPrimaryCtaVisible(page, viewport);
-    });
-
-    test(`sign-in screenshot at ${viewport.label}px`, async ({ page }) => {
-      test.setTimeout(90_000);
-      await blockAnalytics(page);
-      await page.setViewportSize({
-        width: viewport.width,
-        height: viewport.height,
-      });
-      await page.goto('/signin', { waitUntil: 'networkidle', timeout: 60_000 });
-
-      if (isClerkRedirect(page.url())) {
-        test.skip(true, 'Clerk handshake redirect');
-        return;
-      }
-
-      await expect(
-        page.locator('form, [data-clerk-component]').first()
-      ).toBeVisible({ timeout: 15_000 });
-
-      await expect(page).toHaveScreenshot(`signin-${viewport.label}.png`, {
-        fullPage: false,
-      });
     });
   }
 });
