@@ -5,6 +5,13 @@ export const PEN_SAVE_RECEIPT_SCHEMA = 'pen-save-receipt/v1';
 const editedTitlePattern = /(?:^|\s)[—-]?\s*Edited\s*$/i;
 const sha256Pattern = /^[a-f0-9]{64}$/;
 const explicitSaveMethods = new Set(['Cmd-S', 'editor-save', 'save-document']);
+const receiptEvidenceKeys = [
+  'pre_app_state_sha256',
+  'post_app_state_sha256',
+  'window_state_sha256',
+  'save_response_sha256',
+  'readback_sha256',
+];
 
 function text(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -18,6 +25,10 @@ function parseTimestamp(value) {
   const timestamp = text(value);
   const milliseconds = Date.parse(timestamp);
   return Number.isFinite(milliseconds) ? { timestamp, milliseconds } : null;
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function evidenceDigest(evidence) {
@@ -45,6 +56,192 @@ export function matchesProtectedFileIdentity(stats, protectedIdentities = []) {
   return protectedIdentities.some(
     identity => identity.dev === stats.dev && identity.ino === stats.ino
   );
+}
+
+/**
+ * Validates the complete successful pen-save-receipt/v1 output contract.
+ * Promotion callers receive only the serialized receipt, not the raw evidence
+ * content, so this verifies every identity, chronology, state, and evidence
+ * digest invariant that remains available at that boundary.
+ */
+export function validateSavedStateVerifiedReceipt(receipt, options = {}) {
+  const errors = [];
+  const error = (code, message) => errors.push({ code, message });
+
+  if (!isRecord(receipt)) {
+    return {
+      valid: false,
+      errors: [
+        {
+          code: 'receipt_not_object',
+          message: 'Save receipt must be a JSON object.',
+        },
+      ],
+    };
+  }
+
+  if (receipt.schema !== PEN_SAVE_RECEIPT_SCHEMA) {
+    error('schema_invalid', 'Save receipt schema must be pen-save-receipt/v1.');
+  }
+  if (receipt.verdict !== 'saved_state_verified') {
+    error(
+      'verdict_invalid',
+      'Save receipt verdict must be saved_state_verified.'
+    );
+  }
+  if (receipt.durability !== 'not_proven') {
+    error(
+      'durability_invalid',
+      'Save receipt durability must remain not_proven.'
+    );
+  }
+  if (!Array.isArray(receipt.blockers)) {
+    error('blockers_invalid', 'Save receipt blockers must be an array.');
+  } else if (receipt.blockers.length > 0) {
+    error(
+      'blockers_present',
+      'A saved_state_verified receipt must have no blockers.'
+    );
+  }
+
+  const workspaceProfile = text(receipt.workspace_profile);
+  const lockedExpectedPath = text(options.lockedExpectedPath);
+  const expectedPath = text(receipt.expected_path);
+  const activePathBefore = text(receipt.active_path_before);
+  const activePathAfter = text(receipt.active_path_after);
+  const documentTitle = text(receipt.document_title);
+
+  if (!workspaceProfile) {
+    error('workspace_profile_missing', 'Workspace profile is required.');
+  }
+  if (!isPenPath(lockedExpectedPath)) {
+    error(
+      'locked_expected_path_missing',
+      'A trusted profile-locked expected path is required.'
+    );
+  }
+  if (!isPenPath(expectedPath)) {
+    error(
+      'expected_path_invalid',
+      'Expected path must be an absolute .pen path.'
+    );
+  } else if (lockedExpectedPath && expectedPath !== lockedExpectedPath) {
+    error(
+      'locked_path_mismatch',
+      'Receipt expected path differs from the trusted workspace profile lock.'
+    );
+  }
+  if (!isPenPath(activePathBefore) || activePathBefore !== expectedPath) {
+    error(
+      'active_path_before_invalid',
+      'Active path before mutation must equal the expected path.'
+    );
+  }
+  if (!isPenPath(activePathAfter) || activePathAfter !== expectedPath) {
+    error(
+      'active_path_after_invalid',
+      'Active path after save must equal the expected path.'
+    );
+  }
+  if (!documentTitle || editedTitlePattern.test(documentTitle)) {
+    error(
+      'document_title_invalid',
+      'Document title must be present and must not report Edited.'
+    );
+  }
+  if (!text(receipt.writer)) {
+    error('writer_missing', 'A coordinated writer is required.');
+  }
+  if (!text(receipt.mutation_batch_id)) {
+    error('batch_id_missing', 'A mutation batch ID is required.');
+  }
+
+  const rootIds = receipt.root_ids;
+  if (
+    !Array.isArray(rootIds) ||
+    rootIds.length === 0 ||
+    rootIds.some(rootId => !text(rootId)) ||
+    new Set(rootIds).size !== rootIds.length
+  ) {
+    error(
+      'root_ids_invalid',
+      'At least one unique non-empty post-save root ID is required.'
+    );
+  }
+  if (receipt.mutation_state !== 'confirmed') {
+    error('mutation_state_invalid', 'Mutation state must be confirmed.');
+  }
+  if (receipt.dirty_state !== 'clean') {
+    error('dirty_state_invalid', 'Post-save dirty state must be clean.');
+  }
+  if (receipt.post_save_readback_verified !== true) {
+    error(
+      'readback_state_invalid',
+      'Post-save root readback must be verified.'
+    );
+  }
+
+  const explicitSave = isRecord(receipt.explicit_save)
+    ? receipt.explicit_save
+    : null;
+  if (!explicitSave) {
+    error('explicit_save_invalid', 'Explicit-save facts are required.');
+  } else {
+    if (!explicitSaveMethods.has(explicitSave.method)) {
+      error('save_method_invalid', 'Explicit save method is invalid.');
+    }
+    if (explicitSave.acknowledged !== true) {
+      error(
+        'save_acknowledgment_invalid',
+        'Explicit save must be acknowledged.'
+      );
+    }
+  }
+
+  /** @type {Array<[string, { timestamp: string; milliseconds: number } | null]>} */
+  const chronology = [
+    ['batch_started_at_invalid', parseTimestamp(receipt.batch_started_at)],
+    ['save_requested_at_invalid', parseTimestamp(explicitSave?.requested_at)],
+    [
+      'save_acknowledged_at_invalid',
+      parseTimestamp(explicitSave?.acknowledged_at),
+    ],
+    ['post_readback_at_invalid', parseTimestamp(receipt.post_save_readback_at)],
+    ['recorded_at_invalid', parseTimestamp(receipt.recorded_at)],
+  ];
+  for (const [code, timestamp] of chronology) {
+    if (!timestamp) error(code, 'A valid receipt timestamp is required.');
+  }
+  if (chronology.every(([, timestamp]) => timestamp)) {
+    const milliseconds = chronology.map(
+      ([, timestamp]) => timestamp?.milliseconds ?? Number.NaN
+    );
+    if (
+      milliseconds.some(
+        (value, index) => index > 0 && value < milliseconds[index - 1]
+      )
+    ) {
+      error(
+        'chronology_invalid',
+        'Receipt timestamps must be ordered from batch start through receipt creation.'
+      );
+    }
+  }
+
+  if (!isRecord(receipt.evidence)) {
+    error('evidence_invalid', 'Evidence digests are required.');
+  } else {
+    for (const key of receiptEvidenceKeys) {
+      if (!sha256Pattern.test(receipt.evidence[key] ?? '')) {
+        error(
+          `${key}_invalid`,
+          `Evidence digest ${key} must be a lowercase SHA-256 value.`
+        );
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
 }
 
 export function buildPenSaveReceipt(input = {}) {
