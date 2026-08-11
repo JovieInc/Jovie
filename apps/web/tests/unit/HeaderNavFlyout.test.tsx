@@ -50,11 +50,25 @@ describe('HeaderNav flyout interactions', () => {
     const loginLink = screen.getByRole('link', { name: 'Log in' });
     expect(loginLink).toHaveAttribute('href', '/signin');
     expect(loginLink.parentElement).toHaveClass('gap-2');
-    // Default public CTA (no publicCtaLabel override) remains Request Access.
+    // Default public CTA (no publicCta override) remains Request Access.
     // Homepage MarketingHeader passes its own "Get started" label separately.
     expect(
       screen.getByRole('link', { name: 'Request Access' })
     ).toHaveAttribute('href', '/signup');
+  });
+
+  it('uses one CTA contract for the public label and destination', () => {
+    render(
+      <HeaderNav
+        authMode='public-static'
+        publicCta={{ href: '/start', label: 'Get started' }}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
+      'href',
+      '/start'
+    );
   });
 
   it('closes marketing flyouts with Escape', () => {

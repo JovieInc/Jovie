@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { APP_ROUTES } from '@/constants/routes';
 import { HeaderNav } from './HeaderNav';
 
 const meta: Meta<typeof HeaderNav> = {
@@ -26,7 +27,10 @@ export const Default: Story = {};
 export const PublicStatic: Story = {
   args: {
     authMode: 'public-static',
-    publicCtaLabel: 'Get started',
+    publicCta: {
+      href: APP_ROUTES.START,
+      label: 'Get started',
+    },
   },
 };
 

@@ -169,6 +169,16 @@
   background: transparent;
 }
 
+/* Temporary typographic wordmark chosen in founder review W775. This is a
+ * reversible identity treatment, not a replacement for the bespoke artwork. */
+.marketing-glass-header__brand-wordmark {
+  font-family: var(--marketing-font-display);
+  font-size: 0.86rem;
+  font-weight: 775;
+  letter-spacing: -0.032em;
+  line-height: 0.98;
+}
+
 .marketing-glass-header__text-link {
   padding-inline: 0.64rem;
 }
@@ -184,6 +194,7 @@
 
 .marketing-glass-header__cta {
   display: inline-flex;
+  flex-shrink: 0;
   min-height: 2rem;
   align-items: center;
   justify-content: center;
@@ -198,6 +209,7 @@
   letter-spacing: 0;
   line-height: 1;
   text-decoration: none;
+  white-space: nowrap;
   box-shadow: 0 8px 24px rgba(255, 255, 255, 0.1);
   transition:
     background-color 140ms ease,

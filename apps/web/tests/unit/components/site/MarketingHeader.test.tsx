@@ -50,18 +50,34 @@ describe('MarketingHeader', () => {
       'href',
       '/support'
     );
-    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute(
       'href',
       '/signin'
     );
-    expect(
-      screen.getByRole('link', { name: 'Start Free Trial' })
-    ).toHaveAttribute('href', '/signup');
+    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
+      'href',
+      '/start?starter_prompt=Hey%2C+I+want+to+get+access+to+Jovie.'
+    );
   });
 
   it('shows flyout menu triggers when center navigation is enabled', () => {
     render(<MarketingHeader />);
 
+    const navItems = Array.from(
+      document.querySelector('.marketing-glass-header__nav')?.children ?? []
+    ).map(item => item.textContent);
+
+    expect(navItems).toEqual(['Jovie', 'Features', 'Resources', 'Pricing']);
+    expect(
+      document.querySelector(
+        '.marketing-glass-header__nav .marketing-glass-header__brand-wordmark'
+      )
+    ).toHaveTextContent('Jovie');
+    expect(
+      screen
+        .getByTestId('site-logo-link')
+        .querySelector('[data-brand-variant="jovie"]')
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Features/ })).toBeVisible();
     expect(screen.getByRole('button', { name: /Resources/ })).toBeVisible();
   });
@@ -76,7 +92,13 @@ describe('MarketingHeader', () => {
     );
     expect(screen.getByTestId('header-nav')).toHaveAttribute(
       'data-presentation',
-      'homepage-embedded'
+      'marketing-glass'
+    );
+    expect(
+      screen.getByRole('link', { name: 'Claim your profile' })
+    ).toHaveAttribute(
+      'href',
+      '/start?starter_prompt=Hey%2C+I+want+to+get+access+to+Jovie.'
     );
   });
 
@@ -145,6 +167,20 @@ describe('MarketingHeader', () => {
       'href',
       '/pricing'
     );
+    expect(
+      document.querySelector('.marketing-glass-header__brand-wordmark')
+    ).toBeNull();
+  });
+
+  it('accepts a page-owned CTA contract without creating a header variant', () => {
+    render(
+      <MarketingHeader primaryCta={{ href: '/start', label: 'Get started' }} />
+    );
+
+    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
+      'href',
+      '/start'
+    );
   });
 
   it('hides inline glass auth on mobile when a mobile nav is present', () => {
@@ -161,7 +197,15 @@ describe('MarketingHeader', () => {
 
     expect(screen.getByRole('button', { name: 'Open menu' })).toBeVisible();
     expect(
-      screen.getByRole('link', { name: 'Sign in' }).parentElement?.parentElement
-    ).toHaveClass('hidden', 'md:flex');
+      screen.getByRole('link', { name: 'Log in' }).parentElement?.parentElement
+    ).toHaveClass('hidden', 'lg:flex');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+    expect(
+      screen.getByRole('navigation', { name: 'Mobile Navigation' })
+    ).toHaveStyle({
+      maxHeight: 'calc(100dvh - env(safe-area-inset-top))',
+      overflowY: 'auto',
+    });
   });
 });

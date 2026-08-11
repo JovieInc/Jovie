@@ -25,6 +25,10 @@ describe('support route header contract', () => {
     expect(headerSource).toContain(
       'penContractId={MARKETING_PEN_CONTRACT_IDS.shell.header}'
     );
+    expect(headerSource).toContain(
+      'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
+    );
+    expect(headerSource).toContain("treatment: 'wordmark'");
     expect(registrySource).not.toContain('marketing-header-content');
     expect(landingStart).toBeGreaterThanOrEqual(0);
     expect(minimalStart).toBeGreaterThan(landingStart);

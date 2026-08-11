@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- **Public pages now share one adaptable conversion header:** each landing page can supply its own primary action and destination, artist-profile pages use the profile-claim path, and the temporary Jovie identity treatment now carries enough visual weight to balance the icon.
 - **Controlled-access signup now produces a truthful waitlist receipt:** anonymous onboarding rechecks the live access gate, requires a confirmed artist before signup, persists the verified account's request and audit record idempotently, and never says “You're on the list” unless a durable pending entry exists.
 - [internal] **Pen contracts resolve back to canonical source components (JOV-4953):** registered marketing shells, production-backed sections, and recipes expose unique deterministic root identities; the shared atom manifest records Button, link, and brand/logo ownership; and normalization coverage proves one Button master can propagate to multiple CTA refs without replacing instance copy.
 - [internal] **Canonical blog stories now reuse production presentation safely:** browser-only Storybook bundles read blog and author contracts plus category slugs from browser-safe boundaries, so the real BlogFeed, BlogAuthorCard, and BlogCard render without pulling Node filesystem modules into the browser; category and author receipt fixtures are excluded from the story catalog.
