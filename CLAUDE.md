@@ -29,6 +29,8 @@ Before starting any task, agents must query gbrain for both the org chart and ex
 
 If the target canvas is open, attach to the live desktop canvas. Dirty/unsaved is not a bail. Persist is mtime moving on the locked canonical path — `save()` printing Saved is not persist. Full contract: [`.claude/rules/pen.md`](.claude/rules/pen.md).
 
+Registry status is singular and machine-recomputed: `metadataStatus` on each registry root is the only authoritative status field, and visible ledger rows are generated, never hand-written. Audit any ledger export with [`scripts/agent/pen-registry-audit.mjs`](scripts/agent/PEN_REGISTRY_LEDGER.md) before and after registry mutations; it fails closed on visible/metadata contradiction, duplicate authoritative records, unentitled SAFE, silently retained stale proof, and denominator drift.
+
 ## Instruction Architecture
 
 - `AGENTS.md` → symlink to this file. Host wrappers (`CODEX.md`, Copilot, etc.) point here — never duplicate policy.
