@@ -234,7 +234,7 @@ describe('isolated UI/docs promotion policy', () => {
 
     expect(result.allowed).toBe(false);
     expect(result.blockers).toContain(
-      "packages/ui/atoms/Badge.tsx: import ./../../lib/close-linear-issue is not presentation-only"
+      'packages/ui/atoms/Badge.tsx: import ./../../lib/close-linear-issue is not presentation-only'
     );
   });
 
