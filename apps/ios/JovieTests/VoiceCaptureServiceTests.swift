@@ -1,8 +1,70 @@
+import Foundation
 import Speech
 import Testing
 @testable import Jovie
 
 struct VoiceCaptureServiceTests {
+  @Test func teleprompterFollowsWordsAndRecoversAfterOffScriptSpeech() {
+    var follower = KaraokeScriptFollower(
+      script: "Today we are building a calmer path for independent artists"
+    )
+
+    follower.ingest(transcript: "Today we are building")
+    #expect(follower.nextWordIndex == 4)
+    #expect(follower.alignment == .aligned)
+
+    follower.ingest(transcript: "Today we are building honestly this part is a rant")
+    #expect(follower.nextWordIndex == 4)
+    #expect(follower.alignment == .offScript)
+
+    follower.ingest(
+      transcript: "Today we are building honestly this part is a rant a calmer path for"
+    )
+    #expect(follower.nextWordIndex == 8)
+    #expect(follower.alignment == .aligned)
+  }
+
+  @Test func teleprompterManualResumeReanchorsWithoutEndingCapture() {
+    var follower = KaraokeScriptFollower(script: "one two three four five six seven")
+    follower.ingest(transcript: "one two")
+    follower.previewSeek(to: 5)
+    #expect(follower.nextWordIndex == 5)
+    #expect(follower.alignment == .manual)
+
+    follower.resume(at: 5)
+    follower.ingest(transcript: "six seven")
+    #expect(follower.nextWordIndex == 7)
+    #expect(follower.alignment == .aligned)
+  }
+
+  @Test func localVlogStoreKeepsScriptVideoAndTimingLinkage() throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let store = VlogSessionStore(rootURL: root)
+    let (created, videoURL) = try store.create(
+      scriptTitle: "Founder take",
+      scriptText: "hello artists"
+    )
+
+    var completed = created
+    completed.status = .completed
+    completed.endedAt = Date(timeIntervalSince1970: 123)
+    completed.transcript = "hello artists"
+    completed.segments = [
+      VlogWordTiming(word: "hello", startSeconds: 0.2, durationSeconds: 0.4, confidence: 0.9),
+    ]
+    try store.save(completed)
+
+    let loaded = try store.load(id: completed.id)
+    #expect(loaded.scriptID == completed.scriptID)
+    #expect(loaded.scriptText == "hello artists")
+    #expect(loaded.videoFilename == videoURL.lastPathComponent)
+    #expect(loaded.transcript == "hello artists")
+    #expect(loaded.segments.first?.startSeconds == 0.2)
+    #expect(loaded.storageMode == "local_only_no_upload")
+    #expect(FileManager.default.fileExists(atPath: store.metadataURL(for: loaded).path))
+  }
+
   @Test func actionDraftTrimsWhitespace() {
     #expect(VoiceMemoActionDraft.make(fromTranscript: "  launch single Friday  ") == "launch single Friday")
     #expect(VoiceMemoActionDraft.make(fromTranscript: "\n\tpromo plan\n") == "promo plan")
