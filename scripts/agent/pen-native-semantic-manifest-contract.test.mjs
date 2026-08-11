@@ -68,7 +68,9 @@ function receipt(overrides = {}) {
 
 test('accepts a complete native manifest and rejects incomplete traversal', () => {
   assert.deepEqual(
-    validatePenNativeSemanticManifestReceipt(receipt(), { lockedExpectedPath: PATH }),
+    validatePenNativeSemanticManifestReceipt(receipt(), {
+      lockedExpectedPath: PATH,
+    }),
     { valid: true, errors: [] }
   );
 
@@ -98,7 +100,11 @@ test('rejects activity, nonzero event deltas, and identity mismatches', () => {
   assert.equal(result.valid, false);
   assert.deepEqual(
     result.errors.map(error => error.code),
-    ['source_path_mismatch', 'direct_file_read_invalid', 'event_delta_backup_invalid']
+    [
+      'source_path_mismatch',
+      'direct_file_read_invalid',
+      'event_delta_backup_invalid',
+    ]
   );
 });
 
