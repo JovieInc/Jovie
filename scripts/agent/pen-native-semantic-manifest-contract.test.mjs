@@ -179,7 +179,7 @@ test('requires locked authority, binds the digest, and never throws on malformed
   );
 
   const malformed = receipt();
-  malformed.semantic_manifest.nodes[0].child_ids = {};
+  Reflect.set(malformed.semantic_manifest.nodes[0], 'child_ids', {});
   assert.doesNotThrow(() =>
     validatePenNativeSemanticManifestReceipt(malformed, LOCKED_OPTIONS)
   );
