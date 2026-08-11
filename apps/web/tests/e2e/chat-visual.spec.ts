@@ -75,7 +75,7 @@ test.describe('Chat composer visual regression', () => {
     await expect(surface).toHaveAttribute('data-surface-mode', 'root', {
       timeout: 5_000,
     });
-    await expect(surface.locator(SLASH_MENU)).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator(SLASH_MENU)).toBeVisible({ timeout: 5_000 });
     await expect(surface).toHaveScreenshot('composer-root.png', {
       maxDiffPixelRatio: 0.03,
     });

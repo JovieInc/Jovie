@@ -78,7 +78,8 @@ function getPageScopedLocatorCalls(source: string): string[] {
         method?.startsWith('getBy') ||
         (method !== null && /^\$\$?$/.test(method))
       ) {
-        calls.push(method);
+        const firstArgument = node.arguments[0]?.getText(sourceFile) ?? '';
+        calls.push(`${method}:${firstArgument}`);
       }
     }
 
@@ -133,21 +134,24 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
   it('scopes chat visual interactions to the active visible composer', () => {
     const chatVisualSpec = readFileSync(chatVisualSpecPath, 'utf8');
 
-    expect(getPageScopedLocatorCalls(chatVisualSpec)).toEqual(['locator']);
+    expect(getPageScopedLocatorCalls(chatVisualSpec)).toEqual([
+      'locator:COMPOSER_SURFACE',
+      'locator:SLASH_MENU',
+    ]);
     expect(
       getPageScopedLocatorCalls(
         "page.getByLabel /* duplicate-sensitive */ ('Chat Message Input')"
       )
-    ).toEqual(['getByLabel']);
+    ).toEqual(["getByLabel:'Chat Message Input'"]);
     expect(
       getPageScopedLocatorCalls("page['getByLabel']('Chat Message Input')")
-    ).toEqual(['getByLabel']);
+    ).toEqual(["getByLabel:'Chat Message Input'"]);
     expect(getPageScopedLocatorCalls('page[method](selector)')).toEqual([
-      '<computed>',
+      '<computed>:selector',
     ]);
     expect(chatVisualSpec).toContain('.filter({ visible: true })');
     expect(chatVisualSpec).toContain('surface.locator(COMPOSER_TEXTAREA)');
-    expect(chatVisualSpec).toContain('surface.locator(SLASH_MENU)');
+    expect(chatVisualSpec).toContain('page.locator(SLASH_MENU)');
     expect(
       chatVisualSpec.match(/getVisibleComposerSurface\(page\)/g)
     ).toHaveLength(4);
