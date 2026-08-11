@@ -416,8 +416,7 @@ function selectVariant(
  * occurrence is the 1-based index of this section id within the composition
  * (e.g. the 2nd feature-split in artist-lp has occurrence=2). Used to
  * disambiguate repeated section ids (A2 fix): 1st feature-split = adaptive
- * (screenshot-right), 2nd = reactivation (bordered-screenshot-left per
- * shipped exemplar).
+ * (phone-right), 2nd = reactivation (bordered-screenshot-left).
  */
 function matchesVariant(
   variantId: string,
@@ -483,12 +482,13 @@ function matchesVariant(
     // a section is structural, but the specific column count is content-driven.
     // For determinism in the tuple, we emit defaultVariant and let the manifest
     // gate assert the render-time variant is one of the legal set.
-    return variantId === '3-large'; // default
+    return variantId === '4-ledger'; // default
   }
   // feature-split — A2 fix: occurrence index disambiguates repeated instances.
   //   artist-lp has two feature-split instances: occurrence=1 = adaptive beat
-  //   → screenshot-right; occurrence=2 = reactivation beat → bordered-screenshot-left
-  //   (per shipped exemplar). The occurrence index is deterministic and matches
+  //   → phone-right (shipped /artist-profiles adaptive body); occurrence=2 =
+  //   reactivation beat → bordered-screenshot-left.
+  //   The occurrence index is deterministic and matches
   //   the shipped render order (codebase-baseline §2.4: adaptive then reactivation).
   if (sectionId === 'feature-split') {
     if (variantId === 'video-background') {
@@ -635,6 +635,9 @@ function matchesVariant(
       return false; // chosen at render time based on tiles.length and emphasis
     }
     if (variantId === 'dense-compact-grid') {
+      return false; // unproven; no shipped exemplar on current main
+    }
+    if (variantId === '5-screenshot-bento') {
       return true; // default
     }
     return false;

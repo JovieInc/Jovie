@@ -102,7 +102,7 @@ export type VariantAlignment = 'centered' | 'left';
  * A variant is a typed tuple over orthogonal axes (prior-art §4 recommendation),
  * NOT an arbitrary name. The variant id is DERIVED mechanically from the tuple
  * (kebab): `{layout}[-{media}[-{mediaPosition}]][-{columns}{density?}`.
- * Examples: `hero/centered-phone`, `feature-grid/3-large`, `feature-split/screenshot-right`.
+ * Examples: `hero/centered-phone`, `feature-grid/4-ledger`, `feature-split/phone-right`.
  * No surveyed system types its variants; this is the Jovie delta that prevents
  * the shadcn/Relume variant-explosion failure mode (245 heroes, 311 features).
  */
@@ -613,6 +613,16 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     optionalInputs: ['eyebrow', 'title', 'lede'],
     variants: [
       {
+        id: '4-ledger',
+        layout: 'contained',
+        media: 'none',
+        alignment: 'left',
+        chooseWhen:
+          'default for feature-grid; items.length=4 rendered as one ordered outcomes ledger (numbered rows, semantic <ol>) — the shipped /artist-profiles outcomes body',
+        exemplar: { route: '/artist-profiles', section: 'outcomes' },
+        status: 'active',
+      },
+      {
         id: '3-large',
         layout: 'contained',
         media: 'none',
@@ -621,8 +631,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         alignment: 'centered',
         chooseWhen:
           'items.length=3 AND emphasis=high (breadth survey before depth)',
-        exemplar: { route: '/artist-profiles', section: 'outcomes' },
-        status: 'active',
+        status: 'unproven',
       },
       {
         id: '4-equal',
@@ -632,7 +641,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         density: 'large',
         alignment: 'centered',
         chooseWhen: 'items.length=4 AND emphasis=medium',
-        status: 'active',
+        status: 'unproven',
       },
       {
         id: '6-compact',
@@ -642,7 +651,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         density: 'compact',
         alignment: 'centered',
         chooseWhen: 'items.length=6 AND emphasis=low (icon list)',
-        status: 'active',
+        status: 'unproven',
       },
       {
         id: 'icon-list',
@@ -653,10 +662,10 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         alignment: 'left',
         chooseWhen:
           'items.length≥4 AND copy is short label-only (no body text)',
-        status: 'active',
+        status: 'unproven',
       },
     ],
-    defaultVariant: '3-large',
+    defaultVariant: '4-ledger',
     proofClass: 'none',
     audienceLegality: [{ legal: true }],
     illegalAfter: [],
@@ -694,10 +703,10 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       },
     ],
     responsiveContract:
-      'columns:3 → 3→2→1 at md/sm; columns:4 → 4→2→1; columns:2 → 2→1; icon-list stays 2-col until sm then 1-col',
+      '4-ledger: single-column ordered ledger at every breakpoint (index/title/body/result rows reflow, no column collapse); grid variants: columns:3 → 3→2→1 at md/sm; columns:4 → 4→2→1; columns:2 → 2→1',
     accessibility: {
       keyboard:
-        'cards are semantic <li> in <ul>; if interactive, Tab order follows visual order',
+        '4-ledger rows are semantic <li> in an <ol> (ordered outcomes); grid cards are <li> in <ul>; if interactive, Tab order follows visual order',
       contrast: 'card title/body meet AA on tokens.surface-1',
       touchTarget:
         'no interactive targets unless card is a link (then ≥44×44 hit area)',
@@ -724,15 +733,25 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     optionalInputs: ['eyebrow', 'cta', 'bullets'],
     variants: [
       {
+        id: 'phone-right',
+        layout: 'split',
+        media: 'phone',
+        mediaPosition: 'right',
+        alignment: 'left',
+        chooseWhen:
+          'default for feature-split; audience=artist AND media is a phone-framed profile mode switcher (shipped /artist-profiles adaptive body)',
+        exemplar: { route: '/artist-profiles', section: 'adaptive' },
+        status: 'active',
+      },
+      {
         id: 'screenshot-right',
         layout: 'split',
         media: 'screenshot',
         mediaPosition: 'right',
         alignment: 'left',
         chooseWhen:
-          'default for feature-split; product-screenshot asset available',
-        exemplar: { route: '/artist-profiles', section: 'adaptive' },
-        status: 'active',
+          'product-screenshot asset available AND no phone-framed profile asset',
+        status: 'unproven',
       },
       {
         id: 'bordered-screenshot-left',
@@ -741,16 +760,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         mediaPosition: 'left',
         alignment: 'left',
         chooseWhen: 'emphasis on the visual; reading order puts media first',
-        exemplar: { route: '/artist-profiles', section: 'reactivation' },
-        status: 'active',
-      },
-      {
-        id: 'phone-right',
-        layout: 'split',
-        media: 'phone',
-        mediaPosition: 'right',
-        alignment: 'left',
-        chooseWhen: 'audience=artist AND media is a phone-framed profile',
         status: 'unproven',
       },
       {
@@ -764,7 +773,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         status: 'unproven',
       },
     ],
-    defaultVariant: 'screenshot-right',
+    defaultVariant: 'phone-right',
     proofClass: 'none',
     audienceLegality: [{ legal: true }],
     illegalAfter: [],
@@ -796,14 +805,17 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       },
     ],
     responsiveContract:
-      'split: stack media-below at md (≤768px); full-bleed: video hidden at sm, poster image fallback',
+      'split: stack media-below at lg (<1024px); full-bleed: video hidden at sm, poster image fallback',
     accessibility: {
-      keyboard: 'if CTA present, real <a>/<button> with focus ring',
+      keyboard:
+        'mode tabs are a real tablist (arrow-key navigation, aria-label); if CTA present, real <a>/<button> with focus ring',
       contrast: 'text over media meets AA; if not, add tokens.surface-1 scrim',
-      touchTarget: 'CTA ≥44×44 at sm',
-      reducedMotion: 'video motion gated; static poster fallback required',
+      touchTarget: 'CTA ≥44×44 at sm; tab triggers ≥44px height',
+      reducedMotion:
+        'mode-switch motion durations zeroed under prefers-reduced-motion; video motion gated, static poster fallback required',
     },
-    component: 'components/marketing/artist-profile/ArtistProfileAdaptiveIntro',
+    component:
+      'components/marketing/artist-profile/ArtistProfileAdaptiveSection',
     failureModes: [
       'Bespoke layout per section (one repeated template per section type is the invariant — B2B anti-pattern #8)',
       'Media without alt/aria (a11y failure)',
@@ -1433,15 +1445,15 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     optionalInputs: ['eyebrow', 'title', 'lede'],
     variants: [
       {
-        id: 'dense-compact-grid',
+        id: '5-screenshot-bento',
         layout: 'contained',
-        media: 'none',
+        media: 'screenshot',
         columns: 4,
-        density: 'compact',
-        alignment: 'centered',
+        density: 'large',
+        alignment: 'left',
         chooseWhen:
-          'default for spec-wall; tiles.length≥8 AND each tile is a short label + screenshot/icon (Jovie delta: "Details That Matter")',
-        exemplar: { route: '/artist-profiles', section: 'specWall' },
+          'default for spec-wall; tiles.length=5 AND every tile carries a screenshot-registry visual (shipped /artist-notifications spec-wall body)',
+        exemplar: { route: '/artist-notifications', section: 'spec-wall' },
         status: 'active',
       },
       {
@@ -1456,8 +1468,19 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         exemplar: { route: '/new', section: 'power-grid' },
         status: 'active',
       },
+      {
+        id: 'dense-compact-grid',
+        layout: 'contained',
+        media: 'none',
+        columns: 4,
+        density: 'compact',
+        alignment: 'centered',
+        chooseWhen:
+          'tiles.length≥8 AND each tile is a short label + screenshot/icon (Jovie delta: "Details That Matter")',
+        status: 'unproven',
+      },
     ],
-    defaultVariant: 'dense-compact-grid',
+    defaultVariant: '5-screenshot-bento',
     proofClass: 'none',
     audienceLegality: [{ legal: true }],
     illegalAfter: ['hero', 'cta'],
@@ -1477,10 +1500,10 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
       },
     ],
     responsiveContract:
-      'columns:4 → 4→2→1 at md/sm; columns:3 → 3→2→1; bento: fixed cell sizes with grid-area, collapse to 2-col at md, 1-col at sm',
+      '5-screenshot-bento: 1-col at sm, md:grid-cols-2, xl:grid-cols-12 with fixed grid-area spans per tile; dense-compact-grid: 4→2→1 at md/sm',
     accessibility: {
       keyboard:
-        'tiles are <li> in <ul>; if interactive, Tab follows visual order',
+        'visual tiles are <article> cells in a responsive grid; text tiles are <li> in <ol>; if interactive, Tab follows visual order',
       contrast: 'tile title/body meet AA on tokens.surface-1',
       touchTarget: 'no interactive targets unless tile is a link',
       reducedMotion: 'no motion',
@@ -1488,7 +1511,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     component: 'components/marketing/artist-profile/ArtistProfileSpecWall',
     failureModes: [
       'Bespoke tile layout (one repeated template per section type — B2B anti-pattern #8)',
-      'Tiles without screenshots (Jovie delta: spec-wall tiles carry a screenshot or icon; pure text = use feature-grid icon-list variant)',
+      'Tiles without screenshots (Jovie delta: spec-wall tiles carry a screenshot or icon; pure text = use feature-grid instead)',
     ],
     neverUse: [
       'Immediately after hero or cta (illegalAfter)',

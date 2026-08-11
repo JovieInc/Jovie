@@ -14,6 +14,7 @@ export const MARKETING_PEN_CONTRACT_IDS = {
     hero: 'SijpA',
     logoCloud: 'bKvfJ',
     featureGrid: 'pM23w',
+    featureSplit: 'kQ4vN',
     howItWorks: 'rsv9G',
     socialProof: 'RVUME',
     stats: 'fkRn8',

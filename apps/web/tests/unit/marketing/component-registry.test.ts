@@ -395,6 +395,109 @@ describe('canonical marketing component registry', () => {
   });
 });
 
+describe('current-main Pen source contracts (JOV-4961)', () => {
+  const sectionEntry = (sectionId: string) =>
+    MARKETING_SECTION_REGISTRY.find(entry => entry.sectionId === sectionId);
+
+  const variant = (sectionId: string, variantId: string) =>
+    MARKETING_SECTIONS.find(section => section.id === sectionId)?.variants.find(
+      candidate => candidate.id === variantId
+    );
+
+  it('feature-grid registers the shipped four-row ledger as the sole active body', () => {
+    expect(sectionEntry('feature-grid')).toMatchObject({
+      sourceBacked: true,
+      resolvedSource:
+        'apps/web/components/marketing/artist-profile/ArtistProfileOutcomesCarousel.tsx',
+      exportName: 'ArtistProfileOutcomesCarousel',
+      variants: ['4-ledger', '3-large', '4-equal', '6-compact', 'icon-list'],
+      defaultVariant: '4-ledger',
+      storybookTitle: 'Marketing/Sections/feature-grid',
+    });
+    expect(variant('feature-grid', '4-ledger')).toMatchObject({
+      status: 'active',
+      exemplar: { route: '/artist-profiles', section: 'outcomes' },
+    });
+    for (const unsupported of [
+      '3-large',
+      '4-equal',
+      '6-compact',
+      'icon-list',
+    ]) {
+      expect(variant('feature-grid', unsupported)?.status).toBe('unproven');
+    }
+  });
+
+  it('feature-split resolves to the shared adaptive section with phone-right default', () => {
+    expect(sectionEntry('feature-split')).toMatchObject({
+      sourceBacked: true,
+      resolvedSource:
+        'apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx',
+      exportName: 'ArtistProfileAdaptiveSection',
+      defaultVariant: 'phone-right',
+      storybookTitle: 'Marketing/Sections/feature-split',
+    });
+    expect(variant('feature-split', 'phone-right')).toMatchObject({
+      status: 'active',
+      exemplar: { route: '/artist-profiles', section: 'adaptive' },
+    });
+    for (const demoted of ['screenshot-right', 'bordered-screenshot-left']) {
+      const candidate = variant('feature-split', demoted);
+      expect(candidate?.status).toBe('unproven');
+      expect(candidate?.exemplar).toBeUndefined();
+    }
+  });
+
+  it('spec-wall registers the shipped five-screenshot-tile production variant', () => {
+    expect(sectionEntry('spec-wall')).toMatchObject({
+      sourceBacked: true,
+      resolvedSource:
+        'apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx',
+      exportName: 'ArtistProfileSpecWall',
+      variants: ['5-screenshot-bento', 'bento', 'dense-compact-grid'],
+      defaultVariant: '5-screenshot-bento',
+      storybookTitle: 'Marketing/Sections/spec-wall',
+    });
+    expect(variant('spec-wall', '5-screenshot-bento')).toMatchObject({
+      status: 'active',
+      exemplar: { route: '/artist-notifications', section: 'spec-wall' },
+    });
+    const dense = variant('spec-wall', 'dense-compact-grid');
+    expect(dense?.status).toBe('unproven');
+    expect(dense?.exemplar).toBeUndefined();
+  });
+
+  it('mounts each canonical section body exactly once in the catalog stories', () => {
+    const storySource = fs.readFileSync(
+      path.join(
+        repoRoot,
+        'apps/web/components/marketing/storybook/MarketingSections.stories.tsx'
+      ),
+      'utf8'
+    );
+
+    // feature-split: one shared adaptive section body, no duplicate mounts.
+    expect(countOccurrences(storySource, '<ArtistProfileAdaptiveSection')).toBe(
+      1
+    );
+    expect(storySource).not.toContain('<ArtistProfileHeroAdaptiveIntro');
+    expect(storySource).not.toContain('<ArtistProfileModeSwitcher');
+
+    // feature-grid: the shipped outcomes ledger body.
+    expect(
+      countOccurrences(storySource, '<ArtistProfileOutcomesCarousel')
+    ).toBe(1);
+
+    // spec-wall: the exact /artist-notifications route fixture.
+    expect(countOccurrences(storySource, '<ArtistProfileSpecWall')).toBe(1);
+    expect(storySource).toContain('tiles={ARTIST_NOTIFICATIONS_SPEC_TILES}');
+    expect(storySource).toContain(
+      'specWall={ARTIST_NOTIFICATIONS_COPY.specWall}'
+    );
+    expect(storySource).not.toContain('truthTiles=');
+  });
+});
+
 describe('canonical shared source atom registry', () => {
   it('resolves source, story, contract, and test ownership', () => {
     for (const entry of DESIGN_SYSTEM_COMPONENT_REGISTRY) {
