@@ -50,6 +50,10 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
   it('keeps visual compare informational while refresh remains self-healing', () => {
     const workflow = readFileSync(visualRegressionWorkflowPath, 'utf8');
     const visualJob = getJobBlock(workflow, 'visual-regression');
+    const loopbackHostnamePin = visualJob.indexOf('export HOSTNAME=localhost');
+    const standaloneServerStart = visualJob.indexOf(
+      'PORT=3100 node .next/standalone/apps/web/server.js'
+    );
 
     expect(workflow).not.toMatch(/^\s*pull_request:/m);
     expect(workflow).not.toMatch(/^\s*merge_group:/m);
@@ -58,6 +62,8 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(workflow).toContain('Scheduled/manual deep evidence only');
     expect(workflow).not.toContain('Informational on PRs');
     expect(visualJob).not.toContain('continue-on-error:');
+    expect(loopbackHostnamePin).toBeGreaterThanOrEqual(0);
+    expect(loopbackHostnamePin).toBeLessThan(standaloneServerStart);
     expect(visualJob).toContain('--update-snapshots');
     expect(visualJob).toContain('BRANCH="visual-baselines/auto-update"');
     expect(visualJob).toContain('gh pr create');

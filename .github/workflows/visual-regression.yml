@@ -128,6 +128,10 @@ jobs:
             exit 1
           fi
 
+          # GitHub sets HOSTNAME to the runner machine name. Pin the standalone
+          # server to loopback so the existing test-auth gate can verify it.
+          export HOSTNAME=localhost
+
           PORT=3100 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
 
