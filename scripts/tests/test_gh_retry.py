@@ -217,11 +217,14 @@ class TestDrainPrQueueWiring:
         queued_head = "9" * 40
         receipt = {
             "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "signals": {
                 "main": {"status": "unknown"},
                 "production": {"status": "unknown"},
-                "integrity": {"status": "unknown"},
+                "controller": {"status": "unknown"},
+                "queue": {"status": "unknown"},
+                "integrity": {"status": "clear"},
             },
             "promotionAdmission": {"allowed": False},
             "isolatedPromotionAdmission": {

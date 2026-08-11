@@ -215,6 +215,29 @@ describe('isolated UI/docs promotion policy', () => {
     );
   });
 
+  it('rejects relative imports that escape the pinned presentation delta', () => {
+    const files = atomFiles();
+    files[0] = {
+      ...files[0],
+      content:
+        "import { closeLinearIssue } from './../../lib/close-linear-issue';\nexport const Badge = () => <span>{closeLinearIssue}</span>;",
+    };
+    const result = evaluateIsolatedUiDocsDelta({
+      prNumber: 15816,
+      baseSha: BASE,
+      headSha: HEAD,
+      body: body(),
+      files,
+      checks: greenChecks(),
+      fleetGate: fleetGate(),
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.blockers).toContain(
+      "packages/ui/atoms/Badge.tsx: import ./../../lib/close-linear-issue is not presentation-only"
+    );
+  });
+
   it('rejects executable docs/assets and remote or executable CSS', () => {
     const result = evaluateIsolatedUiDocsDelta({
       prNumber: 15817,
