@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
@@ -9,6 +10,10 @@ const workflowPath = resolve(repoRoot, '.github/workflows/ci.yml');
 const visualRegressionWorkflowPath = resolve(
   repoRoot,
   '.github/workflows/visual-regression.yml'
+);
+const chatVisualSpecPath = resolve(
+  repoRoot,
+  'apps/web/tests/e2e/chat-visual.spec.ts'
 );
 
 function getJobBlock(workflow: string, jobKey: string): string {
@@ -28,6 +33,60 @@ function getJobBlock(workflow: string, jobKey: string): string {
   }
 
   return block.join('\n');
+}
+
+function getPageScopedLocatorCalls(source: string): string[] {
+  const sourceFile = ts.createSourceFile(
+    'chat-visual.spec.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS
+  );
+  const calls: string[] = [];
+
+  function getPageMethod(expression: ts.LeftHandSideExpression): string | null {
+    if (
+      ts.isPropertyAccessExpression(expression) &&
+      ts.isIdentifier(expression.expression) &&
+      expression.expression.text === 'page'
+    ) {
+      return expression.name.text;
+    }
+
+    if (
+      ts.isElementAccessExpression(expression) &&
+      ts.isIdentifier(expression.expression) &&
+      expression.expression.text === 'page'
+    ) {
+      return expression.argumentExpression &&
+        ts.isStringLiteralLike(expression.argumentExpression)
+        ? expression.argumentExpression.text
+        : '<computed>';
+    }
+
+    return null;
+  }
+
+  function visit(node: ts.Node): void {
+    if (ts.isCallExpression(node)) {
+      const method = getPageMethod(node.expression);
+
+      if (
+        method === '<computed>' ||
+        method === 'locator' ||
+        method?.startsWith('getBy') ||
+        (method !== null && /^\$\$?$/.test(method))
+      ) {
+        calls.push(method);
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return calls;
 }
 
 describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
@@ -69,6 +128,29 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(visualJob).toContain('gh pr create');
     expect(visualJob).toContain('- name: Cleanup Neon branch');
     expect(visualJob).toContain('if: always()');
+  });
+
+  it('scopes chat visual interactions to the active visible composer', () => {
+    const chatVisualSpec = readFileSync(chatVisualSpecPath, 'utf8');
+
+    expect(getPageScopedLocatorCalls(chatVisualSpec)).toEqual(['locator']);
+    expect(
+      getPageScopedLocatorCalls(
+        "page.getByLabel /* duplicate-sensitive */ ('Chat Message Input')"
+      )
+    ).toEqual(['getByLabel']);
+    expect(
+      getPageScopedLocatorCalls("page['getByLabel']('Chat Message Input')")
+    ).toEqual(['getByLabel']);
+    expect(getPageScopedLocatorCalls('page[method](selector)')).toEqual([
+      '<computed>',
+    ]);
+    expect(chatVisualSpec).toContain('.filter({ visible: true })');
+    expect(chatVisualSpec).toContain('surface.locator(COMPOSER_TEXTAREA)');
+    expect(chatVisualSpec).toContain('surface.locator(SLASH_MENU)');
+    expect(
+      chatVisualSpec.match(/getVisibleComposerSurface\(page\)/g)
+    ).toHaveLength(4);
   });
 
   it('preserves authenticated axe diagnostics when Playwright fails', () => {
