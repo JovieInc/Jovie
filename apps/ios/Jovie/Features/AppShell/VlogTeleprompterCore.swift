@@ -16,10 +16,15 @@ struct KaraokeScriptFollower: Equatable, Sendable {
   private var unmatchedRun = 0
 
   init(script: String) {
-    displayWords = script
+    let scriptWords = script
       .split(whereSeparator: { $0.isWhitespace })
       .map(String.init)
-    normalizedWords = displayWords.map(Self.normalizeWord)
+    let spokenWords = scriptWords.compactMap { word -> (display: String, normalized: String)? in
+      let normalized = Self.normalizeWord(word)
+      return normalized.isEmpty ? nil : (word, normalized)
+    }
+    displayWords = spokenWords.map(\.display)
+    normalizedWords = spokenWords.map(\.normalized)
     nextWordIndex = 0
     alignment = .aligned
   }
@@ -77,9 +82,8 @@ struct KaraokeScriptFollower: Equatable, Sendable {
     nextWordIndex = clamped(index)
     alignment = .aligned
     unmatchedRun = 0
-    // A manual resume establishes a new recognition anchor. Old transcript
-    // words must not pull the cursor back to an earlier repeated phrase.
-    lastTranscriptWords = []
+    // Apple Speech partials are cumulative. Preserve the transcript anchor so
+    // the next partial only contributes words spoken after this manual resume.
   }
 
   private func recoveryIndex(in transcriptWords: [String]) -> Int? {

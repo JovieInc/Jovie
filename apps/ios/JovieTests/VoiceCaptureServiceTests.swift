@@ -26,20 +26,31 @@ struct VoiceCaptureServiceTests {
 
   @Test func teleprompterManualResumeReanchorsWithoutEndingCapture() {
     var follower = KaraokeScriptFollower(script: "one two three four five six seven")
-    follower.ingest(transcript: "one two")
+    follower.ingest(transcript: "one two three")
     follower.previewSeek(to: 5)
     #expect(follower.nextWordIndex == 5)
     #expect(follower.alignment == .manual)
 
     follower.resume(at: 5)
-    follower.ingest(transcript: "six seven")
+    follower.ingest(transcript: "one two three six seven")
     #expect(follower.nextWordIndex == 7)
+    #expect(follower.alignment == .aligned)
+  }
+
+  @Test func teleprompterSkipsPunctuationOnlyScriptTokens() {
+    var follower = KaraokeScriptFollower(script: "hello — artists")
+
+    follower.ingest(transcript: "hello artists")
+
+    #expect(follower.displayWords == ["hello", "artists"])
+    #expect(follower.nextWordIndex == 2)
     #expect(follower.alignment == .aligned)
   }
 
   @Test func localVlogStoreKeepsScriptVideoAndTimingLinkage() throws {
     let root = FileManager.default.temporaryDirectory
       .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
     let store = VlogSessionStore(rootURL: root)
     let (created, videoURL) = try store.create(
       scriptTitle: "Founder take",
