@@ -179,19 +179,19 @@ async function runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun) {
   console.log(JSON.stringify(receipt, null, 2));
 }
 
-async function isTeamProductionRed(team) {
+async function teamProductionStatus(team) {
   try {
     const response = await fetch(team.healthUrl, {
       signal: AbortSignal.timeout(5000),
     });
-    if (!response.ok) return true;
+    if (!response.ok) return 'red';
     if (team.healthKind === 'json-status') {
       const data = /** @type {{ status?: string }} */ (await response.json());
-      return data.status !== 'ok';
+      return data.status === 'ok' ? 'green' : 'red';
     }
-    return false;
+    return 'green';
   } catch {
-    return true;
+    return 'unknown';
   }
 }
 
@@ -210,19 +210,20 @@ function loadFleetGateReceipt(team) {
 }
 
 async function fleetGateForTeam(team, now = new Date().toISOString()) {
-  const productionRed = await isTeamProductionRed(team);
+  const productionStatus = await teamProductionStatus(team);
   const receipt = loadFleetGateReceipt(team);
   const receiptMain = receipt?.signals?.main?.status;
   return admitter.evaluateFleetGate(
     {
       main: {
         status:
-          productionRed || receiptMain === 'red'
+          receiptMain === 'red'
             ? 'red'
             : receiptMain === 'green'
               ? 'green'
               : 'unknown',
       },
+      production: { status: productionStatus },
       controller: {
         status: receipt?.signals?.controller?.status || 'unknown',
       },
@@ -275,10 +276,13 @@ async function recoverStaleLeases(team, isDryRun) {
 
 async function admissionPreflight(team) {
   const fleetGate = await fleetGateForTeam(team);
-  if (!fleetGate.workAdmission.allowed) {
+  if (
+    !fleetGate.workAdmission.allowed ||
+    !fleetGate.workAdmission.activities.includes('approved-issue-lease')
+  ) {
     return {
       open: false,
-      reason: `fleet gate ${fleetGate.state.toLowerCase()} blocks pickup`,
+      reason: `fleet gate ${fleetGate.state.toLowerCase()} blocks new issue pickup`,
       load: { count: 0, identifiers: [] },
       fleetGate,
     };

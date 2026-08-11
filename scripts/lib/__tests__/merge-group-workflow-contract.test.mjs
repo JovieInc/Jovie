@@ -585,9 +585,14 @@ ${heavyGateScript}`,
     expect(coalesce).toContain('echo "is_current=false" >> "$GITHUB_OUTPUT"');
     expect(coalesce).toContain('echo "is_current=true" >> "$GITHUB_OUTPUT"');
     expect(coalesce).toContain('commits/main');
-    expect(authorize).toContain('needs: [coalesce-production]');
+    expect(authorize).toContain(
+      'needs: [coalesce-production, fleet-promotion]'
+    );
     expect(authorize).toContain(
       "needs.coalesce-production.outputs.is_current == 'true'"
+    );
+    expect(authorize).toContain(
+      "needs.fleet-promotion.outputs.deployment_allowed == 'true'"
     );
     expect(PRODUCTION_CONTROLLER_WORKFLOW).toContain(
       'group: production-mutation'

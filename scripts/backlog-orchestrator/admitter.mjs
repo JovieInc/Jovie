@@ -23,6 +23,8 @@ export const FLEET_GATE_STATE = Object.freeze({
 export const FLEET_GATE_REASON = Object.freeze({
   MAIN_NOT_GREEN: 'main-not-green',
   MAIN_UNKNOWN: 'main-unknown',
+  PRODUCTION_NOT_GREEN: 'production-not-green',
+  PRODUCTION_UNKNOWN: 'production-unknown',
   CONTROLLER_FAILURE: 'controller-failure',
   CONTROLLER_UNKNOWN: 'controller-unknown',
   CONTROLLER_STALE: 'controller-stale',
@@ -110,6 +112,7 @@ export function evaluateFleetGate(
   const nowMs = Date.parse(now);
   const reasons = [];
   const mainStatus = evidence?.main?.status || 'unknown';
+  const productionStatus = evidence?.production?.status || 'unknown';
   const controllerStatus = evidence?.controller?.status || 'unknown';
   const integrityStatus = evidence?.integrity?.status;
   const integrityReason = evidence?.integrity?.reason;
@@ -189,6 +192,26 @@ export function evaluateFleetGate(
       );
     }
 
+    if (productionStatus === 'red') {
+      reasons.push(
+        typedReason(
+          FLEET_GATE_REASON.PRODUCTION_NOT_GREEN,
+          'promotion',
+          'warning',
+          'Production is not green; deployments and production promotion are frozen.'
+        )
+      );
+    } else if (productionStatus !== 'green') {
+      reasons.push(
+        typedReason(
+          FLEET_GATE_REASON.PRODUCTION_UNKNOWN,
+          'promotion',
+          'warning',
+          'Production status is unknown; promotion is frozen.'
+        )
+      );
+    }
+
     const queueStatus = evidence?.queue?.status || 'unknown';
     const eligiblePrs = evidence?.queue?.eligiblePrs;
     const queueTarget = evidence?.queue?.target;
@@ -228,6 +251,39 @@ export function evaluateFleetGate(
   const concurrency = resolveGemConcurrency(evidence.concurrencyEvidence, {
     now,
   });
+  const queueStatus = evidence?.queue?.status || 'unknown';
+  const eligiblePrs = evidence?.queue?.eligiblePrs;
+  const queueTarget = evidence?.queue?.target;
+  const queueHealthy =
+    queueStatus === 'known' &&
+    Number.isInteger(eligiblePrs) &&
+    eligiblePrs >= 0 &&
+    Number.isInteger(queueTarget) &&
+    queueTarget >= 0 &&
+    eligiblePrs <= queueTarget;
+  const isolatedPromotionAllowed =
+    state === FLEET_GATE_STATE.AMBER &&
+    controllerFresh &&
+    controllerStatus === 'green' &&
+    mainStatus === 'green' &&
+    productionStatus === 'red' &&
+    ['clear', 'resolved'].includes(integrityStatus) &&
+    queueHealthy &&
+    reasons.every(
+      reason => reason.code === FLEET_GATE_REASON.PRODUCTION_NOT_GREEN
+    );
+  const sourceHealthRed =
+    mainStatus !== 'green' || productionStatus !== 'green';
+  const workActivities =
+    state === FLEET_GATE_STATE.RED
+      ? []
+      : [
+          ...(sourceHealthRed ? [] : ['approved-issue-lease']),
+          'isolated-implementation',
+          'tests',
+          'review',
+          'draft-pr',
+        ];
 
   return {
     schema: FLEET_GATE_SCHEMA,
@@ -237,16 +293,8 @@ export function evaluateFleetGate(
     reasons,
     workAdmission: {
       allowed: state !== FLEET_GATE_STATE.RED,
-      activities:
-        state === FLEET_GATE_STATE.RED
-          ? []
-          : [
-              'approved-issue-lease',
-              'isolated-implementation',
-              'tests',
-              'review',
-              'draft-pr',
-            ],
+      activities: workActivities,
+      newIssueLeaseAllowed: workActivities.includes('approved-issue-lease'),
     },
     promotionAdmission: {
       allowed: state === FLEET_GATE_STATE.GREEN,
@@ -254,6 +302,16 @@ export function evaluateFleetGate(
         state === FLEET_GATE_STATE.GREEN
           ? ['ready-for-merge', 'merge', 'deploy', 'production-promotion']
           : [],
+    },
+    isolatedPromotionAdmission: {
+      allowed: isolatedPromotionAllowed,
+      activities: isolatedPromotionAllowed
+        ? ['ready-for-merge', 'native-merge-queue', 'merge']
+        : [],
+      deploymentsAllowed: false,
+      scope: 'exact-head-semantically-isolated-ui-docs',
+      maxConcurrent: 1,
+      authority: 'canonical-merge-queue-controller',
     },
     ownership: {
       controller: 'Gem',
@@ -388,7 +446,8 @@ export async function selectNextToAdmit(
     state.fleetGate ||
     evaluateFleetGate(
       {
-        main: {
+        main: { status: 'green' },
+        production: {
           status:
             (state.productionRed ?? (await isProductionRed())) === true
               ? 'red'
@@ -400,10 +459,13 @@ export async function selectNextToAdmit(
       },
       { now: state.now || new Date().toISOString() }
     );
-  if (!fleetGate.workAdmission.allowed)
+  if (
+    !fleetGate.workAdmission.allowed ||
+    !fleetGate.workAdmission.activities.includes('approved-issue-lease')
+  )
     return {
       admit: [],
-      reason: `fleet gate ${fleetGate.state.toLowerCase()} — blocking pickup`,
+      reason: `fleet gate ${fleetGate.state.toLowerCase()} — blocking new issue pickup`,
       fleetGate,
     };
   if ((state.currentlyShipping || 0) >= maxConcurrentShipping) {

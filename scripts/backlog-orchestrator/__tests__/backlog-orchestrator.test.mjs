@@ -847,6 +847,7 @@ describe('deterministic Symphony admission boundary', () => {
   function fleetEvidence(overrides = {}) {
     return {
       main: { status: 'green' },
+      production: { status: 'green' },
       controller: { status: 'green' },
       integrity: { status: 'clear' },
       queue: { status: 'known', eligiblePrs: 1, target: 5 },
@@ -855,7 +856,7 @@ describe('deterministic Symphony admission boundary', () => {
     };
   }
 
-  it('treats ordinary main-red as AMBER and still admits approved draft work', async () => {
+  it('treats main-red as draft-only AMBER and blocks new issue pickup', async () => {
     const now = '2026-08-09T05:01:00.000Z';
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({ main: { status: 'red' } }),
@@ -870,8 +871,54 @@ describe('deterministic Symphony admission boundary', () => {
 
     assert.equal(fleetGate.state, 'AMBER');
     assert.equal(fleetGate.workAdmission.allowed, true);
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
     assert.equal(fleetGate.promotionAdmission.allowed, false);
-    assert.equal(result.admit[0].identifier, 'JOV-4900');
+    assert.equal(fleetGate.isolatedPromotionAdmission.allowed, false);
+    assert.deepEqual(result.admit, []);
+    assert.match(result.reason, /blocking new issue pickup/);
+  });
+
+  it('permits only isolated queue promotion when production is red and main is green', () => {
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({ production: { status: 'red' } }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(fleetGate.workAdmission.allowed, true);
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(fleetGate.promotionAdmission.allowed, false);
+    assert.deepEqual(fleetGate.isolatedPromotionAdmission, {
+      allowed: true,
+      activities: ['ready-for-merge', 'native-merge-queue', 'merge'],
+      deploymentsAllowed: false,
+      scope: 'exact-head-semantically-isolated-ui-docs',
+      maxConcurrent: 1,
+      authority: 'canonical-merge-queue-controller',
+    });
+  });
+
+  it('denies the isolated lane when integrity, controller, queue, or production evidence is ambiguous', () => {
+    const cases = [
+      fleetEvidence({ production: { status: 'unknown' } }),
+      fleetEvidence({
+        production: { status: 'red' },
+        controller: { status: 'failed' },
+      }),
+      fleetEvidence({
+        production: { status: 'red' },
+        queue: { status: 'unknown' },
+      }),
+      fleetEvidence({ production: { status: 'red' }, integrity: {} }),
+    ];
+
+    for (const evidence of cases) {
+      const fleetGate = admitter.evaluateFleetGate(evidence, {
+        now: '2026-08-09T05:01:00.000Z',
+      });
+      assert.equal(fleetGate.isolatedPromotionAdmission.allowed, false);
+      assert.equal(fleetGate.promotionAdmission.allowed, false);
+    }
   });
 
   it('blocks pickup only for an explicit severe integrity failure', async () => {
@@ -896,7 +943,7 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(fleetGate.workAdmission.allowed, false);
     assert.equal(fleetGate.promotionAdmission.allowed, false);
     assert.equal(result.admit.length, 0);
-    assert.match(result.reason, /blocking pickup/);
+    assert.match(result.reason, /blocking new issue pickup/);
   });
 
   it('fails closed at the integrity layer and only at promotion for malformed queue evidence', () => {
@@ -1043,7 +1090,9 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(amber.exitCode, 0);
     assert.equal(amber.receipt.state, 'AMBER');
     assert.equal(amber.receipt.workAdmission.allowed, true);
+    assert.equal(amber.receipt.workAdmission.newIssueLeaseAllowed, false);
     assert.equal(amber.receipt.promotionAdmission.allowed, false);
+    assert.equal(amber.receipt.isolatedPromotionAdmission.allowed, false);
     assert.equal(amber.receipt.ownership.directGemPickup, false);
     assert.equal(amberPromotion.exitCode, 2);
     assert.equal(amberPromotion.receipt.state, 'AMBER');
@@ -1069,10 +1118,30 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(recovered.exitCode, 0);
     assert.equal(recovered.receipt.state, 'GREEN');
     assert.equal(recovered.receipt.promotionAdmission.allowed, true);
+    const productionRed = await runController(
+      fleetEvidence({ production: { status: 'red' } })
+    );
+    assert.equal(productionRed.receipt.state, 'AMBER');
+    assert.equal(productionRed.receipt.promotionAdmission.allowed, false);
+    assert.equal(
+      productionRed.receipt.isolatedPromotionAdmission.allowed,
+      true
+    );
+    assert.equal(
+      productionRed.receipt.isolatedPromotionAdmission.deploymentsAllowed,
+      false
+    );
     assert.match(workflowSource, /Always open a draft PR first/);
     assert.match(workflowSource, /including when the gate is `GREEN`/);
     assert.match(workflowSource, /gh pr edit --add-label queue-deferred/);
-    assert.match(workflowSource, /only a fresh `GREEN` may/);
+    assert.match(
+      workflowSource,
+      /fresh `GREEN` receipt or the exact isolated exception/
+    );
+    assert.match(
+      workflowSource,
+      /Labels and path-only classification are not eligibility evidence/
+    );
     assert.match(workflowSource, /max_concurrent_agents: 4/);
     assert.doesNotMatch(workflowSource, /Open a non-draft PR/);
   });
