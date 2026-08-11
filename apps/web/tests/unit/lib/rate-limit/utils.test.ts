@@ -22,6 +22,33 @@ describe('Rate Limit Utils', () => {
       } as Request;
     }
 
+    it('uses Vercel-owned forwarded IP before generic proxy headers', () => {
+      const request = createMockRequest({
+        'x-vercel-forwarded-for': '203.0.113.10, 10.0.0.1',
+        'cf-connecting-ip': '198.51.100.10',
+        'true-client-ip': '198.51.100.11',
+        'x-real-ip': '192.0.2.10',
+        'x-forwarded-for': '198.51.100.12',
+        'x-client-ip': '198.51.100.13',
+      });
+
+      expect(getClientIP(request)).toBe('203.0.113.10');
+    });
+
+    it('keeps Vercel clients distinct behind one shared proxy IP', () => {
+      const firstRequest = createMockRequest({
+        'x-vercel-forwarded-for': '203.0.113.20',
+        'x-real-ip': '192.0.2.1',
+      });
+      const secondRequest = createMockRequest({
+        'x-vercel-forwarded-for': '203.0.113.21',
+        'x-real-ip': '192.0.2.1',
+      });
+
+      expect(getClientIP(firstRequest)).toBe('203.0.113.20');
+      expect(getClientIP(secondRequest)).toBe('203.0.113.21');
+    });
+
     it('should extract IP from cf-connecting-ip (Cloudflare)', () => {
       const request = createMockRequest({
         'cf-connecting-ip': '203.0.113.50',
