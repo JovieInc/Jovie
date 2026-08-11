@@ -58,8 +58,12 @@ export function allowIfRateLimitBackendDegraded(
 export function getClientIP(request: Request): string {
   const headers = request.headers;
 
-  // Priority order for IP extraction
+  // Vercel overwrites its forwarded-for headers at the platform edge, so use
+  // that deployment-owned value before caller-controlled generic proxy
+  // headers. This also prevents a shared x-real-ip proxy from collapsing
+  // distinct Vercel clients into one rate-limit bucket.
   const ipHeaders = [
+    'x-vercel-forwarded-for', // Vercel-owned client IP
     'cf-connecting-ip', // Cloudflare
     'true-client-ip', // Cloudflare Enterprise
     'x-real-ip', // nginx proxy
@@ -70,9 +74,9 @@ export function getClientIP(request: Request): string {
   for (const header of ipHeaders) {
     const value = headers.get(header);
     if (value) {
-      // x-forwarded-for can contain multiple IPs (client, proxy1, proxy2, ...)
-      // Take the first (original client) IP
-      if (header === 'x-forwarded-for') {
+      // Forwarded-for can contain multiple IPs (client, proxy1, proxy2, ...).
+      // Take the first (original client) IP.
+      if (header === 'x-vercel-forwarded-for' || header === 'x-forwarded-for') {
         const firstIP = value.split(',')[0]?.trim();
         if (firstIP) return firstIP;
       } else {
