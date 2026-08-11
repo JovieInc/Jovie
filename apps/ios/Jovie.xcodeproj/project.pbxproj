@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A0F17E100000000000000004 /* VlogTeleprompterCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F17E100000000000000003 /* VlogTeleprompterCore.swift */; };
 		A0J0V3632A00000000000002 /* AppShellTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A00000000000001 /* AppShellTabBar.swift */; };
 		A0J0V3632A00000000000004 /* TalkOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A00000000000003 /* TalkOverlayView.swift */; };
 		A0J0V3632A00000000000006 /* EntityContextSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A00000000000005 /* EntityContextSheet.swift */; };
@@ -139,6 +140,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A0F17E100000000000000003 /* VlogTeleprompterCore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VlogTeleprompterCore.swift; sourceTree = "<group>"; };
 		A0J0V3632A00000000000001 /* AppShellTabBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellTabBar.swift; sourceTree = "<group>"; };
 		A0J0V3632A00000000000003 /* TalkOverlayView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TalkOverlayView.swift; sourceTree = "<group>"; };
 		A0J0V3632A00000000000005 /* EntityContextSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EntityContextSheet.swift; sourceTree = "<group>"; };
@@ -434,6 +436,7 @@
 				4C2C97BF3A0B42C58A62529F /* AppShellView.swift */,
 				A0J0V3632A00000000000005 /* EntityContextSheet.swift */,
 				A0J0V3632A00000000000003 /* TalkOverlayView.swift */,
+				A0F17E100000000000000003 /* VlogTeleprompterCore.swift */,
 			);
 			name = AppShell;
 			path = AppShell;
@@ -838,6 +841,7 @@
 				A0J0V36330000000000000002 /* AppShellLeftDrawer.swift in Sources */,
 				A0J0V3632A00000000000002 /* AppShellTabBar.swift in Sources */,
 				A0J0V3632A00000000000004 /* TalkOverlayView.swift in Sources */,
+				A0F17E100000000000000004 /* VlogTeleprompterCore.swift in Sources */,
 				A0J0V3632A00000000000006 /* EntityContextSheet.swift in Sources */,
 				A0J0V3632A00000000000008 /* LibraryModels.swift in Sources */,
 				A0J0V3632A0000000000000A /* LibrarySurfaceView.swift in Sources */,
