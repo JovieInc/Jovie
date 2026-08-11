@@ -57,6 +57,10 @@ node scripts/agent/pen-save-receipt.mjs \
 
 Exit `0` means the captured saved state is internally consistent. Exit `1` means blocked. Exit `2` means the command or evidence files were malformed.
 
+## Promotion fallback gate
+
+A passing `saved_state_verified` receipt proves the observed save evidence is consistent — it is live-app evidence only. A promotion may claim **cold round-trip verification** only when a `pen-cold-readback/v1` receipt with verdict `cold_readback_verified` was recorded against the same canonical path after the acknowledged save. Evaluate the pair with `pen-promotion-gate.mjs`; when only live-app readback succeeded the claim is `live_readback_only`, and a desktop that stays dirty after a claimed save surfaces the typed reason `desktop_dirty_after_save`. See [`PEN_COLD_READBACK.md`](PEN_COLD_READBACK.md).
+
 ## Side-file reconciliation and archive plan
 
 Do not reconcile while any Pen writer is active. Preserve every side file and backup as evidence.

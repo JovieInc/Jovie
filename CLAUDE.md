@@ -31,6 +31,8 @@ Before any Pen mutation, resolve one versioned workspace profile from [`scripts/
 
 After each logical batch, explicitly save the existing locked document, verify the editor is clean when that state is exposed, re-read the intended roots, and emit a passing `pen-save-receipt/v1` with [`scripts/agent/pen-save-receipt.mjs`](scripts/agent/PEN_SAVE_RECEIPT.md). The receipt must bind hashed pre/post app-state, window-state, explicit-save-response, and root-readback evidence. Its strongest result is `saved_state_verified`; crash/restart durability remains `not_proven`. Autosave, a visible canvas change, an MCP success response, or an opaque backup alone is insufficient. A timeout makes mutation state unknown and prohibits retry.
 
+Headless verification uses [`scripts/agent/pen-cold-readback.mjs`](scripts/agent/PEN_COLD_READBACK.md): it opens the locked file read-only, reads reusable component metadata, and emits `pen-cold-readback/v1`. A promotion may claim cold round-trip verification only when `scripts/agent/pen-promotion-gate.mjs` returns `cold_round_trip_verified` for the save/cold-readback receipt pair; live-app readback alone is `live_readback_only`.
+
 After any Pen/renderer/MCP restart, disconnect, crash indication, or unexpected active-path change, invalidate the writer and batch; do not save, discard, resume, or switch. If Pen displays Save/Don't Save, choose **Cancel**. If no dialog is displayed, leave Pen untouched. In either case, stop all mutations, preserve the active work, and report the lock failure. Never ask the founder to decide whether unknown agent work should be saved or discarded.
 
 ## Instruction Architecture
