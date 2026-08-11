@@ -157,8 +157,11 @@ function runPenInteractive(penBin, targetPath, timeoutMs) {
     );
     const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
     const typedReasons = mapPenCliFailure(output);
-    if (result.error?.code === 'ETIMEDOUT') typedReasons.push('cli_timeout');
-    if (result.error?.code === 'ENOENT') typedReasons.push('cli_unavailable');
+    const errorCode = /** @type {{ code?: string } | undefined} */ (
+      result.error
+    )?.code;
+    if (errorCode === 'ETIMEDOUT') typedReasons.push('cli_timeout');
+    if (errorCode === 'ENOENT') typedReasons.push('cli_unavailable');
     return {
       output,
       typedReasons: [...new Set(typedReasons)],

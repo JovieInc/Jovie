@@ -25,6 +25,7 @@ function parseTimestamp(value) {
 export function mapPenCliFailure(output) {
   const haystack = text(output);
   if (!haystack) return [];
+  /** @type {Array<[RegExp, string]>} */
   const signatures = [
     [
       /authentication required|pen login|PEN_CLI_KEY|not authenticated/i,
