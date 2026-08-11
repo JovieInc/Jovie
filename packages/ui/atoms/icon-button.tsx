@@ -38,7 +38,7 @@ const ICON_BUTTON_VARIANT_TO_BUTTON_VARIANT: Record<
   surface: 'secondary',
   frosted: 'ghost',
   ghost: 'ghost',
-  secondary: 'secondary',
+  secondary: 'ghost',
   outline: 'secondary',
   pearl: 'ghost',
   pearlQuiet: 'ghost',
@@ -78,12 +78,16 @@ const iconButtonVariants = cva(
           'bg-transparent text-secondary-token',
           'hover:bg-surface-1 hover:text-primary-token'
         ),
-        // Secondary - subtle background without border
+        // Secondary - quiet icon control: transparent at rest, with circular
+        // interaction surfaces supplied by the shared rounded-full Button.
+        // Keep overflow visible so the 44px pseudo-element remains hittable
+        // around compact visible controls.
         secondary: cn(
           CIRCLE_CHROME_CLASSNAME,
-          'bg-surface-2 text-secondary-token',
-          'shadow-sm',
-          'hover:bg-surface-3 hover:text-primary-token'
+          'overflow-visible border-transparent bg-transparent text-secondary-token shadow-none',
+          'hover:bg-interactive-hover hover:text-primary-token',
+          'focus-visible:bg-interactive-hover focus-visible:text-primary-token',
+          'active:bg-interactive-active active:text-primary-token'
         ),
         // Outline - transparent with visible border
         outline: cn(
