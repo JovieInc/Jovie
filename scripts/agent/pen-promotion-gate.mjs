@@ -12,8 +12,8 @@ function usage() {
     `Usage: node scripts/agent/pen-promotion-gate.mjs --save-receipt <path> [--cold-readback-receipt <path>]\n\n` +
     `Evaluates the strongest truthful verification claim a Pen promotion may make.\n` +
     `Exit 0 only for cold_round_trip_verified; live_readback_only and unverified\n` +
-    `both exit 1. A promotion may never claim a cold round trip without a\n` +
-    `pen-cold-readback/v1 receipt with verdict cold_readback_verified.\n`
+    `both exit 1. The pinned Pen runtime has no safe native cold-manifest\n` +
+    `inspector, so pen-cold-readback/v2 preserves live_readback_only.\n`
   );
 }
 
