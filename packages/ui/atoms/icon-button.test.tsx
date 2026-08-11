@@ -73,6 +73,84 @@ describe('IconButton', () => {
     }
   });
 
+  it('keeps secondary controls unfilled at rest with circular interaction states', () => {
+    render(
+      <IconButton ariaLabel='Secondary action' size='md' variant='secondary'>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+
+    const button = screen.getByRole('button', { name: 'Secondary action' });
+    expect(button).toHaveAttribute('data-variant', 'ghost');
+    expect(button.className).toContain('rounded-full');
+    expect(button.className).toContain('border-transparent');
+    expect(button.className).toContain('bg-transparent');
+    expect(button.className).toContain('overflow-visible');
+    expect(button.className).toContain('shadow-none');
+    expect(button.className).toContain('hover:bg-interactive-hover');
+    expect(button.className).toContain('focus-visible:bg-interactive-hover');
+    expect(button.className).toContain('active:bg-interactive-active');
+    expect(button.className).not.toContain('bg-surface-2');
+    expect(button.className).not.toContain('shadow-sm');
+    expect(button.className).toContain('before:h-11');
+    expect(button.className).toContain('before:w-11');
+  });
+
+  it('preserves secondary geometry and state semantics when disabled or loading', () => {
+    const { rerender } = render(
+      <IconButton
+        ariaLabel='Secondary state'
+        disabled
+        size='md'
+        variant='secondary'
+      >
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+
+    const disabledButton = screen.getByRole('button', {
+      name: 'Secondary state',
+    });
+    expect(disabledButton).toBeDisabled();
+    expect(disabledButton).toHaveAttribute('data-state', 'disabled');
+    expect(disabledButton).toHaveAttribute('aria-disabled', 'true');
+    expect(disabledButton.className).toContain(
+      'disabled:opacity-[var(--state-disabled-opacity)]'
+    );
+    expect(disabledButton.className).toContain('h-8');
+    expect(disabledButton.className).toContain('w-8');
+    expect(disabledButton.className).toContain('before:h-11');
+    expect(disabledButton.className).toContain('before:w-11');
+
+    rerender(
+      <IconButton
+        ariaLabel='Secondary state'
+        loading
+        size='md'
+        variant='secondary'
+      >
+        <svg aria-hidden='true' data-testid='secondary-glyph' />
+      </IconButton>
+    );
+
+    const loadingButton = screen.getByRole('button', {
+      name: 'Secondary state',
+    });
+    expect(loadingButton).toBeDisabled();
+    expect(loadingButton).toHaveAttribute('data-state', 'loading');
+    expect(loadingButton).toHaveAttribute('aria-busy', 'true');
+    expect(loadingButton.className).toContain('h-8');
+    expect(loadingButton.className).toContain('w-8');
+    expect(loadingButton.className).toContain('before:h-11');
+    expect(loadingButton.className).toContain('before:w-11');
+    expect(screen.getByTestId('secondary-glyph').parentElement).toHaveClass(
+      'opacity-0'
+    );
+    expect(screen.getByLabelText('Loading').parentElement).toHaveClass(
+      'absolute'
+    );
+  });
+
   it('shares one focus ring and reduced-motion policy across all variants', () => {
     for (const variant of ICON_BUTTON_VARIANT_NAMES) {
       const { unmount } = render(

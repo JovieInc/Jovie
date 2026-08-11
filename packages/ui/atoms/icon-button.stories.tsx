@@ -1,4 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useTheme } from 'next-themes';
+import { type ReactNode, useEffect, useRef } from 'react';
+import { expect, userEvent, waitFor } from 'storybook/test';
 import { IconButton } from './icon-button';
 import {
   ICON_BUTTON_SIZE_NAMES,
@@ -17,6 +20,128 @@ const PlaceholderIcon = () => (
     <circle cx='8' cy='8' r='6' />
   </svg>
 );
+
+const SECONDARY_STATE_EXAMPLES = [
+  { label: 'Rest', props: {} },
+  { label: 'Disabled', props: { disabled: true } },
+  { label: 'Loading', props: { loading: true } },
+] as const;
+
+type ProofTheme = 'light' | 'dark';
+
+function RootProofTheme({
+  children,
+  theme,
+}: {
+  readonly children: ReactNode;
+  readonly theme: ProofTheme;
+}) {
+  const { theme: activeTheme, setTheme } = useTheme();
+  const initialTheme = useRef(activeTheme);
+
+  useEffect(() => {
+    setTheme(theme);
+    return () => {
+      setTheme(initialTheme.current ?? 'dark');
+    };
+  }, [setTheme, theme]);
+
+  return children;
+}
+
+function SecondaryStateSurface({ theme }: { readonly theme: ProofTheme }) {
+  return (
+    <section>
+      <div className='rounded-xl bg-surface-0 p-5 text-primary-token'>
+        <p className='mb-4 text-xs font-medium text-secondary-token'>
+          {theme === 'dark' ? 'Dark Surface' : 'Light Surface'}
+        </p>
+        <div className='flex items-start gap-6'>
+          {SECONDARY_STATE_EXAMPLES.map(({ label, props }) => (
+            <div className='flex flex-col items-center gap-2' key={label}>
+              <IconButton
+                {...props}
+                ariaLabel={`${theme === 'dark' ? 'Dark' : 'Light'} ${label}`}
+                size='md'
+                variant='secondary'
+              >
+                <PlaceholderIcon />
+              </IconButton>
+              <span className='text-xs text-tertiary-token'>{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+async function verifySecondaryStateStory(
+  canvasElement: HTMLElement,
+  theme: ProofTheme
+) {
+  const root = canvasElement.ownerDocument.documentElement;
+  await waitFor(() => expect(root).toHaveClass(theme));
+
+  const restControl = canvasElement.querySelector<HTMLButtonElement>(
+    'button[data-state="idle"]'
+  );
+  await expect(restControl).toBeInTheDocument();
+  if (!restControl) return;
+
+  await expect(restControl).toHaveClass('bg-transparent');
+  await expect(restControl).toHaveClass('rounded-full');
+  const restStyle = getComputedStyle(restControl);
+  await expect(restStyle.borderRadius).not.toBe('0px');
+
+  let observedPointerOver = false;
+  restControl.addEventListener(
+    'pointerover',
+    () => {
+      observedPointerOver = true;
+    },
+    { once: true }
+  );
+  await userEvent.hover(restControl);
+  await expect(observedPointerOver).toBe(true);
+  await expect(restControl).toHaveClass('hover:bg-interactive-hover');
+
+  await userEvent.unhover(restControl);
+  await userEvent.tab();
+  await expect(restControl).toHaveFocus();
+  await expect(restControl.matches(':focus-visible')).toBe(true);
+  await expect(restControl).toHaveClass('focus-visible:bg-interactive-hover');
+
+  let observedPointerDown = false;
+  restControl.addEventListener(
+    'pointerdown',
+    () => {
+      observedPointerDown = true;
+    },
+    { once: true }
+  );
+  await userEvent.pointer({ keys: '[MouseLeft>]', target: restControl });
+  await expect(observedPointerDown).toBe(true);
+  await expect(restControl).toHaveClass('active:bg-interactive-active');
+  await userEvent.pointer({ keys: '[/MouseLeft]' });
+
+  const disabledControl = canvasElement.querySelector<HTMLButtonElement>(
+    'button[data-state="disabled"]'
+  );
+  const loadingControl = canvasElement.querySelector<HTMLButtonElement>(
+    'button[data-state="loading"]'
+  );
+  await expect(disabledControl).toBeDisabled();
+  await expect(loadingControl).toHaveAttribute('aria-busy', 'true');
+
+  for (const control of [restControl, disabledControl, loadingControl]) {
+    if (!control) continue;
+    const visibleBox = control.getBoundingClientRect();
+    const hitTarget = getComputedStyle(control, '::before');
+    await expect([visibleBox.width, visibleBox.height]).toEqual([32, 32]);
+    await expect([hitTarget.width, hitTarget.height]).toEqual(['44px', '44px']);
+  }
+}
 
 const meta: Meta<typeof IconButton> = {
   title: 'shadcn/IconButton',
@@ -45,6 +170,10 @@ const meta: Meta<typeof IconButton> = {
     disabled: {
       control: { type: 'boolean' },
       description: 'Disabled state',
+    },
+    loading: {
+      control: { type: 'boolean' },
+      description: 'Loading state with stable control geometry',
     },
     asChild: {
       control: { type: 'boolean' },
@@ -89,6 +218,87 @@ export const Secondary: Story = {
     variant: 'secondary',
     size: 'lg',
     children: <PlaceholderIcon />,
+  },
+};
+
+export const SecondaryStateMatrix: Story = {
+  decorators: [
+    Story => (
+      <RootProofTheme theme='light'>
+        <Story />
+      </RootProofTheme>
+    ),
+  ],
+  render: () => <SecondaryStateSurface theme='light' />,
+  play: async ({ canvasElement }) => {
+    await verifySecondaryStateStory(canvasElement, 'light');
+  },
+  parameters: {
+    backgrounds: { default: 'light' },
+    docs: {
+      description: {
+        story:
+          'Desktop light-surface proof. Rest is transparent; hover and keyboard focus reveal the circular interactive surface, pointer press uses the circular active surface, and disabled/loading keep the same control box and 44px interaction target.',
+      },
+    },
+  },
+};
+
+export const SecondaryStateMatrixDark: Story = {
+  decorators: [
+    Story => (
+      <RootProofTheme theme='dark'>
+        <Story />
+      </RootProofTheme>
+    ),
+  ],
+  render: () => <SecondaryStateSurface theme='dark' />,
+  play: async ({ canvasElement }) => {
+    await verifySecondaryStateStory(canvasElement, 'dark');
+  },
+  parameters: {
+    backgrounds: { default: 'dark' },
+    docs: {
+      description: {
+        story: 'Desktop dark-surface proof using root-scoped dark tokens.',
+      },
+    },
+  },
+};
+
+export const SecondaryStateMatrixMobile: Story = {
+  decorators: [
+    Story => (
+      <RootProofTheme theme='light'>
+        <Story />
+      </RootProofTheme>
+    ),
+  ],
+  render: () => <SecondaryStateSurface theme='light' />,
+  play: async ({ canvasElement }) => {
+    await verifySecondaryStateStory(canvasElement, 'light');
+  },
+  parameters: {
+    backgrounds: { default: 'light' },
+    viewport: { defaultViewport: 'mobile1' },
+  },
+};
+
+export const SecondaryStateMatrixDarkMobile: Story = {
+  decorators: [
+    Story => (
+      <RootProofTheme theme='dark'>
+        <Story />
+      </RootProofTheme>
+    ),
+  ],
+  render: () => <SecondaryStateSurface theme='dark' />,
+  play: async ({ canvasElement }) => {
+    await verifySecondaryStateStory(canvasElement, 'dark');
+  },
+  parameters: {
+    backgrounds: { default: 'dark' },
+    viewport: { defaultViewport: 'mobile1' },
   },
 };
 
