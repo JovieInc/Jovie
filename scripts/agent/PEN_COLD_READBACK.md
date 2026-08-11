@@ -61,6 +61,10 @@ Exit codes:
 - `0`: reserved for a future, separately reviewed native inspector contract;
   unreachable in the current implementation.
 
+`--help` is the standard non-gate exception: it exits `0` and writes usage text,
+not a JSON receipt. Automation must parse and validate the expected JSON schema
+and claim; exit status alone is never promotion evidence.
+
 ## Promotion gate
 
 ```bash
@@ -77,9 +81,21 @@ Claims:
 | `unverified` | The save receipt did not pass. Exit 1. |
 | `cold_round_trip_verified` | Reserved for a future reviewed native inspector contract. Unreachable today. |
 
+The gate resolves the save receipt's workspace profile through the versioned
+file lock and validates the complete successful `pen-save-receipt/v1` output
+contract: canonical path identity, clean state, exclusive writer/batch/root
+facts, explicit-save acknowledgement, ordered timestamps, evidence digests,
+`durability: not_proven`, and an explicit empty blocker list. A schema and
+passing verdict alone are `unverified`.
+
 Legacy `pen-cold-readback/v1` component inventories are explicitly downgraded as
 `partial_component_evidence`. A forged v2 `cold_readback_verified` receipt cannot
 promote because the source contains no reviewed native inspector.
+
+Receipt paths must name single-link regular `.json` files no larger than 1 MB.
+The gate opens them read-only with `O_NOFOLLOW`, validates the opened descriptor,
+and performs a bounded read. Symlinks, hard links, non-regular files, and oversized
+receipts fail with JSON error output and exit `2`.
 
 ## Safety boundary
 

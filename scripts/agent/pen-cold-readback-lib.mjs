@@ -1,5 +1,7 @@
 import { isAbsolute } from 'node:path';
 
+import { validateSavedStateVerifiedReceipt } from './pen-save-receipt-lib.mjs';
+
 export const PEN_COLD_READBACK_SCHEMA = 'pen-cold-readback/v2';
 export const PEN_COLD_READBACK_LEGACY_SCHEMA = 'pen-cold-readback/v1';
 export const PEN_PROMOTION_GATE_SCHEMA = 'pen-promotion-gate/v1';
@@ -12,6 +14,9 @@ const desktopDirtyBlockers = new Set([
   'document_title_edited',
   'dirty_or_unknown',
 ]);
+const MAX_COPIED_BLOCKERS = 32;
+const MAX_REASON_CODE_LENGTH = 96;
+const MAX_REASON_MESSAGE_LENGTH = 512;
 
 function text(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -21,6 +26,10 @@ function parseTimestamp(value) {
   const timestamp = text(value);
   const milliseconds = Date.parse(timestamp);
   return Number.isFinite(milliseconds) ? { timestamp, milliseconds } : null;
+}
+
+function boundedText(value, maximumLength) {
+  return text(value).slice(0, maximumLength);
 }
 
 /**
@@ -37,12 +46,7 @@ export function buildPenColdReadbackReceipt(input = {}) {
   const saveInvoked = input.saveInvoked === true;
   const documentOpened = input.documentOpened === true;
   const outputDocumentCreated = input.outputDocumentCreated === true;
-  const blockers = [
-    {
-      code: SAFE_COLD_MANIFEST_REASON,
-      message: unavailableMessage,
-    },
-  ];
+  const blockers = [];
   const block = (code, message) => blockers.push({ code, message });
 
   if (!workspaceProfile) {
@@ -57,16 +61,20 @@ export function buildPenColdReadbackReceipt(input = {}) {
   if (!recordedAt) {
     block('recorded_at_invalid', 'A valid receipt timestamp is required.');
   }
-  if (
-    executeInvoked ||
-    saveInvoked ||
-    documentOpened ||
-    outputDocumentCreated
-  ) {
+  const forbiddenActivity =
+    executeInvoked || saveInvoked || documentOpened || outputDocumentCreated;
+  if (forbiddenActivity) {
     block(
       'forbidden_cold_readback_activity',
       'Cold-manifest unavailability must be reported before execute, save, document open, or output creation.'
     );
+  }
+
+  if (!forbiddenActivity) {
+    blockers.unshift({
+      code: SAFE_COLD_MANIFEST_REASON,
+      message: unavailableMessage,
+    });
   }
 
   return {
@@ -74,8 +82,12 @@ export function buildPenColdReadbackReceipt(input = {}) {
     mode: 'canonical',
     workspace_profile: workspaceProfile || null,
     target_path: targetPath || null,
-    verdict: 'cold_readback_failed',
-    typed_reasons: [SAFE_COLD_MANIFEST_REASON],
+    verdict: forbiddenActivity ? 'error' : 'cold_readback_failed',
+    typed_reasons: [
+      forbiddenActivity
+        ? 'forbidden_cold_readback_activity'
+        : SAFE_COLD_MANIFEST_REASON,
+    ],
     semantic_manifest: null,
     semantic_manifest_complete: false,
     inspection_method: null,
@@ -85,7 +97,7 @@ export function buildPenColdReadbackReceipt(input = {}) {
     output_document_created: outputDocumentCreated,
     recorded_at: recordedAt?.timestamp ?? null,
     durability: 'not_proven',
-    exit_code: 1,
+    exit_code: forbiddenActivity ? 2 : 1,
     blockers,
   };
 }
@@ -127,26 +139,63 @@ export function evaluatePenPromotionClaim(input = {}) {
       reasons,
     };
   }
-  const saveBlockers = Array.isArray(saveReceipt.blockers)
-    ? saveReceipt.blockers
-    : [];
+  if (!Array.isArray(saveReceipt.blockers)) {
+    reason(
+      'save_receipt_invalid',
+      'Save receipt blockers must be an explicit array.'
+    );
+    return {
+      schema: PEN_PROMOTION_GATE_SCHEMA,
+      claim: 'unverified',
+      reasons,
+    };
+  }
+  const saveBlockers = saveReceipt.blockers;
   if (
     saveReceipt.verdict !== 'saved_state_verified' ||
     saveBlockers.length > 0
   ) {
-    for (const blocker of saveBlockers) {
-      if (desktopDirtyBlockers.has(blocker.code)) {
+    for (const blocker of saveBlockers.slice(0, MAX_COPIED_BLOCKERS)) {
+      const blockerCode = boundedText(blocker?.code, MAX_REASON_CODE_LENGTH);
+      const blockerMessage = boundedText(
+        blocker?.message,
+        MAX_REASON_MESSAGE_LENGTH
+      );
+      if (desktopDirtyBlockers.has(blockerCode)) {
         reason(
           'desktop_dirty_after_save',
           'The desktop remained dirty after the claimed save.'
         );
       } else {
-        reason(blocker.code ?? 'save_receipt_blocked', blocker.message ?? '');
+        reason(blockerCode || 'save_receipt_blocked', blockerMessage);
       }
+    }
+    if (saveBlockers.length > MAX_COPIED_BLOCKERS) {
+      reason(
+        'save_receipt_blockers_truncated',
+        `Only the first ${MAX_COPIED_BLOCKERS} save blockers were copied.`
+      );
     }
     if (saveBlockers.length === 0) {
       reason('save_receipt_blocked', 'Save receipt verdict is not verified.');
     }
+    return {
+      schema: PEN_PROMOTION_GATE_SCHEMA,
+      claim: 'unverified',
+      reasons,
+    };
+  }
+
+  const saveValidation = validateSavedStateVerifiedReceipt(saveReceipt, {
+    lockedExpectedPath: input.lockedExpectedPath,
+  });
+  if (!saveValidation.valid) {
+    reason(
+      'save_receipt_invalid',
+      `Save receipt failed required output checks: ${saveValidation.errors
+        .map(error => error.code)
+        .join(', ')}`
+    );
     return {
       schema: PEN_PROMOTION_GATE_SCHEMA,
       claim: 'unverified',

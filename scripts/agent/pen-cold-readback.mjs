@@ -46,8 +46,12 @@ export function parseArgs(argv) {
     const value = argv[++index];
     if (value === undefined) throw new Error(`${flag} requires a value.`);
     if (flag === '--profile') input.workspaceProfile = value;
-    else if (flag === '--recorded-at') input.recordedAt = value;
-    else {
+    else if (flag === '--recorded-at') {
+      if (!Number.isFinite(Date.parse(value))) {
+        throw new Error('--recorded-at must be a valid timestamp.');
+      }
+      input.recordedAt = value;
+    } else {
       throw new Error(
         `${flag} is prohibited: cold-manifest unavailability must be reported without Pen or .pen access.`
       );
