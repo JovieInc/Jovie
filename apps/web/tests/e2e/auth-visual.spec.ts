@@ -79,10 +79,7 @@ async function openInterceptedAuthModal(
   });
 
   if (mode === 'signin') {
-    await page
-      .getByRole('link', { name: /^sign in$/i })
-      .first()
-      .click();
+    await page.locator(`a[href="${APP_ROUTES.SIGNIN}"]`).first().click();
   } else {
     await page.locator('[data-cta-sign-up="true"]').first().click();
   }
