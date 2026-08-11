@@ -25,14 +25,88 @@ export const BUTTON_SIZE_NAMES = [
   'icon-xl',
 ] as const;
 
-/** Existing Pen origin and descendant slots for the canonical Button atom. */
-export const BUTTON_PEN_CONTRACT = {
-  rootId: 'L2SRKu',
-  descendants: {
-    label: 'zUKwW',
-    leadingIcon: 'wfRl9',
+export type ButtonPenState = 'idle' | 'destructive';
+
+/**
+ * Deterministic key for one normalized Button visual selection. The same key
+ * is produced from source `variant`/`size`/`destructive` values when declaring
+ * the family map and when resolving an instance, so a selection can only ever
+ * resolve to its exact declared Pen master.
+ */
+export type ButtonPenVariantKey =
+  `button/${ButtonVariant}/${ButtonSize}/${ButtonPenState}`;
+
+export function buttonPenVariantKey({
+  variant,
+  size,
+  destructive = false,
+}: {
+  readonly variant: ButtonVariant;
+  readonly size: ButtonSize;
+  readonly destructive?: boolean;
+}): ButtonPenVariantKey {
+  return `button/${variant}/${size}/${
+    destructive ? 'destructive' : 'idle'
+  }` as ButtonPenVariantKey;
+}
+
+/** One reusable Pen master and its stable descendant override slots. */
+export interface ButtonPenMaster {
+  readonly rootId: string;
+  readonly descendants: {
+    readonly label: string;
+    readonly leadingIcon?: string;
+  };
+}
+
+/**
+ * Executable Pen family for the canonical Button atom. Every entry is a
+ * reusable master in the canonical active Pen file whose root and descendant
+ * slot IDs were returned by the coordinated Pen lane. Selections without an
+ * entry have no source-backed master and must fail closed; they never fall
+ * back to another master.
+ *
+ * Receipts (canonical active Pen file, native save + CLI readback):
+ * - `button/primary/lg/idle` → master `g3IC1`, label `iqbJo`,
+ *   leadingIcon `M2rMD2`; production refs `NRxLZ` (/download) and `w0wvCh`
+ *   (footer) persist with independent label/icon overrides.
+ */
+export const BUTTON_PEN_CONTRACT: {
+  readonly rootByVariantKey: Readonly<
+    Partial<Record<ButtonPenVariantKey, ButtonPenMaster>>
+  >;
+} = {
+  rootByVariantKey: {
+    'button/primary/lg/idle': {
+      rootId: 'g3IC1',
+      descendants: {
+        label: 'iqbJo',
+        leadingIcon: 'M2rMD2',
+      },
+    },
   },
-} as const;
+};
+
+/**
+ * Resolve a normalized Button selection to its exact Pen master. Returns null
+ * when the combination has no source-backed master so callers fail closed
+ * instead of silently falling back to the primary master.
+ */
+export function resolveButtonPenMaster({
+  variant,
+  size,
+  destructive = false,
+}: {
+  readonly variant: ButtonVariant;
+  readonly size: ButtonSize;
+  readonly destructive?: boolean;
+}): ButtonPenMaster | null {
+  return (
+    BUTTON_PEN_CONTRACT.rootByVariantKey[
+      buttonPenVariantKey({ variant, size, destructive })
+    ] ?? null
+  );
+}
 
 export type ButtonVariant = (typeof BUTTON_VARIANT_NAMES)[number];
 export type ButtonSize = (typeof BUTTON_SIZE_NAMES)[number];

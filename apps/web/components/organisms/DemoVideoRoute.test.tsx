@@ -1,7 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { BUTTON_PEN_CONTRACT } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DemoVideoPage } from '@/components/features/demo/DemoVideoPage';
@@ -72,13 +71,14 @@ describe('DemoVideoPage route contract', () => {
     );
   });
 
-  it('renders the production CTA through the canonical Button asChild root', () => {
+  it('keeps the unmapped production CTA free of a false Pen identity', () => {
     render(<DemoVideoPage />);
 
-    expect(screen.getByRole('link', { name: 'Try it free' })).toHaveAttribute(
-      'data-pen-contract',
-      BUTTON_PEN_CONTRACT.rootId
-    );
+    // primary/md has no source-backed Pen master yet; the contract fails
+    // closed instead of stamping another master's root.
+    expect(
+      screen.getByRole('link', { name: 'Try it free' })
+    ).not.toHaveAttribute('data-pen-contract');
   });
 
   it('binds both route identities to one exact component and no counter body', () => {

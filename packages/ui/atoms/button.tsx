@@ -6,7 +6,6 @@ import { cva } from 'class-variance-authority';
 import * as React from 'react';
 
 import {
-  BUTTON_PEN_CONTRACT,
   BUTTON_SIZE_NAMES,
   BUTTON_VARIANT_NAMES,
   type ButtonSize,
@@ -15,6 +14,7 @@ import {
   type ButtonVariantInput,
   normalizeButtonSizeContract,
   normalizeButtonVariantContract,
+  resolveButtonPenMaster,
 } from './button-contract';
 import { Spinner } from './spinner';
 
@@ -223,6 +223,17 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       destructive,
     });
     const normalizedSize = normalizeButtonSize(size);
+    // Fail closed: only selections with a source-backed Pen master carry the
+    // canonical Pen identity. Unmapped combinations render without the
+    // attribute rather than claiming another master's root.
+    const penMaster = resolveButtonPenMaster({
+      variant: normalizedVariant.variant,
+      size: normalizedSize,
+      destructive: normalizedVariant.destructive,
+    });
+    const penContractProps = penMaster
+      ? ({ 'data-pen-contract': penMaster.rootId } as const)
+      : null;
 
     const sharedProps = {
       ref,
@@ -254,20 +265,16 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       // Next's server renderer can pass an opaque lazy child across the RSC
       // boundary. Radix Slot resolves that representation itself, while
       // React.Children.only rejects it before Slot gets the chance.
-      const contractChild = React.isValidElement<{
-        'data-pen-contract'?: string;
-      }>(children)
-        ? React.cloneElement(children, {
-            'data-pen-contract': BUTTON_PEN_CONTRACT.rootId,
-          })
-        : children;
+      const contractChild =
+        penContractProps &&
+        React.isValidElement<{
+          'data-pen-contract'?: string;
+        }>(children)
+          ? React.cloneElement(children, penContractProps)
+          : children;
 
       return (
-        <Comp
-          {...sharedProps}
-          {...props}
-          data-pen-contract={BUTTON_PEN_CONTRACT.rootId}
-        >
+        <Comp {...sharedProps} {...props} {...penContractProps}>
           {contractChild}
         </Comp>
       );
@@ -282,12 +289,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     };
 
     return (
-      <Comp
-        {...sharedProps}
-        {...buttonProps}
-        {...props}
-        data-pen-contract={BUTTON_PEN_CONTRACT.rootId}
-      >
+      <Comp {...sharedProps} {...buttonProps} {...props} {...penContractProps}>
         {loading && <ButtonLoadingSpinner />}
         <ButtonContent loading={loading}>{children}</ButtonContent>
       </Comp>

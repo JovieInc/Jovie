@@ -43,18 +43,29 @@ describe('Button', () => {
     expect(btn).toBeInTheDocument();
   });
 
-  it('keeps the canonical Pen identity on button and asChild roots', () => {
+  it('stamps the resolved Pen master on mapped button and asChild roots', () => {
+    const master =
+      BUTTON_PEN_CONTRACT.rootByVariantKey['button/primary/lg/idle'];
+    expect(master).toBeDefined();
+
     const { rerender } = render(
-      <Button data-pen-contract='caller-override'>Press</Button>
+      <Button variant='primary' size='lg' data-pen-contract='caller-override'>
+        Press
+      </Button>
     );
 
     expect(screen.getByRole('button')).toHaveAttribute(
       'data-pen-contract',
-      BUTTON_PEN_CONTRACT.rootId
+      master?.rootId as string
     );
 
     rerender(
-      <Button asChild data-pen-contract='caller-override'>
+      <Button
+        asChild
+        variant='primary'
+        size='lg'
+        data-pen-contract='caller-override'
+      >
         <a href='/start' data-pen-contract='child-override'>
           Start
         </a>
@@ -63,8 +74,13 @@ describe('Button', () => {
 
     expect(screen.getByRole('link', { name: 'Start' })).toHaveAttribute(
       'data-pen-contract',
-      BUTTON_PEN_CONTRACT.rootId
+      master?.rootId as string
     );
+  });
+
+  it('fails closed without a Pen identity for unmapped selections', () => {
+    render(<Button>Press</Button>);
+    expect(screen.getByRole('button')).not.toHaveAttribute('data-pen-contract');
   });
 
   it('renders an opaque server child through the canonical asChild contract', () => {
@@ -86,11 +102,16 @@ describe('Button', () => {
       _payload: payload,
     } as unknown as React.ReactNode;
 
-    render(<Button asChild>{serverChild}</Button>);
+    render(
+      <Button asChild variant='primary' size='lg'>
+        {serverChild}
+      </Button>
+    );
 
     expect(screen.getByTestId('server-button-child')).toHaveAttribute(
       'data-pen-contract',
-      BUTTON_PEN_CONTRACT.rootId
+      BUTTON_PEN_CONTRACT.rootByVariantKey['button/primary/lg/idle']
+        ?.rootId as string
     );
   });
 
