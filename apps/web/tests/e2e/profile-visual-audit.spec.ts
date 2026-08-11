@@ -30,7 +30,6 @@ interface ProfileAuditCase {
 
 const TEST_PROFILE = 'dualipa';
 const TIP_PROFILE = 'testartist';
-const NOTIFICATIONS_PROFILE = 'testartist';
 const PROFILE_READY_SELECTOR = 'h1, [data-testid="profile-header"]';
 // Dead ready selectors removed: subscribe-cta-container and profile-tour-heading
 // were dropped from the app in #8391; the header fallback above is the live gate.
@@ -93,21 +92,6 @@ const PROFILE_CASES: readonly ProfileAuditCase[] = [
     readySelector: `${PROFILE_READY_SELECTOR}, [data-testid="tip-drawer"]`,
     shells: ['legacy'],
   },
-  {
-    id: 'notifications',
-    path: `/${NOTIFICATIONS_PROFILE}/notifications`,
-    readySelector: '[data-testid="notifications-page"]',
-    shells: ['legacy'],
-    composerVisible: true,
-  },
-  {
-    id: 'notifications-focus',
-    path: `/${NOTIFICATIONS_PROFILE}/notifications`,
-    readySelector: '[data-testid="notifications-page"]',
-    shells: ['legacy'],
-    composerVisible: true,
-    focusComposerInput: true,
-  },
 ];
 
 const FAST_ITERATION_CASE_IDS = new Set<ProfileAuditCase['id']>([
@@ -117,8 +101,6 @@ const FAST_ITERATION_CASE_IDS = new Set<ProfileAuditCase['id']>([
   'subscribe-focus',
   'contact',
   'tip',
-  'notifications',
-  'notifications-focus',
 ]);
 
 const ACTIVE_PROFILE_CASES = FAST_ITERATION

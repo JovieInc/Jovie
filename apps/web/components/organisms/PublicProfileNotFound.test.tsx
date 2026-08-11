@@ -111,12 +111,18 @@ describe('public profile missing-state source contract', () => {
       ),
       'utf8'
     );
+    const profileVisualAuditSource = readFileSync(
+      resolve(process.cwd(), 'tests/e2e/profile-visual-audit.spec.ts'),
+      'utf8'
+    );
 
     expect(notificationsRoute).toContain(
       "redirect(getProfileModeHref(username, 'subscribe'))"
     );
     expect(notificationsRoute).not.toContain('notFound()');
     expect(storySource).not.toContain('web-053-[username]--notifications');
+    expect(profileVisualAuditSource).not.toContain("id: 'notifications'");
+    expect(profileVisualAuditSource).not.toContain("id: 'notifications-focus'");
     expect(storySource.match(/fixtureState: 'missing'/g)).toHaveLength(1);
     expect(storySource).toContain("proofTier: 'source-backed-missing-state'");
   });
