@@ -104,4 +104,22 @@ describe('PricingRecipeBody', () => {
       "omissions: ['logo-cloud', 'social-proof', 'faq']"
     );
   });
+
+  it('records true provenance for the recipe.pricing story sourceSha', () => {
+    const storySource = readFileSync(
+      resolve(
+        process.cwd(),
+        'components/organisms/PricingRecipeBody.stories.tsx'
+      ),
+      'utf8'
+    );
+
+    const match = storySource.match(/sourceSha: '([0-9a-f]{40})'/);
+    expect(match).not.toBeNull();
+    const sourceSha = match?.[1] as string;
+    expect(sourceSha).toBe('791efba42391c23dde72f4a2fc1dc7cfedb0eabc');
+    expect(storySource).toContain(
+      "source: 'apps/web/components/organisms/PricingRecipeBody.tsx'"
+    );
+  });
 });
