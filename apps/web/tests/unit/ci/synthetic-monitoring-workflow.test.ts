@@ -57,23 +57,35 @@ describe('synthetic monitoring workflow parser', () => {
     expect(uploadStep).toContain('retention-days: 30');
   });
 
-  it('runs the required Better Auth account suite behind explicit production gates', () => {
+  it('runs the required waitlist suite with scoped credentials and no production database access', () => {
     for (const path of [workflowPath, agentTickWorkflowPath]) {
       const workflow = readFileSync(path, 'utf8');
+      const syntheticJob =
+        path === agentTickWorkflowPath
+          ? workflow.slice(workflow.indexOf('\n  synthetic-monitoring:'))
+          : workflow;
+      const checkoutStep = getStepBlock(syntheticJob, 'Checkout code');
       const canaryStep = getStepBlock(
-        workflow,
-        'Run Better Auth Production Account Canary'
+        syntheticJob,
+        'Run Production Waitlist Canary'
       );
 
+      expect(checkoutStep).toContain('ref: main');
       expect(canaryStep).toContain("E2E_SYNTHETIC_MODE: 'true'");
-      expect(canaryStep).toContain("E2E_PROD_ACCOUNT_CANARY_ENABLED: 'true'");
+      expect(canaryStep).toContain("E2E_PROD_WAITLIST_CANARY_ENABLED: 'true'");
       expect(canaryStep).toContain('VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}');
       expect(canaryStep).toContain(
-        'tests/e2e/synthetic-better-auth-account.spec.ts'
+        'E2E_PROD_OTP_CHECK_ORIGIN: ${{ vars.E2E_PROD_OTP_CHECK_ORIGIN }}'
+      );
+      expect(canaryStep).toContain(
+        'tests/e2e/synthetic-production-waitlist.spec.ts'
       );
       expect(workflow).toContain(
-        'SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-better-auth-account-results.json'
+        'SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-production-waitlist-results.json'
       );
+      expect(canaryStep).not.toContain('DOPPLER_TOKEN_PRD');
+      expect(canaryStep).not.toContain('DATABASE_URL');
+      expect(canaryStep).not.toContain('doppler run');
     }
   });
 });

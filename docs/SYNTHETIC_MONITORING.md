@@ -4,13 +4,13 @@ This document describes the synthetic monitoring setup for Jovie's production fr
 
 ## Overview
 
-Synthetic monitoring runs automated tests against production to make sure a real new visitor can enter the product. The scheduled workflow uses Doppler `prd` secrets, runs Playwright against `https://jov.ie`, and alerts Slack when any blocking check fails.
+Synthetic monitoring runs automated tests against production to make sure a real new visitor can enter the product. The scheduled workflow runs Playwright against `https://jov.ie` and keeps each suite's authority scoped to its purpose.
 
 The production suite is split by responsibility:
 
 - `synthetic-auth-ui.spec.ts` validates that Google/Apple SSO buttons, the intentional email/identifier auth surface, and provider handoff initiation are healthy.
 - `synthetic-golden-path.spec.ts` validates the public front-door signup journey.
-- `synthetic-better-auth-account.spec.ts` creates one real production email-OTP identity, proves `/start`, session, and `ba_users` → `users` linkage, then transactionally removes the exact identity and verifies zero residue.
+- `synthetic-production-waitlist.spec.ts` reuses one exact Better Auth email-OTP identity, traverses the production waitlist path, and reads a redacted durable receipt without production database credentials or identity deletion.
 - `onboarding-robot.full.spec.ts` validates app behavior after Clerk authentication: profile creation, dashboard load, public profile load, welcome-chat continuity, and exact cleanup.
 - `public-profile-smoke.spec.ts` validates the public profile rendering baseline.
 
@@ -45,19 +45,19 @@ Coverage:
 
 The fast PR smoke, `onboarding-robot.smoke.spec.ts`, runs separately through the desktop smoke manifest and only verifies anonymous `/start` chat health plus event emission.
 
-### Better Auth Production Account Canary
+### Production Waitlist Canary
 
-This required suite is the production identity receipt. Before account creation it resolves the latest Vercel production deployment, requires `READY`, and verifies that `/api/health/build-info` reports the same Git SHA. It then:
+This required suite retains one dedicated identity at exactly `<base-local>+jovie-prod-waitlist-canary@<domain>`. Before using it, the runner resolves the latest `READY` Vercel production deployment, verifies `/api/health/build-info` reports the same Git SHA, and calls the scoped receipt endpoint in preflight mode. It then:
 
-1. Creates exactly `<base-local>+jovie-ba-prod-canary-<run-id>@<domain>` through the rendered Better Auth email form.
-2. Reads the real OTP through the bearer-protected Cloudflare Email Routing worker.
-3. Requires the browser to reach `/start` and `/api/auth/get-session` to return a user.
-4. Requires exactly one `ba_users` row linked to exactly one app `users` row by `users.better_auth_user_id`, with a durable `ba_sessions` row.
-5. Re-resolves Vercel and fails if the deployment ID or full SHA changed during the run.
-6. Deletes the exact app identity, verification, and Better Auth identity in one serializable transaction whose ownership/cardinality guard and row locks are inside the same statement; cascades remove its sessions/accounts. A post-cleanup query must report zero rows in every scoped table.
-7. Attaches a receipt containing the deployment ID/SHA and a SHA-256 email digest—never the email, OTP, session token, or database IDs.
+1. Visits the homepage, follows the real primary CTA to `/start`, and opens the rendered Better Auth email form.
+2. Creates or reuses the exact identity and reads its real OTP through the bearer-protected Cloudflare Email Routing worker. Turnstile is never bypassed.
+3. Requires a real Better Auth session, submits the canonical authenticated onboarding intake route, and verifies `/waitlist` renders the retained state.
+4. Reads a token-scoped, redacted receipt proving exactly one Better Auth identity, one linked app user, an active session, the exact waitlist row, the run-specific waitlist audit marker, and a first-party analytics receipt emitted by the rendered confirmation view. This does not claim Google Analytics provider delivery.
+5. Requires zero matching `send_waitlist_email` jobs of any type. The exact canary namespace suppresses the waitlist-confirmation email before enqueue and Slack before the provider call, including when no run header is present. The required auth OTP is routed only to the dedicated mailbox, and automatic approval excludes the retained row before reserving capacity.
+6. Re-resolves Vercel and fails if the deployment ID or full SHA changed during the run.
+7. Attaches separate runtime, database, analytics, and communications evidence with only deployment identity, run id, entry id, and the SHA-256 email digest.
 
-The workflow parser treats a missing, empty, or skipped required suite as failure. The production-account test itself is double-gated by `E2E_SYNTHETIC_MODE=true` and `E2E_PROD_ACCOUNT_CANARY_ENABLED=true`. An `afterEach` hook gets a separate cleanup budget when the test times out. Each healthy run also reconciles at most five identities older than 60 minutes, and only when the address matches the anchored canary namespace, the app row is Better-Auth-only, and no creator profile exists.
+The identity and waitlist row are intentionally retained. The canary never receives `DATABASE_URL`, never deletes production data, and never reconciles or resets shared identities. Both the server and runner fail closed if the exact namespace, production origin, scoped read token, mailbox provider, receipt shape, or requested run/entry binding does not match. The workflow parser treats a missing, empty, or skipped required suite as failure. The suite is double-gated by `E2E_SYNTHETIC_MODE=true` and `E2E_PROD_WAITLIST_CANARY_ENABLED=true`.
 
 ### Health Checks
 
@@ -153,11 +153,14 @@ E2E_PROD_MAILBOX_PROVIDER=gmail
 E2E_PROD_MAILBOX_CLIENT_ID=...
 E2E_PROD_MAILBOX_CLIENT_SECRET=...
 E2E_PROD_MAILBOX_REFRESH_TOKEN=...
-E2E_PROD_ACCOUNT_CANARY_ENABLED=true
+E2E_PROD_WAITLIST_CANARY_ENABLED=true
+PRODUCTION_WAITLIST_CANARY_READ_TOKEN=...
 VERCEL_TOKEN=...
 VERCEL_ORG_ID=...
 VERCEL_PROJECT_ID=...
 ```
+
+The production waitlist canary receives only its dedicated mailbox, receipt-read, and Vercel deployment credentials. It does not receive a production database URL. The production application needs the matching `E2E_PROD_SIGNUP_EMAIL_BASE` and `PRODUCTION_WAITLIST_CANARY_READ_TOKEN` values so it can enforce the exact namespace and authorize redacted reads.
 
 The onboarding robot additionally requires `E2E_PROD_SIGNUP_EMAIL_BASE`, `CLERK_SECRET_KEY`, and `DATABASE_URL`. It does not require mailbox OTP settings because it signs in with a Clerk sign-in token instead of driving provider UI.
 
@@ -166,6 +169,7 @@ Preferred no-inbox provider:
 ```bash
 E2E_PROD_SIGNUP_EMAIL_BASE=synthetic-signup@<dedicated-e2e-domain>
 E2E_PROD_MAILBOX_PROVIDER=cloudflare-email-routing
+E2E_PROD_OTP_CHECK_ORIGIN=https://<otp-worker-host>
 E2E_PROD_OTP_CHECK_URL=https://<otp-worker-host>/latest
 E2E_PROD_OTP_CHECK_TOKEN=...
 ```
@@ -191,7 +195,7 @@ The endpoint should return `404` or `204` while no fresh code is available, or
 
 ### GitHub Secrets
 
-The workflow reads application, database, and mailbox secrets through `DOPPLER_TOKEN_PRD`. The Better Auth account canary also reads the existing `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` GitHub secrets to bind its receipt to the active production deployment. Do not duplicate Turnstile or mailbox values as standalone GitHub repo secrets.
+Other suites continue to read their existing application secrets through `DOPPLER_TOKEN_PRD`. The production waitlist step receives standalone protected secrets only for `E2E_PROD_SIGNUP_EMAIL_BASE`, `E2E_PROD_OTP_CHECK_URL`, `E2E_PROD_OTP_CHECK_TOKEN`, and `PRODUCTION_WAITLIST_CANARY_READ_TOKEN`, plus the existing Vercel credentials. The non-secret `E2E_PROD_OTP_CHECK_ORIGIN` repository variable pins the exact HTTPS worker origin before the bearer token can be sent. The step does not receive `DOPPLER_TOKEN_PRD` or `DATABASE_URL`, and the mailbox provider is pinned to `cloudflare-email-routing` in the workflow.
 
 ## GitHub Actions Workflow
 
@@ -199,8 +203,7 @@ The synthetic monitoring runs automatically via GitHub Actions:
 
 ### Schedule
 
-- **Business Hours (8 AM - 8 PM Pacific)**: Every 15 minutes
-- **Off Hours**: Every 30 minutes
+- **Production synthetic workflow**: Every 6 hours, plus explicit manual dispatch from `main`
 
 ### Environments Tested
 
@@ -212,21 +215,19 @@ The synthetic monitoring runs automatically via GitHub Actions:
 2. **Multiple Environment Failure**: Critical alert sent to `#alerts-critical`
 3. **Daily Success Summary**: Sent to `#monitoring` at 9 PM PST
 
-## Throwaway Account Management
+## Synthetic Account Management
 
 ### Account Strategy
 
-- Each test run creates a fresh user account
-- Better Auth account-canary email format: `<base-local>+jovie-ba-prod-canary-<run-id>@<domain>`
-- Its cleanup guard accepts only that anchored namespace and requires zero `ba_users`, `users`, `ba_sessions`, `ba_accounts`, and `ba_verifications` residue
-- Accounts are tagged with Clerk public metadata `role=synthetic_production_canary`
-- The test deletes only the exact plus-addressed email created in that run
+- The waitlist canary reuses exactly `<base-local>+jovie-prod-waitlist-canary@<domain>` and retains its identity, waitlist entry, and evidence rows.
+- No canary cleanup process may delete, reset, or reconcile this durable identity. If it becomes inconsistent, the receipt fails and requires an explicit operator repair plan.
+- Other suites may create transient, separately namespaced identities under their own cleanup guards.
 - Onboarding robot accounts use the `+onboarding-robot-<run-id>` suffix and Clerk public metadata `role=synthetic_onboarding_robot`
 - Onboarding robot cleanup requires an exact robot email, Clerk `user_` id, `or-` run id, and generated `jor...` handle before touching the database or Clerk
 
 ### Production Considerations
 
-- Synthetic account cleanup must stay scoped to the configured plus-addressed mailbox
+- Synthetic account cleanup must stay scoped to each suite's configured plus-addressed namespace and must exclude the retained waitlist-canary address.
 - Monitor synthetic account creation rate to avoid hitting limits
 - Do not run broad `cleanup-e2e-users.ts` against production Clerk
 - Do not add a production cleanup endpoint for onboarding robot runs
@@ -261,7 +262,7 @@ Each alert includes:
 ### Regular Tasks
 
 - **Weekly**: Review synthetic monitoring results and trends
-- **Monthly**: Clean up old synthetic test accounts
+- **Monthly**: Review transient synthetic accounts; never batch-delete the retained waitlist-canary identity
 - **Quarterly**: Review and update test scenarios
 
 ### Updating Tests
