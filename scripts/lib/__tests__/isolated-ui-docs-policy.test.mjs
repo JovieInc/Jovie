@@ -250,6 +250,16 @@ describe('isolated UI/docs promotion policy', () => {
           patch: '@@ -0,0 +1 @@',
           content: '@import url("https://example.com/theme.css");',
         },
+        {
+          filename: 'packages/ui/atoms/badge-protocol-relative.css',
+          status: 'modified',
+          sha: '0'.repeat(40),
+          additions: 1,
+          deletions: 0,
+          changes: 1,
+          patch: '@@ -0,0 +1 @@',
+          content: 'background-image: url("//cdn.example.com/badge.png");',
+        },
         atomFiles()[1],
       ],
       checks: greenChecks(),
@@ -262,6 +272,7 @@ describe('isolated UI/docs promotion policy', () => {
         'docs/policy.mdx: not in the isolated UI/docs allowlist',
         'apps/web/public/runtime.svg: not in the isolated UI/docs allowlist',
         'packages/ui/atoms/badge.css: contains remote or executable CSS import',
+        'packages/ui/atoms/badge-protocol-relative.css: contains remote or executable CSS import',
       ])
     );
   });

@@ -93,7 +93,7 @@ const DENIED_SOURCE_PATTERNS = [
 const DENIED_STYLE_PATTERNS = [
   {
     reason: 'remote or executable CSS import',
-    pattern: /@import\b|url\(\s*['"]?(?:https?:|data:|javascript:)/i,
+    pattern: /@import\b|url\(\s*['"]?(?:https?:|data:|javascript:|\/\/)/i,
   },
   {
     reason: 'legacy executable CSS',
