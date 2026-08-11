@@ -261,6 +261,30 @@ describe('isolated UI/docs promotion policy', () => {
     );
   });
 
+  it('rejects alias imports that traverse outside the pinned atom closure', () => {
+    const files = atomFiles();
+    files[0] = {
+      ...files[0],
+      filename: 'apps/web/components/atoms/AccountBadge.tsx',
+      content:
+        "import { closeLinearIssue } from '@/components/atoms/../../lib/hud/linear-actions';\nexport const AccountBadge = () => <span>{closeLinearIssue}</span>;",
+    };
+    const result = evaluateIsolatedUiDocsDelta({
+      prNumber: 15818,
+      baseSha: BASE,
+      headSha: HEAD,
+      body: body(),
+      files,
+      checks: greenChecks(),
+      fleetGate: fleetGate(),
+    });
+
+    expect(result.allowed).toBe(false);
+    expect(result.blockers).toContain(
+      'apps/web/components/atoms/AccountBadge.tsx: import @/components/atoms/../../lib/hud/linear-actions is not presentation-only'
+    );
+  });
+
   it('rejects executable docs/assets and remote or executable CSS', () => {
     const result = evaluateIsolatedUiDocsDelta({
       prNumber: 15817,

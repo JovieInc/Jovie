@@ -250,10 +250,15 @@ function resolvesToPinnedPresentationFile(source, file, files) {
   });
 }
 
+function containsPathTraversal(source) {
+  return source.split('/').some(segment => segment === '.' || segment === '..');
+}
+
 function allowedImportSource(source, file, files) {
   if (source.startsWith('.')) {
     return resolvesToPinnedPresentationFile(source, file, files);
   }
+  if (containsPathTraversal(source)) return false;
   if (PRESENTATION_IMPORT_RE.test(source)) return true;
   if (file.kind === 'test' && TEST_IMPORT_RE.test(source)) return true;
   if (/^@\/components\/atoms(?:\/|$)/.test(source)) return true;
