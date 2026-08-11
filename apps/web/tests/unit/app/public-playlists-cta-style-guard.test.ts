@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-const source = readFileSync('app/(dynamic)/playlists/[slug]/page.tsx', 'utf8');
+const source = readFileSync(
+  'components/organisms/PlaylistDetailContent.tsx',
+  'utf8'
+);
 
 describe('public playlist CTA style guard', () => {
   it('keeps the Spotify open action neutral with provider color only on the icon', () => {
