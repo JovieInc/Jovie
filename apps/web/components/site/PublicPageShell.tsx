@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { MarketingFooter } from './MarketingFooter';
 import {
   MarketingHeader,
+  type MarketingHeaderCta,
   type MarketingHeaderNavLink,
   type MarketingHeaderVariant,
 } from './MarketingHeader';
@@ -16,6 +17,7 @@ export interface PublicPageShellProps {
   readonly footerClassName?: string;
   readonly footerVariant?: 'auto' | 'expanded' | 'minimal';
   readonly headerVariant?: MarketingHeaderVariant;
+  readonly headerCta?: MarketingHeaderCta;
   readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   readonly logoVariant?: LogoVariant;
   readonly mainClassName?: string;
@@ -34,6 +36,7 @@ export function PublicPageShell({
   className,
   footerClassName,
   footerVariant,
+  headerCta,
   headerVariant = 'landing',
   logoSize = 'xs',
   logoVariant,
@@ -53,6 +56,7 @@ export function PublicPageShell({
         logoSize={logoSize}
         logoVariant={logoVariant}
         navLinks={navLinks}
+        primaryCta={headerCta}
         showHomepageCenterNav={showHomepageCenterNav}
         variant={headerVariant}
       />

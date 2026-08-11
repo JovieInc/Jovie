@@ -74,9 +74,10 @@ describe('NewLandingPage', () => {
       'href',
       '/support'
     );
-    expect(
-      screen.getByRole('link', { name: 'Start Free Trial' })
-    ).toHaveAttribute('href', '/signup');
+    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
+      'href',
+      '/start?starter_prompt=Hey%2C+I+want+to+get+access+to+Jovie.'
+    );
 
     render(<NewLandingPage />);
 

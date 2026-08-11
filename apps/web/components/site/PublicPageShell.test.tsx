@@ -50,6 +50,20 @@ describe('PublicPageShell', () => {
     expect(footer.className).toContain('system-b-mounted-home-footer');
   });
 
+  it('passes a page-owned CTA contract to the shared header', () => {
+    render(
+      <PublicPageShell
+        headerCta={{ href: '/start', label: 'Claim your profile' }}
+      >
+        body
+      </PublicPageShell>
+    );
+
+    expect(
+      screen.getByRole('link', { name: 'Claim your profile' })
+    ).toHaveAttribute('href', '/start');
+  });
+
   it('renders the skip-to-content link by default and can disable it', () => {
     const { unmount } = render(<PublicPageShell>body</PublicPageShell>);
     expect(

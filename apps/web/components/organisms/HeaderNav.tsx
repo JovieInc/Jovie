@@ -30,19 +30,28 @@ export interface HeaderNavProps {
   readonly hideNav?: boolean;
   readonly hideDesktopNav?: boolean;
   readonly containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
-  readonly navLinks?: ReadonlyArray<{ href: string; label: string }>;
+  readonly navLinks?: ReadonlyArray<HeaderNavLinkItem>;
   readonly mobileNavLinks?: ReadonlyArray<{ href: string; label: string }>;
   readonly authMode?: 'client' | 'public-static';
   readonly minimalAuth?: boolean;
   readonly minimalAuthVariant?: 'link' | 'pill';
   readonly includePublicLoginInMobileNav?: boolean;
-  readonly mobilePublicCtaHref?: string;
-  readonly mobilePublicCtaLabel?: string;
-  readonly publicCtaLabel?: string;
+  readonly publicCta?: HeaderNavCta;
   readonly presentation?: 'default' | 'homepage-embedded' | 'marketing-glass';
   readonly flyoutMenus?: readonly HeaderFlyoutMenu[];
   readonly showContactLink?: boolean;
   readonly penContractId?: MarketingPenContractId;
+}
+
+export interface HeaderNavCta {
+  readonly href: string;
+  readonly label: string;
+}
+
+export interface HeaderNavLinkItem {
+  readonly href: string;
+  readonly label: string;
+  readonly treatment?: 'wordmark';
 }
 
 export interface HeaderFlyoutMenu {
@@ -59,15 +68,16 @@ export interface HeaderFlyoutMenu {
 type PublicAuthActionsProps = Readonly<{
   readonly minimal?: boolean;
   readonly minimalVariant?: 'link' | 'pill';
-  readonly publicCtaHref?: string;
-  readonly publicCtaLabel?: string;
+  readonly publicCta?: HeaderNavCta;
 }>;
 
 function PublicAuthActions({
   minimal = false,
   minimalVariant = 'link',
-  publicCtaHref = APP_ROUTES.SIGNUP,
-  publicCtaLabel = 'Request Access',
+  publicCta = {
+    href: APP_ROUTES.SIGNUP,
+    label: 'Request Access',
+  },
 }: PublicAuthActionsProps = {}) {
   if (minimal) {
     if (minimalVariant === 'pill') {
@@ -93,24 +103,25 @@ function PublicAuthActions({
         Log in
       </Link>
       <Link
-        href={publicCtaHref}
+        href={publicCta.href}
         className={getLinearPillClassName({
           className: 'focus-ring-themed shrink-0 whitespace-nowrap',
         })}
       >
-        {publicCtaLabel}
+        {publicCta.label}
       </Link>
     </div>
   );
 }
 
 function GlassAuthActions({
-  publicCtaHref = APP_ROUTES.SIGNUP,
-  publicCtaLabel = 'Start Free Trial',
+  publicCta = {
+    href: APP_ROUTES.SIGNUP,
+    label: 'Request Access',
+  },
   showContactLink = true,
 }: Readonly<{
-  publicCtaHref?: string;
-  publicCtaLabel?: string;
+  publicCta?: HeaderNavCta;
   showContactLink?: boolean;
 }>) {
   return (
@@ -127,13 +138,13 @@ function GlassAuthActions({
         href={APP_ROUTES.SIGNIN}
         className='marketing-glass-header__text-link focus-ring-themed'
       >
-        Sign in
+        Log in
       </Link>
       <Link
-        href={publicCtaHref}
+        href={publicCta.href}
         className='marketing-glass-header__cta focus-ring-themed'
       >
-        {publicCtaLabel}
+        {publicCta.label}
       </Link>
     </div>
   );
@@ -294,9 +305,7 @@ export function HeaderNav({
   minimalAuth = false,
   minimalAuthVariant = 'link',
   includePublicLoginInMobileNav = true,
-  mobilePublicCtaHref,
-  mobilePublicCtaLabel,
-  publicCtaLabel,
+  publicCta,
   presentation = 'default',
   flyoutMenus,
   showContactLink = true,
@@ -449,8 +458,31 @@ export function HeaderNav({
   const mobileLinks = mobileNavLinks ?? navLinks;
   const hasMobileNavLinks =
     !hideNav && !hideDesktopNav && !!mobileLinks?.length;
+  const leadingMarketingLinks = isMarketingGlass
+    ? navLinks?.filter(link => link.treatment === 'wordmark')
+    : undefined;
+  const trailingNavLinks = isMarketingGlass
+    ? navLinks?.filter(link => link.treatment !== 'wordmark')
+    : navLinks;
+  const renderNavLinks = (
+    links: ReadonlyArray<HeaderNavLinkItem> | undefined
+  ) =>
+    links?.map(link => (
+      <HeaderNavLink
+        key={link.href}
+        href={link.href}
+        label={link.label}
+        className={cn(
+          navLinkClass,
+          isMarketingGlass &&
+            link.treatment === 'wordmark' &&
+            'marketing-glass-header__brand-wordmark'
+        )}
+      />
+    ));
   const navLinksMarkup = hasDesktopNavLinks ? (
-    <div className={cn('max-md:hidden items-center md:flex', navGroupClass)}>
+    <div className={cn('max-lg:hidden items-center lg:flex', navGroupClass)}>
+      {renderNavLinks(leadingMarketingLinks)}
       {isMarketingGlass
         ? resolvedFlyoutMenus.map(menu => {
             const open = openFlyoutId === menu.id;
@@ -477,14 +509,7 @@ export function HeaderNav({
             );
           })
         : null}
-      {navLinks?.map(link => (
-        <HeaderNavLink
-          key={link.href}
-          href={link.href}
-          label={link.label}
-          className={navLinkClass}
-        />
-      ))}
+      {renderNavLinks(trailingNavLinks)}
     </div>
   ) : null;
   const containerClass =
@@ -577,23 +602,21 @@ export function HeaderNav({
           <div
             className={cn(
               isMarketingGlass && hasMobileNavLinks
-                ? 'hidden items-center gap-1 md:flex'
+                ? 'hidden items-center gap-1 lg:flex'
                 : 'flex items-center gap-1',
               isHomepagePresentation && 'homepage-header-auth'
             )}
           >
             {authMode === 'public-static' && isMarketingGlass ? (
               <GlassAuthActions
-                publicCtaHref={mobilePublicCtaHref}
-                publicCtaLabel={publicCtaLabel}
+                publicCta={publicCta}
                 showContactLink={showContactLink}
               />
             ) : authMode === 'public-static' ? (
               <PublicAuthActions
                 minimal={minimalAuth}
                 minimalVariant={minimalAuthVariant}
-                publicCtaHref={mobilePublicCtaHref}
-                publicCtaLabel={publicCtaLabel}
+                publicCta={publicCta}
               />
             ) : (
               <AuthActions />
@@ -602,12 +625,12 @@ export function HeaderNav({
 
           {/* Mobile hamburger menu - shown on small screens only */}
           {hasMobileNavLinks && (
-            <div className='flex md:hidden items-center'>
+            <div className='flex lg:hidden items-center'>
               <MobileNav
                 navLinks={mobileLinks}
                 includePublicLogin={includePublicLoginInMobileNav}
-                publicCtaHref={mobilePublicCtaHref}
-                publicCtaLabel={mobilePublicCtaLabel}
+                publicCtaHref={publicCta?.href}
+                publicCtaLabel={publicCta?.label}
                 authenticatedUserSlot={<UserButton />}
               />
             </div>

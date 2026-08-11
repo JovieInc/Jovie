@@ -358,10 +358,10 @@ function getMotionAcceptanceTargets(
             name: 'Contact',
           }),
           page.getByTestId('header-nav').getByRole('link', {
-            name: 'Sign in',
+            name: 'Log in',
           }),
           page.getByTestId('header-nav').getByRole('link', {
-            name: 'Start Free Trial',
+            name: 'Get started',
           }),
         ]
       : [

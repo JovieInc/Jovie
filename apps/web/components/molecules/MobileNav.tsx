@@ -44,6 +44,9 @@ const NAV_PANEL_STYLE: CSSProperties = {
   boxShadow:
     '0 -8px 40px oklch(0% 0 0 / 0.25), 0 -2px 12px oklch(0% 0 0 / 0.15)',
   paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
+  maxHeight: 'calc(100dvh - env(safe-area-inset-top))',
+  overflowY: 'auto',
+  overscrollBehavior: 'contain',
 };
 
 const GRABBER_STYLE: CSSProperties = {
