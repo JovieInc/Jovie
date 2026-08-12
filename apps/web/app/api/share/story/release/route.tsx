@@ -105,12 +105,6 @@ export async function GET(req: NextRequest) {
           weight: 700,
           style: 'normal' as const,
         },
-        {
-          name: 'Source Serif 4',
-          data: fonts.sourceSerif,
-          weight: 600,
-          style: 'normal' as const,
-        },
       ],
       headers: {
         'Cache-Control': 'public, max-age=86400',

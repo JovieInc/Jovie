@@ -1,5 +1,8 @@
 # Responsive System
 
+> **Historical migration inventory.** Retained for provenance. Current values
+> come from `DESIGN.md` and `apps/web/styles/design-system.css`.
+
 This document records the canonical responsive contract chosen from values already present in the codebase.
 
 ## QA viewport matrix
@@ -18,8 +21,7 @@ This document records the canonical responsive contract chosen from values alrea
 
 ## Canonical widths
 
-- Landing container: `1280px`
-- Page container: `1120px`
+- Landing/page container: `1298px` (`--ds-public-content-max`)
 - Prose container: `680px`
 - Semantic public aliases: `--public-content-max-landing`, `--public-content-max-page`, `--public-content-max-prose`
 - Internal wide content panel: `84rem`

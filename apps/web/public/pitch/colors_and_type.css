@@ -15,7 +15,7 @@
  * They are not redistributed here — we substitute the nearest Google Fonts
  * equivalent. Swap @font-face to the self-hosted files when shipping prod.
  * ------------------------------------------------------------------------- */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Source+Serif+4:wght@300..700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap");
 /* Satoshi is not on Google Fonts. We substitute Manrope (nearest geometric
  * sans w/ weight 800 variant). FLAG: swap for self-hosted Satoshi for prod. */
 @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400..800&display=swap");
@@ -24,7 +24,6 @@
   /* ——— Font stacks ——— */
   --font-satoshi: "Manrope", "Satoshi Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-inter: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-serif: "Source Serif 4", Georgia, serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   /* Marketing scoped */

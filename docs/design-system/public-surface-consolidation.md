@@ -1,5 +1,9 @@
 # Public Surface Consolidation
 
+> **Historical migration inventory.** Retained for provenance. Values below
+> describe the captured migration state and must not override `DESIGN.md` or
+> `apps/web/styles/design-system.css`.
+
 This document records the current canonical public-surface design system for the Jovie web app. It is the first implementation artifact for the broader consolidation plan in `.context/attachments/jovie_design_system_consolidation_plan.md`.
 
 ## Canonical foundations
@@ -47,8 +51,8 @@ This document records the current canonical public-surface design system for the
 
 ## Current canonical widths
 
-- Landing: `1280px`
-- Page: `1120px`
+- Landing/page: `1298px` via `--ds-public-content-max`
+- Deprecated landing/page aliases resolve to the same canonical width
 - Prose: `680px`
 
 These values come from the existing production implementation in `MarketingContainer`. New public-facing layouts should consume these widths instead of introducing new max-width classes.

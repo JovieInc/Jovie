@@ -1,5 +1,9 @@
 # Figma MCP Design System Rules for Jovie
 
+> **Legacy integration reference.** It may explain older Figma translations but
+> cannot override `DESIGN.md`, current source registries, or the Pen/source
+> identity boundary.
+
 > Comprehensive design system reference for Figma MCP integration.
 > Use when translating between Figma designs and Jovie codebase components.
 

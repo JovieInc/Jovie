@@ -5,6 +5,47 @@
 > **Target audience:** World-class touring DJs who take themselves seriously.
 > **Color space:** OKLCH (with LCH for values extracted directly from Linear's CSS).
 
+## Authority and precedence
+
+After `canon/OPERATING_SYSTEM.md` and `canon/DESIGN.md`, this file is the
+operational design authority for Jovie source. Within operational design
+instructions, use this order:
+
+1. Founder-locked decisions in this file, newest dated decision first.
+2. Typed source registries and shared component contracts named in the
+   [source-of-truth map](#source-of-truth-file-map).
+3. `.claude/rules/ui.md` and the generated
+   `docs/llms-design-manifest.txt`, which must mirror this file.
+4. Domain guides such as `docs/marketing/AGENT_GUIDE.md`.
+5. Storybook notes, migration inventories, audit snapshots, prompts, and tool
+   skills. These are implementation aids or historical evidence, never
+   authority over the sources above.
+
+Pen is a review and proposal surface. A Pen component is not source-backed
+until its identity maps to the current source registry and the required
+save/readback evidence exists. Source identities do not become Pen masters by
+visual resemblance. Keep one canonical master or family per source concept;
+express supported states as variants and consume them as instances.
+
+Founder-facing review surfaces contain only canonical masters and intentional
+variants. Receipts, mappings, duplicate explorations, status copy, and process
+notes belong in operator artifacts. Placeholder or explanatory filler is not
+review content.
+
+### Logo asset normalization (founder-global 2026-08-12)
+
+Artist and third-party logos are normalized by visible non-transparent pixel
+bounds, never file-canvas dimensions. One asset correction must propagate to
+manager logo sheets, band/lineup flyers, press kits, artist profiles, marketing
+surfaces, and exports through the shared media primitive.
+
+The asset registry owns `visibleBounds`, `cropInset`, `targetInkHeight`,
+`opticalScale`, `baselineOffsetY`, `opticalOffsetX`, `allowedOverflow`, and
+provenance/version. Preserve intrinsic aspect ratio. Route-local crop, scale,
+baseline, or per-logo offset CSS is forbidden. Alpha measurement and 1x render
+verification are deterministic defaults; a reviewed optical override for an
+asymmetric mark must name its evidence, reviewer, confidence, and rollback.
+
 ---
 
 ## Surface Classification
@@ -27,11 +68,11 @@ Jovie historically used two related but distinct design systems based on surface
 | Surface | System | Mood | Routes |
 |---------|--------|------|--------|
 | Homepage / chat-intake | System B | Product surface, utility-first, inevitable | `(home)/*` |
-| Marketing (editorial) | System A | Cinematic, editorial, proof-led | `(marketing)/*`, blog, changelog, pricing, support |
+| Marketing (editorial) | Unified system, editorial language | Cinematic, editorial, proof-led | `(marketing)/*`, blog, changelog, pricing, support |
 | Product app shell | System B | Compact, operational, tool-like | `app/*`, settings, admin, dashboard |
 | Auth / onboarding / waitlist | System B | Funnel-focused, product family | `(auth)/*`, `onboarding/*`, `waitlist/*` |
 | Public profiles | System B (public variant) | Expressive but product-native | `[username]/*` |
-| Legal / informational | System A (calmer variant) | Clean, readable | `(dynamic)/legal/*` |
+| Legal / informational | Unified system, editorial language | Clean, readable | `(dynamic)/legal/*` |
 
 **Decision tree:** Everything → System B. Marketing/selling surfaces (blog, pricing, legal) use the editorial marketing language on System B tokens — System A is retired (founder-directed 2026-06-18, see banner above).
 
@@ -65,6 +106,18 @@ Satori rendering, which is a build-time asset, not live page type — tracked fo
 
 CSS variables: `--font-satoshi` (set by `next/font/local`); `--marketing-font-display`
 (Satoshi) and `--marketing-font-body` (Inter) scoped to the `.linear-marketing` wrapper.
+
+### No-serif product rule (founder-locked 2026-08-12)
+
+Product source uses no serif fonts. Inter is the body/UI face and Satoshi is
+the sole display face. This includes live routes, static public HTML, Storybook,
+generated review artifacts, SVG text, and product-controlled social media.
+
+An exact, registered UGC or media exception may retain a serif only when the
+typeface is intrinsic to the supplied media or the approved media composition.
+Exceptions are path-and-match specific, carry an owner and reason, and must be
+enforced by the serif ratchet. Generic directory, route-family, or prose-based
+exceptions are invalid.
 
 ### System B — App (Inter)
 
@@ -212,9 +265,9 @@ The example above says one thing three times. Jovie should say it once.
 - Treating borders as the primary way to separate content instead of using spacing, alignment, contrast, and typography
 - Hover motion that makes panels, buttons, screenshots, or cards jump, lift, or slide for no functional reason
 - **Selling the artifact instead of the product** — customer-facing copy must never describe how the page was designed, produced, captured, annotated, or verified. Ban phrases such as "no mockups," "not a concept render," "real screenshot," "captured from the registry," and similar provenance commentary. Replace them with the customer outcome or product capability the visual proves.
-- **Emoji/symbol on colored background square** — explicitly banned. This pattern cheapens the brand and reads as consumer-grade AI slop. Use accent color on title text only.
+- **Emoji/symbol on colored background square** — explicitly banned. This pattern cheapens the brand and reads as consumer-grade AI slop. Decorative icons remain unboxed; semantic color is reserved for meaning.
 - **Gold colors in brand/CTA expression** — banned. Avoid prestige-signaling metallic tones for identity or primary actions. (Feature accent orange/amber for Pro tier is a distinct, permitted use.)
-- **Saturated brand colors** for CTAs — CTAs are white-on-black (Apple approach). Accent colors are for feature differentiation only.
+- **Saturated brand colors** for CTAs — CTAs are white-on-black (Apple approach). Accent colors are semantic only.
 - **"Fun" fonts** — Jovie's audience is world-class touring DJs who take themselves seriously. Typography should be utilitarian, clean, and modern.
 
 ### Product UI Taste
@@ -366,13 +419,13 @@ remap product tokens to prior anchors without a second theme provider).
 | Border strong | `rgba(199,237,255,.26)` | `--color-border-strong` | Emphasis |
 | Focus / selection | Ion `#11AFFF` | `--color-accent`, `--color-border-focus`, `--linear-row-selected` | Focus, links, active nav, selection |
 
-**Accent semantics (dark):**
+**Accent semantics (dark, founder-locked 2026-08-12):**
 
 | Role | Hex | Soft | Meaning |
 |------|-----|------|---------|
-| Ion (blue) | `#11AFFF` | `rgba(17,175,255,.12)` | Primary action intent, focus, active nav, links, selection |
-| Ultra (violet) | `#A982FF` | `rgba(169,130,255,.12)` | Agent intelligence, ranking, recommendations |
-| Pulse (pink) | `#FF48D2` | `rgba(255,72,210,.12)` | Creative energy, launches, merch |
+| Ion (blue) | `#11AFFF` | `rgba(17,175,255,.12)` | Focus, active nav, links, selection, information |
+| Ultra (violet) | `#A982FF` | `rgba(169,130,255,.12)` | Agent intelligence or ranking state only |
+| Pulse (pink) | `#FF48D2` | `rgba(255,72,210,.12)` | Launch or creative-status state only |
 | Aqua (cyan) | `#24F6D2` | `rgba(36,246,210,.10)` | System signal, sync, API/tool state (`--color-info`) |
 | Mint (green) | `#39E58C` | `rgba(57,229,140,.12)` | Success |
 | Gold | `#FFC857` | `rgba(255,200,87,.12)` | Warning |
@@ -381,6 +434,9 @@ remap product tokens to prior anchors without a second theme provider).
 CTAs remain high-contrast light pills (not saturated Ion fills) per the
 neutral-CTA rule. Ion carries focus, links, selection, and active navigation.
 Every status also uses text, icon, shape, or pattern — color alone never carries meaning.
+
+Accent color is semantic only. Do not rotate accent colors for decoration, use
+accent title text as ornament, or put a decorative icon on a colored square.
 
 Specimen: Storybook `Design System/Noir Ion Specimen`.
 
@@ -402,9 +458,11 @@ Specimen: Storybook `Design System/Noir Ion Specimen`.
 | Login button bg | `rgba(255,255,255,0.1)` | Subtle glass |
 | Header bg | `transparent` | Blur backdrop |
 
-### Feature Accent Colors (supporting, never brand)
+### Semantic feature colors (never decorative)
 
-These colors differentiate features in bento grids and semantic indicators. They are supporting cast, never used for CTAs or brand identity. Dark values follow Noir Ion (JOV-4635).
+These colors identify named product states or data categories. They are never
+used to decorate a section, CTA, title, icon, or emoji. Dark values follow Noir
+Ion (JOV-4635).
 
 | Token | Light | Dark (Noir Ion) | Feature |
 |-------|-------|-----------------|---------|
@@ -416,8 +474,8 @@ These colors differentiate features in bento grids and semantic indicators. They
 | `--accent-pro` | `#ff9800` | `#FFC857` (Gold) | Pro Tools / warning |
 
 **Usage rules:**
-- Apply accent color to feature card **title text only** via `text-[color:var(--accent-*)]`
-- Never use accent colors on CTAs, brand identity, icon backgrounds, or decorative elements
+- Assign an accent only to a named semantic state or data category
+- Never use accent colors on CTAs, brand identity, icon backgrounds, ordinary feature titles, or decorative elements
 - Feature accents are defined in `design-system.css` (lines 572-588 light, 840-856 dark, 1395-1401 aliases)
 
 ### Gray Scale (Radix-style)
@@ -513,6 +571,11 @@ of redefining them.
   and `link`. Destructive styling is a `destructive` prop, not a variant.
 - **Canonical button sizes:** `sm` = 28px, `md` = 36px, `lg` = 44px;
   `icon` uses the `md` control height with equal width.
+- **Marketing pill controls (founder-locked 2026-08-12):** the visible pill is
+  32px high inside a 44px minimum hit target. This is a marketing-language
+  contract, not a redefinition of the generic app button scale.
+- **Marketing O-mark (founder-locked 2026-08-12):** render the visible mark at
+  32px and align it to the same control geometry.
 
 See [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md#ds_foundation_v1-canonical-decisions)
 for the canonical CSS + Tailwind references.
@@ -526,12 +589,16 @@ for the canonical CSS + Tailwind references.
 | Token | Value | Usage |
 |-------|-------|-------|
 | xs | 2px | Tags, tiny elements |
-| DEFAULT | 4px | Marketing buttons (preserved — changing risks silent regressions across all DEFAULT consumers) |
+| DEFAULT | 4px | Legacy/default non-control consumers; not the marketing pill contract |
 | sm | 8px | Badges, issue rows, small cards |
 | md | 10px | Inner cards, drawer cards, properties panels |
 | lg | 12px | App shell frame, content surface cards |
 | xl | 16px | Large decorative elements |
 | pill | 9999px | App buttons, inputs, controls, tab buttons |
+
+Decorative icons and emoji receive no border, ring, circular plate, or badge
+container. Meaningful status badges and interactive icon buttons may use their
+canonical semantic or hit-target treatment; the icon itself is not decorated.
 
 ### App Shell Radius
 
@@ -723,6 +790,9 @@ shift.
 | Icon | 36px square | Icon-only controls |
 
 Destructive actions use `destructive` on any variant. Examples: primary destructive is a red filled button, secondary destructive is a red text/border action, and ghost destructive is a red icon/text control with subtle red hover surface.
+
+Marketing text pills use a 32px visible control with a 44px minimum hit target.
+Do not change the generic app scale to reproduce that marketing geometry.
 
 ### Sidebar (App Shell)
 
@@ -951,8 +1021,8 @@ mark intentional marketing sentence-case headlines with
 | Surface | Routes / entrypoints | Layout / shell | Design system |
 |---------|---------------------|----------------|---------------|
 | Homepage / chat-intake | `(home)/*`, `components/homepage/*` | `(home)/layout.tsx` with `MarketingHeader` (minimal) + `MarketingFooter` | System B |
-| Secondary marketing | `(marketing)/blog/*`, `changelog/*`, `support/*`, `pricing/*`, `launch/*`, `ai/*`, `engagement-engine/*`, `investors/*`, `tips/*` | `(marketing)/layout.tsx` + page-specific nested layouts | System A (calmer) |
-| Legal / informational | `(dynamic)/legal/*` | Legal layout | System A (informational) |
+| Secondary marketing | `(marketing)/blog/*`, `changelog/*`, `support/*`, `pricing/*`, `launch/*`, `ai/*`, `engagement-engine/*`, `investors/*`, `tips/*` | `(marketing)/layout.tsx` + page-specific nested layouts | Unified system, editorial language |
+| Legal / informational | `(dynamic)/legal/*` | Legal layout | Unified system, editorial language |
 | Product app shell | `app/(shell)/*` | Authenticated app shell | System B |
 | Auth funnel | `(auth)/*` | `AuthLayout` | System B |
 | Onboarding funnel | `onboarding/*` | `AuthLayout` with onboarding provider | System B |
@@ -962,7 +1032,7 @@ mark intentional marketing sentence-case headlines with
 ### Rules
 
 **Do:**
-- Use System A for acquisition, storytelling, launch, and public informational pages
+- Use the editorial marketing language on unified tokens for acquisition, storytelling, launch, and public informational pages
 - Use System B for sign-in, account setup, waitlist, dashboard, settings, admin
 - Treat public creator pages as public product surfaces
 - Document any intentional cross-system borrowing in PR notes

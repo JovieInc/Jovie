@@ -45,20 +45,11 @@ export async function loadDMSansFont(): Promise<ArrayBuffer> {
   return loadFontBuffer('DMSans-Regular.ttf');
 }
 
-export async function loadSourceSerifFont(): Promise<ArrayBuffer> {
-  return loadFontBuffer('SourceSerif4-SemiBold.ttf');
-}
-
 export async function loadShareFonts(): Promise<{
   readonly satoshi: ArrayBuffer;
-  readonly sourceSerif: ArrayBuffer;
 }> {
-  const [satoshi, sourceSerif] = await Promise.all([
-    loadSatoshiFont(),
-    loadSourceSerifFont(),
-  ]);
-
-  return { satoshi, sourceSerif };
+  const satoshi = await loadSatoshiFont();
+  return { satoshi };
 }
 
 /**

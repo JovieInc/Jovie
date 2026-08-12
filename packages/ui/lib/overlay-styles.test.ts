@@ -68,7 +68,7 @@ describe('overlay-styles', () => {
 
     it('rounded uses responsive border radius', () => {
       expect(centeredContentStyles.rounded).toContain(
-        'rounded-(--linear-radius-lg)'
+        'rounded-(--system-b-radius-panel)'
       );
     });
 

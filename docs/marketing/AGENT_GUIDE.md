@@ -5,8 +5,9 @@ doc-freshness: docs/marketing/AGENT_GUIDE.md
 # Marketing Agent Guide
 
 > **You are an autonomous agent about to generate a Jovie marketing page.**
-> This is your SOLE entrypoint. The contract: a composition needs ONLY this
-> file + `apps/web/data/marketing/` (the typed registry). Other docs
+> Read `DESIGN.md` first; it is the higher design authority. This is the sole
+> marketing-domain entrypoint, paired with `apps/web/data/marketing/` (the
+> typed registry). Other marketing docs
 > (`ARCHITECTURE.md`, `SECTION_CATALOG.md`, `RECIPE_CATALOG.md`,
 > `COMPOSITION_RULES.md`) are optional commentary. Copy generation follows the
 > typed contract below.
@@ -72,7 +73,7 @@ catalog** in Storybook before inventing layout:
 
 Source: `apps/web/components/marketing/storybook/`. Coverage is CI-gated by
 `apps/web/tests/unit/marketing/storybook-catalog-coverage.test.ts`. Stories are
-product compositions (System A, dark-only, `revalidate = false` on live routes)
+product compositions (unified system, editorial language, `revalidate = false` on live routes)
 — not design-studio leftovers. Stub recipes may be tagged `stub`; TBD section
 component paths are tagged `wip` and listed in
 `MARKETING_SECTION_STORY_GAPS`.
@@ -206,7 +207,7 @@ modes, neverUse rules.
 
 **Render rules:**
 - `revalidate = false` (fully static — hard invariant).
-- Dark-only theme (System A — DESIGN.md).
+- Dark-first editorial marketing language on the unified token system.
 - Copy-in-data: copy lives in `apps/web/data/*Copy.ts`, not inline in the page.
 - Customer-facing copy sells the product outcome, never the artifact. Do not mention mockups, concept renders, screenshots, registries, annotations, design decisions, or how proof media was produced. Asset provenance belongs in code, alt text, review notes, or manifests—not the rendered marketing story.
 - One body face, one container width (`page` | `prose`), spacing-only transitions.
@@ -262,7 +263,7 @@ for the selection order and rationale.
 ## Inherited invariants (NOT restated in the registry)
 
 These apply to EVERY composition; the registry does not restate them:
-- **Dark-only theme** (charter delta #9; DESIGN.md System A).
+- **Dark-first editorial language** on the unified token system.
 - **Fully static** (`revalidate = false` — `.claude/rules/ui.md`).
 - **Copy-in-data files** (`apps/web/data/*Copy.ts` pattern — `.claude/rules/code-style.md`).
 - **One body face, one container width** (`page` | `prose`), spacing-only transitions.

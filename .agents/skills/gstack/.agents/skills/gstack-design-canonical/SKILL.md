@@ -515,6 +515,20 @@ work even when they are internal or generated.
 8. Evidence closes the loop. Design work is not done without screenshots, mockups,
    component evidence, or an explicit non-UI rationale.
 
+### Logo asset normalization
+
+Logo bars normalize visible non-transparent ink, never file-canvas dimensions.
+Resolve each asset through `apps/web/data/design/logo-assets.json`; do not add
+route-local crop, scale, baseline, or optical offsets. The registry records
+`visibleBounds`, `cropInset`, `opticalScale`, `baselineOffsetY`,
+`opticalOffsetX`, `allowedOverflow`, and `targetInkHeight`. Run
+`pnpm design:logo-assets:check` after any logo asset or Logo Bar change.
+
+Human optical judgment is an explicit exception, not hidden CSS. Record the
+reviewer, evidence reference, reason, confidence, and rollback in the asset
+registry and Design Learning Ledger. A file canvas with transparent padding is
+never accepted as visual alignment evidence.
+
 ## Step 3: Official System Match
 
 Use the strongest matching system:

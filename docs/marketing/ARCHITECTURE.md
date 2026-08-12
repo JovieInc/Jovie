@@ -9,10 +9,10 @@ doc-freshness: docs/marketing/ARCHITECTURE.md
 > ladders) live in the typed registry at `apps/web/data/marketing/`. This file
 > owns rationale + the canon precedence table + naming/versioning/evolution
 > strategy. Agents: start at [`AGENT_GUIDE.md`](./AGENT_GUIDE.md) — it is the
-> sole entrypoint (≤400 lines). This file is reference.
+> marketing-domain entrypoint (≤400 lines), after `DESIGN.md`. This file is reference.
 
 spec-version: 1.2.0 · registry: `apps/web/data/marketing/index.ts` ·
-charter: `.context/marketing-architecture/GOAL.md` (amended, sole authority) ·
+historical charter: `.context/marketing-architecture/GOAL.md` (provenance only) ·
 reviews: CEO + Eng + Design + DX (all CLEAR, final gate A, 2026-07-06).
 
 ## 1. What this is
@@ -25,9 +25,9 @@ performant, accessible landing page **without inventing new layouts** — by
 selecting recipes and section variants from this system.
 
 The contract for consumer agents:
-> A composition needs ONLY `docs/marketing/AGENT_GUIDE.md` +
-> `apps/web/data/marketing/` (the typed registry). Reading any other file is
-> optional commentary.
+> A composition needs `DESIGN.md`, `docs/marketing/AGENT_GUIDE.md`, and
+> `apps/web/data/marketing/` (the typed registry). Reading any other marketing
+> file is optional commentary.
 
 ## 2. System shape
 
@@ -229,7 +229,7 @@ spec version bumps" (4-step procedure).
 
 | Rule | Old canon | New owner | Needed for composition? | Action |
 |---|---|---|---|---|
-| Dark-only theme for marketing | DESIGN.md System A | charter delta #9 + AGENT_GUIDE §Inherited | yes (variant `theme` axis excluded) | MIGRATED — delete the marketing-theme prose from DESIGN.md in the canon-deletion PR |
+| Dark-first editorial language | `DESIGN.md` unified system | AGENT_GUIDE inherited contract | yes (variant `theme` axis excluded) | ACTIVE |
 | Fully static (`revalidate = false`) | .claude/rules/ui.md | AGENT_GUIDE §Inherited | yes (composition emits static only) | STAYS in ui.md (also applies to non-marketing); AGENT_GUIDE references |
 | One body face, one container width | DESIGN.md | AGENT_GUIDE §Inherited | yes (registry does not model these axes) | MIGRATED reference — delete the per-section restatements from DESIGN.md |
 | Section spacing (`section-spacing-linear`) | DESIGN.md | `sections.ts` `responsiveContract` + DESIGN.md tokens | yes (variant contracts reference it) | STAYS in DESIGN.md (token definitions); AGENT_GUIDE references |
@@ -328,7 +328,7 @@ Linear follow-up filed at ship time.
    (adversarial B2) — add an `editorialForm` Brief field OR allow 2
    `content-prose` slots in `launch`. Today both variants target the same
    slot; `founder-letter` wins on declared order, `release-notes` is unreachable.
-8. **JOV-4071**: DESIGN.md System A marketing-theme prose deletion — coordinated
+8. **Historical JOV-4071 note**: System A marketing-theme prose deletion was coordinated
    with the ongoing System A retirement (2026-06-18 founder-directed). The
    registry references "charter delta #9 + AGENT_GUIDE §Inherited" as the
    binding contract; the physical DESIGN.md deletion ships in a later PR.

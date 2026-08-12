@@ -24,7 +24,7 @@ function Headline({
         letterSpacing: '-0.03em',
         color: THEME.text,
         textAlign: 'center',
-        fontFamily: '"Source Serif 4", serif',
+        fontFamily: 'Satoshi',
       }}
     >
       {children}
@@ -49,7 +49,7 @@ function BodyCopy({
         letterSpacing: '-0.01em',
         color: THEME.textMuted,
         textAlign: 'center',
-        fontFamily: '"Source Serif 4", serif',
+        fontFamily: 'Satoshi',
       }}
     >
       {children}

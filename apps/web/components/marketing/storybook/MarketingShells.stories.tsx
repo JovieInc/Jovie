@@ -55,7 +55,7 @@ export const PublicPageShellDefault: Story = {
       <MarketingContainer width='page' className='py-16'>
         <ShellDemoBlock
           title='Public Page Shell'
-          body='Header + main offset + footer chrome used by marketing routes. Dark-only System A; production routes set revalidate = false.'
+          body='Canonical header, main offset, and footer chrome used by public marketing routes.'
         />
       </MarketingContainer>
     </PublicPageShell>
