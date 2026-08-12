@@ -2,12 +2,7 @@ import { ArrowRight, Mic, Sparkles } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import {
-  ArmadaMusicLogo,
-  AwalLogo,
-  BlackHoleRecordingsLogo,
-  TheOrchardLogo,
-} from '@/components/features/home/label-logos';
+import { NormalizedTrustLogo } from '@/components/media/NormalizedTrustLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   buildHomepageStartHref,
@@ -23,10 +18,10 @@ const SUGGESTIONS = [
 ] as const;
 
 const TRUST_LOGOS = [
-  { label: 'AWAL', Logo: AwalLogo },
-  { label: 'Armada Music', Logo: ArmadaMusicLogo },
-  { label: 'The Orchard', Logo: TheOrchardLogo },
-  { label: 'Black Hole Recordings', Logo: BlackHoleRecordingsLogo },
+  'awal',
+  'armada',
+  'orchard',
+  'black-hole-recordings',
 ] as const;
 
 export function HomeV1Design() {
@@ -151,8 +146,8 @@ export function HomeV1Design() {
               one quiet operating surface.
             </p>
             <div className='flex flex-wrap items-center gap-x-6 gap-y-3 text-white/36'>
-              {TRUST_LOGOS.map(({ label, Logo }) => (
-                <Logo key={label} className='h-5 w-auto opacity-70' />
+              {TRUST_LOGOS.map(id => (
+                <NormalizedTrustLogo key={id} id={id} className='opacity-70' />
               ))}
             </div>
           </div>

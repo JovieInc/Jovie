@@ -1,13 +1,8 @@
 import type { ReactNode } from 'react';
+import { NormalizedTrustLogo } from '@/components/media/NormalizedTrustLogo';
+import { TRUST_LOGO_ASSETS } from '@/components/media/trustLogoAssets';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
-import {
-  ArmadaMusicLogo,
-  AwalLogo,
-  BlackHoleRecordingsLogo,
-  TheOrchardLogo,
-  UniversalMusicGroupLogo,
-} from './label-logos';
 
 interface HomeTrustSectionProps {
   readonly variant?: 'default' | 'compact';
@@ -47,15 +42,6 @@ function getSlotClass(isInlineStrip: boolean, slotName: string): string {
     isInlineStrip &&
       `homepage-trust-logo-slot homepage-trust-logo-slot--${slotName} system-b-mounted-home-trust-strip-logo-slot system-b-mounted-home-trust-strip-logo-slot--${slotName}`
   );
-}
-
-function getLogoClass(
-  isInlineStrip: boolean,
-  inlineClass: string,
-  cardClass: string,
-  tone: string
-): string {
-  return cn(isInlineStrip ? inlineClass : cardClass, tone);
 }
 
 export function HomeTrustSection({
@@ -113,59 +99,27 @@ export function HomeTrustSection({
               'gap-x-5 gap-y-5 sm:gap-x-8'
           )}
         >
-          <div className={getSlotClass(isInlineStrip, 'awal')}>
-            <AwalLogo
-              className={getLogoClass(
-                isInlineStrip,
-                'homepage-trust-logo homepage-trust-logo--awal system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--awal',
-                'h-5 w-auto max-w-[36vw] select-none sm:h-6',
-                logoTone
-              )}
-            />
-          </div>
-          <div className={getSlotClass(isInlineStrip, 'orchard')}>
-            <TheOrchardLogo
-              className={getLogoClass(
-                isInlineStrip,
-                'homepage-trust-logo homepage-trust-logo--orchard system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--orchard',
-                'h-7 w-auto max-w-[34vw] select-none sm:h-8',
-                logoTone
-              )}
-            />
-          </div>
-          <div className={getSlotClass(isInlineStrip, 'umg')}>
-            <UniversalMusicGroupLogo
-              className={getLogoClass(
-                isInlineStrip,
-                'homepage-trust-logo homepage-trust-logo--umg system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--umg',
-                'h-4 w-auto max-w-[72vw] select-none sm:h-4',
-                logoTone
-              )}
-            />
-          </div>
-          <div className={getSlotClass(isInlineStrip, 'armada')}>
-            <ArmadaMusicLogo
-              className={getLogoClass(
-                isInlineStrip,
-                'homepage-trust-logo homepage-trust-logo--armada system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--armada',
-                'h-6 w-auto max-w-[38vw] select-none sm:h-6',
-                logoTone
-              )}
-            />
-          </div>
-          <div
-            data-mobile-logo='secondary'
-            className={getSlotClass(isInlineStrip, 'black-hole')}
-          >
-            <BlackHoleRecordingsLogo
-              className={getLogoClass(
-                isInlineStrip,
-                'homepage-trust-logo homepage-trust-logo--black-hole system-b-mounted-home-trust-strip-logo system-b-mounted-home-trust-strip-logo--black-hole',
-                'h-4 w-auto sm:h-5',
-                ''
-              )}
-            />
-          </div>
+          {TRUST_LOGO_ASSETS.map(asset => {
+            const slotName =
+              asset.id === 'black-hole-recordings' ? 'black-hole' : asset.id;
+            return (
+              <div
+                key={asset.id}
+                data-mobile-logo={
+                  asset.id === 'black-hole-recordings' ? 'secondary' : undefined
+                }
+                className={getSlotClass(isInlineStrip, slotName)}
+              >
+                <NormalizedTrustLogo
+                  id={asset.id}
+                  className={cn(
+                    'homepage-trust-logo system-b-mounted-home-trust-strip-logo',
+                    logoTone
+                  )}
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>

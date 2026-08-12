@@ -9,6 +9,9 @@ vi.mock('next/image', () => ({
 }));
 
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
+import { ArtistProfileLogoBar } from '@/components/marketing/artist-profile/ArtistProfileLogoBar';
+import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
+import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 
 describe('HomeTrustSection', () => {
   it('renders the boxed card presentation by default', () => {
@@ -63,5 +66,18 @@ describe('HomeTrustSection', () => {
         name: 'Trusted by artists and teams releasing on major labels',
       })
     ).toBeInTheDocument();
+  });
+
+  it('normalizes every logo in the artist-profile bar', () => {
+    const { container } = render(
+      <ArtistProfileLogoBar
+        proofData={ARTIST_PROFILE_SOCIAL_PROOF}
+        adaptive={ARTIST_PROFILE_COPY.adaptive}
+        phoneCaption={ARTIST_PROFILE_COPY.hero.phoneCaption}
+        phoneSubcaption={ARTIST_PROFILE_COPY.hero.phoneSubcaption}
+      />
+    );
+
+    expect(container.querySelectorAll('[data-logo-asset]')).toHaveLength(4);
   });
 });

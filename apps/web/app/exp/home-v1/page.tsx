@@ -18,13 +18,9 @@
 import { ArrowDown, ArrowRight, ArrowUp, Mic, Sparkles } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import {
-  ArmadaMusicLogo,
-  AwalLogo,
-  BlackHoleRecordingsLogo,
-  TheOrchardLogo,
-} from '@/components/features/home/label-logos';
+import { NormalizedTrustLogo } from '@/components/media/NormalizedTrustLogo';
 import { cn } from '@/lib/utils';
 
 const EASE_CINEMATIC = 'var(--ease-drawer)';
@@ -97,13 +93,14 @@ const FEATURED_CREATORS = [
 ] as const;
 
 export default function HomeV1Page() {
+  const router = useRouter();
   const [variant, setVariant] = useState<Variant>('a');
   const [draft, setDraft] = useState('');
   const logoRef = useRef<HTMLDivElement | null>(null);
 
   function submit() {
     if (!draft.trim() && variant !== 'd') return;
-    window.location.href = '/exp/auth-v1';
+    router.push('/exp/auth-v1');
   }
 
   function scrollToLogos() {
@@ -781,10 +778,10 @@ function Trust({ variant }: { variant: Variant }) {
             onCream ? 'text-(--color-bg-surface-0)/72' : 'text-white/55'
           )}
         >
-          <AwalLogo className='h-6 w-auto select-none' />
-          <TheOrchardLogo className='h-8 w-auto select-none' />
-          <ArmadaMusicLogo className='h-6 w-auto select-none' />
-          <BlackHoleRecordingsLogo className='h-5 w-auto select-none' />
+          <NormalizedTrustLogo id='awal' />
+          <NormalizedTrustLogo id='orchard' />
+          <NormalizedTrustLogo id='armada' />
+          <NormalizedTrustLogo id='black-hole-recordings' />
         </div>
       </div>
     </section>

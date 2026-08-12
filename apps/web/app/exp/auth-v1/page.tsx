@@ -10,12 +10,7 @@
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { AuthGoogleIcon } from '@/components/features/auth/atoms/AuthGoogleIcon';
-import {
-  ArmadaMusicLogo,
-  AwalLogo,
-  BlackHoleRecordingsLogo,
-  TheOrchardLogo,
-} from '@/components/features/home/label-logos';
+import { NormalizedTrustLogo } from '@/components/media/NormalizedTrustLogo';
 import { cn } from '@/lib/utils';
 
 // Text token vars omitted: already defined by the global design-system.css
@@ -301,10 +296,10 @@ function BentoShowcase() {
           Trusted by artists on
         </p>
         <div className='flex items-center justify-between gap-x-8 text-white/68'>
-          <AwalLogo className='h-6 w-auto select-none' />
-          <TheOrchardLogo className='h-8 w-auto select-none' />
-          <ArmadaMusicLogo className='h-6 w-auto select-none' />
-          <BlackHoleRecordingsLogo className='h-5 w-auto select-none' />
+          <NormalizedTrustLogo id='awal' />
+          <NormalizedTrustLogo id='orchard' />
+          <NormalizedTrustLogo id='armada' />
+          <NormalizedTrustLogo id='black-hole-recordings' />
         </div>
       </div>
     </div>

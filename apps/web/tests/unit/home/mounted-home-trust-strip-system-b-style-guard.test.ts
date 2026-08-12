@@ -41,14 +41,11 @@ describe('mounted homepage trust strip System B source contract', () => {
       'system-b-mounted-home-trust-strip-logo-grid',
       'system-b-mounted-home-trust-strip-logo-slot',
       'system-b-mounted-home-trust-strip-logo',
-      'system-b-mounted-home-trust-strip-logo--awal',
-      'system-b-mounted-home-trust-strip-logo--orchard',
-      'system-b-mounted-home-trust-strip-logo--umg',
-      'system-b-mounted-home-trust-strip-logo--armada',
-      'system-b-mounted-home-trust-strip-logo--black-hole',
     ]) {
       expect(trustSource).toContain(className);
     }
+    expect(trustSource).toContain('NormalizedTrustLogo');
+    expect(trustSource).toContain('TRUST_LOGO_ASSETS');
   });
 
   it('keeps mounted trust strip CSS tokenized and stable', () => {
@@ -87,6 +84,9 @@ describe('mounted homepage trust strip System B source contract', () => {
     );
     expect(css).toContain('padding-inline: 0;');
     expect(css).toContain('@media (max-width: 767px)');
+    expect(css).not.toMatch(
+      /trust-strip-logo--(?:awal|orchard|umg|armada|black-hole)/
+    );
     expect(css).toMatch(
       /\.system-b-mounted-home-trust-strip \.system-b-mounted-home-trust-strip-label\s*\{[^}]*color: var\(--ds-marketing-eyebrow-color\)/
     );

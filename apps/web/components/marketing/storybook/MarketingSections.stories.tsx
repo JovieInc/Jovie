@@ -2,7 +2,6 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Check, Minus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { HomeStatQuoteSection } from '@/components/features/home/HomeStatQuoteSection';
-import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
 import {
   FaqSection,
@@ -17,6 +16,7 @@ import { ArtistProfileFinalCta } from '@/components/marketing/artist-profile/Art
 import { ArtistProfileHero } from '@/components/marketing/artist-profile/ArtistProfileHero';
 import { ArtistProfileHowItWorks } from '@/components/marketing/artist-profile/ArtistProfileHowItWorks';
 import { ArtistProfileLandingPage } from '@/components/marketing/artist-profile/ArtistProfileLandingPage';
+import { ArtistProfileLogoBar } from '@/components/marketing/artist-profile/ArtistProfileLogoBar';
 import { ArtistProfileMonetizationSection } from '@/components/marketing/artist-profile/ArtistProfileMonetizationSection';
 import { ArtistProfileOpinionatedSection } from '@/components/marketing/artist-profile/ArtistProfileOpinionatedSection';
 import { ArtistProfileOutcomesCarousel } from '@/components/marketing/artist-profile/ArtistProfileOutcomesCarousel';
@@ -159,7 +159,12 @@ export const logoCloud: Story = {
   name: 'logo-cloud',
   render: () => (
     <SectionFrame sectionId='logo-cloud'>
-      <HomeTrustSection presentation='inline-strip' />
+      <ArtistProfileLogoBar
+        proofData={ARTIST_PROFILE_SOCIAL_PROOF}
+        adaptive={ARTIST_PROFILE_COPY.adaptive}
+        phoneCaption={ARTIST_PROFILE_COPY.hero.phoneCaption}
+        phoneSubcaption={ARTIST_PROFILE_COPY.hero.phoneSubcaption}
+      />
     </SectionFrame>
   ),
 };

@@ -221,6 +221,8 @@
     "ds:offscale": "node scripts/ds-offscale-report.mjs",
     "ds:llms-manifest": "node scripts/generate-llms-design-manifest.mjs",
     "ds:llms-manifest:check": "node scripts/generate-llms-design-manifest.mjs --check",
+    "design:logo-assets:check": "pnpm --filter @jovie/web exec node ../../scripts/logo-asset-normalization.mjs",
+    "design:logo-assets:test": "pnpm --filter @jovie/web exec node --test ../../scripts/logo-asset-normalization.test.mjs",
     "design:authority:check": "node scripts/design-authority-guard.mjs",
     "golden-path-lock": "node scripts/golden-path-lock.mjs",
     "ci:control:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-harness.test.mjs lib/__tests__/ci-duration-ratchet.test.mjs lib/__tests__/ci-branching-guard.test.mjs lib/__tests__/merge-queue-guard.test.mjs lib/__tests__/ci-metrics-compute.test.mjs lib/__tests__/auto-ready-agent-drafts.test.mjs lib/__tests__/eval-main-health-action.test.mjs lib/__tests__/pr-check-failures.test.mjs lib/__tests__/pr-conflict-handler.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs lib/__tests__/merge-group-workflow-contract.test.mjs lib/__tests__/lockfile-specifier-preflight.test.mjs lib/__tests__/sentry-autofix-workflow-contract.test.mjs lib/__tests__/golden-path-lock.test.mjs lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs lib/__tests__/queue-deferral-receipt.test.mjs lib/__tests__/queue-deferred-release.test.mjs lib/__tests__/queue-deferred-release-admission.test.mjs lib/__tests__/setup-worktree-health.test.mjs",
