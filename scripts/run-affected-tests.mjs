@@ -167,6 +167,19 @@ const SYMPHONY_THROUGHPUT_SCRIPT_TESTS = [
 const SYMPHONY_THROUGHPUT_PYTHON_TESTS = [
   'scripts/hermes/tests/codex-rotate.test.py',
 ];
+const FLEET_PROMOTION_GATE_INPUTS = new Set([
+  'scripts/hermes/gem-priority-gate.py',
+  'scripts/hermes/tests/gem-priority-gate.test.py',
+]);
+const FLEET_PROMOTION_GATE_LANE = new Set([
+  ...FLEET_PROMOTION_GATE_INPUTS,
+  'apps/web/tests/unit/api/health/deploy.critical.test.ts',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/run-affected-tests.mjs',
+]);
+const FLEET_PROMOTION_GATE_PYTHON_TESTS = [
+  'scripts/hermes/tests/gem-priority-gate.test.py',
+];
 const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
   'apps/web/app/exp/shell-v1/page.tsx',
   'apps/web/components/jovie/components/ChatInput.tsx',
@@ -451,6 +464,25 @@ export function buildAffectedTestPlan(
       pythonUnittestTests: SYMPHONY_THROUGHPUT_PYTHON_TESTS,
       scriptVitestTests: SYMPHONY_THROUGHPUT_SCRIPT_TESTS,
       nodeTests: SYMPHONY_THROUGHPUT_NODE_TESTS,
+    };
+  }
+  const isBoundedFleetPromotionGateChange =
+    files.some(file => FLEET_PROMOTION_GATE_INPUTS.has(file)) &&
+    files.every(file => FLEET_PROMOTION_GATE_LANE.has(file));
+  const hasUnboundedFleetPromotionGateChange =
+    files.some(file => FLEET_PROMOTION_GATE_INPUTS.has(file)) &&
+    !isBoundedFleetPromotionGateChange;
+  if (isBoundedFleetPromotionGateChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: ['apps/web/tests/unit/api/health/deploy.critical.test.ts'],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: FLEET_PROMOTION_GATE_PYTHON_TESTS,
+      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+      nodeTests: [],
     };
   }
 
@@ -1002,6 +1034,7 @@ export function buildAffectedTestPlan(
     !isExactPrSizeGuardWithSelector;
   const hasUncoveredSource =
     relatedFiles.some(file => !isCoveredSource(file)) ||
+    hasUnboundedFleetPromotionGateChange ||
     hasUnknownCiCancellationHealerPeer ||
     hasStandaloneCiFastLanesChange ||
     hasIncompletePrerequisiteTrain ||

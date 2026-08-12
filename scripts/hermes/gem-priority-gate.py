@@ -158,10 +158,11 @@ def observe_production(url: str) -> dict[str, Any]:
             value = json.loads(response.read().decode("utf-8"))
         if not isinstance(value, dict):
             raise ValueError("production health was not an object")
+        reported_status = value.get("status")
         return {
-            "status": "green" if value.get("status") == "ok" else "red",
+            "status": "green" if reported_status in ("healthy", "ok") else "red",
             "url": url,
-            "reportedStatus": value.get("status"),
+            "reportedStatus": reported_status,
         }
     except urllib.error.HTTPError as error:
         return {
@@ -503,7 +504,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--production-url",
         default=os.environ.get("JOVIE_PRODUCTION_HEALTH_URL")
-        or "https://jov.ie/api/health",
+        or "https://jov.ie/api/health/deploy",
     )
     parser.add_argument("--symphony-url", default="http://127.0.0.1:4041/api/v1/state")
     parser.add_argument(

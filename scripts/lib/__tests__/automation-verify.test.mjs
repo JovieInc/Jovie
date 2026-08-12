@@ -34,6 +34,13 @@ const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
   'scripts/run-affected-tests.mjs',
 ];
+const FLEET_PROMOTION_GATE_LANE = [
+  'apps/web/tests/unit/api/health/deploy.critical.test.ts',
+  'scripts/hermes/gem-priority-gate.py',
+  'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/run-affected-tests.mjs',
+];
 
 const PREREQUISITE_TRAIN_CORNERS = [
   'scripts/ci/neon-orphan-reaper.mjs',
@@ -401,6 +408,32 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan([
         ...SYMPHONY_THROUGHPUT_CONTROL_MANIFEST,
         'scripts/backlog-orchestrator/unknown.mjs',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects the fleet promotion gate regression lane', () => {
+    for (const files of [
+      ['scripts/hermes/gem-priority-gate.py'],
+      [
+        'scripts/hermes/gem-priority-gate.py',
+        'scripts/hermes/tests/gem-priority-gate.test.py',
+      ],
+      FLEET_PROMOTION_GATE_LANE,
+    ]) {
+      expect(buildAffectedTestPlan(files)).toMatchObject({
+        mode: 'selected',
+        selectedTests: [
+          'apps/web/tests/unit/api/health/deploy.critical.test.ts',
+        ],
+        pythonUnittestTests: ['scripts/hermes/tests/gem-priority-gate.test.py'],
+        scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+      });
+    }
+    expect(
+      buildAffectedTestPlan([
+        'scripts/hermes/gem-priority-gate.py',
+        'scripts/hermes/unknown-fleet-peer.py',
       ]).mode
     ).toBe('full');
   });
