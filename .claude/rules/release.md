@@ -261,7 +261,7 @@ BOT REVIEWS
   observational gates, and the sole rollback job.
 - Merge method: squash (merge queue)
 - Project type: Web app (Next.js monorepo)
-- Post-deploy health check: https://jov.ie/api/health
+- Post-deploy health check: https://jov.ie/api/health/deploy
 
 ### Deploy flow
 
@@ -282,7 +282,7 @@ BOT REVIEWS
 - Pre-merge: typecheck + lint (CI fast path, ~10–15s)
 - DB migrations: run before staging deploy (production DB, additive only)
 - Deploy trigger: automatic after successful exact-attempt `main` CI authorization
-- Health check: https://jov.ie/api/health (returns `{"status":"ok"}`)
+- Health check: https://jov.ie/api/health/deploy (returns `{"status":"healthy"}`)
 
 ## Version Stamping (main-only)
 
