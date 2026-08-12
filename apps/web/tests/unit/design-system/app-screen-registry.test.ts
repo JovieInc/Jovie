@@ -52,6 +52,16 @@ describe('authenticated app screen registry', () => {
     }
   });
 
+  it('keeps authenticated shared components source-backed but non-referenceable until a native Pen root is proven', () => {
+    for (const component of APP_SCREEN_COMPONENT_REGISTRY) {
+      expect(component.penRootId, component.id).toBeNull();
+      expect(component.penReferenceEligible, component.id).toBe(false);
+      expect(component.penIdentityReason, component.id).toMatch(
+        /native canonical-Pen .*root is source-mapped/i
+      );
+    }
+  });
+
   it('keeps every recipe behind a real error boundary', () => {
     for (const recipe of APP_SCREEN_RECIPE_REGISTRY) {
       expect(
@@ -154,6 +164,18 @@ describe('authenticated app screen registry', () => {
       recipes: APP_SCREEN_RECIPE_REGISTRY.length,
     });
     expect(receipt.screens).toHaveLength(APP_SCREEN_REGISTRY.length);
+    expect(receipt.components).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'component.app-shell-frame',
+          penRootId: null,
+          penReferenceEligible: false,
+          penIdentityReason: expect.stringMatching(
+            /native canonical-Pen app-shell root/i
+          ),
+        }),
+      ])
+    );
     const routes = receipt.screens.map(screen => screen.route);
     expect(new Set(routes).size).toBe(routes.length);
     expect(routes).toEqual([...routes].sort((a, b) => a.localeCompare(b)));
@@ -213,6 +235,45 @@ describe('authenticated app screen registry', () => {
         ],
       }).map(x => x.code)
     ).toContain('missing-recipe');
+  });
+
+  it('fails closed on unproven or duplicate authenticated component Pen roots', () => {
+    const [first, second] = APP_SCREEN_COMPONENT_REGISTRY;
+
+    expect(
+      validateAppScreenSystem({
+        components: APP_SCREEN_COMPONENT_REGISTRY.map(component =>
+          component.id === first.id
+            ? { ...component, penReferenceEligible: true }
+            : component
+        ),
+      }).map(issue => issue.code)
+    ).toContain('reference-component-without-pen-root');
+
+    expect(
+      validateAppScreenSystem({
+        components: APP_SCREEN_COMPONENT_REGISTRY.map(component =>
+          component.id === first.id
+            ? { ...component, penIdentityReason: undefined }
+            : component
+        ),
+      }).map(issue => issue.code)
+    ).toContain('unresolved-component-pen-identity-without-reason');
+
+    expect(
+      validateAppScreenSystem({
+        components: APP_SCREEN_COMPONENT_REGISTRY.map(component =>
+          component.id === first.id || component.id === second.id
+            ? {
+                ...component,
+                penRootId: 'native-root-id',
+                penReferenceEligible: true,
+                penIdentityReason: undefined,
+              }
+            : component
+        ),
+      }).map(issue => issue.code)
+    ).toContain('duplicate-component-pen-root');
   });
 
   it('fails closed on missing, duplicated, or unsafe design-reference stories', () => {
