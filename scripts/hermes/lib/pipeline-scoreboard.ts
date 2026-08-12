@@ -11,8 +11,19 @@ import {
   NO_AUTO_LABEL,
 } from './codex-issue-shipper';
 
-export const PIPELINE_SCOREBOARD_SCHEMA_VERSION = 2;
+export const PIPELINE_SCOREBOARD_SCHEMA_VERSION = 3;
 export const BLOCKED_DELTA_CRITICAL_THRESHOLD = 15;
+export const SYMPHONY_HOURLY_TARGET = 5;
+export const SYMPHONY_GAP_P95_TARGET_SECONDS = 12 * 60;
+export const SYMPHONY_MIN_WINDOW_HOURS = 24;
+export const SYMPHONY_MAX_WINDOW_HOURS = 31 * 24;
+export const SYMPHONY_THROUGHPUT_TARGET = {
+  landedPrsPerHour: SYMPHONY_HOURLY_TARGET,
+  landingGapP95Seconds: SYMPHONY_GAP_P95_TARGET_SECONDS,
+} as const;
+
+const SYMPHONY_BRANCH_PATTERN = /^symphony\/JOV-[0-9]+-fix$/;
+const HOUR_MS = 3_600_000;
 
 export interface PipelineScoreboardWindow {
   readonly since: string;
@@ -22,10 +33,42 @@ export interface PipelineScoreboardWindow {
 export interface MergedPr {
   readonly number: number;
   readonly title: string;
+  readonly headRefName: string;
+  readonly baseRefName: string;
   readonly mergedAt: string;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly labels: ReadonlyArray<{ readonly name: string }>;
+}
+
+export interface SymphonyThroughputReceipt {
+  readonly schemaVersion: 1;
+  readonly window: PipelineScoreboardWindow;
+  readonly evidence: MergedPrEvidenceStatus;
+  readonly landedPrs: number | null;
+  readonly landings: ReadonlyArray<{
+    readonly number: number;
+    readonly mergedAt: string;
+  }>;
+  readonly hourlyUtc: ReadonlyArray<{
+    readonly hour: string;
+    readonly landedPrs: number;
+  }>;
+  readonly hourlyLandedPrs: {
+    readonly p05: number | null;
+    readonly p50: number | null;
+    readonly p95: number | null;
+  };
+  readonly landingGapSeconds: {
+    readonly p50: number | null;
+    readonly p95: number | null;
+  };
+  readonly target: {
+    readonly landedPrsPerHour: number;
+    readonly landingGapP95Seconds: number;
+  };
+  readonly verdict: 'passing' | 'failing' | 'insufficient_evidence';
+  readonly reason: string | null;
 }
 
 export interface MergedPrEvidenceStatus {
@@ -76,6 +119,7 @@ export interface PipelineScoreboard {
       readonly p95: number;
     };
   };
+  readonly symphony: SymphonyThroughputReceipt;
   readonly gates: {
     readonly tasteLabeledPrsWeek: number | null;
     readonly tasteEvidence: MergedPrEvidenceStatus;
@@ -88,7 +132,8 @@ export interface PipelineScoreboardAlarm {
   readonly rule:
     | 'blocked_delta'
     | 'zero_ships_after_claims'
-    | 'merge_evidence_incomplete';
+    | 'merge_evidence_incomplete'
+    | 'symphony_throughput_below_target';
   readonly severity: 'warning' | 'critical';
   readonly message: string;
 }
@@ -126,6 +171,7 @@ export interface PipelineScoreboardInput {
     readonly labels?: ReadonlyArray<{ readonly name?: string } | string>;
   }>;
   readonly mergeEvidence: MergedPrEvidenceStatus;
+  readonly symphonyMergeEvidence?: MergedPrEvidence;
   readonly tasteEvidence?: MergedPrEvidenceStatus;
 }
 
@@ -191,6 +237,8 @@ function parseMergedPr(value: unknown): MergedPr | null {
   if (
     !Number.isInteger(value.number) ||
     typeof value.title !== 'string' ||
+    typeof value.headRefName !== 'string' ||
+    typeof value.baseRefName !== 'string' ||
     typeof value.mergedAt !== 'string' ||
     typeof value.createdAt !== 'string' ||
     typeof value.updatedAt !== 'string' ||
@@ -210,6 +258,8 @@ function parseMergedPr(value: unknown): MergedPr | null {
   return {
     number: value.number as number,
     title: value.title,
+    headRefName: value.headRefName,
+    baseRefName: value.baseRefName,
     mergedAt: new Date(value.mergedAt).toISOString(),
     createdAt: new Date(value.createdAt).toISOString(),
     updatedAt: new Date(value.updatedAt).toISOString(),
@@ -327,10 +377,152 @@ function mergedPrMetricFingerprint(prs: ReadonlyArray<MergedPr>): string {
       .sort((left, right) => left.number - right.number)
       .map(pr => ({
         number: pr.number,
+        headRefName: pr.headRefName,
+        baseRefName: pr.baseRefName,
         mergedAt: pr.mergedAt,
         labels: pr.labels.map(label => label.name).sort(),
       }))
   );
+}
+
+export function isSymphonyBranch(headRefName: string): boolean {
+  return SYMPHONY_BRANCH_PATTERN.test(headRefName);
+}
+
+function percentile(
+  values: ReadonlyArray<number>,
+  quantile: number
+): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((left, right) => left - right);
+  return sorted[Math.ceil(quantile * sorted.length) - 1] ?? null;
+}
+
+function emptySymphonyReceipt(
+  window: PipelineScoreboardWindow,
+  evidence: MergedPrEvidenceStatus,
+  reason: string
+): SymphonyThroughputReceipt {
+  return {
+    schemaVersion: 1,
+    window,
+    evidence,
+    landedPrs: null,
+    landings: [],
+    hourlyUtc: [],
+    hourlyLandedPrs: { p05: null, p50: null, p95: null },
+    landingGapSeconds: { p50: null, p95: null },
+    target: SYMPHONY_THROUGHPUT_TARGET,
+    verdict: 'insufficient_evidence',
+    reason,
+  };
+}
+
+export function buildSymphonyThroughputReceipt(
+  evidence: MergedPrEvidence
+): SymphonyThroughputReceipt {
+  const status = {
+    complete: evidence.complete,
+    reason: evidence.reason,
+    pages: evidence.pages,
+  };
+  if (!isMergedPrEvidenceStatus(status)) {
+    return emptySymphonyReceipt(
+      evidence.window,
+      { complete: false, reason: 'invalid_evidence_status', pages: 0 },
+      'invalid_evidence_status'
+    );
+  }
+  if (!evidence.complete) {
+    return emptySymphonyReceipt(
+      evidence.window,
+      status,
+      evidence.reason === 'not_provided'
+        ? 'not_provided'
+        : `merge_evidence_${evidence.reason ?? 'unknown'}`
+    );
+  }
+
+  const sinceMs = Date.parse(evidence.window.since);
+  const untilMs = Date.parse(evidence.window.until);
+  const durationMs = untilMs - sinceMs;
+  if (
+    !Number.isFinite(sinceMs) ||
+    !Number.isFinite(untilMs) ||
+    durationMs <= 0
+  ) {
+    return emptySymphonyReceipt(evidence.window, status, 'invalid_window');
+  }
+  if (
+    sinceMs % HOUR_MS !== 0 ||
+    untilMs % HOUR_MS !== 0 ||
+    durationMs % HOUR_MS !== 0
+  ) {
+    return emptySymphonyReceipt(
+      evidence.window,
+      status,
+      'window_not_hour_aligned'
+    );
+  }
+
+  const hourCount = Math.ceil(durationMs / HOUR_MS);
+  if (hourCount < SYMPHONY_MIN_WINDOW_HOURS) {
+    return emptySymphonyReceipt(evidence.window, status, 'window_too_short');
+  }
+  if (hourCount > SYMPHONY_MAX_WINDOW_HOURS) {
+    return emptySymphonyReceipt(evidence.window, status, 'window_too_long');
+  }
+
+  const hourlyCounts = Array.from({ length: hourCount }, () => 0);
+  const landed = evidence.prs
+    .filter(
+      pr =>
+        isBetween(pr.mergedAt, evidence.window) &&
+        pr.baseRefName === 'main' &&
+        isSymphonyBranch(pr.headRefName)
+    )
+    .sort((left, right) => left.mergedAt.localeCompare(right.mergedAt));
+  for (const pr of landed) {
+    const index = Math.floor((Date.parse(pr.mergedAt) - sinceMs) / HOUR_MS);
+    if (index >= 0 && index < hourlyCounts.length) hourlyCounts[index] += 1;
+  }
+
+  const mergeTimes = landed.map(pr => Date.parse(pr.mergedAt));
+  const boundaryTimes = [sinceMs, ...mergeTimes, untilMs];
+  const gaps = boundaryTimes
+    .slice(1)
+    .map((time, index) => (time - boundaryTimes[index]) / 1_000);
+  const hourlyP05 = percentile(hourlyCounts, 0.05);
+  const gapP95 = percentile(gaps, 0.95);
+  const passing =
+    hourlyP05 !== null &&
+    hourlyP05 >= SYMPHONY_HOURLY_TARGET &&
+    gapP95 !== null &&
+    gapP95 <= SYMPHONY_GAP_P95_TARGET_SECONDS;
+
+  return {
+    schemaVersion: 1,
+    window: evidence.window,
+    evidence: status,
+    landedPrs: landed.length,
+    landings: landed.map(pr => ({ number: pr.number, mergedAt: pr.mergedAt })),
+    hourlyUtc: hourlyCounts.map((landedPrs, index) => ({
+      hour: new Date(sinceMs + index * HOUR_MS).toISOString(),
+      landedPrs,
+    })),
+    hourlyLandedPrs: {
+      p05: hourlyP05,
+      p50: percentile(hourlyCounts, 0.5),
+      p95: percentile(hourlyCounts, 0.95),
+    },
+    landingGapSeconds: {
+      p50: percentile(gaps, 0.5),
+      p95: gapP95,
+    },
+    target: SYMPHONY_THROUGHPUT_TARGET,
+    verdict: passing ? 'passing' : 'failing',
+    reason: passing ? null : 'below_target',
+  };
 }
 
 export function fetchMergedPrEvidence(
@@ -427,14 +619,72 @@ function isMergedPrEvidenceStatus(
     typeof value.complete === 'boolean' &&
     (value.reason === null || typeof value.reason === 'string') &&
     Number.isInteger(value.pages) &&
-    (value.pages as number) >= 0
+    (value.pages as number) >= 0 &&
+    (value.complete
+      ? value.reason === null && (value.pages as number) >= 1
+      : typeof value.reason === 'string' && value.reason.length > 0)
   );
+}
+
+function isSymphonyThroughputReceipt(
+  value: unknown
+): value is SymphonyThroughputReceipt {
+  if (!isRecord(value)) return false;
+  const window = value.window;
+  if (
+    value.schemaVersion !== 1 ||
+    !isRecord(window) ||
+    typeof window.since !== 'string' ||
+    typeof window.until !== 'string' ||
+    !isMergedPrEvidenceStatus(value.evidence) ||
+    !Array.isArray(value.landings)
+  ) {
+    return false;
+  }
+
+  const seenNumbers = new Set<number>();
+  const reconstructedPrs: MergedPr[] = [];
+  for (const landing of value.landings) {
+    const mergedAt = isRecord(landing)
+      ? Date.parse(String(landing.mergedAt))
+      : NaN;
+    if (
+      !isRecord(landing) ||
+      !Number.isInteger(landing.number) ||
+      seenNumbers.has(landing.number as number) ||
+      typeof landing.mergedAt !== 'string' ||
+      !Number.isFinite(mergedAt) ||
+      new Date(mergedAt).toISOString() !== landing.mergedAt
+    ) {
+      return false;
+    }
+    const number = landing.number as number;
+    seenNumbers.add(number);
+    reconstructedPrs.push({
+      number,
+      title: '',
+      headRefName: `symphony/JOV-${number}-fix`,
+      baseRefName: 'main',
+      mergedAt: landing.mergedAt,
+      createdAt: landing.mergedAt,
+      updatedAt: landing.mergedAt,
+      labels: [],
+    });
+  }
+
+  const expected = buildSymphonyThroughputReceipt({
+    ...value.evidence,
+    window: { since: window.since, until: window.until },
+    prs: reconstructedPrs,
+  });
+  return JSON.stringify(value) === JSON.stringify(expected);
 }
 
 function isPipelineScoreboard(value: unknown): value is PipelineScoreboard {
   if (!isRecord(value)) return false;
   const queue = value.queue;
   const gates = value.gates;
+  const symphony = value.symphony;
   return (
     value.schemaVersion === PIPELINE_SCOREBOARD_SCHEMA_VERSION &&
     isRecord(value.window) &&
@@ -445,6 +695,7 @@ function isPipelineScoreboard(value: unknown): value is PipelineScoreboard {
     isRecord(queue) &&
     (queue.merges === null || typeof queue.merges === 'number') &&
     isMergedPrEvidenceStatus(queue.evidence) &&
+    isSymphonyThroughputReceipt(symphony) &&
     isRecord(gates) &&
     (gates.tasteLabeledPrsWeek === null ||
       typeof gates.tasteLabeledPrsWeek === 'number') &&
@@ -618,6 +869,13 @@ export function buildPipelineScoreboard(
   ).length;
   const readyToMerge = input.ciMetrics?.latency?.readyToMergeSeconds;
   const gateEntries = shipperEntries;
+  const symphony = input.symphonyMergeEvidence
+    ? buildSymphonyThroughputReceipt(input.symphonyMergeEvidence)
+    : emptySymphonyReceipt(
+        input.window,
+        { complete: false, reason: 'not_provided', pages: 0 },
+        'not_provided'
+      );
 
   const scoreboard: PipelineScoreboard = {
     schemaVersion: PIPELINE_SCOREBOARD_SCHEMA_VERSION,
@@ -654,6 +912,7 @@ export function buildPipelineScoreboard(
         p95: readyToMerge?.p95 ?? 0,
       },
     },
+    symphony,
     gates: {
       tasteLabeledPrsWeek: tasteEvidence.complete
         ? (input.mergedPrs?.filter(pr =>
@@ -697,6 +956,13 @@ export function evaluatePipelineAlarms(
       message: `Merge evidence is incomplete (${scoreboard.queue.evidence.reason ?? 'unknown'}) after ${scoreboard.queue.evidence.pages} page(s) for ${windowLabel}; merge throughput conclusions are suppressed.`,
     });
   }
+  if (scoreboard.symphony.verdict === 'failing') {
+    alarms.push({
+      rule: 'symphony_throughput_below_target',
+      severity: 'critical',
+      message: `Symphony landed ${scoreboard.symphony.landedPrs ?? 0} PR(s) from ${scoreboard.symphony.window.since} to ${scoreboard.symphony.window.until}; hourly p05 is ${scoreboard.symphony.hourlyLandedPrs.p05 ?? 'n/a'} PRs/hour (target >= ${scoreboard.symphony.target.landedPrsPerHour}) and landing-gap p95 is ${fmtSeconds(scoreboard.symphony.landingGapSeconds.p95 ?? 0)} (target <= ${fmtSeconds(scoreboard.symphony.target.landingGapP95Seconds)}).`,
+    });
+  }
   return alarms;
 }
 
@@ -721,12 +987,17 @@ export function renderPipelineScoreboard(
   const tasteText = scoreboard.gates.tasteEvidence.complete
     ? String(scoreboard.gates.tasteLabeledPrsWeek)
     : `suppressed (${scoreboard.gates.tasteEvidence.reason ?? 'unknown'}, ${scoreboard.gates.tasteEvidence.pages} page(s))`;
+  const symphonyText =
+    scoreboard.symphony.verdict === 'insufficient_evidence'
+      ? `Symphony: insufficient evidence (${scoreboard.symphony.reason ?? 'unknown'})`
+      : `Symphony: ${scoreboard.symphony.landedPrs} landed · hourly p05 ${scoreboard.symphony.hourlyLandedPrs.p05} / p50 ${scoreboard.symphony.hourlyLandedPrs.p50} / p95 ${scoreboard.symphony.hourlyLandedPrs.p95} · landing-gap p95 ${fmtSeconds(scoreboard.symphony.landingGapSeconds.p95 ?? 0)} · target ${scoreboard.symphony.target.landedPrsPerHour}/hour ${scoreboard.symphony.verdict}`;
   return [
     `Pipeline scoreboard (${scoreboard.window.since.slice(0, 10)} UTC)`,
     `Funnel: ready ${scoreboard.funnel.ready} (${signed(scoreboard.funnel.deltas.ready)}) · claimed ${scoreboard.funnel.claimed} (${signed(scoreboard.funnel.deltas.claimed)}) · in-progress ${scoreboard.funnel.inProgress} (${signed(scoreboard.funnel.deltas.inProgress)}) · blocked ${scoreboard.funnel.blocked} (${signed(scoreboard.funnel.deltas.blocked)})`,
     `Shipper: claims ${scoreboard.shipper.claims} · ships ${scoreboard.shipper.ships} · retries ${scoreboard.shipper.retriesUsed} · cost/ship $${scoreboard.shipper.costPerShippedIssueUsd ?? 0}`,
     `Failures: ${failureText || 'none'}`,
     queueText,
+    symphonyText,
     `Gates: taste-labeled PRs/week ${tasteText} · autofix interventions ${scoreboard.gates.autofixInterventions}`,
     scoreboard.alarms.length
       ? `Alarms: ${scoreboard.alarms.map(alarm => alarm.message).join(' ')}`

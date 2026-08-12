@@ -99,7 +99,7 @@ function fetchMergedPrs(window: {
   if (!owner || !name) {
     return fetchMergedPrEvidence(window, () => undefined, { maxPages: 0 });
   }
-  const graphQuery = `query($owner:String!,$name:String!,$cursor:String,$pageSize:Int!){repository(owner:$owner,name:$name){pullRequests(states:MERGED,orderBy:{field:UPDATED_AT,direction:DESC},first:$pageSize,after:$cursor){totalCount pageInfo{hasNextPage endCursor} nodes{number title createdAt updatedAt mergedAt labels(first:100){totalCount nodes{name}}}}}}`;
+  const graphQuery = `query($owner:String!,$name:String!,$cursor:String,$pageSize:Int!){repository(owner:$owner,name:$name){pullRequests(states:MERGED,orderBy:{field:UPDATED_AT,direction:DESC},first:$pageSize,after:$cursor){totalCount pageInfo{hasNextPage endCursor} nodes{number title headRefName baseRefName createdAt updatedAt mergedAt labels(first:100){totalCount nodes{name}}}}}}`;
   return fetchMergedPrEvidence(
     window,
     (cursor, pageSize) => {
@@ -215,6 +215,7 @@ async function main(): Promise<void> {
       ciMetrics,
       mergedPrs: mergedDaily.prs,
       mergeEvidence: mergedDaily,
+      symphonyMergeEvidence: mergedWeekly,
     });
     const alarmScoreboard = buildPipelineScoreboard({
       ts: now.toISOString(),
@@ -225,6 +226,7 @@ async function main(): Promise<void> {
       ciMetrics,
       mergedPrs: mergedAlarm.prs,
       mergeEvidence: mergedAlarm,
+      symphonyMergeEvidence: mergedWeekly,
     });
     // The daily scoreboard owns blocked-count deltas; the rolling 12h
     // scoreboard owns "claims but no ships" stall detection.
@@ -232,7 +234,8 @@ async function main(): Promise<void> {
       ...scoreboard.alarms.filter(
         alarm =>
           alarm.rule === 'blocked_delta' ||
-          alarm.rule === 'merge_evidence_incomplete'
+          alarm.rule === 'merge_evidence_incomplete' ||
+          alarm.rule === 'symphony_throughput_below_target'
       ),
       ...alarmScoreboard.alarms.filter(
         alarm => alarm.rule === 'zero_ships_after_claims'
@@ -289,6 +292,12 @@ async function main(): Promise<void> {
       merges: finalScoreboard.queue.merges,
       mergeEvidenceComplete: finalScoreboard.queue.evidence.complete,
       mergeEvidenceReason: finalScoreboard.queue.evidence.reason,
+      symphonyLandedPrs: finalScoreboard.symphony.landedPrs,
+      symphonyHourlyP05: finalScoreboard.symphony.hourlyLandedPrs.p05,
+      symphonyHourlyP95: finalScoreboard.symphony.hourlyLandedPrs.p95,
+      symphonyLandingGapP95Seconds:
+        finalScoreboard.symphony.landingGapSeconds.p95,
+      symphonyThroughputVerdict: finalScoreboard.symphony.verdict,
       alarms: finalScoreboard.alarms.map(alarm => alarm.rule),
       sentAlertKeys,
       gbrainOk,
