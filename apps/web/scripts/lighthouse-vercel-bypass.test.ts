@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from 'vitest';
 const require = createRequire(import.meta.url);
 const {
   BYPASS_HEADER,
+  DEPLOY_HEALTH_PATH,
   assertAuthorizedDeploymentOrigin,
   assertOriginBoundRedirect,
   bootstrapOriginBoundAccess,
@@ -29,6 +30,7 @@ const {
   verifyPublicDeploymentSurfaces,
 } = require('./vercel-protected-origin.cjs') as {
   readonly BYPASS_HEADER: string;
+  readonly DEPLOY_HEALTH_PATH: string;
   readonly assertAuthorizedDeploymentOrigin: (
     candidate: string,
     resolvedOrigin: string
@@ -188,6 +190,13 @@ const {
 const DEPLOYMENT_URL = 'https://jovie-5sy8pmjja-jovie.vercel.app/';
 const BUILD_INFO_URL = `${DEPLOYMENT_URL}api/health/build-info`;
 const EXPECTED_SHA = '5b38bfd2d32ad88d80989cbf2c2bbbbc3140600e';
+const HEALTHY_DEPLOY_PAYLOAD = JSON.stringify({
+  status: 'healthy',
+  checks: {
+    environment: { ok: true },
+    database: { ok: true },
+  },
+});
 
 interface ResponseFixture {
   readonly status: number;
@@ -1472,11 +1481,11 @@ describe('origin-bound Vercel protection bypass', () => {
     const fetchImpl = vi.fn(async (rawUrl: URL, _options: unknown) => {
       const url = new URL(rawUrl);
       const isFailure = url.pathname === failingPath;
-      const isHealth = url.pathname === '/api/health';
+      const isHealth = url.pathname === DEPLOY_HEALTH_PATH;
       const responseBody = isFailure
         ? body
         : isHealth
-          ? JSON.stringify({ status: 'ok', database: 'ok' })
+          ? HEALTHY_DEPLOY_PAYLOAD
           : html;
       return {
         status: isFailure ? status : 200,
@@ -1515,7 +1524,7 @@ describe('origin-bound Vercel protection bypass', () => {
     const html = '<html><body>' + 'healthy'.repeat(200) + '</body></html>';
     const fetchImpl = vi.fn(async (rawUrl: URL, _options: unknown) => {
       const url = new URL(rawUrl);
-      const isHealth = url.pathname === '/api/health';
+      const isHealth = url.pathname === DEPLOY_HEALTH_PATH;
       const isProfile = url.pathname === '/tim';
       return {
         status: 200,
@@ -1532,7 +1541,7 @@ describe('origin-bound Vercel protection bypass', () => {
           .fn()
           .mockResolvedValue(
             isHealth
-              ? JSON.stringify({ status: 'ok', database: 'ok' })
+              ? HEALTHY_DEPLOY_PAYLOAD
               : isProfile
                 ? healthyProfile
                 : html
@@ -1559,7 +1568,7 @@ describe('origin-bound Vercel protection bypass', () => {
     const html = '<html><body>' + 'healthy'.repeat(200) + '</body></html>';
     const fetchImpl = vi.fn(async (rawUrl: URL, _options: unknown) => {
       const url = new URL(rawUrl);
-      const isHealth = url.pathname === '/api/health';
+      const isHealth = url.pathname === DEPLOY_HEALTH_PATH;
       return {
         status: 200,
         url: url.href,
@@ -1575,7 +1584,7 @@ describe('origin-bound Vercel protection bypass', () => {
           .fn()
           .mockResolvedValue(
             isHealth
-              ? JSON.stringify({ status: 'ok', database: 'ok' })
+              ? HEALTHY_DEPLOY_PAYLOAD
               : url.pathname === '/tim'
                 ? renderedError
                 : html
@@ -1596,7 +1605,7 @@ describe('origin-bound Vercel protection bypass', () => {
     const html = '<html><body>' + 'healthy'.repeat(200) + '</body></html>';
     const fetchImpl = vi.fn(async (rawUrl: URL, _options: unknown) => {
       const url = new URL(rawUrl);
-      const isHealth = url.pathname === '/api/health';
+      const isHealth = url.pathname === DEPLOY_HEALTH_PATH;
       return {
         status: 200,
         url: url.href,
@@ -1610,9 +1619,7 @@ describe('origin-bound Vercel protection bypass', () => {
         },
         text: vi
           .fn()
-          .mockResolvedValue(
-            isHealth ? JSON.stringify({ status: 'ok' }) : html
-          ),
+          .mockResolvedValue(isHealth ? HEALTHY_DEPLOY_PAYLOAD : html),
       };
     });
 
@@ -1623,7 +1630,7 @@ describe('origin-bound Vercel protection bypass', () => {
     });
 
     expect(fetchImpl.mock.calls.map(([url]) => new URL(url).pathname)).toEqual([
-      '/api/health',
+      DEPLOY_HEALTH_PATH,
       '/',
       '/tim',
       '/signup',
@@ -1640,6 +1647,118 @@ describe('origin-bound Vercel protection bypass', () => {
       expect(options.headers).not.toHaveProperty(BYPASS_HEADER);
       expect(options.redirect).toBe('manual');
     }
+  });
+
+  it('uses deploy health without touching the rate-limited general health endpoint', async () => {
+    const html = '<html><body>' + 'healthy'.repeat(200) + '</body></html>';
+    const fetchImpl = vi.fn(async (rawUrl: URL, _options: unknown) => {
+      const url = new URL(rawUrl);
+      const isDeployHealth = url.pathname === DEPLOY_HEALTH_PATH;
+      const isGeneralHealth = url.pathname === '/api/health';
+      const body = isDeployHealth
+        ? JSON.stringify({
+            status: 'healthy',
+            checks: {
+              environment: { ok: true },
+              database: { ok: true },
+            },
+          })
+        : isGeneralHealth
+          ? JSON.stringify({ status: 'rate_limited' })
+          : html;
+      return {
+        status: isGeneralHealth ? 429 : 200,
+        url: url.href,
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === 'content-type'
+              ? isDeployHealth || isGeneralHealth
+                ? 'application/json'
+                : 'text/html; charset=utf-8'
+              : null,
+        },
+        text: vi.fn().mockResolvedValue(body),
+      };
+    });
+
+    await expect(
+      verifyPublicDeploymentSurfaces(DEPLOYMENT_URL, {
+        cookieHeader: '__vercel_live_token=opaque-cookie',
+        fetchImpl,
+        attempts: 1,
+      })
+    ).resolves.toBeUndefined();
+
+    const requestedPaths = fetchImpl.mock.calls.map(
+      ([url]) => new URL(url).pathname
+    );
+    expect(requestedPaths[0]).toBe(DEPLOY_HEALTH_PATH);
+    expect(requestedPaths).not.toContain('/api/health');
+  });
+
+  it.each([
+    {
+      label: 'legacy general-health status',
+      payload: {
+        status: 'ok',
+        checks: {
+          environment: { ok: true },
+          database: { ok: true },
+        },
+      },
+      error: 'did not report healthy status',
+    },
+    {
+      label: 'failed environment check',
+      payload: {
+        status: 'healthy',
+        checks: {
+          environment: { ok: false },
+          database: { ok: true },
+        },
+      },
+      error: 'did not report healthy environment state',
+    },
+    {
+      label: 'failed database check',
+      payload: {
+        status: 'healthy',
+        checks: {
+          environment: { ok: true },
+          database: { ok: false },
+        },
+      },
+      error: 'did not report healthy database state',
+    },
+  ])('fails closed on a deploy-health $label', async ({ payload, error }) => {
+    const html = '<html><body>' + 'healthy'.repeat(200) + '</body></html>';
+    const fetchImpl = vi.fn(async (rawUrl: URL) => {
+      const url = new URL(rawUrl);
+      const isDeployHealth = url.pathname === DEPLOY_HEALTH_PATH;
+      return {
+        status: 200,
+        url: url.href,
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === 'content-type'
+              ? isDeployHealth
+                ? 'application/json'
+                : 'text/html; charset=utf-8'
+              : null,
+        },
+        text: vi
+          .fn()
+          .mockResolvedValue(isDeployHealth ? JSON.stringify(payload) : html),
+      };
+    });
+
+    await expect(
+      verifyPublicDeploymentSurfaces(DEPLOYMENT_URL, {
+        cookieHeader: '__vercel_live_token=opaque-cookie',
+        fetchImpl,
+        attempts: 1,
+      })
+    ).rejects.toThrow(error);
   });
 
   // Regression coverage for the #14654 canary false positive: a healthy Next.js
@@ -1710,7 +1829,7 @@ describe('origin-bound Vercel protection bypass', () => {
         '</body></html>';
       const fetchImpl = vi.fn(async (rawUrl: URL) => {
         const url = new URL(rawUrl);
-        const isHealth = url.pathname === '/api/health';
+        const isHealth = url.pathname === DEPLOY_HEALTH_PATH;
         return {
           status: 200,
           url: url.href,
@@ -1724,11 +1843,7 @@ describe('origin-bound Vercel protection bypass', () => {
           },
           text: vi
             .fn()
-            .mockResolvedValue(
-              isHealth
-                ? JSON.stringify({ status: 'ok', database: 'ok' })
-                : healthyBody
-            ),
+            .mockResolvedValue(isHealth ? HEALTHY_DEPLOY_PAYLOAD : healthyBody),
         };
       });
 
@@ -1744,10 +1859,10 @@ describe('origin-bound Vercel protection bypass', () => {
     it('still rejects visible not-found copy that is not inside a script tag', async () => {
       const fetchImpl = vi.fn(async (rawUrl: URL) => {
         const url = new URL(rawUrl);
-        const isHealth = url.pathname === '/api/health';
+        const isHealth = url.pathname === DEPLOY_HEALTH_PATH;
         const isBroken = url.pathname === '/tim';
         const body = isHealth
-          ? JSON.stringify({ status: 'ok', database: 'ok' })
+          ? HEALTHY_DEPLOY_PAYLOAD
           : isBroken
             ? '<html><body><main>Profile not found</main>' +
               'x'.repeat(600) +
@@ -1780,10 +1895,10 @@ describe('origin-bound Vercel protection bypass', () => {
     it('still rejects a surface whose raw body is below the minimum byte floor', async () => {
       const fetchImpl = vi.fn(async (rawUrl: URL) => {
         const url = new URL(rawUrl);
-        const isHealth = url.pathname === '/api/health';
+        const isHealth = url.pathname === DEPLOY_HEALTH_PATH;
         const isTiny = url.pathname === '/pricing';
         const body = isHealth
-          ? JSON.stringify({ status: 'ok', database: 'ok' })
+          ? HEALTHY_DEPLOY_PAYLOAD
           : isTiny
             ? '<html><body>hi</body></html>'
             : '<html><body>' + 'healthy'.repeat(200) + '</body></html>';

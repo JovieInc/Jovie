@@ -22,6 +22,7 @@ const PUBLIC_PROBE_COOKIE_NAMES = new Set([
 ]);
 const ZERO_DYNAMIC_SECRET_RECEIPT = 'jovie-protected-probe:no-dynamic-secrets';
 const BUILD_INFO_PATH = '/api/health/build-info';
+const DEPLOY_HEALTH_PATH = '/api/health/deploy';
 const DEFAULT_PROBE_TIMEOUT_MS = 120_000;
 const DEFAULT_VERCEL_API_PAGES = 5;
 const DEFAULT_VERCEL_DEPLOYMENT_POLL_INTERVAL_MS = 5_000;
@@ -989,8 +990,19 @@ async function verifyPublicSurfaceOnce(
     } catch {
       throw new Error(`${surface.label} returned invalid JSON.`);
     }
-    if (!payload || typeof payload !== 'object' || payload.status !== 'ok') {
+    if (
+      !payload ||
+      typeof payload !== 'object' ||
+      payload.status !== surface.expectedStatus
+    ) {
       throw new Error(`${surface.label} did not report healthy status.`);
+    }
+    for (const check of surface.requiredChecks ?? []) {
+      if (payload.checks?.[check]?.ok !== true) {
+        throw new Error(
+          `${surface.label} did not report healthy ${check} state.`
+        );
+      }
     }
     if (
       Object.hasOwn(payload, 'database') &&
@@ -1061,7 +1073,13 @@ async function verifyPublicDeploymentSurfaces(
     createAbsoluteDeadline(timeoutMs, 'Public surface verification');
   const ownsDeadline = !suppliedDeadline;
   const surfaces = [
-    { label: 'Health', path: '/api/health', json: true },
+    {
+      label: 'Deploy health',
+      path: DEPLOY_HEALTH_PATH,
+      json: true,
+      expectedStatus: 'healthy',
+      requiredChecks: ['environment', 'database'],
+    },
     ...PUBLIC_HTML_SURFACES,
   ];
 
@@ -1441,6 +1459,7 @@ async function bootstrapAndVerifyFromEnvironment() {
 
 module.exports = {
   BUILD_INFO_PATH,
+  DEPLOY_HEALTH_PATH,
   BYPASS_HEADER,
   DEFAULT_PROBE_TIMEOUT_MS,
   PUBLIC_PROBE_COOKIE_NAMES,

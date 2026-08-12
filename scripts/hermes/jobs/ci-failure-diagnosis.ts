@@ -99,7 +99,7 @@ const DIAGNOSES: ReadonlyArray<{
     rootCause:
       'The prebuilt Vercel function was deployed without repo-relative files referenced by its Build Output filePathMap. Transferring only .vercel/output between jobs can omit those traced runtime sources, so middleware fails before the health handler boots.',
     remediation:
-      'Do not rerun or promote the unchanged prebuilt. Build and deploy in the same job and workspace so every filePathMap source remains available; never restore .vercel/output alone. Require the exact deployment to pass /api/health before promotion.',
+      'Do not rerun or promote the unchanged prebuilt. Build and deploy in the same job and workspace so every filePathMap source remains available; never restore .vercel/output alone. Require the exact deployment to pass /api/health/deploy before promotion.',
   },
   {
     failureClass: 'staged_production_deployment_failed',

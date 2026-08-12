@@ -497,7 +497,7 @@ LIGHTHOUSE_FAILURE_CLASS=deterministic_assertion LIGHTHOUSE_ATTEMPT=1/3`);
     expect(diagnoses[0]).toMatchObject({
       rootCause: expect.stringMatching(/filePathMap.*\.vercel\/output/),
       remediation: expect.stringMatching(
-        /Do not rerun.*same job and workspace.*\/api\/health/
+        /Do not rerun.*same job and workspace.*\/api\/health\/deploy/
       ),
     });
   });
