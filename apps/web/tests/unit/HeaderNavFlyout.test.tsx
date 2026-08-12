@@ -1,3 +1,4 @@
+import { BUTTON_PEN_CONTRACT } from '@jovie/ui';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
@@ -55,6 +56,31 @@ describe('HeaderNav flyout interactions', () => {
     expect(
       screen.getByRole('link', { name: 'Request Access' })
     ).toHaveAttribute('href', '/signup');
+    const publicCta = screen.getByRole('link', { name: 'Request Access' });
+    expect(publicCta).toHaveAttribute(
+      'data-pen-contract',
+      BUTTON_PEN_CONTRACT.rootId
+    );
+    expect(publicCta).toHaveAttribute('data-variant', 'primary');
+    expect(publicCta).toHaveAttribute('data-size', 'md');
+  });
+
+  it('uses the canonical Button for the minimal pill sign-in action', () => {
+    render(
+      <HeaderNav
+        authMode='public-static'
+        minimalAuth
+        minimalAuthVariant='pill'
+      />
+    );
+
+    const signIn = screen.getByRole('link', { name: 'Sign in' });
+    expect(signIn).toHaveAttribute(
+      'data-pen-contract',
+      BUTTON_PEN_CONTRACT.rootId
+    );
+    expect(signIn).toHaveAttribute('data-variant', 'primary');
+    expect(signIn).toHaveAttribute('data-size', 'md');
   });
 
   it('uses one CTA contract for the public label and destination', () => {
