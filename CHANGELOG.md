@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
-- [internal] **Protected Vercel canaries use the dedicated deploy-health contract (JOV-5013):** exact preview and staged-production verification no longer depend on the rate-limited general health endpoint; environment and database checks must both report healthy before promotion.
+- [internal] **Protected Vercel canaries use the dedicated deploy-health contract (JOV-5013):** exact preview and staged-production verification no longer depend on the rate-limited general health endpoint; staging previews receive their canonical app/profile origins at runtime; and environment plus database checks must both report healthy before promotion.
 - [internal] **iPhone vlog takes have a durable local script-following core:** cumulative speech partials advance a karaoke cursor, off-script speech can recover without forcing alignment, manual resume preserves its recognition anchor, and local session JSON keeps the script, transcript, timing segments, and recording filename linked without upload.
 - **Public pages now share one adaptable conversion header:** each landing page can supply its own primary action and destination, artist-profile pages use the profile-claim path, and the temporary Jovie identity treatment now carries enough visual weight to balance the icon.
 - **Controlled-access signup now produces a truthful waitlist receipt:** anonymous onboarding rechecks the live access gate, requires a confirmed artist before signup, persists the verified account's request and audit record idempotently, and never says “You're on the list” unless a durable pending entry exists.

@@ -1501,7 +1501,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(readinessStep).toContain('handing off to retrying canary');
   });
 
-  it('passes signup readiness keys into the staging preview runtime', () => {
+  it('passes signup readiness and canonical staging origins into the preview runtime', () => {
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const deployStep = getStepBlock(
       workflow,
@@ -1509,6 +1509,9 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     );
     const runtimeKeys = [
       'VERCEL_AUTOMATION_BYPASS_SECRET',
+      'NEXT_PUBLIC_APP_URL',
+      'NEXT_PUBLIC_PROFILE_URL',
+      'NEXT_PUBLIC_PROFILE_HOSTNAME',
       'NEXT_PUBLIC_BETTER_AUTH_URL',
       'NEXT_PUBLIC_GOOGLE_CLIENT_ID',
       'BETTER_AUTH_SECRET',
@@ -1539,6 +1542,9 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       .split('\n')
       .find(line => line.includes('--only-secrets='));
     for (const key of [
+      'NEXT_PUBLIC_APP_URL',
+      'NEXT_PUBLIC_PROFILE_URL',
+      'NEXT_PUBLIC_PROFILE_HOSTNAME',
       'NEXT_PUBLIC_GOOGLE_CLIENT_ID',
       'AUTH_GOOGLE_CLIENT_ID',
       'AUTH_GOOGLE_CLIENT_SECRET',
