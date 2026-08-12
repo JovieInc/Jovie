@@ -2,7 +2,7 @@
 'use client';
 
 import './HeaderNav.css';
-import { Button, getLinearPillClassName } from '@jovie/ui';
+import { Button } from '@jovie/ui';
 import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -84,8 +84,9 @@ function PublicAuthActions({
       return (
         <Button
           asChild
-          variant='whitePill'
-          className='focus-ring-themed hidden h-9 px-4 text-app sm:inline-flex sm:h-10 sm:px-5 sm:text-sm'
+          size='md'
+          variant='primary'
+          className='focus-ring-themed hidden sm:inline-flex'
         >
           <Link href={APP_ROUTES.SIGNIN}>Sign in</Link>
         </Button>
@@ -102,14 +103,14 @@ function PublicAuthActions({
       >
         Log in
       </Link>
-      <Link
-        href={publicCta.href}
-        className={getLinearPillClassName({
-          className: 'focus-ring-themed shrink-0 whitespace-nowrap',
-        })}
+      <Button
+        asChild
+        size='md'
+        variant='primary'
+        className='focus-ring-themed shrink-0 whitespace-nowrap'
       >
-        {publicCta.label}
-      </Link>
+        <Link href={publicCta.href}>{publicCta.label}</Link>
+      </Button>
     </div>
   );
 }
