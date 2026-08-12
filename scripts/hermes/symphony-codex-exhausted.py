@@ -136,16 +136,32 @@ def _read_state() -> dict | None:
         return None
 
 
-def _account_off_cooldown(state: dict, now: int) -> bool:
-    """True when at least one recorded account's cooldown has expired."""
-    for raw in (state.get("cooldowns") or {}).values():
+def _configured_accounts() -> set[str] | None:
+    """Return the exact account set codex-rotate considers runnable."""
+    try:
+        return {
+            path.name
+            for path in _state_path().parent.iterdir()
+            if path.is_dir() and (path / "auth.json").is_file()
+        }
+    except OSError:
+        return None
+
+
+def _all_accounts_on_cooldown(state: dict, accounts: set[str], now: int) -> bool:
+    """True only when every configured account has a valid future cooldown."""
+    if not accounts:
+        return False
+    cooldowns = state.get("cooldowns") or {}
+    for account in accounts:
+        raw = cooldowns.get(account)
         try:
-            until = int(raw or 0)
+            until = int(raw)
         except (TypeError, ValueError):
-            continue
+            return False
         if until <= now:
-            return True
-    return False
+            return False
+    return True
 
 
 def codex_canary_ready() -> tuple[bool, str]:
@@ -157,8 +173,10 @@ def codex_canary_ready() -> tuple[bool, str]:
     state = _read_state()
     if state is None:
         return False, "unknown_state"
-    cooldowns = state.get("cooldowns") or {}
-    if cooldowns and not _account_off_cooldown(state, int(time.time())):
+    accounts = _configured_accounts()
+    if accounts is None:
+        return False, "unknown_accounts"
+    if _all_accounts_on_cooldown(state, accounts, int(time.time())):
         return False, "all_accounts_cooldown"
     executable = _rotate_executable()
     if executable is None:
@@ -187,6 +205,11 @@ def _systemctl(*args: str) -> list[str]:
 def _control(command: list[str]) -> bool:
     result = _captured(command, CONTROL_TIMEOUT_SECONDS)
     return result is not None and result.returncode == 0
+
+
+def _services_active() -> bool:
+    """Require every primary service to be active, not merely one of them."""
+    return all(_control(_systemctl("is-active", "--quiet", service)) for service in SERVICES)
 
 
 def _active_grok_units() -> list[str] | None:
@@ -415,7 +438,7 @@ def reconcile() -> int:
         if not _control(_systemctl("start", *SERVICES)):
             print("codex_not_exhausted symphony_start_failed", file=sys.stderr)
             return 2
-        if not _control(_systemctl("is-active", "--quiet", *SERVICES)):
+        if not _services_active():
             print("codex_not_exhausted symphony_not_active", file=sys.stderr)
             return 2
         print("codex_not_exhausted symphony_active idle", file=sys.stderr)
@@ -462,18 +485,33 @@ def reconcile() -> int:
             file=sys.stderr,
         )
         return 0
-    if not _control(_systemctl("stop", *SERVICES)):
-        print("codex_exhausted symphony_stop_failed", file=sys.stderr)
+    limit = _grok_limit()
+    if limit <= 0 and not active:
+        print(
+            f"codex_exhausted {reason} grok_capacity_zero symphony_unchanged",
+            file=sys.stderr,
+        )
         return 2
-    remaining = _grok_limit() - len(active)
-    if remaining <= 0:
-        print(f"codex_exhausted {reason} grok_concurrency_full grok_started=0", file=sys.stderr)
-        return 0
+
+    # Symphony is the sole implementation owner. Stop its scheduler before
+    # launching any new Grok worker so Todo/In Progress work can never have two
+    # implementation owners. This handoff is reversible: if no Grok worker is
+    # active after the bounded launch batch, restart and verify Symphony before
+    # returning. systemctl stop is synchronous, so success proves the old owner
+    # has released its scheduler before a new owner starts.
+    if not _control(_systemctl("stop", *SERVICES)):
+        print("codex_exhausted symphony_stop_failed grok_unchanged", file=sys.stderr)
+        return 2
+
+    active_units = set(active)
+    capacity_used = len(active_units)
+    launched_units: set[str] = set()
     started = 0
     for identifier in identifiers:
-        if started >= remaining:
+        if capacity_used >= limit:
             break
-        if _control(_systemctl("is-active", "--quiet", f"grok-ship-{identifier}")):
+        unit = f"grok-ship-{identifier}.service"
+        if unit in active_units:
             continue
         # Re-verify admission immediately before launch: a label/state guard
         # may have flagged the issue (blocked / needs-human) after the list
@@ -488,11 +526,67 @@ def reconcile() -> int:
             print(f"codex_exhausted skip {identifier} not admitted", file=sys.stderr)
             continue
         if not _control(_grok_command(identifier, executable)):
-            print("codex_exhausted grok_launch_failed", file=sys.stderr)
+            print(f"codex_exhausted skip {identifier} grok_launch_failed", file=sys.stderr)
+            continue
+        # Reserve the slot as soon as systemd accepts the launch. Activation can
+        # be delayed, but acceptance must never allow the batch to exceed its
+        # configured concurrency ceiling.
+        launched_units.add(unit)
+        capacity_used += 1
+    final_active = _active_grok_units()
+    if final_active is None:
+        # Exclusivity cannot be proven. Do not restart Symphony while an
+        # accepted or pre-existing Grok unit may still own implementation.
+        # The timer will retry the observation and restore the safe owner once
+        # systemd state is knowable again.
+        print(
+            f"codex_exhausted {reason} grok_state_query_failed symphony_stopped",
+            file=sys.stderr,
+        )
+        return 2
+    if final_active:
+        started = len(launched_units.intersection(final_active))
+        print(f"codex_exhausted {reason} grok_started={started}", file=sys.stderr)
+        return 0
+
+    if launched_units:
+        # Accepted transient units can activate after an empty snapshot. Cancel
+        # every accepted launch synchronously, then prove the entire Grok lane
+        # is still empty before bringing the primary owner back.
+        if not _control(_systemctl("stop", *sorted(launched_units))):
+            print(
+                f"codex_exhausted {reason} grok_cleanup_failed symphony_stopped",
+                file=sys.stderr,
+            )
             return 2
-        started += 1
-    print(f"codex_exhausted {reason} grok_started={started}", file=sys.stderr)
-    return 0
+        cleared = _active_grok_units()
+        if cleared is None or cleared:
+            print(
+                f"codex_exhausted {reason} grok_cleanup_unverified symphony_stopped",
+                file=sys.stderr,
+            )
+            return 2
+
+    # No fallback owner survived the handoff. Restore the primary owner and
+    # verify it is active so this failure path self-heals instead of stranding a
+    # zero-worker runtime.
+    if not _control(_systemctl("start", *SERVICES)):
+        print(
+            f"codex_exhausted {reason} grok_started=0 symphony_restore_failed",
+            file=sys.stderr,
+        )
+        return 2
+    if not _services_active():
+        print(
+            f"codex_exhausted {reason} grok_started=0 symphony_not_active",
+            file=sys.stderr,
+        )
+        return 2
+    print(
+        f"codex_exhausted {reason} grok_started=0 symphony_restored",
+        file=sys.stderr,
+    )
+    return 2
 
 
 class InstallValidationError(Exception):
