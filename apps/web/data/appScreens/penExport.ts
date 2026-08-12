@@ -22,7 +22,11 @@ import {
 } from './registry';
 import { validateAppScreenSystem } from './validation';
 
-export const APP_SCREEN_PEN_EXPORT_SCHEMA = 'app-screen-pen-export/v1';
+/**
+ * v2 adds per-component native Pen-root resolution. Consumers must treat an
+ * unresolved component as non-referenceable rather than guessing an ID.
+ */
+export const APP_SCREEN_PEN_EXPORT_SCHEMA = 'app-screen-pen-export/v2';
 
 export interface AppScreenPenExportScreen {
   readonly id: string;

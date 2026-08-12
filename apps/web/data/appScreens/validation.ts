@@ -11,12 +11,15 @@ import {
 
 export type AppScreenValidationCode =
   | 'duplicate-component'
+  | 'duplicate-component-pen-root'
   | 'duplicate-recipe'
   | 'duplicate-screen'
   | 'duplicate-source'
   | 'duplicate-route'
   | 'duplicate-reference-concept'
   | 'missing-component'
+  | 'reference-component-without-pen-root'
+  | 'unresolved-component-pen-identity-without-reason'
   | 'duplicate-recipe-component'
   | 'missing-recipe'
   | 'invalid-recipe-kind'
@@ -97,6 +100,31 @@ export function validateAppScreenSystem({
     components.map(component => [component.id, component])
   );
   const recipesById = new Map(recipes.map(recipe => [recipe.id, recipe]));
+
+  const componentPenRoots = new Set<string>();
+  for (const component of components) {
+    if (component.penReferenceEligible && !component.penRootId) {
+      add(
+        'reference-component-without-pen-root',
+        `component ${component.id} is Pen-referenceable without a native root`
+      );
+    }
+    if (!component.penReferenceEligible && !component.penIdentityReason) {
+      add(
+        'unresolved-component-pen-identity-without-reason',
+        `component ${component.id} has no native Pen root or unresolved-identity reason`
+      );
+    }
+    if (component.penRootId) {
+      if (componentPenRoots.has(component.penRootId)) {
+        add(
+          'duplicate-component-pen-root',
+          `component Pen root ${component.penRootId} is registered more than once`
+        );
+      }
+      componentPenRoots.add(component.penRootId);
+    }
+  }
 
   for (const recipe of recipes) {
     for (const componentId of duplicates(recipe.componentIds)) {

@@ -28,6 +28,15 @@ export interface AppScreenComponentRegistryEntry {
   readonly source: string;
   readonly storySource: string;
   readonly storybookTitle: string;
+  /**
+   * Native Pen identity is deliberately independent from the source identity.
+   * A component remains ineligible for Pen reference until a canonical-file
+   * manifest/readback proves this exact root; never mint an ID from source.
+   */
+  readonly penRootId: string | null;
+  readonly penReferenceEligible: boolean;
+  /** Required while no native, source-mapped Pen root is proven. */
+  readonly penIdentityReason?: string;
 }
 
 export interface AppScreenRecipeRegistryEntry {
@@ -74,12 +83,20 @@ export const APP_SCREEN_COMPONENT_REGISTRY = [
     source: 'apps/web/components/organisms/AppShellFrame.tsx',
     storySource: 'apps/web/components/organisms/AppShellFrame.stories.tsx',
     storybookTitle: 'Organisms/AppShellFrame',
+    penRootId: null,
+    penReferenceEligible: false,
+    penIdentityReason:
+      'No native canonical-Pen app-shell root is source-mapped; promote only after manifest/readback proof.',
   },
   {
     id: 'component.page-shell',
     source: 'apps/web/components/organisms/PageShell.tsx',
     storySource: 'apps/web/components/organisms/PageShell.stories.tsx',
     storybookTitle: 'Organisms/PageShell',
+    penRootId: null,
+    penReferenceEligible: false,
+    penIdentityReason:
+      'No native canonical-Pen page-shell root is source-mapped; promote only after manifest/readback proof.',
   },
   {
     id: 'component.settings-panel',
@@ -87,6 +104,10 @@ export const APP_SCREEN_COMPONENT_REGISTRY = [
     storySource:
       'apps/web/components/molecules/settings/SettingsPanel.stories.tsx',
     storybookTitle: 'Molecules/Settings/SettingsPanel',
+    penRootId: null,
+    penReferenceEligible: false,
+    penIdentityReason:
+      'No native canonical-Pen settings-panel root is source-mapped; promote only after manifest/readback proof.',
   },
   {
     id: 'component.unified-table',
@@ -94,6 +115,10 @@ export const APP_SCREEN_COMPONENT_REGISTRY = [
     storySource:
       'apps/web/components/organisms/table/organisms/UnifiedTable.stories.tsx',
     storybookTitle: 'Organisms/Table/UnifiedTable',
+    penRootId: null,
+    penReferenceEligible: false,
+    penIdentityReason:
+      'No native canonical-Pen unified-table root is source-mapped; promote only after manifest/readback proof.',
   },
   {
     id: 'component.entity-sidebar',
@@ -101,12 +126,20 @@ export const APP_SCREEN_COMPONENT_REGISTRY = [
     storySource:
       'apps/web/components/molecules/drawer/EntitySidebarShell.stories.tsx',
     storybookTitle: 'Molecules/Drawer/EntitySidebarShell',
+    penRootId: null,
+    penReferenceEligible: false,
+    penIdentityReason:
+      'No native canonical-Pen entity-sidebar root is source-mapped; promote only after manifest/readback proof.',
   },
   {
     id: 'component.empty-state',
     source: 'apps/web/components/organisms/EmptyState.tsx',
     storySource: 'apps/web/components/organisms/EmptyState.stories.tsx',
     storybookTitle: 'UI/EmptyState',
+    penRootId: null,
+    penReferenceEligible: false,
+    penIdentityReason:
+      'No native canonical-Pen empty-state root is source-mapped; promote only after manifest/readback proof.',
   },
   {
     id: 'component.error-fallback',
@@ -114,6 +147,10 @@ export const APP_SCREEN_COMPONENT_REGISTRY = [
     storySource:
       'apps/web/components/organisms/DashboardErrorFallback.stories.tsx',
     storybookTitle: 'Organisms/DashboardErrorFallback',
+    penRootId: null,
+    penReferenceEligible: false,
+    penIdentityReason:
+      'No native canonical-Pen error-fallback root is source-mapped; promote only after manifest/readback proof.',
   },
 ] as const satisfies readonly AppScreenComponentRegistryEntry[];
 
