@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SlashCommandMenu } from '@/components/jovie/components/SlashCommandMenu';
 import type { PickerState } from '@/components/jovie/components/useChatPicker';
@@ -16,12 +16,13 @@ import type { SkillCommand } from '@/lib/commands/registry';
  * ChatInput) so each assertion is local to the listener contract.
  */
 
-const { mockUseEventsQuery } = vi.hoisted(() => ({
+const { mockUseEventsQuery, mockUseReleasesQuery } = vi.hoisted(() => ({
   mockUseEventsQuery: vi.fn(),
+  mockUseReleasesQuery: vi.fn(),
 }));
 
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
-  useReleasesQuery: () => ({ data: [], isLoading: false }),
+  useReleasesQuery: mockUseReleasesQuery,
 }));
 
 vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
@@ -89,12 +90,16 @@ function rootState(selectedIndex: number): PickerState {
   };
 }
 
-function renderMenu(state: PickerState, handlers: Handlers) {
+function renderMenu(
+  state: PickerState,
+  handlers: Handlers,
+  profileId = 'profile-test'
+) {
   return render(
     withProviders(
       <SlashCommandMenu
         state={state}
-        profileId='profile-test'
+        profileId={profileId}
         onSelectSkill={handlers.onSelectSkill}
         onSelectEntity={handlers.onSelectEntity}
         onSetSelected={handlers.onSetSelected}
@@ -106,8 +111,10 @@ function renderMenu(state: PickerState, handlers: Handlers) {
   );
 }
 
-// Default mock: no events. Individual /event-mode tests override below.
-mockUseEventsQuery.mockReturnValue({ data: [], isLoading: false });
+beforeEach(() => {
+  mockUseEventsQuery.mockReturnValue({ data: [], isLoading: false });
+  mockUseReleasesQuery.mockReturnValue({ data: [], isLoading: false });
+});
 
 describe('SlashCommandMenu keyboard + IME + ARIA', () => {
   it('renders a listbox with role=option rows for each skill', () => {
@@ -121,6 +128,34 @@ describe('SlashCommandMenu keyboard + IME + ARIA', () => {
     expect(options.length).toBeGreaterThan(0);
     expect(options[0]).toHaveAttribute('aria-selected', 'true');
     expect(options[1]).toHaveAttribute('aria-selected', 'false');
+  });
+
+  it('does not offer release-dependent skills without release context', () => {
+    const handlers = makeHandlers();
+    renderMenu(rootState(0), handlers, '');
+
+    expect(
+      screen.queryByRole('option', { name: /generate pitch/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('option', { name: /generate album art/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('option', { name: /send feedback/i })
+    ).toBeVisible();
+  });
+
+  it('keeps release-dependent skills when release context exists', () => {
+    mockUseReleasesQuery.mockReturnValue({
+      data: [{ id: 'release-1', title: 'First Release' }],
+      isLoading: false,
+    });
+    const handlers = makeHandlers();
+    renderMenu(rootState(0), handlers);
+
+    expect(
+      screen.getByRole('option', { name: /generate pitch/i })
+    ).toBeVisible();
   });
 
   it('ArrowDown delegates to onMoveSelected with delta=+1', () => {

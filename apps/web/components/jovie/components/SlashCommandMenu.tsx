@@ -198,6 +198,10 @@ export function useSlashItems(
       query,
       limit
     );
+    const hasReleaseContext =
+      releaseLoading ||
+      releaseRecents.length > 0 ||
+      (releaseData?.length ?? 0) > 0;
 
     const eventRecents = recents.filter(r => r.kind === 'event');
     const filteredEvents: EntityRef[] = rankRecentsFirst(
@@ -260,12 +264,23 @@ export function useSlashItems(
     }
 
     // root: skills + entity suggestions per kind
+    // A release-dependent skill immediately opens the release picker. Do not
+    // offer it when the creator has no release context: anonymous /start users
+    // would otherwise enter an empty picker with no forward action.
     const skills = filterSkillsHidingBrokenAlbumArt(
       commandsForSurface('chat-slash').filter(
         (c): c is SkillCommand => c.kind === 'skill'
       ),
       chatCapabilities?.tools.albumArt
-    ).filter(s => fuzzyMatch(`${s.label} ${s.description}`, query));
+    )
+      .filter(
+        skill =>
+          hasReleaseContext ||
+          !skill.entitySlots.some(
+            slot => slot.kind === 'release' && slot.required
+          )
+      )
+      .filter(s => fuzzyMatch(`${s.label} ${s.description}`, query));
 
     const sections: ListSection[] = [];
     const items: SlashMenuItem[] = [];
