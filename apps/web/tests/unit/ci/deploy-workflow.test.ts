@@ -1560,6 +1560,15 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       workflow,
       'Build (preview target for staging verification)'
     );
+    for (const assignment of [
+      'NEXT_PUBLIC_APP_URL="https://staging.jov.ie"',
+      'NEXT_PUBLIC_PROFILE_URL="https://staging.jov.ie"',
+      'NEXT_PUBLIC_PROFILE_HOSTNAME="staging.jov.ie"',
+    ]) {
+      expect(buildStep).toContain(`export ${assignment}`);
+      expect(deployStep).toContain(`export ${assignment}`);
+    }
+
     for (const key of [
       'NEXT_PUBLIC_GOOGLE_CLIENT_ID',
       'AUTH_GOOGLE_CLIENT_ID',
