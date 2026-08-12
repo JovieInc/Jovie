@@ -34,6 +34,12 @@ const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
   'scripts/run-affected-tests.mjs',
 ];
+const FLEET_PROMOTION_GATE_MANIFEST = [
+  'scripts/hermes/gem-priority-gate.py',
+  'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/run-affected-tests.mjs',
+];
 
 const PREREQUISITE_TRAIN_CORNERS = [
   'scripts/ci/neon-orphan-reaper.mjs',
@@ -403,6 +409,15 @@ describe('automation-verify affected scope', () => {
         'scripts/backlog-orchestrator/unknown.mjs',
       ]).mode
     ).toBe('full');
+  });
+
+  it('selects the fleet promotion gate regression lane', () => {
+    const plan = buildAffectedTestPlan(FLEET_PROMOTION_GATE_MANIFEST);
+    expect(plan).toMatchObject({
+      mode: 'selected',
+      pythonUnittestTests: ['scripts/hermes/tests/gem-priority-gate.test.py'],
+      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+    });
   });
 
   it('fails closed on an unresolved base and retains mandatory risk policy', () => {

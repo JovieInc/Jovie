@@ -167,6 +167,15 @@ const SYMPHONY_THROUGHPUT_SCRIPT_TESTS = [
 const SYMPHONY_THROUGHPUT_PYTHON_TESTS = [
   'scripts/hermes/tests/codex-rotate.test.py',
 ];
+const FLEET_PROMOTION_GATE_MANIFEST = new Set([
+  'scripts/hermes/gem-priority-gate.py',
+  'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/run-affected-tests.mjs',
+]);
+const FLEET_PROMOTION_GATE_PYTHON_TESTS = [
+  'scripts/hermes/tests/gem-priority-gate.test.py',
+];
 const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
   'apps/web/app/exp/shell-v1/page.tsx',
   'apps/web/components/jovie/components/ChatInput.tsx',
@@ -451,6 +460,22 @@ export function buildAffectedTestPlan(
       pythonUnittestTests: SYMPHONY_THROUGHPUT_PYTHON_TESTS,
       scriptVitestTests: SYMPHONY_THROUGHPUT_SCRIPT_TESTS,
       nodeTests: SYMPHONY_THROUGHPUT_NODE_TESTS,
+    };
+  }
+  const isExactFleetPromotionGate =
+    files.length === FLEET_PROMOTION_GATE_MANIFEST.size &&
+    files.every(file => FLEET_PROMOTION_GATE_MANIFEST.has(file));
+  if (isExactFleetPromotionGate) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: FLEET_PROMOTION_GATE_PYTHON_TESTS,
+      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+      nodeTests: [],
     };
   }
 
