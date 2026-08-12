@@ -1,0 +1,252 @@
+import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import test, { after } from 'node:test';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+import {
+  diffPenSemanticManifests,
+  hashPenSemanticManifest,
+  PEN_NATIVE_SEMANTIC_MANIFEST_SCHEMA,
+  validatePenNativeSemanticManifestReceipt,
+} from './pen-native-semantic-manifest-contract.mjs';
+
+const PATH = '/workspace/canonical.pen';
+const DIGEST = 'a'.repeat(64);
+const fixtureDirectory = mkdtempSync(join(tmpdir(), 'pen-manifest-authority-'));
+const fixtureModulePath = join(
+  fixtureDirectory,
+  'pen-native-semantic-manifest-contract.mjs'
+);
+writeFileSync(
+  fixtureModulePath,
+  readFileSync(
+    fileURLToPath(
+      new URL('./pen-native-semantic-manifest-contract.mjs', import.meta.url)
+    )
+  )
+);
+writeFileSync(
+  join(fixtureDirectory, 'pen-workspace-locks.json'),
+  JSON.stringify({
+    schema: 'pen-workspace-locks/v1',
+    profiles: {
+      fixture: {
+        canonical_path: PATH,
+        read_only_paths: [],
+        native_semantic_manifest_authority: {
+          status: 'available',
+          expected_source_path: PATH,
+          node_ids: ['root', 'child'],
+          root_ids: ['root'],
+        },
+      },
+    },
+  })
+);
+const fixtureContract = await import(pathToFileURL(fixtureModulePath).href);
+const validateFixtureReceipt =
+  fixtureContract.validatePenNativeSemanticManifestReceipt;
+after(() => rmSync(fixtureDirectory, { recursive: true, force: true }));
+
+function receipt(overrides = {}) {
+  const nodes = [
+    {
+      id: 'root',
+      type: 'frame',
+      name: 'Root',
+      reusable: false,
+      ref_id: null,
+      child_ids: ['child'],
+      properties_sha256: DIGEST,
+    },
+    {
+      id: 'child',
+      type: 'text',
+      name: 'Headline',
+      reusable: true,
+      ref_id: 'component-1',
+      child_ids: [],
+      properties_sha256: 'b'.repeat(64),
+    },
+  ];
+  const result = {
+    schema: PEN_NATIVE_SEMANTIC_MANIFEST_SCHEMA,
+    workspace_profile: 'fixture',
+    verdict: 'verified',
+    inspection_method: 'pen-native-non-evaluating',
+    source_path: PATH,
+    source_byte_identity: DIGEST,
+    canonical_manifest_sha256: null,
+    runtime_identity: 'Pen 1.2.4',
+    build_identity: 'pen-native-inspector-test',
+    execute_invoked: false,
+    save_invoked: false,
+    document_opened: false,
+    output_document_created: false,
+    direct_file_read: false,
+    event_deltas: {
+      document_modified: 0,
+      file_changed: 0,
+      save: 0,
+      backup: 0,
+      open: 0,
+      switch: 0,
+      output: 0,
+    },
+    semantic_manifest_complete: true,
+    semantic_manifest: {
+      root_ids: ['root'],
+      root_count: 1,
+      total_node_count: 2,
+      reusable_count: 1,
+      nodes,
+    },
+    ...overrides,
+  };
+  if (!Object.hasOwn(overrides, 'canonical_manifest_sha256')) {
+    result.canonical_manifest_sha256 = hashPenSemanticManifest(
+      result.semantic_manifest
+    );
+  }
+  return result;
+}
+
+test('accepts a complete native manifest and rejects incomplete traversal', () => {
+  assert.deepEqual(validateFixtureReceipt(receipt()), {
+    valid: true,
+    errors: [],
+  });
+
+  const truncated = receipt({
+    semantic_manifest: {
+      ...receipt().semantic_manifest,
+      nodes: receipt().semantic_manifest.nodes.slice(0, 1),
+      total_node_count: 1,
+    },
+  });
+  const result = validateFixtureReceipt(truncated);
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.some(error => error.code === 'child_id_missing'));
+
+  const selfConsistentOmission = receipt({
+    semantic_manifest: {
+      root_ids: ['root'],
+      root_count: 1,
+      total_node_count: 1,
+      reusable_count: 0,
+      nodes: [
+        {
+          ...receipt().semantic_manifest.nodes[0],
+          child_ids: [],
+        },
+      ],
+    },
+  });
+  const omissionResult = validateFixtureReceipt(selfConsistentOmission, {
+    lockedExpectedNodeIds: ['root'],
+    lockedExpectedRootIds: ['root'],
+  });
+  assert.equal(omissionResult.valid, false);
+  assert.ok(
+    omissionResult.errors.some(
+      error => error.code === 'locked_node_ids_mismatch'
+    )
+  );
+
+  const emptyManifest = receipt({
+    semantic_manifest: {
+      root_ids: [],
+      root_count: 0,
+      total_node_count: 0,
+      reusable_count: 0,
+      nodes: [],
+    },
+  });
+  const emptyResult = validateFixtureReceipt(emptyManifest);
+  assert.equal(emptyResult.valid, false);
+  assert.ok(emptyResult.errors.some(error => error.code === 'manifest_empty'));
+});
+
+test('rejects activity, nonzero event deltas, and identity mismatches', () => {
+  const result = validateFixtureReceipt(
+    receipt({
+      source_path: '/tmp/recovery.pen',
+      direct_file_read: true,
+      event_deltas: { ...receipt().event_deltas, backup: 1 },
+    }),
+    { lockedExpectedPath: '/tmp/recovery.pen' }
+  );
+  assert.equal(result.valid, false);
+  assert.deepEqual(
+    result.errors.map(error => error.code),
+    [
+      'source_path_mismatch',
+      'direct_file_read_invalid',
+      'event_delta_backup_invalid',
+    ]
+  );
+});
+
+test('requires repository authority, binds the digest, and never throws on malformed children', () => {
+  const unavailable = validatePenNativeSemanticManifestReceipt({
+    ...receipt(),
+    workspace_profile: 'jovie-founder-design-studio',
+  });
+  assert.equal(unavailable.valid, false);
+  assert.ok(
+    unavailable.errors.some(
+      error => error.code === 'workspace_authority_unavailable'
+    )
+  );
+
+  const forgedDigest = validateFixtureReceipt(
+    receipt({ canonical_manifest_sha256: 'f'.repeat(64) })
+  );
+  assert.equal(forgedDigest.valid, false);
+  assert.ok(
+    forgedDigest.errors.some(
+      error => error.code === 'canonical_manifest_digest_mismatch'
+    )
+  );
+
+  const malformed = receipt();
+  Reflect.set(malformed.semantic_manifest.nodes[0], 'child_ids', {});
+  assert.doesNotThrow(() => validateFixtureReceipt(malformed));
+  const malformedResult = validateFixtureReceipt(malformed);
+  assert.equal(malformedResult.valid, false);
+  assert.ok(
+    malformedResult.errors.some(error => error.code === 'node_children_invalid')
+  );
+});
+
+test('semantic diff is deterministic and preserves unrelated IDs', () => {
+  const left = receipt().semantic_manifest;
+  const right = structuredClone(left);
+  right.root_ids = ['child', 'root'];
+  right.root_count = 2;
+  right.nodes[1] = {
+    ...right.nodes[1],
+    type: 'frame',
+    name: 'Changed',
+    reusable: false,
+    ref_id: 'component-2',
+    child_ids: ['root'],
+    properties_sha256: 'd'.repeat(64),
+  };
+  assert.deepEqual(diffPenSemanticManifests(left, right), {
+    valid: true,
+    added: [],
+    removed: [],
+    changed: ['child'],
+    roots_changed: true,
+  });
+  assert.deepEqual(diffPenSemanticManifests(right, left), {
+    valid: true,
+    added: [],
+    removed: [],
+    changed: ['child'],
+    roots_changed: true,
+  });
+});

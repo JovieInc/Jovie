@@ -5,7 +5,13 @@
       "canonical_path": "$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.pen",
       "read_only_paths": [
         "$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Marketing Workspace.pen"
-      ]
+      ],
+      "native_semantic_manifest_authority": {
+        "status": "unavailable",
+        "expected_source_path": "/Users/timwhite/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.pen",
+        "node_ids": [],
+        "root_ids": []
+      }
     }
   }
 }
