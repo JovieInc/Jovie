@@ -421,20 +421,49 @@ def reconcile() -> int:
         print("codex_not_exhausted symphony_active idle", file=sys.stderr)
         return 0
 
-    if not _control(_systemctl("stop", *SERVICES)):
-        print("codex_exhausted symphony_stop_failed", file=sys.stderr)
+    # A failed readiness probe is not proof that Codex is exhausted. Only the
+    # typed cooldown state authorizes the destructive primary-to-fallback
+    # handoff. Preserve the running services on missing state, missing binaries,
+    # timeouts, transport failures, and malformed probe output.
+    if reason != "all_accounts_cooldown":
+        print(
+            f"codex_readiness_indeterminate {reason} symphony_unchanged",
+            file=sys.stderr,
+        )
         return 2
+
+    # Prove the fallback control plane before stopping Symphony. Otherwise a
+    # transient Linear, filesystem, or systemd observation failure can turn a
+    # healthy primary into a zero-worker outage.
     executable = _grok_ship_one_executable()
-    identifiers = _linear_identifiers() if executable else None
     if executable is None:
-        print("codex_exhausted grok_executable_missing", file=sys.stderr)
+        print(
+            "codex_exhausted grok_executable_missing symphony_unchanged",
+            file=sys.stderr,
+        )
         return 2
+    identifiers = _linear_identifiers()
     if identifiers is None:
-        print("codex_exhausted linear_query_failed", file=sys.stderr)
+        print(
+            "codex_exhausted linear_query_failed symphony_unchanged",
+            file=sys.stderr,
+        )
         return 2
     active = _active_grok_units()
     if active is None:
-        print("codex_exhausted grok_state_query_failed", file=sys.stderr)
+        print(
+            "codex_exhausted grok_state_query_failed symphony_unchanged",
+            file=sys.stderr,
+        )
+        return 2
+    if not identifiers and not active:
+        print(
+            f"codex_exhausted {reason} no_admitted_work symphony_unchanged",
+            file=sys.stderr,
+        )
+        return 0
+    if not _control(_systemctl("stop", *SERVICES)):
+        print("codex_exhausted symphony_stop_failed", file=sys.stderr)
         return 2
     remaining = _grok_limit() - len(active)
     if remaining <= 0:

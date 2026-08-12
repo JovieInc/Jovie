@@ -15,6 +15,7 @@ import textwrap
 import threading
 import time
 import unittest
+from unittest import mock
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
@@ -184,6 +185,14 @@ class FallbackTests(unittest.TestCase):
         path.chmod(0o755)
         return path
 
+    def set_all_accounts_cooldown(self):
+        future = int(time.time()) + 3600
+        self.state.write_text(json.dumps({
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future},
+            "last_error": {},
+        }))
+
     def run_controller(self, *args, controller=CONTROLLER, **env):
         return subprocess.run(
             ["/usr/bin/python3", str(controller), *args], capture_output=True, text=True,
@@ -301,10 +310,85 @@ class FallbackTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         events = self.events.read_text().splitlines()
-        self.assertEqual(events[0], "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service")
+        self.assertEqual(
+            events[:2],
+            [
+                "systemctl --user list-units --type=service --state=active grok-ship-*.service --no-legend --no-pager",
+                "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service",
+            ],
+        )
         self.assertTrue(any(line.startswith("systemd-run") for line in events), events)
         self.assertIn("codex_exhausted", result.stderr)
         self.assertNotIn("codex_not_exhausted", result.stderr)
+
+    def test_indeterminate_readiness_never_mutates_runtime_services(self):
+        module = self.load_controller_module()
+
+        for reason in (
+            "unknown_state",
+            "executable_missing",
+            "probe_failed",
+            "missing_ready_evidence",
+        ):
+            controls: list[list[str]] = []
+            with self.subTest(reason=reason):
+                with (
+                    mock.patch.object(
+                        module,
+                        "codex_canary_ready",
+                        return_value=(False, reason),
+                    ),
+                    mock.patch.object(
+                        module,
+                        "_control",
+                        side_effect=lambda command: controls.append(command) or True,
+                    ),
+                ):
+                    self.assertEqual(module.reconcile(), 2)
+                self.assertEqual(controls, [])
+
+    def test_exhausted_handoff_proves_fallback_before_stopping_symphony(self):
+        module = self.load_controller_module()
+
+        cases = (
+            ("grok_executable_missing", None, ["JOV-1"], []),
+            ("linear_query_failed", "/bin/true", None, []),
+            ("grok_state_query_failed", "/bin/true", ["JOV-1"], None),
+            ("no_admitted_work", "/bin/true", [], []),
+        )
+        for expected, executable, identifiers, active in cases:
+            controls: list[list[str]] = []
+            with self.subTest(expected=expected):
+                with (
+                    mock.patch.object(
+                        module,
+                        "codex_canary_ready",
+                        return_value=(False, "all_accounts_cooldown"),
+                    ),
+                    mock.patch.object(
+                        module,
+                        "_grok_ship_one_executable",
+                        return_value=executable,
+                    ),
+                    mock.patch.object(
+                        module,
+                        "_linear_identifiers",
+                        return_value=identifiers,
+                    ),
+                    mock.patch.object(
+                        module,
+                        "_active_grok_units",
+                        return_value=active,
+                    ),
+                    mock.patch.object(
+                        module,
+                        "_control",
+                        side_effect=lambda command: controls.append(command) or True,
+                    ),
+                ):
+                    expected_rc = 0 if expected == "no_admitted_work" else 2
+                    self.assertEqual(module.reconcile(), expected_rc)
+                self.assertEqual(controls, [])
 
     def test_live_canary_requires_luna_and_exact_marker(self):
         canary = self.command("codex-rotate", "printf '%s\\n' \"$*\" > \"$GEM_EVENTS\"; printf 'GEM_MODEL_READY\\n'")
@@ -371,6 +455,7 @@ class FallbackTests(unittest.TestCase):
         self.assertIn("recovery_deferred", result.stderr)
 
     def test_exhausted_recovery_stops_symphony_and_bounds_grok_launches(self):
+        self.set_all_accounts_cooldown()
         self.command("codex-rotate", "exit 1")
         self.command("systemctl", "printf 'systemctl %s\\n' \"$*\" >> \"$GEM_EVENTS\"; if [ \"$2\" = is-active ]; then [ \"$4\" = grok-ship-JOV-2 ] && exit 0; exit 1; fi; exit 0")
         self.command("systemd-run", "printf 'systemd-run %s\\n' \"$*\" >> \"$GEM_EVENTS\"")
@@ -381,7 +466,13 @@ class FallbackTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         events = self.events.read_text().splitlines()
-        self.assertEqual(events[0], "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service")
+        self.assertEqual(
+            events[:2],
+            [
+                "systemctl --user list-units --type=service --state=active grok-ship-*.service --no-legend --no-pager",
+                "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service",
+            ],
+        )
         self.assertEqual(len([line for line in events if line.startswith("systemd-run")]), 2)
         self.assertTrue(any("grok-ship-LYB-3" in line for line in events))
         self.assertFalse(any("grok-ship-JOV-4" in line or "grok-ship-LYB-5" in line for line in events))
@@ -433,6 +524,7 @@ class FallbackTests(unittest.TestCase):
     def test_reconcile_skips_issue_flag_as_not_admitted_between_list_and_launch(self):
         # The list query sees candidates as admitted, but the launch-time re-check
         # (via single_issue_labels) finds blocked/needs-human added by a guard.
+        self.set_all_accounts_cooldown()
         self.command("codex-rotate", "exit 1")
         self.command("systemctl", 'if [ "$2" = is-active ]; then exit 1; fi; exit 0')
         self.command("systemd-run", "printf 'systemd-run %s\\n' \"$*\"")
@@ -454,6 +546,7 @@ class FallbackTests(unittest.TestCase):
         self.assertNotIn("systemd-run", events)
 
     def test_reconcile_respects_active_grok_concurrency_cap(self):
+        self.set_all_accounts_cooldown()
         self.command("codex-rotate", "exit 1")
         self.command(
             "systemctl",
