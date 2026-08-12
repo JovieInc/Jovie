@@ -182,6 +182,13 @@ jobs:
         run: |
           staging_build() {
             set -euo pipefail
+            # The staging alias is source-owned public configuration. Pin it
+            # after Doppler injection so config drift cannot freeze jov.ie into
+            # the prebuilt NEXT_PUBLIC bundle and misclassify staging as an
+            # arbitrary preview at runtime.
+            export NEXT_PUBLIC_APP_URL="https://staging.jov.ie"
+            export NEXT_PUBLIC_PROFILE_URL="https://staging.jov.ie"
+            export NEXT_PUBLIC_PROFILE_HOSTNAME="staging.jov.ie"
             scope_args=()
             if [ -n "${VERCEL_ORG_ID:-}" ]; then
               scope_args=(--scope "$VERCEL_ORG_ID")
@@ -238,6 +245,11 @@ jobs:
         run: |
           staging_deploy() {
             set -euo pipefail
+            # Keep the prebuilt server runtime on the same canonical origins as
+            # the bundle. These are public routing constants, not secrets.
+            export NEXT_PUBLIC_APP_URL="https://staging.jov.ie"
+            export NEXT_PUBLIC_PROFILE_URL="https://staging.jov.ie"
+            export NEXT_PUBLIC_PROFILE_HOSTNAME="staging.jov.ie"
             required_runtime_env=(
               VERCEL_AUTOMATION_BYPASS_SECRET
               NEXT_PUBLIC_APP_URL
