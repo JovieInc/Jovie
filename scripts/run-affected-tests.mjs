@@ -167,9 +167,13 @@ const SYMPHONY_THROUGHPUT_SCRIPT_TESTS = [
 const SYMPHONY_THROUGHPUT_PYTHON_TESTS = [
   'scripts/hermes/tests/codex-rotate.test.py',
 ];
-const FLEET_PROMOTION_GATE_MANIFEST = new Set([
+const FLEET_PROMOTION_GATE_INPUTS = new Set([
   'scripts/hermes/gem-priority-gate.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
+]);
+const FLEET_PROMOTION_GATE_LANE = new Set([
+  ...FLEET_PROMOTION_GATE_INPUTS,
+  'apps/web/tests/unit/api/health/deploy.critical.test.ts',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/run-affected-tests.mjs',
 ]);
@@ -462,15 +466,18 @@ export function buildAffectedTestPlan(
       nodeTests: SYMPHONY_THROUGHPUT_NODE_TESTS,
     };
   }
-  const isExactFleetPromotionGate =
-    files.length === FLEET_PROMOTION_GATE_MANIFEST.size &&
-    files.every(file => FLEET_PROMOTION_GATE_MANIFEST.has(file));
-  if (isExactFleetPromotionGate) {
+  const isBoundedFleetPromotionGateChange =
+    files.some(file => FLEET_PROMOTION_GATE_INPUTS.has(file)) &&
+    files.every(file => FLEET_PROMOTION_GATE_LANE.has(file));
+  const hasUnboundedFleetPromotionGateChange =
+    files.some(file => FLEET_PROMOTION_GATE_INPUTS.has(file)) &&
+    !isBoundedFleetPromotionGateChange;
+  if (isBoundedFleetPromotionGateChange) {
     return {
       mode: 'selected',
       relatedFiles: [],
       mandatoryTests: [],
-      selectedTests: [],
+      selectedTests: ['apps/web/tests/unit/api/health/deploy.critical.test.ts'],
       rootVitestTests: [],
       pythonTests: [],
       pythonUnittestTests: FLEET_PROMOTION_GATE_PYTHON_TESTS,
@@ -1027,6 +1034,7 @@ export function buildAffectedTestPlan(
     !isExactPrSizeGuardWithSelector;
   const hasUncoveredSource =
     relatedFiles.some(file => !isCoveredSource(file)) ||
+    hasUnboundedFleetPromotionGateChange ||
     hasUnknownCiCancellationHealerPeer ||
     hasStandaloneCiFastLanesChange ||
     hasIncompletePrerequisiteTrain ||

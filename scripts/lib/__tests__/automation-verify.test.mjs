@@ -34,7 +34,8 @@ const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
   'scripts/run-affected-tests.mjs',
 ];
-const FLEET_PROMOTION_GATE_MANIFEST = [
+const FLEET_PROMOTION_GATE_LANE = [
+  'apps/web/tests/unit/api/health/deploy.critical.test.ts',
   'scripts/hermes/gem-priority-gate.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
@@ -412,12 +413,29 @@ describe('automation-verify affected scope', () => {
   });
 
   it('selects the fleet promotion gate regression lane', () => {
-    const plan = buildAffectedTestPlan(FLEET_PROMOTION_GATE_MANIFEST);
-    expect(plan).toMatchObject({
-      mode: 'selected',
-      pythonUnittestTests: ['scripts/hermes/tests/gem-priority-gate.test.py'],
-      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
-    });
+    for (const files of [
+      ['scripts/hermes/gem-priority-gate.py'],
+      [
+        'scripts/hermes/gem-priority-gate.py',
+        'scripts/hermes/tests/gem-priority-gate.test.py',
+      ],
+      FLEET_PROMOTION_GATE_LANE,
+    ]) {
+      expect(buildAffectedTestPlan(files)).toMatchObject({
+        mode: 'selected',
+        selectedTests: [
+          'apps/web/tests/unit/api/health/deploy.critical.test.ts',
+        ],
+        pythonUnittestTests: ['scripts/hermes/tests/gem-priority-gate.test.py'],
+        scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+      });
+    }
+    expect(
+      buildAffectedTestPlan([
+        'scripts/hermes/gem-priority-gate.py',
+        'scripts/hermes/unknown-fleet-peer.py',
+      ]).mode
+    ).toBe('full');
   });
 
   it('fails closed on an unresolved base and retains mandatory risk policy', () => {

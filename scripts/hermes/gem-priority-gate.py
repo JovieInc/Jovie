@@ -160,7 +160,7 @@ def observe_production(url: str) -> dict[str, Any]:
             raise ValueError("production health was not an object")
         reported_status = value.get("status")
         return {
-            "status": "green" if reported_status in {"healthy", "ok"} else "red",
+            "status": "green" if reported_status in ("healthy", "ok") else "red",
             "url": url,
             "reportedStatus": reported_status,
         }

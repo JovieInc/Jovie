@@ -85,6 +85,16 @@ class ProductionHealthTests(unittest.TestCase):
         self.assertEqual(observed["status"], "red")
         self.assertEqual(observed["reportedStatus"], "unhealthy")
 
+    def test_malformed_unhashable_status_fails_closed(self):
+        url = "https://jov.ie/api/health/deploy"
+        response = FakeResponse(url, {"status": {"unexpected": True}})
+
+        with mock.patch.object(MODULE.urllib.request, "urlopen", return_value=response):
+            observed = MODULE.observe_production(url)
+
+        self.assertEqual(observed["status"], "red")
+        self.assertEqual(observed["reportedStatus"], {"unexpected": True})
+
 
 if __name__ == "__main__":
     unittest.main()
