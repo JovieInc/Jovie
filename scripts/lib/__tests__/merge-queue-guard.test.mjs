@@ -16,12 +16,14 @@ import {
   detectIssueOverlap,
   extractWorkflowJobBlock,
   fastTrackPolicy,
+  frontItemChurnDecision,
   isAutonomousBranch,
   MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN,
   MERGE_QUEUE_REPO_PATHS,
   NATIVE_BRANCH_PROTECTION_POLICY,
   NATIVE_QUEUE_POLICY,
   normalizeBranchProtectionSource,
+  parseMergeQueueFrontBranch,
   parseMergeQueueTimeline,
   parseRequiredStatusChecksFromYaml,
   preQueueFreshnessDecision,
@@ -1725,5 +1727,106 @@ describe('remediation mutations', () => {
       labelPrImpl.mock.invocationCallOrder[0]
     );
     expect(commentPrImpl).toHaveBeenCalledOnce();
+  });
+});
+
+describe('merge-group front-item churn guard (JOV-5030)', () => {
+  const BASE = '9bd3fade96833ea440c2354a53436eff1caeda35';
+  const NEW_BASE = '51a6c71de16ad17aa36053f7d47d685ec200236d';
+
+  let nextRunId = 1;
+  function groupRun(
+    frontPr,
+    baseSha,
+    conclusion,
+    createdAt,
+    status = 'completed'
+  ) {
+    return {
+      id: nextRunId++,
+      headBranch: `gh-readonly-queue/main/pr-${frontPr}-${baseSha}`,
+      status,
+      conclusion,
+      createdAt,
+    };
+  }
+
+  it('parses native queue branch names into front PR and exact base', () => {
+    expect(
+      parseMergeQueueFrontBranch(`gh-readonly-queue/main/pr-15849-${BASE}`)
+    ).toEqual({ prNumber: 15849, baseSha: BASE });
+    expect(parseMergeQueueFrontBranch('main')).toBeNull();
+    expect(
+      parseMergeQueueFrontBranch('gh-readonly-queue/main/pr-x')
+    ).toBeNull();
+    expect(parseMergeQueueFrontBranch(null)).toBeNull();
+  });
+
+  it('blocks an unchanged head that already failed on the exact current base', () => {
+    // Incident regression: #15849 fronted repeated failed group attempts on
+    // base 9bd3fade9 while its head b499576 stayed unchanged.
+    const decision = frontItemChurnDecision({
+      prNumber: 15849,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-08-13T00:30:00.000Z',
+      mergeGroupRuns: [
+        groupRun(15849, BASE, 'failure', '2026-08-13T01:51:17.000Z'),
+        groupRun(15849, BASE, 'failure', '2026-08-13T01:30:16.000Z'),
+      ],
+    });
+    expect(decision.action).toBe('block');
+    expect(decision.reason).toContain('unchanged head');
+    expect(decision.evidence.failedAttempts).toBe(2);
+  });
+
+  it('allows when the exact main base genuinely changed', () => {
+    const decision = frontItemChurnDecision({
+      prNumber: 15849,
+      currentBaseSha: NEW_BASE,
+      headCommittedAt: '2026-08-13T00:30:00.000Z',
+      mergeGroupRuns: [
+        groupRun(15849, BASE, 'failure', '2026-08-13T01:51:17.000Z'),
+      ],
+    });
+    expect(decision.action).toBe('allow');
+  });
+
+  it('allows when the head moved after the last failed attempt', () => {
+    const decision = frontItemChurnDecision({
+      prNumber: 15849,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-08-13T02:00:00.000Z',
+      mergeGroupRuns: [
+        groupRun(15849, BASE, 'failure', '2026-08-13T01:51:17.000Z'),
+      ],
+    });
+    expect(decision.action).toBe('allow');
+    expect(decision.reason).toContain('head moved');
+  });
+
+  it('ignores cancelled and in-progress runs and other fronts', () => {
+    const decision = frontItemChurnDecision({
+      prNumber: 15849,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-08-13T00:30:00.000Z',
+      mergeGroupRuns: [
+        groupRun(15849, BASE, 'cancelled', '2026-08-13T03:16:37.000Z'),
+        groupRun(15849, BASE, null, '2026-08-13T03:20:00.000Z', 'in_progress'),
+        groupRun(15862, BASE, 'failure', '2026-08-13T01:51:17.000Z'),
+      ],
+    });
+    expect(decision.action).toBe('allow');
+  });
+
+  it('returns unknown on missing or invalid evidence so mutations never fire', () => {
+    /** @type {any[]} */
+    const inputs = [
+      { prNumber: 15849, currentBaseSha: BASE, mergeGroupRuns: null },
+      { prNumber: 15849, currentBaseSha: 'not-a-sha', mergeGroupRuns: [] },
+      { prNumber: 'x', currentBaseSha: BASE, mergeGroupRuns: [] },
+    ];
+    for (const input of inputs) {
+      expect(frontItemChurnDecision(input).action).toBe('unknown');
+    }
   });
 });

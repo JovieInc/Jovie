@@ -425,6 +425,16 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     echo "    ⏸ event admission scope no longer matches #$n at $expected_head; refusing enrollment"
     return 2
   fi
+  # JOV-5030 churn guard: never re-admit an unchanged head that already
+  # fronted a failed merge-group attempt on the exact current main base; the
+  # rebuilt group would deterministically fail again and duplicate follower
+  # CI. 'unknown' (missing evidence) degrades to the pre-guard behavior.
+  local churn_action
+  churn_action="$(front_churn_action "$n" "$expected_head")"
+  if [[ "$churn_action" == "block" ]]; then
+    echo "    ⏸ unchanged head already failed a merge-group attempt on the exact current main base; refusing re-enrollment for #$n until the head or main moves"
+    return 2
+  fi
   if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
     local isolated_receipt isolated_rc
     set +e
@@ -700,6 +710,35 @@ else
 
 fi
 
+# Merge-group churn evidence (JOV-5030). Each native group build runs on
+# gh-readonly-queue/main/pr-<front>-<exactBaseSha>, so recent merge_group CI
+# runs identify which PR fronted each attempt and against which exact main
+# base. Read-only: when either fetch fails the churn guard degrades to
+# 'unknown', enrollment keeps its pre-guard behavior, and no dequeue mutation
+# may fire on unproven evidence.
+MAIN_HEAD_SHA=""
+MERGE_GROUP_RUNS_JSON="[]"
+if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
+  MAIN_HEAD_SHA="$(gh_retry api "repos/${REPO}/git/ref/heads/main" --jq '.object.sha // empty' 2>/dev/null || true)"
+  MAIN_HEAD_SHA="$(printf '%s' "$MAIN_HEAD_SHA" | tr '[:upper:]' '[:lower:]')"
+  MERGE_GROUP_RUNS_JSON="$(gh_retry api "repos/${REPO}/actions/workflows/ci.yml/runs?event=merge_group&per_page=50" \
+    --jq '[.workflow_runs[]? | {id, headBranch, status, conclusion, headSha, createdAt, updatedAt}]' 2>/dev/null || echo '[]')"
+  export MERGE_GROUP_RUNS_JSON
+fi
+
+# front_churn_action <num> <head_oid> → prints allow|block|unknown.
+front_churn_action() {
+  local n="$1" head_oid="$2" committed
+  if [[ "$MERGE_QUEUE_BACKEND" != "native" || ! "$MAIN_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "unknown"
+    return 0
+  fi
+  committed="$(gh_retry api "repos/${REPO}/commits/${head_oid}" --jq '.commit.committer.date // empty' 2>/dev/null || true)"
+  node scripts/ci-merge-queue-check.mjs front-churn \
+    --pr="$n" --base="$MAIN_HEAD_SHA" --head-committed-at="$committed" 2>/dev/null \
+    | jq -r '.action // "unknown"'
+}
+
 # Production-red mode permits one exact-head exception. Evaluate only native
 # queue members plus the single event-scoped candidate. Positive labels are
 # deliberately absent from this authority; every unknown returns iso=false.
@@ -891,6 +930,36 @@ echo "$SNAP" | jq -c --arg promotion_mode "$DRAIN_PROMOTION_MODE" --arg freeze "
       unlabel "$n" merge-queue
     fi
   done
+
+# --- DEQUEUE: non-progressing front items (JOV-5030) ---
+# A front PR whose unchanged head already failed a merge-group attempt on the
+# exact current main base cannot land (the combined head deterministically
+# fails), yet while it occupies the queue every follower is grouped behind it
+# and pays a duplicate full merge-group CI run when the group is rebuilt.
+# GitHub ejects it after the failed attempt; this pass removes it again if
+# anything re-added the unchanged head, and the ENROLL guard below refuses to
+# re-admit it. Action 'unknown' (missing evidence) never dequeues. Fleet
+# promotion modes are excluded: those passes above already hold the queue.
+if [[ "$DRAIN_PROMOTION_MODE" == "normal" || ( "$DRAIN_PROMOTION_MODE" == "blocked" && "$DRAIN_FREEZE_EXISTING_QUEUE" == "0" ) ]]; then
+  echo "=== DEQUEUE (non-progressing front → queue removal) ==="
+  while read -r pr; do
+    n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
+    head_oid="$(jq -r '.headOid // ""' <<<"$pr")"
+    [[ "$head_oid" =~ ^[0-9a-f]{40}$ ]] || continue
+    churn_action="$(front_churn_action "$n" "$head_oid")"
+    if [[ "$churn_action" == "block" ]]; then
+      echo "  #$n  $t  ✗ unchanged head already failed a merge-group attempt on the exact current main base"
+      if ! dequeue_strict "$n"; then
+        echo "::error::Failed to prove non-progressing front PR #$n is outside native merge queue" >&2
+        exit 1
+      fi
+    fi
+  done < <(echo "$SNAP" | jq -c '.[]
+    | select(.q == true)
+    | select(.base == "main")
+    | select(.draft | not)
+    | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred")) | not)')
+fi
 
 # --- ENROLL: non-draft, mergeable, no FAILING checks, not opted-out, not queued ---
 # Enroll on mergeable + no actually-failing checks. We deliberately do NOT require

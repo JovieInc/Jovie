@@ -25,7 +25,9 @@ import {
   buildPipelineScoreboard,
   dailyWindow,
   fetchMergedPrEvidence,
+  fetchMergeGroupRunEvidence,
   filterMergedPrEvidence,
+  filterMergeGroupRunEvidence,
   type JobLogEntry,
   last12HoursWindow,
   readJsonlEntries,
@@ -54,6 +56,12 @@ const ALERT_STATE = join(
   'pipeline-scoreboard-alerts.json'
 );
 const CI_METRICS_LATEST = join(HERMES_PATHS.stateDir, 'ci-metrics-latest.json');
+const MQ_RUNS_WORKFLOW =
+  process.env.HERMES_PIPELINE_SCOREBOARD_MQ_WORKFLOW ?? 'ci.yml';
+const MQ_RUNS_MAX_PAGES = Number.parseInt(
+  process.env.HERMES_PIPELINE_SCOREBOARD_MQ_RUNS_MAX_PAGES ?? '10',
+  10
+);
 
 interface GhIssue {
   readonly number: number;
@@ -138,6 +146,31 @@ function filterEntries(
   );
 }
 
+/**
+ * Authoritative native merge-group CI attempts (JOV-5030). Reads the Actions
+ * workflow-runs API with event=merge_group so attempts-per-merge and queue
+ * churn reflect real GitHub group builds rather than local labels/logs.
+ */
+function fetchMergeGroupRuns(window: { since: string; until: string }) {
+  return fetchMergeGroupRunEvidence(
+    window,
+    (page, pageSize) =>
+      JSON.parse(
+        gh([
+          'api',
+          `repos/${REPO}/actions/workflows/${MQ_RUNS_WORKFLOW}/runs`,
+          '-f',
+          'event=merge_group',
+          '-F',
+          `per_page=${pageSize}`,
+          '-F',
+          `page=${page}`,
+        ])
+      ) as unknown,
+    { maxPages: MQ_RUNS_MAX_PAGES }
+  );
+}
+
 function alertKey(rule: string, windowSince: string): string {
   return `${rule}:${windowSince.slice(0, 10)}`;
 }
@@ -203,6 +236,8 @@ async function main(): Promise<void> {
     const mergedDaily = filterMergedPrEvidence(mergedAll, daily);
     const mergedAlarm = filterMergedPrEvidence(mergedAll, alarmWindow);
     const mergedWeekly = filterMergedPrEvidence(mergedAll, weeklyWindow);
+    const mqRunsDaily = fetchMergeGroupRuns(daily);
+    const mqRunsAlarm = filterMergeGroupRunEvidence(mqRunsDaily, alarmWindow);
     const previous = readLatestScoreboard(SCOREBOARD_LATEST);
     const ciMetrics = readLatestCiMetrics(CI_METRICS_LATEST);
 
@@ -215,6 +250,7 @@ async function main(): Promise<void> {
       ciMetrics,
       mergedPrs: mergedDaily.prs,
       mergeEvidence: mergedDaily,
+      mergeGroupRunEvidence: mqRunsDaily,
       symphonyMergeEvidence: mergedWeekly,
     });
     const alarmScoreboard = buildPipelineScoreboard({
@@ -226,10 +262,12 @@ async function main(): Promise<void> {
       ciMetrics,
       mergedPrs: mergedAlarm.prs,
       mergeEvidence: mergedAlarm,
+      mergeGroupRunEvidence: mqRunsAlarm,
       symphonyMergeEvidence: mergedWeekly,
     });
     // The daily scoreboard owns blocked-count deltas; the rolling 12h
-    // scoreboard owns "claims but no ships" stall detection.
+    // scoreboard owns "claims but no ships" stall detection and merge-queue
+    // churn (churn compounds within hours, long before a daily window trips).
     const mergedAlarms = [
       ...scoreboard.alarms.filter(
         alarm =>
@@ -238,7 +276,9 @@ async function main(): Promise<void> {
           alarm.rule === 'symphony_throughput_below_target'
       ),
       ...alarmScoreboard.alarms.filter(
-        alarm => alarm.rule === 'zero_ships_after_claims'
+        alarm =>
+          alarm.rule === 'zero_ships_after_claims' ||
+          alarm.rule === 'merge_queue_churn'
       ),
     ];
     const finalScoreboard = {
@@ -290,6 +330,11 @@ async function main(): Promise<void> {
       claims: finalScoreboard.shipper.claims,
       ships: finalScoreboard.shipper.ships,
       merges: finalScoreboard.queue.merges,
+      mergeGroupAttempts: finalScoreboard.queue.mergeGroupAttempts,
+      mergeGroupFailedAttempts: finalScoreboard.queue.mergeGroupFailedAttempts,
+      queueChurn: finalScoreboard.queue.queueChurn,
+      mergeGroupEvidenceComplete:
+        finalScoreboard.queue.mergeGroupEvidence.complete,
       mergeEvidenceComplete: finalScoreboard.queue.evidence.complete,
       mergeEvidenceReason: finalScoreboard.queue.evidence.reason,
       symphonyLandedPrs: finalScoreboard.symphony.landedPrs,
