@@ -5,8 +5,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { AUDIO_FILE_ACCEPT, validateAudioFile } from '@/lib/audio/constants';
 import type { AudioEntityInference } from '@/lib/chat/infer-audio-entity';
+import {
+  canTransitionMediaLifecycle,
+  type MediaLifecycleState,
+} from '@/lib/media/lifecycle';
 
-export type PendingAudioStatus = 'uploading' | 'ready' | 'error';
+export type PendingAudioStatus = MediaLifecycleState;
 
 export interface PendingAudio {
   readonly id: string;
@@ -70,7 +74,7 @@ export function useChatAudioAttachments({
           id: generateId(),
           name: file.name,
           mediaType: file.type,
-          status: 'error',
+          status: 'failed',
           error: validationError,
         });
         setIsProcessing(false);
@@ -85,11 +89,26 @@ export function useChatAudioAttachments({
         status: 'uploading',
       });
 
+      const updatePendingAudio = (patch: Partial<PendingAudio>) => {
+        setPendingAudio(current => {
+          if (!current || current.id !== pendingId) return current;
+          if (
+            patch.status &&
+            !canTransitionMediaLifecycle(current.status, patch.status)
+          ) {
+            return current;
+          }
+          return { ...current, ...patch };
+        });
+      };
+
       try {
         const blob = await upload(file.name, file, {
           access: 'public',
           handleUploadUrl: '/api/library/audio/upload-token',
         });
+
+        updatePendingAudio({ status: 'processing' });
 
         const response = await fetch('/api/chat/audio', {
           method: 'POST',
@@ -131,18 +150,14 @@ export function useChatAudioAttachments({
         };
 
         onUploaded?.(result);
-        setPendingAudio(null);
+        setPendingAudio(current =>
+          current?.id === pendingId ? null : current
+        );
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Audio upload failed';
         onError(message);
-        setPendingAudio({
-          id: pendingId,
-          name: file.name,
-          mediaType: file.type,
-          status: 'error',
-          error: message,
-        });
+        updatePendingAudio({ status: 'failed', error: message });
       } finally {
         setIsProcessing(false);
       }

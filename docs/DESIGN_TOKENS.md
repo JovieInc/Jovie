@@ -187,8 +187,9 @@ these, not redefine them.
     Wave 4).
 - **Canonical button variants** — `primary`, `secondary`, `tertiary`, `ghost`,
   and `link`; destructive styling is `destructive`, not a variant.
-- **Canonical button sizes** — `sm` = 28px, `md` = 36px, `lg` = 44px; `icon`
-  uses the `md` control height with equal width.
+- **Canonical button sizes** — `sm` = 28px, `marketing` = 32px visible inside a
+  44px minimum hit target, `md` = 36px, `lg` = 44px; `icon` uses the `md`
+  control height with equal width.
 
 ### Concentric radius-by-elevation
 

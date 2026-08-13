@@ -14,6 +14,7 @@ export const BUTTON_VARIANT_NAMES = [
 
 export const BUTTON_SIZE_NAMES = [
   'sm',
+  'marketing',
   'md',
   'lg',
   'icon',

@@ -5,12 +5,10 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * ActionPill — primary white-on-dark CTA pill used in shell headers.
+ * ActionPill — primary semantic CTA pill used in shell headers.
  *
- * White surface with black text, leading optional icon, single-row pill.
- * White was chosen over a saturated brand color because primary actions
- * shouldn't compete with the brand mark or status chips — white-on-dark
- * stays the visual anchor without screaming.
+ * The canonical primary surface/foreground tokens keep the pill aligned with
+ * the shared Button family across themes without hard-coded color pairs.
  *
  * Pure presentational. Caller controls label, icon, and click handler.
  *
@@ -39,7 +37,7 @@ export function ActionPill({
       type={type}
       onClick={onClick}
       className={cn(
-        'inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full bg-white dark:bg-surface-1 text-black dark:text-white text-xs font-medium hover:bg-white dark:bg-surface-1/90 transition-colors duration-subtle ease-subtle',
+        'inline-flex items-center gap-1.5 h-7 px-3.5 rounded-full bg-btn-primary text-btn-primary-foreground text-xs font-medium hover:bg-btn-primary-hover transition-colors duration-subtle ease-subtle',
         className
       )}
     >

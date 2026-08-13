@@ -48,4 +48,32 @@ describe('AudioPreviewStrip', () => {
       screen.getByText('Matched Take Me Over · attaching audio')
     ).toBeTruthy();
   });
+
+  it.each([
+    ['processing', 'Processing audio…'],
+    ['failed', 'The audio service is unavailable'],
+    ['cancelled', 'Upload cancelled'],
+  ] as const)('renders the %s lifecycle state', (status, label) => {
+    render(
+      <AudioPreviewStrip
+        audio={{
+          id: `audio-${status}`,
+          name: 'demo-track.mp3',
+          mediaType: 'audio/mpeg',
+          status,
+          error:
+            status === 'failed'
+              ? 'The audio service is unavailable'
+              : undefined,
+        }}
+      />
+    );
+
+    expect(screen.getByTestId('chat-audio-preview-strip')).toHaveAttribute(
+      'data-upload-state',
+      status
+    );
+    expect(screen.getByText(label)).toBeTruthy();
+    expect(screen.queryByTestId('chat-audio-preview-player')).toBeNull();
+  });
 });
