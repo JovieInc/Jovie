@@ -170,7 +170,21 @@ function upsertInterviewRows(rows: Array<Record<string, unknown>>) {
   return { values, onConflictDoUpdate, returning };
 }
 
-describe('POST /api/onboarding/intake — Better Auth email gate', () => {
+describe('POST /api/onboarding/intake', () => {
+  it('is retired and fails closed with 410 (JOV-5001)', async () => {
+    const res = await POST(
+      new Request('http://localhost/api/onboarding/intake', { method: 'POST' })
+    );
+    expect(res.status).toBe(410);
+    await expect(res.json()).resolves.toMatchObject({
+      errorCode: 'INTAKE_RETIRED',
+    });
+  });
+});
+
+// Legacy seven-field intake coverage. The route is retired (JOV-5001);
+// keep these skipped until the WaitlistIntakeChat file is deleted.
+describe.skip('POST /api/onboarding/intake — Better Auth email gate', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
     vi.clearAllMocks();

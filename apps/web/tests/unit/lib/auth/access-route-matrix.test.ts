@@ -5,19 +5,19 @@ import {
   getAuthenticatedAuthRouteRedirect,
   getClientAuthenticatedAuthEntryRedirect,
   getStartRouteRedirect,
+  getWaitlistRouteRedirect,
 } from '@/lib/auth/access-route-redirect';
-import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
+import {
+  CanonicalUserState,
+  toProxyUserState,
+} from '@/lib/auth/canonical-user-state';
 
 describe('access route matrix (JOV-3087)', () => {
   describe('admitted / waitlisted / signed-out alignment', () => {
     it.each([
       [CanonicalUserState.UNAUTHENTICATED, false, null],
       [CanonicalUserState.NEEDS_DB_USER, false, null],
-      [
-        CanonicalUserState.NEEDS_WAITLIST_SUBMISSION,
-        false,
-        APP_ROUTES.WAITLIST,
-      ],
+      [CanonicalUserState.NEEDS_WAITLIST_SUBMISSION, false, null],
       [CanonicalUserState.WAITLIST_PENDING, false, APP_ROUTES.WAITLIST],
       [CanonicalUserState.NEEDS_ONBOARDING, true, null],
       [CanonicalUserState.ACTIVE, true, APP_ROUTES.DASHBOARD],
@@ -35,7 +35,10 @@ describe('access route matrix (JOV-3087)', () => {
     it.each([
       [CanonicalUserState.UNAUTHENTICATED, APP_ROUTES.SIGNIN],
       [CanonicalUserState.NEEDS_DB_USER, '/start?fresh_signup=true'],
-      [CanonicalUserState.NEEDS_WAITLIST_SUBMISSION, APP_ROUTES.WAITLIST],
+      [
+        CanonicalUserState.NEEDS_WAITLIST_SUBMISSION,
+        '/start?fresh_signup=true',
+      ],
       [CanonicalUserState.WAITLIST_PENDING, APP_ROUTES.WAITLIST],
       [CanonicalUserState.NEEDS_ONBOARDING, '/start?fresh_signup=true'],
       [CanonicalUserState.ACTIVE, APP_ROUTES.DASHBOARD],
@@ -83,6 +86,57 @@ describe('access route matrix (JOV-3087)', () => {
           )
         )
       ).toBe(APP_ROUTES.DASHBOARD);
+    });
+  });
+
+  describe('chat-first waitlist recovery (JOV-5001)', () => {
+    const allStates = Object.values(CanonicalUserState);
+
+    it.each([
+      [CanonicalUserState.UNAUTHENTICATED, APP_ROUTES.START],
+      [CanonicalUserState.NEEDS_DB_USER, APP_ROUTES.START],
+      [CanonicalUserState.NEEDS_WAITLIST_SUBMISSION, APP_ROUTES.START],
+      [CanonicalUserState.WAITLIST_PENDING, null],
+      [CanonicalUserState.NEEDS_ONBOARDING, APP_ROUTES.START],
+      [CanonicalUserState.ACTIVE, APP_ROUTES.DASHBOARD],
+      [CanonicalUserState.BANNED, APP_ROUTES.UNAVAILABLE],
+      [CanonicalUserState.USER_CREATION_FAILED, APP_ROUTES.USER_CREATION_ERROR],
+    ])('maps %s on /waitlist to %s', (state, expected) => {
+      expect(getWaitlistRouteRedirect(state)).toBe(expected);
+    });
+
+    it.each(
+      allStates
+    )('does not bounce %s in a /start ↔ /waitlist redirect loop', state => {
+      const startRedirect = getStartRouteRedirect(state);
+      const waitlistRedirect = getWaitlistRouteRedirect(state);
+      const loops =
+        startRedirect === APP_ROUTES.WAITLIST &&
+        waitlistRedirect === APP_ROUTES.START;
+      expect(loops).toBe(false);
+    });
+
+    it('projects pre-receipt waitlist states as onboarding, not waitlist, for proxy', () => {
+      expect(
+        toProxyUserState(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION)
+      ).toEqual({
+        needsWaitlist: false,
+        needsOnboarding: true,
+        isActive: false,
+        isBanned: false,
+      });
+      expect(toProxyUserState(CanonicalUserState.WAITLIST_PENDING)).toEqual({
+        needsWaitlist: true,
+        needsOnboarding: false,
+        isActive: false,
+        isBanned: false,
+      });
+      expect(toProxyUserState(CanonicalUserState.NEEDS_DB_USER)).toEqual({
+        needsWaitlist: false,
+        needsOnboarding: true,
+        isActive: false,
+        isBanned: false,
+      });
     });
   });
 });

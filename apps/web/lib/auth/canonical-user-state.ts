@@ -149,7 +149,9 @@ export function resolveCanonicalState(
 const STATE_REDIRECT_MAP: Record<CanonicalUserState, string | null> = {
   [CanonicalUserState.UNAUTHENTICATED]: '/signin',
   [CanonicalUserState.NEEDS_DB_USER]: '/start?fresh_signup=true',
-  [CanonicalUserState.NEEDS_WAITLIST_SUBMISSION]: '/waitlist',
+  // Pre-receipt waitlist states recover to /start chat. /waitlist is only a
+  // durable pending receipt (JOV-5001). WAITLIST_PENDING keeps the receipt.
+  [CanonicalUserState.NEEDS_WAITLIST_SUBMISSION]: '/start?fresh_signup=true',
   [CanonicalUserState.WAITLIST_PENDING]: '/waitlist',
   [CanonicalUserState.NEEDS_ONBOARDING]: '/start?fresh_signup=true',
   [CanonicalUserState.BANNED]: '/unavailable',
@@ -220,6 +222,7 @@ export function toProxyUserState(
       };
     case CanonicalUserState.NEEDS_ONBOARDING:
     case CanonicalUserState.NEEDS_DB_USER:
+    case CanonicalUserState.NEEDS_WAITLIST_SUBMISSION:
     case CanonicalUserState.USER_CREATION_FAILED:
       return {
         needsWaitlist: false,
@@ -228,7 +231,6 @@ export function toProxyUserState(
         isBanned: false,
       };
     case CanonicalUserState.WAITLIST_PENDING:
-    case CanonicalUserState.NEEDS_WAITLIST_SUBMISSION:
       return {
         needsWaitlist: true,
         needsOnboarding: false,

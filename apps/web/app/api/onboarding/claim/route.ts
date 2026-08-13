@@ -77,6 +77,13 @@ function deriveFullName(params: {
   return params.email.split('@')[0]?.trim() || 'Jovie user';
 }
 
+function hasDurablePublicArtistIdentity(
+  rows: readonly { toolCalls: unknown }[]
+): boolean {
+  const state = deriveClaimedOnboardingStateFromMessageRows(rows);
+  return Boolean(state.socialLinks[0] ?? state.artist?.url);
+}
+
 function hasWaitlistDecision(rows: readonly { toolCalls: unknown }[]): boolean {
   const events = rows.flatMap(row => decodeToolEvents(row.toolCalls).events);
   for (const event of events.toReversed()) {
@@ -313,11 +320,21 @@ export async function POST(req: Request) {
         const messageRows = await loadConversationMessageRows(
           alreadyClaimed.id
         );
+        const mustWaitlist =
+          accessControlled || hasWaitlistDecision(messageRows);
+        if (mustWaitlist && !hasDurablePublicArtistIdentity(messageRows)) {
+          return NextResponse.json({
+            claimed: 0,
+            conversationId: alreadyClaimed.id,
+            alreadyClaimed: true,
+            waitlistIntakeRequired: true,
+          });
+        }
         const handoff = await resolveClaimHandoff({
           appUserId: userId,
           conversationId: alreadyClaimed.id,
           messageRows,
-          mustWaitlist: accessControlled || hasWaitlistDecision(messageRows),
+          mustWaitlist,
           ipAddress,
           userAgent,
         });
@@ -341,6 +358,16 @@ export async function POST(req: Request) {
     try {
       const messageRows = await loadConversationMessageRows(primary.id);
       const mustWaitlist = accessControlled || hasWaitlistDecision(messageRows);
+
+      // Do not consume the anonymous transcript until a public artist
+      // identity exists. The same /start conversation retries after the next
+      // natural-language turn (JOV-5001).
+      if (mustWaitlist && !hasDurablePublicArtistIdentity(messageRows)) {
+        return NextResponse.json({
+          claimed: 0,
+          waitlistIntakeRequired: true,
+        });
+      }
 
       // Compare-and-swap ownership before writing user-scoped waitlist data.
       // The WHERE clause only
@@ -381,6 +408,15 @@ export async function POST(req: Request) {
             },
             { status: 409 }
           );
+        }
+
+        if (mustWaitlist && !hasDurablePublicArtistIdentity(messageRows)) {
+          return NextResponse.json({
+            claimed: 0,
+            conversationId: primary.id,
+            alreadyClaimed: true,
+            waitlistIntakeRequired: true,
+          });
         }
 
         const handoff = await resolveClaimHandoff({

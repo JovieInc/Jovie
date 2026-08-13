@@ -142,16 +142,50 @@ describe('useOnboardingClaim', () => {
     expect(replaceMock).not.toHaveBeenCalledWith('/onboarding/checkout');
   });
 
-  it('routes missing durable artist data to the truthful waitlist intake', async () => {
+  it('keeps missing durable artist data in the same /start conversation', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({
-        claimed: 1,
+        claimed: 0,
         waitlistIntakeRequired: true,
       })
     );
     vi.stubGlobal('fetch', fetchMock);
 
     render(renderClaimHarness(0));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('no-op')
+    );
+    expect(replaceMock).not.toHaveBeenCalled();
+  });
+
+  it('retries claim after the next natural-language turn when artist identity was missing', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        claimed: 0,
+        waitlistIntakeRequired: true,
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { rerender } = render(renderClaimHarness(0));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('no-op')
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        claimed: 1,
+        waitlist: {
+          entryId: 'entry-1',
+          status: 'waitlisted',
+          outcome: 'waitlisted_gate_on',
+        },
+      })
+    );
+    rerender(renderClaimHarness(1));
 
     await waitFor(() =>
       expect(screen.getByTestId('claim-status')).toHaveTextContent('claimed')
