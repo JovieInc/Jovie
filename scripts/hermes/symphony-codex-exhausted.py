@@ -303,6 +303,18 @@ def _active_grok_units() -> list[str] | None:
     return [line.split()[0] for line in decoded.splitlines() if line.strip()]
 
 
+def _unit_not_loaded(unit: str) -> bool:
+    result = _captured(
+        _systemctl("show", "--property=LoadState", "--value", unit),
+        CONTROL_TIMEOUT_SECONDS,
+    )
+    return (
+        result is not None
+        and result.returncode == 0
+        and result.stdout.decode(errors="replace").strip() == "not-found"
+    )
+
+
 def _grok_ship_one_executable() -> str | None:
     executable = pathlib.Path.home() / ".local/bin/grok-ship-one"
     return str(executable) if executable.is_file() and os.access(executable, os.X_OK) else None
@@ -653,8 +665,14 @@ def reconcile() -> int:
     if launched_units:
         # Accepted transient units can activate after an empty snapshot. Cancel
         # every accepted launch synchronously, then prove the entire Grok lane
-        # is still empty before bringing the primary owner back.
-        if not _control(_systemctl("stop", *sorted(launched_units))):
+        # is still empty before bringing the primary owner back. A collected
+        # transient may already have disappeared, in which case systemctl stop
+        # reports "unit not loaded" even though cleanup is complete. Tolerate
+        # only that exact, independently proven state; every other stop failure
+        # leaves exclusivity unproven and must remain degraded.
+        if not _control(_systemctl("stop", *sorted(launched_units))) and not all(
+            _unit_not_loaded(unit) for unit in launched_units
+        ):
             print(
                 f"codex_exhausted {reason} grok_cleanup_failed symphony_stopped",
                 file=sys.stderr,

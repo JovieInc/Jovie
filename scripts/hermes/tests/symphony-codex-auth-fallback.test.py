@@ -858,6 +858,64 @@ class FallbackTests(unittest.TestCase):
         )
         self.assertLess(cleanup_index, restore_index)
 
+    def test_collected_collapsed_worker_restores_when_stop_reports_not_loaded(self):
+        module = self.load_controller_module()
+        controls: list[list[str]] = []
+        unit = "grok-ship-JOV-1.service"
+
+        def control(command):
+            controls.append(command)
+            if command[:3] == ["systemctl", "--user", "stop"] and unit in command:
+                return False
+            return True
+
+        with (
+            mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
+            mock.patch.object(module, "_grok_canary_ready", return_value=(True, "grok_provider_ready")),
+            mock.patch.object(module, "_active_grok_units", side_effect=[[], [unit], []]),
+            mock.patch.object(module, "_grok_units_after_survival_window", return_value=[]),
+            mock.patch.object(module, "_fetch_single_issue", return_value={}),
+            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
+            mock.patch.object(module, "_unit_not_loaded", return_value=True),
+            mock.patch.object(module, "_control", side_effect=control),
+        ):
+            self.assertEqual(module.reconcile(), module.EXIT_SAFE_FAIL_CLOSED)
+
+        self.assertTrue(
+            any(command[:3] == ["systemctl", "--user", "start"] for command in controls)
+        )
+
+    def test_cleanup_failure_with_loaded_worker_never_restarts_symphony(self):
+        module = self.load_controller_module()
+        controls: list[list[str]] = []
+        unit = "grok-ship-JOV-1.service"
+
+        def control(command):
+            controls.append(command)
+            if command[:3] == ["systemctl", "--user", "stop"] and unit in command:
+                return False
+            return True
+
+        with (
+            mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
+            mock.patch.object(module, "_grok_canary_ready", return_value=(True, "grok_provider_ready")),
+            mock.patch.object(module, "_active_grok_units", side_effect=[[], [unit]]),
+            mock.patch.object(module, "_grok_units_after_survival_window", return_value=[]),
+            mock.patch.object(module, "_fetch_single_issue", return_value={}),
+            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
+            mock.patch.object(module, "_unit_not_loaded", return_value=False),
+            mock.patch.object(module, "_control", side_effect=control),
+        ):
+            self.assertEqual(module.reconcile(), module.EXIT_DEGRADED)
+
+        self.assertFalse(
+            any(command[:3] == ["systemctl", "--user", "start"] for command in controls)
+        )
+
     def test_grok_worker_must_survive_window_before_handoff_succeeds(self):
         module = self.load_controller_module()
         controls: list[list[str]] = []
