@@ -165,7 +165,7 @@ describe('section.pricing variant contract', () => {
       'components/features/pricing/MarketingPricingPlans'
     );
     expect(route).toContain(
-      "<MarketingPricingPlans\n              mode='expanded'\n              variant='tier-cards-neutral'"
+      "<MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />"
     );
     expect(sectionStory).toContain(
       "<MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />"

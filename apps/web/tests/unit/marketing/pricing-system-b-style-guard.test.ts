@@ -3,6 +3,9 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const pageSourcePath = 'app/(marketing)/pricing/page.tsx';
+// JOV-4968: the shipped pricing markup is extracted into this canonical body;
+// route-level source assertions apply to route + body combined.
+const pricingRecipeBodyPath = 'components/organisms/PricingRecipeBody.tsx';
 const comparisonChartPath =
   'components/features/pricing/PricingComparisonChart.tsx';
 const marketingPlansPath =
@@ -61,6 +64,10 @@ describe('pricing page System B source contract', () => {
         readFileSync(resolve(process.cwd(), pageSourcePath), 'utf8'),
       ],
       [
+        pricingRecipeBodyPath,
+        readFileSync(resolve(process.cwd(), pricingRecipeBodyPath), 'utf8'),
+      ],
+      [
         comparisonChartPath,
         readFileSync(resolve(process.cwd(), comparisonChartPath), 'utf8'),
       ],
@@ -91,7 +98,9 @@ describe('pricing page System B source contract', () => {
   });
 
   it('keeps exactly one page-level primary action on pricing', () => {
-    const source = readFileSync(resolve(process.cwd(), pageSourcePath), 'utf8');
+    const source = [pageSourcePath, pricingRecipeBodyPath]
+      .map(path => readFileSync(resolve(process.cwd(), path), 'utf8'))
+      .join('\n');
 
     // The canonical MarketingHero owns the single page-level primary action
     // (it renders data-primary-action='true' on its primary CTA).
