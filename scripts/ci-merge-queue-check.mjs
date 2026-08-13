@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
+  frontItemChurnDecision,
   MERGE_QUEUE_POLICY,
   MERGE_QUEUE_REPO_PATHS,
   validateLiveMergeQueueRuleset,
@@ -154,9 +155,37 @@ async function main() {
     case 'max-queue-depth':
       console.log(String(MERGE_QUEUE_POLICY.maxQueueDepth));
       break;
+    case 'front-churn': {
+      // Read-only churn decision for the drain controller (JOV-5030). Recent
+      // merge_group runs arrive via MERGE_GROUP_RUNS_JSON; any parse/argument
+      // problem degrades to action 'unknown' (never 'block') so a controller
+      // mutation can never fire on unproven evidence.
+      const args = Object.fromEntries(
+        process.argv
+          .slice(3)
+          .map(arg => /^--([^=]+)=(.*)$/.exec(arg))
+          .filter(Boolean)
+          .map(([, key, value]) => [key, value])
+      );
+      let mergeGroupRuns = null;
+      try {
+        const parsed = JSON.parse(process.env.MERGE_GROUP_RUNS_JSON ?? 'null');
+        if (Array.isArray(parsed)) mergeGroupRuns = parsed;
+      } catch {
+        mergeGroupRuns = null;
+      }
+      const decision = frontItemChurnDecision({
+        prNumber: Number(args.pr),
+        currentBaseSha: String(args.base ?? '').toLowerCase(),
+        headCommittedAt: args['head-committed-at'] ?? null,
+        mergeGroupRuns,
+      });
+      console.log(JSON.stringify(decision));
+      break;
+    }
     default:
       console.error(
-        'Usage: node scripts/ci-merge-queue-check.mjs <validate|verify|policy|max-queue-depth>'
+        'Usage: node scripts/ci-merge-queue-check.mjs <validate|verify|policy|max-queue-depth|front-churn>'
       );
       process.exitCode = 1;
   }

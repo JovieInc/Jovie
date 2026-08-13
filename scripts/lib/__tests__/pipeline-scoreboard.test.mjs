@@ -10,8 +10,11 @@ import {
   dailyWindow,
   evaluatePipelineAlarms,
   fetchMergedPrEvidence,
+  fetchMergeGroupRunEvidence,
   filterMergedPrEvidence,
+  filterMergeGroupRunEvidence,
   last12HoursWindow,
+  mergeGroupRunFrontPr,
   readLatestScoreboard,
   renderPipelineScoreboard,
 } from '../../hermes/lib/pipeline-scoreboard.ts';
@@ -797,6 +800,14 @@ describe('pipeline scoreboard compute', () => {
         queue: {
           merges: 0,
           mqAttemptsPerMerge: null,
+          mergeGroupAttempts: null,
+          mergeGroupFailedAttempts: null,
+          queueChurn: null,
+          mergeGroupEvidence: {
+            complete: false,
+            reason: 'not_provided',
+            pages: 0,
+          },
           evidence: { complete: true, reason: null, pages: 1 },
           timeToMergeSeconds: { p50: 0, p95: 0 },
         },
@@ -851,6 +862,14 @@ describe('pipeline scoreboard compute', () => {
         queue: {
           merges: 0,
           mqAttemptsPerMerge: null,
+          mergeGroupAttempts: null,
+          mergeGroupFailedAttempts: null,
+          queueChurn: null,
+          mergeGroupEvidence: {
+            complete: false,
+            reason: 'not_provided',
+            pages: 0,
+          },
           evidence: { complete: true, reason: null, pages: 1 },
           timeToMergeSeconds: { p50: 0, p95: 0 },
         },
@@ -1171,6 +1190,182 @@ describe('pipeline scoreboard compute', () => {
     expect(body).toContain('merge evidence incomplete');
     expect(body).toContain('merge count and MQ attempts/merge suppressed');
     expect(body).not.toContain('Queue: merges 1');
+  });
+});
+
+describe('pipeline scoreboard merge-group attempts (JOV-5030)', () => {
+  const mqWindow = {
+    since: '2026-08-13T00:00:00.000Z',
+    until: '2026-08-14T00:00:00.000Z',
+  };
+
+  function mqRun(
+    id,
+    createdAt,
+    {
+      frontPr = 15849,
+      baseSha = '9'.repeat(40),
+      conclusion = 'failure',
+      status = 'completed',
+    } = {}
+  ) {
+    return {
+      id,
+      head_branch:
+        frontPr === null
+          ? null
+          : `gh-readonly-queue/main/pr-${frontPr}-${baseSha}`,
+      status,
+      conclusion,
+      created_at: createdAt,
+    };
+  }
+
+  function mqEvidence(runs, window = mqWindow) {
+    return fetchMergeGroupRunEvidence(
+      window,
+      () => ({ total_count: runs.length, workflow_runs: runs }),
+      { maxPages: 5 }
+    );
+  }
+
+  it('collects the exact attempt window from workflow-runs pages', () => {
+    const evidence = mqEvidence([
+      mqRun(3, '2026-08-13T03:00:00.000Z', { conclusion: 'success' }),
+      mqRun(2, '2026-08-13T02:00:00.000Z'),
+      mqRun(1, '2026-08-12T23:00:00.000Z'),
+    ]);
+    expect(evidence.complete).toBe(true);
+    expect(evidence.runs.map(run => run.id)).toEqual([3, 2]);
+    expect(mergeGroupRunFrontPr(evidence.runs[0])).toBe(15849);
+  });
+
+  it('fails closed on fetch errors, malformed runs, and truncated windows', () => {
+    expect(
+      fetchMergeGroupRunEvidence(
+        mqWindow,
+        () => {
+          throw new Error('boom');
+        },
+        { maxPages: 5 }
+      )
+    ).toMatchObject({ complete: false, reason: 'fetch_failed' });
+    expect(mqEvidence([{ id: 'not-a-number' }])).toMatchObject({
+      complete: false,
+      reason: 'malformed_run',
+    });
+    const fullPage = page =>
+      Array.from({ length: 100 }, (_, index) =>
+        mqRun(page * 1000 + index, '2026-08-13T01:00:00.000Z')
+      );
+    expect(
+      fetchMergeGroupRunEvidence(
+        {
+          since: '2026-08-12T00:00:00.000Z',
+          until: '2026-08-13T00:00:00.000Z',
+        },
+        page => ({ total_count: 500, workflow_runs: fullPage(page) }),
+        { maxPages: 5 }
+      )
+    ).toMatchObject({ complete: false, reason: 'window_not_covered' });
+  });
+
+  it('filters a fetched window down to a narrower alarm window', () => {
+    const evidence = mqEvidence([
+      mqRun(2, '2026-08-13T10:00:00.000Z'),
+      mqRun(1, '2026-08-13T02:00:00.000Z'),
+    ]);
+    const filtered = filterMergeGroupRunEvidence(evidence, {
+      since: '2026-08-13T06:00:00.000Z',
+      until: '2026-08-13T18:00:00.000Z',
+    });
+    expect(filtered.complete).toBe(true);
+    expect(filtered.runs.map(run => run.id)).toEqual([2]);
+  });
+
+  it('measures real attempts, failures, and churn instead of the label proxy', () => {
+    // JOV-5030 incident shape: a non-progressing front item rebuilt the group
+    // 11 times while only 2 follower PRs landed. The old label proxy reported
+    // MQ attempts/merge 0 for exactly this window.
+    const runs = [
+      ...Array.from({ length: 11 }, (_, index) =>
+        mqRun(
+          index + 1,
+          `2026-08-13T0${Math.floor(index / 2)}:${String(30 + (index % 2) * 20).padStart(2, '0')}:00.000Z`
+        )
+      ),
+      mqRun(100, '2026-08-13T01:58:00.000Z', {
+        frontPr: 15862,
+        conclusion: 'success',
+      }),
+      mqRun(101, '2026-08-13T02:19:00.000Z', {
+        frontPr: 15864,
+        conclusion: 'success',
+      }),
+    ];
+    const scoreboard = buildPipelineScoreboard({
+      ts: mqWindow.until,
+      window: mqWindow,
+      issues: [],
+      mergedPrs: [{ labels: [] }, { labels: [] }],
+      mergeEvidence: { complete: true, reason: null, pages: 1 },
+      mergeGroupRunEvidence: mqEvidence(runs),
+    });
+
+    expect(scoreboard.queue.merges).toBe(2);
+    expect(scoreboard.queue.mergeGroupAttempts).toBe(13);
+    expect(scoreboard.queue.mergeGroupFailedAttempts).toBe(11);
+    expect(scoreboard.queue.mqAttemptsPerMerge).toBe(6.5);
+    expect(scoreboard.queue.queueChurn).toBe(11);
+    expect(scoreboard.alarms.map(alarm => alarm.rule)).toContain(
+      'merge_queue_churn'
+    );
+    const body = renderPipelineScoreboard(scoreboard);
+    expect(body).toContain('MQ attempts/merge 6.5');
+    expect(body).toContain('merge-group attempts 13 (failed 11, churn 11)');
+  });
+
+  it('does not raise the churn alarm for healthy one-attempt-per-merge flow', () => {
+    const scoreboard = buildPipelineScoreboard({
+      ts: mqWindow.until,
+      window: mqWindow,
+      issues: [],
+      mergedPrs: [{ labels: [] }, { labels: [] }],
+      mergeEvidence: { complete: true, reason: null, pages: 1 },
+      mergeGroupRunEvidence: mqEvidence([
+        mqRun(1, '2026-08-13T01:00:00.000Z', { conclusion: 'success' }),
+        mqRun(2, '2026-08-13T02:00:00.000Z', { conclusion: 'success' }),
+      ]),
+    });
+    expect(scoreboard.queue.mqAttemptsPerMerge).toBe(1);
+    expect(scoreboard.queue.queueChurn).toBe(0);
+    expect(scoreboard.alarms.map(alarm => alarm.rule)).not.toContain(
+      'merge_queue_churn'
+    );
+  });
+
+  it('suppresses attempt metrics when merge-group evidence is unavailable', () => {
+    const scoreboard = buildPipelineScoreboard({
+      ts: mqWindow.until,
+      window: mqWindow,
+      issues: [],
+      mergedPrs: [{ labels: [{ name: 'merge-queue' }] }],
+      mergeEvidence: { complete: true, reason: null, pages: 1 },
+    });
+    expect(scoreboard.queue.mergeGroupAttempts).toBeNull();
+    expect(scoreboard.queue.mqAttemptsPerMerge).toBeNull();
+    expect(scoreboard.queue.queueChurn).toBeNull();
+    expect(scoreboard.queue.mergeGroupEvidence).toEqual({
+      complete: false,
+      reason: 'not_provided',
+      pages: 0,
+    });
+    expect(scoreboard.alarms.map(alarm => alarm.rule)).not.toContain(
+      'merge_queue_churn'
+    );
+    expect(renderPipelineScoreboard(scoreboard)).toContain(
+      'merge-group attempts suppressed (not_provided)'
+    );
   });
 });
 

@@ -100,6 +100,18 @@ It fails closed if an open PR is missing from that authoritative snapshot.
   or legacy vendor label-cycle loop in the native path.
 - Queue enrollment is serialized by `merge-queue-drain-mutex`; it does not
   race another controller instance.
+- Front-item churn guard (JOV-5030): every native group build runs on
+  `gh-readonly-queue/main/pr-<front>-<exactBaseSha>`, so recent `merge_group`
+  CI runs identify which PR fronted each failed attempt and against which
+  exact main base. The drain refuses to re-enroll — and actively dequeues — a
+  PR whose unchanged head already fronted a failed attempt on the exact
+  current main base, because the rebuilt group would deterministically fail
+  again and force every follower through a duplicate full merge-group CI run.
+  The guard lifts when the head moves or main advances, and never acts on
+  missing evidence (`unknown` → no dequeue, pre-guard enrollment behavior).
+  The pipeline scoreboard measures real `merge_group` attempts from the
+  Actions API and alarms on `merge_queue_churn` (≥3 attempts at ≥2 attempts
+  per merge).
 
 ## Typed queue deferral (`jovie-queue-deferral/v1`)
 
