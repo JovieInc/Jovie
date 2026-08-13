@@ -135,18 +135,22 @@ completion, and the existing five-minute fleet-receipt refresh. That upstream
 durability tick means a PR checked during AMBER self-heals after GREEN even when
 the repository is otherwise idle. It runs `scripts/release-queue-deferred.sh`:
 
-- **Report pass** — prints age and typed reason for every queue-deferred agent
-  PR and raises a warning once a hold exceeds the 12-minute SLA. A missing,
-  malformed, or head-stale receipt reports as
-  `untyped-hold-manual-release-required` and is never released automatically.
+- **Report pass** — prints age and reason for every `queue-deferred` PR
+  (not only agent-branch PRs) and raises a warning once a hold exceeds the
+  12-minute SLA. A missing or malformed receipt reports as
+  `untyped-ready-hold` and is released automatically when the live PR is
+  ready, mergeable, exact-head green, and a fresh GREEN fleet receipt
+  agrees. Human-policy labels (`needs:taste`, `net-new`, `outbound`,
+  `needs-human`, …) report as `human-policy-hold:<label>` and stay held.
 - **Release pass** — only under a fresh (≤10-minute) `GREEN` fleet receipt
-  with `promotionAdmission.allowed`, and only when the exact head still
-  matches the receipt, no other hold labels are present, and required checks
-  are green: removes `queue-deferred`, then marks drafts ready. Both mutations
-  fire real PR events (app token), so this controller's `unlabeled` /
-  `ready_for_review` events re-enter the normal admission path above, which
+  with `promotionAdmission.allowed`, and only when the live PR is non-draft,
+  mergeable, same-repo/main, no human-policy hold labels are present, and
+  required checks are green: removes `queue-deferred`. Typed mechanical
+  receipts (`symphony-birth-hold`, `queue-pressure`) still bind reason to
+  source. Untyped ready holds are dropped rather than waiting for a human.
+  The `unlabeled` event re-enters the normal admission path above, which
   independently revalidates the exact head before enrollment. Under
-  AMBER/RED/stale fleet state no mutation happens — drafts keep the hold.
+  AMBER/RED/stale fleet state no mutation happens — the hold stays in place.
   `queue-pressure` holds additionally re-run the canonical live queue-depth
   policy and remain held while pressure is still above its threshold.
 

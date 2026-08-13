@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  classifyQueueDeferredHold,
   classifyReceipt,
   extractReceiptFromComment,
+  HUMAN_POLICY_HOLD_LABELS,
+  humanPolicyHoldRegex,
+  humanPolicyHoldsOn,
   QUEUE_DEFERRAL_MARKER,
   QUEUE_DEFERRAL_SCHEMA,
   RELEASABLE_REASON_SOURCES,
@@ -163,10 +167,132 @@ describe('classifyReceipt', () => {
     });
   });
 
-  it('holds missing receipts as untyped manual holds', () => {
+  it('holds missing receipts as untyped at the receipt layer', () => {
     expect(classifyReceipt(null)).toEqual({
       releasable: false,
       detail: 'untyped-hold-manual-release-required',
+    });
+  });
+});
+
+describe('human-policy holds', () => {
+  it('covers taste, net-new, and outbound without treating queue-deferred as human', () => {
+    expect(HUMAN_POLICY_HOLD_LABELS).toEqual(
+      expect.arrayContaining([
+        'needs:taste',
+        'needs-human-taste',
+        'taste',
+        'net-new',
+        'needs:net-new',
+        'outbound',
+        'needs:outbound',
+        'needs-human',
+      ])
+    );
+    expect(HUMAN_POLICY_HOLD_LABELS).not.toContain('queue-deferred');
+  });
+
+  it('matches only the canonical human-policy labels', () => {
+    const re = new RegExp(humanPolicyHoldRegex());
+    expect(re.test('needs:taste')).toBe(true);
+    expect(re.test('net-new')).toBe(true);
+    expect(re.test('outbound')).toBe(true);
+    expect(re.test('queue-deferred')).toBe(false);
+    expect(re.test('taste-approved')).toBe(false);
+    expect(re.test('needs-human-taste')).toBe(true);
+    expect(re.test('needs-human')).toBe(true);
+  });
+
+  it('extracts human-policy labels from mixed PR label lists', () => {
+    expect(
+      humanPolicyHoldsOn([
+        'queue-deferred',
+        'needs:taste',
+        { name: 'outbound' },
+      ])
+    ).toEqual(['needs:taste', 'outbound']);
+  });
+});
+
+describe('classifyQueueDeferredHold', () => {
+  it('releases an untyped hold on a ready PR with no human-policy labels', () => {
+    expect(
+      classifyQueueDeferredHold({ receipt: null, labels: ['queue-deferred'] })
+    ).toEqual({
+      releasable: true,
+      detail: 'untyped-ready-hold',
+    });
+  });
+
+  it('releases a structurally invalid receipt as untyped rather than a manual trap', () => {
+    expect(
+      classifyQueueDeferredHold({
+        receipt: { reason: 'symphony-birth-hold' },
+        labels: ['queue-deferred'],
+      })
+    ).toEqual({
+      releasable: true,
+      detail: 'untyped-ready-hold',
+    });
+  });
+
+  it.each([
+    'needs:taste',
+    'needs-human-taste',
+    'taste',
+  ])('holds untyped PRs with taste label %s', label => {
+    expect(
+      classifyQueueDeferredHold({
+        receipt: null,
+        labels: ['queue-deferred', label],
+      })
+    ).toEqual({
+      releasable: false,
+      detail: `human-policy-hold:${label}`,
+    });
+  });
+
+  it.each([
+    'net-new',
+    'needs:net-new',
+    'needs-net-new',
+  ])('holds untyped PRs with net-new label %s', label => {
+    expect(
+      classifyQueueDeferredHold({
+        receipt: null,
+        labels: ['queue-deferred', label],
+      })
+    ).toEqual({
+      releasable: false,
+      detail: `human-policy-hold:${label}`,
+    });
+  });
+
+  it.each([
+    'outbound',
+    'needs:outbound',
+    'needs-outbound',
+  ])('holds untyped PRs with outbound label %s', label => {
+    expect(
+      classifyQueueDeferredHold({
+        receipt: null,
+        labels: ['queue-deferred', label],
+      })
+    ).toEqual({
+      releasable: false,
+      detail: `human-policy-hold:${label}`,
+    });
+  });
+
+  it('still holds unknown typed reasons even when the PR is otherwise ready', () => {
+    expect(
+      classifyQueueDeferredHold({
+        receipt: { ...VALID, reason: 'human-repair' },
+        labels: ['queue-deferred'],
+      })
+    ).toEqual({
+      releasable: false,
+      detail: 'held:unknown-reason:human-repair',
     });
   });
 });

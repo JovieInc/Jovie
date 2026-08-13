@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Releases only typed mechanical `queue-deferred` holds under a fresh GREEN
-# fleet receipt, exact-head green checks, and live same-repo/main PR state.
-# Report mode is read-only; release mode removes the typed label from an
-# already-ready PR so native autoenrollment revalidates and owns queue admission. Untyped or
-# inconsistent evidence stays held. Mutations are re-read and compensated.
+# Releases mechanical `queue-deferred` holds under a fresh GREEN fleet
+# receipt, exact-head green checks, and live same-repo/main PR state.
+# Report mode is read-only; release mode removes the label from an
+# already-ready PR so native autoenrollment revalidates and owns queue admission.
+# Untyped holds (missing receipt) on a ready green PR are lifted — they are
+# not a permanent manual trap. Human-policy holds (taste, net-new, outbound)
+# stay held. Mutations are re-read and compensated.
 #
 # Env:
 #   REPO                     target repo (default JovieInc/Jovie)
@@ -40,8 +42,8 @@ LIB="$(dirname "${BASH_SOURCE[0]}")/lib/queue-deferral-receipt.mjs"
 # are the only identities used by the current workflow/Symphony writers.
 TRUSTED_DEFERRAL_AUTHORS='["itstimwhite","jovie-bot[bot]"]'
 # `queue-deferred` itself is expected; every OTHER hold label blocks release.
-OTHER_HOLD_RE='^(needs-human|hold|gated|fast|needs-conflict-resolution)$'
-AGENT_BRANCH_RE='^(tim/|codex/|agent/|claude/|linear/|codegen-bot/|symphony/)'
+# Canonical set lives in queue-deferral-receipt.mjs (taste/net-new/outbound).
+OTHER_HOLD_RE="$(node "$LIB" human-policy-re)"
 now_epoch="$(date -u +%s)"
 
 request_retry_after() {  # request_retry_after <seconds> — shortest request wins
@@ -199,7 +201,7 @@ restore_hold_label() {  # restore_hold_label <num> — compensation; never maske
   return 1
 }
 
-echo "=== QUEUE-DEFERRED: scanning open queue-deferred agent PRs ==="
+echo "=== QUEUE-DEFERRED: scanning open queue-deferred PRs ==="
 
 SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
   --base main \
@@ -216,13 +218,12 @@ SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
     L: [.labels[].name]
   } ]')"
 
-CANDIDATES="$(jq -c --arg branch_re "$AGENT_BRANCH_RE" --arg repo_owner "$REPO_OWNER" '.[]
+CANDIDATES="$(jq -c --arg repo_owner "$REPO_OWNER" '.[]
   | select([.L[]] | any(. == "queue-deferred"))
-  | select(.owner == $repo_owner)
-  | select(.head | test($branch_re))' <<<"$SNAP")"
+  | select(.owner == $repo_owner)' <<<"$SNAP")"
 
 if [[ -z "$CANDIDATES" ]]; then
-  echo "  (no queue-deferred agent PRs)"
+  echo "  (no queue-deferred PRs)"
 fi
 
 # ---------------------------------------------------------------------------
@@ -238,12 +239,14 @@ if [[ "$RELEASE_MODE" == "report" || "$RELEASE_MODE" == "both" ]]; then
   while read -r pr; do
     [[ -z "$pr" ]] && continue
     n=$(jq -r '.n' <<<"$pr")
+    labels_csv="$(jq -r '.L | join(",")' <<<"$pr")"
     receipt="$(deferral_receipt_for_pr "$n")"
+    hold_class="$(printf '%s' "${receipt:-}" | node "$LIB" classify-hold --labels "$labels_csv" || true)"
     if [[ -n "$receipt" ]]; then
       reason="$(jq -r '.reason' <<<"$receipt")"
       deferred_epoch="$(iso_to_epoch "$(jq -r '.deferredAt' <<<"$receipt")")"
     else
-      reason="untyped-hold-manual-release-required"
+      reason="${hold_class:-untyped-ready-hold}"
       deferred_epoch=""
     fi
     if [[ -z "$deferred_epoch" ]]; then
@@ -268,7 +271,7 @@ fi
 # RELEASE pass — lift mechanical holds under a fresh GREEN fleet receipt.
 # ---------------------------------------------------------------------------
 if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
-  echo "=== RELEASE: typed mechanical holds under a fresh GREEN fleet gate ==="
+  echo "=== RELEASE: mechanical holds under a fresh GREEN fleet gate ==="
 
   release_allowed=0
   release_block_reason=""
@@ -303,28 +306,31 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
       expected_branch=$(jq -r '.head' <<<"$pr")
       echo "  #$n  $t"
 
+      snapshot_labels="$(jq -r '.L | join(",")' <<<"$pr")"
       receipt="$(deferral_receipt_for_pr "$n")"
-      if [[ -z "$receipt" ]]; then
-        echo "    ~ untyped hold (no valid ${DEFERRAL_MARKER} receipt); never released automatically"
+      if [[ -n "$receipt" ]]; then
+        receipt_pr="$(jq -r '.pr' <<<"$receipt")"
+        if [[ "$receipt_pr" != "$n" ]]; then
+          echo "    ~ deferral-receipt-pr-mismatch (receipt=#${receipt_pr}, live=#${n}); treating as untyped ready hold"
+          receipt=""
+        fi
+      fi
+      if ! classification="$(printf '%s' "${receipt:-}" | node "$LIB" classify-hold --labels "$snapshot_labels")"; then
+        echo "    ~ ${classification:-held}"
         continue
       fi
-      if ! classification="$(node "$LIB" classify <<<"$receipt")"; then
-        echo "    ~ ${classification}"
-        continue
-      fi
-      receipt_pr="$(jq -r '.pr' <<<"$receipt")"
-      if [[ "$receipt_pr" != "$n" ]]; then
-        echo "    ~ deferral-receipt-pr-mismatch (receipt=#${receipt_pr}, live=#${n}); a fresh receipt is required"
-        continue
-      fi
-      reason="$(jq -r '.reason' <<<"$receipt")"
-      if [[ "$reason" == "queue-pressure" ]] && ! queue_pressure_allows_release "$n"; then
-        continue
-      fi
-      receipt_head="$(jq -r '.head' <<<"$receipt")"
-      if [[ "$receipt_head" != "$expected_head" ]]; then
-        echo "    ~ deferral-receipt-head-stale (receipt=${receipt_head:0:12}, live=${expected_head:0:12}); a fresh receipt is required"
-        continue
+      reason="untyped-ready-hold"
+      if [[ -n "$receipt" ]]; then
+        reason="$(jq -r '.reason' <<<"$receipt")"
+        if [[ "$reason" == "queue-pressure" ]] && ! queue_pressure_allows_release "$n"; then
+          continue
+        fi
+        receipt_head="$(jq -r '.head' <<<"$receipt")"
+        if [[ "$receipt_head" != "$expected_head" ]]; then
+          echo "    ~ deferral-receipt-head-stale (receipt=${receipt_head:0:12}, live=${expected_head:0:12}); evaluating live head"
+        fi
+      else
+        echo "    ~ untyped hold (no valid ${DEFERRAL_MARKER} receipt); releasing if live state is ready under GREEN"
       fi
 
       attempt_age_m="$(last_attempt_age_minutes "$n")"
@@ -387,7 +393,7 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
       head_after="$(jq -r '.head // ""' <<<"$after")"
       draft_after="$(jq -r '.draft' <<<"$after")"
       state_after="$(jq -r '.state // "UNKNOWN"' <<<"$after")"
-      held_after="$(jq -r '[.labels[] | select(. == "queue-deferred" or . == "needs-human" or . == "hold" or . == "gated" or . == "fast" or . == "needs-conflict-resolution")] | join(",")' <<<"$after")"
+      held_after="$(jq -r --arg other_hold_re "$OTHER_HOLD_RE" '[.labels[] | select(. == "queue-deferred" or test($other_hold_re))] | join(",")' <<<"$after")"
 
       if [[ "$state_after" == "OPEN" && "$draft_after" == "false" && "$head_after" == "$expected_head" && -z "$held_after" ]]; then
         upsert_status_comment "$n" "🤖 Queue-deferred release: typed hold (\`${reason}\`) lifted under a fresh GREEN fleet receipt with all required checks passing — PR is ready for review; the merge-queue controller revalidates this exact head before enrollment. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
