@@ -20,6 +20,11 @@ import { logger } from '@/lib/utils/logger';
  * - `getAndDelete`/`delete` FAIL CLOSED. A swallowed removal could allow
  *   reuse of a one-time value or leave a revoked session readable from Redis
  *   until TTL (security.md fail-closed persistence rule).
+ * - `verification:*` is intentionally excluded from Redis. Better Auth is
+ *   configured with `verification.storeInDatabase: true`, so Postgres is the
+ *   atomic source of truth for one-time values. Caching those rows makes a
+ *   Redis quota outage able to reject an OTP after Postgres already consumed
+ *   it. Session and revocation keys keep the fail-closed Redis contract.
  * - In-memory Map fallback is used ONLY when Redis is unconfigured AND the
  *   deploy is not production (security.md bans in-memory public traffic
  *   controls in production).
@@ -60,6 +65,10 @@ function toStringValue(value: unknown): string | null {
 
 function isProductionDeploy(): boolean {
   return env.VERCEL_ENV === 'production';
+}
+
+function isDatabaseAuthoritativeVerificationKey(key: string): boolean {
+  return key.startsWith('verification:');
 }
 
 // ---------------------------------------------------------------------------
@@ -132,6 +141,8 @@ export function resetSecondaryStorageMemoryForTests(): void {
 
 export const secondaryStorage = {
   async get(key) {
+    if (isDatabaseAuthoritativeVerificationKey(key)) return null;
+
     const redis = getRedis();
     if (!redis) {
       if (isProductionDeploy()) {
@@ -151,6 +162,8 @@ export const secondaryStorage = {
   },
 
   async set(key, value, ttl) {
+    if (isDatabaseAuthoritativeVerificationKey(key)) return;
+
     const redis = getRedis();
     if (!redis) {
       if (isProductionDeploy()) {
@@ -205,6 +218,8 @@ export const secondaryStorage = {
   },
 
   async getAndDelete(key) {
+    if (isDatabaseAuthoritativeVerificationKey(key)) return null;
+
     const redis = getRedis();
     if (!redis) {
       if (!isProductionDeploy()) return memoryGetAndDelete(key);
@@ -234,6 +249,8 @@ export const secondaryStorage = {
   },
 
   async delete(key) {
+    if (isDatabaseAuthoritativeVerificationKey(key)) return;
+
     const redis = getRedis();
     if (!redis) {
       if (!isProductionDeploy()) {
