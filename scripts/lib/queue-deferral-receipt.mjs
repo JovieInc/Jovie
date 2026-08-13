@@ -33,12 +33,18 @@
 export const QUEUE_DEFERRAL_SCHEMA = 'jovie-queue-deferral/v1';
 export const QUEUE_DEFERRAL_MARKER = '<!-- bot-comment:queue-deferral -->';
 
-/** Mechanical holds a controller may lift after green checks + fresh GREEN. */
-export const RELEASABLE_REASONS = Object.freeze([
-  'symphony-birth-hold',
-  'queue-pressure',
-  'fleet-amber-hold',
-]);
+/**
+ * Mechanical holds a controller may lift after green checks + fresh GREEN.
+ * Bind each reason to its only authorized writer; a reason string on its own
+ * is not provenance.
+ */
+export const RELEASABLE_REASON_SOURCES = Object.freeze({
+  'symphony-birth-hold': 'symphony',
+  'queue-pressure': 'agent-pipeline',
+});
+export const RELEASABLE_REASONS = Object.freeze(
+  Object.keys(RELEASABLE_REASON_SOURCES)
+);
 
 const HEAD_RE = /^[0-9a-f]{40}$/;
 const JSON_BLOCK_RE = /```json\s*\n([\s\S]*?)\n```/;
@@ -160,16 +166,25 @@ export function extractReceiptFromComment(body) {
 }
 
 export function classifyReceipt(receipt) {
-  if (receipt === null || typeof receipt !== 'object') {
+  const validation = validateReceipt(receipt);
+  if (!validation.ok) {
     return {
       releasable: false,
       detail: 'untyped-hold-manual-release-required',
     };
   }
-  if (!RELEASABLE_REASONS.includes(receipt.reason)) {
+  const normalized = validation.receipt;
+  const expectedSource = RELEASABLE_REASON_SOURCES[normalized.reason];
+  if (!expectedSource) {
     return {
       releasable: false,
-      detail: `held:unknown-reason:${receipt.reason}`,
+      detail: `held:unknown-reason:${normalized.reason}`,
+    };
+  }
+  if (normalized.source !== expectedSource) {
+    return {
+      releasable: false,
+      detail: `held:source-mismatch:${normalized.reason}:${normalized.source}`,
     };
   }
   return { releasable: true, detail: 'releasable' };

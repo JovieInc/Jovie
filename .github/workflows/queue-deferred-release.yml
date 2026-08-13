@@ -9,9 +9,10 @@ name: Queue-Deferred Release
 # mechanical hold, green drafts sat indefinitely (#15808/#15810/#15811).
 #
 # Triggers:
-#   workflow_run      — CI completion (a deferred PR's checks can only turn
-#                       green via a CI completion; same trigger-hygiene rule
-#                       as auto-ready, #13349)
+#   workflow_run      — PR CI completion, successful Production Controller,
+#                       or successful five-minute Fleet Gate Refresh. The last
+#                       two wake holds that were checked while the fleet was
+#                       AMBER, so an idle repository still self-heals to GREEN.
 #   workflow_dispatch — manual report/release sweep
 #
 # Two jobs run:
@@ -30,7 +31,7 @@ name: Queue-Deferred Release
 
 on:
   workflow_run:
-    workflows: ['CI']
+    workflows: ['CI', 'Production Controller', 'Fleet Gate Refresh']
     types: [completed]
   workflow_dispatch:
 
@@ -113,8 +114,16 @@ jobs:
     if: >-
       github.event_name != 'workflow_run' ||
       (
+        github.event.workflow_run.name == 'CI' &&
         github.event.workflow_run.event == 'pull_request' &&
         github.event.workflow_run.conclusion != 'cancelled'
+      ) ||
+      (
+        (
+          github.event.workflow_run.name == 'Production Controller' ||
+          github.event.workflow_run.name == 'Fleet Gate Refresh'
+        ) &&
+        github.event.workflow_run.conclusion == 'success'
       )
     # Fleet controller: use the hosted image contract so `gh` is always
     # available. Some self-hosted fast runners intentionally lack it.

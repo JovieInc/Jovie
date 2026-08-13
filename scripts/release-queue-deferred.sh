@@ -39,12 +39,15 @@
 #   ALARM_MINUTES            report-pass age alarm threshold (default 12)
 #   ATTEMPT_COOLDOWN_MINUTES min minutes between release attempts per PR
 #                            (default 30; one upserted marker comment per PR)
+#   QUEUE_READY_THRESHOLD    test/operator override for queue-pressure release;
+#                            defaults to the canonical merge-queue max depth
 set -euo pipefail
 
 # shellcheck source=./scripts/lib/gh-retry.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"
 
 REPO="${REPO:-JovieInc/Jovie}"
+REPO_OWNER="${REPO%%/*}"
 DRY_RUN="${DRY_RUN:-0}"
 RELEASE_MODE="${RELEASE_MODE:-both}"
 FLEET_RECEIPT_FILE="${FLEET_RECEIPT_FILE:-}"
@@ -54,6 +57,9 @@ ATTEMPT_COOLDOWN_MINUTES="${ATTEMPT_COOLDOWN_MINUTES:-30}"
 DEFERRAL_MARKER='<!-- bot-comment:queue-deferral -->'
 RELEASE_MARKER="queue-deferral-release"
 LIB="$(dirname "${BASH_SOURCE[0]}")/lib/queue-deferral-receipt.mjs"
+# Receipt comments are controller authority, not public-input authority. These
+# are the only identities used by the current workflow/Symphony writers.
+TRUSTED_DEFERRAL_AUTHORS='["itstimwhite","jovie-bot[bot]"]'
 # `queue-deferred` itself is expected; every OTHER hold label blocks release.
 OTHER_HOLD_RE='^(needs-human|hold|gated|fast|needs-conflict-resolution)$'
 AGENT_BRANCH_RE='^(tim/|codex/|agent/|claude/|linear/|codegen-bot/|symphony/)'
@@ -67,29 +73,81 @@ iso_to_epoch() {  # iso_to_epoch <iso> — empty output on unparseable input
 
 read_state() {  # read_state <num> — one API snapshot; discovery is never authorization
   gh_retry pr view "$1" -R "$REPO" \
-    --json isDraft,headRefOid,headRefName,labels,mergeable,state \
-    --jq '{draft: .isDraft, head: .headRefOid, branch: .headRefName, labels: [.labels[].name], mergeable: .mergeable, state: .state}'
+    --json isDraft,headRefOid,headRefName,headRepositoryOwner,baseRefName,labels,mergeable,state \
+    --jq '{draft: .isDraft, head: .headRefOid, branch: .headRefName, headOwner: .headRepositoryOwner.login, base: .baseRefName, labels: [.labels[].name], mergeable: .mergeable, state: .state}'
 }
 
 # Live state must still show an open, mergeable PR carrying queue-deferred (and
 # no other hold) on the exact expected head/branch.
 state_is_releasable() {  # state_is_releasable <json> <expected-head> <expected-branch>
-  jq -e --arg expected_head "$2" --arg expected_branch "$3" --arg other_hold_re "$OTHER_HOLD_RE" '
+  jq -e --arg expected_head "$2" --arg expected_branch "$3" --arg repo_owner "$REPO_OWNER" --arg other_hold_re "$OTHER_HOLD_RE" '
     .state == "OPEN"
     and .head == $expected_head
     and .branch == $expected_branch
+    and .headOwner == $repo_owner
+    and .base == "main"
     and .mergeable == "MERGEABLE"
     and ([.labels[] | select(. == "queue-deferred")] | length == 1)
     and ([.labels[] | select(test($other_hold_re))] | length == 0)
   ' <<<"$1" >/dev/null
 }
 
+# A queue-pressure receipt is not permission to discard the pressure policy.
+# Re-run the same ready-count contract immediately before release. This is
+# reason-specific: Symphony birth holds do not wait on queue depth once source
+# checks and the fleet gate are green.
+queue_pressure_allows_release() {  # queue_pressure_allows_release <candidate-pr>
+  local candidate="$1" threshold open_prs ready_count
+  if [[ -n "${QUEUE_READY_THRESHOLD:-}" ]]; then
+    threshold="$QUEUE_READY_THRESHOLD"
+  elif ! threshold="$(node "$(dirname "${BASH_SOURCE[0]}")/ci-merge-queue-check.mjs" max-queue-depth 2>/dev/null)"; then
+    echo "    ~ queue-pressure policy unavailable; leaving hold"
+    return 1
+  fi
+  if ! [[ "$threshold" =~ ^[1-9][0-9]*$ ]]; then
+    echo "    ~ queue-pressure threshold malformed; leaving hold"
+    return 1
+  fi
+  if ! open_prs="$(gh_retry pr list -R "$REPO" --state open --base main --limit 100 \
+      --json number,isDraft,mergeStateStatus,labels 2>/dev/null)"; then
+    echo "    ~ queue-pressure state unavailable; leaving hold"
+    return 1
+  fi
+  if ! ready_count="$(jq -er --argjson candidate "$candidate" '
+      [ .[]
+        | select(.number != $candidate)
+        | select(.isDraft == false)
+        | select(
+            (.labels | any(.name == "merge-queue")) or
+            (.mergeStateStatus == "CLEAN") or
+            (.mergeStateStatus == "UNSTABLE")
+          )
+      ] | length
+    ' <<<"$open_prs" 2>/dev/null)"; then
+    echo "    ~ queue-pressure state malformed; leaving hold"
+    return 1
+  fi
+  if (( ready_count >= threshold )); then
+    echo "    ~ queue pressure remains high (${ready_count} ready, threshold ${threshold}); leaving hold"
+    return 1
+  fi
+  echo "    ✓ queue pressure relieved (${ready_count} ready, threshold ${threshold})"
+}
+
 # Latest valid typed deferral receipt for a PR. Empty output = untyped hold.
 deferral_receipt_for_pr() {  # deferral_receipt_for_pr <num>
-  local body
-  body="$(gh_retry api "repos/${REPO}/issues/${1}/comments" --paginate \
-    --jq "[.[] | select(.body | contains(\"${DEFERRAL_MARKER}\")) | .body] | last // empty" \
+  local raw body
+  raw="$(gh_retry api "repos/${REPO}/issues/${1}/comments" --paginate --slurp \
     2>/dev/null || true)"
+  [[ -z "$raw" ]] && return 0
+  body="$(jq -r --arg marker "$DEFERRAL_MARKER" \
+    --argjson trusted "$TRUSTED_DEFERRAL_AUTHORS" '
+      [ .[][]?
+        | select(.user.login as $login | $trusted | index($login))
+        | select((.body | type == "string") and (.body | contains($marker)))
+        | .body
+      ] | last // empty
+    ' <<<"$raw" 2>/dev/null || true)"
   [[ -z "$body" ]] && return 0
   node "$LIB" extract <<<"$body" 2>/dev/null || true
 }
@@ -162,7 +220,8 @@ mark_ready() {  # mark_ready <num>
 echo "=== QUEUE-DEFERRED: scanning open queue-deferred agent PRs ==="
 
 SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-  --json number,title,isDraft,mergeable,labels,headRefName,headRefOid,updatedAt --jq '
+  --base main \
+  --json number,title,isDraft,mergeable,labels,headRefName,headRefOid,headRepositoryOwner,updatedAt --jq '
   [ .[] | {
     n: .number,
     t: (.title[0:48]),
@@ -170,12 +229,14 @@ SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
     m: .mergeable,
     head: .headRefName,
     oid: .headRefOid,
+    owner: .headRepositoryOwner.login,
     updated: .updatedAt,
     L: [.labels[].name]
   } ]')"
 
-CANDIDATES="$(jq -c --arg branch_re "$AGENT_BRANCH_RE" '.[]
+CANDIDATES="$(jq -c --arg branch_re "$AGENT_BRANCH_RE" --arg repo_owner "$REPO_OWNER" '.[]
   | select([.L[]] | any(. == "queue-deferred"))
+  | select(.owner == $repo_owner)
   | select(.head | test($branch_re))' <<<"$SNAP")"
 
 if [[ -z "$CANDIDATES" ]]; then
@@ -269,6 +330,15 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
         echo "    ~ ${classification}"
         continue
       fi
+      receipt_pr="$(jq -r '.pr' <<<"$receipt")"
+      if [[ "$receipt_pr" != "$n" ]]; then
+        echo "    ~ deferral-receipt-pr-mismatch (receipt=#${receipt_pr}, live=#${n}); a fresh receipt is required"
+        continue
+      fi
+      reason="$(jq -r '.reason' <<<"$receipt")"
+      if [[ "$reason" == "queue-pressure" ]] && ! queue_pressure_allows_release "$n"; then
+        continue
+      fi
       receipt_head="$(jq -r '.head' <<<"$receipt")"
       if [[ "$receipt_head" != "$expected_head" ]]; then
         echo "    ~ deferral-receipt-head-stale (receipt=${receipt_head:0:12}, live=${expected_head:0:12}); a fresh receipt is required"
@@ -340,7 +410,6 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
       held_after="$(jq -r '[.labels[] | select(. == "queue-deferred" or . == "needs-human" or . == "hold" or . == "gated" or . == "fast" or . == "needs-conflict-resolution")] | join(",")' <<<"$after")"
 
       if [[ "$state_after" == "OPEN" && "$draft_after" == "false" && "$head_after" == "$expected_head" && -z "$held_after" ]]; then
-        reason="$(jq -r '.reason' <<<"$receipt")"
         upsert_status_comment "$n" "🤖 Queue-deferred release: typed hold (\`${reason}\`) lifted under a fresh GREEN fleet receipt with all required checks passing — PR is ready for review; the merge-queue controller revalidates this exact head before enrollment. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
       else
         [[ "$was_draft" == "true" && "$draft_after" == "false" ]] && { gh_retry pr ready "$n" -R "$REPO" --undo >/dev/null 2>&1 || true; }

@@ -4,6 +4,7 @@ import {
   extractReceiptFromComment,
   QUEUE_DEFERRAL_MARKER,
   QUEUE_DEFERRAL_SCHEMA,
+  RELEASABLE_REASON_SOURCES,
   RELEASABLE_REASONS,
   renderReceiptComment,
   validateReceipt,
@@ -122,7 +123,13 @@ describe('renderReceiptComment + extractReceiptFromComment', () => {
 
 describe('classifyReceipt', () => {
   it.each(RELEASABLE_REASONS)('releases the mechanical reason %s', reason => {
-    expect(classifyReceipt({ ...VALID, reason })).toEqual({
+    expect(
+      classifyReceipt({
+        ...VALID,
+        reason,
+        source: RELEASABLE_REASON_SOURCES[reason],
+      })
+    ).toEqual({
       releasable: true,
       detail: 'releasable',
     });
@@ -135,6 +142,25 @@ describe('classifyReceipt', () => {
     });
     expect(releasable).toBe(false);
     expect(detail).toBe('held:unknown-reason:human-repair');
+  });
+
+  it('holds a releasable reason written by the wrong source', () => {
+    expect(
+      classifyReceipt({
+        ...VALID,
+        source: 'public-commenter',
+      })
+    ).toEqual({
+      releasable: false,
+      detail: 'held:source-mismatch:symphony-birth-hold:public-commenter',
+    });
+  });
+
+  it('holds structurally invalid objects even when the reason looks releasable', () => {
+    expect(classifyReceipt({ reason: 'symphony-birth-hold' })).toEqual({
+      releasable: false,
+      detail: 'untyped-hold-manual-release-required',
+    });
   });
 
   it('holds missing receipts as untyped manual holds', () => {
