@@ -3,12 +3,12 @@ import type { Meta } from '@storybook/nextjs-vite';
 /**
  * Shared Storybook parameters for marketing catalog stories (JOV-4420).
  *
- * Marketing surfaces are dark-only System A, fully static (`revalidate = false`),
+ * Marketing surfaces use the unified editorial language and are fully static (`revalidate = false`),
  * and must render product compositions — never design-studio fakes or pure-black
  * story chrome (see scripts/storybook-story-quality-guard.mjs).
  */
 export const MARKETING_STORY_DESCRIPTION = [
-  'System A marketing surface (dark-only).',
+  'Unified-system marketing surface with the editorial language.',
   'Production routes use `export const revalidate = false` (fully static).',
   'Proof/trust sections only render with verified or fixture-safe data; zero-proof path omits the section.',
   'Visual entry after Brief → resolveComposition (see docs/marketing/AGENT_GUIDE.md).',

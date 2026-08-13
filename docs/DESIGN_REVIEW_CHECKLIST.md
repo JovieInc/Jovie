@@ -1,5 +1,8 @@
 # Design Review Checklist
 
+> `DESIGN.md` is authoritative. This checklist is a review aid and must not
+> introduce geometry, palette, or component rules of its own.
+
 ## Icon Usage Standards ✅
 
 When reviewing PRs or design implementations, ensure the following icon standards are met:
@@ -77,10 +80,9 @@ When reviewing PRs or design implementations, ensure the following icon standard
   </IconButton>
   ```
 
-- [ ] **IconBadge component** for icon badges
-  ```tsx
-  <IconBadge Icon={BoltIcon} colorVar="--color-yellow-500" />
-  ```
+- [ ] **No decorative icon badge**: decorative icons render unboxed, without a
+  border, ring, circle, or colored plate. Use a semantic status component only
+  when the container itself carries meaning.
 
 - [ ] **SocialIcon component** for social/brand icons
   ```tsx
@@ -192,4 +194,3 @@ The following automated checks help enforce these standards:
 ---
 
 *This checklist ensures consistent, accessible, and maintainable icon usage across the Jovie application.*
-

@@ -1,5 +1,8 @@
 # Token Inventory
 
+> **Historical migration inventory.** Retained for provenance. The live token
+> registry and `DESIGN.md` override captured values in this document.
+
 This document records the current token sources and the canonical values already present in production code. It is an inventory artifact for the consolidation plan, not a redesign proposal.
 
 ## Source files
@@ -173,8 +176,7 @@ Defined primarily in `apps/web/styles/linear-tokens.css` and consumed through cl
 
 #### Canonical public widths
 
-- `MarketingContainer landing`: `1280px`
-- `MarketingContainer page`: `1120px`
+- `MarketingContainer landing/page`: `1298px` (`--ds-public-content-max`)
 - `MarketingContainer prose`: `680px`
 
 #### Existing marketing/layout size tokens

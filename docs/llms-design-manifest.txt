@@ -27,6 +27,18 @@
 - No emoji in UI — use Lucide icons or approved SVGs.
 - Title Case for labels/buttons; sentence case for body, tooltips, and toasts.
 
+## Canonical Invariants
+
+- `no-serif-product-source` — Product source uses Inter and Satoshi only; serif media requires an exact approved exception.
+- `marketing-pill-32-visible-44-target` — Marketing pills are 32px visible inside a 44px minimum hit target.
+- `marketing-o-mark-32` — The marketing O-mark is visibly 32px and control-aligned.
+- `semantic-accent-only` — Accent color communicates semantic state or a named data category, never decoration.
+- `decorative-icons-unboxed` — Decorative icons and emoji have no border, ring, circle, or badge plate.
+- `single-component-family` — One canonical component family owns a concept; supported states are variants consumed as instances.
+- `founder-review-canonical-only` — Founder review contains canonical masters and intentional variants, without receipts, duplicates, or filler.
+- `pen-source-identity-boundary` — Pen is proposal/review evidence until source identity and required persistence receipts pass.
+- `logo-visible-bounds-normalization` — Logos normalize visible non-transparent ink through the shared asset registry, never route-local crop or scale CSS.
+
 ## Canonical Tailwind Utilities
 
 - `max-w-public-content` — public/marketing container (1298px)
@@ -38,7 +50,7 @@
 - `border-subtle`, `border-default`, `border-strong`
 - `focus-ring-themed` or `focus-visible:*` on interactive elements
 
-## Design Tokens (245 contract tokens; 461 total in CSS)
+## Design Tokens (246 contract tokens; 462 total in CSS)
 
 Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.
 
@@ -277,6 +289,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--space-1`: 0.25rem
 - `--space-1-5`: 0.375rem
 - `--space-10`: 2.5rem
+- `--space-11`: 2.75rem
 - `--space-12`: 3rem
 - `--space-16`: 4rem
 - `--space-2`: 0.5rem
@@ -336,7 +349,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--ease-subtle`: var(--ds-motion-subtle-easing)
 - `--page-pad`: clamp(16px, 4vw, 32px)
 
-## Shared UI Components (36 atom primitives)
+## Shared UI Components (37 atom primitives)
 
 Import from `@jovie/ui` — do not recreate local atom copies.
 
@@ -353,6 +366,7 @@ Import from `@jovie/ui` — do not recreate local atom copies.
 - **DropdownMenu** — `packages/ui/atoms/dropdown-menu.tsx`
 - **Field** — `packages/ui/atoms/field.tsx`
 - **Form** — `packages/ui/atoms/form.tsx`
+- **IconButton** — `packages/ui/atoms/icon-button.tsx`
 - **InlineOffline** — `packages/ui/atoms/inline-offline.tsx`
 - **Input** — `packages/ui/atoms/input.tsx`
 - **InputGroup** — `packages/ui/atoms/input-group.tsx`

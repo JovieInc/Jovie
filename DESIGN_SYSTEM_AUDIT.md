@@ -1,5 +1,9 @@
 # Design System Audit
 
+> **Historical audit snapshot.** Retained for provenance; it is not active
+> design authority. Current rules live in `DESIGN.md`, typed registries, and
+> `docs/llms-design-manifest.txt` in that order.
+
 Tracking issue: [JOV-2712](https://linear.app/jovie/issue/JOV-2712/track-platform-hardening-deliverables-and-ios-evidence-baseline)
 
 ## Scope

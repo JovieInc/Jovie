@@ -208,7 +208,7 @@ import { IconButton } from '@/components/atoms/IconButton';
 </IconButton>
 ```
 
-#### IconBadge Component
+#### Historical IconBadge migration
 ```tsx
 // Before
 <div className="rounded-full bg-yellow-100 p-2">
@@ -217,9 +217,8 @@ import { IconButton } from '@/components/atoms/IconButton';
 
 // After
 import { Bolt } from 'lucide-react';
-import { IconBadge } from '@/components/atoms/IconBadge';
-
-<IconBadge Icon={Bolt} colorVar="--color-yellow-500" />
+Do not introduce `IconBadge` for decoration. Decorative icons are unboxed;
+meaningful status containers use the current semantic component registry.
 ```
 
 ## Common Icon Mappings

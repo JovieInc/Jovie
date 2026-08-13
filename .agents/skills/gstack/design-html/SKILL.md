@@ -798,7 +798,7 @@ PRETEXT API CHEATSHEET:
 
 prepare(text, font) → handle
   One-time text measurement. Call after document.fonts.ready.
-  Font: CSS shorthand like '16px Inter' or 'bold 24px Georgia'.
+  Font: CSS shorthand like '16px Inter' or 'bold 24px Satoshi'.
 
 layout(prepared, maxWidth, lineHeight) → { height, lineCount }
   Fast layout computation. Call on every resize. Sub-millisecond.

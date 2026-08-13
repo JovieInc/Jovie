@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {
   buildLlmsDesignManifest,
+  CANONICAL_DESIGN_INVARIANTS,
   categorizeTokens,
   filterContractTokens,
   filterDesignEslintRules,
@@ -112,6 +113,10 @@ test('buildLlmsDesignManifest includes required llms.txt sections', () => {
   assert.match(manifest, /## Design Tokens/);
   assert.match(manifest, /## Shared UI Components/);
   assert.match(manifest, /## Canonical Surfaces/);
+  assert.match(manifest, /## Canonical Invariants/);
+  for (const [id] of CANONICAL_DESIGN_INVARIANTS) {
+    assert.ok(manifest.includes(`\`${id}\``));
+  }
   assert.match(manifest, /## ESLint Design Guardrails/);
   assert.match(manifest, /@jovie\/no-raw-motion-values/);
 });

@@ -102,17 +102,23 @@ The main content area (`<main>`) uses `bg-(--linear-app-content-surface)`, a ded
 
 ### Color & Accent Discipline
 
-Canonical accents are the carbon palette (dark): gray `#8d8d93`, blue `#4d7dff`, purple `#9b4dff`, pink `#ea4a9c`, red `#ff4d5f`, orange `#ffab2e`, green `#43b85c`, teal `#22b8a7`. Use the Tailwind token utilities (`text-accent-blue`, `bg-accent-purple-subtle`, …), never arbitrary hex.
+`DESIGN.md` is canonical. Accent color is semantic only: status, focus,
+selection, active navigation, links, or a named data category. Do not rotate
+accent colors between sections, ornament title text, or place decorative icons
+on colored squares. CTAs remain neutral high-contrast pills. Color never
+carries status alone.
 
-- **Semantics are reserved:** green = success, red = error, orange = warning, blue = info.
-- **Prefer blue / purple / pink** for primary and decorative accents.
-- **Red/green gating by count:** at low density use red & green ONLY for their semantic meaning. When a single view has **≥4 categorical variables** (e.g. 5 metrics/series), the full palette including red & green is allowed as categorical colors — at that density they read as categories, not status.
-- **1–2 colors on a page → avoid red, green, yellow, and orange.** Use blue/purple/pink or greyscale.
-- **Never a single global accent.** Do not theme a whole screen in one accent. **Rotate per section** (one section blue, the next pink, the next purple…) or fall back to greyscale / black / white. Greyscale is the default; color is the exception, used to differentiate.
-- **Interactive accent is the exception to rotation:** links, focus rings, active states, and emphasized waveforms use the consistent `--color-accent` (`#7170ff`, blue-purple) — a focus/emphasis color, not a CTA color.
-- **CTAs are never saturated** — white-on-black pills (`--radius-pill: 9999px`). Accent goes on **title text**, never on an icon-on-colored-square.
+### Locked Marketing Geometry and Review
 
-Canonical source: the "Jovie Design System" project on claude.ai/design (read via the DesignSync tool; its `SKILL.md` is the contract). See `DESIGN.md` for the full system.
+- Marketing pill controls are visibly 32px high inside a 44px minimum target.
+- The marketing O-mark is visibly 32px and shares the control alignment.
+- Decorative icons and emoji have no border, ring, circle, or badge container.
+- Reuse one canonical component family; encode supported states as variants and
+  consume instances. Do not create route-local masters.
+- Founder review contains only canonical masters and intentional variants. Put
+  receipts, duplicates, mappings, and process copy in operator artifacts.
+- Pen is proposal/review evidence until source identity, save/readback, and
+  persistence contracts pass. Visual similarity is not source backing.
 
 ### No Duplicate Page Titles (Breadcrumb + Toolbar)
 
