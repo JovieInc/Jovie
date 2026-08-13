@@ -19,6 +19,53 @@ import {
   secondaryStorage,
 } from '@/lib/auth/secondary-storage';
 
+describe('Better Auth database-authoritative verification storage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.env.VERCEL_ENV = 'production';
+    resetSecondaryStorageMemoryForTests();
+  });
+
+  it('keeps verification values entirely off Redis', async () => {
+    const redis = {
+      get: vi.fn().mockResolvedValue('stale-verification'),
+      set: vi.fn().mockResolvedValue('OK'),
+      getdel: vi.fn().mockResolvedValue('stale-verification'),
+      del: vi.fn().mockResolvedValue(1),
+    };
+    mocks.getRedis.mockReturnValue(redis);
+    const key = 'verification:sign-in-otp-creator-ready@jovie.test';
+
+    await expect(secondaryStorage.get(key)).resolves.toBeNull();
+    await expect(secondaryStorage.set(key, 'value', 600)).resolves.toBe(
+      undefined
+    );
+    await expect(secondaryStorage.getAndDelete(key)).resolves.toBeNull();
+    await expect(secondaryStorage.delete(key)).resolves.toBeUndefined();
+
+    expect(redis.get).not.toHaveBeenCalled();
+    expect(redis.set).not.toHaveBeenCalled();
+    expect(redis.getdel).not.toHaveBeenCalled();
+    expect(redis.del).not.toHaveBeenCalled();
+  });
+
+  it('keeps non-verification deletion fail-closed', async () => {
+    const failure = new Error('redis quota exhausted');
+    const del = vi.fn().mockRejectedValue(failure);
+    mocks.getRedis.mockReturnValue({ del });
+
+    await expect(secondaryStorage.delete('session-token')).rejects.toThrow(
+      'Secondary storage delete failed closed after retry'
+    );
+    expect(del).toHaveBeenCalledTimes(2);
+    expect(mocks.captureError).toHaveBeenCalledWith(
+      'Better Auth secondary storage delete failed after retry',
+      failure,
+      { operation: 'secondary-storage.delete' }
+    );
+  });
+});
+
 describe('Better Auth secondary storage getAndDelete', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -87,6 +87,11 @@ function getOptions() {
 }
 
 describe('Better Auth base URL', () => {
+  it('keeps verification values database-backed when Redis is secondary', () => {
+    expect(getOptions().verification).toEqual({ storeInDatabase: true });
+    expect(getOptions().secondaryStorage).toBeDefined();
+  });
+
   it('derives request-specific URLs from exact trusted hosts', () => {
     expect(getOptions().baseURL).toEqual({
       allowedHosts: [

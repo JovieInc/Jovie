@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- [internal] **Production sign-in stays available when Redis is exhausted (JOV-5021):** one-time verification records now rely on their existing atomic Postgres store instead of a duplicate Redis cache, while session and revocation deletion retains its fail-closed protection.
 - [internal] **Protected Vercel canaries use the dedicated deploy-health contract (JOV-5013):** exact preview and staged-production verification no longer depend on the rate-limited general health endpoint; staging previews receive their canonical app/profile origins at runtime; and environment plus database checks must both report healthy before promotion.
 - [internal] **iPhone vlog takes have a durable local script-following core:** cumulative speech partials advance a karaoke cursor, off-script speech can recover without forcing alignment, manual resume preserves its recognition anchor, and local session JSON keeps the script, transcript, timing segments, and recording filename linked without upload.
 - **Public pages now share one adaptable conversion header:** each landing page can supply its own primary action and destination, artist-profile pages use the profile-claim path, and the temporary Jovie identity treatment now carries enough visual weight to balance the icon.
