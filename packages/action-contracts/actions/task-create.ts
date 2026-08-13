@@ -32,20 +32,22 @@ export const TASK_PRIORITIES = [
 /** Mirrors the domain task assignee-kind enum. */
 export const TASK_ASSIGNEE_KINDS = ['human', 'jovie'] as const;
 
-const isoDateSchema = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
-
 export const taskCreateInputSchema = z.object({
   title: z.string().trim().min(1).max(200),
   description: z.string().max(2000).optional(),
   status: z.enum(TASK_STATUSES).optional(),
   priority: z.enum(TASK_PRIORITIES).optional(),
   assigneeKind: z.enum(TASK_ASSIGNEE_KINDS).optional(),
+  /** Mirrors canonical `CreateTaskInput.assigneeUserId` (an app user id). */
+  assigneeUserId: z.uuid().nullish(),
   /** Attach to a release owned by the same profile. */
   releaseId: z.uuid().optional(),
   parentTaskId: z.uuid().optional(),
-  dueDate: isoDateSchema.optional(),
+  /** Canonical `CreateTaskInput` date fields; ISO datetimes on the wire. */
+  dueAt: z.iso.datetime().nullish(),
+  scheduledFor: z.iso.datetime().nullish(),
+  startedAt: z.iso.datetime().nullish(),
+  completedAt: z.iso.datetime().nullish(),
   category: z.string().trim().min(1).max(100).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });

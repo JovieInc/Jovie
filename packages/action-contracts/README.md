@@ -34,6 +34,12 @@ materially different effect receives a different ID.
   optional `confirmationToken`. Also the six-status `ActionResult` union and
   the durable `ActionReceipt`. Context fields live in the envelope, never
   inside domain input schemas.
+- `client-version.ts` — the deterministic client-version gate.
+  `minimumClientVersions[channel]` declares the oldest client build that may
+  invoke an action on that channel; discovery evaluates the envelope
+  `clientVersion` against it and resolves gated actions as
+  `CLIENT_UPGRADE_REQUIRED`. The gate fails closed: a missing or malformed
+  version counts as below the minimum.
 - `errors.ts` — the stable error vocabulary (`ACTION_ERROR_CODES`), the
   structured `ActionError` (`code`, `messageKey`, `retryable`, optional
   `fieldIssues`/`upgrade`/`handoff`), `EntityRef`, and the semantic

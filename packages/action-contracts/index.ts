@@ -2,6 +2,7 @@ export * from './actions/chat-start';
 export * from './actions/contact-create';
 export * from './actions/release-create';
 export * from './actions/task-create';
+export * from './client-version';
 export * from './descriptor';
 export * from './errors';
 export * from './ids';
