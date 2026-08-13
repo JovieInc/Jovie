@@ -7,6 +7,8 @@
  */
 
 import { preAdmissionDecision } from './admission-policy.mjs';
+import { contextGateReceipt } from './context-gate.mjs';
+import { researchGateReceipt } from './research-gate.mjs';
 import { scoreIssue } from './scorer.mjs';
 import { verifyRoutingReceipt } from './symphony-routing.mjs';
 
@@ -654,7 +656,14 @@ export function buildAdmissionReceipt(
   issue,
   { now = new Date().toISOString(), fingerprint = '' } = {}
 ) {
-  return `${ADMISSION_RECEIPT_PREFIX}${JSON.stringify({ issue: issue.identifier, fingerprint, action: 'lease', at: now })} -->`;
+  return `${ADMISSION_RECEIPT_PREFIX}${JSON.stringify({
+    issue: issue.identifier,
+    fingerprint,
+    contextFingerprint: contextGateReceipt(issue)?.payload?.fingerprint || '',
+    researchFingerprint: researchGateReceipt(issue)?.payload?.fingerprint || '',
+    action: 'lease',
+    at: now,
+  })} -->`;
 }
 
 function hasReceipt(issue, receipt) {
@@ -822,6 +831,18 @@ export async function admitIssue({
   ) {
     return { status: 'already-admitted', identifier: issue.identifier };
   }
+
+  // Fail closed before lease: the pre-lease GBrain context and research
+  // receipts must revalidate semantically against the current issue
+  // (JOV-5032). A GBrain outage surfaces earlier as a typed context-gate
+  // system-blocker; a missing or stale receipt here is a rejection.
+  if (!contextGateReceipt(issue, { now }))
+    return { status: 'rejected', reason: 'context-receipt-missing-or-invalid' };
+  if (!researchGateReceipt(issue, { now }))
+    return {
+      status: 'rejected',
+      reason: 'research-receipt-missing-or-invalid',
+    };
 
   let current = issue;
   if (current.state?.name !== 'Todo') {

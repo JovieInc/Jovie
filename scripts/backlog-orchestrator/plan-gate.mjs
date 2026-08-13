@@ -8,6 +8,8 @@
 
 import { createHash } from 'node:crypto';
 import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
+import { contextGateReceipt } from './context-gate.mjs';
+import { researchGateReceipt } from './research-gate.mjs';
 
 export const PLAN_GATE_SCHEMA = 'plan-gate/v1';
 export const PLAN_GATE_PREFIX = '<!-- plan-gate/v1 -->';
@@ -99,7 +101,6 @@ export function validatePlanCandidate(issue, evidence) {
   const required = [
     ['repo', evidence.repo],
     ['project', evidence.project],
-    ['owner', evidence.owner],
     ['scope', evidence.scope],
     ['acceptance', evidence.acceptance],
     ['test', evidence.test],
@@ -111,6 +112,16 @@ export function validatePlanCandidate(issue, evidence) {
       : !nonEmptyString(value)
   );
   if (missing) return `missing-${missing[0]}-evidence`;
+
+  // Ownership roles are explicit and consistent (JOV-5032): Symphony owns
+  // implementation through draft PR / In Review; Gem + GitHub own
+  // verification, queue, merge, deploy, and production receipts. The
+  // ambiguous single `owner` field is intentionally not accepted.
+  if (
+    evidence.owners?.implementation !== 'Symphony' ||
+    evidence.owners?.verification !== 'Gem'
+  )
+    return 'ownership-roles-invalid';
 
   const state = issue.state?.name || issue.state;
   if (!ALLOWED_STATES.has(state)) return 'ambiguous-or-inactive-state';
@@ -143,7 +154,10 @@ function normalizedEvidence(evidence) {
     bounded: true,
     repo: evidence.repo.trim(),
     project: evidence.project.trim(),
-    owner: evidence.owner.trim(),
+    owners: {
+      implementation: evidence.owners.implementation.trim(),
+      verification: evidence.owners.verification.trim(),
+    },
     scope: evidence.scope.trim(),
     acceptance: Array.isArray(evidence.acceptance)
       ? evidence.acceptance.map(item => item.trim())
@@ -167,6 +181,9 @@ export function buildPlanGateReceipt(issue, evidence) {
     schema: PLAN_GATE_SCHEMA,
     issue: issue.identifier,
     fingerprint: planGateFingerprint(issue, evidence),
+    contextFingerprint: contextGateReceipt(issue)?.payload?.fingerprint || null,
+    researchFingerprint:
+      researchGateReceipt(issue)?.payload?.fingerprint || null,
     evidence: normalizedEvidence(evidence),
   };
   return `${PLAN_GATE_PREFIX}\n${JSON.stringify(payload)}\n${PLAN_GATE_SUFFIX}`;
@@ -231,10 +248,26 @@ function labelIds(issue, labelId) {
 /**
  * Write exactly one plan receipt, or return an idempotent no-op. The client is
  * injected so this boundary remains unit-testable without touching Linear.
+ * Plan approval is fail-closed on the pre-lease context and research
+ * receipts: they are revalidated semantically against the current issue
+ * before any plan mutation is written (JOV-5032).
  */
-export async function approvePlan({ issue, evidence, client, teamId = null }) {
+export async function approvePlan({
+  issue,
+  evidence,
+  client,
+  teamId = null,
+  now = new Date().toISOString(),
+}) {
   const reason = validatePlanCandidate(issue, evidence);
   if (reason) return { status: 'rejected', reason };
+  if (!contextGateReceipt(issue, { now }))
+    return { status: 'rejected', reason: 'context-receipt-missing-or-invalid' };
+  if (!researchGateReceipt(issue, { now }))
+    return {
+      status: 'rejected',
+      reason: 'research-receipt-missing-or-invalid',
+    };
 
   const receipt = buildPlanGateReceipt(issue, evidence);
   if (hasReceipt(issue, receipt) && hasLabel(issue, PLAN_APPROVED_LABEL)) {

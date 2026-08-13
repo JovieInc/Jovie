@@ -21,6 +21,7 @@ const admitter = await import('../admitter.mjs');
 const routing = await import('../symphony-routing.mjs');
 const triageRouter = await import('../triage-router.mjs');
 const deterministicGates = await import('../deterministic-gates.mjs');
+const { withPreLeaseReceipts } = await import('./pre-lease.mjs');
 
 describe('team production health contract', () => {
   it('uses a direct bounded LYB artifact instead of the redirecting homepage', async () => {
@@ -1963,10 +1964,13 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
   });
 
   it('verifies state, labels, and receipt by reread after mutation', async () => {
-    const issue = admissionIssue({
-      state: 'Triage',
-      labels: ['plan-approved', 'admission-approved'],
-    });
+    const issue = withPreLeaseReceipts(
+      admissionIssue({
+        state: 'Triage',
+        labels: ['plan-approved', 'admission-approved'],
+      }),
+      { now: '2026-07-29T00:00:00.000Z' }
+    );
     const afterTransition = admissionIssue({
       state: 'Todo',
       labels: ['plan-approved', 'admission-approved'],
