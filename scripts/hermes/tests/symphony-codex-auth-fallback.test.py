@@ -788,7 +788,7 @@ class FallbackTests(unittest.TestCase):
                 side_effect=lambda command: controls.append(command) or True,
             ),
         ):
-            self.assertEqual(module.reconcile(), 2)
+            self.assertEqual(module.reconcile(), module.EXIT_DEGRADED)
 
         self.assertTrue(any("stop" in command for command in controls))
         self.assertTrue(any(command[0] == "systemd-run" for command in controls))
@@ -814,7 +814,7 @@ class FallbackTests(unittest.TestCase):
                 side_effect=lambda command: controls.append(command) or True,
             ),
         ):
-            self.assertEqual(module.reconcile(), 2)
+            self.assertEqual(module.reconcile(), module.EXIT_DEGRADED)
 
         self.assertTrue(any(command[0] == "systemd-run" for command in controls))
         self.assertFalse(any("start" in command for command in controls))
@@ -838,7 +838,7 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "_issue_meta", return_value=(False, "blocked", None)),
             mock.patch.object(module, "_control", side_effect=control),
         ):
-            self.assertEqual(module.reconcile(), 2)
+            self.assertEqual(module.reconcile(), module.EXIT_DEGRADED)
 
         primary_checks = [
             command for command in controls

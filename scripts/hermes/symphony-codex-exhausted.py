@@ -49,6 +49,20 @@ BLOCKED_ADMISSION_LABELS = frozenset(
 )
 SUPPORTED_TEAMS = frozenset(("JOV", "LYB"))
 
+# Exit-status contract consumed by systemd: the versioned
+# symphony-grok-sidecar.service declares SuccessExitStatus=0 2, so only the
+# codes below classify how the oneshot unit lands.
+#   EXIT_SAFE_FAIL_CLOSED (2): typed safe fail-closed exit. Runtime state was
+#       preserved and verified (codex_readiness_indeterminate,
+#       *_symphony_unchanged, grok_unchanged, symphony_restored). An expected
+#       result that must NOT mark the unit failed.
+#   EXIT_DEGRADED (3): a real controller failure — Symphony left stopped, Grok
+#       ownership unknowable after a mutation, or restore/start failed. Must
+#       keep failing the unit so the outage stays visible.
+# check-admission and install keep their own separate exit-code contracts.
+EXIT_SAFE_FAIL_CLOSED = 2
+EXIT_DEGRADED = 3
+
 LINEAR_QUERY = """
 query {
   issues(
@@ -431,16 +445,16 @@ def reconcile() -> int:
         active = _active_grok_units()
         if active is None:
             print("codex_not_exhausted grok_state_query_failed", file=sys.stderr)
-            return 2
+            return EXIT_SAFE_FAIL_CLOSED
         if active:
             print("codex_not_exhausted recovery_deferred grok_ship_active", file=sys.stderr)
             return 0
         if not _control(_systemctl("start", *SERVICES)):
             print("codex_not_exhausted symphony_start_failed", file=sys.stderr)
-            return 2
+            return EXIT_DEGRADED
         if not _services_active():
             print("codex_not_exhausted symphony_not_active", file=sys.stderr)
-            return 2
+            return EXIT_DEGRADED
         print("codex_not_exhausted symphony_active idle", file=sys.stderr)
         return 0
 
@@ -453,7 +467,7 @@ def reconcile() -> int:
             f"codex_readiness_indeterminate {reason} symphony_unchanged",
             file=sys.stderr,
         )
-        return 2
+        return EXIT_SAFE_FAIL_CLOSED
 
     # Prove the fallback control plane before stopping Symphony. Otherwise a
     # transient Linear, filesystem, or systemd observation failure can turn a
@@ -464,21 +478,21 @@ def reconcile() -> int:
             "codex_exhausted grok_executable_missing symphony_unchanged",
             file=sys.stderr,
         )
-        return 2
+        return EXIT_SAFE_FAIL_CLOSED
     identifiers = _linear_identifiers()
     if identifiers is None:
         print(
             "codex_exhausted linear_query_failed symphony_unchanged",
             file=sys.stderr,
         )
-        return 2
+        return EXIT_SAFE_FAIL_CLOSED
     active = _active_grok_units()
     if active is None:
         print(
             "codex_exhausted grok_state_query_failed symphony_unchanged",
             file=sys.stderr,
         )
-        return 2
+        return EXIT_SAFE_FAIL_CLOSED
     if not identifiers and not active:
         print(
             f"codex_exhausted {reason} no_admitted_work symphony_unchanged",
@@ -491,7 +505,7 @@ def reconcile() -> int:
             f"codex_exhausted {reason} grok_capacity_zero symphony_unchanged",
             file=sys.stderr,
         )
-        return 2
+        return EXIT_SAFE_FAIL_CLOSED
 
     # Symphony is the sole implementation owner. Stop its scheduler before
     # launching any new Grok worker so Todo/In Progress work can never have two
@@ -501,7 +515,7 @@ def reconcile() -> int:
     # has released its scheduler before a new owner starts.
     if not _control(_systemctl("stop", *SERVICES)):
         print("codex_exhausted symphony_stop_failed grok_unchanged", file=sys.stderr)
-        return 2
+        return EXIT_SAFE_FAIL_CLOSED
 
     active_units = set(active)
     capacity_used = len(active_units)
@@ -543,7 +557,7 @@ def reconcile() -> int:
             f"codex_exhausted {reason} grok_state_query_failed symphony_stopped",
             file=sys.stderr,
         )
-        return 2
+        return EXIT_DEGRADED
     if final_active:
         started = len(launched_units.intersection(final_active))
         print(f"codex_exhausted {reason} grok_started={started}", file=sys.stderr)
@@ -558,14 +572,14 @@ def reconcile() -> int:
                 f"codex_exhausted {reason} grok_cleanup_failed symphony_stopped",
                 file=sys.stderr,
             )
-            return 2
+            return EXIT_DEGRADED
         cleared = _active_grok_units()
         if cleared is None or cleared:
             print(
                 f"codex_exhausted {reason} grok_cleanup_unverified symphony_stopped",
                 file=sys.stderr,
             )
-            return 2
+            return EXIT_DEGRADED
 
     # No fallback owner survived the handoff. Restore the primary owner and
     # verify it is active so this failure path self-heals instead of stranding a
@@ -575,18 +589,18 @@ def reconcile() -> int:
             f"codex_exhausted {reason} grok_started=0 symphony_restore_failed",
             file=sys.stderr,
         )
-        return 2
+        return EXIT_DEGRADED
     if not _services_active():
         print(
             f"codex_exhausted {reason} grok_started=0 symphony_not_active",
             file=sys.stderr,
         )
-        return 2
+        return EXIT_DEGRADED
     print(
         f"codex_exhausted {reason} grok_started=0 symphony_restored",
         file=sys.stderr,
     )
-    return 2
+    return EXIT_SAFE_FAIL_CLOSED
 
 
 class InstallValidationError(Exception):
