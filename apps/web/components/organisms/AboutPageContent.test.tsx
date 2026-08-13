@@ -122,12 +122,16 @@ describe('AboutPageContent', () => {
       source: 'apps/web/components/organisms/AboutPageContent.tsx',
       sourceExport: 'AboutPageContent',
       storyExport: 'Web016About',
-      sourceSha: 'c767a55d279c69fbddb32324f78faced8938884c',
+      sourceAuditBaseSha: 'c767a55d279c69fbddb32324f78faced8938884c',
+      containingMergeSha: '841866b0a7891bb064958af2cbbdf09b3cd3b1b3',
       proofScope: 'system-b-body-only',
       implementation: 'exact-production-body',
     });
     expect(storySource).toContain(
-      "sourceSha: 'c767a55d279c69fbddb32324f78faced8938884c'"
+      "sourceAuditBaseSha: 'c767a55d279c69fbddb32324f78faced8938884c'"
+    );
+    expect(storySource).toContain(
+      "containingMergeSha: '841866b0a7891bb064958af2cbbdf09b3cd3b1b3'"
     );
     expect(storySource).toContain("proofScope: 'system-b-body-only'");
     expect(storySource).toContain("sourceExport: 'AboutPageContent'");
@@ -137,10 +141,63 @@ describe('AboutPageContent', () => {
     expect(storySource).toContain('story owns the shared body only');
   });
 
-  it('binds the receipt to the audited source SHA with unchanged body copy', () => {
-    expect(ABOUT_STORY_RECEIPT.sourceSha).toMatch(/^[0-9a-f]{40}$/);
+  it('binds the receipt to a containing merge with both named exports', () => {
+    expect(ABOUT_STORY_RECEIPT.containingMergeSha).toMatch(/^[0-9a-f]{40}$/);
     expect(ABOUT_STORY_RECEIPT.sourceExport).toBe('AboutPageContent');
     expect(ABOUT_STORY_RECEIPT.storyExport).toBe('Web016About');
+
+    try {
+      execFileSync('git', [
+        'cat-file',
+        '-e',
+        `${ABOUT_STORY_RECEIPT.containingMergeSha}^{commit}`,
+      ]);
+    } catch {
+      // The containing merge is only guaranteed to exist in full-history checkouts;
+      // shallow CI checkouts skip the ancestry proof.
+      expect(
+        execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
+          encoding: 'utf8',
+        }).trim()
+      ).toBe('true');
+      return;
+    }
+
+    expect(() =>
+      execFileSync('git', [
+        'merge-base',
+        '--is-ancestor',
+        ABOUT_STORY_RECEIPT.containingMergeSha,
+        'HEAD',
+      ])
+    ).not.toThrow();
+
+    const sourceAtReceipt = execFileSync(
+      'git',
+      [
+        'show',
+        `${ABOUT_STORY_RECEIPT.containingMergeSha}:${ABOUT_STORY_RECEIPT.source}`,
+      ],
+      { encoding: 'utf8' }
+    );
+    const storyAtReceipt = execFileSync(
+      'git',
+      [
+        'show',
+        `${ABOUT_STORY_RECEIPT.containingMergeSha}:apps/web/components/organisms/AboutPageContent.stories.tsx`,
+      ],
+      { encoding: 'utf8' }
+    );
+    expect(sourceAtReceipt).toContain(
+      `export function ${ABOUT_STORY_RECEIPT.sourceExport}`
+    );
+    expect(storyAtReceipt).toContain(
+      `export const ${ABOUT_STORY_RECEIPT.storyExport}`
+    );
+  });
+
+  it('preserves the audit-base route copy provenance', () => {
+    expect(ABOUT_STORY_RECEIPT.sourceAuditBaseSha).toMatch(/^[0-9a-f]{40}$/);
 
     let routeAtReceipt: string;
     try {
@@ -148,13 +205,13 @@ describe('AboutPageContent', () => {
         'git',
         [
           'show',
-          `${ABOUT_STORY_RECEIPT.sourceSha}:apps/web/app/(marketing)/about/page.tsx`,
+          `${ABOUT_STORY_RECEIPT.sourceAuditBaseSha}:apps/web/app/(marketing)/about/page.tsx`,
         ],
         { encoding: 'utf8' }
       );
     } catch {
       // The audit SHA is only guaranteed to exist in full-history checkouts;
-      // shallow CI checkouts skip the ancestry proof.
+      // shallow CI checkouts skip the old-route copy proof.
       expect(
         execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
           encoding: 'utf8',
