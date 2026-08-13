@@ -1,4 +1,6 @@
+import type { ActionDescriptor } from '@jovie/action-contracts';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import { resolveActionCapabilities } from '@/lib/actions/capabilities';
 import type { UserEntitlements } from '@/types';
@@ -127,5 +129,86 @@ describe('resolveActionCapabilities', () => {
     expect(chatStart?.action.effect).toBe('navigation');
     expect(chatStart?.action.inputSchema).toMatchObject({ type: 'object' });
     expect(chatStart?.action.titleKey).toBe('actions.chat.start.title');
+  });
+});
+
+describe('resolveActionCapabilities client-version gate', () => {
+  function makeDescriptor(
+    overrides: Partial<ActionDescriptor> = {}
+  ): ActionDescriptor {
+    return {
+      id: 'task.create',
+      schemaVersion: 1,
+      titleKey: 'actions.task.create.title',
+      descriptionKey: 'actions.task.create.description',
+      effect: 'internal_write',
+      confirmation: 'none',
+      supportedChannels: ['web', 'ios'],
+      requirements: [{ type: 'auth' }],
+      inputSchema: z.object({}),
+      outputSchema: z.object({}),
+      ...overrides,
+    };
+  }
+
+  const gatedDescriptor = makeDescriptor({
+    minimumClientVersions: { ios: '2.1.0' },
+  });
+
+  function resolveGated(clientVersion?: string) {
+    return resolveActionCapabilities({
+      entitlements: makeEntitlements(),
+      channel: 'ios',
+      profileOwned: true,
+      clientVersion,
+      manifest: [gatedDescriptor],
+    })[0];
+  }
+
+  it('returns CLIENT_UPGRADE_REQUIRED below the declared channel minimum', () => {
+    const capability = resolveGated('2.0.9');
+    expect(capability.available).toBe(false);
+    expect(capability.visibility).toBe('visible');
+    expect(capability.reasonCode).toBe('CLIENT_UPGRADE_REQUIRED');
+    expect(capability.retryable).toBe(false);
+  });
+
+  it('fails closed when the client omits its version', () => {
+    const capability = resolveGated(undefined);
+    expect(capability.available).toBe(false);
+    expect(capability.reasonCode).toBe('CLIENT_UPGRADE_REQUIRED');
+  });
+
+  it('is available at the exact minimum boundary', () => {
+    const capability = resolveGated('2.1.0');
+    expect(capability.available).toBe(true);
+    expect(capability.reasonCode).toBeUndefined();
+  });
+
+  it('is available above the declared minimum', () => {
+    const capability = resolveGated('3.0.0');
+    expect(capability.available).toBe(true);
+  });
+
+  it('does not gate channels without a declared minimum', () => {
+    const [capability] = resolveActionCapabilities({
+      entitlements: makeEntitlements(),
+      channel: 'web',
+      profileOwned: true,
+      manifest: [gatedDescriptor],
+    });
+    expect(capability.available).toBe(true);
+  });
+
+  it('lets CLIENT_UPGRADE_REQUIRED take precedence over requirement failures', () => {
+    const [capability] = resolveActionCapabilities({
+      entitlements: makeEntitlements({ isAuthenticated: false }),
+      channel: 'ios',
+      profileOwned: false,
+      clientVersion: '2.0.0',
+      manifest: [gatedDescriptor],
+    });
+    expect(capability.available).toBe(false);
+    expect(capability.reasonCode).toBe('CLIENT_UPGRADE_REQUIRED');
   });
 });

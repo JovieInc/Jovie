@@ -28,8 +28,10 @@ const discoveryQuerySchema = z.object({
  * Canonical Actions discovery (contract phase 2).
  *
  * Authenticated, read-only capability resolution:
- * `GET /api/v1/actions?profileId=<owned-profile>&channel=<channel>`.
+ * `GET /api/v1/actions?profileId=<owned-profile>&channel=<channel>[&clientVersion=<semver>]`.
  * Advisory UX only — invocation repeats every check server-side.
+ * `clientVersion` is evaluated against `minimumClientVersions[channel]`;
+ * gated actions resolve as `CLIENT_UPGRADE_REQUIRED`.
  */
 export async function GET(req: Request) {
   try {
@@ -66,7 +68,7 @@ export async function GET(req: Request) {
       );
     }
 
-    const { profileId, channel } = parsedQuery.data;
+    const { profileId, channel, clientVersion } = parsedQuery.data;
 
     const scope = await withDbSessionTx(async (tx, appUserId) => {
       const [profile] = await tx
@@ -110,6 +112,7 @@ export async function GET(req: Request) {
     const actions = resolveActionCapabilities({
       entitlements,
       channel,
+      clientVersion,
       profileOwned: true,
       quotaUsage: { contactsLimit: scope.contactCount },
     });
