@@ -8,13 +8,26 @@
       "format": "uuid",
       "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
     },
-    "created": {
-      "type": "boolean"
+    "role": {
+      "type": "string",
+      "enum": [
+        "bookings",
+        "management",
+        "press_pr",
+        "brand_partnerships",
+        "music_collaboration",
+        "fan_general",
+        "other"
+      ]
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1
     }
   },
   "required": [
     "contactId",
-    "created"
+    "role"
   ],
   "additionalProperties": false
 }

@@ -3,16 +3,25 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { z } from 'zod';
+
+import { resolvedActionCapabilitySchema } from './descriptor';
+import { actionErrorSchema } from './errors';
+import { actionInvocationSchema, actionResultSchema } from './invocation';
 import { ACTION_MANIFEST, buildDiscoveryDocument } from './manifest';
-import { ACTION_CONTRACT_VERSION } from './metadata';
 
 /**
  * Deterministic generator for the versioned artifacts derived from the
  * canonical manifest:
  *
- *   generated/manifest.json          — discovery document
- *   generated/schemas/<id>.*.json    — JSON Schema (draft 2020-12) per action
- *   generated/openapi.json           — contract-only OpenAPI 3.1 document
+ *   generated/manifest.json                  — discovery document
+ *   generated/openapi.json                   — OpenAPI 3.1 view of the
+ *                                              discovery + invoke contract
+ *   generated/schemas/<id>.input.json        — domain input (JSON Schema)
+ *   generated/schemas/<id>.output.json       — domain output
+ *   generated/schemas/<id>.invocation.json   — full invocation envelope
+ *   generated/schemas/<id>.result.json       — full result union
+ *   generated/schemas/shared.error.json      — stable error shape
+ *   generated/schemas/shared.capability.json — discovery item shape
  *
  * `pnpm --filter @jovie/action-contracts run generate` rewrites them;
  * `--check` (and the schema-parity vitest) fails on any drift.
@@ -33,34 +42,73 @@ function jsonSchema(schema: z.ZodType, title: string) {
 }
 
 function buildOpenApiDocument() {
-  const paths: Record<string, unknown> = {};
+  const paths: Record<string, unknown> = {
+    '/api/v1/actions': {
+      get: {
+        operationId: 'resolveActionCapabilities',
+        summary: 'Resolve action capabilities',
+        description:
+          'Authenticated, read-only discovery. Advisory UX only — never authorization; every invocation repeats all checks server-side.',
+        parameters: [
+          {
+            name: 'profileId',
+            in: 'query',
+            required: true,
+            schema: { type: 'string', format: 'uuid' },
+            description: 'Owned creator profile to resolve against.',
+          },
+          {
+            name: 'channel',
+            in: 'query',
+            required: true,
+            schema: { $ref: './manifest.json#/channels' },
+          },
+          {
+            name: 'clientVersion',
+            in: 'query',
+            required: false,
+            schema: { type: 'string' },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'Resolved capabilities for every manifest action.',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'array',
+                  items: { $ref: './schemas/shared.capability.json' },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
   for (const action of ACTION_MANIFEST) {
-    paths[`/actions/${action.id}`] = {
+    paths[`/api/v1/actions/${action.id}/invoke`] = {
       post: {
-        operationId: action.id.replace('.', '_'),
-        summary: action.discovery.title,
-        description: `${action.discovery.summary} Contract-only definition; no runtime route exists at this path yet.`,
-        'x-jovie-action-version': action.version,
-        'x-jovie-contract-only': true,
+        operationId: `invoke_${action.id.replace('.', '_')}`,
+        summary: `Invoke ${action.id}`,
+        description:
+          'Canonical invocation endpoint. Phase 3 (dispatcher); not implemented in the foundation slice.',
+        'x-jovie-phase': 'dispatcher',
+        'x-jovie-implemented': false,
         requestBody: {
           required: true,
           content: {
             'application/json': {
-              schema: { $ref: `./schemas/${action.id}.input.json` },
+              schema: { $ref: `./schemas/${action.id}.invocation.json` },
             },
           },
         },
         responses: {
           '200': {
-            description: 'Canonical action result envelope.',
+            description: 'Canonical action result union.',
             content: {
               'application/json': {
-                schema: {
-                  oneOf: [
-                    { $ref: `./schemas/${action.id}.output.json` },
-                    { $ref: `./schemas/${action.id}.error.json` },
-                  ],
-                },
+                schema: { $ref: `./schemas/${action.id}.result.json` },
               },
             },
           },
@@ -71,10 +119,10 @@ function buildOpenApiDocument() {
   return {
     openapi: '3.1.0',
     info: {
-      title: 'Jovie Canonical Actions (contract only)',
-      version: ACTION_CONTRACT_VERSION,
+      title: 'Jovie Canonical Actions',
+      version: '1.0.0',
       description:
-        'Contract-only view of the canonical actions manifest. These paths are not served by any runtime; they exist so Swift, MCP, and CLI bindings can be generated against a stable OpenAPI artifact.',
+        'Generated from the @jovie/action-contracts manifest. Discovery is live; invoke paths are phase-3 contract definitions.',
     },
     paths,
   };
@@ -85,16 +133,37 @@ export function buildArtifacts(): Record<string, string> {
   const artifacts: Record<string, string> = {
     'manifest.json': serialize(buildDiscoveryDocument()),
     'openapi.json': serialize(buildOpenApiDocument()),
+    'schemas/shared.error.json': serialize(
+      jsonSchema(actionErrorSchema, 'Canonical action error')
+    ),
+    'schemas/shared.capability.json': serialize(
+      jsonSchema(resolvedActionCapabilitySchema, 'Resolved action capability')
+    ),
   };
   for (const action of ACTION_MANIFEST) {
     artifacts[`schemas/${action.id}.input.json`] = serialize(
-      jsonSchema(action.input, `${action.id} input v${action.version}`)
+      jsonSchema(
+        action.inputSchema,
+        `${action.id} input v${action.schemaVersion}`
+      )
     );
     artifacts[`schemas/${action.id}.output.json`] = serialize(
-      jsonSchema(action.output, `${action.id} output v${action.version}`)
+      jsonSchema(
+        action.outputSchema,
+        `${action.id} output v${action.schemaVersion}`
+      )
     );
-    artifacts[`schemas/${action.id}.error.json`] = serialize(
-      jsonSchema(action.error, `${action.id} error v${action.version}`)
+    artifacts[`schemas/${action.id}.invocation.json`] = serialize(
+      jsonSchema(
+        actionInvocationSchema(action.inputSchema),
+        `${action.id} invocation v${action.schemaVersion}`
+      )
+    );
+    artifacts[`schemas/${action.id}.result.json`] = serialize(
+      jsonSchema(
+        actionResultSchema(action.outputSchema),
+        `${action.id} result v${action.schemaVersion}`
+      )
     );
   }
   return artifacts;

@@ -1,20 +1,17 @@
 import { z } from 'zod';
 
-import { actionErrorSchemaFor, COMMON_ERROR_CODES } from '../envelope';
-import type { ActionDefinition } from '../metadata';
-import {
-  CANONICAL_AUTH,
-  CANONICAL_EVOLUTION,
-  CANONICAL_IDEMPOTENCY,
-  isoDateSchema,
-  mutationBaseSchema,
-} from '../shared';
+import type { ActionDescriptor } from '../descriptor';
 
-export const RELEASE_CREATE_DOMAIN_ERROR_CODES = [
-  'RELEASE_SLUG_CONFLICT',
-] as const;
+/**
+ * `release.create` — create a manual Jovie release draft.
+ *
+ * Internal write. Creates only a manual draft: Spotify/Apple import, sync,
+ * smart-link publication, distribution, and chat-generated paid tools are
+ * separate actions with separate IDs. Enforces the canonical manual-release
+ * capability at invoke time even while enabled for all plans.
+ */
 
-/** Canonical superset of the divergent per-surface release type enums. */
+/** Mirrors the discog release type domain enum. */
 export const RELEASE_TYPES = [
   'single',
   'ep',
@@ -22,71 +19,51 @@ export const RELEASE_TYPES = [
   'compilation',
   'live',
   'mixtape',
+  'music_video',
   'other',
 ] as const;
 
-export const releaseCreateInputSchema = mutationBaseSchema.extend({
-  title: z.string().min(1).max(200),
-  releaseType: z.enum(RELEASE_TYPES),
+export const releaseTypeSchema = z.enum(RELEASE_TYPES);
+
+/** ISO calendar date, YYYY-MM-DD. */
+const isoDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
+
+export const releaseCreateInputSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  releaseType: releaseTypeSchema,
   releaseDate: isoDateSchema.optional(),
-  label: z.string().min(1).max(200).optional(),
-  upc: z.string().min(1).max(20).optional(),
+  revealDate: isoDateSchema.optional(),
+  genres: z.array(z.string().trim().min(1).max(60)).max(3).optional(),
+  explicit: z.boolean().optional(),
 });
 
 export const releaseCreateOutputSchema = z.object({
   releaseId: z.uuid(),
   slug: z.string().min(1),
-  /** False when the idempotency key replayed an existing release. */
-  created: z.boolean(),
+  title: z.string().min(1),
 });
-
-const errorCodes = [
-  ...COMMON_ERROR_CODES,
-  ...RELEASE_CREATE_DOMAIN_ERROR_CODES,
-];
-
-export const releaseCreateErrorSchema = actionErrorSchemaFor(
-  errorCodes as [string, ...string[]]
-);
 
 export type ReleaseCreateInput = z.infer<typeof releaseCreateInputSchema>;
 export type ReleaseCreateOutput = z.infer<typeof releaseCreateOutputSchema>;
 
-export const releaseCreateAction: ActionDefinition<
+export const releaseCreateAction: ActionDescriptor<
   typeof releaseCreateInputSchema,
-  typeof releaseCreateOutputSchema,
-  typeof releaseCreateErrorSchema
+  typeof releaseCreateOutputSchema
 > = {
   id: 'release.create',
-  version: '1',
-  kind: 'mutation',
-  discovery: {
-    title: 'Create release',
-    summary:
-      'Create a discography release (single, EP, album, …) on the authenticated creator profile.',
-    category: 'releases',
-    bindings: [
-      {
-        kind: 'web-api',
-        status: 'existing',
-        note: 'Legacy paths: createRelease server action, createRelease chat tool, album-art create-release-and-apply, chat audio upload, Spotify ingestion.',
-      },
-      {
-        kind: 'chat-tool',
-        status: 'contract-only',
-      },
-      {
-        kind: 'swift',
-        status: 'contract-only',
-      },
-    ],
-  },
-  auth: CANONICAL_AUTH,
-  idempotency: CANONICAL_IDEMPOTENCY,
-  evolution: CANONICAL_EVOLUTION,
-  domainErrorCodes: RELEASE_CREATE_DOMAIN_ERROR_CODES,
-  entitlementKeys: ['canCreateManualReleases'],
-  input: releaseCreateInputSchema,
-  output: releaseCreateOutputSchema,
-  error: releaseCreateErrorSchema,
+  schemaVersion: 1,
+  titleKey: 'actions.release.create.title',
+  descriptionKey: 'actions.release.create.description',
+  effect: 'internal_write',
+  confirmation: 'none',
+  supportedChannels: ['web', 'ios', 'chat_tool', 'mcp', 'cli'],
+  requirements: [
+    { type: 'auth' },
+    { type: 'profile_ownership' },
+    { type: 'entitlement', key: 'canCreateManualReleases' },
+  ],
+  inputSchema: releaseCreateInputSchema,
+  outputSchema: releaseCreateOutputSchema,
 };

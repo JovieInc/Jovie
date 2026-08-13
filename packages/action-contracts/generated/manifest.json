@@ -1,219 +1,169 @@
 {
   "contract": "jovie-actions",
-  "contractVersion": "1.0.0",
-  "invariants": {
-    "dispatcherOwnsPolicy": true,
-    "ledgerRequiredBeforeWrites": true,
-    "publicArtistMcpWritable": false,
-    "clientsArePresentationOnly": true
+  "transport": {
+    "major": "v1",
+    "discoveryPath": "/api/v1/actions",
+    "invokePathTemplate": "/api/v1/actions/{actionId}/invoke"
   },
+  "channels": [
+    "web",
+    "ios",
+    "electron",
+    "app_intent",
+    "widget",
+    "cli",
+    "mcp",
+    "chat_tool",
+    "extension"
+  ],
+  "errorCodes": [
+    "AUTH_REQUIRED",
+    "PROFILE_REQUIRED",
+    "FORBIDDEN",
+    "ENTITLEMENT_REQUIRED",
+    "ENTITLEMENT_UNVERIFIED",
+    "QUOTA_EXHAUSTED",
+    "FEATURE_DISABLED",
+    "PROVIDER_UNAVAILABLE",
+    "CLIENT_UPGRADE_REQUIRED",
+    "VALIDATION_FAILED",
+    "REQUIRES_INPUT",
+    "CONFIRMATION_REQUIRED",
+    "CONFLICT",
+    "IN_PROGRESS",
+    "RATE_LIMITED",
+    "TEMPORARILY_UNAVAILABLE",
+    "INTERNAL"
+  ],
   "actions": [
     {
       "id": "chat.start",
-      "version": "1",
-      "kind": "mutation",
-      "title": "Start chat",
-      "summary": "Create or resume an authenticated AI chat conversation, optionally reserving the first turn.",
-      "category": "chat",
-      "auth": {
-        "requiresAuth": true,
-        "profileScoped": true,
-        "publicArtistMcpWritable": false
-      },
-      "idempotency": {
-        "required": true,
-        "keyField": "idempotencyKey",
-        "onConflict": "replay"
-      },
-      "evolution": {
-        "additiveOnly": true,
-        "breakingChanges": "new-action-version",
-        "deprecation": "successor-required"
-      },
-      "bindings": [
-        {
-          "kind": "web-api",
-          "status": "existing",
-          "note": "Legacy paths: POST /api/chat, /api/chat/conversations, /api/onboarding/welcome-chat, /api/mobile/v1/chat/turns."
-        },
-        {
-          "kind": "chat-tool",
-          "status": "contract-only",
-          "note": "Dispatcher-owned in a later phase; tools never own policy."
-        },
-        {
-          "kind": "swift",
-          "status": "contract-only",
-          "note": "App Intent binding contract only; no runtime claim."
-        }
+      "schemaVersion": 1,
+      "titleKey": "actions.chat.start.title",
+      "descriptionKey": "actions.chat.start.description",
+      "effect": "navigation",
+      "confirmation": "none",
+      "supportedChannels": [
+        "web",
+        "ios",
+        "electron",
+        "app_intent",
+        "widget"
       ],
-      "entitlementKeys": [],
-      "errorCodes": [
-        "CHAT_DISABLED",
-        "TURN_IN_PROGRESS"
+      "requirements": [
+        {
+          "type": "auth"
+        },
+        {
+          "type": "profile_ownership"
+        }
       ],
       "schemas": {
         "input": "schemas/chat.start.input.json",
         "output": "schemas/chat.start.output.json",
-        "error": "schemas/chat.start.error.json"
+        "invocation": "schemas/chat.start.invocation.json",
+        "result": "schemas/chat.start.result.json"
       }
     },
     {
       "id": "contact.create",
-      "version": "1",
-      "kind": "mutation",
-      "title": "Create contact",
-      "summary": "Create an audience contact (email or SMS subscriber) on the authenticated creator profile.",
-      "category": "audience",
-      "auth": {
-        "requiresAuth": true,
-        "profileScoped": true,
-        "publicArtistMcpWritable": false
-      },
-      "idempotency": {
-        "required": true,
-        "keyField": "idempotencyKey",
-        "onConflict": "replay"
-      },
-      "evolution": {
-        "additiveOnly": true,
-        "breakingChanges": "new-action-version",
-        "deprecation": "successor-required"
-      },
-      "bindings": [
+      "schemaVersion": 1,
+      "titleKey": "actions.contact.create.title",
+      "descriptionKey": "actions.contact.create.description",
+      "effect": "internal_write",
+      "confirmation": "none",
+      "supportedChannels": [
+        "web",
+        "ios",
+        "app_intent",
+        "chat_tool",
+        "mcp",
+        "cli"
+      ],
+      "requirements": [
         {
-          "kind": "web-api",
-          "status": "existing",
-          "note": "Legacy paths: POST /api/notifications/subscribe, promo-download OTP routes, Twilio SMS webhook, saveContact server action."
+          "type": "auth"
         },
         {
-          "kind": "chat-tool",
-          "status": "contract-only"
+          "type": "profile_ownership"
         },
         {
-          "kind": "mcp",
-          "status": "contract-only",
-          "note": "Authenticated owner-workspace MCP only. The public per-artist MCP endpoint never accepts this action."
-        },
-        {
-          "kind": "cli",
-          "status": "contract-only"
+          "type": "entitlement",
+          "key": "contactsLimit"
         }
-      ],
-      "entitlementKeys": [
-        "contactsLimit"
-      ],
-      "errorCodes": [
-        "CONTACT_LIMIT_EXCEEDED"
       ],
       "schemas": {
         "input": "schemas/contact.create.input.json",
         "output": "schemas/contact.create.output.json",
-        "error": "schemas/contact.create.error.json"
+        "invocation": "schemas/contact.create.invocation.json",
+        "result": "schemas/contact.create.result.json"
       }
     },
     {
       "id": "release.create",
-      "version": "1",
-      "kind": "mutation",
-      "title": "Create release",
-      "summary": "Create a discography release (single, EP, album, …) on the authenticated creator profile.",
-      "category": "releases",
-      "auth": {
-        "requiresAuth": true,
-        "profileScoped": true,
-        "publicArtistMcpWritable": false
-      },
-      "idempotency": {
-        "required": true,
-        "keyField": "idempotencyKey",
-        "onConflict": "replay"
-      },
-      "evolution": {
-        "additiveOnly": true,
-        "breakingChanges": "new-action-version",
-        "deprecation": "successor-required"
-      },
-      "bindings": [
+      "schemaVersion": 1,
+      "titleKey": "actions.release.create.title",
+      "descriptionKey": "actions.release.create.description",
+      "effect": "internal_write",
+      "confirmation": "none",
+      "supportedChannels": [
+        "web",
+        "ios",
+        "chat_tool",
+        "mcp",
+        "cli"
+      ],
+      "requirements": [
         {
-          "kind": "web-api",
-          "status": "existing",
-          "note": "Legacy paths: createRelease server action, createRelease chat tool, album-art create-release-and-apply, chat audio upload, Spotify ingestion."
+          "type": "auth"
         },
         {
-          "kind": "chat-tool",
-          "status": "contract-only"
+          "type": "profile_ownership"
         },
         {
-          "kind": "swift",
-          "status": "contract-only"
+          "type": "entitlement",
+          "key": "canCreateManualReleases"
         }
-      ],
-      "entitlementKeys": [
-        "canCreateManualReleases"
-      ],
-      "errorCodes": [
-        "RELEASE_SLUG_CONFLICT"
       ],
       "schemas": {
         "input": "schemas/release.create.input.json",
         "output": "schemas/release.create.output.json",
-        "error": "schemas/release.create.error.json"
+        "invocation": "schemas/release.create.invocation.json",
+        "result": "schemas/release.create.result.json"
       }
     },
     {
       "id": "task.create",
-      "version": "1",
-      "kind": "mutation",
-      "title": "Create task",
-      "summary": "Create a workspace task, optionally attached to a release, on the authenticated creator profile.",
-      "category": "tasks",
-      "auth": {
-        "requiresAuth": true,
-        "profileScoped": true,
-        "publicArtistMcpWritable": false
-      },
-      "idempotency": {
-        "required": true,
-        "keyField": "idempotencyKey",
-        "onConflict": "replay"
-      },
-      "evolution": {
-        "additiveOnly": true,
-        "breakingChanges": "new-action-version",
-        "deprecation": "successor-required"
-      },
-      "bindings": [
+      "schemaVersion": 1,
+      "titleKey": "actions.task.create.title",
+      "descriptionKey": "actions.task.create.description",
+      "effect": "internal_write",
+      "confirmation": "none",
+      "supportedChannels": [
+        "web",
+        "ios",
+        "app_intent",
+        "chat_tool",
+        "mcp",
+        "cli"
+      ],
+      "requirements": [
         {
-          "kind": "web-api",
-          "status": "existing",
-          "note": "Legacy paths: createTask, addReleaseTask, addCatalogTaskToRelease server actions and the manageTasks chat tool."
+          "type": "auth"
         },
         {
-          "kind": "chat-tool",
-          "status": "contract-only"
+          "type": "profile_ownership"
         },
         {
-          "kind": "swift",
-          "status": "contract-only"
-        },
-        {
-          "kind": "mcp",
-          "status": "contract-only",
-          "note": "Authenticated owner-workspace MCP only. The public per-artist MCP endpoint never accepts this action."
+          "type": "entitlement",
+          "key": "canAccessTasksWorkspace"
         }
-      ],
-      "entitlementKeys": [
-        "canAccessTasksWorkspace"
-      ],
-      "errorCodes": [
-        "TASKS_WORKSPACE_LOCKED",
-        "RELEASE_NOT_FOUND"
       ],
       "schemas": {
         "input": "schemas/task.create.input.json",
         "output": "schemas/task.create.output.json",
-        "error": "schemas/task.create.error.json"
+        "invocation": "schemas/task.create.invocation.json",
+        "result": "schemas/task.create.result.json"
       }
     }
   ]

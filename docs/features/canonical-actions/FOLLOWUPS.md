@@ -1,170 +1,234 @@
 # Canonical Actions follow-up sequence (JOV-5041)
 
-The follow-up issues to file after this foundation, in the approved program
-order. Step 1 is this ticket (foundation: `packages/action-contracts` +
-[INVENTORY.md](./INVENTORY.md) + [MIGRATION_MAP.md](./MIGRATION_MAP.md)) and is
-already done. Steps 2–10 are the program sequence; step 11 is the explicit
-post-deletion cleanup/verification pass.
+The follow-up issues to file, in the approved rollout-program order from the
+founder-approved contract (§ Rollout program). Step 1 is this ticket
+(foundation: `packages/action-contracts` + [INVENTORY.md](./INVENTORY.md) +
+[MIGRATION_MAP.md](./MIGRATION_MAP.md)). **Step 1 is drafted, not accepted:**
+the contract package and these docs were re-cut to the approved contract and
+acceptance is pending the semantic re-review. Steps 2–11 follow the approved
+program.
 
 **Status of this list:** these are prepared drafts. Issues are filed in Linear
 when the founder/orchestrator approves each phase — not before. Each step lists
-its dependencies; do not start a step whose dependencies are not merged.
+its dependencies; do not start a step whose dependencies are not merged. One
+writer owns the foundation registry and dispatcher (steps 2–3); domain and
+client adapters parallelize only after that contract is merged and
+version-locked.
+
+All steps target the approved wire shapes: `ActionDescriptor` (integer
+`schemaVersion`, `titleKey`/`descriptionKey`, `effect`, `confirmation`,
+`supportedChannels`, `requirements`), `ActionInvocation` with
+`context { profileId, channel, clientVersion }` + top-level `idempotencyKey`,
+the six-status `ActionResult` union with `ActionReceipt`, the stable error
+vocabulary, and the durable `action_executions` ledger keyed on
+`actorUserId + profileId + actionId + idempotencyKey`.
 
 ---
 
-## Step 2 — Dispatcher + durable ledger
+## Step 1 — Baseline and inventory (this ticket)
+
+- **Proposed Linear title:** `Canonical Actions: baseline, inventory, and contract foundation`
+- **Scope:** Measure current completion/error/latency baselines for the four
+  actions' legacy entry points; enumerate call sites and active ownership
+  ([INVENTORY.md](./INVENTORY.md)); land the contract package with the
+  manifest, descriptor/invocation/result schemas, stable error vocabulary,
+  codegen + parity guard, and read-only authenticated discovery
+  (`GET /api/v1/actions`).
+- **Acceptance:** pending the semantic re-review of the corrected contract
+  package against the founder-approved spec.
+- **Depends on:** nothing.
+
+## Step 2 — Foundation PR
+
+- **Proposed Linear title:** `Canonical Actions: foundation — manifest, schemas, discovery`
+- **Scope:** Merge the contract package and the read-only authenticated
+  discovery endpoint: one `ResolvedActionCapability` per manifest action with
+  `available`/`visibility`/`reasonCode`/`retryable`/`requirements`/`quota`/
+  `upgrade`. Discovery is advisory UX only — never authorization. Wire the
+  capability resolver to `getCurrentUserEntitlements()` +
+  `ENTITLEMENT_REGISTRY`; preserve degraded entitlement verification as the
+  distinct `ENTITLEMENT_UNVERIFIED` reason rather than widening access. No
+  action is invocable yet.
+- **Out of scope:** The dispatcher, the ledger, any write path, any client
+  change, any new action IDs.
+- **Depends on:** Step 1 acceptance.
+
+## Step 3 — Dispatcher PR
 
 - **Proposed Linear title:** `Canonical Actions: dispatcher + action_executions ledger`
-- **Scope:** Create the durable `action_executions` table (migration-guarded)
-  and the authenticated, profile-scoped resolver/dispatcher in `apps/web` that
-  consumes `packages/action-contracts`: validates input against the manifest
-  zod schemas, evaluates `action.entitlementKeys` via
-  `apps/web/lib/entitlements/registry.ts`, applies quota/feature-flag checks,
-  enforces `idempotencyKey` with `onConflict: 'replay'` semantics against the
-  ledger (`meta.replayed` on repeat, `IDEMPOTENCY_CONFLICT` on payload
-  mismatch), and emits the canonical envelope (`{ ok, data|error, meta }`) with
-  `COMMON_ERROR_CODES` + per-action domain codes. No action is routed through
-  it yet in this step; ship with resolver unit tests and ledger replay tests.
+- **Scope:** Create the durable `action_executions` ledger (migration-guarded)
+  and the one server action dispatcher in `apps/web`: auth → requested-profile
+  ownership proof → entitlement/quota → flags/provider/client-version →
+  confirmation policy, then domain executor invocation, redacted result
+  recording, and durable `ActionReceipt` return. Ledger identity is
+  `actorUserId + profileId + actionId + idempotencyKey`; same key + same input
+  hash replays the recorded in-progress/terminal result; same key + different
+  input hash returns `CONFLICT`; concurrent calls cannot create two entities;
+  target entity IDs are preallocated before the domain mutation;
+  external/destructive actions require a short-lived confirmation token bound
+  to actor, profile, action, schema version, and input hash. Model
+  reservation/replay on the existing chat turn IDs and uniqueness constraints —
+  the Redis lock helper and the dashboard idempotency table are not sufficient.
+  Ship with resolver unit tests and ledger replay/reconciliation tests. No
+  action is routed through it yet.
 - **Out of scope:** Migrating any existing route, server action, or chat tool;
-  any client change; any new action IDs.
-- **Depends on:** Step 1 (foundation).
-
-## Step 3 — `chat.start` canary
-
-- **Proposed Linear title:** `Canonical Actions: chat.start canary through dispatcher`
-- **Scope:** Route one production chat-start path (primary candidate:
-  `POST /api/mobile/v1/chat/turns`, whose `reserveChatTurn` semantics are the
-  closest existing model for ledger replay) through the dispatcher with no
-  user-visible change. Generalize `reserveChatTurn`
-  (`apps/web/lib/chat/turns.ts:222`) replay outcomes onto `action_executions`.
-  Verify with shadow comparisons against the legacy path plus the existing cron
-  canary (`apps/web/app/api/cron/auth-signup-onboarding-canary/route.ts:114`)
-  and Promptfoo eval harness.
-- **Out of scope:** The anonymous onboarding chat path, web `/api/chat`
-  migration, deleting any legacy code, streaming-protocol changes.
+  any client change.
 - **Depends on:** Step 2.
 
-## Step 4 — `contact.create` real write
+## Step 4 — `chat.start` canary
 
-- **Proposed Linear title:** `Canonical Actions: contact.create real write via dispatcher`
-- **Scope:** First mutation written through the dispatcher + ledger. Migrate
-  the `saveContact` server action
+- **Proposed Linear title:** `Canonical Actions: chat.start canary through dispatcher`
+- **Scope:** Route `chat.start` — the non-mutating navigation action — through
+  discovery + invocation and return the `handoff` result with semantic
+  destination `chat.new`. Web executes the typed local handoff immediately for
+  latency, derived from the same manifest and capability result; remote clients
+  invoke the endpoint for the same semantic handoff. Verify: no empty
+  conversation is ever persisted (a conversation is reserved only when the
+  first message is submitted and acknowledged), no message quota is consumed,
+  cookie and bearer identities produce equivalent decisions, and canary
+  completion rate / p95 latency regress no more than 5% against measured
+  direct-path baselines. Verified with the existing cron canary
+  (`apps/web/app/api/cron/auth-signup-onboarding-canary/route.ts:114`) and
+  Promptfoo eval harness.
+- **Out of scope:** Migrating the legacy chat-turn routes
+  (`POST /api/chat`, `/api/mobile/v1/chat/turns`, welcome-chat), the anonymous
+  onboarding chat path, deleting any legacy code, streaming-protocol changes.
+  `chat.start` is a handoff canary, not a chat-turn migration.
+- **Depends on:** Step 3.
+
+## Step 5 — `contact.create` first write
+
+- **Proposed Linear title:** `Canonical Actions: contact.create first write via dispatcher`
+- **Scope:** First real mutation through the dispatcher + ledger, proving
+  quota, validation, durable replay, and PII redaction. Migrate the
+  `saveContact` server action
   (`apps/web/app/app/(shell)/dashboard/contacts/actions.ts:135`) to canonical
-  `contact.create` so `contactsLimit` enforcement, validation, and idempotency
-  come from the resolver; close the `processProfileExtraction` entitlement
-  bypass by routing its `creator_contacts` write through the resolver too.
-  Duplicate submissions must replay (`meta.replayed`) instead of creating
-  duplicates.
+  `contact.create` so `contactsLimit` enforcement, canonical validation (at
+  least one usable contact channel; incomplete submissions get
+  `requires_input` with field issues before mutation), and idempotency come
+  from the resolver; close the `processProfileExtraction` entitlement bypass by
+  routing its `creator_contacts` write through the same executor. Duplicate
+  submissions replay the recorded result instead of creating duplicates; the
+  generic ledger and analytics carry no raw contact PII.
 - **Out of scope:** Fan-capture fan-in (`/api/notifications/subscribe`, promo
   OTP, SMS intents/webhook) migration; anonymous `audience_members` telemetry
   consolidation; platform-level changelog/waitlist entities.
-- **Depends on:** Steps 2–3.
+- **Depends on:** Steps 3–4.
 
-## Step 5 — `task.create` + `release.create` extraction
+## Step 6 — `task.create` + `release.create` domain slices
 
 - **Proposed Linear title:** `Canonical Actions: extract task.create and release.create into dispatcher`
-- **Scope:** Collapse the duplicated write paths into the resolver. For tasks:
+- **Scope:** Extract/migrate `task.create`, then `release.create`; current
+  server actions become thin adapters of the same domain services. For tasks:
   the five server actions and the `manageTasks` chat tool (4 insert sites, 3
   release-ownership-check copies, 3 task-number allocators, 4 `position=max+1`
-  computations). For releases: `createRelease`, `createReleaseTool`, album-art
+  computations); users without Tasks workspace access get a truthful
+  `unavailable` result with entitlement reason + upgrade handoff, never a
+  silent no-op. For releases: `createRelease`, `createReleaseTool`, album-art
   `create-release-and-apply`, and audio-upload draft single (one `releaseType`
   enum, one slug strategy, insert-or-replay semantics, first server-side
-  `canCreateManualReleases` enforcement). Spotify ingestion shares the
-  canonical slug/validation helpers but stays a sync process outside the
-  per-action ledger.
+  `canCreateManualReleases` enforcement). `release.create` creates manual
+  drafts only — import/sync/publish/distribute stay separate actions. Resolve
+  the canonical form owner (Library/release domain code, not the legacy
+  `/app/dashboard/releases` route) before the adapter lands. Spotify ingestion
+  shares the canonical slug/validation helpers but stays a sync process outside
+  the per-action ledger.
 - **Out of scope:** Client/UI changes beyond swapping the call target; Spotify
-  sync-scheduling changes; deleting legacy paths (that is step 10).
-- **Depends on:** Steps 2–4.
+  sync-scheduling changes; deleting legacy paths (step 11).
+- **Depends on:** Steps 3–5.
 
-## Step 6 — Approved web sidebar adapter
+## Step 7 — Web adoption
 
-- **Proposed Linear title:** `Canonical Actions: web sidebar adapter (presentation-only client)`
-- **Scope:** Ship the first pure-presentation web client (the approved sidebar
-  surface) that invokes canonical actions through the dispatcher and renders
-  the canonical envelope, including entitlement-denial upgrade CTAs rendered
-  from structured errors instead of client-side string matching. Remove the
-  duplicated client-side validation (e.g. `useContactsManager.ts:288`) for any
-  action the sidebar touches.
+- **Proposed Linear title:** `Canonical Actions: web adoption — sidebar, CmdK, native forms`
+- **Scope:** Ship the approved sidebar split control (direct `New Chat` segment
+  plus menu items `New Release…`, `Add Contact`, `New Task`) as the first
+  pure-presentation client of the dispatcher, plus CmdK and other eligible
+  surfaces and native route-owned web forms that gather input and invoke the
+  canonical action on submit (no generic dynamic form DSL). Render the
+  six-status result union, including entitlement-denial upgrade CTAs from the
+  structured error's `upgrade` metadata instead of client-side string matching.
+  Remove duplicated client-side validation (e.g. `useContactsManager.ts:288`)
+  for any action these surfaces touch.
 - **Out of scope:** New actions, native clients, MCP/CLI, sidebar visual
   redesign.
-- **Depends on:** Steps 2–5 (the actions it presents must be dispatcher-backed).
+- **Depends on:** Steps 3–6 (the actions it presents must be
+  dispatcher-backed).
 
-## Step 7 — iOS / App Intents + Electron adapters
+## Step 8 — Existing client adoption: iOS / App Intents + Electron
 
 - **Proposed Linear title:** `Canonical Actions: iOS App Intents + Electron adapters`
-- **Scope:** Make the native surfaces presentation-only adapters. iOS:
+- **Scope:** Make the existing native surfaces presentation-only adapters. iOS:
   `MobileChatClient`/`ChatRepository` and the App Intents in
-  `apps/ios/Jovie/Features/Intents/JovieAppIntents.swift` consume the
-  dispatcher-backed endpoints; the Swift binding spec in
-  `packages/action-contracts/bindings/` flips to `existing` only with a shipped
-  runtime receipt. Electron: tray/menu actions (`apps/desktop/src/tray.ts`,
-  `main.ts:1654`) route through dispatcher-backed endpoints instead of
-  deep-link-only behavior where a canonical action applies.
-- **Out of scope:** WidgetKit (step 9), new App Intents beyond existing
+  `apps/ios/Jovie/Features/Intents/JovieAppIntents.swift` consume
+  dispatcher-backed endpoints; Swift IDs and parameter contracts are
+  generated/parity-checked at build time; availability is re-resolved at
+  runtime; missing inputs use native dialogs. The Swift binding flips to
+  runtime-backed only with a shipped receipt. Electron: tray/menu actions
+  (`apps/desktop/src/tray.ts`, `main.ts:1654`) consume the same action adapter;
+  remove the inert standalone New Message event once parity is proven.
+- **Out of scope:** WidgetKit (step 10), new App Intents beyond existing
   actions, macOS MenuMonitor (not an actions surface), offline queue redesign.
-- **Depends on:** Steps 2–5 (chat.start canary at minimum; task/release
+- **Depends on:** Steps 3–6 (`chat.start` canary at minimum; task/release
   extraction for the intents that create them).
 
-## Step 8 — Authenticated owner-workspace MCP + CLI
+## Step 9 — Machine adapters: owner-workspace MCP + CLI
 
 - **Proposed Linear title:** `Canonical Actions: authenticated owner-workspace MCP server + product CLI`
 - **Scope:** Ship two new surfaces, both dispatcher adapters from day one: (1)
-  a new authenticated owner-workspace MCP server exposing the four canonical
-  actions with real MCP auth (OAuth/API key) — the existing public per-artist
-  endpoint (`apps/web/app/api/mcp/[username]/route.ts`) is untouched and never
-  receives workspace writes (`publicArtistMcpWritable === false`); (2) the
-  first product CLI package (none exists today) implementing the CLI binding
-  spec. Both bindings flip to `existing` only when the surfaces ship with
-  runtime receipts.
+  a new authenticated owner-workspace MCP server whose tool descriptors are
+  generated from the manifest and delegate to the dispatcher, with real MCP
+  auth (OAuth/API key) — the existing public per-artist endpoint
+  (`apps/web/app/api/mcp/[username]/route.ts`) is untouched and never receives
+  workspace writes; (2) the first product CLI package (none exists today) with
+  generated commands/schema help from the manifest, a Jovie OAuth client,
+  scoped browser/PKCE authentication, packaging, and distribution. MCP retains
+  the stable error code in `error.data`; the CLI maps documented exit codes;
+  neither branches on message text. Both bindings flip from contract-only only
+  when the surfaces ship with runtime receipts.
 - **Out of scope:** Modifying the public per-artist MCP endpoint's tools or
   auth model; merch tool migration; exposing actions not yet dispatcher-backed.
-- **Depends on:** Steps 2–6 (all four actions dispatcher-backed; web adapter
+- **Depends on:** Steps 3–7 (all four actions dispatcher-backed; web adapter
   proven as the presentation-only reference).
 
-## Step 9 — WidgetKit / new-client slices
+## Step 10 — New client slices: WidgetKit / new clients
 
 - **Proposed Linear title:** `Canonical Actions: WidgetKit and new-client adapter slices`
-- **Scope:** Net-new client surfaces (WidgetKit and any other approved new
-  clients) ship adapter-first against the dispatcher — they never touch legacy
-  paths. Each new binding enters the manifest as `contract-only` and flips to
-  `existing` only with a real product surface and runtime receipt.
+- **Scope:** Net-new client surfaces (the WidgetKit extension and any
+  macOS-native App Intents) ship adapter-first against the dispatcher — they
+  never touch legacy paths. Widgets use the generated ID and input contract,
+  then invoke or open the canonical native handoff. Each new binding enters the
+  manifest as contract-only and flips to runtime-backed only with a real
+  product surface and runtime receipt; no support is claimed before the
+  products exist.
 - **Out of scope:** New action IDs (separate contract evolution per the
-  additive-only/new-version rules), retrofitting surfaces not in the approved
-  client list.
-- **Depends on:** Steps 2–8 (dispatcher plus at least one native and one
+  versioning rules), retrofitting surfaces not in the approved client list.
+- **Depends on:** Steps 3–9 (dispatcher plus at least one native and one
   machine adapter proven).
 
-## Step 10 — Old-path deletion after parity
+## Step 11 — Removal after parity
 
-- **Proposed Linear title:** `Canonical Actions: delete legacy entry paths after parity`
-- **Scope:** Delete legacy routes/server actions/chat-tool write internals
-  per path, only after the per-action parity criteria in
+- **Proposed Linear title:** `Canonical Actions: remove superseded paths after parity`
+- **Scope:** Delete superseded local descriptors, callback buses, and legacy
+  write internals per path, only after the per-action parity criteria in
   [MIGRATION_MAP.md](./MIGRATION_MAP.md) are met with production evidence
-  (canary + replay tests + telemetry). Each deletion PR removes the dead code,
-  its tests, and its docs references together. Includes: `POST
-  /api/chat/conversations`, the welcome-chat route's creation internals,
-  `saveContact`'s own validation/entitlement copies, the three
-  `requireReleaseAccess` copies, duplicated task-number/position logic, the
-  dashboard `createRelease` slug/validation fork, and the per-surface merch
-  gate stacks where superseded.
+  (canary + replay tests + telemetry) and rollback receipts (per-action/channel
+  kill switches verified in staging and production). Each deletion PR removes
+  the dead code, its tests, and its docs references together. Includes:
+  `POST /api/chat/conversations` (obsolete once callers take the `chat.new`
+  handoff with no empty-conversation persistence), the welcome-chat route's
+  creation internals (with the onboarding convergence decision), `saveContact`'s
+  own validation/entitlement copies, the three `requireReleaseAccess` copies,
+  duplicated task-number/position logic, the dashboard `createRelease`
+  slug/validation fork, and the per-surface merch gate stacks where superseded.
+  Close out with a final sweep: zero remaining non-dispatcher write paths for
+  the four actions (grep-level audit against [INVENTORY.md](./INVENTORY.md)),
+  removal of now-unused schemas/helpers (e.g. the unused `insertTaskSchema`,
+  forked message validators), `docs/API_ROUTE_MAP.md` and index updates, and a
+  post-implementation note on what ledger replay changed in production
+  behavior. Deleted paths are removed, not retained as permanent fallbacks.
 - **Out of scope:** Any path whose parity criterion is not met (file a
   follow-up instead); the anonymous onboarding chat surface unless its own
-  convergence decision has been made; Spotify ingestion sync internals.
-- **Depends on:** Steps 3–9 for the relevant action/surface; per-path parity
+  convergence decision has been made; Spotify ingestion sync internals; new
+  features, actions, or clients.
+- **Depends on:** Steps 4–10 for the relevant action/surface; per-path parity
   evidence attached to each deletion PR.
-
-## Step 11 — Post-deletion cleanup and verification
-
-- **Proposed Linear title:** `Canonical Actions: post-deletion cleanup + verification sweep`
-- **Scope:** Final sweep after step 10 completes: verify zero remaining
-  non-dispatcher write paths for the four actions (grep-level audit against
-  [INVENTORY.md](./INVENTORY.md) entry points), remove now-unused schemas and
-  helpers (e.g. the unused `insertTaskSchema`, forked message validators,
-  duplicated `audience_members` upsert helpers if consolidated), update
-  `docs/API_ROUTE_MAP.md` and related indexes, mark all `contract-only`
-  bindings honestly, and confirm the manifest, generated artifacts, and
-  `schema-parity` tests still pass byte-for-byte. Close out with a
-  post-implementation note capturing what the ledger replay semantics changed
-  in production behavior.
-- **Out of scope:** New features, new actions, new clients.
-- **Depends on:** Step 10 fully merged.

@@ -1,0 +1,96 @@
+{
+  "title": "Canonical action error",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string",
+      "enum": [
+        "AUTH_REQUIRED",
+        "PROFILE_REQUIRED",
+        "FORBIDDEN",
+        "ENTITLEMENT_REQUIRED",
+        "ENTITLEMENT_UNVERIFIED",
+        "QUOTA_EXHAUSTED",
+        "FEATURE_DISABLED",
+        "PROVIDER_UNAVAILABLE",
+        "CLIENT_UPGRADE_REQUIRED",
+        "VALIDATION_FAILED",
+        "REQUIRES_INPUT",
+        "CONFIRMATION_REQUIRED",
+        "CONFLICT",
+        "IN_PROGRESS",
+        "RATE_LIMITED",
+        "TEMPORARILY_UNAVAILABLE",
+        "INTERNAL"
+      ]
+    },
+    "messageKey": {
+      "type": "string",
+      "minLength": 1
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "fieldIssues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "messageKey": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "path",
+          "messageKey"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "upgrade": {
+      "type": "object",
+      "properties": {
+        "eligible": {
+          "type": "boolean"
+        },
+        "routeRef": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "eligible"
+      ],
+      "additionalProperties": false
+    },
+    "handoff": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "labelKey": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "code",
+    "messageKey",
+    "retryable"
+  ],
+  "additionalProperties": false
+}
