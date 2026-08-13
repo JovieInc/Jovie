@@ -11,7 +11,7 @@ import {
   NO_AUTO_LABEL,
 } from './codex-issue-shipper';
 
-export const PIPELINE_SCOREBOARD_SCHEMA_VERSION = 3;
+export const PIPELINE_SCOREBOARD_SCHEMA_VERSION = 4;
 export const BLOCKED_DELTA_CRITICAL_THRESHOLD = 15;
 export const SYMPHONY_HOURLY_TARGET = 5;
 export const SYMPHONY_GAP_P95_TARGET_SECONDS = 12 * 60;
@@ -33,6 +33,7 @@ export interface PipelineScoreboardWindow {
 export interface MergedPr {
   readonly number: number;
   readonly title: string;
+  readonly body: string;
   readonly headRefName: string;
   readonly baseRefName: string;
   readonly mergedAt: string;
@@ -42,13 +43,15 @@ export interface MergedPr {
 }
 
 export interface SymphonyThroughputReceipt {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly window: PipelineScoreboardWindow;
   readonly evidence: MergedPrEvidenceStatus;
   readonly landedPrs: number | null;
   readonly landings: ReadonlyArray<{
     readonly number: number;
     readonly mergedAt: string;
+    readonly contextFingerprint: string | null;
+    readonly researchFingerprint: string | null;
   }>;
   readonly hourlyUtc: ReadonlyArray<{
     readonly hour: string;
@@ -237,6 +240,7 @@ function parseMergedPr(value: unknown): MergedPr | null {
   if (
     !Number.isInteger(value.number) ||
     typeof value.title !== 'string' ||
+    typeof value.body !== 'string' ||
     typeof value.headRefName !== 'string' ||
     typeof value.baseRefName !== 'string' ||
     typeof value.mergedAt !== 'string' ||
@@ -258,6 +262,7 @@ function parseMergedPr(value: unknown): MergedPr | null {
   return {
     number: value.number as number,
     title: value.title,
+    body: value.body,
     headRefName: value.headRefName,
     baseRefName: value.baseRefName,
     mergedAt: new Date(value.mergedAt).toISOString(),
@@ -379,6 +384,7 @@ function mergedPrMetricFingerprint(prs: ReadonlyArray<MergedPr>): string {
         number: pr.number,
         headRefName: pr.headRefName,
         baseRefName: pr.baseRefName,
+        body: pr.body,
         mergedAt: pr.mergedAt,
         labels: pr.labels.map(label => label.name).sort(),
       }))
@@ -387,6 +393,12 @@ function mergedPrMetricFingerprint(prs: ReadonlyArray<MergedPr>): string {
 
 export function isSymphonyBranch(headRefName: string): boolean {
   return SYMPHONY_BRANCH_PATTERN.test(headRefName);
+}
+
+function prEvidenceFingerprint(body: string, name: string): string | null {
+  return (
+    new RegExp(`^${name}:\\s*([a-f0-9]{24})\\s*$`, 'm').exec(body)?.[1] ?? null
+  );
 }
 
 function percentile(
@@ -404,7 +416,7 @@ function emptySymphonyReceipt(
   reason: string
 ): SymphonyThroughputReceipt {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     window,
     evidence,
     landedPrs: null,
@@ -501,11 +513,16 @@ export function buildSymphonyThroughputReceipt(
     gapP95 <= SYMPHONY_GAP_P95_TARGET_SECONDS;
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     window: evidence.window,
     evidence: status,
     landedPrs: landed.length,
-    landings: landed.map(pr => ({ number: pr.number, mergedAt: pr.mergedAt })),
+    landings: landed.map(pr => ({
+      number: pr.number,
+      mergedAt: pr.mergedAt,
+      contextFingerprint: prEvidenceFingerprint(pr.body, 'Context'),
+      researchFingerprint: prEvidenceFingerprint(pr.body, 'Research'),
+    })),
     hourlyUtc: hourlyCounts.map((landedPrs, index) => ({
       hour: new Date(sinceMs + index * HOUR_MS).toISOString(),
       landedPrs,
@@ -632,7 +649,7 @@ function isSymphonyThroughputReceipt(
   if (!isRecord(value)) return false;
   const window = value.window;
   if (
-    value.schemaVersion !== 1 ||
+    value.schemaVersion !== 2 ||
     !isRecord(window) ||
     typeof window.since !== 'string' ||
     typeof window.until !== 'string' ||
@@ -653,6 +670,10 @@ function isSymphonyThroughputReceipt(
       !Number.isInteger(landing.number) ||
       seenNumbers.has(landing.number as number) ||
       typeof landing.mergedAt !== 'string' ||
+      ![landing.contextFingerprint, landing.researchFingerprint].every(
+        fingerprint =>
+          fingerprint === null || /^[a-f0-9]{24}$/.test(String(fingerprint))
+      ) ||
       !Number.isFinite(mergedAt) ||
       new Date(mergedAt).toISOString() !== landing.mergedAt
     ) {
@@ -663,6 +684,13 @@ function isSymphonyThroughputReceipt(
     reconstructedPrs.push({
       number,
       title: '',
+      body: [
+        landing.contextFingerprint && `Context: ${landing.contextFingerprint}`,
+        landing.researchFingerprint &&
+          `Research: ${landing.researchFingerprint}`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
       headRefName: `symphony/JOV-${number}-fix`,
       baseRefName: 'main',
       mergedAt: landing.mergedAt,

@@ -99,7 +99,7 @@ function fetchMergedPrs(window: {
   if (!owner || !name) {
     return fetchMergedPrEvidence(window, () => undefined, { maxPages: 0 });
   }
-  const graphQuery = `query($owner:String!,$name:String!,$cursor:String,$pageSize:Int!){repository(owner:$owner,name:$name){pullRequests(states:MERGED,orderBy:{field:UPDATED_AT,direction:DESC},first:$pageSize,after:$cursor){totalCount pageInfo{hasNextPage endCursor} nodes{number title headRefName baseRefName createdAt updatedAt mergedAt labels(first:100){totalCount nodes{name}}}}}}`;
+  const graphQuery = `query($owner:String!,$name:String!,$cursor:String,$pageSize:Int!){repository(owner:$owner,name:$name){pullRequests(states:MERGED,orderBy:{field:UPDATED_AT,direction:DESC},first:$pageSize,after:$cursor){totalCount pageInfo{hasNextPage endCursor} nodes{number title body headRefName baseRefName createdAt updatedAt mergedAt labels(first:100){totalCount nodes{name}}}}}}`;
   return fetchMergedPrEvidence(
     window,
     (cursor, pageSize) => {

@@ -32,11 +32,13 @@ function mergedPr(
   createdAt = mergedAt,
   labels = [],
   headRefName = `codex/pr-${number}`,
-  baseRefName = 'main'
+  baseRefName = 'main',
+  body = ''
 ) {
   return {
     number,
     title: `PR ${number}`,
+    body,
     headRefName,
     baseRefName,
     mergedAt,
@@ -73,7 +75,7 @@ const completeEvidence = { complete: true, reason: null, pages: 1 };
  */
 function insufficientSymphony(window) {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     window,
     evidence: { complete: false, reason: 'not_provided', pages: 0 },
     landedPrs: null,
@@ -350,6 +352,7 @@ describe('pipeline scoreboard windows', () => {
         headRefName: scan === 1 ? 'symphony/JOV-1-fix' : 'symphony/JOV-2-fix',
       }),
       scan => ({ baseRefName: scan === 1 ? 'main' : 'codex/stack-parent' }),
+      scan => ({ body: `Context: ${(scan === 1 ? 'a' : 'b').repeat(24)}` }),
     ];
     for (const mutation of mutations) {
       let scan = 0;
@@ -487,7 +490,9 @@ describe('Symphony landed throughput', () => {
           '2026-07-01T00:10:00.000Z',
           '2026-07-01T00:00:00.000Z',
           [],
-          'symphony/JOV-1-fix'
+          'symphony/JOV-1-fix',
+          'main',
+          'Context: aaaaaaaaaaaaaaaaaaaaaaaa\nResearch: bbbbbbbbbbbbbbbbbbbbbbbb'
         ),
         normalizedMergedPr(
           2,
@@ -504,11 +509,29 @@ describe('Symphony landed throughput', () => {
           'symphony/JOV-3-fix',
           'codex/stack-parent'
         ),
+        normalizedMergedPr(
+          4,
+          '2026-07-01T00:40:00.000Z',
+          '2026-07-01T00:00:00.000Z',
+          [],
+          'symphony/JOV-4-fix'
+        ),
       ],
     });
 
     expect(receipt.landings).toEqual([
-      { number: 1, mergedAt: '2026-07-01T00:10:00.000Z' },
+      {
+        number: 1,
+        mergedAt: '2026-07-01T00:10:00.000Z',
+        contextFingerprint: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+        researchFingerprint: 'bbbbbbbbbbbbbbbbbbbbbbbb',
+      },
+      {
+        number: 4,
+        mergedAt: '2026-07-01T00:40:00.000Z',
+        contextFingerprint: null,
+        researchFingerprint: null,
+      },
     ]);
     expect(receipt.hourlyUtc).toHaveLength(24);
     expect(receipt.hourlyUtc.slice(1).every(hour => hour.landedPrs === 0)).toBe(
@@ -754,7 +777,7 @@ describe('pipeline scoreboard compute', () => {
         issue(7, ['codex', 'type:epic']),
       ],
       previous: {
-        schemaVersion: 3,
+        schemaVersion: 4,
         ts: '2026-07-02T00:00:00.000Z',
         window,
         funnel: {
@@ -808,7 +831,7 @@ describe('pipeline scoreboard compute', () => {
         issue(index + 1, ['codex', 'codex-blocked'])
       ),
       previous: {
-        schemaVersion: 3,
+        schemaVersion: 4,
         ts: '2026-07-02T00:00:00.000Z',
         window,
         funnel: {
@@ -1184,7 +1207,7 @@ describe('pipeline scoreboard digest and schedule wiring', () => {
     const path = join(directory, 'latest.json');
     try {
       writeFileSync(path, JSON.stringify(scoreboard));
-      expect(readLatestScoreboard(path)).toMatchObject({ schemaVersion: 3 });
+      expect(readLatestScoreboard(path)).toMatchObject({ schemaVersion: 4 });
 
       const malformed = JSON.parse(JSON.stringify(scoreboard));
       delete malformed.symphony.target;
@@ -1225,7 +1248,7 @@ describe('pipeline scoreboard digest and schedule wiring', () => {
         },
       });
       writeFileSync(path, JSON.stringify(completeScoreboard));
-      expect(readLatestScoreboard(path)).toMatchObject({ schemaVersion: 3 });
+      expect(readLatestScoreboard(path)).toMatchObject({ schemaVersion: 4 });
 
       /** @type {Array<(receipt: any) => void>} */
       const semanticMutations = [
@@ -1238,6 +1261,9 @@ describe('pipeline scoreboard digest and schedule wiring', () => {
         },
         receipt => {
           receipt.landingGapSeconds.p95 = 1;
+        },
+        receipt => {
+          receipt.landings[0].contextFingerprint = 'forged';
         },
       ];
       for (const mutate of semanticMutations) {
@@ -1287,7 +1313,7 @@ describe('pipeline scoreboard digest and schedule wiring', () => {
       'scripts/hermes/jobs/pipeline-scoreboard.ts'
     );
     expect(job).toContain(
-      'nodes{number title headRefName baseRefName createdAt'
+      'nodes{number title body headRefName baseRefName createdAt'
     );
     expect(job).toContain('symphonyMergeEvidence: mergedWeekly');
     expect(job).toContain('symphonyThroughputVerdict');
