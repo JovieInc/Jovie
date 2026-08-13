@@ -48,7 +48,7 @@ Better Auth owns four tables (`ba_users`, `ba_sessions`, `ba_accounts`, `ba_veri
 - **Provisioning:** Clerk webhook deleted; `databaseHooks.user.create.after → lib/auth/provision.ts#provisionAppUser` (idempotent: lookup by ba-id → adopt existing row by verified email `WHERE better_auth_user_id IS NULL` → insert new with waitlist status `ON CONFLICT DO NOTHING`), plus `gate.ts`'s existing lazy-create as the healing fallback. Hook is never-throw (Sentry + heal).
 - **Session read tiers:** proxy hot path = `getSessionCookie(req)` (zero DB/Redis); public `/` always passes through as an explicit navigation target; auth pages + layouts + actions + API = full `auth.api.getSession({headers})`. **Auth-page signed-in redirects use full getSession in the page (proxy does NOT redirect auth pages)** — avoids stale client/server redirect loops.
 - **Native handoff:** transport unchanged (deep links, PKCE Redis record, handoff window, Keychain, cookie jar). `/auth/callback` mints an OTT from the live browser session; `/api/auth/native/exchange` — iOS: server verifies OTT and returns a **fresh** session token (`internalAdapter.createSession`, independent of the browser session) for Keychain+bearer; Electron: returns the OTT, the `native-complete` page POSTs it to the built-in `/api/auth/one-time-token/verify` which sets the session cookie. iOS refreshes token/expiry from the bearer plugin's `set-auth-token` response header.
-- **Redis:** `apps/web/lib/auth/secondary-storage.ts` over `getRedis()` — 500ms timeout race, returns strings (guards Upstash `automaticDeserialization`), Sentry-warn; `get`/`set` best-effort, **`delete` fails closed** (retry/escalate). In-memory fallback for local/test only; production rate-limit storage is Redis-or-DB, never in-memory. Postgres remains the durable session store.
+- **Redis:** `apps/web/lib/auth/secondary-storage.ts` over `getRedis()` — 500ms timeout race, returns strings (guards Upstash `automaticDeserialization`), Sentry-warn; `get`/`set` best-effort, while session and revocation `delete` calls **fail closed** (retry/escalate). Better Auth verification records use `verification.storeInDatabase: true`; their `verification:` secondary-storage keys bypass Redis so Postgres remains the single atomic authority and Redis exhaustion cannot invalidate an already-consumed OTP. In-memory fallback is local/test only; production rate-limit storage is Redis-or-DB, never in-memory. Postgres remains the durable session store.
 
 ## The 42 review amendments (folded in)
 
@@ -58,7 +58,7 @@ Full audit trail lives in the autoplan working notes. Load-bearing subset (all P
 3. Own the Apple client-secret JWT: verify library behavior at the pinned version; if it needs a pre-signed ES256 JWT, add `generateAppleClientSecret()` (jose, from the .p8); add a `<30-day exp` watchdog either way. Handle multi-line PEM in Doppler.
 4. iOS reads `set-auth-token` to refresh token/expiry (don't force-logout at the original `expiresAt`); set `session.expiresIn`/`updateAge`.
 5. Pin `better-auth` exactly + `transaction:false` explicit + config test (the db.transaction ban passes only by the adapter's unpinned default).
-6. `secondaryStorage` returns strings + contract test; `delete` fails closed (fail-open revocation otherwise).
+6. `secondaryStorage` returns strings + contract test; session/revocation `delete` fails closed (fail-open revocation otherwise), while database-authoritative `verification:` keys bypass Redis.
 7. Provision hook never-throw + upsert-idempotent + hook-vs-lazy-create concurrency test.
 8. Scope Vercel-preview `trustedOrigins` to the project pattern (not `*.vercel.app`); derive `baseURL` from `VERCEL_URL`.
 9. Audit every `clerk_id`-keyed read path beyond `users.clerk_id`: `billing.user_clerk_id` and ~13 files (chat, claim, profile services, feedback, mobile artist-context) — the billing/revenue path must resolve post-cutover.
@@ -181,7 +181,8 @@ smoke. Keep the rollback deploy path ready until all gates pass.
 | Young library on the security path | Exact version pin + Dependabot + canary/auto-rollback |
 | Apple client-secret 6-month expiry | `<30-day` watchdog + canary alert |
 | Redis object-vs-string mass sign-out | `secondaryStorage` string contract + unit test; Postgres durable session store |
-| Fail-open revocation | `delete` fails closed |
+| Redis exhaustion after Postgres consumes an OTP | Verification records use `verification.storeInDatabase: true`; `verification:` secondary-storage operations bypass Redis |
+| Fail-open revocation | Non-verification `delete` fails closed |
 | Billing keyed on clerk_id | Dedicated clerk-id coupling audit + tests before flip |
 | Long-lived branch conflicts | Daily rebase; land fast once green |
 | Merge before OAuth verified | Credentials-first merge gate |
