@@ -185,7 +185,7 @@ restore_hold_label() {  # restore_hold_label <num> — compensation; never maske
 
 mark_ready() {  # mark_ready <num>
   [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would mark #$1 ready"; return 0; }
-  if gh_retry pr ready "$1" -R "$REPO" >/dev/null 2>&1; then
+  if GH_TOKEN="${READY_GH_TOKEN:-${GH_TOKEN:-}}" gh_retry pr ready "$1" -R "$REPO" >/dev/null 2>&1; then
     echo "    ✓ marked #$1 ready"
     return 0
   fi
@@ -356,16 +356,20 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
       fi
 
       was_draft="$(jq -r '.draft' <<<"$before_mutation")"
-      if ! remove_hold_label "$n"; then
-        upsert_status_comment "$n" "⚠️ Queue-deferred release: checks green and fleet gate GREEN, but removing the \`queue-deferred\` label **failed**. Will retry in ${ATTEMPT_COOLDOWN_MINUTES}m. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
-        continue
-      fi
       if [[ "$was_draft" == "true" ]]; then
         if ! mark_ready "$n"; then
-          restore_hold_label "$n" || true
-          upsert_status_comment "$n" "⚠️ Queue-deferred release: the hold label was removed but marking the PR ready **failed**, so the hold was restored. Will retry in ${ATTEMPT_COOLDOWN_MINUTES}m. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+          upsert_status_comment "$n" "⚠️ Queue-deferred release: checks green and fleet gate GREEN, but marking the PR ready **failed**; the hold remains in place. Will retry in ${ATTEMPT_COOLDOWN_MINUTES}m. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
           continue
         fi
+      fi
+      # Ready first with the scoped Actions token, then remove the hold with
+      # the App token. GITHUB_TOKEN stage changes do not cascade workflows;
+      # the App-authored `unlabeled` event therefore wakes autoenrollment only
+      # after the PR is ready and the exact-head checks already passed.
+      if ! remove_hold_label "$n"; then
+        [[ "$was_draft" == "true" ]] && { GH_TOKEN="${READY_GH_TOKEN:-${GH_TOKEN:-}}" gh_retry pr ready "$n" -R "$REPO" --undo >/dev/null 2>&1 || true; }
+        upsert_status_comment "$n" "⚠️ Queue-deferred release: the PR was made ready but removing the \`queue-deferred\` label **failed**, so draft state was restored. Will retry in ${ATTEMPT_COOLDOWN_MINUTES}m. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+        continue
       fi
 
       [[ "$DRY_RUN" == "1" ]] && continue
@@ -374,7 +378,7 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
       # or new head raced the promotion, restore the hold (and draft status)
       # immediately so the now-unproven revision cannot be enrolled.
       if ! after="$(read_state "$n" 2>/dev/null)"; then
-        [[ "$was_draft" == "true" ]] && { gh_retry pr ready "$n" -R "$REPO" --undo >/dev/null 2>&1 || true; }
+        [[ "$was_draft" == "true" ]] && { GH_TOKEN="${READY_GH_TOKEN:-${GH_TOKEN:-}}" gh_retry pr ready "$n" -R "$REPO" --undo >/dev/null 2>&1 || true; }
         restore_hold_label "$n" || true
         upsert_status_comment "$n" "⚠️ Queue-deferred release: the release could not be verified, so a compensating hold restore was attempted. Re-run after the current head and labels stabilize. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
         continue
@@ -388,7 +392,7 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
       if [[ "$state_after" == "OPEN" && "$draft_after" == "false" && "$head_after" == "$expected_head" && -z "$held_after" ]]; then
         upsert_status_comment "$n" "🤖 Queue-deferred release: typed hold (\`${reason}\`) lifted under a fresh GREEN fleet receipt with all required checks passing — PR is ready for review; the merge-queue controller revalidates this exact head before enrollment. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
       else
-        [[ "$was_draft" == "true" && "$draft_after" == "false" ]] && { gh_retry pr ready "$n" -R "$REPO" --undo >/dev/null 2>&1 || true; }
+        [[ "$was_draft" == "true" && "$draft_after" == "false" ]] && { GH_TOKEN="${READY_GH_TOKEN:-${GH_TOKEN:-}}" gh_retry pr ready "$n" -R "$REPO" --undo >/dev/null 2>&1 || true; }
         restore_hold_label "$n" || true
         upsert_status_comment "$n" "⚠️ Queue-deferred release: the PR changed during release (head=\`${head_after:0:12}\`, holds=\`${held_after:-none}\`, state=${state_after}, draft=${draft_after}), so the hold was restored. Re-run checks on the live head before releasing again. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
       fi

@@ -681,8 +681,16 @@ class TestReleaseQueueDeferred:
         assert "schedule:" not in workflow
         assert "workflow_run:" in workflow
         assert "workflows: ['CI', 'Production Controller', 'Fleet Gate Refresh']" in workflow
-        assert "github.event.workflow_run.name == 'Fleet Gate Refresh'" in workflow
-        assert "github.event.workflow_run.name == 'Production Controller'" in workflow
+        # The trigger allowlist owns workflow identity. Job admission must not
+        # compare `workflow_run.name`: custom `run-name` values include dynamic
+        # SHAs and caused successful Production Controller wakes to skip.
+        assert "github.event.workflow_run.name" not in workflow
+        assert "github.event.workflow_run.event == 'pull_request'" in workflow
+        assert "github.event.workflow_run.event != 'pull_request'" in workflow
+        assert "github.event.workflow_run.conclusion == 'success'" in workflow
+        assert "github.event.workflow_run.conclusion != 'cancelled'" in workflow
+        assert "pull-requests: write" in workflow
+        assert "READY_GH_TOKEN: ${{ github.token }}" in workflow
         assert "bash scripts/release-queue-deferred.sh" in workflow
         # Mutations must fire real PR events that wake the autoenroll
         # controller; a GITHUB_TOKEN mutation would not cascade.
@@ -920,8 +928,10 @@ JSON
                 fi
                 {_FAKE_GH_GREEN_CHECKS}
                 if [[ "$1 $2" == "pr view" ]]; then
-                  if [[ -f "${{FAKE_GH_STATE}}/ready" ]]; then
+                  if [[ -f "${{FAKE_GH_STATE}}/ready" && -f "${{FAKE_GH_STATE}}/label_removed" ]]; then
                     echo '{{"draft":false,"head":"{head}","branch":"symphony/JOV-900-fix","headOwner":"JovieInc","base":"main","labels":[],"mergeable":"MERGEABLE","state":"OPEN"}}'
+                  elif [[ -f "${{FAKE_GH_STATE}}/ready" ]]; then
+                    echo '{{"draft":false,"head":"{head}","branch":"symphony/JOV-900-fix","headOwner":"JovieInc","base":"main","labels":["queue-deferred"],"mergeable":"MERGEABLE","state":"OPEN"}}'
                   else
                     echo '{{"draft":true,"head":"{head}","branch":"symphony/JOV-900-fix","headOwner":"JovieInc","base":"main","labels":["queue-deferred"],"mergeable":"MERGEABLE","state":"OPEN"}}'
                   fi
@@ -960,5 +970,5 @@ JSON
         log = (tmp_path / "gh-calls.log").read_text(encoding="utf-8")
         remove_idx = log.index("--remove-label queue-deferred")
         ready_idx = log.index("pr ready 900")
-        assert remove_idx < ready_idx, "hold must be lifted before the ready flip"
+        assert ready_idx < remove_idx, "App event must fire only after the ready flip"
         assert "--add-label queue-deferred" not in log, "no compensating restore expected"
