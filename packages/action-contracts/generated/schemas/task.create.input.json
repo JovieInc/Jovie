@@ -49,9 +49,7 @@
     "assigneeUserId": {
       "anyOf": [
         {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 128
+          "type": "string"
         },
         {
           "type": "null"

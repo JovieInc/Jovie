@@ -40,10 +40,11 @@ export const taskCreateInputSchema = z.object({
   assigneeKind: z.enum(TASK_ASSIGNEE_KINDS).optional(),
   /**
    * Mirrors canonical `CreateTaskInput.assigneeUserId` — an opaque app-user
-   * ID. Storage is `text` (`apps/web/lib/db/schema/tasks.ts`), so the
-   * contract must not impose a UUID rule the domain owner does not have.
+   * ID (`string | null`; storage `text`). The contract must not trim,
+   * normalize, bound, or reject opaque identity; the executor/ownership
+   * layer resolves whether an ID exists.
    */
-  assigneeUserId: z.string().trim().min(1).max(128).nullish(),
+  assigneeUserId: z.string().nullish(),
   /** Attach to a release owned by the same profile. */
   releaseId: z.uuid().nullish(),
   parentTaskId: z.uuid().nullish(),
