@@ -1,34 +1,5 @@
 #!/usr/bin/env node
-/**
- * Typed queue-deferral receipt (`jovie-queue-deferral/v1`).
- *
- * `queue-deferred` is a hard hold on the auto-ready and merge-queue paths.
- * Historically the label had no provenance, so no controller could tell a
- * temporary mechanical hold (Symphony birth hold, queue-pressure deferral)
- * from an explicit repair/human hold — and nothing could safely release it.
- * This module is the canonical reader/writer of the typed receipt that makes
- * that distinction. The receipt is stored as one upserted PR comment carrying
- * the `<!-- bot-comment:queue-deferral -->` marker plus a fenced JSON block.
- *
- * Release contract (consumed by scripts/release-queue-deferred.sh):
- *   - schema, pr, head (40-hex), reason, source, deferredAt are required.
- *   - The receipt's head must equal the PR's exact current head.
- *   - Only RELEASABLE_REASONS are mechanical holds eligible for automatic
- *     release once required checks are green and a fresh GREEN fleet receipt
- *     exists. Any missing, malformed, head-stale, or unknown-reason receipt is
- *     an untyped hold and is never released automatically.
- *
- * CLI:
- *   render --pr <n> --head <sha> --reason <r> --source <s> [--note <text>]
- *          [--deferred-at <iso>]   print the full comment body
- *   validate                        read receipt JSON from stdin; print the
- *                                   normalized receipt; exit 2 on violations
- *   extract                         read a comment body from stdin; print the
- *                                   receipt JSON; exit 3 when absent/invalid
- *   classify                        read receipt JSON from stdin; print
- *                                   "releasable" (exit 0) or "held:<detail>"
- *                                   (exit 4)
- */
+/** Canonical reader/writer for exact-head `jovie-queue-deferral/v1` comments. */
 
 export const QUEUE_DEFERRAL_SCHEMA = 'jovie-queue-deferral/v1';
 export const QUEUE_DEFERRAL_MARKER = '<!-- bot-comment:queue-deferral -->';
@@ -104,22 +75,13 @@ export function validateReceipt(candidate) {
   return { ok: true, errors: [], receipt };
 }
 
-/**
- * @param {object} fields
- * @param {number} fields.pr
- * @param {string} fields.head
- * @param {string} fields.reason
- * @param {string} fields.source
- * @param {string} [fields.deferredAt]
- * @param {string} [fields.note]
- */
 export function renderReceiptComment({
   pr,
   head,
   reason,
   source,
   deferredAt = new Date().toISOString(),
-  note,
+  note = undefined,
 }) {
   const { ok, errors, receipt } = validateReceipt({
     schema: QUEUE_DEFERRAL_SCHEMA,
@@ -140,11 +102,9 @@ export function renderReceiptComment({
 ${JSON.stringify(receipt, null, 2)}
 \`\`\`
 
-This PR carries a typed \`queue-deferred\` hold (reason: \`${reason}\`, source: \`${source}\`).
-The queue-deferred release controller lifts this hold automatically once the
-required checks are green on this exact head and a fresh GREEN fleet receipt
-exists. A missing, malformed, or head-stale receipt is an untyped hold and is
-never released automatically.`;
+Typed \`queue-deferred\` hold: \`${reason}\` from \`${source}\`.
+It is released only when this exact head, required checks, and a fresh GREEN fleet gate agree;
+missing, malformed, or stale receipts stay held.`;
 }
 
 export function extractReceiptFromComment(body) {
@@ -237,22 +197,6 @@ export async function runCli(argv = process.argv.slice(2)) {
       process.stdout.write(`${body}\n`);
       return 0;
     }
-    case 'validate': {
-      let parsed;
-      try {
-        parsed = JSON.parse(await readStdin());
-      } catch {
-        process.stderr.write('receipt is not valid JSON\n');
-        return 2;
-      }
-      const { ok, errors, receipt } = validateReceipt(parsed);
-      if (!ok) {
-        process.stderr.write(`${errors.join('\n')}\n`);
-        return 2;
-      }
-      process.stdout.write(`${JSON.stringify(receipt)}\n`);
-      return 0;
-    }
     case 'extract': {
       const receipt = extractReceiptFromComment(await readStdin());
       if (!receipt) {
@@ -275,7 +219,7 @@ export async function runCli(argv = process.argv.slice(2)) {
     }
     default:
       process.stderr.write(
-        'usage: queue-deferral-receipt.mjs <render|validate|extract|classify> [options]\n'
+        'usage: queue-deferral-receipt.mjs <render|extract|classify> [options]\n'
       );
       return 2;
   }

@@ -1,33 +1,9 @@
 #!/usr/bin/env bash
-# Queue-Deferred Release
-#
-# Closes the Symphony In Review → native merge queue handoff. `queue-deferred`
-# is a hard hold on the auto-ready and merge-queue paths. With a typed
-# `jovie-queue-deferral/v1` receipt (scripts/lib/queue-deferral-receipt.mjs) a
-# controller can finally distinguish a temporary mechanical hold from an
-# explicit repair/human hold — and lift only the mechanical ones:
-#
-#   report  — for every open queue-deferred agent PR, print its age and typed
-#             reason (or `untyped-hold-manual-release-required`) and raise a
-#             ::warning once the hold is older than ALARM_MINUTES. This is the
-#             scoreboard surface; it never mutates anything.
-#   release — lift the hold only when ALL of the following hold:
-#               1. a fresh (<= FLEET_MAX_AGE_SECONDS) `jovie-fleet-gate/v1`
-#                  receipt with state GREEN and promotionAdmission.allowed
-#               2. a valid typed deferral receipt whose head equals the PR's
-#                  exact current head, with a releasable (mechanical) reason
-#               3. the PR is OPEN, MERGEABLE, carries queue-deferred and no
-#                  other hold label, and has zero failing required checks
-#             The label is removed first; a draft is then marked ready. Both
-#             transitions fire real PR events (app token), so the merge-queue
-#             autoenroll controller revalidates and owns enrollment. Under
-#             AMBER/RED/stale/unknown fleet state no mutation happens: the
-#             draft keeps queue-deferred, matching the fleet admission
-#             contract. Untyped holds are never released automatically.
-#
-# Discovery is never authorization: the exact head, draft bit, mergeability,
-# and live labels are re-read before and after every mutation, with a
-# compensating draft+label restore if the PR raced the promotion.
+# Releases only typed mechanical `queue-deferred` holds under a fresh GREEN
+# fleet receipt, exact-head green checks, and live same-repo/main PR state.
+# Report mode is read-only; release mode removes the label before marking ready
+# so native autoenrollment revalidates and owns queue admission. Untyped or
+# inconsistent evidence stays held. Mutations are re-read and compensated.
 #
 # Env:
 #   REPO                     target repo (default JovieInc/Jovie)
