@@ -90,6 +90,38 @@ export interface MergedPrFetchOptions {
   readonly maxPages?: number;
 }
 
+/**
+ * One native merge-group CI attempt (JOV-5030). Sourced from the Actions
+ * workflow-runs API with event=merge_group; the queue branch name encodes the
+ * group's front PR and exact main base. This is the authoritative GitHub-side
+ * attempt count — never derived from local labels or job logs.
+ */
+export interface MergeGroupRun {
+  readonly id: number;
+  readonly headBranch: string | null;
+  readonly status: string | null;
+  readonly conclusion: string | null;
+  readonly createdAt: string;
+}
+
+export interface MergeGroupRunEvidence extends MergedPrEvidenceStatus {
+  readonly window: PipelineScoreboardWindow;
+  readonly runs: ReadonlyArray<MergeGroupRun>;
+}
+
+// Mirrors MERGE_GROUP_FAILURE_CONCLUSIONS in scripts/lib/merge-queue-guard.mjs
+// (that module is plain ESM for CI shell callers; keep the sets in sync).
+const MERGE_GROUP_FAILURE_CONCLUSIONS = new Set([
+  'failure',
+  'timed_out',
+  'action_required',
+  'startup_failure',
+  'stale',
+]);
+
+export const MERGE_QUEUE_CHURN_MIN_ATTEMPTS = 3;
+export const MERGE_QUEUE_CHURN_ATTEMPTS_PER_MERGE = 2;
+
 export interface PipelineScoreboard {
   readonly schemaVersion: number;
   readonly ts: string;
@@ -116,6 +148,10 @@ export interface PipelineScoreboard {
   readonly queue: {
     readonly merges: number | null;
     readonly mqAttemptsPerMerge: number | null;
+    readonly mergeGroupAttempts: number | null;
+    readonly mergeGroupFailedAttempts: number | null;
+    readonly queueChurn: number | null;
+    readonly mergeGroupEvidence: MergedPrEvidenceStatus;
     readonly evidence: MergedPrEvidenceStatus;
     readonly timeToMergeSeconds: {
       readonly p50: number;
@@ -136,6 +172,7 @@ export interface PipelineScoreboardAlarm {
     | 'blocked_delta'
     | 'zero_ships_after_claims'
     | 'merge_evidence_incomplete'
+    | 'merge_queue_churn'
     | 'symphony_throughput_below_target';
   readonly severity: 'warning' | 'critical';
   readonly message: string;
@@ -174,6 +211,7 @@ export interface PipelineScoreboardInput {
     readonly labels?: ReadonlyArray<{ readonly name?: string } | string>;
   }>;
   readonly mergeEvidence: MergedPrEvidenceStatus;
+  readonly mergeGroupRunEvidence?: MergeGroupRunEvidence;
   readonly symphonyMergeEvidence?: MergedPrEvidence;
   readonly tasteEvidence?: MergedPrEvidenceStatus;
 }
@@ -599,6 +637,169 @@ function isBetween(
   return typeof ts === 'string' && ts >= window.since && ts < window.until;
 }
 
+function incompleteMergeGroupRunEvidence(
+  window: PipelineScoreboardWindow,
+  reason: string,
+  pages: number,
+  runs: ReadonlyArray<MergeGroupRun>
+): MergeGroupRunEvidence {
+  return { complete: false, reason, pages, window, runs };
+}
+
+function parseMergeGroupRun(value: unknown): MergeGroupRun | null {
+  if (!isRecord(value)) return null;
+  if (
+    !Number.isInteger(value.id) ||
+    (value.head_branch !== null && typeof value.head_branch !== 'string') ||
+    (value.status !== null && typeof value.status !== 'string') ||
+    (value.conclusion !== null && typeof value.conclusion !== 'string') ||
+    typeof value.created_at !== 'string' ||
+    !Number.isFinite(Date.parse(value.created_at))
+  ) {
+    return null;
+  }
+  return {
+    id: value.id as number,
+    headBranch: value.head_branch as string | null,
+    status: value.status as string | null,
+    conclusion: value.conclusion as string | null,
+    createdAt: new Date(value.created_at).toISOString(),
+  };
+}
+
+/**
+ * Fetches the exact half-open window of native merge-group CI attempts from
+ * GitHub's authoritative Actions workflow-runs API (event=merge_group). Pages
+ * are created-descending; pagination stops once a page's oldest run predates
+ * the window. A truncated window, malformed page, or fetch failure becomes
+ * typed incomplete evidence — attempts/merge is then suppressed, never
+ * guessed from local logs.
+ */
+export function fetchMergeGroupRunEvidence(
+  window: PipelineScoreboardWindow,
+  fetchPage: (page: number, pageSize: number) => unknown,
+  options: MergedPrFetchOptions = {}
+): MergeGroupRunEvidence {
+  const pageSize = options.pageSize ?? 100;
+  const maxPages = options.maxPages ?? 10;
+  if (
+    !Number.isInteger(pageSize) ||
+    pageSize < 1 ||
+    pageSize > 100 ||
+    !Number.isInteger(maxPages) ||
+    maxPages < 1
+  ) {
+    return incompleteMergeGroupRunEvidence(
+      window,
+      'invalid_fetch_options',
+      0,
+      []
+    );
+  }
+
+  const runs: MergeGroupRun[] = [];
+  const seen = new Set<number>();
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    let rawPage: unknown;
+    try {
+      rawPage = fetchPage(page, pageSize);
+    } catch {
+      return incompleteMergeGroupRunEvidence(
+        window,
+        'fetch_failed',
+        page - 1,
+        runs
+      );
+    }
+    if (!isRecord(rawPage) || !Array.isArray(rawPage.workflow_runs)) {
+      return incompleteMergeGroupRunEvidence(
+        window,
+        'malformed_page',
+        page,
+        runs
+      );
+    }
+    const pageRuns = rawPage.workflow_runs as ReadonlyArray<unknown>;
+    let oldestOnPage: string | null = null;
+    for (const rawRun of pageRuns) {
+      const parsed = parseMergeGroupRun(rawRun);
+      if (!parsed) {
+        return incompleteMergeGroupRunEvidence(
+          window,
+          'malformed_run',
+          page,
+          runs
+        );
+      }
+      if (seen.has(parsed.id)) {
+        return incompleteMergeGroupRunEvidence(
+          window,
+          'duplicate_run',
+          page,
+          runs
+        );
+      }
+      seen.add(parsed.id);
+      if (isBetween(parsed.createdAt, window)) runs.push(parsed);
+      if (oldestOnPage === null || parsed.createdAt < oldestOnPage) {
+        oldestOnPage = parsed.createdAt;
+      }
+    }
+    const covered =
+      pageRuns.length < pageSize ||
+      (oldestOnPage !== null && oldestOnPage < window.since);
+    if (covered) {
+      return { complete: true, reason: null, pages: page, window, runs };
+    }
+  }
+  return incompleteMergeGroupRunEvidence(
+    window,
+    'window_not_covered',
+    maxPages,
+    runs
+  );
+}
+
+export function filterMergeGroupRunEvidence(
+  evidence: MergeGroupRunEvidence,
+  window: PipelineScoreboardWindow
+): MergeGroupRunEvidence {
+  const runs = evidence.runs.filter(run => isBetween(run.createdAt, window));
+  if (
+    window.since < evidence.window.since ||
+    window.until > evidence.window.until
+  ) {
+    return incompleteMergeGroupRunEvidence(
+      window,
+      'window_not_covered',
+      0,
+      runs
+    );
+  }
+  return evidence.complete
+    ? {
+        complete: true,
+        reason: null,
+        pages: evidence.pages,
+        window,
+        runs,
+      }
+    : incompleteMergeGroupRunEvidence(
+        window,
+        evidence.reason ?? 'unknown',
+        evidence.pages,
+        runs
+      );
+}
+
+/** Front-PR attribution for one merge-group run, parsed from the queue branch. */
+export function mergeGroupRunFrontPr(run: MergeGroupRun): number | null {
+  const match = /^gh-readonly-queue\/main\/pr-([1-9][0-9]*)-[0-9a-f]{40}$/.exec(
+    run.headBranch ?? ''
+  );
+  return match ? Number(match[1]) : null;
+}
 export function readJsonlEntries(path: string): JobLogEntry[] {
   if (!existsSync(path)) return [];
   try {
@@ -722,6 +923,12 @@ function isPipelineScoreboard(value: unknown): value is PipelineScoreboard {
     isRecord(value.shipper) &&
     isRecord(queue) &&
     (queue.merges === null || typeof queue.merges === 'number') &&
+    (queue.mergeGroupAttempts === null ||
+      typeof queue.mergeGroupAttempts === 'number') &&
+    (queue.mergeGroupFailedAttempts === null ||
+      typeof queue.mergeGroupFailedAttempts === 'number') &&
+    (queue.queueChurn === null || typeof queue.queueChurn === 'number') &&
+    isMergedPrEvidenceStatus(queue.mergeGroupEvidence) &&
     isMergedPrEvidenceStatus(queue.evidence) &&
     isSymphonyThroughputReceipt(symphony) &&
     isRecord(gates) &&
@@ -892,9 +1099,39 @@ export function buildPipelineScoreboard(
       }
     : mergeEvidence;
   const merges = mergeEvidence.complete ? (input.mergedPrs?.length ?? 0) : null;
-  const mqAttempts = input.mergedPrs?.filter(pr =>
-    labelList(pr.labels).includes('merge-queue')
-  ).length;
+  // JOV-5030: MQ attempts come from GitHub's authoritative merge_group
+  // workflow runs, not from the merge-queue label (which is stripped seconds
+  // after enqueue and structurally under-reports to zero).
+  const mqRunEvidence = input.mergeGroupRunEvidence ?? null;
+  const mergeGroupEvidence: MergedPrEvidenceStatus = mqRunEvidence
+    ? {
+        complete: mqRunEvidence.complete,
+        reason: mqRunEvidence.reason,
+        pages: mqRunEvidence.pages,
+      }
+    : { complete: false, reason: 'not_provided', pages: 0 };
+  const mqRuns = mergeGroupEvidence.complete
+    ? (mqRunEvidence?.runs ?? [])
+    : null;
+  const mergeGroupAttempts = mqRuns ? mqRuns.length : null;
+  const mergeGroupFailedAttempts = mqRuns
+    ? mqRuns.filter(
+        run =>
+          run.status === 'completed' &&
+          run.conclusion !== null &&
+          MERGE_GROUP_FAILURE_CONCLUSIONS.has(run.conclusion)
+      ).length
+    : null;
+  const mqAttemptsPerMerge =
+    typeof merges === 'number' &&
+    merges > 0 &&
+    typeof mergeGroupAttempts === 'number'
+      ? Number((mergeGroupAttempts / merges).toFixed(2))
+      : null;
+  const queueChurn =
+    typeof merges === 'number' && typeof mergeGroupAttempts === 'number'
+      ? mergeGroupAttempts - merges
+      : null;
   const readyToMerge = input.ciMetrics?.latency?.readyToMergeSeconds;
   const gateEntries = shipperEntries;
   const symphony = input.symphonyMergeEvidence
@@ -929,12 +1166,11 @@ export function buildPipelineScoreboard(
     queue: {
       merges,
       evidence: mergeEvidence,
-      mqAttemptsPerMerge:
-        typeof merges === 'number' &&
-        merges > 0 &&
-        typeof mqAttempts === 'number'
-          ? Number((mqAttempts / merges).toFixed(2))
-          : null,
+      mqAttemptsPerMerge,
+      mergeGroupAttempts,
+      mergeGroupFailedAttempts,
+      queueChurn,
+      mergeGroupEvidence,
       timeToMergeSeconds: {
         p50: readyToMerge?.p50 ?? 0,
         p95: readyToMerge?.p95 ?? 0,
@@ -984,6 +1220,20 @@ export function evaluatePipelineAlarms(
       message: `Merge evidence is incomplete (${scoreboard.queue.evidence.reason ?? 'unknown'}) after ${scoreboard.queue.evidence.pages} page(s) for ${windowLabel}; merge throughput conclusions are suppressed.`,
     });
   }
+  const mqAttempts = scoreboard.queue.mergeGroupAttempts;
+  const mqMerges = scoreboard.queue.merges;
+  if (
+    mqAttempts !== null &&
+    mqMerges !== null &&
+    mqAttempts >= MERGE_QUEUE_CHURN_MIN_ATTEMPTS &&
+    mqAttempts >= MERGE_QUEUE_CHURN_ATTEMPTS_PER_MERGE * mqMerges
+  ) {
+    alarms.push({
+      rule: 'merge_queue_churn',
+      severity: 'critical',
+      message: `Merge-queue churn: ${mqAttempts} merge-group CI attempt(s) (${scoreboard.queue.mergeGroupFailedAttempts ?? 0} failed) for ${mqMerges} merge(s) from ${windowLabel}; a non-progressing front item is rebuilding the group and duplicating follower CI.`,
+    });
+  }
   if (scoreboard.symphony.verdict === 'failing') {
     alarms.push({
       rule: 'symphony_throughput_below_target',
@@ -1009,9 +1259,12 @@ export function renderPipelineScoreboard(
   const failureText = Object.entries(scoreboard.shipper.failuresByCategory)
     .map(([key, value]) => `${key}:${value}`)
     .join(', ');
+  const mqRunText = scoreboard.queue.mergeGroupEvidence.complete
+    ? `merge-group attempts ${scoreboard.queue.mergeGroupAttempts ?? 0} (failed ${scoreboard.queue.mergeGroupFailedAttempts ?? 0}, churn ${scoreboard.queue.queueChurn ?? 0})`
+    : `merge-group attempts suppressed (${scoreboard.queue.mergeGroupEvidence.reason ?? 'unknown'})`;
   const queueText = scoreboard.queue.evidence.complete
-    ? `Queue: merges ${scoreboard.queue.merges} · MQ attempts/merge ${scoreboard.queue.mqAttemptsPerMerge ?? 'n/a'} · time-to-merge p50 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p50)} / p95 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p95)}`
-    : `Queue: merge evidence incomplete (${scoreboard.queue.evidence.reason ?? 'unknown'}, ${scoreboard.queue.evidence.pages} page(s)); merge count and MQ attempts/merge suppressed · time-to-merge p50 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p50)} / p95 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p95)}`;
+    ? `Queue: merges ${scoreboard.queue.merges} · MQ attempts/merge ${scoreboard.queue.mqAttemptsPerMerge ?? 'n/a'} · ${mqRunText} · time-to-merge p50 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p50)} / p95 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p95)}`
+    : `Queue: merge evidence incomplete (${scoreboard.queue.evidence.reason ?? 'unknown'}, ${scoreboard.queue.evidence.pages} page(s)); merge count and MQ attempts/merge suppressed · ${mqRunText} · time-to-merge p50 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p50)} / p95 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p95)}`;
   const tasteText = scoreboard.gates.tasteEvidence.complete
     ? String(scoreboard.gates.tasteLabeledPrsWeek)
     : `suppressed (${scoreboard.gates.tasteEvidence.reason ?? 'unknown'}, ${scoreboard.gates.tasteEvidence.pages} page(s))`;

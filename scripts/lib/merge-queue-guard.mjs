@@ -1515,3 +1515,161 @@ export function formatBlockedByPrReason(result) {
     )
     .join('\n');
 }
+
+// Native merge-group churn guard (JOV-5030). The native queue publishes each
+// group build on a branch named
+//   gh-readonly-queue/main/pr-<frontPrNumber>-<exactBaseSha>
+// so every merge_group Actions run identifies the group's front PR and the
+// exact main base it was built against. A front PR whose branch-head checks
+// are green can still deterministically fail the combined head (e.g. a
+// shrink-only ratchet that only fails once merged with current main). GitHub
+// ejects it, and anything that re-enqueues the unchanged head rebuilds the
+// group — every follower then pays a duplicate full merge-group CI run.
+
+// Conclusions that prove a group attempt failed. `cancelled` is excluded:
+// supersession cancels in-flight runs when the group is rebuilt, which is not
+// evidence that the front item is bad.
+export const MERGE_GROUP_FAILURE_CONCLUSIONS = new Set([
+  'failure',
+  'timed_out',
+  'action_required',
+  'startup_failure',
+  'stale',
+]);
+
+// A single failed workflow is not proof that the combined head is bad: GitHub
+// API timeouts and runner startup faults surface as an ordinary workflow
+// `failure`. Require repetition before suppressing a front item, and reopen a
+// bounded retry after five minutes so infrastructure recovery cannot deadlock
+// an unchanged PR forever.
+export const MERGE_GROUP_CHURN_FAILURE_THRESHOLD = 2;
+export const MERGE_GROUP_CHURN_COOLDOWN_MS = 5 * 60 * 1000;
+
+export function parseMergeQueueFrontBranch(branch) {
+  const match =
+    /^gh-readonly-queue\/main\/pr-([1-9][0-9]*)-([0-9a-f]{40})$/.exec(
+      typeof branch === 'string' ? branch : ''
+    );
+  if (!match) return null;
+  return { prNumber: Number(match[1]), baseSha: match[2] };
+}
+
+/**
+ * Decide whether enrolling (or keeping enrolled) a PR would repeat an
+ * already-failed native merge-group attempt with no new information.
+ *
+ * Actions:
+ *  - 'allow'   no failed attempt by this front on the exact current base, or
+ *              the head moved after the last failed attempt.
+ *  - 'block'   the unchanged head already fronted a failed attempt on the
+ *              exact current main base; re-entry would deterministically
+ *              rebuild the group and duplicate follower CI.
+ *  - 'unknown' evidence is missing/invalid. Callers must treat this as
+ *              non-authoritative: enrollment degrades to the pre-guard
+ *              behavior and dequeue mutations must not fire.
+ */
+export function frontItemChurnDecision({
+  prNumber,
+  currentBaseSha,
+  headCommittedAt,
+  mergeGroupRuns,
+  observedAt,
+}) {
+  if (
+    !Number.isInteger(prNumber) ||
+    prNumber <= 0 ||
+    typeof currentBaseSha !== 'string' ||
+    !/^[0-9a-f]{40}$/.test(currentBaseSha) ||
+    !Array.isArray(mergeGroupRuns) ||
+    !Number.isFinite(Date.parse(observedAt))
+  ) {
+    return {
+      action: 'unknown',
+      reason: 'merge-group churn evidence unavailable',
+      evidence: null,
+    };
+  }
+
+  const failedFrontedRuns = mergeGroupRuns
+    .map(run => ({ run, front: parseMergeQueueFrontBranch(run?.headBranch) }))
+    .filter(
+      ({ run, front }) =>
+        front !== null &&
+        front.prNumber === prNumber &&
+        front.baseSha === currentBaseSha &&
+        run.status === 'completed' &&
+        MERGE_GROUP_FAILURE_CONCLUSIONS.has(run.conclusion)
+    )
+    .map(({ run }) => run)
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+
+  if (failedFrontedRuns.length === 0) {
+    return {
+      action: 'allow',
+      reason:
+        'no failed merge-group attempt fronted by this PR on the exact current main base',
+      evidence: null,
+    };
+  }
+
+  const lastFailed = failedFrontedRuns[0];
+  const headMs = Date.parse(headCommittedAt);
+  const attemptMs = Date.parse(lastFailed.createdAt);
+  if (
+    Number.isFinite(headMs) &&
+    Number.isFinite(attemptMs) &&
+    headMs > attemptMs
+  ) {
+    return {
+      action: 'allow',
+      reason:
+        'head moved after the last failed merge-group attempt on this base; the new head has no failed attempt',
+      evidence: {
+        failedAttempts: failedFrontedRuns.length,
+        lastFailedRunId: lastFailed.id ?? null,
+        lastFailedAt: lastFailed.createdAt ?? null,
+        baseSha: currentBaseSha,
+      },
+    };
+  }
+
+  if (failedFrontedRuns.length < MERGE_GROUP_CHURN_FAILURE_THRESHOLD) {
+    return {
+      action: 'allow',
+      reason:
+        'one failed merge-group attempt is insufficient to distinguish a combined-head failure from transient infrastructure',
+      evidence: {
+        failedAttempts: failedFrontedRuns.length,
+        lastFailedRunId: lastFailed.id ?? null,
+        lastFailedAt: lastFailed.createdAt ?? null,
+        baseSha: currentBaseSha,
+      },
+    };
+  }
+
+  const observedMs = Date.parse(observedAt);
+  if (observedMs - attemptMs >= MERGE_GROUP_CHURN_COOLDOWN_MS) {
+    return {
+      action: 'allow',
+      reason:
+        'repeated failures completed the five-minute cooldown; allow one bounded infrastructure-recovery retry',
+      evidence: {
+        failedAttempts: failedFrontedRuns.length,
+        lastFailedRunId: lastFailed.id ?? null,
+        lastFailedAt: lastFailed.createdAt ?? null,
+        baseSha: currentBaseSha,
+      },
+    };
+  }
+
+  return {
+    action: 'block',
+    reason: `unchanged head already fronted ${failedFrontedRuns.length} recent failed merge-group attempt(s) on the exact current main base ${currentBaseSha}; re-enrollment would rebuild the group and duplicate follower CI before the bounded cooldown`,
+    evidence: {
+      failedAttempts: failedFrontedRuns.length,
+      lastFailedRunId: lastFailed.id ?? null,
+      lastFailedAt: lastFailed.createdAt ?? null,
+      baseSha: currentBaseSha,
+    },
+  };
+}
