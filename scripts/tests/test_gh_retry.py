@@ -16,7 +16,7 @@ import shutil
 import stat
 import subprocess
 import textwrap
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -308,7 +308,10 @@ class TestDrainPrQueueWiring:
             for line in source.splitlines()
             if line.strip().startswith("return f'{env_prefix}bash")
         ]
-        assert helper_launches == ["return f'{env_prefix}bash \"{_DRAIN_SCRIPT}\"'"]
+        assert helper_launches == [
+            "return f'{env_prefix}bash \"{_DRAIN_SCRIPT}\"'",
+            "return f'{env_prefix}bash \"{_RELEASE_SCRIPT}\"'",
+        ]
         assert 'DRAIN_EXPECT_GH="{fake_gh}"' in source
         assert "DRAIN_MUTATION_AUTHORIZATION=test-fixture" in source
 
@@ -526,3 +529,436 @@ JSON
         assert "would -queue-deferred" not in result.stdout
         assert "#700" in result.stdout
         assert "{queue-deferred}" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# Queue-deferred release (JOV-5033): typed `jovie-queue-deferral/v1`
+# provenance lets the release controller lift mechanical holds only under a
+# fresh GREEN fleet receipt; untyped holds are never released automatically.
+# ---------------------------------------------------------------------------
+
+_RELEASE_SCRIPT = _REPO_ROOT / "scripts" / "release-queue-deferred.sh"
+_RELEASE_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "queue-deferred-release.yml"
+
+
+def _release_command(tmp_path: Path, *, extra_env: str = "") -> str:
+    fake_gh = tmp_path / "gh"
+    assert fake_gh.is_file(), f"test must create isolated gh fixture first: {fake_gh}"
+    env_prefix = (
+        f'PATH="{tmp_path}:$PATH" '
+        f'FAKE_GH_LOG="{tmp_path}/gh-calls.log" '
+        f'FAKE_GH_STATE="{tmp_path}/state" '
+    )
+    if extra_env:
+        env_prefix += f"{extra_env} "
+    return f'{env_prefix}bash "{_RELEASE_SCRIPT}"'
+
+
+def _fleet_receipt(tmp_path: Path, *, state: str = "GREEN", age_minutes: int = 0) -> Path:
+    observed = datetime.now(timezone.utc) - timedelta(minutes=age_minutes)
+    receipt = tmp_path / f"fleet-{state.lower()}-{age_minutes}.json"
+    receipt.write_text(
+        json.dumps(
+            {
+                "schema": "jovie-fleet-gate/v1",
+                "observedAt": observed.isoformat(),
+                "state": state,
+                "promotionAdmission": {"allowed": state == "GREEN"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return receipt
+
+
+def _receipt_comment_body(
+    tmp_path: Path,
+    *,
+    head: str,
+    deferred_minutes: int = 120,
+    pr: int = 900,
+    author: str = "itstimwhite",
+    reason: str = "symphony-birth-hold",
+    source: str = "symphony",
+) -> None:
+    deferred = datetime.now(timezone.utc) - timedelta(minutes=deferred_minutes)
+    receipt = {
+        "schema": "jovie-queue-deferral/v1",
+        "pr": pr,
+        "head": head,
+        "reason": reason,
+        "source": source,
+        "deferredAt": deferred.isoformat(),
+    }
+    body = (
+        "<!-- bot-comment:queue-deferral -->\n"
+        "## Queue Deferral Receipt\n\n"
+        "```json\n"
+        + json.dumps(receipt, indent=2)
+        + "\n```\n"
+    )
+    # `gh api --paginate --slurp` wraps endpoint pages in an outer array.
+    (tmp_path / "comments-900.json").write_text(
+        json.dumps([[{"user": {"login": author}, "body": body}]]),
+        encoding="utf-8",
+    )
+
+
+_FAKE_GH_PREAMBLE = """\
+#!/usr/bin/env bash
+set -euo pipefail
+echo "$*" >> "${FAKE_GH_LOG:?}"
+mkdir -p "${FAKE_GH_STATE:?}"
+"""
+
+_FAKE_GH_API_UNTYPED = """\
+if [[ "$1" == "api" ]]; then
+  # Attempt-marker lookup and untyped deferral lookup: no marker comments.
+  exit 0
+fi
+"""
+
+_FAKE_GH_GREEN_CHECKS = """\
+if [[ "$1 $2" == "pr checks" ]]; then
+  echo '[{"name":"PR Ready","bucket":"pass","state":"SUCCESS"},{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"},{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"},{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}]'
+  exit 0
+fi
+"""
+
+
+def _write_fake_gh(tmp_path: Path, body: str) -> None:
+    fake_gh = tmp_path / "gh"
+    fake_gh.write_text(body, encoding="utf-8")
+    fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def _run_single_candidate_release(
+    tmp_path: Path,
+    *,
+    head: str,
+    base: str = "main",
+) -> subprocess.CompletedProcess[str]:
+    receipt = _fleet_receipt(tmp_path, state="GREEN")
+    _write_fake_gh(
+        tmp_path,
+        textwrap.dedent(
+            f"""\
+            {_FAKE_GH_PREAMBLE}
+            if [[ "$1 $2" == "pr list" ]]; then
+              echo '[{{"n":900,"t":"Deferred PR","draft":true,"m":"MERGEABLE","head":"symphony/JOV-900-fix","oid":"{head}","owner":"JovieInc","updated":"2026-08-13T00:00:00Z","L":["queue-deferred"]}}]'
+              exit 0
+            fi
+            if [[ "$1" == "api" ]]; then
+              if [[ "$*" != *"queue-deferral-release"* && -f "${{FAKE_GH_STATE}}/../comments-900.json" ]]; then
+                cat "${{FAKE_GH_STATE}}/../comments-900.json"
+              fi
+              exit 0
+            fi
+            if [[ "$1 $2" == "pr view" ]]; then
+              echo '{{"draft":true,"head":"{head}","branch":"symphony/JOV-900-fix","headOwner":"JovieInc","base":"{base}","labels":["queue-deferred"],"mergeable":"MERGEABLE","state":"OPEN"}}'
+              exit 0
+            fi
+            {_FAKE_GH_GREEN_CHECKS}
+            echo "unexpected gh args: $*" >&2
+            exit 2
+            """
+        ),
+    )
+    return _run_bash(
+        _release_command(
+            tmp_path,
+            extra_env=(
+                "RELEASE_MODE=release DRY_RUN=1 ATTEMPT_COOLDOWN_MINUTES=0 "
+                f'FLEET_RECEIPT_FILE="{receipt}"'
+            ),
+        )
+    )
+
+
+class TestReleaseQueueDeferred:
+    def test_workflow_is_event_driven_with_no_cron(self) -> None:
+        workflow = _RELEASE_WORKFLOW.read_text(encoding="utf-8")
+        assert "schedule:" not in workflow
+        assert "workflow_run:" in workflow
+        assert "workflows: ['CI', 'Production Controller', 'Fleet Gate Refresh']" in workflow
+        assert "github.event.workflow_run.name == 'Fleet Gate Refresh'" in workflow
+        assert "github.event.workflow_run.name == 'Production Controller'" in workflow
+        assert "bash scripts/release-queue-deferred.sh" in workflow
+        # Mutations must fire real PR events that wake the autoenroll
+        # controller; a GITHUB_TOKEN mutation would not cascade.
+        assert "steps.app-token.outputs.token" in workflow
+
+    def test_report_lists_age_and_typed_reason_with_alarm(
+        self, tmp_path: Path
+    ) -> None:
+        head = "c" * 40
+        _receipt_comment_body(tmp_path, head=head, deferred_minutes=120)
+        stale_update = (
+            datetime.now(timezone.utc) - timedelta(hours=3)
+        ).isoformat()
+        _write_fake_gh(
+            tmp_path,
+            textwrap.dedent(
+                f"""\
+                {_FAKE_GH_PREAMBLE}
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{{"n":900,"t":"Symphony draft","draft":true,"m":"MERGEABLE","head":"symphony/JOV-900-fix","oid":"{head}","owner":"JovieInc","updated":"{stale_update}","L":["queue-deferred"]}},{{"n":901,"t":"Repair hold","draft":true,"m":"MERGEABLE","head":"codex/JOV-901-fix","oid":"{"d" * 40}","owner":"JovieInc","updated":"{stale_update}","L":["queue-deferred"]}}]
+JSON
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  if [[ "$*" == *"issues/900/"* && "$*" != *"queue-deferral-release"* ]]; then
+                    cat "${{FAKE_GH_STATE}}/../comments-900.json"
+                  fi
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+        )
+
+        result = _run_bash(
+            _release_command(tmp_path, extra_env="RELEASE_MODE=report")
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "#900" in result.stdout
+        assert "symphony-birth-hold" in result.stdout
+        assert "#901" in result.stdout
+        assert "untyped-hold-manual-release-required" in result.stdout
+        assert "::warning::queue-deferred #900" in result.stdout
+        assert "::warning::queue-deferred #901" in result.stdout
+
+    def test_release_disabled_under_amber(self, tmp_path: Path) -> None:
+        head = "c" * 40
+        _receipt_comment_body(tmp_path, head=head)
+        receipt = _fleet_receipt(tmp_path, state="AMBER")
+        _write_fake_gh(
+            tmp_path,
+            textwrap.dedent(
+                f"""\
+                {_FAKE_GH_PREAMBLE}
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":900,"t":"Symphony draft","draft":true,"m":"MERGEABLE","head":"symphony/JOV-900-fix","oid":"{head}","owner":"JovieInc","updated":"2026-08-13T00:00:00Z","L":["queue-deferred"]}}]'
+                  exit 0
+                fi
+                {_FAKE_GH_API_UNTYPED}
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+        )
+
+        result = _run_bash(
+            _release_command(
+                tmp_path,
+                extra_env=f'RELEASE_MODE=release FLEET_RECEIPT_FILE="{receipt}"',
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "fleet-gate-not-green:AMBER" in result.stdout
+        log = (tmp_path / "gh-calls.log").read_text(encoding="utf-8")
+        assert "pr edit" not in log
+        assert "pr ready" not in log
+
+    def test_release_disabled_with_stale_fleet_receipt(self, tmp_path: Path) -> None:
+        receipt = _fleet_receipt(tmp_path, state="GREEN", age_minutes=30)
+        _write_fake_gh(
+            tmp_path,
+            textwrap.dedent(
+                f"""\
+                {_FAKE_GH_PREAMBLE}
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[]'
+                  exit 0
+                fi
+                {_FAKE_GH_API_UNTYPED}
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+        )
+
+        result = _run_bash(
+            _release_command(
+                tmp_path,
+                extra_env=f'RELEASE_MODE=release FLEET_RECEIPT_FILE="{receipt}"',
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "fleet-receipt-stale" in result.stdout
+
+    def test_untyped_hold_is_never_released(self, tmp_path: Path) -> None:
+        head = "c" * 40
+        result = _run_single_candidate_release(tmp_path, head=head)
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "untyped hold" in result.stdout
+        assert "never released automatically" in result.stdout
+        assert "would remove" not in result.stdout
+
+    def test_untrusted_comment_cannot_create_release_authority(
+        self, tmp_path: Path
+    ) -> None:
+        head = "c" * 40
+        _receipt_comment_body(tmp_path, head=head, author="random-contributor")
+        result = _run_single_candidate_release(tmp_path, head=head)
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "untyped hold" in result.stdout
+        assert "would remove" not in result.stdout
+
+    def test_receipt_for_another_pr_cannot_release_live_hold(
+        self, tmp_path: Path
+    ) -> None:
+        head = "c" * 40
+        _receipt_comment_body(tmp_path, head=head, pr=901)
+        result = _run_single_candidate_release(tmp_path, head=head)
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "deferral-receipt-pr-mismatch (receipt=#901, live=#900)" in result.stdout
+        assert "would remove" not in result.stdout
+
+    def test_head_stale_receipt_is_not_released(self, tmp_path: Path) -> None:
+        live_head = "e" * 40
+        _receipt_comment_body(tmp_path, head="f" * 40)
+        result = _run_single_candidate_release(tmp_path, head=live_head)
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "deferral-receipt-head-stale" in result.stdout
+        assert "would remove" not in result.stdout
+
+    def test_queue_pressure_receipt_stays_held_while_live_pressure_is_high(
+        self, tmp_path: Path
+    ) -> None:
+        head = "c" * 40
+        _receipt_comment_body(
+            tmp_path,
+            head=head,
+            reason="queue-pressure",
+            source="agent-pipeline",
+        )
+        receipt = _fleet_receipt(tmp_path, state="GREEN")
+        _write_fake_gh(
+            tmp_path,
+            textwrap.dedent(
+                f"""\
+                {_FAKE_GH_PREAMBLE}
+                if [[ "$1 $2" == "pr list" && "$*" == *"number,title"* ]]; then
+                  echo '[{{"n":900,"t":"Pressure hold","draft":true,"m":"MERGEABLE","head":"symphony/JOV-900-fix","oid":"{head}","owner":"JovieInc","updated":"2026-08-13T00:00:00Z","L":["queue-deferred"]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"number":901,"isDraft":false,"mergeStateStatus":"CLEAN","labels":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  if [[ "$*" != *"queue-deferral-release"* ]]; then
+                    cat "${{FAKE_GH_STATE}}/../comments-900.json"
+                  fi
+                  exit 0
+                fi
+                {_FAKE_GH_GREEN_CHECKS}
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+        )
+
+        result = _run_bash(
+            _release_command(
+                tmp_path,
+                extra_env=(
+                    "RELEASE_MODE=release DRY_RUN=1 ATTEMPT_COOLDOWN_MINUTES=0 "
+                    "QUEUE_READY_THRESHOLD=1 "
+                    f'FLEET_RECEIPT_FILE="{receipt}"'
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "queue pressure remains high (1 ready, threshold 1)" in result.stdout
+        assert "would remove" not in result.stdout
+
+    def test_non_main_live_target_cannot_be_released(self, tmp_path: Path) -> None:
+        head = "c" * 40
+        _receipt_comment_body(tmp_path, head=head)
+        result = _run_single_candidate_release(
+            tmp_path,
+            head=head,
+            base="symphony/JOV-899-stack",
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "live state no longer matches the releasable snapshot" in result.stdout
+        assert "would remove" not in result.stdout
+
+    def test_green_receipt_releases_typed_birth_hold_in_order(
+        self, tmp_path: Path
+    ) -> None:
+        head = "c" * 40
+        _receipt_comment_body(tmp_path, head=head)
+        receipt = _fleet_receipt(tmp_path, state="GREEN")
+        _write_fake_gh(
+            tmp_path,
+            textwrap.dedent(
+                f"""\
+                {_FAKE_GH_PREAMBLE}
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":900,"t":"Symphony draft","draft":true,"m":"MERGEABLE","head":"symphony/JOV-900-fix","oid":"{head}","owner":"JovieInc","updated":"2026-08-13T00:00:00Z","L":["queue-deferred"]}}]'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  if [[ "$*" != *"queue-deferral-release"* && "$*" != *"-X PATCH"* ]]; then
+                    cat "${{FAKE_GH_STATE}}/../comments-900.json"
+                  fi
+                  exit 0
+                fi
+                {_FAKE_GH_GREEN_CHECKS}
+                if [[ "$1 $2" == "pr view" ]]; then
+                  if [[ -f "${{FAKE_GH_STATE}}/ready" ]]; then
+                    echo '{{"draft":false,"head":"{head}","branch":"symphony/JOV-900-fix","headOwner":"JovieInc","base":"main","labels":[],"mergeable":"MERGEABLE","state":"OPEN"}}'
+                  else
+                    echo '{{"draft":true,"head":"{head}","branch":"symphony/JOV-900-fix","headOwner":"JovieInc","base":"main","labels":["queue-deferred"],"mergeable":"MERGEABLE","state":"OPEN"}}'
+                  fi
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr edit" ]]; then
+                  touch "${{FAKE_GH_STATE}}/label_removed"
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr ready" ]]; then
+                  touch "${{FAKE_GH_STATE}}/ready"
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr comment" ]]; then
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+        )
+
+        result = _run_bash(
+            _release_command(
+                tmp_path,
+                extra_env=(
+                    "RELEASE_MODE=release ATTEMPT_COOLDOWN_MINUTES=0 "
+                    f'FLEET_RECEIPT_FILE="{receipt}"'
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "✓ removed `queue-deferred` from #900" in result.stdout
+        assert "✓ marked #900 ready" in result.stdout
+        log = (tmp_path / "gh-calls.log").read_text(encoding="utf-8")
+        remove_idx = log.index("--remove-label queue-deferred")
+        ready_idx = log.index("pr ready 900")
+        assert remove_idx < ready_idx, "hold must be lifted before the ready flip"
+        assert "--add-label queue-deferred" not in log, "no compensating restore expected"
