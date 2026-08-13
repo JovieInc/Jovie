@@ -4,6 +4,13 @@ import { DemoVideoPage } from '@/components/features/demo/DemoVideoPage';
 const meta = {
   title: 'Marketing/Routes/DemoVideo',
   component: DemoVideoPage,
+  decorators: [
+    Story => (
+      <div className='system-b-marketing dark min-h-svh overflow-x-clip bg-base text-primary-token'>
+        <Story />
+      </div>
+    ),
+  ],
   parameters: {
     layout: 'fullscreen',
     chromatic: { viewports: [390, 1024] },

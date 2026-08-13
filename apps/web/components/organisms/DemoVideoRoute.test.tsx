@@ -121,6 +121,33 @@ describe('DemoVideoPage route contract', () => {
     });
   });
 
+  it('gives both aliases the shared marketing document-scroll context', () => {
+    expect(demoVideoMeta.decorators).toHaveLength(1);
+    expect(Web028DemoVideo.decorators).toBeUndefined();
+    expect(Web029DemoVideoAlias.decorators).toBeUndefined();
+
+    const decorate = demoVideoMeta.decorators[0];
+    const decoratedStory = decorate(() => <div data-testid='story-body' />);
+
+    const { container } = render(decoratedStory);
+    const routeContext = container.firstElementChild;
+
+    expect(routeContext).toHaveClass(
+      'system-b-marketing',
+      'dark',
+      'min-h-svh',
+      'overflow-x-clip',
+      'bg-base',
+      'text-primary-token'
+    );
+    expect(routeContext).not.toHaveClass(
+      'h-svh',
+      'overflow-hidden',
+      'overflow-y-hidden'
+    );
+    expect(screen.getByTestId('story-body')).toBeInTheDocument();
+  });
+
   it('binds its receipt to an ancestor commit containing the source and story exports', () => {
     const receipt = demoVideoMeta.parameters.pen;
     const storyExport = Web028DemoVideo.parameters?.pen.storyExport;
