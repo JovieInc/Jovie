@@ -1,0 +1,162 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Jovie Canonical Actions (contract only)",
+    "version": "1.0.0",
+    "description": "Contract-only view of the canonical actions manifest. These paths are not served by any runtime; they exist so Swift, MCP, and CLI bindings can be generated against a stable OpenAPI artifact."
+  },
+  "paths": {
+    "/actions/chat.start": {
+      "post": {
+        "operationId": "chat_start",
+        "summary": "Start chat",
+        "description": "Create or resume an authenticated AI chat conversation, optionally reserving the first turn. Contract-only definition; no runtime route exists at this path yet.",
+        "x-jovie-action-version": "1",
+        "x-jovie-contract-only": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/chat.start.input.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Canonical action result envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "./schemas/chat.start.output.json"
+                    },
+                    {
+                      "$ref": "./schemas/chat.start.error.json"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/actions/contact.create": {
+      "post": {
+        "operationId": "contact_create",
+        "summary": "Create contact",
+        "description": "Create an audience contact (email or SMS subscriber) on the authenticated creator profile. Contract-only definition; no runtime route exists at this path yet.",
+        "x-jovie-action-version": "1",
+        "x-jovie-contract-only": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/contact.create.input.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Canonical action result envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "./schemas/contact.create.output.json"
+                    },
+                    {
+                      "$ref": "./schemas/contact.create.error.json"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/actions/release.create": {
+      "post": {
+        "operationId": "release_create",
+        "summary": "Create release",
+        "description": "Create a discography release (single, EP, album, …) on the authenticated creator profile. Contract-only definition; no runtime route exists at this path yet.",
+        "x-jovie-action-version": "1",
+        "x-jovie-contract-only": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/release.create.input.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Canonical action result envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "./schemas/release.create.output.json"
+                    },
+                    {
+                      "$ref": "./schemas/release.create.error.json"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/actions/task.create": {
+      "post": {
+        "operationId": "task_create",
+        "summary": "Create task",
+        "description": "Create a workspace task, optionally attached to a release, on the authenticated creator profile. Contract-only definition; no runtime route exists at this path yet.",
+        "x-jovie-action-version": "1",
+        "x-jovie-contract-only": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/task.create.input.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Canonical action result envelope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "./schemas/task.create.output.json"
+                    },
+                    {
+                      "$ref": "./schemas/task.create.error.json"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
