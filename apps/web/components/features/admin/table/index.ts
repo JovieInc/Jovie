@@ -19,11 +19,12 @@
 
 // Re-export everything from the consolidated organisms/table
 export * from '@/components/organisms/table';
+// Compatibility export; the organisms/table implementation is canonical.
+export { SortableHeaderButton } from '@/components/organisms/table/SortableHeaderButton';
 export type { AdminDataTableProps } from './AdminDataTable';
 // Admin-specific utilities (kept for now)
 export { ADMIN_DATA_TABLE_CLASSNAME, AdminDataTable } from './AdminDataTable';
 export { AdminTableShell } from './AdminTableShell';
-export { SortableHeaderButton } from './SortableHeaderButton';
 export {
   type UseCSVExportOptions,
   type UseCSVExportResult,

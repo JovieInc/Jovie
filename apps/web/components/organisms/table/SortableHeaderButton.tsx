@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
+
 import { cn } from '@/lib/utils';
 
 export interface SortableHeaderButtonProps {
@@ -20,27 +22,36 @@ export function SortableHeaderButton({
   onClick,
   className,
 }: SortableHeaderButtonProps) {
+  // Table headers keep their established compact visual geometry while the
+  // canonical md Button contract preserves the 44px hit target.
   return (
-    <button
+    <Button
       type='button'
+      variant='ghost'
+      size='md'
       onClick={onClick}
       className={cn(
-        'inline-flex w-full items-center gap-2 text-left text-app font-caption tracking-normal text-secondary-token hover:text-primary-token focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+        'inline-flex h-auto w-full items-center justify-start text-left text-app font-caption tracking-normal',
+        'rounded-full px-1.5 py-1 transition-[background-color,color,box-shadow] duration-subtle',
+        'text-secondary-token hover:bg-surface-1 hover:text-primary-token',
+        'active:bg-surface-0',
         className
       )}
     >
-      {label}
-      <span
-        className={cn(
-          'text-3xs transition-opacity',
-          direction
-            ? 'opacity-100 text-primary-token'
-            : 'opacity-50 text-secondary-token'
-        )}
-        aria-hidden='true'
-      >
-        {getSortIndicator(direction)}
+      <span className='inline-flex items-center gap-2'>
+        {label}
+        <span
+          className={cn(
+            'text-3xs transition-opacity',
+            direction
+              ? 'opacity-100 text-primary-token'
+              : 'opacity-50 text-secondary-token'
+          )}
+          aria-hidden='true'
+        >
+          {getSortIndicator(direction)}
+        </span>
       </span>
-    </button>
+    </Button>
   );
 }
