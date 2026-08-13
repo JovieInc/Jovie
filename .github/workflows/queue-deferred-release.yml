@@ -111,18 +111,17 @@ jobs:
   release:
     name: Report and release typed queue deferrals
     needs: fleet-policy
+    permissions:
+      contents: read
+      pull-requests: write
     if: >-
       github.event_name != 'workflow_run' ||
       (
-        github.event.workflow_run.name == 'CI' &&
         github.event.workflow_run.event == 'pull_request' &&
         github.event.workflow_run.conclusion != 'cancelled'
       ) ||
       (
-        (
-          github.event.workflow_run.name == 'Production Controller' ||
-          github.event.workflow_run.name == 'Fleet Gate Refresh'
-        ) &&
+        github.event.workflow_run.event != 'pull_request' &&
         github.event.workflow_run.conclusion == 'success'
       )
     # Fleet controller: use the hosted image contract so `gh` is always
@@ -157,6 +156,11 @@ jobs:
       - name: Report and release typed queue deferrals
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          # GitHub stage changes require repository write authority. Use the
+          # scoped Actions token only for the ready flip; the subsequent App
+          # label mutation emits the real `unlabeled` event that wakes
+          # autoenrollment after the PR is ready.
+          READY_GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60
