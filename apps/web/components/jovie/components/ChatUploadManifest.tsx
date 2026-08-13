@@ -9,6 +9,7 @@ import {
   Copy,
   Loader2,
   Lock,
+  XCircle,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import Link from 'next/link';
@@ -30,11 +31,14 @@ function statusColor(status: PendingFile['status']): string {
   switch (status) {
     case 'ready':
       return 'text-accent-green';
-    case 'error':
+    case 'failed':
       return 'text-error';
+    case 'cancelled':
+      return 'text-tertiary-token';
     case 'duplicate':
       return 'text-warning';
     case 'uploading':
+    case 'processing':
       return 'text-primary-token';
     default:
       return 'text-tertiary-token';
@@ -45,12 +49,16 @@ function statusText(f: PendingFile): string {
   switch (f.status) {
     case 'ready':
       return 'Uploaded';
-    case 'error':
+    case 'failed':
       return f.error ?? 'Failed';
+    case 'cancelled':
+      return 'Cancelled';
     case 'duplicate':
       return 'Duplicate — skipped';
     case 'uploading':
       return `${f.progress}% · uploading`;
+    case 'processing':
+      return 'Processing';
     case 'queued':
       return 'Queued';
     default:
@@ -102,8 +110,10 @@ function FileRowTrailingIcon({ file }: { readonly file: PendingFile }) {
           strokeWidth={2.5}
         />
       );
-    case 'error':
+    case 'failed':
       return <AlertCircle className='h-3.5 w-3.5 shrink-0 text-error' />;
+    case 'cancelled':
+      return <XCircle className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />;
     case 'duplicate':
       return <Copy className='h-3.5 w-3.5 shrink-0 text-warning' />;
     case 'locked':

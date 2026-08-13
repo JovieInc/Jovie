@@ -11,6 +11,11 @@ import {
   convertHeicToJpeg,
   isHeicLikeMimeType,
 } from '@/lib/images/heic-conversion';
+import {
+  canTransitionMediaLifecycle,
+  isMediaLifecycleState,
+  type MediaLifecycleState,
+} from '@/lib/media/lifecycle';
 import type { FileUIPart } from '../types';
 
 // ── Constants ──────────────────────────────────────────────────────────
@@ -66,10 +71,7 @@ export type FileKind =
 
 export type FileUploadStatus =
   | 'queued'
-  | 'uploading'
-  | 'processing'
-  | 'ready'
-  | 'error'
+  | MediaLifecycleState
   | 'duplicate'
   | 'locked';
 
@@ -313,7 +315,7 @@ async function uploadImageAttachment(
         processedFile = await convertHeicToJpeg(file);
       } catch {
         updateFile(id, {
-          status: 'error',
+          status: 'failed',
           error: 'Could not process HEIC. Try JPEG or PNG.',
         });
         return;
@@ -337,7 +339,7 @@ async function uploadImageAttachment(
       URL.revokeObjectURL(previewUrl);
     }
     updateFile(id, {
-      status: 'error',
+      status: 'failed',
       error:
         err instanceof Error ? err.message : `Failed to upload ${file.name}.`,
     });
@@ -356,6 +358,7 @@ async function uploadAudioAttachment(
       access: 'public',
       handleUploadUrl: '/api/library/audio/upload-token',
     });
+    updateFile(id, { status: 'processing' });
     const response = await fetch('/api/chat/audio', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -394,7 +397,7 @@ async function uploadAudioAttachment(
     });
   } catch (err) {
     updateFile(id, {
-      status: 'error',
+      status: 'failed',
       error: err instanceof Error ? err.message : 'Upload failed',
     });
   }
@@ -418,7 +421,7 @@ async function uploadGenericAttachment(
     });
   } catch (err) {
     updateFile(id, {
-      status: 'error',
+      status: 'failed',
       error: err instanceof Error ? err.message : 'Upload failed',
     });
   }
@@ -552,7 +555,18 @@ export function useChatFileAttachments({
 
   const updateFile = useCallback((id: string, patch: Partial<PendingFile>) => {
     setPendingFiles(prev =>
-      prev.map(f => (f.id === id ? { ...f, ...patch } : f))
+      prev.map(f => {
+        if (f.id !== id) return f;
+        if (
+          patch.status &&
+          isMediaLifecycleState(f.status) &&
+          isMediaLifecycleState(patch.status) &&
+          !canTransitionMediaLifecycle(f.status, patch.status)
+        ) {
+          return f;
+        }
+        return { ...f, ...patch };
+      })
     );
   }, []);
 
@@ -700,9 +714,11 @@ export function useChatFileAttachments({
   const aggregate = useCallback(() => {
     const total = pendingFiles.length;
     const done = pendingFiles.filter(f => f.status === 'ready').length;
-    const uploading = pendingFiles.filter(f => f.status === 'uploading').length;
+    const uploading = pendingFiles.filter(
+      f => f.status === 'uploading' || f.status === 'processing'
+    ).length;
     const queued = pendingFiles.filter(f => f.status === 'queued').length;
-    const errors = pendingFiles.filter(f => f.status === 'error').length;
+    const errors = pendingFiles.filter(f => f.status === 'failed').length;
     const duplicates = pendingFiles.filter(
       f => f.status === 'duplicate'
     ).length;
@@ -714,7 +730,12 @@ export function useChatFileAttachments({
     const overallPct =
       totalBytes > 0 ? Math.round((uploadedBytes / totalBytes) * 100) : 0;
     const remainingBytes = pendingFiles
-      .filter(f => f.status === 'uploading' || f.status === 'queued')
+      .filter(
+        f =>
+          f.status === 'uploading' ||
+          f.status === 'processing' ||
+          f.status === 'queued'
+      )
       .reduce((s, f) => s + f.size * (1 - f.progress / 100), 0);
     const totalSpeed = pendingFiles
       .filter(f => f.status === 'uploading')

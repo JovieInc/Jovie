@@ -1,6 +1,6 @@
 'use client';
 
-import { FileAudio2, Loader2, X } from 'lucide-react';
+import { AlertCircle, FileAudio2, Loader2, X, XCircle } from 'lucide-react';
 
 import type { PendingAudio } from '../hooks/useChatAudioAttachments';
 
@@ -14,8 +14,16 @@ function inferenceLabel(audio: PendingAudio): string {
     return 'Uploading audio…';
   }
 
-  if (audio.status === 'error') {
+  if (audio.status === 'processing') {
+    return 'Processing audio…';
+  }
+
+  if (audio.status === 'failed') {
     return audio.error ?? 'Upload failed';
+  }
+
+  if (audio.status === 'cancelled') {
+    return 'Upload cancelled';
   }
 
   if (audio.inference?.kind === 'attach-to-existing') {
@@ -33,6 +41,7 @@ export function AudioPreviewStrip({ audio, onRemove }: AudioPreviewStripProps) {
   return (
     <div
       className='system-b-image-preview-strip'
+      data-upload-state={audio.status}
       data-testid='chat-audio-preview-strip'
     >
       <div className='flex items-center justify-between gap-3'>
@@ -51,8 +60,12 @@ export function AudioPreviewStrip({ audio, onRemove }: AudioPreviewStripProps) {
 
       <div className='mt-2 flex items-center gap-3 rounded-xl border border-subtle bg-surface-1 px-3 py-2.5'>
         <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
-          {audio.status === 'uploading' ? (
+          {audio.status === 'uploading' || audio.status === 'processing' ? (
             <Loader2 className='h-4 w-4 animate-spin text-secondary-token' />
+          ) : audio.status === 'failed' ? (
+            <AlertCircle className='h-4 w-4 text-error' />
+          ) : audio.status === 'cancelled' ? (
+            <XCircle className='h-4 w-4 text-tertiary-token' />
           ) : (
             <FileAudio2 className='h-4 w-4 text-secondary-token' />
           )}

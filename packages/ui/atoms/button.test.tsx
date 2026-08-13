@@ -114,6 +114,22 @@ describe('Button', () => {
     expect(btn.className).toContain('h-7');
   });
 
+  it('keeps the marketing text contract at 32px visible inside a 44px target', () => {
+    render(
+      <Button variant='primary' size='marketing'>
+        Join the waitlist
+      </Button>
+    );
+
+    const btn = screen.getByRole('button', { name: 'Join the waitlist' });
+    expect(btn).toHaveAttribute('data-size', 'marketing');
+    expect(btn.className).toContain('h-8');
+    expect(btn.className).toContain('before:h-11');
+    expect(btn.className).toContain('before:min-w-11');
+    expect(btn.className).toContain('before:w-full');
+    expect(btn.className).not.toMatch(/(?:^|\s)h-11(?:\s|$)/);
+  });
+
   it('renders every entry in the server-safe button registry', () => {
     render(
       <>

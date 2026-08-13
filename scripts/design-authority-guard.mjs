@@ -32,13 +32,50 @@ const STALE_ACTIVE_PATTERNS = [
   /Inter,.*never recommend as primary/i,
 ];
 
-const SERIF_DECLARATION =
+const SERIF_NAME_DECLARATION =
   /font-serif|ui-serif|--font-serif|Instrument Serif|Source Serif|SourceSerif|\bGeorgia\b|\bTimes New Roman\b|font(?:-family|Family)[^\n]*(?<!sans-)\bserif\b/i;
+const SERIF_SHORTHAND_DECLARATION = /\bfont\s*:[^\n]*(?<!sans-)\bserif\b/i;
+
+const SERIF_EXCEPTION_KEYS = ['path', 'match', 'kind', 'owner', 'reason'];
+const SERIF_EXCEPTION_KINDS = ['ugc', 'media'];
+
+export function validateSerifException(exception) {
+  if (!exception || typeof exception !== 'object') {
+    throw new Error('serif exception must be an object');
+  }
+  for (const key of SERIF_EXCEPTION_KEYS) {
+    if (typeof exception[key] !== 'string' || exception[key].trim() === '') {
+      throw new Error(`serif exception requires ${key}`);
+    }
+  }
+  if (/[*?{}[\]]/.test(exception.path)) {
+    throw new Error(`serif exception paths must be exact: ${exception.path}`);
+  }
+  if (/[*?]/.test(exception.match)) {
+    throw new Error(
+      `serif exception matches must be exact: ${exception.match}`
+    );
+  }
+  if (/^serif$/i.test(exception.match)) {
+    throw new Error(
+      `serif exception matches must identify a concrete declaration: ${exception.match}`
+    );
+  }
+  if (!SERIF_EXCEPTION_KINDS.includes(exception.kind)) {
+    throw new Error(
+      `serif exception kind must be ugc or media: ${exception.path}`
+    );
+  }
+  return { ...exception, used: false };
+}
 
 export function isSerifDeclaration(line, isTemplate = false) {
   const templateRecommendation =
     /Instrument Serif|Source Serif|SourceSerif|\bGeorgia\b|\bTimes New Roman\b/i;
-  return (isTemplate ? templateRecommendation : SERIF_DECLARATION).test(line);
+  if (isTemplate) return templateRecommendation.test(line);
+  return (
+    SERIF_NAME_DECLARATION.test(line) || SERIF_SHORTHAND_DECLARATION.test(line)
+  );
 }
 
 export function hasExactSerifException(exceptions, relativePath, line) {
@@ -55,22 +92,7 @@ function readSerifExceptions(repoRoot) {
   const parsed = JSON.parse(readFileSync(exceptionPath, 'utf8'));
   if (!Array.isArray(parsed.serif))
     throw new Error('serif exceptions must be an array');
-  return parsed.serif.map(exception => {
-    for (const key of ['path', 'match', 'kind', 'owner', 'reason']) {
-      if (typeof exception[key] !== 'string' || exception[key].trim() === '') {
-        throw new Error(`serif exception requires ${key}`);
-      }
-    }
-    if (/[*?{}[\]]/.test(exception.path)) {
-      throw new Error(`serif exception paths must be exact: ${exception.path}`);
-    }
-    if (!['ugc', 'media'].includes(exception.kind)) {
-      throw new Error(
-        `serif exception kind must be ugc or media: ${exception.path}`
-      );
-    }
-    return { ...exception, used: false };
-  });
+  return parsed.serif.map(validateSerifException);
 }
 
 function trackedFiles(repoRoot) {
@@ -101,7 +123,7 @@ export function findDesignAuthorityViolations(repoRoot = process.cwd()) {
 
   const productFiles = trackedFiles(repoRoot).filter(file => {
     if (!/^(apps|packages)\//.test(file)) return false;
-    if (!/\.(?:ts|tsx|js|jsx|css|scss|html|svg|swift)$/.test(file))
+    if (!/\.(?:ts|tsx|js|jsx|mjs|cjs|css|scss|html|svg|swift)$/.test(file))
       return false;
     if (
       /(?:^|\/)(?:tests?|fixtures?|snapshots?|generated|dist|build)(?:\/|$)/.test(

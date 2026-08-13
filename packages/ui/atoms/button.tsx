@@ -37,6 +37,10 @@ const ICON_HIT_TARGET_44 =
 
 const BUTTON_SIZE_CLASSES: Record<ButtonSize, string> = {
   sm: 'h-7 px-2.5 text-xs before:absolute before:left-1/2 before:top-1/2 before:h-10 before:min-w-10 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
+  // Founder-approved marketing text contract: 32px visible control inside a
+  // 44px minimum hit target without changing surrounding layout.
+  marketing:
+    'h-8 px-3 text-xs before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
   md: 'h-9 px-3 text-[13px] before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
   lg: 'h-11 px-5 text-sm before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
   icon: `h-9 w-9 px-0 ${ICON_HIT_TARGET_44}`,
@@ -64,6 +68,7 @@ const buttonVariants = cva(
         variant: 'link',
         size: [
           'sm',
+          'marketing',
           'md',
           'lg',
           'icon',
