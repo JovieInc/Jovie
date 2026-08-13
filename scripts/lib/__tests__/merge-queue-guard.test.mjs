@@ -10,10 +10,13 @@ import {
 } from '../github-update-branch.mjs';
 import {
   bisectBatchFailure,
+  buildNativeQueuePolicyReadback,
+  buildProductionControllerGenerationReadback,
   ciWorkflowHasMergeGroupTrigger,
   compareRatchetCounts,
   detectChangedFileOverlap,
   detectIssueOverlap,
+  evaluateNativeCohortMergeDecision,
   extractWorkflowJobBlock,
   fastTrackPolicy,
   frontItemChurnDecision,
@@ -21,6 +24,7 @@ import {
   MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN,
   MERGE_QUEUE_REPO_PATHS,
   NATIVE_BRANCH_PROTECTION_POLICY,
+  NATIVE_QUEUE_COHORT_POLICY,
   NATIVE_QUEUE_POLICY,
   normalizeBranchProtectionSource,
   parseMergeQueueFrontBranch,
@@ -1882,5 +1886,118 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     for (const input of inputs) {
       expect(frontItemChurnDecision(input).action).toBe('unknown');
     }
+  });
+});
+
+describe('native merge-queue cohort (JOV-5047)', () => {
+  it('waits below five entries until the bounded low-traffic timeout', () => {
+    expect(
+      evaluateNativeCohortMergeDecision({ queuedCount: 1, waitedMinutes: 0 })
+    ).toMatchObject({ action: 'awaiting-cohort', reason: 'below-min-entries' });
+    expect(
+      evaluateNativeCohortMergeDecision({ queuedCount: 4, waitedMinutes: 9 })
+    ).toMatchObject({ action: 'awaiting-cohort', reason: 'below-min-entries' });
+    expect(
+      evaluateNativeCohortMergeDecision({ queuedCount: 0, waitedMinutes: 10 })
+    ).toMatchObject({ action: 'empty', reason: 'no-queued-entries' });
+  });
+
+  it('merges a five-entry cohort immediately and a partial cohort after 10 minutes', () => {
+    expect(NATIVE_QUEUE_COHORT_POLICY).toMatchObject({
+      schema: 'jovie-native-queue-cohort/v1',
+      minEntriesToMerge: 5,
+      minEntriesToMergeWaitMinutes: 10,
+      alreadyAdmittedOnStaleProduction: 'preserve',
+      newIntakeOnStaleProduction: 'freeze',
+      deterministicMemberFailure: 'isolate-and-remove',
+      transientFailure: 'bounded-retry',
+    });
+    expect(NATIVE_QUEUE_POLICY.min_entries_to_merge).toBe(5);
+    expect(NATIVE_QUEUE_POLICY.min_entries_to_merge_wait_minutes).toBe(10);
+    expect(
+      evaluateNativeCohortMergeDecision({ queuedCount: 5, waitedMinutes: 0 })
+    ).toMatchObject({ action: 'merge', reason: 'cohort-full' });
+    expect(
+      evaluateNativeCohortMergeDecision({ queuedCount: 1, waitedMinutes: 10 })
+    ).toMatchObject({ action: 'merge', reason: 'low-traffic-timeout' });
+  });
+
+  it('emits a deterministic policy readback receipt', () => {
+    const matched = buildNativeQueuePolicyReadback(NATIVE_QUEUE_POLICY);
+    expect(matched).toMatchObject({
+      schema: 'jovie-native-queue-policy-readback/v1',
+      matched: true,
+      drift: [],
+    });
+    const drifted = buildNativeQueuePolicyReadback({
+      ...NATIVE_QUEUE_POLICY,
+      min_entries_to_merge: 1,
+      min_entries_to_merge_wait_minutes: 0,
+    });
+    expect(drifted.matched).toBe(false);
+    expect(drifted.drift).toEqual([
+      'min_entries_to_merge',
+      'min_entries_to_merge_wait_minutes',
+    ]);
+    const liveUntilCutover = validateLiveMergeQueueRuleset(
+      {
+        bypass_actors: [],
+        rules: [
+          {
+            type: 'required_status_checks',
+            parameters: {
+              strict_required_status_checks_policy: false,
+              required_status_checks: [
+                'PR Ready',
+                'Migration Guard',
+                'Fork PR Gate',
+                'PR Size Guard',
+              ].map(context => ({ context })),
+            },
+          },
+          {
+            type: 'merge_queue',
+            parameters: {
+              ...NATIVE_QUEUE_POLICY,
+              min_entries_to_merge: 1,
+              min_entries_to_merge_wait_minutes: 0,
+            },
+          },
+        ],
+      },
+      { backend: 'native' }
+    );
+    expect(NATIVE_QUEUE_COHORT_POLICY.liveRulesetCutover).toBe('pending');
+    expect(liveUntilCutover.ok).toBe(true);
+  });
+
+  it('skips a superseded Production Controller generation and promotes only exact main', () => {
+    const exact = '7b937033b15622d85f7df721883d5e00fc95e0b9';
+    const later = 'a0d977fc0123456789abcdef0123456789abcdef';
+    expect(
+      buildProductionControllerGenerationReadback({
+        expectedSha: exact,
+        currentMainSha: exact,
+      })
+    ).toMatchObject({
+      schema: 'jovie-production-controller-generation-readback/v1',
+      matched: true,
+      action: 'promote-exact-main',
+    });
+    expect(
+      buildProductionControllerGenerationReadback({
+        expectedSha: exact,
+        currentMainSha: later,
+      })
+    ).toMatchObject({
+      matched: false,
+      action: 'skip-superseded',
+    });
+    expect(
+      buildProductionControllerGenerationReadback({
+        expectedSha: 'short',
+        currentMainSha: later,
+      })
+    ).toMatchObject({ action: 'fail-closed' });
   });
 });

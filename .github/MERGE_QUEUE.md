@@ -60,10 +60,13 @@ Checked-in source: `.github/rulesets/branch-protection.yml`.
   latest-`main` validation.
 - Merge method: `SQUASH`
 - Grouping strategy: `ALLGREEN`
-- Minimum entries to merge: `1`
+- Minimum entries to merge: `5` (typed cohort; GitHub waits for this size or the bounded timeout)
+- Minimum entries wait: `10` minutes (low-traffic timeout so a partial cohort can still land)
 - Maximum entries per merge: `10`
 - Maximum entries building concurrently: `8` (sized for ~120 org job concurrency; ~10 peak jobs per merge_group)
 - Check response timeout: `60` minutes
+- Stale exact-production: freeze new intake (`hold-intake`); preserve already-admitted cohort members. Do not dequeue green siblings while Production Controller binds the latest exact main.
+- Live ruleset `10512119` remains `min_entries_to_merge=1` / wait `0` until the post-merge apply. Source and preflight readback already describe the 5/10 cohort; auto-enroll stays up during that pending cutover.
 - Signed-commit and non-fast-forward rules: dormant/not applied. The checked-in
   payload intentionally matches live ruleset `10512119`; enabling either is a
   separate reviewed cutover, not an implicit source reapply.

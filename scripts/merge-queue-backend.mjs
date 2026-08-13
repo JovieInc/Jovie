@@ -2,7 +2,11 @@
 
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { NATIVE_QUEUE_POLICY } from './lib/merge-queue-guard.mjs';
+import {
+  buildNativeQueuePolicyReadback,
+  isPendingNativeCohortCutoverField,
+  NATIVE_QUEUE_POLICY,
+} from './lib/merge-queue-guard.mjs';
 
 // The live repository variable and active ruleset both use GitHub native.
 // Keep bare read-only/local callers aligned with that canon; mutations still
@@ -295,7 +299,8 @@ export function validateNativePreflightEvidence({
     ...Object.fromEntries(
       Object.entries(NATIVE_QUEUE_POLICY).map(([field, expected]) => [
         `merge_queue ${field} must be ${expected}`,
-        mergeQueue?.[field] === expected,
+        mergeQueue?.[field] === expected ||
+          isPendingNativeCohortCutoverField(field),
       ])
     ),
     [`ruleset is missing required checks: ${missingChecks.join(', ')}`]:
@@ -323,9 +328,19 @@ export function validateNativePreflightEvidence({
   for (const [message, condition] of Object.entries(validations)) {
     if (!condition) errors.push(message);
   }
+  const policyReadback = buildNativeQueuePolicyReadback(mergeQueue);
+  const blockingDrift = policyReadback.drift.filter(
+    field => !isPendingNativeCohortCutoverField(field)
+  );
+  if (blockingDrift.length > 0) {
+    errors.push(
+      `native queue policy readback drifted: ${blockingDrift.join(', ')}`
+    );
+  }
   return {
     ok: errors.length === 0,
     errors,
+    policyReadback,
     evidence: {
       baseBranch,
       mergeMethod: mergeQueue?.merge_method ?? null,
@@ -333,6 +348,7 @@ export function validateNativePreflightEvidence({
       rulesetId: ruleset?.id ?? null,
       workflowHasMergeGroup,
       bypassActorsVisible,
+      policyReadback,
     },
   };
 }
@@ -400,6 +416,7 @@ export async function preflightMergeQueue({
   return {
     backend: resolvedBackend,
     ready: true,
+    policyReadback: validation.policyReadback,
     ...validation.evidence,
   };
 }

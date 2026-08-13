@@ -24,6 +24,41 @@ export const MERGE_QUEUE_POLICY = Object.freeze({
   rulesetId: '10512119',
 });
 
+/**
+ * Typed immutable native cohort (JOV-5047). GitHub merges when the queue
+ * reaches this size or the bounded low-traffic wait elapses. Live ruleset
+ * 10512119 still has 1/0 until the post-merge apply + canary; source is the
+ * desired contract. A 1/0 policy serializes source-green landings behind
+ * exact-production deploy latency (2026-08-13: #15903 then dequeue of
+ * #15901/#15896 during Production Controller run 31699751815).
+ */
+export const NATIVE_QUEUE_COHORT_POLICY = Object.freeze({
+  schema: 'jovie-native-queue-cohort/v1',
+  minEntriesToMerge: 5,
+  minEntriesToMergeWaitMinutes: 10,
+  alreadyAdmittedOnStaleProduction: 'preserve',
+  newIntakeOnStaleProduction: 'freeze',
+  deterministicMemberFailure: 'isolate-and-remove',
+  transientFailure: 'bounded-retry',
+  // Source is 5/10. Live ruleset 10512119 is still 1/0 until the post-merge
+  // PUT. While pending, live preflight records drift and does not fail closed
+  // on these two fields so auto-enroll keeps working. Flip to `applied` in
+  // the same change that updates the live ruleset.
+  liveRulesetCutover: 'pending',
+});
+
+const COHORT_LIVE_CUTOVER_FIELDS = Object.freeze([
+  'min_entries_to_merge',
+  'min_entries_to_merge_wait_minutes',
+]);
+
+export function isPendingNativeCohortCutoverField(field) {
+  return (
+    NATIVE_QUEUE_COHORT_POLICY.liveRulesetCutover === 'pending' &&
+    COHORT_LIVE_CUTOVER_FIELDS.includes(field)
+  );
+}
+
 export const NATIVE_QUEUE_POLICY = Object.freeze({
   check_response_timeout_minutes: 60,
   grouping_strategy: 'ALLGREEN',
@@ -34,9 +69,118 @@ export const NATIVE_QUEUE_POLICY = Object.freeze({
   max_entries_to_build: 8,
   max_entries_to_merge: 10,
   merge_method: 'SQUASH',
-  min_entries_to_merge: 1,
-  min_entries_to_merge_wait_minutes: 0,
+  min_entries_to_merge: NATIVE_QUEUE_COHORT_POLICY.minEntriesToMerge,
+  min_entries_to_merge_wait_minutes:
+    NATIVE_QUEUE_COHORT_POLICY.minEntriesToMergeWaitMinutes,
 });
+
+export const NATIVE_QUEUE_POLICY_READBACK_SCHEMA =
+  'jovie-native-queue-policy-readback/v1';
+export const PRODUCTION_CONTROLLER_GENERATION_READBACK_SCHEMA =
+  'jovie-production-controller-generation-readback/v1';
+
+/**
+ * Decide whether a native cohort should merge now. GitHub owns the live
+ * wait clock; this is the typed source contract for tests and readback.
+ *
+ * @param {{ queuedCount?: unknown, waitedMinutes?: unknown }} [input]
+ */
+export function evaluateNativeCohortMergeDecision({
+  queuedCount,
+  waitedMinutes,
+} = {}) {
+  const count = Number(queuedCount);
+  const waited = Number(waitedMinutes);
+  if (
+    !Number.isInteger(count) ||
+    count < 0 ||
+    !Number.isFinite(waited) ||
+    waited < 0
+  ) {
+    return {
+      action: 'awaiting-cohort',
+      reason: 'invalid-evidence',
+      policy: NATIVE_QUEUE_COHORT_POLICY,
+    };
+  }
+  if (count === 0) {
+    return {
+      action: 'empty',
+      reason: 'no-queued-entries',
+      policy: NATIVE_QUEUE_COHORT_POLICY,
+    };
+  }
+  if (count >= NATIVE_QUEUE_COHORT_POLICY.minEntriesToMerge) {
+    return {
+      action: 'merge',
+      reason: 'cohort-full',
+      policy: NATIVE_QUEUE_COHORT_POLICY,
+    };
+  }
+  if (waited >= NATIVE_QUEUE_COHORT_POLICY.minEntriesToMergeWaitMinutes) {
+    return {
+      action: 'merge',
+      reason: 'low-traffic-timeout',
+      policy: NATIVE_QUEUE_COHORT_POLICY,
+    };
+  }
+  return {
+    action: 'awaiting-cohort',
+    reason: 'below-min-entries',
+    policy: NATIVE_QUEUE_COHORT_POLICY,
+  };
+}
+
+/**
+ * Deterministic readback of observed native queue parameters vs source policy.
+ *
+ * @param {Record<string, unknown> | null | undefined} observed
+ */
+export function buildNativeQueuePolicyReadback(observed = {}) {
+  const expected = { ...NATIVE_QUEUE_POLICY };
+  const drift = Object.keys(expected).filter(
+    key => observed?.[key] !== expected[key]
+  );
+  return {
+    schema: NATIVE_QUEUE_POLICY_READBACK_SCHEMA,
+    matched: drift.length === 0,
+    expected,
+    observed: Object.fromEntries(
+      Object.keys(expected).map(key => [key, observed?.[key] ?? null])
+    ),
+    drift,
+  };
+}
+
+/**
+ * Production Controller promotes only the latest exact main. A superseded
+ * generation skips safely (live: run 31704020306 completed in ~8s).
+ *
+ * @param {{ expectedSha?: unknown, currentMainSha?: unknown }} [input]
+ */
+export function buildProductionControllerGenerationReadback({
+  expectedSha,
+  currentMainSha,
+} = {}) {
+  const expected =
+    typeof expectedSha === 'string' ? expectedSha.toLowerCase() : '';
+  const current =
+    typeof currentMainSha === 'string' ? currentMainSha.toLowerCase() : '';
+  const exact =
+    /^[0-9a-f]{40}$/.test(expected) && /^[0-9a-f]{40}$/.test(current);
+  const matched = exact && expected === current;
+  return {
+    schema: PRODUCTION_CONTROLLER_GENERATION_READBACK_SCHEMA,
+    matched,
+    action: matched
+      ? 'promote-exact-main'
+      : exact
+        ? 'skip-superseded'
+        : 'fail-closed',
+    expectedSha: expected || null,
+    currentMainSha: current || null,
+  };
+}
 
 /** Exact normalized source-of-record policy for live ruleset 10512119. */
 export const NATIVE_BRANCH_PROTECTION_POLICY = Object.freeze({
@@ -1033,7 +1177,10 @@ export function validateLiveMergeQueueRuleset(ruleset, options = {}) {
   }
   if (mergeQueueRule)
     for (const [field, expected] of Object.entries(NATIVE_QUEUE_POLICY))
-      if (mergeQueueRule?.parameters?.[field] !== expected)
+      if (
+        mergeQueueRule?.parameters?.[field] !== expected &&
+        !isPendingNativeCohortCutoverField(field)
+      )
         errors.push(`live native merge_queue ${field} must be ${expected}`);
 
   const statusRule = rules.find(
