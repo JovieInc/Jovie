@@ -3,10 +3,12 @@ name: Queue-Deferred Release
 # Closes the Symphony In Review → native merge queue handoff. Fully
 # event-driven — zero polling crons.
 #
-# Symphony drafts are born with `queue-deferred` plus a typed
+# Symphony PRs are born ready but hard-held with `queue-deferred` plus a typed
 # `jovie-queue-deferral/v1` receipt; agent-pipeline deferrals under queue
-# pressure carry the same typed receipt. Without a controller lifting that
-# mechanical hold, green drafts sat indefinitely (#15808/#15810/#15811).
+# pressure carry the same typed receipt. The label is the only promotion hold:
+# GitHub stage changes require a human author/write actor, which installation
+# and Actions tokens are not. Without a controller lifting the typed label,
+# green PRs sat indefinitely (#15808/#15810/#15811).
 #
 # Triggers:
 #   workflow_run      — PR CI completion, successful Production Controller,
@@ -156,11 +158,6 @@ jobs:
       - name: Report and release typed queue deferrals
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          # GitHub stage changes require repository write authority. Use the
-          # scoped Actions token only for the ready flip; the subsequent App
-          # label mutation emits the real `unlabeled` event that wakes
-          # autoenrollment after the PR is ready.
-          READY_GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60

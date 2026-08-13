@@ -637,6 +637,7 @@ def _run_single_candidate_release(
     *,
     head: str,
     base: str = "main",
+    draft: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     receipt = _fleet_receipt(tmp_path, state="GREEN")
     _write_fake_gh(
@@ -645,7 +646,7 @@ def _run_single_candidate_release(
             f"""\
             {_FAKE_GH_PREAMBLE}
             if [[ "$1 $2" == "pr list" ]]; then
-              echo '[{{"n":900,"t":"Deferred PR","draft":true,"m":"MERGEABLE","head":"symphony/JOV-900-fix","oid":"{head}","owner":"JovieInc","updated":"2026-08-13T00:00:00Z","L":["queue-deferred"]}}]'
+              echo '[{{"n":900,"t":"Deferred PR","draft":{str(draft).lower()},"m":"MERGEABLE","head":"symphony/JOV-900-fix","oid":"{head}","owner":"JovieInc","updated":"2026-08-13T00:00:00Z","L":["queue-deferred"]}}]'
               exit 0
             fi
             if [[ "$1" == "api" ]]; then
@@ -655,7 +656,7 @@ def _run_single_candidate_release(
               exit 0
             fi
             if [[ "$1 $2" == "pr view" ]]; then
-              echo '{{"draft":true,"head":"{head}","branch":"symphony/JOV-900-fix","headOwner":"JovieInc","base":"{base}","labels":["queue-deferred"],"mergeable":"MERGEABLE","state":"OPEN"}}'
+              echo '{{"draft":{str(draft).lower()},"head":"{head}","branch":"symphony/JOV-900-fix","headOwner":"JovieInc","base":"{base}","labels":["queue-deferred"],"mergeable":"MERGEABLE","state":"OPEN"}}'
               exit 0
             fi
             {_FAKE_GH_GREEN_CHECKS}
@@ -690,7 +691,7 @@ class TestReleaseQueueDeferred:
         assert "github.event.workflow_run.conclusion == 'success'" in workflow
         assert "github.event.workflow_run.conclusion != 'cancelled'" in workflow
         assert "pull-requests: write" in workflow
-        assert "READY_GH_TOKEN: ${{ github.token }}" in workflow
+        assert "READY_GH_TOKEN" not in workflow
         assert "bash scripts/release-queue-deferred.sh" in workflow
         assert "ATTEMPT_COOLDOWN_MINUTES: 5" in workflow
         assert 'RELEASE_RETRY_FILE="$retry_file"' in workflow
@@ -959,7 +960,20 @@ JSON
         assert "live state no longer matches the releasable snapshot" in result.stdout
         assert "would remove" not in result.stdout
 
-    def test_green_receipt_releases_typed_birth_hold_in_order(
+    def test_draft_hold_cannot_be_released_by_non_human_controller(
+        self, tmp_path: Path
+    ) -> None:
+        head = "c" * 40
+        _receipt_comment_body(tmp_path, head=head)
+        result = _run_single_candidate_release(tmp_path, head=head, draft=True)
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "live state no longer matches the releasable snapshot" in result.stdout
+        assert "would remove" not in result.stdout
+        log = (tmp_path / "gh-calls.log").read_text(encoding="utf-8")
+        assert "pr ready" not in log
+
+    def test_green_receipt_releases_ready_typed_birth_hold(
         self, tmp_path: Path
     ) -> None:
         head = "c" * 40
@@ -971,7 +985,7 @@ JSON
                 f"""\
                 {_FAKE_GH_PREAMBLE}
                 if [[ "$1 $2" == "pr list" ]]; then
-                  echo '[{{"n":900,"t":"Symphony draft","draft":true,"m":"MERGEABLE","head":"symphony/JOV-900-fix","oid":"{head}","owner":"JovieInc","updated":"2026-08-13T00:00:00Z","L":["queue-deferred"]}}]'
+                  echo '[{{"n":900,"t":"Symphony PR","draft":false,"m":"MERGEABLE","head":"symphony/JOV-900-fix","oid":"{head}","owner":"JovieInc","updated":"2026-08-13T00:00:00Z","L":["queue-deferred"]}}]'
                   exit 0
                 fi
                 if [[ "$1" == "api" ]]; then
@@ -982,21 +996,15 @@ JSON
                 fi
                 {_FAKE_GH_GREEN_CHECKS}
                 if [[ "$1 $2" == "pr view" ]]; then
-                  if [[ -f "${{FAKE_GH_STATE}}/ready" && -f "${{FAKE_GH_STATE}}/label_removed" ]]; then
+                  if [[ -f "${{FAKE_GH_STATE}}/label_removed" ]]; then
                     echo '{{"draft":false,"head":"{head}","branch":"symphony/JOV-900-fix","headOwner":"JovieInc","base":"main","labels":[],"mergeable":"MERGEABLE","state":"OPEN"}}'
-                  elif [[ -f "${{FAKE_GH_STATE}}/ready" ]]; then
-                    echo '{{"draft":false,"head":"{head}","branch":"symphony/JOV-900-fix","headOwner":"JovieInc","base":"main","labels":["queue-deferred"],"mergeable":"MERGEABLE","state":"OPEN"}}'
                   else
-                    echo '{{"draft":true,"head":"{head}","branch":"symphony/JOV-900-fix","headOwner":"JovieInc","base":"main","labels":["queue-deferred"],"mergeable":"MERGEABLE","state":"OPEN"}}'
+                    echo '{{"draft":false,"head":"{head}","branch":"symphony/JOV-900-fix","headOwner":"JovieInc","base":"main","labels":["queue-deferred"],"mergeable":"MERGEABLE","state":"OPEN"}}'
                   fi
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr edit" ]]; then
                   touch "${{FAKE_GH_STATE}}/label_removed"
-                  exit 0
-                fi
-                if [[ "$1 $2" == "pr ready" ]]; then
-                  touch "${{FAKE_GH_STATE}}/ready"
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr comment" ]]; then
@@ -1020,9 +1028,7 @@ JSON
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "✓ removed `queue-deferred` from #900" in result.stdout
-        assert "✓ marked #900 ready" in result.stdout
         log = (tmp_path / "gh-calls.log").read_text(encoding="utf-8")
-        remove_idx = log.index("--remove-label queue-deferred")
-        ready_idx = log.index("pr ready 900")
-        assert ready_idx < remove_idx, "App event must fire only after the ready flip"
+        assert "--remove-label queue-deferred" in log
+        assert "pr ready" not in log
         assert "--add-label queue-deferred" not in log, "no compensating restore expected"
