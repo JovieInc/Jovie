@@ -491,15 +491,12 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
                     "Promotion queue is missing, unknown, or malformed.",
                 )
             )
-        elif eligible_prs > queue_target:
-            reasons.append(
-                typed_reason(
-                    "queue-above-target",
-                    "promotion",
-                    "warning",
-                    "Promotion queue is above its target.",
-                )
-            )
+        # Queue pressure is demand for the promotion controller, not a reason
+        # to disable it. Freezing promotion when eligible_prs exceeds the
+        # target deadlocks the only path that can drain the backlog. The
+        # observed count and target remain in signals.queue for alerting and
+        # throughput reporting; malformed or unknown queue evidence still
+        # fails closed above.
 
     critical = any(reason["severity"] == "critical" for reason in reasons)
     state = "RED" if critical else "AMBER" if reasons else "GREEN"
@@ -546,11 +543,23 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         or production.get("status") != "green"
         or production_unbound
     )
+    queue_pressure = (
+        queue.get("status") == "known"
+        and isinstance(eligible_prs, int)
+        and not isinstance(eligible_prs, bool)
+        and isinstance(queue_target, int)
+        and not isinstance(queue_target, bool)
+        and eligible_prs > queue_target
+    )
     work_activities = (
         []
         if state == "RED"
         else (
-            ([] if source_health_red else ["approved-issue-lease"])
+            (
+                []
+                if source_health_red or queue_pressure
+                else ["approved-issue-lease"]
+            )
             + ["isolated-implementation", "tests", "review", "draft-pr"]
         )
     )

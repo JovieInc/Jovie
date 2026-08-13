@@ -875,6 +875,23 @@ describe('deterministic Symphony admission boundary', () => {
     });
   }
 
+  it('keeps an above-target healthy queue drainable', () => {
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        queue: { status: 'known', eligiblePrs: 7, target: 5 },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.state, 'GREEN');
+    assert.equal(fleetGate.promotionAdmission.allowed, true);
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(
+      fleetGate.reasons.some(reason => reason.code === 'queue-above-target'),
+      false
+    );
+  });
+
   it('freezes new leases when healthy production is behind exact main', async () => {
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
@@ -1204,7 +1221,8 @@ describe('deterministic Symphony admission boundary', () => {
       productionRed.receipt.isolatedPromotionAdmission.deploymentsAllowed,
       false
     );
-    assert.match(workflowSource, /Always open a draft PR first/);
+    assert.match(workflowSource, /Always open a non-draft PR/);
+    assert.match(workflowSource, /Do not create draft PRs/);
     assert.match(workflowSource, /including when the gate is `GREEN`/);
     assert.match(workflowSource, /gh pr edit --add-label queue-deferred/);
     assert.match(

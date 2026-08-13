@@ -263,16 +263,11 @@ export function evaluateFleetGate(
           'Promotion queue state is missing, unknown, or malformed.'
         )
       );
-    } else if (eligiblePrs > queueTarget) {
-      reasons.push(
-        typedReason(
-          FLEET_GATE_REASON.QUEUE_ABOVE_TARGET,
-          'promotion',
-          'warning',
-          'Promotion queue is above its target.'
-        )
-      );
     }
+    // Queue pressure is demand for the promotion controller, not a reason to
+    // disable it. Freezing promotion above target deadlocks the only path that
+    // can drain the backlog. The count and target remain in evidence.queue for
+    // alerting; malformed or unknown queue evidence still fails closed above.
   }
 
   const state = redReasons.length
@@ -306,11 +301,16 @@ export function evaluateFleetGate(
     );
   const sourceHealthRed =
     mainStatus !== 'green' || productionStatus !== 'green' || productionUnbound;
+  const queuePressure =
+    queueStatus === 'known' &&
+    Number.isInteger(eligiblePrs) &&
+    Number.isInteger(queueTarget) &&
+    eligiblePrs > queueTarget;
   const workActivities =
     state === FLEET_GATE_STATE.RED
       ? []
       : [
-          ...(sourceHealthRed ? [] : ['approved-issue-lease']),
+          ...(sourceHealthRed || queuePressure ? [] : ['approved-issue-lease']),
           'isolated-implementation',
           'tests',
           'review',

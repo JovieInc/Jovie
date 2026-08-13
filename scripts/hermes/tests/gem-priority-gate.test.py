@@ -413,6 +413,21 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
         self.assertTrue(receipt["deploymentAdmission"]["allowed"])
 
+    def test_above_target_queue_remains_drainable_when_health_is_green(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["queue"] = {"status": "known", "eligiblePrs": 7, "target": 5}
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertTrue(receipt["promotionAdmission"]["allowed"])
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertEqual(receipt["signals"]["queue"], signals["queue"])
+        self.assertNotIn(
+            "queue-above-target",
+            {reason["code"] for reason in receipt["reasons"]},
+        )
+
     def test_controller_failure_blocks_deployment(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
