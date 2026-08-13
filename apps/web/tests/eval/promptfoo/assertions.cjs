@@ -3611,6 +3611,30 @@ function assertSkillPromptContractCovered(output) {
       `retouch prompt missing guardrails: ${missingGuardrails.join(', ')}`
     );
   }
+  const missingGenerationFacts = Array.isArray(retouch.missingGenerationFacts)
+    ? retouch.missingGenerationFacts
+    : [];
+  if (missingGenerationFacts.length > 0) {
+    return fail(
+      `retouch generation prompt missing facts: ${missingGenerationFacts.join(', ')}`
+    );
+  }
+
+  const packaging = payload.packaging ?? {};
+  if (!packaging || typeof packaging !== 'object') {
+    return fail('skill prompt contract missing packaging payload');
+  }
+  if (packaging.skillId !== 'analyzePackaging') {
+    return fail('packaging payload is not tied to analyzePackaging');
+  }
+  const missingPackagingFacts = Array.isArray(packaging.missingFacts)
+    ? packaging.missingFacts
+    : [];
+  if (missingPackagingFacts.length > 0) {
+    return fail(
+      `packaging prompt missing facts: ${missingPackagingFacts.join(', ')}`
+    );
+  }
 
   return pass();
 }

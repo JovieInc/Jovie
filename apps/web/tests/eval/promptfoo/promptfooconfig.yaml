@@ -1634,6 +1634,11 @@ tests:
             - "Do not change protected or sensitive attributes"
             - "return a safe refusal"
             - "same person"
+            - "Intent → Action"
+            - "Preserve Clause"
+            - "face identity unchanged unless"
+            - "replace_bg"
+            - "natural skin texture"
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend
