@@ -5,6 +5,7 @@ import {
   buildRoutingReceipt,
   parseRoutingReceipt,
   selectSymphonyRoute,
+  verifyRoutingReceipt,
 } from '../symphony-routing.mjs';
 
 const models = {
@@ -99,5 +100,106 @@ describe('Symphony routing receipts', () => {
       parseRoutingReceipt(current).fingerprint,
       decision.route.fingerprint
     );
+  });
+
+  it('verifies receipts semantically and rejects tampering', () => {
+    const current = issue('Fix README typo');
+    const decision = selectSymphonyRoute({
+      issue: current,
+      availableModels: models,
+    });
+    const receiptBody = buildRoutingReceipt(decision.route);
+    current.comments.nodes.push({ body: receiptBody });
+    assert.equal(
+      verifyRoutingReceipt(current, { availableModels: models }).model,
+      'gpt-5.6-luna'
+    );
+
+    // Arbitrary model swap.
+    let forged = issue('Fix README typo');
+    forged.comments.nodes.push({
+      body: receiptBody.replace('gpt-5.6-luna', 'gpt-5.6-sol'),
+    });
+    assert.equal(
+      verifyRoutingReceipt(forged, { availableModels: models }),
+      null
+    );
+
+    // Forged fingerprint.
+    forged = issue('Fix README typo');
+    forged.comments.nodes.push({
+      body: receiptBody.replace(decision.route.fingerprint, '0'.repeat(24)),
+    });
+    assert.equal(
+      verifyRoutingReceipt(forged, { availableModels: models }),
+      null
+    );
+
+    // Stale classification after a title edit.
+    const stale = issue('Repair fleet architecture');
+    stale.comments.nodes.push({ body: receiptBody });
+    assert.equal(
+      verifyRoutingReceipt(stale, { availableModels: models }),
+      null
+    );
+
+    // Altered candidates must not name the selected model.
+    forged = issue('Fix README typo');
+    forged.comments.nodes.push({
+      body: receiptBody.replace(
+        '"candidates":[]',
+        '"candidates":[{"id":"codex-luna","status":"cooldown","until":1}]'
+      ),
+    });
+    assert.equal(
+      verifyRoutingReceipt(forged, { availableModels: models }),
+      null
+    );
+  });
+
+  it('blocks every codex route when capacity is unreadable or empty', () => {
+    const blocked = selectSymphonyRoute({
+      issue: issue('Add profile validation'),
+      availableModels: models,
+      capacity: null,
+    });
+    assert.equal(blocked.status, 'blocked');
+    assert.equal(blocked.capacity.readable, false);
+    const empty = selectSymphonyRoute({
+      issue: issue('Add profile validation'),
+      availableModels: models,
+      capacity: { accounts: 0, ready: 0, active: null, cooldowns: {} },
+    });
+    assert.equal(empty.status, 'blocked');
+    const healthy = selectSymphonyRoute({
+      issue: issue('Add profile validation'),
+      availableModels: models,
+      capacity: { accounts: 2, ready: 1, active: 'a', cooldowns: {} },
+    });
+    assert.equal(healthy.route.model, 'gpt-5.6-luna');
+    assert.deepEqual(healthy.route.capacity, {
+      accounts: 2,
+      ready: 1,
+      active: 'a',
+      readable: true,
+    });
+  });
+
+  it('supersedes a stale receipt with the most recent valid one', () => {
+    const current = issue('Fix README typo');
+    const first = selectSymphonyRoute({
+      issue: current,
+      availableModels: models,
+    });
+    current.comments.nodes.push({ body: buildRoutingReceipt(first.route) });
+    const second = selectSymphonyRoute({
+      issue: current,
+      availableModels: {
+        ...models,
+        'codex-luna': { ...models['codex-luna'], available: false },
+      },
+    });
+    current.comments.nodes.push({ body: buildRoutingReceipt(second.route) });
+    assert.equal(parseRoutingReceipt(current).model, 'gpt-5.6-terra');
   });
 });

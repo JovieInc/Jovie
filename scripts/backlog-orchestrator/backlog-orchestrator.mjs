@@ -39,8 +39,9 @@ import * as scorer from './scorer.mjs';
 import * as staleLeaseGuard from './stale-lease-guard.mjs';
 import {
   buildRoutingReceipt,
-  parseRoutingReceipt,
+  readCodexRotateCapacity,
   selectSymphonyRoute,
+  verifyRoutingReceipt,
 } from './symphony-routing.mjs';
 import * as workstreamer from './workstreamer.mjs';
 
@@ -185,9 +186,12 @@ async function runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun) {
 }
 
 async function approveSymphonyRoute(issue, isDryRun) {
-  const existing = parseRoutingReceipt(issue);
+  const existing = verifyRoutingReceipt(issue, {
+    requireCapacityEvidence: true,
+  });
   if (existing) return { status: 'already-routed', route: existing };
-  const decision = selectSymphonyRoute({ issue });
+  const capacity = readCodexRotateCapacity();
+  const decision = selectSymphonyRoute({ issue, capacity });
   if (decision.status === 'blocked') return decision;
   if (isDryRun) return { status: 'would-route', route: decision.route };
   const receipt = buildRoutingReceipt(decision.route);
@@ -195,7 +199,9 @@ async function approveSymphonyRoute(issue, isDryRun) {
   if (!result?.commentCreate?.success && !result?.success)
     throw new Error('symphony-routing-receipt-mutation-failed');
   const reread = await linear.fetchIssue(issue.identifier);
-  const verified = parseRoutingReceipt(reread);
+  const verified = verifyRoutingReceipt(reread, {
+    requireCapacityEvidence: true,
+  });
   if (!verified || verified.fingerprint !== decision.route.fingerprint)
     throw new Error('symphony-routing-receipt-verification-failed');
   return { status: 'routed', route: verified };

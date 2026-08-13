@@ -7,7 +7,7 @@
  */
 
 import { scoreIssue } from './scorer.mjs';
-import { parseRoutingReceipt } from './symphony-routing.mjs';
+import { verifyRoutingReceipt } from './symphony-routing.mjs';
 
 export const MAX_CONCURRENT_SHIPPING = 1;
 const MAX_CONCURRENT_SHIPPING_BY_TEAM = Object.freeze({ JOV: 2, LYB: 1 });
@@ -568,7 +568,7 @@ export async function admitIssue({
   if (!hasAdmissionEvidence(issue, classification).eligible) {
     return { status: 'rejected', reason: 'plan-or-admission-evidence-missing' };
   }
-  const routing = parseRoutingReceipt(issue);
+  const routing = verifyRoutingReceipt(issue);
   if (!routing)
     return { status: 'rejected', reason: 'routing-receipt-missing-or-invalid' };
   const receipt = buildAdmissionReceipt(issue, {

@@ -51,8 +51,11 @@ agent:
   max_concurrent_agents: 4
   max_turns: 24
 codex:
-  # The admission controller writes a symphony-routing/v1 receipt before lease
-  # claim. The launcher reads that receipt and fails closed when it is absent.
+  # The admission controller writes a semantically verified symphony-routing/v1
+  # receipt (with codex-rotate capacity evidence) to the Linear workpad before
+  # lease claim. The launcher re-fetches and re-verifies that receipt, binds
+  # live capacity, materializes it atomically into the workspace, and fails
+  # closed (exit 78) when any of that evidence is missing or drifted.
   command: ./scripts/hermes/symphony-codex-router app-server
   approval_policy: never
   thread_sandbox: workspace-write
