@@ -7,6 +7,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 - **Loading indicators respect reduced-motion preferences (JOV-4921):** canonical spinners now become fully static while preserving their size, color, and accessible loading status.
+- [internal] **About Storybook provenance distinguishes extraction from containment (JOV-4943):** the web-016 receipt keeps the audited route-copy SHA separate from the merge that first contains the shared component and story, with regression proof for both named exports.
 - [internal] **Production sign-in stays available when Redis is exhausted (JOV-5021):** one-time verification records now rely on their existing atomic Postgres store instead of a duplicate Redis cache, while session and revocation deletion retains its fail-closed protection.
 - [internal] **Design instructions now fail closed against stale authority:** founder-locked typography, control geometry, accent semantics, component identity, review boundaries, and Pen/source ownership are mirrored into generated agent guidance and checked by deterministic contradiction and no-serif guards.
 - [internal] **Protected Vercel canaries use the dedicated deploy-health contract (JOV-5013):** exact preview and staged-production verification no longer depend on the rate-limited general health endpoint; staging previews receive their canonical app/profile origins at runtime; and environment plus database checks must both report healthy before promotion.
