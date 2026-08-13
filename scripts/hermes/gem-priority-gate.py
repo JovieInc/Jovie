@@ -62,6 +62,38 @@ def typed_reason(code: str, layer: str, severity: str, detail: str) -> dict[str,
     return {"code": code, "layer": layer, "severity": severity, "detail": detail}
 
 
+def already_admitted_cohort_semantics(promotion_mode: str) -> dict[str, Any]:
+    if promotion_mode == "hold-intake":
+        return {
+            "preserve": True,
+            "newIntakeAllowed": False,
+            "semantics": "preserve-already-admitted-cohort-freeze-new-intake",
+        }
+    if promotion_mode == "blocked":
+        return {
+            "preserve": False,
+            "newIntakeAllowed": False,
+            "semantics": "dequeue-until-exact-production-recovers",
+        }
+    if promotion_mode == "isolated-only":
+        return {
+            "preserve": False,
+            "newIntakeAllowed": True,
+            "semantics": "isolated-only",
+        }
+    if promotion_mode == "draft-only":
+        return {
+            "preserve": False,
+            "newIntakeAllowed": False,
+            "semantics": "draft-only",
+        }
+    return {
+        "preserve": True,
+        "newIntakeAllowed": True,
+        "semantics": "normal",
+    }
+
+
 def read_json(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
@@ -538,6 +570,30 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and queue_healthy
         and all(reason["code"] == "production-not-green" for reason in reasons)
     )
+    hold_intake_allowed = (
+        state == "AMBER"
+        and controller.get("status") == "green"
+        and main.get("status") == "green"
+        and production.get("status") == "green"
+        and production_unbound
+        and integrity.get("status") in {"clear", "resolved"}
+        and len(reasons) == 1
+        and reasons[0]["code"] == "production-deployment-unbound"
+    )
+    if isolated_promotion_allowed:
+        promotion_mode = "isolated-only"
+    elif state == "GREEN":
+        promotion_mode = "normal"
+    elif (
+        state == "AMBER"
+        and main.get("status") == "red"
+        and integrity.get("status") in {"clear", "resolved"}
+    ):
+        promotion_mode = "draft-only"
+    elif hold_intake_allowed:
+        promotion_mode = "hold-intake"
+    else:
+        promotion_mode = "blocked"
     source_health_red = (
         main.get("status") != "green"
         or production.get("status") != "green"
@@ -559,6 +615,8 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "schema": SCHEMA,
         "observedAt": observed_at,
         "state": state,
+        "promotionMode": promotion_mode,
+        "alreadyAdmittedCohort": already_admitted_cohort_semantics(promotion_mode),
         "signals": signals,
         "reasons": reasons,
         "workAdmission": {

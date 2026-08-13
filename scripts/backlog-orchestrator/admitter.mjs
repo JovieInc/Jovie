@@ -51,6 +51,49 @@ const DEFAULT_GEM_CONCURRENCY = 4;
 const MAX_EVIDENCE_BACKED_GEM_CONCURRENCY = 8;
 const CONTROLLER_RECEIPT_MAX_AGE_MS = 10 * 60 * 1000;
 const CONCURRENCY_EVIDENCE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+export const FLEET_PROMOTION_MODE = Object.freeze({
+  NORMAL: 'normal',
+  ISOLATED_ONLY: 'isolated-only',
+  DRAFT_ONLY: 'draft-only',
+  HOLD_INTAKE: 'hold-intake',
+  BLOCKED: 'blocked',
+});
+
+function alreadyAdmittedCohortSemantics(promotionMode) {
+  if (promotionMode === FLEET_PROMOTION_MODE.HOLD_INTAKE) {
+    return {
+      preserve: true,
+      newIntakeAllowed: false,
+      semantics: 'preserve-already-admitted-cohort-freeze-new-intake',
+    };
+  }
+  if (promotionMode === FLEET_PROMOTION_MODE.BLOCKED) {
+    return {
+      preserve: false,
+      newIntakeAllowed: false,
+      semantics: 'dequeue-until-exact-production-recovers',
+    };
+  }
+  if (promotionMode === FLEET_PROMOTION_MODE.ISOLATED_ONLY) {
+    return {
+      preserve: false,
+      newIntakeAllowed: true,
+      semantics: 'isolated-only',
+    };
+  }
+  if (promotionMode === FLEET_PROMOTION_MODE.DRAFT_ONLY) {
+    return {
+      preserve: false,
+      newIntakeAllowed: false,
+      semantics: 'draft-only',
+    };
+  }
+  return {
+    preserve: true,
+    newIntakeAllowed: true,
+    semantics: 'normal',
+  };
+}
 
 function typedReason(code, layer, severity, detail) {
   return { code, layer, severity, detail };
@@ -311,12 +354,35 @@ export function evaluateFleetGate(
           'review',
           'draft-pr',
         ];
+  const holdIntakeAllowed =
+    state === FLEET_GATE_STATE.AMBER &&
+    controllerFresh &&
+    controllerStatus === 'green' &&
+    mainStatus === 'green' &&
+    productionStatus === 'green' &&
+    productionUnbound &&
+    ['clear', 'resolved'].includes(integrityStatus) &&
+    reasons.length === 1 &&
+    reasons[0]?.code === FLEET_GATE_REASON.PRODUCTION_DEPLOYMENT_UNBOUND;
+  const promotionMode = isolatedPromotionAllowed
+    ? FLEET_PROMOTION_MODE.ISOLATED_ONLY
+    : state === FLEET_GATE_STATE.GREEN
+      ? FLEET_PROMOTION_MODE.NORMAL
+      : state === FLEET_GATE_STATE.AMBER &&
+          mainStatus === 'red' &&
+          ['clear', 'resolved'].includes(integrityStatus)
+        ? FLEET_PROMOTION_MODE.DRAFT_ONLY
+        : holdIntakeAllowed
+          ? FLEET_PROMOTION_MODE.HOLD_INTAKE
+          : FLEET_PROMOTION_MODE.BLOCKED;
 
   return {
     schema: FLEET_GATE_SCHEMA,
     observedAt: evidence.observedAt || null,
     evaluatedAt: now,
     state,
+    promotionMode,
+    alreadyAdmittedCohort: alreadyAdmittedCohortSemantics(promotionMode),
     reasons,
     workAdmission: {
       allowed: state !== FLEET_GATE_STATE.RED,

@@ -543,6 +543,49 @@ describe('Symphony landed throughput', () => {
     expect(receipt.hourlyLandedPrs).toEqual({ p05: 0, p50: 0, p95: 0 });
   });
 
+  it('records a five-entry main Symphony cohort as schema-v2 landings', () => {
+    const mergedAt = '2026-08-13T13:14:54.000Z';
+    const window = {
+      since: '2026-08-13T00:00:00.000Z',
+      until: '2026-08-14T00:00:00.000Z',
+    };
+    const cohort = [1, 2, 3, 4, 5].map(index =>
+      normalizedMergedPr(
+        15900 + index,
+        mergedAt,
+        '2026-08-13T12:00:00.000Z',
+        [],
+        `symphony/JOV-504${index}-fix`
+      )
+    );
+    const excluded = normalizedMergedPr(
+      15910,
+      mergedAt,
+      '2026-08-13T12:00:00.000Z',
+      [],
+      'symphony/JOV-5047-fix',
+      'codex/stack-parent'
+    );
+    const receipt = buildSymphonyThroughputReceipt({
+      complete: true,
+      reason: null,
+      pages: 1,
+      window,
+      prs: [...cohort, excluded],
+    });
+
+    expect(receipt.schemaVersion).toBe(2);
+    expect(receipt.landedPrs).toBe(5);
+    expect(receipt.landings).toEqual(
+      cohort.map(pr => ({
+        number: pr.number,
+        mergedAt,
+        contextFingerprint: null,
+        researchFingerprint: null,
+      }))
+    );
+  });
+
   it('passes only when the reliable hourly floor and gap p95 both meet target', () => {
     const prs = evenlySpacedSymphonyPrs();
     const receipt = buildSymphonyThroughputReceipt({

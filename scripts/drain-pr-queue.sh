@@ -23,7 +23,7 @@
 #     evaluator process (default 45)
 #   DRAIN_ADMISSION_PR / DRAIN_ADMISSION_HEAD  optional exact new-admission
 #     scope; when both are empty this run is maintenance-only
-#   DRAIN_PROMOTION_MODE  normal, isolated-only, draft-only, or blocked
+#   DRAIN_PROMOTION_MODE  normal, isolated-only, draft-only, hold-intake, or blocked
 #   DRAIN_FLEET_GATE_B64  fresh typed fleet receipt; mandatory outside normal
 #   DRAIN_RECOVER_FLEET_HOLDS  exact production-controller recovery event only
 #   MERGE_QUEUE_BACKEND  native (default); test-label-fixture is test-only
@@ -91,7 +91,7 @@ FLEET_HOLD_CONTEXT="jovie-fleet-queue-hold/v1"
 FLEET_GATE_JSON=""
 case "$DRAIN_PROMOTION_MODE" in
   normal) ;;
-  isolated-only | draft-only | blocked)
+  isolated-only | draft-only | blocked | hold-intake)
     if [[ -z "$DRAIN_FLEET_GATE_B64" ]]; then
       echo "::error::Refusing $DRAIN_PROMOTION_MODE without a fresh typed fleet receipt" >&2
       exit 2
@@ -111,6 +111,7 @@ case "$DRAIN_PROMOTION_MODE" in
     fi
     if ! jq -e --arg mode "$DRAIN_PROMOTION_MODE" '
       .schema == "jovie-fleet-gate/v1" and
+      .promotionMode == $mode and
       if $mode == "isolated-only" then
         .signals.main.status == "green" and
         .signals.production.status == "red" and
@@ -121,6 +122,14 @@ case "$DRAIN_PROMOTION_MODE" in
         (.signals.integrity.status | IN("clear", "resolved")) and
         .promotionAdmission.allowed == false and
         .isolatedPromotionAdmission.allowed == false
+      elif $mode == "hold-intake" then
+        .state == "AMBER" and
+        .signals.main.status == "green" and
+        .signals.production.status == "green" and
+        .promotionAdmission.allowed == false and
+        .isolatedPromotionAdmission.allowed == false and
+        .alreadyAdmittedCohort.preserve == true and
+        .alreadyAdmittedCohort.newIntakeAllowed == false
       else
         .promotionAdmission.allowed == false and
         .isolatedPromotionAdmission.allowed == false
@@ -800,12 +809,13 @@ while IFS= read -r pr; do
 done < <(jq -c '.[]' <<<"$SNAP")
 SNAP="$ENRICHED"
 
-# Any non-normal promotion mode freezes existing native queue entries. The
-# isolated-only mode below may preserve exactly one freshly proven isolated
-# entry; draft-only and blocked modes preserve none. Ambiguous evidence must not
-# leave GitHub's autonomous queue free to merge previously admitted work.
+# Non-normal modes freeze existing native queue entries except hold-intake.
+# hold-intake (JOV-5047) freezes new intake while exact production is unbound
+# and preserves already-admitted cohort members so they are not serialized
+# behind Production Controller deploy latency. isolated-only may keep one
+# freshly proven isolated entry; draft-only and blocked preserve none.
 DRAIN_FREEZE_EXISTING_QUEUE=0
-if [[ "$DRAIN_PROMOTION_MODE" != "normal" ]]; then
+if [[ "$DRAIN_PROMOTION_MODE" != "normal" && "$DRAIN_PROMOTION_MODE" != "hold-intake" ]]; then
   DRAIN_FREEZE_EXISTING_QUEUE=1
 fi
 
@@ -906,13 +916,19 @@ fi
 # (m == CONFLICTING, never UNKNOWN), or actually-failing checks (.fail).
 echo "=== DEQUEUE (conflict / failing → queue removal) ==="
 echo "$SNAP" | jq -c --arg promotion_mode "$DRAIN_PROMOTION_MODE" --arg freeze "$DRAIN_FREEZE_EXISTING_QUEUE" '.[]
-  | select($promotion_mode == "normal" or ($promotion_mode == "blocked" and $freeze == "0"))
+  | select($promotion_mode == "normal" or $promotion_mode == "hold-intake" or ($promotion_mode == "blocked" and $freeze == "0"))
   | select(.q == true)
   | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred")) | not)
   | select(
       ([.L[]] | any(.=="needs-conflict-resolution"))
       or (.m == "CONFLICTING")
-      or (.fail|length>0)
+      or (
+        (.fail|length>0)
+        and (
+          $promotion_mode != "hold-intake"
+          or ((.fail | index("required check status unavailable")) == null)
+        )
+      )
     )' \
 | while read -r pr; do
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")

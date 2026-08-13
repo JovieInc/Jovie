@@ -334,6 +334,15 @@ class DeploymentBindingTests(unittest.TestCase):
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
         receipt = self.evaluate(signals)
         self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertEqual(
+            receipt["alreadyAdmittedCohort"],
+            {
+                "preserve": True,
+                "newIntakeAllowed": False,
+                "semantics": "preserve-already-admitted-cohort-freeze-new-intake",
+            },
+        )
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
         self.assertTrue(receipt["deploymentAdmission"]["allowed"])
         self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
@@ -454,9 +463,19 @@ class DeploymentBindingTests(unittest.TestCase):
         signals["production"] = {"status": "red"}
         receipt = self.evaluate(signals)
         self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "isolated-only")
         self.assertTrue(receipt["isolatedPromotionAdmission"]["allowed"])
         self.assertFalse(receipt["isolatedPromotionAdmission"]["deploymentsAllowed"])
         self.assertFalse(receipt["deploymentAdmission"]["allowed"])
+
+    def test_unbound_production_plus_queue_unknown_stays_blocked(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 7}
+        signals["queue"] = {"status": "known"}
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "blocked")
+        self.assertFalse(receipt["alreadyAdmittedCohort"]["preserve"])
 
 
 class SemanticReadbackTests(unittest.TestCase):

@@ -144,13 +144,17 @@ rules:
     parameters:
       merge_method: 'SQUASH'
       grouping_strategy: 'ALLGREEN'
-      min_entries_to_merge: 1
+      # JOV-5047: cohort of 5 or a bounded 10-minute low-traffic wait so
+      # source-green PRs land together instead of serializing behind exact
+      # production deploy latency. Live ruleset 10512119 stays 1/0 until the
+      # post-merge apply + canary.
+      min_entries_to_merge: 5
       max_entries_to_merge: 10
       # Eight concurrent merge_group builds (~10 peak jobs each) fit under the
       # ~120 org Actions concurrency ceiling while leaving headroom for source
       # PR CI and release. Raise toward 10–12 only after measured land waves.
       max_entries_to_build: 8
-      min_entries_to_merge_wait_minutes: 0
+      min_entries_to_merge_wait_minutes: 10
       check_response_timeout_minutes: 60
 
   # Dormant rules are intentionally absent from this applied payload:

@@ -907,6 +907,12 @@ describe('deterministic Symphony admission boundary', () => {
     );
 
     assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(fleetGate.promotionMode, 'hold-intake');
+    assert.deepEqual(fleetGate.alreadyAdmittedCohort, {
+      preserve: true,
+      newIntakeAllowed: false,
+      semantics: 'preserve-already-admitted-cohort-freeze-new-intake',
+    });
     assert.equal(fleetGate.promotionAdmission.allowed, false);
     assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
     assert.ok(
@@ -929,8 +935,23 @@ describe('deterministic Symphony admission boundary', () => {
     );
 
     assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(fleetGate.promotionMode, 'hold-intake');
     assert.equal(fleetGate.promotionAdmission.allowed, false);
     assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+  });
+
+  it('blocks already-admitted cohort preservation when unbound production has extra amber reasons', () => {
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        production: { status: 'green', deployedSha: 'bda0d88' },
+        queue: { status: 'known' },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(fleetGate.promotionMode, 'blocked');
+    assert.equal(fleetGate.alreadyAdmittedCohort.preserve, false);
   });
 
   it('wires persisted main and deployment identities into lease admission', async () => {
@@ -960,6 +981,7 @@ describe('deterministic Symphony admission boundary', () => {
     );
 
     assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(fleetGate.promotionMode, 'draft-only');
     assert.equal(fleetGate.workAdmission.allowed, true);
     assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
     assert.equal(fleetGate.promotionAdmission.allowed, false);
@@ -975,6 +997,7 @@ describe('deterministic Symphony admission boundary', () => {
     );
 
     assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(fleetGate.promotionMode, 'isolated-only');
     assert.equal(fleetGate.workAdmission.allowed, true);
     assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
     assert.equal(fleetGate.promotionAdmission.allowed, false);

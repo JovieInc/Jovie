@@ -100,7 +100,8 @@ jobs:
             (.signals.main.sha | test("^[0-9a-f]{40}$")) and
             (.signals.integrity.status | IN("clear", "resolved", "active", "invalid")) and
             (.promotionAdmission.allowed | type == "boolean") and
-            (.isolatedPromotionAdmission.allowed | type == "boolean")
+            (.isolatedPromotionAdmission.allowed | type == "boolean") and
+            (.promotionMode | IN("normal", "isolated-only", "draft-only", "hold-intake", "blocked"))
           ' "$receipt" >/dev/null || {
             echo '::error::Fleet gate emitted a malformed receipt.' >&2
             exit 2
@@ -110,23 +111,7 @@ jobs:
             exit 2
           fi
 
-          mode=blocked
-          if jq -e '.state == "GREEN" and .promotionAdmission.allowed == true' "$receipt" >/dev/null; then
-            mode=normal
-          elif jq -e '
-            .state == "AMBER" and
-            .signals.main.status == "green" and
-            .signals.production.status == "red" and
-            .isolatedPromotionAdmission.allowed == true and
-            .isolatedPromotionAdmission.deploymentsAllowed == false
-          ' "$receipt" >/dev/null; then
-            mode=isolated-only
-          elif jq -e '
-            .signals.main.status == "red" and
-            (.signals.integrity.status | IN("clear", "resolved"))
-          ' "$receipt" >/dev/null; then
-            mode=draft-only
-          fi
+          mode="$(jq -r '.promotionMode' "$receipt")"
           receipt_b64="$(base64 -w0 <"$receipt")"
           {
             echo "mode=$mode"

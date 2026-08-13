@@ -450,7 +450,9 @@ describe('isolated UI/docs promotion policy', () => {
     expect(queueWorkflow).toContain('DRAIN_PROMOTION_MODE:');
     expect(queueWorkflow).toContain('DRAIN_RECOVER_FLEET_HOLDS:');
     expect(queueWorkflow).toContain('merge-queue-drain-mutex');
-    expect(queueWorkflow).toContain('mode=isolated-only');
+    expect(queueWorkflow).toContain('isolated-only');
+    expect(queueWorkflow).toContain('hold-intake');
+    expect(queueWorkflow).toContain('.promotionMode');
     expect(productionWorkflow).toContain('fleet-promotion:');
     expect(productionWorkflow).toContain(
       "needs.fleet-promotion.outputs.deployment_allowed == 'true'"

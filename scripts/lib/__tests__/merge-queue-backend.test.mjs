@@ -31,7 +31,7 @@ const VALID_REPOSITORY = Object.freeze(
 );
 const VALID_RULESET = Object.freeze(
   JSON.parse(
-    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":60,"grouping_strategy":"ALLGREEN","max_entries_to_build":8,"max_entries_to_merge":10,"merge_method":"SQUASH","min_entries_to_merge":1,"min_entries_to_merge_wait_minutes":0}}]}`
+    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":60,"grouping_strategy":"ALLGREEN","max_entries_to_build":8,"max_entries_to_merge":10,"merge_method":"SQUASH","min_entries_to_merge":5,"min_entries_to_merge_wait_minutes":10}}]}`
   )
 );
 const VALID_WORKFLOW = `name: CI
@@ -515,6 +515,40 @@ describe('native live preflight', () => {
     });
     expect(result.ok).toBe(true);
     expect(result.evidence.bypassActorsVisible).toBe(true);
+    expect(result.policyReadback).toMatchObject({
+      schema: 'jovie-native-queue-policy-readback/v1',
+      matched: true,
+      drift: [],
+    });
+  });
+
+  it('records pending cohort cutover drift without failing live 1/0 preflight', () => {
+    const liveUntilCutover = {
+      ...VALID_RULESET,
+      rules: VALID_RULESET.rules.map(rule =>
+        rule.type === 'merge_queue'
+          ? {
+              ...rule,
+              parameters: {
+                ...rule.parameters,
+                min_entries_to_merge: 1,
+                min_entries_to_merge_wait_minutes: 0,
+              },
+            }
+          : rule
+      ),
+    };
+    const result = validateNativePreflightEvidence({
+      ruleset: liveUntilCutover,
+      repository: VALID_REPOSITORY,
+      workflowYaml: VALID_WORKFLOW,
+      branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
+    });
+    expect(result.ok).toBe(true);
+    expect(result.policyReadback).toMatchObject({
+      matched: false,
+      drift: ['min_entries_to_merge', 'min_entries_to_merge_wait_minutes'],
+    });
     expect(result.evidence).not.toHaveProperty('classicPushAllowanceCount');
     expect(result.evidence).not.toHaveProperty('classicPushAllowanceActors');
   });
@@ -581,6 +615,10 @@ describe('native live preflight', () => {
       runner,
     });
     expect(result).toMatchObject({ ready: true });
+    expect(result.policyReadback).toMatchObject({
+      schema: 'jovie-native-queue-policy-readback/v1',
+      matched: true,
+    });
     expect(result).not.toHaveProperty('classicPushAllowanceCount');
     expect(result).not.toHaveProperty('classicPushAllowanceActors');
     const protectionCall = runner.mock.calls.find(([args]) =>
