@@ -34,22 +34,26 @@ export const TASK_ASSIGNEE_KINDS = ['human', 'jovie'] as const;
 
 export const taskCreateInputSchema = z.object({
   title: z.string().trim().min(1).max(200),
-  description: z.string().max(2000).optional(),
+  description: z.string().max(2000).nullish(),
   status: z.enum(TASK_STATUSES).optional(),
   priority: z.enum(TASK_PRIORITIES).optional(),
   assigneeKind: z.enum(TASK_ASSIGNEE_KINDS).optional(),
-  /** Mirrors canonical `CreateTaskInput.assigneeUserId` (an app user id). */
-  assigneeUserId: z.uuid().nullish(),
+  /**
+   * Mirrors canonical `CreateTaskInput.assigneeUserId` — an opaque app-user
+   * ID. Storage is `text` (`apps/web/lib/db/schema/tasks.ts`), so the
+   * contract must not impose a UUID rule the domain owner does not have.
+   */
+  assigneeUserId: z.string().trim().min(1).max(128).nullish(),
   /** Attach to a release owned by the same profile. */
-  releaseId: z.uuid().optional(),
-  parentTaskId: z.uuid().optional(),
+  releaseId: z.uuid().nullish(),
+  parentTaskId: z.uuid().nullish(),
   /** Canonical `CreateTaskInput` date fields; ISO datetimes on the wire. */
   dueAt: z.iso.datetime().nullish(),
   scheduledFor: z.iso.datetime().nullish(),
   startedAt: z.iso.datetime().nullish(),
   completedAt: z.iso.datetime().nullish(),
-  category: z.string().trim().min(1).max(100).optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+  category: z.string().trim().min(1).max(100).nullish(),
+  metadata: z.record(z.string(), z.unknown()).nullish(),
 });
 
 export const taskCreateOutputSchema = z.object({
