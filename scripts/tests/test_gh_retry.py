@@ -222,6 +222,7 @@ class TestDrainPrQueueWiring:
         receipt = {
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
+            "promotionMode": "blocked",
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "signals": {
                 "main": {"status": "unknown"},
@@ -234,6 +235,11 @@ class TestDrainPrQueueWiring:
             "isolatedPromotionAdmission": {
                 "allowed": False,
                 "deploymentsAllowed": False,
+            },
+            "alreadyAdmittedCohort": {
+                "preserve": False,
+                "newIntakeAllowed": False,
+                "semantics": "dequeue-until-exact-production-recovers",
             },
         }
         encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
@@ -278,6 +284,211 @@ class TestDrainPrQueueWiring:
         assert "[dry-run] would -merge-queue on #909" in result.stdout
         assert "queue depth: 0/0 (0 slots)" in result.stdout
         assert "would +merge-queue" not in result.stdout
+
+    def test_hold_intake_preserves_queued_ordinary_pr_and_freezes_new_intake(
+        self, tmp_path: Path
+    ) -> None:
+        queued_head = "8" * 40
+        receipt = {
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "promotionMode": "hold-intake",
+            "observedAt": datetime.now(timezone.utc).isoformat(),
+            "signals": {
+                "main": {"status": "green", "sha": "a" * 40},
+                "production": {"status": "green", "deployedSha": "b" * 40},
+                "controller": {"status": "green"},
+                "queue": {"status": "known", "eligiblePrs": 1, "target": 5},
+                "integrity": {"status": "clear"},
+            },
+            "promotionAdmission": {"allowed": False},
+            "isolatedPromotionAdmission": {
+                "allowed": False,
+                "deploymentsAllowed": False,
+            },
+            "alreadyAdmittedCohort": {
+                "preserve": True,
+                "newIntakeAllowed": False,
+                "semantics": "preserve-already-admitted-cohort-freeze-new-intake",
+            },
+        }
+        encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":901,"t":"Already admitted green PR","draft":false,"m":"MERGEABLE","head":"codex/jov-901","headOid":"{queued_head}","base":"main","L":["merge-queue"],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_PROMOTION_MODE=hold-intake "
+                    f"DRAIN_FLEET_GATE_B64={encoded}"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "fleet promotion constraint" not in result.stdout
+        assert "would -merge-queue on #901" not in result.stdout
+        assert "would dequeue #901" not in result.stdout
+        assert "would +merge-queue" not in result.stdout
+        assert "queue depth: 1/" in result.stdout
+        assert "(0 slots)" in result.stdout
+
+    def test_hold_intake_dequeues_deterministic_failing_member_and_keeps_green_sibling(
+        self, tmp_path: Path
+    ) -> None:
+        green_head = "c" * 40
+        fail_head = "d" * 40
+        receipt = {
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "promotionMode": "hold-intake",
+            "observedAt": datetime.now(timezone.utc).isoformat(),
+            "signals": {
+                "main": {"status": "green", "sha": "a" * 40},
+                "production": {"status": "green", "deployedSha": "b" * 40},
+                "controller": {"status": "green"},
+                "queue": {"status": "known", "eligiblePrs": 2, "target": 5},
+                "integrity": {"status": "clear"},
+            },
+            "promotionAdmission": {"allowed": False},
+            "isolatedPromotionAdmission": {
+                "allowed": False,
+                "deploymentsAllowed": False,
+            },
+            "alreadyAdmittedCohort": {
+                "preserve": True,
+                "newIntakeAllowed": False,
+                "semantics": "preserve-already-admitted-cohort-freeze-new-intake",
+            },
+        }
+        encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":901,"t":"Green sibling","draft":false,"m":"MERGEABLE","head":"codex/jov-901","headOid":"{green_head}","base":"main","L":["merge-queue"],"fail":[]}},{{"n":902,"t":"Deterministic fail","draft":false,"m":"MERGEABLE","head":"codex/jov-902","headOid":"{fail_head}","base":"main","L":["merge-queue"],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  if [[ "$*" == *"902"* ]]; then
+                    echo '[{{"name":"PR Ready","bucket":"fail","state":"FAILURE"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                    exit 0
+                  fi
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_PROMOTION_MODE=hold-intake "
+                    f"DRAIN_FLEET_GATE_B64={encoded}"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "would -merge-queue on #902" in result.stdout
+        assert "would -merge-queue on #901" not in result.stdout
+        assert "fleet promotion constraint" not in result.stdout
+
+    def test_hold_intake_does_not_dequeue_transient_unknown_mergeable(
+        self, tmp_path: Path
+    ) -> None:
+        queued_head = "e" * 40
+        receipt = {
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "promotionMode": "hold-intake",
+            "observedAt": datetime.now(timezone.utc).isoformat(),
+            "signals": {
+                "main": {"status": "green", "sha": "a" * 40},
+                "production": {"status": "green", "deployedSha": "b" * 40},
+                "controller": {"status": "green"},
+                "queue": {"status": "known", "eligiblePrs": 1, "target": 5},
+                "integrity": {"status": "clear"},
+            },
+            "promotionAdmission": {"allowed": False},
+            "isolatedPromotionAdmission": {
+                "allowed": False,
+                "deploymentsAllowed": False,
+            },
+            "alreadyAdmittedCohort": {
+                "preserve": True,
+                "newIntakeAllowed": False,
+                "semantics": "preserve-already-admitted-cohort-freeze-new-intake",
+            },
+        }
+        encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":903,"t":"Transient unknown mergeable","draft":false,"m":"UNKNOWN","head":"codex/jov-903","headOid":"{queued_head}","base":"main","L":["merge-queue"],"fail":[]}}]'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_PROMOTION_MODE=hold-intake "
+                    f"DRAIN_FLEET_GATE_B64={encoded}"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "would -merge-queue on #903" not in result.stdout
+        assert "fleet promotion constraint" not in result.stdout
+        assert "queue depth: 1/" in result.stdout
 
     def test_live_drain_refuses_before_calling_gh_when_fixture_path_mismatches(
         self, tmp_path: Path
