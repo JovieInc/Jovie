@@ -543,21 +543,13 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         or production.get("status") != "green"
         or production_unbound
     )
-    queue_pressure = (
-        queue.get("status") == "known"
-        and isinstance(eligible_prs, int)
-        and not isinstance(eligible_prs, bool)
-        and isinstance(queue_target, int)
-        and not isinstance(queue_target, bool)
-        and eligible_prs > queue_target
-    )
     work_activities = (
         []
         if state == "RED"
         else (
             (
                 []
-                if source_health_red or queue_pressure
+                if source_health_red or not queue_healthy
                 else ["approved-issue-lease"]
             )
             + ["isolated-implementation", "tests", "review", "draft-pr"]

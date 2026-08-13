@@ -301,16 +301,11 @@ export function evaluateFleetGate(
     );
   const sourceHealthRed =
     mainStatus !== 'green' || productionStatus !== 'green' || productionUnbound;
-  const queuePressure =
-    queueStatus === 'known' &&
-    Number.isInteger(eligiblePrs) &&
-    Number.isInteger(queueTarget) &&
-    eligiblePrs > queueTarget;
   const workActivities =
     state === FLEET_GATE_STATE.RED
       ? []
       : [
-          ...(sourceHealthRed || queuePressure ? [] : ['approved-issue-lease']),
+          ...(sourceHealthRed || !queueHealthy ? [] : ['approved-issue-lease']),
           'isolated-implementation',
           'tests',
           'review',

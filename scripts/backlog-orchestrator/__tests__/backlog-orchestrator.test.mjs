@@ -1056,6 +1056,7 @@ describe('deterministic Symphony admission boundary', () => {
     );
     assert.equal(invalidQueue.state, 'AMBER');
     assert.equal(invalidQueue.workAdmission.allowed, true);
+    assert.equal(invalidQueue.workAdmission.newIssueLeaseAllowed, false);
     assert.equal(invalidQueue.promotionAdmission.allowed, false);
     assert.ok(
       invalidQueue.reasons.some(reason => reason.code === 'queue-unknown')
