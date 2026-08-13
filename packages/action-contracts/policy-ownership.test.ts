@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * Policy-ownership guard: the contract package declares shape and metadata
  * only. Executable business policy (entitlement evaluation, flag checks,
- * persistence, network, env access) belongs to the future dispatcher and
+ * persistence, network, env access) belongs to the resolver/dispatcher and
  * must never be implemented here or duplicated into adapters.
  */
 
@@ -35,11 +35,11 @@ const FORBIDDEN_PATTERNS: ReadonlyArray<{
     reason: 'no imports from other workspace packages',
   },
   {
-    pattern: /apps\/web|lib\/entitlements|lib\/flags|lib\/rate-limit/,
-    reason: 'no references to app-owned policy modules',
+    pattern: /from ['"][^'"]*(@\/|apps\/)/,
+    reason: 'no imports from application code',
   },
   {
-    pattern: /getEntitlements|getCurrentUserEntitlements|ENTITLEMENT_REGISTRY/,
+    pattern: /getEntitlements|getCurrentUserEntitlements/,
     reason: 'no entitlement evaluation',
   },
   {

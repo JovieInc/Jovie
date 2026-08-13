@@ -1,86 +1,80 @@
 import { z } from 'zod';
 
-import { actionErrorSchemaFor, COMMON_ERROR_CODES } from '../envelope';
-import type { ActionDefinition } from '../metadata';
-import {
-  CANONICAL_AUTH,
-  CANONICAL_EVOLUTION,
-  CANONICAL_IDEMPOTENCY,
-  isoDateSchema,
-  mutationBaseSchema,
-} from '../shared';
+import type { ActionDescriptor } from '../descriptor';
 
-export const TASK_CREATE_DOMAIN_ERROR_CODES = [
-  'TASKS_WORKSPACE_LOCKED',
-  'RELEASE_NOT_FOUND',
+/**
+ * `task.create` — create an internal task.
+ *
+ * Internal write on the authenticated creator profile. Enforces Tasks
+ * workspace access and release ownership at invoke time; users without
+ * access receive a truthful structured `unavailable` result with an
+ * entitlement reason and upgrade handoff, never a silent no-op.
+ */
+
+/** Mirrors the domain task status enum. */
+export const TASK_STATUSES = [
+  'backlog',
+  'todo',
+  'in_progress',
+  'done',
+  'cancelled',
 ] as const;
 
-export const taskCreateInputSchema = mutationBaseSchema.extend({
-  title: z.string().min(1).max(200),
-  /** Attach the task to a release owned by the same profile. */
+/** Mirrors the domain task priority enum. */
+export const TASK_PRIORITIES = [
+  'urgent',
+  'high',
+  'medium',
+  'low',
+  'none',
+] as const;
+
+/** Mirrors the domain task assignee-kind enum. */
+export const TASK_ASSIGNEE_KINDS = ['human', 'jovie'] as const;
+
+const isoDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
+
+export const taskCreateInputSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  status: z.enum(TASK_STATUSES).optional(),
+  priority: z.enum(TASK_PRIORITIES).optional(),
+  assigneeKind: z.enum(TASK_ASSIGNEE_KINDS).optional(),
+  /** Attach to a release owned by the same profile. */
   releaseId: z.uuid().optional(),
-  category: z.string().min(1).max(100).optional(),
-  priority: z.enum(['low', 'medium', 'high']).optional(),
+  parentTaskId: z.uuid().optional(),
   dueDate: isoDateSchema.optional(),
-  assigneeKind: z.enum(['creator', 'jovie']).optional(),
+  category: z.string().trim().min(1).max(100).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const taskCreateOutputSchema = z.object({
   taskId: z.uuid(),
   taskNumber: z.number().int().positive(),
-  /** False when the idempotency key replayed an existing task. */
-  created: z.boolean(),
+  title: z.string().min(1),
 });
-
-const errorCodes = [...COMMON_ERROR_CODES, ...TASK_CREATE_DOMAIN_ERROR_CODES];
-
-export const taskCreateErrorSchema = actionErrorSchemaFor(
-  errorCodes as [string, ...string[]]
-);
 
 export type TaskCreateInput = z.infer<typeof taskCreateInputSchema>;
 export type TaskCreateOutput = z.infer<typeof taskCreateOutputSchema>;
 
-export const taskCreateAction: ActionDefinition<
+export const taskCreateAction: ActionDescriptor<
   typeof taskCreateInputSchema,
-  typeof taskCreateOutputSchema,
-  typeof taskCreateErrorSchema
+  typeof taskCreateOutputSchema
 > = {
   id: 'task.create',
-  version: '1',
-  kind: 'mutation',
-  discovery: {
-    title: 'Create task',
-    summary:
-      'Create a workspace task, optionally attached to a release, on the authenticated creator profile.',
-    category: 'tasks',
-    bindings: [
-      {
-        kind: 'web-api',
-        status: 'existing',
-        note: 'Legacy paths: createTask, addReleaseTask, addCatalogTaskToRelease server actions and the manageTasks chat tool.',
-      },
-      {
-        kind: 'chat-tool',
-        status: 'contract-only',
-      },
-      {
-        kind: 'swift',
-        status: 'contract-only',
-      },
-      {
-        kind: 'mcp',
-        status: 'contract-only',
-        note: 'Authenticated owner-workspace MCP only. The public per-artist MCP endpoint never accepts this action.',
-      },
-    ],
-  },
-  auth: CANONICAL_AUTH,
-  idempotency: CANONICAL_IDEMPOTENCY,
-  evolution: CANONICAL_EVOLUTION,
-  domainErrorCodes: TASK_CREATE_DOMAIN_ERROR_CODES,
-  entitlementKeys: ['canAccessTasksWorkspace'],
-  input: taskCreateInputSchema,
-  output: taskCreateOutputSchema,
-  error: taskCreateErrorSchema,
+  schemaVersion: 1,
+  titleKey: 'actions.task.create.title',
+  descriptionKey: 'actions.task.create.description',
+  effect: 'internal_write',
+  confirmation: 'none',
+  supportedChannels: ['web', 'ios', 'app_intent', 'chat_tool', 'mcp', 'cli'],
+  requirements: [
+    { type: 'auth' },
+    { type: 'profile_ownership' },
+    { type: 'entitlement', key: 'canAccessTasksWorkspace' },
+  ],
+  inputSchema: taskCreateInputSchema,
+  outputSchema: taskCreateOutputSchema,
 };

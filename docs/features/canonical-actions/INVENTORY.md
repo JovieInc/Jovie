@@ -7,24 +7,46 @@ inventory swarm, branch `symphony/JOV-5041-fix`). Nothing here is invented; if a
 surface is listed as "none", it was grep/read-verified as absent.
 
 Contract package: [`packages/action-contracts`](../../../packages/action-contracts/README.md)
-owns action identity (manifest, schemas, envelope, bindings). The dispatcher and
-durable `action_executions` ledger do not exist yet — see
-[MIGRATION_MAP.md](./MIGRATION_MAP.md) for where each entry point migrates.
+owns action identity (manifest, descriptors, invocation/result schemas, stable
+error vocabulary, bindings). The dispatcher and durable `action_executions`
+ledger do not exist yet — see [MIGRATION_MAP.md](./MIGRATION_MAP.md) for where
+each entry point migrates.
+
+**Framing:** everything below is a *legacy* entry point. These routes, server
+actions, chat tools, and clients are existing paths to be mapped onto — or
+migrated to — the canonical actions. None of them defines the canonical
+semantics of an action; those come only from the manifest in
+`packages/action-contracts`.
 
 Action IDs:
 
 | ID | Purpose | Contract |
 | --- | --- | --- |
-| `chat.start` | Create/resume an authenticated AI chat conversation | `actions/chat-start.ts` |
-| `contact.create` | Create an audience contact (email/SMS subscriber) | `actions/contact-create.ts` |
-| `release.create` | Create a discography release | `actions/release-create.ts` |
-| `task.create` | Create a workspace task | `actions/task-create.ts` |
+| `chat.start` | Begin a new conversation handoff (navigation; never persists an empty conversation) | `actions/chat-start.ts` |
+| `contact.create` | Create an internal artist contact | `actions/contact-create.ts` |
+| `release.create` | Create a manual Jovie release draft | `actions/release-create.ts` |
+| `task.create` | Create an internal task | `actions/task-create.ts` |
 
 ---
 
-## 1. `chat.start` — starting an AI chat session
+## 1. `chat.start` — conversation handoff (navigation)
 
-### 1a. `POST /api/chat` — authenticated artist chat turn (primary)
+**Approved canonical semantics** (from `actions/chat-start.ts`, not from the
+routes below): `chat.start` is a **navigation/handoff action** with no required
+input. Its result is a `handoff` to the semantic destination `chat.new`, which
+adapters map to `/app/chat`, the native Chat tab, or an appropriate client
+link. It **never creates, resumes, or persists an empty conversation** — a
+conversation is reserved only when the first message is submitted and
+acknowledged — and opening chat **consumes no message quota** (message
+submission retains the existing quota contract).
+
+The routes and clients inventoried below are the **legacy chat paths** that the
+dispatcher phase will map. They are evidence of what exists today, not the
+definition of `chat.start`: today's create/resume/turn routes conflate
+navigation, conversation persistence, and message turns, and removing that
+conflation is the point of the canonical action.
+
+### 1a. `POST /api/chat` — authenticated artist chat turn (legacy, primary)
 
 - **Path:** `apps/web/app/api/chat/route.ts:2326` (`POST`); dispatch pipeline `apps/web/lib/chat/run.ts:238` (`executeChatTurn`)
 - **What:** Runs one AI chat turn; lazily creates conversation + turn via `reserveChatTurn` when `clientTurnId` present. Streams UIMessage SSE.
@@ -514,7 +536,7 @@ central entitlement/quota/flag modules the dispatcher will plug into.
   - `select_merch_design` (line 499) → `selectMerchDesign()` (service.ts:872+) + `proposeMerchAction` from `@/lib/chat/tools/merch-propose`. Zod inline schema with `.refine` (optionNumber XOR optionId). Idempotency: partial — "A product is already selected" guard (service.ts:990).
   - `publish_merch_card` (line 534) → `publishMerchCard()` gated by explicit `confirmed: true` + sellability checks (`getMerchCardSellability`, `assertSellable` service.ts:405). Zod inline schema. No idempotency key; errors: JSON-RPC `-32602` with generic message.
 - **Auth model:** mixed — reads are unauthenticated (public profile only); merch writes reuse the web Clerk cookie session (`getCachedAuth`). No OAuth/API-key MCP auth exists. `.mcp.json` is agent-side client config; `@modelcontextprotocol/sdk` in root package.json is a dev dependency, not a server implementation.
-- **Contract note:** `packages/action-contracts` hard-pins `auth.publicArtistMcpWritable === false` on every action — this endpoint never receives canonical workspace writes.
+- **Contract note:** the approved contract keeps this endpoint read-only for workspace data — no action's `supportedChannels` includes the public per-artist MCP surface, and authenticated owner-workspace writes belong to a separate, new MCP adapter (explicit contract non-goal: never merge the two).
 
 ### 5b. CLI surface
 

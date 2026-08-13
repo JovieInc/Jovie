@@ -1,31 +1,29 @@
 import { describe, expect, it } from 'vitest';
 
-import { COMMON_ERROR_CODES, isErrorCodeFormat } from './envelope';
+import { ACTION_EFFECTS } from './descriptor';
+import { ACTION_ERROR_CODES, actionErrorSchema } from './errors';
 import { ACTION_IDS, assertActionIdFormat } from './ids';
+import {
+  ACTION_CHANNELS,
+  ACTION_RESULT_STATUSES,
+  actionInvocationSchema,
+  actionResultSchema,
+} from './invocation';
 import { ACTION_MANIFEST, buildDiscoveryDocument } from './manifest';
 
 const UUID = '123e4567-e89b-42d3-a456-426614174000';
-const KEY = 'test-key-0001';
+
+const VALID_INVOCATION_BASE = {
+  schemaVersion: 1,
+  idempotencyKey: 'test-key-0001',
+  context: { profileId: UUID, channel: 'web' },
+};
 
 const VALID_INPUTS: Record<string, unknown> = {
-  'chat.start': { profileId: UUID, idempotencyKey: KEY, source: 'web' },
-  'contact.create': {
-    profileId: UUID,
-    idempotencyKey: KEY,
-    channel: 'email',
-    value: 'fan@example.com',
-  },
-  'release.create': {
-    profileId: UUID,
-    idempotencyKey: KEY,
-    title: 'New Single',
-    releaseType: 'single',
-  },
-  'task.create': {
-    profileId: UUID,
-    idempotencyKey: KEY,
-    title: 'Follow up with venue',
-  },
+  'chat.start': {},
+  'contact.create': { role: 'management', email: 'manager@example.com' },
+  'release.create': { title: 'New Single', releaseType: 'single' },
+  'task.create': { title: 'Follow up with venue' },
 };
 
 describe('action identity', () => {
@@ -43,138 +41,256 @@ describe('action identity', () => {
       expect(() => assertActionIdFormat(id)).not.toThrow();
     }
   });
-
-  it('pins every action to version 1 as a mutation', () => {
-    for (const action of ACTION_MANIFEST) {
-      expect(action.version).toBe('1');
-      expect(action.kind).toBe('mutation');
-    }
-  });
 });
 
-describe('contract metadata', () => {
-  it('every action is authenticated and profile-scoped', () => {
+describe('canonical descriptor shape', () => {
+  it('every descriptor carries the approved fields', () => {
     for (const action of ACTION_MANIFEST) {
-      expect(action.auth.requiresAuth).toBe(true);
-      expect(action.auth.profileScoped).toBe(true);
-    }
-  });
-
-  it('no action is writable through the public per-artist MCP endpoint', () => {
-    for (const action of ACTION_MANIFEST) {
-      expect(action.auth.publicArtistMcpWritable).toBe(false);
-    }
-  });
-
-  it('every action requires an idempotency key with replay semantics', () => {
-    for (const action of ACTION_MANIFEST) {
-      expect(action.idempotency.required).toBe(true);
-      expect(action.idempotency.keyField).toBe('idempotencyKey');
-      expect(['replay', 'conflict']).toContain(action.idempotency.onConflict);
-    }
-  });
-
-  it('every action declares additive-only evolution rules', () => {
-    for (const action of ACTION_MANIFEST) {
-      expect(action.evolution.additiveOnly).toBe(true);
-      expect(action.evolution.breakingChanges).toBe('new-action-version');
-      expect(action.evolution.deprecation).toBe('successor-required');
-    }
-  });
-
-  it('discovery metadata is complete and bindings are honestly labeled', () => {
-    for (const action of ACTION_MANIFEST) {
-      expect(action.discovery.title.length).toBeGreaterThan(0);
-      expect(action.discovery.summary.length).toBeGreaterThan(0);
-      expect(action.discovery.bindings.length).toBeGreaterThan(0);
-      for (const binding of action.discovery.bindings) {
-        expect(['existing', 'contract-only']).toContain(binding.status);
-      }
-    }
-  });
-});
-
-describe('structured errors', () => {
-  it('domain codes are SNAKE_CASE, unique per action, and not common codes', () => {
-    const common = new Set<string>(COMMON_ERROR_CODES);
-    for (const action of ACTION_MANIFEST) {
-      expect(action.domainErrorCodes.length).toBeGreaterThan(0);
-      const seen = new Set<string>();
-      for (const code of action.domainErrorCodes) {
-        expect(isErrorCodeFormat(code)).toBe(true);
-        expect(common.has(code)).toBe(false);
-        expect(seen.has(code)).toBe(false);
-        seen.add(code);
+      expect(Number.isInteger(action.schemaVersion)).toBe(true);
+      expect(action.schemaVersion).toBeGreaterThanOrEqual(1);
+      expect(action.titleKey).toMatch(/^actions\.[a-z.]+$/);
+      expect(action.descriptionKey).toMatch(/^actions\.[a-z.]+$/);
+      expect(ACTION_EFFECTS).toContain(action.effect);
+      expect(['none', 'required']).toContain(action.confirmation);
+      expect(action.supportedChannels.length).toBeGreaterThan(0);
+      for (const channel of action.supportedChannels) {
+        expect(ACTION_CHANNELS).toContain(channel);
       }
     }
   });
 
-  it('every action error schema accepts its domain codes and rejects others', () => {
+  it('descriptors contain no routes, prose, or client-trusted plan data', () => {
     for (const action of ACTION_MANIFEST) {
-      for (const code of action.domainErrorCodes) {
-        const parsed = action.error.safeParse({
-          code,
-          message: 'human readable',
-          retryable: false,
-        });
-        expect(parsed.success).toBe(true);
-      }
-      const invalid = action.error.safeParse({
-        code: 'NOT_A_DECLARED_CODE',
-        message: 'x',
-        retryable: false,
+      const serialized = JSON.stringify({
+        titleKey: action.titleKey,
+        descriptionKey: action.descriptionKey,
+        requirements: action.requirements,
       });
-      expect(invalid.success).toBe(false);
+      expect(serialized).not.toMatch(/\/app\//);
+      expect(serialized).not.toMatch(/https?:/);
     }
   });
 
-  it('errors without a code or retryable flag fail to parse', () => {
+  it('every action requires auth and profile ownership', () => {
     for (const action of ACTION_MANIFEST) {
-      expect(
-        action.error.safeParse({ message: 'x', retryable: false }).success
-      ).toBe(false);
-      expect(
-        action.error.safeParse({ code: 'INTERNAL_ERROR', message: 'x' }).success
-      ).toBe(false);
+      const types = action.requirements.map(r => r.type);
+      expect(types).toContain('auth');
+      expect(types).toContain('profile_ownership');
+    }
+  });
+
+  it('entitlement requirements reference registry keys by name only', () => {
+    for (const action of ACTION_MANIFEST) {
+      for (const requirement of action.requirements) {
+        if (requirement.type === 'entitlement') {
+          expect(requirement.key).toMatch(/^[a-z][a-zA-Z0-9]*$/);
+        }
+      }
+    }
+  });
+
+  it('chat.start is a navigation handoff with no required input', () => {
+    const chatStart = ACTION_MANIFEST.find(a => a.id === 'chat.start');
+    expect(chatStart?.effect).toBe('navigation');
+    expect(chatStart?.confirmation).toBe('none');
+    expect(chatStart?.inputSchema.safeParse({}).success).toBe(true);
+  });
+
+  it('write actions declare internal_write effect', () => {
+    for (const id of ['contact.create', 'release.create', 'task.create']) {
+      const action = ACTION_MANIFEST.find(a => a.id === id);
+      expect(action?.effect).toBe('internal_write');
     }
   });
 });
 
-describe('input schemas', () => {
-  it('accepts a minimal valid input per action', () => {
+describe('stable error vocabulary', () => {
+  it('matches the approved vocabulary exactly', () => {
+    expect([...ACTION_ERROR_CODES]).toEqual([
+      'AUTH_REQUIRED',
+      'PROFILE_REQUIRED',
+      'FORBIDDEN',
+      'ENTITLEMENT_REQUIRED',
+      'ENTITLEMENT_UNVERIFIED',
+      'QUOTA_EXHAUSTED',
+      'FEATURE_DISABLED',
+      'PROVIDER_UNAVAILABLE',
+      'CLIENT_UPGRADE_REQUIRED',
+      'VALIDATION_FAILED',
+      'REQUIRES_INPUT',
+      'CONFIRMATION_REQUIRED',
+      'CONFLICT',
+      'IN_PROGRESS',
+      'RATE_LIMITED',
+      'TEMPORARILY_UNAVAILABLE',
+      'INTERNAL',
+    ]);
+  });
+
+  it('error schema requires code, messageKey, and retryable', () => {
+    expect(
+      actionErrorSchema.safeParse({
+        code: 'ENTITLEMENT_REQUIRED',
+        messageKey: 'errors.entitlementRequired',
+        retryable: false,
+      }).success
+    ).toBe(true);
+    expect(
+      actionErrorSchema.safeParse({
+        code: 'NOT_A_CODE',
+        messageKey: 'x',
+        retryable: false,
+      }).success
+    ).toBe(false);
+    expect(
+      actionErrorSchema.safeParse({ code: 'INTERNAL', retryable: true }).success
+    ).toBe(false);
+    expect(
+      actionErrorSchema.safeParse({
+        code: 'INTERNAL',
+        messageKey: 'errors.internal',
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('invocation envelope', () => {
+  it('context owns profileId, channel, and clientVersion', () => {
     for (const action of ACTION_MANIFEST) {
-      const input = VALID_INPUTS[action.id];
-      const parsed = action.input.safeParse(input);
-      expect(parsed.success).toBe(true);
+      const invocation = actionInvocationSchema(action.inputSchema);
+      const valid = invocation.safeParse({
+        ...VALID_INVOCATION_BASE,
+        input: VALID_INPUTS[action.id],
+      });
+      expect(valid.success).toBe(true);
     }
   });
 
-  it('rejects inputs missing idempotencyKey or profileId', () => {
+  it('rejects invocations missing idempotencyKey or context.profileId', () => {
     for (const action of ACTION_MANIFEST) {
-      const input = VALID_INPUTS[action.id] as Record<string, unknown>;
-      const { idempotencyKey: _k, ...noKey } = input;
-      expect(action.input.safeParse(noKey).success).toBe(false);
-      const { profileId: _p, ...noProfile } = input;
-      expect(action.input.safeParse(noProfile).success).toBe(false);
+      const invocation = actionInvocationSchema(action.inputSchema);
+      const input = VALID_INPUTS[action.id];
+      const { idempotencyKey: _k, ...noKey } = VALID_INVOCATION_BASE;
+      expect(invocation.safeParse({ ...noKey, input }).success).toBe(false);
+      expect(
+        invocation.safeParse({
+          ...VALID_INVOCATION_BASE,
+          context: { channel: 'web' },
+          input,
+        }).success
+      ).toBe(false);
     }
+  });
+
+  it('domain inputs never duplicate invocation context fields', () => {
+    for (const action of ACTION_MANIFEST) {
+      const parsed = action.inputSchema.safeParse({
+        ...(VALID_INPUTS[action.id] as Record<string, unknown>),
+        profileId: UUID,
+        idempotencyKey: 'test-key-0001',
+        channel: 'web',
+        clientVersion: '1.0.0',
+      });
+      if (parsed.success) {
+        const data = parsed.data as Record<string, unknown>;
+        expect(data).not.toHaveProperty('profileId');
+        expect(data).not.toHaveProperty('idempotencyKey');
+        expect(data).not.toHaveProperty('channel');
+        expect(data).not.toHaveProperty('clientVersion');
+      }
+    }
+  });
+});
+
+describe('result union', () => {
+  const receipt = {
+    executionId: UUID,
+    requestId: 'req-1',
+    actionId: 'task.create',
+    schemaVersion: 1,
+    channel: 'web',
+    status: 'completed',
+    startedAt: '2026-08-13T12:00:00.000Z',
+  };
+
+  it('parses every approved status', () => {
+    const task = ACTION_MANIFEST.find(a => a.id === 'task.create');
+    const result = actionResultSchema(task!.outputSchema);
+    const error = {
+      code: 'ENTITLEMENT_REQUIRED',
+      messageKey: 'errors.entitlementRequired',
+      retryable: false,
+    };
+    const cases: unknown[] = [
+      {
+        status: 'completed',
+        receipt,
+        data: { taskId: UUID, taskNumber: 7, title: 't' },
+      },
+      {
+        status: 'handoff',
+        receipt: { ...receipt, status: 'handoff' },
+        handoff: { target: 'chat.new' },
+      },
+      {
+        status: 'requires_input',
+        receipt: { ...receipt, status: 'requires_input' },
+        missingFields: ['title'],
+      },
+      {
+        status: 'in_progress',
+        receipt: { ...receipt, status: 'in_progress' },
+        retryAfterMs: 500,
+      },
+      {
+        status: 'unavailable',
+        receipt: { ...receipt, status: 'unavailable' },
+        error,
+      },
+      {
+        status: 'failed',
+        receipt: { ...receipt, status: 'failed' },
+        error,
+      },
+    ];
+    for (const value of cases) {
+      expect(result.safeParse(value).success).toBe(true);
+    }
+    expect(ACTION_RESULT_STATUSES).toHaveLength(6);
+  });
+
+  it('rejects unknown statuses and malformed receipts', () => {
+    const task = ACTION_MANIFEST.find(a => a.id === 'task.create');
+    const result = actionResultSchema(task!.outputSchema);
+    expect(result.safeParse({ status: 'ok', receipt }).success).toBe(false);
+    expect(result.safeParse({ status: 'completed', data: {} }).success).toBe(
+      false
+    );
   });
 });
 
 describe('discovery document', () => {
-  it('is serializable and carries one entry per stable ID', () => {
+  it('exposes the complete channel and error vocabulary', () => {
     const doc = buildDiscoveryDocument();
-    expect(doc.contractVersion).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(doc.channels).toEqual(ACTION_CHANNELS);
+    expect(doc.errorCodes).toEqual(ACTION_ERROR_CODES);
     expect(doc.actions.map(a => a.id)).toEqual([...ACTION_IDS]);
-    expect(() => JSON.stringify(doc)).not.toThrow();
   });
 
-  it('declares the platform invariants machine-readably', () => {
+  it('carries the approved descriptor fields per action', () => {
     const doc = buildDiscoveryDocument();
-    expect(doc.invariants).toEqual({
-      dispatcherOwnsPolicy: true,
-      ledgerRequiredBeforeWrites: true,
-      publicArtistMcpWritable: false,
-      clientsArePresentationOnly: true,
-    });
+    for (const action of doc.actions) {
+      expect(action.schemaVersion).toBeGreaterThanOrEqual(1);
+      expect(action.titleKey.length).toBeGreaterThan(0);
+      expect(action.descriptionKey.length).toBeGreaterThan(0);
+      expect(action.supportedChannels.length).toBeGreaterThan(0);
+      expect(action.schemas.input).toBe(`schemas/${action.id}.input.json`);
+    }
+  });
+
+  it('is JSON-serializable and stable', () => {
+    expect(JSON.stringify(buildDiscoveryDocument())).toBe(
+      JSON.stringify(buildDiscoveryDocument())
+    );
   });
 });

@@ -1,88 +1,63 @@
 {
   "title": "contact.create input v1",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "oneOf": [
-    {
-      "type": "object",
-      "properties": {
-        "profileId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "idempotencyKey": {
-          "type": "string",
-          "minLength": 8,
-          "maxLength": 128
-        },
-        "channel": {
-          "type": "string",
-          "const": "email"
-        },
-        "value": {
-          "type": "string",
-          "maxLength": 320,
-          "format": "email",
-          "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
-        },
-        "name": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 200
-        },
-        "source": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 100
-        }
-      },
-      "required": [
-        "profileId",
-        "idempotencyKey",
-        "channel",
-        "value"
-      ],
-      "additionalProperties": false
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "bookings",
+        "management",
+        "press_pr",
+        "brand_partnerships",
+        "music_collaboration",
+        "fan_general",
+        "other"
+      ]
     },
-    {
-      "type": "object",
-      "properties": {
-        "profileId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "idempotencyKey": {
-          "type": "string",
-          "minLength": 8,
-          "maxLength": 128
-        },
-        "channel": {
-          "type": "string",
-          "const": "phone"
-        },
-        "value": {
-          "type": "string",
-          "pattern": "^\\+[1-9]\\d{6,14}$"
-        },
-        "name": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 200
-        },
-        "source": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 100
-        }
-      },
-      "required": [
-        "profileId",
-        "idempotencyKey",
-        "channel",
-        "value"
-      ],
-      "additionalProperties": false
+    "customLabel": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "personName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "companyName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "territories": {
+      "maxItems": 8,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "email": {
+      "type": "string",
+      "maxLength": 254,
+      "format": "email",
+      "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+    },
+    "phone": {
+      "type": "string",
+      "pattern": "^\\+[1-9]\\d{6,14}$"
+    },
+    "preferredChannel": {
+      "type": "string",
+      "enum": [
+        "email",
+        "phone"
+      ]
     }
-  ]
+  },
+  "required": [
+    "role"
+  ],
+  "additionalProperties": false
 }
