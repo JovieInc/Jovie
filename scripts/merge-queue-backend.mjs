@@ -234,6 +234,20 @@ function hasMergeGroupChecksRequested(workflowYaml) {
   );
 }
 
+/**
+ * Validate live GitHub ruleset, repository, and workflow evidence for native
+ * merge-queue enrollment.
+ *
+ * @param {{
+ *   ruleset?: object | null,
+ *   repository?: object | null,
+ *   workflowYaml?: string | null,
+ *   branchProtectionRef?: object | null,
+ *   rulesetId?: string,
+ *   baseBranch?: string,
+ *   allowUnavailableBypassActors?: boolean,
+ * }} [input]
+ */
 export function validateNativePreflightEvidence({
   ruleset,
   repository,
