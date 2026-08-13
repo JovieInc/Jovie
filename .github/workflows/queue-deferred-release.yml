@@ -3,10 +3,12 @@ name: Queue-Deferred Release
 # Closes the Symphony In Review → native merge queue handoff. Fully
 # event-driven — zero polling crons.
 #
-# Symphony drafts are born with `queue-deferred` plus a typed
+# Symphony PRs are born ready but hard-held with `queue-deferred` plus a typed
 # `jovie-queue-deferral/v1` receipt; agent-pipeline deferrals under queue
-# pressure carry the same typed receipt. Without a controller lifting that
-# mechanical hold, green drafts sat indefinitely (#15808/#15810/#15811).
+# pressure carry the same typed receipt. The label is the only promotion hold:
+# GitHub stage changes require a human author/write actor, which installation
+# and Actions tokens are not. Without a controller lifting the typed label,
+# green PRs sat indefinitely (#15808/#15810/#15811).
 #
 # Triggers:
 #   workflow_run      — PR CI completion, successful Production Controller,
@@ -156,19 +158,34 @@ jobs:
       - name: Report and release typed queue deferrals
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          # GitHub stage changes require repository write authority. Use the
-          # scoped Actions token only for the ready flip; the subsequent App
-          # label mutation emits the real `unlabeled` event that wakes
-          # autoenrollment after the PR is ready.
-          READY_GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60
           RELEASE_MODE: both
           ALARM_MINUTES: 12
+          ATTEMPT_COOLDOWN_MINUTES: 5
           FLEET_RECEIPT_FILE: ${{ runner.temp }}/jovie-fleet-gate.json
           FLEET_MODE: ${{ needs.fleet-policy.outputs.mode }}
         run: |
           set -euo pipefail
           echo "${{ needs.fleet-policy.outputs.receipt_b64 }}" | base64 -d >"$FLEET_RECEIPT_FILE"
-          bash scripts/release-queue-deferred.sh
+          retry_file="$RUNNER_TEMP/queue-deferred-retry-after-seconds"
+          release_mode="$RELEASE_MODE"
+          for pass in 1 2; do
+            rm -f "$retry_file"
+            RELEASE_MODE="$release_mode" RELEASE_RETRY_FILE="$retry_file" \
+              bash scripts/release-queue-deferred.sh
+            [[ ! -s "$retry_file" ]] && break
+            if [[ "$pass" -eq 2 ]]; then
+              echo '::warning::Queue-deferred release exhausted its bounded in-run retry; the typed hold remains fail-closed.'
+              break
+            fi
+            retry_seconds="$(tr -d '[:space:]' <"$retry_file")"
+            if [[ ! "$retry_seconds" =~ ^[1-9][0-9]*$ || "$retry_seconds" -gt 300 ]]; then
+              echo "::error::Invalid queue-deferred retry request: ${retry_seconds:-empty}"
+              exit 2
+            fi
+            echo "Retrying typed queue deferrals in ${retry_seconds}s within the fresh fleet-receipt window."
+            sleep "$retry_seconds"
+            release_mode=release
+          done

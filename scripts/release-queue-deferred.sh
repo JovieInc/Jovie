@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Releases only typed mechanical `queue-deferred` holds under a fresh GREEN
 # fleet receipt, exact-head green checks, and live same-repo/main PR state.
-# Report mode is read-only; release mode removes the label before marking ready
-# so native autoenrollment revalidates and owns queue admission. Untyped or
+# Report mode is read-only; release mode removes the typed label from an
+# already-ready PR so native autoenrollment revalidates and owns queue admission. Untyped or
 # inconsistent evidence stays held. Mutations are re-read and compensated.
 #
 # Env:
@@ -14,7 +14,9 @@
 #   FLEET_MAX_AGE_SECONDS    receipt freshness window (default 600)
 #   ALARM_MINUTES            report-pass age alarm threshold (default 12)
 #   ATTEMPT_COOLDOWN_MINUTES min minutes between release attempts per PR
-#                            (default 30; one upserted marker comment per PR)
+#                            (default 5; one upserted marker comment per PR)
+#   RELEASE_RETRY_FILE       optional path receiving the shortest requested
+#                            retry delay in seconds for the workflow wrapper
 #   QUEUE_READY_THRESHOLD    test/operator override for queue-pressure release;
 #                            defaults to the canonical merge-queue max depth
 set -euo pipefail
@@ -29,7 +31,8 @@ RELEASE_MODE="${RELEASE_MODE:-both}"
 FLEET_RECEIPT_FILE="${FLEET_RECEIPT_FILE:-}"
 FLEET_MAX_AGE_SECONDS="${FLEET_MAX_AGE_SECONDS:-600}"
 ALARM_MINUTES="${ALARM_MINUTES:-12}"
-ATTEMPT_COOLDOWN_MINUTES="${ATTEMPT_COOLDOWN_MINUTES:-30}"
+ATTEMPT_COOLDOWN_MINUTES="${ATTEMPT_COOLDOWN_MINUTES:-5}"
+RELEASE_RETRY_FILE="${RELEASE_RETRY_FILE:-}"
 DEFERRAL_MARKER='<!-- bot-comment:queue-deferral -->'
 RELEASE_MARKER="queue-deferral-release"
 LIB="$(dirname "${BASH_SOURCE[0]}")/lib/queue-deferral-receipt.mjs"
@@ -40,6 +43,18 @@ TRUSTED_DEFERRAL_AUTHORS='["itstimwhite","jovie-bot[bot]"]'
 OTHER_HOLD_RE='^(needs-human|hold|gated|fast|needs-conflict-resolution)$'
 AGENT_BRANCH_RE='^(tim/|codex/|agent/|claude/|linear/|codegen-bot/|symphony/)'
 now_epoch="$(date -u +%s)"
+
+request_retry_after() {  # request_retry_after <seconds> — shortest request wins
+  local requested="$1" current=""
+  [[ "$DRY_RUN" == "1" || -z "$RELEASE_RETRY_FILE" ]] && return 0
+  [[ "$requested" =~ ^[1-9][0-9]*$ ]] || return 0
+  if [[ -f "$RELEASE_RETRY_FILE" ]]; then
+    current="$(tr -d '[:space:]' <"$RELEASE_RETRY_FILE")"
+  fi
+  if [[ ! "$current" =~ ^[1-9][0-9]*$ || "$requested" -lt "$current" ]]; then
+    printf '%s\n' "$requested" >"$RELEASE_RETRY_FILE"
+  fi
+}
 
 iso_to_epoch() {  # iso_to_epoch <iso> — empty output on unparseable input
   date -u -d "$1" +%s 2>/dev/null \
@@ -58,6 +73,7 @@ read_state() {  # read_state <num> — one API snapshot; discovery is never auth
 state_is_releasable() {  # state_is_releasable <json> <expected-head> <expected-branch>
   jq -e --arg expected_head "$2" --arg expected_branch "$3" --arg repo_owner "$REPO_OWNER" --arg other_hold_re "$OTHER_HOLD_RE" '
     .state == "OPEN"
+    and .draft == false
     and .head == $expected_head
     and .branch == $expected_branch
     and .headOwner == $repo_owner
@@ -180,16 +196,6 @@ restore_hold_label() {  # restore_hold_label <num> — compensation; never maske
     return 0
   fi
   echo "    !! compensating label restore failed for #$1"
-  return 1
-}
-
-mark_ready() {  # mark_ready <num>
-  [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would mark #$1 ready"; return 0; }
-  if GH_TOKEN="${READY_GH_TOKEN:-${GH_TOKEN:-}}" gh_retry pr ready "$1" -R "$REPO" >/dev/null 2>&1; then
-    echo "    ✓ marked #$1 ready"
-    return 0
-  fi
-  echo "    !! failed to mark #$1 ready"
   return 1
 }
 
@@ -323,11 +329,13 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
 
       attempt_age_m="$(last_attempt_age_minutes "$n")"
       if [[ -n "$attempt_age_m" && "$attempt_age_m" -lt "$ATTEMPT_COOLDOWN_MINUTES" ]]; then
-        echo "    ~ last attempt ${attempt_age_m}m ago (< ${ATTEMPT_COOLDOWN_MINUTES}m cooldown); skipping"
+        retry_after_seconds=$(( (ATTEMPT_COOLDOWN_MINUTES - attempt_age_m) * 60 ))
+        request_retry_after "$retry_after_seconds"
+        echo "    ~ last attempt ${attempt_age_m}m ago (< ${ATTEMPT_COOLDOWN_MINUTES}m cooldown); retry requested in ${retry_after_seconds}s"
         continue
       fi
 
-      # The list snapshot is discovery only. Re-read exact head, draft bit,
+      # The list snapshot is discovery only. Re-read exact head, ready state,
       # mergeability, and live labels before consulting checks.
       if ! before="$(read_state "$n" 2>/dev/null)"; then
         echo "    ~ could not read live PR state; leaving hold"
@@ -355,32 +363,24 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
         continue
       fi
 
-      was_draft="$(jq -r '.draft' <<<"$before_mutation")"
-      if [[ "$was_draft" == "true" ]]; then
-        if ! mark_ready "$n"; then
-          upsert_status_comment "$n" "⚠️ Queue-deferred release: checks green and fleet gate GREEN, but marking the PR ready **failed**; the hold remains in place. Will retry in ${ATTEMPT_COOLDOWN_MINUTES}m. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
-          continue
-        fi
-      fi
-      # Ready first with the scoped Actions token, then remove the hold with
-      # the App token. GITHUB_TOKEN stage changes do not cascade workflows;
-      # the App-authored `unlabeled` event therefore wakes autoenrollment only
-      # after the PR is ready and the exact-head checks already passed.
+      # Symphony PRs are born ready and immediately hard-held by this label.
+      # The App-authored `unlabeled` event wakes autoenrollment only after the
+      # exact-head checks and fleet receipt have passed.
       if ! remove_hold_label "$n"; then
-        [[ "$was_draft" == "true" ]] && { GH_TOKEN="${READY_GH_TOKEN:-${GH_TOKEN:-}}" gh_retry pr ready "$n" -R "$REPO" --undo >/dev/null 2>&1 || true; }
-        upsert_status_comment "$n" "⚠️ Queue-deferred release: the PR was made ready but removing the \`queue-deferred\` label **failed**, so draft state was restored. Will retry in ${ATTEMPT_COOLDOWN_MINUTES}m. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+        upsert_status_comment "$n" "⚠️ Queue-deferred release: removing the \`queue-deferred\` label **failed**; the ready PR remains hard-held. Will retry in ${ATTEMPT_COOLDOWN_MINUTES}m. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+        request_retry_after "$(( ATTEMPT_COOLDOWN_MINUTES * 60 ))"
         continue
       fi
 
       [[ "$DRY_RUN" == "1" ]] && continue
 
       # Verify exact head and live labels after the mutation. If a hold label
-      # or new head raced the promotion, restore the hold (and draft status)
+      # or new head raced the promotion, restore the hold
       # immediately so the now-unproven revision cannot be enrolled.
       if ! after="$(read_state "$n" 2>/dev/null)"; then
-        [[ "$was_draft" == "true" ]] && { GH_TOKEN="${READY_GH_TOKEN:-${GH_TOKEN:-}}" gh_retry pr ready "$n" -R "$REPO" --undo >/dev/null 2>&1 || true; }
         restore_hold_label "$n" || true
         upsert_status_comment "$n" "⚠️ Queue-deferred release: the release could not be verified, so a compensating hold restore was attempted. Re-run after the current head and labels stabilize. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+        request_retry_after "$(( ATTEMPT_COOLDOWN_MINUTES * 60 ))"
         continue
       fi
 
@@ -392,9 +392,9 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
       if [[ "$state_after" == "OPEN" && "$draft_after" == "false" && "$head_after" == "$expected_head" && -z "$held_after" ]]; then
         upsert_status_comment "$n" "🤖 Queue-deferred release: typed hold (\`${reason}\`) lifted under a fresh GREEN fleet receipt with all required checks passing — PR is ready for review; the merge-queue controller revalidates this exact head before enrollment. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
       else
-        [[ "$was_draft" == "true" && "$draft_after" == "false" ]] && { GH_TOKEN="${READY_GH_TOKEN:-${GH_TOKEN:-}}" gh_retry pr ready "$n" -R "$REPO" --undo >/dev/null 2>&1 || true; }
         restore_hold_label "$n" || true
         upsert_status_comment "$n" "⚠️ Queue-deferred release: the PR changed during release (head=\`${head_after:0:12}\`, holds=\`${held_after:-none}\`, state=${state_after}, draft=${draft_after}), so the hold was restored. Re-run checks on the live head before releasing again. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+        request_retry_after "$(( ATTEMPT_COOLDOWN_MINUTES * 60 ))"
       fi
     done <<<"$CANDIDATES"
   fi
