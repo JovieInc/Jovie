@@ -1,0 +1,448 @@
+{
+  "manifest": "jovie-native-ui-pen-handoff/v1",
+  "source_snapshot": "7b937033b15622d85f7df721883d5e00fc95e0b9",
+  "working_tree_source_changes": {
+    "committed": true,
+    "description": "Exact duplicate press-feedback recipe consolidated into one shared owner with four call-site migrations and one contract test in this focused PR.",
+    "files": [
+      "apps/ios/Jovie/DesignSystem/JovieTheme.swift",
+      "apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift",
+      "apps/ios/Jovie/Features/AppShell/AppShellTabBar.swift",
+      "apps/ios/JovieTests/AppShellTabBarTests.swift"
+    ]
+  },
+  "observed_date": "2026-08-13",
+  "scope": ["apps/ios", "apps/macos/MenuMonitor", "apps/web parity contracts"],
+  "pen_write": "forbidden",
+  "pen_promotion": "not_proven",
+  "pen_presence": "unknown_by_policy",
+  "source_parity": "verified_for_cited_source_only",
+  "runtime_proof": "not_run_in_this_slice",
+  "founder_locks": {
+    "chat": "locked",
+    "calendar": "locked"
+  },
+  "invariants": {
+    "font": "Inter-first; no serif",
+    "elevation": [
+      "page and sidebar share base elevation",
+      "main content is one elevation above",
+      "additional elevations are semantic only"
+    ],
+    "control_target": "32px/pt visible control inside 44px/pt hit target",
+    "duplicate_primitives": "do_not_create",
+    "persistence": "not_proven_without_canonical_save_readback_and_cold_evidence"
+  },
+  "frames": [
+    {
+      "id": "ios-launch-auth",
+      "platform": "ios",
+      "authority": "source",
+      "pen_presence": "unknown_by_policy",
+      "write_authorized": false,
+      "promotion": "blocked",
+      "source": [
+        {
+          "file": "apps/ios/Jovie/Features/Splash/SplashView.swift",
+          "lines": "3-69"
+        },
+        {
+          "file": "apps/ios/Jovie/Features/Auth/AuthScreen.swift",
+          "lines": "27-207"
+        },
+        { "file": "apps/ios/Jovie/App/RootView.swift", "lines": "60-118" }
+      ],
+      "anatomy": [
+        "full-screen dark canvas",
+        "Jovie logo",
+        "browser auth action",
+        "reserved auth error slot"
+      ],
+      "states": ["launching", "signed_out", "loading", "error"],
+      "responsive": [
+        "compact portrait",
+        "medium portrait",
+        "preserve auth max width 430",
+        "preserve error footprint"
+      ],
+      "handoff_status": "source_mapped_pen_unknown"
+    },
+    {
+      "id": "ios-shell-drawer",
+      "platform": "ios",
+      "authority": "source",
+      "pen_presence": "unknown_by_policy",
+      "write_authorized": false,
+      "promotion": "blocked",
+      "source": [
+        {
+          "file": "apps/ios/Jovie/Features/AppShell/AppShellView.swift",
+          "lines": "203-394"
+        },
+        {
+          "file": "apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift",
+          "lines": "38-147,206-465"
+        },
+        {
+          "file": "apps/ios/Jovie/Features/AppShell/AppShellTabBar.swift",
+          "lines": "3-69,71-128"
+        }
+      ],
+      "anatomy": [
+        "base drawer",
+        "raised shell content plane",
+        "toolbar",
+        "surface switcher",
+        "recent threads",
+        "settings row",
+        "bottom tab bar",
+        "Talk FAB"
+      ],
+      "states": [
+        "closed",
+        "open",
+        "dragging",
+        "selected",
+        "conversation_loading",
+        "no_threads",
+        "filtered_empty",
+        "offline",
+        "reduce_motion"
+      ],
+      "responsive": [
+        "drawer width min(320, 86vw)",
+        "edge gesture only",
+        "safe-area toolbar",
+        "safe-area bottom bar",
+        "no horizontal tab paging"
+      ],
+      "handoff_status": "source_mapped_pen_unknown"
+    },
+    {
+      "id": "ios-dashboard-qr",
+      "platform": "ios",
+      "authority": "source",
+      "pen_presence": "unknown_by_policy",
+      "write_authorized": false,
+      "promotion": "blocked",
+      "source": [
+        {
+          "file": "apps/ios/Jovie/Features/Dashboard/DashboardView.swift",
+          "lines": "52-256"
+        },
+        {
+          "file": "apps/ios/Jovie/Features/Dashboard/QRCodeCardView.swift",
+          "lines": "4-65"
+        },
+        {
+          "file": "apps/ios/Jovie/Features/Dashboard/VenueModeView.swift",
+          "lines": "4-35"
+        }
+      ],
+      "anatomy": [
+        "avatar/name header",
+        "square QR plate",
+        "public URL",
+        "copy/share actions",
+        "optional Wallet action"
+      ],
+      "states": [
+        "idle",
+        "loading",
+        "loaded",
+        "error",
+        "qr_unavailable",
+        "copied",
+        "wallet_busy",
+        "wallet_error",
+        "venue_full_screen"
+      ],
+      "responsive": [
+        "square QR footprint",
+        "preserve action row hit targets",
+        "venue is semantic full-screen overlay"
+      ],
+      "handoff_status": "source_mapped_pen_unknown"
+    },
+    {
+      "id": "ios-audience",
+      "platform": "ios",
+      "authority": "source",
+      "pen_presence": "unknown_by_policy",
+      "write_authorized": false,
+      "promotion": "blocked",
+      "source": [
+        {
+          "file": "apps/ios/Jovie/Features/Audience/AudienceHighlightsView.swift",
+          "lines": "3-243"
+        },
+        {
+          "file": "apps/ios/Jovie/Core/MobileAudienceHighlightsResponse.swift",
+          "lines": "3-38"
+        }
+      ],
+      "anatomy": [
+        "header",
+        "hero metric",
+        "two-column stat tiles",
+        "Ask Jovie CTA"
+      ],
+      "states": ["idle", "loading", "loaded", "error", "offline"],
+      "responsive": [
+        "padded vertical scroll",
+        "two-column stats remain the source contract",
+        "no web table inferred"
+      ],
+      "handoff_status": "source_mapped_pen_unknown"
+    },
+    {
+      "id": "ios-library",
+      "platform": "ios",
+      "authority": "source",
+      "pen_presence": "unknown_by_policy",
+      "write_authorized": false,
+      "promotion": "blocked",
+      "source": [
+        {
+          "file": "apps/ios/Jovie/Features/Library/LibraryModels.swift",
+          "lines": "3-136"
+        },
+        {
+          "file": "apps/ios/Jovie/Features/Library/LibrarySurfaceView.swift",
+          "lines": "3-175"
+        }
+      ],
+      "anatomy": [
+        "horizontal filter strip",
+        "vertical asset feed",
+        "64px cover",
+        "asset badges",
+        "entity handoff"
+      ],
+      "states": ["loaded", "filter_selected", "filtered_empty"],
+      "responsive": [
+        "filter strip scrolls horizontally",
+        "feed scrolls vertically",
+        "preview-only source contract remains labeled"
+      ],
+      "handoff_status": "source_mapped_partial_pen_unknown"
+    },
+    {
+      "id": "ios-calendar-locked",
+      "platform": "ios",
+      "authority": "source_and_founder_lock",
+      "pen_presence": "unknown_by_policy",
+      "write_authorized": false,
+      "promotion": "blocked",
+      "source": [
+        {
+          "file": "apps/ios/Jovie/Features/Calendar/CalendarSurfaceView.swift",
+          "lines": "3-201"
+        }
+      ],
+      "anatomy": [
+        "header",
+        "upcoming events",
+        "needs confirmation",
+        "releases",
+        "Ask Jovie"
+      ],
+      "states": ["loaded", "empty", "loading", "error", "offline", "pending"],
+      "responsive": [
+        "vertical scroll",
+        "stable row footprints",
+        "no visual proposal"
+      ],
+      "handoff_status": "founder_locked_source_reference"
+    },
+    {
+      "id": "ios-inbox-locked",
+      "platform": "ios",
+      "authority": "source_and_founder_lock",
+      "pen_presence": "unknown_by_policy",
+      "write_authorized": false,
+      "promotion": "blocked",
+      "source": [
+        {
+          "file": "apps/ios/Jovie/Features/Inbox/InboxSurfaceView.swift",
+          "lines": "3-239"
+        }
+      ],
+      "anatomy": [
+        "header",
+        "triage action cards",
+        "empty action cards",
+        "Ask Jovie"
+      ],
+      "states": ["loaded", "empty", "loading", "error", "offline", "triage"],
+      "responsive": [
+        "vertical scroll",
+        "80-point triage threshold",
+        "reduce-motion offset removal",
+        "no visual proposal"
+      ],
+      "handoff_status": "founder_locked_source_reference"
+    },
+    {
+      "id": "ios-chat-locked",
+      "platform": "ios",
+      "authority": "source_and_founder_lock",
+      "pen_presence": "unknown_by_policy",
+      "write_authorized": false,
+      "promotion": "blocked",
+      "source": [
+        {
+          "file": "apps/ios/Jovie/Features/Chat/MobileChatView.swift",
+          "lines": "3-216"
+        },
+        {
+          "file": "apps/ios/Jovie/Features/Chat/MobileChatMessageViews.swift",
+          "lines": "4-385"
+        },
+        {
+          "file": "apps/ios/Jovie/Features/Chat/ChatComposerBar.swift",
+          "lines": "3-363"
+        }
+      ],
+      "anatomy": [
+        "empty state",
+        "transcript",
+        "user/assistant bubbles",
+        "tool cards",
+        "composer",
+        "slash palette"
+      ],
+      "states": [
+        "empty",
+        "offline",
+        "streaming",
+        "thinking",
+        "retry",
+        "web_handoff",
+        "composer_error",
+        "entity_chip"
+      ],
+      "responsive": [
+        "bottom safe-area composer inset",
+        "lazy transcript",
+        "keyboard-aware scroll",
+        "no visual proposal"
+      ],
+      "handoff_status": "founder_locked_source_reference"
+    },
+    {
+      "id": "ios-settings",
+      "platform": "ios",
+      "authority": "source",
+      "pen_presence": "unknown_by_policy",
+      "write_authorized": false,
+      "promotion": "blocked",
+      "source": [
+        {
+          "file": "apps/ios/Jovie/Features/Settings/SettingsView.swift",
+          "lines": "15-250"
+        }
+      ],
+      "anatomy": [
+        "account card",
+        "support/billing/privacy/terms rows",
+        "version/build rows",
+        "logout"
+      ],
+      "states": ["loaded", "logout_busy", "logout_disabled"],
+      "responsive": [
+        "single-column scroll",
+        "44px icon target",
+        "preserve row footprints"
+      ],
+      "handoff_status": "source_mapped_pen_unknown"
+    },
+    {
+      "id": "ios-talk-context",
+      "platform": "ios",
+      "authority": "source",
+      "pen_presence": "unknown_by_policy",
+      "write_authorized": false,
+      "promotion": "blocked",
+      "source": [
+        {
+          "file": "apps/ios/Jovie/Features/AppShell/TalkOverlayView.swift",
+          "lines": "3-291"
+        },
+        {
+          "file": "apps/ios/Jovie/Features/AppShell/EntityContextSheet.swift",
+          "lines": "4-221"
+        },
+        {
+          "file": "apps/ios/Jovie/Features/Chat/ComposerWorkflowSheet.swift",
+          "lines": "3-141"
+        }
+      ],
+      "anatomy": [
+        "Talk orb and draft region",
+        "entity context sheet",
+        "workflow tile sheet"
+      ],
+      "states": [
+        "starting",
+        "recording",
+        "reviewing",
+        "permission_error",
+        "medium_sheet",
+        "large_sheet",
+        "workflow_selected"
+      ],
+      "responsive": [
+        "semantic surface above raised content",
+        "reserved transcript/error space",
+        "sheet detents remain source contract"
+      ],
+      "handoff_status": "source_mapped_pen_unknown"
+    },
+    {
+      "id": "macos-menu-monitor",
+      "platform": "macos",
+      "authority": "source",
+      "pen_presence": "unknown_by_policy",
+      "write_authorized": false,
+      "promotion": "blocked",
+      "source": [
+        {
+          "file": "apps/macos/MenuMonitor/Sources/MenuMonitor/MenuMonitorApp.swift",
+          "lines": "4-100"
+        },
+        {
+          "file": "apps/macos/MenuMonitor/Sources/MenuMonitor/ShippingStatusStore.swift",
+          "lines": "4-111"
+        },
+        { "file": "apps/macos/MenuMonitor/Package.swift", "lines": "4-17" }
+      ],
+      "anatomy": [
+        "menu-bar shipping icon",
+        "count badge",
+        "kanban counts",
+        "error/fallback text",
+        "operator actions",
+        "status output"
+      ],
+      "states": [
+        "zero",
+        "positive",
+        "ninety_nine_plus",
+        "refreshed",
+        "error",
+        "github_fallback",
+        "action_output"
+      ],
+      "responsive": ["menu_bar_only", "macos_14", "no product-shell geometry"],
+      "handoff_status": "operator_surface_source_mapped_pen_unknown"
+    }
+  ],
+  "coordinator_gates": [
+    "Do not infer Pen presence or absence from this manifest.",
+    "Do not write, save, rename, open, or promote any Pen document from this manifest.",
+    "Do not create duplicate primitives when mapping any frame.",
+    "Keep Chat and Calendar founder-locked.",
+    "Require source mapping, canonical save/readback, persistence evidence, and runtime/device proof before promotion."
+  ]
+}

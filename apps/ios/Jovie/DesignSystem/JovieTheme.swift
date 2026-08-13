@@ -221,6 +221,26 @@ struct JovieIconButtonStyle: ButtonStyle {
   }
 }
 
+/// Shared tactile feedback for plain-content rows that do not own a filled
+/// control background. Feature-specific styles may opt into a different
+/// opacity only when that difference is intentional and tested.
+struct JoviePressFeedbackButtonStyle: ButtonStyle {
+  static let defaultPressedOpacity: Double = 0.72
+
+  let pressedOpacity: Double
+
+  init(pressedOpacity: Double = JoviePressFeedbackButtonStyle.defaultPressedOpacity) {
+    self.pressedOpacity = pressedOpacity
+  }
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label
+      .opacity(configuration.isPressed ? pressedOpacity : 1)
+      .scaleEffect(configuration.isPressed ? JovieMotion.pressScale : 1)
+      .animation(JovieMotion.subtle, value: configuration.isPressed)
+  }
+}
+
 struct JovieLogoMark: View {
   let size: CGFloat
 

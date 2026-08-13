@@ -85,7 +85,7 @@ struct AppShellTabBar: View {
       .frame(height: AppShellTabBarLayout.barHeight)
       .contentShape(Rectangle())
     }
-    .buttonStyle(AppShellTabBarButtonStyle())
+    .buttonStyle(JoviePressFeedbackButtonStyle())
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(tab.title)
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
@@ -109,21 +109,12 @@ struct AppShellTabBar: View {
       }
       .offset(y: -AppShellTabBarLayout.talkFabLift)
     }
-    .buttonStyle(AppShellTabBarButtonStyle())
+    .buttonStyle(JoviePressFeedbackButtonStyle())
     .frame(width: AppShellTabBarLayout.talkFabSize + 8)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("Talk")
     .accessibilityIdentifier("shell-talk-fab")
     .accessibilityHint("Opens full-screen voice capture")
-  }
-}
-
-private struct AppShellTabBarButtonStyle: ButtonStyle {
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .opacity(configuration.isPressed ? 0.72 : 1)
-      .scaleEffect(configuration.isPressed ? JovieMotion.pressScale : 1)
-      .animation(JovieMotion.subtle, value: configuration.isPressed)
   }
 }
 
