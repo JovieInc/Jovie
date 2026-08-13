@@ -18,6 +18,7 @@ const workstreamer = await import('../workstreamer.mjs');
 const reporter = await import('../reporter.mjs');
 const staleLease = await import('../stale-lease-guard.mjs');
 const admitter = await import('../admitter.mjs');
+const routing = await import('../symphony-routing.mjs');
 
 describe('team production health contract', () => {
   it('uses a direct bounded LYB artifact instead of the redirecting homepage', async () => {
@@ -33,6 +34,12 @@ describe('team production health contract', () => {
     assert.doesNotMatch(source, /healthUrl: 'https:\/\/logyourbody\.com'/);
   });
 });
+
+function routingComment(issue) {
+  const decision = routing.selectSymphonyRoute({ issue });
+  assert.equal(decision.status, 'selected');
+  return { body: routing.buildRoutingReceipt(decision.route) };
+}
 
 function makeIssue(overrides = {}) {
   return {
@@ -1559,6 +1566,7 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
       state: 'Todo',
       labels: ['plan-approved', 'admission-approved', 'symphony'],
     });
+    issue.comments.nodes.push(routingComment(issue));
     issue.comments.nodes.push({
       body: admitter.buildAdmissionReceipt(issue, {
         now: '2026-07-29T00:00:00.000Z',
@@ -1603,6 +1611,10 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
         },
       ],
     });
+    issue.comments.nodes.push(routingComment(issue));
+    afterTransition.comments.nodes.push(routingComment(afterTransition));
+    afterLabel.comments.nodes.push(routingComment(afterLabel));
+    afterReceipt.comments.nodes.push(routingComment(afterReceipt));
     const client = fakeClient(issue, [
       afterTransition,
       afterLabel,

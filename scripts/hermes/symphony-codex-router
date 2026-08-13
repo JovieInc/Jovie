@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Symphony starts one app-server per leased issue. The admission controller
+# writes a verified symphony-routing/v1 receipt to the Linear workpad before
+# the lease exists; this launcher re-fetches that receipt, semantically
+# re-verifies it against the current issue and the model registry, binds live
+# codex-rotate capacity, and materializes it atomically into the workspace.
+# Any gap fails closed (exit 78) rather than silently using a volume model.
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+workspace="${SYMPHONY_WORKSPACE:-$PWD}"
+issue="${SYMPHONY_ISSUE_IDENTIFIER:-$(basename "$workspace")}"
+
+model="$(node "$SCRIPT_DIR/../backlog-orchestrator/symphony-routing.mjs" launch \
+  --workspace "$workspace" \
+  --issue "$issue")"
+
+exec "${SYMPHONY_CODEX_ROTATE:-$HOME/.local/bin/codex-rotate}" \
+  --config shell_environment_policy.inherit=all \
+  --config "model=\"${model}\"" \
+  "$@"

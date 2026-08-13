@@ -51,7 +51,12 @@ agent:
   max_concurrent_agents: 4
   max_turns: 24
 codex:
-  command: /home/timwhite/.local/bin/codex-rotate --config shell_environment_policy.inherit=all --config model="gpt-5.6-luna" app-server
+  # The admission controller writes a semantically verified symphony-routing/v1
+  # receipt (with codex-rotate capacity evidence) to the Linear workpad before
+  # lease claim. The launcher re-fetches and re-verifies that receipt, binds
+  # live capacity, materializes it atomically into the workspace, and fails
+  # closed (exit 78) when any of that evidence is missing or drifted.
+  command: ./scripts/hermes/symphony-codex-router app-server
   approval_policy: never
   thread_sandbox: workspace-write
   turn_sandbox_policy:
@@ -81,6 +86,14 @@ No description provided.
 {% endif %}
 
 ## Fleet admission contract
+
+Before a Todo issue is claimed, Symphony requires both a verified plan-gate
+receipt and a verified `symphony-routing/v1` receipt. The routing receipt
+contains the deterministic capabilities, risk/complexity rationale, selected
+Luna/Terra/Sol model, fallback/escalation decision, and candidate statuses.
+The spawned app-server must use the receipt-selected model; no fixed model
+default is permitted. The receipt is durable in the Linear workpad and is
+included in the PR/scoreboard evidence.
 
 The versioned Gem controller writes `/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json` with schema `jovie-fleet-gate/v1`. Read it before moving a Todo issue to In Progress, before push, and before changing a PR from draft to ready.
 

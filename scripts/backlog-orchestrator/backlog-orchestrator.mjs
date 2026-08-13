@@ -37,6 +37,12 @@ import * as reconciler from './reconcile.mjs';
 import * as reporter from './reporter.mjs';
 import * as scorer from './scorer.mjs';
 import * as staleLeaseGuard from './stale-lease-guard.mjs';
+import {
+  buildRoutingReceipt,
+  readCodexRotateCapacity,
+  selectSymphonyRoute,
+  verifyRoutingReceipt,
+} from './symphony-routing.mjs';
 import * as workstreamer from './workstreamer.mjs';
 
 // ----- Config -----
@@ -177,6 +183,28 @@ async function runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun) {
     teamId: team.id,
   });
   console.log(JSON.stringify(receipt, null, 2));
+}
+
+async function approveSymphonyRoute(issue, isDryRun) {
+  const existing = verifyRoutingReceipt(issue, {
+    requireCapacityEvidence: true,
+  });
+  if (existing) return { status: 'already-routed', route: existing };
+  const capacity = readCodexRotateCapacity();
+  const decision = selectSymphonyRoute({ issue, capacity });
+  if (decision.status === 'blocked') return decision;
+  if (isDryRun) return { status: 'would-route', route: decision.route };
+  const receipt = buildRoutingReceipt(decision.route);
+  const result = await linear.addComment(issue.id, receipt);
+  if (!result?.commentCreate?.success && !result?.success)
+    throw new Error('symphony-routing-receipt-mutation-failed');
+  const reread = await linear.fetchIssue(issue.identifier);
+  const verified = verifyRoutingReceipt(reread, {
+    requireCapacityEvidence: true,
+  });
+  if (!verified || verified.fingerprint !== decision.route.fingerprint)
+    throw new Error('symphony-routing-receipt-verification-failed');
+  return { status: 'routed', route: verified };
 }
 
 async function teamProductionStatus(team) {
@@ -403,11 +431,13 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
   }
 
   if (isDryRun) {
+    const routing = await approveSymphonyRoute(selected, true);
     return {
       team: team.key,
       status: 'would-admit',
       issue: selected.identifier,
       plan: plan.evidence,
+      routing,
       fleetGate: preflight.fleetGate,
       staleLeaseRecovery,
       mutations: 0,
@@ -427,6 +457,11 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
   const finalPreflight = await admissionPreflight(team);
   if (!finalPreflight.open)
     throw new Error(`admission preflight blocked: ${finalPreflight.reason}`);
+
+  const routing = await approveSymphonyRoute(current, false);
+  if (routing.status === 'blocked')
+    throw new Error(`symphony routing blocked: ${routing.reason}`);
+  current = await linear.fetchIssue(selected.identifier);
 
   const admissionResult = await admissionGate.approveAdmission({
     issue: current,
@@ -475,6 +510,7 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
     active: load.identifiers,
     fleetGate: finalPreflight.fleetGate,
     staleLeaseRecovery,
+    routing,
     mutations: 'verified',
   };
 }
@@ -695,6 +731,10 @@ async function runTeamAdmitNext(team, isDryRun) {
   if (result.admit.length > 0 && !isDryRun) {
     const item = result.admit[0];
     try {
+      const routing = await approveSymphonyRoute(item.issue, false);
+      if (routing.status === 'blocked')
+        throw new Error(`symphony routing blocked: ${routing.reason}`);
+      item.issue = await linear.fetchIssue(item.identifier);
       const receipt = await admitter.admitIssue({
         issue: item.issue,
         classification: item,
@@ -702,7 +742,9 @@ async function runTeamAdmitNext(team, isDryRun) {
         teamId: team.id,
         todoStateId: team.todoStateId,
       });
-      console.log(`  ${receipt.status}: ${item.identifier}`);
+      console.log(
+        `  ${receipt.status}: ${item.identifier} model=${routing.route.model}`
+      );
     } catch (err) {
       console.error(
         `  Admission failed for ${item.identifier}: ${err.message}`
