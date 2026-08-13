@@ -7,8 +7,8 @@ name: Queue-Deferred Release
 # `jovie-queue-deferral/v1` receipt; agent-pipeline deferrals under queue
 # pressure carry the same typed receipt. The label is the only promotion hold:
 # GitHub stage changes require a human author/write actor, which installation
-# and Actions tokens are not. Without a controller lifting the typed label,
-# green PRs sat indefinitely (#15808/#15810/#15811).
+# and Actions tokens are not. Without a controller lifting the label,
+# green PRs sat indefinitely (#15808/#15810/#15811/#15849).
 #
 # Triggers:
 #   workflow_run      — PR CI completion, successful Production Controller,
@@ -21,11 +21,11 @@ name: Queue-Deferred Release
 #   fleet-policy — evaluates a fresh `jovie-fleet-gate/v1` receipt on the Gem
 #                  runner where the canonical integrity and Symphony state
 #                  live (identical contract to merge-queue-autoenroll).
-#   release      — reports age + typed reason for every queue-deferred agent
-#                  PR (12-minute alarm), then lifts mechanical holds only
-#                  under a fresh GREEN receipt. Untyped holds are never
-#                  released automatically. The label removal / ready
-#                  transition fires real PR events (app token), so the
+#   release      — reports age + reason for every queue-deferred PR
+#                  (12-minute alarm), then lifts mechanical holds — including
+#                  untyped ready holds — under a fresh GREEN receipt.
+#                  Human-policy holds (taste, net-new, outbound) stay held.
+#                  The label removal fires real PR events (app token), so the
 #                  merge-queue autoenroll controller revalidates the exact
 #                  head and owns enrollment — no second queue is created here.
 #
@@ -111,7 +111,7 @@ jobs:
           echo "Fleet promotion mode: $mode"
 
   release:
-    name: Report and release typed queue deferrals
+    name: Report and release queue deferrals
     needs: fleet-policy
     permissions:
       contents: read
@@ -155,7 +155,7 @@ jobs:
       - name: Verify GitHub CLI
         run: gh --version
 
-      - name: Report and release typed queue deferrals
+      - name: Report and release queue deferrals
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
@@ -177,7 +177,7 @@ jobs:
               bash scripts/release-queue-deferred.sh
             [[ ! -s "$retry_file" ]] && break
             if [[ "$pass" -eq 2 ]]; then
-              echo '::warning::Queue-deferred release exhausted its bounded in-run retry; the typed hold remains fail-closed.'
+              echo '::warning::Queue-deferred release exhausted its bounded in-run retry; the hold remains fail-closed.'
               break
             fi
             retry_seconds="$(tr -d '[:space:]' <"$retry_file")"

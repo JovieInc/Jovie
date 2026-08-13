@@ -17,6 +17,50 @@ export const RELEASABLE_REASONS = Object.freeze(
   Object.keys(RELEASABLE_REASON_SOURCES)
 );
 
+/**
+ * Holds only a human may keep in place. Mechanical `queue-deferred` is not
+ * in this set: missing receipts must not become a permanent manual trap.
+ * Closed-loop policy: humans block on net-new, taste, or outbound.
+ */
+export const HUMAN_POLICY_HOLD_LABELS = Object.freeze([
+  'needs-human',
+  'hold',
+  'gated',
+  'fast',
+  'needs-conflict-resolution',
+  'needs:taste',
+  'needs-human-taste',
+  'taste',
+  'net-new',
+  'needs:net-new',
+  'needs-net-new',
+  'outbound',
+  'needs:outbound',
+  'needs-outbound',
+]);
+
+function labelName(label) {
+  if (typeof label === 'string') return label;
+  if (label && typeof label === 'object' && typeof label.name === 'string') {
+    return label.name;
+  }
+  return '';
+}
+
+export function humanPolicyHoldsOn(labels = []) {
+  const allowed = new Set(HUMAN_POLICY_HOLD_LABELS);
+  return [
+    ...new Set((labels ?? []).map(labelName).filter(name => allowed.has(name))),
+  ];
+}
+
+export function humanPolicyHoldRegex() {
+  const escaped = HUMAN_POLICY_HOLD_LABELS.map(name =>
+    name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  );
+  return `^(${escaped.join('|')})$`;
+}
+
 const HEAD_RE = /^[0-9a-f]{40}$/;
 const JSON_BLOCK_RE = /```json\s*\n([\s\S]*?)\n```/;
 
@@ -103,8 +147,8 @@ ${JSON.stringify(receipt, null, 2)}
 \`\`\`
 
 Typed \`queue-deferred\` hold: \`${reason}\` from \`${source}\`.
-It is released only when this exact head, required checks, and a fresh GREEN fleet gate agree;
-missing, malformed, or stale receipts stay held.`;
+It is released when this exact head, required checks, and a fresh GREEN fleet gate agree.
+Human-policy holds (taste, net-new, outbound) stay held. Untyped ready holds are not a manual trap.`;
 }
 
 export function extractReceiptFromComment(body) {
@@ -148,6 +192,36 @@ export function classifyReceipt(receipt) {
     };
   }
   return { releasable: true, detail: 'releasable' };
+}
+
+/**
+ * Decide whether a queue-deferred hold may be lifted once fleet/live
+ * checks agree. Typed mechanical receipts stay reason-bound. A missing or
+ * structurally invalid receipt is an untyped ready hold — releasable unless
+ * a human-policy label is present.
+ */
+export function classifyQueueDeferredHold({
+  receipt = null,
+  labels = [],
+} = {}) {
+  const humanHolds = humanPolicyHoldsOn(labels);
+  if (humanHolds.length > 0) {
+    return {
+      releasable: false,
+      detail: `human-policy-hold:${humanHolds.join(',')}`,
+    };
+  }
+  if (receipt == null) {
+    return { releasable: true, detail: 'untyped-ready-hold' };
+  }
+  const typed = classifyReceipt(receipt);
+  if (
+    !typed.releasable &&
+    typed.detail === 'untyped-hold-manual-release-required'
+  ) {
+    return { releasable: true, detail: 'untyped-ready-hold' };
+  }
+  return typed;
 }
 
 function parseArgs(argv) {
@@ -217,9 +291,34 @@ export async function runCli(argv = process.argv.slice(2)) {
       process.stdout.write(`${releasable ? 'releasable' : detail}\n`);
       return releasable ? 0 : 4;
     }
+    case 'human-policy-re': {
+      process.stdout.write(`${humanPolicyHoldRegex()}\n`);
+      return 0;
+    }
+    case 'classify-hold': {
+      const labels = String(args.labels ?? '')
+        .split(',')
+        .map(name => name.trim())
+        .filter(Boolean);
+      const raw = (await readStdin()).trim();
+      let receipt = null;
+      if (raw.length > 0) {
+        try {
+          receipt = JSON.parse(raw);
+        } catch {
+          receipt = null;
+        }
+      }
+      const { releasable, detail } = classifyQueueDeferredHold({
+        receipt,
+        labels,
+      });
+      process.stdout.write(`${detail}\n`);
+      return releasable ? 0 : 4;
+    }
     default:
       process.stderr.write(
-        'usage: queue-deferral-receipt.mjs <render|extract|classify> [options]\n'
+        'usage: queue-deferral-receipt.mjs <render|extract|classify|classify-hold|human-policy-re> [options]\n'
       );
       return 2;
   }

@@ -532,9 +532,10 @@ JSON
 
 
 # ---------------------------------------------------------------------------
-# Queue-deferred release (JOV-5033): typed `jovie-queue-deferral/v1`
-# provenance lets the release controller lift mechanical holds only under a
-# fresh GREEN fleet receipt; untyped holds are never released automatically.
+# Queue-deferred release (JOV-5054): mechanical `jovie-queue-deferral/v1`
+# provenance plus untyped ready holds may be lifted under a fresh GREEN
+# fleet receipt. Human-policy holds (taste, net-new, outbound) stay held.
+# The scanner covers every queue-deferred PR, not only agent branches.
 # ---------------------------------------------------------------------------
 
 _RELEASE_SCRIPT = _REPO_ROOT / "scripts" / "release-queue-deferred.sh"
@@ -638,15 +639,22 @@ def _run_single_candidate_release(
     head: str,
     base: str = "main",
     draft: bool = False,
+    branch: str = "symphony/JOV-900-fix",
+    labels: list[str] | None = None,
+    fleet_state: str = "GREEN",
+    fleet_age_minutes: int = 0,
 ) -> subprocess.CompletedProcess[str]:
-    receipt = _fleet_receipt(tmp_path, state="GREEN")
+    labels_json = json.dumps(labels or ["queue-deferred"])
+    receipt = _fleet_receipt(
+        tmp_path, state=fleet_state, age_minutes=fleet_age_minutes
+    )
     _write_fake_gh(
         tmp_path,
         textwrap.dedent(
             f"""\
             {_FAKE_GH_PREAMBLE}
             if [[ "$1 $2" == "pr list" ]]; then
-              echo '[{{"n":900,"t":"Deferred PR","draft":{str(draft).lower()},"m":"MERGEABLE","head":"symphony/JOV-900-fix","oid":"{head}","owner":"JovieInc","updated":"2026-08-13T00:00:00Z","L":["queue-deferred"]}}]'
+              echo '[{{"n":900,"t":"Deferred PR","draft":{str(draft).lower()},"m":"MERGEABLE","head":"{branch}","oid":"{head}","owner":"JovieInc","updated":"2026-08-13T00:00:00Z","L":{labels_json}}}]'
               exit 0
             fi
             if [[ "$1" == "api" ]]; then
@@ -656,7 +664,7 @@ def _run_single_candidate_release(
               exit 0
             fi
             if [[ "$1 $2" == "pr view" ]]; then
-              echo '{{"draft":{str(draft).lower()},"head":"{head}","branch":"symphony/JOV-900-fix","headOwner":"JovieInc","base":"{base}","labels":["queue-deferred"],"mergeable":"MERGEABLE","state":"OPEN"}}'
+              echo '{{"draft":{str(draft).lower()},"head":"{head}","branch":"{branch}","headOwner":"JovieInc","base":"{base}","labels":{labels_json},"mergeable":"MERGEABLE","state":"OPEN"}}'
               exit 0
             fi
             {_FAKE_GH_GREEN_CHECKS}
@@ -740,7 +748,8 @@ JSON
         assert "#900" in result.stdout
         assert "symphony-birth-hold" in result.stdout
         assert "#901" in result.stdout
-        assert "untyped-hold-manual-release-required" in result.stdout
+        assert "untyped-ready-hold" in result.stdout
+        assert "untyped-hold-manual-release-required" not in result.stdout
         assert "::warning::queue-deferred #900" in result.stdout
         assert "::warning::queue-deferred #901" in result.stdout
 
@@ -805,13 +814,128 @@ JSON
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "fleet-receipt-stale" in result.stdout
 
-    def test_untyped_hold_is_never_released(self, tmp_path: Path) -> None:
+    def test_scanner_includes_non_agent_queue_deferred_prs(
+        self, tmp_path: Path
+    ) -> None:
         head = "c" * 40
-        result = _run_single_candidate_release(tmp_path, head=head)
+        stale_update = (
+            datetime.now(timezone.utc) - timedelta(hours=3)
+        ).isoformat()
+        _write_fake_gh(
+            tmp_path,
+            textwrap.dedent(
+                f"""\
+                {_FAKE_GH_PREAMBLE}
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{{"n":15849,"t":"Non-agent ready PR","draft":false,"m":"MERGEABLE","head":"cursor/fix-shell-restore","oid":"{head}","owner":"JovieInc","updated":"{stale_update}","L":["queue-deferred"]}},{{"n":901,"t":"Human feat branch","draft":false,"m":"MERGEABLE","head":"feat/onboarding","oid":"{"d" * 40}","owner":"JovieInc","updated":"{stale_update}","L":["queue-deferred"]}}]
+JSON
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+        )
+
+        result = _run_bash(
+            _release_command(tmp_path, extra_env="RELEASE_MODE=report")
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "scanning open queue-deferred PRs" in result.stdout
+        assert "#15849" in result.stdout
+        assert "#901" in result.stdout
+        assert "untyped-ready-hold" in result.stdout
+
+    def test_untyped_hold_on_ready_green_pr_is_released_under_green_fleet(
+        self, tmp_path: Path
+    ) -> None:
+        head = "c" * 40
+        result = _run_single_candidate_release(
+            tmp_path,
+            head=head,
+            branch="cursor/fix-shell-restore",
+        )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "untyped hold" in result.stdout
-        assert "never released automatically" in result.stdout
+        assert "releasing if live state is ready under GREEN" in result.stdout
+        assert "never released automatically" not in result.stdout
+        assert "would remove `queue-deferred` from #900" in result.stdout
+
+    def test_untyped_draft_hold_cannot_be_released(self, tmp_path: Path) -> None:
+        head = "c" * 40
+        result = _run_single_candidate_release(tmp_path, head=head, draft=True)
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "live state no longer matches the releasable snapshot" in result.stdout
+        assert "would remove" not in result.stdout
+
+    def test_untyped_hold_with_taste_stays_held(self, tmp_path: Path) -> None:
+        head = "c" * 40
+        result = _run_single_candidate_release(
+            tmp_path,
+            head=head,
+            labels=["queue-deferred", "needs:taste"],
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "human-policy-hold:needs:taste" in result.stdout
+        assert "would remove" not in result.stdout
+
+    def test_untyped_hold_with_net_new_stays_held(self, tmp_path: Path) -> None:
+        head = "c" * 40
+        result = _run_single_candidate_release(
+            tmp_path,
+            head=head,
+            labels=["queue-deferred", "net-new"],
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "human-policy-hold:net-new" in result.stdout
+        assert "would remove" not in result.stdout
+
+    def test_untyped_hold_with_outbound_stays_held(self, tmp_path: Path) -> None:
+        head = "c" * 40
+        result = _run_single_candidate_release(
+            tmp_path,
+            head=head,
+            labels=["queue-deferred", "outbound"],
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "human-policy-hold:outbound" in result.stdout
+        assert "would remove" not in result.stdout
+
+    def test_untyped_hold_stays_held_when_fleet_is_red(self, tmp_path: Path) -> None:
+        head = "c" * 40
+        result = _run_single_candidate_release(
+            tmp_path,
+            head=head,
+            fleet_state="RED",
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "fleet-gate-not-green:RED" in result.stdout
+        assert "would remove" not in result.stdout
+
+    def test_untyped_hold_stays_held_when_production_receipt_is_stale(
+        self, tmp_path: Path
+    ) -> None:
+        head = "c" * 40
+        result = _run_single_candidate_release(
+            tmp_path,
+            head=head,
+            fleet_state="GREEN",
+            fleet_age_minutes=30,
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "fleet-receipt-stale" in result.stdout
         assert "would remove" not in result.stdout
 
     def test_recent_attempt_requests_bounded_in_run_retry(
@@ -864,7 +988,7 @@ JSON
         assert "pr edit" not in log
         assert "pr ready" not in log
 
-    def test_untrusted_comment_cannot_create_release_authority(
+    def test_untrusted_comment_is_ignored_and_ready_untyped_hold_releases(
         self, tmp_path: Path
     ) -> None:
         head = "c" * 40
@@ -873,9 +997,9 @@ JSON
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "untyped hold" in result.stdout
-        assert "would remove" not in result.stdout
+        assert "would remove `queue-deferred` from #900" in result.stdout
 
-    def test_receipt_for_another_pr_cannot_release_live_hold(
+    def test_receipt_for_another_pr_is_treated_as_untyped_ready_hold(
         self, tmp_path: Path
     ) -> None:
         head = "c" * 40
@@ -884,16 +1008,20 @@ JSON
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "deferral-receipt-pr-mismatch (receipt=#901, live=#900)" in result.stdout
-        assert "would remove" not in result.stdout
+        assert "treating as untyped ready hold" in result.stdout
+        assert "would remove `queue-deferred` from #900" in result.stdout
 
-    def test_head_stale_receipt_is_not_released(self, tmp_path: Path) -> None:
+    def test_head_stale_mechanical_receipt_is_released_against_live_head(
+        self, tmp_path: Path
+    ) -> None:
         live_head = "e" * 40
         _receipt_comment_body(tmp_path, head="f" * 40)
         result = _run_single_candidate_release(tmp_path, head=live_head)
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "deferral-receipt-head-stale" in result.stdout
-        assert "would remove" not in result.stdout
+        assert "evaluating live head" in result.stdout
+        assert "would remove `queue-deferred` from #900" in result.stdout
 
     def test_queue_pressure_receipt_stays_held_while_live_pressure_is_high(
         self, tmp_path: Path
