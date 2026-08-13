@@ -692,6 +692,10 @@ class TestReleaseQueueDeferred:
         assert "pull-requests: write" in workflow
         assert "READY_GH_TOKEN: ${{ github.token }}" in workflow
         assert "bash scripts/release-queue-deferred.sh" in workflow
+        assert "ATTEMPT_COOLDOWN_MINUTES: 5" in workflow
+        assert 'RELEASE_RETRY_FILE="$retry_file"' in workflow
+        assert 'sleep "$retry_seconds"' in workflow
+        assert "for pass in 1 2" in workflow
         # Mutations must fire real PR events that wake the autoenroll
         # controller; a GITHUB_TOKEN mutation would not cascade.
         assert "steps.app-token.outputs.token" in workflow
@@ -808,6 +812,56 @@ JSON
         assert "untyped hold" in result.stdout
         assert "never released automatically" in result.stdout
         assert "would remove" not in result.stdout
+
+    def test_recent_attempt_requests_bounded_in_run_retry(
+        self, tmp_path: Path
+    ) -> None:
+        head = "c" * 40
+        _receipt_comment_body(tmp_path, head=head)
+        receipt = _fleet_receipt(tmp_path, state="GREEN")
+        retry_file = tmp_path / "retry-after-seconds"
+        attempted = (datetime.now(timezone.utc) - timedelta(minutes=2)).isoformat()
+        _write_fake_gh(
+            tmp_path,
+            textwrap.dedent(
+                f"""\
+                {_FAKE_GH_PREAMBLE}
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":900,"t":"Symphony draft","draft":true,"m":"MERGEABLE","head":"symphony/JOV-900-fix","oid":"{head}","owner":"JovieInc","updated":"2026-08-13T00:00:00Z","L":["queue-deferred"]}}]'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  if [[ "$*" == *"queue-deferral-release"* ]]; then
+                    echo '{attempted}'
+                  else
+                    cat "${{FAKE_GH_STATE}}/../comments-900.json"
+                  fi
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+        )
+
+        result = _run_bash(
+            _release_command(
+                tmp_path,
+                extra_env=(
+                    "RELEASE_MODE=release ATTEMPT_COOLDOWN_MINUTES=5 "
+                    f'RELEASE_RETRY_FILE="{retry_file}" '
+                    f'FLEET_RECEIPT_FILE="{receipt}"'
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "retry requested in 180s" in result.stdout
+        assert retry_file.read_text(encoding="utf-8").strip() == "180"
+        log = (tmp_path / "gh-calls.log").read_text(encoding="utf-8")
+        assert "pr view" not in log
+        assert "pr edit" not in log
+        assert "pr ready" not in log
 
     def test_untrusted_comment_cannot_create_release_authority(
         self, tmp_path: Path

@@ -14,7 +14,9 @@
 #   FLEET_MAX_AGE_SECONDS    receipt freshness window (default 600)
 #   ALARM_MINUTES            report-pass age alarm threshold (default 12)
 #   ATTEMPT_COOLDOWN_MINUTES min minutes between release attempts per PR
-#                            (default 30; one upserted marker comment per PR)
+#                            (default 5; one upserted marker comment per PR)
+#   RELEASE_RETRY_FILE       optional path receiving the shortest requested
+#                            retry delay in seconds for the workflow wrapper
 #   QUEUE_READY_THRESHOLD    test/operator override for queue-pressure release;
 #                            defaults to the canonical merge-queue max depth
 set -euo pipefail
@@ -29,7 +31,8 @@ RELEASE_MODE="${RELEASE_MODE:-both}"
 FLEET_RECEIPT_FILE="${FLEET_RECEIPT_FILE:-}"
 FLEET_MAX_AGE_SECONDS="${FLEET_MAX_AGE_SECONDS:-600}"
 ALARM_MINUTES="${ALARM_MINUTES:-12}"
-ATTEMPT_COOLDOWN_MINUTES="${ATTEMPT_COOLDOWN_MINUTES:-30}"
+ATTEMPT_COOLDOWN_MINUTES="${ATTEMPT_COOLDOWN_MINUTES:-5}"
+RELEASE_RETRY_FILE="${RELEASE_RETRY_FILE:-}"
 DEFERRAL_MARKER='<!-- bot-comment:queue-deferral -->'
 RELEASE_MARKER="queue-deferral-release"
 LIB="$(dirname "${BASH_SOURCE[0]}")/lib/queue-deferral-receipt.mjs"
@@ -40,6 +43,18 @@ TRUSTED_DEFERRAL_AUTHORS='["itstimwhite","jovie-bot[bot]"]'
 OTHER_HOLD_RE='^(needs-human|hold|gated|fast|needs-conflict-resolution)$'
 AGENT_BRANCH_RE='^(tim/|codex/|agent/|claude/|linear/|codegen-bot/|symphony/)'
 now_epoch="$(date -u +%s)"
+
+request_retry_after() {  # request_retry_after <seconds> — shortest request wins
+  local requested="$1" current=""
+  [[ "$DRY_RUN" == "1" || -z "$RELEASE_RETRY_FILE" ]] && return 0
+  [[ "$requested" =~ ^[1-9][0-9]*$ ]] || return 0
+  if [[ -f "$RELEASE_RETRY_FILE" ]]; then
+    current="$(tr -d '[:space:]' <"$RELEASE_RETRY_FILE")"
+  fi
+  if [[ ! "$current" =~ ^[1-9][0-9]*$ || "$requested" -lt "$current" ]]; then
+    printf '%s\n' "$requested" >"$RELEASE_RETRY_FILE"
+  fi
+}
 
 iso_to_epoch() {  # iso_to_epoch <iso> — empty output on unparseable input
   date -u -d "$1" +%s 2>/dev/null \
@@ -323,7 +338,9 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
 
       attempt_age_m="$(last_attempt_age_minutes "$n")"
       if [[ -n "$attempt_age_m" && "$attempt_age_m" -lt "$ATTEMPT_COOLDOWN_MINUTES" ]]; then
-        echo "    ~ last attempt ${attempt_age_m}m ago (< ${ATTEMPT_COOLDOWN_MINUTES}m cooldown); skipping"
+        retry_after_seconds=$(( (ATTEMPT_COOLDOWN_MINUTES - attempt_age_m) * 60 ))
+        request_retry_after "$retry_after_seconds"
+        echo "    ~ last attempt ${attempt_age_m}m ago (< ${ATTEMPT_COOLDOWN_MINUTES}m cooldown); retry requested in ${retry_after_seconds}s"
         continue
       fi
 
@@ -359,6 +376,7 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
       if [[ "$was_draft" == "true" ]]; then
         if ! mark_ready "$n"; then
           upsert_status_comment "$n" "⚠️ Queue-deferred release: checks green and fleet gate GREEN, but marking the PR ready **failed**; the hold remains in place. Will retry in ${ATTEMPT_COOLDOWN_MINUTES}m. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+          request_retry_after "$(( ATTEMPT_COOLDOWN_MINUTES * 60 ))"
           continue
         fi
       fi
@@ -369,6 +387,7 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
       if ! remove_hold_label "$n"; then
         [[ "$was_draft" == "true" ]] && { GH_TOKEN="${READY_GH_TOKEN:-${GH_TOKEN:-}}" gh_retry pr ready "$n" -R "$REPO" --undo >/dev/null 2>&1 || true; }
         upsert_status_comment "$n" "⚠️ Queue-deferred release: the PR was made ready but removing the \`queue-deferred\` label **failed**, so draft state was restored. Will retry in ${ATTEMPT_COOLDOWN_MINUTES}m. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+        request_retry_after "$(( ATTEMPT_COOLDOWN_MINUTES * 60 ))"
         continue
       fi
 
@@ -381,6 +400,7 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
         [[ "$was_draft" == "true" ]] && { GH_TOKEN="${READY_GH_TOKEN:-${GH_TOKEN:-}}" gh_retry pr ready "$n" -R "$REPO" --undo >/dev/null 2>&1 || true; }
         restore_hold_label "$n" || true
         upsert_status_comment "$n" "⚠️ Queue-deferred release: the release could not be verified, so a compensating hold restore was attempted. Re-run after the current head and labels stabilize. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+        request_retry_after "$(( ATTEMPT_COOLDOWN_MINUTES * 60 ))"
         continue
       fi
 
@@ -395,6 +415,7 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
         [[ "$was_draft" == "true" && "$draft_after" == "false" ]] && { GH_TOKEN="${READY_GH_TOKEN:-${GH_TOKEN:-}}" gh_retry pr ready "$n" -R "$REPO" --undo >/dev/null 2>&1 || true; }
         restore_hold_label "$n" || true
         upsert_status_comment "$n" "⚠️ Queue-deferred release: the PR changed during release (head=\`${head_after:0:12}\`, holds=\`${held_after:-none}\`, state=${state_after}, draft=${draft_after}), so the hold was restored. Re-run checks on the live head before releasing again. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+        request_retry_after "$(( ATTEMPT_COOLDOWN_MINUTES * 60 ))"
       fi
     done <<<"$CANDIDATES"
   fi
