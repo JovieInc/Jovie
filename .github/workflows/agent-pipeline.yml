@@ -845,12 +845,24 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+          PR_HEAD_SHA="${{ needs.guard.outputs.pr_head_sha }}"
           READY_COUNT="${{ steps.queue-pressure.outputs.ready_count }}"
           READY_THRESHOLD="${{ steps.queue-pressure.outputs.ready_threshold }}"
 
           gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
             --method POST \
             --field "labels[]=queue-deferred" || true
+
+          # Typed deferral provenance (jovie-queue-deferral/v1): without it the
+          # hold is indistinguishable from a repair/human hold and no
+          # controller may lift it. The queue-deferred release workflow lifts
+          # this mechanical hold automatically once the fleet gate is GREEN
+          # and the exact head still matches.
+          bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "queue-deferral" \
+            "$(node scripts/lib/queue-deferral-receipt.mjs render \
+              --pr "$PR_NUMBER" --head "$PR_HEAD_SHA" \
+              --reason queue-pressure --source agent-pipeline \
+              --note "merge-ready PRs ahead: $READY_COUNT (threshold $READY_THRESHOLD)")"
 
           bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "auto-merge-deferred" "## Auto-Merge Deferred
 
@@ -863,7 +875,7 @@ jobs:
 
           This keeps quick human-driven PRs moving when the queue is saturated with agent traffic.
 
-          Re-enable queue consideration later with:
+          The typed deferral receipt above lets the queue-deferred release controller lift this hold automatically once the fleet gate is GREEN and this exact head is still current. Manual fallback:
 
           \`gh pr edit $PR_NUMBER --remove-label queue-deferred\`"
 

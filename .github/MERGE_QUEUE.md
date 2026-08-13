@@ -101,6 +101,32 @@ It fails closed if an open PR is missing from that authoritative snapshot.
 - Queue enrollment is serialized by `merge-queue-drain-mutex`; it does not
   race another controller instance.
 
+## Typed queue deferral (`jovie-queue-deferral/v1`)
+
+`queue-deferred` is a mechanical hold placed at a draft's birth (Symphony) or
+under queue pressure (agent-pipeline). The label alone has no provenance, so
+every deferral posts a typed receipt — one upserted PR comment with the
+`<!-- bot-comment:queue-deferral -->` marker — recording the exact head, a
+typed reason (`symphony-birth-hold`, `queue-pressure`, `fleet-amber-hold`),
+the source, and the deferral time. `scripts/lib/queue-deferral-receipt.mjs`
+is the canonical reader/writer.
+
+`queue-deferred-release.yml` (event-driven on CI completion, no cron) runs
+`scripts/release-queue-deferred.sh`:
+
+- **Report pass** — prints age and typed reason for every queue-deferred agent
+  PR and raises a warning once a hold exceeds the 12-minute SLA. A missing,
+  malformed, or head-stale receipt reports as
+  `untyped-hold-manual-release-required` and is never released automatically.
+- **Release pass** — only under a fresh (≤10-minute) `GREEN` fleet receipt
+  with `promotionAdmission.allowed`, and only when the exact head still
+  matches the receipt, no other hold labels are present, and required checks
+  are green: removes `queue-deferred`, then marks drafts ready. Both mutations
+  fire real PR events (app token), so this controller's `unlabeled` /
+  `ready_for_review` events re-enter the normal admission path above, which
+  independently revalidates the exact head before enrollment. Under
+  AMBER/RED/stale fleet state no mutation happens — drafts keep the hold.
+
 ### Update Branch convergence
 
 Update Branch can advance the branch Git ref before the PR database, timeline,

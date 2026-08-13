@@ -73,11 +73,14 @@ if [[ ! "$DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] \
   exit 2
 fi
 DRAIN_STARTED_AT="$SECONDS"
-# `queue-deferred` is a hard hold. It currently has no typed provenance that
-# distinguishes temporary queue pressure from a repair/human hold. A prior
-# main-push reconciliation removed explicit repair holds and its `unlabeled`
-# events immediately re-admitted those exact heads. Keep the compatibility flag
-# fail-closed until a typed, controller-owned deferral receipt exists.
+# `queue-deferred` is a hard hold. Typed provenance now exists as
+# `jovie-queue-deferral/v1` (scripts/lib/queue-deferral-receipt.mjs), and the
+# queue-deferred release controller (scripts/release-queue-deferred.sh) owns
+# lifting mechanical holds before enrollment. This reconcile path stays
+# disabled: without a typed receipt on the exact head, main maintenance still
+# cannot distinguish temporary queue pressure from a repair/human hold. A
+# prior main-push reconciliation removed explicit repair holds and its
+# `unlabeled` events immediately re-admitted those exact heads.
 DRAIN_RECONCILE_QUEUE_DEFERRED="${DRAIN_RECONCILE_QUEUE_DEFERRED:-0}"
 DRAIN_ADMISSION_PR="${DRAIN_ADMISSION_PR:-}"
 DRAIN_ADMISSION_HEAD="${DRAIN_ADMISSION_HEAD:-}"

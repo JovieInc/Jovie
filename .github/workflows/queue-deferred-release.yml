@@ -1,0 +1,161 @@
+name: Queue-Deferred Release
+
+# Closes the Symphony In Review → native merge queue handoff. Fully
+# event-driven — zero polling crons.
+#
+# Symphony drafts are born with `queue-deferred` plus a typed
+# `jovie-queue-deferral/v1` receipt; agent-pipeline deferrals under queue
+# pressure carry the same typed receipt. Without a controller lifting that
+# mechanical hold, green drafts sat indefinitely (#15808/#15810/#15811).
+#
+# Triggers:
+#   workflow_run      — CI completion (a deferred PR's checks can only turn
+#                       green via a CI completion; same trigger-hygiene rule
+#                       as auto-ready, #13349)
+#   workflow_dispatch — manual report/release sweep
+#
+# Two jobs run:
+#   fleet-policy — evaluates a fresh `jovie-fleet-gate/v1` receipt on the Gem
+#                  runner where the canonical integrity and Symphony state
+#                  live (identical contract to merge-queue-autoenroll).
+#   release      — reports age + typed reason for every queue-deferred agent
+#                  PR (12-minute alarm), then lifts mechanical holds only
+#                  under a fresh GREEN receipt. Untyped holds are never
+#                  released automatically. The label removal / ready
+#                  transition fires real PR events (app token), so the
+#                  merge-queue autoenroll controller revalidates the exact
+#                  head and owns enrollment — no second queue is created here.
+#
+# No schedule. No watchdog label-cycling. No polling.
+
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: queue-deferred-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  fleet-policy:
+    name: Resolve fleet promotion policy
+    # The checked-in controller evaluates a fresh receipt on Gem, where the
+    # canonical integrity and Symphony state live. Unknown/unavailable evidence
+    # produces no release; this is not a second queue or mutator.
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    timeout-minutes: 5
+    outputs:
+      mode: ${{ steps.policy.outputs.mode }}
+      receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}
+    steps:
+      - name: Generate read-only Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: read
+          permission-pull-requests: read
+      - name: Checkout canonical main policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Evaluate fresh fleet policy
+        id: policy
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GEM_PRIORITY_GATE_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/jovie-fleet-gate.json"
+          set +e
+          python3 scripts/hermes/gem-priority-gate.py \
+            --dry-run --consumer fleet >"$receipt"
+          gate_rc=$?
+          set -e
+          jq -e '
+            .schema == "jovie-fleet-gate/v1" and
+            (.observedAt | type == "string") and
+            (.signals.main.sha | test("^[0-9a-f]{40}$")) and
+            (.signals.integrity.status | IN("clear", "resolved", "active", "invalid")) and
+            (.promotionAdmission.allowed | type == "boolean") and
+            (.isolatedPromotionAdmission.allowed | type == "boolean")
+          ' "$receipt" >/dev/null || {
+            echo '::error::Fleet gate emitted a malformed receipt.' >&2
+            exit 2
+          }
+          if [ "$gate_rc" -ne 0 ] && [ "$gate_rc" -ne 2 ]; then
+            echo "::error::Fleet gate exited unexpectedly: $gate_rc" >&2
+            exit 2
+          fi
+
+          mode=blocked
+          if jq -e '.state == "GREEN" and .promotionAdmission.allowed == true' "$receipt" >/dev/null; then
+            mode=normal
+          fi
+          receipt_b64="$(base64 -w0 <"$receipt")"
+          {
+            echo "mode=$mode"
+            echo "receipt_b64=$receipt_b64"
+          } >>"$GITHUB_OUTPUT"
+          echo "Fleet promotion mode: $mode"
+
+  release:
+    name: Report and release typed queue deferrals
+    needs: fleet-policy
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (
+        github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.conclusion != 'cancelled'
+      )
+    # Fleet controller: use the hosted image contract so `gh` is always
+    # available. Some self-hosted fast runners intentionally lack it.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          # Mutations must fire real PR events (unlabeled, ready_for_review)
+          # so the merge-queue autoenroll controller wakes and revalidates;
+          # GITHUB_TOKEN mutations would not cascade to other workflows.
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: read
+          permission-pull-requests: write
+          permission-issues: write
+          permission-checks: read
+      - name: Checkout main policy code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # pull_request-adjacent events otherwise checkout the triggering ref,
+          # which may not contain the current fleet scripts.
+          ref: main
+          persist-credentials: false
+
+      - name: Verify GitHub CLI
+        run: gh --version
+
+      - name: Report and release typed queue deferrals
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          GH_RETRY_ATTEMPTS: 8
+          GH_RETRY_MAX_DELAY: 60
+          RELEASE_MODE: both
+          ALARM_MINUTES: 12
+          FLEET_RECEIPT_FILE: ${{ runner.temp }}/jovie-fleet-gate.json
+          FLEET_MODE: ${{ needs.fleet-policy.outputs.mode }}
+        run: |
+          set -euo pipefail
+          echo "${{ needs.fleet-policy.outputs.receipt_b64 }}" | base64 -d >"$FLEET_RECEIPT_FILE"
+          bash scripts/release-queue-deferred.sh
