@@ -2,14 +2,15 @@
 # install-symphony-ui-pilot.sh — deterministic installer for the supervised
 # Symphony UI pilot runtime on gem (JOV-4962).
 #
-# The repo is the source of truth for the versioned workflow and the systemd
-# user unit. This script materializes both onto the host with timestamped
-# backups and reloads the user systemd manager. It NEVER starts, stops, or
-# restarts the service and never kills a running process — draining active
-# leases before swapping the runtime is a separate, deliberate operation.
+# The repo is the source of truth for the versioned workflow, the systemd
+# user unit, and the lease guard (JOV-5031). This script materializes them
+# onto the host with timestamped backups and reloads the user systemd manager.
+# It NEVER starts, stops, or restarts the service and never kills a running
+# process — draining active leases before swapping the runtime is a separate,
+# deliberate operation.
 #
 # Modes:
-#   (default)          install workflow + unit, then daemon-reload
+#   (default)          install workflow + unit + lease guard, then daemon-reload
 #   --check            verify installed files match the repo sources; no writes
 #   --no-daemon-reload install files but skip systemctl --user daemon-reload
 #
@@ -21,8 +22,10 @@ TARGET_HOME="${SYMPHONY_UI_PILOT_HOME:-$HOME}"
 
 WORKFLOW_SRC="$REPO_ROOT/scripts/hermes/WORKFLOW.jovie-ui-pilot.md"
 UNIT_SRC="$REPO_ROOT/scripts/hermes/systemd/symphony-ui-pilot.service"
+GUARD_SRC="$REPO_ROOT/scripts/hermes/symphony-lease-guard"
 WORKFLOW_DST="$TARGET_HOME/symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
 UNIT_DST="$TARGET_HOME/.config/systemd/user/symphony-ui-pilot.service"
+GUARD_DST="$TARGET_HOME/.local/bin/symphony-lease-guard"
 
 CHECK_ONLY=0
 DAEMON_RELOAD=1
@@ -35,7 +38,7 @@ for arg in "$@"; do
 done
 
 install_one() {
-  local src="$1" dst="$2"
+  local src="$1" dst="$2" mode="${3:-0644}"
   if [ ! -f "$src" ]; then
     echo "MISSING_SOURCE $src" >&2
     return 1
@@ -47,7 +50,7 @@ install_one() {
     cp -p "$dst" "$backup"
     echo "BACKUP $backup"
   fi
-  install -m 0644 "$src" "$dst"
+  install -m "$mode" "$src" "$dst"
   echo "INSTALLED $dst"
 }
 
@@ -70,11 +73,13 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
   rc=0
   check_one "$WORKFLOW_SRC" "$WORKFLOW_DST" || rc=1
   check_one "$UNIT_SRC" "$UNIT_DST" || rc=1
+  check_one "$GUARD_SRC" "$GUARD_DST" || rc=1
   exit "$rc"
 fi
 
 install_one "$WORKFLOW_SRC" "$WORKFLOW_DST"
 install_one "$UNIT_SRC" "$UNIT_DST"
+install_one "$GUARD_SRC" "$GUARD_DST" 0755
 
 if [ "$DAEMON_RELOAD" -eq 1 ]; then
   if [ -z "${XDG_RUNTIME_DIR:-}" ]; then

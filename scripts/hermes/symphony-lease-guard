@@ -1,0 +1,494 @@
+#!/usr/bin/env python3
+"""Fail-closed Symphony lease guard (JOV-5031).
+
+Two duties:
+
+1. `check <identifier>` — invoked from the workflow `before_run` hook before a
+   codex session (and its provider account) is seized. Performs a fresh
+   single-issue tracker read and enforces a monotonic terminal lease
+   tombstone: once an issue is observed outside the workflow's active_states,
+   a tombstone is installed and stale tracker snapshots that still show an
+   active state cannot redispatch it. Only a newer explicit active-state
+   transition (issue.updatedAt newer than the tombstoned observation) reopens
+   the lease. A run is aborted (exit 1) only on positive evidence of a
+   non-active or stale state; an indeterminate tracker read admits the run and
+   is counted, matching the fleet rule that a failed observation is not proof
+   of a state change.
+
+2. `report` — emits the live lease health receipt consumed by the fleet gate:
+   tombstone/counter state, orphan-launcher count (codex-rotate app-server
+   launchers waiting past their account-wait bound without holding a lock),
+   and typed account-capacity state.
+
+Stdlib only; state lives in a single atomically-replaced JSON file.
+"""
+
+from __future__ import annotations
+
+import argparse
+import fcntl
+import json
+import os
+import pathlib
+import re
+import sys
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
+
+SCHEMA = "symphony-lease-guard/v1"
+REPORT_SCHEMA = "symphony-lease-guard-report/v1"
+DEFAULT_STATE_DIR = "~/.local/state/symphony-lease-guard"
+DEFAULT_WORKFLOW = "~/symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
+FALLBACK_ACTIVE_STATES = ("Todo", "In Progress")
+LINEAR_API = "https://api.linear.app/graphql"
+LINEAR_ENV_PATH = "~/.config/symphony/linear.env"
+CONTROL_TIMEOUT_SECONDS = 10.0
+DOTENV_ASSIGNMENT = re.compile(r"^(?:export[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
+IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+ORPHAN_MARGIN_SECONDS = 120.0
+
+ISSUE_QUERY = """
+query($id: String!) {
+  issue(id: $id) {
+    identifier
+    updatedAt
+    state { name }
+  }
+}
+"""
+
+
+def _state_dir() -> pathlib.Path:
+    return pathlib.Path(
+        os.path.expanduser(os.environ.get("SYMPHONY_LEASE_GUARD_STATE_DIR", DEFAULT_STATE_DIR))
+    )
+
+
+def _state_file() -> pathlib.Path:
+    return _state_dir() / "leases.json"
+
+
+def _default_counters() -> dict[str, int]:
+    return {
+        "checks": 0,
+        "admitted": 0,
+        "suppressedNonActive": 0,
+        "suppressedStaleSnapshot": 0,
+        "reopened": 0,
+        "indeterminate": 0,
+    }
+
+
+def _load_state() -> dict:
+    try:
+        raw = json.loads(_state_file().read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        raw = None
+    if not isinstance(raw, dict) or not isinstance(raw.get("tombstones"), dict):
+        raw = {"tombstones": {}}
+    counters = raw.get("counters")
+    merged = _default_counters()
+    if isinstance(counters, dict):
+        for key in merged:
+            value = counters.get(key)
+            if isinstance(value, int) and value >= 0:
+                merged[key] = value
+    tombstones = {}
+    for identifier, entry in raw["tombstones"].items():
+        if (
+            isinstance(identifier, str)
+            and isinstance(entry, dict)
+            and isinstance(entry.get("state"), str)
+            and isinstance(entry.get("observedAt"), (int, float))
+            and isinstance(entry.get("issueUpdatedAtEpoch"), (int, float))
+        ):
+            tombstones[identifier] = {
+                "state": entry["state"],
+                "observedAt": entry["observedAt"],
+                "issueUpdatedAtEpoch": entry["issueUpdatedAtEpoch"],
+            }
+    return {"schema": SCHEMA, "tombstones": tombstones, "counters": merged}
+
+
+def _save_state(state: dict) -> None:
+    state_dir = _state_dir()
+    state_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = state_dir / "leases.json.lock"
+    with open(lock_path, "a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        temporary = state_dir / ".leases.json.tmp"
+        temporary.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, state_dir / "leases.json")
+
+
+def _active_states() -> frozenset[str]:
+    """Lowercased active_states from the installed workflow front matter.
+
+    The workflow is the same file Symphony parses, so the guard can never
+    drift from the orchestrator's notion of active. Falls back to the
+    Symphony default when the file is unreadable.
+    """
+    path = pathlib.Path(
+        os.path.expanduser(os.environ.get("SYMPHONY_WORKFLOW_PATH", DEFAULT_WORKFLOW))
+    )
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return frozenset(state.lower() for state in FALLBACK_ACTIVE_STATES)
+    if not text.startswith("---\n"):
+        return frozenset(state.lower() for state in FALLBACK_ACTIVE_STATES)
+    end = text.find("\n---", 4)
+    if end == -1:
+        return frozenset(state.lower() for state in FALLBACK_ACTIVE_STATES)
+    lines = text[4:end].splitlines()
+    in_tracker = False
+    in_active = False
+    states: list[str] = []
+    for line in lines:
+        if re.match(r"^tracker:\s*$", line):
+            in_tracker = True
+            continue
+        if in_tracker and line and not line.startswith(" "):
+            break
+        if in_tracker and re.match(r"^\s+active_states:\s*$", line):
+            in_active = True
+            continue
+        if in_active:
+            match = re.match(r"^\s+-\s*(.+?)\s*$", line)
+            if match:
+                states.append(match.group(1).strip('"').strip("'"))
+            elif line.strip():
+                break
+    if not states:
+        return frozenset(state.lower() for state in FALLBACK_ACTIVE_STATES)
+    return frozenset(state.lower() for state in states)
+
+
+def _dotenv_value(raw: str) -> str | None:
+    if not raw:
+        return None
+    if raw[0] in "'\"":
+        quote = raw[0]
+        if len(raw) < 2 or raw[-1] != quote or quote in raw[1:-1] or any(c in raw for c in "\\$`"):
+            return None
+        return raw[1:-1] or None
+    return None if any(c.isspace() or c in "'\"\\$`;|&<>(){}" for c in raw) else raw
+
+
+def _linear_api_key() -> str | None:
+    key = os.environ.get("LINEAR_API_KEY")
+    if key:
+        return key
+    try:
+        lines = (
+            pathlib.Path(os.path.expanduser(LINEAR_ENV_PATH))
+            .read_text(encoding="utf-8")
+            .splitlines()
+        )
+    except (OSError, UnicodeError):
+        return None
+    found: str | None = None
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = DOTENV_ASSIGNMENT.fullmatch(line)
+        if match is None or match.group(1) != "LINEAR_API_KEY" or found is not None:
+            return None
+        found = _dotenv_value(match.group(2))
+        if found is None:
+            return None
+    return found
+
+
+def _parse_epoch(value: object) -> float | None:
+    if not isinstance(value, str):
+        return None
+    raw = value.strip()
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.timestamp()
+
+
+def _fetch_issue(identifier: str) -> dict | None:
+    """Fresh single-issue tracker read. None means indeterminate."""
+    key = _linear_api_key()
+    if not key:
+        return None
+    request = urllib.request.Request(
+        os.environ.get("LINEAR_API_URL", LINEAR_API),
+        data=json.dumps({"query": ISSUE_QUERY, "variables": {"id": identifier}}).encode(),
+        headers={"Authorization": key, "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=CONTROL_TIMEOUT_SECONDS) as response:
+            payload = json.load(response)
+    except (OSError, ValueError, TypeError, urllib.error.URLError):
+        return None
+    if payload.get("errors"):
+        return None
+    issue = (payload.get("data") or {}).get("issue")
+    if not isinstance(issue, dict):
+        return None
+    state = issue.get("state")
+    updated_epoch = _parse_epoch(issue.get("updatedAt"))
+    if (
+        issue.get("identifier") != identifier
+        or not isinstance(state, dict)
+        or not isinstance(state.get("name"), str)
+        or updated_epoch is None
+    ):
+        return None
+    return {
+        "identifier": identifier,
+        "state": state["name"],
+        "updatedAtEpoch": updated_epoch,
+    }
+
+
+def lease_decision(
+    identifier: str,
+    issue: dict | None,
+    tombstone: dict | None,
+    active_states: frozenset[str],
+    now: float,
+) -> tuple[str, str, dict | None, bool]:
+    """Pure lease verdict.
+
+    Returns (decision, reason, tombstone_to_store, clear_existing). decision is
+    "admit" or "suppress"; tombstone_to_store replaces any existing entry when
+    not None; clear_existing removes the entry (deliberate reopen).
+    """
+    if issue is None:
+        return "admit", "indeterminate", tombstone, False
+    state_name = issue["state"]
+    if state_name.strip().lower() in active_states:
+        if tombstone is None:
+            return "admit", "active", None, False
+        if issue["updatedAtEpoch"] > tombstone["issueUpdatedAtEpoch"]:
+            # Newer explicit transition into an active state: deliberate reopen.
+            return "admit", "reopened", None, True
+        # Active per this read, but the issue carries no transition newer than
+        # the tombstoned observation: a stale tracker snapshot.
+        return "suppress", "stale_snapshot", tombstone, False
+    # Positive evidence of a non-active state: install the monotonic tombstone.
+    observed_at = now
+    if tombstone is not None:
+        observed_at = max(float(tombstone["observedAt"]), now)
+    return (
+        "suppress",
+        f"non_active state={state_name!r}",
+        {
+            "state": state_name,
+            "observedAt": observed_at,
+            "issueUpdatedAtEpoch": issue["updatedAtEpoch"],
+        },
+        False,
+    )
+
+
+def check(identifier: str) -> int:
+    if not IDENTIFIER.fullmatch(identifier):
+        print(f"LEASE_CHECK_INVALID identifier={identifier!r}", file=sys.stderr)
+        return 2
+    state = _load_state()
+    counters = state["counters"]
+    counters["checks"] += 1
+    issue = _fetch_issue(identifier)
+    decision, reason, tombstone, clear = lease_decision(
+        identifier, issue, state["tombstones"].get(identifier), _active_states(), time.time()
+    )
+    if clear:
+        state["tombstones"].pop(identifier, None)
+    elif tombstone is not None:
+        state["tombstones"][identifier] = tombstone
+    counter_key = {
+        ("admit", "indeterminate"): "indeterminate",
+        ("admit", "active"): "admitted",
+        ("admit", "reopened"): "reopened",
+    }.get((decision, reason))
+    if counter_key is None:
+        counter_key = (
+            "suppressedStaleSnapshot" if reason == "stale_snapshot" else "suppressedNonActive"
+        )
+    counters[counter_key] += 1
+    _save_state(state)
+    if decision == "admit":
+        print(f"LEASE_ADMITTED reason={reason} identifier={identifier}")
+        return 0
+    print(f"LEASE_SUPPRESSED reason={reason} identifier={identifier}", file=sys.stderr)
+    return 1
+
+
+def _proc_root() -> pathlib.Path:
+    return pathlib.Path(os.environ.get("SYMPHONY_LEASE_GUARD_PROC_ROOT", "/proc"))
+
+
+def _accounts_root() -> pathlib.Path:
+    return pathlib.Path(os.path.expanduser(os.environ.get("CODEX_ACCOUNTS_ROOT", "~/.codex-accounts")))
+
+
+def _process_age_seconds(pid: str, uptime: float, clock_ticks: float) -> float | None:
+    try:
+        stat = (_proc_root() / pid / "stat").read_text(encoding="utf-8", errors="replace")
+        # Field 22 (starttime) follows the comm field, which may contain
+        # spaces/parens; split after the final ')'.
+        tail = stat.rsplit(")", 1)[1].split()
+        starttime_ticks = int(tail[19])
+    except (OSError, IndexError, ValueError):
+        return None
+    if clock_ticks <= 0:
+        return None
+    return max(0.0, uptime - starttime_ticks / clock_ticks)
+
+
+def _holds_lock(pid: str, locks_dir: pathlib.Path) -> bool | None:
+    """True when the process holds an fd inside the account locks dir."""
+    fd_dir = _proc_root() / pid / "fd"
+    try:
+        entries = list(fd_dir.iterdir())
+    except OSError:
+        return None
+    prefix = str(locks_dir) + "/"
+    for entry in entries:
+        try:
+            target = os.readlink(entry)
+        except OSError:
+            continue
+        if target.startswith(prefix):
+            return True
+    return False
+
+
+def count_orphan_launchers() -> int | None:
+    """codex-rotate app-server launchers waiting past their bounded account
+    wait without holding an account lock — the orphan class from JOV-5031.
+    None when the process table cannot be observed.
+    """
+    try:
+        uptime = float((_proc_root() / "uptime").read_text().split()[0])
+        clock_ticks = float(os.sysconf("SC_CLK_TCK"))
+        wait_seconds = float(os.environ.get("CODEX_ACCOUNT_WAIT_SECONDS", "900"))
+    except (OSError, ValueError, IndexError):
+        return None
+    orphan_after = wait_seconds + ORPHAN_MARGIN_SECONDS
+    locks_dir = _accounts_root() / "locks"
+    orphans = 0
+    try:
+        pids = [entry.name for entry in _proc_root().iterdir() if entry.name.isdigit()]
+    except OSError:
+        return None
+    for pid in pids:
+        try:
+            raw = (_proc_root() / pid / "cmdline").read_bytes()
+        except OSError:
+            continue
+        args = [part.decode(errors="replace") for part in raw.split(b"\0") if part]
+        if not any("codex-rotate" in arg for arg in args):
+            continue
+        if "app-server" not in args:
+            continue
+        age = _process_age_seconds(pid, uptime, clock_ticks)
+        if age is None or age <= orphan_after:
+            continue
+        if _holds_lock(pid, locks_dir):
+            continue
+        orphans += 1
+    return orphans
+
+
+def capacity_state() -> dict:
+    """Typed account capacity: configured accounts vs. held locks vs. active
+    cooldowns. State is 'available' or 'saturated'; 'unknown' when the account
+    root or state file cannot be observed (never synthesized)."""
+    root = _accounts_root()
+    try:
+        accounts = sorted(
+            path.name for path in root.iterdir() if path.is_dir() and (path / "auth.json").is_file()
+        )
+    except OSError:
+        return {"state": "unknown", "reason": "accounts_root_unreadable"}
+    if not accounts:
+        return {"state": "unknown", "reason": "no_accounts_configured"}
+    now = int(time.time())
+    try:
+        stored = json.loads((root / "state.json").read_text(encoding="utf-8"))
+        cooldowns = stored.get("cooldowns") if isinstance(stored, dict) else None
+    except (OSError, TypeError, ValueError):
+        return {"state": "unknown", "reason": "account_state_unreadable"}
+    cooling = 0
+    for name in accounts:
+        try:
+            until = int((cooldowns or {}).get(name) or 0)
+        except (TypeError, ValueError):
+            until = 0
+        if until > now:
+            cooling += 1
+    locked = 0
+    locks_dir = root / "locks"
+    for name in accounts:
+        lock_file = locks_dir / f"{name}.lock"
+        if not lock_file.is_file():
+            continue
+        try:
+            descriptor = os.open(lock_file, os.O_RDONLY)
+        except OSError:
+            continue
+        try:
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                locked += 1
+            else:
+                fcntl.flock(descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(descriptor)
+    available = max(0, len(accounts) - locked - cooling)
+    return {
+        "state": "available" if available > 0 else "saturated",
+        "reason": None,
+        "accounts": len(accounts),
+        "locked": locked,
+        "cooldown": cooling,
+        "available": available,
+    }
+
+
+def report() -> int:
+    state = _load_state()
+    receipt = {
+        "schema": REPORT_SCHEMA,
+        "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "tombstones": state["tombstones"],
+        "counters": state["counters"],
+        "orphanLaunchers": count_orphan_launchers(),
+        "capacity": capacity_state(),
+    }
+    print(json.dumps(receipt, indent=2, sort_keys=True))
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("command", choices=("check", "report"))
+    parser.add_argument("identifier", nargs="?")
+    args = parser.parse_args()
+    if args.command == "report":
+        return report()
+    if not args.identifier:
+        print("check requires an issue identifier", file=sys.stderr)
+        return 2
+    return check(args.identifier)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

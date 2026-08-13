@@ -178,6 +178,42 @@ def observe_build_info(build_info_url: str) -> dict[str, Any]:
         }
 
 
+def observe_lease(guard_bin: str) -> dict[str, Any]:
+    """JOV-5031: additive, observation-only lease health signal.
+
+    Runs the lease guard's report (tombstones, redispatch-suppression
+    counters, orphan-launcher count, typed account capacity) and embeds it
+    verbatim. Missing guard, timeouts, and malformed reports degrade to a
+    typed unknown and never gate the fleet receipt.
+    """
+    try:
+        result = subprocess.run(
+            [guard_bin, "report"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        return {"status": "unknown", "reason": f"lease-report-unavailable: {error}"}
+    if result.returncode != 0:
+        return {"status": "unknown", "reason": f"lease-report-rc-{result.returncode}"}
+    try:
+        value = json.loads(result.stdout.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError) as error:
+        return {"status": "unknown", "reason": f"lease-report-malformed: {error}"}
+    if not isinstance(value, dict) or value.get("schema") != "symphony-lease-guard-report/v1":
+        return {"status": "unknown", "reason": "lease-report-schema-mismatch"}
+    return {
+        "status": "ok",
+        "observedAt": value.get("ts"),
+        "tombstones": len(value.get("tombstones") or {}),
+        "counters": value.get("counters") or {},
+        "orphanLaunchers": value.get("orphanLaunchers"),
+        "capacity": value.get("capacity") or {"state": "unknown", "reason": "missing"},
+    }
+
+
 def observe_production(url: str) -> dict[str, Any]:
     try:
         with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - configured health URL
@@ -694,6 +730,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--symphony-url", default="http://127.0.0.1:4041/api/v1/state")
     parser.add_argument(
+        "--lease-guard-bin",
+        default=os.environ.get("SYMPHONY_LEASE_GUARD_BIN")
+        or str(Path.home() / ".local/bin/symphony-lease-guard"),
+    )
+    parser.add_argument(
         "--state-dir",
         type=Path,
         default=Path(
@@ -718,6 +759,7 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
         "integrity": observe_integrity(integrity_path),
         "queue": observe_queue(args.repo, args.queue_target),
         "concurrencyEvidence": observe_concurrency(concurrency_path, now),
+        "lease": observe_lease(args.lease_guard_bin),
     }
 
 

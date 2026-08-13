@@ -26,6 +26,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / "scripts/hermes/WORKFLOW.jovie-ui-pilot.md"
 UNIT = ROOT / "scripts/hermes/systemd/symphony-ui-pilot.service"
+GUARD = ROOT / "scripts/hermes/symphony-lease-guard"
 INSTALLER = ROOT / "scripts/hermes/install-symphony-ui-pilot.sh"
 
 
@@ -126,6 +127,28 @@ def test_workflow_server_and_workspace() -> None:
     )
 
 
+def test_workflow_before_run_enforces_lease_guard() -> None:
+    # JOV-5031: before any codex session seizes a provider account, the hook
+    # must run the lease guard against the workspace-derived issue identifier
+    # so stale tracker snapshots cannot redispatch a tombstoned issue.
+    hooks = _section(_front_matter_lines(), "hooks")
+    before_run: list[str] = []
+    inside = False
+    for line in hooks:
+        if re.match(r"^\s+before_run:\s*\|", line):
+            inside = True
+            continue
+        if inside:
+            if re.match(r"^\s+[a-z_]+:", line):
+                break
+            before_run.append(line)
+    body = "\n".join(before_run)
+    assert "symphony-lease-guard" in body
+    assert 'check "${PWD##*/}"' in body
+    # The existing workspace bootstrap must survive the guard addition.
+    assert "git clone" in body
+
+
 def test_unit_bounded_restart_policy() -> None:
     sections = _unit_sections()
     unit = sections["Unit"]
@@ -177,12 +200,17 @@ def test_installer_deploys_workflow_and_unit(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     workflow = tmp_path / "symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
     unit = tmp_path / ".config/systemd/user/symphony-ui-pilot.service"
+    guard = tmp_path / ".local/bin/symphony-lease-guard"
     assert workflow.read_text() == WORKFLOW.read_text()
     assert unit.read_text() == UNIT.read_text()
+    # JOV-5031: the lease guard installs executable so the before_run hook can
+    # enforce the monotonic tombstone before a provider account is seized.
+    assert guard.read_text() == GUARD.read_text()
+    assert guard.stat().st_mode & 0o111
     # Freshly installed state must pass drift detection.
     check = _run_installer(tmp_path, "--check")
     assert check.returncode == 0, check.stdout
-    assert check.stdout.count("OK") == 2
+    assert check.stdout.count("OK") == 3
 
 
 def test_installer_backs_up_and_detects_drift(tmp_path: Path) -> None:

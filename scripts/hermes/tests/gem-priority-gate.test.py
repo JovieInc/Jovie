@@ -614,5 +614,68 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertEqual(python_minutes.group(1), js_minutes.group(1))
 
 
+class LeaseSignalTests(unittest.TestCase):
+    """JOV-5031: the lease signal is additive and observation-only."""
+
+    def write_guard(self, directory: pathlib.Path, body: str) -> str:
+        guard = directory / "symphony-lease-guard"
+        guard.write_text(body)
+        guard.chmod(0o755)
+        return str(guard)
+
+    def test_missing_guard_is_typed_unknown_not_a_gate_failure(self):
+        observed = MODULE.observe_lease("/nonexistent/symphony-lease-guard")
+        self.assertEqual(observed["status"], "unknown")
+        self.assertIn("lease-report-unavailable", observed["reason"])
+
+    def test_valid_report_is_embedded_verbatim(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            guard = self.write_guard(
+                pathlib.Path(tmp),
+                "#!/usr/bin/env bash\n"
+                "cat <<'JSON'\n"
+                '{"schema":"symphony-lease-guard-report/v1","ts":"2026-08-13T00:00:00Z",'
+                '"tombstones":{"JOV-5029":{"state":"In Review","observedAt":1,"issueUpdatedAtEpoch":1}},'
+                '"counters":{"checks":4,"suppressedStaleSnapshot":2},'
+                '"orphanLaunchers":0,'
+                '"capacity":{"state":"available","accounts":4,"locked":1,"cooldown":0,"available":3}}\n'
+                "JSON\n",
+            )
+            observed = MODULE.observe_lease(guard)
+        self.assertEqual(observed["status"], "ok")
+        self.assertEqual(observed["tombstones"], 1)
+        self.assertEqual(observed["orphanLaunchers"], 0)
+        self.assertEqual(observed["counters"]["suppressedStaleSnapshot"], 2)
+        self.assertEqual(observed["capacity"]["state"], "available")
+
+    def test_failing_guard_is_typed_unknown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            guard = self.write_guard(
+                pathlib.Path(tmp), "#!/usr/bin/env bash\nexit 1\n"
+            )
+            observed = MODULE.observe_lease(guard)
+        self.assertEqual(observed["status"], "unknown")
+        self.assertEqual(observed["reason"], "lease-report-rc-1")
+
+    def test_malformed_report_is_typed_unknown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            guard = self.write_guard(
+                pathlib.Path(tmp), "#!/usr/bin/env bash\necho 'not json'\n"
+            )
+            observed = MODULE.observe_lease(guard)
+        self.assertEqual(observed["status"], "unknown")
+        self.assertIn("lease-report-malformed", observed["reason"])
+
+    def test_wrong_schema_is_typed_unknown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            guard = self.write_guard(
+                pathlib.Path(tmp),
+                "#!/usr/bin/env bash\necho '{\"schema\":\"other/v9\"}'\n",
+            )
+            observed = MODULE.observe_lease(guard)
+        self.assertEqual(observed["status"], "unknown")
+        self.assertEqual(observed["reason"], "lease-report-schema-mismatch")
+
+
 if __name__ == "__main__":
     unittest.main()

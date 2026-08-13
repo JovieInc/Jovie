@@ -35,6 +35,15 @@ hooks:
     git config push.negotiate true
   before_run: |
     set -eu
+    # JOV-5031: fail-closed lease gate. Before a codex session seizes a
+    # provider account, verify the lease against a fresh tracker read. An
+    # issue observed outside active_states gets a monotonic tombstone and
+    # stale tracker snapshots cannot redispatch it; only a newer explicit
+    # active-state transition reopens it. Indeterminate reads admit the run
+    # (a failed observation is not proof of a state change).
+    if [ -x "${SYMPHONY_LEASE_GUARD_BIN:-$HOME/.local/bin/symphony-lease-guard}" ]; then
+      "${SYMPHONY_LEASE_GUARD_BIN:-$HOME/.local/bin/symphony-lease-guard}" check "${PWD##*/}"
+    fi
     if [ ! -d .git ]; then
       find . -mindepth 1 -maxdepth 1 -exec rm -rf {} +
       git clone --depth 1 https://github.com/JovieInc/Jovie.git .
