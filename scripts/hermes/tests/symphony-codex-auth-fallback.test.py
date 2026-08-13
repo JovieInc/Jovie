@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import http.server
 import importlib.util
+import io
 import json
 import os
 import pathlib
@@ -15,6 +17,7 @@ import textwrap
 import threading
 import time
 import unittest
+from unittest import mock
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
@@ -159,6 +162,10 @@ class FallbackTests(unittest.TestCase):
         python.chmod(0o755)
         self.state = self.root / "state.json"
         self.state.write_text(json.dumps({"active": None, "cooldowns": {"jovie": 1}, "last_error": {}}))
+        for account in ("jovie", "meetjovie"):
+            account_dir = self.root / account
+            account_dir.mkdir()
+            (account_dir / "auth.json").write_text("{}\n")
         self.events = self.root / "events.log"
 
     def tearDown(self):
@@ -183,6 +190,14 @@ class FallbackTests(unittest.TestCase):
         path.write_text("#!/bin/sh\nset -eu\n" + textwrap.dedent(body))
         path.chmod(0o755)
         return path
+
+    def set_all_accounts_cooldown(self):
+        future = int(time.time()) + 3600
+        self.state.write_text(json.dumps({
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future},
+            "last_error": {},
+        }))
 
     def run_controller(self, *args, controller=CONTROLLER, **env):
         return subprocess.run(
@@ -273,38 +288,201 @@ class FallbackTests(unittest.TestCase):
         # Both accounts are capped; codex-rotate's kimi fallback would answer the
         # live probe with GEM_MODEL_READY anyway. The canary must decide from the
         # cooldown state alone and never consult the probe for this verdict.
-        future = int(time.time()) + 3600
-        self.state.write_text(json.dumps({
-            "active": None,
-            "cooldowns": {"jovie": future, "meetjovie": future},
-            "last_error": {},
-        }))
+        self.set_all_accounts_cooldown()
         kimi_canary = self.command("codex-rotate", "echo GEM_MODEL_READY")
         result = self.run_controller(GEM_CODEX_ROTATE_BIN=kimi_canary)
         self.assertEqual((result.stdout, result.returncode), ("yes\n", 0))
 
     def test_kimi_fallback_cannot_mask_cooldown_exhaustion_in_sidecar(self):
-        future = int(time.time()) + 3600
-        self.state.write_text(json.dumps({
-            "active": None,
-            "cooldowns": {"jovie": future, "meetjovie": future},
-            "last_error": {},
-        }))
+        self.set_all_accounts_cooldown()
         kimi_canary = self.command("codex-rotate", "echo GEM_MODEL_READY")
-        self.command("systemctl", "printf 'systemctl %s\\n' \"$*\" >> \"$GEM_EVENTS\"; [ \"$2\" = is-active ] && exit 1; exit 0")
-        self.command("systemd-run", "printf 'systemd-run %s\\n' \"$*\" >> \"$GEM_EVENTS\"")
+        self.command(
+            "systemctl",
+            "printf 'systemctl %s\\n' \"$*\" >> \"$GEM_EVENTS\"\n"
+            "if [ \"$2\" = list-units ]; then\n"
+            "  while read -r unit; do printf '%s loaded active running\\n' \"$unit\"; done < \"$GEM_ACTIVE_UNITS\" 2>/dev/null || true\n"
+            "  exit 0\n"
+            "fi\n"
+            "if [ \"$2\" = is-active ]; then\n"
+            "  unit=$4\n"
+            "  grep -q \"^$unit$\" \"$GEM_ACTIVE_UNITS\" 2>/dev/null\n"
+            "  exit $?\n"
+            "fi\n"
+            "exit 0",
+        )
+        self.command(
+            "systemd-run",
+            "printf 'systemd-run %s\\n' \"$*\" >> \"$GEM_EVENTS\"\n"
+            "for arg in \"$@\"; do case \"$arg\" in --unit=*) printf '%s\\n' \"${arg#--unit=}\" >> \"$GEM_ACTIVE_UNITS\";; esac; done",
+        )
+        active_units = self.root / "active-units"
         result = subprocess.run(
             [self.install_runtime() / "symphony-grok-sidecar"], capture_output=True, text=True,
             env=self.env(GEM_CODEX_ROTATE_BIN=kimi_canary, GEM_EVENTS=self.events,
+                         GEM_ACTIVE_UNITS=active_units,
                          LINEAR_API_KEY="linear-secret", LINEAR_API_URL=self.linear_url()),
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         events = self.events.read_text().splitlines()
-        self.assertEqual(events[0], "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service")
-        self.assertTrue(any(line.startswith("systemd-run") for line in events), events)
+        launch_index = next(i for i, line in enumerate(events) if line.startswith("systemd-run"))
+        stop_index = events.index("systemctl --user stop symphony-ui-pilot.service symphony-lyb.service")
+        self.assertLess(stop_index, launch_index, events)
         self.assertIn("codex_exhausted", result.stderr)
         self.assertNotIn("codex_not_exhausted", result.stderr)
+
+    def test_indeterminate_readiness_never_mutates_runtime_services(self):
+        module = self.load_controller_module()
+
+        for reason in (
+            "unknown_state",
+            "executable_missing",
+            "probe_failed",
+            "missing_ready_evidence",
+        ):
+            controls: list[list[str]] = []
+            with self.subTest(reason=reason):
+                with (
+                    mock.patch.object(
+                        module,
+                        "codex_canary_ready",
+                        return_value=(False, reason),
+                    ),
+                    mock.patch.object(
+                        module,
+                        "_control",
+                        side_effect=lambda command: controls.append(command) or True,
+                    ),
+                ):
+                    self.assertEqual(module.reconcile(), 2)
+                self.assertEqual(controls, [])
+
+    def test_actual_indeterminate_probe_paths_never_mutate_runtime_services(self):
+        module = self.load_controller_module()
+        rotate = self.command("codex-rotate", "echo GEM_MODEL_READY")
+
+        cases = (
+            ("unknown_state", None, rotate),
+            ("executable_missing", {"active": None, "cooldowns": {}, "last_error": {}}, self.root / "missing"),
+            ("probe_failed", {"active": None, "cooldowns": {}, "last_error": {}}, self.command("probe-failed", "exit 1")),
+            ("missing_ready_evidence", {"active": None, "cooldowns": {}, "last_error": {}}, self.command("wrong-marker", "echo not-ready")),
+        )
+        for reason, state, executable in cases:
+            controls: list[list[str]] = []
+            with self.subTest(reason=reason):
+                if state is None:
+                    self.state.unlink(missing_ok=True)
+                else:
+                    self.state.write_text(json.dumps(state))
+                stderr = io.StringIO()
+                with (
+                    mock.patch.dict(
+                        os.environ,
+                        self.env(
+                            GEM_CODEX_ROTATE_BIN=executable,
+                            GEM_CODEX_CANARY_TIMEOUT_SECONDS="5",
+                        ),
+                        clear=True,
+                    ),
+                    mock.patch.object(
+                        module,
+                        "_control",
+                        side_effect=lambda command: controls.append(command) or True,
+                    ),
+                    contextlib.redirect_stderr(stderr),
+                ):
+                    self.assertEqual(module.reconcile(), 2)
+                self.assertEqual(controls, [])
+                self.assertIn(f"codex_readiness_indeterminate {reason}", stderr.getvalue())
+
+        slow = self.command("probe-timeout", "sleep 1; echo GEM_MODEL_READY")
+        self.state.write_text(json.dumps({"active": None, "cooldowns": {}, "last_error": {}}))
+        controls = []
+        stderr = io.StringIO()
+        with (
+            mock.patch.dict(
+                os.environ,
+                self.env(
+                    GEM_CODEX_ROTATE_BIN=slow,
+                    GEM_CODEX_CANARY_TIMEOUT_SECONDS="0.05",
+                ),
+                clear=True,
+            ),
+            mock.patch.object(
+                module,
+                "_control",
+                side_effect=lambda command: controls.append(command) or True,
+            ),
+            contextlib.redirect_stderr(stderr),
+        ):
+            self.assertEqual(module.reconcile(), 2)
+        self.assertEqual(controls, [])
+        self.assertIn("codex_readiness_indeterminate probe_failed", stderr.getvalue())
+
+    def test_cooldown_handoff_requires_every_configured_account(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        canary = self.command("codex-rotate", "echo GEM_MODEL_READY")
+
+        for cooldowns in (
+            {"jovie": future},
+            {"jovie": future, "meetjovie": "not-a-timestamp"},
+        ):
+            with self.subTest(cooldowns=cooldowns):
+                self.state.write_text(json.dumps({
+                    "active": None,
+                    "cooldowns": cooldowns,
+                    "last_error": {},
+                }))
+                with mock.patch.dict(
+                    os.environ,
+                    self.env(GEM_CODEX_ROTATE_BIN=canary),
+                    clear=True,
+                ):
+                    self.assertEqual(module.codex_canary_ready(), (True, "ready"))
+
+    def test_exhausted_handoff_proves_fallback_before_stopping_symphony(self):
+        module = self.load_controller_module()
+
+        cases = (
+            ("grok_executable_missing", None, ["JOV-1"], []),
+            ("linear_query_failed", "/bin/true", None, []),
+            ("grok_state_query_failed", "/bin/true", ["JOV-1"], None),
+            ("no_admitted_work", "/bin/true", [], []),
+        )
+        for expected, executable, identifiers, active in cases:
+            controls: list[list[str]] = []
+            with self.subTest(expected=expected):
+                with (
+                    mock.patch.object(
+                        module,
+                        "codex_canary_ready",
+                        return_value=(False, "all_accounts_cooldown"),
+                    ),
+                    mock.patch.object(
+                        module,
+                        "_grok_ship_one_executable",
+                        return_value=executable,
+                    ),
+                    mock.patch.object(
+                        module,
+                        "_linear_identifiers",
+                        return_value=identifiers,
+                    ),
+                    mock.patch.object(
+                        module,
+                        "_active_grok_units",
+                        return_value=active,
+                    ),
+                    mock.patch.object(
+                        module,
+                        "_control",
+                        side_effect=lambda command: controls.append(command) or True,
+                    ),
+                ):
+                    expected_rc = 0 if expected == "no_admitted_work" else 2
+                    self.assertEqual(module.reconcile(), expected_rc)
+                self.assertEqual(controls, [])
 
     def test_live_canary_requires_luna_and_exact_marker(self):
         canary = self.command("codex-rotate", "printf '%s\\n' \"$*\" > \"$GEM_EVENTS\"; printf 'GEM_MODEL_READY\\n'")
@@ -349,7 +527,8 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(self.events.read_text().splitlines(), [
             "systemctl --user list-units --type=service --state=active grok-ship-*.service --no-legend --no-pager",
             "systemctl --user start symphony-ui-pilot.service symphony-lyb.service",
-            "systemctl --user is-active --quiet symphony-ui-pilot.service symphony-lyb.service",
+            "systemctl --user is-active --quiet symphony-ui-pilot.service",
+            "systemctl --user is-active --quiet symphony-lyb.service",
         ])
         self.assertIn("idle", result.stderr)
 
@@ -371,8 +550,14 @@ class FallbackTests(unittest.TestCase):
         self.assertIn("recovery_deferred", result.stderr)
 
     def test_exhausted_recovery_stops_symphony_and_bounds_grok_launches(self):
+        self.set_all_accounts_cooldown()
         self.command("codex-rotate", "exit 1")
-        self.command("systemctl", "printf 'systemctl %s\\n' \"$*\" >> \"$GEM_EVENTS\"; if [ \"$2\" = is-active ]; then [ \"$4\" = grok-ship-JOV-2 ] && exit 0; exit 1; fi; exit 0")
+        self.command(
+            "systemctl",
+            "printf 'systemctl %s\\n' \"$*\" >> \"$GEM_EVENTS\"\n"
+            "if [ \"$2\" = list-units ]; then printf 'grok-ship-JOV-2.service loaded active running\\n'; fi\n"
+            "exit 0",
+        )
         self.command("systemd-run", "printf 'systemd-run %s\\n' \"$*\" >> \"$GEM_EVENTS\"")
         result = subprocess.run(
             [self.install_runtime() / "symphony-grok-sidecar"], capture_output=True, text=True,
@@ -381,7 +566,9 @@ class FallbackTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         events = self.events.read_text().splitlines()
-        self.assertEqual(events[0], "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service")
+        first_launch = next(i for i, line in enumerate(events) if line.startswith("systemd-run"))
+        stop_index = events.index("systemctl --user stop symphony-ui-pilot.service symphony-lyb.service")
+        self.assertLess(stop_index, first_launch, events)
         self.assertEqual(len([line for line in events if line.startswith("systemd-run")]), 2)
         self.assertTrue(any("grok-ship-LYB-3" in line for line in events))
         self.assertFalse(any("grok-ship-JOV-4" in line or "grok-ship-LYB-5" in line for line in events))
@@ -433,8 +620,14 @@ class FallbackTests(unittest.TestCase):
     def test_reconcile_skips_issue_flag_as_not_admitted_between_list_and_launch(self):
         # The list query sees candidates as admitted, but the launch-time re-check
         # (via single_issue_labels) finds blocked/needs-human added by a guard.
+        self.set_all_accounts_cooldown()
         self.command("codex-rotate", "exit 1")
-        self.command("systemctl", 'if [ "$2" = is-active ]; then exit 1; fi; exit 0')
+        self.command(
+            "systemctl",
+            "printf 'systemctl %s\\n' \"$*\" >> \"$GEM_EVENTS\"\n"
+            'if [ "$2" = is-active ]; then case "$*" in *symphony-*.service*) exit 0;; *) exit 1;; esac; fi\n'
+            "exit 0",
+        )
         self.command("systemd-run", "printf 'systemd-run %s\\n' \"$*\"")
         url = self.linear_url()
         LinearHandler.single_issue_labels = {
@@ -448,12 +641,46 @@ class FallbackTests(unittest.TestCase):
                          LINEAR_API_KEY="linear-secret", LINEAR_API_URL=url),
             check=False,
         )
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.returncode, 2, result.stderr)
         self.assertIn("not admitted", result.stderr)
         events = self.events.read_text() if self.events.exists() else ""
         self.assertNotIn("systemd-run", events)
+        stop_index = events.index("systemctl --user stop")
+        restore_index = events.index("systemctl --user start")
+        self.assertLess(stop_index, restore_index)
+        self.assertIn("symphony_restored", result.stderr)
+
+    def test_zero_grok_capacity_preserves_symphony(self):
+        self.set_all_accounts_cooldown()
+        self.command("codex-rotate", "exit 1")
+        self.command(
+            "systemctl",
+            "printf 'systemctl %s\\n' \"$*\" >> \"$GEM_EVENTS\"\n"
+            'if [ "$2" = is-active ]; then exit 1; fi\n'
+            "exit 0",
+        )
+        self.command("systemd-run", "printf 'systemd-run %s\\n' \"$*\" >> \"$GEM_EVENTS\"")
+        result = subprocess.run(
+            [self.install_runtime() / "symphony-grok-sidecar"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_CODEX_ROTATE_BIN=self.bin / "codex-rotate",
+                GEM_EVENTS=self.events,
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.linear_url(),
+                SYMPHONY_GROK_MAX="0",
+            ),
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2, result.stderr)
+        events = self.events.read_text()
+        self.assertNotIn("systemd-run", events)
+        self.assertNotIn("systemctl --user stop", events)
+        self.assertIn("grok_capacity_zero symphony_unchanged", result.stderr)
 
     def test_reconcile_respects_active_grok_concurrency_cap(self):
+        self.set_all_accounts_cooldown()
         self.command("codex-rotate", "exit 1")
         self.command(
             "systemctl",
@@ -478,8 +705,146 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(self.events.exists(), result.stderr)
         launches = [line for line in self.events.read_text().splitlines() if line.startswith("systemd-run")]
-        # 5 limit - 3 already-active grok ships = at most 2 more.
+        # Only LYB-3 is both admitted and absent from the three active units.
+        self.assertEqual(len(launches), 1)
+
+    def test_delayed_grok_activation_reserves_capacity_and_restores_symphony(self):
+        module = self.load_controller_module()
+        controls: list[list[str]] = []
+        identifiers = [f"JOV-{index}" for index in range(1, 7)]
+        issue = {
+            "identifier": "placeholder",
+            "team": {"key": "JOV"},
+            "labels": {"nodes": []},
+            "state": {"name": "Todo"},
+        }
+
+        def control(command):
+            controls.append(command)
+            return True
+
+        with (
+            mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_linear_identifiers", return_value=identifiers),
+            mock.patch.object(module, "_active_grok_units", side_effect=[[], [], []]),
+            mock.patch.object(module, "_grok_limit", return_value=2),
+            mock.patch.object(module, "_fetch_single_issue", return_value=issue),
+            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
+            mock.patch.object(module, "_control", side_effect=control),
+        ):
+            self.assertEqual(module.reconcile(), 2)
+
+        launches = [command for command in controls if command[0] == "systemd-run"]
         self.assertEqual(len(launches), 2)
+        stop_index = next(i for i, command in enumerate(controls) if "stop" in command)
+        first_launch = next(i for i, command in enumerate(controls) if command[0] == "systemd-run")
+        restore_index = next(i for i, command in enumerate(controls) if "start" in command)
+        cleanup_index = next(
+            i for i, command in enumerate(controls)
+            if command[:3] == ["systemctl", "--user", "stop"]
+            and any(str(item).startswith("grok-ship-") for item in command)
+        )
+        self.assertLess(stop_index, first_launch)
+        self.assertLess(first_launch, cleanup_index)
+        self.assertLess(cleanup_index, restore_index)
+
+    def test_vanished_fallback_is_rechecked_before_handoff_completes(self):
+        module = self.load_controller_module()
+        controls: list[list[str]] = []
+        with (
+            mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_linear_identifiers", return_value=[]),
+            mock.patch.object(
+                module,
+                "_active_grok_units",
+                side_effect=[["grok-ship-JOV-1.service"], []],
+            ),
+            mock.patch.object(
+                module,
+                "_control",
+                side_effect=lambda command: controls.append(command) or True,
+            ),
+        ):
+            self.assertEqual(module.reconcile(), 2)
+
+        self.assertTrue(any("stop" in command for command in controls))
+        self.assertTrue(any("start" in command for command in controls))
+
+    def test_unknown_final_grok_state_never_restarts_competing_owner(self):
+        module = self.load_controller_module()
+        controls: list[list[str]] = []
+        with (
+            mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
+            mock.patch.object(module, "_active_grok_units", side_effect=[[], None]),
+            mock.patch.object(module, "_fetch_single_issue", return_value={}),
+            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
+            mock.patch.object(
+                module,
+                "_control",
+                side_effect=lambda command: controls.append(command) or True,
+            ),
+        ):
+            self.assertEqual(module.reconcile(), 2)
+
+        self.assertTrue(any("stop" in command for command in controls))
+        self.assertTrue(any(command[0] == "systemd-run" for command in controls))
+        self.assertFalse(any("start" in command for command in controls))
+
+    def test_delayed_unit_seen_after_cleanup_blocks_primary_restore(self):
+        module = self.load_controller_module()
+        controls: list[list[str]] = []
+        with (
+            mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
+            mock.patch.object(
+                module,
+                "_active_grok_units",
+                side_effect=[[], [], ["grok-ship-JOV-1.service"]],
+            ),
+            mock.patch.object(module, "_fetch_single_issue", return_value={}),
+            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
+            mock.patch.object(
+                module,
+                "_control",
+                side_effect=lambda command: controls.append(command) or True,
+            ),
+        ):
+            self.assertEqual(module.reconcile(), 2)
+
+        self.assertTrue(any(command[0] == "systemd-run" for command in controls))
+        self.assertFalse(any("start" in command for command in controls))
+
+    def test_restore_requires_every_symphony_service_active(self):
+        module = self.load_controller_module()
+        controls: list[list[str]] = []
+
+        def control(command):
+            controls.append(command)
+            if "is-active" in command and "symphony-lyb.service" in command:
+                return False
+            return True
+
+        with (
+            mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
+            mock.patch.object(module, "_active_grok_units", side_effect=[[], []]),
+            mock.patch.object(module, "_fetch_single_issue", return_value={}),
+            mock.patch.object(module, "_issue_meta", return_value=(False, "blocked", None)),
+            mock.patch.object(module, "_control", side_effect=control),
+        ):
+            self.assertEqual(module.reconcile(), 2)
+
+        primary_checks = [
+            command for command in controls
+            if "is-active" in command and any(service in command for service in module.SERVICES)
+        ]
+        self.assertEqual(len(primary_checks), 2)
 
     def test_managed_grok_worker_routes_jov_and_lyb_and_updates_team_states(self):
         created = self.root / "pr-created"
