@@ -1130,8 +1130,6 @@ function InputRow({
         {useHeroPill && hasAttachButton ? (
           <ComposerAttachButton
             isFileProcessing={isFileProcessing}
-            isLoading={isLoading}
-            isSubmitting={isSubmitting}
             disabled={attachDisabledForPicker}
             plusMenuOpen={plusMenuOpen}
             onOpenChange={setPlusMenuOpen}
@@ -1219,8 +1217,6 @@ function InputRow({
             {!useHeroPill && hasAttachButton ? (
               <ComposerAttachButton
                 isFileProcessing={isFileProcessing}
-                isLoading={isLoading}
-                isSubmitting={isSubmitting}
                 disabled={attachDisabledForPicker}
                 plusMenuOpen={plusMenuOpen}
                 onOpenChange={setPlusMenuOpen}
@@ -1234,8 +1230,6 @@ function InputRow({
             {dictationEnabled ? (
               <ComposerMicButton
                 isListening={isListening}
-                isLoading={isLoading}
-                isSubmitting={isSubmitting}
                 isSupported={isDictationSupported}
                 onPreserveFocus={handlePreserveFocus}
                 onPushStart={handleMicPushStart}
@@ -1248,8 +1242,6 @@ function InputRow({
               canSend={canSend}
               canInterruptAndSend={canInterruptAndSend}
               isStreaming={isStreaming}
-              isLoading={isLoading}
-              isSubmitting={isSubmitting}
               reducedMotion={reducedMotion}
               onMouseDown={handlePreserveFocus}
               onSend={onSend}

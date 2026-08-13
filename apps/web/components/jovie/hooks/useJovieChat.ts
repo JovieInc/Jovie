@@ -30,6 +30,7 @@ import { logger } from '@/lib/utils/logger';
 import { hydratePersistedMessageParts } from '../message-parts';
 import {
   type ChatTimelineEvent,
+  type ChatTimelineMessage,
   type ChatTimelineServerMessage,
   type ChatTimelineState,
   createInitialChatTimelineState,
@@ -239,14 +240,31 @@ function getCachedTimelineState(conversationId: string | null) {
   );
 }
 
-function shouldCacheTimelineState(state: ChatTimelineState) {
-  return !state.messages.some(
-    message =>
-      message.status === 'sending' ||
-      message.status === 'pending' ||
-      message.status === 'sent' ||
-      message.status === 'streaming'
+function isInFlightTimelineMessage(message: ChatTimelineMessage) {
+  return (
+    message.status === 'sending' ||
+    message.status === 'pending' ||
+    message.status === 'sent' ||
+    message.status === 'streaming'
   );
+}
+
+function shouldCacheTimelineState(state: ChatTimelineState) {
+  if (state.phase !== 'ready' || state.messages.length === 0) {
+    return false;
+  }
+  return !state.messages.some(isInFlightTimelineMessage);
+}
+
+function takeCachedTimelineMessages(conversationId: string | null) {
+  if (!conversationId) return undefined;
+  const cached = timelineStateCache.get(conversationId);
+  if (!cached || !shouldCacheTimelineState(cached)) return undefined;
+  return cached.messages;
+}
+
+export function resetChatTimelineStateCacheForTests() {
+  timelineStateCache.clear();
 }
 
 function cacheTimelineState(state: ChatTimelineState) {
@@ -918,6 +936,7 @@ export function useJovieChat({
       type: 'conversation.switched',
       conversationId: nextConversationId,
       requestId: nextConversationId ?? 'new-chat',
+      cachedMessages: takeCachedTimelineMessages(nextConversationId),
       now: Date.now(),
     });
   }, [activeConversationId, conversationId, dispatchTimelineEvent]);

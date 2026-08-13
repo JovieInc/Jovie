@@ -518,4 +518,64 @@ describe('chat timeline reducer', () => {
       });
     });
   });
+
+  it('hydrates a switched conversation from cached settled messages without emptying the thread', () => {
+    const settled = reduceChatTimeline(
+      reduceChatTimeline(createInitialChatTimelineState('conv_a'), {
+        type: 'message.send.started',
+        conversationId: 'conv_a',
+        clientTurnId: 'turn_a',
+        clientMessageId: 'turn_a:user',
+        parts: [textPart('Hello')],
+        now: 100,
+      }),
+      {
+        type: 'assistant.stream.completed',
+        conversationId: 'conv_a',
+        clientTurnId: 'turn_a',
+        parts: [textPart('Cached reply')],
+        now: 200,
+      }
+    );
+
+    const switched = reduceChatTimeline(settled, {
+      type: 'conversation.switched',
+      conversationId: 'conv_a',
+      cachedMessages: settled.messages,
+      now: 300,
+    });
+
+    expect(switched.phase).toBe('ready');
+    expect(switched.requestEpoch).toBe(settled.requestEpoch + 1);
+    expect(selectRenderableMessages(switched)).toBe(settled.messages);
+    expect(selectRenderableMessages(switched)).toMatchObject([
+      { role: 'user', status: 'sending' },
+      { role: 'assistant', status: 'complete' },
+    ]);
+  });
+
+  it('starts uncached thread switches from an empty loading timeline', () => {
+    const previous = reduceChatTimeline(
+      createInitialChatTimelineState('conv_a'),
+      {
+        type: 'message.send.started',
+        conversationId: 'conv_a',
+        clientTurnId: 'turn_a',
+        clientMessageId: 'turn_a:user',
+        parts: [textPart('Hello')],
+        now: 100,
+      }
+    );
+
+    const switched = reduceChatTimeline(previous, {
+      type: 'conversation.switched',
+      conversationId: 'conv_b',
+      now: 200,
+    });
+
+    expect(switched.phase).toBe('initial-loading');
+    expect(switched.conversationId).toBe('conv_b');
+    expect(selectRenderableMessages(switched)).toEqual([]);
+    expect(switched.requestEpoch).toBe(previous.requestEpoch + 1);
+  });
 });

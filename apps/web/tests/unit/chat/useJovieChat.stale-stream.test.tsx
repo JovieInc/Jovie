@@ -1,7 +1,10 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useJovieChat } from '@/components/jovie/hooks/useJovieChat';
+import {
+  resetChatTimelineStateCacheForTests,
+  useJovieChat,
+} from '@/components/jovie/hooks/useJovieChat';
 
 // Regression coverage for #11921: on a follow-up send, the AI SDK's "last
 // assistant message" is still the PREVIOUS turn's reply until the new stream
@@ -96,6 +99,7 @@ function getLastAssistantRow(
 
 describe('useJovieChat stale-stream guard (#11921)', () => {
   beforeEach(() => {
+    resetChatTimelineStateCacheForTests();
     sendMessageMock.mockReset();
     sendMessageMock.mockImplementation(() => undefined);
     mockStatus = 'ready';

@@ -192,6 +192,26 @@ describe('ChatInput', () => {
     expect(onInterruptAndSend).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps attach enabled while the assistant is generating', () => {
+    const { getByRole } = fastRender(
+      withProviders(
+        <ChatInput {...baseProps} isLoading onFileAttach={vi.fn()} />
+      )
+    );
+
+    expect(getByRole('button', { name: /Attach Files/i })).toBeEnabled();
+  });
+
+  it('does not lock the send control behind a spinner while generating', () => {
+    const { getByRole } = fastRender(
+      withProviders(<ChatInput {...baseProps} value='' isLoading />)
+    );
+
+    const sendButton = getByRole('button', { name: /send message/i });
+    expect(sendButton).toBeDisabled();
+    expect(sendButton.querySelector('.animate-spin')).toBeNull();
+  });
+
   it('opens the file attach menu when clicking the plus button', async () => {
     const user = userEvent.setup();
     const onFileAttach = vi.fn();
