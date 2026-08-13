@@ -25,7 +25,7 @@ Classify the company before applying any investor policy.
 | **Acceleration** | A repeatable customer-value and retention loop is proven, but a measured constraint is limiting growth. | Use capital to remove that constraint faster than internal cash generation can. |
 | **Optionality** | On the current trajectory, the company can reach sustainability before cash is exhausted, or can decline outside capital without reducing the required learning loop. | Optimize investor quality, terms, and strategic value. |
 
-When evidence points to multiple phases, use the most survival-oriented phase. Review the classification whenever the runway forecast, retention evidence, or financing availability materially changes.
+When evidence points to multiple phases, use the most survival-oriented phase. Every classification must record a quantitative `Re-evaluate when` trigger and the `Then` policy that activates when it is crossed; do not rely on “materially changes” as an unmeasured reminder.
 
 ## Survival-Mode Doctrine
 
@@ -105,7 +105,7 @@ Investor selectivity increases only as capital becomes less existential.
 
 ### Survival
 
-- Optimize: capital closed per founder-hour and runway added.
+- Optimize: clean runway added per founder-hour.
 - Investor understanding: sufficient to make an informed investment decision.
 - Synchronous access: available to credible capital.
 - Decision bias: close clean capital.
@@ -134,7 +134,7 @@ Track financing as an operating funnel, not a social calendar.
 | Net runway months added | Measures survival impact after transaction costs and planned spend. |
 | Modeled fully diluted ownership sold | Prevents SAFE-by-SAFE dilution blindness. |
 | Founder hours spent | Captures the opportunity cost against customer and product work. |
-| Clean capital closed per founder-hour | Primary process-efficiency metric. |
+| Clean runway added per founder-hour | Primary process-efficiency metric; combines survival impact with founder opportunity cost. |
 | Median days from credible interest to yes/no | Exposes stalled diligence and false pipeline. |
 | Median days from signed document to wire | Exposes closing risk. |
 | Customer or build sessions displaced | Keeps fundraising cost tied to the real company bottleneck. |
@@ -159,7 +159,9 @@ Modeled aggregate dilution:
 Non-standard rights or obligations:
 Counterparty/compliance review:
 Founder hours required to close:
-Decision: accept / continue diligence / decline
+Ship now: accept / continue diligence / decline
+Re-evaluate when: [quantitative condition and review date]
+Then: [phase or financing-policy change that activates]
 Next action, owner, and date:
 ```
 
