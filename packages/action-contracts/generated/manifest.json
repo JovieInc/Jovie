@@ -1,0 +1,220 @@
+{
+  "contract": "jovie-actions",
+  "contractVersion": "1.0.0",
+  "invariants": {
+    "dispatcherOwnsPolicy": true,
+    "ledgerRequiredBeforeWrites": true,
+    "publicArtistMcpWritable": false,
+    "clientsArePresentationOnly": true
+  },
+  "actions": [
+    {
+      "id": "chat.start",
+      "version": "1",
+      "kind": "mutation",
+      "title": "Start chat",
+      "summary": "Create or resume an authenticated AI chat conversation, optionally reserving the first turn.",
+      "category": "chat",
+      "auth": {
+        "requiresAuth": true,
+        "profileScoped": true,
+        "publicArtistMcpWritable": false
+      },
+      "idempotency": {
+        "required": true,
+        "keyField": "idempotencyKey",
+        "onConflict": "replay"
+      },
+      "evolution": {
+        "additiveOnly": true,
+        "breakingChanges": "new-action-version",
+        "deprecation": "successor-required"
+      },
+      "bindings": [
+        {
+          "kind": "web-api",
+          "status": "existing",
+          "note": "Legacy paths: POST /api/chat, /api/chat/conversations, /api/onboarding/welcome-chat, /api/mobile/v1/chat/turns."
+        },
+        {
+          "kind": "chat-tool",
+          "status": "contract-only",
+          "note": "Dispatcher-owned in a later phase; tools never own policy."
+        },
+        {
+          "kind": "swift",
+          "status": "contract-only",
+          "note": "App Intent binding contract only; no runtime claim."
+        }
+      ],
+      "entitlementKeys": [],
+      "errorCodes": [
+        "CHAT_DISABLED",
+        "TURN_IN_PROGRESS"
+      ],
+      "schemas": {
+        "input": "schemas/chat.start.input.json",
+        "output": "schemas/chat.start.output.json",
+        "error": "schemas/chat.start.error.json"
+      }
+    },
+    {
+      "id": "contact.create",
+      "version": "1",
+      "kind": "mutation",
+      "title": "Create contact",
+      "summary": "Create an audience contact (email or SMS subscriber) on the authenticated creator profile.",
+      "category": "audience",
+      "auth": {
+        "requiresAuth": true,
+        "profileScoped": true,
+        "publicArtistMcpWritable": false
+      },
+      "idempotency": {
+        "required": true,
+        "keyField": "idempotencyKey",
+        "onConflict": "replay"
+      },
+      "evolution": {
+        "additiveOnly": true,
+        "breakingChanges": "new-action-version",
+        "deprecation": "successor-required"
+      },
+      "bindings": [
+        {
+          "kind": "web-api",
+          "status": "existing",
+          "note": "Legacy paths: POST /api/notifications/subscribe, promo-download OTP routes, Twilio SMS webhook, saveContact server action."
+        },
+        {
+          "kind": "chat-tool",
+          "status": "contract-only"
+        },
+        {
+          "kind": "mcp",
+          "status": "contract-only",
+          "note": "Authenticated owner-workspace MCP only. The public per-artist MCP endpoint never accepts this action."
+        },
+        {
+          "kind": "cli",
+          "status": "contract-only"
+        }
+      ],
+      "entitlementKeys": [
+        "contactsLimit"
+      ],
+      "errorCodes": [
+        "CONTACT_LIMIT_EXCEEDED"
+      ],
+      "schemas": {
+        "input": "schemas/contact.create.input.json",
+        "output": "schemas/contact.create.output.json",
+        "error": "schemas/contact.create.error.json"
+      }
+    },
+    {
+      "id": "release.create",
+      "version": "1",
+      "kind": "mutation",
+      "title": "Create release",
+      "summary": "Create a discography release (single, EP, album, …) on the authenticated creator profile.",
+      "category": "releases",
+      "auth": {
+        "requiresAuth": true,
+        "profileScoped": true,
+        "publicArtistMcpWritable": false
+      },
+      "idempotency": {
+        "required": true,
+        "keyField": "idempotencyKey",
+        "onConflict": "replay"
+      },
+      "evolution": {
+        "additiveOnly": true,
+        "breakingChanges": "new-action-version",
+        "deprecation": "successor-required"
+      },
+      "bindings": [
+        {
+          "kind": "web-api",
+          "status": "existing",
+          "note": "Legacy paths: createRelease server action, createRelease chat tool, album-art create-release-and-apply, chat audio upload, Spotify ingestion."
+        },
+        {
+          "kind": "chat-tool",
+          "status": "contract-only"
+        },
+        {
+          "kind": "swift",
+          "status": "contract-only"
+        }
+      ],
+      "entitlementKeys": [
+        "canCreateManualReleases"
+      ],
+      "errorCodes": [
+        "RELEASE_SLUG_CONFLICT"
+      ],
+      "schemas": {
+        "input": "schemas/release.create.input.json",
+        "output": "schemas/release.create.output.json",
+        "error": "schemas/release.create.error.json"
+      }
+    },
+    {
+      "id": "task.create",
+      "version": "1",
+      "kind": "mutation",
+      "title": "Create task",
+      "summary": "Create a workspace task, optionally attached to a release, on the authenticated creator profile.",
+      "category": "tasks",
+      "auth": {
+        "requiresAuth": true,
+        "profileScoped": true,
+        "publicArtistMcpWritable": false
+      },
+      "idempotency": {
+        "required": true,
+        "keyField": "idempotencyKey",
+        "onConflict": "replay"
+      },
+      "evolution": {
+        "additiveOnly": true,
+        "breakingChanges": "new-action-version",
+        "deprecation": "successor-required"
+      },
+      "bindings": [
+        {
+          "kind": "web-api",
+          "status": "existing",
+          "note": "Legacy paths: createTask, addReleaseTask, addCatalogTaskToRelease server actions and the manageTasks chat tool."
+        },
+        {
+          "kind": "chat-tool",
+          "status": "contract-only"
+        },
+        {
+          "kind": "swift",
+          "status": "contract-only"
+        },
+        {
+          "kind": "mcp",
+          "status": "contract-only",
+          "note": "Authenticated owner-workspace MCP only. The public per-artist MCP endpoint never accepts this action."
+        }
+      ],
+      "entitlementKeys": [
+        "canAccessTasksWorkspace"
+      ],
+      "errorCodes": [
+        "TASKS_WORKSPACE_LOCKED",
+        "RELEASE_NOT_FOUND"
+      ],
+      "schemas": {
+        "input": "schemas/task.create.input.json",
+        "output": "schemas/task.create.output.json",
+        "error": "schemas/task.create.error.json"
+      }
+    }
+  ]
+}
