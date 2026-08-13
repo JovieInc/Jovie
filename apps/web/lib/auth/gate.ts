@@ -428,7 +428,7 @@ async function handleMissingDbUser(
         clerkUserId: betterAuthUserId,
         dbUserId: null,
         profileId: null,
-        redirectTo: '/waitlist',
+        redirectTo: '/start?fresh_signup=true',
         context: { ...baseContext, email },
       };
     }

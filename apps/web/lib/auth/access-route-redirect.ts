@@ -100,7 +100,9 @@ export function getClientAuthenticatedAuthEntryRedirect(
 
 /**
  * Redirect destination for /start based on canonical access state.
- * Anonymous visitors and onboarding-eligible users may remain on /start.
+ * Anonymous visitors, missing app-user identities, and pre-receipt waitlist
+ * states remain on /start so the canonical chat can continue (JOV-5001).
+ * Durable pending receipts belong on /waitlist.
  */
 export function getStartRouteRedirect(
   state: CanonicalUserState
@@ -108,6 +110,7 @@ export function getStartRouteRedirect(
   switch (state) {
     case CanonicalUserState.UNAUTHENTICATED:
     case CanonicalUserState.NEEDS_DB_USER:
+    case CanonicalUserState.NEEDS_WAITLIST_SUBMISSION:
     case CanonicalUserState.NEEDS_ONBOARDING:
       return null;
     case CanonicalUserState.ACTIVE:
@@ -116,10 +119,40 @@ export function getStartRouteRedirect(
       return APP_ROUTES.UNAVAILABLE;
     case CanonicalUserState.USER_CREATION_FAILED:
       return APP_ROUTES.USER_CREATION_ERROR;
-    case CanonicalUserState.NEEDS_WAITLIST_SUBMISSION:
     case CanonicalUserState.WAITLIST_PENDING:
       return APP_ROUTES.WAITLIST;
     default:
       return null;
+  }
+}
+
+/**
+ * Redirect destination for /waitlist. Pre-receipt authenticated states recover
+ * to /start. WAITLIST_PENDING stays so the page can render a durable receipt
+ * or fail closed without false confirmation.
+ *
+ * Paired with `getStartRouteRedirect`: a state must not bounce /start →
+ * /waitlist → /start. Proxy already leaves /start un-rewritten for waitlist
+ * users (JOV-2161); this helper is the remaining server-page contract.
+ */
+export function getWaitlistRouteRedirect(
+  state: CanonicalUserState
+): string | null {
+  switch (state) {
+    case CanonicalUserState.BANNED:
+      return APP_ROUTES.UNAVAILABLE;
+    case CanonicalUserState.USER_CREATION_FAILED:
+      return APP_ROUTES.USER_CREATION_ERROR;
+    case CanonicalUserState.ACTIVE:
+      return APP_ROUTES.DASHBOARD;
+    case CanonicalUserState.UNAUTHENTICATED:
+    case CanonicalUserState.NEEDS_DB_USER:
+    case CanonicalUserState.NEEDS_WAITLIST_SUBMISSION:
+    case CanonicalUserState.NEEDS_ONBOARDING:
+      return APP_ROUTES.START;
+    case CanonicalUserState.WAITLIST_PENDING:
+      return null;
+    default:
+      return APP_ROUTES.START;
   }
 }

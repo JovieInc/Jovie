@@ -644,10 +644,10 @@ describe('gate.ts utility functions', () => {
       );
     });
 
-    it('returns /waitlist for waitlist states', () => {
+    it('returns /start for pre-receipt waitlist submission and /waitlist for pending receipts', () => {
       expect(
         getRedirectForState(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION)
-      ).toBe('/waitlist');
+      ).toBe('/start?fresh_signup=true');
       expect(getRedirectForState(CanonicalUserState.WAITLIST_PENDING)).toBe(
         '/waitlist'
       );

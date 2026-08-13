@@ -398,7 +398,7 @@ describe('@critical gate.ts (Better Auth)', () => {
     expect(mockDbInsert).toHaveBeenCalled();
   });
 
-  it('redirects to waitlist when gate is enabled and user has no waitlist entry', async () => {
+  it('recovers to /start when gate is enabled and user has no waitlist entry', async () => {
     mockGetSession.mockResolvedValue({
       user: { id: 'ba_waitlist', email: 'waitlist@example.com' },
       session: { id: 'sess_waitlist' },
@@ -424,7 +424,7 @@ describe('@critical gate.ts (Better Auth)', () => {
     const result = await resolveUserState();
 
     expect(result.state).toBe(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION);
-    expect(result.redirectTo).toBe('/waitlist');
+    expect(result.redirectTo).toBe('/start?fresh_signup=true');
     expect(result.dbUserId).toBeNull();
     expect(mockDbInsert).not.toHaveBeenCalled();
   });
