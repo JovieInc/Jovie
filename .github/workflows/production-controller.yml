@@ -112,8 +112,11 @@ jobs:
           set -euo pipefail
           receipt="$RUNNER_TEMP/jovie-fleet-gate.json"
           set +e
+          # This exact-main evaluation also persists the canonical fleet gate
+          # receipt under the gate's one-writer lock, so a completed production
+          # controller run refreshes the persisted deployment-authority state.
           python3 scripts/hermes/gem-priority-gate.py \
-            --dry-run --consumer promotion >"$receipt"
+            --consumer promotion >"$receipt"
           gate_rc=$?
           set -e
           jq -e '

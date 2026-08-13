@@ -10,10 +10,12 @@ Linear leases.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -24,6 +26,10 @@ from typing import Any
 SCHEMA = "jovie-fleet-gate/v1"
 INTEGRITY_SCHEMA = "jovie-integrity/v1"
 CONCURRENCY_SCHEMA = "gem-concurrency-evidence/v1"
+# Keep in sync with the consumer fail-closed window
+# (scripts/backlog-orchestrator/admitter.mjs CONTROLLER_RECEIPT_MAX_AGE_MS).
+RECEIPT_STALE_AFTER = timedelta(minutes=10)
+WRITER_LOCK_TIMEOUT_SECONDS = 60.0
 SEVERE_REASONS = {
     "credential-compromise",
     "unsafe-migration-or-data-corruption",
@@ -487,6 +493,70 @@ def write_receipt(receipt: dict[str, Any], state_dir: Path) -> None:
     )
 
 
+def acquire_writer_lock(state_dir: Path, timeout_seconds: float = WRITER_LOCK_TIMEOUT_SECONDS) -> int:
+    """Serialize the observe-evaluate-persist cycle to one writer.
+
+    The native merge queue owns promotion; this lock only orders receipt
+    refreshes so a slower, older observation can never overwrite a fresher
+    persisted receipt. A contested lock past the timeout fails closed.
+    """
+    state_dir.mkdir(parents=True, exist_ok=True)
+    fd = os.open(state_dir / ".writer.lock", os.O_RDWR | os.O_CREAT, 0o644)
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return fd
+        except BlockingIOError:
+            if time.monotonic() >= deadline:
+                os.close(fd)
+                raise TimeoutError(
+                    f"fleet gate writer lock stayed contested for {timeout_seconds}s"
+                ) from None
+            time.sleep(0.2)
+
+
+def release_writer_lock(fd: int) -> None:
+    try:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+    finally:
+        os.close(fd)
+
+
+def alarm_if_previous_receipt_stale(state_dir: Path, now: datetime) -> None:
+    """Surface stale persisted state before repairing it.
+
+    The refresh still proceeds; the alarm records how long the canonical
+    receipt went without a writer so the gap is visible in controller logs.
+    """
+    destination = state_dir / "latest.json"
+    detail: str | None = None
+    if not destination.exists():
+        detail = "no persisted receipt exists"
+    else:
+        try:
+            previous = read_json(destination)
+            observed_at = parse_time(previous.get("observedAt"))
+            if previous.get("schema") != SCHEMA or observed_at is None:
+                detail = "persisted receipt is malformed"
+            elif now - observed_at > RECEIPT_STALE_AFTER:
+                age_seconds = int((now - observed_at).total_seconds())
+                detail = f"persisted receipt was stale for {age_seconds}s before refresh"
+        except (OSError, ValueError, json.JSONDecodeError):
+            detail = "persisted receipt could not be read"
+    if detail is None:
+        return
+    prefix = "::warning::" if os.environ.get("GITHUB_ACTIONS") == "true" else "WARNING:"
+    print(f"{prefix} fleet gate receipt refresh repaired stale state: {detail}", file=sys.stderr)
+
+
+def verify_persisted_receipt(state_dir: Path, receipt: dict[str, Any]) -> None:
+    """Fail closed unless the canonical receipt holds exactly this evaluation."""
+    persisted = read_json(state_dir / "latest.json")
+    if persisted.get("schema") != SCHEMA or persisted.get("observedAt") != receipt.get("observedAt"):
+        raise ValueError("persisted fleet gate receipt failed post-write readback")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
@@ -522,28 +592,42 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
+    integrity_path = args.integrity_receipt or args.state_dir.parent / "integrity.json"
+    concurrency_path = args.concurrency_evidence or args.state_dir.parent / "concurrency.json"
+    return {
+        "main": observe_main(args.repo),
+        "production": observe_production(args.production_url),
+        "controller": observe_controller(args.symphony_url),
+        "integrity": observe_integrity(integrity_path),
+        "queue": observe_queue(args.repo, args.queue_target),
+        "concurrencyEvidence": observe_concurrency(concurrency_path, now),
+    }
+
+
 def main() -> int:
     args = parse_args()
-    now = utc_now()
-    observed_at = isoformat(now)
     if args.evaluate_json:
         signals = json.loads(args.evaluate_json)
         if not isinstance(signals, dict):
             raise ValueError("--evaluate-json must be a JSON object")
+        receipt = evaluate(signals, isoformat(utc_now()))
+    elif args.dry_run:
+        now = utc_now()
+        receipt = evaluate(observe_signals(args, now), isoformat(now))
     else:
-        integrity_path = args.integrity_receipt or args.state_dir.parent / "integrity.json"
-        concurrency_path = args.concurrency_evidence or args.state_dir.parent / "concurrency.json"
-        signals = {
-            "main": observe_main(args.repo),
-            "production": observe_production(args.production_url),
-            "controller": observe_controller(args.symphony_url),
-            "integrity": observe_integrity(integrity_path),
-            "queue": observe_queue(args.repo, args.queue_target),
-            "concurrencyEvidence": observe_concurrency(concurrency_path, now),
-        }
-    receipt = evaluate(signals, observed_at)
-    if not args.dry_run and not args.evaluate_json:
-        write_receipt(receipt, args.state_dir)
+        # Persisting refreshers hold one writer lock across the whole
+        # observe-evaluate-write cycle so concurrent event-driven and
+        # scheduled refreshes stay ordered by observation time.
+        lock_fd = acquire_writer_lock(args.state_dir)
+        try:
+            now = utc_now()
+            alarm_if_previous_receipt_stale(args.state_dir, now)
+            receipt = evaluate(observe_signals(args, now), isoformat(now))
+            write_receipt(receipt, args.state_dir)
+            verify_persisted_receipt(args.state_dir, receipt)
+        finally:
+            release_writer_lock(lock_fd)
     print(json.dumps(receipt, indent=2, sort_keys=True))
     allowed = {
         "direct-gem": receipt["ownership"]["directGemPickup"],
