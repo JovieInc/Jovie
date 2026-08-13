@@ -113,10 +113,6 @@ export function validatePlanCandidate(issue, evidence) {
   );
   if (missing) return `missing-${missing[0]}-evidence`;
 
-  // Ownership roles are explicit and consistent (JOV-5032): Symphony owns
-  // implementation through draft PR / In Review; Gem + GitHub own
-  // verification, queue, merge, deploy, and production receipts. The
-  // ambiguous single `owner` field is intentionally not accepted.
   if (
     evidence.owners?.implementation !== 'Symphony' ||
     evidence.owners?.verification !== 'Gem'
@@ -197,7 +193,7 @@ function hasReceipt(issue, receipt) {
 export function planGateReceipt(issue, options = {}) {
   const body = commentsOf(issue)
     .map(commentBody)
-    .find(
+    .findLast(
       value =>
         value.startsWith(`${PLAN_GATE_PREFIX}\n`) &&
         value.endsWith(`\n${PLAN_GATE_SUFFIX}`)
@@ -219,10 +215,6 @@ export function planGateReceipt(issue, options = {}) {
       planGateFingerprint(issue, payload.evidence) !== payload.fingerprint
     )
       return null;
-    // The pre-lease fingerprints are required and reconstructed semantically
-    // (JOV-5032): a plan receipt with null or mismatched context/research
-    // fingerprints — or one whose pre-lease receipts went stale after an
-    // issue edit — is not authority for admission or lease.
     const context = contextGateReceipt(issue, options);
     const research = researchGateReceipt(issue, options);
     if (
@@ -262,9 +254,6 @@ function labelIds(issue, labelId) {
 /**
  * Write exactly one plan receipt, or return an idempotent no-op. The client is
  * injected so this boundary remains unit-testable without touching Linear.
- * Plan approval is fail-closed on the pre-lease context and research
- * receipts: they are revalidated semantically against the current issue
- * before any plan mutation is written (JOV-5032).
  */
 export async function approvePlan({
   issue,

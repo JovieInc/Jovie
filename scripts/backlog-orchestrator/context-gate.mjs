@@ -1,28 +1,10 @@
-/**
- * Verified pre-lease GBrain context boundary (symphony-context/v1).
- *
- * Before plan or admission approval, the orchestrator must query the canonical
- * agent org chart plus targeted ownership/current-priorities context and bind
- * the consulted GBrain page IDs and revisions to one stable receipt comment.
- * An unreachable GBrain is a typed system-blocker before lease — never a
- * silent skip. Receipts are reconstructed semantically from the current issue,
- * the expected ownership roles, and a freshness window; stale, forged, or
- * mismatched receipts are rejected.
- *
- * Ownership roles are explicit and consistent everywhere:
- * - Symphony owns implementation through draft PR / In Review.
- * - Gem + GitHub own verification, queue, merge, deploy, and production
- *   receipts.
- */
-
 import { createHash } from 'node:crypto';
-
 export const CONTEXT_GATE_SCHEMA = 'symphony-context/v1';
 export const CONTEXT_GATE_PREFIX = '<!-- symphony-context/v1 -->';
 export const CONTEXT_GATE_SUFFIX = '<!--/symphony-context-->';
 export const ORG_CHART_SLUG = 'agent-org-chart';
 export const CONTEXT_RECEIPT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-export const MAX_CONTEXT_PAGES_PER_QUERY = 3;
+export const MAX_CONTEXT_PAGES_PER_QUERY = 1;
 
 export const IMPLEMENTATION_OWNER = 'Symphony';
 export const VERIFICATION_OWNER = 'Gem';
@@ -31,7 +13,6 @@ export const EXPECTED_OWNERSHIP = Object.freeze({
   verification: VERIFICATION_OWNER,
 });
 
-/** Typed pre-lease system-blocker codes. */
 export const CONTEXT_BLOCKER = Object.freeze({
   GBRAIN_UNAVAILABLE: 'gbrain-unavailable',
   ORG_CHART_MISSING: 'org-chart-missing',
@@ -72,11 +53,6 @@ function isFreshTimestamp(value, nowMs, maxAgeMs) {
   );
 }
 
-/**
- * Content binding for the current issue prose. Deliberately excludes labels
- * and comments: gate mutations add both, and must not invalidate a receipt
- * that was correctly bound to the issue statement.
- */
 export function issueContentHash(issue) {
   const canonical = [
     issue?.identifier || '',
@@ -96,7 +72,6 @@ function keyTerms(text) {
     .join(' ');
 }
 
-/** The bounded, deterministic pre-lease context queries for an issue. */
 export function buildContextQueries(issue) {
   const terms = keyTerms(issue?.title) || String(issue?.identifier || '');
   return [
@@ -105,10 +80,6 @@ export function buildContextQueries(issue) {
   ];
 }
 
-/**
- * Normalize a GBrain page into a bindable reference. A page without a slug,
- * canonical ID, and revision cannot be bound and returns null.
- */
 export function boundPage(page) {
   if (!page || typeof page !== 'object') return null;
   const revision =
@@ -124,24 +95,15 @@ export function boundPage(page) {
   return { slug: page.slug, id: String(page.id), revision: String(revision) };
 }
 
-/**
- * Deterministic ownership-conflict check: when the org chart explicitly
- * declares an implementation owner other than Symphony, the context evidence
- * contradicts the fleet ownership contract and must block the lease.
- */
-function declaredImplementationOwner(orgChart) {
+function declaredOwner(orgChart, role) {
   const truth = `${orgChart?.compiledTruth || ''} ${orgChart?.compiled_truth || ''} ${orgChart?.body || ''}`;
-  const match = /implementation\s+owner\s*[:=]\s*([A-Za-z][A-Za-z-]*)/i.exec(
-    truth
-  );
+  const match = new RegExp(
+    `${role}\\s+owner\\s*[:=]\\s*([A-Za-z][A-Za-z-]*)`,
+    'i'
+  ).exec(truth);
   return match ? match[1] : null;
 }
 
-/**
- * Collect and bind the pre-lease context evidence. `gbrain` is an injected
- * client with `getPage(slug)` and `searchPages(query, limit)` so this boundary
- * stays unit-testable. Any transport failure is a typed system-blocker.
- */
 export async function collectContextEvidence({
   issue,
   gbrain,
@@ -157,15 +119,16 @@ export async function collectContextEvidence({
   if (!boundOrgChart)
     return { evidence: null, reason: CONTEXT_BLOCKER.ORG_CHART_MISSING };
 
-  const declaredOwner = declaredImplementationOwner(orgChart);
+  const implementationOwner = declaredOwner(orgChart, 'implementation');
+  const verificationOwner = declaredOwner(orgChart, 'verification');
   if (
-    declaredOwner &&
-    declaredOwner.toLowerCase() !== IMPLEMENTATION_OWNER.toLowerCase()
+    implementationOwner?.toLowerCase() !== IMPLEMENTATION_OWNER.toLowerCase() ||
+    verificationOwner?.toLowerCase() !== VERIFICATION_OWNER.toLowerCase()
   ) {
     return {
       evidence: null,
       reason: CONTEXT_BLOCKER.OWNERSHIP_CONFLICT,
-      detail: `org chart declares implementation owner ${declaredOwner}; expected ${IMPLEMENTATION_OWNER}`,
+      detail: `org chart owners are implementation=${implementationOwner || 'none'}, verification=${verificationOwner || 'none'}; expected ${IMPLEMENTATION_OWNER}/${VERIFICATION_OWNER}`,
     };
   }
 
@@ -179,9 +142,6 @@ export async function collectContextEvidence({
     }
     if (!Array.isArray(pages))
       return { evidence: null, reason: CONTEXT_BLOCKER.GBRAIN_UNAVAILABLE };
-    // A targeted ownership/priorities query with zero bindable pages proves
-    // nothing; fail closed with a typed blocker instead of admitting empty
-    // context evidence.
     const bound = pages.map(boundPage).filter(Boolean);
     if (bound.length === 0)
       return {
@@ -205,11 +165,6 @@ export async function collectContextEvidence({
   };
 }
 
-/**
- * Semantically revalidate context evidence against the current issue, the
- * expected ownership roles, and the freshness window. Returns a stable reason
- * string, or null when the evidence is valid.
- */
 export function validateContextEvidence(
   issue,
   evidence,
@@ -293,15 +248,10 @@ function hasReceipt(issue, receipt) {
   return commentsOf(issue).some(comment => commentBody(comment) === receipt);
 }
 
-/**
- * Reconstruct the context receipt from the issue's comments and revalidate it
- * semantically. Returns null for missing, stale, forged, or mismatched
- * receipts.
- */
 export function contextGateReceipt(issue, options = {}) {
   const body = commentsOf(issue)
     .map(commentBody)
-    .find(
+    .findLast(
       value =>
         value.startsWith(`${CONTEXT_GATE_PREFIX}\n`) &&
         value.endsWith(`\n${CONTEXT_GATE_SUFFIX}`)
@@ -337,10 +287,6 @@ function mutationSucceeded(result) {
   );
 }
 
-/**
- * Query GBrain and write exactly one context receipt, or return a typed
- * system-blocker. Every mutation is verified by an authoritative reread.
- */
 export async function approveContext({
   issue,
   gbrain,

@@ -1,12 +1,5 @@
-/**
- * Default GBrain CLI client for the pre-lease context gate.
- *
- * Unlike the soft-degrading cron helpers, this client throws on transport
- * failure: the context gate must turn an unreachable brain into a typed
- * system-blocker before lease, never a silent skip.
- */
-
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 const GBRAIN_BIN = process.env.JOVIE_GBRAIN_BIN || 'gbrain';
 const GBRAIN_TIMEOUT_MS = 30_000;
@@ -19,31 +12,37 @@ function run(args) {
 }
 
 export async function getPage(slug) {
-  const page = JSON.parse(run(['get', slug]));
-  if (!page || typeof page !== 'object') return null;
+  return parsePage(slug, run(['get', slug]));
+}
+
+export function parsePage(slug, raw) {
+  const document = String(raw || '');
+  const start = document.indexOf('---\n');
+  const end = start < 0 ? -1 : document.indexOf('\n---\n', start + 4);
+  if (start < 0 || end < 0) return null;
+  const frontmatter = document.slice(start + 4, end);
+  const revision = /^updated_at:\s*['"]?([^'"\n]+)['"]?\s*$/m.exec(
+    frontmatter
+  )?.[1];
   return {
-    slug: page.slug,
-    id: page.id,
-    revision: page.content_hash || page.updated_at,
-    compiledTruth: page.compiled_truth || '',
+    slug,
+    id: slug,
+    revision: revision || createHash('sha256').update(document).digest('hex'),
+    compiledTruth: document.slice(end + 5),
   };
 }
 
 export async function searchPages(query, limit = 3) {
-  const results = JSON.parse(run(['search', query]));
-  if (!Array.isArray(results)) return [];
-  return results
-    .slice(0, limit)
-    .map(page => ({
-      slug: page?.slug,
-      id: page?.page_id ?? page?.id,
-      revision:
-        page?.content_hash ||
-        (page?.chunk_id ? `chunk:${page.chunk_id}` : null) ||
-        page?.effective_date ||
-        page?.updated_at,
-    }))
-    .filter(page => page.slug);
+  const slugs = parseSearchSlugs(
+    run(['query', query, '--limit', String(limit)])
+  );
+  return Promise.all(slugs.slice(0, limit).map(getPage));
+}
+
+export function parseSearchSlugs(raw) {
+  return [...String(raw || '').matchAll(/^\[[^\]]+\]\s+([^\s]+)\s+--/gm)]
+    .map(match => match[1])
+    .filter((slug, index, all) => all.indexOf(slug) === index);
 }
 
 export const cliGbrainClient = Object.freeze({ getPage, searchPages });

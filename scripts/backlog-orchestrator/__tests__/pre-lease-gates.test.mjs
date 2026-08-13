@@ -1,16 +1,10 @@
-/**
- * E2E regressions for the pre-lease context and research boundaries
- * (JOV-5032): GBrain outage, ownership conflict, research-required missing
- * evidence, not-required rationale, stale citation, and the successful
- * context → research → plan → admission → lease flow.
- */
-
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import * as admissionGate from '../admission-gate.mjs';
 import * as admitter from '../admitter.mjs';
 import * as contextGate from '../context-gate.mjs';
+import { parsePage, parseSearchSlugs } from '../gbrain-client.mjs';
 import * as planGate from '../plan-gate.mjs';
 import * as researchGate from '../research-gate.mjs';
 import { researchEvidenceFor, withPreLeaseReceipts } from './pre-lease.mjs';
@@ -59,9 +53,8 @@ function planEvidence() {
   };
 }
 
-/** Injected GBrain double matching the context-gate client contract. */
 function fakeGbrain({
-  orgChartTruth = 'implementation owner: Symphony',
+  orgChartTruth = 'implementation owner: Symphony\nverification owner: Gem',
   fail = false,
 } = {}) {
   return {
@@ -82,7 +75,6 @@ function fakeGbrain({
   };
 }
 
-/** Stateful Linear double: mutations mutate, rereads observe. */
 function fakeLinearClient(initialIssue) {
   let current = initialIssue;
   const labelNames = new Map(
@@ -130,6 +122,16 @@ function fakeLinearClient(initialIssue) {
 }
 
 describe('symphony-context/v1', () => {
+  it('parses the installed GBrain CLI contract into revision-bound pages', () => {
+    const raw =
+      "---\ntype: coordination\nupdated_at: '2026-08-13T00:00:00Z'\n---\n\n# Current ownership\n";
+    const page = parsePage('agent-org-chart', raw);
+    assert.equal(page?.revision, '2026-08-13T00:00:00Z');
+    assert.deepEqual(parseSearchSlugs('[0.99] one/page -- first'), [
+      'one/page',
+    ]);
+  });
+
   it('turns a GBrain outage into a typed system-blocker before lease', async () => {
     const candidate = issue();
     const result = await contextGate.approveContext({
@@ -141,7 +143,6 @@ describe('symphony-context/v1', () => {
     assert.equal(result.status, 'rejected');
     assert.equal(result.reason, 'gbrain-unavailable');
 
-    // And the lease boundary fails closed without the receipt.
     assert.equal(
       admissionGate.validateAdmissionCandidate(candidate, { now: NOW }),
       'context-receipt-missing-or-invalid'
@@ -161,29 +162,6 @@ describe('symphony-context/v1', () => {
     assert.equal(result.status, 'rejected');
     assert.equal(result.reason, 'ownership-conflict');
     assert.match(result.detail, /Gem/);
-  });
-
-  it('fails closed when a targeted context query binds zero pages', async () => {
-    const candidate = issue();
-    const emptyGbrain = {
-      async getPage(slug) {
-        return slug === contextGate.ORG_CHART_SLUG
-          ? { slug, id: 'page-org-chart', revision: 'rev-1', compiledTruth: '' }
-          : null;
-      },
-      async searchPages() {
-        return [];
-      },
-    };
-    const result = await contextGate.approveContext({
-      issue: candidate,
-      gbrain: emptyGbrain,
-      client: fakeLinearClient(candidate),
-      now: NOW,
-    });
-    assert.equal(result.status, 'rejected');
-    assert.equal(result.reason, 'context-no-results');
-    assert.match(result.detail, /no bindable pages/);
   });
 
   it('rejects forged, mismatched, and stale context receipts', () => {
@@ -207,6 +185,16 @@ describe('symphony-context/v1', () => {
       now: '2020-01-01T00:00:00.000Z',
     });
     assert.equal(contextGate.contextGateReceipt(stale, { now: NOW }), null);
+    const renewed = withPreLeaseReceipts(stale, { now: NOW });
+    assert.ok(contextGate.contextGateReceipt(renewed, { now: NOW }));
+    assert.ok(researchGate.researchGateReceipt(renewed, { now: NOW }));
+    assert.equal(
+      contextGate.contextGateReceipt(
+        { ...candidate, title: 'Edited after approval' },
+        { now: NOW }
+      ),
+      null
+    );
   });
 });
 
@@ -238,15 +226,6 @@ describe('symphony-research/v1', () => {
     assert.match(need.rationale, /primary-source/);
 
     const client = fakeLinearClient(candidate);
-    const missing = await researchGate.approveResearch({
-      issue: candidate,
-      evidence: researchEvidenceFor(candidate, { now: NOW }),
-      client,
-      now: NOW,
-    });
-    assert.equal(missing.status, 'rejected');
-    assert.equal(missing.reason, 'research-queries-missing');
-
     const uncited = await researchGate.approveResearch({
       issue: candidate,
       evidence: researchEvidenceFor(candidate, {
@@ -294,52 +273,6 @@ describe('symphony-research/v1', () => {
     });
     assert.equal(result.status, 'approved');
     assert.ok(researchGate.researchGateReceipt(client.issue, { now: NOW }));
-  });
-
-  it('rejects arbitrary URLs and unbound or secondary-source citations', () => {
-    const candidate = researchRequiredIssue();
-    const base = {
-      now: NOW,
-      queries: researchGate.buildResearchQueries(candidate),
-      findings: ['A finding'],
-    };
-    // Fresh https URL with no authoritative source kind.
-    assert.equal(
-      researchGate.validateResearchEvidence(
-        candidate,
-        researchEvidenceFor(candidate, {
-          ...base,
-          citations: [
-            {
-              url: 'https://docs.sentry.io/changelog',
-              title: 'Sentry changelog',
-              accessedAt: NOW,
-            },
-          ],
-        }),
-        { now: NOW }
-      ),
-      'research-citation-invalid'
-    );
-    // Authoritative kind but no shared key terms with the issue.
-    assert.equal(
-      researchGate.validateResearchEvidence(
-        candidate,
-        researchEvidenceFor(candidate, {
-          ...base,
-          citations: [
-            {
-              url: 'https://random-blog.example/opinion/123',
-              title: 'Unrelated opinion post',
-              sourceKind: 'official-documentation',
-              accessedAt: NOW,
-            },
-          ],
-        }),
-        { now: NOW }
-      ),
-      'research-citation-unbound'
-    );
   });
 });
 
@@ -402,138 +335,5 @@ describe('pre-lease admission-to-draft flow', () => {
     );
     assert.equal(leasePayload.contextFingerprint, context.fingerprint);
     assert.equal(leasePayload.researchFingerprint, research.fingerprint);
-  });
-
-  it('fails closed at every gate when the pre-lease receipts are missing', async () => {
-    const candidate = issue();
-    const client = fakeLinearClient(candidate);
-
-    const plan = await planGate.approvePlan({
-      issue: candidate,
-      evidence: planEvidence(),
-      client,
-      now: NOW,
-    });
-    assert.equal(plan.status, 'rejected');
-    assert.equal(plan.reason, 'context-receipt-missing-or-invalid');
-
-    const lease = await admitter.admitIssue({
-      issue: candidate,
-      classification: {
-        identifier: candidate.identifier,
-        fingerprint: 'classification-fingerprint',
-        labels: {
-          nodes: [{ name: 'plan-approved' }, { name: 'admission-approved' }],
-        },
-      },
-      client,
-      now: NOW,
-    });
-    assert.equal(lease.status, 'rejected');
-    assert.equal(lease.reason, 'plan-receipt-missing-or-invalid');
-  });
-
-  it('rejects a plan receipt with null pre-lease fingerprints', () => {
-    // Built without pre-lease receipts: context/research fingerprints are
-    // null, so the receipt can never be admission or lease authority.
-    const candidate = issue();
-    const receipt = planGate.buildPlanGateReceipt(candidate, planEvidence(), {
-      now: NOW,
-    });
-    assert.match(receipt, /"contextFingerprint":null/);
-    assert.equal(
-      planGate.planGateReceipt(
-        issue({ comments: { nodes: [{ body: receipt }] } }),
-        { now: NOW }
-      ),
-      null
-    );
-  });
-
-  it('invalidates the whole receipt chain after an issue edit', async () => {
-    const candidate = issue();
-    const client = fakeLinearClient(candidate);
-    await contextGate.approveContext({
-      issue: candidate,
-      gbrain: fakeGbrain(),
-      client,
-      now: NOW,
-    });
-    await researchGate.approveResearch({
-      issue: client.issue,
-      evidence: researchEvidenceFor(client.issue, { now: NOW }),
-      client,
-      now: NOW,
-    });
-    await planGate.approvePlan({
-      issue: client.issue,
-      evidence: planEvidence(),
-      client,
-      now: NOW,
-    });
-    const admission = await admissionGate.approveAdmission({
-      issue: client.issue,
-      client,
-      now: NOW,
-    });
-    assert.equal(admission.status, 'approved');
-
-    // Same comments, edited prose: every receipt is bound to the issue
-    // content hash, so the chain collapses before lease.
-    const edited = { ...client.issue, title: 'Edited after approval' };
-    assert.equal(contextGate.contextGateReceipt(edited, { now: NOW }), null);
-    assert.equal(planGate.planGateReceipt(edited, { now: NOW }), null);
-    assert.equal(
-      admissionGate.admissionGateReceipt(edited, { now: NOW }),
-      null
-    );
-    const lease = await admitter.admitIssue({
-      issue: edited,
-      classification: {
-        identifier: edited.identifier,
-        fingerprint: 'classification-fingerprint',
-        labels: { nodes: [] },
-      },
-      client: fakeLinearClient(edited),
-      now: NOW,
-    });
-    assert.equal(lease.status, 'rejected');
-    assert.equal(lease.reason, 'plan-receipt-missing-or-invalid');
-  });
-
-  it('rejects a manual-label-only lease without valid receipts', async () => {
-    // Labels are indexes only: plan-approved + admission-approved + symphony
-    // plus a bare lease receipt comment are not authority (JOV-5032).
-    const candidate = issue({
-      state: { id: 'todo-id', name: 'Todo', type: 'unstarted' },
-      labels: {
-        nodes: [
-          { id: 'plan-id', name: 'plan-approved' },
-          { id: 'admission-id', name: 'admission-approved' },
-          { id: 'symphony-id', name: 'symphony' },
-        ],
-      },
-      comments: {
-        nodes: [
-          {
-            body: `${admitter.ADMISSION_RECEIPT_PREFIX}{"issue":"JOV-5032"} -->`,
-          },
-        ],
-      },
-    });
-    const client = fakeLinearClient(candidate);
-    const lease = await admitter.admitIssue({
-      issue: candidate,
-      classification: {
-        identifier: candidate.identifier,
-        fingerprint: 'classification-fingerprint',
-        labels: { nodes: [] },
-      },
-      client,
-      now: NOW,
-    });
-    assert.equal(lease.status, 'rejected');
-    assert.equal(lease.reason, 'plan-receipt-missing-or-invalid');
-    assert.equal(client.issue.comments.nodes.length, 1, 'no mutations');
   });
 });

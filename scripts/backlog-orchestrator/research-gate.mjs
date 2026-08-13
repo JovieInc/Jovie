@@ -1,18 +1,3 @@
-/**
- * Deterministic pre-lease research boundary (symphony-research/v1).
- *
- * Before model routing and lease, every issue is classified deterministically:
- * - `not-required` with an explicit rationale for purely local, mechanical
- *   work, or
- * - `required` with bounded primary-source queries, dated citations, and
- *   findings.
- *
- * The classification and evidence are bound to one stable receipt comment.
- * Receipts are reconstructed semantically from the current issue and a
- * freshness window; stale citations, forged classifications, and mismatched
- * evidence are rejected.
- */
-
 import { createHash } from 'node:crypto';
 import { issueContentHash } from './context-gate.mjs';
 
@@ -23,11 +8,6 @@ export const RESEARCH_RECEIPT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 export const CITATION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 export const MAX_RESEARCH_QUERIES = 3;
 
-/**
- * Primary-source kinds accepted as research citations. Secondary commentary
- * (blogs, forums, social posts) is not authoritative grounding for model
- * routing.
- */
 export const CITATION_SOURCE_KINDS = Object.freeze([
   'official-documentation',
   'api-reference',
@@ -39,11 +19,6 @@ export const CITATION_SOURCE_KINDS = Object.freeze([
   'rfc',
 ]);
 
-/**
- * External/primary-source signals. Matching any of these means the issue
- * depends on facts outside the repository, so model routing must be grounded
- * in dated primary-source citations rather than stale memory.
- */
 const RESEARCH_REQUIRED_PATTERN =
   /https?:\/\/|dependenc|npm\s|pnpm\s|package version|third[- ]party|vendor|\bsdk\b|external api|api deprecat|breaking change|upgrade guide|migration guide|changelog|release notes|app store|play store|store review|legal|compliance|pricing|rate limit/i;
 
@@ -96,7 +71,6 @@ function significantTokens(text) {
   );
 }
 
-/** Deterministic research classifier. No model calls. */
 export function classifyResearchNeed(issue) {
   const text = `${issue?.title || ''}\n${issue?.description || ''}`;
   const match = RESEARCH_REQUIRED_PATTERN.exec(text);
@@ -123,7 +97,6 @@ function keyTerms(text) {
     .join(' ');
 }
 
-/** Bounded primary-source queries for research-required issues. */
 export function buildResearchQueries(issue) {
   const terms = keyTerms(issue?.title) || String(issue?.identifier || '');
   return [
@@ -132,11 +105,6 @@ export function buildResearchQueries(issue) {
   ].slice(0, MAX_RESEARCH_QUERIES);
 }
 
-/**
- * Semantically revalidate research evidence against the current issue, the
- * deterministic classification, and the freshness windows. Returns a stable
- * reason string, or null when the evidence is valid.
- */
 export function validateResearchEvidence(
   issue,
   evidence,
@@ -162,7 +130,6 @@ export function validateResearchEvidence(
 
   if (expected.decision === 'not-required') return null;
 
-  // classification === 'required'
   if (
     !nonEmptyList(evidence.queries) ||
     evidence.queries.length > MAX_RESEARCH_QUERIES
@@ -170,8 +137,6 @@ export function validateResearchEvidence(
     return 'research-queries-missing';
   if (!Array.isArray(evidence.citations) || evidence.citations.length === 0)
     return 'research-citation-missing';
-  // Citations must be dated, primary-source, and semantically bound to the
-  // issue: an arbitrary fresh URL is not research evidence.
   const bindingTokens = significantTokens(
     [issue?.title || '', ...buildResearchQueries(issue)].join(' ')
   );
@@ -236,15 +201,10 @@ function hasReceipt(issue, receipt) {
   return commentsOf(issue).some(comment => commentBody(comment) === receipt);
 }
 
-/**
- * Reconstruct the research receipt from the issue's comments and revalidate it
- * semantically. Returns null for missing, stale, forged, or mismatched
- * receipts.
- */
 export function researchGateReceipt(issue, options = {}) {
   const body = commentsOf(issue)
     .map(commentBody)
-    .find(
+    .findLast(
       value =>
         value.startsWith(`${RESEARCH_GATE_PREFIX}\n`) &&
         value.endsWith(`\n${RESEARCH_GATE_SUFFIX}`)
@@ -280,10 +240,6 @@ function mutationSucceeded(result) {
   );
 }
 
-/**
- * Write exactly one research receipt, or return a typed rejection. Every
- * mutation is verified by an authoritative reread.
- */
 export async function approveResearch({
   issue,
   evidence,
