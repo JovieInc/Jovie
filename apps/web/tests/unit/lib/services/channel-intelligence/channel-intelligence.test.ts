@@ -145,6 +145,8 @@ describe('buildChannelIntelligenceReport + answers', () => {
         hasText: true,
         topic: 'vlog',
         reachTrend: -0.25,
+        ctr: 0.02,
+        avgViewDurationSeconds: 20,
       }),
       ...[0, 1, 2].map(i =>
         makeVideoWithWmpi(`face_${i}`, `Face ${i}`, 0.55, 2_000, {
@@ -167,6 +169,14 @@ describe('buildChannelIntelligenceReport + answers', () => {
     expect(report.worstVideos[0]?.videoId).toBe('weak');
     expect(report.decliningVideos.map(v => v.videoId)).toContain('weak');
     expect(report.sources.some(s => s.kind === 'youtube_reporting_api')).toBe(
+      true
+    );
+    expect(report.changePlan.length).toBeGreaterThan(0);
+    expect(report.changePlan[0]?.priority).toBe(1);
+    expect(
+      report.changePlan.some(item => item.action.includes('Random Dump'))
+    ).toBe(true);
+    expect(report.changePlan.every(item => item.observation.length > 0)).toBe(
       true
     );
   });
@@ -196,6 +206,7 @@ describe('buildChannelIntelligenceReport + answers', () => {
     });
     expect(working.intent).toBe('whats_working');
     expect(working.winSignals.length).toBeGreaterThan(0);
+    expect(working.summary).toContain('Prioritized change plan');
 
     const declining = answerChannelIntelligenceQuery({
       question: "what's declining?",

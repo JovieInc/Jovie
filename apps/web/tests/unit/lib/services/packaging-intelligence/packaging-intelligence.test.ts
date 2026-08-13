@@ -31,7 +31,10 @@ vi.mock(
 );
 
 import { analyzeVideoPackaging } from '@/lib/services/packaging-intelligence';
-import { analyzePackagingWithLlm } from '@/lib/services/packaging-intelligence/analyze';
+import {
+  analyzePackagingWithLlm,
+  PACKAGING_AUDIT_SYSTEM_PROMPT,
+} from '@/lib/services/packaging-intelligence/analyze';
 import {
   extractFirst30sHookText,
   parseWebVtt,
@@ -65,6 +68,35 @@ const llmOutput = {
   },
   first30sDeliversPromise: true,
   first30sAssessment: 'Opens with the first mistake immediately.',
+  findings: [
+    {
+      observation: 'Title promises three specific mistakes.',
+      evidence: 'Title: 3 Money Mistakes Keeping You Broke',
+      evidenceTier: 'observed' as const,
+      recommendation:
+        'Keep the numbered promise; make the first 30s name mistake one.',
+    },
+  ],
+  thumbnailVariants: [
+    {
+      headline: 'Three mistakes',
+      wordCount: 2,
+      concept: 'High-contrast face plus wallet, three-word overlay.',
+      mobileLegible: true,
+    },
+    {
+      headline: 'Stop broke',
+      wordCount: 2,
+      concept: 'Paycheck visual with two-word overlay, no URL.',
+      mobileLegible: true,
+    },
+  ],
+  safeZone: {
+    thumbnail1280x720: 'unknown' as const,
+    channelArt2560x1440Safe1546x423: 'unknown' as const,
+    cover3000x3000JpgRgbNoUrls: 'unknown' as const,
+    notes: 'Dimensions not measured from the thumbnail URL; specs still apply.',
+  },
 };
 
 function mockLlmResult(
@@ -176,7 +208,25 @@ describe('packaging intelligence', () => {
       transcriptSource: 'captions',
       modelUsed: PACKAGING_INTELLIGENCE_MODEL,
       priors: { faceEffect: 'neutral', source: '1of10' },
+      findings: llmOutput.findings,
+      thumbnailVariants: llmOutput.thumbnailVariants,
+      safeZone: llmOutput.safeZone,
     });
+    expect(result.thumbnailVariants).toHaveLength(2);
+    expect(
+      result.thumbnailVariants.every(
+        variant => variant.wordCount <= 3 && variant.mobileLegible
+      )
+    ).toBe(true);
+  });
+
+  it('asks the model for evidence-backed findings, not a vibe score', () => {
+    expect(PACKAGING_AUDIT_SYSTEM_PROMPT).toContain('Evidence, not vibes');
+    expect(PACKAGING_AUDIT_SYSTEM_PROMPT).toContain('observation + evidence');
+    expect(PACKAGING_AUDIT_SYSTEM_PROMPT).toContain('1280×720');
+    expect(PACKAGING_AUDIT_SYSTEM_PROMPT).toContain('1546×423');
+    expect(PACKAGING_AUDIT_SYSTEM_PROMPT).toContain('3000×3000');
+    expect(PACKAGING_AUDIT_SYSTEM_PROMPT).toContain('No overall score');
   });
 
   it('prefers provided transcript segments and falls back to ASR', async () => {
