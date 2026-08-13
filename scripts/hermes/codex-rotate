@@ -8,7 +8,26 @@ STATE_FILE="${CODEX_ACCOUNTS_STATE:-$ACCOUNTS_ROOT/state.json}"
 LOG_FILE="${CODEX_ROTATE_LOG:-$ACCOUNTS_ROOT/rotate.log}"
 LOCKS_DIR="${CODEX_ACCOUNT_LOCKS_DIR:-$ACCOUNTS_ROOT/locks}"
 WAIT_SECONDS="${CODEX_ACCOUNT_WAIT_SECONDS:-900}"
+# JOV-5031: Symphony's app-server reader enforces read_timeout_ms (5s) as an
+# inactivity deadline, not a boot budget. While this launcher waits for an
+# account it is silent, so the reader used to time out and abandon the port,
+# orphaning the launcher behind a dead reader where it could later seize an
+# account and strand it. In app-server mode the launcher emits a typed
+# keepalive line on the JSON-RPC stream; the reader treats it as an ignorable
+# notification and resets its inactivity clock. If the reader is gone, the
+# write fails (SIGPIPE/EPIPE) and the launcher dies before it can seize an
+# account — the initialization wait is cancellation-safe and the account lock
+# can never strand behind a dead reader.
+HEARTBEAT_SECONDS="${CODEX_ROTATE_HEARTBEAT_SECONDS:-2}"
 DEFAULT_COOLDOWN_SECONDS="${CODEX_DEFAULT_COOLDOWN_SECONDS:-21600}"
+
+app_server_mode=0
+for arg in "$@"; do
+  if [[ "$arg" == "app-server" ]]; then
+    app_server_mode=1
+    break
+  fi
+done
 
 mkdir -p "$LOCKS_DIR"
 touch "$LOG_FILE"
@@ -165,6 +184,7 @@ PY
 }
 
 started_at=$(date +%s)
+last_heartbeat=$started_at
 account=""
 account_lock_fd=""
 while [[ -z "$account" ]]; do
@@ -182,10 +202,23 @@ while [[ -z "$account" ]]; do
   if [[ -n "$account" ]]; then
     break
   fi
-  if (( $(date +%s) - started_at >= WAIT_SECONDS )); then
-    log "WAIT_TIMEOUT seconds=$WAIT_SECONDS"
-    echo "codex-rotate: all account slots are busy" >&2
+  now=$(date +%s)
+  if (( now - started_at >= WAIT_SECONDS )); then
+    # Typed capacity signal (JOV-5031): exit 75 (EX_TEMPFAIL) plus an explicit
+    # marker so account-busy startup is classifiable as capacity backoff
+    # instead of a generic agent failure. The launcher exits before acquiring
+    # any lock, so no orphan process or stranded account can outlive it.
+    log "CAPACITY_UNAVAILABLE reason=account_busy seconds=$WAIT_SECONDS"
+    echo "codex-rotate: CAPACITY_UNAVAILABLE reason=account_busy after ${WAIT_SECONDS}s wait" >&2
     exit 75
+  fi
+  if (( app_server_mode == 1 && HEARTBEAT_SECONDS > 0 && now - last_heartbeat >= HEARTBEAT_SECONDS )); then
+    # JSON-RPC notification without an id: Symphony's reader ignores it and
+    # resets the inactivity deadline. A dead reader fails this write and kills
+    # the launcher (set -e / SIGPIPE) before it can strand an account.
+    printf '{"jsonrpc":"2.0","method":"codex-rotate/account-wait","params":{"elapsedSeconds":%d}}\n' \
+      "$(( now - started_at ))"
+    last_heartbeat=$now
   fi
   sleep 1
 done
