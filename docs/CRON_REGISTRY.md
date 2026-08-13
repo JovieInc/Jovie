@@ -31,7 +31,7 @@ These are machine-local Hermes jobs, not Vercel production crons. They run from 
 
 | Unit | Schedule | Purpose | Source |
 |------|----------|---------|--------|
-| `co.jovie.hermes.cron-pipeline-scoreboard` | every 60 min | Computes the daily codex shipping funnel from the authoritative, cursor-paginated merged-PR repository connection and exact local windows; writes the schema-v2 `pipeline-scoreboard-latest.json` + gbrain `ops/pipeline-scoreboard/latest`; suppresses nullable merge/taste conclusions and alerts when merge evidence is incomplete; also alerts on 12h shipper stalls. | `scripts/hermes/jobs/pipeline-scoreboard.ts` |
+| `co.jovie.hermes.cron-pipeline-scoreboard` | every 60 min | Computes the daily codex shipping funnel from the authoritative, cursor-paginated merged-PR repository connection and exact local windows; writes the schema-v3 `pipeline-scoreboard-latest.json` + gbrain `ops/pipeline-scoreboard/latest`; attributes Symphony landings only from exact `symphony/JOV-N-fix` branches merged into `main`, includes zero-hour buckets, and alerts when the 5 landed PRs/hour reliability target fails; suppresses nullable conclusions when merge evidence is incomplete and also alerts on 12h shipper stalls. | `scripts/hermes/jobs/pipeline-scoreboard.ts` |
 | `co.jovie.hermes.cron-gbrain-health-summary` | 07:15 local daily | Verifies the Tailscale-bound HTTP health endpoint, source freshness, and that exactly one server is running; retains `gbrain doctor` as an advisory diagnostic, writes `ops/gbrain-health/latest`, and posts the summary to Telegram/Slack. | `scripts/hermes/jobs/gbrain-health-summary.ts` |
 
 ## Production Schedule

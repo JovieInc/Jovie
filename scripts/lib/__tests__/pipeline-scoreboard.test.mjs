@@ -1,15 +1,18 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { buildDailyBriefingContext } from '../../hermes/jobs/daily-briefing.ts';
 import {
   buildPipelineScoreboard,
+  buildSymphonyThroughputReceipt,
   dailyWindow,
   evaluatePipelineAlarms,
   fetchMergedPrEvidence,
   filterMergedPrEvidence,
   last12HoursWindow,
+  readLatestScoreboard,
   renderPipelineScoreboard,
 } from '../../hermes/lib/pipeline-scoreboard.ts';
 
@@ -23,10 +26,19 @@ function issue(number, labels) {
   };
 }
 
-function mergedPr(number, mergedAt, createdAt = mergedAt, labels = []) {
+function mergedPr(
+  number,
+  mergedAt,
+  createdAt = mergedAt,
+  labels = [],
+  headRefName = `codex/pr-${number}`,
+  baseRefName = 'main'
+) {
   return {
     number,
     title: `PR ${number}`,
+    headRefName,
+    baseRefName,
     mergedAt,
     createdAt,
     updatedAt: mergedAt,
@@ -35,6 +47,11 @@ function mergedPr(number, mergedAt, createdAt = mergedAt, labels = []) {
       nodes: labels.map(name => ({ name })),
     },
   };
+}
+
+function normalizedMergedPr(...args) {
+  const pr = mergedPr(...args);
+  return { ...pr, labels: pr.labels.nodes };
 }
 
 function searchPage(
@@ -49,6 +66,26 @@ function searchPage(
 }
 
 const completeEvidence = { complete: true, reason: null, pages: 1 };
+
+/**
+ * @param {import('../../hermes/lib/pipeline-scoreboard.ts').PipelineScoreboardWindow} window
+ * @returns {import('../../hermes/lib/pipeline-scoreboard.ts').SymphonyThroughputReceipt}
+ */
+function insufficientSymphony(window) {
+  return {
+    schemaVersion: 1,
+    window,
+    evidence: { complete: false, reason: 'not_provided', pages: 0 },
+    landedPrs: null,
+    landings: [],
+    hourlyUtc: [],
+    hourlyLandedPrs: { p05: null, p50: null, p95: null },
+    landingGapSeconds: { p50: null, p95: null },
+    target: { landedPrsPerHour: 5, landingGapP95Seconds: 720 },
+    verdict: 'insufficient_evidence',
+    reason: 'not_provided',
+  };
+}
 
 describe('pipeline scoreboard windows', () => {
   it('uses the previous UTC day for daily scoreboards', () => {
@@ -307,6 +344,37 @@ describe('pipeline scoreboard windows', () => {
     });
   });
 
+  it('fails closed when a metric-bearing ref changes between scans', () => {
+    const mutations = [
+      scan => ({
+        headRefName: scan === 1 ? 'symphony/JOV-1-fix' : 'symphony/JOV-2-fix',
+      }),
+      scan => ({ baseRefName: scan === 1 ? 'main' : 'codex/stack-parent' }),
+    ];
+    for (const mutation of mutations) {
+      let scan = 0;
+      const evidence = fetchMergedPrEvidence(
+        {
+          since: '2026-07-02T00:00:00.000Z',
+          until: '2026-07-03T00:00:00.000Z',
+        },
+        () => {
+          scan += 1;
+          return searchPage([
+            {
+              ...mergedPr(1, '2026-07-02T12:00:00.000Z'),
+              ...mutation(scan),
+            },
+          ]);
+        }
+      );
+      expect(evidence).toMatchObject({
+        complete: false,
+        reason: 'unstable_snapshot',
+      });
+    }
+  });
+
   it('ignores metric-irrelevant title edits between scans', () => {
     let scan = 0;
     const evidence = fetchMergedPrEvidence(
@@ -384,6 +452,267 @@ describe('pipeline scoreboard windows', () => {
   });
 });
 
+describe('Symphony landed throughput', () => {
+  const window = {
+    since: '2026-07-01T00:00:00.000Z',
+    until: '2026-07-02T00:00:00.000Z',
+  };
+
+  function evenlySpacedSymphonyPrs(excludedHours = new Set()) {
+    return Array.from({ length: 24 * 5 }, (_, index) => {
+      const hour = Math.floor(index / 5);
+      if (excludedHours.has(hour)) return null;
+      const mergedAt = new Date(
+        Date.parse(window.since) + index * 12 * 60_000 + 6 * 60_000
+      ).toISOString();
+      return normalizedMergedPr(
+        index + 1,
+        mergedAt,
+        window.since,
+        [],
+        `symphony/JOV-${index + 1}-fix`
+      );
+    }).filter(Boolean);
+  }
+
+  it('keeps idle UTC hours in the percentile distribution', () => {
+    const receipt = buildSymphonyThroughputReceipt({
+      complete: true,
+      reason: null,
+      pages: 1,
+      window,
+      prs: [
+        normalizedMergedPr(
+          1,
+          '2026-07-01T00:10:00.000Z',
+          '2026-07-01T00:00:00.000Z',
+          [],
+          'symphony/JOV-1-fix'
+        ),
+        normalizedMergedPr(
+          2,
+          '2026-07-01T00:20:00.000Z',
+          '2026-07-01T00:00:00.000Z',
+          [],
+          'not-symphony/JOV-2-fix'
+        ),
+        normalizedMergedPr(
+          3,
+          '2026-07-01T00:30:00.000Z',
+          '2026-07-01T00:00:00.000Z',
+          [],
+          'symphony/JOV-3-fix',
+          'codex/stack-parent'
+        ),
+      ],
+    });
+
+    expect(receipt.landings).toEqual([
+      { number: 1, mergedAt: '2026-07-01T00:10:00.000Z' },
+    ]);
+    expect(receipt.hourlyUtc).toHaveLength(24);
+    expect(receipt.hourlyUtc.slice(1).every(hour => hour.landedPrs === 0)).toBe(
+      true
+    );
+    expect(receipt.hourlyLandedPrs).toEqual({ p05: 0, p50: 0, p95: 0 });
+  });
+
+  it('passes only when the reliable hourly floor and gap p95 both meet target', () => {
+    const prs = evenlySpacedSymphonyPrs();
+    const receipt = buildSymphonyThroughputReceipt({
+      complete: true,
+      reason: null,
+      pages: 2,
+      window,
+      prs,
+    });
+
+    expect(receipt.hourlyLandedPrs).toEqual({ p05: 5, p50: 5, p95: 5 });
+    expect(receipt.landingGapSeconds.p95).toBe(720);
+    expect(receipt.verdict).toBe('passing');
+  });
+
+  it('requires both the hourly floor and gap p95 to pass', () => {
+    const clusteredPrs = Array.from({ length: 24 * 5 }, (_, index) => {
+      const hour = Math.floor(index / 5);
+      const minute = index % 5;
+      return normalizedMergedPr(
+        index + 1,
+        new Date(
+          Date.parse(window.since) + hour * 3_600_000 + minute * 60_000
+        ).toISOString(),
+        window.since,
+        [],
+        `symphony/JOV-${index + 1}-fix`
+      );
+    });
+    const hourlyOnly = buildSymphonyThroughputReceipt({
+      complete: true,
+      reason: null,
+      pages: 1,
+      window,
+      prs: clusteredPrs,
+    });
+    const gapOnly = buildSymphonyThroughputReceipt({
+      complete: true,
+      reason: null,
+      pages: 1,
+      window,
+      prs: evenlySpacedSymphonyPrs(new Set([5, 10])),
+    });
+
+    expect(hourlyOnly.hourlyLandedPrs.p05).toBe(5);
+    expect(hourlyOnly.landingGapSeconds.p95).toBeGreaterThan(720);
+    expect(hourlyOnly.verdict).toBe('failing');
+    expect(gapOnly.hourlyLandedPrs.p05).toBe(0);
+    expect(gapOnly.landingGapSeconds.p95).toBe(720);
+    expect(gapOnly.verdict).toBe('failing');
+  });
+
+  it('suppresses all metrics when merge evidence is incomplete', () => {
+    const receipt = buildSymphonyThroughputReceipt({
+      complete: false,
+      reason: 'max_pages_reached',
+      pages: 100,
+      window,
+      prs: [],
+    });
+
+    expect(receipt).toMatchObject({
+      landedPrs: null,
+      hourlyUtc: [],
+      verdict: 'insufficient_evidence',
+      reason: 'merge_evidence_max_pages_reached',
+    });
+  });
+
+  it.each([
+    { complete: true, reason: null, pages: 0 },
+    { complete: true, reason: 'fetch_failed', pages: 1 },
+    { complete: false, reason: null, pages: 0 },
+  ])('rejects impossible evidence status %#', status => {
+    const receipt = buildSymphonyThroughputReceipt({
+      ...status,
+      window,
+      prs: [],
+    });
+    expect(receipt).toMatchObject({
+      verdict: 'insufficient_evidence',
+      reason: 'invalid_evidence_status',
+    });
+  });
+
+  it.each([
+    [
+      'invalid timestamp',
+      { since: 'invalid', until: window.until },
+      'invalid_window',
+    ],
+    [
+      'equal bounds',
+      { since: window.since, until: window.since },
+      'invalid_window',
+    ],
+    [
+      'reversed bounds',
+      { since: window.until, until: window.since },
+      'invalid_window',
+    ],
+    [
+      '23-hour sample',
+      {
+        since: window.since,
+        until: '2026-07-01T23:00:00.000Z',
+      },
+      'window_too_short',
+    ],
+    [
+      'overlong sample',
+      {
+        since: window.since,
+        until: '2026-08-02T00:00:00.000Z',
+      },
+      'window_too_long',
+    ],
+    [
+      'unaligned sample',
+      {
+        since: '2026-07-01T00:30:00.000Z',
+        until: '2026-07-02T00:30:00.000Z',
+      },
+      'window_not_hour_aligned',
+    ],
+  ])('fails closed for %s', (_name, candidateWindow, reason) => {
+    const receipt = buildSymphonyThroughputReceipt({
+      complete: true,
+      reason: null,
+      pages: 1,
+      window: candidateWindow,
+      prs: [],
+    });
+
+    expect(receipt).toMatchObject({
+      landedPrs: null,
+      verdict: 'insufficient_evidence',
+      reason,
+    });
+  });
+
+  it('ignores canonical Symphony branches outside the half-open window', () => {
+    const receipt = buildSymphonyThroughputReceipt({
+      complete: true,
+      reason: null,
+      pages: 1,
+      window,
+      prs: [
+        normalizedMergedPr(
+          1,
+          '2026-06-30T23:59:59.000Z',
+          window.since,
+          [],
+          'symphony/JOV-1-fix'
+        ),
+        normalizedMergedPr(
+          2,
+          '2026-07-01T12:00:00.000Z',
+          window.since,
+          [],
+          'symphony/JOV-2-fix'
+        ),
+        normalizedMergedPr(
+          3,
+          window.until,
+          window.since,
+          [],
+          'symphony/JOV-3-fix'
+        ),
+      ],
+    });
+
+    expect(receipt.landedPrs).toBe(1);
+  });
+
+  it('sorts merge timestamps before computing landing gaps', () => {
+    const receipt = buildSymphonyThroughputReceipt({
+      complete: true,
+      reason: null,
+      pages: 1,
+      window,
+      prs: [3, 1, 2].map(hour =>
+        normalizedMergedPr(
+          hour,
+          new Date(Date.parse(window.since) + hour * 3_600_000).toISOString(),
+          window.since,
+          [],
+          `symphony/JOV-${hour}-fix`
+        )
+      ),
+    });
+
+    expect(receipt.landingGapSeconds).toEqual({ p50: 3600, p95: 75_600 });
+  });
+});
+
 describe('pipeline scoreboard compute', () => {
   const window = {
     since: '2026-07-02T00:00:00.000Z',
@@ -425,7 +754,7 @@ describe('pipeline scoreboard compute', () => {
         issue(7, ['codex', 'type:epic']),
       ],
       previous: {
-        schemaVersion: 2,
+        schemaVersion: 3,
         ts: '2026-07-02T00:00:00.000Z',
         window,
         funnel: {
@@ -448,6 +777,7 @@ describe('pipeline scoreboard compute', () => {
           evidence: { complete: true, reason: null, pages: 1 },
           timeToMergeSeconds: { p50: 0, p95: 0 },
         },
+        symphony: insufficientSymphony(window),
         gates: {
           tasteLabeledPrsWeek: 0,
           tasteEvidence: { complete: true, reason: null, pages: 1 },
@@ -478,7 +808,7 @@ describe('pipeline scoreboard compute', () => {
         issue(index + 1, ['codex', 'codex-blocked'])
       ),
       previous: {
-        schemaVersion: 2,
+        schemaVersion: 3,
         ts: '2026-07-02T00:00:00.000Z',
         window,
         funnel: {
@@ -501,6 +831,7 @@ describe('pipeline scoreboard compute', () => {
           evidence: { complete: true, reason: null, pages: 1 },
           timeToMergeSeconds: { p50: 0, p95: 0 },
         },
+        symphony: insufficientSymphony(window),
         gates: {
           tasteLabeledPrsWeek: 0,
           tasteEvidence: { complete: true, reason: null, pages: 1 },
@@ -718,6 +1049,80 @@ describe('pipeline scoreboard compute', () => {
     expect(body).toContain('Funnel: ready 1');
     expect(body).toContain('Queue: merges 1');
     expect(body).toContain('time-to-merge p50 10m / p95 15m');
+    expect(body).toContain('Symphony: insufficient evidence (not_provided)');
+  });
+
+  it('renders and alarms on complete Symphony evidence below target', () => {
+    const symphonyWindow = {
+      since: '2026-06-26T00:00:00.000Z',
+      until: '2026-07-03T00:00:00.000Z',
+    };
+    const scoreboard = buildPipelineScoreboard({
+      ts: '2026-07-03T00:00:00.000Z',
+      window,
+      issues: [],
+      mergedPrs: [],
+      mergeEvidence: completeEvidence,
+      symphonyMergeEvidence: {
+        complete: true,
+        reason: null,
+        pages: 1,
+        window: symphonyWindow,
+        prs: [
+          normalizedMergedPr(
+            1,
+            '2026-07-01T00:10:00.000Z',
+            '2026-07-01T00:00:00.000Z',
+            [],
+            'symphony/JOV-1-fix'
+          ),
+        ],
+      },
+    });
+    const body = renderPipelineScoreboard(scoreboard);
+
+    expect(scoreboard.alarms.map(alarm => alarm.rule)).toContain(
+      'symphony_throughput_below_target'
+    );
+    expect(body).toContain('Symphony: 1 landed');
+    expect(body).toContain('target 5/hour failing');
+  });
+
+  it('does not raise the throughput alarm for a fully passing receipt', () => {
+    const passingWindow = {
+      since: '2026-07-01T00:00:00.000Z',
+      until: '2026-07-02T00:00:00.000Z',
+    };
+    const prs = Array.from({ length: 24 * 5 }, (_, index) =>
+      normalizedMergedPr(
+        index + 1,
+        new Date(
+          Date.parse(passingWindow.since) + index * 12 * 60_000 + 6 * 60_000
+        ).toISOString(),
+        passingWindow.since,
+        [],
+        `symphony/JOV-${index + 1}-fix`
+      )
+    );
+    const scoreboard = buildPipelineScoreboard({
+      ts: passingWindow.until,
+      window,
+      issues: [],
+      mergedPrs: [],
+      mergeEvidence: completeEvidence,
+      symphonyMergeEvidence: {
+        complete: true,
+        reason: null,
+        pages: 2,
+        window: passingWindow,
+        prs,
+      },
+    });
+
+    expect(scoreboard.symphony.verdict).toBe('passing');
+    expect(scoreboard.alarms.map(alarm => alarm.rule)).not.toContain(
+      'symphony_throughput_below_target'
+    );
   });
 
   it('suppresses queue conclusions when merge evidence is incomplete', () => {
@@ -763,6 +1168,89 @@ describe('pipeline scoreboard digest and schedule wiring', () => {
     expect(context).toContain('#1 Ship scoreboard');
   });
 
+  it('rejects malformed persisted Symphony receipts', () => {
+    const window = {
+      since: '2026-07-02T00:00:00.000Z',
+      until: '2026-07-03T00:00:00.000Z',
+    };
+    const scoreboard = buildPipelineScoreboard({
+      ts: window.until,
+      window,
+      issues: [],
+      mergedPrs: [],
+      mergeEvidence: completeEvidence,
+    });
+    const directory = mkdtempSync(join(tmpdir(), 'pipeline-scoreboard-'));
+    const path = join(directory, 'latest.json');
+    try {
+      writeFileSync(path, JSON.stringify(scoreboard));
+      expect(readLatestScoreboard(path)).toMatchObject({ schemaVersion: 3 });
+
+      const malformed = JSON.parse(JSON.stringify(scoreboard));
+      delete malformed.symphony.target;
+      writeFileSync(path, JSON.stringify(malformed));
+      expect(readLatestScoreboard(path)).toBeNull();
+
+      const contradictory = JSON.parse(JSON.stringify(scoreboard));
+      contradictory.symphony.verdict = 'passing';
+      contradictory.symphony.reason = null;
+      writeFileSync(path, JSON.stringify(contradictory));
+      expect(readLatestScoreboard(path)).toBeNull();
+
+      const alteredTarget = JSON.parse(JSON.stringify(scoreboard));
+      alteredTarget.symphony.target.landedPrsPerHour = 1;
+      writeFileSync(path, JSON.stringify(alteredTarget));
+      expect(readLatestScoreboard(path)).toBeNull();
+
+      const completeScoreboard = buildPipelineScoreboard({
+        ts: window.until,
+        window,
+        issues: [],
+        mergedPrs: [],
+        mergeEvidence: completeEvidence,
+        symphonyMergeEvidence: {
+          complete: true,
+          reason: null,
+          pages: 1,
+          window,
+          prs: [
+            normalizedMergedPr(
+              1,
+              '2026-07-02T00:10:00.000Z',
+              window.since,
+              [],
+              'symphony/JOV-1-fix'
+            ),
+          ],
+        },
+      });
+      writeFileSync(path, JSON.stringify(completeScoreboard));
+      expect(readLatestScoreboard(path)).toMatchObject({ schemaVersion: 3 });
+
+      /** @type {Array<(receipt: any) => void>} */
+      const semanticMutations = [
+        receipt => receipt.hourlyUtc.pop(),
+        receipt => {
+          receipt.hourlyUtc[0].landedPrs = 2;
+        },
+        receipt => {
+          receipt.hourlyLandedPrs.p95 = 999;
+        },
+        receipt => {
+          receipt.landingGapSeconds.p95 = 1;
+        },
+      ];
+      for (const mutate of semanticMutations) {
+        const inconsistent = JSON.parse(JSON.stringify(completeScoreboard));
+        mutate(inconsistent.symphony);
+        writeFileSync(path, JSON.stringify(inconsistent));
+        expect(readLatestScoreboard(path)).toBeNull();
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('keeps package script, launchd unit, and cron registry wired together', () => {
     const packageJson = JSON.parse(
       readFileSync(resolve(repoRoot, 'package.json'), 'utf8')
@@ -776,6 +1264,10 @@ describe('pipeline scoreboard digest and schedule wiring', () => {
     );
     const cronRegistry = readFileSync(
       resolve(repoRoot, 'docs/CRON_REGISTRY.md'),
+      'utf8'
+    );
+    const job = readFileSync(
+      resolve(repoRoot, 'scripts/hermes/jobs/pipeline-scoreboard.ts'),
       'utf8'
     );
 
@@ -794,5 +1286,10 @@ describe('pipeline scoreboard digest and schedule wiring', () => {
     expect(cronRegistry).toContain(
       'scripts/hermes/jobs/pipeline-scoreboard.ts'
     );
+    expect(job).toContain(
+      'nodes{number title headRefName baseRefName createdAt'
+    );
+    expect(job).toContain('symphonyMergeEvidence: mergedWeekly');
+    expect(job).toContain('symphonyThroughputVerdict');
   });
 });
