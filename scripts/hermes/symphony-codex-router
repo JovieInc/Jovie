@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Symphony starts one app-server per leased issue. The admission controller
+# must provide this receipt; a missing receipt is safer than silently using a
+# volume-model default.
+receipt_path="${SYMPHONY_ROUTING_RECEIPT:-${PWD}/.symphony-routing.json}"
+if [[ ! -s "$receipt_path" ]]; then
+  echo "symphony-codex-router: routing receipt is missing: $receipt_path" >&2
+  exit 78
+fi
+
+model="$(python3 - "$receipt_path" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding='utf-8') as handle:
+    receipt = json.load(handle)
+if receipt.get('schema') != 'symphony-routing/v1' or not receipt.get('model'):
+    raise SystemExit('invalid symphony routing receipt')
+print(receipt['model'])
+PY
+)"
+
+exec /home/timwhite/.local/bin/codex-rotate \
+  --config shell_environment_policy.inherit=all \
+  --config "model=\"${model}\"" \
+  "$@"
