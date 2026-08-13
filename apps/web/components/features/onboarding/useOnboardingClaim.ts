@@ -17,9 +17,10 @@ import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
  * conversations to the freshly created user.
  *
  * On a durable pending receipt it navigates to `/waitlist`; admitted users
- * continue to `/onboarding/checkout`. If the claim returns `claimed: 0`
- * without an idempotent receipt, it stays put and retries after later chat
- * activity.
+ * continue to `/onboarding/checkout`. Missing durable artist data stays in
+ * the same `/start` conversation and retries after the next natural-language
+ * turn. If the claim returns `claimed: 0` without an idempotent receipt, it
+ * stays put and retries after later chat activity.
  *
  * Duplicate-request guard (JOV-2203):
  * React 18+ re-runs effects whenever any dependency changes. Clerk's auth
@@ -152,14 +153,6 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
         track(ONBOARDING_FUNNEL_EVENTS.AUTH_COMPLETED, {
           surface: 'start_chat',
         });
-        if (body.waitlistIntakeRequired) {
-          track(ONBOARDING_FUNNEL_EVENTS.WAITLIST_INTAKE_REQUIRED, {
-            surface: 'start_chat',
-            duration_ms: Date.now() - startedAt,
-          });
-          router.replace(APP_ROUTES.WAITLIST);
-          return;
-        }
         if (body.waitlist?.entryId) {
           track(ONBOARDING_FUNNEL_EVENTS.WAITLISTED, {
             surface: 'start_chat',
@@ -182,6 +175,18 @@ export function useOnboardingClaim(claimTrigger = 0): ClaimStatus {
         // Hand off to the existing /onboarding/checkout flow.
         router.replace(APP_ROUTES.ONBOARDING_CHECKOUT);
       };
+
+      if (body.waitlistIntakeRequired) {
+        // Missing durable artist/social identity. Stay in this /start
+        // conversation and retry after the next natural-language turn.
+        track(ONBOARDING_FUNNEL_EVENTS.WAITLIST_INTAKE_REQUIRED, {
+          surface: 'start_chat',
+          duration_ms: Date.now() - startedAt,
+        });
+        markTriggerCompleted();
+        setStatus('no-op');
+        return;
+      }
 
       if ((body.claimed && body.claimed > 0) || body.alreadyClaimed) {
         completeClaim();

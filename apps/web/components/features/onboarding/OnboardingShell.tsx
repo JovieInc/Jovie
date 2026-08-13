@@ -149,8 +149,9 @@ export function OnboardingShell({
   }, [resetTurnstileVerification]);
 
   // Auto-claim any anonymous transcript once Better Auth reports the user is
-  // authenticated, then retry after completed chat turns. The claim receipt
-  // routes controlled-access users to /waitlist and admitted users to checkout.
+  // authenticated, then retry after completed chat turns. Durable waitlist
+  // receipts route to /waitlist; admitted users go to checkout; missing
+  // artist identity stays in this chat.
   const claimStatus = useOnboardingClaim(claimTrigger);
   const isLinking =
     claimStatus === 'pending' || claimStatus === 'retry-after-webhook';

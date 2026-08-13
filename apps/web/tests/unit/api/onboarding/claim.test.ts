@@ -500,22 +500,22 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     expect(mockMaterializeClaimedOnboardingProfile).not.toHaveBeenCalled();
   });
 
-  it('routes to truthful waitlist intake when the current gate is on but durable artist data is missing', async () => {
+  it('refuses to consume the transcript when the current gate is on but durable artist data is missing', async () => {
     mockIsWaitlistGateEnabled.mockResolvedValue(true);
     setupDbSelectForCandidates(
       [{ id: 'conv_missing_artist', createdAt: new Date('2026-05-01') }],
       []
     );
-    setupUpdateForPrimary(1);
-    setupInsertAudit(true);
 
     const res = await POST(makeRequest());
 
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
-      claimed: 1,
+      claimed: 0,
       waitlistIntakeRequired: true,
     });
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+    expect(mockClearOnboardingSessionCookie).not.toHaveBeenCalled();
     expect(mockSubmitWaitlistAccessRequest).not.toHaveBeenCalled();
     expect(mockMaterializeClaimedOnboardingProfile).not.toHaveBeenCalled();
   });
