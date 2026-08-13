@@ -22,6 +22,24 @@ describe('taskCreateInputSchema', () => {
     expect(parsed.data?.assigneeUserId).toBe('user_2fK9dPqXwLmN0vYzAbC1');
   });
 
+  it('preserves assigneeUserId as an opaque value (no trim, no length ceiling)', () => {
+    const padded = '  user_with_whitespace  ';
+    const parsed = taskCreateInputSchema.safeParse({
+      title: 't',
+      assigneeUserId: padded,
+    });
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.assigneeUserId).toBe(padded);
+
+    const long = `u${'x'.repeat(1024)}`;
+    const longParsed = taskCreateInputSchema.safeParse({
+      title: 't',
+      assigneeUserId: long,
+    });
+    expect(longParsed.success).toBe(true);
+    expect(longParsed.data?.assigneeUserId).toBe(long);
+  });
+
   it('accepts null for every nullable domain field', () => {
     const parsed = taskCreateInputSchema.safeParse({
       title: 'Follow up with venue',
