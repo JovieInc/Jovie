@@ -7,6 +7,7 @@ import * as contextGate from '../context-gate.mjs';
 import { parsePage, parseSearchSlugs } from '../gbrain-client.mjs';
 import * as planGate from '../plan-gate.mjs';
 import * as researchGate from '../research-gate.mjs';
+import * as routing from '../symphony-routing.mjs';
 import { researchEvidenceFor, withPreLeaseReceipts } from './pre-lease.mjs';
 
 const NOW = new Date().toISOString();
@@ -314,6 +315,14 @@ describe('pre-lease admission-to-draft flow', () => {
       now: NOW,
     });
     assert.equal(admission.status, 'approved');
+
+    const routeDecision = routing.selectSymphonyRoute({ issue: client.issue });
+    assert.equal(routeDecision.status, 'selected');
+    await client.addComment(
+      client.issue.id,
+      routing.buildRoutingReceipt(routeDecision.route)
+    );
+    assert.ok(routing.verifyRoutingReceipt(client.issue));
 
     const lease = await admitter.admitIssue({
       issue: client.issue,
