@@ -547,10 +547,7 @@ describe('native live preflight', () => {
     expect(result.ok).toBe(true);
     expect(result.policyReadback).toMatchObject({
       matched: false,
-      drift: [
-        'min_entries_to_merge',
-        'min_entries_to_merge_wait_minutes',
-      ],
+      drift: ['min_entries_to_merge', 'min_entries_to_merge_wait_minutes'],
     });
     expect(result.evidence).not.toHaveProperty('classicPushAllowanceCount');
     expect(result.evidence).not.toHaveProperty('classicPushAllowanceActors');
