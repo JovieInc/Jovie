@@ -36,6 +36,7 @@ export const CONTEXT_BLOCKER = Object.freeze({
   GBRAIN_UNAVAILABLE: 'gbrain-unavailable',
   ORG_CHART_MISSING: 'org-chart-missing',
   OWNERSHIP_CONFLICT: 'ownership-conflict',
+  NO_RESULTS: 'context-no-results',
 });
 
 function sorted(value) {
@@ -178,10 +179,17 @@ export async function collectContextEvidence({
     }
     if (!Array.isArray(pages))
       return { evidence: null, reason: CONTEXT_BLOCKER.GBRAIN_UNAVAILABLE };
-    queries.push({
-      query,
-      pages: pages.map(boundPage).filter(Boolean),
-    });
+    // A targeted ownership/priorities query with zero bindable pages proves
+    // nothing; fail closed with a typed blocker instead of admitting empty
+    // context evidence.
+    const bound = pages.map(boundPage).filter(Boolean);
+    if (bound.length === 0)
+      return {
+        evidence: null,
+        reason: CONTEXT_BLOCKER.NO_RESULTS,
+        detail: `targeted context query returned no bindable pages: ${query}`,
+      };
+    queries.push({ query, pages: bound });
   }
 
   return {
@@ -229,6 +237,7 @@ export function validateContextEvidence(
     return 'context-query-mismatch';
   for (const entry of evidence.queries) {
     if (!Array.isArray(entry?.pages)) return 'context-malformed';
+    if (entry.pages.length === 0) return CONTEXT_BLOCKER.NO_RESULTS;
     if (entry.pages.some(page => !boundPage(page))) return 'context-malformed';
   }
 
