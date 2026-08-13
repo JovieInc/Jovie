@@ -168,11 +168,12 @@ If issues arise, you can temporarily restore files from git:
 
 ```bash
 # Restore all deleted files
-git checkout HEAD~1 -- apps/web/components/admin/table/atoms/*.tsx
-git checkout HEAD~1 -- apps/web/components/admin/table/molecules/*.tsx
-git checkout HEAD~1 -- apps/web/components/admin/table/organisms/UnifiedTable.tsx
-git checkout HEAD~1 -- apps/web/components/admin/table/utils/*.ts
-git checkout HEAD~1 -- apps/web/components/admin/table/table.styles.ts
+git checkout HEAD~1 -- apps/web/components/features/admin/table/SortableHeaderButton.tsx
+git checkout HEAD~1 -- apps/web/components/features/admin/table/atoms/*.tsx
+git checkout HEAD~1 -- apps/web/components/features/admin/table/molecules/*.tsx
+git checkout HEAD~1 -- apps/web/components/features/admin/table/organisms/UnifiedTable.tsx
+git checkout HEAD~1 -- apps/web/components/features/admin/table/utils/*.ts
+git checkout HEAD~1 -- apps/web/components/features/admin/table/table.styles.ts
 ```
 
 ## Completion Status
