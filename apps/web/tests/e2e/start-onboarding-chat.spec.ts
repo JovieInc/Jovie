@@ -82,15 +82,15 @@ function relevantConsoleFailures(failures: readonly string[]) {
   );
 }
 
-async function expectFixedElementScreenshot({
-  height,
+async function expectElementScreenshotWithMinimumHeight({
+  minimumHeight,
   locator,
   maxDiffPixelRatio,
   name,
   page,
   width,
 }: {
-  readonly height: number;
+  readonly minimumHeight: number;
   readonly locator: Locator;
   readonly maxDiffPixelRatio: number;
   readonly name: string;
@@ -103,13 +103,13 @@ async function expectFixedElementScreenshot({
   if (!box) return;
 
   expect(Math.abs(box.width - width)).toBeLessThanOrEqual(1);
-  expect(Math.abs(box.height - height)).toBeLessThanOrEqual(1);
+  expect(box.height).toBeGreaterThanOrEqual(minimumHeight);
   await expect(page).toHaveScreenshot(name, {
     clip: {
       x: box.x,
       y: box.y,
       width,
-      height,
+      height: minimumHeight,
     },
     maxDiffPixelRatio,
   });
@@ -156,23 +156,59 @@ function textAndToolStream({
   ]);
 }
 
-async function mockOnboardingChat(page: import('@playwright/test').Page) {
+function textStream({ messageId, text }: { messageId: string; text: string }) {
+  return uiStreamBody([
+    { type: 'start', messageId },
+    { type: 'start-step' },
+    { type: 'text-start', id: `${messageId}-text` },
+    { type: 'text-delta', id: `${messageId}-text`, delta: text },
+    { type: 'text-end', id: `${messageId}-text` },
+    { type: 'finish-step' },
+    { type: 'finish', finishReason: 'stop' },
+  ]);
+}
+
+async function mockOnboardingChat(
+  page: import('@playwright/test').Page,
+  { keepPickerOpen = false }: { readonly keepPickerOpen?: boolean } = {}
+) {
   let chatRequestCount = 0;
 
   await page.route('**/api/spotify/search**', async route => {
+    const query = new URL(route.request().url()).searchParams
+      .get('q')
+      ?.toLowerCase();
+    const results = query?.includes('muse')
+      ? [
+          {
+            id: 'artist-muse-petal',
+            name: 'Muse Petal',
+            url: 'https://open.spotify.com/artist/artist-muse-petal',
+            followers: 8_400,
+            popularity: 37,
+          },
+          {
+            id: 'artist-bloc-party',
+            name: 'Bloc Party',
+            url: 'https://open.spotify.com/artist/artist-bloc-party',
+            followers: 6_700,
+            popularity: 34,
+          },
+        ]
+      : [
+          {
+            id: 'artist-1',
+            name: 'Test Artist',
+            url: 'https://open.spotify.com/artist/artist-1',
+            imageUrl: 'https://i.scdn.co/image/test-artist',
+            followers: 12_300,
+            popularity: 48,
+          },
+        ];
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify([
-        {
-          id: 'artist-1',
-          name: 'Test Artist',
-          url: 'https://open.spotify.com/artist/artist-1',
-          imageUrl: 'https://i.scdn.co/image/test-artist',
-          followers: 12_300,
-          popularity: 48,
-        },
-      ]),
+      body: JSON.stringify(results),
     });
   });
   await page.route('https://i.scdn.co/**', async route => {
@@ -247,6 +283,13 @@ async function mockOnboardingChat(page: import('@playwright/test').Page) {
               summary: 'Test Artist matched on Spotify.',
             },
           });
+    const responseBody =
+      keepPickerOpen && chatRequestCount > 1
+        ? textStream({
+            messageId: 'assistant-follow-up',
+            text: 'Here is the next step while we keep the artist picker open.',
+          })
+        : stream;
 
     await route.fulfill({
       status: 200,
@@ -256,7 +299,7 @@ async function mockOnboardingChat(page: import('@playwright/test').Page) {
         'set-cookie':
           'jovie_onboarding_session=e2e-session; Path=/; HttpOnly; SameSite=Lax',
       },
-      body: stream,
+      body: responseBody,
     });
   });
 
@@ -625,8 +668,8 @@ test.describe('canonical /start onboarding chat', () => {
     await expect(
       page.getByText('Pick the exact Spotify artist').first()
     ).toBeVisible();
-    await expectFixedElementScreenshot({
-      height: 168,
+    await expectElementScreenshotWithMinimumHeight({
+      minimumHeight: 168,
       locator: page.getByTestId('onboarding-artist-picker'),
       maxDiffPixelRatio: 0.05,
       name: 'start-artist-picker.png',
@@ -675,5 +718,40 @@ test.describe('canonical /start onboarding chat', () => {
       relevantConsoleFailures(consoleFailures),
       `Unexpected /start console failures: ${consoleFailures.join('\n')}`
     ).toEqual([]);
+  });
+
+  test('artist search results reserve space before later chat messages', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockOnboardingChat(page, { keepPickerOpen: true });
+    await page.goto('/start', { waitUntil: 'domcontentloaded' });
+    await waitForHydration(page);
+
+    await sendComposerMessage(page, 'help me find my spotify artist profile');
+    const picker = page.getByTestId('onboarding-artist-picker');
+    await expect(picker).toBeVisible();
+
+    await sendComposerMessage(page, 'keep going');
+    const laterMessage = page.getByText(
+      'Here is the next step while we keep the artist picker open.'
+    );
+    await expect(laterMessage).toBeVisible();
+
+    await picker
+      .getByRole('textbox', { name: 'Search Spotify artists' })
+      .fill('muse');
+    await expect(page.getByText('Muse Petal')).toBeVisible();
+    await expect(page.getByText('Bloc Party')).toBeVisible();
+
+    const pickerBox = await picker.boundingBox();
+    const laterMessageBox = await laterMessage.boundingBox();
+    expect(pickerBox).not.toBeNull();
+    expect(laterMessageBox).not.toBeNull();
+    if (pickerBox && laterMessageBox) {
+      expect(laterMessageBox.y).toBeGreaterThanOrEqual(
+        pickerBox.y + pickerBox.height - 1
+      );
+    }
   });
 });
