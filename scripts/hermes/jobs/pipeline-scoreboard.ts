@@ -24,6 +24,8 @@ import { sendOpsAlert } from '../lib/ops-notify';
 import {
   buildPipelineScoreboard,
   dailyWindow,
+  fetchMergedPrEvidence,
+  filterMergedPrEvidence,
   type JobLogEntry,
   last12HoursWindow,
   readJsonlEntries,
@@ -35,7 +37,10 @@ import {
 const JOB = 'pipeline-scoreboard';
 const REPO = process.env.HERMES_GITHUB_REPO ?? 'JovieInc/Jovie';
 const ISSUE_LIMIT = process.env.HERMES_PIPELINE_SCOREBOARD_ISSUE_LIMIT ?? '500';
-const PR_LIMIT = process.env.HERMES_PIPELINE_SCOREBOARD_PR_LIMIT ?? '100';
+const PR_MAX_PAGES = Number.parseInt(
+  process.env.HERMES_PIPELINE_SCOREBOARD_PR_MAX_PAGES ?? '100',
+  10
+);
 const SCOREBOARD_JSONL = join(
   HERMES_PATHS.stateDir,
   'pipeline-scoreboard.jsonl'
@@ -57,13 +62,6 @@ interface GhIssue {
   readonly url: string;
   readonly updatedAt?: string;
   readonly labels: ReadonlyArray<{ readonly name: string }>;
-}
-
-interface GhPr {
-  readonly number: number;
-  readonly title: string;
-  readonly mergedAt: string;
-  readonly labels?: ReadonlyArray<{ readonly name: string }>;
 }
 
 function gh(args: readonly string[], timeoutMs = 30_000): string {
@@ -93,22 +91,40 @@ function fetchCodexIssues(): GhIssue[] {
   ) as GhIssue[];
 }
 
-function fetchMergedPrsSince(since: string): GhPr[] {
-  const prs = JSON.parse(
-    gh([
-      'pr',
-      'list',
-      '--repo',
-      REPO,
-      '--state',
-      'merged',
-      '--limit',
-      PR_LIMIT,
-      '--json',
-      'number,title,mergedAt,labels',
-    ])
-  ) as GhPr[];
-  return prs.filter(pr => pr.mergedAt >= since);
+function fetchMergedPrs(window: {
+  readonly since: string;
+  readonly until: string;
+}) {
+  const [owner, name] = REPO.split('/', 2);
+  if (!owner || !name) {
+    return fetchMergedPrEvidence(window, () => undefined, { maxPages: 0 });
+  }
+  const graphQuery = `query($owner:String!,$name:String!,$cursor:String,$pageSize:Int!){repository(owner:$owner,name:$name){pullRequests(states:MERGED,orderBy:{field:UPDATED_AT,direction:DESC},first:$pageSize,after:$cursor){totalCount pageInfo{hasNextPage endCursor} nodes{number title createdAt updatedAt mergedAt labels(first:100){totalCount nodes{name}}}}}}`;
+  return fetchMergedPrEvidence(
+    window,
+    (cursor, pageSize) => {
+      const args = [
+        'api',
+        'graphql',
+        '-f',
+        `query=${graphQuery}`,
+        '-F',
+        `owner=${owner}`,
+        '-F',
+        `name=${name}`,
+        '-F',
+        `pageSize=${pageSize}`,
+      ];
+      if (cursor !== null) args.push('-F', `cursor=${cursor}`);
+      const response = JSON.parse(gh(args)) as {
+        readonly data?: {
+          readonly repository?: { readonly pullRequests?: unknown };
+        };
+      };
+      return response.data?.repository?.pullRequests;
+    },
+    { maxPages: PR_MAX_PAGES }
+  );
 }
 
 function filterEntries(
@@ -176,10 +192,17 @@ async function main(): Promise<void> {
       alarmWindow.until
     );
     const issues = fetchCodexIssues();
-    const mergedDaily = fetchMergedPrsSince(daily.since);
-    const mergedWeekly = fetchMergedPrsSince(
-      new Date(Date.parse(daily.until) - 7 * 86_400_000).toISOString()
-    );
+    const weeklyWindow = {
+      since: new Date(Date.parse(daily.until) - 7 * 86_400_000).toISOString(),
+      until: daily.until,
+    };
+    const mergedAll = fetchMergedPrs({
+      since: weeklyWindow.since,
+      until: alarmWindow.until,
+    });
+    const mergedDaily = filterMergedPrEvidence(mergedAll, daily);
+    const mergedAlarm = filterMergedPrEvidence(mergedAll, alarmWindow);
+    const mergedWeekly = filterMergedPrEvidence(mergedAll, weeklyWindow);
     const previous = readLatestScoreboard(SCOREBOARD_LATEST);
     const ciMetrics = readLatestCiMetrics(CI_METRICS_LATEST);
 
@@ -190,7 +213,8 @@ async function main(): Promise<void> {
       previous,
       jobLogEntries: dailyEntries,
       ciMetrics,
-      mergedPrs: mergedDaily,
+      mergedPrs: mergedDaily.prs,
+      mergeEvidence: mergedDaily,
     });
     const alarmScoreboard = buildPipelineScoreboard({
       ts: now.toISOString(),
@@ -199,12 +223,17 @@ async function main(): Promise<void> {
       previous,
       jobLogEntries: alarmEntries,
       ciMetrics,
-      mergedPrs: mergedDaily,
+      mergedPrs: mergedAlarm.prs,
+      mergeEvidence: mergedAlarm,
     });
     // The daily scoreboard owns blocked-count deltas; the rolling 12h
     // scoreboard owns "claims but no ships" stall detection.
     const mergedAlarms = [
-      ...scoreboard.alarms.filter(alarm => alarm.rule === 'blocked_delta'),
+      ...scoreboard.alarms.filter(
+        alarm =>
+          alarm.rule === 'blocked_delta' ||
+          alarm.rule === 'merge_evidence_incomplete'
+      ),
       ...alarmScoreboard.alarms.filter(
         alarm => alarm.rule === 'zero_ships_after_claims'
       ),
@@ -214,9 +243,16 @@ async function main(): Promise<void> {
       alarms: mergedAlarms,
       gates: {
         ...scoreboard.gates,
-        tasteLabeledPrsWeek: mergedWeekly.filter(pr =>
-          (pr.labels ?? []).some(label => label.name.includes('taste'))
-        ).length,
+        tasteLabeledPrsWeek: mergedWeekly.complete
+          ? mergedWeekly.prs.filter(pr =>
+              pr.labels.some(label => label.name.includes('taste'))
+            ).length
+          : null,
+        tasteEvidence: {
+          complete: mergedWeekly.complete,
+          reason: mergedWeekly.reason,
+          pages: mergedWeekly.pages,
+        },
       },
     };
     const body = renderPipelineScoreboard(finalScoreboard);
@@ -251,6 +287,8 @@ async function main(): Promise<void> {
       claims: finalScoreboard.shipper.claims,
       ships: finalScoreboard.shipper.ships,
       merges: finalScoreboard.queue.merges,
+      mergeEvidenceComplete: finalScoreboard.queue.evidence.complete,
+      mergeEvidenceReason: finalScoreboard.queue.evidence.reason,
       alarms: finalScoreboard.alarms.map(alarm => alarm.rule),
       sentAlertKeys,
       gbrainOk,

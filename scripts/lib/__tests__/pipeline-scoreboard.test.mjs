@@ -7,6 +7,8 @@ import {
   buildPipelineScoreboard,
   dailyWindow,
   evaluatePipelineAlarms,
+  fetchMergedPrEvidence,
+  filterMergedPrEvidence,
   last12HoursWindow,
   renderPipelineScoreboard,
 } from '../../hermes/lib/pipeline-scoreboard.ts';
@@ -21,6 +23,33 @@ function issue(number, labels) {
   };
 }
 
+function mergedPr(number, mergedAt, createdAt = mergedAt, labels = []) {
+  return {
+    number,
+    title: `PR ${number}`,
+    mergedAt,
+    createdAt,
+    updatedAt: mergedAt,
+    labels: {
+      totalCount: labels.length,
+      nodes: labels.map(name => ({ name })),
+    },
+  };
+}
+
+function searchPage(
+  nodes,
+  { totalCount = nodes.length, hasNextPage = false, endCursor = null } = {}
+) {
+  return {
+    totalCount,
+    pageInfo: { hasNextPage, endCursor },
+    nodes,
+  };
+}
+
+const completeEvidence = { complete: true, reason: null, pages: 1 };
+
 describe('pipeline scoreboard windows', () => {
   it('uses the previous UTC day for daily scoreboards', () => {
     expect(dailyWindow(new Date('2026-07-03T16:20:00Z'))).toEqual({
@@ -33,6 +62,324 @@ describe('pipeline scoreboard windows', () => {
     expect(last12HoursWindow(new Date('2026-07-03T16:20:00Z'))).toEqual({
       since: '2026-07-03T04:20:00.000Z',
       until: '2026-07-03T16:20:00.000Z',
+    });
+  });
+
+  it('uses exact half-open merge boundaries', () => {
+    const window = {
+      since: '2026-07-02T00:00:00.000Z',
+      until: '2026-07-03T00:00:00.000Z',
+    };
+    const evidence = fetchMergedPrEvidence(
+      window,
+      () =>
+        searchPage([
+          mergedPr(3, window.until, '2026-07-01T01:00:00.000Z'),
+          mergedPr(2, '2026-07-02T12:00:00.000Z', '2026-07-01T02:00:00.000Z'),
+          mergedPr(1, window.since, '2026-07-01T03:00:00.000Z'),
+        ]),
+      { pageSize: 100 }
+    );
+
+    expect(evidence.complete).toBe(true);
+    expect(evidence.prs.map(pr => pr.number)).toEqual([2, 1]);
+  });
+
+  it('paginates beyond the former 100-result cap', () => {
+    const window = {
+      since: '2026-07-02T00:00:00.000Z',
+      until: '2026-07-03T00:00:00.000Z',
+    };
+    const rows = Array.from({ length: 101 }, (_, index) =>
+      mergedPr(
+        index + 1,
+        '2026-07-02T12:00:00.000Z',
+        new Date(Date.parse('2026-07-01T00:00:00.000Z') + index).toISOString()
+      )
+    );
+    const evidence = fetchMergedPrEvidence(
+      window,
+      (cursor, pageSize) => {
+        const offset = cursor === null ? 0 : Number(cursor);
+        const nodes = rows.slice(offset, offset + pageSize);
+        const nextOffset = offset + nodes.length;
+        return searchPage(nodes, {
+          totalCount: rows.length,
+          hasNextPage: nextOffset < rows.length,
+          endCursor: nextOffset < rows.length ? String(nextOffset) : null,
+        });
+      },
+      { pageSize: 100 }
+    );
+
+    expect(evidence).toMatchObject({ complete: true, pages: 2 });
+    expect(evidence.prs).toHaveLength(101);
+  });
+
+  it('derives exact subwindows from one complete snapshot', () => {
+    const source = fetchMergedPrEvidence(
+      {
+        since: '2026-07-01T00:00:00.000Z',
+        until: '2026-07-03T12:00:00.000Z',
+      },
+      () =>
+        searchPage([
+          mergedPr(3, '2026-07-03T06:00:00.000Z'),
+          mergedPr(2, '2026-07-02T12:00:00.000Z'),
+          mergedPr(1, '2026-07-01T12:00:00.000Z'),
+        ])
+    );
+    const daily = filterMergedPrEvidence(source, {
+      since: '2026-07-02T00:00:00.000Z',
+      until: '2026-07-03T00:00:00.000Z',
+    });
+
+    expect(daily).toMatchObject({ complete: true, pages: 1 });
+    expect(daily.prs.map(pr => pr.number)).toEqual([2]);
+  });
+
+  it('marks truncated label connections as incomplete', () => {
+    const evidence = fetchMergedPrEvidence(
+      {
+        since: '2026-07-02T00:00:00.000Z',
+        until: '2026-07-03T00:00:00.000Z',
+      },
+      () =>
+        searchPage([
+          {
+            ...mergedPr(1, '2026-07-02T12:00:00.000Z'),
+            labels: { totalCount: 2, nodes: [{ name: 'taste' }] },
+          },
+        ])
+    );
+
+    expect(evidence).toMatchObject({
+      complete: false,
+      reason: 'malformed_pr',
+    });
+  });
+
+  it('fails closed when a derived window exceeds the source snapshot', () => {
+    const source = fetchMergedPrEvidence(
+      {
+        since: '2026-07-02T00:00:00.000Z',
+        until: '2026-07-03T00:00:00.000Z',
+      },
+      () => searchPage([])
+    );
+    const evidence = filterMergedPrEvidence(source, {
+      since: '2026-07-01T00:00:00.000Z',
+      until: '2026-07-03T00:00:00.000Z',
+    });
+
+    expect(evidence).toMatchObject({
+      complete: false,
+      reason: 'window_not_covered',
+    });
+  });
+
+  it.each([
+    [
+      'malformed page',
+      () => ({ message: 'not a search page' }),
+      'malformed_page',
+    ],
+    ['malformed row', () => searchPage([{ number: 1 }]), 'malformed_pr'],
+    [
+      'fetch failure',
+      () => {
+        throw new Error('network unavailable');
+      },
+      'fetch_failed',
+    ],
+    [
+      'duplicate row',
+      () =>
+        searchPage([
+          mergedPr(1, '2026-07-02T12:00:00.000Z', '2026-07-01T12:00:00.000Z'),
+          mergedPr(1, '2026-07-02T11:00:00.000Z', '2026-07-01T13:00:00.000Z'),
+        ]),
+      'duplicate_pr',
+    ],
+    [
+      'unstable ordering',
+      () =>
+        searchPage([
+          mergedPr(1, '2026-07-02T11:00:00.000Z', '2026-07-02T12:00:00.000Z'),
+          mergedPr(2, '2026-07-02T12:00:00.000Z', '2026-07-02T11:00:00.000Z'),
+        ]),
+      'unstable_page_order',
+    ],
+  ])('marks %s as incomplete evidence', (_name, fetchPage, reason) => {
+    const evidence = fetchMergedPrEvidence(
+      {
+        since: '2026-07-02T00:00:00.000Z',
+        until: '2026-07-03T00:00:00.000Z',
+      },
+      fetchPage
+    );
+
+    expect(evidence).toMatchObject({ complete: false, reason });
+  });
+
+  it('marks a safety-page cutoff as incomplete instead of undercounting', () => {
+    const evidence = fetchMergedPrEvidence(
+      {
+        since: '2026-07-02T00:00:00.000Z',
+        until: '2026-07-03T00:00:00.000Z',
+      },
+      cursor =>
+        searchPage(
+          [
+            mergedPr(
+              cursor === null ? 1 : 2,
+              '2026-07-02T12:00:00.000Z',
+              cursor === null
+                ? '2026-07-01T01:00:00.000Z'
+                : '2026-07-01T02:00:00.000Z'
+            ),
+          ],
+          {
+            totalCount: 3,
+            hasNextPage: true,
+            endCursor: cursor === null ? '1' : '2',
+          }
+        ),
+      { pageSize: 1, maxPages: 2 }
+    );
+
+    expect(evidence).toMatchObject({
+      complete: false,
+      reason: 'max_pages_reached',
+      pages: 2,
+    });
+  });
+
+  it('fails closed when merged membership changes between cursor pages', () => {
+    const evidence = fetchMergedPrEvidence(
+      {
+        since: '2026-07-02T00:00:00.000Z',
+        until: '2026-07-03T00:00:00.000Z',
+      },
+      cursor =>
+        cursor === null
+          ? searchPage([mergedPr(1, '2026-07-02T12:00:00.000Z')], {
+              totalCount: 2,
+              hasNextPage: true,
+              endCursor: 'next',
+            })
+          : searchPage([mergedPr(2, '2026-07-02T13:00:00.000Z')], {
+              totalCount: 3,
+            }),
+      { pageSize: 1 }
+    );
+
+    expect(evidence).toMatchObject({
+      complete: false,
+      reason: 'unstable_snapshot',
+    });
+    expect(evidence.prs.map(pr => pr.number)).toEqual([1]);
+  });
+
+  it('fails closed when metric-bearing labels change between scans', () => {
+    let scan = 0;
+    const evidence = fetchMergedPrEvidence(
+      {
+        since: '2026-07-02T00:00:00.000Z',
+        until: '2026-07-03T00:00:00.000Z',
+      },
+      () => {
+        scan += 1;
+        return searchPage([
+          mergedPr(
+            1,
+            '2026-07-02T12:00:00.000Z',
+            '2026-07-01T12:00:00.000Z',
+            scan === 1 ? [] : ['taste']
+          ),
+        ]);
+      }
+    );
+
+    expect(evidence).toMatchObject({
+      complete: false,
+      reason: 'unstable_snapshot',
+    });
+  });
+
+  it('ignores metric-irrelevant title edits between scans', () => {
+    let scan = 0;
+    const evidence = fetchMergedPrEvidence(
+      {
+        since: '2026-07-02T00:00:00.000Z',
+        until: '2026-07-03T00:00:00.000Z',
+      },
+      () => {
+        scan += 1;
+        return searchPage([
+          {
+            ...mergedPr(1, '2026-07-02T12:00:00.000Z'),
+            title: `Title revision ${scan}`,
+          },
+        ]);
+      }
+    );
+
+    expect(evidence).toMatchObject({ complete: true, reason: null });
+  });
+
+  it('marks missing next-page cursors as incomplete', () => {
+    const evidence = fetchMergedPrEvidence(
+      {
+        since: '2026-07-02T00:00:00.000Z',
+        until: '2026-07-03T00:00:00.000Z',
+      },
+      () =>
+        searchPage([mergedPr(1, '2026-07-02T12:00:00.000Z')], {
+          totalCount: 2,
+          hasNextPage: true,
+          endCursor: null,
+        })
+    );
+
+    expect(evidence).toMatchObject({
+      complete: false,
+      reason: 'malformed_cursor',
+    });
+  });
+
+  it('marks terminal count mismatches as incomplete', () => {
+    const evidence = fetchMergedPrEvidence(
+      {
+        since: '2026-07-02T00:00:00.000Z',
+        until: '2026-07-03T00:00:00.000Z',
+      },
+      () =>
+        searchPage([mergedPr(1, '2026-07-02T12:00:00.000Z')], {
+          totalCount: 2,
+        })
+    );
+
+    expect(evidence).toMatchObject({
+      complete: false,
+      reason: 'result_count_mismatch',
+    });
+  });
+
+  it('marks invalid pagination configuration as incomplete', () => {
+    const evidence = fetchMergedPrEvidence(
+      {
+        since: '2026-07-02T00:00:00.000Z',
+        until: '2026-07-03T00:00:00.000Z',
+      },
+      () => searchPage([]),
+      { pageSize: 101 }
+    );
+
+    expect(evidence).toMatchObject({
+      complete: false,
+      reason: 'invalid_fetch_options',
+      pages: 0,
     });
   });
 });
@@ -50,6 +397,7 @@ describe('pipeline scoreboard compute', () => {
       issues: [],
       jobLogEntries: [],
       mergedPrs: [],
+      mergeEvidence: completeEvidence,
     });
 
     expect(scoreboard.funnel).toMatchObject({
@@ -77,7 +425,7 @@ describe('pipeline scoreboard compute', () => {
         issue(7, ['codex', 'type:epic']),
       ],
       previous: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         ts: '2026-07-02T00:00:00.000Z',
         window,
         funnel: {
@@ -97,11 +445,18 @@ describe('pipeline scoreboard compute', () => {
         queue: {
           merges: 0,
           mqAttemptsPerMerge: null,
+          evidence: { complete: true, reason: null, pages: 1 },
           timeToMergeSeconds: { p50: 0, p95: 0 },
         },
-        gates: { tasteLabeledPrsWeek: 0, autofixInterventions: 0 },
+        gates: {
+          tasteLabeledPrsWeek: 0,
+          tasteEvidence: { complete: true, reason: null, pages: 1 },
+          autofixInterventions: 0,
+        },
         alarms: [],
       },
+      mergedPrs: [],
+      mergeEvidence: completeEvidence,
     });
 
     expect(scoreboard.funnel.ready).toBe(1);
@@ -123,7 +478,7 @@ describe('pipeline scoreboard compute', () => {
         issue(index + 1, ['codex', 'codex-blocked'])
       ),
       previous: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         ts: '2026-07-02T00:00:00.000Z',
         window,
         funnel: {
@@ -143,14 +498,38 @@ describe('pipeline scoreboard compute', () => {
         queue: {
           merges: 0,
           mqAttemptsPerMerge: null,
+          evidence: { complete: true, reason: null, pages: 1 },
           timeToMergeSeconds: { p50: 0, p95: 0 },
         },
-        gates: { tasteLabeledPrsWeek: 0, autofixInterventions: 0 },
+        gates: {
+          tasteLabeledPrsWeek: 0,
+          tasteEvidence: { complete: true, reason: null, pages: 1 },
+          autofixInterventions: 0,
+        },
         alarms: [],
       },
+      mergedPrs: [],
+      mergeEvidence: completeEvidence,
     });
 
     expect(scoreboard.alarms.map(alarm => alarm.rule)).toContain(
+      'blocked_delta'
+    );
+  });
+
+  it('does not report backlog growth without a comparable prior snapshot', () => {
+    const scoreboard = buildPipelineScoreboard({
+      ts: '2026-07-03T00:00:00.000Z',
+      window,
+      issues: Array.from({ length: 17 }, (_, index) =>
+        issue(index + 1, ['codex', 'codex-blocked'])
+      ),
+      mergedPrs: [],
+      mergeEvidence: completeEvidence,
+    });
+
+    expect(scoreboard.funnel.deltas.blocked).toBe(0);
+    expect(scoreboard.alarms.map(alarm => alarm.rule)).not.toContain(
       'blocked_delta'
     );
   });
@@ -163,6 +542,8 @@ describe('pipeline scoreboard compute', () => {
         until: '2026-07-03T12:00:00.000Z',
       },
       issues: [],
+      mergedPrs: [],
+      mergeEvidence: completeEvidence,
       jobLogEntries: [
         {
           job: 'codex-issue-shipper',
@@ -185,6 +566,8 @@ describe('pipeline scoreboard compute', () => {
       ts: '2026-07-03T12:00:00.000Z',
       window,
       issues: [],
+      mergedPrs: [],
+      mergeEvidence: completeEvidence,
       jobLogEntries: [
         {
           job: 'codex-issue-shipper',
@@ -210,6 +593,8 @@ describe('pipeline scoreboard compute', () => {
       ts: '2026-07-03T12:00:00.000Z',
       window,
       issues: [],
+      mergedPrs: [],
+      mergeEvidence: completeEvidence,
       jobLogEntries: [
         {
           job: 'codex-issue-shipper',
@@ -234,6 +619,8 @@ describe('pipeline scoreboard compute', () => {
       ts: '2026-07-03T12:00:00.000Z',
       window,
       issues: [],
+      mergedPrs: [],
+      mergeEvidence: completeEvidence,
       jobLogEntries: [
         {
           job: 'codex-issue-shipper',
@@ -259,6 +646,8 @@ describe('pipeline scoreboard compute', () => {
       ts: '2026-07-03T12:00:00.000Z',
       window,
       issues: [],
+      mergedPrs: [],
+      mergeEvidence: completeEvidence,
       jobLogEntries: [
         {
           job: 'codex-issue-shipper',
@@ -280,6 +669,8 @@ describe('pipeline scoreboard compute', () => {
           ts: '2026-07-03T12:00:00.000Z',
           window,
           issues: [],
+          mergedPrs: [],
+          mergeEvidence: completeEvidence,
           jobLogEntries: [],
         })
       )
@@ -290,6 +681,8 @@ describe('pipeline scoreboard compute', () => {
         ts: '2026-07-03T12:00:00.000Z',
         window,
         issues: [],
+        mergedPrs: [],
+        mergeEvidence: completeEvidence,
         jobLogEntries: [
           {
             job: 'codex-issue-shipper',
@@ -317,6 +710,7 @@ describe('pipeline scoreboard compute', () => {
           latency: { readyToMergeSeconds: { p50: 600, p95: 900 } },
         },
         mergedPrs: [{ labels: [{ name: 'merge-queue' }] }],
+        mergeEvidence: completeEvidence,
       })
     );
 
@@ -324,6 +718,31 @@ describe('pipeline scoreboard compute', () => {
     expect(body).toContain('Funnel: ready 1');
     expect(body).toContain('Queue: merges 1');
     expect(body).toContain('time-to-merge p50 10m / p95 15m');
+  });
+
+  it('suppresses queue conclusions when merge evidence is incomplete', () => {
+    const scoreboard = buildPipelineScoreboard({
+      ts: '2026-07-03T00:00:00.000Z',
+      window,
+      issues: [],
+      mergedPrs: [{ labels: [{ name: 'merge-queue' }] }],
+      mergeEvidence: {
+        complete: false,
+        reason: 'max_pages_reached',
+        pages: 100,
+      },
+    });
+    const body = renderPipelineScoreboard(scoreboard);
+
+    expect(scoreboard.queue.merges).toBeNull();
+    expect(scoreboard.queue.mqAttemptsPerMerge).toBeNull();
+    expect(scoreboard.queue.evidence).not.toHaveProperty('prs');
+    expect(scoreboard.alarms.map(alarm => alarm.rule)).toContain(
+      'merge_evidence_incomplete'
+    );
+    expect(body).toContain('merge evidence incomplete');
+    expect(body).toContain('merge count and MQ attempts/merge suppressed');
+    expect(body).not.toContain('Queue: merges 1');
   });
 });
 

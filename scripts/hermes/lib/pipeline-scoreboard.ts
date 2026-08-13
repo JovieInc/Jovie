@@ -11,12 +11,37 @@ import {
   NO_AUTO_LABEL,
 } from './codex-issue-shipper';
 
-export const PIPELINE_SCOREBOARD_SCHEMA_VERSION = 1;
+export const PIPELINE_SCOREBOARD_SCHEMA_VERSION = 2;
 export const BLOCKED_DELTA_CRITICAL_THRESHOLD = 15;
 
 export interface PipelineScoreboardWindow {
   readonly since: string;
   readonly until: string;
+}
+
+export interface MergedPr {
+  readonly number: number;
+  readonly title: string;
+  readonly mergedAt: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly labels: ReadonlyArray<{ readonly name: string }>;
+}
+
+export interface MergedPrEvidenceStatus {
+  readonly complete: boolean;
+  readonly reason: string | null;
+  readonly pages: number;
+}
+
+export interface MergedPrEvidence extends MergedPrEvidenceStatus {
+  readonly window: PipelineScoreboardWindow;
+  readonly prs: ReadonlyArray<MergedPr>;
+}
+
+export interface MergedPrFetchOptions {
+  readonly pageSize?: number;
+  readonly maxPages?: number;
 }
 
 export interface PipelineScoreboard {
@@ -43,22 +68,27 @@ export interface PipelineScoreboard {
     readonly costPerShippedIssueUsd: number | null;
   };
   readonly queue: {
-    readonly merges: number;
+    readonly merges: number | null;
     readonly mqAttemptsPerMerge: number | null;
+    readonly evidence: MergedPrEvidenceStatus;
     readonly timeToMergeSeconds: {
       readonly p50: number;
       readonly p95: number;
     };
   };
   readonly gates: {
-    readonly tasteLabeledPrsWeek: number;
+    readonly tasteLabeledPrsWeek: number | null;
+    readonly tasteEvidence: MergedPrEvidenceStatus;
     readonly autofixInterventions: number;
   };
   readonly alarms: ReadonlyArray<PipelineScoreboardAlarm>;
 }
 
 export interface PipelineScoreboardAlarm {
-  readonly rule: 'blocked_delta' | 'zero_ships_after_claims';
+  readonly rule:
+    | 'blocked_delta'
+    | 'zero_ships_after_claims'
+    | 'merge_evidence_incomplete';
   readonly severity: 'warning' | 'critical';
   readonly message: string;
 }
@@ -92,9 +122,11 @@ export interface PipelineScoreboardInput {
       };
     };
   } | null;
-  readonly mergedPrs?: ReadonlyArray<{
+  readonly mergedPrs: ReadonlyArray<{
     readonly labels?: ReadonlyArray<{ readonly name?: string } | string>;
   }>;
+  readonly mergeEvidence: MergedPrEvidenceStatus;
+  readonly tasteEvidence?: MergedPrEvidenceStatus;
 }
 
 const FAILURE_EVENTS = new Set([
@@ -144,6 +176,213 @@ export function last12HoursWindow(now = new Date()): PipelineScoreboardWindow {
   };
 }
 
+function incompleteMergedPrEvidence(
+  window: PipelineScoreboardWindow,
+  reason: string,
+  pages: number,
+  prs: ReadonlyArray<MergedPr>
+): MergedPrEvidence {
+  return { complete: false, reason, pages, window, prs };
+}
+
+function parseMergedPr(value: unknown): MergedPr | null {
+  if (!isRecord(value)) return null;
+  const labels = value.labels;
+  if (
+    !Number.isInteger(value.number) ||
+    typeof value.title !== 'string' ||
+    typeof value.mergedAt !== 'string' ||
+    typeof value.createdAt !== 'string' ||
+    typeof value.updatedAt !== 'string' ||
+    !isRecord(labels) ||
+    !Array.isArray(labels.nodes) ||
+    !Number.isInteger(labels.totalCount) ||
+    labels.totalCount !== labels.nodes.length ||
+    !labels.nodes.every(
+      label => isRecord(label) && typeof label.name === 'string'
+    ) ||
+    !Number.isFinite(Date.parse(value.mergedAt)) ||
+    !Number.isFinite(Date.parse(value.createdAt)) ||
+    !Number.isFinite(Date.parse(value.updatedAt))
+  ) {
+    return null;
+  }
+  return {
+    number: value.number as number,
+    title: value.title,
+    mergedAt: new Date(value.mergedAt).toISOString(),
+    createdAt: new Date(value.createdAt).toISOString(),
+    updatedAt: new Date(value.updatedAt).toISOString(),
+    labels: labels.nodes as ReadonlyArray<{ readonly name: string }>,
+  };
+}
+
+/**
+ * Fetches an exact half-open merge window from GitHub's authoritative merged-PR
+ * repository connection. Results are cursor-paginated in updated-descending
+ * order until the oldest row predates the merge window. Every PR merged inside
+ * the window must have updatedAt >= mergedAt >= window.since. Ordering drift,
+ * malformed cursors, or truncated labels becomes typed incomplete evidence.
+ */
+function fetchMergedPrEvidenceOnce(
+  window: PipelineScoreboardWindow,
+  fetchPage: (cursor: string | null, pageSize: number) => unknown,
+  options: MergedPrFetchOptions = {}
+): MergedPrEvidence {
+  const pageSize = options.pageSize ?? 100;
+  const maxPages = options.maxPages ?? 100;
+  if (
+    !Number.isInteger(pageSize) ||
+    pageSize < 1 ||
+    pageSize > 100 ||
+    !Number.isInteger(maxPages) ||
+    maxPages < 1
+  ) {
+    return incompleteMergedPrEvidence(window, 'invalid_fetch_options', 0, []);
+  }
+
+  const prs: MergedPr[] = [];
+  const seen = new Set<number>();
+  let cursor: string | null = null;
+  let expectedTotalCount: number | null = null;
+  let previousUpdatedAt: string | null = null;
+
+  for (let page = 1; page <= maxPages; page += 1) {
+    let rawPage: unknown;
+    try {
+      rawPage = fetchPage(cursor, pageSize);
+    } catch {
+      return incompleteMergedPrEvidence(window, 'fetch_failed', page - 1, prs);
+    }
+    if (!isRecord(rawPage)) {
+      return incompleteMergedPrEvidence(window, 'malformed_page', page, prs);
+    }
+    const nodes = rawPage.nodes;
+    const pageInfo = rawPage.pageInfo;
+    const totalCount = rawPage.totalCount;
+    if (
+      !Array.isArray(nodes) ||
+      !isRecord(pageInfo) ||
+      typeof pageInfo.hasNextPage !== 'boolean' ||
+      (pageInfo.endCursor !== null && typeof pageInfo.endCursor !== 'string') ||
+      !Number.isInteger(totalCount) ||
+      (totalCount as number) < 0
+    ) {
+      return incompleteMergedPrEvidence(window, 'malformed_page', page, prs);
+    }
+    if (expectedTotalCount === null) expectedTotalCount = totalCount as number;
+    if (totalCount !== expectedTotalCount) {
+      return incompleteMergedPrEvidence(window, 'unstable_snapshot', page, prs);
+    }
+    for (const rawPr of nodes) {
+      const parsed = parseMergedPr(rawPr);
+      if (!parsed) {
+        return incompleteMergedPrEvidence(window, 'malformed_pr', page, prs);
+      }
+      if (previousUpdatedAt !== null && parsed.updatedAt > previousUpdatedAt) {
+        return incompleteMergedPrEvidence(
+          window,
+          'unstable_page_order',
+          page,
+          prs
+        );
+      }
+      previousUpdatedAt = parsed.updatedAt;
+      if (seen.has(parsed.number)) {
+        return incompleteMergedPrEvidence(window, 'duplicate_pr', page, prs);
+      }
+      seen.add(parsed.number);
+      if (isBetween(parsed.mergedAt, window)) prs.push(parsed);
+    }
+
+    if (previousUpdatedAt !== null && previousUpdatedAt < window.since) {
+      return { complete: true, reason: null, pages: page, window, prs };
+    }
+    if (!pageInfo.hasNextPage) {
+      if (seen.size !== expectedTotalCount) {
+        return incompleteMergedPrEvidence(
+          window,
+          'result_count_mismatch',
+          page,
+          prs
+        );
+      }
+      return { complete: true, reason: null, pages: page, window, prs };
+    }
+    if (
+      typeof pageInfo.endCursor !== 'string' ||
+      pageInfo.endCursor === cursor
+    ) {
+      return incompleteMergedPrEvidence(window, 'malformed_cursor', page, prs);
+    }
+    cursor = pageInfo.endCursor;
+  }
+
+  return incompleteMergedPrEvidence(window, 'max_pages_reached', maxPages, prs);
+}
+
+function mergedPrMetricFingerprint(prs: ReadonlyArray<MergedPr>): string {
+  return JSON.stringify(
+    [...prs]
+      .sort((left, right) => left.number - right.number)
+      .map(pr => ({
+        number: pr.number,
+        mergedAt: pr.mergedAt,
+        labels: pr.labels.map(label => label.name).sort(),
+      }))
+  );
+}
+
+export function fetchMergedPrEvidence(
+  window: PipelineScoreboardWindow,
+  fetchPage: (cursor: string | null, pageSize: number) => unknown,
+  options: MergedPrFetchOptions = {}
+): MergedPrEvidence {
+  const first = fetchMergedPrEvidenceOnce(window, fetchPage, options);
+  if (!first.complete) return first;
+  const second = fetchMergedPrEvidenceOnce(window, fetchPage, options);
+  if (!second.complete) return second;
+  if (
+    mergedPrMetricFingerprint(first.prs) !==
+    mergedPrMetricFingerprint(second.prs)
+  ) {
+    return incompleteMergedPrEvidence(
+      window,
+      'unstable_snapshot',
+      Math.max(first.pages, second.pages),
+      second.prs
+    );
+  }
+  return second;
+}
+
+export function filterMergedPrEvidence(
+  evidence: MergedPrEvidence,
+  window: PipelineScoreboardWindow
+): MergedPrEvidence {
+  const prs = evidence.prs.filter(pr => isBetween(pr.mergedAt, window));
+  if (
+    window.since < evidence.window.since ||
+    window.until > evidence.window.until
+  ) {
+    return incompleteMergedPrEvidence(window, 'window_not_covered', 0, prs);
+  }
+  return evidence.complete
+    ? {
+        complete: true,
+        reason: null,
+        pages: evidence.pages,
+        window,
+        prs,
+      }
+    : incompleteMergedPrEvidence(
+        window,
+        evidence.reason ?? 'unknown',
+        evidence.pages,
+        prs
+      );
+}
+
 function isBetween(
   ts: string | undefined,
   window: PipelineScoreboardWindow
@@ -180,8 +419,22 @@ function isPercentileRecord(value: unknown): boolean {
   );
 }
 
+function isMergedPrEvidenceStatus(
+  value: unknown
+): value is MergedPrEvidenceStatus {
+  return (
+    isRecord(value) &&
+    typeof value.complete === 'boolean' &&
+    (value.reason === null || typeof value.reason === 'string') &&
+    Number.isInteger(value.pages) &&
+    (value.pages as number) >= 0
+  );
+}
+
 function isPipelineScoreboard(value: unknown): value is PipelineScoreboard {
   if (!isRecord(value)) return false;
+  const queue = value.queue;
+  const gates = value.gates;
   return (
     value.schemaVersion === PIPELINE_SCOREBOARD_SCHEMA_VERSION &&
     isRecord(value.window) &&
@@ -189,8 +442,13 @@ function isPipelineScoreboard(value: unknown): value is PipelineScoreboard {
     typeof value.window.until === 'string' &&
     isRecord(value.funnel) &&
     isRecord(value.shipper) &&
-    isRecord(value.queue) &&
-    isRecord(value.gates) &&
+    isRecord(queue) &&
+    (queue.merges === null || typeof queue.merges === 'number') &&
+    isMergedPrEvidenceStatus(queue.evidence) &&
+    isRecord(gates) &&
+    (gates.tasteLabeledPrsWeek === null ||
+      typeof gates.tasteLabeledPrsWeek === 'number') &&
+    isMergedPrEvidenceStatus(gates.tasteEvidence) &&
     Array.isArray(value.alarms)
   );
 }
@@ -268,7 +526,7 @@ function funnelCounts(issues: ReadonlyArray<GithubIssue>) {
 }
 
 function delta(current: number, previous: number | undefined): number {
-  return current - (previous ?? 0);
+  return previous === undefined ? 0 : current - previous;
 }
 
 function failureCategory(entry: JobLogEntry): string {
@@ -342,7 +600,19 @@ export function buildPipelineScoreboard(
   const totalCost = shipperEntries
     .map(entry => (typeof entry.cost === 'number' ? entry.cost : 0))
     .reduce((sum, value) => sum + value, 0);
-  const merges = input.mergedPrs?.length ?? 0;
+  const mergeEvidence = {
+    complete: input.mergeEvidence.complete,
+    reason: input.mergeEvidence.reason,
+    pages: input.mergeEvidence.pages,
+  };
+  const tasteEvidence = input.tasteEvidence
+    ? {
+        complete: input.tasteEvidence.complete,
+        reason: input.tasteEvidence.reason,
+        pages: input.tasteEvidence.pages,
+      }
+    : mergeEvidence;
+  const merges = mergeEvidence.complete ? (input.mergedPrs?.length ?? 0) : null;
   const mqAttempts = input.mergedPrs?.filter(pr =>
     labelList(pr.labels).includes('merge-queue')
   ).length;
@@ -372,8 +642,11 @@ export function buildPipelineScoreboard(
     },
     queue: {
       merges,
+      evidence: mergeEvidence,
       mqAttemptsPerMerge:
-        merges > 0 && typeof mqAttempts === 'number'
+        typeof merges === 'number' &&
+        merges > 0 &&
+        typeof mqAttempts === 'number'
           ? Number((mqAttempts / merges).toFixed(2))
           : null,
       timeToMergeSeconds: {
@@ -382,10 +655,12 @@ export function buildPipelineScoreboard(
       },
     },
     gates: {
-      tasteLabeledPrsWeek:
-        input.mergedPrs?.filter(pr =>
-          labelList(pr.labels).some(label => label.includes('taste'))
-        ).length ?? 0,
+      tasteLabeledPrsWeek: tasteEvidence.complete
+        ? (input.mergedPrs?.filter(pr =>
+            labelList(pr.labels).some(label => label.includes('taste'))
+          ).length ?? 0)
+        : null,
+      tasteEvidence,
       autofixInterventions: gateEntries.filter(entry =>
         AUTOFIX_EVENTS.has(String(entry.event))
       ).length,
@@ -415,6 +690,13 @@ export function evaluatePipelineAlarms(
       message: `Shipper recorded ${scoreboard.shipper.claims} claim attempt(s) and 0 shipped PRs from ${windowLabel}.`,
     });
   }
+  if (!scoreboard.queue.evidence.complete) {
+    alarms.push({
+      rule: 'merge_evidence_incomplete',
+      severity: 'critical',
+      message: `Merge evidence is incomplete (${scoreboard.queue.evidence.reason ?? 'unknown'}) after ${scoreboard.queue.evidence.pages} page(s) for ${windowLabel}; merge throughput conclusions are suppressed.`,
+    });
+  }
   return alarms;
 }
 
@@ -433,13 +715,19 @@ export function renderPipelineScoreboard(
   const failureText = Object.entries(scoreboard.shipper.failuresByCategory)
     .map(([key, value]) => `${key}:${value}`)
     .join(', ');
+  const queueText = scoreboard.queue.evidence.complete
+    ? `Queue: merges ${scoreboard.queue.merges} · MQ attempts/merge ${scoreboard.queue.mqAttemptsPerMerge ?? 'n/a'} · time-to-merge p50 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p50)} / p95 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p95)}`
+    : `Queue: merge evidence incomplete (${scoreboard.queue.evidence.reason ?? 'unknown'}, ${scoreboard.queue.evidence.pages} page(s)); merge count and MQ attempts/merge suppressed · time-to-merge p50 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p50)} / p95 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p95)}`;
+  const tasteText = scoreboard.gates.tasteEvidence.complete
+    ? String(scoreboard.gates.tasteLabeledPrsWeek)
+    : `suppressed (${scoreboard.gates.tasteEvidence.reason ?? 'unknown'}, ${scoreboard.gates.tasteEvidence.pages} page(s))`;
   return [
     `Pipeline scoreboard (${scoreboard.window.since.slice(0, 10)} UTC)`,
     `Funnel: ready ${scoreboard.funnel.ready} (${signed(scoreboard.funnel.deltas.ready)}) · claimed ${scoreboard.funnel.claimed} (${signed(scoreboard.funnel.deltas.claimed)}) · in-progress ${scoreboard.funnel.inProgress} (${signed(scoreboard.funnel.deltas.inProgress)}) · blocked ${scoreboard.funnel.blocked} (${signed(scoreboard.funnel.deltas.blocked)})`,
     `Shipper: claims ${scoreboard.shipper.claims} · ships ${scoreboard.shipper.ships} · retries ${scoreboard.shipper.retriesUsed} · cost/ship $${scoreboard.shipper.costPerShippedIssueUsd ?? 0}`,
     `Failures: ${failureText || 'none'}`,
-    `Queue: merges ${scoreboard.queue.merges} · MQ attempts/merge ${scoreboard.queue.mqAttemptsPerMerge ?? 'n/a'} · time-to-merge p50 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p50)} / p95 ${fmtSeconds(scoreboard.queue.timeToMergeSeconds.p95)}`,
-    `Gates: taste-labeled PRs/week ${scoreboard.gates.tasteLabeledPrsWeek} · autofix interventions ${scoreboard.gates.autofixInterventions}`,
+    queueText,
+    `Gates: taste-labeled PRs/week ${tasteText} · autofix interventions ${scoreboard.gates.autofixInterventions}`,
     scoreboard.alarms.length
       ? `Alarms: ${scoreboard.alarms.map(alarm => alarm.message).join(' ')}`
       : 'Alarms: none',
