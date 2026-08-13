@@ -5,6 +5,7 @@ import * as admissionGate from '../admission-gate.mjs';
 import * as admitter from '../admitter.mjs';
 import * as deterministicGates from '../deterministic-gates.mjs';
 import * as planGate from '../plan-gate.mjs';
+import { withPreLeaseReceipts } from './pre-lease.mjs';
 
 function issue(overrides = {}) {
   return {
@@ -43,7 +44,7 @@ function plannedIssue(overrides = {}) {
   if (overrides.identifier !== undefined)
     seed.identifier = overrides.identifier;
   if (overrides.project !== undefined) seed.project = overrides.project;
-  const base = issue(seed);
+  const base = withPreLeaseReceipts(issue(seed));
   const { evidence } = deterministicGates.buildDeterministicPlanEvidence(base);
   const receipt = planGate.buildPlanGateReceipt(base, evidence);
   return issue({
@@ -54,7 +55,9 @@ function plannedIssue(overrides = {}) {
         { id: 'plan-id', name: planGate.PLAN_APPROVED_LABEL },
       ],
     },
-    comments: overrides.comments || { nodes: [{ body: receipt }] },
+    comments: overrides.comments || {
+      nodes: [...base.comments.nodes, { body: receipt }],
+    },
   });
 }
 

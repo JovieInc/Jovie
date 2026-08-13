@@ -195,7 +195,13 @@ export function buildDeterministicPlanEvidence(issue) {
       bounded: true,
       repo: route.repo,
       project: issue.project?.name || route.name,
-      owner: 'Gem',
+      // Explicit ownership roles (JOV-5032): Symphony owns implementation
+      // through draft PR / In Review; Gem + GitHub own verification, queue,
+      // merge, deploy, and production receipts.
+      owners: {
+        implementation: 'Symphony',
+        verification: 'Gem',
+      },
       scope: scope.slice(0, 1800),
       acceptance,
       test: [

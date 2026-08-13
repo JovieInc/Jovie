@@ -1,7 +1,9 @@
 /** Deterministic approval boundary between a verified plan and Symphony. */
 
 import { createHash } from 'node:crypto';
+import { contextGateReceipt } from './context-gate.mjs';
 import { PLAN_APPROVED_LABEL, planGateReceipt } from './plan-gate.mjs';
+import { researchGateReceipt } from './research-gate.mjs';
 
 export const ADMISSION_GATE_SCHEMA = 'admission-gate/v1';
 export const ADMISSION_GATE_PREFIX = '<!-- admission-gate/v1 -->';
@@ -52,7 +54,10 @@ function isTimOwned(issue) {
   );
 }
 
-export function validateAdmissionCandidate(issue) {
+export function validateAdmissionCandidate(
+  issue,
+  { now = new Date().toISOString() } = {}
+) {
   if (!issue?.id || !/^(?:JOV|LYB)-\d+$/.test(issue.identifier || ''))
     return 'not-concrete-routed-issue';
   if (!ALLOWED_STATES.has(issue.state?.name || issue.state))
@@ -60,6 +65,12 @@ export function validateAdmissionCandidate(issue) {
   if (isTimOwned(issue)) return 'tim-owned';
   if (labelsOf(issue).some(label => PROTECTED_LABELS.has(label)))
     return 'protected-or-human-review';
+  // Pre-lease context and research receipts are revalidated semantically
+  // against the current issue and freshness window (JOV-5032).
+  if (!contextGateReceipt(issue, { now }))
+    return 'context-receipt-missing-or-invalid';
+  if (!researchGateReceipt(issue, { now }))
+    return 'research-receipt-missing-or-invalid';
   if (!hasLabel(issue, PLAN_APPROVED_LABEL)) return 'plan-label-missing';
   if (!planGateReceipt(issue)) return 'plan-receipt-missing-or-invalid';
   return null;
@@ -67,8 +78,12 @@ export function validateAdmissionCandidate(issue) {
 
 export function admissionGateFingerprint(issue) {
   const plan = planGateReceipt(issue);
+  const context = contextGateReceipt(issue);
+  const research = researchGateReceipt(issue);
   return createHash('sha256')
-    .update(`${issue.identifier}|${plan?.payload?.fingerprint || ''}`)
+    .update(
+      `${issue.identifier}|${plan?.payload?.fingerprint || ''}|${context?.payload?.fingerprint || ''}|${research?.payload?.fingerprint || ''}`
+    )
     .digest('hex')
     .slice(0, 24);
 }
@@ -80,6 +95,8 @@ export function buildAdmissionGateReceipt(issue) {
     issue: issue.identifier,
     fingerprint: admissionGateFingerprint(issue),
     planFingerprint: plan?.payload?.fingerprint || '',
+    contextFingerprint: contextGateReceipt(issue)?.payload?.fingerprint || '',
+    researchFingerprint: researchGateReceipt(issue)?.payload?.fingerprint || '',
     decision: 'approved',
   };
   return `${ADMISSION_GATE_PREFIX}\n${JSON.stringify(payload)}\n${ADMISSION_GATE_SUFFIX}`;
@@ -106,8 +123,13 @@ function labelIds(issue, labelId) {
   ];
 }
 
-export async function approveAdmission({ issue, client, teamId = null }) {
-  const reason = validateAdmissionCandidate(issue);
+export async function approveAdmission({
+  issue,
+  client,
+  teamId = null,
+  now = new Date().toISOString(),
+}) {
+  const reason = validateAdmissionCandidate(issue, { now });
   if (reason) return { status: 'rejected', reason };
 
   const receipt = buildAdmissionGateReceipt(issue);
@@ -152,7 +174,7 @@ export async function approveAdmission({ issue, client, teamId = null }) {
     !reread ||
     !hasReceipt(reread, receipt) ||
     !hasLabel(reread, ADMISSION_APPROVED_LABEL) ||
-    validateAdmissionCandidate(reread)
+    validateAdmissionCandidate(reread, { now })
   )
     throw new Error('admission-gate-final-verification-failed');
 

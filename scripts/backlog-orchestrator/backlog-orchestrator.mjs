@@ -30,11 +30,14 @@ import * as admissionGate from './admission-gate.mjs';
 // module tooling. These are canonical sibling modules, not host-only copies.
 import * as admitter from './admitter.mjs';
 import * as classifier from './classifier.mjs';
+import * as contextGate from './context-gate.mjs';
 import * as deterministicGates from './deterministic-gates.mjs';
+import { cliGbrainClient } from './gbrain-client.mjs';
 import * as linear from './linear-client.mjs';
 import * as planGate from './plan-gate.mjs';
 import * as reconciler from './reconcile.mjs';
 import * as reporter from './reporter.mjs';
+import * as researchGate from './research-gate.mjs';
 import * as scorer from './scorer.mjs';
 import * as staleLeaseGuard from './stale-lease-guard.mjs';
 import * as workstreamer from './workstreamer.mjs';
@@ -119,6 +122,7 @@ Usage:
   node backlog-orchestrator.mjs gate-next             Plan, approve, and admit one safe issue
   node backlog-orchestrator.mjs gate-next --dry-run   Show the next issue without mutations
   node backlog-orchestrator.mjs approve-plan --issue=JOV-123 --evidence-file=/path/evidence.json
+  node backlog-orchestrator.mjs approve-research --issue=JOV-123 --evidence-file=/path/research.json
   node backlog-orchestrator.mjs report                Generate shadow report
 `);
     return;
@@ -136,6 +140,8 @@ Usage:
     await runGateNext(isDryRun, issueArg);
   } else if (command === 'approve-plan') {
     await runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun);
+  } else if (command === 'approve-research') {
+    await runApproveResearch(issueArg, evidenceFile, evidenceJson, isDryRun);
   } else {
     console.error(`Unknown command: ${command}`);
     process.exit(1);
@@ -175,6 +181,77 @@ async function runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun) {
     evidence,
     client: linear,
     teamId: team.id,
+  });
+  console.log(JSON.stringify(receipt, null, 2));
+}
+
+/**
+ * Bind caller-supplied primary-source research evidence (queries, dated
+ * citations, findings) for a research-required issue to one
+ * symphony-research/v1 receipt. Validation is deterministic and fail-closed.
+ */
+async function runApproveResearch(
+  issueArg,
+  evidenceFile,
+  evidenceJson,
+  isDryRun
+) {
+  if (!issueArg || (!evidenceFile && !evidenceJson))
+    throw new Error(
+      'approve-research requires --issue and --evidence-file or --evidence'
+    );
+  const supplied = evidenceFile
+    ? JSON.parse(readFileSync(evidenceFile, 'utf8'))
+    : JSON.parse(evidenceJson);
+  const issue = await linear.fetchIssue(issueArg);
+  if (!issue) throw new Error(`Issue ${issueArg} not found`);
+  const team = teamForIdentifier(issue.identifier);
+  if (!team)
+    throw new Error(`Issue ${issue.identifier} has no repository route`);
+  const evidence = {
+    issue: issue.identifier,
+    // Compute the content binding here so callers cannot forge it.
+    issueHash: contextGate.issueContentHash(issue),
+    classification: supplied.classification,
+    rationale: supplied.rationale,
+    queries: supplied.queries || [],
+    citations: supplied.citations || [],
+    findings: supplied.findings || [],
+    observedAt: supplied.observedAt || new Date().toISOString(),
+  };
+  const invalid = researchGate.validateResearchEvidence(issue, evidence);
+  if (isDryRun) {
+    console.log(
+      JSON.stringify(
+        {
+          schema: researchGate.RESEARCH_GATE_SCHEMA,
+          status: invalid ? 'rejected' : 'would-approve',
+          reason: invalid,
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+  if (invalid) {
+    console.log(
+      JSON.stringify(
+        {
+          schema: researchGate.RESEARCH_GATE_SCHEMA,
+          status: 'rejected',
+          reason: invalid,
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+  const receipt = await researchGate.approveResearch({
+    issue,
+    evidence,
+    client: linear,
   });
   console.log(JSON.stringify(receipt, null, 2));
 }
@@ -328,7 +405,7 @@ async function runGateNext(isDryRun, issueArg) {
   console.log(
     JSON.stringify(
       {
-        schema: 'deterministic-gates/run/v2',
+        schema: 'deterministic-gates/run/v3',
         status: results.some(result => result.status === 'admitted')
           ? 'admitted'
           : results.some(result => result.status === 'would-admit')
@@ -402,20 +479,94 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
     };
   }
 
+  // Pre-lease context and research classification are deterministic and
+  // decided before any plan mutation or model routing (JOV-5032).
+  const researchNeed = researchGate.classifyResearchNeed(selected);
+
   if (isDryRun) {
     return {
       team: team.key,
       status: 'would-admit',
       issue: selected.identifier,
       plan: plan.evidence,
+      research: researchNeed,
       fleetGate: preflight.fleetGate,
       staleLeaseRecovery,
       mutations: 0,
     };
   }
 
-  const planResult = await planGate.approvePlan({
+  // Bind verified GBrain context first. An unreachable brain is a typed
+  // system-blocker before lease — never a silent skip.
+  const contextResult = await contextGate.approveContext({
     issue: selected,
+    gbrain: cliGbrainClient,
+    client: linear,
+  });
+  if (contextResult.status === 'rejected') {
+    return {
+      team: team.key,
+      status: 'blocked',
+      stage: 'context',
+      issue: selected.identifier,
+      reason: contextResult.reason,
+      detail: contextResult.detail || null,
+      fleetGate: preflight.fleetGate,
+      staleLeaseRecovery,
+      mutations: 0,
+    };
+  }
+
+  let current = await linear.fetchIssue(selected.identifier);
+
+  // Bind the research receipt. `not-required` evidence is derived from the
+  // deterministic classifier; `required` evidence must already exist (written
+  // via approve-research with bounded primary-source citations).
+  let researchResult;
+  if (researchNeed.decision === 'not-required') {
+    researchResult = await researchGate.approveResearch({
+      issue: current,
+      evidence: {
+        issue: current.identifier,
+        issueHash: contextGate.issueContentHash(current),
+        classification: researchNeed.decision,
+        rationale: researchNeed.rationale,
+        queries: [],
+        citations: [],
+        findings: [],
+        observedAt: new Date().toISOString(),
+      },
+      client: linear,
+    });
+  } else if (researchGate.researchGateReceipt(current)) {
+    researchResult = {
+      status: 'already-approved',
+      fingerprint:
+        researchGate.researchGateReceipt(current).payload.fingerprint,
+    };
+  } else {
+    researchResult = {
+      status: 'rejected',
+      reason: 'research-evidence-required',
+    };
+  }
+  if (researchResult.status === 'rejected') {
+    return {
+      team: team.key,
+      status: 'blocked',
+      stage: 'research',
+      issue: selected.identifier,
+      reason: researchResult.reason,
+      fleetGate: preflight.fleetGate,
+      staleLeaseRecovery,
+      mutations: 0,
+    };
+  }
+
+  current = await linear.fetchIssue(selected.identifier);
+
+  const planResult = await planGate.approvePlan({
+    issue: current,
     evidence: plan.evidence,
     client: linear,
     teamId: team.id,
@@ -423,7 +574,7 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
   if (planResult.status === 'rejected')
     throw new Error(`plan gate rejected: ${planResult.reason}`);
 
-  let current = await linear.fetchIssue(selected.identifier);
+  current = await linear.fetchIssue(selected.identifier);
   const finalPreflight = await admissionPreflight(team);
   if (!finalPreflight.open)
     throw new Error(`admission preflight blocked: ${finalPreflight.reason}`);
@@ -469,6 +620,10 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
     team: team.key,
     status: 'admitted',
     issue: selected.identifier,
+    contextGate: contextResult.status,
+    contextFingerprint: contextResult.fingerprint,
+    researchGate: researchResult.status,
+    researchFingerprint: researchResult.fingerprint,
     planGate: planResult.status,
     admissionGate: admissionResult.status,
     lease: lease.status,

@@ -91,6 +91,17 @@ The versioned Gem controller writes `/home/timwhite/gem-workspace/state/gem-prio
 
 Gem owns the controller and queue observation. Symphony is the only implementation owner. Never start a second implementation because a Gem direct-ship loop exists.
 
+## Pre-lease context and research contract (JOV-5032)
+
+Ownership roles are explicit: **Symphony owns implementation through draft PR / In Review; Gem + GitHub own verification, queue, merge, deploy, and production receipts.** Plan evidence carries `owners.implementation: Symphony` and `owners.verification: Gem`; the ambiguous single `owner` field is rejected.
+
+Before plan/admission approval and before any lease, the deterministic control plane must bind two receipts on the issue:
+
+1. `symphony-context/v1` — the canonical agent org chart plus targeted ownership/current-priorities GBrain queries, bound by page slug, canonical page ID, and content revision. GBrain unreachable produces a typed system-blocker (`gbrain-unavailable`, `org-chart-missing`, or `ownership-conflict`) **before lease — never a silent skip**.
+2. `symphony-research/v1` — the deterministic research classifier verdict: `not-required` with an explicit rationale for purely local/mechanical work, or `required` with bounded primary-source queries, dated citations, and findings. `required` evidence is bound via `backlog:approve-research` before the gate may proceed.
+
+Both receipts are reconstructed semantically from the current issue, the expected ownership roles, and a freshness window at every later boundary (plan approval, admission approval, lease); stale, forged, or mismatched receipts are rejected. Their fingerprints flow into the plan receipt, the admission receipt, the lease receipt, and the gate run output — carry them into the PR body as `Context: <fingerprint>` / `Research: <fingerprint>` lines.
+
 ## Hard rules
 
 0. On `Todo`, evaluate the fleet receipt first. Only `GREEN` with `workAdmission.newIssueLeaseAllowed=true` may claim new work and move it to `In Progress`. `AMBER` may continue an existing lease but may not create one; `RED` may not claim or continue. After a draft PR exists with a real commit, move to `In Review` using `gh` plus one Linear GraphQL mutation if needed. Never use an interactive connector approval path.
@@ -129,11 +140,12 @@ Maintain one persistent comment starting with `## Codex Workpad`. Include:
 
 ## GBrain / learning
 
-If `gbrain` is available, write a short non-secret note with the change, proof, and residual risk. If unavailable, record `gbrain=unavailable` in the workpad without failing the ticket.
+The pre-lease context query is mandatory and enforced by the `symphony-context/v1` receipt (see the pre-lease contract above): if `gbrain` is unreachable before lease, record the typed system-blocker and stop — do not proceed on stale or missing context. Separately, after implementation, if `gbrain` is available, write a short non-secret note with the change, proof, and residual risk. If unavailable at that later point, record `gbrain=unavailable` in the workpad without failing the ticket.
 
 ## Done means
 
 - a draft PR is opened or updated with validation evidence
+- valid `symphony-context/v1` and `symphony-research/v1` receipts exist on the issue, and their fingerprints appear in the PR body
 - Linear is In Review only after the PR exists
 - `AMBER` remains draft plus `queue-deferred`, except the one controller-proven production-red/main-green UI/docs admission
 - ready-for-merge requires a fresh `GREEN` receipt or the exact isolated exception, plus normal review/CI
