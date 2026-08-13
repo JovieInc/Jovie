@@ -271,7 +271,7 @@ private struct DrawerSurfaceButton: View {
           .stroke(isSelected ? JovieColor.borderDefault : Color.clear, lineWidth: 1)
       }
     }
-    .buttonStyle(DrawerRowButtonStyle())
+    .buttonStyle(JoviePressFeedbackButtonStyle())
     .frame(maxWidth: .infinity, minHeight: 62, maxHeight: 62)
     .accessibilityLabel(tab.title)
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
@@ -299,7 +299,7 @@ private struct DrawerNewChatButton: View {
       .padding(.horizontal, JovieSpacing.medium)
       .background(JovieColor.surface1, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
     }
-    .buttonStyle(DrawerRowButtonStyle())
+    .buttonStyle(JoviePressFeedbackButtonStyle())
     .accessibilityLabel("New chat")
     .accessibilityIdentifier("shell-drawer-new-chat")
   }
@@ -397,7 +397,7 @@ private struct DrawerThreadRow: View {
         in: RoundedRectangle(cornerRadius: JovieRadius.small, style: .continuous)
       )
     }
-    .buttonStyle(DrawerRowButtonStyle())
+    .buttonStyle(JoviePressFeedbackButtonStyle())
     .accessibilityIdentifier("shell-drawer-thread-\(conversation.id)")
   }
 }
@@ -444,22 +444,8 @@ private struct DrawerSettingsRow: View {
       .padding(.vertical, 13)
       .padding(.horizontal, JovieSpacing.medium)
     }
-    .buttonStyle(DrawerRowButtonStyle())
+    .buttonStyle(JoviePressFeedbackButtonStyle())
     .accessibilityLabel("Settings")
     .accessibilityIdentifier("shell-drawer-settings")
-  }
-}
-
-// Canonical drawer-row press feedback (background dim + JovieMotion.pressScale),
-// shared by every plain-content Button row in the drawer (new chat, threads,
-// settings). Mirrors JoviePillButtonStyle/JovieIconButtonStyle in
-// DesignSystem/JovieTheme.swift but without their filled backgrounds, since
-// drawer rows are flush against the drawer canvas.
-private struct DrawerRowButtonStyle: ButtonStyle {
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .opacity(configuration.isPressed ? 0.72 : 1)
-      .scaleEffect(configuration.isPressed ? JovieMotion.pressScale : 1)
-      .animation(JovieMotion.subtle, value: configuration.isPressed)
   }
 }

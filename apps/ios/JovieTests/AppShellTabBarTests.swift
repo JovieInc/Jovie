@@ -66,6 +66,12 @@ struct AppShellTabBarTests {
   }
 }
 
+struct SharedPressFeedbackStyleTests {
+  @Test func plainRowPressFeedbackHasOneCanonicalDefaultOpacity() {
+    #expect(JoviePressFeedbackButtonStyle.defaultPressedOpacity == 0.72)
+  }
+}
+
 struct LibraryFeedTests {
   @Test func filterAllReturnsEveryAsset() {
     let assets = LibraryFeed.previewAssets
