@@ -438,8 +438,10 @@ export function buildAdmissionReceipt(
   return `${ADMISSION_RECEIPT_PREFIX}${JSON.stringify({
     issue: issue.identifier,
     fingerprint,
-    contextFingerprint: contextGateReceipt(issue)?.payload?.fingerprint || '',
-    researchFingerprint: researchGateReceipt(issue)?.payload?.fingerprint || '',
+    contextFingerprint:
+      contextGateReceipt(issue, { now })?.payload?.fingerprint || '',
+    researchFingerprint:
+      researchGateReceipt(issue, { now })?.payload?.fingerprint || '',
     action: 'lease',
     at: now,
   })} -->`;
@@ -575,9 +577,6 @@ export async function admitIssue({
 }) {
   if (!isConcreteJovieIssue(issue))
     return { status: 'rejected', reason: 'not-concrete-routed-issue' };
-  // Labels are indexes only, never authority (JOV-5032): the pickup path
-  // semantically parses and reconstructs the current plan-gate/v1 and
-  // admission-gate/v1 receipts before any workspace or model starts.
   if (!planGateReceipt(issue, { now }))
     return { status: 'rejected', reason: 'plan-receipt-missing-or-invalid' };
   if (!admissionGateReceipt(issue, { now }))
@@ -600,10 +599,6 @@ export async function admitIssue({
     return { status: 'already-admitted', identifier: issue.identifier };
   }
 
-  // Fail closed before lease: the pre-lease GBrain context and research
-  // receipts must revalidate semantically against the current issue
-  // (JOV-5032). A GBrain outage surfaces earlier as a typed context-gate
-  // system-blocker; a missing or stale receipt here is a rejection.
   if (!contextGateReceipt(issue, { now }))
     return { status: 'rejected', reason: 'context-receipt-missing-or-invalid' };
   if (!researchGateReceipt(issue, { now }))

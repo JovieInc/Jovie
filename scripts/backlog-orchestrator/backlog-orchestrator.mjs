@@ -185,11 +185,6 @@ async function runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun) {
   console.log(JSON.stringify(receipt, null, 2));
 }
 
-/**
- * Bind caller-supplied primary-source research evidence (queries, dated
- * citations, findings) for a research-required issue to one
- * symphony-research/v1 receipt. Validation is deterministic and fail-closed.
- */
 async function runApproveResearch(
   issueArg,
   evidenceFile,
@@ -210,7 +205,6 @@ async function runApproveResearch(
     throw new Error(`Issue ${issue.identifier} has no repository route`);
   const evidence = {
     issue: issue.identifier,
-    // Compute the content binding here so callers cannot forge it.
     issueHash: contextGate.issueContentHash(issue),
     classification: supplied.classification,
     rationale: supplied.rationale,
@@ -479,8 +473,6 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
     };
   }
 
-  // Pre-lease context and research classification are deterministic and
-  // decided before any plan mutation or model routing (JOV-5032).
   const researchNeed = researchGate.classifyResearchNeed(selected);
 
   if (isDryRun) {
@@ -496,8 +488,6 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
     };
   }
 
-  // Bind verified GBrain context first. An unreachable brain is a typed
-  // system-blocker before lease — never a silent skip.
   const contextResult = await contextGate.approveContext({
     issue: selected,
     gbrain: cliGbrainClient,
@@ -519,9 +509,6 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
 
   let current = await linear.fetchIssue(selected.identifier);
 
-  // Bind the research receipt. `not-required` evidence is derived from the
-  // deterministic classifier; `required` evidence must already exist (written
-  // via approve-research with bounded primary-source citations).
   let researchResult;
   if (researchNeed.decision === 'not-required') {
     researchResult = await researchGate.approveResearch({

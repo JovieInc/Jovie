@@ -65,8 +65,6 @@ export function validateAdmissionCandidate(
   if (isTimOwned(issue)) return 'tim-owned';
   if (labelsOf(issue).some(label => PROTECTED_LABELS.has(label)))
     return 'protected-or-human-review';
-  // Pre-lease context and research receipts are revalidated semantically
-  // against the current issue and freshness window (JOV-5032).
   if (!contextGateReceipt(issue, { now }))
     return 'context-receipt-missing-or-invalid';
   if (!researchGateReceipt(issue, { now }))
@@ -105,16 +103,10 @@ export function buildAdmissionGateReceipt(issue, options = {}) {
   return `${ADMISSION_GATE_PREFIX}\n${JSON.stringify(payload)}\n${ADMISSION_GATE_SUFFIX}`;
 }
 
-/**
- * Reconstruct the admission receipt from the issue's comments and revalidate
- * it semantically: schema, decision, candidate validity, and a recomputed
- * fingerprint over the current plan/context/research receipts. Labels are
- * indexes only — this receipt is the admission authority (JOV-5032).
- */
 export function admissionGateReceipt(issue, options = {}) {
   const body = commentsOf(issue)
     .map(commentBody)
-    .find(
+    .findLast(
       value =>
         value.startsWith(`${ADMISSION_GATE_PREFIX}\n`) &&
         value.endsWith(`\n${ADMISSION_GATE_SUFFIX}`)

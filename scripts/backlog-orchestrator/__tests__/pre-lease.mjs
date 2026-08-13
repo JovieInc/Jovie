@@ -1,10 +1,3 @@
-/**
- * Shared pre-lease receipt helpers for the deterministic gate tests
- * (JOV-5032). Every gate test that exercises plan approval, admission
- * approval, or the lease needs valid `symphony-context/v1` and
- * `symphony-research/v1` receipts bound to the issue under test.
- */
-
 import { buildAdmissionGateReceipt } from '../admission-gate.mjs';
 import {
   buildContextGateReceipt,
@@ -19,7 +12,10 @@ import {
   classifyResearchNeed,
 } from '../research-gate.mjs';
 
-export function contextEvidenceFor(issue, { now, ...overrides } = {}) {
+export function contextEvidenceFor(
+  issue,
+  { now, ...overrides } = /** @type {any} */ ({})
+) {
   return {
     issue: issue.identifier,
     issueHash: issueContentHash(issue),
@@ -38,7 +34,10 @@ export function contextEvidenceFor(issue, { now, ...overrides } = {}) {
   };
 }
 
-export function researchEvidenceFor(issue, { now, ...overrides } = {}) {
+export function researchEvidenceFor(
+  issue,
+  { now, ...overrides } = /** @type {any} */ ({})
+) {
   const need = classifyResearchNeed(issue);
   return {
     issue: issue.identifier,
@@ -67,7 +66,6 @@ export function preLeaseComments(issue, options = {}) {
   ];
 }
 
-/** Return a copy of the issue with valid pre-lease receipts appended. */
 export function withPreLeaseReceipts(issue, options = {}) {
   const existing = issue.comments?.nodes || issue.comments || [];
   return {
@@ -76,7 +74,6 @@ export function withPreLeaseReceipts(issue, options = {}) {
   };
 }
 
-/** Minimal valid plan evidence for a JOV control-plane issue. */
 export function planEvidenceFor(overrides = {}) {
   return {
     verified: true,
@@ -93,11 +90,10 @@ export function planEvidenceFor(overrides = {}) {
   };
 }
 
-/**
- * Return a copy of the issue with the full deterministic receipt chain:
- * context, research, plan, and admission receipts bound in order.
- */
-export function withFullGateReceipts(issue, { now, planEvidence } = {}) {
+export function withFullGateReceipts(
+  issue,
+  { now, planEvidence } = /** @type {any} */ ({})
+) {
   const withPreLease = withPreLeaseReceipts(issue, { now });
   const planReceipt = buildPlanGateReceipt(
     withPreLease,
