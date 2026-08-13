@@ -61,7 +61,7 @@ These files remain in `admin/table/` as they contain admin-specific logic:
 - `AdminCreatorsToolbar.tsx`
 - `AdminPageSizeSelect.tsx`
 - `AdminTableShell.tsx`
-- `SortableHeaderButton.tsx`
+- `SortableHeaderButton` is re-exported from `components/organisms/table/SortableHeaderButton.tsx`.
 - `TableRowActions.tsx`
 - `atoms/TableCheckboxCell.tsx` (different from organisms version)
 - `molecules/ExportCSVButton.tsx`
@@ -82,21 +82,21 @@ These files remain in `admin/table/` as they contain admin-specific logic:
 
 ```tsx
 // These imports will fail because files were deleted
-import { UnifiedTable } from '@/components/admin/table/organisms/UnifiedTable';
-import { AvatarCell } from '@/components/admin/table/atoms/AvatarCell';
-import { DateCell } from '@/components/admin/table/atoms/DateCell';
-import { TableContextMenu } from '@/components/admin/table/molecules/TableContextMenu';
-import { useTableGrouping } from '@/components/admin/table/utils/useTableGrouping';
+import { UnifiedTable } from '@/components/features/admin/table/organisms/UnifiedTable';
+import { AvatarCell } from '@/components/features/admin/table/atoms/AvatarCell';
+import { DateCell } from '@/components/features/admin/table/atoms/DateCell';
+import { TableContextMenu } from '@/components/features/admin/table/molecules/TableContextMenu';
+import { useTableGrouping } from '@/components/features/admin/table/utils/useTableGrouping';
 ```
 
 ### ✅ New (Index Re-Exports - Works via Deprecation Layer)
 
 ```tsx
 // These work because they're re-exported through index.ts
-import { UnifiedTable } from '@/components/admin/table';
-import { AvatarCell, DateCell } from '@/components/admin/table';
-import { TableContextMenu } from '@/components/admin/table';
-import { useTableGrouping } from '@/components/admin/table';
+import { UnifiedTable } from '@/components/features/admin/table';
+import { AvatarCell, DateCell } from '@/components/features/admin/table';
+import { TableContextMenu } from '@/components/features/admin/table';
+import { useTableGrouping } from '@/components/features/admin/table';
 ```
 
 ### ⭐ Recommended (Direct from Source)
@@ -111,26 +111,27 @@ import { useTableGrouping } from '@/components/organisms/table';
 
 ## Files Requiring Import Updates
 
-The following files currently have broken imports and need updating:
+The following files were migrated to the canonical source and now import from
+`components/organisms/table`:
 
-1. `components/admin/ActivityTableUnified.tsx`
-2. `components/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx`
-3. `components/admin/admin-users-table/AdminUsersTableUnified.tsx`
-4. `components/admin/waitlist-table/AdminWaitlistTableUnified.tsx`
-5. `components/admin/waitlist-table/AdminWaitlistTableWithViews.tsx`
-6. `components/admin/waitlist-table/utils/context-menu-builders.tsx`
-7. `components/admin/waitlist-table/WaitlistKanbanCard.tsx`
-8. `components/dashboard/organisms/dashboard-audience-table/DashboardAudienceTableUnified.tsx`
+1. `components/features/admin/ActivityTableUnified.tsx`
+2. `components/features/admin/admin-creator-profiles/AdminCreatorProfilesUnified.tsx`
+3. `components/features/admin/admin-users-table/AdminUsersTableUnified.tsx`
+4. `components/features/admin/waitlist-table/AdminWaitlistTableUnified.tsx`
+5. `components/features/admin/waitlist-table/AdminWaitlistTableWithViews.tsx`
+6. `components/features/admin/waitlist-table/utils/context-menu-builders.tsx`
+7. `components/features/admin/waitlist-table/WaitlistKanbanCard.tsx`
+8. `components/features/dashboard/organisms/dashboard-audience-table/DashboardAudienceTableUnified.tsx`
 
 ### Automated Migration Script
 
 ```bash
 # Find and replace deep imports with index imports
 find apps/web/components -type f \( -name "*.tsx" -o -name "*.ts" \) -exec sed -i '' \
-  -e "s|from '@/components/admin/table/atoms/\([^']*\)'|from '@/components/organisms/table'|g" \
-  -e "s|from '@/components/admin/table/molecules/\([^']*\)'|from '@/components/organisms/table'|g" \
-  -e "s|from '@/components/admin/table/organisms/\([^']*\)'|from '@/components/organisms/table'|g" \
-  -e "s|from '@/components/admin/table/utils/\([^']*\)'|from '@/components/organisms/table'|g" \
+  -e "s|from '@/components/features/admin/table/atoms/\([^']*\)'|from '@/components/organisms/table'|g" \
+  -e "s|from '@/components/features/admin/table/molecules/\([^']*\)'|from '@/components/organisms/table'|g" \
+  -e "s|from '@/components/features/admin/table/organisms/\([^']*\)'|from '@/components/organisms/table'|g" \
+  -e "s|from '@/components/features/admin/table/utils/\([^']*\)'|from '@/components/organisms/table'|g" \
   {} \;
 ```
 
