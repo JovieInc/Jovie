@@ -35,6 +35,15 @@ hooks:
     git config push.negotiate true
   before_run: |
     set -eu
+    # JOV-5031: fail-closed lease gate. Before a codex session seizes a
+    # provider account, verify the lease against a fresh tracker read. An
+    # issue observed outside active_states gets a monotonic tombstone and
+    # stale tracker snapshots cannot redispatch it; only a newer explicit
+    # active-state transition reopens it. Indeterminate reads admit the run
+    # (a failed observation is not proof of a state change).
+    if [ -x "${SYMPHONY_LEASE_GUARD_BIN:-$HOME/.local/bin/symphony-lease-guard}" ]; then
+      "${SYMPHONY_LEASE_GUARD_BIN:-$HOME/.local/bin/symphony-lease-guard}" check "${PWD##*/}"
+    fi
     if [ ! -d .git ]; then
       find . -mindepth 1 -maxdepth 1 -exec rm -rf {} +
       git clone --depth 1 https://github.com/JovieInc/Jovie.git .
@@ -51,7 +60,12 @@ agent:
   max_concurrent_agents: 4
   max_turns: 24
 codex:
-  command: /home/timwhite/.local/bin/codex-rotate --config shell_environment_policy.inherit=all --config model="gpt-5.6-luna" app-server
+  # The admission controller writes a semantically verified symphony-routing/v1
+  # receipt (with codex-rotate capacity evidence) to the Linear workpad before
+  # lease claim. The launcher re-fetches and re-verifies that receipt, binds
+  # live capacity, materializes it atomically into the workspace, and fails
+  # closed (exit 78) when any of that evidence is missing or drifted.
+  command: ./scripts/hermes/symphony-codex-router app-server
   approval_policy: never
   thread_sandbox: workspace-write
   turn_sandbox_policy:
@@ -81,6 +95,14 @@ No description provided.
 {% endif %}
 
 ## Fleet admission contract
+
+Before a Todo issue is claimed, Symphony requires both a verified plan-gate
+receipt and a verified `symphony-routing/v1` receipt. The routing receipt
+contains the deterministic capabilities, risk/complexity rationale, selected
+Luna/Terra/Sol model, fallback/escalation decision, and candidate statuses.
+The spawned app-server must use the receipt-selected model; no fixed model
+default is permitted. The receipt is durable in the Linear workpad and is
+included in the PR/scoreboard evidence.
 
 The versioned Gem controller writes `/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json` with schema `jovie-fleet-gate/v1`. Read it before moving a Todo issue to In Progress, before push, and before removing a typed PR hold.
 
