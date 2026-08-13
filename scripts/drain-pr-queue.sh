@@ -428,14 +428,14 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     echo "    ⏸ event admission scope no longer matches #$n at $expected_head; refusing enrollment"
     return 2
   fi
-  # JOV-5030 churn guard: never re-admit an unchanged head that already
-  # fronted a failed merge-group attempt on the exact current main base; the
-  # rebuilt group would deterministically fail again and duplicate follower
-  # CI. 'unknown' (missing evidence) degrades to the pre-guard behavior.
+  # JOV-5030 churn guard: suppress an unchanged head only after repeated,
+  # recent merge-group failures on the exact current main base. One failure
+  # may be transient infrastructure, and a five-minute cooldown reopens one
+  # bounded recovery retry. 'unknown' degrades to the pre-guard behavior.
   local churn_action
   churn_action="$(front_churn_action "$n" "$expected_head")"
   if [[ "$churn_action" == "block" ]]; then
-    echo "    ⏸ unchanged head already failed a merge-group attempt on the exact current main base; refusing re-enrollment for #$n until the head or main moves"
+    echo "    ⏸ unchanged head has repeated recent merge-group failures on the exact current main base; refusing re-enrollment for #$n until the head, main, or cooldown moves"
     return 2
   fi
   if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
@@ -935,10 +935,9 @@ echo "$SNAP" | jq -c --arg promotion_mode "$DRAIN_PROMOTION_MODE" --arg freeze "
   done
 
 # --- DEQUEUE: non-progressing front items (JOV-5030) ---
-# A front PR whose unchanged head already failed a merge-group attempt on the
-# exact current main base cannot land (the combined head deterministically
-# fails), yet while it occupies the queue every follower is grouped behind it
-# and pays a duplicate full merge-group CI run when the group is rebuilt.
+# A front PR whose unchanged head has repeated recent merge-group failures on
+# the exact current main base is temporarily non-progressing; while it occupies
+# the queue every follower is grouped behind it and pays duplicate full CI.
 # GitHub ejects it after the failed attempt; this pass removes it again if
 # anything re-added the unchanged head, and the ENROLL guard below refuses to
 # re-admit it. Action 'unknown' (missing evidence) never dequeues. Fleet
@@ -951,7 +950,7 @@ if [[ "$DRAIN_PROMOTION_MODE" == "normal" || ( "$DRAIN_PROMOTION_MODE" == "block
     [[ "$head_oid" =~ ^[0-9a-f]{40}$ ]] || continue
     churn_action="$(front_churn_action "$n" "$head_oid")"
     if [[ "$churn_action" == "block" ]]; then
-      echo "  #$n  $t  ✗ unchanged head already failed a merge-group attempt on the exact current main base"
+      echo "  #$n  $t  ✗ unchanged head has repeated recent merge-group failures on the exact current main base"
       if ! dequeue_strict "$n"; then
         echo "::error::Failed to prove non-progressing front PR #$n is outside native merge queue" >&2
         exit 1

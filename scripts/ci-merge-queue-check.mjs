@@ -179,6 +179,7 @@ async function main() {
         currentBaseSha: String(args.base ?? '').toLowerCase(),
         headCommittedAt: args['head-committed-at'] ?? null,
         mergeGroupRuns,
+        observedAt: new Date().toISOString(),
       });
       console.log(JSON.stringify(decision));
       break;

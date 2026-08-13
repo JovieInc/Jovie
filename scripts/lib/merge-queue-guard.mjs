@@ -1537,6 +1537,14 @@ export const MERGE_GROUP_FAILURE_CONCLUSIONS = new Set([
   'stale',
 ]);
 
+// A single failed workflow is not proof that the combined head is bad: GitHub
+// API timeouts and runner startup faults surface as an ordinary workflow
+// `failure`. Require repetition before suppressing a front item, and reopen a
+// bounded retry after five minutes so infrastructure recovery cannot deadlock
+// an unchanged PR forever.
+export const MERGE_GROUP_CHURN_FAILURE_THRESHOLD = 2;
+export const MERGE_GROUP_CHURN_COOLDOWN_MS = 5 * 60 * 1000;
+
 export function parseMergeQueueFrontBranch(branch) {
   const match =
     /^gh-readonly-queue\/main\/pr-([1-9][0-9]*)-([0-9a-f]{40})$/.exec(
@@ -1565,13 +1573,15 @@ export function frontItemChurnDecision({
   currentBaseSha,
   headCommittedAt,
   mergeGroupRuns,
+  observedAt,
 }) {
   if (
     !Number.isInteger(prNumber) ||
     prNumber <= 0 ||
     typeof currentBaseSha !== 'string' ||
     !/^[0-9a-f]{40}$/.test(currentBaseSha) ||
-    !Array.isArray(mergeGroupRuns)
+    !Array.isArray(mergeGroupRuns) ||
+    !Number.isFinite(Date.parse(observedAt))
   ) {
     return {
       action: 'unknown',
@@ -1623,9 +1633,38 @@ export function frontItemChurnDecision({
     };
   }
 
+  if (failedFrontedRuns.length < MERGE_GROUP_CHURN_FAILURE_THRESHOLD) {
+    return {
+      action: 'allow',
+      reason:
+        'one failed merge-group attempt is insufficient to distinguish a combined-head failure from transient infrastructure',
+      evidence: {
+        failedAttempts: failedFrontedRuns.length,
+        lastFailedRunId: lastFailed.id ?? null,
+        lastFailedAt: lastFailed.createdAt ?? null,
+        baseSha: currentBaseSha,
+      },
+    };
+  }
+
+  const observedMs = Date.parse(observedAt);
+  if (observedMs - attemptMs >= MERGE_GROUP_CHURN_COOLDOWN_MS) {
+    return {
+      action: 'allow',
+      reason:
+        'repeated failures completed the five-minute cooldown; allow one bounded infrastructure-recovery retry',
+      evidence: {
+        failedAttempts: failedFrontedRuns.length,
+        lastFailedRunId: lastFailed.id ?? null,
+        lastFailedAt: lastFailed.createdAt ?? null,
+        baseSha: currentBaseSha,
+      },
+    };
+  }
+
   return {
     action: 'block',
-    reason: `unchanged head already fronted ${failedFrontedRuns.length} failed merge-group attempt(s) on the exact current main base ${currentBaseSha}; re-enrollment would rebuild the group and duplicate follower CI until the head or main moves`,
+    reason: `unchanged head already fronted ${failedFrontedRuns.length} recent failed merge-group attempt(s) on the exact current main base ${currentBaseSha}; re-enrollment would rebuild the group and duplicate follower CI before the bounded cooldown`,
     evidence: {
       failedAttempts: failedFrontedRuns.length,
       lastFailedRunId: lastFailed.id ?? null,

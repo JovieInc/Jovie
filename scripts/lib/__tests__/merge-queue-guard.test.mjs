@@ -1769,6 +1769,7 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
       prNumber: 15849,
       currentBaseSha: BASE,
       headCommittedAt: '2026-08-13T00:30:00.000Z',
+      observedAt: '2026-08-13T01:53:00.000Z',
       mergeGroupRuns: [
         groupRun(15849, BASE, 'failure', '2026-08-13T01:51:17.000Z'),
         groupRun(15849, BASE, 'failure', '2026-08-13T01:30:16.000Z'),
@@ -1779,11 +1780,41 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(decision.evidence.failedAttempts).toBe(2);
   });
 
+  it('allows one failed attempt because infrastructure failure is not deterministic evidence', () => {
+    const decision = frontItemChurnDecision({
+      prNumber: 15896,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-08-13T00:30:00.000Z',
+      observedAt: '2026-08-13T01:53:00.000Z',
+      mergeGroupRuns: [
+        groupRun(15896, BASE, 'failure', '2026-08-13T01:51:17.000Z'),
+      ],
+    });
+    expect(decision.action).toBe('allow');
+    expect(decision.reason).toContain('transient infrastructure');
+  });
+
+  it('allows one bounded retry after repeated failures cool down', () => {
+    const decision = frontItemChurnDecision({
+      prNumber: 15849,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-08-13T00:30:00.000Z',
+      observedAt: '2026-08-13T01:57:00.000Z',
+      mergeGroupRuns: [
+        groupRun(15849, BASE, 'failure', '2026-08-13T01:51:17.000Z'),
+        groupRun(15849, BASE, 'failure', '2026-08-13T01:50:16.000Z'),
+      ],
+    });
+    expect(decision.action).toBe('allow');
+    expect(decision.reason).toContain('cooldown');
+  });
+
   it('allows when the exact main base genuinely changed', () => {
     const decision = frontItemChurnDecision({
       prNumber: 15849,
       currentBaseSha: NEW_BASE,
       headCommittedAt: '2026-08-13T00:30:00.000Z',
+      observedAt: '2026-08-13T01:53:00.000Z',
       mergeGroupRuns: [
         groupRun(15849, BASE, 'failure', '2026-08-13T01:51:17.000Z'),
       ],
@@ -1796,6 +1827,7 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
       prNumber: 15849,
       currentBaseSha: BASE,
       headCommittedAt: '2026-08-13T02:00:00.000Z',
+      observedAt: '2026-08-13T02:01:00.000Z',
       mergeGroupRuns: [
         groupRun(15849, BASE, 'failure', '2026-08-13T01:51:17.000Z'),
       ],
@@ -1809,6 +1841,7 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
       prNumber: 15849,
       currentBaseSha: BASE,
       headCommittedAt: '2026-08-13T00:30:00.000Z',
+      observedAt: '2026-08-13T03:21:00.000Z',
       mergeGroupRuns: [
         groupRun(15849, BASE, 'cancelled', '2026-08-13T03:16:37.000Z'),
         groupRun(15849, BASE, null, '2026-08-13T03:20:00.000Z', 'in_progress'),
@@ -1821,9 +1854,30 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
   it('returns unknown on missing or invalid evidence so mutations never fire', () => {
     /** @type {any[]} */
     const inputs = [
-      { prNumber: 15849, currentBaseSha: BASE, mergeGroupRuns: null },
-      { prNumber: 15849, currentBaseSha: 'not-a-sha', mergeGroupRuns: [] },
-      { prNumber: 'x', currentBaseSha: BASE, mergeGroupRuns: [] },
+      {
+        prNumber: 15849,
+        currentBaseSha: BASE,
+        mergeGroupRuns: null,
+        observedAt: '2026-08-13T03:21:00.000Z',
+      },
+      {
+        prNumber: 15849,
+        currentBaseSha: 'not-a-sha',
+        mergeGroupRuns: [],
+        observedAt: '2026-08-13T03:21:00.000Z',
+      },
+      {
+        prNumber: 'x',
+        currentBaseSha: BASE,
+        mergeGroupRuns: [],
+        observedAt: '2026-08-13T03:21:00.000Z',
+      },
+      {
+        prNumber: 15849,
+        currentBaseSha: BASE,
+        mergeGroupRuns: [],
+        observedAt: 'invalid',
+      },
     ];
     for (const input of inputs) {
       expect(frontItemChurnDecision(input).action).toBe('unknown');
