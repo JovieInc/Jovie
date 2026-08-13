@@ -107,7 +107,7 @@ describe('Symphony launcher closed loop', () => {
       assert.throws(
         () => runRouter(env, issue),
         error => {
-          assert.equal(error.status, 78);
+          assert.equal(/** @type {any} */ (error).status, 78);
           return true;
         }
       );
@@ -130,7 +130,7 @@ describe('Symphony launcher closed loop', () => {
       assert.throws(
         () => runRouter(env, issue),
         error => {
-          assert.equal(error.status, 78);
+          assert.equal(/** @type {any} */ (error).status, 78);
           return true;
         }
       );
@@ -147,7 +147,7 @@ describe('Symphony launcher closed loop', () => {
       assert.throws(
         () => runRouter(env, issue),
         error => {
-          assert.equal(error.status, 78);
+          assert.equal(/** @type {any} */ (error).status, 78);
           return true;
         }
       );

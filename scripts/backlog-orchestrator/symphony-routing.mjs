@@ -123,7 +123,7 @@ export function selectSymphonyRoute({
   availableModels = MODEL_BY_ID,
   cooldowns = {},
   now = Date.now(),
-  capacity,
+  capacity = undefined,
 }) {
   const classification = classifySymphonyIssue(issue);
   const preferred = preferredModels(classification);
