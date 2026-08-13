@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import pathlib
 import re
@@ -151,7 +152,7 @@ def _bounded_seconds(name: str, default: float, maximum: float) -> float:
         value = float(os.environ.get(name, default))
     except (TypeError, ValueError):
         return default
-    return default if value <= 0 else min(value, maximum)
+    return default if not math.isfinite(value) or value <= 0 else min(value, maximum)
 
 
 def _grok_executable() -> str | None:

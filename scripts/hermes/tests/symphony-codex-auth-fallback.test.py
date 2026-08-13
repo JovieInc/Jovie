@@ -509,6 +509,29 @@ class FallbackTests(unittest.TestCase):
             self.assertEqual(module.reconcile(), module.EXIT_SAFE_FAIL_CLOSED)
         self.assertEqual(controls, [])
 
+    def test_non_finite_grok_durations_fall_back_to_safe_defaults(self):
+        module = self.load_controller_module()
+        cases = (
+            (
+                "GEM_GROK_CANARY_TIMEOUT_SECONDS",
+                module.DEFAULT_GROK_CANARY_TIMEOUT_SECONDS,
+                module.MAX_GROK_CANARY_TIMEOUT_SECONDS,
+            ),
+            (
+                "SYMPHONY_GROK_SURVIVAL_SECONDS",
+                module.DEFAULT_GROK_SURVIVAL_SECONDS,
+                module.MAX_GROK_SURVIVAL_SECONDS,
+            ),
+        )
+        for name, default, maximum in cases:
+            for value in ("NaN", "inf", "-inf"):
+                with self.subTest(name=name, value=value):
+                    with mock.patch.dict(os.environ, {name: value}):
+                        self.assertEqual(
+                            module._bounded_seconds(name, default, maximum),
+                            default,
+                        )
+
     def test_grok_provider_is_proven_before_symphony_stops(self):
         module = self.load_controller_module()
         events: list[str] = []
