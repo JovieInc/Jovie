@@ -93,6 +93,38 @@ describe('onboarding tool artifacts', () => {
     );
   });
 
+  it('lets search results expand the picker instead of overflowing its fixed height', () => {
+    mocks.artistSearch.results = [
+      {
+        id: 'artist-1',
+        name: 'Test Artist',
+        url: 'https://open.spotify.com/artist/artist-1',
+        followers: 12_300,
+        popularity: 48,
+      },
+      {
+        id: 'artist-2',
+        name: 'Another Artist',
+        url: 'https://open.spotify.com/artist/artist-2',
+        followers: 9_800,
+        popularity: 41,
+      },
+    ];
+
+    fastRender(
+      <OnboardingSpotifyArtistPickerCard
+        state='output-available'
+        output={{ action: 'open_artist_picker', query: 'Test Artist' }}
+        onSelectArtist={vi.fn()}
+        onNoneOfThese={vi.fn()}
+      />
+    );
+
+    const picker = screen.getByTestId('onboarding-artist-picker');
+    expect(picker).toHaveClass('min-h-42');
+    expect(picker).not.toHaveClass('h-42');
+  });
+
   it('renders Spotify search failures as an actionable retry state', () => {
     mocks.artistSearch.error =
       'Request failed due to a temporary server issue. Please try again.';

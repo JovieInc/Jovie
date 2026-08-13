@@ -1,0 +1,16 @@
+[Unit]
+Description=Symphony Grok sidecar when Codex exhausted
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/symphony-grok-sidecar
+# Exit-status contract (scripts/hermes/symphony-codex-exhausted.py):
+#   0  reconciled (ready/idle, recovery deferred, or Grok workers launched)
+#   2  typed SAFE fail-closed exit — runtime state preserved and verified:
+#      codex_readiness_indeterminate, *_symphony_unchanged, grok_unchanged,
+#      symphony_restored. Expected outcome; must NOT mark this unit failed.
+#   3  degraded handoff — a real controller failure: Symphony left stopped,
+#      Grok ownership unknowable after mutation, or restore/start failed.
+#      Must keep failing the unit so the failure stays visible.
+# Every other non-zero status also remains a failure.
+SuccessExitStatus=0 2

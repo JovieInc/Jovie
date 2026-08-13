@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Symphony Grok sidecar every 20m
+
+[Timer]
+OnBootSec=2m
+OnUnitActiveSec=20m
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -11,7 +11,8 @@ export const ABOUT_STORY_RECEIPT = {
   source: 'apps/web/components/organisms/AboutPageContent.tsx',
   sourceExport: 'AboutPageContent',
   storyExport: 'Web016About',
-  sourceSha: 'c767a55d279c69fbddb32324f78faced8938884c',
+  sourceAuditBaseSha: 'c767a55d279c69fbddb32324f78faced8938884c',
+  containingMergeSha: '841866b0a7891bb064958af2cbbdf09b3cd3b1b3',
   proofScope: 'system-b-body-only',
   implementation: 'exact-production-body',
 } as const;
