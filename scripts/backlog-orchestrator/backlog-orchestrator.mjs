@@ -33,15 +33,15 @@ import * as classifier from './classifier.mjs';
 import * as deterministicGates from './deterministic-gates.mjs';
 import * as linear from './linear-client.mjs';
 import * as planGate from './plan-gate.mjs';
+import * as reconciler from './reconcile.mjs';
+import * as reporter from './reporter.mjs';
+import * as scorer from './scorer.mjs';
+import * as staleLeaseGuard from './stale-lease-guard.mjs';
 import {
   buildRoutingReceipt,
   parseRoutingReceipt,
   selectSymphonyRoute,
 } from './symphony-routing.mjs';
-import * as reconciler from './reconcile.mjs';
-import * as reporter from './reporter.mjs';
-import * as scorer from './scorer.mjs';
-import * as staleLeaseGuard from './stale-lease-guard.mjs';
 import * as workstreamer from './workstreamer.mjs';
 
 // ----- Config -----
@@ -736,7 +736,9 @@ async function runTeamAdmitNext(team, isDryRun) {
         teamId: team.id,
         todoStateId: team.todoStateId,
       });
-      console.log(`  ${receipt.status}: ${item.identifier} model=${routing.route.model}`);
+      console.log(
+        `  ${receipt.status}: ${item.identifier} model=${routing.route.model}`
+      );
     } catch (err) {
       console.error(
         `  Admission failed for ${item.identifier}: ${err.message}`

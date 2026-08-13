@@ -8,31 +8,54 @@ export const ROUTING_PREFIX = '<!-- symphony-routing/v1 -->';
 export const ROUTING_SUFFIX = '<!--/symphony-routing-->';
 
 const registry = JSON.parse(
-  readFileSync(new URL('../hermes/config/model-registry.json', import.meta.url), 'utf8')
+  readFileSync(
+    new URL('../hermes/config/model-registry.json', import.meta.url),
+    'utf8'
+  )
 );
 const MODEL_BY_ID = Object.freeze(
   Object.fromEntries(
     registry.models
       .filter(model => model.provider === 'codex')
-      .map(model => [model.id, { model: model.model, capabilities: model.capabilities }])
+      .map(model => [
+        model.id,
+        { model: model.model, capabilities: model.capabilities },
+      ])
   )
 );
 
-const TEXT = issue => `${issue?.title || ''} ${issue?.description || ''}`.toLowerCase();
-const labels = issue => (issue?.labels?.nodes || issue?.labels || []).map(label =>
-  String(typeof label === 'string' ? label : label?.name || '').toLowerCase()
-);
+const TEXT = issue =>
+  `${issue?.title || ''} ${issue?.description || ''}`.toLowerCase();
+const labels = issue =>
+  (issue?.labels?.nodes || issue?.labels || []).map(label =>
+    String(typeof label === 'string' ? label : label?.name || '').toLowerCase()
+  );
 
 export function classifySymphonyIssue(issue) {
   const text = `${TEXT(issue)} ${labels(issue).join(' ')}`;
-  const rootCause = /\b(root cause|regression|incident|broken|failure|500|crash|debug)\b/.test(text);
-  const architecture = /\b(architecture|orchestrat|control[- ]plane|fleet|routing|workflow|infra|migration|queue|system)\b/.test(text);
-  const mechanical = /\b(typo|copy|docs?|readme|format|lint|rename|comment|mechanical|test[- ]only)\b/.test(text);
+  const rootCause =
+    /\b(root cause|regression|incident|broken|failure|500|crash|debug)\b/.test(
+      text
+    );
+  const architecture =
+    /\b(architecture|orchestrat|control[- ]plane|fleet|routing|workflow|infra|migration|queue|system)\b/.test(
+      text
+    );
+  const mechanical =
+    /\b(typo|copy|docs?|readme|format|lint|rename|comment|mechanical|test[- ]only)\b/.test(
+      text
+    );
   const tests = /\b(test|fixture|vitest|pytest|coverage)\b/.test(text);
-  const risk = /\b(auth|billing|payment|security|secret|token|webhook|database|migration|deploy|ci|production)\b/.test(text)
-    ? 'high'
-    : architecture || rootCause ? 'medium' : 'low';
-  const complexity = architecture || rootCause ? 'high' : mechanical ? 'low' : 'standard';
+  const risk =
+    /\b(auth|billing|payment|security|secret|token|webhook|database|migration|deploy|ci|production)\b/.test(
+      text
+    )
+      ? 'high'
+      : architecture || rootCause
+        ? 'medium'
+        : 'low';
+  const complexity =
+    architecture || rootCause ? 'high' : mechanical ? 'low' : 'standard';
   const capabilities = rootCause
     ? ['root-cause', 'architecture']
     : architecture
@@ -42,20 +65,37 @@ export function classifySymphonyIssue(issue) {
         : tests
           ? ['tests', 'code']
           : ['code'];
-  return { risk, complexity, capabilities, reasons: [
-    `capabilities=${capabilities.join(',')}`,
-    `risk=${risk}`,
-    `complexity=${complexity}`,
-  ] };
+  return {
+    risk,
+    complexity,
+    capabilities,
+    reasons: [
+      `capabilities=${capabilities.join(',')}`,
+      `risk=${risk}`,
+      `complexity=${complexity}`,
+    ],
+  };
 }
 
 function fingerprint(issue, classification) {
   return createHash('sha256')
-    .update(JSON.stringify({ issue: issue?.identifier, title: issue?.title, classification }))
-    .digest('hex').slice(0, 24);
+    .update(
+      JSON.stringify({
+        issue: issue?.identifier,
+        title: issue?.title,
+        classification,
+      })
+    )
+    .digest('hex')
+    .slice(0, 24);
 }
 
-export function selectSymphonyRoute({ issue, availableModels = MODEL_BY_ID, cooldowns = {}, now = Date.now() }) {
+export function selectSymphonyRoute({
+  issue,
+  availableModels = MODEL_BY_ID,
+  cooldowns = {},
+  now = Date.now(),
+}) {
   const classification = classifySymphonyIssue(issue);
   const preferred = classification.capabilities.includes('root-cause')
     ? ['codex-sol', 'codex-terra']
@@ -65,7 +105,12 @@ export function selectSymphonyRoute({ issue, availableModels = MODEL_BY_ID, cool
   const candidates = [];
   for (const id of preferred) {
     const model = availableModels[id] || MODEL_BY_ID[id];
-    if (!model || !model.capabilities.some(capability => classification.capabilities.includes(capability))) {
+    if (
+      !model ||
+      !model.capabilities.some(capability =>
+        classification.capabilities.includes(capability)
+      )
+    ) {
       candidates.push({ id, status: 'incompatible' });
       continue;
     }
@@ -108,12 +153,21 @@ export function parseRoutingReceipt(issue) {
   const comments = issue?.comments?.nodes || issue?.comments || [];
   for (const comment of comments) {
     const body = typeof comment === 'string' ? comment : comment?.body || '';
-    const match = body.match(new RegExp(`${ROUTING_PREFIX}\\n(.*?)\\n${ROUTING_SUFFIX}`, 's'));
+    const match = body.match(
+      new RegExp(`${ROUTING_PREFIX}\\n(.*?)\\n${ROUTING_SUFFIX}`, 's')
+    );
     if (!match) continue;
     try {
       const receipt = JSON.parse(match[1]);
-      if (receipt.schema === SYMPHONY_ROUTING_SCHEMA && receipt.issue === issue.identifier && receipt.model) return receipt;
-    } catch { /* malformed receipts are ignored and fail closed */ }
+      if (
+        receipt.schema === SYMPHONY_ROUTING_SCHEMA &&
+        receipt.issue === issue.identifier &&
+        receipt.model
+      )
+        return receipt;
+    } catch {
+      /* malformed receipts are ignored and fail closed */
+    }
   }
   return null;
 }
