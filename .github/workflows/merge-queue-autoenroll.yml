@@ -141,7 +141,8 @@ jobs:
       (
         github.event.workflow_run.conclusion != 'cancelled' &&
         (
-          github.event.workflow_run.name == 'Production Controller' ||
+          github.event.workflow_run.path == '.github/workflows/production-controller.yml' ||
+          startsWith(github.event.workflow_run.path, '.github/workflows/production-controller.yml@') ||
           github.event.workflow_run.event == 'pull_request' ||
           github.event.workflow_run.event == 'push' ||
           github.event.workflow_run.event == 'merge_group'
@@ -189,9 +190,10 @@ jobs:
               ;;
             workflow_run)
               head_sha="$(jq -er '.workflow_run.head_sha | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
-              workflow_name="$(jq -er '.workflow_run.name' "$GITHUB_EVENT_PATH")"
+              workflow_path="$(jq -er '.workflow_run.path | select(type == "string" and length > 0)' "$GITHUB_EVENT_PATH")"
+              workflow_path="${workflow_path%%@*}"
               workflow_conclusion="$(jq -er '.workflow_run.conclusion' "$GITHUB_EVENT_PATH")"
-              if [[ "$workflow_name" == "Production Controller" ]]; then
+              if [[ "$workflow_path" == ".github/workflows/production-controller.yml" ]]; then
                 echo "Production Controller completed; maintenance-only exact fleet-hold recovery signal"
                 [[ "$workflow_conclusion" == "success" ]] && recover_holds=1
                 head_sha=''

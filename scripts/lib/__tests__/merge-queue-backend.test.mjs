@@ -1,5 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_MERGE_QUEUE_BACKEND,
@@ -151,6 +153,102 @@ function workflowStep(workflow, name) {
   return workflow.slice(start, end === -1 ? undefined : end);
 }
 
+function workflowJobCondition(workflow, name) {
+  const job = extractWorkflowJobBlock(workflow, name);
+  const lines = job.split('\n');
+  const start = lines.findIndex(line => line === '    if: >-');
+  if (start === -1)
+    throw new Error(`Workflow job condition not found: ${name}`);
+  const condition = [];
+  for (const line of lines.slice(start + 1)) {
+    if (!line.startsWith('      ')) break;
+    condition.push(line.slice(6));
+  }
+  return condition.join(' ').trim();
+}
+
+function evaluateWorkflowJobCondition(condition, event) {
+  const expression = condition
+    .replaceAll('github.event_name', JSON.stringify(event.eventName))
+    .replaceAll(
+      'github.event.workflow_run.conclusion',
+      JSON.stringify(event.conclusion ?? null)
+    )
+    .replaceAll(
+      'github.event.workflow_run.path',
+      JSON.stringify(event.path ?? null)
+    )
+    .replaceAll(
+      'github.event.workflow_run.event',
+      JSON.stringify(event.workflowEvent ?? null)
+    );
+  if (!/^[\s(),"'@/a-z0-9_!=|&.-]+$/i.test(expression)) {
+    throw new Error(`Unsupported workflow condition: ${condition}`);
+  }
+  return Boolean(
+    Function(
+      'startsWith',
+      `"use strict"; return (${expression});`
+    )((value, prefix) => value?.startsWith(prefix) ?? false)
+  );
+}
+
+function workflowRunScript(workflow, name) {
+  const step = workflowStep(workflow, name);
+  const marker = '        run: |\n';
+  const start = step.indexOf(marker);
+  if (start === -1) throw new Error(`Workflow run script not found: ${name}`);
+  return step
+    .slice(start + marker.length)
+    .split('\n')
+    .map(line => (line.startsWith('          ') ? line.slice(10) : line))
+    .join('\n');
+}
+
+function executeAdmissionScope({ path, conclusion, name }) {
+  const workflow = readRepoFile('.github/workflows/merge-queue-autoenroll.yml');
+  const script = workflowRunScript(workflow, 'Resolve exact admission scope');
+  const directory = mkdtempSync(join(tmpdir(), 'merge-queue-admission-'));
+  const eventPath = join(directory, 'event.json');
+  const outputPath = join(directory, 'output.txt');
+  writeFileSync(
+    eventPath,
+    JSON.stringify({ workflow_run: { path, conclusion, name, head_sha: HEAD } })
+  );
+  writeFileSync(outputPath, '');
+  try {
+    const result = spawnSync(
+      'bash',
+      ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          EVENT_NAME: 'workflow_run',
+          GITHUB_EVENT_PATH: eventPath,
+          GITHUB_OUTPUT: outputPath,
+          MANUAL_PR: '',
+          MANUAL_HEAD: '',
+          REPO: REPOSITORY,
+        },
+      }
+    );
+    if (result.status !== 0) {
+      throw new Error(
+        `Admission scope failed (${result.status}): ${result.stderr || result.stdout}`
+      );
+    }
+    return Object.fromEntries(
+      readFileSync(outputPath, 'utf8')
+        .trim()
+        .split('\n')
+        .map(line => line.split('=', 2))
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
 describe('merge queue backend resolution', () => {
   it('defaults bare callers to the live native backend', () => {
     expect(DEFAULT_MERGE_QUEUE_BACKEND).toBe('native');
@@ -183,6 +281,68 @@ describe('merge queue backend resolution', () => {
 });
 
 describe('queue workflow mutation safety', () => {
+  it.each([
+    ['success', '.github/workflows/production-controller.yml', true, '1'],
+    [
+      'success',
+      '.github/workflows/production-controller.yml@refs/heads/main',
+      true,
+      '1',
+    ],
+    ['failure', '.github/workflows/production-controller.yml', true, '0'],
+    [
+      'failure',
+      '.github/workflows/production-controller.yml@refs/heads/main',
+      true,
+      '0',
+    ],
+    ['cancelled', '.github/workflows/production-controller.yml', false, '0'],
+    [
+      'cancelled',
+      '.github/workflows/production-controller.yml@refs/heads/main',
+      false,
+      '0',
+    ],
+  ])('classifies a %s Production Controller run at %s', (conclusion, path, admitted, recoverHolds) => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const condition = workflowJobCondition(workflow, 'enroll');
+    const scope = workflowStep(workflow, 'Resolve exact admission scope');
+    const dynamicRunName = `Production Controller ${HEAD} from CI 31699642425 attempt 1`;
+    const outputs = executeAdmissionScope({
+      path,
+      conclusion,
+      name: dynamicRunName,
+    });
+
+    expect(dynamicRunName).not.toBe('Production Controller');
+    expect(workflow).not.toContain('github.event.workflow_run.name');
+    expect(scope).not.toContain('.workflow_run.name');
+    expect(
+      evaluateWorkflowJobCondition(condition, {
+        eventName: 'workflow_run',
+        conclusion,
+        path,
+        workflowEvent: 'workflow_run',
+      })
+    ).toBe(admitted);
+    expect(outputs).toEqual(
+      expect.objectContaining({
+        pr_number: '',
+        head_sha: '',
+        recover_holds: recoverHolds,
+      })
+    );
+    expect(scope).toContain('workflow_path="${workflow_path%%@*}"');
+    expect(scope).toContain(
+      '[[ "$workflow_path" == ".github/workflows/production-controller.yml" ]]'
+    );
+    expect(scope).toContain(
+      '[[ "$workflow_conclusion" == "success" ]] && recover_holds=1'
+    );
+  });
+
   it('scopes each new admission to the triggering PR and exact published head', () => {
     const workflow = readRepoFile(
       '.github/workflows/merge-queue-autoenroll.yml'

@@ -100,6 +100,12 @@ It fails closed if an open PR is missing from that authoritative snapshot.
   or legacy vendor label-cycle loop in the native path.
 - Queue enrollment is serialized by `merge-queue-drain-mutex`; it does not
   race another controller instance.
+- An above-target count of eligible PRs is queue-pressure telemetry, not a
+  promotion blocker. Closing admission at that threshold would set native
+  capacity to zero and deadlock the only controller that can drain the
+  backlog. New issue intake pauses until the count returns to target, while
+  existing implementation and the native drain continue. Unknown or malformed
+  queue evidence still fails closed.
 - Front-item churn guard (JOV-5030): every native group build runs on
   `gh-readonly-queue/main/pr-<front>-<exactBaseSha>`, so recent `merge_group`
   CI runs identify which PR fronted each failed attempt and against which
@@ -212,8 +218,10 @@ fleet-driven dequeue, the controller writes a pending
 `jovie-fleet-queue-hold/v1` commit status on that exact head. Only a successful
 `Production Controller` completion under a fresh normal `GREEN` gate may
 consume those receipts and re-enroll the still-current heads through the same
-native preflight and postcondition checks. Main-push and untargeted manual runs
-cannot perform this recovery.
+native preflight and postcondition checks. The recovery signal binds the stable
+workflow path (including GitHub's optional `@ref` suffix), not the controller's
+dynamic run title. Main-push and untargeted manual runs cannot perform this
+recovery.
 
 ## Monitoring and troubleshooting
 
