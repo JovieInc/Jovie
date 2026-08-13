@@ -11,8 +11,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-13T10:05:00.703Z",
-    "gitSha": "98cad58c93829618b1bef54f6775919db66967bb",
+    "capturedAt": "2026-08-13T12:25:35.887Z",
+    "gitSha": "7b937033b15622d85f7df721883d5e00fc95e0b9",
     "imagePath": "marketing-home-desktop.png"
   },
   {
@@ -192,8 +192,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-13T10:09:17.418Z",
-    "gitSha": "98cad58c93829618b1bef54f6775919db66967bb",
+    "capturedAt": "2026-08-13T12:29:49.109Z",
+    "gitSha": "7b937033b15622d85f7df721883d5e00fc95e0b9",
     "imagePath": "artist-profile-how-it-works-section-desktop.png"
   },
   {
@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-13T10:10:06.012Z",
-    "gitSha": "98cad58c93829618b1bef54f6775919db66967bb",
+    "capturedAt": "2026-08-13T12:30:37.043Z",
+    "gitSha": "7b937033b15622d85f7df721883d5e00fc95e0b9",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
@@ -609,8 +609,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-13T10:19:10.147Z",
-    "gitSha": "98cad58c93829618b1bef54f6775919db66967bb",
+    "capturedAt": "2026-08-13T12:39:36.641Z",
+    "gitSha": "7b937033b15622d85f7df721883d5e00fc95e0b9",
     "imagePath": "dashboard-releases-desktop.png",
     "publicExportPath": "releases-dashboard-full.png"
   },
@@ -626,8 +626,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-13T10:19:36.706Z",
-    "gitSha": "98cad58c93829618b1bef54f6775919db66967bb",
+    "capturedAt": "2026-08-13T12:40:03.085Z",
+    "gitSha": "7b937033b15622d85f7df721883d5e00fc95e0b9",
     "imagePath": "dashboard-releases-sidebar-desktop.png",
     "publicExportPath": "releases-dashboard-sidebar.png"
   },
@@ -677,8 +677,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-13T04:50:22.814Z",
-    "gitSha": "bda0d8836b01f812ed646587c48058fcb4ffd349",
+    "capturedAt": "2026-08-13T12:41:22.147Z",
+    "gitSha": "7b937033b15622d85f7df721883d5e00fc95e0b9",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },
@@ -694,8 +694,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-13T10:21:20.013Z",
-    "gitSha": "98cad58c93829618b1bef54f6775919db66967bb",
+    "capturedAt": "2026-08-13T12:41:45.861Z",
+    "gitSha": "7b937033b15622d85f7df721883d5e00fc95e0b9",
     "imagePath": "dashboard-analytics-desktop.png"
   },
   {
@@ -710,8 +710,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-13T10:21:24.150Z",
-    "gitSha": "98cad58c93829618b1bef54f6775919db66967bb",
+    "capturedAt": "2026-08-13T12:41:49.806Z",
+    "gitSha": "7b937033b15622d85f7df721883d5e00fc95e0b9",
     "imagePath": "dashboard-earnings-desktop.png"
   },
   {
@@ -726,8 +726,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin"],
-    "capturedAt": "2026-08-13T10:21:47.923Z",
-    "gitSha": "98cad58c93829618b1bef54f6775919db66967bb",
+    "capturedAt": "2026-08-13T12:42:13.400Z",
+    "gitSha": "7b937033b15622d85f7df721883d5e00fc95e0b9",
     "imagePath": "settings-profile-desktop.png"
   },
   {
@@ -742,8 +742,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-12T10:20:16.497Z",
-    "gitSha": "07e0d149214caa01f8cd3bfb260152613a65be0f",
+    "capturedAt": "2026-08-13T12:42:37.102Z",
+    "gitSha": "7b937033b15622d85f7df721883d5e00fc95e0b9",
     "imagePath": "settings-links-desktop.png"
   },
   {
