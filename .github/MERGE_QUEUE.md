@@ -212,8 +212,10 @@ fleet-driven dequeue, the controller writes a pending
 `jovie-fleet-queue-hold/v1` commit status on that exact head. Only a successful
 `Production Controller` completion under a fresh normal `GREEN` gate may
 consume those receipts and re-enroll the still-current heads through the same
-native preflight and postcondition checks. Main-push and untargeted manual runs
-cannot perform this recovery.
+native preflight and postcondition checks. The recovery signal binds the stable
+workflow path (including GitHub's optional `@ref` suffix), not the controller's
+dynamic run title. Main-push and untargeted manual runs cannot perform this
+recovery.
 
 ## Monitoring and troubleshooting
 
