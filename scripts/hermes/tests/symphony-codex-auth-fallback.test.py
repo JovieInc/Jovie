@@ -160,6 +160,7 @@ class FallbackTests(unittest.TestCase):
         python = self.bin / "python3"
         python.write_text("#!/bin/sh\nexec /usr/bin/python3 \"$@\"\n")
         python.chmod(0o755)
+        self.command("grok", "printf 'GROK_MODEL_READY\\n'")
         self.state = self.root / "state.json"
         self.state.write_text(json.dumps({"active": None, "cooldowns": {"jovie": 1}, "last_error": {}}))
         for account in ("jovie", "meetjovie"):
@@ -181,6 +182,8 @@ class FallbackTests(unittest.TestCase):
             "PATH": f"{self.bin}:/usr/bin:/bin",
             "GEM_CODEX_ACCOUNTS_STATE": str(self.state),
             "GEM_CODEX_CANARY_TIMEOUT_SECONDS": "1.0",
+            "GEM_GROK_CANARY_TIMEOUT_SECONDS": "1.0",
+            "SYMPHONY_GROK_SURVIVAL_SECONDS": "0.01",
         })
         env.update({key: str(value) for key, value in overrides.items()})
         return env
@@ -484,6 +487,55 @@ class FallbackTests(unittest.TestCase):
                     self.assertEqual(module.reconcile(), expected_rc)
                 self.assertEqual(controls, [])
 
+    def test_grok_provider_canary_failures_preserve_symphony(self):
+        module = self.load_controller_module()
+        controls: list[list[str]] = []
+        with (
+            mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
+            mock.patch.object(module, "_active_grok_units", return_value=[]),
+            mock.patch.object(
+                module,
+                "_grok_canary_ready",
+                return_value=(False, "grok_provider_probe_failed"),
+            ),
+            mock.patch.object(
+                module,
+                "_control",
+                side_effect=lambda command: controls.append(command) or True,
+            ),
+        ):
+            self.assertEqual(module.reconcile(), module.EXIT_SAFE_FAIL_CLOSED)
+        self.assertEqual(controls, [])
+
+    def test_grok_provider_is_proven_before_symphony_stops(self):
+        module = self.load_controller_module()
+        events: list[str] = []
+
+        def canary():
+            events.append("grok-canary")
+            return True, "grok_provider_ready"
+
+        def control(command):
+            events.append(" ".join(command))
+            return True
+
+        with (
+            mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
+            mock.patch.object(module, "_active_grok_units", side_effect=[[], []]),
+            mock.patch.object(module, "_grok_canary_ready", side_effect=canary),
+            mock.patch.object(module, "_fetch_single_issue", return_value={}),
+            mock.patch.object(module, "_issue_meta", return_value=(False, "blocked", None)),
+            mock.patch.object(module, "_control", side_effect=control),
+        ):
+            self.assertEqual(module.reconcile(), module.EXIT_SAFE_FAIL_CLOSED)
+
+        stop = "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service"
+        self.assertLess(events.index("grok-canary"), events.index(stop))
+
     def test_live_canary_requires_luna_and_exact_marker(self):
         canary = self.command("codex-rotate", "printf '%s\\n' \"$*\" > \"$GEM_EVENTS\"; printf 'GEM_MODEL_READY\\n'")
         result = self.run_controller(GEM_CODEX_ROTATE_BIN=canary, GEM_EVENTS=self.events)
@@ -728,6 +780,7 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(module, "_linear_identifiers", return_value=identifiers),
             mock.patch.object(module, "_active_grok_units", side_effect=[[], [], []]),
+            mock.patch.object(module, "_grok_canary_ready", return_value=(True, "grok_provider_ready")),
             mock.patch.object(module, "_grok_limit", return_value=2),
             mock.patch.object(module, "_fetch_single_issue", return_value=issue),
             mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
@@ -749,6 +802,64 @@ class FallbackTests(unittest.TestCase):
         self.assertLess(first_launch, cleanup_index)
         self.assertLess(cleanup_index, restore_index)
 
+    def test_grok_worker_collapse_during_survival_window_restores_symphony(self):
+        module = self.load_controller_module()
+        controls: list[list[str]] = []
+        unit = "grok-ship-JOV-1.service"
+        with (
+            mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
+            mock.patch.object(module, "_grok_canary_ready", return_value=(True, "grok_provider_ready")),
+            mock.patch.object(module, "_active_grok_units", side_effect=[[], [unit], []]),
+            mock.patch.object(module, "_grok_units_after_survival_window", return_value=[]),
+            mock.patch.object(module, "_fetch_single_issue", return_value={}),
+            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
+            mock.patch.object(
+                module,
+                "_control",
+                side_effect=lambda command: controls.append(command) or True,
+            ),
+        ):
+            self.assertEqual(module.reconcile(), module.EXIT_SAFE_FAIL_CLOSED)
+
+        cleanup_index = next(
+            index
+            for index, command in enumerate(controls)
+            if command[:3] == ["systemctl", "--user", "stop"] and unit in command
+        )
+        restore_index = next(
+            index
+            for index, command in enumerate(controls)
+            if command[:3] == ["systemctl", "--user", "start"]
+        )
+        self.assertLess(cleanup_index, restore_index)
+
+    def test_grok_worker_must_survive_window_before_handoff_succeeds(self):
+        module = self.load_controller_module()
+        controls: list[list[str]] = []
+        unit = "grok-ship-JOV-1.service"
+        with (
+            mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
+            mock.patch.object(module, "_grok_canary_ready", return_value=(True, "grok_provider_ready")),
+            mock.patch.object(module, "_active_grok_units", side_effect=[[], [unit]]),
+            mock.patch.object(module, "_grok_units_after_survival_window", return_value=[unit]),
+            mock.patch.object(module, "_fetch_single_issue", return_value={}),
+            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
+            mock.patch.object(
+                module,
+                "_control",
+                side_effect=lambda command: controls.append(command) or True,
+            ),
+        ):
+            self.assertEqual(module.reconcile(), 0)
+
+        self.assertFalse(
+            any(command[:3] == ["systemctl", "--user", "start"] for command in controls)
+        )
+
     def test_vanished_fallback_is_rechecked_before_handoff_completes(self):
         module = self.load_controller_module()
         controls: list[list[str]] = []
@@ -756,6 +867,7 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(module, "_linear_identifiers", return_value=[]),
+            mock.patch.object(module, "_grok_canary_ready", return_value=(True, "grok_provider_ready")),
             mock.patch.object(
                 module,
                 "_active_grok_units",
@@ -779,6 +891,7 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
+            mock.patch.object(module, "_grok_canary_ready", return_value=(True, "grok_provider_ready")),
             mock.patch.object(module, "_active_grok_units", side_effect=[[], None]),
             mock.patch.object(module, "_fetch_single_issue", return_value={}),
             mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
@@ -801,6 +914,7 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
+            mock.patch.object(module, "_grok_canary_ready", return_value=(True, "grok_provider_ready")),
             mock.patch.object(
                 module,
                 "_active_grok_units",
@@ -833,6 +947,7 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
+            mock.patch.object(module, "_grok_canary_ready", return_value=(True, "grok_provider_ready")),
             mock.patch.object(module, "_active_grok_units", side_effect=[[], []]),
             mock.patch.object(module, "_fetch_single_issue", return_value={}),
             mock.patch.object(module, "_issue_meta", return_value=(False, "blocked", None)),

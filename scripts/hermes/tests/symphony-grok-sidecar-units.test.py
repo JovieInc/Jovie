@@ -148,6 +148,7 @@ class ExitClassificationTests(unittest.TestCase):
                     mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
                     mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
                     mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"] if launch else []),
+                    mock.patch.object(module, "_grok_canary_ready", return_value=(True, "grok_provider_ready")),
                     mock.patch.object(module, "_active_grok_units", side_effect=active_snapshots),
                     mock.patch.object(module, "_fetch_single_issue", return_value=issue),
                     mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
