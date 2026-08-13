@@ -148,6 +148,36 @@ def observe_controller(url: str) -> dict[str, Any]:
         }
 
 
+def observe_build_info(build_info_url: str) -> dict[str, Any]:
+    """Read the public production identity receipt for deployed-SHA binding."""
+    try:
+        with urllib.request.urlopen(build_info_url, timeout=5) as response:  # noqa: S310 - derived from the configured health URL
+            if response.status < 200 or response.status >= 300:
+                return {"deployedSha": None, "buildInfoHttpStatus": response.status}
+            final_url = response.geturl()
+            if final_url.rstrip("/") != build_info_url.rstrip("/"):
+                return {
+                    "deployedSha": None,
+                    "buildInfoError": "build-info redirected away from the configured alias",
+                }
+            value = json.loads(response.read().decode("utf-8"))
+        if not isinstance(value, dict):
+            raise ValueError("build-info was not an object")
+        commit_sha = value.get("commitSha")
+        return {
+            "deployedSha": commit_sha
+            if isinstance(commit_sha, str) and commit_sha
+            else None
+        }
+    except urllib.error.HTTPError as error:
+        return {"deployedSha": None, "buildInfoHttpStatus": error.code}
+    except (OSError, ValueError, json.JSONDecodeError, urllib.error.URLError) as error:
+        return {
+            "deployedSha": None,
+            "buildInfoError": f"build-info-observation-failed: {error}",
+        }
+
+
 def observe_production(url: str) -> dict[str, Any]:
     try:
         with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 - configured health URL
@@ -165,7 +195,7 @@ def observe_production(url: str) -> dict[str, Any]:
         if not isinstance(value, dict):
             raise ValueError("production health was not an object")
         reported_status = value.get("status")
-        return {
+        observed: dict[str, Any] = {
             "status": "green" if reported_status in ("healthy", "ok") else "red",
             "url": url,
             "reportedStatus": reported_status,
@@ -183,6 +213,22 @@ def observe_production(url: str) -> dict[str, Any]:
             "url": url,
             "error": f"production-observation-failed: {error}",
         }
+    if observed["status"] == "green":
+        # A healthy payload alone is not deployment authority: bind the green
+        # signal to the immutable deployed SHA advertised by build-info so a
+        # stale production deploy can never pass as current-main proof.
+        observed.update(observe_build_info(url.rsplit("/", 1)[0] + "/build-info"))
+    return observed
+
+
+def deployment_bound(main_sha: object, deployed_sha: object) -> bool:
+    """True only when production is provably running the exact main SHA."""
+    return (
+        isinstance(main_sha, str)
+        and isinstance(deployed_sha, str)
+        and len(deployed_sha) >= 7
+        and main_sha.startswith(deployed_sha)
+    )
 
 
 def observe_integrity(path: Path) -> dict[str, Any]:
@@ -333,6 +379,15 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             )
         )
 
+    # Cross-field invariant: green health is only deployment authority when
+    # production is bound to the exact deployed main SHA. A healthy but
+    # stale (or unverifiable) deployment freezes promotion and new leases.
+    production_unbound = (
+        main.get("status") == "green"
+        and production.get("status") == "green"
+        and not deployment_bound(main.get("sha"), production.get("deployedSha"))
+    )
+
     if not any(reason["severity"] == "critical" for reason in reasons):
         if controller.get("status") != "green":
             reasons.append(
@@ -361,6 +416,15 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
                     "promotion",
                     "warning",
                     "Production is not green; deployment and production promotion are frozen.",
+                )
+            )
+        if production_unbound:
+            reasons.append(
+                typed_reason(
+                    "production-deployment-unbound",
+                    "promotion",
+                    "warning",
+                    "Production health is not bound to the exact deployed main SHA; promotion is frozen.",
                 )
             )
         eligible_prs = queue.get("eligiblePrs")
@@ -419,7 +483,9 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and all(reason["code"] == "production-not-green" for reason in reasons)
     )
     source_health_red = (
-        main.get("status") != "green" or production.get("status") != "green"
+        main.get("status") != "green"
+        or production.get("status") != "green"
+        or production_unbound
     )
     work_activities = (
         []
@@ -473,32 +539,39 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
 
 
 def write_receipt(receipt: dict[str, Any], state_dir: Path) -> None:
+    """Commit the hold first, then publish latest.json as the commit marker.
+
+    A partial commit must never expose a fresh GREEN receipt while the
+    direct-pickup hold is absent or stale, so the hold is written atomically
+    and verified before latest.json is replaced. If the publish fails, the
+    previous receipt stays in place and consumers fail closed on staleness.
+    """
     state_dir.mkdir(parents=True, exist_ok=True)
+    hold = {
+        "schema": "gem-direct-pickup-hold/v1",
+        "observedAt": receipt["observedAt"],
+        "reason": receipt["ownership"]["reason"],
+    }
+    pause_file = state_dir.parent.parent / ".gem-ship-paused-pr-queue"
+    hold_temporary = pause_file.with_name(pause_file.name + ".tmp")
+    hold_temporary.write_text(json.dumps(hold, sort_keys=True) + "\n", encoding="utf-8")
+    hold_temporary.replace(pause_file)
+    persisted_hold = read_json(pause_file)
+    if json.dumps(persisted_hold, sort_keys=True) != json.dumps(hold, sort_keys=True):
+        raise ValueError("direct-pickup hold failed post-write readback")
     destination = state_dir / "latest.json"
     temporary = state_dir / "latest.json.tmp"
     temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     temporary.replace(destination)
-    pause_file = state_dir.parent.parent / ".gem-ship-paused-pr-queue"
-    pause_file.write_text(
-        json.dumps(
-            {
-                "schema": "gem-direct-pickup-hold/v1",
-                "observedAt": receipt["observedAt"],
-                "reason": receipt["ownership"]["reason"],
-            },
-            sort_keys=True,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
 
 
 def acquire_writer_lock(state_dir: Path, timeout_seconds: float = WRITER_LOCK_TIMEOUT_SECONDS) -> int:
-    """Serialize the observe-evaluate-persist cycle to one writer.
+    """Serialize the compare-and-commit section to one writer.
 
     The native merge queue owns promotion; this lock only orders receipt
     refreshes so a slower, older observation can never overwrite a fresher
-    persisted receipt. A contested lock past the timeout fails closed.
+    persisted receipt. Observation happens before the lock is taken; a
+    contested lock past the timeout fails closed.
     """
     state_dir.mkdir(parents=True, exist_ok=True)
     fd = os.open(state_dir / ".writer.lock", os.O_RDWR | os.O_CREAT, 0o644)
@@ -550,11 +623,22 @@ def alarm_if_previous_receipt_stale(state_dir: Path, now: datetime) -> None:
     print(f"{prefix} fleet gate receipt refresh repaired stale state: {detail}", file=sys.stderr)
 
 
+def persisted_observed_at(state_dir: Path) -> datetime | None:
+    """Observation time of the canonical receipt, or None when unusable."""
+    try:
+        persisted = read_json(state_dir / "latest.json")
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+    if persisted.get("schema") != SCHEMA:
+        return None
+    return parse_time(persisted.get("observedAt"))
+
+
 def verify_persisted_receipt(state_dir: Path, receipt: dict[str, Any]) -> None:
     """Fail closed unless the canonical receipt holds exactly this evaluation."""
     persisted = read_json(state_dir / "latest.json")
-    if persisted.get("schema") != SCHEMA or persisted.get("observedAt") != receipt.get("observedAt"):
-        raise ValueError("persisted fleet gate receipt failed post-write readback")
+    if json.dumps(persisted, sort_keys=True) != json.dumps(receipt, sort_keys=True):
+        raise ValueError("persisted fleet gate receipt failed semantic post-write readback")
 
 
 def parse_args() -> argparse.Namespace:
@@ -616,16 +700,23 @@ def main() -> int:
         now = utc_now()
         receipt = evaluate(observe_signals(args, now), isoformat(now))
     else:
-        # Persisting refreshers hold one writer lock across the whole
-        # observe-evaluate-write cycle so concurrent event-driven and
-        # scheduled refreshes stay ordered by observation time.
+        # Observe outside the writer lock: network observation can outlast
+        # the competing-writer timeout, so only the fast compare-and-commit
+        # section is serialized. A slower writer whose observation predates
+        # the persisted receipt never overwrites fresher state.
+        now = utc_now()
+        alarm_if_previous_receipt_stale(args.state_dir, now)
+        receipt = evaluate(observe_signals(args, now), isoformat(now))
         lock_fd = acquire_writer_lock(args.state_dir)
         try:
-            now = utc_now()
-            alarm_if_previous_receipt_stale(args.state_dir, now)
-            receipt = evaluate(observe_signals(args, now), isoformat(now))
-            write_receipt(receipt, args.state_dir)
-            verify_persisted_receipt(args.state_dir, receipt)
+            persisted_at = persisted_observed_at(args.state_dir)
+            if persisted_at is not None and persisted_at >= now:
+                # A concurrent writer committed a newer-or-equal receipt while
+                # this evaluation was observing; adopt that authority instead.
+                receipt = read_json(args.state_dir / "latest.json")
+            else:
+                write_receipt(receipt, args.state_dir)
+                verify_persisted_receipt(args.state_dir, receipt)
         finally:
             release_writer_lock(lock_fd)
     print(json.dumps(receipt, indent=2, sort_keys=True))

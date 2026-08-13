@@ -1,0 +1,72 @@
+name: Fleet Gate Refresh
+
+# Bounded scheduled one-writer refresh for the persisted Gem fleet gate
+# receipt. The native merge queue stays event-driven and remains the sole
+# promotion mutator; this lane only keeps gem-priority-gate/latest.json fresh
+# during quiet periods so consumers never fail closed on staleness alone.
+#
+# The 5-minute cadence is comfortably below the 10-minute consumer fail-closed
+# window (scripts/backlog-orchestrator/admitter.mjs). A missed or failed run
+# is surfaced by the gate's own stale-repair alarm on the next refresh, and
+# consumers fail closed (stale = AMBER) in between. GitHub only runs
+# schedules from the default branch, so this always executes exact-main code.
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fleet-gate-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Refresh persisted fleet gate receipt
+    # The canonical receipt lives on the Gem host; exact-main gate code only.
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    timeout-minutes: 5
+    steps:
+      - name: Generate read-only Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: read
+          permission-pull-requests: read
+      - name: Checkout exact main gate code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Refresh canonical receipt
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GEM_PRIORITY_GATE_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/jovie-fleet-gate.json"
+          set +e
+          python3 scripts/hermes/gem-priority-gate.py \
+            --consumer fleet >"$receipt"
+          gate_rc=$?
+          set -e
+          jq -e '
+            .schema == "jovie-fleet-gate/v1" and
+            (.observedAt | type == "string")
+          ' "$receipt" >/dev/null || {
+            echo '::error::Fleet gate refresh emitted a malformed receipt.' >&2
+            exit 2
+          }
+          # A non-GREEN gate (rc 2) is a truthful persisted state, not a
+          # refresh failure; only unexpected exits fail this lane.
+          if [ "$gate_rc" -ne 0 ] && [ "$gate_rc" -ne 2 ]; then
+            echo "::error::Fleet gate refresh exited unexpectedly: $gate_rc" >&2
+            exit 2
+          fi
+          echo "Fleet gate receipt refreshed (consumer rc=$gate_rc)."

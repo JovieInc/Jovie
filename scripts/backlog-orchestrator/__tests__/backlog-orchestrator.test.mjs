@@ -846,8 +846,11 @@ describe('deterministic Symphony admission boundary', () => {
 
   function fleetEvidence(overrides = {}) {
     return {
-      main: { status: 'green' },
-      production: { status: 'green' },
+      main: {
+        status: 'green',
+        sha: 'a3eeefdd4dc681d1c9b5b4385720d661f5129137',
+      },
+      production: { status: 'green', deployedSha: 'a3eeefd' },
       controller: { status: 'green' },
       integrity: { status: 'clear' },
       queue: { status: 'known', eligiblePrs: 1, target: 5 },
