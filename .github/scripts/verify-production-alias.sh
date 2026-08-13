@@ -25,8 +25,8 @@ if [ -z "$expected_sha" ] || [ -z "$expected_deploy_id" ] ||
   exit 2
 fi
 
-expected_sha="${expected_sha:0:7}"
-if [[ "$expected_deploy_id" != dpl_* ]] ||
+if ! [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]] ||
+  [[ "$expected_deploy_id" != dpl_* ]] ||
   ! [[ "$max_attempts" =~ ^[1-9][0-9]*$ ]] ||
   ! [[ "$retry_seconds" =~ ^[0-9]+$ ]] ||
   ! [[ "$required_rounds" =~ ^[1-9][0-9]*$ ]] ||

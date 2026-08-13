@@ -222,8 +222,12 @@ async function fleetGateForTeam(team, now = new Date().toISOString()) {
             : receiptMain === 'green'
               ? 'green'
               : 'unknown',
+        sha: receipt?.signals?.main?.sha,
       },
-      production: { status: productionStatus },
+      production: {
+        status: productionStatus,
+        deployedSha: receipt?.signals?.production?.deployedSha,
+      },
       controller: {
         status: receipt?.signals?.controller?.status || 'unknown',
       },

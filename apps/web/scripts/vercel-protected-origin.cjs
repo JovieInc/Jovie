@@ -665,7 +665,7 @@ function validateBuildIdentity(payload, expectedEnvironment) {
 function validateBuildInfo(payload, expectedCommitSha, expectedEnvironment) {
   const expectedSha = requireFullCommitSha(expectedCommitSha);
   const identity = validateBuildIdentity(payload, expectedEnvironment);
-  if (!expectedSha.startsWith(identity.commitSha)) {
+  if (identity.commitSha !== expectedSha) {
     throw new Error(
       'Exact Vercel deployment bypass verification returned the wrong commit.'
     );

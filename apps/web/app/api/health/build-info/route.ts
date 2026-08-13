@@ -42,11 +42,13 @@ function resolveAppVersion(): string {
 }
 
 function resolveCommitSha(): string | undefined {
-  const buildSha = env.NEXT_PUBLIC_BUILD_SHA?.trim().slice(0, 7);
-  const runtimeCommitSha = env.VERCEL_GIT_COMMIT_SHA?.trim().slice(0, 7);
+  const buildSha = env.NEXT_PUBLIC_BUILD_SHA?.trim();
+  const runtimeCommitSha = env.VERCEL_GIT_COMMIT_SHA?.trim();
   // Prefer build-time SHA when present (inlined for prebuilt artifacts). Fall
   // back to the runtime Vercel deployment SHA so CLI deploys still identify.
-  return buildSha || runtimeCommitSha || undefined;
+  return [buildSha, runtimeCommitSha].find(sha =>
+    /^[0-9a-f]{40}$/.test(sha ?? '')
+  );
 }
 
 export function GET() {

@@ -224,10 +224,18 @@ def observe_production(url: str) -> dict[str, Any]:
 def deployment_bound(main_sha: object, deployed_sha: object) -> bool:
     """True only when production is provably running the exact main SHA."""
     return (
-        isinstance(main_sha, str)
-        and isinstance(deployed_sha, str)
-        and len(deployed_sha) >= 7
-        and main_sha.startswith(deployed_sha)
+        valid_commit_sha(main_sha, exact=True)
+        and valid_commit_sha(deployed_sha, exact=True)
+        and main_sha == deployed_sha
+    )
+
+
+def valid_commit_sha(value: object, *, exact: bool = False) -> bool:
+    """Validate a full or GitHub-style abbreviated lowercase commit SHA."""
+    return (
+        isinstance(value, str)
+        and (len(value) == 40 if exact else 7 <= len(value) <= 40)
+        and all(character in "0123456789abcdef" for character in value)
     )
 
 
@@ -459,6 +467,21 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
 
     critical = any(reason["severity"] == "critical" for reason in reasons)
     state = "RED" if critical else "AMBER" if reasons else "GREEN"
+    # Deployment is the operation that can make an unbound healthy production
+    # deployment catch up to current main. It therefore cannot require the
+    # exact-main binding that only exists *after* deployment. Keep this
+    # authority separate from merge/promotion admission and require a verified
+    # current-main source SHA plus a known healthy production identity. The
+    # Production Controller independently binds signals.main.sha to its exact
+    # workflow subject before using this authority.
+    deployment_allowed = (
+        not critical
+        and controller.get("status") == "green"
+        and main.get("status") == "green"
+        and valid_commit_sha(main.get("sha"), exact=True)
+        and production.get("status") == "green"
+        and valid_commit_sha(production.get("deployedSha"))
+    )
     evidence = signals.get("concurrencyEvidence") or {}
     gem_concurrency = 8 if evidence.get("accepted") is True else DEFAULT_GEM_CONCURRENCY
     eligible_prs = queue.get("eligiblePrs")
@@ -508,9 +531,16 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         },
         "promotionAdmission": {
             "allowed": state == "GREEN",
-            "activities": ["ready-for-merge", "merge", "deploy", "production-promotion"]
+            "activities": ["ready-for-merge", "merge"]
             if state == "GREEN"
             else [],
+        },
+        "deploymentAdmission": {
+            "allowed": deployment_allowed,
+            "activities": ["deploy-current-main", "production-promotion"]
+            if deployment_allowed
+            else [],
+            "authority": "exact-main-production-controller",
         },
         "isolatedPromotionAdmission": {
             "allowed": isolated_promotion_allowed,
@@ -646,7 +676,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--evaluate-json")
     parser.add_argument(
-        "--consumer", choices=("direct-gem", "fleet", "promotion"), default="direct-gem"
+        "--consumer",
+        choices=("direct-gem", "fleet", "promotion", "deployment"),
+        default="direct-gem",
     )
     parser.add_argument(
         "--repo",
@@ -724,6 +756,7 @@ def main() -> int:
         "direct-gem": receipt["ownership"]["directGemPickup"],
         "fleet": receipt["workAdmission"]["allowed"],
         "promotion": receipt["promotionAdmission"]["allowed"],
+        "deployment": receipt["deploymentAdmission"]["allowed"],
     }[args.consumer]
     return 0 if allowed else 2
 
@@ -739,6 +772,7 @@ if __name__ == "__main__":
                     "state": "RED",
                     "workAdmission": {"allowed": False},
                     "promotionAdmission": {"allowed": False},
+                    "deploymentAdmission": {"allowed": False},
                     "reasons": [
                         typed_reason(
                             "gate-evaluation-failed",

@@ -24,6 +24,7 @@ export const FLEET_GATE_REASON = Object.freeze({
   MAIN_NOT_GREEN: 'main-not-green',
   MAIN_UNKNOWN: 'main-unknown',
   PRODUCTION_NOT_GREEN: 'production-not-green',
+  PRODUCTION_DEPLOYMENT_UNBOUND: 'production-deployment-unbound',
   PRODUCTION_UNKNOWN: 'production-unknown',
   CONTROLLER_FAILURE: 'controller-failure',
   CONTROLLER_UNKNOWN: 'controller-unknown',
@@ -60,6 +61,22 @@ function isFreshTimestamp(value, nowMs, maxAgeMs) {
     Number.isFinite(observedMs) &&
     observedMs <= nowMs + 60_000 &&
     nowMs - observedMs <= maxAgeMs
+  );
+}
+
+function validCommitSha(value, { exact = false } = {}) {
+  return (
+    typeof value === 'string' &&
+    (exact ? value.length === 40 : value.length >= 7 && value.length <= 40) &&
+    /^[0-9a-f]+$/.test(value)
+  );
+}
+
+function deploymentBound(mainSha, deployedSha) {
+  return (
+    validCommitSha(mainSha, { exact: true }) &&
+    validCommitSha(deployedSha, { exact: true }) &&
+    mainSha === deployedSha
   );
 }
 
@@ -113,6 +130,10 @@ export function evaluateFleetGate(
   const reasons = [];
   const mainStatus = evidence?.main?.status || 'unknown';
   const productionStatus = evidence?.production?.status || 'unknown';
+  const productionUnbound =
+    mainStatus === 'green' &&
+    productionStatus === 'green' &&
+    !deploymentBound(evidence?.main?.sha, evidence?.production?.deployedSha);
   const controllerStatus = evidence?.controller?.status || 'unknown';
   const integrityStatus = evidence?.integrity?.status;
   const integrityReason = evidence?.integrity?.reason;
@@ -211,6 +232,16 @@ export function evaluateFleetGate(
         )
       );
     }
+    if (productionUnbound) {
+      reasons.push(
+        typedReason(
+          FLEET_GATE_REASON.PRODUCTION_DEPLOYMENT_UNBOUND,
+          'promotion',
+          'warning',
+          'Production health is not bound to the exact deployed main SHA; promotion and new issue pickup are frozen.'
+        )
+      );
+    }
 
     const queueStatus = evidence?.queue?.status || 'unknown';
     const eligiblePrs = evidence?.queue?.eligiblePrs;
@@ -273,7 +304,7 @@ export function evaluateFleetGate(
       reason => reason.code === FLEET_GATE_REASON.PRODUCTION_NOT_GREEN
     );
   const sourceHealthRed =
-    mainStatus !== 'green' || productionStatus !== 'green';
+    mainStatus !== 'green' || productionStatus !== 'green' || productionUnbound;
   const workActivities =
     state === FLEET_GATE_STATE.RED
       ? []
@@ -299,9 +330,7 @@ export function evaluateFleetGate(
     promotionAdmission: {
       allowed: state === FLEET_GATE_STATE.GREEN,
       activities:
-        state === FLEET_GATE_STATE.GREEN
-          ? ['ready-for-merge', 'merge', 'deploy', 'production-promotion']
-          : [],
+        state === FLEET_GATE_STATE.GREEN ? ['ready-for-merge', 'merge'] : [],
     },
     isolatedPromotionAdmission: {
       allowed: isolatedPromotionAllowed,

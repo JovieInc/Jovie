@@ -70,7 +70,7 @@ class ProductionHealthTests(unittest.TestCase):
         router = urlopen_router(
             {
                 "/api/health/deploy": {"status": "healthy"},
-                "/api/health/build-info": {"commitSha": "a3eeefd"},
+                "/api/health/build-info": {"commitSha": "a" * 40},
             }
         )
 
@@ -83,7 +83,7 @@ class ProductionHealthTests(unittest.TestCase):
                 "status": "green",
                 "url": url,
                 "reportedStatus": "healthy",
-                "deployedSha": "a3eeefd",
+                "deployedSha": "a" * 40,
             },
         )
 
@@ -92,7 +92,7 @@ class ProductionHealthTests(unittest.TestCase):
         router = urlopen_router(
             {
                 "/health": {"status": "ok"},
-                "/build-info": {"commitSha": "a3eeefd"},
+                "/build-info": {"commitSha": "a" * 40},
             }
         )
 
@@ -101,7 +101,7 @@ class ProductionHealthTests(unittest.TestCase):
 
         self.assertEqual(observed["status"], "green")
         self.assertEqual(observed["reportedStatus"], "ok")
-        self.assertEqual(observed["deployedSha"], "a3eeefd")
+        self.assertEqual(observed["deployedSha"], "a" * 40)
 
     def test_green_health_without_build_info_is_green_but_unbound(self):
         url = "https://jov.ie/api/health/deploy"
@@ -144,7 +144,7 @@ MAIN_SHA = "a3eeefdd4dc681d1c9b5b4385720d661f5129137"
 
 GREEN_SIGNALS: dict[str, object] = {
     "main": {"status": "green", "sha": MAIN_SHA},
-    "production": {"status": "green", "deployedSha": MAIN_SHA[:7]},
+    "production": {"status": "green", "deployedSha": MAIN_SHA},
     "controller": {"status": "green"},
     "integrity": {"status": "clear"},
     "queue": {"status": "known", "eligiblePrs": 0, "target": 5},
@@ -152,12 +152,18 @@ GREEN_SIGNALS: dict[str, object] = {
 }
 
 
-def run_main(argv: list[str]) -> tuple[int, str, str]:
+def run_main(
+    argv: list[str], signals: dict[str, object] | None = None
+) -> tuple[int, str, str]:
     stdout = io.StringIO()
     stderr = io.StringIO()
     with (
         mock.patch.object(sys, "argv", argv),
-        mock.patch.object(MODULE, "observe_signals", return_value=dict(GREEN_SIGNALS)),
+        mock.patch.object(
+            MODULE,
+            "observe_signals",
+            return_value=dict(GREEN_SIGNALS if signals is None else signals),
+        ),
         contextlib.redirect_stdout(stdout),
         contextlib.redirect_stderr(stderr),
     ):
@@ -320,19 +326,49 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = self.evaluate(GREEN_SIGNALS)
         self.assertEqual(receipt["state"], "GREEN")
         self.assertTrue(receipt["promotionAdmission"]["allowed"])
+        self.assertTrue(receipt["deploymentAdmission"]["allowed"])
         self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
 
-    def test_stale_deployment_sha_freezes_promotion(self):
+    def test_stale_deployment_sha_freezes_promotion_but_allows_catchup_deploy(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
         receipt = self.evaluate(signals)
         self.assertEqual(receipt["state"], "AMBER")
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertTrue(receipt["deploymentAdmission"]["allowed"])
         self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertIn(
             "production-deployment-unbound",
             {reason["code"] for reason in receipt["reasons"]},
         )
+
+    def test_same_prefix_different_commit_never_binds(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {
+            "status": "green",
+            "deployedSha": MAIN_SHA[:7] + "f" * 33,
+        }
+        receipt = self.evaluate(signals)
+
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["deploymentAdmission"]["allowed"])
+
+    def test_cli_allows_catchup_deployment_while_promotion_stays_closed(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 7}
+
+        deployment_exit, deployment_stdout, _ = run_main(
+            [str(GATE), "--consumer", "deployment", "--dry-run"], signals
+        )
+        promotion_exit, promotion_stdout, _ = run_main(
+            [str(GATE), "--consumer", "promotion", "--dry-run"], signals
+        )
+
+        self.assertEqual(deployment_exit, 0)
+        self.assertTrue(json.loads(deployment_stdout)["deploymentAdmission"]["allowed"])
+        self.assertEqual(promotion_exit, 2)
+        self.assertFalse(json.loads(promotion_stdout)["promotionAdmission"]["allowed"])
 
     def test_missing_deployed_sha_fails_closed(self):
         signals = dict(GREEN_SIGNALS)
@@ -340,6 +376,7 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = self.evaluate(signals)
         self.assertEqual(receipt["state"], "AMBER")
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertFalse(receipt["deploymentAdmission"]["allowed"])
         self.assertIn(
             "production-deployment-unbound",
             {reason["code"] for reason in receipt["reasons"]},
@@ -351,12 +388,37 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = self.evaluate(signals)
         self.assertEqual(receipt["state"], "AMBER")
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertFalse(receipt["deploymentAdmission"]["allowed"])
 
     def test_short_deployed_sha_never_binds(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "a3e"}
         receipt = self.evaluate(signals)
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertFalse(receipt["deploymentAdmission"]["allowed"])
+
+    def test_malformed_deployed_sha_never_authorizes_deployment(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "not-a-sha"}
+        receipt = self.evaluate(signals)
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertFalse(receipt["deploymentAdmission"]["allowed"])
+
+    def test_queue_blocker_does_not_deadlock_current_main_deployment(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 7}
+        signals["queue"] = {"status": "known", "eligiblePrs": 6, "target": 5}
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertTrue(receipt["deploymentAdmission"]["allowed"])
+
+    def test_controller_failure_blocks_deployment(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 7}
+        signals["controller"] = {"status": "failed"}
+        receipt = self.evaluate(signals)
+        self.assertFalse(receipt["deploymentAdmission"]["allowed"])
 
     def test_red_production_keeps_the_isolated_exception(self):
         signals = dict(GREEN_SIGNALS)
@@ -365,6 +427,7 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(receipt["state"], "AMBER")
         self.assertTrue(receipt["isolatedPromotionAdmission"]["allowed"])
         self.assertFalse(receipt["isolatedPromotionAdmission"]["deploymentsAllowed"])
+        self.assertFalse(receipt["deploymentAdmission"]["allowed"])
 
 
 class SemanticReadbackTests(unittest.TestCase):
@@ -515,9 +578,12 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("--consumer fleet", content)
         self.assertNotIn("--dry-run", content)
 
-    def test_production_controller_persists_promotion_receipt_without_dry_run(self):
+    def test_production_controller_uses_exact_subject_deployment_admission(self):
         content = (self.WORKFLOWS / "production-controller.yml").read_text(encoding="utf-8")
-        self.assertIn("--consumer promotion", content)
+        self.assertIn("--consumer deployment", content)
+        self.assertIn("EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}", content)
+        self.assertIn(".signals.main.sha == env.EXPECTED_SHA", content)
+        self.assertIn(".deploymentAdmission.allowed == true", content)
         self.assertNotIn("--dry-run", content)
 
     def test_scheduled_refresh_is_bounded_below_the_consumer_window(self):
