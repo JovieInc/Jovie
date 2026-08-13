@@ -575,7 +575,7 @@ describe('origin-bound Vercel protection bypass', () => {
           contentType: 'application/json',
           body: JSON.stringify({
             buildId: 'gKtEF24TywuvaaRXMU6cg',
-            commitSha: '5b38bfd',
+            commitSha: EXPECTED_SHA,
             environment: 'production',
           }),
         })
@@ -804,7 +804,7 @@ describe('origin-bound Vercel protection bypass', () => {
   it('requires the caller to distinguish a trusted preview from production', () => {
     const payload = {
       buildId: 'preview-build',
-      commitSha: EXPECTED_SHA.slice(0, 7),
+      commitSha: EXPECTED_SHA,
       environment: 'preview',
     };
 

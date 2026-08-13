@@ -14,6 +14,7 @@ PRODUCTION_ALIAS_SCRIPT = REPO_ROOT / ".github/scripts/verify-production-alias.s
 CI_WORKFLOW = REPO_ROOT / ".github/workflows/ci.yml"
 PRODUCTION_RELEASE_WORKFLOW = REPO_ROOT / ".github/workflows/production-release.yml"
 CANARY_WORKFLOW = REPO_ROOT / ".github/workflows/canary-health-gate.yml"
+EXPECTED_COMMIT_SHA = "a" * 40
 
 
 def test_timed_out_prebuilt_with_accepted_url_hands_off_to_health_gate(
@@ -909,7 +910,7 @@ http_status="200"
 
 case "$observation" in
   match) ;;
-  stale-sha) build_sha="old1234" ;;
+  stale-sha) build_sha="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" ;;
   wrong-environment) build_environment="preview" ;;
   http-503) http_status="503" ;;
   http-000) http_status="000" ;;
@@ -944,7 +945,7 @@ def _run_alias_verifier(
     env = {
         **os.environ,
         "PATH": f"{fake_bin}:{os.environ['PATH']}",
-        "EXPECTED_COMMIT_SHA": "new5678full",
+        "EXPECTED_COMMIT_SHA": EXPECTED_COMMIT_SHA,
         "EXPECTED_PRODUCTION_DEPLOYMENT_ID": "dpl_target",
         "PRODUCTION_ALIAS_MAX_ATTEMPTS": str(max_attempts),
         "PRODUCTION_ALIAS_REQUIRED_ROUNDS": str(required_rounds),
@@ -984,7 +985,7 @@ def test_alias_verifier_requires_exact_id_sha_and_all_rolling_routes(
     tmp_path: Path,
 ) -> None:
     result = _run_alias_verifier(
-        tmp_path, current_id="dpl_target", build_sha="new5678"
+        tmp_path, current_id="dpl_target", build_sha=EXPECTED_COMMIT_SHA
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
@@ -993,6 +994,19 @@ def test_alias_verifier_requires_exact_id_sha_and_all_rolling_routes(
     assert "vcrrForceStable=true" in curl_calls
     assert "vcrrForceCanary=true" in curl_calls
     assert "x-vercel-protection-bypass" not in curl_calls
+
+
+def test_alias_verifier_rejects_an_abbreviated_matching_prefix(tmp_path: Path) -> None:
+    result = _run_alias_verifier(
+        tmp_path,
+        current_id="dpl_target",
+        build_sha=EXPECTED_COMMIT_SHA[:7],
+    )
+
+    assert result.returncode == 1
+    assert "failure_subtype=production_alias_not_updated" in (
+        tmp_path / "github-output"
+    ).read_text()
 
 
 def test_alias_verifier_replays_production_transients_with_independent_proof(
@@ -1021,7 +1035,7 @@ def test_alias_verifier_replays_production_transients_with_independent_proof(
     result = _run_alias_verifier(
         tmp_path,
         current_id="dpl_target",
-        build_sha="new5678",
+        build_sha=EXPECTED_COMMIT_SHA,
         max_attempts=15,
         required_rounds=3,
         max_transient_failures=2,
@@ -1039,7 +1053,7 @@ def test_alias_verifier_requires_every_latest_observation_to_be_exact(
     result = _run_alias_verifier(
         tmp_path,
         current_id="dpl_target",
-        build_sha="new5678",
+        build_sha=EXPECTED_COMMIT_SHA,
         max_attempts=3,
         required_rounds=2,
         max_transient_failures=2,
@@ -1060,7 +1074,7 @@ def test_alias_verifier_retries_transport_unknowns_within_each_route_observation
     result = _run_alias_verifier(
         tmp_path,
         current_id="dpl_target",
-        build_sha="new5678",
+        build_sha=EXPECTED_COMMIT_SHA,
         max_attempts=2,
         required_rounds=2,
         max_transient_failures=0,
@@ -1083,7 +1097,7 @@ def test_alias_verifier_retries_successful_http_000_within_each_route_observatio
     result = _run_alias_verifier(
         tmp_path,
         current_id="dpl_target",
-        build_sha="new5678",
+        build_sha=EXPECTED_COMMIT_SHA,
         route_retries=1,
         curl_sequence=_alias_observation_sequence(
             ("http-000", "match", "match", "match"),
@@ -1136,7 +1150,7 @@ def test_alias_verifier_resets_proof_on_observed_identity_mismatch(
     result = _run_alias_verifier(
         tmp_path,
         current_id="dpl_target",
-        build_sha="new5678",
+        build_sha=EXPECTED_COMMIT_SHA,
         max_attempts=5,
         required_rounds=3,
         max_transient_failures=2,
@@ -1159,7 +1173,7 @@ def test_alias_verifier_resets_proof_after_bounded_transport_unknowns(
     result = _run_alias_verifier(
         tmp_path,
         current_id="dpl_target",
-        build_sha="new5678",
+        build_sha=EXPECTED_COMMIT_SHA,
         max_attempts=6,
         required_rounds=3,
         max_transient_failures=2,
@@ -1185,7 +1199,7 @@ def test_alias_verifier_rejects_stale_sha_even_on_expected_deployment(
     result = _run_alias_verifier(
         tmp_path,
         current_id="dpl_target",
-        build_sha="old1234",
+        build_sha="b" * 40,
         route_retries=2,
         curl_sequence="stale-sha,match,match",
     )
@@ -1203,7 +1217,7 @@ def test_alias_verifier_does_not_retry_wrong_environment_response(
     result = _run_alias_verifier(
         tmp_path,
         current_id="dpl_target",
-        build_sha="new5678",
+        build_sha=EXPECTED_COMMIT_SHA,
         route_retries=2,
         curl_sequence="wrong-environment,match,match",
     )
@@ -1219,7 +1233,7 @@ def test_alias_verifier_does_not_retry_non_transport_http_response(
     result = _run_alias_verifier(
         tmp_path,
         current_id="dpl_target",
-        build_sha="new5678",
+        build_sha=EXPECTED_COMMIT_SHA,
         route_retries=2,
         curl_sequence="http-503,match,match",
     )
@@ -1233,7 +1247,7 @@ def test_alias_verifier_rejects_wrong_current_id_even_with_expected_sha(
     tmp_path: Path,
 ) -> None:
     result = _run_alias_verifier(
-        tmp_path, current_id="dpl_old", build_sha="new5678"
+        tmp_path, current_id="dpl_old", build_sha=EXPECTED_COMMIT_SHA
     )
 
     assert result.returncode == 1

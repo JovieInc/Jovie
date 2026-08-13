@@ -846,8 +846,14 @@ describe('deterministic Symphony admission boundary', () => {
 
   function fleetEvidence(overrides = {}) {
     return {
-      main: { status: 'green' },
-      production: { status: 'green' },
+      main: {
+        status: 'green',
+        sha: 'a3eeefdd4dc681d1c9b5b4385720d661f5129137',
+      },
+      production: {
+        status: 'green',
+        deployedSha: 'a3eeefdd4dc681d1c9b5b4385720d661f5129137',
+      },
       controller: { status: 'green' },
       integrity: { status: 'clear' },
       queue: { status: 'known', eligiblePrs: 1, target: 5 },
@@ -861,6 +867,60 @@ describe('deterministic Symphony admission boundary', () => {
       now: '2026-08-09T05:01:00.000Z',
     });
   }
+
+  it('freezes new leases when healthy production is behind exact main', async () => {
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        production: { status: 'green', deployedSha: 'bda0d88' },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+    const issue = admissionIssue({ identifier: 'JOV-4899' });
+    const result = await admitter.selectNextToAdmit(
+      [classification(issue)],
+      [],
+      { currentlyShipping: 0, fleetGate }
+    );
+
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(fleetGate.promotionAdmission.allowed, false);
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+    assert.ok(
+      fleetGate.reasons.some(
+        reason => reason.code === 'production-deployment-unbound'
+      )
+    );
+    assert.deepEqual(result.admit, []);
+  });
+
+  it('never binds a different full commit that shares the display prefix', () => {
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        production: {
+          status: 'green',
+          deployedSha: 'a3eeefdfffffffffffffffffffffffffffffffff',
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(fleetGate.promotionAdmission.allowed, false);
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+  });
+
+  it('wires persisted main and deployment identities into lease admission', async () => {
+    const source = await readFile(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs'),
+      'utf8'
+    );
+
+    assert.match(source, /sha: receipt\?\.signals\?\.main\?\.sha/);
+    assert.match(
+      source,
+      /deployedSha: receipt\?\.signals\?\.production\?\.deployedSha/
+    );
+  });
 
   it('treats main-red as draft-only AMBER and blocks new issue pickup', async () => {
     const now = '2026-08-09T05:01:00.000Z';

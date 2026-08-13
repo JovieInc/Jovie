@@ -102,22 +102,28 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
-      - name: Require fresh GREEN deployment authority
+      - name: Require fresh exact-main deployment authority
         id: policy
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GEM_PRIORITY_GATE_REPO: ${{ github.repository }}
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
         shell: bash
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/jovie-fleet-gate.json"
           set +e
+          # This exact-main evaluation also persists the canonical fleet gate
+          # receipt under the gate's one-writer lock, so a completed production
+          # controller run refreshes the persisted deployment-authority state.
           python3 scripts/hermes/gem-priority-gate.py \
-            --dry-run --consumer promotion >"$receipt"
+            --consumer deployment >"$receipt"
           gate_rc=$?
           set -e
           jq -e '
             .schema == "jovie-fleet-gate/v1" and
+            (.signals.main.sha == env.EXPECTED_SHA) and
+            (.deploymentAdmission.allowed | type == "boolean") and
             (.promotionAdmission.allowed | type == "boolean") and
             (.isolatedPromotionAdmission.deploymentsAllowed == false)
           ' "$receipt" >/dev/null || {
@@ -127,7 +133,8 @@ jobs:
           deployment_allowed=false
           mode=blocked
           if [ "$gate_rc" -eq 0 ] && jq -e '
-            .state == "GREEN" and .promotionAdmission.allowed == true
+            .signals.main.sha == env.EXPECTED_SHA and
+            .deploymentAdmission.allowed == true
           ' "$receipt" >/dev/null; then
             deployment_allowed=true
             mode=normal

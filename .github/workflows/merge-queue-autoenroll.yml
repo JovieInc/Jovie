@@ -58,6 +58,9 @@ jobs:
     # The checked-in controller evaluates a fresh receipt on Gem, where the
     # canonical integrity and Symphony state live. Unknown/unavailable evidence
     # produces no new admission; this is not a second queue or mutator.
+    # The same exact-main evaluation also persists the canonical receipt under
+    # the gate's one-writer lock so /home/timwhite/gem-workspace/state/
+    # gem-priority-gate/latest.json never depends on the disabled Gem PR drain.
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 5
     outputs:
@@ -88,7 +91,7 @@ jobs:
           receipt="$RUNNER_TEMP/jovie-fleet-gate.json"
           set +e
           python3 scripts/hermes/gem-priority-gate.py \
-            --dry-run --consumer fleet >"$receipt"
+            --consumer fleet >"$receipt"
           gate_rc=$?
           set -e
           jq -e '
