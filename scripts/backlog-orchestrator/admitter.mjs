@@ -6,8 +6,10 @@
  * fail-closed on ownership, plan evidence, and mutation read-back.
  */
 
+import { admissionGateReceipt } from './admission-gate.mjs';
 import { preAdmissionDecision } from './admission-policy.mjs';
 import { contextGateReceipt } from './context-gate.mjs';
+import { planGateReceipt } from './plan-gate.mjs';
 import { researchGateReceipt } from './research-gate.mjs';
 import { scoreIssue } from './scorer.mjs';
 import { verifyRoutingReceipt } from './symphony-routing.mjs';
@@ -811,9 +813,16 @@ export async function admitIssue({
       reason: preAdmission.reason.code,
       preAdmission,
     };
-  if (!hasAdmissionEvidence(issue, classification).eligible) {
-    return { status: 'rejected', reason: 'plan-or-admission-evidence-missing' };
-  }
+  // Labels are indexes only, never authority (JOV-5032): the pickup path
+  // semantically parses and reconstructs the current plan-gate/v1 and
+  // admission-gate/v1 receipts before any workspace or model starts.
+  if (!planGateReceipt(issue, { now }))
+    return { status: 'rejected', reason: 'plan-receipt-missing-or-invalid' };
+  if (!admissionGateReceipt(issue, { now }))
+    return {
+      status: 'rejected',
+      reason: 'admission-receipt-missing-or-invalid',
+    };
   const routing = verifyRoutingReceipt(issue);
   if (!routing)
     return { status: 'rejected', reason: 'routing-receipt-missing-or-invalid' };

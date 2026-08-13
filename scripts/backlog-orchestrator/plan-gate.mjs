@@ -176,14 +176,15 @@ export function planGateFingerprint(issue, evidence) {
   return createHash('sha256').update(canonical).digest('hex').slice(0, 24);
 }
 
-export function buildPlanGateReceipt(issue, evidence) {
+export function buildPlanGateReceipt(issue, evidence, options = {}) {
   const payload = {
     schema: PLAN_GATE_SCHEMA,
     issue: issue.identifier,
     fingerprint: planGateFingerprint(issue, evidence),
-    contextFingerprint: contextGateReceipt(issue)?.payload?.fingerprint || null,
+    contextFingerprint:
+      contextGateReceipt(issue, options)?.payload?.fingerprint || null,
     researchFingerprint:
-      researchGateReceipt(issue)?.payload?.fingerprint || null,
+      researchGateReceipt(issue, options)?.payload?.fingerprint || null,
     evidence: normalizedEvidence(evidence),
   };
   return `${PLAN_GATE_PREFIX}\n${JSON.stringify(payload)}\n${PLAN_GATE_SUFFIX}`;
@@ -193,7 +194,7 @@ function hasReceipt(issue, receipt) {
   return commentsOf(issue).some(comment => commentBody(comment) === receipt);
 }
 
-export function planGateReceipt(issue) {
+export function planGateReceipt(issue, options = {}) {
   const body = commentsOf(issue)
     .map(commentBody)
     .find(
@@ -216,6 +217,19 @@ export function planGateReceipt(issue) {
       !payload?.evidence ||
       validatePlanCandidate(issue, payload.evidence) ||
       planGateFingerprint(issue, payload.evidence) !== payload.fingerprint
+    )
+      return null;
+    // The pre-lease fingerprints are required and reconstructed semantically
+    // (JOV-5032): a plan receipt with null or mismatched context/research
+    // fingerprints — or one whose pre-lease receipts went stale after an
+    // issue edit — is not authority for admission or lease.
+    const context = contextGateReceipt(issue, options);
+    const research = researchGateReceipt(issue, options);
+    if (
+      !context ||
+      !research ||
+      payload.contextFingerprint !== context.payload.fingerprint ||
+      payload.researchFingerprint !== research.payload.fingerprint
     )
       return null;
     return { body, payload };
@@ -269,7 +283,7 @@ export async function approvePlan({
       reason: 'research-receipt-missing-or-invalid',
     };
 
-  const receipt = buildPlanGateReceipt(issue, evidence);
+  const receipt = buildPlanGateReceipt(issue, evidence, { now });
   if (hasReceipt(issue, receipt) && hasLabel(issue, PLAN_APPROVED_LABEL)) {
     return {
       status: 'already-approved',

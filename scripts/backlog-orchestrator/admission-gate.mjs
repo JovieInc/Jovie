@@ -58,14 +58,15 @@ export function validateAdmissionCandidate(
   if (!researchGateReceipt(issue, { now }))
     return 'research-receipt-missing-or-invalid';
   if (!hasLabel(issue, PLAN_APPROVED_LABEL)) return 'plan-label-missing';
-  if (!planGateReceipt(issue)) return 'plan-receipt-missing-or-invalid';
+  if (!planGateReceipt(issue, { now }))
+    return 'plan-receipt-missing-or-invalid';
   return null;
 }
 
-export function admissionGateFingerprint(issue) {
-  const plan = planGateReceipt(issue);
-  const context = contextGateReceipt(issue);
-  const research = researchGateReceipt(issue);
+export function admissionGateFingerprint(issue, options = {}) {
+  const plan = planGateReceipt(issue, options);
+  const context = contextGateReceipt(issue, options);
+  const research = researchGateReceipt(issue, options);
   return createHash('sha256')
     .update(
       `${issue.identifier}|${plan?.payload?.fingerprint || ''}|${context?.payload?.fingerprint || ''}|${research?.payload?.fingerprint || ''}`
@@ -74,18 +75,57 @@ export function admissionGateFingerprint(issue) {
     .slice(0, 24);
 }
 
-export function buildAdmissionGateReceipt(issue) {
-  const plan = planGateReceipt(issue);
+export function buildAdmissionGateReceipt(issue, options = {}) {
+  const plan = planGateReceipt(issue, options);
   const payload = {
     schema: ADMISSION_GATE_SCHEMA,
     issue: issue.identifier,
-    fingerprint: admissionGateFingerprint(issue),
+    fingerprint: admissionGateFingerprint(issue, options),
     planFingerprint: plan?.payload?.fingerprint || '',
-    contextFingerprint: contextGateReceipt(issue)?.payload?.fingerprint || '',
-    researchFingerprint: researchGateReceipt(issue)?.payload?.fingerprint || '',
+    contextFingerprint:
+      contextGateReceipt(issue, options)?.payload?.fingerprint || '',
+    researchFingerprint:
+      researchGateReceipt(issue, options)?.payload?.fingerprint || '',
     decision: 'approved',
   };
   return `${ADMISSION_GATE_PREFIX}\n${JSON.stringify(payload)}\n${ADMISSION_GATE_SUFFIX}`;
+}
+
+/**
+ * Reconstruct the admission receipt from the issue's comments and revalidate
+ * it semantically: schema, decision, candidate validity, and a recomputed
+ * fingerprint over the current plan/context/research receipts. Labels are
+ * indexes only — this receipt is the admission authority (JOV-5032).
+ */
+export function admissionGateReceipt(issue, options = {}) {
+  const body = commentsOf(issue)
+    .map(commentBody)
+    .find(
+      value =>
+        value.startsWith(`${ADMISSION_GATE_PREFIX}\n`) &&
+        value.endsWith(`\n${ADMISSION_GATE_SUFFIX}`)
+    );
+  if (!body) return null;
+  try {
+    const payload = JSON.parse(
+      body.slice(
+        `${ADMISSION_GATE_PREFIX}\n`.length,
+        -`\n${ADMISSION_GATE_SUFFIX}`.length
+      )
+    );
+    if (
+      payload?.schema !== ADMISSION_GATE_SCHEMA ||
+      payload?.issue !== issue?.identifier ||
+      !payload?.fingerprint ||
+      payload?.decision !== 'approved' ||
+      validateAdmissionCandidate(issue, options) ||
+      admissionGateFingerprint(issue, options) !== payload.fingerprint
+    )
+      return null;
+    return { body, payload };
+  } catch {
+    return null;
+  }
 }
 
 function hasReceipt(issue, receipt) {
@@ -118,12 +158,12 @@ export async function approveAdmission({
   const reason = validateAdmissionCandidate(issue, { now });
   if (reason) return { status: 'rejected', reason };
 
-  const receipt = buildAdmissionGateReceipt(issue);
+  const receipt = buildAdmissionGateReceipt(issue, { now });
   if (hasReceipt(issue, receipt) && hasLabel(issue, ADMISSION_APPROVED_LABEL)) {
     return {
       status: 'already-approved',
       identifier: issue.identifier,
-      fingerprint: admissionGateFingerprint(issue),
+      fingerprint: admissionGateFingerprint(issue, { now }),
       receipt,
     };
   }
@@ -167,7 +207,7 @@ export async function approveAdmission({
   return {
     status: 'approved',
     identifier: reread.identifier,
-    fingerprint: admissionGateFingerprint(reread),
+    fingerprint: admissionGateFingerprint(reread, { now }),
     receipt,
   };
 }

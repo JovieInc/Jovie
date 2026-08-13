@@ -24,6 +24,22 @@ export const CITATION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 export const MAX_RESEARCH_QUERIES = 3;
 
 /**
+ * Primary-source kinds accepted as research citations. Secondary commentary
+ * (blogs, forums, social posts) is not authoritative grounding for model
+ * routing.
+ */
+export const CITATION_SOURCE_KINDS = Object.freeze([
+  'official-documentation',
+  'api-reference',
+  'changelog',
+  'release-notes',
+  'migration-guide',
+  'upgrade-guide',
+  'vendor-policy',
+  'rfc',
+]);
+
+/**
  * External/primary-source signals. Matching any of these means the issue
  * depends on facts outside the repository, so model routing must be grounded
  * in dated primary-source citations rather than stale memory.
@@ -67,6 +83,16 @@ function isFreshTimestamp(value, nowMs, maxAgeMs) {
     Number.isFinite(observedMs) &&
     observedMs <= nowMs + 60_000 &&
     nowMs - observedMs <= maxAgeMs
+  );
+}
+
+function significantTokens(text) {
+  return new Set(
+    String(text || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .split(/\s+/)
+      .filter(word => word.length > 3)
   );
 }
 
@@ -144,11 +170,26 @@ export function validateResearchEvidence(
     return 'research-queries-missing';
   if (!Array.isArray(evidence.citations) || evidence.citations.length === 0)
     return 'research-citation-missing';
+  // Citations must be dated, primary-source, and semantically bound to the
+  // issue: an arbitrary fresh URL is not research evidence.
+  const bindingTokens = significantTokens(
+    [issue?.title || '', ...buildResearchQueries(issue)].join(' ')
+  );
   for (const citation of evidence.citations) {
     if (!nonEmptyString(citation?.url) || !citation.url.startsWith('https://'))
       return 'research-citation-invalid';
+    if (
+      !nonEmptyString(citation?.title) ||
+      !CITATION_SOURCE_KINDS.includes(citation?.sourceKind)
+    )
+      return 'research-citation-invalid';
     if (!isFreshTimestamp(citation?.accessedAt, nowMs, citationMaxAgeMs))
       return 'research-citation-stale';
+    const citationTokens = significantTokens(
+      `${citation.url} ${citation.title}`
+    );
+    if (![...citationTokens].some(token => bindingTokens.has(token)))
+      return 'research-citation-unbound';
   }
   if (!nonEmptyList(evidence.findings)) return 'research-findings-missing';
   return null;
@@ -164,6 +205,9 @@ function normalizedEvidence(evidence) {
     citations: (evidence.citations || []).map(citation => ({
       url: citation.url.trim(),
       title: nonEmptyString(citation.title) ? citation.title.trim() : '',
+      sourceKind: nonEmptyString(citation.sourceKind)
+        ? citation.sourceKind.trim()
+        : '',
       accessedAt: citation.accessedAt.trim(),
     })),
     findings: (evidence.findings || []).map(finding => finding.trim()),
