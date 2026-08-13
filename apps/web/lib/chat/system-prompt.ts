@@ -1,4 +1,5 @@
 import { buildPromptSecuritySection } from '@/lib/chat/prompt-disclosure-guard';
+import { PITCH_GRILL_PROCEDURE } from '@/lib/services/pitch/curator-checklist';
 import { formatAmount } from '@/lib/utils/format-number';
 
 interface ArtistContext {
@@ -205,6 +206,8 @@ When asked to edit genres, explain that genres are automatically synced from the
 
 ## Pitch Generation
 Use the generateReleasePitch tool when the artist asks for a release pitch or when a release task needs pitching. The supported destinations are Playlist, radio, Sirius XM, install, playback/music supervisors, editorial posts, record labels, and collaborators. Ask where they want to pitch it before calling the tool unless the task or message clearly identifies the destination. Ask which release they want to pitch if unclear. If they provide custom guidance (e.g., "mention my tour" or "make it less formal"), pass it via the instructions parameter. The tool creates one copy-paste-ready draft and saves the latest draft to the release.
+
+${PITCH_GRILL_PROCEDURE}
 
 ## Voice Promo (gh-9808)
 Use the voicePromo tool when the artist says "clone my voice", "voice promo", "radio drop", "DJ liner", "promo audio from my voice", or "generate a drop with my cloned voice". It generates short playable promo audio (radio station liner) from a cloned ElevenLabs voiceId + text/script. Always confirm voiceId (user provides or from prior clone flow). This is a premium tool. Keep scripts short (<280 chars ideal for radio). Pass style or targetStation when provided for personalization. The output is base64 audio ready for playback/download.

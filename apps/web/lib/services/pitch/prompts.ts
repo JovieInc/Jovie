@@ -5,11 +5,50 @@
  * Uses a story-first, first-person formula optimized for editorial curators.
  */
 
+import {
+  formatPitchChecklistForPrompt,
+  getPitchChecklistStatus,
+  type PitchChecklistInput,
+} from './curator-checklist';
 import type { PitchDestination } from './targets';
 import { type PitchInput, PLATFORM_LIMITS } from './types';
 
+const CURATOR_CHECKLIST_RULES = `CURATOR CHECKLIST — refuse to invent missing fields. Every outreach draft must include or explicitly mark UNKNOWN:
+artist, title, genre, 1–2 sentences on why this release exists, Spotify or private listen link, release date, why-this-playlist.
+
+If a required field is UNKNOWN, write UNKNOWN in that slot. Do not draft a finished pitch that hides the gap.
+
+OUTPUT RULES:
+- Readable in under 1 minute. Short beats, no blast-email padding.
+- Never open with "Dear Curator" or any Dear [role] greeting.
+- One ask only.
+- Target playlist/destination fit over follower count.
+- Include FFO (for fans of) only from supplied references — never invent comparisons.
+- No attachments. Never invent a listen URL, @handle, or private email.
+- Include the Spotify or private listen link only when the artist supplied one.
+- When the release date is known, note that outreach should start 2–4 weeks pre-release.`;
+
+function checklistInputFromPitch(
+  input: PitchInput,
+  instructions?: string
+): PitchChecklistInput {
+  return {
+    artistName: input.artist.displayName,
+    title: input.release.title,
+    genres: input.release.genres?.length
+      ? input.release.genres
+      : input.artist.genres,
+    releaseDate: input.release.releaseDate,
+    targetPlaylists: input.artist.targetPlaylists,
+    whyText: null,
+    instructions,
+  };
+}
+
 export function buildSystemPrompt(): string {
   return `You write playlist pitches in the artist's own voice (first person). These are submitted to editorial curators at streaming platforms who scan hundreds of pitches daily. Your job is to make the artist's pitch stand out through specificity, vivid storytelling, and easy-to-scan structure.
+
+${CURATOR_CHECKLIST_RULES}
 
 FORMULA — every pitch follows 3 beats in this order:
 
@@ -25,7 +64,7 @@ HARD RULES:
 - Each platform has a strict character limit — you MUST stay under it
 - NEVER include streaming stats in Spotify or Apple Music pitches — curators already have the artist's dashboard
 - NEVER use hype words: "banger", "monster hit", "fire", "smash", "anthem", "certified"
-- NEVER include links, @handles, or social media references
+- NEVER invent links, @handles, or social media references
 - NEVER reference generic mega-playlists like "Today's Top Hits" or "RapCaviar" unless the artist specifically targets them
 - NEVER use vague genre descriptions: "kinda pop, kinda rap, kinda vibes" — be specific
 - NEVER copy-paste the artist's bio — the pitch tells the story of THIS song, not the artist's career
@@ -46,6 +85,8 @@ export function buildPitchDraftSystemPrompt(): string {
 
 Your job is to produce one copy-paste-ready pitch for the requested destination. Keep it specific, practical, and easy to scan.
 
+${CURATOR_CHECKLIST_RULES}
+
 CORE STRUCTURE:
 1. Release hook: name the release and give the human or creative reason it exists.
 2. Sonic/context fit: explain the sound, mood, audience, and placement fit for the destination.
@@ -55,7 +96,7 @@ CORE STRUCTURE:
 HARD RULES:
 - Write in first person as the artist unless the destination clearly needs a short third-person editorial blurb.
 - Never fabricate statistics, awards, press, playlist names, clearances, label interest, or collaborator relationships.
-- Do not include links, @handles, or private contact placeholders.
+- Do not invent links, @handles, or private contact placeholders.
 - Avoid hype words: "banger", "monster hit", "fire", "smash", "anthem", "certified".
 - Do not copy-paste the artist bio; use only details that explain this release and this destination.
 - Respect the requested character limit.`;
@@ -134,7 +175,11 @@ export function buildUserPrompt(
   }
 
   sections.push(
-    `\nGenerate a playlist pitch for each platform. Stay strictly within character limits.`
+    `\n${formatPitchChecklistForPrompt(getPitchChecklistStatus(checklistInputFromPitch(input, instructions)))}`
+  );
+
+  sections.push(
+    `\nGenerate a playlist pitch for each platform. Stay strictly within character limits. If a curator-checklist field is UNKNOWN, mark it UNKNOWN instead of inventing it.`
   );
   return sections.join('\n');
 }
@@ -160,7 +205,11 @@ export function buildPitchDraftUserPrompt(params: {
   }
 
   sections.push(
-    `\nGenerate one pitch for the requested destination. Return a concise subject line only when the pitch would naturally be sent as an email or DM.`
+    `\n${formatPitchChecklistForPrompt(getPitchChecklistStatus(checklistInputFromPitch(input, instructions)))}`
+  );
+
+  sections.push(
+    `\nGenerate one pitch for the requested destination. Return a concise subject line only when the pitch would naturally be sent as an email or DM. If a curator-checklist field is UNKNOWN, mark it UNKNOWN instead of inventing it.`
   );
 
   return sections.join('\n');

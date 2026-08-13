@@ -171,4 +171,13 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Billing verification is temporarily unavailable');
     expect(prompt).not.toContain('This artist is on the Free plan');
   });
+
+  it('grills missing curator pitch fields before generateReleasePitch', () => {
+    const prompt = buildSystemPrompt(baseContext, []);
+
+    expect(prompt).toContain('generateReleasePitch');
+    expect(prompt).toContain('ONE missing field');
+    expect(prompt).toContain('Spotify or private listen link');
+    expect(prompt).toContain('Dear Curator');
+  });
 });

@@ -91,9 +91,11 @@ describe('buildSystemPrompt', () => {
   it('includes anti-pattern rules', () => {
     const prompt = buildSystemPrompt();
     expect(prompt.toLowerCase()).toContain('never use hype words');
-    expect(prompt.toLowerCase()).toContain('never include links');
+    expect(prompt.toLowerCase()).toContain('never invent links');
     expect(prompt.toLowerCase()).toContain('never include streaming stats');
     expect(prompt.toLowerCase()).toContain('never copy-paste');
+    expect(prompt).toContain('CURATOR CHECKLIST');
+    expect(prompt).toContain('Dear Curator');
   });
 
   it('includes an example pitch', () => {
@@ -154,6 +156,8 @@ describe('buildUserPrompt', () => {
     expect(prompt).toContain('Solo Act');
     expect(prompt).toContain('Untitled');
     expect(prompt).not.toContain('null');
+    expect(prompt).toContain('Curator Checklist');
+    expect(prompt).toContain('UNKNOWN');
   });
 
   it('does not include career highlights section when empty', () => {
