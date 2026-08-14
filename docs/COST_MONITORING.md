@@ -62,6 +62,11 @@ This is the primary defense. Walk this checklist on initial setup and re-verify 
 
 ### Upstash Redis
 
+- Approved pre-revenue ceiling: **$5/month** for `Jovie-1` pay-as-you-go.
+  This is a hard maximum, not a target. Automated budget increases are disabled
+  while the verified active paid-subscriber count is zero. Upstash account
+  currently lacks a payment method, so the approved plan change remains
+  unapplied until billing setup is completed.
 - Hard tier limit: record the current monthly command quota in the production
   operations dashboard; the free-tier reference value is 500,000 commands.
 - Provisioning status: the application emits the metrics and stable failure
@@ -85,10 +90,14 @@ This is the primary defense. Walk this checklist on initial setup and re-verify 
   analytics off; documented payment-abuse exceptions retain sliding windows
   with analytics off. Known crawlers skip durable telemetry limiters, and quota
   errors open the shared Redis circuit for 15 minutes to stop retry
-  amplification.
+  amplification. Authentication routing state and native exchange codes are
+  Postgres-backed, so Redis mitigation degrades analytics/rate-limit precision
+  instead of blocking login.
 - Recovery: restore write operability (quota reset, approved plan change, or
   replacement datastore), run the authenticated `/api/health/redis` write/read
   probe, then complete the production auth dogfood path before closing incident.
+  Automation may apply the approved pay-as-you-go plan and hard cap, but must
+  never delete/recreate the database, restore a backup, or rotate credentials.
 
 ### R2 / Cloudflare
 

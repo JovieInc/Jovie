@@ -82,6 +82,16 @@ and agent traffic all consume their quotas.
 6. **No public keepalive traffic.** A public health route must not issue a
    metered datastore command merely to prevent archival. The standing
    operability canary owns both liveness and keepalive behavior.
+7. **Quota exhaustion must not block authentication.** PKCE state, native
+   exchange codes, sessions, and other one-time auth values must use the
+   Postgres-backed verification/session stores as their durable authority.
+   Redis may accelerate auth or enforce advisory abuse limits, but auth must
+   remain correct and usable when Redis is unavailable or quota-blocked.
+8. **Automated upgrades are budget-bound, never replacement loops.** A plan
+   mutation must install its approved hard monthly cap in the same operation.
+   The cap must not auto-increase while verified paid-subscriber count is zero.
+   Never automate datastore deletion, archive/recreation, backup restore, or
+   credential rotation as quota recovery; those remain human-approved DR.
 
 For every Redis/Upstash PR, disclose:
 
