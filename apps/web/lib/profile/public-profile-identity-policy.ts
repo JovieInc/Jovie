@@ -6,9 +6,10 @@
  * repository or production-fixture provenance.
  *
  * Every identity in this registry is excluded from search and machine-readable
- * discovery. All identities except the dedicated claim-flow fixture are also
- * permanently unavailable for create, rename, reserve, and claim flows.
- * Production monitors may still render their public routes directly.
+ * discovery and permanently unavailable to general create, rename, reserve,
+ * and ingestion assignment flows. The dedicated claim-flow fixture has one
+ * narrower exception: a verified token-backed pending claim may take over the
+ * preseeded row. Production monitors may still render their public routes.
  */
 
 export type PublicProfileIdentityExclusionReason =
@@ -51,11 +52,7 @@ export const PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE =
 
 /** Complete exact-handle reservation set, exported for cross-surface tests. */
 export const PUBLIC_PROFILE_RESERVED_IDENTITY_HANDLES: readonly string[] =
-  Object.freeze(
-    Object.entries(EXCLUDED_HANDLES_BY_REASON)
-      .filter(([reason]) => reason !== 'claim_flow_fixture')
-      .flatMap(([, handles]) => handles)
-  );
+  Object.freeze(Object.values(EXCLUDED_HANDLES_BY_REASON).flat());
 
 const EXCLUSION_REASON_BY_HANDLE = new Map<
   string,
@@ -79,8 +76,23 @@ export function getPublicProfileIdentityExclusionReason(
   return EXCLUSION_REASON_BY_HANDLE.get(normalizeHandle(handle)) ?? null;
 }
 
-/** Exact protected identities can never become legitimate claimed handles. */
+/** Exact protected identities are unavailable to every general assignment path. */
 export function isReservedPublicProfileIdentity(handle: string): boolean {
+  return getPublicProfileIdentityExclusionReason(handle) !== null;
+}
+
+/**
+ * The only protected identity eligible for a verified token-backed takeover.
+ * Callers must separately verify the signed pending context and stored token.
+ */
+export function isTokenBackedClaimFixture(handle: string): boolean {
+  return (
+    getPublicProfileIdentityExclusionReason(handle) === 'claim_flow_fixture'
+  );
+}
+
+/** Normal identities and the dedicated claim fixture may enter token routes. */
+export function isTokenBackedClaimEligibleIdentity(handle: string): boolean {
   const reason = getPublicProfileIdentityExclusionReason(handle);
-  return reason !== null && reason !== 'claim_flow_fixture';
+  return reason === null || reason === 'claim_flow_fixture';
 }

@@ -53,7 +53,7 @@ describe('public profile indexing policy', () => {
 
   it('keeps the dedicated claim fixture claimable but non-indexable', () => {
     expect(isPublicProfileIndexable('e2eclaimartist')).toBe(false);
-    expect(isReservedPublicProfileIdentity('e2eclaimartist')).toBe(false);
+    expect(isReservedPublicProfileIdentity('e2eclaimartist')).toBe(true);
   });
 
   it('provides indexable metadata for legitimate profiles', () => {

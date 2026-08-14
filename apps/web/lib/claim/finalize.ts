@@ -8,7 +8,10 @@ import {
   profileOwnershipLog,
   userProfileClaims,
 } from '@/lib/db/schema/profiles';
-import { isReservedPublicProfileIdentity } from '@/lib/profile/public-profile-identity-policy';
+import {
+  isReservedPublicProfileIdentity,
+  isTokenBackedClaimFixture,
+} from '@/lib/profile/public-profile-identity-policy';
 import {
   isUnclaimedStructuredCreditProfile,
   markStructuredCreditProfileClaimed,
@@ -28,6 +31,8 @@ interface ClaimTargetProfile {
   readonly isClaimed: boolean | null;
   readonly claimedAt: Date | null;
   readonly onboardingCompletedAt: Date | null;
+  readonly claimToken: string | null;
+  readonly claimTokenExpiresAt: Date | null;
 }
 
 async function getClaimTargetProfile(
@@ -44,6 +49,8 @@ async function getClaimTargetProfile(
       isClaimed: creatorProfiles.isClaimed,
       claimedAt: creatorProfiles.claimedAt,
       onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+      claimToken: creatorProfiles.claimToken,
+      claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
     })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, creatorProfileId))
@@ -57,8 +64,31 @@ async function getClaimTargetProfile(
   return profile;
 }
 
-function assertClaimableProfileIdentity(username: string): void {
-  if (isReservedPublicProfileIdentity(username)) {
+function assertGenerallyClaimableProfileIdentity(username: string): void {
+  if (!isReservedPublicProfileIdentity(username)) return;
+
+  throw new Error(
+    '[PROFILE_CONFLICT] This synthetic profile identity cannot be claimed.'
+  );
+}
+
+function assertTokenBackedClaimAuthorization(
+  profile: ClaimTargetProfile,
+  params: { source: ClaimOperationSource; claimTokenHash?: string | null }
+): void {
+  if (!isReservedPublicProfileIdentity(profile.usernameNormalized)) return;
+
+  const tokenMatches =
+    params.source === 'token_backed_onboarding' &&
+    isTokenBackedClaimFixture(profile.usernameNormalized) &&
+    Boolean(params.claimTokenHash) &&
+    profile.claimToken === params.claimTokenHash &&
+    (!profile.claimTokenExpiresAt ||
+      profile.claimTokenExpiresAt > new Date()) &&
+    !profile.isClaimed &&
+    !profile.userId;
+
+  if (!tokenMatches) {
     throw new Error(
       '[PROFILE_CONFLICT] This synthetic profile identity cannot be claimed.'
     );
@@ -177,7 +207,7 @@ export async function reservePrebuiltProfileForUser(
   if (profile.usernameNormalized !== expectedUsername) {
     throw new Error('[CLAIM_NOT_FOUND] Claim context is out of date');
   }
-  assertClaimableProfileIdentity(profile.usernameNormalized);
+  assertGenerallyClaimableProfileIdentity(profile.usernameNormalized);
 
   await ensureNoClaimedProfileConflict(tx, params.userId, profile.id);
 
@@ -220,6 +250,7 @@ export async function claimPrebuiltProfileForUser(
     expectedUsername: string;
     displayName: string;
     source: ClaimOperationSource;
+    claimTokenHash?: string | null;
     finalizeOnboarding?: boolean;
   }
 ): Promise<{ profileId: string; username: string; status: 'updated' }> {
@@ -230,7 +261,7 @@ export async function claimPrebuiltProfileForUser(
   if (profile.usernameNormalized !== expectedUsername) {
     throw new Error('[CLAIM_NOT_FOUND] Claim context is out of date');
   }
-  assertClaimableProfileIdentity(profile.usernameNormalized);
+  assertTokenBackedClaimAuthorization(profile, params);
 
   await ensureNoClaimedProfileConflict(tx, params.userId, profile.id);
 

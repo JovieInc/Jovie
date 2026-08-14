@@ -31,6 +31,7 @@ describe('createAdditionalProfile', () => {
     'dualipa',
     'testartist',
     'authqaprod',
+    'e2eclaimartist',
   ])('rejects protected identity %s before database access', async username => {
     const { createAdditionalProfile } = await import('./switch-profile');
     const result = await createAdditionalProfile({
@@ -44,21 +45,5 @@ describe('createAdditionalProfile', () => {
     });
     expect(hoisted.select).not.toHaveBeenCalled();
     expect(hoisted.transaction).not.toHaveBeenCalled();
-  });
-
-  it('does not reserve the deliberately claimable non-indexed fixture', async () => {
-    const limit = vi.fn().mockResolvedValue([]);
-    const where = vi.fn(() => ({ limit }));
-    const from = vi.fn(() => ({ where }));
-    hoisted.select.mockReturnValue({ from });
-
-    const { createAdditionalProfile } = await import('./switch-profile');
-    const result = await createAdditionalProfile({
-      displayName: 'E2E Claim Artist',
-      username: 'e2eclaimartist',
-    });
-
-    expect(result.error).not.toBe('Username is reserved');
-    expect(hoisted.select).toHaveBeenCalled();
   });
 });

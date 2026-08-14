@@ -91,6 +91,17 @@ export async function checkExistingProfile(
   usernameNormalized: string
 ): Promise<ExistingProfileCheck> {
   return withSystemIngestionSession(async tx => {
+    // Protected identities are never reingestion targets, even if a legacy or
+    // fixture row already exists. Skip the exact-handle lookup entirely so the
+    // existing/unclaimed branch cannot mark the protected row as processing.
+    if (isReservedPublicProfileIdentity(usernameNormalized)) {
+      return {
+        existing: null,
+        isReingest: false,
+        finalHandle: await findAvailableHandle(tx, usernameNormalized),
+      };
+    }
+
     const [existing] = await tx
       .select({
         id: creatorProfiles.id,
@@ -112,9 +123,7 @@ export async function checkExistingProfile(
 
     let finalHandle: string | null;
     if (!existing) {
-      finalHandle = isReservedPublicProfileIdentity(usernameNormalized)
-        ? await findAvailableHandle(tx, usernameNormalized)
-        : usernameNormalized;
+      finalHandle = usernameNormalized;
     } else if (existing.isClaimed) {
       finalHandle = await findAvailableHandle(tx, usernameNormalized);
     } else {

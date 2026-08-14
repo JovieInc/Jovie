@@ -51,6 +51,8 @@ interface ProfileRowOverrides {
   isClaimed?: boolean | null;
   claimedAt?: Date | null;
   onboardingCompletedAt?: Date | null;
+  claimToken?: string | null;
+  claimTokenExpiresAt?: Date | null;
 }
 
 function profileRow(overrides: ProfileRowOverrides = {}) {
@@ -63,6 +65,8 @@ function profileRow(overrides: ProfileRowOverrides = {}) {
     isClaimed: false,
     claimedAt: null,
     onboardingCompletedAt: null,
+    claimToken: null,
+    claimTokenExpiresAt: null,
     ...overrides,
   };
 }
@@ -191,6 +195,80 @@ describe('claimPrebuiltProfileForUser', () => {
       claimPrebuiltProfileForUser(mocks.tx, {
         ...baseParams,
         expectedUsername: 'dualipa',
+      })
+    ).rejects.toThrow(
+      '[PROFILE_CONFLICT] This synthetic profile identity cannot be claimed.'
+    );
+    assertNoWrites(mocks);
+  });
+
+  it('refuses the claim fixture without matching token-backed authorization', async () => {
+    const mocks = createTxMock([
+      [
+        profileRow({
+          usernameNormalized: 'e2eclaimartist',
+          claimToken: 'stored-hash',
+          claimTokenExpiresAt: new Date('2026-04-01T00:00:00.000Z'),
+        }),
+      ],
+    ]);
+
+    await expect(
+      claimPrebuiltProfileForUser(mocks.tx, {
+        ...baseParams,
+        expectedUsername: 'e2eclaimartist',
+      })
+    ).rejects.toThrow(
+      '[PROFILE_CONFLICT] This synthetic profile identity cannot be claimed.'
+    );
+    assertNoWrites(mocks);
+  });
+
+  it('claims the fixture only with a matching unexpired token-backed context', async () => {
+    const mocks = createTxMock([
+      [
+        profileRow({
+          usernameNormalized: 'e2eclaimartist',
+          claimToken: 'stored-hash',
+          claimTokenExpiresAt: new Date('2026-04-01T00:00:00.000Z'),
+        }),
+      ],
+      [],
+    ]);
+
+    const result = await claimPrebuiltProfileForUser(mocks.tx, {
+      ...baseParams,
+      expectedUsername: 'e2eclaimartist',
+      claimTokenHash: 'stored-hash',
+      finalizeOnboarding: true,
+    });
+
+    expect(result).toEqual({
+      profileId: 'profile-1',
+      username: 'e2eclaimartist',
+      status: 'updated',
+    });
+    expect(mocks.updateMock).toHaveBeenCalledTimes(3);
+    expect(mocks.insertMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses the claim fixture through direct Spotify finalization', async () => {
+    const mocks = createTxMock([
+      [
+        profileRow({
+          usernameNormalized: 'e2eclaimartist',
+          claimToken: 'stored-hash',
+          claimTokenExpiresAt: new Date('2026-04-01T00:00:00.000Z'),
+        }),
+      ],
+    ]);
+
+    await expect(
+      claimPrebuiltProfileForUser(mocks.tx, {
+        ...baseParams,
+        expectedUsername: 'e2eclaimartist',
+        source: 'direct_profile_spotify_match',
+        claimTokenHash: 'stored-hash',
       })
     ).rejects.toThrow(
       '[PROFILE_CONFLICT] This synthetic profile identity cannot be claimed.'
@@ -457,6 +535,22 @@ describe('reservePrebuiltProfileForUser', () => {
       reservePrebuiltProfileForUser(mocks.tx, {
         ...baseParams,
         expectedUsername: 'authqaprod',
+      })
+    ).rejects.toThrow(
+      '[PROFILE_CONFLICT] This synthetic profile identity cannot be claimed.'
+    );
+    assertNoWrites(mocks);
+  });
+
+  it('refuses to reserve the token-only claim fixture through a direct flow', async () => {
+    const mocks = createTxMock([
+      [profileRow({ usernameNormalized: 'e2eclaimartist' })],
+    ]);
+
+    await expect(
+      reservePrebuiltProfileForUser(mocks.tx, {
+        ...baseParams,
+        expectedUsername: 'e2eclaimartist',
       })
     ).rejects.toThrow(
       '[PROFILE_CONFLICT] This synthetic profile identity cannot be claimed.'

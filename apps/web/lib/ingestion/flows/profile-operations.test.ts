@@ -56,28 +56,38 @@ describe('profile ingestion handle allocation', () => {
     vi.clearAllMocks();
   });
 
-  it('allocates a suffixed handle instead of a protected exact identity', async () => {
-    hoisted.tx.select
-      .mockReturnValueOnce(selectResult([]))
-      .mockReturnValueOnce(selectResult([]));
+  it.each([
+    'dualipa',
+    'testartist',
+  ])('fails closed without reingesting an existing unclaimed protected row: %s', async handle => {
+    hoisted.tx.select.mockReturnValueOnce(
+      selectResult([{ usernameNormalized: handle }])
+    );
 
     const { checkExistingProfile } = await import('./profile-operations');
-    const result = await checkExistingProfile('dualipa');
+    const result = await checkExistingProfile(handle);
 
-    expect(result.existing).toBeUndefined();
-    expect(result.finalHandle).toBe('dualipa_1');
+    expect(result.existing).toBeNull();
+    expect(result.isReingest).toBe(false);
+    expect(result.finalHandle).toBe(`${handle}_1`);
+    expect(hoisted.eq).not.toHaveBeenCalled();
+    expect(hoisted.markProcessing).not.toHaveBeenCalled();
     const candidates = hoisted.inArray.mock.calls[0]?.[1] as string[];
-    expect(candidates).not.toContain('dualipa');
-    expect(candidates).toContain('dualipa_1');
+    expect(candidates).not.toContain(handle);
+    expect(candidates).toContain(`${handle}_1`);
   });
 
-  it('keeps the dedicated claim-flow fixture available at its exact handle', async () => {
+  it('reserves the claim-flow fixture from ingestion allocation', async () => {
     hoisted.tx.select.mockReturnValueOnce(selectResult([]));
 
     const { checkExistingProfile } = await import('./profile-operations');
     const result = await checkExistingProfile('e2eclaimartist');
 
-    expect(result.finalHandle).toBe('e2eclaimartist');
-    expect(hoisted.inArray).not.toHaveBeenCalled();
+    expect(result.existing).toBeNull();
+    expect(result.isReingest).toBe(false);
+    expect(result.finalHandle).toBe('e2eclaimartist_1');
+    const candidates = hoisted.inArray.mock.calls[0]?.[1] as string[];
+    expect(candidates).not.toContain('e2eclaimartist');
+    expect(hoisted.markProcessing).not.toHaveBeenCalled();
   });
 });

@@ -141,6 +141,38 @@ describe('Claim token route', () => {
     });
   });
 
+  it('admits the dedicated fixture only after token verification', async () => {
+    mockLookupUsernameByClaimToken.mockResolvedValue('e2eclaimartist');
+    mockIsClaimTokenValid.mockResolvedValue(true);
+    mockGetProfileByUsername.mockResolvedValue({
+      id: 'fixture-profile',
+      usernameNormalized: 'e2eclaimartist',
+      spotifyId: 'fixture_spotify',
+    });
+
+    const response = await GET(
+      new NextRequest('http://localhost/claim/fixture-token'),
+      { params: Promise.resolve({ token: 'fixture-token' }) }
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost/e2eclaimartist?claim=1'
+    );
+    expect(mockIsClaimTokenValid).toHaveBeenCalledWith(
+      'e2eclaimartist',
+      'fixture-token'
+    );
+    expect(mockWritePendingClaimContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'token_backed',
+        creatorProfileId: 'fixture-profile',
+        username: 'e2eclaimartist',
+        claimTokenHash: 'hashed-token',
+      })
+    );
+  });
+
   it('redirects to root with no token provided (early exit, no side effects)', async () => {
     const response = await GET(new NextRequest('http://localhost/claim/'), {
       params: Promise.resolve({ token: '' }),

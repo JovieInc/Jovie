@@ -321,6 +321,88 @@ describe('completeOnboarding', () => {
     ).rejects.toThrow('Invalid username');
   });
 
+  it('rejects general onboarding assignment of the reserved claim fixture', async () => {
+    mockValidateUsername.mockReturnValueOnce({
+      isValid: false,
+      error: 'This handle is reserved and cannot be used',
+    });
+
+    await expect(
+      completeOnboarding({
+        username: 'e2eclaimartist',
+        displayName: 'E2E Claim Artist',
+        redirectToDashboard: false,
+      })
+    ).rejects.toThrow('This handle is reserved and cannot be used');
+
+    expect(mockWithDbSessionTx).not.toHaveBeenCalled();
+    expect(mockClaimPrebuiltProfileForUser).not.toHaveBeenCalled();
+  });
+
+  it('admits the claim fixture only through signed token-backed onboarding', async () => {
+    mockValidateUsername.mockReturnValueOnce({
+      isValid: false,
+      error: 'This handle is reserved and cannot be used',
+    });
+    mockReadPendingClaimContext.mockResolvedValueOnce({
+      mode: 'token_backed',
+      creatorProfileId: 'fixture-profile',
+      username: 'e2eclaimartist',
+      claimTokenHash: 'verified-hash',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+    mockClaimPrebuiltProfileForUser.mockResolvedValueOnce({
+      username: 'e2eclaimartist',
+      status: 'updated',
+      profileId: 'fixture-profile',
+    });
+
+    await completeOnboarding({
+      username: 'e2eclaimartist',
+      displayName: 'E2E Claim Artist',
+      redirectToDashboard: false,
+    });
+
+    expect(mockClaimPrebuiltProfileForUser).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        creatorProfileId: 'fixture-profile',
+        expectedUsername: 'e2eclaimartist',
+        source: 'token_backed_onboarding',
+        claimTokenHash: 'verified-hash',
+      })
+    );
+    expect(mockCreateUserAndProfile).not.toHaveBeenCalled();
+    expect(mockReservePrebuiltProfileForUser).not.toHaveBeenCalled();
+  });
+
+  it('does not admit the claim fixture through direct-profile onboarding', async () => {
+    mockValidateUsername.mockReturnValueOnce({
+      isValid: false,
+      error: 'This handle is reserved and cannot be used',
+    });
+    mockReadPendingClaimContext.mockResolvedValueOnce({
+      mode: 'direct_profile',
+      creatorProfileId: 'fixture-profile',
+      username: 'e2eclaimartist',
+      expectedSpotifyArtistId: 'fixture-spotify',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+
+    await expect(
+      completeOnboarding({
+        username: 'e2eclaimartist',
+        displayName: 'E2E Claim Artist',
+        redirectToDashboard: false,
+      })
+    ).rejects.toThrow('This handle is reserved and cannot be used');
+
+    expect(mockReservePrebuiltProfileForUser).not.toHaveBeenCalled();
+    expect(mockClaimPrebuiltProfileForUser).not.toHaveBeenCalled();
+  });
+
   it('rejects empty, oversized, and unclean display names', async () => {
     await expect(
       completeOnboarding({
@@ -394,6 +476,7 @@ describe('completeOnboarding', () => {
         displayName: 'Artist',
         expectedUsername: 'artist',
         source: 'token_backed_onboarding',
+        claimTokenHash: 'hash',
       })
     );
     expect(mockReservePrebuiltProfileForUser).not.toHaveBeenCalled();
