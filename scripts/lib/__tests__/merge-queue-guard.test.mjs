@@ -1744,7 +1744,8 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     baseSha,
     conclusion,
     createdAt,
-    status = 'completed'
+    status = 'completed',
+    failedSteps = []
   ) {
     return {
       id: nextRunId++,
@@ -1752,6 +1753,7 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
       status,
       conclusion,
       createdAt,
+      failedSteps,
     };
   }
 
@@ -1766,7 +1768,7 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(parseMergeQueueFrontBranch(null)).toBeNull();
   });
 
-  it('blocks an unchanged head that already failed on the exact current base', () => {
+  it('suppresses an unchanged source head after its first terminal merge-group failure', () => {
     // Incident regression: #15849 fronted repeated failed group attempts on
     // base 9bd3fade9 while its head b499576 stayed unchanged.
     const decision = frontItemChurnDecision({
@@ -1775,69 +1777,102 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
       headCommittedAt: '2026-08-13T00:30:00.000Z',
       observedAt: '2026-08-13T01:53:00.000Z',
       mergeGroupRuns: [
-        groupRun(15849, BASE, 'failure', '2026-08-13T01:51:17.000Z'),
-        groupRun(15849, BASE, 'failure', '2026-08-13T01:30:16.000Z'),
+        groupRun(
+          15849,
+          BASE,
+          'failure',
+          '2026-08-13T01:51:17.000Z',
+          'completed',
+          ['Run unit tests']
+        ),
       ],
     });
     expect(decision.action).toBe('block');
     expect(decision.reason).toContain('unchanged head');
-    expect(decision.evidence.failedAttempts).toBe(2);
+    expect(decision.evidence.failureClass).toBe('deterministic-product-check');
+    expect(decision.evidence.failedAttempts).toBe(1);
   });
 
-  it('allows one failed attempt because infrastructure failure is not deterministic evidence', () => {
-    const decision = frontItemChurnDecision({
-      prNumber: 15896,
-      currentBaseSha: BASE,
-      headCommittedAt: '2026-08-13T00:30:00.000Z',
-      observedAt: '2026-08-13T01:53:00.000Z',
-      mergeGroupRuns: [
-        groupRun(15896, BASE, 'failure', '2026-08-13T01:51:17.000Z'),
-      ],
-    });
-    expect(decision.action).toBe('allow');
-    expect(decision.reason).toContain('transient infrastructure');
-  });
-
-  it('allows one bounded retry after repeated failures cool down', () => {
+  it('keeps the failing source head suppressed after elapsed time', () => {
     const decision = frontItemChurnDecision({
       prNumber: 15849,
       currentBaseSha: BASE,
       headCommittedAt: '2026-08-13T00:30:00.000Z',
-      observedAt: '2026-08-13T01:57:00.000Z',
+      observedAt: '2026-08-14T01:53:00.000Z',
       mergeGroupRuns: [
-        groupRun(15849, BASE, 'failure', '2026-08-13T01:51:17.000Z'),
-        groupRun(15849, BASE, 'failure', '2026-08-13T01:50:16.000Z'),
+        groupRun(
+          15849,
+          BASE,
+          'failure',
+          '2026-08-13T01:51:17.000Z',
+          'completed',
+          ['Run unit tests']
+        ),
       ],
     });
-    expect(decision.action).toBe('allow');
-    expect(decision.reason).toContain('cooldown');
+    expect(decision.action).toBe('block');
   });
 
-  it('allows when the exact main base genuinely changed', () => {
+  it('keeps the failing source head suppressed when main moves', () => {
     const decision = frontItemChurnDecision({
       prNumber: 15849,
       currentBaseSha: NEW_BASE,
       headCommittedAt: '2026-08-13T00:30:00.000Z',
       observedAt: '2026-08-13T01:53:00.000Z',
       mergeGroupRuns: [
-        groupRun(15849, BASE, 'failure', '2026-08-13T01:51:17.000Z'),
+        groupRun(
+          15849,
+          BASE,
+          'failure',
+          '2026-08-13T01:51:17.000Z',
+          'completed',
+          ['Run unit tests']
+        ),
       ],
     });
-    expect(decision.action).toBe('allow');
+    expect(decision.action).toBe('block');
   });
 
-  it('allows when the head moved after the last failed attempt', () => {
+  it('recovers automatically when the source head moves after the failed attempt', () => {
     const decision = frontItemChurnDecision({
       prNumber: 15849,
       currentBaseSha: BASE,
       headCommittedAt: '2026-08-13T02:00:00.000Z',
       observedAt: '2026-08-13T02:01:00.000Z',
       mergeGroupRuns: [
-        groupRun(15849, BASE, 'failure', '2026-08-13T01:51:17.000Z'),
+        groupRun(
+          15849,
+          BASE,
+          'failure',
+          '2026-08-13T01:51:17.000Z',
+          'completed',
+          ['Run unit tests']
+        ),
       ],
     });
     expect(decision.action).toBe('allow');
     expect(decision.reason).toContain('head moved');
+  });
+
+  it('retains a bounded retry for one unclassified infrastructure failure', () => {
+    const decision = frontItemChurnDecision({
+      prNumber: 15849,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-08-13T00:30:00.000Z',
+      observedAt: '2026-08-13T01:53:00.000Z',
+      mergeGroupRuns: [
+        groupRun(
+          15849,
+          BASE,
+          'failure',
+          '2026-08-13T01:51:17.000Z',
+          'completed',
+          ['Setup Node.js and pnpm']
+        ),
+      ],
+    });
+    expect(decision.action).toBe('allow');
+    expect(decision.reason).toContain('infrastructure-recovery retry');
   });
 
   it('ignores cancelled and in-progress runs and other fronts', () => {

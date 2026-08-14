@@ -437,14 +437,14 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     echo "    ⏸ event admission scope no longer matches #$n at $expected_head; refusing enrollment"
     return 2
   fi
-  # JOV-5030 churn guard: suppress an unchanged head only after repeated,
-  # recent merge-group failures on the exact current main base. One failure
-  # may be transient infrastructure, and a five-minute cooldown reopens one
-  # bounded recovery retry. 'unknown' degrades to the pre-guard behavior.
+  # JOV-5116 failure disposition: one classified product-check failure
+  # suppresses the unchanged source head across base movement and elapsed
+  # time. Unclassified infrastructure failures retain the bounded retry.
+  # A new source commit is the recovery signal; unknown evidence never mutates.
   local churn_action
   churn_action="$(front_churn_action "$n" "$expected_head")"
   if [[ "$churn_action" == "block" ]]; then
-    echo "    ⏸ unchanged head has repeated recent merge-group failures on the exact current main base; refusing re-enrollment for #$n until the head, main, or cooldown moves"
+    echo "    ⏸ unchanged head has a classified/repeated merge-group failure; refusing re-enrollment for #$n until recovery policy allows it"
     return 2
   fi
   if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
@@ -740,13 +740,32 @@ fi
 
 # front_churn_action <num> <head_oid> → prints allow|block|unknown.
 front_churn_action() {
-  local n="$1" head_oid="$2" committed
+  local n="$1" head_oid="$2" committed run_id jobs_json runs_json
   if [[ "$MERGE_QUEUE_BACKEND" != "native" || ! "$MAIN_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
     echo "unknown"
     return 0
   fi
   committed="$(gh_retry api "repos/${REPO}/commits/${head_oid}" --jq '.commit.committer.date // empty' 2>/dev/null || true)"
-  node scripts/ci-merge-queue-check.mjs front-churn \
+  runs_json="$MERGE_GROUP_RUNS_JSON"
+  run_id="$(jq -r --arg prefix "gh-readonly-queue/main/pr-${n}-" '
+    [.[]
+      | select((.headBranch // "") | startswith($prefix))
+      | select(.status == "completed")
+      | select(.conclusion == "failure" or .conclusion == "timed_out"
+        or .conclusion == "action_required" or .conclusion == "startup_failure"
+        or .conclusion == "stale")]
+    | sort_by(.createdAt) | reverse | .[0].id // empty
+  ' <<<"$runs_json")"
+  if [[ "$run_id" =~ ^[1-9][0-9]*$ ]]; then
+    jobs_json="$(gh_retry api "repos/${REPO}/actions/runs/${run_id}/jobs?per_page=100" --paginate \
+      --jq '[.jobs[]? | .steps[]? | select(.conclusion == "failure") | .name]' 2>/dev/null || echo '[]')"
+    if jq -e 'type == "array" and all(.[]; type == "string")' <<<"$jobs_json" >/dev/null; then
+      runs_json="$(jq -c --argjson run_id "$run_id" --argjson failed_steps "$jobs_json" '
+        map(if .id == $run_id then . + {failedSteps: $failed_steps} else . end)
+      ' <<<"$runs_json")"
+    fi
+  fi
+  MERGE_GROUP_RUNS_JSON="$runs_json" node scripts/ci-merge-queue-check.mjs front-churn \
     --pr="$n" --base="$MAIN_HEAD_SHA" --head-committed-at="$committed" 2>/dev/null \
     | jq -r '.action // "unknown"'
 }
@@ -951,8 +970,8 @@ echo "$SNAP" | jq -c --arg promotion_mode "$DRAIN_PROMOTION_MODE" --arg freeze "
   done
 
 # --- DEQUEUE: non-progressing front items (JOV-5030) ---
-# A front PR whose unchanged head has repeated recent merge-group failures on
-# the exact current main base is temporarily non-progressing; while it occupies
+# A front PR whose unchanged head has a classified or repeated merge-group
+# failure is non-progressing; while it occupies
 # the queue every follower is grouped behind it and pays duplicate full CI.
 # GitHub ejects it after the failed attempt; this pass removes it again if
 # anything re-added the unchanged head, and the ENROLL guard below refuses to
@@ -966,7 +985,7 @@ if [[ "$DRAIN_PROMOTION_MODE" == "normal" || ( "$DRAIN_PROMOTION_MODE" == "block
     [[ "$head_oid" =~ ^[0-9a-f]{40}$ ]] || continue
     churn_action="$(front_churn_action "$n" "$head_oid")"
     if [[ "$churn_action" == "block" ]]; then
-      echo "  #$n  $t  ✗ unchanged head has repeated recent merge-group failures on the exact current main base"
+      echo "  #$n  $t  ✗ unchanged head has a classified/repeated merge-group failure"
       if ! dequeue_strict "$n"; then
         echo "::error::Failed to prove non-progressing front PR #$n is outside native merge queue" >&2
         exit 1

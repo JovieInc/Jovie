@@ -1686,11 +1686,20 @@ export const MERGE_GROUP_FAILURE_CONCLUSIONS = new Set([
   'stale',
 ]);
 
-// A single failed workflow is not proof that the combined head is bad: GitHub
-// API timeouts and runner startup faults surface as an ordinary workflow
-// `failure`. Require repetition before suppressing a front item, and reopen a
-// bounded retry after five minutes so infrastructure recovery cannot deadlock
-// an unchanged PR forever.
+// Only a failed product-validation step is deterministic enough to suppress
+// an unchanged source revision after one attempt. Setup, checkout, dependency,
+// runner, and aggregate failures remain unclassified and retain the bounded
+// retry policy below.
+export const DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS = new Set([
+  'Run unit tests',
+  'Run packages/ui unit tests',
+  'Run deterministic brand safety scan',
+  'Run deterministic Promptfoo evals',
+  'Run golden eval-set CI gate',
+  'Run Knip (unused files, deps & exports)',
+  'Run deterministic layout behavior guard',
+  'Run static mobile overflow guard',
+]);
 export const MERGE_GROUP_CHURN_FAILURE_THRESHOLD = 2;
 export const MERGE_GROUP_CHURN_COOLDOWN_MS = 5 * 60 * 1000;
 
@@ -1708,11 +1717,10 @@ export function parseMergeQueueFrontBranch(branch) {
  * already-failed native merge-group attempt with no new information.
  *
  * Actions:
- *  - 'allow'   no failed attempt by this front on the exact current base, or
- *              the head moved after the last failed attempt.
- *  - 'block'   the unchanged head already fronted a failed attempt on the
- *              exact current main base; re-entry would deterministically
- *              rebuild the group and duplicate follower CI.
+ *  - 'allow'   no applicable failure, a new head, or the bounded recovery path
+ *              for unclassified infrastructure failures.
+ *  - 'block'   the unchanged head has a classified product-check failure, or
+ *              repeated unclassified failures inside the bounded cooldown.
  *  - 'unknown' evidence is missing/invalid. Callers must treat this as
  *              non-authoritative: enrollment degrades to the pre-guard
  *              behavior and dequeue mutations must not fire.
@@ -1739,42 +1747,38 @@ export function frontItemChurnDecision({
     };
   }
 
-  const failedFrontedRuns = mergeGroupRuns
+  const allFailedFrontedRuns = mergeGroupRuns
     .map(run => ({ run, front: parseMergeQueueFrontBranch(run?.headBranch) }))
     .filter(
       ({ run, front }) =>
         front !== null &&
         front.prNumber === prNumber &&
-        front.baseSha === currentBaseSha &&
         run.status === 'completed' &&
         MERGE_GROUP_FAILURE_CONCLUSIONS.has(run.conclusion)
     )
     .map(({ run }) => run)
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 
-  if (failedFrontedRuns.length === 0) {
+  if (allFailedFrontedRuns.length === 0) {
     return {
       action: 'allow',
-      reason:
-        'no failed merge-group attempt fronted by this PR on the exact current main base',
+      reason: 'no failed merge-group attempt fronted by this PR',
       evidence: null,
     };
   }
 
-  const lastFailed = failedFrontedRuns[0];
   const headMs = Date.parse(headCommittedAt);
-  const attemptMs = Date.parse(lastFailed.createdAt);
-  if (
-    Number.isFinite(headMs) &&
-    Number.isFinite(attemptMs) &&
-    headMs > attemptMs
-  ) {
+  const failuresForCurrentHead = Number.isFinite(headMs)
+    ? allFailedFrontedRuns.filter(run => Date.parse(run.createdAt) >= headMs)
+    : allFailedFrontedRuns;
+  if (failuresForCurrentHead.length === 0) {
+    const lastFailed = allFailedFrontedRuns[0];
     return {
       action: 'allow',
       reason:
-        'head moved after the last failed merge-group attempt on this base; the new head has no failed attempt',
+        'head moved after the last failed merge-group attempt; the new head has no failed attempt',
       evidence: {
-        failedAttempts: failedFrontedRuns.length,
+        failedAttempts: allFailedFrontedRuns.length,
         lastFailedRunId: lastFailed.id ?? null,
         lastFailedAt: lastFailed.createdAt ?? null,
         baseSha: currentBaseSha,
@@ -1782,12 +1786,50 @@ export function frontItemChurnDecision({
     };
   }
 
+  const deterministicFailure = failuresForCurrentHead.find(run =>
+    (run.failedSteps ?? []).some(step =>
+      DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS.has(step)
+    )
+  );
+  if (deterministicFailure) {
+    const front = parseMergeQueueFrontBranch(deterministicFailure.headBranch);
+    return {
+      action: 'block',
+      reason:
+        'unchanged head has a classified product-validation failure; re-enrollment would duplicate the same merge-group work until the source head moves',
+      evidence: {
+        failureClass: 'deterministic-product-check',
+        failedAttempts: failuresForCurrentHead.length,
+        lastFailedRunId: deterministicFailure.id ?? null,
+        lastFailedAt: deterministicFailure.createdAt ?? null,
+        failedSteps: deterministicFailure.failedSteps,
+        baseSha: front?.baseSha ?? null,
+      },
+    };
+  }
+
+  const failedFrontedRuns = failuresForCurrentHead.filter(({ headBranch }) => {
+    const front = parseMergeQueueFrontBranch(headBranch);
+    return front?.baseSha === currentBaseSha;
+  });
+  if (failedFrontedRuns.length === 0) {
+    return {
+      action: 'allow',
+      reason:
+        'only unclassified failures exist and none occurred on the exact current main base',
+      evidence: null,
+    };
+  }
+  const lastFailed = failedFrontedRuns[0];
+  const attemptMs = Date.parse(lastFailed.createdAt);
+
   if (failedFrontedRuns.length < MERGE_GROUP_CHURN_FAILURE_THRESHOLD) {
     return {
       action: 'allow',
       reason:
-        'one failed merge-group attempt is insufficient to distinguish a combined-head failure from transient infrastructure',
+        'one unclassified merge-group failure retains a bounded infrastructure-recovery retry',
       evidence: {
+        failureClass: 'unclassified',
         failedAttempts: failedFrontedRuns.length,
         lastFailedRunId: lastFailed.id ?? null,
         lastFailedAt: lastFailed.createdAt ?? null,
@@ -1801,8 +1843,9 @@ export function frontItemChurnDecision({
     return {
       action: 'allow',
       reason:
-        'repeated failures completed the five-minute cooldown; allow one bounded infrastructure-recovery retry',
+        'unclassified failures completed the five-minute cooldown; allow one bounded infrastructure-recovery retry',
       evidence: {
+        failureClass: 'unclassified',
         failedAttempts: failedFrontedRuns.length,
         lastFailedRunId: lastFailed.id ?? null,
         lastFailedAt: lastFailed.createdAt ?? null,
@@ -1813,8 +1856,9 @@ export function frontItemChurnDecision({
 
   return {
     action: 'block',
-    reason: `unchanged head already fronted ${failedFrontedRuns.length} recent failed merge-group attempt(s) on the exact current main base ${currentBaseSha}; re-enrollment would rebuild the group and duplicate follower CI before the bounded cooldown`,
+    reason: `unchanged head already fronted ${failedFrontedRuns.length} recent unclassified merge-group failures on the exact current main base; suppressing until the bounded cooldown`,
     evidence: {
+      failureClass: 'unclassified',
       failedAttempts: failedFrontedRuns.length,
       lastFailedRunId: lastFailed.id ?? null,
       lastFailedAt: lastFailed.createdAt ?? null,
