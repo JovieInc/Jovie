@@ -13,6 +13,7 @@ export const REQUIRED_DESIGN_INVARIANT_IDS = [
   'founder-review-canonical-only',
   'pen-source-identity-boundary',
   'logo-visible-bounds-normalization',
+  'do-not-fuck-with-art',
 ];
 
 const ACTIVE_AUTHORITY_FILES = [

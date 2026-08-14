@@ -135,6 +135,10 @@ export const CANONICAL_DESIGN_INVARIANTS = [
     'logo-visible-bounds-normalization',
     'Logos normalize visible non-transparent ink through the shared asset registry, never route-local crop or scale CSS.',
   ],
+  [
+    'do-not-fuck-with-art',
+    'Never crop album art. Use object-fit: contain, not cover. No gradient, overlay, play button, or chrome on album art, merch, or a face except optional mostly-transparent glass play/pause.',
+  ],
 ];
 
 export function isContractToken(name) {
