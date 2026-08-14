@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-14T10:06:24.913Z",
-    "gitSha": "ad404a4eb04aebc0abf8b4ed1828cdb52a91b859",
+    "capturedAt": "2026-08-14T18:39:46.582Z",
+    "gitSha": "286e4d6ce5f17e14683e9051f90d25625bcde1e5",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
@@ -609,8 +609,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-14T10:15:29.296Z",
-    "gitSha": "ad404a4eb04aebc0abf8b4ed1828cdb52a91b859",
+    "capturedAt": "2026-08-14T18:48:50.708Z",
+    "gitSha": "286e4d6ce5f17e14683e9051f90d25625bcde1e5",
     "imagePath": "dashboard-releases-desktop.png",
     "publicExportPath": "releases-dashboard-full.png"
   },
@@ -626,8 +626,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-14T07:49:06.392Z",
-    "gitSha": "a94166f4069664e57220f295e4759976a9282863",
+    "capturedAt": "2026-08-14T18:49:17.332Z",
+    "gitSha": "286e4d6ce5f17e14683e9051f90d25625bcde1e5",
     "imagePath": "dashboard-releases-sidebar-desktop.png",
     "publicExportPath": "releases-dashboard-sidebar.png"
   },
@@ -677,8 +677,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-08-14T10:17:15.280Z",
-    "gitSha": "ad404a4eb04aebc0abf8b4ed1828cdb52a91b859",
+    "capturedAt": "2026-08-14T18:50:36.809Z",
+    "gitSha": "286e4d6ce5f17e14683e9051f90d25625bcde1e5",
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
   },
@@ -710,8 +710,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-08-14T10:17:43.423Z",
-    "gitSha": "ad404a4eb04aebc0abf8b4ed1828cdb52a91b859",
+    "capturedAt": "2026-08-14T18:51:04.903Z",
+    "gitSha": "286e4d6ce5f17e14683e9051f90d25625bcde1e5",
     "imagePath": "dashboard-earnings-desktop.png"
   },
   {
