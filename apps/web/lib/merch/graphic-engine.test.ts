@@ -119,6 +119,25 @@ describe('generatePrintGraphic', () => {
     expect(out.modelKey).toBe(native.key);
     expect(out.mediaType).toBe('image/png');
     expect(out.image.equals(Buffer.from(bytes))).toBe(true);
+    expect(out.contentReview.verdict).toBe('pass');
+  });
+
+  it('rejects a person-content subject before the PNG can be accepted', async () => {
+    generateImage.mockClear();
+    const native = MERCH_IMAGE_MODELS.find(m => m.alpha === 'native');
+    if (!native) throw new Error('expected a native-alpha model in the roster');
+
+    await expect(
+      generatePrintGraphic({
+        prompt: 'abstract merch',
+        model: native,
+        content: {
+          labels: ['photoreal person', 'face'],
+          imageDescription: 'A generated person looking at camera',
+        },
+      })
+    ).rejects.toThrow(/person or person-like content/);
+    expect(generateImage).not.toHaveBeenCalled();
   });
 
   it('throws rather than emit a non-alpha graphic for knockout models', async () => {

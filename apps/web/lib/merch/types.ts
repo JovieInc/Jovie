@@ -161,6 +161,15 @@ export interface MerchDesignPreview {
     readonly sellable: boolean;
     readonly reasons: readonly string[];
   };
+  /** Structured merch content review evidence (JOV-4740). */
+  readonly content_review?: {
+    readonly contract_version: string;
+    readonly reviewer_version: string;
+    readonly verdict: 'pass' | 'reject';
+    readonly failure_codes: readonly string[];
+    readonly confidence: number;
+    readonly reviewed_at: string;
+  };
 }
 
 export interface MerchDesignCarouselResult {
@@ -174,6 +183,8 @@ export interface MerchDesignCarouselResult {
    * fixtures/payloads; the canonical pipeline always sets it.
    */
   readonly contractVersion?: string;
+  readonly contentContractVersion?: string;
+  readonly contentReviews?: readonly MerchDesignPreview['content_review'][];
   readonly designs: readonly MerchDesignPreview[];
 }
 

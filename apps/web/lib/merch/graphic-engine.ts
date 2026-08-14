@@ -20,6 +20,12 @@ import 'server-only';
 import { gateway } from '@ai-sdk/gateway';
 import { generateImage } from 'ai';
 import { logger } from '@/lib/utils/logger';
+import {
+  type MerchContentReview,
+  type MerchContentSubject,
+  MerchPersonContentRejectedError,
+} from './content-contract';
+import { reviewMerchContent } from './content-review';
 
 // ---------------------------------------------------------------------------
 // Model roster
@@ -156,6 +162,8 @@ export interface PrintGraphic {
   readonly modelKey: MerchImageModelKey;
   readonly modelId: string;
   readonly mediaType: 'image/png';
+  /** Person-content review of the supplied subject (JOV-4740). */
+  readonly contentReview: MerchContentReview;
 }
 
 const ALPHA_DIRECTIVE =
@@ -209,9 +217,21 @@ export async function generatePrintGraphic(params: {
   readonly prompt: string;
   readonly model?: MerchImageModelConfig;
   readonly selection?: ModelSelectionOptions;
+  /** Person-content subject reviewed before the graphic can be treated as ready. */
+  readonly content?: MerchContentSubject;
 }): Promise<PrintGraphic> {
   const model = params.model ?? selectMerchImageModel(params.selection);
   const started = Date.now();
+  const contentReview = reviewMerchContent(
+    params.content ?? { prompt: params.prompt }
+  );
+  if (contentReview.verdict === 'reject') {
+    logger.warn('[merch] print graphic rejected by person-content review', {
+      model: model.key,
+      failureCodes: contentReview.failureCodes,
+    });
+    throw new MerchPersonContentRejectedError(contentReview);
+  }
 
   const providerOptions =
     model.alpha === 'native' ? alphaProviderOptions(model) : undefined;
@@ -236,5 +256,6 @@ export async function generatePrintGraphic(params: {
     modelKey: model.key,
     modelId: model.id,
     mediaType: 'image/png',
+    contentReview,
   };
 }

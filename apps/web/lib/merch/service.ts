@@ -39,6 +39,10 @@ import {
   resolveLiveMerchCatalogProduct,
   resolveMerchCatalogSelection,
 } from './catalog';
+import {
+  getMerchContentReviewBlockers,
+  MERCH_PERSON_CONTENT_PUBLISH_BLOCKER,
+} from './content-contract';
 import { MERCH_DEFAULT_PRINTFUL_PRODUCT } from './default-catalog';
 import {
   MERCH_MOCKUP_FAILURE_PUBLISH_BLOCKER,
@@ -388,6 +392,7 @@ function getDesignOptionSellability(
       primaryImageUrl: selectPreferredMockupUrl(option.mockupUrls) ?? '',
       mockupUrls: option.mockupUrls,
       printful,
+      qualityReview: option.qualityReview,
     }).reasons,
   ];
   if (option.productionWarnings.length > 0) {
@@ -400,13 +405,31 @@ function getDesignOptionSellability(
   return { sellable: reasons.length === 0, reasons };
 }
 
-function validateMerchCardForPublishing(card: MerchCard): void {
-  const result = getMerchCardSellability(card);
+function validateMerchCardForPublishing(
+  card: MerchCard,
+  qualityReview?: Record<string, unknown> | null
+): void {
+  const result = getMerchCardSellability({
+    ...card,
+    qualityReview: qualityReview ?? undefined,
+  });
   if (!result.sellable) {
     throw new Error(
       `Merch card cannot be published: ${result.reasons.join(' ')}`
     );
   }
+}
+
+async function readSelectedOptionQualityReview(
+  card: Pick<MerchCard, 'selectedDesignOptionId'>
+): Promise<Record<string, unknown> | null> {
+  if (!card.selectedDesignOptionId) return null;
+  const [option] = await db
+    .select({ qualityReview: merchDesignOptions.qualityReview })
+    .from(merchDesignOptions)
+    .where(eq(merchDesignOptions.id, card.selectedDesignOptionId))
+    .limit(1);
+  return option?.qualityReview ?? null;
 }
 
 function buildOptionPriceRecommendation(option: MerchDesignOption) {
@@ -976,6 +999,14 @@ export async function selectMerchDesign(params: {
       'This older merch option cannot be selected because its source and no-people safety contract were not verified. Regenerate from a confirmed catalog source.'
     );
   }
+  const contentReviewBlockers = getMerchContentReviewBlockers(
+    rawSelected.qualityReview
+  );
+  if (contentReviewBlockers.length > 0 || rawSelected.status === 'rejected') {
+    throw new Error(
+      contentReviewBlockers[0] ?? MERCH_PERSON_CONTENT_PUBLISH_BLOCKER
+    );
+  }
   const existing = await db
     .select()
     .from(merchCards)
@@ -1077,7 +1108,7 @@ export async function selectMerchDesign(params: {
       attachPrintfulMockupsAsync([selected]);
     }
   } else if (shouldPublish && card.status !== 'live') {
-    validateMerchCardForPublishing(card);
+    validateMerchCardForPublishing(card, selected.qualityReview);
     [card] = await db
       .update(merchCards)
       .set({ status: 'live', publishedAt: new Date(), updatedAt: new Date() })
@@ -1112,7 +1143,10 @@ export async function selectMerchDesign(params: {
     revalidatePublicProfile(profile.usernameNormalized);
   }
 
-  const cardSellability = getMerchCardSellability(card);
+  const cardSellability = getMerchCardSellability({
+    ...card,
+    qualityReview: selected.qualityReview,
+  });
   // JOV-4743: a terminal mockup failure on the selected option is a
   // user-visible publish blocker even when the card's own economics pass.
   const publishBlockers = [...cardSellability.reasons];
@@ -1380,7 +1414,10 @@ export async function publishMerchCard(params: {
   if (!current) throw new Error('Merch card not found');
   // Cards generated before Printful cost hydration can still publish once costs refresh.
   const hydrated = await hydrateMerchCardPrintfulEconomics(current);
-  validateMerchCardForPublishing(hydrated);
+  validateMerchCardForPublishing(
+    hydrated,
+    await readSelectedOptionQualityReview(hydrated)
+  );
 
   const [card] = await db
     .update(merchCards)
@@ -1468,7 +1505,10 @@ export async function updateMerchCardDetails(params: {
   };
 
   if (wantsLive) {
-    validateMerchCardForPublishing(candidate);
+    validateMerchCardForPublishing(
+      candidate,
+      await readSelectedOptionQualityReview(current)
+    );
   }
 
   const [card] = await db
@@ -1529,7 +1569,10 @@ export async function updateMerchCardStatus(params: {
       )
       .limit(1);
     if (!current) throw new Error('Merch card not found');
-    validateMerchCardForPublishing(current);
+    validateMerchCardForPublishing(
+      current,
+      await readSelectedOptionQualityReview(current)
+    );
   }
   const nextValues =
     params.status === 'live'
