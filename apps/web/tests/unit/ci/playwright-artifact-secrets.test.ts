@@ -1444,6 +1444,11 @@ ${fixtureCheckout}
         true,
       ],
       ['{"headers":[["authorization","Bearer fake-value"]]}', {}, true],
+      [
+        '{"reasons":["Plan authorization source of truth","Security rule requires getCurrentUserEntitlements"]}',
+        {},
+        false,
+      ],
       ['{"tokenCount":123,"tokensUsed":7}', {}, false],
       ['Authorization: Bearer fake-value', {}, true],
       ['DATABASE_URL=[REDACTED]', {}, false],
@@ -1589,6 +1594,80 @@ ${fixtureCheckout}
       )
     ).toContainEqual({
       path: join(policy, 'credential.md'),
+      category: 'credential-text',
+    });
+  });
+
+  it('uploads nightly testing-agent context JSON without treating prose reasons as credentials', () => {
+    const workspace = fixture();
+    const contextDir = join(
+      workspace,
+      'apps/web/test-results/nightly-agent/context'
+    );
+    const entitlementsReasons = [
+      'Plan authorization source of truth',
+      'Security rule requires getCurrentUserEntitlements',
+    ];
+    const context = {
+      generatedAt: '2026-08-14T12:10:34.000Z',
+      repo: 'jovie',
+      policy: {
+        secrets:
+          'No secrets, raw env values, cookies, auth tokens, or database URLs may be sent to models.',
+      },
+      riskItems: [
+        {
+          id: 'entitlements-source-of-truth',
+          reasons: entitlementsReasons,
+        },
+      ],
+    };
+    const selected = {
+      generatedAt: '2026-08-14T12:10:34.000Z',
+      repo: 'jovie',
+      failureMemoryRecords: 0,
+      selectedTargets: [
+        {
+          id: 'entitlements-source-of-truth',
+          reasons: entitlementsReasons,
+          recommendedLanes: ['unit', 'mutation'],
+        },
+      ],
+    };
+    write(
+      join(contextDir, 'context.json'),
+      `${JSON.stringify(context, null, 2)}\n`
+    );
+    write(
+      join(contextDir, 'selected-targets.json'),
+      `${JSON.stringify(selected, null, 2)}\n`
+    );
+    const paths = [
+      'apps/web/test-results/nightly-agent/context/context.json',
+      'apps/web/test-results/nightly-agent/context/selected-targets.json',
+    ];
+    expect(
+      inspectPlaywrightArtifacts(paths, {}, { workspace })
+    ).toEqual([]);
+    expect(
+      inspectPlaywrightArtifacts(
+        paths,
+        { E2E_CLERK_USER_PASSWORD: 'exact-secret' },
+        { workspace }
+      )
+    ).toEqual([]);
+    write(
+      join(contextDir, 'context.json'),
+      `${JSON.stringify({ ...context, leak: 'exact-secret' }, null, 2)}\n`
+    );
+    expect(
+      inspectPlaywrightArtifacts(
+        ['apps/web/test-results/nightly-agent/context/context.json'],
+        { E2E_CLERK_USER_PASSWORD: 'exact-secret' },
+        { workspace }
+      )
+    ).toContainEqual({
+      path: join(contextDir, 'context.json'),
       category: 'credential-text',
     });
   });
