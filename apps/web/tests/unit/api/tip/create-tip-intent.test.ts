@@ -80,7 +80,7 @@ describe('POST /api/create-tip-intent', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         amount: 0,
-        handle: 'taylorswift',
+        handle: 'validartist',
       }),
     });
 
@@ -109,6 +109,23 @@ describe('POST /api/create-tip-intent', () => {
     expect(data.error).toBeDefined();
   });
 
+  it('rejects reserved synthetic handles before database or Stripe access', async () => {
+    const request = new NextRequest('http://localhost/api/create-tip-intent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: 500,
+        handle: 'taylorswift',
+      }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    expect(mockSelect).not.toHaveBeenCalled();
+    expect(mockStripePaymentIntentsCreate).not.toHaveBeenCalled();
+  });
+
   it('returns 401 when user is not authenticated', async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
@@ -117,7 +134,7 @@ describe('POST /api/create-tip-intent', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         amount: 500,
-        handle: 'taylorswift',
+        handle: 'validartist',
       }),
     });
 
@@ -136,7 +153,7 @@ describe('POST /api/create-tip-intent', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         amount: 500,
-        handle: 'taylorswift',
+        handle: 'validartist',
       }),
     });
 
