@@ -129,7 +129,7 @@ case "$DRAIN_PROMOTION_MODE" in
         .promotionAdmission.allowed == false and
         .isolatedPromotionAdmission.allowed == false and
         .alreadyAdmittedCohort.preserve == true and
-        .alreadyAdmittedCohort.newIntakeAllowed == false
+        .alreadyAdmittedCohort.newIntakeAllowed == true
       else
         .promotionAdmission.allowed == false and
         .isolatedPromotionAdmission.allowed == false
@@ -810,10 +810,11 @@ done < <(jq -c '.[]' <<<"$SNAP")
 SNAP="$ENRICHED"
 
 # Non-normal modes freeze existing native queue entries except hold-intake.
-# hold-intake (JOV-5047) freezes new intake while exact production is unbound
-# and preserves already-admitted cohort members so they are not serialized
-# behind Production Controller deploy latency. isolated-only may keep one
-# freshly proven isolated entry; draft-only and blocked preserve none.
+# hold-intake preserves the promotion cohort while isolated implementation
+# intake continues; it does not authorize new promotion or deployment. This
+# prevents Production Controller latency from serializing coding work.
+# isolated-only may keep one freshly proven isolated entry; draft-only and
+# blocked preserve none.
 DRAIN_FREEZE_EXISTING_QUEUE=0
 if [[ "$DRAIN_PROMOTION_MODE" != "normal" && "$DRAIN_PROMOTION_MODE" != "hold-intake" ]]; then
   DRAIN_FREEZE_EXISTING_QUEUE=1

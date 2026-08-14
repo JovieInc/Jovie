@@ -69,8 +69,8 @@ def already_admitted_cohort_semantics(promotion_mode: str) -> dict[str, Any]:
     if promotion_mode == "hold-intake":
         return {
             "preserve": True,
-            "newIntakeAllowed": False,
-            "semantics": "preserve-already-admitted-cohort-freeze-new-intake",
+            "newIntakeAllowed": True,
+            "semantics": "preserve-cohort-and-continue-isolated-implementation",
         }
     if promotion_mode == "blocked":
         return {
@@ -383,7 +383,7 @@ def observe_queue(repo: str, target: int) -> dict[str, Any]:
                 "--state",
                 "open",
                 "--json",
-                "isDraft,labels",
+                "isDraft,labels,mergeStateStatus,statusCheckRollup",
                 "--limit",
                 "100",
             ],
@@ -401,7 +401,22 @@ def observe_queue(repo: str, target: int) -> dict[str, Any]:
                 str(label.get("name")) for label in pr.get("labels", [])
             }.intersection({"hold", "gated", "queue-deferred", "needs-human"})
         ]
-        return {"status": "known", "eligiblePrs": len(eligible), "target": target}
+        green_ready = [
+            pr
+            for pr in eligible
+            if pr.get("mergeStateStatus") == "CLEAN"
+            and all(
+                (check.get("conclusion") or check.get("state"))
+                in {"SUCCESS", "NEUTRAL", "SKIPPED"}
+                for check in pr.get("statusCheckRollup") or []
+            )
+        ]
+        return {
+            "status": "known",
+            "eligiblePrs": len(eligible),
+            "greenReadyPrs": len(green_ready),
+            "target": target,
+        }
     except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
         return {
             "status": "unknown",
@@ -503,19 +518,20 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
                     "production-deployment-unbound",
                     "promotion",
                     "warning",
-                    "Production health is not bound to the exact deployed main SHA; promotion is frozen.",
+                    "Production health is not bound to the exact deployed main SHA; "
+                    "promotion is frozen while isolated implementation continues.",
                 )
             )
-        eligible_prs = queue.get("eligiblePrs")
+        green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
         queue_target = queue.get("target")
         queue_shape_valid = (
             queue.get("status") == "known"
-            and isinstance(eligible_prs, int)
-            and not isinstance(eligible_prs, bool)
-            and eligible_prs >= 0
+            and isinstance(green_ready_prs, int)
+            and not isinstance(green_ready_prs, bool)
+            and green_ready_prs >= 0
             and isinstance(queue_target, int)
             and not isinstance(queue_target, bool)
-            and queue_target >= 0
+            and queue_target > 0
         )
         if not queue_shape_valid:
             reasons.append(
@@ -527,7 +543,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
                 )
             )
         # Queue pressure is demand for the promotion controller, not a reason
-        # to disable it. Freezing promotion when eligible_prs exceeds the
+        # to disable it. Freezing promotion when green_ready_prs reaches the
         # target deadlocks the only path that can drain the backlog. The
         # observed count and target remain in signals.queue for alerting and
         # throughput reporting; malformed or unknown queue evidence still
@@ -552,25 +568,25 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     )
     evidence = signals.get("concurrencyEvidence") or {}
     gem_concurrency = 8 if evidence.get("accepted") is True else DEFAULT_GEM_CONCURRENCY
-    eligible_prs = queue.get("eligiblePrs")
+    green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
     queue_target = queue.get("target")
-    queue_healthy = (
+    queue_shape_valid = (
         queue.get("status") == "known"
-        and isinstance(eligible_prs, int)
-        and not isinstance(eligible_prs, bool)
-        and eligible_prs >= 0
+        and isinstance(green_ready_prs, int)
+        and not isinstance(green_ready_prs, bool)
+        and green_ready_prs >= 0
         and isinstance(queue_target, int)
         and not isinstance(queue_target, bool)
-        and queue_target >= 0
-        and eligible_prs <= queue_target
+        and queue_target > 0
     )
+    queue_below_backpressure = queue_shape_valid and green_ready_prs < queue_target
     isolated_promotion_allowed = (
         state == "AMBER"
         and controller.get("status") == "green"
         and main.get("status") == "green"
         and production.get("status") == "red"
         and integrity.get("status") in {"clear", "resolved"}
-        and queue_healthy
+        and queue_below_backpressure
         and all(reason["code"] == "production-not-green" for reason in reasons)
     )
     hold_intake_allowed = (
@@ -597,19 +613,14 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         promotion_mode = "hold-intake"
     else:
         promotion_mode = "blocked"
-    source_health_red = (
-        main.get("status") != "green"
-        or production.get("status") != "green"
-        or production_unbound
-    )
     work_activities = (
         []
         if state == "RED"
         else (
             (
-                []
-                if source_health_red or not queue_healthy
-                else ["approved-issue-lease"]
+                ["approved-issue-lease"]
+                if not queue_shape_valid or queue_below_backpressure
+                else []
             )
             + ["isolated-implementation", "tests", "review", "draft-pr"]
         )
@@ -661,7 +672,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
                 "maxConcurrent": gem_concurrency,
                 "evidenceAccepted": gem_concurrency == 8,
             },
-            "symphonyImplementation": 1,
+            "symphonyImplementation": "event-driven-backpressure",
         },
     }
 
@@ -832,7 +843,7 @@ def failed_evaluation_receipt(
                 "maxConcurrent": DEFAULT_GEM_CONCURRENCY,
                 "evidenceAccepted": False,
             },
-            "symphonyImplementation": 1,
+            "symphonyImplementation": "event-driven-backpressure",
         },
     }
 
@@ -905,7 +916,7 @@ def parse_args() -> argparse.Namespace:
         or os.environ.get("GEM_PR_DRAIN_REPO")
         or "JovieInc/Jovie",
     )
-    parser.add_argument("--queue-target", type=int, default=5)
+    parser.add_argument("--queue-target", type=int, default=15)
     parser.add_argument(
         "--production-url",
         default=os.environ.get("JOVIE_PRODUCTION_HEALTH_URL")

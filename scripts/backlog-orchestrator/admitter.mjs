@@ -9,8 +9,6 @@
 import { scoreIssue } from './scorer.mjs';
 import { verifyRoutingReceipt } from './symphony-routing.mjs';
 
-export const MAX_CONCURRENT_SHIPPING = 1;
-const MAX_CONCURRENT_SHIPPING_BY_TEAM = Object.freeze({ JOV: 2, LYB: 1 });
 export const SYMPHONY_LABEL = 'symphony';
 export const TODO_STATE_ID = 'c6c00506-dc9f-4910-8ff7-3874dd77174c';
 export const ADMISSION_RECEIPT_PREFIX = '<!-- symphony-admission:v1 ';
@@ -63,8 +61,8 @@ function alreadyAdmittedCohortSemantics(promotionMode) {
   if (promotionMode === FLEET_PROMOTION_MODE.HOLD_INTAKE) {
     return {
       preserve: true,
-      newIntakeAllowed: false,
-      semantics: 'preserve-already-admitted-cohort-freeze-new-intake',
+      newIntakeAllowed: true,
+      semantics: 'preserve-cohort-and-continue-isolated-implementation',
     };
   }
   if (promotionMode === FLEET_PROMOTION_MODE.BLOCKED) {
@@ -282,20 +280,21 @@ export function evaluateFleetGate(
           FLEET_GATE_REASON.PRODUCTION_DEPLOYMENT_UNBOUND,
           'promotion',
           'warning',
-          'Production health is not bound to the exact deployed main SHA; promotion and new issue pickup are frozen.'
+          'Production health is not bound to the exact deployed main SHA; promotion is frozen while isolated implementation continues.'
         )
       );
     }
 
     const queueStatus = evidence?.queue?.status || 'unknown';
-    const eligiblePrs = evidence?.queue?.eligiblePrs;
+    const greenReadyPrs =
+      evidence?.queue?.greenReadyPrs ?? evidence?.queue?.eligiblePrs;
     const queueTarget = evidence?.queue?.target;
     const queueShapeValid =
       queueStatus === 'known' &&
-      Number.isInteger(eligiblePrs) &&
-      eligiblePrs >= 0 &&
+      Number.isInteger(greenReadyPrs) &&
+      greenReadyPrs >= 0 &&
       Number.isInteger(queueTarget) &&
-      queueTarget >= 0;
+      queueTarget > 0;
 
     if (!queueShapeValid) {
       reasons.push(
@@ -322,15 +321,16 @@ export function evaluateFleetGate(
     now,
   });
   const queueStatus = evidence?.queue?.status || 'unknown';
-  const eligiblePrs = evidence?.queue?.eligiblePrs;
+  const greenReadyPrs =
+    evidence?.queue?.greenReadyPrs ?? evidence?.queue?.eligiblePrs;
   const queueTarget = evidence?.queue?.target;
-  const queueHealthy =
+  const queueShapeValid =
     queueStatus === 'known' &&
-    Number.isInteger(eligiblePrs) &&
-    eligiblePrs >= 0 &&
+    Number.isInteger(greenReadyPrs) &&
+    greenReadyPrs >= 0 &&
     Number.isInteger(queueTarget) &&
-    queueTarget >= 0 &&
-    eligiblePrs <= queueTarget;
+    queueTarget > 0;
+  const queueBelowBackpressure = queueShapeValid && greenReadyPrs < queueTarget;
   const isolatedPromotionAllowed =
     state === FLEET_GATE_STATE.AMBER &&
     controllerFresh &&
@@ -338,17 +338,17 @@ export function evaluateFleetGate(
     mainStatus === 'green' &&
     productionStatus === 'red' &&
     ['clear', 'resolved'].includes(integrityStatus) &&
-    queueHealthy &&
+    queueBelowBackpressure &&
     reasons.every(
       reason => reason.code === FLEET_GATE_REASON.PRODUCTION_NOT_GREEN
     );
-  const sourceHealthRed =
-    mainStatus !== 'green' || productionStatus !== 'green' || productionUnbound;
   const workActivities =
     state === FLEET_GATE_STATE.RED
       ? []
       : [
-          ...(sourceHealthRed || !queueHealthy ? [] : ['approved-issue-lease']),
+          ...(!queueShapeValid || queueBelowBackpressure
+            ? ['approved-issue-lease']
+            : []),
           'isolated-implementation',
           'tests',
           'review',
@@ -411,20 +411,9 @@ export function evaluateFleetGate(
     },
     concurrency: {
       gem: concurrency,
-      symphonyImplementation: 1,
+      symphonyImplementation: 'event-driven-backpressure',
     },
   };
-}
-
-export function maxConcurrentShippingForTeam(teamKey, env = process.env) {
-  const key = String(teamKey || '').toUpperCase();
-  const configured = Number.parseInt(
-    env[`SYMPHONY_MAX_CONCURRENT_SHIPPING_${key}`] || '',
-    10
-  );
-  if (Number.isInteger(configured) && configured > 0 && configured <= 8)
-    return configured;
-  return MAX_CONCURRENT_SHIPPING_BY_TEAM[key] || MAX_CONCURRENT_SHIPPING;
 }
 
 const PROTECTED_LABELS = new Set([
@@ -531,8 +520,6 @@ export async function selectNextToAdmit(
   workstreams,
   state = {}
 ) {
-  const maxConcurrentShipping =
-    state.maxConcurrentShipping || MAX_CONCURRENT_SHIPPING;
   const fleetGate = state.fleetGate;
   if (!fleetGate)
     return {
@@ -549,14 +536,6 @@ export async function selectNextToAdmit(
       reason: `fleet gate ${fleetGate.state.toLowerCase()} — blocking new issue pickup`,
       fleetGate,
     };
-  if ((state.currentlyShipping || 0) >= maxConcurrentShipping) {
-    return {
-      admit: [],
-      reason: `at capacity (${state.currentlyShipping}/${maxConcurrentShipping})`,
-      fleetGate,
-    };
-  }
-
   const bundledIds = new Set(
     (workstreams || []).flatMap(workstream => workstream.issueIds || [])
   );

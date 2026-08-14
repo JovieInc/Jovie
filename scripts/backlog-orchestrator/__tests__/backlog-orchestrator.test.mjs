@@ -787,22 +787,6 @@ describe('entrypoint contract', () => {
 });
 
 describe('deterministic Symphony admission boundary', () => {
-  it('uses a bounded two-slot JOV cap while preserving one LYB slot', () => {
-    assert.equal(admitter.maxConcurrentShippingForTeam('JOV', {}), 2);
-    assert.equal(admitter.maxConcurrentShippingForTeam('LYB', {}), 1);
-    assert.equal(
-      admitter.maxConcurrentShippingForTeam('JOV', {
-        SYMPHONY_MAX_CONCURRENT_SHIPPING_JOV: '3',
-      }),
-      3
-    );
-    assert.equal(
-      admitter.maxConcurrentShippingForTeam('JOV', {
-        SYMPHONY_MAX_CONCURRENT_SHIPPING_JOV: '99',
-      }),
-      2
-    );
-  });
   function admissionIssue(overrides = {}) {
     return makeIssue({
       id: overrides.id || `${overrides.identifier || 'JOV-900'}-id`,
@@ -869,7 +853,12 @@ describe('deterministic Symphony admission boundary', () => {
       },
       controller: { status: 'green' },
       integrity: { status: 'clear' },
-      queue: { status: 'known', eligiblePrs: 1, target: 5 },
+      queue: {
+        status: 'known',
+        eligiblePrs: 6,
+        greenReadyPrs: 1,
+        target: 15,
+      },
       observedAt: '2026-08-09T05:00:00.000Z',
       ...overrides,
     };
@@ -881,10 +870,15 @@ describe('deterministic Symphony admission boundary', () => {
     });
   }
 
-  it('keeps an above-target healthy queue drainable', () => {
+  it('backpressures only at fifteen green ready-to-merge PRs', () => {
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
-        queue: { status: 'known', eligiblePrs: 7, target: 5 },
+        queue: {
+          status: 'known',
+          eligiblePrs: 40,
+          greenReadyPrs: 15,
+          target: 15,
+        },
       }),
       { now: '2026-08-09T05:01:00.000Z' }
     );
@@ -896,9 +890,21 @@ describe('deterministic Symphony admission boundary', () => {
       fleetGate.reasons.some(reason => reason.code === 'queue-above-target'),
       false
     );
+    const oneLanded = admitter.evaluateFleetGate(
+      fleetEvidence({
+        queue: {
+          status: 'known',
+          eligiblePrs: 39,
+          greenReadyPrs: 14,
+          target: 15,
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+    assert.equal(oneLanded.workAdmission.newIssueLeaseAllowed, true);
   });
 
-  it('freezes new leases when healthy production is behind exact main', async () => {
+  it('continues new isolated leases when healthy production is behind exact main', async () => {
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
         production: { status: 'green', deployedSha: 'bda0d88' },
@@ -916,17 +922,17 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(fleetGate.promotionMode, 'hold-intake');
     assert.deepEqual(fleetGate.alreadyAdmittedCohort, {
       preserve: true,
-      newIntakeAllowed: false,
-      semantics: 'preserve-already-admitted-cohort-freeze-new-intake',
+      newIntakeAllowed: true,
+      semantics: 'preserve-cohort-and-continue-isolated-implementation',
     });
     assert.equal(fleetGate.promotionAdmission.allowed, false);
-    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, true);
     assert.ok(
       fleetGate.reasons.some(
         reason => reason.code === 'production-deployment-unbound'
       )
     );
-    assert.deepEqual(result.admit, []);
+    assert.equal(result.admit.length, 1);
   });
 
   it('never binds a different full commit that shares the display prefix', () => {
@@ -943,7 +949,7 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(fleetGate.state, 'AMBER');
     assert.equal(fleetGate.promotionMode, 'hold-intake');
     assert.equal(fleetGate.promotionAdmission.allowed, false);
-    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, true);
   });
 
   it('blocks already-admitted cohort preservation when unbound production has extra amber reasons', () => {
@@ -973,7 +979,7 @@ describe('deterministic Symphony admission boundary', () => {
     );
   });
 
-  it('treats main-red as draft-only AMBER and blocks new issue pickup', async () => {
+  it('treats main-red as draft-only AMBER while continuing new issue pickup', async () => {
     const now = '2026-08-09T05:01:00.000Z';
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({ main: { status: 'red' } }),
@@ -989,11 +995,10 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(fleetGate.state, 'AMBER');
     assert.equal(fleetGate.promotionMode, 'draft-only');
     assert.equal(fleetGate.workAdmission.allowed, true);
-    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, true);
     assert.equal(fleetGate.promotionAdmission.allowed, false);
     assert.equal(fleetGate.isolatedPromotionAdmission.allowed, false);
-    assert.deepEqual(result.admit, []);
-    assert.match(result.reason, /blocking new issue pickup/);
+    assert.equal(result.admit.length, 1);
   });
 
   it('permits only isolated queue promotion when production is red and main is green', () => {
@@ -1005,7 +1010,7 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(fleetGate.state, 'AMBER');
     assert.equal(fleetGate.promotionMode, 'isolated-only');
     assert.equal(fleetGate.workAdmission.allowed, true);
-    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, true);
     assert.equal(fleetGate.promotionAdmission.allowed, false);
     assert.deepEqual(fleetGate.isolatedPromotionAdmission, {
       allowed: true,
@@ -1085,7 +1090,7 @@ describe('deterministic Symphony admission boundary', () => {
     );
     assert.equal(invalidQueue.state, 'AMBER');
     assert.equal(invalidQueue.workAdmission.allowed, true);
-    assert.equal(invalidQueue.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(invalidQueue.workAdmission.newIssueLeaseAllowed, true);
     assert.equal(invalidQueue.promotionAdmission.allowed, false);
     assert.ok(
       invalidQueue.reasons.some(reason => reason.code === 'queue-unknown')
@@ -1210,7 +1215,7 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(amber.exitCode, 0);
     assert.equal(amber.receipt.state, 'AMBER');
     assert.equal(amber.receipt.workAdmission.allowed, true);
-    assert.equal(amber.receipt.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(amber.receipt.workAdmission.newIssueLeaseAllowed, true);
     assert.equal(amber.receipt.promotionAdmission.allowed, false);
     assert.equal(amber.receipt.isolatedPromotionAdmission.allowed, false);
     assert.equal(amber.receipt.ownership.directGemPickup, false);
@@ -1540,7 +1545,7 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
     assert.match(result.reason, /synthetic|no eligible/i);
   });
 
-  it('admits with zero active leases and blocks with one active lease', async () => {
+  it('does not impose a standing lease cap on active implementation', async () => {
     const issue = admissionIssue({ identifier: 'JOV-4580' });
     const noLeases = await admitter.selectNextToAdmit(
       [classification(issue)],
@@ -1553,8 +1558,7 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
       { currentlyShipping: 1, fleetGate: greenFleetGate() }
     );
     assert.equal(noLeases.admit.length, 1);
-    assert.equal(oneLease.admit.length, 0);
-    assert.equal(oneLease.reason, 'at capacity (1/1)');
+    assert.equal(oneLease.admit.length, 1);
   });
 
   it('selects exactly one concrete eligible JOV issue deterministically', async () => {
