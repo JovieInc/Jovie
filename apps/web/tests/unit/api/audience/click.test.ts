@@ -5,7 +5,10 @@ const mockPublicClickLimiterGetStatus = vi.hoisted(() => vi.fn());
 const mockPublicClickLimiterLimit = vi.hoisted(() => vi.fn());
 const capturedInsertValues = vi.hoisted(() => [] as unknown[]);
 const mockDetectBot = vi.hoisted(() => vi.fn());
+const mockRecordAnonymousBotMetric = vi.hoisted(() => vi.fn());
 const mockShouldExcludeSelfByProfileId = vi.hoisted(() => vi.fn());
+const mockDbSelect = vi.hoisted(() => vi.fn());
+const mockCheckClickRateLimit = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/rate-limit', () => ({
   publicClickLimiter: {
@@ -20,7 +23,7 @@ vi.mock('@/lib/utils/ip-extraction', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: {
-    select: vi.fn().mockReturnValue({
+    select: mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
           limit: vi.fn().mockResolvedValue([
@@ -116,7 +119,7 @@ vi.mock('@/lib/ingestion/session', () => ({
 }));
 
 vi.mock('@/lib/analytics/tracking-rate-limit', () => ({
-  checkClickRateLimit: vi.fn().mockResolvedValue({ success: true }),
+  checkClickRateLimit: mockCheckClickRateLimit,
   getRateLimitHeaders: vi.fn().mockReturnValue({}),
 }));
 
@@ -131,6 +134,7 @@ vi.mock('@/lib/utils/pii-encryption', () => ({
 
 vi.mock('@/lib/utils/bot-detection', () => ({
   detectBot: mockDetectBot,
+  recordAnonymousBotMetric: mockRecordAnonymousBotMetric,
 }));
 
 vi.mock('@/lib/analytics/self-exclusion', () => ({
@@ -150,6 +154,7 @@ describe('POST /api/audience/click', () => {
       remaining: 100,
     });
     mockPublicClickLimiterLimit.mockResolvedValue({ success: true });
+    mockCheckClickRateLimit.mockResolvedValue({ success: true });
     mockDetectBot.mockReturnValue({ isBot: false, shouldBlock: false });
     mockShouldExcludeSelfByProfileId.mockResolvedValue(false);
   });
@@ -161,7 +166,6 @@ describe('POST /api/audience/click', () => {
       remaining: 0,
       reset: new Date(Date.now() + 60_000),
     });
-
     const request = new NextRequest('http://localhost/api/audience/click', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -248,7 +252,7 @@ describe('POST /api/audience/click', () => {
     expect(data.success).toBe(true);
   });
 
-  it('labels bot click traffic without dropping the row', async () => {
+  it('filters bot click traffic before Redis and database work', async () => {
     mockDetectBot.mockReturnValue({ isBot: true, shouldBlock: false });
 
     const request = new NextRequest('http://localhost/api/audience/click', {
@@ -265,12 +269,14 @@ describe('POST /api/audience/click', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(capturedInsertValues).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ tags: ['bot'] }),
-        expect.objectContaining({ isBot: true }),
-      ])
+    expect(data).toEqual({ success: true, filtered: true });
+    expect(mockPublicClickLimiterLimit).not.toHaveBeenCalled();
+    expect(mockCheckClickRateLimit).not.toHaveBeenCalled();
+    expect(mockRecordAnonymousBotMetric).toHaveBeenCalledWith(
+      expect.objectContaining({ isBot: true }),
+      'audience_click'
     );
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(capturedInsertValues).toHaveLength(0);
   });
 });

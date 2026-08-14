@@ -8,6 +8,7 @@ const mockExtractClientIP = vi.hoisted(() =>
 const mockDetectBot = vi.hoisted(() =>
   vi.fn().mockReturnValue({ isBot: false })
 );
+const mockRecordAnonymousBotMetric = vi.hoisted(() => vi.fn());
 const mockShouldExcludeSelfByHandle = vi.hoisted(() => vi.fn());
 const mockIncrementProfileViews = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
@@ -37,6 +38,7 @@ vi.mock('@/lib/services/profile', () => ({
 
 vi.mock('@/lib/utils/bot-detection', () => ({
   detectBot: mockDetectBot,
+  recordAnonymousBotMetric: mockRecordAnonymousBotMetric,
 }));
 
 vi.mock('@/lib/utils/ip-extraction', () => ({
@@ -80,9 +82,30 @@ describe('POST /api/profile/view', () => {
     expect(response.headers.get('X-RateLimit-Limit')).toBe('100');
     expect(response.headers.get('X-RateLimit-Remaining')).toBe('0');
     expect(Number(response.headers.get('Retry-After'))).toBeGreaterThan(0);
-    expect(mockDetectBot).not.toHaveBeenCalled();
+    expect(mockDetectBot).toHaveBeenCalledWith(
+      expect.any(NextRequest),
+      '/api/profile/view'
+    );
     expect(mockIncrementProfileViews).not.toHaveBeenCalled();
     expect(mockCaptureError).not.toHaveBeenCalled();
+  });
+
+  it('filters known bots before consuming the durable rate-limit budget', async () => {
+    mockDetectBot.mockReturnValueOnce({ isBot: true });
+
+    const response = await POST(buildRequest());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      filtered: true,
+    });
+    expect(mockPublicProfileLimiterLimit).not.toHaveBeenCalled();
+    expect(mockRecordAnonymousBotMetric).toHaveBeenCalledWith(
+      expect.objectContaining({ isBot: true }),
+      'profile_view'
+    );
+    expect(mockIncrementProfileViews).not.toHaveBeenCalled();
   });
 
   it('records a view when the request is under the limit', async () => {
@@ -102,6 +125,7 @@ describe('POST /api/profile/view', () => {
       expect.any(NextRequest),
       '/api/profile/view'
     );
+    expect(mockRecordAnonymousBotMetric).not.toHaveBeenCalled();
     expect(mockIncrementProfileViews).toHaveBeenCalledWith('dualipa');
     expect(mockCaptureError).not.toHaveBeenCalled();
   });

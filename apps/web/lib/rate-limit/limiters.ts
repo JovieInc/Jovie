@@ -300,7 +300,8 @@ export const publicVisitLimiter = createRateLimiter(RATE_LIMITERS.publicVisit, {
  * Limit: 30 requests per minute per IP
  */
 export const healthLimiter = createRateLimiter(RATE_LIMITERS.health, {
-  requireRedis: true,
+  preferRedis: false,
+  warnOnFallback: false,
 });
 
 /**

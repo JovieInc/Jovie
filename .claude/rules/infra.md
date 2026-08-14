@@ -50,6 +50,51 @@ The `infra-guardrails-check.sh` hook blocks new `app/api/cron/*/route.ts` files 
 | **Cache aggressively** | If you need external data, cache it with appropriate TTLs. Don't re-fetch what hasn't changed. |
 | **Log and monitor call volume** | Any new external API integration must log call counts so we can track costs. |
 
+## Quota-Limited Datastore Guardrails
+
+Redis and other metered datastores are production dependencies even before the
+first customer signs up: crawlers, public telemetry, health probes, cron, CI,
+and agent traffic all consume their quotas.
+
+1. **Connectivity is not operability.** `PING` may succeed after writes are
+   blocked by a hard quota. Production health must exercise the minimum real
+   write/read path required by the application and return non-200 when it fails.
+2. **Every hard quota needs a standing canary and alert.** Reuse an existing
+   scheduled job. Classify quota exhaustion separately from network failure and
+   emit a stable error class so one incident groups into one actionable alert.
+   Emit a bounded per-limiter command estimate before failure; warning and
+   critical thresholds belong at 80% and 95% of the provider quota.
+3. **Anonymous traffic pays the cheapest safe command cost.** Public and
+   anonymous Redis rate limits use fixed-window enforcement and disable Upstash
+   analytics. Every limiter must explicitly declare its algorithm so the
+   security/cost tradeoff is reviewable. Sliding windows or analytics require a documented
+   abuse-model reason and monthly command projection in the PR.
+4. **Filter before metering.** Known bot/crawler rejection and request
+   validation must run before a durable rate-limit call when doing so does not
+   weaken an authorization or paid-resource boundary. Anonymous anomaly signals
+   must use bounded surface enums and SDK counter aggregation so spoofed bot
+   headers cannot create high-cardinality telemetry.
+5. **Quota errors trigger bounded mitigation.** Open a provider-specific
+   circuit long enough to prevent retry storms; preserve fail-closed behavior
+   only for security/financial boundaries, and fail soft for best-effort
+   telemetry and public UX.
+6. **No public keepalive traffic.** A public health route must not issue a
+   metered datastore command merely to prevent archival. The standing
+   operability canary owns both liveness and keepalive behavior.
+
+For every Redis/Upstash PR, disclose:
+
+- commands per request/run, including analytics;
+- Global database write replication using the provider formula;
+- projected anonymous, monitor, cron, CI, and agent traffic—not only users;
+- the quota threshold, owner, alert, automated mitigation, and recovery step.
+
+Executable policy lives in the `RateLimitConfig` traffic-class union and
+`apps/web/tests/unit/lib/rate-limit/config.test.ts`; do not weaken its anonymous
+limiter budget assertions to make a change pass. Anonymous sliding-window
+exceptions must disable analytics and carry a concrete rolling-window abuse
+rationale in the config.
+
 ### Stripe-Specific Rules
 
 - Stripe webhooks are the **primary** mechanism for billing state changes. The webhook handlers already exist and are hardened with deduplication, optimistic locking, and audit logging.

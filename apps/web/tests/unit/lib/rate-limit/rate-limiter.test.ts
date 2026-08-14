@@ -35,6 +35,7 @@ const {
 });
 
 const mockCreateRedisRateLimiter = vi.hoisted(() => vi.fn());
+const mockSentryMetricCount = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/rate-limit/redis-limiter', () => ({
   createRedisRateLimiter: mockCreateRedisRateLimiter,
@@ -48,6 +49,7 @@ vi.mock('@/lib/rate-limit/memory-limiter', () => ({
 vi.mock('@sentry/nextjs', () => ({
   getClient: vi.fn(() => undefined),
   addBreadcrumb: vi.fn(),
+  metrics: { count: mockSentryMetricCount },
 }));
 
 vi.mock('@/lib/env-server', () => ({
@@ -57,6 +59,7 @@ vi.mock('@/lib/env-server', () => ({
 // ── Imports (after mocks) ──────────────────────────────────────────────
 import {
   createRateLimiter,
+  estimateRateLimitCommandUpperBound,
   isRateLimitingEnabled,
   RateLimiter,
   resetRedisCircuitBreaker,
@@ -68,6 +71,9 @@ const baseConfig = {
   limit: 10,
   window: '1m',
   prefix: 'test',
+  analytics: false,
+  algorithm: 'fixed-window' as const,
+  trafficClass: 'internal' as const,
 };
 
 // ── Tests ──────────────────────────────────────────────────────────────
@@ -80,6 +86,31 @@ describe('rate-limiter.ts', () => {
     // Default: Redis is available (factory returns the mock)
     mockCreateRedisRateLimiter.mockReturnValue(mockRedisLimiter);
     mockIsRedisAvailable.mockReturnValue(true);
+  });
+
+  it('reports a pre-failure upper-bound command estimate by limiter', async () => {
+    mockRedisLimiter.limit.mockResolvedValue({
+      success: true,
+      limit: 10,
+      remaining: 9,
+      reset: Date.now() + 60_000,
+    });
+    const limiter = new RateLimiter(baseConfig);
+
+    await limiter.limit('normal-browser');
+
+    expect(estimateRateLimitCommandUpperBound(baseConfig)).toBe(3);
+    expect(mockSentryMetricCount).toHaveBeenCalledWith(
+      'redis.rate_limit_command_estimate',
+      3,
+      {
+        attributes: {
+          algorithm: 'fixed-window',
+          limiter: 'test',
+          traffic_class: 'internal',
+        },
+      }
+    );
   });
 
   // ── 1. Factory ─────────────────────────────────────────────────────
@@ -218,6 +249,16 @@ describe('rate-limiter.ts', () => {
 
       expect(logger).toHaveBeenCalledWith(
         expect.stringContaining('Redis error')
+      );
+      expect(mockSentryMetricCount).toHaveBeenCalledWith(
+        'redis.rate_limit_failure',
+        1,
+        expect.objectContaining({
+          attributes: expect.objectContaining({
+            failure_kind: 'unavailable',
+            limiter: 'test',
+          }),
+        })
       );
       expect(result).toEqual({ ...memoryResult, degraded: true });
     });
@@ -359,6 +400,48 @@ describe('rate-limiter.ts', () => {
         const result = await limiter.limit('user-1');
         expect(mockRedisLimiter.limit).toHaveBeenCalledTimes(2);
         expect(result.degraded).toBeUndefined();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('backs off for 15 minutes when the provider quota is exhausted', async () => {
+      vi.useFakeTimers();
+      try {
+        mockRedisLimiter.limit.mockRejectedValueOnce(
+          new Error('ERR max requests limit exceeded. Limit: 500000')
+        );
+        mockMemoryInstance.limit.mockResolvedValue({
+          success: true,
+          limit: 10,
+          remaining: 9,
+          reset: new Date(),
+        });
+
+        const limiter = new RateLimiter(baseConfig, { warnOnFallback: false });
+        await limiter.limit('anonymous-ip');
+        expect(mockSentryMetricCount).toHaveBeenCalledWith(
+          'redis.rate_limit_failure',
+          1,
+          expect.objectContaining({
+            attributes: expect.objectContaining({
+              failure_kind: 'quota_exceeded',
+            }),
+          })
+        );
+        vi.advanceTimersByTime(15 * 60_000 - 1);
+        await limiter.limit('anonymous-ip');
+        expect(mockRedisLimiter.limit).toHaveBeenCalledTimes(1);
+
+        vi.advanceTimersByTime(1);
+        mockRedisLimiter.limit.mockResolvedValue({
+          success: true,
+          limit: 10,
+          remaining: 9,
+          reset: Date.now() + 60_000,
+        });
+        await limiter.limit('anonymous-ip');
+        expect(mockRedisLimiter.limit).toHaveBeenCalledTimes(2);
       } finally {
         vi.useRealTimers();
       }

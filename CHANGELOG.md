@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- [internal] **Redis quota failures now surface before they break sign-in (JOV-5086):** production exercises a real write/read canary, groups quota exhaustion separately from outages, backs off degraded Redis traffic, filters known bots before metering high-volume anonymous telemetry, and makes every limiter's command-cost algorithm an explicit reviewed choice.
+
 ## [26.8.0] - 2026-08-14
 - **Mac app recovers from a black launch window (JOV-5086):** packaged Jovie.app now paints a loading splash immediately, and a hung or blank hosted page shows Retry instead of staying black forever.
 - [internal] **Production recovery reopens exact fleet holds (JOV-5048/JOV-5049):** Merge Queue Auto-Enroll now identifies successful Production Controller completions by the stable workflow path instead of the dynamic run title, and above-target queue pressure stays observable without reducing native queue capacity to zero, so source-green Symphony heads can return to and drain the native queue.

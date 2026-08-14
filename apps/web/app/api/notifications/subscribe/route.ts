@@ -27,7 +27,9 @@ const emailOtpSendLimiter = createRateLimiter({
   limit: 5,
   window: '10 m',
   prefix: 'notifications:email-otp:send',
-  analytics: true,
+  analytics: false,
+  algorithm: 'fixed-window',
+  trafficClass: 'anonymous',
 });
 
 // Server-side resend cooldown: enforces a single OTP send per email per
@@ -39,7 +41,9 @@ const emailOtpResendCooldownLimiter = createRateLimiter({
   limit: 1,
   window: '30 s',
   prefix: 'notifications:email-otp:resend-cooldown',
-  analytics: true,
+  analytics: false,
+  algorithm: 'fixed-window',
+  trafficClass: 'anonymous',
 });
 
 /**

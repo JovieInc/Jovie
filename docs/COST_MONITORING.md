@@ -60,6 +60,23 @@ This is the primary defense. Walk this checklist on initial setup and re-verify 
 - Already configured: compute autosuspend
 - Verify: autosuspend timeout = 5 minutes (Neon dashboard → branch settings)
 
+### Upstash Redis
+
+- Hard tier limit: record the current monthly command quota in the production
+  operations dashboard; the free-tier reference value is 500,000 commands.
+- Early signal: alert on the monthly sum of
+  `redis.rate_limit_command_estimate` at 80% (warning) and 95% (critical).
+  The metric uses the documented per-decision upper bound and a bounded limiter
+  prefix; multiply writes by the database's current Global replica count.
+- Failure signal: `redis.rate_limit_failure{failure_kind=quota_exceeded}` and
+  the hourly `redis_operability_*` canary event must page production operations.
+- Mitigation: anonymous traffic is fixed-window with provider analytics off;
+  known crawlers skip durable telemetry limiters; quota errors open the shared
+  Redis circuit for 15 minutes to stop retry amplification.
+- Recovery: restore write operability (quota reset, approved plan change, or
+  replacement datastore), run the authenticated `/api/health/redis` write/read
+  probe, then complete the production auth dogfood path before closing incident.
+
 ### R2 / Cloudflare
 
 - R2 has no native spend cap as of writing; rely on Layer 2 and bandwidth alerts in Cloudflare dashboard

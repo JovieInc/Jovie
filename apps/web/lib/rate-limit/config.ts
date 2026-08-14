@@ -62,6 +62,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'avatar_upload',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Artwork upload: 5 uploads per minute per user */
@@ -71,6 +73,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'artwork_upload',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Album art generation: expensive image model calls, per user */
@@ -80,6 +84,8 @@ export const RATE_LIMITERS = {
     window: '1 d',
     prefix: 'album_art_generation',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
     requireRedis: true,
   } satisfies RateLimitConfig,
 
@@ -90,6 +96,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'album_art_generation_burst',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
     requireRedis: true,
   } satisfies RateLimitConfig,
 
@@ -99,7 +107,9 @@ export const RATE_LIMITERS = {
     limit: 100,
     window: '1 m',
     prefix: 'api_calls',
-    analytics: true,
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   /**
@@ -113,6 +123,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'navigation_telemetry',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -125,7 +137,9 @@ export const RATE_LIMITERS = {
     limit: 3,
     window: '1 h',
     prefix: 'onboarding',
-    analytics: true,
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   /** Handle check: 30 checks per minute per IP */
@@ -134,7 +148,9 @@ export const RATE_LIMITERS = {
     limit: 30,
     window: '1 m',
     prefix: 'handle_check',
-    analytics: true,
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -149,7 +165,9 @@ export const RATE_LIMITERS = {
     limit: 20,
     window: '1 h',
     prefix: 'anon_onb_chat_ip',
-    analytics: true,
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   /** Anonymous onboarding chat: 60 messages per hour per ASN (defeats residential proxy IP rotation) */
@@ -158,7 +176,9 @@ export const RATE_LIMITERS = {
     limit: 60,
     window: '1 h',
     prefix: 'anon_onb_chat_asn',
-    analytics: true,
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   /** Anonymous onboarding chat: 20 total turns per session lifetime (7 days) */
@@ -167,7 +187,9 @@ export const RATE_LIMITERS = {
     limit: 20,
     window: '7 d',
     prefix: 'anon_onb_chat_session',
-    analytics: true,
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -181,6 +203,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'dashboard_links',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Authenticated header search: 60 requests per minute per user */
@@ -190,6 +214,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'header_search',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -203,6 +229,8 @@ export const RATE_LIMITERS = {
     window: '1 h',
     prefix: 'payment_intent',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Tip checkout: 30 sessions per hour per IP - public endpoint, higher limit for shared IPs */
@@ -211,7 +239,11 @@ export const RATE_LIMITERS = {
     limit: 30,
     window: '1 h',
     prefix: 'tip_checkout',
-    analytics: true,
+    analytics: false,
+    algorithm: 'sliding-window',
+    trafficClass: 'anonymous',
+    anonymousCostException:
+      'Checkout abuse can create paid Stripe sessions; preserve rolling-window semantics.',
   } satisfies RateLimitConfig,
 
   /** Merch checkout: 20 sessions per hour per IP - public physical-goods endpoint */
@@ -220,7 +252,11 @@ export const RATE_LIMITERS = {
     limit: 20,
     window: '1 h',
     prefix: 'merch_checkout',
-    analytics: true,
+    analytics: false,
+    algorithm: 'sliding-window',
+    trafficClass: 'anonymous',
+    anonymousCostException:
+      'Physical-goods checkout abuse can create paid provider work; preserve rolling-window semantics.',
     requireRedis: true,
   } satisfies RateLimitConfig,
 
@@ -235,6 +271,8 @@ export const RATE_LIMITERS = {
     window: '1 h',
     prefix: 'admin:impersonate',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Admin fit-score recalculation: 5 per hour per admin - compute-intensive */
@@ -244,6 +282,8 @@ export const RATE_LIMITERS = {
     window: '1 h',
     prefix: 'admin:fit-scores',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Admin outreach: 10 per hour per admin - bulk external API calls */
@@ -253,6 +293,8 @@ export const RATE_LIMITERS = {
     window: '1 h',
     prefix: 'admin:outreach',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Admin creator ingest: 10 per minute per admin - heavy ingestion job */
@@ -262,6 +304,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'admin:creator-ingest',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Deploy promote: 1 request per minute globally */
@@ -271,6 +315,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'admin:deploy-promote',
     analytics: false,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -283,7 +329,9 @@ export const RATE_LIMITERS = {
     limit: TRACKING_CLICKS_PER_HOUR,
     window: '1 h',
     prefix: 'tracking:clicks',
-    analytics: true,
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   /** Visit tracking per creator: configurable, default 50k/hour */
@@ -292,7 +340,9 @@ export const RATE_LIMITERS = {
     limit: TRACKING_VISITS_PER_HOUR,
     window: '1 h',
     prefix: 'tracking:visits',
-    analytics: true,
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   /** Click tracking per IP: 60/minute to prevent single-source attacks */
@@ -301,7 +351,9 @@ export const RATE_LIMITERS = {
     limit: 60,
     window: '1 m',
     prefix: 'tracking:ip:clicks',
-    analytics: true,
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   /** Visit tracking per IP: 120/minute to prevent single-source attacks */
@@ -310,11 +362,13 @@ export const RATE_LIMITERS = {
     limit: 120,
     window: '1 m',
     prefix: 'tracking:ip:visits',
-    analytics: true,
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
-  // Public Endpoints (In-memory only)
+  // Public Endpoints (durable, lower-command fixed-window enforcement)
   // ---------------------------------------------------------------------------
 
   /** Public profile: 100 requests per minute per IP */
@@ -324,6 +378,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'public:profile',
     analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   /** Public click: 50 requests per minute per IP */
@@ -333,6 +389,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'public:click',
     analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   /** Public visit: 50 requests per minute per IP */
@@ -342,6 +400,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'public:visit',
     analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   /**
@@ -356,6 +416,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'public:claim-token',
     analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -369,6 +431,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'health',
     analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   /** General endpoints (fallback): 60 requests per minute per IP */
@@ -378,6 +442,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'general',
     analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   /** Changelog subscribe: 1 request per 10 seconds per IP */
@@ -387,6 +453,8 @@ export const RATE_LIMITERS = {
     window: '10 s',
     prefix: 'changelog:subscribe',
     analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -400,6 +468,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'spotify:search',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** API search: 30 requests per minute per IP */
@@ -408,7 +478,9 @@ export const RATE_LIMITERS = {
     limit: 30,
     window: '1 m',
     prefix: 'spotify:search:api',
-    analytics: true,
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   /** Profile claim: 5 attempts per hour per user - CRITICAL for security */
@@ -418,6 +490,8 @@ export const RATE_LIMITERS = {
     window: '1 h',
     prefix: 'spotify:claim',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Data refresh: 10 per hour per artist */
@@ -427,6 +501,8 @@ export const RATE_LIMITERS = {
     window: '1 h',
     prefix: 'spotify:refresh',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Unauthenticated search (homepage): 10 per minute per IP */
@@ -436,6 +512,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'spotify:public-search',
     analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -449,6 +527,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'dsp:apple-music:lookup',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Apple Music search: 30 requests per minute per IP */
@@ -457,7 +537,9 @@ export const RATE_LIMITERS = {
     limit: 30,
     window: '1 m',
     prefix: 'dsp:apple-music:search',
-    analytics: true,
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   /** Apple Music bulk ISRC lookup: 20 batch requests per minute (each batch = up to 25 ISRCs) */
@@ -467,6 +549,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'dsp:apple-music:bulk-isrc',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Deezer lookup: 40 requests per minute (conservative limit for Deezer API) */
@@ -476,6 +560,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'dsp:deezer:lookup',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** MusicBrainz: 1 request per second (be respectful of free service) */
@@ -485,6 +571,8 @@ export const RATE_LIMITERS = {
     window: '1 s',
     prefix: 'dsp:musicbrainz:lookup',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** DSP discovery: 10 discoveries per minute per user */
@@ -494,6 +582,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'dsp:discovery',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** DSP enrichment: 100 enrichments per hour (global) */
@@ -503,6 +593,8 @@ export const RATE_LIMITERS = {
     window: '1 h',
     prefix: 'dsp:enrichment',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** ISRC rescan: 1 rescan per 5 minutes per release - prevents API abuse */
@@ -512,6 +604,8 @@ export const RATE_LIMITERS = {
     window: '5 m',
     prefix: 'dsp:isrc-rescan',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Apple Music rescan (free): 1 per day per profile */
@@ -521,6 +615,8 @@ export const RATE_LIMITERS = {
     window: '1 d',
     prefix: 'dsp:apple-music:rescan:free',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Apple Music rescan (paid): 1 per hour per profile */
@@ -530,6 +626,8 @@ export const RATE_LIMITERS = {
     window: '1 h',
     prefix: 'dsp:apple-music:rescan:paid',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Release refresh (free): 1 per day per release */
@@ -539,6 +637,8 @@ export const RATE_LIMITERS = {
     window: '1 d',
     prefix: 'release:refresh:free',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Release refresh (paid): 1 per hour per release */
@@ -548,6 +648,8 @@ export const RATE_LIMITERS = {
     window: '1 h',
     prefix: 'release:refresh:paid',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -561,6 +663,8 @@ export const RATE_LIMITERS = {
     window: '1 h',
     prefix: 'ai:chat',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** AI Chat daily quota (Free): derived from ENTITLEMENT_REGISTRY */
@@ -570,6 +674,8 @@ export const RATE_LIMITERS = {
     window: '1 d',
     prefix: 'ai:chat:daily:free',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** AI Chat daily quota (Pro): derived from ENTITLEMENT_REGISTRY */
@@ -579,6 +685,8 @@ export const RATE_LIMITERS = {
     window: '1 d',
     prefix: 'ai:chat:daily:pro',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** AI Chat daily quota (Max): derived from ENTITLEMENT_REGISTRY */
@@ -588,6 +696,8 @@ export const RATE_LIMITERS = {
     window: '1 d',
     prefix: 'ai:chat:daily:max',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -601,6 +711,8 @@ export const RATE_LIMITERS = {
     window: '5 m',
     prefix: 'bandsintown:sync',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -614,6 +726,8 @@ export const RATE_LIMITERS = {
     window: '1 h',
     prefix: 'wrap-link',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Wrap-link (anonymous): 20 requests per hour per IP - stricter for unauthenticated */
@@ -622,7 +736,9 @@ export const RATE_LIMITERS = {
     limit: 20,
     window: '1 h',
     prefix: 'wrap-link:anon',
-    analytics: true,
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -636,6 +752,8 @@ export const RATE_LIMITERS = {
     window: '1 d',
     prefix: 'account:delete',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Account data export: 5 exports per hour per user - protects against abuse */
@@ -645,6 +763,8 @@ export const RATE_LIMITERS = {
     window: '1 h',
     prefix: 'account:export',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Account email sync: 5 requests per minute per IP - prevents abuse */
@@ -654,6 +774,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'account:email',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
@@ -671,6 +793,8 @@ export const RATE_LIMITERS = {
     window: '1 d',
     prefix: 'verification:request',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Bio import from URL (chat tool): per-user, fan-out cap inside a single chat turn */
@@ -680,6 +804,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'bio_import_from_url',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
   /** Bio import from URL (chat tool): hourly cap to absorb chat-level burstiness */
@@ -689,6 +815,8 @@ export const RATE_LIMITERS = {
     window: '1 h',
     prefix: 'bio_import_from_url_hourly',
     analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 } as const;
 

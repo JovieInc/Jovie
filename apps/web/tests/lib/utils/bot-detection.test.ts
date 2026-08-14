@@ -4,7 +4,13 @@
  */
 
 import { NextRequest } from 'next/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@sentry/nextjs', () => ({
+  addBreadcrumb: vi.fn(),
+  metrics: { count: vi.fn() },
+}));
+
 import {
   createBotResponse,
   detectBot,

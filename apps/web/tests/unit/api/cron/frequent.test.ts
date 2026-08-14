@@ -19,6 +19,8 @@ const {
   mockWithSystemIngestionSession,
   mockProcessOutreachBatch,
   mockReconcileOrphanedAcceptedActions,
+  mockProbeRedisOperability,
+  mockCaptureError,
 } = vi.hoisted(() => ({
   mockDbExecute: vi.fn(),
   mockDbSelect: vi.fn(),
@@ -38,6 +40,8 @@ const {
   mockWithSystemIngestionSession: vi.fn(),
   mockProcessOutreachBatch: vi.fn(),
   mockReconcileOrphanedAcceptedActions: vi.fn(),
+  mockProbeRedisOperability: vi.fn(),
+  mockCaptureError: vi.fn(),
 }));
 
 vi.mock(
@@ -75,7 +79,7 @@ vi.mock('@/lib/env-server', () => ({
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
-  captureError: vi.fn(),
+  captureError: mockCaptureError,
 }));
 
 vi.mock('@/lib/ingestion/processor', () => ({
@@ -114,6 +118,15 @@ vi.mock('@/lib/notifications/suppression', () => ({
   cleanupExpiredSuppressions: mockCleanupExpiredSuppressions,
 }));
 
+vi.mock('@/lib/redis-operability', () => ({
+  probeRedisOperability: mockProbeRedisOperability,
+  RedisOperabilityError: class RedisOperabilityError extends Error {
+    constructor(readonly kind: string) {
+      super(kind);
+    }
+  },
+}));
+
 vi.mock('@/lib/spotify/alphabet-cache', () => ({
   warmAlphabetCache: mockWarmAlphabetCache,
 }));
@@ -143,7 +156,7 @@ describe('GET /api/cron/frequent', () => {
     vi.clearAllMocks();
     vi.resetModules();
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-03-24T10:30:00.000Z'));
+    vi.setSystemTime(new Date('2026-03-24T10:15:00.000Z'));
 
     mockDbExecute.mockResolvedValue(undefined);
     mockDbSelect.mockReturnValue({
@@ -197,6 +210,10 @@ describe('GET /api/cron/frequent', () => {
       scanned: 0,
       enqueued: 0,
     });
+    mockProbeRedisOperability.mockResolvedValue({
+      status: 'healthy',
+      latencyMs: 5,
+    });
   });
 
   afterEach(() => {
@@ -235,6 +252,60 @@ describe('GET /api/cron/frequent', () => {
     });
     expect(data.results.scheduleNotifications.success).toBe(true);
     expect(data.results.sendNotifications.success).toBe(true);
+    expect(data.results.redisOperability).toEqual({
+      success: true,
+      skipped: true,
+    });
+    expect(mockProbeRedisOperability).not.toHaveBeenCalled();
+  });
+
+  it('returns 207 and classifies an exhausted Redis quota as a failed canary', async () => {
+    vi.setSystemTime(new Date('2026-03-24T10:00:00.000Z'));
+    const { RedisOperabilityError } = await import('@/lib/redis-operability');
+    mockProbeRedisOperability.mockRejectedValue(
+      new RedisOperabilityError('quota_exceeded')
+    );
+
+    const { GET } = await import('@/app/api/cron/frequent/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/frequent', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(207);
+    expect(data.results.redisOperability).toEqual({
+      success: false,
+      error: 'quota_exceeded',
+    });
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Frequent cron: redisOperability failed',
+      expect.any(RedisOperabilityError),
+      expect.objectContaining({
+        subjob: 'redisOperability',
+        error_class: 'redis_operability_quota_exceeded',
+      })
+    );
+  });
+
+  it('runs the Redis operability canary during the first quarter-hour', async () => {
+    vi.setSystemTime(new Date('2026-03-24T10:00:00.000Z'));
+
+    const { GET } = await import('@/app/api/cron/frequent/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/frequent', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mockProbeRedisOperability).toHaveBeenCalledTimes(1);
+    expect(data.results.redisOperability).toEqual({
+      success: true,
+      data: { status: 'healthy', latencyMs: 5 },
+    });
   });
 
   it('returns 207 when notification scheduling fails', async () => {

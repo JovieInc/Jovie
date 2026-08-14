@@ -36,7 +36,7 @@ import {
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { publicVisitLimiter } from '@/lib/rate-limit';
-import { detectBot } from '@/lib/utils/bot-detection';
+import { detectBot, recordAnonymousBotMetric } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
 import { visitSchema } from '@/lib/validation/schemas';
@@ -311,26 +311,6 @@ export async function POST(request: NextRequest) {
     // Extract client IP for rate limiting
     const clientIP = extractClientIP(request.headers);
 
-    // Atomically check-and-decrement to avoid TOCTOU race
-    const ipRateLimitResult = await publicVisitLimiter.limit(clientIP);
-    if (!ipRateLimitResult.success) {
-      const retryAfterSeconds = Math.ceil(
-        (ipRateLimitResult.reset.getTime() - Date.now()) / 1000
-      );
-      return NextResponse.json(
-        { error: 'Rate limit exceeded' },
-        {
-          status: 429,
-          headers: {
-            ...NO_STORE_HEADERS,
-            'Retry-After': String(Math.max(retryAfterSeconds, 1)),
-            'X-RateLimit-Limit': String(ipRateLimitResult.limit),
-            'X-RateLimit-Remaining': String(ipRateLimitResult.remaining),
-          },
-        }
-      );
-    }
-
     let body: unknown;
     try {
       body = await request.json();
@@ -378,6 +358,49 @@ export async function POST(request: NextRequest) {
     const botResult = detectBot(request, '/api/audience/visit', {
       userAgent: resolvedUserAgent,
     });
+    if (botResult.isBot) {
+      recordAnonymousBotMetric(botResult, 'audience_visit');
+      return NextResponse.json(
+        { success: true, filtered: true },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const ipRateLimitResult = await publicVisitLimiter.limit(clientIP);
+    if (!ipRateLimitResult.success) {
+      const retryAfterSeconds = Math.ceil(
+        (ipRateLimitResult.reset.getTime() - Date.now()) / 1000
+      );
+      return NextResponse.json(
+        { error: 'Rate limit exceeded' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            'Retry-After': String(Math.max(retryAfterSeconds, 1)),
+            'X-RateLimit-Limit': String(ipRateLimitResult.limit),
+            'X-RateLimit-Remaining': String(ipRateLimitResult.remaining),
+          },
+        }
+      );
+    }
+
+    const rateLimitResult = await checkVisitRateLimit(
+      profileId,
+      resolvedIpAddress
+    );
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', reason: rateLimitResult.reason },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...getRateLimitHeaders(rateLimitResult),
+          },
+        }
+      );
+    }
     // Use the client-provided referrer (document.referrer) if available.
     // The HTTP Referer header on same-origin fetch() is the current page URL,
     // NOT the external referrer, so we filter out self-referrals from the fallback.
@@ -401,24 +424,6 @@ export async function POST(request: NextRequest) {
       request.headers.get('x-vercel-ip-country') ??
       request.headers.get('cf-ipcountry') ??
       undefined;
-
-    // Per-creator rate limiting (50k visits/hour)
-    const rateLimitResult = await checkVisitRateLimit(
-      profileId,
-      resolvedIpAddress
-    );
-    if (!rateLimitResult.success) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded', reason: rateLimitResult.reason },
-        {
-          status: 429,
-          headers: {
-            ...NO_STORE_HEADERS,
-            ...getRateLimitHeaders(rateLimitResult),
-          },
-        }
-      );
-    }
 
     // Validate profile exists AND is public before recording
     const [profile] = await db
