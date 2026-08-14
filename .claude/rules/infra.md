@@ -65,10 +65,11 @@ and agent traffic all consume their quotas.
    Emit a bounded per-limiter command estimate before failure; warning and
    critical thresholds belong at 80% and 95% of the provider quota.
 3. **Anonymous traffic pays the cheapest safe command cost.** Public and
-   anonymous Redis rate limits use fixed-window enforcement and disable Upstash
-   analytics. Every limiter must explicitly declare its algorithm so the
-   security/cost tradeoff is reviewable. Sliding windows or analytics require a documented
-   abuse-model reason and monthly command projection in the PR.
+   anonymous Redis rate limits default to fixed-window enforcement with Upstash
+   analytics disabled. Every limiter must explicitly declare its algorithm so
+   the security/cost tradeoff is reviewable. Sliding windows or analytics
+   require a documented abuse-model reason and monthly command projection in
+   the PR.
 4. **Filter before metering.** Known bot/crawler rejection and request
    validation must run before a durable rate-limit call when doing so does not
    weaken an authorization or paid-resource boundary. Anonymous anomaly signals
