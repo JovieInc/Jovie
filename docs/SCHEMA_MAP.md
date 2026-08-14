@@ -46,6 +46,7 @@ Token read/write must go through `apps/web/lib/connectors/token-vault.ts` — ne
 |-------------|--------|---------------|
 | `content.ts` | `artists`, `providers`, `providerLinks`, `smartLinkTargets`, `discogReleases`, `discogRecordings`, `discogTracks`, `discogReleaseTracks`, `recordingArtists`, `releaseArtists`, `trackArtists`, `contentSlugRedirects` | `providerLinks.providerId` → `providers`; artist junction tables link to `artists` |
 | `dsp-enrichment.ts` | `dspArtistMatches`, `fanReleaseNotifications`, `socialLinkSuggestions` | `dspArtistMatches.creatorProfileId` → `creatorProfiles` |
+| `youtube-library.ts` | `youtubeVideos`, `youtubeVideoMetricSnapshots`, `youtubeThumbnailVersions`, `youtubeVideoReleaseLinks` | `youtubeVideos.creatorProfileId` → `creatorProfiles`; snapshots/thumbnails/links `.videoId` → `youtubeVideos` cascade; links `.releaseId`/`recordingId` → `discogReleases`/`discogRecordings`. Thumbnail versions are append-only (never delete, never update imageUrl/provenance). Sync engine in `lib/youtube-library/`; provider interface plugs in with JOV-3189 |
 | `dsp-bio-sync.ts` | `dspBioSyncRequests` | `dspBioSyncRequests.creatorProfileId` → `creatorProfiles` |
 | `release-tasks.ts` | `releaseTasks`, `releaseTaskTemplates`, `releaseTaskTemplateItems` | `releaseTasks.releaseId` → `discogReleases` |
 | `pre-save.ts` | `preSaveTokens` | Links fans to upcoming releases |

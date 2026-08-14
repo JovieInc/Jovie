@@ -49,6 +49,7 @@ import {
 import { warmAlphabetCache } from '@/lib/spotify/alphabet-cache';
 import { processPendingEvents } from '@/lib/tracking/forwarding';
 import { logger } from '@/lib/utils/logger';
+import { runScheduledRefreshes } from '@/lib/youtube-library';
 import { scheduleReleaseNotifications } from '../schedule-release-notifications/route';
 import { sendPendingNotifications } from '../send-release-notifications/route';
 
@@ -290,6 +291,17 @@ export async function GET(request: Request) {
   results.workflowApprovalRecovery = await runSubJob(
     'workflowApprovalRecovery',
     async () => reconcileOrphanedAcceptedActions(20)
+  );
+
+  // 8.5 YouTube library refresh — JOV-5136. Real provider wiring lands with
+  //     JOV-3189 (YouTube OAuth connector); with provider: null this is a
+  //     no-op until channels exist.
+  results.youtubeLibraryRefresh = await runSubJob(
+    'youtubeLibraryRefresh',
+    async () => {
+      const refreshResult = await runScheduledRefreshes({ provider: null });
+      return refreshResult as unknown as Record<string, unknown>;
+    }
   );
 
   // 9. Fallback ingestion job processing — drains up to 2 jobs if the
