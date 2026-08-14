@@ -37,7 +37,7 @@ Branch protection pins aggregate contexts only—never individual CI jobs.
 
 | Context | Source PR | Native `merge_group` |
 | --- | --- | --- |
-| `PR Ready` | Path selection, risk classification, `ci-fast` (including the portable iOS contract), diff secret scan | Path selection, risk classification, `ci-fast`, five affected unit shards, one hosted build + layout workspace, path-selected hosted Xcode build/test, diff secret scan |
+| `PR Ready` | Path selection, risk classification, `ci-fast` (including the portable iOS contract), diff secret scan, Golden Path Lock | Path selection, risk classification, `ci-fast`, five affected unit shards, one hosted build + layout workspace, path-selected hosted Xcode build/test, diff secret scan, Golden Path Lock |
 | `Migration Guard` | Path-gated migration policy | Re-emitted and evaluated on the combined head |
 | `Fork PR Gate` | Human approval policy for external forks | Revalidates every exact group member before emitting the combined-head context |
 | `PR Size Guard` | Source-diff size policy | Revalidates every exact group member before emitting the combined-head context |

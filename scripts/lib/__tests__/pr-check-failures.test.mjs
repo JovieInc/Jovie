@@ -146,6 +146,7 @@ describe('pr-check-failures', () => {
       'ci-fast',
       'CI Risk Classifier',
       'Secret Scan (gitleaks + trufflehog)',
+      'Golden Path Lock',
       'Migration Guard',
     ]);
     expect(ADVISORY_CHECK_NAMES).toContain('Preview Deploy');

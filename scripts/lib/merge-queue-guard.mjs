@@ -260,6 +260,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'CI Risk Classifier',
   'CI / Secret Scan (gitleaks + trufflehog)',
   'Secret Scan (gitleaks + trufflehog)',
+  'CI / Golden Path Lock',
+  'Golden Path Lock',
   'CI / Layout Guard',
   'Layout Guard',
   'CI / Build + Layout (combined)',

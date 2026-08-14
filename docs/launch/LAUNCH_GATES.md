@@ -1,5 +1,9 @@
 # Launch Gates
 
+## Founder lock (JOV-5085) — fail-closed on every PR
+
+Locked path: homepage **Get started** → `/start` → logged-out first message sends → waitlist write only after verified auth. `Golden Path Lock` (`ci-golden-path-lock`) always runs and fans into `PR Ready`. Red cannot merge. No stub/skip for missing `E2E_PROD`. Local: `node scripts/golden-path-lock.mjs merge-gate`. Prod autofix is event-driven off Production Controller (not a cron); missing `CURSOR_API_KEY` fails closed. JOV-5084-class 401→“Too many messages” lies fail the lock. This is not the manual signup→Stripe Playwright suite below.
+
 ## Required CI Jobs For Launch-Candidate PRs
 
 Launch-candidate PRs are not launch-ready unless all of these jobs are green when the launch gate is triggered:

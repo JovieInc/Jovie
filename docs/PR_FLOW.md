@@ -48,10 +48,10 @@ in the merge queue, while network/deploy/exhaustive depth runs later.
 
 | Tier | Jobs | Trigger |
 |---|---|---|
-| **PR gate** (must stay fast) | typecheck, lint, portable iOS contract, structural contract, diff secret scan, size/fork/migration policy | every PR — deterministic, path-aware |
-| **Merge queue** | combined-head `ci-fast`, five affected unit shards, one hosted build + layout workspace, path-selected hosted Xcode build/test, path-selected model-free Promptfoo/golden evals, diff secret scan, migration policy | GitHub `merge_group` synthetic head |
+| **PR gate** (must stay fast) | typecheck, lint, portable iOS contract, structural contract, diff secret scan, Golden Path Lock, size/fork/migration policy | every PR — deterministic, path-aware |
+| **Merge queue** | combined-head `ci-fast`, five affected unit shards, one hosted build + layout workspace, path-selected hosted Xcode build/test, path-selected model-free Promptfoo/golden evals, diff secret scan, Golden Path Lock, migration policy | GitHub `merge_group` synthetic head |
 | **Release (`main`)** | exact queue proof or fail-closed direct-main fallback, then successful exact CI-attempt authorization into one `production-mutation` FIFO spanning staging, promotion, one centralized rollback owner, and final verification | completed successful `CI` workflow run for `main`; one bounded controller retry |
-| **Post-deploy** | hosted public, homepage, and live Lighthouse probes against the immutable deployment URL while the controller retains its lease; authenticated smoke is explicit optional evidence until credentials exist; final current-main/canonical check; `Production Verified` marker | successful current production release |
+| **Post-deploy** | hosted public, homepage, and live Lighthouse probes against the immutable deployment URL while the controller retains its lease; authenticated smoke is explicit optional evidence until credentials exist; final current-main/canonical check; `Production Verified` marker; event-driven Golden Path Prod Autofix (Cursor-direct, fail-closed) | successful current production release |
 | **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites | schedule, event, or explicit manual dispatch |
 
 Rules:

@@ -258,6 +258,7 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('ci-ios');
     expect(aggregate).toContain('ci-promptfoo-evals');
     expect(aggregate).toContain('ci-golden-eval-set');
+    expect(aggregate).toContain('ci-golden-path-lock');
     expect(aggregate).toContain('drizzle-migration-guard');
     expect(aggregate).toContain('BUILD_LAYOUT_RESULT');
     expect(aggregate).toContain('RUN_PROMPTFOO');
@@ -459,6 +460,7 @@ describe('merge_group workflow contract', () => {
       'ci-risk-classifier',
       'ci-fast',
       'ci-secret-scan',
+      'ci-golden-path-lock',
       'drizzle-migration-guard',
     ]) {
       expect(getJobBlock(CI_WORKFLOW, jobId), jobId).not.toContain(
@@ -898,6 +900,7 @@ ${heavyGateScript}`,
       'ci-risk-classifier',
       'ci-fast',
       'ci-secret-scan',
+      'ci-golden-path-lock',
       'drizzle-migration-guard',
       'ci-integration-ready',
       'ci-pr-ready',
@@ -918,6 +921,7 @@ ${heavyGateScript}`,
       'ci-promptfoo-evals',
       'ci-golden-eval-set',
       'ci-secret-scan',
+      'ci-golden-path-lock',
       'drizzle-migration-guard',
       'ci-unit-tests',
       'ci-merge-group-ready',
