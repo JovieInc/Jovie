@@ -41,6 +41,7 @@ const TOKEN = /(?:^|_)TOKEN(?:_|$)/;
 const TOKEN_METRIC =
   /(?:^|_)TOKEN_(?:BUDGET|COUNT|COUNTS|ESTIMATE|LIMIT|TOTAL|USAGE|USED)(?:_|$)/;
 const TOKEN_EXPIRY_METADATA = /(?:^|_)TOKEN(?:_[A-Z0-9]+)*_EXPIRES_AT$/;
+const CREDENTIAL_IDENTIFIER = /^[A-Za-z][A-Za-z0-9_.-]*$/;
 const STRUCTURED = new Set(['.json', '.jsonl']);
 const IMAGES = new Set([
   '.bmp',
@@ -180,6 +181,17 @@ export function isCredentialBearingName(name) {
   );
 }
 
+function isCredentialPairName(name) {
+  // Two-element arrays are Playwright header/env pairs such as
+  // ["authorization","Bearer ..."]. Prose like "Plan authorization source of
+  // truth" must not be treated as a credential name after underscore folding.
+  return (
+    typeof name === 'string' &&
+    CREDENTIAL_IDENTIFIER.test(name) &&
+    isCredentialBearingName(name)
+  );
+}
+
 function hasValue(value) {
   if (typeof value === 'string') {
     const normalized = value.trim().toLowerCase();
@@ -242,8 +254,7 @@ function structuredContains(value, environment) {
   if (Array.isArray(value)) {
     if (
       value.length === 2 &&
-      typeof value[0] === 'string' &&
-      isCredentialBearingName(value[0]) &&
+      isCredentialPairName(value[0]) &&
       namedValue(value[0], value[1])
     )
       return true;
