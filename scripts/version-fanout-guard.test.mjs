@@ -40,6 +40,21 @@ test('allows version stamping on main and release/integration branches', () => {
   assert.equal(isStampAllowedBranch('integration/release-train'), true);
 });
 
+test('allows dedicated cloud-agent stamp and desktop-publish branches', () => {
+  assert.equal(
+    isStampAllowedBranch('cursor/jov-5086-desktop-publish-de0f'),
+    true
+  );
+  assert.equal(
+    isStampAllowedBranch('cursor/stamp-26-8-0-version-stamp-ab12'),
+    true
+  );
+  assert.equal(
+    isStampAllowedBranch('cursor/jov-5086-black-window-recovery-dadf'),
+    false
+  );
+});
+
 test('allows merge-queue synthetic heads (source branch already enforced)', () => {
   assert.equal(
     isStampAllowedBranch(
