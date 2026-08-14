@@ -8,6 +8,8 @@ This repo uses a **multi-domain** setup and a custom **proxy middleware entrypoi
 - Proxy middleware: `apps/web/proxy.ts`
 - Proxy guard (prevents `middleware.ts`): `apps/web/scripts/next-proxy-guard.mjs`
 - Auth gate (server): `apps/web/lib/auth/gate.ts`
+- Native/web PKCE routing state: `apps/web/lib/auth/routing-state.server.ts`
+  through Better Auth's Postgres-backed verification adapter
 - Proxy auth state (edge-friendly): `apps/web/lib/auth/proxy-state.ts`
 - Root providers: `apps/web/app/layout.tsx` and `apps/web/components/providers/ClientProviders.tsx`
 
@@ -36,6 +38,11 @@ There are two intentional layers:
 - **Authoritative app layer** (`lib/auth/gate.ts`): full user state machine and redirects.
 
 Avoid introducing a third place where auth routing decisions are made.
+
+Redis is not an authentication availability dependency. Rate limiting and
+secondary-storage caching may degrade during a Redis outage, but PKCE state,
+native exchange codes, durable sessions, and one-time tokens remain
+Postgres-backed and atomically consumed.
 
 ## Runtime selection (Vercel)
 

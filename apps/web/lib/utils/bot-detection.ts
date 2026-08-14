@@ -22,6 +22,14 @@ export interface DetectBotOptions {
   readonly memberConversions?: number;
 }
 
+export type AnonymousBotSurface =
+  | 'profile_view'
+  | 'pixel'
+  | 'audience_click'
+  | 'audience_visit'
+  | 'redirect'
+  | 'other';
+
 /** Minimum visits before the high-velocity zero-click heuristic applies. */
 export const VELOCITY_BOT_MIN_VISITS = 40;
 
@@ -86,6 +94,29 @@ const KNOWN_CRAWLERS = [
   'telegrambot',
   'skypebot',
 ];
+
+export function recordAnonymousBotMetric(
+  result: Pick<BotDetectionResult, 'isBot' | 'reason' | 'shouldBlock'>,
+  surface: AnonymousBotSurface
+): void {
+  if (!result.isBot) return;
+
+  if (!('metrics' in Sentry)) return;
+  // Sentry's metrics SDK aggregates counter samples while preserving every
+  // increment. Closed attributes prevent spoofed headers/routes from creating
+  // high-cardinality telemetry or process-local counts that disappear on freeze.
+  (Sentry.metrics as typeof Sentry.metrics | undefined)?.count(
+    'anonymous.bot_detected',
+    1,
+    {
+      attributes: {
+        reason: result.reason,
+        blocked: result.shouldBlock,
+        surface,
+      },
+    }
+  );
+}
 
 /**
  * Extract ASN from CDN/proxy headers (Vercel, Cloudflare).

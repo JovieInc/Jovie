@@ -8,7 +8,7 @@ import { captureError } from '@/lib/error-tracking';
 import { createRateLimitHeaders, publicVisitLimiter } from '@/lib/rate-limit';
 import { ensureClaimRetargetingCreatives } from '@/lib/retargeting/claim-creatives';
 import { forwardEvent } from '@/lib/tracking/forwarding';
-import { detectBot } from '@/lib/utils/bot-detection';
+import { detectBot, recordAnonymousBotMetric } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
 import { pixelEventPayloadSchema } from '@/lib/validation/schemas';
@@ -60,6 +60,16 @@ export async function POST(request: NextRequest) {
     // Extract client IP for rate limiting and hashing
     const clientIP = extractClientIP(request.headers);
 
+    // Reject known automated traffic before consuming a durable Redis command.
+    const botResult = detectBot(request, '/api/px');
+    if (botResult.isBot) {
+      recordAnonymousBotMetric(botResult, 'pixel');
+      return NextResponse.json(
+        { success: true, filtered: true },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
     // Public rate limiting check (per-IP) - use 'visit' limiter for pixel events
     const rateLimitResult = await publicVisitLimiter.limit(clientIP);
     if (!rateLimitResult.success) {
@@ -72,16 +82,6 @@ export async function POST(request: NextRequest) {
           ...createRateLimitHeaders(rateLimitResult),
         },
       });
-    }
-
-    // Bot detection - silently skip recording for bots
-    const botResult = detectBot(request, '/api/px');
-    if (botResult.isBot) {
-      // Return success but don't record - prevents metric inflation
-      return NextResponse.json(
-        { success: true, filtered: true },
-        { headers: NO_STORE_HEADERS }
-      );
     }
 
     // Parse request body

@@ -283,7 +283,7 @@
 | `/api/health/env` | GET | `public` | Environment variable presence check |
 | `/api/health/homepage` | GET | `public` | Homepage rendering health |
 | `/api/health/keys` | GET | `public` | Cryptographic key health |
-| `/api/health/redis` | GET | `public` | Redis connectivity |
+| `/api/health/redis` | GET | `admin` or `CRON_SECRET` | Redis write/read operability (protected to prevent quota burn) |
 
 ### HUD
 

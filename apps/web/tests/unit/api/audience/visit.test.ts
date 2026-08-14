@@ -5,6 +5,7 @@ import { BIO_LINK_ACTIVATION_WINDOW_DAYS } from '@/lib/distribution/instagram-ac
 const mockPublicVisitLimiterGetStatus = vi.hoisted(() => vi.fn());
 const mockPublicVisitLimiterLimit = vi.hoisted(() => vi.fn());
 const mockDetectBot = vi.hoisted(() => vi.fn());
+const mockRecordAnonymousBotMetric = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockDoesColumnExist = vi.hoisted(() => vi.fn());
 const mockDoesTableExist = vi.hoisted(() => vi.fn());
@@ -28,6 +29,7 @@ vi.mock('@/lib/rate-limit', () => ({
 
 vi.mock('@/lib/utils/bot-detection', () => ({
   detectBot: mockDetectBot,
+  recordAnonymousBotMetric: mockRecordAnonymousBotMetric,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -191,17 +193,16 @@ describe('POST /api/audience/visit', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.success).toBe(true);
-    expect(data.fingerprint).toBeDefined();
-    expect(insertedValues).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          engagementScore: 0,
-          tags: ['bot'],
-          visits: 0,
-        }),
-      ])
+    expect(data).toEqual({ success: true, filtered: true });
+    expect(mockPublicVisitLimiterLimit).not.toHaveBeenCalled();
+    expect(mockCheckVisitRateLimit).not.toHaveBeenCalled();
+    expect(mockRecordAnonymousBotMetric).toHaveBeenCalledWith(
+      expect.objectContaining({ isBot: true }),
+      'audience_visit'
     );
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(mockWithSystemIngestionSession).not.toHaveBeenCalled();
+    expect(insertedValues).toHaveLength(0);
   });
 
   it('returns 403 when visitor is blocked', async () => {

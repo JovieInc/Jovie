@@ -50,12 +50,15 @@ export function createRedisRateLimiter(
     return null;
   }
 
+  const window = toUpstashWindow(config.window);
+  const limiter =
+    config.algorithm === 'sliding-window'
+      ? Ratelimit.slidingWindow(config.limit, window)
+      : Ratelimit.fixedWindow(config.limit, window);
+
   return new Ratelimit({
     redis: redisClient,
-    limiter: Ratelimit.slidingWindow(
-      config.limit,
-      toUpstashWindow(config.window)
-    ),
+    limiter,
     analytics: config.analytics ?? false,
     prefix: config.prefix,
   });

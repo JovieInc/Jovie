@@ -1,6 +1,12 @@
 import 'server-only';
 
 import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from 'node:crypto';
+import {
   type AuthClient,
   type AuthIntent,
   type AuthStateRecord,
@@ -13,27 +19,14 @@ import {
   type NativeExchangeValidationResult,
   validateNativeExchange,
 } from '@jovie/auth-routing';
-import { getRedis } from '@/lib/redis';
+import { auth } from '@/lib/auth/better-auth';
+import { env } from '@/lib/env-server';
 
-const AUTH_STATE_TTL_SECONDS = 10 * 60;
-const NATIVE_EXCHANGE_TTL_SECONDS = 5 * 60;
-const AUTH_STATE_PREFIX = 'auth:state';
-const NATIVE_EXCHANGE_PREFIX = 'auth:exchange';
-
-export class AuthRoutingStoreUnavailableError extends Error {
-  constructor() {
-    super('Redis is required for auth routing state');
-    this.name = 'AuthRoutingStoreUnavailableError';
-  }
-}
-
-function getRequiredRedis() {
-  const redis = getRedis();
-  if (!redis) {
-    throw new AuthRoutingStoreUnavailableError();
-  }
-  return redis;
-}
+const AUTH_STATE_PREFIX = 'jovie-auth-state';
+const NATIVE_EXCHANGE_PREFIX = 'jovie-auth-exchange';
+const SEALED_VALUE_VERSION = 'v1';
+const NON_PRODUCTION_FALLBACK_SECRET =
+  'jovie-non-production-better-auth-fallback-secret';
 
 function buildAuthStateKey(state: string): string {
   return `${AUTH_STATE_PREFIX}:${state}`;
@@ -41,6 +34,106 @@ function buildAuthStateKey(state: string): string {
 
 function buildNativeExchangeKey(code: string): string {
   return `${NATIVE_EXCHANGE_PREFIX}:${code}`;
+}
+
+function getAuthRoutingEncryptionKey(): Buffer {
+  const secret = env.BETTER_AUTH_SECRET;
+  if (!secret && env.VERCEL_ENV === 'production') {
+    throw new Error('BETTER_AUTH_SECRET is required for auth routing state');
+  }
+
+  return createHash('sha256')
+    .update('jovie-auth-routing-state:v1\0')
+    .update(secret ?? NON_PRODUCTION_FALLBACK_SECRET)
+    .digest();
+}
+
+function sealVerificationValue(identifier: string, value: unknown): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv(
+    'aes-256-gcm',
+    getAuthRoutingEncryptionKey(),
+    iv
+  );
+  cipher.setAAD(Buffer.from(identifier, 'utf8'));
+  const ciphertext = Buffer.concat([
+    cipher.update(JSON.stringify(value), 'utf8'),
+    cipher.final(),
+  ]);
+  return [
+    SEALED_VALUE_VERSION,
+    iv.toString('base64url'),
+    cipher.getAuthTag().toString('base64url'),
+    ciphertext.toString('base64url'),
+  ].join('.');
+}
+
+function unsealVerificationValue(
+  identifier: string,
+  sealedValue: unknown
+): unknown {
+  if (typeof sealedValue !== 'string') return null;
+  const [version, encodedIv, encodedTag, encodedCiphertext, ...rest] =
+    sealedValue.split('.');
+  if (
+    version !== SEALED_VALUE_VERSION ||
+    !encodedIv ||
+    !encodedTag ||
+    !encodedCiphertext ||
+    rest.length > 0
+  ) {
+    return null;
+  }
+
+  try {
+    const decipher = createDecipheriv(
+      'aes-256-gcm',
+      getAuthRoutingEncryptionKey(),
+      Buffer.from(encodedIv, 'base64url')
+    );
+    decipher.setAAD(Buffer.from(identifier, 'utf8'));
+    decipher.setAuthTag(Buffer.from(encodedTag, 'base64url'));
+    const plaintext = Buffer.concat([
+      decipher.update(Buffer.from(encodedCiphertext, 'base64url')),
+      decipher.final(),
+    ]).toString('utf8');
+    return JSON.parse(plaintext) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Auth routing is a security-critical login dependency, not a cache. Keep its
+ * short-lived one-time records in Better Auth's existing Postgres-backed
+ * verification store so a Redis quota or network outage can shed analytics
+ * without blocking sign-in. The verification adapter provides atomic consume
+ * semantics, and secondary-storage deliberately bypasses Redis for every
+ * `verification:` key.
+ */
+async function createVerificationRecord(
+  identifier: string,
+  value: unknown,
+  expiresAt: number
+): Promise<void> {
+  const ctx = await auth.$context;
+  await ctx.internalAdapter.createVerificationValue({
+    identifier,
+    value: sealVerificationValue(identifier, value),
+    expiresAt: new Date(expiresAt),
+  });
+}
+
+async function readVerificationRecord(identifier: string): Promise<unknown> {
+  const ctx = await auth.$context;
+  const record = await ctx.internalAdapter.findVerificationValue(identifier);
+  return unsealVerificationValue(identifier, record?.value);
+}
+
+async function consumeVerificationRecord(identifier: string): Promise<unknown> {
+  const ctx = await auth.$context;
+  const record = await ctx.internalAdapter.consumeVerificationValue(identifier);
+  return unsealVerificationValue(identifier, record?.value);
 }
 
 function parseJsonRecord(value: unknown): unknown {
@@ -148,7 +241,6 @@ export async function createStoredAuthState(input: {
   readonly desktopFlow?: string | null;
   readonly now?: number;
 }): Promise<AuthStateRecord> {
-  const redis = getRequiredRedis();
   const record = createAuthStateRecord({
     client: input.client,
     intent: input.intent,
@@ -159,9 +251,11 @@ export async function createStoredAuthState(input: {
     now: input.now ?? Date.now(),
   });
 
-  await redis.set(buildAuthStateKey(record.state), JSON.stringify(record), {
-    ex: AUTH_STATE_TTL_SECONDS,
-  });
+  await createVerificationRecord(
+    buildAuthStateKey(record.state),
+    record,
+    record.expiresAt
+  );
 
   return record;
 }
@@ -170,9 +264,7 @@ export async function readStoredAuthState(input: {
   readonly state: string;
   readonly now?: number;
 }): Promise<AuthStateRecord | null> {
-  const redis = getRequiredRedis();
-  const key = buildAuthStateKey(input.state);
-  const stored = await redis.get(key);
+  const stored = await readVerificationRecord(buildAuthStateKey(input.state));
   const record = parseStoredAuthState(stored);
   if (!record) return null;
 
@@ -192,11 +284,21 @@ export async function consumeStoredAuthState(input: {
   readonly state: string;
   readonly now?: number;
 }): Promise<AuthStateRecord | null> {
-  const record = await readStoredAuthState(input);
+  const stored = await consumeVerificationRecord(
+    buildAuthStateKey(input.state)
+  );
+  const record = parseStoredAuthState(stored);
   if (!record) return null;
 
-  const redis = getRequiredRedis();
-  await redis.del(buildAuthStateKey(input.state));
+  const now = input.now ?? Date.now();
+  if (
+    record.state !== input.state ||
+    record.consumedAt ||
+    now > record.expiresAt
+  ) {
+    return null;
+  }
+
   return record;
 }
 
@@ -210,7 +312,6 @@ export async function createStoredNativeExchangeCode(input: {
   readonly ott?: string | null;
   readonly now?: number;
 }): Promise<NativeExchangeCodeRecord> {
-  const redis = getRequiredRedis();
   const record = buildNativeExchangeCodeRecord({
     code: input.code,
     client: input.client,
@@ -222,9 +323,11 @@ export async function createStoredNativeExchangeCode(input: {
     now: input.now ?? Date.now(),
   });
 
-  await redis.set(buildNativeExchangeKey(record.code), JSON.stringify(record), {
-    ex: NATIVE_EXCHANGE_TTL_SECONDS,
-  });
+  await createVerificationRecord(
+    buildNativeExchangeKey(record.code),
+    record,
+    record.expiresAt
+  );
 
   return record;
 }
@@ -237,14 +340,12 @@ export async function consumeStoredNativeExchangeCode(input: {
   readonly now?: number;
   readonly createCodeChallenge: (verifier: string) => string;
 }): Promise<NativeExchangeValidationResult> {
-  const redis = getRequiredRedis();
-  const key = buildNativeExchangeKey(input.code);
   const now = input.now ?? Date.now();
-  // Atomically claim the code so concurrent exchange attempts cannot both succeed.
-  const stored = await redis.getdel(key);
-  const record = parseStoredNativeExchange(stored);
-  const result = validateNativeExchange({
-    record,
+  const identifier = buildNativeExchangeKey(input.code);
+  const stored = await readVerificationRecord(identifier);
+  const candidate = parseStoredNativeExchange(stored);
+  const preliminary = validateNativeExchange({
+    record: candidate,
     client: input.client,
     code: input.code,
     state: input.state,
@@ -253,10 +354,21 @@ export async function consumeStoredNativeExchangeCode(input: {
     createCodeChallenge: input.createCodeChallenge,
   });
 
-  if (!result.ok && result.reason === 'wrong_verifier' && record) {
-    const ttlSeconds = Math.max(1, Math.ceil((record.expiresAt - now) / 1000));
-    await redis.set(key, JSON.stringify(record), { ex: ttlSeconds });
-  }
+  // Preserve the record on a verifier mismatch so an invalid attempt cannot
+  // consume the real user's one-time exchange. Once validation succeeds, the
+  // database adapter atomically claims the row; concurrent attempts cannot
+  // both succeed.
+  if (!preliminary.ok) return preliminary;
 
-  return result;
+  const consumed = await consumeVerificationRecord(identifier);
+  const record = parseStoredNativeExchange(consumed);
+  return validateNativeExchange({
+    record,
+    client: input.client,
+    code: input.code,
+    state: input.state,
+    codeVerifier: input.codeVerifier,
+    now,
+    createCodeChallenge: input.createCodeChallenge,
+  });
 }

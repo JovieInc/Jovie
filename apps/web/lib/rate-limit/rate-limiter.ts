@@ -9,6 +9,7 @@ import * as Sentry from '@sentry/nextjs';
 import type { Ratelimit } from '@upstash/ratelimit';
 import { after } from 'next/server';
 import { env } from '@/lib/env-server';
+import { classifyRedisFailure } from '@/lib/redis-operability';
 import { withTimeout } from '@/lib/resilience/primitives';
 import { parseWindowToMs } from './config';
 import { MemoryRateLimiter } from './memory-limiter';
@@ -36,14 +37,35 @@ const REDIS_RATE_LIMIT_TIMEOUT_MS = 750;
  * failure signal applies to the shared Redis backend, not a single limiter.
  */
 const REDIS_CIRCUIT_OPEN_MS = 30_000;
+const REDIS_QUOTA_CIRCUIT_OPEN_MS = 15 * 60_000;
 let redisCircuitOpenUntil = 0;
+
+function countRedisMetric(
+  name: string,
+  value: number,
+  attributes: Record<string, string>
+): void {
+  if (!('metrics' in Sentry)) return;
+  Sentry.metrics.count(name, value, { attributes });
+}
+
+export function estimateRateLimitCommandUpperBound(
+  config: RateLimitConfig
+): number {
+  const algorithmCommands = config.algorithm === 'sliding-window' ? 5 : 3;
+  return algorithmCommands + (config.analytics ? 1 : 0);
+}
 
 function isRedisCircuitOpen(): boolean {
   return Date.now() < redisCircuitOpenUntil;
 }
 
-function openRedisCircuit(): void {
-  redisCircuitOpenUntil = Date.now() + REDIS_CIRCUIT_OPEN_MS;
+function openRedisCircuit(error: unknown): void {
+  const duration =
+    classifyRedisFailure(error) === 'quota_exceeded'
+      ? REDIS_QUOTA_CIRCUIT_OPEN_MS
+      : REDIS_CIRCUIT_OPEN_MS;
+  redisCircuitOpenUntil = Date.now() + duration;
 }
 
 /** Test-only helper to reset the shared Redis circuit breaker. */
@@ -132,6 +154,19 @@ export class RateLimiter {
         if (result.pending) {
           after(() => result.pending.catch(console.error));
         }
+        // Sentry's metric aggregator turns this bounded-cardinality count into
+        // a pre-failure command-volume signal. Values use the provider's
+        // documented per-decision upper bound; Global write replication is
+        // applied separately in the operations dashboard/alert calculation.
+        countRedisMetric(
+          'redis.rate_limit_command_estimate',
+          estimateRateLimitCommandUpperBound(this.config),
+          {
+            limiter: this.config.prefix,
+            algorithm: this.config.algorithm,
+            traffic_class: this.config.trafficClass,
+          }
+        );
         return {
           success: result.success,
           limit: result.limit,
@@ -146,7 +181,12 @@ export class RateLimiter {
         // request are enforced in-memory only and won't persist across deploys.
         // Open the circuit so subsequent requests skip the Redis timeout
         // entirely while the backend is known-degraded.
-        openRedisCircuit();
+        const failureKind = classifyRedisFailure(error);
+        openRedisCircuit(error);
+        countRedisMetric('redis.rate_limit_failure', 1, {
+          failure_kind: failureKind,
+          limiter: this.config.prefix,
+        });
         const message = `[RateLimit:${this.config.name}] Redis error, falling back to in-memory: ${error}`;
         console.error(message);
         this.options.logger(message);

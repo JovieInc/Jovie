@@ -1,54 +1,69 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
-  getRedisMock: vi.fn(),
-  redisGetMock: vi.fn(),
-  redisGetdelMock: vi.fn(),
-  redisSetMock: vi.fn(),
-  redisDelMock: vi.fn(),
+  createVerificationValue: vi.fn(),
+  findVerificationValue: vi.fn(),
+  consumeVerificationValue: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
-
-vi.mock('@/lib/redis', () => ({
-  getRedis: hoisted.getRedisMock,
+vi.mock('@/lib/auth/better-auth', () => ({
+  auth: {
+    $context: Promise.resolve({
+      internalAdapter: {
+        createVerificationValue: hoisted.createVerificationValue,
+        findVerificationValue: hoisted.findVerificationValue,
+        consumeVerificationValue: hoisted.consumeVerificationValue,
+      },
+    }),
+  },
 }));
 
-const redisMock = {
-  get: hoisted.redisGetMock,
-  getdel: hoisted.redisGetdelMock,
-  set: hoisted.redisSetMock,
-  del: hoisted.redisDelMock,
-};
-
 const modulePromise = import('@/lib/auth/routing-state.server');
+
+function verification(value: string) {
+  return { value };
+}
+
+async function createSealedAuthState(): Promise<string> {
+  const { createStoredAuthState } = await modulePromise;
+  await createStoredAuthState({
+    client: 'electron',
+    intent: 'sign_in',
+    returnTo: '/app/settings',
+    state: 'state_123',
+    codeChallenge: 'challenge',
+    now: 1_000,
+  });
+  return hoisted.createVerificationValue.mock.calls.at(-1)?.[0].value;
+}
+
+async function createSealedNativeExchange(
+  overrides: { code?: string; ott?: string | null } = {}
+): Promise<string> {
+  const { createStoredNativeExchangeCode } = await modulePromise;
+  await createStoredNativeExchangeCode({
+    code: overrides.code ?? 'code_123',
+    client: 'ios',
+    state: 'state_123',
+    userId: 'user_123',
+    returnTo: '/app',
+    codeChallenge: 'challenge',
+    ott: overrides.ott ?? null,
+    now: 1_000,
+  });
+  return hoisted.createVerificationValue.mock.calls.at(-1)?.[0].value;
+}
 
 describe('auth routing state store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    hoisted.getRedisMock.mockReturnValue(redisMock);
-    hoisted.redisSetMock.mockResolvedValue('OK');
-    hoisted.redisDelMock.mockResolvedValue(1);
-    hoisted.redisGetMock.mockResolvedValue(null);
-    hoisted.redisGetdelMock.mockResolvedValue(null);
+    hoisted.createVerificationValue.mockResolvedValue(undefined);
+    hoisted.findVerificationValue.mockResolvedValue(null);
+    hoisted.consumeVerificationValue.mockResolvedValue(null);
   });
 
-  it('fails closed when Redis is unavailable', async () => {
-    hoisted.getRedisMock.mockReturnValue(null);
-    const { createStoredAuthState } = await modulePromise;
-
-    await expect(
-      createStoredAuthState({
-        client: 'web',
-        intent: 'sign_in',
-        returnTo: '/app',
-        state: 'state_123',
-        now: 1_000,
-      })
-    ).rejects.toThrow(/redis/i);
-  });
-
-  it('stores auth state with a bounded Redis TTL', async () => {
+  it('stores auth state in the database-backed verification store', async () => {
     const { createStoredAuthState } = await modulePromise;
 
     await expect(
@@ -66,26 +81,22 @@ describe('auth routing state store', () => {
       codeChallenge: 'challenge',
     });
 
-    expect(hoisted.redisSetMock).toHaveBeenCalledWith(
-      'auth:state:state_123',
-      expect.stringContaining('"client":"ios"'),
-      { ex: 600 }
-    );
+    expect(hoisted.createVerificationValue).toHaveBeenCalledWith({
+      identifier: 'jovie-auth-state:state_123',
+      value: expect.stringMatching(/^v1\./),
+      expiresAt: new Date(601_000),
+    });
+    const storedValue =
+      hoisted.createVerificationValue.mock.calls.at(-1)?.[0].value;
+    expect(storedValue).not.toContain('state_123');
+    expect(storedValue).not.toContain('challenge');
   });
 
-  it('consumes auth state once', async () => {
+  it('consumes auth state once through the atomic database adapter', async () => {
     const { consumeStoredAuthState } = await modulePromise;
-    hoisted.redisGetMock.mockResolvedValue(
-      JSON.stringify({
-        client: 'electron',
-        intent: 'sign_in',
-        returnTo: '/app/settings',
-        state: 'state_123',
-        codeChallenge: 'challenge',
-        createdAt: 1_000,
-        expiresAt: 601_000,
-        consumedAt: null,
-      })
+    const storedRecord = await createSealedAuthState();
+    hoisted.consumeVerificationValue.mockResolvedValue(
+      verification(storedRecord)
     );
 
     await expect(
@@ -95,21 +106,21 @@ describe('auth routing state store', () => {
       returnTo: '/app/settings',
     });
 
-    expect(hoisted.redisDelMock).toHaveBeenCalledWith('auth:state:state_123');
+    expect(hoisted.consumeVerificationValue).toHaveBeenCalledWith(
+      'jovie-auth-state:state_123'
+    );
   });
 
-  it('reads malformed auth state as expired without deleting it', async () => {
-    const { consumeStoredAuthState, readStoredAuthState } = await modulePromise;
-    hoisted.redisGetMock.mockResolvedValue('{not valid json');
+  it('reads malformed auth state as expired without consuming it', async () => {
+    const { readStoredAuthState } = await modulePromise;
+    hoisted.findVerificationValue.mockResolvedValue(
+      verification('{not valid json')
+    );
 
     await expect(
       readStoredAuthState({ state: 'state_123', now: 2_000 })
     ).resolves.toBeNull();
-    await expect(
-      consumeStoredAuthState({ state: 'state_123', now: 2_000 })
-    ).resolves.toBeNull();
-
-    expect(hoisted.redisDelMock).not.toHaveBeenCalled();
+    expect(hoisted.consumeVerificationValue).not.toHaveBeenCalled();
   });
 
   it('stores native exchange codes without putting tickets in URLs', async () => {
@@ -131,28 +142,24 @@ describe('auth routing state store', () => {
       userId: 'user_123',
     });
 
-    expect(hoisted.redisSetMock).toHaveBeenCalledWith(
-      'auth:exchange:code_123',
-      expect.not.stringContaining('ticket'),
-      { ex: 300 }
-    );
+    expect(hoisted.createVerificationValue).toHaveBeenCalledWith({
+      identifier: 'jovie-auth-exchange:code_123',
+      value: expect.stringMatching(/^v1\./),
+      expiresAt: new Date(301_000),
+    });
+    const storedValue =
+      hoisted.createVerificationValue.mock.calls.at(-1)?.[0].value;
+    expect(storedValue).not.toContain('user_123');
+    expect(storedValue).not.toContain('challenge');
   });
 
-  it('validates native exchange and atomically claims the code after success', async () => {
+  it('validates native exchange then atomically claims the database record', async () => {
     const { consumeStoredNativeExchangeCode } = await modulePromise;
-    const storedRecord = JSON.stringify({
-      code: 'code_123',
-      client: 'ios',
-      state: 'state_123',
-      userId: 'user_123',
-      returnTo: '/app',
-      codeChallenge: 'challenge',
-      ott: null,
-      createdAt: 1_000,
-      expiresAt: 61_000,
-      consumedAt: null,
-    });
-    hoisted.redisGetdelMock.mockResolvedValue(storedRecord);
+    const storedRecord = await createSealedNativeExchange();
+    hoisted.findVerificationValue.mockResolvedValue(verification(storedRecord));
+    hoisted.consumeVerificationValue.mockResolvedValue(
+      verification(storedRecord)
+    );
 
     await expect(
       consumeStoredNativeExchangeCode({
@@ -170,28 +177,18 @@ describe('auth routing state store', () => {
       ott: null,
     });
 
-    expect(hoisted.redisGetdelMock).toHaveBeenCalledWith(
-      'auth:exchange:code_123'
+    expect(hoisted.findVerificationValue).toHaveBeenCalledWith(
+      'jovie-auth-exchange:code_123'
     );
-    expect(hoisted.redisSetMock).not.toHaveBeenCalled();
-    expect(hoisted.redisDelMock).not.toHaveBeenCalled();
+    expect(hoisted.consumeVerificationValue).toHaveBeenCalledWith(
+      'jovie-auth-exchange:code_123'
+    );
   });
 
-  it('restores native exchange codes on verifier mismatch', async () => {
+  it('preserves native exchange codes on verifier mismatch', async () => {
     const { consumeStoredNativeExchangeCode } = await modulePromise;
-    const storedRecord = JSON.stringify({
-      code: 'code_123',
-      client: 'ios',
-      state: 'state_123',
-      userId: 'user_123',
-      returnTo: '/app',
-      codeChallenge: 'challenge',
-      ott: null,
-      createdAt: 1_000,
-      expiresAt: 61_000,
-      consumedAt: null,
-    });
-    hoisted.redisGetdelMock.mockResolvedValue(storedRecord);
+    const storedRecord = await createSealedNativeExchange();
+    hoisted.findVerificationValue.mockResolvedValue(verification(storedRecord));
 
     await expect(
       consumeStoredNativeExchangeCode({
@@ -204,33 +201,15 @@ describe('auth routing state store', () => {
       })
     ).resolves.toEqual({ ok: false, reason: 'wrong_verifier' });
 
-    expect(hoisted.redisGetdelMock).toHaveBeenCalledWith(
-      'auth:exchange:code_123'
-    );
-    expect(hoisted.redisSetMock).toHaveBeenCalledWith(
-      'auth:exchange:code_123',
-      storedRecord,
-      { ex: 59 }
-    );
-    expect(hoisted.redisDelMock).not.toHaveBeenCalled();
+    expect(hoisted.consumeVerificationValue).not.toHaveBeenCalled();
   });
 
   it('allows only one concurrent native exchange to succeed', async () => {
     const { consumeStoredNativeExchangeCode } = await modulePromise;
-    const storedRecord = JSON.stringify({
-      code: 'code_123',
-      client: 'ios',
-      state: 'state_123',
-      userId: 'user_123',
-      returnTo: '/app',
-      codeChallenge: 'challenge',
-      ott: null,
-      createdAt: 1_000,
-      expiresAt: 61_000,
-      consumedAt: null,
-    });
-    hoisted.redisGetdelMock
-      .mockResolvedValueOnce(storedRecord)
+    const storedRecord = await createSealedNativeExchange();
+    hoisted.findVerificationValue.mockResolvedValue(verification(storedRecord));
+    hoisted.consumeVerificationValue
+      .mockResolvedValueOnce(verification(storedRecord))
       .mockResolvedValueOnce(null);
 
     const exchangeInput = {
@@ -254,7 +233,31 @@ describe('auth routing state store', () => {
       ott: null,
     });
     expect(secondResult).toEqual({ ok: false, reason: 'missing' });
-    expect(hoisted.redisGetdelMock).toHaveBeenCalledTimes(2);
-    expect(hoisted.redisSetMock).not.toHaveBeenCalled();
+    expect(hoisted.consumeVerificationValue).toHaveBeenCalledTimes(2);
+  });
+
+  it('encrypts one-time tokens and binds ciphertext to its database key', async () => {
+    const { consumeStoredNativeExchangeCode } = await modulePromise;
+    const sealedRecord = await createSealedNativeExchange({
+      code: 'code_123',
+      ott: 'ott-secret',
+    });
+
+    expect(sealedRecord).toMatch(/^v1\./);
+    expect(sealedRecord).not.toContain('ott-secret');
+    expect(sealedRecord).not.toContain('user_123');
+
+    hoisted.findVerificationValue.mockResolvedValue(verification(sealedRecord));
+    await expect(
+      consumeStoredNativeExchangeCode({
+        client: 'ios',
+        code: 'code_456',
+        state: 'state_123',
+        codeVerifier: 'verifier',
+        now: 2_000,
+        createCodeChallenge: () => 'challenge',
+      })
+    ).resolves.toEqual({ ok: false, reason: 'missing' });
+    expect(hoisted.consumeVerificationValue).not.toHaveBeenCalled();
   });
 });

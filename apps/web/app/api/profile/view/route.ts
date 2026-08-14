@@ -5,7 +5,7 @@ import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { createRateLimitHeaders, publicProfileLimiter } from '@/lib/rate-limit';
 import { incrementProfileViews } from '@/lib/services/profile';
-import { detectBot } from '@/lib/utils/bot-detection';
+import { detectBot, recordAnonymousBotMetric } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 
 export const dynamic = 'force-dynamic';
@@ -47,6 +47,16 @@ export async function POST(request: NextRequest) {
   try {
     const clientIP = extractClientIP(request.headers);
 
+    // Reject known automated traffic before consuming a durable Redis command.
+    const botResult = detectBot(request, '/api/profile/view');
+    if (botResult.isBot) {
+      recordAnonymousBotMetric(botResult, 'profile_view');
+      return NextResponse.json(
+        { success: true, filtered: true },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
     // Atomically check-and-decrement to avoid TOCTOU race between getStatus + limit
     const rateLimitResult = await publicProfileLimiter.limit(clientIP);
 
@@ -60,14 +70,6 @@ export async function POST(request: NextRequest) {
           ...createRateLimitHeaders(rateLimitResult),
         },
       });
-    }
-
-    const botResult = detectBot(request, '/api/profile/view');
-    if (botResult.isBot) {
-      return NextResponse.json(
-        { success: true, filtered: true },
-        { headers: NO_STORE_HEADERS }
-      );
     }
 
     let body: unknown;

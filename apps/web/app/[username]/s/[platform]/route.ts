@@ -19,7 +19,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { publicClickLimiter } from '@/lib/rate-limit';
 import { resolveSocialShortcutPlatforms } from '@/lib/social/shortcut-platforms';
-import { detectBot } from '@/lib/utils/bot-detection';
+import { detectBot, recordAnonymousBotMetric } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 
@@ -159,8 +159,13 @@ export async function GET(
       `/${profile.usernameNormalized}/s/${platformKey}`
     );
 
-    const rateLimitResult = await publicClickLimiter.limit(clientIP);
-    if (rateLimitResult.success) {
+    if (botDetection.isBot) {
+      recordAnonymousBotMetric(botDetection, 'redirect');
+    }
+    const rateLimitResult = botDetection.isBot
+      ? null
+      : await publicClickLimiter.limit(clientIP);
+    if (rateLimitResult?.success) {
       after(() =>
         recordShortcutAnalytics({
           creatorProfileId: profile.id,

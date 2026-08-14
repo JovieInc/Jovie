@@ -18,8 +18,10 @@ const { mockLimit } = vi.hoisted(() => ({
 vi.mock('@/lib/rate-limit/rate-limiter', () => {
   class FakeRateLimiter {
     config: unknown;
-    constructor(config: unknown) {
+    options: unknown;
+    constructor(config: unknown, options?: unknown) {
       this.config = config;
+      this.options = options;
     }
     limit = mockLimit;
     getStatus = vi.fn();
@@ -31,8 +33,8 @@ vi.mock('@/lib/rate-limit/rate-limiter', () => {
   }
   return {
     RateLimiter: FakeRateLimiter,
-    createRateLimiter: (config: unknown, _options?: unknown) =>
-      new FakeRateLimiter(config),
+    createRateLimiter: (config: unknown, options?: unknown) =>
+      new FakeRateLimiter(config, options),
   };
 });
 
@@ -386,6 +388,20 @@ describe('limiters.ts', () => {
       for (const limiter of Object.values(limiters)) {
         expect(typeof limiter.limit).toBe('function');
       }
+    });
+
+    it('keeps public health probes entirely off the metered Redis backend', async () => {
+      const { healthLimiter } = await import('@/lib/rate-limit/limiters');
+      const options = (
+        healthLimiter as unknown as {
+          options: { preferRedis: boolean; warnOnFallback: boolean };
+        }
+      ).options;
+
+      expect(options).toEqual({
+        preferRedis: false,
+        warnOnFallback: false,
+      });
     });
   });
 

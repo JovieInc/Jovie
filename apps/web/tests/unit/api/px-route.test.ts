@@ -8,6 +8,7 @@ const mockExtractClientIP = vi.hoisted(() =>
 const mockDetectBot = vi.hoisted(() =>
   vi.fn().mockReturnValue({ isBot: false })
 );
+const mockRecordAnonymousBotMetric = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockDbInsert = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
@@ -46,6 +47,7 @@ vi.mock('@/lib/tracking/forwarding', () => ({
 
 vi.mock('@/lib/utils/bot-detection', () => ({
   detectBot: mockDetectBot,
+  recordAnonymousBotMetric: mockRecordAnonymousBotMetric,
 }));
 
 vi.mock('@/lib/utils/ip-extraction', () => ({
@@ -67,7 +69,7 @@ function buildRequest() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      profileId: 'profile-id',
+      profileId: '550e8400-e29b-41d4-a716-446655440000',
       sessionId: 'session-id',
       eventType: 'page_view',
       consent: true,
@@ -102,9 +104,65 @@ describe('POST /api/px', () => {
     expect(response.headers.get('X-RateLimit-Limit')).toBe('100');
     expect(response.headers.get('X-RateLimit-Remaining')).toBe('0');
     expect(Number(response.headers.get('Retry-After'))).toBeGreaterThan(0);
-    expect(mockDetectBot).not.toHaveBeenCalled();
+    expect(mockDetectBot).toHaveBeenCalledWith(
+      expect.any(NextRequest),
+      '/api/px'
+    );
     expect(mockDbSelect).not.toHaveBeenCalled();
     expect(mockForwardEvent).not.toHaveBeenCalled();
     expect(mockCaptureError).not.toHaveBeenCalled();
+  });
+
+  it('filters known bots before consuming the durable rate-limit budget', async () => {
+    mockDetectBot.mockReturnValueOnce({ isBot: true });
+
+    const response = await POST(buildRequest());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      filtered: true,
+    });
+    expect(mockPublicVisitLimiterLimit).not.toHaveBeenCalled();
+    expect(mockRecordAnonymousBotMetric).toHaveBeenCalledWith(
+      expect.objectContaining({ isBot: true }),
+      'pixel'
+    );
+    expect(mockDbSelect).not.toHaveBeenCalled();
+  });
+
+  it('continues human event ingestion after the pre-meter bot check', async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([
+            {
+              id: '550e8400-e29b-41d4-a716-446655440000',
+              isPublic: true,
+              username: 'dualipa',
+            },
+          ]),
+        }),
+      }),
+    });
+    const mockReturning = vi.fn().mockResolvedValue([]);
+    const mockValues = vi.fn().mockReturnValue({ returning: mockReturning });
+    mockDbInsert.mockReturnValue({ values: mockValues });
+
+    const response = await POST(buildRequest());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ success: true });
+    expect(mockDetectBot).toHaveBeenCalledWith(
+      expect.any(NextRequest),
+      '/api/px'
+    );
+    expect(mockPublicVisitLimiterLimit).toHaveBeenCalledWith('127.0.0.1');
+    expect(mockRecordAnonymousBotMetric).not.toHaveBeenCalled();
+    expect(mockValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: '550e8400-e29b-41d4-a716-446655440000',
+      })
+    );
   });
 });
