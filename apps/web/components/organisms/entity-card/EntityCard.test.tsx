@@ -66,6 +66,7 @@ vi.mock('@/features/profile/usePacEvents', () => ({
 vi.mock('@/lib/profile/capture-dismissal-client', () => ({
   getCaptureDismissalStatus: mockGetCaptureDismissalStatus,
   invalidateCaptureDismissalStatus: vi.fn(),
+  handleCaptureDismissalResponse: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/notifications/client', () => ({

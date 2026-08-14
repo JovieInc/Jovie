@@ -309,6 +309,9 @@ describe('ci-harness manifest', () => {
       'needs: [ci-path-changes, ci-build-public, neon-db, ci-e2e-migrate]'
     );
     expect(e2e).toContain("github.event_name == 'workflow_dispatch'");
+    expect(e2e).not.toContain("github.event_name == 'pull_request'");
+    expect(e2e).not.toContain('E2E Smoke (PR to Preview)');
+    expect(e2e).not.toContain('E2E Auth Smoke (PR Gate)');
     expect(e2e).toMatch(
       /strategy:\n\s+fail-fast: true\n\s+# Run all four E2E shards concurrently; each reuses the shared Neon artifact\.\n\s+max-parallel: 4\n\s+matrix:\n\s+shard: \[1, 2, 3, 4\]/
     );

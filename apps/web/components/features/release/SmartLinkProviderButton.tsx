@@ -13,6 +13,8 @@ interface SmartLinkProviderButtonProps {
   readonly className?: string;
   readonly disabled?: boolean;
   readonly ariaLabel?: string;
+  /** Stable canonical registry key for browser admission and analytics. */
+  readonly providerKey?: string;
   /** The canonical full-width primary provider action used by the payment terminal. */
   readonly primary?: boolean;
 }
@@ -30,6 +32,7 @@ export function SmartLinkProviderButton({
   className,
   disabled = false,
   ariaLabel,
+  providerKey,
   primary = false,
 }: Readonly<SmartLinkProviderButtonProps>) {
   const content = (
@@ -93,6 +96,7 @@ export function SmartLinkProviderButton({
           onClick={onClick}
           className={sharedClassName}
           aria-label={ariaLabel ?? `Open ${label}`}
+          data-dsp-provider={providerKey}
           disabled={disabled}
         >
           {content}
@@ -100,7 +104,11 @@ export function SmartLinkProviderButton({
       );
     }
 
-    return <div className={sharedClassName}>{content}</div>;
+    return (
+      <div className={sharedClassName} data-dsp-provider={providerKey}>
+        {content}
+      </div>
+    );
   }
 
   return (
@@ -111,6 +119,7 @@ export function SmartLinkProviderButton({
       onClick={onClick}
       className={sharedClassName}
       aria-label={ariaLabel ?? `Open ${label}`}
+      data-dsp-provider={providerKey}
     >
       {content}
     </a>

@@ -6,7 +6,7 @@ const mockDbLimit = vi.hoisted(() => vi.fn());
 const mockDbSet = vi.hoisted(() => vi.fn());
 const mockDbValues = vi.hoisted(() => vi.fn());
 const mockDbOnConflictDoUpdate = vi.hoisted(() => vi.fn());
-const mockGeneralLimiterLimit = vi.hoisted(() => vi.fn());
+const mockCaptureDismissalLimiterLimit = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 
 vi.mock('drizzle-orm', () => ({
@@ -66,8 +66,8 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 
 vi.mock('@/lib/rate-limit', () => ({
-  generalLimiter: {
-    limit: mockGeneralLimiterLimit,
+  publicProfileCaptureDismissalLimiter: {
+    limit: mockCaptureDismissalLimiterLimit,
   },
   getClientIP: vi.fn(() => '127.0.0.1'),
 }));
@@ -105,7 +105,7 @@ describe('/api/profile/capture-dismissal', () => {
       onConflictDoUpdate: mockDbOnConflictDoUpdate,
     });
     mockDbOnConflictDoUpdate.mockResolvedValue(undefined);
-    mockGeneralLimiterLimit.mockResolvedValue({
+    mockCaptureDismissalLimiterLimit.mockResolvedValue({
       success: true,
       limit: 100,
       remaining: 99,
@@ -212,5 +212,83 @@ describe('/api/profile/capture-dismissal', () => {
       expect.any(Error),
       expect.objectContaining({ artistId })
     );
+  });
+
+  it('returns 429 from the isolated capture-dismissal limiter', async () => {
+    mockCaptureDismissalLimiterLimit.mockResolvedValue({
+      success: false,
+      degraded: false,
+      unavailable: false,
+    });
+    const { GET } = await import('@/app/api/profile/capture-dismissal/route');
+
+    const response = await GET(getRequest());
+
+    expect(response.status).toBe(429);
+    expect(mockCaptureDismissalLimiterLimit).toHaveBeenCalledWith('127.0.0.1');
+    expect(mockDbLimit).not.toHaveBeenCalled();
+  });
+
+  it('returns a neutral GET response without DB reads when Redis is degraded', async () => {
+    mockCaptureDismissalLimiterLimit.mockResolvedValue({
+      success: false,
+      degraded: true,
+    });
+    const { GET } = await import('@/app/api/profile/capture-dismissal/route');
+
+    const response = await GET(getRequest());
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      success: true,
+      suppressed: false,
+      sessionCount: 0,
+      nextEligibleAt: null,
+      degraded: true,
+    });
+    expect(mockDbLimit).not.toHaveBeenCalled();
+    expect(mockDbSet).not.toHaveBeenCalled();
+  });
+
+  it('acknowledges a valid POST without DB writes when Redis is unavailable', async () => {
+    mockCaptureDismissalLimiterLimit.mockResolvedValue({
+      success: false,
+      unavailable: true,
+    });
+    const { POST } = await import('@/app/api/profile/capture-dismissal/route');
+
+    const response = await POST(
+      postRequest({ artist_id: artistId, source: 'profile_inline' })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      success: true,
+      accepted: true,
+      suppressed: true,
+      persisted: false,
+      degraded: true,
+      nextEligibleAt: expect.any(String),
+    });
+    expect(Date.parse(data.nextEligibleAt) - Date.now()).toBeGreaterThan(
+      6 * 24 * 60 * 60 * 1000
+    );
+    expect(mockDbValues).not.toHaveBeenCalled();
+    expect(mockDbOnConflictDoUpdate).not.toHaveBeenCalled();
+  });
+
+  it('still rejects invalid degraded POST payloads without touching the DB', async () => {
+    mockCaptureDismissalLimiterLimit.mockResolvedValue({
+      success: true,
+      degraded: true,
+    });
+    const { POST } = await import('@/app/api/profile/capture-dismissal/route');
+
+    const response = await POST(postRequest({ artist_id: 'not-a-uuid' }));
+
+    expect(response.status).toBe(400);
+    expect(mockDbValues).not.toHaveBeenCalled();
   });
 });

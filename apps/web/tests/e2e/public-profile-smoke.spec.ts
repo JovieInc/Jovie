@@ -39,6 +39,18 @@ const hasDatabase = Boolean(
 test('public profile renders core elements within budget', async ({ page }) => {
   test.setTimeout(60_000);
 
+  const profileApiFailures: string[] = [];
+  page.on('response', apiResponse => {
+    const url = new URL(apiResponse.url());
+    if (
+      apiResponse.status() >= 400 &&
+      (url.pathname === '/api/profile/capture-dismissal' ||
+        url.pathname === '/api/profile/pac-event')
+    ) {
+      profileApiFailures.push(`${apiResponse.status()} ${url.pathname}`);
+    }
+  });
+
   // Listen mode surfaces music links; default mode often hides them behind a
   // tab selector. Fan flow lands here from outreach messages.
   const start = Date.now();
@@ -115,6 +127,14 @@ test('public profile renders core elements within budget', async ({ page }) => {
     actionAffordances.first(),
     'No support/contact/listen-mode affordance visible on public profile'
   ).toBeVisible({ timeout: 5_000 });
+
+  // These requests are part of ordinary anonymous profile navigation. A 429
+  // or other error here is a runtime admission failure, not harmless telemetry.
+  await page.waitForTimeout(500);
+  expect(
+    profileApiFailures,
+    'Public profile emitted failed capture-dismissal or PAC requests'
+  ).toEqual([]);
 
   await page.screenshot({
     path: `test-results/public-profile-smoke-${PROFILE_HANDLE}.png`,

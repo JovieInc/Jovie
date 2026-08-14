@@ -78,13 +78,22 @@ async function collectVisibleButtonLabels(page: Page): Promise<string[]> {
       const element = node as HTMLElement;
       const style = window.getComputedStyle(element);
       const rect = element.getBoundingClientRect();
+      // JOV-4764: carousel items can have non-zero geometry while translated
+      // outside the viewport. Only controls a visitor can see simultaneously
+      // count toward the JOV-4433 duplicate-CTA runtime assertion.
+      const intersectsViewport =
+        rect.bottom > 0 &&
+        rect.right > 0 &&
+        rect.top < window.innerHeight &&
+        rect.left < window.innerWidth;
       const visible =
         style.display !== 'none' &&
         style.visibility !== 'hidden' &&
         style.opacity !== '0' &&
         element.getAttribute('aria-hidden') !== 'true' &&
         rect.width > 0 &&
-        rect.height > 0;
+        rect.height > 0 &&
+        intersectsViewport;
       if (!visible) continue;
 
       // Skip elements inside a dropdown menu, dialog overlay, or screen-reader

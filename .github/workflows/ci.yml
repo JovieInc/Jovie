@@ -1204,6 +1204,100 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+  ci-profile-admission-browser:
+    name: ci-fast (profile browser)
+    # Secret-free browser proof for public-profile visual, accessibility, and
+    # runtime behavior. The aggregate makes this required on PR and merge-group
+    # heads whenever the bounded profile surface selector matches.
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: >-
+      !cancelled() &&
+      needs.ci-lockfile-preflight.result == 'success' &&
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        needs.ci-merge-group-admission.result == 'success'
+      )
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Select public-profile browser admission
+        id: profile-browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            BASE="${{ github.event.merge_group.base_sha }}"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin "${{ github.base_ref }}" --no-tags
+            BASE="origin/${{ github.base_ref }}"
+          elif [[ -n "${{ github.event.before }}" && "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
+            BASE="${{ github.event.before }}"
+          else
+            BASE="HEAD^1"
+          fi
+
+          CHANGED_FILES="$(git diff --diff-filter=ACDMRT --name-only "$BASE" HEAD -- \
+            ':(glob)apps/web/app/\[username\]/**' \
+            'apps/web/app/(marketing)/profile-admission-fixture/**' \
+            'apps/web/app/(marketing)/renders/**' \
+            'apps/web/app/api/profile/**' \
+            'apps/web/components/features/home/homepage-profile-preview-fixture.ts' \
+            'apps/web/components/features/release/SmartLinkProviderButton.tsx' \
+            'apps/web/components/features/profile/**' \
+            'apps/web/components/organisms/CookieBannerMount.tsx' \
+            'apps/web/components/organisms/CookieBannerSection.tsx' \
+            'apps/web/lib/cookies/**' \
+            'apps/web/lib/profile/**' \
+            'apps/web/lib/rate-limit/**' \
+            'apps/web/lib/tracking/pac-**' \
+            'apps/web/styles/design-system.css' \
+            'apps/web/tests/e2e/profile-admission.spec.ts' \
+            'apps/web/tests/e2e/utils/public-surface-helpers.ts' \
+            '.github/workflows/ci.yml' \
+            'scripts/ci-fast-lanes.mjs')"
+          if [[ -n "$CHANGED_FILES" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Setup Playwright (Chromium)
+        if: steps.profile-browser.outputs.run == 'true'
+        uses: ./.github/actions/setup-playwright
+      - name: Run public-profile browser admission
+        if: steps.profile-browser.outputs.run == 'true'
+        env:
+          CI: 'true'
+          DATABASE_URL: postgresql://jovie:jovie@127.0.0.1:1/jovie?sslmode=disable
+          E2E_SKIP_SEED: '1'
+          E2E_SKIP_WARMUP: '1'
+          E2E_WEB_SERVER_COMMAND: pnpm run dev:fast
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          PUBLIC_NOAUTH_SMOKE: '1'
+        run: >-
+          node .github/scripts/guard-playwright-artifacts.mjs --run --
+          pnpm --filter @jovie/web exec playwright test
+          tests/e2e/profile-admission.spec.ts
+          --config=playwright.config.noauth.ts
+          --project=chromium
+          --reporter=line
+      - name: Upload profile admission failure evidence
+        if: ${{ failure() && steps.profile-browser.outputs.run == 'true' && hashFiles('apps/web/test-results/**') != '' }}
+        continue-on-error: true
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/
+          retention-days: 3
+
   ci-fast:
     name: ci-fast
     # Preserve the required ci-fast context and fail closed for every dedicated
@@ -1214,6 +1308,7 @@ jobs:
         ci-merge-group-admission,
         ci-fast-typecheck,
         ci-fast-remaining,
+        ci-profile-admission-browser,
       ]
     if: >-
       always() &&
@@ -1229,13 +1324,14 @@ jobs:
         env:
           TYPECHECK_RESULT: ${{ needs.ci-fast-typecheck.result }}
           REMAINING_RESULT: ${{ needs.ci-fast-remaining.result }}
+          PROFILE_BROWSER_RESULT: ${{ needs.ci-profile-admission-browser.result }}
         run: |
           set -euo pipefail
-          if [[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then
-            echo "::error title=ci-fast failed closed::typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT"
+          if [[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" || "$PROFILE_BROWSER_RESULT" != "success" ]]; then
+            echo "::error title=ci-fast failed closed::typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT"
             exit 1
           fi
-          echo "All ci-fast lane groups passed: typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT"
+          echo "All ci-fast lane groups passed: typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT"
 
   ci-promptfoo-evals:
     name: Promptfoo Evals (deterministic)
@@ -4267,64 +4363,6 @@ jobs:
           else
             echo "has_quarantine=false" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: E2E Smoke (PR to Preview)
-        if: ${{ github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-          NODE_ENV: test
-          E2E_SKIP_SEED: '1'
-          SMOKE_ONLY: '1'
-          E2E_USE_TEST_AUTH_BYPASS: '1'
-          VERCEL_ENV: development
-          SENTRY_E2E_REPORTING: '1'
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          SENTRY_ENVIRONMENT: ci-pr-e2e
-          SENTRY_RELEASE: ${{ github.sha }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
-          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
-          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
-          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
-        run: |
-          if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
-            echo "No non-quarantined E2E specs to run."
-            exit 0
-          fi
-          # Chrome-only for PRs - faster feedback, Firefox runs on main only.
-          # `e2e:smoke:tagged` runs every `-g @smoke` test across the suite,
-          # sharded and quarantine-filtered. The focused PR-fast lane lives in
-          # the separate `ci-e2e-smoke` job (playwright.config.smoke.ts).
-          cd apps/web && node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm e2e:smoke:tagged --trace=off --project=chromium --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
-
-      - name: E2E Auth Smoke (PR Gate)
-        if: ${{ matrix.shard == 1 && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && hashFiles('apps/web/tests/e2e/smoke-auth.spec.ts') != '' }}
-        env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-          NODE_ENV: test
-          E2E_SKIP_SEED: '1'
-          SMOKE_ONLY: '1'
-          E2E_USE_TEST_AUTH_BYPASS: '1'
-          E2E_TEST_AUTH_PERSONA: creator-ready
-          NEXT_PUBLIC_CLERK_MOCK: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
-          VERCEL_ENV: development
-          SENTRY_E2E_REPORTING: '1'
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
-          SENTRY_ENVIRONMENT: ci-pr-e2e-auth
-          SENTRY_RELEASE: ${{ github.sha }}
-          # Auth smoke requires real Clerk keys in CI
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
-          # Auth smoke signs in a configured E2E user
-          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
-          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
-          # Optional: enable deterministic spotify-only UI check
-          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
-        run: |
-          cd apps/web && node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter=@jovie/web run e2e:auth-smoke --project=chromium
 
       - name: E2E Full (Main Branch)
         if: ${{ github.ref == 'refs/heads/main' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}

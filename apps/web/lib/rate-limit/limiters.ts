@@ -296,6 +296,25 @@ export const publicVisitLimiter = createRateLimiter(RATE_LIMITERS.publicVisit, {
 });
 
 /**
+ * Public profile capture dismissal limiter. A dedicated prefix prevents the
+ * status read/write path from competing with unrelated general API traffic.
+ */
+export const publicProfileCaptureDismissalLimiter = createRateLimiter(
+  RATE_LIMITERS.publicProfileCaptureDismissal,
+  { requireRedis: false }
+);
+
+/**
+ * Public profile PAC telemetry limiter. Its 40/minute ceiling combines with
+ * capture dismissal's 20/minute ceiling to preserve the former aggregate
+ * 60/minute per-IP budget while isolating these endpoints from other APIs.
+ */
+export const publicProfilePacEventLimiter = createRateLimiter(
+  RATE_LIMITERS.publicProfilePacEvent,
+  { requireRedis: false }
+);
+
+/**
  * Rate limiter for health endpoints
  * Limit: 30 requests per minute per IP
  */
@@ -1095,6 +1114,8 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     claimTokenAccess: claimTokenAccessLimiter,
     publicClick: publicClickLimiter,
     publicVisit: publicVisitLimiter,
+    publicProfileCaptureDismissal: publicProfileCaptureDismissalLimiter,
+    publicProfilePacEvent: publicProfilePacEventLimiter,
     health: healthLimiter,
     general: generalLimiter,
     changelogSubscribe: changelogSubscribeLimiter,
