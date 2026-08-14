@@ -87,6 +87,7 @@ enum MobileChatRenderableSegment: Equatable, Identifiable, Sendable {
   case text(runs: [MobileChatProseRun])
   case toolCall(MobileChatToolCallCardModel)
   case merchArtifact(MobileChatMerchArtifact)
+  case videoProposal(MobileChatVideoProposalPayload)
 
   var id: String {
     switch self {
@@ -96,6 +97,8 @@ enum MobileChatRenderableSegment: Equatable, Identifiable, Sendable {
       return model.id
     case let .merchArtifact(artifact):
       return artifact.id
+    case let .videoProposal(payload):
+      return payload.id
     }
   }
 

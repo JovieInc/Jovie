@@ -6,9 +6,15 @@ struct LibrarySurfaceView: View {
   let onSelectAsset: (LibraryAsset) -> Void
 
   @State private var filter: LibraryFilter = .all
+  @State private var localVideoAssets: [LibraryAsset] = []
+
+  private var allAssets: [LibraryAsset] {
+    // Locally recorded videos first (most recent), then the storefront feed.
+    localVideoAssets + assets
+  }
 
   private var filteredAssets: [LibraryAsset] {
-    LibraryFeed.filtered(assets: assets, filter: filter)
+    LibraryFeed.filtered(assets: allAssets, filter: filter)
   }
 
   var body: some View {
@@ -39,6 +45,21 @@ struct LibrarySurfaceView: View {
       }
     }
     .accessibilityIdentifier("library-surface")
+    .task {
+      await reloadLocalVideos()
+    }
+  }
+
+  /// Reads completed teleprompter sessions off disk (JOV-5075). The view is
+  /// recreated on every tab switch (the shell keys paged content on the tab),
+  /// so this re-runs and picks up a just-saved recording when the shell lands
+  /// the user on Library.
+  private func reloadLocalVideos() async {
+    let store = VlogSessionStore.localDocuments()
+    let sessions = await Task.detached {
+      store.recent()
+    }.value
+    localVideoAssets = LibraryVlogVideos.assets(from: sessions, store: store)
   }
 
   private var filterChips: some View {
@@ -152,6 +173,7 @@ private struct LibraryAssetCard: View {
     case .smartLink: return "link"
     case .photo: return "photo"
     case .press: return "doc.richtext"
+    case .video: return "video.fill"
     }
   }
 

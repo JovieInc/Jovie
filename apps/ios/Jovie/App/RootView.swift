@@ -102,7 +102,7 @@ private struct AppContentView: View {
           EmptyView()
         } inboxContent: { _ in
           EmptyView()
-        } chatContent: { draft, voiceCaptureTrigger, _ in
+        } chatContent: { draft, voiceCaptureTrigger, _, _ in
           if let chatRepository {
             MobileChatView(
               repository: chatRepository,
@@ -177,14 +177,15 @@ private struct AppContentView: View {
             onRetry: { await reloadActionLoops(for: appState.activeUserID) },
             onAskJovie: askJovie
           )
-        } chatContent: { draft, voiceCaptureTrigger, onEntityTap in
+        } chatContent: { draft, voiceCaptureTrigger, onEntityTap, onRecordVideo in
           if let chatRepository {
             MobileChatView(
               repository: chatRepository,
               draft: draft,
               voiceCaptureTrigger: voiceCaptureTrigger,
               webBaseURL: appState.configuration.webBaseURL,
-              onEntityTap: onEntityTap
+              onEntityTap: onEntityTap,
+              onRecordVideo: onRecordVideo
             )
           } else {
             MobileChatPlaceholderView(isOffline: appState.isOffline, draft: draft)

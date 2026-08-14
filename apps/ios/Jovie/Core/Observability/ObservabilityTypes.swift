@@ -31,6 +31,9 @@ enum ObservabilityEvent: String, CaseIterable, Equatable {
   case chatEntityTokenUnmappedKind = "chat_entity_token_unmapped_kind"
   case voiceCaptureStarted = "voice_capture_started"
   case voiceTranscriptionCompleted = "voice_transcription_completed"
+  case teleprompterRecordingStarted = "teleprompter_recording_started"
+  case teleprompterRecordingCompleted = "teleprompter_recording_completed"
+  case teleprompterRecordingFailed = "teleprompter_recording_failed"
 }
 
 struct ObservabilityConfiguration: Equatable {
