@@ -1691,14 +1691,16 @@ export const MERGE_GROUP_FAILURE_CONCLUSIONS = new Set([
 // runner, and aggregate failures remain unclassified and retain the bounded
 // retry policy below.
 export const DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS = new Set([
-  'Run unit tests',
-  'Run packages/ui unit tests',
   'Run deterministic brand safety scan',
   'Run deterministic Promptfoo evals',
   'Run golden eval-set CI gate',
   'Run Knip (unused files, deps & exports)',
   'Run deterministic layout behavior guard',
   'Run static mobile overflow guard',
+]);
+export const RETRYABLE_PRODUCT_FAILURE_STEPS = new Set([
+  'Run unit tests',
+  'Run packages/ui unit tests',
 ]);
 export const MERGE_GROUP_CHURN_FAILURE_THRESHOLD = 2;
 export const MERGE_GROUP_CHURN_COOLDOWN_MS = 5 * 60 * 1000;
@@ -1786,6 +1788,27 @@ export function frontItemChurnDecision({
     };
   }
 
+  const latestCompletedForCurrentHead = mergeGroupRuns
+    .map(run => ({ run, front: parseMergeQueueFrontBranch(run?.headBranch) }))
+    .filter(
+      ({ run, front }) =>
+        front?.prNumber === prNumber &&
+        run.status === 'completed' &&
+        (!Number.isFinite(headMs) || Date.parse(run.createdAt) >= headMs)
+    )
+    .map(({ run }) => run)
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
+  if (latestCompletedForCurrentHead?.conclusion === 'success') {
+    return {
+      action: 'allow',
+      reason: 'latest merge-group attempt for the unchanged head succeeded',
+      evidence: {
+        lastSuccessfulRunId: latestCompletedForCurrentHead.id ?? null,
+        lastSuccessfulAt: latestCompletedForCurrentHead.createdAt ?? null,
+      },
+    };
+  }
+
   const deterministicFailure = failuresForCurrentHead.find(run =>
     (run.failedSteps ?? []).some(step =>
       DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS.has(step)
@@ -1803,6 +1826,29 @@ export function frontItemChurnDecision({
         lastFailedRunId: deterministicFailure.id ?? null,
         lastFailedAt: deterministicFailure.createdAt ?? null,
         failedSteps: deterministicFailure.failedSteps,
+        baseSha: front?.baseSha ?? null,
+      },
+    };
+  }
+
+  const retryableProductFailures = failuresForCurrentHead.filter(run =>
+    (run.failedSteps ?? []).some(step =>
+      RETRYABLE_PRODUCT_FAILURE_STEPS.has(step)
+    )
+  );
+  if (retryableProductFailures.length >= MERGE_GROUP_CHURN_FAILURE_THRESHOLD) {
+    const lastFailed = retryableProductFailures[0];
+    const front = parseMergeQueueFrontBranch(lastFailed.headBranch);
+    return {
+      action: 'block',
+      reason:
+        'unchanged head has repeated product-validation failures; re-enrollment would duplicate the same merge-group work until the source head moves',
+      evidence: {
+        failureClass: 'repeated-product-check',
+        failedAttempts: retryableProductFailures.length,
+        lastFailedRunId: lastFailed.id ?? null,
+        lastFailedAt: lastFailed.createdAt ?? null,
+        failedSteps: lastFailed.failedSteps,
         baseSha: front?.baseSha ?? null,
       },
     };

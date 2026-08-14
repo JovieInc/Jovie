@@ -1768,7 +1768,7 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(parseMergeQueueFrontBranch(null)).toBeNull();
   });
 
-  it('suppresses an unchanged source head after its first terminal merge-group failure', () => {
+  it('suppresses an unchanged source head after repeated unit-test failures', () => {
     // Incident regression: #15849 fronted repeated failed group attempts on
     // base 9bd3fade9 while its head b499576 stayed unchanged.
     const decision = frontItemChurnDecision({
@@ -1785,12 +1785,62 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
           'completed',
           ['Run unit tests']
         ),
+        groupRun(
+          15849,
+          NEW_BASE,
+          'failure',
+          '2026-08-13T01:52:17.000Z',
+          'completed',
+          ['Run unit tests']
+        ),
       ],
     });
     expect(decision.action).toBe('block');
     expect(decision.reason).toContain('unchanged head');
-    expect(decision.evidence.failureClass).toBe('deterministic-product-check');
-    expect(decision.evidence.failedAttempts).toBe(1);
+    expect(decision.evidence.failureClass).toBe('repeated-product-check');
+    expect(decision.evidence.failedAttempts).toBe(2);
+  });
+
+  it('retains one bounded retry for a single unit-test failure', () => {
+    const decision = frontItemChurnDecision({
+      prNumber: 15849,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-08-13T00:30:00.000Z',
+      observedAt: '2026-08-13T01:53:00.000Z',
+      mergeGroupRuns: [
+        groupRun(
+          15849,
+          BASE,
+          'failure',
+          '2026-08-13T01:51:17.000Z',
+          'completed',
+          ['Run unit tests']
+        ),
+      ],
+    });
+    expect(decision.action).toBe('allow');
+  });
+
+  it('clears an earlier failure when the latest unchanged-head attempt succeeds', () => {
+    const decision = frontItemChurnDecision({
+      prNumber: 15849,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-08-13T00:30:00.000Z',
+      observedAt: '2026-08-13T01:53:00.000Z',
+      mergeGroupRuns: [
+        groupRun(
+          15849,
+          BASE,
+          'failure',
+          '2026-08-13T01:50:17.000Z',
+          'completed',
+          ['Run deterministic brand safety scan']
+        ),
+        groupRun(15849, BASE, 'success', '2026-08-13T01:52:17.000Z'),
+      ],
+    });
+    expect(decision.action).toBe('allow');
+    expect(decision.reason).toContain('succeeded');
   });
 
   it('keeps the failing source head suppressed after elapsed time', () => {
@@ -1805,6 +1855,14 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
           BASE,
           'failure',
           '2026-08-13T01:51:17.000Z',
+          'completed',
+          ['Run unit tests']
+        ),
+        groupRun(
+          15849,
+          NEW_BASE,
+          'failure',
+          '2026-08-13T01:52:17.000Z',
           'completed',
           ['Run unit tests']
         ),
@@ -1825,6 +1883,14 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
           BASE,
           'failure',
           '2026-08-13T01:51:17.000Z',
+          'completed',
+          ['Run unit tests']
+        ),
+        groupRun(
+          15849,
+          NEW_BASE,
+          'failure',
+          '2026-08-13T01:52:17.000Z',
           'completed',
           ['Run unit tests']
         ),
