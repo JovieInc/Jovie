@@ -13,6 +13,8 @@
 #   (default)          install workflow + unit + lease guard, then daemon-reload
 #   --check            verify installed files match the repo sources; no writes
 #   --no-daemon-reload install files but skip systemctl --user daemon-reload
+#   --lease-guard-only restore only the executable lease guard atomically;
+#                      never reload systemd or touch workflow/unit files
 #
 # SYMPHONY_UI_PILOT_HOME overrides the target home (used by regression tests).
 set -euo pipefail
@@ -29,11 +31,13 @@ GUARD_DST="$TARGET_HOME/.local/bin/symphony-lease-guard"
 
 CHECK_ONLY=0
 DAEMON_RELOAD=1
+LEASE_GUARD_ONLY=0
 for arg in "$@"; do
   case "$arg" in
     --check) CHECK_ONLY=1 ;;
     --no-daemon-reload) DAEMON_RELOAD=0 ;;
-    *) echo "usage: $0 [--check] [--no-daemon-reload]" >&2; exit 2 ;;
+    --lease-guard-only) LEASE_GUARD_ONLY=1; DAEMON_RELOAD=0 ;;
+    *) echo "usage: $0 [--check] [--no-daemon-reload] [--lease-guard-only]" >&2; exit 2 ;;
   esac
 done
 
@@ -43,14 +47,21 @@ install_one() {
     echo "MISSING_SOURCE $src" >&2
     return 1
   fi
-  mkdir -p "$(dirname "$dst")"
+  local dst_dir tmp
+  dst_dir="$(dirname "$dst")"
+  mkdir -p "$dst_dir"
   if [ -f "$dst" ] && ! cmp -s "$src" "$dst"; then
     local backup
     backup="$dst.bak.$(date -u +%Y%m%dT%H%M%SZ)"
     cp -p "$dst" "$backup"
     echo "BACKUP $backup"
   fi
-  install -m "$mode" "$src" "$dst"
+  tmp="$(mktemp "$dst_dir/.$(basename "$dst").tmp.XXXXXX")"
+  if ! install -m "$mode" "$src" "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  mv -f "$tmp" "$dst"
   echo "INSTALLED $dst"
 }
 
@@ -71,19 +82,24 @@ check_one() {
 
 if [ "$CHECK_ONLY" -eq 1 ]; then
   rc=0
-  check_one "$WORKFLOW_SRC" "$WORKFLOW_DST" || rc=1
-  check_one "$UNIT_SRC" "$UNIT_DST" || rc=1
+  if [ "$LEASE_GUARD_ONLY" -eq 0 ]; then
+    check_one "$WORKFLOW_SRC" "$WORKFLOW_DST" || rc=1
+    check_one "$UNIT_SRC" "$UNIT_DST" || rc=1
+  fi
   check_one "$GUARD_SRC" "$GUARD_DST" || rc=1
   exit "$rc"
 fi
 
-install_one "$WORKFLOW_SRC" "$WORKFLOW_DST"
-install_one "$UNIT_SRC" "$UNIT_DST"
+if [ "$LEASE_GUARD_ONLY" -eq 0 ]; then
+  install_one "$WORKFLOW_SRC" "$WORKFLOW_DST"
+  install_one "$UNIT_SRC" "$UNIT_DST"
+fi
 install_one "$GUARD_SRC" "$GUARD_DST" 0755
 
 if [ "$DAEMON_RELOAD" -eq 1 ]; then
   if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
-    export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+    XDG_RUNTIME_DIR="/run/user/$(id -u)"
+    export XDG_RUNTIME_DIR
   fi
   systemctl --user daemon-reload
   echo "DAEMON_RELOADED"
