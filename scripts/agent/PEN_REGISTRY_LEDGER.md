@@ -24,7 +24,8 @@ Status is computed from receipts, never asserted by hand:
   `runtime-narrow` (390), `same-node-readback`, and
   `containing-production` — and no open blocker.
 - Exact current-source evidence wins. A receipt carrying any other SHA is
-  stale. Stale proof must be explicitly marked `expired: true` with an
+  stale, and a receipt without a SHA is unbound rather than current evidence.
+  Stale proof must be explicitly marked `expired: true` with an
   `expiredReason`; silently retained stale proof fails the audit.
 - Source identity and runtime generation are distinct. A `source` receipt may
   stay current across a newer SHA only with an explicit `currentThrough`

@@ -40,10 +40,11 @@ function isIsoTimestamp(value) {
  * (`currentThrough`): the fleet distinguishes "source identity still current"
  * from "runtime generation receipt stale". Runtime, same-node, and
  * containing-production receipts are generation-bound and must be refreshed
- * at the exact current SHA. A receipt without a SHA is an unbound observation.
+ * at the exact current SHA. A receipt without a SHA is an unbound observation,
+ * not current-source evidence.
  */
 function receiptProofCurrent(receipt, currentSourceSha) {
-  if (!isNonEmptyString(receipt.sha)) return true;
+  if (!isNonEmptyString(receipt.sha)) return false;
   if (receipt.sha === currentSourceSha) return true;
   return (
     receipt.kind === 'source' && receipt.currentThrough === currentSourceSha

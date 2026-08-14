@@ -244,6 +244,26 @@ test('SAFE without same-node readback and runtime evidence fails', () => {
   assert.match(unsafe.detail, /containing-production/);
 });
 
+test('SAFE without exact current-source receipt evidence fails', () => {
+  const receipt = auditPenRegistryLedger(
+    ledger({
+      records: [
+        record({
+          receipts: safeReceipts().map(receipt => ({
+            ...receipt,
+            ...(receipt.kind === 'runtime-narrow' ? { sha: null } : {}),
+          })),
+        }),
+        ledgerRecord2(),
+      ],
+    })
+  );
+  assert.equal(receipt.verdict, 'fail');
+  assert.ok(failureCodes(receipt).includes('unsafe-safe'));
+  const unsafe = receipt.failures.find(f => f.code === 'unsafe-safe');
+  assert.match(unsafe.detail, /runtime-narrow/);
+});
+
 test('stale proof retained without explicit expiry fails', () => {
   const stale = record({
     metadataStatus: 'PARTIAL',
