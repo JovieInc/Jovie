@@ -699,6 +699,7 @@ describe('entrypoint contract', () => {
       'workstreamer.mjs',
       'admitter.mjs',
       'reporter.mjs',
+      'runtime-state.mjs',
       'stale-lease-guard.mjs',
     ]) {
       assert.match(
@@ -708,6 +709,11 @@ describe('entrypoint contract', () => {
       );
     }
     assert.equal(JSON.parse(await readFile(config, 'utf8')).version, 1);
+    assert.match(executableSource, /runtimeState\.resolveCacheFile/);
+    assert.doesNotMatch(
+      executableSource,
+      /CACHE_FILE = resolve\(__dirname, '\.orchestrator-cache\.json'\)/
+    );
   });
 
   it('preserves an injected key and falls back to the configured file', async () => {

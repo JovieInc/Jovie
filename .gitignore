@@ -22,6 +22,11 @@ apps/web/.ds-design-sync-marketing.css
 apps/web/.ds-design-sync-home.css
 .design-sync/previews/_images.ts
 
+# Backlog orchestrator runtime state. Writing these in-tree dirties
+# ~/jovie-triage-runtime and fail-closes gem's no-LLM control plane (JOV-5076).
+scripts/backlog-orchestrator/.orchestrator-cache.json
+scripts/backlog-orchestrator/shadow-report-latest.txt
+
 # testing
 /coverage
 apps/web/coverage/

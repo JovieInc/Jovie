@@ -17,4 +17,6 @@ if [[ -z "${LINEAR_API_KEY:-}" ]]; then
 fi
 
 cd "$(dirname "$0")"
+# Runtime cache/report live outside this checkout (JOV-5076). Do not add a
+# timer tick here — callers must be event-driven (Linear issue/label/comment).
 exec node backlog-orchestrator.mjs "$@"
