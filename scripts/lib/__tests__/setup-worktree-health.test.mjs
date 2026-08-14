@@ -77,6 +77,14 @@ function makeWorktree() {
   return root;
 }
 
+/**
+ * @param {string} script
+ * @param {{
+ *   cwd?: string,
+ *   env?: Record<string, string | undefined>,
+ *   pathPrefix?: string,
+ * }} [options]
+ */
 function runHelper(script, { cwd = repoRoot, env = {}, pathPrefix } = {}) {
   return spawnSync('bash', ['-c', script], {
     cwd,
@@ -113,6 +121,13 @@ function seedHealthyCache(worktree) {
   );
 }
 
+/**
+ * @param {string} worktree
+ * @param {{
+ *   env?: Record<string, string | undefined>,
+ *   pathPrefix?: string,
+ * }} [options]
+ */
 function evaluateHealth(worktree, { env = {}, pathPrefix } = {}) {
   const result = runHelper(
     `set -euo pipefail
