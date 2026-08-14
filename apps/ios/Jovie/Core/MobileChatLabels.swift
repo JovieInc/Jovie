@@ -38,6 +38,11 @@ enum MobileChatToolLabels {
       successTitle: "Album art ready",
       errorTitle: "Couldn't create your album art"
     ),
+    "proposeVideoRecording": ToolLabel(
+      loadingTitle: "Writing your script…",
+      successTitle: "Script ready",
+      errorTitle: "Couldn't write the script"
+    ),
   ]
 
   static func displayName(for toolName: String) -> String {
