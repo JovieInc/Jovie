@@ -1380,6 +1380,15 @@ ${fixtureCheckout}
     expect(readFileSync(guardScript, 'utf8')).toContain(
       "binding() + '|' + stageName + '\\n'"
     );
+    const unitJob = jobBlock(nightly, 'unit-tests');
+    expect(unitJob).not.toBe('');
+    expect(unitJob).toContain('uses: ./.github/actions/setup-playwright');
+    expect(
+      unitJob.indexOf('uses: ./.github/actions/setup-node-pnpm')
+    ).toBeLessThan(unitJob.indexOf('uses: ./.github/actions/setup-playwright'));
+    expect(
+      unitJob.indexOf('uses: ./.github/actions/setup-playwright')
+    ).toBeLessThan(unitJob.indexOf('Run full unit test suite'));
   });
 
   it('requires step-scoped Markdown allowance for every production smoke producer', () => {
