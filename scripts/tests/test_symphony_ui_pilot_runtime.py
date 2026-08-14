@@ -228,3 +228,26 @@ def test_installer_backs_up_and_detects_drift(tmp_path: Path) -> None:
     assert backups[0].read_text() == "drifted\n"
     assert workflow.read_text() == WORKFLOW.read_text()
     assert _run_installer(tmp_path, "--check").returncode == 0
+
+
+def test_installer_restores_only_lease_guard_atomically(tmp_path: Path) -> None:
+    workflow = tmp_path / "symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
+    unit = tmp_path / ".config/systemd/user/symphony-ui-pilot.service"
+    workflow.parent.mkdir(parents=True)
+    unit.parent.mkdir(parents=True)
+    workflow.write_text("preserve workflow drift\n")
+    unit.write_text("preserve unit drift\n")
+
+    result = _run_installer(tmp_path, "--lease-guard-only")
+    assert result.returncode == 0, result.stderr
+    guard = tmp_path / ".local/bin/symphony-lease-guard"
+    assert guard.read_text() == GUARD.read_text()
+    assert guard.stat().st_mode & 0o111
+    assert workflow.read_text() == "preserve workflow drift\n"
+    assert unit.read_text() == "preserve unit drift\n"
+    assert not list(guard.parent.glob(".symphony-lease-guard.tmp.*"))
+    assert "DAEMON_RELOADED" not in result.stdout
+
+    check = _run_installer(tmp_path, "--check", "--lease-guard-only")
+    assert check.returncode == 0, check.stdout
+    assert check.stdout.splitlines() == [f"OK {guard}"]
