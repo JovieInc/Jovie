@@ -336,6 +336,35 @@ export function artifactContainsSecret(
   );
 }
 
+export function redactSecretValues(text, environment = process.env) {
+  return secretValues(environment)
+    .toSorted((left, right) => right.length - left.length)
+    .reduce((result, secret) => result.split(secret).join('[redacted]'), text);
+}
+
+function markdownRetainsSecret(text) {
+  const labeled = text.matchAll(
+    /["']?([A-Za-z][A-Za-z0-9_.-]{2,})["']?\s*[=:]\s*["']?([^\s<>"']+)/g
+  );
+  const authorization = text.match(
+    /\b(?:Proxy-)?Authorization\s*[=:]\s*["']?(?:Bearer|Basic|Token)\s+([^\s<>"']+)/i
+  )?.[1];
+  return (
+    [...labeled].some(
+      match =>
+        isCredentialBearingName(match[1]) &&
+        match[1].includes('_') &&
+        hasValue(match[2])
+    ) ||
+    hasValue(authorization) ||
+    /(?:postgres(?:ql)?|redis(?:s)?):\/\/[^\s/:@]+:[^\s/@]+@/i.test(text)
+  );
+}
+
+export function markdownContainsSecret(text, environment = process.env) {
+  return markdownRetainsSecret(redactSecretValues(text, environment));
+}
+
 export function validPlaywrightPng(bytes) {
   try {
     if (!bytes.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex')))
@@ -456,6 +485,17 @@ function inspect(paths, environment, options = {}) {
     let text;
     try {
       text = new TextDecoder('utf-8', { fatal: true }).decode(record.bytes);
+      if (extension === '.md') {
+        // Playwright error-context.md is a page snapshot plus code frame.
+        // Redact known secrets, then only fail on remaining env-style leaks.
+        const sanitized = redactSecretValues(text, environment);
+        if (markdownRetainsSecret(sanitized)) {
+          findings.push({ path: record.path, category: 'credential-text' });
+          continue;
+        }
+        if (sanitized !== text) record.bytes = Buffer.from(sanitized, 'utf8');
+        continue;
+      }
       const values =
         extension === '.json'
           ? [JSON.parse(text)]
