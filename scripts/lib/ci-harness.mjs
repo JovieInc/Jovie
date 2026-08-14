@@ -443,7 +443,7 @@ export function generateCiHarnessDocs(manifest, title = 'CI Agent Harness') {
     '',
     '| Stage | Exact responsibility |',
     '| --- | --- |',
-    '| Source PR | Deterministic path + brand classification, risk classification, `ci-fast`, and diff secret scan. `Migration Guard`, `Fork PR Gate`, and `PR Size Guard` remain separate required contexts. |',
+    '| Source PR | Deterministic path + brand classification, risk classification, `ci-fast`, diff secret scan, and `Golden Path Lock`. `Migration Guard`, `Fork PR Gate`, and `PR Size Guard` remain separate required contexts. |',
     '| Native merge queue | Re-run deterministic gates on the exact `merge_group` head, then require five affected unit shards, one hosted build + layout workspace, path-selected Xcode, and model-free semantic evals. |',
     '| Queue-proven main | Reuse the exact successful merge-group `PR Ready` proof and skip duplicate fallback work. |',
     '| Direct/admin main | Fail closed through path/risk/fast/secret/migration, all five unit shards, and the combined hosted build + layout job; skipped placeholders are invalid. |',

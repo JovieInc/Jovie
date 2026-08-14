@@ -1037,6 +1037,25 @@ jobs:
       - name: Verify backup-file fixture coverage
         run: ./scripts/security/verify-gitleaks-coverage.sh
 
+  ci-golden-path-lock:
+    name: Golden Path Lock
+    # JOV-5085: fail-closed homepage → /start first-message → waitlist-after-auth.
+    # Cheap focused Vitest only. No Neon, Playwright, or signup secrets.
+    # Missing secrets must not skip this job.
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Fail-closed golden path lock
+        run: node scripts/golden-path-lock.mjs merge-gate
+
   ci-fast-typecheck:
     name: ci-fast (typecheck)
     # JOV-4477: dedicated jobs keep structural Docker/Python action setup out of
@@ -4618,6 +4637,7 @@ jobs:
         ci-promptfoo-evals,
         ci-golden-eval-set,
         ci-secret-scan,
+        ci-golden-path-lock,
         drizzle-migration-guard,
       ]
     if: ${{ always() && github.event_name == 'merge_group' }}
@@ -4638,6 +4658,7 @@ jobs:
           PROMPTFOO_RESULT="${{ needs.ci-promptfoo-evals.result }}"
           GOLDEN_EVAL_RESULT="${{ needs.ci-golden-eval-set.result }}"
           SECRET_RESULT="${{ needs.ci-secret-scan.result }}"
+          GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
           NOOP_GROUP="${{ needs.ci-path-changes.outputs.is_noop_merge_group }}"
           RUN_IOS="${{ needs.ci-path-changes.outputs.run_ios }}"
@@ -4662,6 +4683,7 @@ jobs:
             echo "| Promptfoo Evals (path-selected) | $PROMPTFOO_RESULT |"
             echo "| Golden Eval Set (path-selected) | $GOLDEN_EVAL_RESULT |"
             echo "| Secret Scan | $SECRET_RESULT |"
+            echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT |"
             echo "| Migration Guard | $MIGRATION_RESULT |"
             echo
             echo "Preview/A11y evidence is explicit opt-in or post-merge; merge groups do not provision Neon."
@@ -4673,6 +4695,7 @@ jobs:
             "CI Risk Classifier:$RISK_RESULT" \
             "ci-fast:$FAST_RESULT" \
             "Secret Scan:$SECRET_RESULT" \
+            "Golden Path Lock:$GOLDEN_PATH_LOCK_RESULT" \
             "Migration Guard:$MIGRATION_RESULT"; do
             name="${gate%%:*}"
             result="${gate#*:}"
@@ -4734,7 +4757,7 @@ jobs:
     # GitHub's merge_group producer reuses the same required context name for
     # combined-head unit/build/layout evidence. Migration Guard, Fork PR Gate,
     # and PR Size Guard remain separately required ruleset contexts.
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan]
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -4746,6 +4769,7 @@ jobs:
           PATH_RESULT="${{ needs.ci-path-changes.result }}"
           FAST_RESULT="${{ needs.ci-fast.result }}"
           SECRET_SCAN_RESULT="${{ needs.ci-secret-scan.result }}"
+          GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
@@ -4760,6 +4784,7 @@ jobs:
             echo "| Path Changes | $PATH_RESULT | re-run workflow if cancelled/failed |"
             echo "| ci-fast (typecheck/biome/eslint/guardrails/structural) | $FAST_RESULT | \`pnpm run typecheck && pnpm run biome:check\` |"
             echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
+            echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT | \`node scripts/golden-path-lock.mjs merge-gate\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
             echo
             echo "Risk level: ${RISK_LEVEL:-low}; matched rules: ${RISK_RULES:-none}"
@@ -4772,6 +4797,10 @@ jobs:
           fi
           if [[ "$SECRET_SCAN_RESULT" != "success" ]]; then
             echo "❌ Secret Scan did not pass (result: $SECRET_SCAN_RESULT)"
+            exit 1
+          fi
+          if [[ "$GOLDEN_PATH_LOCK_RESULT" != "success" ]]; then
+            echo "❌ Golden Path Lock did not pass (result: $GOLDEN_PATH_LOCK_RESULT)"
             exit 1
           fi
           if [[ "$RISK_RESULT" != "success" ]]; then

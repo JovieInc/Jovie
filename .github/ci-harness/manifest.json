@@ -94,6 +94,15 @@
       "remediation": "Remove the detected credential or high-entropy secret from the exact diff and rotate it if it was ever published."
     },
     {
+      "id": "ci-golden-path-lock",
+      "name": "Golden Path Lock",
+      "tier": "fast-gate",
+      "mergeGate": true,
+      "gateStage": "both",
+      "nextLocalCommand": "node scripts/golden-path-lock.mjs merge-gate",
+      "remediation": "The locked homepage → /start first-message → waitlist-after-auth path broke. Fix the product regression; this gate never skips because secrets are missing and never accepts a stub receipt."
+    },
+    {
       "id": "drizzle-migration-guard",
       "name": "Migration Guard",
       "tier": "fast-gate",
@@ -322,6 +331,14 @@
       "mergeGate": false,
       "nextLocalCommand": "gh run view --log-failed",
       "remediation": "A controller generation was superseded before its in-lease probes ran, so the follow-up re-probed the landed canonical production deployment. Inspect the resolved exact deployment ID/URL/SHA evidence and fix the product regression; never repair by gating deploys on this read-only lane."
+    },
+    {
+      "id": "golden-path-prod-autofix",
+      "name": "Golden Path Prod Autofix",
+      "tier": "post-deploy",
+      "mergeGate": false,
+      "nextLocalCommand": "node scripts/golden-path-lock.mjs prod-probe",
+      "remediation": "Live homepage → /start first message → waitlist-after-auth failed. This lane launches Cursor-direct immediately; missing CURSOR_API_KEY fails closed instead of skipping. Do not wait for Gem triage."
     },
     {
       "id": "test-flakiness-report",

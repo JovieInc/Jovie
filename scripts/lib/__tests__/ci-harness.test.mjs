@@ -32,6 +32,7 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'ci-fast',
   'CI Risk Classifier',
   'Secret Scan (gitleaks + trufflehog)',
+  'Golden Path Lock',
   'Migration Guard',
   'Unit Tests',
   'Build + Layout (combined)',
@@ -127,6 +128,7 @@ describe('ci-harness manifest', () => {
       'Main Release Ready',
       'Production Verified',
       'Post-Deploy Probes (supersession follow-up)',
+      'Golden Path Prod Autofix',
       'Test Flakiness Report',
     ]);
   });
@@ -206,7 +208,7 @@ describe('ci-harness manifest', () => {
     const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
 
     expect(prReady).toContain(
-      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan]'
+      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock]'
     );
     expect(prReady).toContain('Evaluate deterministic source PR checks');
     expect(prReady).toContain('All deterministic source PR checks passed.');
@@ -228,6 +230,10 @@ describe('ci-harness manifest', () => {
       'ci-promptfoo-evals',
       'ci-golden-eval-set',
     ]) {
+      if (heavyJob === 'ci-golden-path') {
+        expect(prReady).not.toMatch(/(^|[\s,\[])ci-golden-path($|[\s,\]])/);
+        continue;
+      }
       expect(prReady).not.toContain(heavyJob);
     }
 

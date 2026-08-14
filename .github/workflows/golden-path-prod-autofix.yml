@@ -1,0 +1,82 @@
+name: Golden Path Prod Autofix
+
+# JOV-5085: event-driven live-path probe + Cursor-direct autofix.
+# Separate from Post-Deploy Probes, which are read-only and must not notify
+# or mutate. Detect without a ship lock is a hole.
+#
+# Does not read signup-account secrets. Missing CURSOR_API_KEY fails closed.
+
+on:
+  workflow_run:
+    workflows: [Production Controller]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: golden-path-prod-autofix
+  cancel-in-progress: false
+
+jobs:
+  probe-and-autofix:
+    name: Probe live golden path
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.path == '.github/workflows/production-controller.yml'
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    env:
+      CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+      LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+      GITHUB_TOKEN: ${{ github.token }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      - name: Probe https://jov.ie without signup secrets
+        id: probe
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/golden-path-lock
+          node scripts/golden-path-lock.mjs prod-probe \
+            --origin https://jov.ie \
+            --receipt /tmp/golden-path-lock/receipt.json
+
+      - name: Fail closed if Cursor cannot autofix a break
+        if: always()
+        env:
+          PROBE_OUTCOME: ${{ steps.probe.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ ! -f /tmp/golden-path-lock/receipt.json ]]; then
+            echo "::error::Golden-path prod probe wrote no receipt; refusing to skip."
+            exit 1
+          fi
+          if [[ -z "${CURSOR_API_KEY:-}" ]]; then
+            echo "::error::CURSOR_API_KEY is missing. Detect without a ship lock is a hole."
+            exit 1
+          fi
+          if [[ "$PROBE_OUTCOME" == "success" ]]; then
+            echo "Live golden path passed. Cursor-direct not launched."
+            exit 0
+          fi
+          node scripts/golden-path-lock.mjs autofix \
+            --receipt /tmp/golden-path-lock/receipt.json
