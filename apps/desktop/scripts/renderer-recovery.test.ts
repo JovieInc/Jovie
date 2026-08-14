@@ -1,9 +1,15 @@
 import { expect, test } from 'vitest';
 import {
+  decideAbortedMainFrameRecovery,
+  decideRendererLoadStart,
   decideRendererRecovery,
+  decideRendererWatchdogExpiry,
+  parseDidStartNavigation,
   RENDERER_BOOT_WATCHDOG_MS,
+  RENDERER_LOAD_WATCHDOG_MS,
   shouldArmRendererBootWatchdog,
   shouldRecoverAuthHandoffToCanonicalShell,
+  shouldSkipRendererWatchdogForAuthHandoff,
 } from '../src/renderer-recovery.ts';
 
 const MAX = 2;
@@ -102,6 +108,173 @@ test('boot watchdog arms only for real hosted app-origin navigations', () => {
     false
   );
   expect(shouldArmRendererBootWatchdog('not a url', appOrigin)).toBe(false);
+});
+
+test('load watchdog covers hung navigation before did-finish-load', () => {
+  expect(RENDERER_LOAD_WATCHDOG_MS).toBeGreaterThanOrEqual(15_000);
+  expect(RENDERER_LOAD_WATCHDOG_MS).toBeLessThanOrEqual(20_000);
+  expect(RENDERER_LOAD_WATCHDOG_MS).toBeGreaterThan(RENDERER_BOOT_WATCHDOG_MS);
+});
+
+test('a hung or intercepted hosted navigation arms the load watchdog', () => {
+  const appOrigin = 'https://jov.ie';
+  expect(
+    decideRendererLoadStart({
+      url: 'https://jov.ie/app/chat?runtime=electron',
+      appOrigin,
+      isMainFrame: true,
+      isInPlace: false,
+    })
+  ).toBe('arm-load-watchdog');
+  expect(
+    decideRendererLoadStart({
+      url: 'https://jov.ie/desktop-auth?auth_url=%2Fauth%2Fstart',
+      appOrigin,
+      isMainFrame: true,
+      isInPlace: false,
+    })
+  ).toBe('arm-load-watchdog');
+
+  expect(
+    decideRendererLoadStart({
+      url: 'https://jov.ie/app/chat?runtime=electron',
+      appOrigin,
+      isMainFrame: false,
+      isInPlace: false,
+    })
+  ).toBe('ignore');
+  expect(
+    decideRendererLoadStart({
+      url: 'https://jov.ie/app/chat#composer',
+      appOrigin,
+      isMainFrame: true,
+      isInPlace: true,
+    })
+  ).toBe('ignore');
+  expect(
+    decideRendererLoadStart({
+      url: 'data:text/html,splash',
+      appOrigin,
+      isMainFrame: true,
+      isInPlace: false,
+    })
+  ).toBe('ignore');
+  expect(
+    decideRendererLoadStart({
+      url: 'about:blank',
+      appOrigin,
+      isMainFrame: true,
+      isInPlace: false,
+    })
+  ).toBe('ignore');
+});
+
+test('200-but-blank and hung load both expire to the failure page', () => {
+  expect(
+    decideRendererWatchdogExpiry({
+      booted: false,
+      windowDestroyed: false,
+      skipForAuthHandoff: false,
+    })
+  ).toBe('failure-page');
+  expect(
+    decideRendererWatchdogExpiry({
+      booted: true,
+      windowDestroyed: false,
+      skipForAuthHandoff: false,
+    })
+  ).toBe('ignore');
+  expect(
+    decideRendererWatchdogExpiry({
+      booted: false,
+      windowDestroyed: true,
+      skipForAuthHandoff: false,
+    })
+  ).toBe('ignore');
+});
+
+test('an open-but-invisible auth handoff does not suppress recovery', () => {
+  expect(
+    shouldSkipRendererWatchdogForAuthHandoff({
+      handoffOpen: true,
+      handoffVisible: false,
+    })
+  ).toBe(false);
+  expect(
+    shouldSkipRendererWatchdogForAuthHandoff({
+      handoffOpen: false,
+      handoffVisible: false,
+    })
+  ).toBe(false);
+  expect(
+    shouldSkipRendererWatchdogForAuthHandoff({
+      handoffOpen: true,
+      handoffVisible: true,
+    })
+  ).toBe(true);
+
+  expect(
+    decideRendererWatchdogExpiry({
+      booted: false,
+      windowDestroyed: false,
+      skipForAuthHandoff: shouldSkipRendererWatchdogForAuthHandoff({
+        handoffOpen: true,
+        handoffVisible: false,
+      }),
+    })
+  ).toBe('failure-page');
+});
+
+test('an aborted sign-in intercept without a visible handoff recovers the blank window', () => {
+  expect(
+    decideAbortedMainFrameRecovery({
+      recoveredViaAuthHandoff: true,
+      currentUrl: 'about:blank',
+    })
+  ).toBe('ignore');
+  expect(
+    decideAbortedMainFrameRecovery({
+      recoveredViaAuthHandoff: false,
+      currentUrl: 'about:blank',
+    })
+  ).toBe('canonical-auth-shell');
+  expect(
+    decideAbortedMainFrameRecovery({
+      recoveredViaAuthHandoff: false,
+      currentUrl: '',
+    })
+  ).toBe('canonical-auth-shell');
+  expect(
+    decideAbortedMainFrameRecovery({
+      recoveredViaAuthHandoff: false,
+      currentUrl: 'https://jov.ie/app/chat?runtime=electron',
+    })
+  ).toBe('arm-load-watchdog');
+});
+
+test('did-start-navigation parses both Electron event shapes', () => {
+  expect(
+    parseDidStartNavigation([
+      {
+        url: 'https://jov.ie/app/chat',
+        isMainFrame: true,
+        isSameDocument: false,
+      },
+    ])
+  ).toEqual({
+    url: 'https://jov.ie/app/chat',
+    isMainFrame: true,
+    isInPlace: false,
+  });
+  expect(
+    parseDidStartNavigation([{}, 'https://jov.ie/app/chat', false, true])
+  ).toEqual({
+    url: 'https://jov.ie/app/chat',
+    isMainFrame: true,
+    isInPlace: false,
+  });
+  expect(parseDidStartNavigation([{}])).toBeNull();
+  expect(parseDidStartNavigation([])).toBeNull();
 });
 
 test('crash-after-load without a booted ping exhausts the reload budget', () => {
