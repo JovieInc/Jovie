@@ -35,6 +35,7 @@ import * as linear from './linear-client.mjs';
 import * as planGate from './plan-gate.mjs';
 import * as reconciler from './reconcile.mjs';
 import * as reporter from './reporter.mjs';
+import * as runtimeState from './runtime-state.mjs';
 import * as scorer from './scorer.mjs';
 import * as staleLeaseGuard from './stale-lease-guard.mjs';
 import {
@@ -46,7 +47,12 @@ import {
 import * as workstreamer from './workstreamer.mjs';
 
 // ----- Config -----
-const CACHE_FILE = resolve(__dirname, '.orchestrator-cache.json');
+// Never write beside the checkout. In-tree `.orchestrator-cache.json` is the
+// dirty file that fail-closed gem's no-LLM plane (JOV-5076).
+const CACHE_FILE = runtimeState.assertsOutsideGitTree(
+  runtimeState.resolveCacheFile({ orchestratorDir: __dirname }),
+  __dirname
+);
 const FLEET_GATE_RECEIPT_FILE =
   process.env.JOVIE_FLEET_GATE_RECEIPT ||
   resolve(
@@ -94,6 +100,7 @@ function loadCache() {
 }
 
 function saveCache(cache) {
+  runtimeState.ensureParentDir(CACHE_FILE);
   writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2));
 }
 
@@ -583,8 +590,12 @@ async function runAudit(cache, isDryRun) {
     )
   );
 
-  // Persist report
-  const reportPath = resolve(__dirname, 'shadow-report-latest.txt');
+  // Persist report outside the git tree. Same class of dirt as the cache.
+  const reportPath = runtimeState.assertsOutsideGitTree(
+    runtimeState.resolveReportFile({ orchestratorDir: __dirname }),
+    __dirname
+  );
+  runtimeState.ensureParentDir(reportPath);
   writeFileSync(reportPath, report);
   console.log(`\nReport saved to: ${reportPath}`);
 }
