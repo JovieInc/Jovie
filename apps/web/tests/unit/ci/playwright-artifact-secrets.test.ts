@@ -1646,9 +1646,7 @@ ${fixtureCheckout}
       'apps/web/test-results/nightly-agent/context/context.json',
       'apps/web/test-results/nightly-agent/context/selected-targets.json',
     ];
-    expect(
-      inspectPlaywrightArtifacts(paths, {}, { workspace })
-    ).toEqual([]);
+    expect(inspectPlaywrightArtifacts(paths, {}, { workspace })).toEqual([]);
     expect(
       inspectPlaywrightArtifacts(
         paths,
