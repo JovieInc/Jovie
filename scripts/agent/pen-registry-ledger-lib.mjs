@@ -61,13 +61,15 @@ export function isReceiptValid(receipt, currentSourceSha) {
 }
 
 /**
- * A receipt whose proof is not current is stale. Stale proof must be
- * explicitly expired, never silently retained.
+ * A receipt whose bound proof is not current is stale. Stale proof must be
+ * explicitly expired, never silently retained. A receipt without a SHA is an
+ * unbound observation, not proof, so it cannot be stale — it simply never
+ * counts as valid evidence.
  */
 export function isReceiptStale(receipt, currentSourceSha) {
-  return (
-    receipt.expired !== true && !receiptProofCurrent(receipt, currentSourceSha)
-  );
+  if (receipt.expired === true) return false;
+  if (!isNonEmptyString(receipt.sha)) return false;
+  return !receiptProofCurrent(receipt, currentSourceSha);
 }
 
 export function validReceiptKinds(record, currentSourceSha) {

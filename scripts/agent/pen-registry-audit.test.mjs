@@ -283,6 +283,30 @@ test('stale proof retained without explicit expiry fails', () => {
   assert.ok(failureCodes(receipt).includes('stale-proof-retained'));
 });
 
+test('unbound receipt (no SHA) is an observation, not stale proof', () => {
+  const unbound = record({
+    metadataStatus: 'PARTIAL',
+    visibleStatus: 'PARTIAL',
+    receipts: [
+      {
+        kind: 'source',
+        sha: CURRENT_SHA,
+        observedAt: '2026-08-10T00:00:00.000Z',
+      },
+      {
+        kind: 'runtime-narrow',
+        sha: null,
+        observedAt: '2026-08-09T00:00:00.000Z',
+      },
+    ],
+  });
+  const receipt = auditPenRegistryLedger(
+    ledger({ records: [unbound, ledgerRecord2()] })
+  );
+  assert.equal(receipt.verdict, 'pass');
+  assert.ok(!failureCodes(receipt).includes('stale-proof-retained'));
+});
+
 test('explicitly expired stale proof is retained history, not a failure', () => {
   const expiredHistory = record({
     receipts: [
