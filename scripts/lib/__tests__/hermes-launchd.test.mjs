@@ -190,16 +190,34 @@ describe('shipper-gated entrypoint', () => {
     expect(script).toContain('codex-issue-shipper.ts');
   });
 
-  it('documents pause, gbrain, grok, and checkout fail-closed gates', () => {
+  it('keeps provider abort events dynamic for every supported provider', () => {
     const script = readFileSync(
       join(REPO_ROOT, 'scripts/hermes/shipper-gated-entrypoint.py'),
       'utf8'
     );
     expect(script).toContain('stale_checkout_abort');
     expect(script).toContain('gbrain_gate_abort');
-    expect(script).toContain('grok_gate_abort');
+    expect(script).toContain('provider_abort_event(agent)');
     expect(script).toContain('shipping-paused');
     expect(script).toContain('SHIPPER_CRITICAL_PATHS');
+
+    const result = spawnSync(
+      'python3',
+      [
+        '-c',
+        `import json, runpy
+module = runpy.run_path(${JSON.stringify(join(REPO_ROOT, 'scripts/hermes/shipper-gated-entrypoint.py'))})
+print(json.dumps([module['provider_abort_event'](provider) for provider in ('codex', 'claude', 'grok')]))`,
+      ],
+      { encoding: 'utf8' }
+    );
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual([
+      'codex_gate_abort',
+      'claude_gate_abort',
+      'grok_gate_abort',
+    ]);
   });
 
   it('codex issue shipper launchd plist uses the gated entrypoint', () => {
@@ -216,7 +234,8 @@ describe('shipper-gated entrypoint', () => {
     expect(rendered).toContain(
       '<string>co.jovie.hermes.cron-codex-issue-shipper</string>'
     );
-    expect(rendered).toContain('<integer>900</integer>');
+    expect(rendered).not.toContain('<key>StartInterval</key>');
+    expect(rendered).not.toMatch(/<integer>(300|900)<\/integer>/);
     expect(rendered).toContain(
       '/Users/tester/.hermes/scripts/shipper-gated-entrypoint.py'
     );

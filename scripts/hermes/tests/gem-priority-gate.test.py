@@ -778,19 +778,25 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn(".deploymentAdmission.allowed == true", content)
         self.assertNotIn("--dry-run", content)
 
-    def test_scheduled_refresh_is_bounded_below_the_consumer_window(self):
+    def test_refresh_is_event_driven_and_bounds_one_admission(self):
         content = (self.WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
-        self.assertIn("schedule:", content)
-        match = re.search(r"cron:\s*'\*/(\d+) \* \* \* \*'", content)
-        self.assertIsNotNone(match, "fleet-gate-refresh.yml must run on a fixed minute interval")
-        interval_minutes = int(match.group(1))
-        stale_minutes = MODULE.RECEIPT_STALE_AFTER.total_seconds() / 60
-        # Comfortably below the fail-closed window: at most half of it.
-        self.assertLessEqual(interval_minutes * 2, stale_minutes)
+        self.assertNotIn("schedule:", content)
+        self.assertNotIn("cron:", content)
+        self.assertIn("pull_request:", content)
+        self.assertIn("workflow_run:", content)
+        self.assertIn("workflows: [CI, Production Controller, Queue-Deferred Release]", content)
+        self.assertIn("push:", content)
+        self.assertIn("branches: [main]", content)
         self.assertIn("ref: main", content)
+        self.assertIn("node-version: '22'", content)
         self.assertIn("gem-priority-gate.py", content)
         self.assertNotIn("--dry-run", content)
         self.assertIn("jovie-fixed", content)
+        self.assertIn("cancel-in-progress: false", content)
+        self.assertIn("github.event.pull_request.merged != true", content)
+        self.assertIn("JOVIE_AGENT_PROFILE: no_agent", content)
+        self.assertIn("timeout 240s scripts/backlog-orchestrator/run-backlog.sh gate-next", content)
+        self.assertIn("symphony-event-admission-heartbeat/v1", content)
 
     def test_stale_window_matches_the_consumer_fail_closed_window(self):
         gate_source = GATE.read_text(encoding="utf-8")

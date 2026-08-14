@@ -18,7 +18,7 @@ The Hermes gateway itself is managed by the installed Hermes CLI as `ai.hermes.g
 | `co.jovie.hermes.cron-hud.plist.template` | every 5 min | Refresh HUD snapshot |
 | `co.jovie.hermes.cron-pr-monitor.plist.template` | every 10 min | Detect stuck PRs |
 | `co.jovie.hermes.cron-ci-monitor.plist.template` | every 10 min | Detect CI failures on main |
-| `co.jovie.hermes.cron-codex-issue-shipper.plist.template` | every 5 min + load | Claim up to three eligible open GitHub issues and dispatch bounded coder-profile agents |
+| `co.jovie.hermes.cron-codex-issue-shipper.plist.template` | load/crash recovery only | Manual fallback for the event-driven GitHub/Symphony admission lanes; never polls for work |
 | `co.jovie.hermes.cron-pipeline-scoreboard.plist.template` | every 60 min | Write daily pipeline scoreboard to local state + gbrain, and alert on 12h shipper stalls |
 | `co.jovie.hermes.cron-gbrain-health-summary.plist.template` | 07:15 local daily | Probe the Tailscale HTTP endpoint, source freshness, and server count; write the latest health summary back to gbrain and notify ops |
 | `co.jovie.hermes.cron-agent-config-health.plist.template` | every 15 min | Detect invalid Hermes/OpenClaw agent config before gateway churn |
@@ -35,7 +35,7 @@ Coder/shipping loops run on Houston, not Hermes-Air. Pro-only templates live in 
 | File | Schedule | Purpose |
 |---|---|---|
 | `pro/co.jovie.hermes.cron-codex-kanban-ship.plist.template` | every 15 min | Launch `scripts/hermes/ship-loop.sh` → `~/.hermes/scripts/codex-kanban-ship.py` (PAUSE + gbrain gated) |
-| `co.jovie.hermes.cron-codex-issue-shipper.plist.template` | every 5 min + load | `~/.hermes/scripts/shipper-gated-entrypoint.py` → fail-closed gbrain/selected-provider/checkout gate → `codex-issue-shipper.ts` |
+| `co.jovie.hermes.cron-codex-issue-shipper.plist.template` | load/crash recovery only | `~/.hermes/scripts/shipper-gated-entrypoint.py` → fail-closed gbrain/selected-provider/checkout gate → `codex-issue-shipper.ts`; no periodic admit tick |
 
 Install on the Pro:
 
@@ -47,6 +47,13 @@ tail -f ~/.hermes/logs/launchd/cron-codex-kanban-ship.log ~/.hermes/logs/ship-lo
 ```
 
 `bootstrap-pro-launchd.sh` copies `scripts/hermes/shipper-gated-entrypoint.py` to `~/.hermes/scripts/` on every install/reconfigure. The entrypoint refuses to exec the TypeScript shipper unless the primary `~/Jovie` checkout is clean `main` at `origin/main` (after fetch); stale ticks log `stale_checkout_abort` and notify Telegram/Slack.
+
+Symphony admission is driven by `.github/workflows/fleet-gate-refresh.yml` on
+CI completion, main movement, and PR eligibility/hold changes. The workflow
+serializes events, bounds each admission attempt to four minutes, and writes
+`symphony-event-admission-heartbeat.json`. The launchd unit has no
+`StartInterval`; `ThrottleInterval` only backs off load/crash recovery and does
+not create work.
 
 Ship outcomes append to `~/.hermes/events/events.jsonl` from `codex-kanban-ship.py`.
 
