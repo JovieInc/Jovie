@@ -21,7 +21,10 @@ describe('no-LLM runtime state (JOV-5076)', () => {
       env,
       orchestratorDir: ORCHESTRATOR_DIR,
     });
-    assert.equal(cache, '/tmp/jovie-home/.cache/jovie/.orchestrator-cache.json');
+    assert.equal(
+      cache,
+      '/tmp/jovie-home/.cache/jovie/.orchestrator-cache.json'
+    );
     assert.equal(
       report,
       '/tmp/jovie-home/.cache/jovie/shadow-report-latest.txt'
