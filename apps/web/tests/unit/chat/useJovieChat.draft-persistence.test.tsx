@@ -1,7 +1,10 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useJovieChat } from '@/components/jovie/hooks/useJovieChat';
+import {
+  resetChatTimelineStateCacheForTests,
+  useJovieChat,
+} from '@/components/jovie/hooks/useJovieChat';
 import { resetComposerDraftStoreForTests } from '@/lib/chat/composer-draft-store';
 
 vi.mock('next/navigation', () => ({
@@ -68,6 +71,7 @@ vi.mock('@/lib/chat/open-chat-with-prompt', () => ({
 describe('useJovieChat draft persistence', () => {
   beforeEach(() => {
     resetComposerDraftStoreForTests();
+    resetChatTimelineStateCacheForTests();
     sendMessageMock.mockReset();
     maybeExecuteMock.mockReset();
     vi.useFakeTimers();

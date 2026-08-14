@@ -253,4 +253,32 @@ describe('useStickToBottom', () => {
 
     expect(scrollHeightSpy).not.toHaveBeenCalled();
   });
+
+  it('re-pins only on the initial 0 → positive message count (JOV-5044)', () => {
+    const { result, rerender } = renderHook(
+      ({ count }: { count?: number }) => useStickToBottom(count),
+      { initialProps: { count: 0 } }
+    );
+    attachSentinel(result);
+
+    act(() => {
+      intersectionCallback?.([
+        { isIntersecting: false } as IntersectionObserverEntry,
+      ]);
+    });
+    expect(result.current.isStuckToBottom).toBe(false);
+
+    rerender({ count: 2 });
+    expect(result.current.isStuckToBottom).toBe(true);
+
+    act(() => {
+      intersectionCallback?.([
+        { isIntersecting: false } as IntersectionObserverEntry,
+      ]);
+    });
+    expect(result.current.isStuckToBottom).toBe(false);
+
+    rerender({ count: 3 });
+    expect(result.current.isStuckToBottom).toBe(false);
+  });
 });

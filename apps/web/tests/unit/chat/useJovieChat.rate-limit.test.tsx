@@ -1,7 +1,10 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useJovieChat } from '@/components/jovie/hooks/useJovieChat';
+import {
+  resetChatTimelineStateCacheForTests,
+  useJovieChat,
+} from '@/components/jovie/hooks/useJovieChat';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -142,6 +145,7 @@ vi.mock('@/lib/queries/useChatMutations', () => ({
 describe('useJovieChat', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    resetChatTimelineStateCacheForTests();
     sendMessageMock.mockReset();
     maybeExecuteMock.mockReset();
     mutateAsyncMock.mockReset();
@@ -637,5 +641,60 @@ describe('useJovieChat', () => {
 
     expect(addMessagesMutateMock).not.toHaveBeenCalled();
     expect(result.current.isSubmitting).toBe(true);
+  });
+
+  it('restores a settled thread from timeline cache without a loading skeleton', () => {
+    mockConversationData = {
+      conversation: { id: 'conv_cached', title: 'Cached thread' },
+      messages: [
+        {
+          id: 'db_user_1',
+          role: 'user',
+          content: 'Cached hello',
+          clientMessageId: 'turn_cache:user',
+          turnId: 'turn_cache',
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'db_assistant_1',
+          role: 'assistant',
+          content: 'Cached answer',
+          turnId: 'turn_cache',
+          createdAt: '2026-01-01T00:00:01.000Z',
+        },
+      ],
+    };
+
+    const { result, rerender } = renderHook(
+      ({ conversationId }: { conversationId: string }) =>
+        useJovieChat({ profileId: 'profile_1', conversationId }),
+      { initialProps: { conversationId: 'conv_cached' } }
+    );
+
+    expect(result.current.isLoadingConversation).toBe(false);
+    expect(result.current.messages).toMatchObject([
+      { role: 'user', status: 'complete' },
+      { role: 'assistant', status: 'complete' },
+    ]);
+
+    mockConversationData = undefined;
+    rerender({ conversationId: 'conv_uncached' });
+
+    expect(result.current.isLoadingConversation).toBe(true);
+    expect(result.current.messages).toHaveLength(0);
+
+    rerender({ conversationId: 'conv_cached' });
+
+    expect(result.current.isLoadingConversation).toBe(false);
+    expect(result.current.messages).toMatchObject([
+      {
+        role: 'user',
+        status: 'complete',
+      },
+      {
+        role: 'assistant',
+        status: 'complete',
+      },
+    ]);
   });
 });

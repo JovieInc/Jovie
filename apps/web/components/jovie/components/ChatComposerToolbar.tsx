@@ -31,21 +31,14 @@ import { TRANSITION_FAST } from './chat-motion';
  * Pulled out of ChatInput to keep that file focused on layout + state.
  */
 
-function getButtonIcon(
-  showStop: boolean,
-  isLoading: boolean,
-  isSubmitting: boolean
-): { key: string; icon: React.ReactNode } {
+function getButtonIcon(showStop: boolean): {
+  key: string;
+  icon: React.ReactNode;
+} {
   if (showStop) {
     return {
       key: 'stop',
       icon: <span className='block h-3 w-3 rounded-sm bg-current' />,
-    };
-  }
-  if (isLoading || isSubmitting) {
-    return {
-      key: 'loading',
-      icon: <Loader2 className='h-4 w-4 animate-spin' strokeWidth={2.25} />,
     };
   }
   return {
@@ -58,8 +51,6 @@ export interface ComposerSendButtonProps {
   readonly canSend: boolean;
   readonly canInterruptAndSend?: boolean;
   readonly isStreaming: boolean;
-  readonly isLoading: boolean;
-  readonly isSubmitting: boolean;
   readonly reducedMotion: boolean | null;
   readonly onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
   readonly onSend?: () => void;
@@ -71,8 +62,6 @@ export function ComposerSendButton({
   canSend,
   canInterruptAndSend = false,
   isStreaming,
-  isLoading,
-  isSubmitting,
   reducedMotion,
   onMouseDown,
   onSend,
@@ -80,7 +69,7 @@ export function ComposerSendButton({
   onStop,
 }: ComposerSendButtonProps) {
   const showStop = isStreaming && Boolean(onStop) && !canInterruptAndSend;
-  const { key, icon } = getButtonIcon(showStop, isLoading, isSubmitting);
+  const { key, icon } = getButtonIcon(showStop);
   const motionInit = reducedMotion ? undefined : { scale: 0.5, opacity: 0 };
   const isInteractive = showStop || canSend || canInterruptAndSend;
 
@@ -140,12 +129,9 @@ export function ComposerSendButton({
 
 export interface ComposerAttachButtonProps {
   readonly isFileProcessing: boolean;
-  readonly isLoading: boolean;
-  readonly isSubmitting: boolean;
   /**
    * Caller-driven disable (e.g. slash picker has the keyboard). Independent
-   * of loading/submitting so the trigger can be inert without showing a
-   * spinner.
+   * of generation so attach stays live while the assistant works.
    */
   readonly disabled?: boolean;
   readonly plusMenuOpen: boolean;
@@ -156,8 +142,6 @@ export interface ComposerAttachButtonProps {
 
 export function ComposerAttachButton({
   isFileProcessing,
-  isLoading,
-  isSubmitting,
   disabled = false,
   plusMenuOpen,
   onOpenChange,
@@ -175,7 +159,7 @@ export function ComposerAttachButton({
             variant='ghost'
             size='icon'
             onMouseDown={onMouseDown}
-            disabled={isProcessing || isLoading || isSubmitting || disabled}
+            disabled={isProcessing || disabled}
             className={cn(
               'h-9 w-9 shrink-0 border border-transparent bg-surface-0 text-tertiary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token',
               plusMenuOpen && 'border-subtle bg-surface-1 text-primary-token',
@@ -218,8 +202,6 @@ export function ComposerAttachButton({
 
 export interface ComposerMicButtonProps {
   readonly isListening: boolean;
-  readonly isLoading: boolean;
-  readonly isSubmitting: boolean;
   readonly isSupported: boolean;
   readonly onPreserveFocus: (
     event: React.MouseEvent<HTMLButtonElement>
@@ -231,8 +213,6 @@ export interface ComposerMicButtonProps {
 
 export function ComposerMicButton({
   isListening,
-  isLoading,
-  isSubmitting,
   isSupported,
   onPreserveFocus,
   onPushStart,
@@ -256,21 +236,21 @@ export function ComposerMicButton({
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) => {
       onPreserveFocus(event);
-      if (isLoading || isSubmitting || !isSupported) return;
+      if (!isSupported) return;
       suppressClickToggleRef.current = false;
       if (typeof event.currentTarget.setPointerCapture === 'function') {
         event.currentTarget.setPointerCapture(event.pointerId);
       }
       onPushStart();
     },
-    [isLoading, isSubmitting, isSupported, onPreserveFocus, onPushStart]
+    [isSupported, onPreserveFocus, onPushStart]
   );
 
   const handlePointerEnd = useCallback(() => {
-    if (isLoading || isSubmitting || !isSupported) return;
+    if (!isSupported) return;
     suppressClickToggleRef.current = true;
     onPushEnd();
-  }, [isLoading, isSubmitting, isSupported, onPushEnd]);
+  }, [isSupported, onPushEnd]);
 
   const handleClick = useCallback(() => {
     if (suppressClickToggleRef.current) {
@@ -291,7 +271,7 @@ export function ComposerMicButton({
         onPointerCancel={handlePointerEnd}
         onPointerLeave={isListening ? handlePointerEnd : undefined}
         onClick={handleClick}
-        disabled={isLoading || isSubmitting || !isSupported}
+        disabled={!isSupported}
         data-testid='dictation-toggle'
         data-active={isListening ? 'true' : undefined}
         className={cn(

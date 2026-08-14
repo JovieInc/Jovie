@@ -1,7 +1,10 @@
 import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useJovieChat } from '@/components/jovie/hooks/useJovieChat';
+import {
+  resetChatTimelineStateCacheForTests,
+  useJovieChat,
+} from '@/components/jovie/hooks/useJovieChat';
 
 const { transportBodies } = vi.hoisted(() => ({
   transportBodies: [] as Array<Record<string, unknown> | undefined>,
@@ -74,6 +77,7 @@ vi.mock('@/lib/queries/useChatMutations', () => ({
 
 describe('useJovieChat chatMode transport body', () => {
   beforeEach(() => {
+    resetChatTimelineStateCacheForTests();
     transportBodies.length = 0;
   });
 

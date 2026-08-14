@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, SimpleTooltip, Skeleton } from '@jovie/ui';
+import { Button, SimpleTooltip } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { memo, useEffect, useRef, useState } from 'react';
@@ -23,7 +23,7 @@ interface ChatMessageProps {
   readonly parts: MessagePart[];
   /** Whether this message is actively being streamed from the AI. */
   readonly isStreaming?: boolean;
-  /** Whether this is a synthetic thinking placeholder (now rendered as shimmer skeleton). */
+  /** Whether this is a synthetic pending placeholder (compact live typing bubble). */
   readonly isThinking?: boolean;
   /** Avatar URL for user messages. */
   readonly avatarUrl?: string | null;
@@ -146,7 +146,7 @@ export const ChatMessage = memo(function ChatMessage({
   })();
   const hasAssistantContent =
     Boolean(messageText) || toolEvents.length > 0 || toolStepCapExhausted;
-  // Keep the thinking shimmer up while the stream is open but no renderable
+  // Keep a compact live bubble up while the stream is open but no renderable
   // content has arrived yet. Without this, the pending→streaming transition
   // collapses the reply row to blank until the first token lands (GH-11921).
   const showThinkingIndicator =
@@ -226,27 +226,16 @@ export const ChatMessage = memo(function ChatMessage({
               className='system-b-chat-loading-indicator'
               role='status'
               aria-live='polite'
-              aria-label='Jovie Is Thinking'
+              aria-label='Jovie Is Responding'
             >
-              {/* Assistant thinking shimmer — ChatMessageSkeleton-style reserved space */}
-              <div className='system-b-chat-loading-head'>
-                <Skeleton
-                  className='system-b-chat-loading-avatar'
-                  rounded='full'
-                  aria-hidden='true'
-                />
-                <Skeleton
-                  className='system-b-chat-loading-label'
-                  rounded='sm'
-                  aria-hidden='true'
-                />
-              </div>
-              <div className='system-b-chat-loading-body'>
-                <Skeleton
-                  className='system-b-chat-loading-line'
-                  rounded='lg'
-                  aria-hidden='true'
-                />
+              <div
+                className='system-b-chat-typing-bubble'
+                data-testid='chat-typing-bubble'
+                aria-hidden='true'
+              >
+                <span className='system-b-chat-typing-dot' />
+                <span className='system-b-chat-typing-dot' />
+                <span className='system-b-chat-typing-dot' />
               </div>
             </div>
           ) : null}

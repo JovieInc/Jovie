@@ -73,6 +73,8 @@ export type ChatTimelineEvent =
   | (BaseEvent & {
       readonly type: 'conversation.switched';
       readonly conversationId: string | null;
+      /** Settled local snapshot so thread switches paint immediately. */
+      readonly cachedMessages?: readonly ChatTimelineMessage[];
     })
   | (BaseEvent & {
       readonly type: 'conversation.load.started';
@@ -176,12 +178,25 @@ export function reduceChatTimeline(
   const now = event.now ?? Date.now();
 
   switch (event.type) {
-    case 'conversation.switched':
+    case 'conversation.switched': {
+      const cachedMessages = event.cachedMessages;
+      if (cachedMessages && cachedMessages.length > 0) {
+        return {
+          conversationId: event.conversationId,
+          phase: 'ready',
+          messages: cachedMessages,
+          activeClientTurnId: null,
+          requestEpoch: state.requestEpoch + 1,
+          lastEventAt: now,
+          diagnostics: [],
+        };
+      }
       return {
         ...createInitialChatTimelineState(event.conversationId),
         requestEpoch: state.requestEpoch + 1,
         lastEventAt: now,
       };
+    }
     case 'conversation.load.started':
       return {
         ...state,

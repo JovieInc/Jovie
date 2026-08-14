@@ -52,7 +52,8 @@ import type {
   JovieChatProps,
 } from './types';
 
-const VIRTUALIZATION_THRESHOLD = 12;
+/** Window long threads early so short-but-growing chats stay at 60fps. */
+const VIRTUALIZATION_THRESHOLD = 8;
 const CHAT_PICKER_THREAD_CLEARANCE = 'min(620px, calc(100vh - 8rem))';
 
 function findLastAssistantIndex(
@@ -177,7 +178,7 @@ export function JovieChat({
     totalSizeRef,
     scrollContainerRef,
     bottomSentinelRef,
-  } = useStickToBottom();
+  } = useStickToBottom(messages.length);
 
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
@@ -240,7 +241,6 @@ export function JovieChat({
     fileUploadLimit: chatFileUploadLimit,
     onError: error => setChatError({ type: 'unknown', message: error }),
     onAudioUploaded: handleAudioUploaded,
-    disabled: isLoading || isSubmitting,
   });
 
   // Manifest collapse state: when uploading and user scrolls/types, show collapsed bar
@@ -365,18 +365,14 @@ export function JovieChat({
     chatEntityPanel.upsertContexts(railContextTargets);
   }, [chatEntityPanel, railContextTargets]);
 
-  // Populate known message IDs from hydrated conversation to skip entrance animations
-  useEffect(() => {
-    if (
-      conversationId &&
-      messages.length > 0 &&
-      knownMessageIdsRef.current.size === 0
-    ) {
-      for (const m of messages) {
-        knownMessageIdsRef.current.add(m.id);
-      }
-    }
-  }, [conversationId, messages]);
+  const knownConversationKey = activeConversationId ?? conversationId ?? null;
+  const knownConversationSeedRef = useRef<string | null>(null);
+  if (knownConversationSeedRef.current !== knownConversationKey) {
+    knownConversationSeedRef.current = knownConversationKey;
+    knownMessageIdsRef.current = new Set(messages.map(message => message.id));
+  } else if (knownMessageIdsRef.current.size === 0 && messages.length > 0) {
+    knownMessageIdsRef.current = new Set(messages.map(message => message.id));
+  }
 
   // Virtualizer
   const virtualizer = useVirtualizer({

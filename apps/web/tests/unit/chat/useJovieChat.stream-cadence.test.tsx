@@ -1,7 +1,10 @@
 import { renderHook } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useJovieChat } from '@/components/jovie/hooks/useJovieChat';
+import {
+  resetChatTimelineStateCacheForTests,
+  useJovieChat,
+} from '@/components/jovie/hooks/useJovieChat';
 
 // JOV-3525 — chat streaming cadence (client half): the useChat hook must batch
 // streaming UI updates via the AI SDK v6 `experimental_throttle` option so raw
@@ -63,6 +66,11 @@ vi.mock('@/lib/queries/useChatMutations', () => ({
 }));
 
 describe('useJovieChat — streaming cadence (JOV-3525)', () => {
+  beforeEach(() => {
+    resetChatTimelineStateCacheForTests();
+    useChatMock.mockClear();
+  });
+
   it('configures useChat with a 50ms experimental_throttle (~20fps UI updates)', () => {
     renderHook(() => useJovieChat({ profileId: 'profile_1' }));
 

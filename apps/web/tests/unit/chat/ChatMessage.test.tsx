@@ -227,7 +227,7 @@ describe('ChatMessage', () => {
     expect(screen.queryByTestId('chat-user-bubble')).toBeNull();
   });
 
-  it('renders thinking with stable System B loading hooks', () => {
+  it('renders thinking as a compact live typing bubble', () => {
     const messageProps = {
       id: 'assistant-thinking',
       role: 'assistant' as const,
@@ -239,14 +239,17 @@ describe('ChatMessage', () => {
 
     const loading = screen.getByTestId('chat-loading-indicator');
     expect(loading).toHaveClass('system-b-chat-loading-indicator');
-    expect(loading.querySelector('.system-b-chat-loading-avatar')).toBeTruthy();
-    expect(loading.querySelector('.system-b-chat-loading-label')).toBeTruthy();
-    expect(loading.querySelector('.system-b-chat-loading-line')).toBeTruthy();
+    expect(screen.getByTestId('chat-typing-bubble')).toHaveClass(
+      'system-b-chat-typing-bubble'
+    );
+    expect(loading.querySelectorAll('.system-b-chat-typing-dot')).toHaveLength(
+      3
+    );
   });
 
-  it('keeps the thinking shimmer while streaming before any renderable content arrives (#11921)', () => {
+  it('keeps the typing bubble while streaming before any renderable content arrives (#11921)', () => {
     // pending→streaming flips isThinking off before the first token lands;
-    // the reply row must keep the shimmer instead of collapsing to blank.
+    // the reply row must keep the live bubble instead of collapsing to blank.
     const messageProps = {
       id: 'assistant-streaming-empty',
       role: 'assistant' as const,
@@ -258,9 +261,10 @@ describe('ChatMessage', () => {
     fastRender(<ChatMessage {...messageProps} />);
 
     expect(screen.getByTestId('chat-loading-indicator')).toBeInTheDocument();
+    expect(screen.getByTestId('chat-typing-bubble')).toBeInTheDocument();
   });
 
-  it('replaces the shimmer with the reply once streamed content arrives', () => {
+  it('replaces the typing bubble with the reply once streamed content arrives', () => {
     const messageProps = {
       id: 'assistant-streaming-content',
       role: 'assistant' as const,
