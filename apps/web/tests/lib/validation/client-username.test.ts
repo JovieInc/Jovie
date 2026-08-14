@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PUBLIC_PROFILE_RESERVED_IDENTITY_HANDLES } from '@/lib/profile/public-profile-identity-policy';
 import { debounce } from '@/lib/utils';
 import {
   generateUsernameSuggestions,
@@ -85,6 +86,14 @@ describe('validateUsernameFormat', () => {
       error: 'This handle is reserved and cannot be used',
       suggestion: 'api-artist',
     });
+
+    for (const protectedHandle of PUBLIC_PROFILE_RESERVED_IDENTITY_HANDLES) {
+      expect(validateUsernameFormat(protectedHandle)).toEqual({
+        valid: false,
+        error: 'This handle is reserved and cannot be used',
+        suggestion: undefined,
+      });
+    }
   });
 
   it('should handle empty usernames', () => {

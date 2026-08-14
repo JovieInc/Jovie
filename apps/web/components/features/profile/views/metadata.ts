@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
 import { PROFILE_VIEW_REGISTRY, type ProfileViewKey } from './registry';
 
 /**
@@ -40,6 +41,7 @@ export function buildViewMetadata(
   return {
     title,
     description,
+    robots: getPublicProfileRobots(input.artistHandle),
     alternates: {
       canonical,
     },

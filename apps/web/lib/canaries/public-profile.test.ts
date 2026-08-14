@@ -4,7 +4,6 @@ import {
   buildReport,
   buildVisitPayload,
   CANARY_CREATOR_HANDLE,
-  CANARY_CREATOR_SPOTIFY_ID,
   CANARY_ROUTES,
   type CanaryCheckResult,
   checkHttpGet,
@@ -27,7 +26,7 @@ describe('isOkStatus', () => {
     expect(isOkStatus(301)).toBe(true);
   });
 
-  it('accepts 307 (pay redirect)', () => {
+  it('accepts 307 (mode redirect)', () => {
     expect(isOkStatus(307)).toBe(true);
   });
 
@@ -292,17 +291,13 @@ describe('formatReportSummary', () => {
 
 describe('canary constants', () => {
   it('uses the explicit non-indexed production canary identity', () => {
-    expect(CANARY_CREATOR_HANDLE).toBe('testartist');
+    expect(CANARY_CREATOR_HANDLE).toBe('authqaprod');
     expect(isPublicProfileIndexable(CANARY_CREATOR_HANDLE)).toBe(false);
   });
 
-  it('uses the deterministic synthetic Spotify ID', () => {
-    expect(CANARY_CREATOR_SPOTIFY_ID).toBe('test');
-  });
-
   it('targets the non-indexed canary profile surface', () => {
-    expect(CANARY_ROUTES.profile).toBe('/testartist');
-    expect(CANARY_ROUTES.alerts).toBe('/testartist/alerts');
-    expect(CANARY_ROUTES.pay).toBe('/testartist/pay');
+    expect(CANARY_ROUTES.profile).toBe('/authqaprod');
+    expect(CANARY_ROUTES.alerts).toBe('/authqaprod/alerts');
+    expect(CANARY_ROUTES.listen).toBe('/authqaprod/listen');
   });
 });

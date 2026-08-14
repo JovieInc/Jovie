@@ -15,6 +15,7 @@ import {
   markLeadClaimPageViewedFromToken,
   setLeadAttributionCookieFromToken,
 } from '@/lib/leads/funnel-events';
+import { isReservedPublicProfileIdentity } from '@/lib/profile/public-profile-identity-policy';
 import { hashClaimToken } from '@/lib/security/claim-token';
 import {
   getProfileByUsername,
@@ -98,7 +99,8 @@ export async function GET(
 
   if (
     username.length > USERNAME_MAX_LENGTH ||
-    !USERNAME_PATTERN.test(username)
+    !USERNAME_PATTERN.test(username) ||
+    isReservedPublicProfileIdentity(normalizedUsername)
   ) {
     return redirectTo(request, '/');
   }

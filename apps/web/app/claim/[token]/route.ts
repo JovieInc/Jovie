@@ -6,6 +6,7 @@ import {
   markLeadClaimPageViewedFromToken,
   setLeadAttributionCookieFromToken,
 } from '@/lib/leads/funnel-events';
+import { isReservedPublicProfileIdentity } from '@/lib/profile/public-profile-identity-policy';
 import {
   allowIfRateLimitBackendDegraded,
   claimTokenAccessLimiter,
@@ -54,7 +55,7 @@ export async function GET(
   }
 
   const username = await lookupUsernameByClaimToken(token);
-  if (!username) {
+  if (!username || isReservedPublicProfileIdentity(username)) {
     await clearLeadAttributionCookie();
     return NextResponse.redirect(buildAbsoluteUrl(request, '/'));
   }

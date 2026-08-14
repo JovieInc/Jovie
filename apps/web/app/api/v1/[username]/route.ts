@@ -3,6 +3,10 @@ import { BASE_URL } from '@/constants/app';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
+import {
+  isPublicProfileIndexable,
+  PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
+} from '@/lib/profile/public-profile-indexing-policy';
 import { getProfileByUsername } from '@/lib/services/profile';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 
@@ -13,12 +17,25 @@ export async function GET(
   { params }: { params: Promise<{ username: string }> }
 ) {
   const { username } = await params;
+  if (!isPublicProfileIndexable(username)) {
+    return NextResponse.json(
+      { error: 'Artist not found' },
+      { status: 404, headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS }
+    );
+  }
+
   const profile = await getProfileByUsername(username);
 
   if (!profile || !profile.isPublic) {
     return NextResponse.json(
       { error: 'Artist not found' },
       { status: 404, headers: NO_STORE_HEADERS }
+    );
+  }
+  if (!isPublicProfileIndexable(profile.username)) {
+    return NextResponse.json(
+      { error: 'Artist not found' },
+      { status: 404, headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS }
     );
   }
 

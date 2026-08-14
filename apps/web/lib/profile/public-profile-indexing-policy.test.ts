@@ -10,8 +10,8 @@ describe('public profile indexing policy', () => {
   it.each([
     ['dualipa', 'fabricated_identity_fixture'],
     ['taylorswift', 'fabricated_identity_fixture'],
-    ['testartist', 'production_canary'],
-    ['authqaprod', 'qa_auth_fixture'],
+    ['testartist', 'legacy_claim_fixture'],
+    ['authqaprod', 'production_canary'],
     ['e2e-test-user', 'qa_auth_fixture'],
   ] as const)('excludes verified synthetic handle %s', (handle, reason) => {
     expect(getPublicProfileIndexingExclusionReason(handle)).toBe(reason);
@@ -19,7 +19,7 @@ describe('public profile indexing policy', () => {
   });
 
   it('normalizes exact synthetic handles before matching', () => {
-    expect(getPublicProfileIndexingExclusionReason('  TestArtist ')).toBe(
+    expect(getPublicProfileIndexingExclusionReason('  AuthQaProd ')).toBe(
       'production_canary'
     );
   });
@@ -36,7 +36,7 @@ describe('public profile indexing policy', () => {
   });
 
   it('defines the production canary as a non-indexed identity', () => {
-    expect(PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE).toBe('testartist');
+    expect(PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE).toBe('authqaprod');
     expect(
       isPublicProfileIndexable(PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE)
     ).toBe(false);

@@ -76,4 +76,18 @@ describe('buildViewMetadata', () => {
     const meta = buildViewMetadata('pay', BASELINE);
     expect(meta.openGraph?.url).toBe('https://jov.ie/theweeknd/pay');
   });
+
+  it('noindexes every routed view for a protected synthetic identity', () => {
+    for (const mode of ['listen', 'pay', 'contact', 'about'] as const) {
+      expect(
+        buildViewMetadata(mode, {
+          ...BASELINE,
+          artistHandle: 'dualipa',
+        }).robots
+      ).toMatchObject({
+        index: false,
+        follow: false,
+      });
+    }
+  });
 });

@@ -13,11 +13,7 @@
  */
 export const CANARY_CREATOR = {
   /** URL handle / slug (matches CANARY_CREATOR_HANDLE in lib/canaries/public-profile.ts) */
-  handle: 'testartist',
-  /** Deterministic synthetic Spotify ID from seed-test-data.ts. */
-  spotifyId: 'test',
-  /** Display name expected in the page h1 (case-insensitive comparison in spec) */
-  displayNameFragment: 'Test Artist',
+  handle: 'authqaprod',
 } as const;
 
 /** A fake email to use for notification subscription flow assertions. */
@@ -27,6 +23,6 @@ export const CANARY_SUBSCRIBE_EMAIL = `canary+${Date.now()}@test.jov.ie`;
 export const CANARY_SPEC_ROUTES = {
   profile: `/${CANARY_CREATOR.handle}`,
   alerts: `/${CANARY_CREATOR.handle}/alerts`,
-  pay: `/${CANARY_CREATOR.handle}/pay`,
+  listen: `/${CANARY_CREATOR.handle}/listen`,
   profileNoRedirect: `/${CANARY_CREATOR.handle}?noredirect=1`,
 } as const;

@@ -66,9 +66,9 @@ describe('Claim route', () => {
     mockReadPendingClaimContext.mockResolvedValue(null);
     mockGetProfileByUsername.mockResolvedValue({
       id: 'profile_1',
-      username: 'testartist',
-      usernameNormalized: 'testartist',
-      displayName: 'Test Artist',
+      username: 'claimableartist',
+      usernameNormalized: 'claimableartist',
+      displayName: 'Claimable Artist',
       spotifyId: 'spotify_123',
       spotifyUrl: 'https://open.spotify.com/artist/spotify_123',
       isClaimed: false,
@@ -78,17 +78,29 @@ describe('Claim route', () => {
 
   it('canonicalizes legacy claim routes back to the public profile preview', async () => {
     const response = await GET(
-      new NextRequest('http://localhost/TestArtist/claim'),
+      new NextRequest('http://localhost/ClaimableArtist/claim'),
       {
-        params: Promise.resolve({ username: 'TestArtist' }),
+        params: Promise.resolve({ username: 'ClaimableArtist' }),
       }
     );
 
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe(
-      'http://localhost/testartist?claim=1'
+      'http://localhost/claimableartist?claim=1'
     );
-    expect(mockGetProfileByUsername).toHaveBeenCalledWith('testartist');
+    expect(mockGetProfileByUsername).toHaveBeenCalledWith('claimableartist');
+  });
+
+  it('refuses protected synthetic identities before profile lookup', async () => {
+    const response = await GET(
+      new NextRequest('http://localhost/dualipa/claim?next=auth'),
+      { params: Promise.resolve({ username: 'dualipa' }) }
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/');
+    expect(mockGetProfileByUsername).not.toHaveBeenCalled();
+    expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
   });
 
   it('redirects to / for invalid username (length or pattern)', async () => {

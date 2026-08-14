@@ -8,6 +8,7 @@ import {
   profileOwnershipLog,
   userProfileClaims,
 } from '@/lib/db/schema/profiles';
+import { isReservedPublicProfileIdentity } from '@/lib/profile/public-profile-identity-policy';
 import {
   isUnclaimedStructuredCreditProfile,
   markStructuredCreditProfileClaimed,
@@ -54,6 +55,14 @@ async function getClaimTargetProfile(
   }
 
   return profile;
+}
+
+function assertClaimableProfileIdentity(username: string): void {
+  if (isReservedPublicProfileIdentity(username)) {
+    throw new Error(
+      '[PROFILE_CONFLICT] This synthetic profile identity cannot be claimed.'
+    );
+  }
 }
 
 async function ensureNoClaimedProfileConflict(
@@ -168,6 +177,7 @@ export async function reservePrebuiltProfileForUser(
   if (profile.usernameNormalized !== expectedUsername) {
     throw new Error('[CLAIM_NOT_FOUND] Claim context is out of date');
   }
+  assertClaimableProfileIdentity(profile.usernameNormalized);
 
   await ensureNoClaimedProfileConflict(tx, params.userId, profile.id);
 
@@ -220,6 +230,7 @@ export async function claimPrebuiltProfileForUser(
   if (profile.usernameNormalized !== expectedUsername) {
     throw new Error('[CLAIM_NOT_FOUND] Claim context is out of date');
   }
+  assertClaimableProfileIdentity(profile.usernameNormalized);
 
   await ensureNoClaimedProfileConflict(tx, params.userId, profile.id);
 

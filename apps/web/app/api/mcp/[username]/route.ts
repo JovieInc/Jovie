@@ -34,6 +34,10 @@ import {
   publishMerchCard,
   selectMerchDesign,
 } from '@/lib/merch/service';
+import {
+  isPublicProfileIndexable,
+  PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
+} from '@/lib/profile/public-profile-indexing-policy';
 import { getProfileByUsername } from '@/lib/services/profile';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 
@@ -70,12 +74,25 @@ export async function GET(
   { params }: { params: Promise<{ username: string }> }
 ) {
   const { username } = await params;
+  if (!isPublicProfileIndexable(username)) {
+    return NextResponse.json(
+      { error: 'Artist not found' },
+      { status: 404, headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS }
+    );
+  }
+
   const profile = await getProfileByUsername(username);
 
   if (!profile || !profile.isPublic) {
     return NextResponse.json(
       { error: 'Artist not found' },
       { status: 404, headers: NO_STORE_HEADERS }
+    );
+  }
+  if (!isPublicProfileIndexable(profile.username)) {
+    return NextResponse.json(
+      { error: 'Artist not found' },
+      { status: 404, headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS }
     );
   }
 
@@ -99,10 +116,29 @@ export async function POST(
   { params }: { params: Promise<{ username: string }> }
 ) {
   const { username } = await params;
+  if (!isPublicProfileIndexable(username)) {
+    return mcpError(
+      -32602,
+      'Artist not found',
+      404,
+      null,
+      PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS
+    );
+  }
+
   const profile = await getProfileByUsername(username);
 
   if (!profile || !profile.isPublic) {
     return mcpError(-32602, 'Artist not found', 404);
+  }
+  if (!isPublicProfileIndexable(profile.username)) {
+    return mcpError(
+      -32602,
+      'Artist not found',
+      404,
+      null,
+      PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS
+    );
   }
 
   let body: unknown;
@@ -226,13 +262,14 @@ function mcpError(
   code: number,
   message: string,
   status = 200,
-  requestId: JsonRpcId | undefined = null
+  requestId: JsonRpcId | undefined = null,
+  headers?: HeadersInit
 ) {
   return NextResponse.json(
     requestId !== undefined
       ? { jsonrpc: '2.0', id: requestId, error: { code, message } }
       : { jsonrpc: '2.0', error: { code, message } },
-    { status }
+    { status, headers }
   );
 }
 

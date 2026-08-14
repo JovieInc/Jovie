@@ -182,6 +182,22 @@ describe('claimPrebuiltProfileForUser', () => {
     expect(mocks.limitMock).toHaveBeenCalledTimes(1);
   });
 
+  it('refuses to claim a protected synthetic profile identity', async () => {
+    const mocks = createTxMock([
+      [profileRow({ usernameNormalized: 'dualipa' })],
+    ]);
+
+    await expect(
+      claimPrebuiltProfileForUser(mocks.tx, {
+        ...baseParams,
+        expectedUsername: 'dualipa',
+      })
+    ).rejects.toThrow(
+      '[PROFILE_CONFLICT] This synthetic profile identity cannot be claimed.'
+    );
+    assertNoWrites(mocks);
+  });
+
   it('throws PROFILE_CONFLICT when the user already owns a different claimed profile', async () => {
     const mocks = createTxMock([
       [profileRow()],
@@ -429,6 +445,22 @@ describe('reservePrebuiltProfileForUser', () => {
     await expect(
       reservePrebuiltProfileForUser(mocks.tx, baseParams)
     ).rejects.toThrow('[CLAIM_NOT_FOUND] Claim context is out of date');
+    assertNoWrites(mocks);
+  });
+
+  it('refuses to reserve the dedicated production canary identity', async () => {
+    const mocks = createTxMock([
+      [profileRow({ usernameNormalized: 'authqaprod' })],
+    ]);
+
+    await expect(
+      reservePrebuiltProfileForUser(mocks.tx, {
+        ...baseParams,
+        expectedUsername: 'authqaprod',
+      })
+    ).rejects.toThrow(
+      '[PROFILE_CONFLICT] This synthetic profile identity cannot be claimed.'
+    );
     assertNoWrites(mocks);
   });
 

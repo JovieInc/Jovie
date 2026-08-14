@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
+import {
+  isPublicProfileIndexable,
+  PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
+} from '@/lib/profile/public-profile-indexing-policy';
 import { getProfileByUsername } from '@/lib/services/profile';
 
 export const revalidate = 3600;
@@ -19,10 +23,23 @@ export async function GET(
   { params }: { params: Promise<{ username: string }> }
 ) {
   const { username } = await params;
+  if (!isPublicProfileIndexable(username)) {
+    return new NextResponse('Not found', {
+      status: 404,
+      headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
+    });
+  }
+
   const profile = await getProfileByUsername(username);
 
   if (!profile || !profile.isPublic) {
     return new NextResponse('Not found', { status: 404 });
+  }
+  if (!isPublicProfileIndexable(profile.username)) {
+    return new NextResponse('Not found', {
+      status: 404,
+      headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
+    });
   }
 
   const releases = await getReleasesForProfileLite(profile.id);
