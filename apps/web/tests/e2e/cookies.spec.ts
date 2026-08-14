@@ -173,10 +173,9 @@ test.describe('Cookie banner @smoke', () => {
     const acceptBox = await acceptBtn.boundingBox();
     expect(rejectBox, '"Reject all" button has no bounding box').not.toBeNull();
     expect(acceptBox, '"Accept all" button has no bounding box').not.toBeNull();
-    expect(
-      rejectBox!.height,
-      '"Reject all" is shorter than Accept all'
-    ).toBe(acceptBox!.height);
+    expect(rejectBox!.height, '"Reject all" is shorter than Accept all').toBe(
+      acceptBox!.height
+    );
     expect(
       Math.abs(rejectBox!.width - acceptBox!.width),
       'Accept all and Reject all widths are not comparable'
