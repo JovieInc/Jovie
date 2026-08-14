@@ -47,6 +47,9 @@ fi
 echo "Setting up Claude Code environment..."
 
 if [ -x "$PROJECT_DIR/scripts/setup.sh" ]; then
+  # setup.sh cheap-exits when the worktree is already healthy (deps
+  # fingerprint matches and Node/pnpm pins are ok). Cold/stale worktrees
+  # still run the full bootstrap.
   echo "Running ./scripts/setup.sh to normalize this worktree..."
   "$PROJECT_DIR/scripts/setup.sh"
 fi

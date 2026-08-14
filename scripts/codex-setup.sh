@@ -36,6 +36,8 @@ NODE
 }
 
 if [[ "$CODEX_HOOK" == "1" ]]; then
+  # setup.sh cheap-exits when the worktree is already healthy. GBrain sync
+  # below is independent and always runs — do not skip it on a warm setup.
   bash "$REPO_ROOT/scripts/setup.sh" "$@" >&2
   GBRAIN_CONTEXT=""
   if [[ -f "$REPO_ROOT/scripts/codex-gbrain-sync.sh" ]]; then
