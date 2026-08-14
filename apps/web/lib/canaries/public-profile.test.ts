@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { isPublicProfileIndexable } from '@/lib/profile/public-profile-indexing-policy';
 import {
   buildReport,
   buildVisitPayload,
@@ -290,17 +291,18 @@ describe('formatReportSummary', () => {
 });
 
 describe('canary constants', () => {
-  it('CANARY_CREATOR_HANDLE is tim (founder identity rule)', () => {
-    expect(CANARY_CREATOR_HANDLE).toBe('tim');
+  it('uses the explicit non-indexed production canary identity', () => {
+    expect(CANARY_CREATOR_HANDLE).toBe('testartist');
+    expect(isPublicProfileIndexable(CANARY_CREATOR_HANDLE)).toBe(false);
   });
 
-  it('CANARY_CREATOR_SPOTIFY_ID is 4u (canonical Spotify ID)', () => {
-    expect(CANARY_CREATOR_SPOTIFY_ID).toBe('4u');
+  it('uses the deterministic synthetic Spotify ID', () => {
+    expect(CANARY_CREATOR_SPOTIFY_ID).toBe('test');
   });
 
-  it('CANARY_ROUTES includes /tim, /tim/alerts, /tim/pay', () => {
-    expect(CANARY_ROUTES.profile).toBe('/tim');
-    expect(CANARY_ROUTES.alerts).toBe('/tim/alerts');
-    expect(CANARY_ROUTES.pay).toBe('/tim/pay');
+  it('targets the non-indexed canary profile surface', () => {
+    expect(CANARY_ROUTES.profile).toBe('/testartist');
+    expect(CANARY_ROUTES.alerts).toBe('/testartist/alerts');
+    expect(CANARY_ROUTES.pay).toBe('/testartist/pay');
   });
 });

@@ -39,6 +39,7 @@ import type { MusicVideoMetadata, ProviderKey } from '@/lib/discography/types';
 import { isVideoProviderKey } from '@/lib/discography/video-providers';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { getArtistEntitySameAs } from '@/lib/entity/queries';
+import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
 import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import type { Artist } from '@/types/db';
@@ -683,17 +684,7 @@ export async function generateMetadata({
     alternates: {
       canonical: canonicalUrl,
     },
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        'max-video-preview': -1,
-        'max-image-preview': 'large',
-        'max-snippet': -1,
-      },
-    },
+    robots: getPublicProfileRobots(creator.usernameNormalized),
     openGraph: {
       type: ogType,
       title: ogTitle,

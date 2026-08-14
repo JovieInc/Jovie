@@ -13,8 +13,14 @@
  *    browser rendering pipeline.
  */
 
-export const CANARY_CREATOR_HANDLE = 'tim';
-export const CANARY_CREATOR_SPOTIFY_ID = '4u';
+import { PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE } from '@/lib/profile/public-profile-indexing-policy';
+
+/**
+ * Synthetic production identity owned by this canary. The indexing policy
+ * must keep it out of search while the route remains available for monitoring.
+ */
+export const CANARY_CREATOR_HANDLE = PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE;
+export const CANARY_CREATOR_SPOTIFY_ID = 'test';
 export const CANARY_AUDIENCE_VISIT_PATH = '/api/audience/visit';
 export const CANARY_REDIS_KEY = 'canary:public_profile:last_run';
 

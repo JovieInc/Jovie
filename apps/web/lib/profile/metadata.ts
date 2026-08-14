@@ -17,7 +17,9 @@
 
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import type { CreatorProfile } from '@/types/db';
+import { getPublicProfileRobots } from './public-profile-indexing-policy';
 import { isUnclaimedStructuredCreditProfile } from './unclaimed-artist-profile';
 
 // ---------------------------------------------------------------------------
@@ -198,6 +200,7 @@ export function buildPublicProfileMetadata(
   );
   const isStructuredCreditUnclaimed =
     !isClaimed && isUnclaimedStructuredCreditProfile(profile.settings);
+  const profileHandle = profile.username_normalized ?? profile.username;
 
   const baseKeywords = [
     artistName,
@@ -223,17 +226,9 @@ export function buildPublicProfileMetadata(
     alternates: {
       canonical: canonicalUrl,
     },
-    robots: {
-      index: !isStructuredCreditUnclaimed,
-      follow: !isStructuredCreditUnclaimed,
-      googleBot: {
-        index: !isStructuredCreditUnclaimed,
-        follow: !isStructuredCreditUnclaimed,
-        'max-video-preview': -1,
-        'max-image-preview': 'large',
-        'max-snippet': -1,
-      },
-    },
+    robots: isStructuredCreditUnclaimed
+      ? NOINDEX_ROBOTS
+      : getPublicProfileRobots(profileHandle),
     openGraph: {
       type: 'profile',
       title: socialTitle,

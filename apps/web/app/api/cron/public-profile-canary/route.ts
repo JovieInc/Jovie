@@ -4,14 +4,15 @@
  * Runs daily at 06:13 UTC (off-peak — ~11 PM PT / late evening Tim time).
  *
  * PURPOSE: Lightweight HTTP-level check that the canonical public profile
- * surface (/tim, /tim/alerts, /api/audience/visit) is healthy in production.
+ * surface on an explicitly non-indexed synthetic profile is healthy in
+ * production.
  * This is the production-monitoring half of the Reliability Every-Bug-Becomes-a-Detector
  * loop (JOV-1855). The full Playwright canary spec runs in nightly CI.
  *
  * CHECKS (see lib/canaries/public-profile.ts for implementation):
- *  1. GET /tim           — 200, no server error body
- *  2. GET /tim/alerts    — 200, no server error body
- *  3. GET /tim/pay       — 200 (follows 307 redirect), no server error body
+ *  1. GET /testartist           — 200, no server error body
+ *  2. GET /testartist/alerts    — 200, no server error body
+ *  3. GET /testartist/pay       — 200 (follows 307 redirect), no server error body
  *  4. POST /api/audience/visit — 2xx or 429 (rate-limited is healthy)
  *
  * OUTPUT: Structured Sentry breadcrumb with tag `canary.public_profile=pass|fail`.
@@ -111,8 +112,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         // Audience-visit POST — uses a synthetic profileId so we intentionally
         // expect a 404 (profile not found in prod for canary payload). We treat
         // any non-5xx as healthy because the route itself responded correctly.
-        // A real canary would use the actual Tim profile ID — but we deliberately
-        // avoid writing audience rows from the canary bot.
+        // We deliberately use a nonexistent profile ID so the canary never
+        // writes audience rows.
         checkHttpPost(
           'audience-visit',
           `${base}${CANARY_AUDIENCE_VISIT_PATH}`,

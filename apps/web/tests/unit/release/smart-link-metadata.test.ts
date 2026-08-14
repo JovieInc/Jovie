@@ -160,6 +160,7 @@ describe('smart-link metadata', () => {
     expect(metadata.openGraph?.url).toBe(
       'https://jov.ie/dualipa/future-nostalgia'
     );
+    expect(metadata.robots).toMatchObject({ index: false, follow: false });
   });
 
   it('renders published content before considering a matching mode alias', async () => {

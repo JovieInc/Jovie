@@ -45,4 +45,25 @@ describe('SEO ratchet — public profile metadata builder (JOV-11044)', () => {
     expect(metadata.twitter?.card).toBe('summary_large_image');
     expect(metadata.robots).toMatchObject({ index: true, follow: true });
   });
+
+  it('emits noindex metadata for the production canary identity', () => {
+    const metadata = buildPublicProfileMetadata({
+      profile: {
+        username: 'TestArtist',
+        username_normalized: 'testartist',
+        display_name: 'Test Artist',
+        bio: 'Synthetic production canary',
+        location: null,
+        avatar_url: null,
+        is_verified: false,
+      },
+      genres: [],
+    });
+
+    expect(metadata.robots).toMatchObject({
+      index: false,
+      follow: false,
+      googleBot: { index: false, follow: false },
+    });
+  });
 });
