@@ -22,9 +22,11 @@
  *      Sentry from this layer so executeChatTurn stays provider-neutral
  *      (eval scripts pass a no-op).
  *
- * Auth: Clerk; unauthenticated requests get 401. CORS via
- * createAuthenticatedCorsHeaders so the chat client can be embedded on
- * trusted origins.
+ * Auth: Better Auth via getOptionalAuth. Anonymous `/start` turns are handled
+ * by tryHandleAnonymousOnboardingChat (explicit `mode: 'onboarding'` or a
+ * locator-less messages envelope). Remaining unauthenticated requests get 401
+ * with errorCode AUTH_REQUIRED. CORS via createAuthenticatedCorsHeaders so the
+ * chat client can be embedded on trusted origins.
  *
  * Cancellation: req.signal forwarded to executeChatTurn; client disconnects
  * surface as 499 (and bypass Sentry capture).
@@ -2355,7 +2357,7 @@ export async function POST(req: Request) {
   const { userId } = await getOptionalAuth();
   if (!userId) {
     return NextResponse.json(
-      { error: 'Unauthorized', requestId },
+      { error: 'Unauthorized', errorCode: 'AUTH_REQUIRED', requestId },
       { status: 401, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }

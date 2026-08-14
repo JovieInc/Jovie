@@ -344,6 +344,7 @@ describe('POST /api/chat guard wiring', () => {
     expect(response.status).toBe(401);
     const body = await response.json();
     expect(body.error).toBe('Unauthorized');
+    expect(body.errorCode).toBe('AUTH_REQUIRED');
     expect(body.requestId).toBeTruthy();
     expect(response.headers.get('x-request-id')).toBe(body.requestId);
 
