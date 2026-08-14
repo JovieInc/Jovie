@@ -26,6 +26,10 @@ import { z } from 'zod';
 import { BASE_URL } from '@/constants/app';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
+import {
+  socialReplyTargetSchema,
+  stageSocialReplyBatch,
+} from '@/lib/connectors/social-replies';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
@@ -314,6 +318,43 @@ function buildToolDescriptors() {
       },
     },
     {
+      name: 'stage_social_replies',
+      description:
+        'Stage unique social reply drafts in the authenticated owner Inbox. Draft-only: this never posts, approves, or sends a reply.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          batchId: { type: 'string', minLength: 1, maxLength: 256 },
+          targets: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 100,
+            items: {
+              type: 'object',
+              properties: {
+                platform: { type: 'string', minLength: 1, maxLength: 64 },
+                sourceId: { type: 'string', minLength: 1, maxLength: 512 },
+                targetId: { type: 'string', minLength: 1, maxLength: 512 },
+                draftedText: {
+                  type: 'string',
+                  minLength: 1,
+                  maxLength: 4000,
+                },
+                sourceKind: {
+                  type: 'string',
+                  enum: ['owned-audience', 'outbound-discovery'],
+                },
+                sourceUrl: { type: ['string', 'null'], format: 'uri' },
+                baselineMetadata: { type: 'object' },
+              },
+              required: ['platform', 'sourceId', 'targetId', 'draftedText'],
+            },
+          },
+        },
+        required: ['batchId', 'targets'],
+      },
+    },
+    {
       name: 'select_merch_design',
       description:
         'Select one generated merch option for the authenticated owner and create a draft merch card. Returns a publish confirmation proposal; it does not publish.',
@@ -451,6 +492,44 @@ async function callTool(
     const item = merch.find(m => m.id === itemId);
     if (!item) return { error: `Merch item not found: ${itemId}` };
     return { data: { itemId, checkoutUrl: `${profileUrl}/merch` } };
+  }
+
+  if (name === 'stage_social_replies') {
+    const { userId } = await getCachedAuth();
+    if (!userId) {
+      return { error: 'Authentication required to stage social replies' };
+    }
+
+    const parsed = z
+      .object({
+        batchId: z.string().trim().min(1).max(256),
+        targets: z.array(socialReplyTargetSchema).min(1).max(100),
+      })
+      .safeParse(args);
+    if (!parsed.success) {
+      return { error: 'Invalid stage_social_replies arguments' };
+    }
+
+    try {
+      const result = await stageSocialReplyBatch({
+        appUserId: userId,
+        profileId: profile.id,
+        batch: {
+          batchId: parsed.data.batchId,
+          mode: 'draft',
+          targets: parsed.data.targets,
+        },
+      });
+      return {
+        data: {
+          ...result,
+          draftOnly: true,
+          nextStep: 'Review these replies in Inbox before execution.',
+        },
+      };
+    } catch {
+      return { error: 'Unable to stage social replies' };
+    }
   }
 
   if (

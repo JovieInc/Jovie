@@ -35,3 +35,13 @@ export {
   socialReplyWriteResultSchema,
 } from './contract';
 export { runSocialReplyBatch } from './orchestrator';
+export type {
+  SocialReplySuggestedActionRow,
+  StagedSocialReplyAction,
+} from './stage-actions';
+export {
+  buildSocialReplySuggestedActionRows,
+  SOCIAL_REPLY_ACTION_KIND,
+  SOCIAL_REPLY_SIGNAL_TYPE,
+  stageSocialReplyBatch,
+} from './stage-actions';

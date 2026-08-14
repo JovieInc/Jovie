@@ -33,6 +33,7 @@ interface SuggestedActionRow {
 const PRIMARY_ACTION_LABEL_BY_KIND: Readonly<Record<string, string>> = {
   'calendar.create_event': 'Add to calendar',
   'brand_deal.opportunity': 'Approve buyer',
+  'social.reply': 'Review reply',
 };
 
 function primaryActionLabelFor(
@@ -91,7 +92,11 @@ export function mapSuggestedActionToInboxCard(
     ? 'report'
     : brandDeal
       ? 'brand_deal'
-      : classifySuggestedActionCategory(row);
+      : signalType === 'fan_reply'
+        ? 'fan_reply'
+        : signalType === 'collab_request'
+          ? 'collab_request'
+          : classifySuggestedActionCategory(row);
   return {
     id: row.id,
     signalType,

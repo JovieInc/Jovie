@@ -307,6 +307,38 @@ describe('POST approve (real handler)', () => {
     });
   });
 
+  it('approves a social reply without routing it through the calendar executor', async () => {
+    dbMockState.updateReturningQueue.push([
+      casApprovedRow({
+        kind: 'social.reply',
+        signalType: 'fan_reply',
+        payload: { targetId: 'comment-1', draftedText: 'Thank you.' },
+      }),
+    ]);
+
+    const response = await approvePOST(
+      makeApproveRequest(),
+      makeParams(ACTION_ID)
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      ok: true,
+      approvalId: ACTION_ID,
+      status: 'approved-awaiting-connector-execution',
+    });
+    expectNoStore(response);
+    expect(dbMockState.insertedRows).toEqual([]);
+    expect(mockRecordInboxDecision).toHaveBeenCalledWith({
+      suggestedActionId: ACTION_ID,
+      userId: USER_ID,
+      verdict: 'approved',
+      cardKind: 'social.reply',
+      surface: 'opportunity-inbox',
+    });
+  });
+
   it('second approve after a completed first approve: recovery finds the run → 200 approved-pending-enqueue, no new insert', async () => {
     dbMockState.updateReturningQueue.push([]); // CAS missed
     dbMockState.selectResultQueue.push(

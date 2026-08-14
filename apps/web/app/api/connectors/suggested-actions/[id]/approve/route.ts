@@ -25,6 +25,7 @@ import {
   parseBrandDealOpportunity,
 } from '@/lib/connectors/brand-deal-opportunity';
 import { recordInboxDecision } from '@/lib/connectors/inbox-decision';
+import { SOCIAL_REPLY_ACTION_KIND } from '@/lib/connectors/social-replies/stage-actions';
 import {
   enqueueApprovedActionWorkflow,
   recoverOrphanedApprovedAction,
@@ -190,6 +191,26 @@ export async function POST(_request: Request, { params }: RouteParams) {
           ok: true,
           approvalId: id,
           status: 'approved-for-preparation',
+        },
+        { status: 200, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (approvedKind === SOCIAL_REPLY_ACTION_KIND) {
+      void recordInboxDecision({
+        suggestedActionId: id,
+        userId,
+        verdict: 'approved',
+        cardKind: approvedKind,
+        surface: 'opportunity-inbox',
+      });
+      revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
+
+      return NextResponse.json(
+        {
+          ok: true,
+          approvalId: id,
+          status: 'approved-awaiting-connector-execution',
         },
         { status: 200, headers: NO_STORE_HEADERS }
       );

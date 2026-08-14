@@ -17,6 +17,7 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 import { BRAND_DEAL_OPPORTUNITY_KIND } from '@/lib/connectors/brand-deal-opportunity';
+import { SOCIAL_REPLY_ACTION_KIND } from '@/lib/connectors/social-replies/stage-actions';
 import { db } from '@/lib/db';
 import { suggestedActionStatusEnum } from '@/lib/db/schema/enums';
 import {
@@ -192,6 +193,29 @@ describe('recoverOrphanedApprovedAction', () => {
         userId: USER_ID,
       })
     ).resolves.toBe('invalid-decision-only');
+
+    expect(db.select).toHaveBeenCalledOnce();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('keeps approved social replies out of the calendar executor', async () => {
+    mockSelectChain([
+      {
+        id: ACTION_ID,
+        status: 'approved',
+        userId: USER_ID,
+        payload: { targetId: 'comment-1' },
+        kind: SOCIAL_REPLY_ACTION_KIND,
+        signalType: 'fan_reply',
+      },
+    ]);
+
+    await expect(
+      recoverOrphanedApprovedAction({
+        approvalId: ACTION_ID,
+        userId: USER_ID,
+      })
+    ).resolves.toBe('decision-only');
 
     expect(db.select).toHaveBeenCalledOnce();
     expect(db.insert).not.toHaveBeenCalled();

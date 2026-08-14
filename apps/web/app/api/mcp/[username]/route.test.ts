@@ -20,6 +20,7 @@ const hoisted = vi.hoisted(() => ({
   selectMerchDesign: vi.fn(),
   publishMerchCard: vi.fn(),
   proposeMerchAction: vi.fn(),
+  stageSocialReplyBatch: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -35,6 +36,15 @@ vi.mock('@/lib/auth/cached', () => ({
 vi.mock('@/lib/chat/tools/merch-propose', () => ({
   proposeMerchAction: hoisted.proposeMerchAction,
 }));
+
+vi.mock('@/lib/connectors/social-replies', async importOriginal => {
+  const original =
+    await importOriginal<typeof import('@/lib/connectors/social-replies')>();
+  return {
+    ...original,
+    stageSocialReplyBatch: hoisted.stageSocialReplyBatch,
+  };
+});
 
 vi.mock('@/lib/discography/queries', () => ({
   getReleasesForProfileLite: hoisted.getReleasesForProfileLite,
@@ -333,6 +343,87 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
       profileId: 'p1',
       clerkUserId: 'owner-1',
     });
+  });
+
+  it('stages social replies as draft-only Inbox work for the owner', async () => {
+    hoisted.getCachedAuth.mockResolvedValue({ userId: 'owner-1' });
+    hoisted.stageSocialReplyBatch.mockResolvedValue({
+      batchId: 'batch-1',
+      draftFingerprint: 'fingerprint-1',
+      actions: [{ id: 'action-1', targetId: 'comment-1', status: 'created' }],
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest({
+        jsonrpc: '2.0',
+        id: 13,
+        method: 'tools/call',
+        params: {
+          name: 'stage_social_replies',
+          arguments: {
+            batchId: 'batch-1',
+            targets: [
+              {
+                platform: 'youtube',
+                sourceId: 'video-1',
+                targetId: 'comment-1',
+                draftedText: 'Thank you for listening.',
+              },
+            ],
+          },
+        },
+      }),
+      { params: Promise.resolve({ username: 'artist1' }) }
+    );
+
+    const body = await response.json();
+    expect(body.result.content[0].text).toContain('draftOnly');
+    expect(hoisted.stageSocialReplyBatch).toHaveBeenCalledWith({
+      appUserId: 'owner-1',
+      profileId: 'p1',
+      batch: {
+        batchId: 'batch-1',
+        mode: 'draft',
+        targets: [
+          expect.objectContaining({
+            platform: 'youtube',
+            targetId: 'comment-1',
+          }),
+        ],
+      },
+    });
+  });
+
+  it('does not stage social replies without authentication', async () => {
+    hoisted.getCachedAuth.mockResolvedValue({ userId: null });
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest({
+        jsonrpc: '2.0',
+        id: 14,
+        method: 'tools/call',
+        params: {
+          name: 'stage_social_replies',
+          arguments: {
+            batchId: 'batch-1',
+            targets: [
+              {
+                platform: 'youtube',
+                sourceId: 'video-1',
+                targetId: 'comment-1',
+                draftedText: 'Thank you for listening.',
+              },
+            ],
+          },
+        },
+      }),
+      { params: Promise.resolve({ username: 'artist1' }) }
+    );
+
+    const body = await response.json();
+    expect(body.error.message).toContain('Authentication required');
+    expect(hoisted.stageSocialReplyBatch).not.toHaveBeenCalled();
   });
 
   it('returns 404 with null id when artist is not found (pre-body-parse)', async () => {

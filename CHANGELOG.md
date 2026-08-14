@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- **Inbox can stage social-reply work safely:** authenticated MCP clients can add unique draft replies as fan activity, approvals remain decision-only until a connector executor owns the send, and the YouTube dogfood CLI verifies account identity, unanswered state, exact approval, paced writes, and remote receipts before reporting success.
 
 ## [26.8.0] - 2026-08-14
 - **Mac app recovers from a black launch window (JOV-5086):** packaged Jovie.app now paints a loading splash immediately, and a hung or blank hosted page shows Retry instead of staying black forever.

@@ -52,6 +52,20 @@ describe('classifyOpportunitySignalType', () => {
     ).toBe('new_profile_match');
     expect(
       classifyOpportunitySignalType({
+        kind: 'social.reply',
+        payload: {},
+        rationale: null,
+      })
+    ).toBe('fan_reply');
+    expect(
+      classifyOpportunitySignalType({
+        kind: 'collab.request',
+        payload: {},
+        rationale: null,
+      })
+    ).toBe('collab_request');
+    expect(
+      classifyOpportunitySignalType({
         kind: 'brand_deal.opportunity',
         payload: {},
         rationale: null,
@@ -152,6 +166,10 @@ describe('OPPORTUNITY_SIGNAL_TYPE_META', () => {
     expect(OPPORTUNITY_SIGNAL_TYPE_META.new_event.label).toBe('New Event');
     expect(OPPORTUNITY_SIGNAL_TYPE_META.new_profile_match.label).toBe(
       'Profile Match'
+    );
+    expect(OPPORTUNITY_SIGNAL_TYPE_META.fan_reply.label).toBe('Fan Reply');
+    expect(OPPORTUNITY_SIGNAL_TYPE_META.collab_request.label).toBe(
+      'Collab Request'
     );
     expect(OPPORTUNITY_SIGNAL_TYPE_META.brand_deal.label).toBe('Brand Deal');
     expect(OPPORTUNITY_SIGNAL_TYPE_META.other.label).toBe('Suggestion');

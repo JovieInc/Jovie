@@ -20,6 +20,7 @@ import {
   parseBrandDealOpportunity,
 } from '@/lib/connectors/brand-deal-opportunity';
 import { isMissingConnectorWorkflowTablesError } from '@/lib/connectors/schema-errors';
+import { SOCIAL_REPLY_ACTION_KIND } from '@/lib/connectors/social-replies/stage-actions';
 import { db } from '@/lib/db';
 import { suggestedActions, workflowRuns } from '@/lib/db/schema/connectors';
 import { logger } from '@/lib/utils/logger';
@@ -114,6 +115,10 @@ export async function recoverOrphanedApprovedAction(input: {
         : 'invalid-decision-only';
     }
 
+    if (action.kind === SOCIAL_REPLY_ACTION_KIND) {
+      return 'decision-only';
+    }
+
     const [existingRun] = await db
       .select({ id: workflowRuns.id })
       .from(workflowRuns)
@@ -174,6 +179,7 @@ export async function reconcileOrphanedAcceptedActions(
         and(
           eq(suggestedActions.status, 'approved'),
           ne(suggestedActions.kind, BRAND_DEAL_OPPORTUNITY_KIND),
+          ne(suggestedActions.kind, SOCIAL_REPLY_ACTION_KIND),
           or(
             isNull(suggestedActions.signalType),
             ne(suggestedActions.signalType, 'brand_deal')
@@ -188,7 +194,8 @@ export async function reconcileOrphanedAcceptedActions(
       // Defense in depth if a caller or mock bypasses the SQL predicate.
       if (
         action.kind === BRAND_DEAL_OPPORTUNITY_KIND ||
-        action.signalType === 'brand_deal'
+        action.signalType === 'brand_deal' ||
+        action.kind === SOCIAL_REPLY_ACTION_KIND
       ) {
         continue;
       }

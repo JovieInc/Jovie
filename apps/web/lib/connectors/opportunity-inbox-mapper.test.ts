@@ -120,6 +120,40 @@ describe('mapSuggestedActionToInboxCard', () => {
     expect(card.typeLabel).toBe('New Song');
   });
 
+  it('maps social replies into first-class fan activity', () => {
+    const card = mapSuggestedActionToInboxCard({
+      id: 'reply-1',
+      kind: 'social.reply',
+      payload: { title: 'Reply to a YouTube fan' },
+      rationale: 'An unanswered fan comment is ready for review.',
+      createdAt: new Date('2026-08-14T10:00:00.000Z'),
+    });
+
+    expect(card).toMatchObject({
+      signalType: 'fan_reply',
+      typeLabel: 'Fan Reply',
+      category: 'fan_reply',
+      primaryActionLabel: 'Review reply',
+    });
+  });
+
+  it('maps collaboration requests into their own Inbox lane', () => {
+    const card = mapSuggestedActionToInboxCard({
+      id: 'collab-1',
+      kind: 'collab.request',
+      payload: { title: 'Feature request from another artist' },
+      rationale: 'A verified artist asked about a collaboration.',
+      createdAt: new Date('2026-08-14T10:00:00.000Z'),
+    });
+
+    expect(card).toMatchObject({
+      signalType: 'collab_request',
+      typeLabel: 'Collab Request',
+      category: 'collab_request',
+      primaryActionLabel: 'Approve',
+    });
+  });
+
   it('falls back when payload title and rationale are missing', () => {
     const card = mapSuggestedActionToInboxCard({
       id: 'action-2',
