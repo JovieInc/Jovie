@@ -124,6 +124,20 @@ test('autosave and Save As cannot pass as explicit save methods', () => {
   }
 });
 
+test('CLI save() is a valid explicit save method', () => {
+  const receipt = buildPenSaveReceipt(
+    validInput({
+      saveMethod: 'save()',
+      evidence: {
+        ...validInput().evidence,
+        saveResponse: evidence('Saved'),
+      },
+    })
+  );
+  assert.equal(receipt.verdict, 'saved_state_verified');
+  assert.equal(receipt.explicit_save.method, 'save()');
+});
+
 test('save acknowledgment and root readback are mandatory', () => {
   const receipt = buildPenSaveReceipt(
     validInput({ saveAcknowledged: false, readbackVerified: false })

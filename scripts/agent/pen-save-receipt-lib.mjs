@@ -4,7 +4,12 @@ export const PEN_SAVE_RECEIPT_SCHEMA = 'pen-save-receipt/v1';
 
 const editedTitlePattern = /(?:^|\s)[—-]?\s*Edited\s*$/i;
 const sha256Pattern = /^[a-f0-9]{64}$/;
-const explicitSaveMethods = new Set(['Cmd-S', 'editor-save', 'save-document']);
+const explicitSaveMethods = new Set([
+  'Cmd-S',
+  'editor-save',
+  'save-document',
+  'save()',
+]);
 const receiptEvidenceKeys = [
   'pre_app_state_sha256',
   'post_app_state_sha256',
@@ -325,7 +330,7 @@ export function buildPenSaveReceipt(input = {}) {
   if (!explicitSaveMethods.has(input.saveMethod)) {
     block(
       'save_method_invalid',
-      'Save method must be Cmd-S, editor-save, or save-document.'
+      'Save method must be Cmd-S, editor-save, save-document, or save().'
     );
   }
   if (input.dirtyState !== 'clean') {
@@ -448,7 +453,7 @@ export function buildPenSaveReceipt(input = {}) {
     );
   }
   if (
-    !/(?:Cmd-S|editor-save|save-document|Received response: save)/.test(
+    !/(?:Cmd-S|editor-save|save-document|Received response: save|save\(\)|Saved)/.test(
       text(evidence.saveResponse?.content)
     )
   ) {

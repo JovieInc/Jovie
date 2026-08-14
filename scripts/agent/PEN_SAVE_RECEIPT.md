@@ -13,14 +13,17 @@ An agent cannot make a side file canonical by passing it as the expected path.
 
 ## Trust boundary
 
+This receipt is for **batch close / handback**, not a per-edit gate. If the target canvas is open, attach to the live desktop canvas and keep working while it is dirty. See [`PEN_LIVE_CANVAS.md`](PEN_LIVE_CANVAS.md).
+
 Before mutation, capture the active path with Pencil `get_app_state` using all required schema flags. Establish one coordinated writer and mutation batch. After the batch:
 
 1. Capture post-save app state and verify the active path is unchanged.
-2. Explicitly save the existing file with `Cmd-S`, `editor-save`, or `save-document`. Autosave and Save As are rejected.
-3. Capture the explicit save acknowledgment and post-save window state.
-4. Verify the title no longer reports `Edited` and dirty state is `clean` when exposed.
-5. Re-read every intended root and capture a deterministic text/JSON artifact containing the root IDs and relevant fields/sentinels.
-6. Run the receipt gate. It hashes all five evidence artifacts and binds the root IDs and pinned path to their contents.
+2. Explicitly save the existing locked file with `save()`, `Cmd-S`, `editor-save`, or `save-document`. `save({path})`, `--out`, autosave, and Save As are rejected.
+3. Prove disk persist: the locked canonical file's mtime must move (`pen-live-canvas-persist.mjs`). `Saved` text alone is insufficient.
+4. Capture the explicit save acknowledgment and post-save window state.
+5. When dirty state is exposed at handback, prefer `clean`. Dirty during attach/work is not a bail.
+6. Re-read every intended root and capture a deterministic text/JSON artifact containing the root IDs and relevant fields/sentinels.
+7. Run the receipt gate. It hashes all five evidence artifacts and binds the root IDs and pinned path to their contents.
 
 If Pen displays Save/Don't Save, choose **Cancel**. If no dialog is displayed, leave Pen untouched. After a Pen/renderer/MCP restart, disconnect, crash indication, timeout, or unexpected path change, invalidate the writer and batch; do not save, discard, retry, resume, close, or switch.
 
