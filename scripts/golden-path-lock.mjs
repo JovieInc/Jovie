@@ -1,11 +1,7 @@
 #!/usr/bin/env node
 /**
  * Fail-closed golden-path lock CLI (JOV-5085).
- *
- *   node scripts/golden-path-lock.mjs merge-gate
- *   node scripts/golden-path-lock.mjs prod-probe
- *   node scripts/golden-path-lock.mjs autofix --receipt <path>
- *
+ * merge-gate | prod-probe | autofix --receipt <path>
  * Never skip because secrets are missing. Never read E2E_PROD.
  */
 
@@ -75,12 +71,9 @@ function parseArgs(argv) {
 }
 
 function assertNoSignupSecretSkip() {
+  // Presence of signup secrets is fine; the CLI never reads them to skip.
   for (const name of FORBIDDEN_ENV) {
-    if (process.env[name]) {
-      // Presence is fine; using it to skip is not. The CLI never reads these
-      // to decide whether to run. This assertion documents the contract.
-      continue;
-    }
+    void process.env[name];
   }
 }
 

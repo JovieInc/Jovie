@@ -1,13 +1,8 @@
 #!/usr/bin/env node
 /**
- * Fail-closed golden-path lock (JOV-5085).
- *
- * Locked product path (do not invent a new flow):
- *   homepage Get started → /start → logged-out first message sends
- *   → waitlist write only after verified auth
- *
- * Missing secrets are a failure, never a skip. The merge gate never reads
- * E2E_PROD / signup credentials. Prod autofix is Cursor-direct.
+ * Fail-closed golden-path lock (JOV-5085): homepage Get started → /start →
+ * logged-out first message sends → waitlist write only after verified auth.
+ * Missing secrets fail closed. Merge gate never reads E2E_PROD.
  */
 
 export const GOLDEN_PATH_LOCK_SCHEMA = 'jovie-golden-path-lock/v1';
@@ -58,64 +53,13 @@ const FORBIDDEN_SKIP_REASONS = Object.freeze([
   'stub receipt',
 ]);
 
-/**
- * @typedef {object} GoldenPathCheck
- * @property {string} id
- * @property {boolean} ok
- * @property {string} reason
- */
+/** @typedef {{ id: string, ok: boolean, reason: string }} GoldenPathCheck */
+/** @typedef {{ changed: string[], matched: string[], touchesGoldenPath: boolean }} GoldenPathPathClassification */
+/** @typedef {{ schema: string, mode: 'merge-gate'|'prod-probe'|'autofix', ok: boolean, skipped?: boolean, stub?: boolean, alwaysRan?: boolean, origin?: string, fingerprint?: string, testFiles?: string[], classification?: GoldenPathPathClassification, checks?: GoldenPathCheck[] }} GoldenPathReceipt */
+/** @typedef {{ schema: string, mode: 'prod-probe', ok: boolean, skipped: boolean, origin: string, fingerprint: string, checks: GoldenPathCheck[] }} GoldenPathProdProbeReceipt */
+/** @typedef {{ action: 'fail_closed'|'dedup'|'launch', reason: string, fingerprint?: string, existingAgentIds?: string[], openIssueUrl?: string|null, request?: { prompt: { text: string }, source: { repository: string, ref: string }, target: { autoCreatePr: boolean } } }} GoldenPathAutofixPlan */
 
-/**
- * @typedef {object} GoldenPathPathClassification
- * @property {string[]} changed
- * @property {string[]} matched
- * @property {boolean} touchesGoldenPath
- */
-
-/**
- * @typedef {object} GoldenPathReceipt
- * @property {string} schema
- * @property {'merge-gate' | 'prod-probe' | 'autofix'} mode
- * @property {boolean} ok
- * @property {boolean} [skipped]
- * @property {boolean} [stub]
- * @property {boolean} [alwaysRan]
- * @property {string} [origin]
- * @property {string} [fingerprint]
- * @property {string[]} [testFiles]
- * @property {GoldenPathPathClassification} [classification]
- * @property {GoldenPathCheck[]} [checks]
- */
-
-/**
- * @typedef {object} GoldenPathProdProbeReceipt
- * @property {string} schema
- * @property {'prod-probe'} mode
- * @property {boolean} ok
- * @property {boolean} skipped
- * @property {string} origin
- * @property {string} fingerprint
- * @property {GoldenPathCheck[]} checks
- */
-
-/**
- * @typedef {object} GoldenPathAutofixPlan
- * @property {'fail_closed' | 'dedup' | 'launch'} action
- * @property {string} reason
- * @property {string} [fingerprint]
- * @property {string[]} [existingAgentIds]
- * @property {string | null} [openIssueUrl]
- * @property {{
- *   prompt: { text: string },
- *   source: { repository: string, ref: string },
- *   target: { autoCreatePr: boolean },
- * }} [request]
- */
-
-/**
- * @param {string[]} [files]
- * @returns {GoldenPathPathClassification}
- */
+/** @param {string[]} [files] @returns {GoldenPathPathClassification} */
 export function classifyChangedPaths(files = []) {
   const changed = (Array.isArray(files) ? files : [])
     .filter(file => typeof file === 'string' && file.length > 0)
@@ -132,10 +76,7 @@ export function classifyChangedPaths(files = []) {
   };
 }
 
-/**
- * @param {string} [html]
- * @returns {GoldenPathCheck}
- */
+/** @param {string} [html] @returns {GoldenPathCheck} */
 export function evaluateHomepageHtml(html) {
   if (typeof html !== 'string' || html.trim().length === 0) {
     return {
@@ -170,13 +111,7 @@ function bodyTextOf(body) {
   }
 }
 
-/**
- * @param {{
- *   status?: number,
- *   body?: unknown,
- * }} [input]
- * @returns {GoldenPathCheck}
- */
+/** @param {{ status?: number, body?: unknown }} [input] @returns {GoldenPathCheck} */
 export function evaluateChatFirstMessage({ status, body } = {}) {
   const text = bodyTextOf(body);
   if (status === 401) {
@@ -215,12 +150,7 @@ export function evaluateChatFirstMessage({ status, body } = {}) {
   };
 }
 
-/**
- * @param {{
- *   status?: number,
- * }} [input]
- * @returns {GoldenPathCheck}
- */
+/** @param {{ status?: number }} [input] @returns {GoldenPathCheck} */
 export function evaluateWaitlistUnauth({ status } = {}) {
   if (status === 401) {
     return {
@@ -236,15 +166,7 @@ export function evaluateWaitlistUnauth({ status } = {}) {
   };
 }
 
-/**
- * @param {{
- *   homepageHtml?: string,
- *   chatStatus?: number,
- *   chatBody?: unknown,
- *   waitlistStatus?: number,
- * }} [input]
- * @returns {{ ok: boolean, checks: GoldenPathCheck[] }}
- */
+/** @param {{ homepageHtml?: string, chatStatus?: number, chatBody?: unknown, waitlistStatus?: number }} [input] @returns {{ ok: boolean, checks: GoldenPathCheck[] }} */
 export function evaluateProdProbe({
   homepageHtml,
   chatStatus,
@@ -262,28 +184,19 @@ export function evaluateProdProbe({
   };
 }
 
-/**
- * @param {GoldenPathCheck[]} [checks]
- * @returns {string[]}
- */
+/** @param {GoldenPathCheck[]} [checks] @returns {string[]} */
 export function failedCheckIds(checks = []) {
   return checks.filter(check => !check.ok).map(check => check.id);
 }
 
-/**
- * @param {GoldenPathCheck[]} [checks]
- * @returns {string}
- */
+/** @param {GoldenPathCheck[]} [checks] @returns {string} */
 export function buildFingerprint(checks = []) {
   const failed = failedCheckIds(checks);
   const suffix = failed.length > 0 ? failed.join(',') : 'ok';
   return `${GOLDEN_PATH_FINGERPRINT_PREFIX}:${suffix}`;
 }
 
-/**
- * @param {unknown} candidate
- * @returns {{ ok: boolean, errors: string[] }}
- */
+/** @param {unknown} candidate @returns {{ ok: boolean, errors: string[] }} */
 export function validateReceipt(candidate) {
   const errors = [];
   if (
@@ -345,15 +258,7 @@ export function validateReceipt(candidate) {
   return { ok: errors.length === 0, errors };
 }
 
-/**
- * @param {{
- *   ok?: boolean,
- *   checks?: GoldenPathCheck[],
- *   classification?: GoldenPathPathClassification,
- *   testFiles?: readonly string[],
- * }} [input]
- * @returns {GoldenPathReceipt}
- */
+/** @param {{ ok?: boolean, checks?: GoldenPathCheck[], classification?: GoldenPathPathClassification, testFiles?: readonly string[] }} [input] @returns {GoldenPathReceipt} */
 export function buildMergeGateReceipt({
   ok,
   checks,
@@ -372,14 +277,7 @@ export function buildMergeGateReceipt({
   };
 }
 
-/**
- * @param {{
- *   ok?: boolean,
- *   checks?: GoldenPathCheck[],
- *   origin?: string,
- * }} [input]
- * @returns {GoldenPathProdProbeReceipt}
- */
+/** @param {{ ok?: boolean, checks?: GoldenPathCheck[], origin?: string }} [input] @returns {GoldenPathProdProbeReceipt} */
 export function buildProdProbeReceipt({
   ok,
   checks,
@@ -397,15 +295,7 @@ export function buildProdProbeReceipt({
   };
 }
 
-/**
- * @param {{
- *   fingerprint?: string,
- *   checks?: GoldenPathCheck[],
- *   origin?: string,
- *   receipt?: GoldenPathReceipt | null,
- * }} input
- * @returns {string}
- */
+/** @param {{ fingerprint?: string, checks?: GoldenPathCheck[], origin?: string, receipt?: GoldenPathReceipt | null }} input @returns {string} */
 export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
   const failed = (checks ?? []).filter(check => !check.ok);
   const lines = failed.map(check => `- ${check.id}: ${check.reason}`);
@@ -440,18 +330,7 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
     .join('\n');
 }
 
-/**
- * @param {{
- *   cursorApiKey?: string | null,
- *   existingAgentIds?: string[],
- *   openIssueUrl?: string,
- *   fingerprint?: string,
- *   checks?: GoldenPathCheck[],
- *   origin?: string,
- *   receipt?: GoldenPathReceipt | null,
- * }} [input]
- * @returns {GoldenPathAutofixPlan}
- */
+/** @param {{ cursorApiKey?: string | null, existingAgentIds?: string[], openIssueUrl?: string, fingerprint?: string, checks?: GoldenPathCheck[], origin?: string, receipt?: GoldenPathReceipt | null }} [input] @returns {GoldenPathAutofixPlan} */
 export function planAutofix({
   cursorApiKey,
   existingAgentIds = [],
@@ -500,20 +379,13 @@ export function planAutofix({
   };
 }
 
-/**
- * @param {string} apiKey
- * @returns {string}
- */
+/** @param {string} apiKey @returns {string} */
 export function cursorAuthHeader(apiKey) {
   const token = Buffer.from(`${apiKey}:`, 'utf8').toString('base64');
   return `Basic ${token}`;
 }
 
-/**
- * @param {unknown} agents
- * @param {string} [fingerprint]
- * @returns {string[]}
- */
+/** @param {unknown} agents @param {string} [fingerprint] @returns {string[]} */
 export function findOwnedAgents(agents, fingerprint) {
   const list = Array.isArray(agents) ? agents : [];
   const needle = String(fingerprint ?? '');

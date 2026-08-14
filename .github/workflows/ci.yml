@@ -1039,9 +1039,7 @@ jobs:
 
   ci-golden-path-lock:
     name: Golden Path Lock
-    # JOV-5085: fail-closed homepage → /start first-message → waitlist-after-auth.
-    # Cheap focused Vitest only. No Neon, Playwright, or signup secrets.
-    # Missing secrets must not skip this job.
+    # JOV-5085: cheap focused Vitest; no Neon/Playwright/signup secrets.
     if: >-
       github.event_name == 'pull_request' ||
       github.event_name == 'merge_group'
