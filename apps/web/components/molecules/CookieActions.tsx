@@ -5,7 +5,7 @@ import type { CSSProperties } from 'react';
 
 export interface CookieActionsProps {
   readonly onAcceptAll: () => void;
-  readonly onReject: () => void;
+  readonly onRejectAll: () => void;
   readonly onCustomize: () => void;
   readonly className?: string;
   readonly disabled?: boolean;
@@ -13,7 +13,7 @@ export interface CookieActionsProps {
   readonly compact?: boolean;
 }
 
-const secondaryButtonStyle: CSSProperties = {
+const customizeButtonStyle: CSSProperties = {
   backgroundColor: 'var(--linear-bg-button)',
   color: 'var(--linear-text-primary)',
   border: '1px solid var(--linear-border-default)',
@@ -25,9 +25,11 @@ const secondaryButtonStyle: CSSProperties = {
   height: '28px',
 };
 
-const primaryButtonStyle: CSSProperties = {
+/** Shared by Accept all and Reject all so neither choice is visually stronger. */
+const choiceButtonStyle: CSSProperties = {
   backgroundColor: 'var(--linear-btn-primary-bg)',
   color: 'var(--linear-btn-primary-fg)',
+  border: '1px solid var(--linear-btn-primary-bg)',
   borderRadius: 'var(--linear-radius-sm)',
   fontSize: '12px',
   fontWeight: 'var(--linear-font-weight-medium)',
@@ -38,75 +40,72 @@ const primaryButtonStyle: CSSProperties = {
 
 export function CookieActions({
   onAcceptAll,
-  onReject,
+  onRejectAll,
   onCustomize,
   className = '',
   disabled = false,
   compact = false,
 }: CookieActionsProps) {
   const containerClass = compact
-    ? `flex shrink-0 flex-row items-center flex-wrap gap-1 ${className}`
+    ? `flex shrink-0 flex-row flex-wrap items-center ${className}`
     : `flex shrink-0 flex-col sm:flex-row sm:flex-wrap ${className}`;
   const containerGap = compact ? '4px' : 'var(--linear-space-2)';
 
-  const secStyle: CSSProperties = compact
+  const customizeStyle: CSSProperties = compact
     ? {
-        ...secondaryButtonStyle,
+        ...customizeButtonStyle,
         fontSize: '12px',
         padding: '6px',
         height: '44px',
       }
-    : secondaryButtonStyle;
-  const priStyle: CSSProperties = compact
+    : customizeButtonStyle;
+  const choiceStyle: CSSProperties = compact
     ? {
-        ...primaryButtonStyle,
+        ...choiceButtonStyle,
         fontSize: '12px',
         padding: '6px 8px',
         height: '44px',
       }
-    : primaryButtonStyle;
+    : choiceButtonStyle;
 
   const btnBase =
-    'transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent';
-  const rejectClass = compact ? btnBase : `${btnBase} flex-1 sm:flex-none`;
-  const customClass = compact ? btnBase : `${btnBase} flex-1 sm:flex-none`;
-  const acceptClass = compact
-    ? `${btnBase} shrink-0`
-    : `${btnBase} w-full sm:w-auto hover:opacity-90`;
+    'min-w-0 flex-1 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent sm:flex-none';
 
   return (
-    <div className={containerClass} style={{ gap: containerGap }}>
-      <div
-        className='flex'
-        style={{ gap: compact ? '4px' : 'var(--linear-space-2)' }}
+    <div
+      className={containerClass}
+      style={{ gap: containerGap }}
+      data-testid='cookie-actions'
+    >
+      <button
+        type='button'
+        onClick={onRejectAll}
+        disabled={disabled}
+        className={btnBase}
+        style={choiceStyle}
+        data-testid='cookie-action-reject-all'
       >
-        <button
-          type='button'
-          onClick={onReject}
-          disabled={disabled}
-          className={rejectClass}
-          style={secStyle}
-        >
-          Reject
-        </button>
-        <button
-          type='button'
-          onClick={onCustomize}
-          disabled={disabled}
-          className={customClass}
-          style={secStyle}
-        >
-          Customize
-        </button>
-      </div>
+        Reject all
+      </button>
+      <button
+        type='button'
+        onClick={onCustomize}
+        disabled={disabled}
+        className={btnBase}
+        style={customizeStyle}
+        data-testid='cookie-action-customize'
+      >
+        Customize
+      </button>
       <button
         type='button'
         onClick={onAcceptAll}
         disabled={disabled}
-        className={acceptClass}
-        style={priStyle}
+        className={btnBase}
+        style={choiceStyle}
+        data-testid='cookie-action-accept-all'
       >
-        Accept All
+        Accept all
       </button>
     </div>
   );

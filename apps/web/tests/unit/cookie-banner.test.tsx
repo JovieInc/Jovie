@@ -22,30 +22,65 @@ function setCookie(value: string) {
 describe('CookieActions', () => {
   it('keeps every compact action touch-sized and dispatches its callback', () => {
     const onAcceptAll = vi.fn();
-    const onReject = vi.fn();
+    const onRejectAll = vi.fn();
     const onCustomize = vi.fn();
 
     render(
       <CookieActions
         compact
         onAcceptAll={onAcceptAll}
-        onReject={onReject}
+        onRejectAll={onRejectAll}
         onCustomize={onCustomize}
       />
     );
 
     const actions = [
-      screen.getByRole('button', { name: /reject/i }),
-      screen.getByRole('button', { name: /customize/i }),
-      screen.getByRole('button', { name: /accept all/i }),
+      screen.getByRole('button', { name: 'Reject all' }),
+      screen.getByRole('button', { name: 'Customize' }),
+      screen.getByRole('button', { name: 'Accept all' }),
     ];
     for (const action of actions) {
       expect(action).toHaveStyle({ height: '44px' });
       fireEvent.click(action);
     }
-    expect(onReject).toHaveBeenCalledOnce();
+    expect(onRejectAll).toHaveBeenCalledOnce();
     expect(onCustomize).toHaveBeenCalledOnce();
     expect(onAcceptAll).toHaveBeenCalledOnce();
+  });
+
+  it('keeps Accept all and Reject all comparably prominent on the same layer', () => {
+    render(
+      <CookieActions
+        compact
+        onAcceptAll={vi.fn()}
+        onRejectAll={vi.fn()}
+        onCustomize={vi.fn()}
+      />
+    );
+
+    const rejectAll = screen.getByTestId('cookie-action-reject-all');
+    const customize = screen.getByTestId('cookie-action-customize');
+    const acceptAll = screen.getByTestId('cookie-action-accept-all');
+    const layer = screen.getByTestId('cookie-actions');
+
+    expect(layer).toContainElement(rejectAll);
+    expect(layer).toContainElement(customize);
+    expect(layer).toContainElement(acceptAll);
+    expect(rejectAll).toHaveTextContent('Reject all');
+    expect(acceptAll).toHaveTextContent('Accept all');
+    expect(customize).toHaveTextContent('Customize');
+
+    for (const property of [
+      'backgroundColor',
+      'color',
+      'border',
+      'fontSize',
+      'fontWeight',
+      'height',
+      'padding',
+    ] as const) {
+      expect(acceptAll).toHaveStyle({ [property]: rejectAll.style[property] });
+    }
   });
 });
 
@@ -59,7 +94,13 @@ describe('CookieBannerSection', () => {
     render(<CookieBannerSection />);
     expect(screen.getByTestId('cookie-banner')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /accept all/i })
+      screen.getByRole('button', { name: 'Accept all' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Reject all' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Customize' })
     ).toBeInTheDocument();
   });
 
@@ -125,12 +166,14 @@ describe('CookieBannerSection', () => {
       screen.queryByRole('button', { name: /manage/i })
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /accept all/i })
+      screen.getByRole('button', { name: 'Accept all' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /customize/i })
+      screen.getByRole('button', { name: 'Customize' })
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /reject/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Reject all' })
+    ).toBeInTheDocument();
     for (const button of screen.getAllByRole('button')) {
       expect(button).toHaveStyle({ height: '44px' });
     }

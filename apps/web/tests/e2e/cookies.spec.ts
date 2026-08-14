@@ -3,7 +3,7 @@
  *
  * Covers:
  *   - cookie banner appears for new visitors (requires jv_cc_required=1)
- *   - "Accept All" button is clickable (has nonzero bounding box)
+ *   - "Accept all" and "Reject all" are same-layer, equally prominent, and clickable
  *   - "Customize" button opens the modal which contains "Save Preferences"
  *
  * The banner is only rendered when `jv_cc_required=1` cookie is present
@@ -91,7 +91,7 @@ test.describe('Cookie banner @smoke', () => {
     expect(box!.width, 'Cookie banner has zero width').toBeGreaterThan(0);
     expect(box!.height, 'Cookie banner has zero height').toBeGreaterThan(0);
 
-    for (const actionName of ['Reject', 'Customize', 'Accept All']) {
+    for (const actionName of ['Reject all', 'Customize', 'Accept all']) {
       const actionBox = await banner
         .getByRole('button', { name: actionName, exact: true })
         .boundingBox();
@@ -107,7 +107,7 @@ test.describe('Cookie banner @smoke', () => {
     }
   });
 
-  test('Accept All button is clickable and has nonzero bounding box', async ({
+  test('Accept all button is clickable and persists every optional category', async ({
     page,
   }) => {
     test.setTimeout(90_000);
@@ -118,27 +118,83 @@ test.describe('Cookie banner @smoke', () => {
     await expect(banner).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
 
     // Floating-card actions stay directly available at every breakpoint.
-    const acceptBtn = banner.getByRole('button', { name: 'Accept All' });
+    const acceptBtn = banner.getByRole('button', { name: 'Accept all' });
 
     await expect(
       acceptBtn,
-      '"Accept All" button not found in cookie banner'
+      '"Accept all" button not found in cookie banner'
     ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
 
     const box = await acceptBtn.boundingBox();
-    expect(box, '"Accept All" button has no bounding box').not.toBeNull();
+    expect(box, '"Accept all" button has no bounding box').not.toBeNull();
     expect(
       box!.width,
-      '"Accept All" button misses 44px touch width'
+      '"Accept all" button misses 44px touch width'
     ).toBeGreaterThanOrEqual(44);
     expect(
       box!.height,
-      '"Accept All" button misses 44px touch height'
+      '"Accept all" button misses 44px touch height'
     ).toBeGreaterThanOrEqual(44);
 
-    // Clicking must not throw and must dismiss the banner
     await acceptBtn.click();
     await expect(banner).toBeHidden({ timeout: 5_000 });
+    await expect
+      .poll(async () =>
+        page.evaluate(() => {
+          const raw = localStorage.getItem('jv_cc');
+          return raw ? JSON.parse(raw) : null;
+        })
+      )
+      .toMatchObject({
+        essential: true,
+        analytics: true,
+        marketing: true,
+      });
+  });
+
+  test('Reject all button is clickable and leaves only essential consent', async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+
+    await openHomepageWithBanner(page);
+
+    const banner = page.locator('[data-testid="cookie-banner"]');
+    await expect(banner).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+
+    const rejectBtn = banner.getByRole('button', { name: 'Reject all' });
+    await expect(
+      rejectBtn,
+      '"Reject all" button not found in cookie banner'
+    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+
+    const acceptBtn = banner.getByRole('button', { name: 'Accept all' });
+    const rejectBox = await rejectBtn.boundingBox();
+    const acceptBox = await acceptBtn.boundingBox();
+    expect(rejectBox, '"Reject all" button has no bounding box').not.toBeNull();
+    expect(acceptBox, '"Accept all" button has no bounding box').not.toBeNull();
+    expect(rejectBox!.height, '"Reject all" is shorter than Accept all').toBe(
+      acceptBox!.height
+    );
+    expect(
+      Math.abs(rejectBox!.width - acceptBox!.width),
+      'Accept all and Reject all widths are not comparable'
+    ).toBeLessThanOrEqual(8);
+
+    await rejectBtn.click();
+    await expect(banner).toBeHidden({ timeout: 5_000 });
+    await expect
+      .poll(async () =>
+        page.evaluate(() => {
+          const raw = localStorage.getItem('jv_cc');
+          return raw ? JSON.parse(raw) : null;
+        })
+      )
+      .toMatchObject({
+        essential: true,
+        analytics: false,
+        marketing: false,
+      });
   });
 
   test('Customize button opens modal with Save Preferences button', async ({

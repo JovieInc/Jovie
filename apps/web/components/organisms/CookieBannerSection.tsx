@@ -182,7 +182,7 @@ export function CookieBannerSection() {
     void persistConsent(consent);
   };
 
-  const reject = () => {
+  const rejectAll = () => {
     const consent = { essential: true, analytics: false, marketing: false };
     void persistConsent(consent);
   };
@@ -229,7 +229,7 @@ export function CookieBannerSection() {
                   <CookieActions
                     compact
                     onAcceptAll={acceptAll}
-                    onReject={reject}
+                    onRejectAll={rejectAll}
                     onCustomize={() => setCustomize(true)}
                     disabled={isSavingConsent}
                   />
