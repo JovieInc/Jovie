@@ -319,6 +319,10 @@ describe('merge_group workflow contract', () => {
     expect(unitTests).toContain(
       "shard: ['1/10', '2/10', '3/10', '4/10', '5/10', '6/10', '7/10', '8/10', '9/10', '10/10']"
     );
+    expect(unitTests).toContain(
+      "matrix.shard == '1/10'\n        run: pnpm turbo test --filter=@jovie/ui"
+    );
+    expect(unitTests).not.toContain("matrix.shard == '1/5'");
     expect(unitTests).toContain('max-parallel: 120');
     expect(getJobBlock(CI_WORKFLOW, 'ci-a11y')).not.toContain(
       "github.event_name == 'merge_group'"
