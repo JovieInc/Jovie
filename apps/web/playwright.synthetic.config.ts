@@ -19,7 +19,7 @@ export default defineConfig({
     '**/synthetic-auth-ui.spec.ts',
     '**/synthetic-golden-path.spec.ts',
     '**/synthetic-legacy-otp.spec.ts',
-    '**/synthetic-better-auth-account.spec.ts',
+    '**/synthetic-production-waitlist.spec.ts',
     '**/onboarding-robot.full.spec.ts',
     '**/public-profile-smoke.spec.ts',
     // Production Journey Auditor: anonymous signup→interview initialization
