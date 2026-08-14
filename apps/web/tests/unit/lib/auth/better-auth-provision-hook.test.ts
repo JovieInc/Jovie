@@ -222,6 +222,66 @@ describe('Better Auth base URL', () => {
   });
 });
 
+async function loadTrustedOrigins(): Promise<string[]> {
+  mocks.betterAuth.mockClear();
+  vi.resetModules();
+  await import('@/lib/auth/better-auth');
+  const trustedOrigins = getOptions().trustedOrigins;
+  expect(trustedOrigins).toBeTypeOf('function');
+  const origins =
+    typeof trustedOrigins === 'function' ? trustedOrigins() : trustedOrigins;
+  expect(Array.isArray(origins)).toBe(true);
+  return origins as string[];
+}
+
+describe('Better Auth trusted origins (JOV-5111)', () => {
+  it('trusts exact preview Vercel hosts and never a wildcard', async () => {
+    mocks.env.VERCEL_ENV = 'preview';
+    mocks.env.VERCEL_URL = 'jovie-preview-abc.vercel.app';
+    mocks.env.VERCEL_BRANCH_URL = 'jovie-git-auth-jovie.vercel.app';
+
+    const origins = await loadTrustedOrigins();
+
+    expect(origins).toEqual(
+      expect.arrayContaining([
+        'https://jov.ie',
+        'https://staging.jov.ie',
+        'logyourbody://',
+        'https://jovie-preview-abc.vercel.app',
+        'https://jovie-git-auth-jovie.vercel.app',
+      ])
+    );
+    expect(origins).not.toContain(undefined);
+    expect(origins).not.toContain('https://*.vercel.app');
+    expect(origins.every(origin => typeof origin === 'string')).toBe(true);
+  });
+
+  it('trusts the exact production Vercel deploy host used by smoke-prod-auth', async () => {
+    mocks.env.VERCEL_ENV = 'production';
+    mocks.env.VERCEL_URL = 'jovie-kt7t5zw6u-jovie.vercel.app';
+    mocks.env.VERCEL_BRANCH_URL = undefined;
+
+    const origins = await loadTrustedOrigins();
+
+    expect(origins).toContain('https://jov.ie');
+    expect(origins).toContain('https://jovie-kt7t5zw6u-jovie.vercel.app');
+    expect(origins).not.toContain(undefined);
+    expect(origins).not.toContain('https://*.vercel.app');
+  });
+
+  it('omits empty Vercel hosts so origin matching never sees undefined', async () => {
+    mocks.env.VERCEL_ENV = 'production';
+    mocks.env.VERCEL_URL = undefined;
+    mocks.env.VERCEL_BRANCH_URL = undefined;
+
+    const origins = await loadTrustedOrigins();
+
+    expect(origins).not.toContain(undefined);
+    expect(origins).toContain('https://jov.ie');
+    expect(origins.some(origin => origin.includes('vercel.app'))).toBe(false);
+  });
+});
+
 describe('Better Auth app-user provisioning hook', () => {
   beforeEach(() => {
     mocks.provisionAppUser.mockReset().mockResolvedValue('app-user-id');
