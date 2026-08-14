@@ -30,10 +30,15 @@ export {
   titleLengthBucket,
   watchMinutesPerImpression,
 } from './metrics';
-export { buildChannelIntelligenceReport } from './report';
+export {
+  buildChannelChangePlan,
+  buildChannelIntelligenceReport,
+} from './report';
 export type {
   AnswerChannelIntelligenceQueryInput,
   BuildChannelIntelligenceReportInput,
+  ChannelChangeEvidenceTier,
+  ChannelChangePlanItem,
   ChannelIntelligenceAnswer,
   ChannelIntelligenceIntent,
   ChannelIntelligenceReport,

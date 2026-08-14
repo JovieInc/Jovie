@@ -7,6 +7,7 @@
  */
 
 import { z } from 'zod';
+import { PITCH_GRILL_PROCEDURE } from '@/lib/services/pitch/curator-checklist';
 import {
   PITCH_PLATFORMS,
   PITCH_TARGET_OPTIONS_TEXT,
@@ -54,7 +55,7 @@ export const TOOL_SCHEMAS = {
   },
 
   generateReleasePitch: {
-    description: `Generate one copy-paste-ready release pitch for a destination. Ask where they want to pitch it before using this tool unless the task or user message clearly maps to: ${PITCH_TARGET_OPTIONS_TEXT}.`,
+    description: `Generate one copy-paste-ready release pitch for a destination. Ask where they want to pitch it before using this tool unless the task or user message clearly maps to: ${PITCH_TARGET_OPTIONS_TEXT}. ${PITCH_GRILL_PROCEDURE}`,
     inputSchema: chatToolSchema({
       releaseTitle: z.string().max(200).optional(),
       releaseId: z.string().uuid().optional(),

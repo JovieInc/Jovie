@@ -54,6 +54,67 @@ export const packagingPromiseSchema = z.object({
 
 export type PackagingPromise = z.infer<typeof packagingPromiseSchema>;
 
+export const packagingEvidenceTierSchema = z.enum([
+  'observed',
+  'transcript',
+  'platform_spec',
+  'prior',
+  'unknown',
+]);
+
+export type PackagingEvidenceTier = z.infer<typeof packagingEvidenceTierSchema>;
+
+export const packagingAssetSurfaceSchema = z.enum([
+  'cover',
+  'thumbnail',
+  'channel_art',
+  'title',
+  'other',
+]);
+
+export type PackagingAssetSurface = z.infer<typeof packagingAssetSurfaceSchema>;
+
+export const packagingArtReadinessSchema = z.enum([
+  'uninspected',
+  'needs_work',
+]);
+
+export type PackagingArtReadiness = z.infer<typeof packagingArtReadinessSchema>;
+
+export const packagingFindingSchema = z.object({
+  surface: packagingAssetSurfaceSchema,
+  observation: z.string(),
+  evidence: z.string(),
+  evidenceTier: packagingEvidenceTierSchema,
+  recommendation: z.string(),
+});
+
+export type PackagingFinding = z.infer<typeof packagingFindingSchema>;
+
+export const packagingThumbnailVariantSchema = z.object({
+  headline: z.string(),
+  wordCount: z.number().int().min(1).max(3),
+  concept: z.string(),
+  mobileLegible: z.boolean(),
+  hookOffFace: z.boolean(),
+  coversFace: z.boolean(),
+});
+
+export type PackagingThumbnailVariant = z.infer<
+  typeof packagingThumbnailVariantSchema
+>;
+
+export const packagingSafeZoneCheckSchema = z.object({
+  thumbnail1280x720: z.enum(['pass', 'fail', 'unknown']),
+  channelArt2560x1440Safe1546x423: z.enum(['pass', 'fail', 'unknown']),
+  cover3000x3000JpgRgbNoUrls: z.enum(['pass', 'fail', 'unknown']),
+  notes: z.string(),
+});
+
+export type PackagingSafeZoneCheck = z.infer<
+  typeof packagingSafeZoneCheckSchema
+>;
+
 export const packagingLlmOutputSchema = z.object({
   transcriptSummary: z.string(),
   promise: packagingPromiseSchema,
@@ -65,6 +126,11 @@ export const packagingLlmOutputSchema = z.object({
   }),
   first30sDeliversPromise: z.boolean(),
   first30sAssessment: z.string(),
+  findings: z.array(packagingFindingSchema).min(1).max(8),
+  thumbnailVariants: z.array(packagingThumbnailVariantSchema).length(2),
+  safeZone: packagingSafeZoneCheckSchema,
+  pixelsInspected: z.boolean(),
+  artReadiness: packagingArtReadinessSchema,
 });
 
 export type PackagingLlmOutput = z.infer<typeof packagingLlmOutputSchema>;
@@ -77,6 +143,11 @@ export interface PackagingIntelligence {
   readonly first30sDeliversPromise: boolean;
   readonly first30sAssessment: string;
   readonly niche: PackagingLlmOutput['niche'];
+  readonly findings: readonly PackagingFinding[];
+  readonly thumbnailVariants: readonly PackagingThumbnailVariant[];
+  readonly safeZone: PackagingSafeZoneCheck;
+  readonly pixelsInspected: boolean;
+  readonly artReadiness: PackagingArtReadiness;
   readonly priors: NichePriors;
   readonly transcriptSource: 'provided' | 'captions' | 'asr' | 'none';
   readonly modelUsed: string;

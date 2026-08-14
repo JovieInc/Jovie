@@ -104,11 +104,23 @@ import {
   buildVideoGenerationPrompt,
 } from '@/lib/services/canvas/prompts';
 import type { CanvasGenerationInput } from '@/lib/services/canvas/types';
+import { buildChannelIntelligenceReport } from '@/lib/services/channel-intelligence';
 import {
   buildSystemPrompt as buildInsightSystemPrompt,
   buildUserPrompt as buildInsightUserPrompt,
 } from '@/lib/services/insights/prompts';
 import { buildWelcomeMessage } from '@/lib/services/onboarding/welcome-message';
+import { PACKAGING_AUDIT_SYSTEM_PROMPT } from '@/lib/services/packaging-intelligence/analyze';
+import {
+  evaluateAllPackagingRuleCases,
+  evaluatePackagingRuleCase,
+  PACKAGING_RULE_CASE_IDS,
+  type PackagingRuleCaseId,
+} from '@/lib/services/packaging-intelligence/format-rules';
+import {
+  getPitchChecklistStatus,
+  PITCH_GRILL_PROCEDURE,
+} from '@/lib/services/pitch/curator-checklist';
 import {
   buildPitchDraftSystemPrompt,
   buildPitchDraftUserPrompt,
@@ -117,6 +129,7 @@ import {
 } from '@/lib/services/pitch/prompts';
 import { resolvePitchDestination } from '@/lib/services/pitch/targets';
 import { type PitchInput, PLATFORM_LIMITS } from '@/lib/services/pitch/types';
+import { buildRetouchPrompt } from '@/lib/services/retouching/style';
 import { RECORDABLE_VIDEO_KINDS } from '@/lib/teleprompter/types';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
@@ -5769,6 +5782,61 @@ function evaluateSkillPromptContract(vars: EvalVars) {
       })
     : '';
   const retouchPrompt = registryPathContent(SKILL_REGISTRY.retouch.promptPath);
+  const retouchGenerationPrompt = buildRetouchPrompt({
+    instructions: 'smooth skin',
+  });
+  const chatPitchPrompt = buildSystemPrompt(
+    buildTestArtistContext(),
+    buildTestReleases(),
+    { aiCanUseTools: true, aiDailyMessageLimit: 20 }
+  );
+  const incompleteChecklist = getPitchChecklistStatus({
+    artistName: 'Luna Waves',
+    title: 'Neon Reef',
+    genres: ['dream pop'],
+    releaseDate: '2026-06-19',
+    targetPlaylists: null,
+    whyText: null,
+    instructions: null,
+  });
+  const packagingChangePlan = buildChannelIntelligenceReport({
+    channelId: 'UC_eval',
+    videos: [
+      {
+        videoId: 'best',
+        title: 'Hit Single',
+        publishedAt: '2026-06-01T00:00:00Z',
+        impressions: 8000,
+        views: 400,
+        watchMinutes: 4800,
+        ctr: 0.08,
+        avgViewDurationSeconds: 180,
+        reachTrend: 0.2,
+        hasFace: true,
+        hasText: false,
+        topic: 'music',
+        titleWordCount: 2,
+        durationSeconds: 210,
+      },
+      {
+        videoId: 'weak',
+        title: 'Random Dump',
+        publishedAt: '2026-06-08T00:00:00Z',
+        impressions: 3000,
+        views: 60,
+        watchMinutes: 240,
+        ctr: 0.02,
+        avgViewDurationSeconds: 20,
+        reachTrend: -0.3,
+        hasFace: false,
+        hasText: true,
+        topic: 'vlog',
+        titleWordCount: 8,
+        durationSeconds: 90,
+      },
+    ],
+    nowIso: '2026-08-13T00:00:00Z',
+  });
   const combinedPitchPrompt = [
     playlistSystemPrompt,
     playlistUserPrompt,
@@ -5780,14 +5848,29 @@ function evaluateSkillPromptContract(vars: EvalVars) {
       `${playlistSystemPrompt}\n${draftSystemPrompt}`,
       ['NEVER fabricate', 'Never fabricate']
     ),
-    systemBlocksLinksAndHandles: textIncludesAll(
+    systemBlocksInventedLinksAndHandles: textIncludesAll(
       `${playlistSystemPrompt}\n${draftSystemPrompt}`,
-      ['NEVER include links, @handles', 'Do not include links, @handles']
+      ['NEVER invent links, @handles', 'Do not invent links, @handles']
     ),
     systemUsesArtistVoice: textIncludesAll(
       `${playlistSystemPrompt}\n${draftSystemPrompt}`,
       ['FIRST PERSON', 'first person as the artist']
     ),
+    systemIncludesCuratorChecklist: textIncludesAll(
+      `${playlistSystemPrompt}\n${draftSystemPrompt}\n${playlistUserPrompt}\n${draftUserPrompt}`,
+      ['CURATOR CHECKLIST', 'UNKNOWN', 'Dear Curator']
+    ),
+    chatGrillsOneMissingFieldBeforeDraft: textIncludesAll(chatPitchPrompt, [
+      'ONE missing field',
+      'Spotify or private listen link',
+      'Dear Curator',
+    ]),
+    grillProcedureBlocksPrematureDraft: textIncludesAll(PITCH_GRILL_PROCEDURE, [
+      'Do not call generateReleasePitch',
+      'ONE missing field',
+    ]),
+    incompleteChecklistRefusesSilentDraft:
+      incompleteChecklist.allResolved === false,
     playlistSystemIncludesPlatformLimits: Object.values(PLATFORM_LIMITS).every(
       limit => playlistSystemPrompt.includes(String(limit))
     ),
@@ -5805,11 +5888,72 @@ function evaluateSkillPromptContract(vars: EvalVars) {
     promptAvoidsPrivateContactLeak:
       promptLeakPatterns(combinedPitchPrompt).length === 0,
   };
+  const packagingRuleCases = evaluateAllPackagingRuleCases();
+  const requestedPackagingRuleCase =
+    typeof vars.packagingRuleCase === 'string' &&
+    (PACKAGING_RULE_CASE_IDS as readonly string[]).includes(
+      vars.packagingRuleCase
+    )
+      ? (vars.packagingRuleCase as PackagingRuleCaseId)
+      : null;
+  const requestedPackagingRule = requestedPackagingRuleCase
+    ? evaluatePackagingRuleCase(requestedPackagingRuleCase)
+    : null;
+  const packagingPromptFacts = {
+    evidenceNotVibes: textIncludesAll(PACKAGING_AUDIT_SYSTEM_PROMPT, [
+      'Evidence, not vibes',
+      'observation + evidence',
+      'exactly two thumbnail variants',
+      '≤3 words',
+      '1280×720',
+      '1546×423',
+      '3000×3000',
+      'No overall score',
+    ]),
+    formatSplitCoverVsThumb: textIncludesAll(PACKAGING_AUDIT_SYSTEM_PROMPT, [
+      'no hooky text',
+      'object-fit: contain',
+      'Hook words off the face',
+      'Never overlay a face',
+      '≤3 words',
+    ]),
+    founderLockNoFaceCover: textIncludesAll(PACKAGING_AUDIT_SYSTEM_PROMPT, [
+      'Never cover a face',
+      'gradients',
+      'chrome',
+      'play button',
+    ]),
+    analyzeGateNoClaimWithoutLooking: textIncludesAll(
+      PACKAGING_AUDIT_SYSTEM_PROMPT,
+      ['ANALYZE-GATE', 'not evidence the content is good', 'unknown', 'ready']
+    ),
+    hookTextOnFaceRefused:
+      packagingRuleCases.find(item => item.id === 'hook-text-on-face')
+        ?.passed === true,
+    coverWithHookTextRefused:
+      packagingRuleCases.find(item => item.id === 'cover-with-hook-text')
+        ?.passed === true,
+    noImageUnknownNoReady:
+      packagingRuleCases.find(item => item.id === 'no-image-unknown')
+        ?.passed === true,
+    coverVsThumbOppositeRules:
+      packagingRuleCases.find(item => item.id === 'cover-vs-thumb')?.passed ===
+      true,
+    channelReportIsChangePlan:
+      packagingChangePlan.changePlan.length > 0 &&
+      packagingChangePlan.changePlan[0]?.priority === 1 &&
+      packagingChangePlan.changePlan.every(item => item.observation.length > 0),
+  };
   const retouchGuardrails = [
     "Preserve the person's identity",
     'Do not change protected or sensitive attributes',
     'return a safe refusal',
     'same person',
+    'Intent → Action',
+    'Preserve Clause',
+    'face identity unchanged unless',
+    'replace_bg',
+    'natural skin texture',
   ];
   const missingRetouchGuardrails = retouchGuardrails.filter(
     guardrail => !retouchPrompt.toLowerCase().includes(guardrail.toLowerCase())
@@ -5817,6 +5961,19 @@ function evaluateSkillPromptContract(vars: EvalVars) {
   const missingReleasePitchPromptFacts = Object.entries(releasePitchPromptFacts)
     .filter(([, passed]) => !passed)
     .map(([name]) => name);
+  const missingPackagingPromptFacts = Object.entries(packagingPromptFacts)
+    .filter(([, passed]) => !passed)
+    .map(([name]) => name);
+  const missingRetouchGenerationFacts = [
+    retouchGenerationPrompt.includes('Preserve Clause For This Generation')
+      ? null
+      : 'generationPreserveClause',
+    retouchGenerationPrompt.includes(
+      'Keep face identity unchanged unless the artist explicitly asked to change it'
+    )
+      ? null
+      : 'faceIdentityUnchangedUnlessAsked',
+  ].filter((name): name is string => name !== null);
   const missingExpectedSkillIds = expectedSkillIds
     .filter(skillId => !knownSkillIdSet.has(skillId))
     .sort();
@@ -5860,12 +6017,27 @@ function evaluateSkillPromptContract(vars: EvalVars) {
       missingFacts: missingReleasePitchPromptFacts,
       leakPatterns: promptLeakPatterns(combinedPitchPrompt),
     },
+    packaging: {
+      skillId: 'analyzePackaging',
+      facts: packagingPromptFacts,
+      missingFacts: missingPackagingPromptFacts,
+      changePlanPriorities: packagingChangePlan.changePlan.map(
+        item => item.priority
+      ),
+      ruleCases: packagingRuleCases,
+      ruleCase: requestedPackagingRule?.id ?? null,
+      ruleCasePassed: requestedPackagingRule
+        ? requestedPackagingRule.passed
+        : packagingRuleCases.every(item => item.passed),
+      ruleCaseReason: requestedPackagingRule?.reason ?? null,
+    },
     retouch: {
       skillId: 'retouch',
       promptPath: SKILL_REGISTRY.retouch.promptPath,
       promptLength: retouchPrompt.length,
       requiredGuardrails: retouchGuardrails,
       missingGuardrails: missingRetouchGuardrails,
+      missingGenerationFacts: missingRetouchGenerationFacts,
     },
     toolCalls: [],
     toolResults: [],

@@ -85,6 +85,20 @@ export interface ChannelWinSignal {
   readonly source: MetricSource;
 }
 
+export type ChannelChangeEvidenceTier =
+  | 'reporting_api'
+  | 'derived'
+  | 'learning_layer'
+  | 'insufficient';
+
+export interface ChannelChangePlanItem {
+  readonly priority: number;
+  readonly action: string;
+  readonly observation: string;
+  readonly evidenceTier: ChannelChangeEvidenceTier;
+  readonly sources: readonly MetricSource[];
+}
+
 export interface ChannelIntelligenceReport {
   readonly channelId: string;
   readonly generatedAt: string;
@@ -96,6 +110,7 @@ export interface ChannelIntelligenceReport {
   readonly worstVideos: readonly RankedVideo[];
   readonly decliningVideos: readonly RankedVideo[];
   readonly winSignals: readonly ChannelWinSignal[];
+  readonly changePlan: readonly ChannelChangePlanItem[];
   readonly sources: readonly MetricSource[];
 }
 

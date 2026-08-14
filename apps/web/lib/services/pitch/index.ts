@@ -1,5 +1,11 @@
 export { buildPitchInput } from './build-pitch-input';
 export {
+  formatPitchChecklistForPrompt,
+  getPitchChecklistStatus,
+  PITCH_CHECKLIST_FIELDS,
+  PITCH_GRILL_PROCEDURE,
+} from './curator-checklist';
+export {
   generatePitchDraft,
   generatePitches,
   truncateToLimit,

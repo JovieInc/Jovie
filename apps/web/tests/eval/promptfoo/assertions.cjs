@@ -3611,7 +3611,45 @@ function assertSkillPromptContractCovered(output) {
       `retouch prompt missing guardrails: ${missingGuardrails.join(', ')}`
     );
   }
+  const missingGenerationFacts = Array.isArray(retouch.missingGenerationFacts)
+    ? retouch.missingGenerationFacts
+    : [];
+  if (missingGenerationFacts.length > 0) {
+    return fail(
+      `retouch generation prompt missing facts: ${missingGenerationFacts.join(', ')}`
+    );
+  }
 
+  const packaging = payload.packaging ?? {};
+  if (!packaging || typeof packaging !== 'object') {
+    return fail('skill prompt contract missing packaging payload');
+  }
+  if (packaging.skillId !== 'analyzePackaging') {
+    return fail('packaging payload is not tied to analyzePackaging');
+  }
+  const missingPackagingFacts = Array.isArray(packaging.missingFacts)
+    ? packaging.missingFacts
+    : [];
+  if (missingPackagingFacts.length > 0) {
+    return fail(
+      `packaging prompt missing facts: ${missingPackagingFacts.join(', ')}`
+    );
+  }
+
+  return pass();
+}
+
+function assertPackagingFormatSplitCase(output) {
+  const payload = parseOutput(output);
+  const packaging = payload.packaging ?? {};
+  if (packaging.skillId !== 'analyzePackaging') {
+    return fail('packaging format-split case is not tied to analyzePackaging');
+  }
+  if (packaging.ruleCasePassed !== true) {
+    return fail(
+      `packaging rule case failed: ${String(packaging.ruleCase)} ${String(packaging.ruleCaseReason)}`
+    );
+  }
   return pass();
 }
 
@@ -5104,6 +5142,7 @@ module.exports = {
   assertSkillCatalogSyncContractCovered,
   assertSkillCommandContractCovered,
   assertSkillPromptContractCovered,
+  assertPackagingFormatSplitCase,
   assertAlbumArtProviderContractCovered,
   assertAiToolPromptContractCovered,
   assertChatTitleContractCovered,

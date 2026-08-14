@@ -30,6 +30,16 @@ export {
   MIN_SAMPLE_SIZE,
   resolvePackagingPriors,
 } from './channel-rules';
+export {
+  applyPackagingAnalyzeGate,
+  evaluateAllPackagingRuleCases,
+  evaluatePackagingRuleCase,
+  PACKAGING_ANALYZE_GATE,
+  PACKAGING_FORMAT_SPLIT_RULES,
+  PACKAGING_FOUNDER_LOCK,
+  PACKAGING_RULE_CASE_IDS,
+  recommendationIsRefused,
+} from './format-rules';
 export type {
   AnalyzeVideoPackagingInput,
   AnalyzeVideoPackagingOptions,
@@ -163,6 +173,11 @@ export async function analyzeVideoPackaging(
     first30sDeliversPromise: llmResult.output.first30sDeliversPromise,
     first30sAssessment: llmResult.output.first30sAssessment,
     niche: llmResult.output.niche,
+    findings: llmResult.output.findings,
+    thumbnailVariants: llmResult.output.thumbnailVariants,
+    safeZone: llmResult.output.safeZone,
+    pixelsInspected: llmResult.output.pixelsInspected,
+    artReadiness: llmResult.output.artReadiness,
     priors: getNichePriors(llmResult.output.niche.category),
     transcriptSource: source,
     modelUsed: llmResult.modelUsed,

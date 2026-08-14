@@ -2,14 +2,33 @@
 
 Use this style for Jovie AI retouching when the user asks for the White Space look: cinematic editorial polish, soft natural contrast, clean skin tone handling, and restrained Kodak Portra-inspired color.
 
+## Intent → Action
+
+Map the artist's words to one action. Prefer sequential single-action edits over a kitchen-sink prompt.
+
+| Artist says | Action |
+| --- | --- |
+| smooth skin, blemish, polish, retouch | retouch |
+| better lighting, exposure, color, enhance | enhance |
+| wider, more space, uncrop, extend | extend |
+| no background, new backdrop, replace background | replace_bg |
+
+Default action is retouch. Default intensity is subtle. Keep natural skin texture.
+
 ## Non-Negotiable Guardrails
 
 - Preserve the person's identity, face structure, age appearance, skin tone, hair, body shape, and distinctive features.
+- Face identity unchanged unless the artist explicitly asked to change it.
+- Always name what stays: face, age, skin tone, hair, distinctive features, and wardrobe unless replace_bg or a wardrobe change was requested.
 - Do not change protected or sensitive attributes.
 - Do not add or remove people, tattoos, scars, logos, jewelry, wardrobe items, or identifying marks.
 - Do not sexualize the subject or make the image less safe for work.
 - Do not fabricate text, signatures, documents, credentials, or brand marks.
 - If the input is too low quality or ambiguous to preserve identity confidently, return a safe refusal instead of guessing.
+
+## Preserve Clause
+
+Keep face identity unchanged unless the artist explicitly asked to change it. Name what stays in every generation. Do not beautify into a different person.
 
 ## Visual Direction
 

@@ -182,6 +182,7 @@ import { getInsightsSummary } from '@/lib/services/insights/lifecycle';
 import {
   buildPitchInput,
   generatePitchDraft,
+  PITCH_GRILL_PROCEDURE,
   PITCH_PLATFORMS,
   PITCH_TARGET_OPTIONS_TEXT,
   PITCH_TARGETS,
@@ -1795,7 +1796,7 @@ function createGenerateReleasePitchTool(
   releases: ReleaseContext[]
 ) {
   return tool({
-    description: `Generate one copy-paste-ready release pitch for a specific destination. Use for playlist, radio, Sirius XM, install, playback/music supervisor, editorial post, record label, or collaborator pitching. Ask the artist where they want to pitch it before calling this tool unless a task or user message clearly maps to one of these destinations: ${PITCH_TARGET_OPTIONS_TEXT}. Ask which release they want to pitch if unclear. If the artist provides custom guidance, pass it via instructions.`,
+    description: `Generate one copy-paste-ready release pitch for a specific destination. Use for playlist, radio, Sirius XM, install, playback/music supervisor, editorial post, record label, or collaborator pitching. Ask the artist where they want to pitch it before calling this tool unless a task or user message clearly maps to one of these destinations: ${PITCH_TARGET_OPTIONS_TEXT}. Ask which release they want to pitch if unclear. If the artist provides custom guidance, pass it via instructions. ${PITCH_GRILL_PROCEDURE}`,
     inputSchema: chatToolSchema({
       releaseTitle: z
         .string()

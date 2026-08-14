@@ -147,6 +147,10 @@ function summarizeWorking(
     };
   }
 
+  const planLines = report.changePlan.map(
+    item =>
+      `${item.priority}. ${item.action} — ${item.observation} [${item.evidenceTier}]`
+  );
   const lines = report.winSignals.map(
     (s, i) =>
       `${i + 1}. ${s.summary} (confidence: ${s.confidence}, n=${s.sampleSize})`
@@ -154,7 +158,7 @@ function summarizeWorking(
 
   return {
     intent: 'whats_working',
-    summary: `What correlates with wins on this channel (watch-min/impression):\n${lines.join('\n')}`,
+    summary: `Prioritized change plan (not a score):\n${planLines.join('\n')}\n\nWhat correlates with wins on this channel:\n${lines.join('\n')}`,
     rankedVideos: report.bestVideos.slice(0, 3),
     winSignals: report.winSignals,
     sources: [
@@ -224,8 +228,14 @@ export function answerChannelIntelligenceQuery(
     default:
       return {
         intent: 'unknown',
-        summary:
-          'Ask about your best or worst videos, what is working on this channel, or what is declining. Answers use watch-minutes-per-impression from YouTube Reporting API data.',
+        summary: input.report.changePlan.length
+          ? `Prioritized change plan (not a score):\n${input.report.changePlan
+              .map(
+                item =>
+                  `${item.priority}. ${item.action} — ${item.observation} [${item.evidenceTier}]`
+              )
+              .join('\n')}`
+          : 'Ask about your best or worst videos, what is working on this channel, or what is declining. Answers use watch-minutes-per-impression from YouTube Reporting API data.',
         rankedVideos: input.report.bestVideos.slice(0, 3),
         winSignals: input.report.winSignals.slice(0, 2),
         sources: input.report.sources,

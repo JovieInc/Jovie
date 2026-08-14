@@ -1634,6 +1634,11 @@ tests:
             - "Do not change protected or sensitive attributes"
             - "return a safe refusal"
             - "same person"
+            - "Intent → Action"
+            - "Preserve Clause"
+            - "face identity unchanged unless"
+            - "replace_bg"
+            - "natural skin texture"
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend
@@ -1702,6 +1707,62 @@ tests:
         value: file://assertions.cjs:assertDeterministicNoSpend
       - type: javascript
         value: file://assertions.cjs:assertSkillPromptContractCovered
+
+  - description: Packaging refuses hook text on a face
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Packaging format-split: hook-text-on-face refused"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      packagingRuleCase: hook-text-on-face
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertPackagingFormatSplitCase
+
+  - description: Packaging refuses hooky text on a cover
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Packaging format-split: cover-with-hook-text refused"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      packagingRuleCase: cover-with-hook-text
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertPackagingFormatSplitCase
+
+  - description: Packaging marks uninspected art unknown and will not claim ready
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Packaging analyze-gate: no-image unknown and no ready claim"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      packagingRuleCase: no-image-unknown
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertPackagingFormatSplitCase
+
+  - description: Packaging honors cover vs thumbnail opposite rules
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Packaging format-split: cover-vs-thumb opposite rules"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      packagingRuleCase: cover-vs-thumb
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertPackagingFormatSplitCase
 
   - description: AI chat tool prompt builders preserve no-text and factual guardrails
     metadata:
