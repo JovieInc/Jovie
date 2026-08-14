@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import base64
 import http.server
 import importlib.util
 import io
@@ -26,8 +27,11 @@ CONTROLLER = SOURCE_DIR / "symphony-codex-exhausted.py"
 WRAPPER = SOURCE_DIR / "symphony-codex-exhausted"
 SIDECAR = SOURCE_DIR / "symphony-grok-sidecar"
 GROK_SHIP = SOURCE_DIR / "grok-ship-one"
-RUNTIME_ARTIFACTS = (WRAPPER, CONTROLLER, SIDECAR, GROK_SHIP)
+MODEL_ROUTER = SOURCE_DIR / "model-router.py"
+MODEL_REGISTRY = SOURCE_DIR / "config/model-registry.json"
+RUNTIME_ARTIFACTS = (WRAPPER, CONTROLLER, SIDECAR, GROK_SHIP, MODEL_ROUTER, MODEL_REGISTRY)
 RUNTIME_NAMES = tuple(path.name for path in RUNTIME_ARTIFACTS)
+LAUNCHER_NAMES = (WRAPPER.name, CONTROLLER.name, SIDECAR.name, GROK_SHIP.name)
 
 
 class LinearHandler(http.server.BaseHTTPRequestHandler):
@@ -43,7 +47,7 @@ class LinearHandler(http.server.BaseHTTPRequestHandler):
             ("JOV-2", ("symphony", "plan-approved", "admission-approved")),
             ("LYB-3", ("symphony", "plan-approved", "admission-approved")),
             ("JOV-4", ("symphony", "needs:human")),
-            ("LYB-5", ("symphony", "plan-approved")),
+            ("LYB-5", ("symphony", "hold")),
         )
     ]
     # Override for single-issue admission re-checks (simulates a label guard
@@ -74,6 +78,7 @@ class LinearHandler(http.server.BaseHTTPRequestHandler):
                             "title": f"Ship {identifier}",
                             "description": "Bounded admitted work.",
                             "url": f"https://linear.example/{identifier}",
+                            "updatedAt": "2026-08-14T19:00:00Z",
                             "state": {"id": f"{team}-todo", "name": "Todo"},
                             "team": {
                                 "key": team,
@@ -124,6 +129,7 @@ class GrokLinearHandler(http.server.BaseHTTPRequestHandler):
                         "title": f"Ship {identifier}",
                         "description": "Bounded admitted work.",
                         "url": f"https://linear.example/{identifier}",
+                        "updatedAt": "2026-08-14T19:00:00Z",
                         "state": {"id": f"{team}-todo", "name": "Todo"},
                         "team": {
                             "key": team,
@@ -161,6 +167,22 @@ class FallbackTests(unittest.TestCase):
         python.write_text("#!/bin/sh\nexec /usr/bin/python3 \"$@\"\n")
         python.chmod(0o755)
         self.command("grok", "printf 'GROK_MODEL_READY\\n'")
+        self.model_probe = self.command("model-probe", "echo qwen3-coder:30b")
+        self.model_agent = self.command("model-agent", "exit 0")
+        self.command("flock", "exit 0")
+        self.gate = self.root / "fleet-gate.json"
+        self.gate.write_text(json.dumps({
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "workAdmission": {"allowed": True, "newIssueLeaseAllowed": False},
+        }))
+        self.environment = mock.patch.dict(os.environ, {
+            "GEM_FLEET_GATE_RECEIPT": str(self.gate),
+            "GEM_PR_DRAIN_QWEN": str(self.model_probe),
+            "GEM_QWEN_AGENT_EXECUTABLE": str(self.model_agent),
+        })
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
         self.state = self.root / "state.json"
         self.state.write_text(json.dumps({"active": None, "cooldowns": {"jovie": 1}, "last_error": {}}))
         for account in ("jovie", "meetjovie"):
@@ -184,6 +206,27 @@ class FallbackTests(unittest.TestCase):
             "GEM_CODEX_CANARY_TIMEOUT_SECONDS": "1.0",
             "GEM_GROK_CANARY_TIMEOUT_SECONDS": "1.0",
             "SYMPHONY_GROK_SURVIVAL_SECONDS": "0.01",
+            "GEM_FLEET_GATE_RECEIPT": str(self.gate),
+            "GEM_PR_DRAIN_QWEN": str(self.model_probe),
+            "GEM_QWEN_AGENT_EXECUTABLE": str(self.model_agent),
+            "SYMPHONY_FALLBACK_SELECTION_B64": base64.b64encode(json.dumps({
+                "schema_version": 1,
+                "deterministic_first": True,
+                "selected": {
+                    "id": "grok-composer-2.5-fast",
+                    "provider": "grok",
+                    "model": "grok-composer-2.5-fast",
+                    "executor": {
+                        "executable": str(self.bin / "grok"),
+                        "argv": ["--always-approve", "--cwd", "{cwd}", "-p", "{prompt}"],
+                    },
+                },
+            }).encode()).decode(),
+            "SYMPHONY_FALLBACK_ISSUE_REVISION": "2026-08-14T19:00:00Z",
+            "SYMPHONY_FALLBACK_BUNDLE_REVISION": "a" * 64,
+            "SYMPHONY_FALLBACK_UNIT": "fallback-ship-JOV-7-3247073049db",
+            "SYMPHONY_FALLBACK_LEASE_DIR": str(self.root / "fallback-leases"),
+            "SYMPHONY_FALLBACK_RECEIPT_DIR": str(self.root / "fallback-receipts"),
         })
         env.update({key: str(value) for key, value in overrides.items()})
         return env
@@ -241,18 +284,23 @@ class FallbackTests(unittest.TestCase):
         self.assertTrue(current.is_symlink())
         release = current.resolve()
         for name in RUNTIME_NAMES:
-            self.assertEqual((release / name).read_bytes(), (source_dir / name).read_bytes())
-            self.assertTrue((destination / name).is_file())
-            self.assertEqual(stat.S_IMODE((destination / name).stat().st_mode), 0o755)
-            self.assertNotEqual((destination / name).read_bytes(), (source_dir / name).read_bytes())
+            source = source_dir / name
+            if name == MODEL_REGISTRY.name and not source.is_file():
+                source = source_dir / "config" / name
+            self.assertEqual((release / name).read_bytes(), source.read_bytes())
+            if name in LAUNCHER_NAMES:
+                self.assertTrue((destination / name).is_file())
+                self.assertEqual(stat.S_IMODE((destination / name).stat().st_mode), 0o755)
+                self.assertNotEqual((destination / name).read_bytes(), (source_dir / name).read_bytes())
 
     def distinct_source(self, label):
         source = self.root / f"source-{label}"
         source.mkdir()
         for path in RUNTIME_ARTIFACTS:
             target = source / path.name
-            target.write_bytes(path.read_bytes() + f"\n# {label}-{path.name}\n".encode())
-            target.chmod(0o755)
+            suffix = b"\n" if path == MODEL_REGISTRY else f"\n# {label}-{path.name}\n".encode()
+            target.write_bytes(path.read_bytes() + suffix)
+            target.chmod(path.stat().st_mode)
         return source / CONTROLLER.name
 
     def linear_url(self):
@@ -487,7 +535,7 @@ class FallbackTests(unittest.TestCase):
                     self.assertEqual(module.reconcile(), expected_rc)
                 self.assertEqual(controls, [])
 
-    def test_grok_provider_canary_failures_preserve_symphony(self):
+    def test_model_router_failure_preserves_symphony(self):
         module = self.load_controller_module()
         controls: list[list[str]] = []
         with (
@@ -495,11 +543,7 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
             mock.patch.object(module, "_active_grok_units", return_value=[]),
-            mock.patch.object(
-                module,
-                "_grok_canary_ready",
-                return_value=(False, "grok_provider_probe_failed"),
-            ),
+            mock.patch.object(module, "_model_router_selection", return_value=(None, "model_router_failed")),
             mock.patch.object(
                 module,
                 "_control",
@@ -532,13 +576,24 @@ class FallbackTests(unittest.TestCase):
                             default,
                         )
 
-    def test_grok_provider_is_proven_before_symphony_stops(self):
+    def test_model_router_selection_is_proven_before_symphony_stops(self):
         module = self.load_controller_module()
         events: list[str] = []
 
-        def canary():
-            events.append("grok-canary")
-            return True, "grok_provider_ready"
+        selection = {
+            "schema_version": 1,
+            "deterministic_first": True,
+            "selected": {
+                "id": "qwen-coder-local",
+                "provider": "ollama",
+                "model": "qwen3-coder:30b",
+                "executor": {"executable": "/bin/true", "argv": ["{prompt}"]},
+            },
+        }
+
+        def select():
+            events.append("model-router")
+            return selection, "model_router_ready"
 
         def control(command):
             events.append(" ".join(command))
@@ -549,7 +604,7 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
             mock.patch.object(module, "_linear_identifiers", return_value=["JOV-1"]),
             mock.patch.object(module, "_active_grok_units", side_effect=[[], []]),
-            mock.patch.object(module, "_grok_canary_ready", side_effect=canary),
+            mock.patch.object(module, "_model_router_selection", side_effect=select),
             mock.patch.object(module, "_fetch_single_issue", return_value={}),
             mock.patch.object(module, "_issue_meta", return_value=(False, "blocked", None)),
             mock.patch.object(module, "_control", side_effect=control),
@@ -557,7 +612,7 @@ class FallbackTests(unittest.TestCase):
             self.assertEqual(module.reconcile(), module.EXIT_SAFE_FAIL_CLOSED)
 
         stop = "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service"
-        self.assertLess(events.index("grok-canary"), events.index(stop))
+        self.assertLess(events.index("model-router"), events.index(stop))
 
     def test_live_canary_requires_luna_and_exact_marker(self):
         canary = self.command("codex-rotate", "printf '%s\\n' \"$*\" > \"$GEM_EVENTS\"; printf 'GEM_MODEL_READY\\n'")
@@ -600,7 +655,7 @@ class FallbackTests(unittest.TestCase):
         result = subprocess.run([destination / "symphony-grok-sidecar"], capture_output=True, text=True, env=self.env(GEM_CODEX_ROTATE_BIN=canary, GEM_EVENTS=self.events), check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.events.read_text().splitlines(), [
-            "systemctl --user list-units --type=service --state=active grok-ship-*.service --no-legend --no-pager",
+            "systemctl --user list-units --type=service --state=active grok-ship-*.service fallback-ship-*.service --no-legend --no-pager",
             "systemctl --user start symphony-ui-pilot.service symphony-lyb.service",
             "systemctl --user is-active --quiet symphony-ui-pilot.service",
             "systemctl --user is-active --quiet symphony-lyb.service",
@@ -645,8 +700,8 @@ class FallbackTests(unittest.TestCase):
         stop_index = events.index("systemctl --user stop symphony-ui-pilot.service symphony-lyb.service")
         self.assertLess(stop_index, first_launch, events)
         self.assertEqual(len([line for line in events if line.startswith("systemd-run")]), 2)
-        self.assertTrue(any("grok-ship-LYB-3" in line for line in events))
-        self.assertFalse(any("grok-ship-JOV-4" in line or "grok-ship-LYB-5" in line for line in events))
+        self.assertTrue(any("fallback-ship-LYB-3" in line for line in events))
+        self.assertFalse(any("fallback-ship-JOV-4" in line or "fallback-ship-LYB-5" in line for line in events))
         self.assertNotIn("linear-secret", result.stdout + result.stderr + self.events.read_text())
         self.assertIn("first: 20", LinearHandler.requests[0][1])
         self.assertIn("labels { nodes { name } }", LinearHandler.requests[0][1])
@@ -669,6 +724,8 @@ class FallbackTests(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertEqual(reason, "blocked")
+        symphony_only, reason = module.admission_decision("JOV", "JOV-2", {"symphony"})
+        self.assertTrue(symphony_only, reason)
 
     def test_check_admission_verdicts_match_single_predicate(self):
         url = self.linear_url()
@@ -806,7 +863,7 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "_grok_canary_ready", return_value=(True, "grok_provider_ready")),
             mock.patch.object(module, "_grok_limit", return_value=2),
             mock.patch.object(module, "_fetch_single_issue", return_value=issue),
-            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
+            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {"issue_revision": "2026-08-14T19:00:00Z"})),
             mock.patch.object(module, "_control", side_effect=control),
         ):
             self.assertEqual(module.reconcile(), 2)
@@ -819,7 +876,7 @@ class FallbackTests(unittest.TestCase):
         cleanup_index = next(
             i for i, command in enumerate(controls)
             if command[:3] == ["systemctl", "--user", "stop"]
-            and any(str(item).startswith("grok-ship-") for item in command)
+            and any(str(item).startswith("fallback-ship-") for item in command)
         )
         self.assertLess(stop_index, first_launch)
         self.assertLess(first_launch, cleanup_index)
@@ -828,7 +885,7 @@ class FallbackTests(unittest.TestCase):
     def test_grok_worker_collapse_during_survival_window_restores_symphony(self):
         module = self.load_controller_module()
         controls: list[list[str]] = []
-        unit = "grok-ship-JOV-1.service"
+        unit = module._fallback_unit("JOV-1", "2026-08-14T19:00:00Z") + ".service"
         with (
             mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
@@ -837,7 +894,7 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "_active_grok_units", side_effect=[[], [unit], []]),
             mock.patch.object(module, "_grok_units_after_survival_window", return_value=[]),
             mock.patch.object(module, "_fetch_single_issue", return_value={}),
-            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
+            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {"issue_revision": "2026-08-14T19:00:00Z"})),
             mock.patch.object(
                 module,
                 "_control",
@@ -861,7 +918,7 @@ class FallbackTests(unittest.TestCase):
     def test_collected_collapsed_worker_restores_when_stop_reports_not_loaded(self):
         module = self.load_controller_module()
         controls: list[list[str]] = []
-        unit = "grok-ship-JOV-1.service"
+        unit = module._fallback_unit("JOV-1", "2026-08-14T19:00:00Z") + ".service"
 
         def control(command):
             controls.append(command)
@@ -877,7 +934,7 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "_active_grok_units", side_effect=[[], [unit], []]),
             mock.patch.object(module, "_grok_units_after_survival_window", return_value=[]),
             mock.patch.object(module, "_fetch_single_issue", return_value={}),
-            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
+            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {"issue_revision": "2026-08-14T19:00:00Z"})),
             mock.patch.object(module, "_unit_not_loaded", return_value=True),
             mock.patch.object(module, "_control", side_effect=control),
         ):
@@ -890,7 +947,7 @@ class FallbackTests(unittest.TestCase):
     def test_cleanup_failure_with_loaded_worker_never_restarts_symphony(self):
         module = self.load_controller_module()
         controls: list[list[str]] = []
-        unit = "grok-ship-JOV-1.service"
+        unit = module._fallback_unit("JOV-1", "2026-08-14T19:00:00Z") + ".service"
 
         def control(command):
             controls.append(command)
@@ -906,7 +963,7 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "_active_grok_units", side_effect=[[], [unit]]),
             mock.patch.object(module, "_grok_units_after_survival_window", return_value=[]),
             mock.patch.object(module, "_fetch_single_issue", return_value={}),
-            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
+            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {"issue_revision": "2026-08-14T19:00:00Z"})),
             mock.patch.object(module, "_unit_not_loaded", return_value=False),
             mock.patch.object(module, "_control", side_effect=control),
         ):
@@ -919,7 +976,7 @@ class FallbackTests(unittest.TestCase):
     def test_grok_worker_must_survive_window_before_handoff_succeeds(self):
         module = self.load_controller_module()
         controls: list[list[str]] = []
-        unit = "grok-ship-JOV-1.service"
+        unit = module._fallback_unit("JOV-1", "2026-08-14T19:00:00Z") + ".service"
         with (
             mock.patch.object(module, "codex_canary_ready", return_value=(False, "all_accounts_cooldown")),
             mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
@@ -928,7 +985,7 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "_active_grok_units", side_effect=[[], [unit]]),
             mock.patch.object(module, "_grok_units_after_survival_window", return_value=[unit]),
             mock.patch.object(module, "_fetch_single_issue", return_value={}),
-            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
+            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {"issue_revision": "2026-08-14T19:00:00Z"})),
             mock.patch.object(
                 module,
                 "_control",
@@ -975,7 +1032,7 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "_grok_canary_ready", return_value=(True, "grok_provider_ready")),
             mock.patch.object(module, "_active_grok_units", side_effect=[[], None]),
             mock.patch.object(module, "_fetch_single_issue", return_value={}),
-            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
+            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {"issue_revision": "2026-08-14T19:00:00Z"})),
             mock.patch.object(
                 module,
                 "_control",
@@ -1002,7 +1059,7 @@ class FallbackTests(unittest.TestCase):
                 side_effect=[[], [], ["grok-ship-JOV-1.service"]],
             ),
             mock.patch.object(module, "_fetch_single_issue", return_value={}),
-            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
+            mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {"issue_revision": "2026-08-14T19:00:00Z"})),
             mock.patch.object(
                 module,
                 "_control",
@@ -1047,7 +1104,8 @@ class FallbackTests(unittest.TestCase):
         self.command(
             "git",
             'printf "git %s\\n" "$*" >> "$GEM_EVENTS"\n'
-            '[ "$1" != clone ] || mkdir -p "$5/.git"\n',
+            '[ "$1" != clone ] || mkdir -p "$5/.git"\n'
+            'case "$*" in *"rev-parse HEAD") printf "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\n";; esac\n',
         )
         self.command(
             "gh",
@@ -1073,6 +1131,7 @@ class FallbackTests(unittest.TestCase):
                     GROK_CREATED=created,
                     GROK_SHIP_WS_ROOT=workspace,
                     GROK_SHIP_LOG_DIR=logs,
+                    SYMPHONY_FALLBACK_UNIT=f"fallback-ship-{identifier}-3247073049db",
                     LINEAR_API_KEY="linear-secret",
                     LINEAR_API_URL=linear_url,
                 ),
@@ -1081,8 +1140,50 @@ class FallbackTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(f"git clone --depth 1 https://github.com/{repository}.git", self.events.read_text())
             self.assertIn(f"--cwd {workspace / identifier.split('-', 1)[0] / identifier}", self.events.read_text())
+            receipt = json.loads((self.root / "fallback-receipts" / f"{identifier}.json").read_text())
+            self.assertEqual(receipt["schema"], "symphony-fallback-lease/v1")
+            self.assertEqual(receipt["issueRevision"], "2026-08-14T19:00:00Z")
+            self.assertEqual(receipt["baseRevision"], "b" * 40)
+            self.assertEqual(receipt["bundleRevision"], "a" * 64)
+            self.assertEqual(receipt["ownership"], "isolated-implementation-only")
+            expected_unit = self.load_controller_module()._fallback_unit(identifier, receipt["issueRevision"])
+            self.assertEqual(receipt["unit"], expected_unit)
+            self.assertIn("deploy", receipt["forbidden"])
         mutations = [request["variables"]["input"]["stateId"] for request in GrokLinearHandler.requests if "issueUpdate" in request["query"]]
         self.assertEqual(mutations, ["JOV-progress", "JOV-review", "LYB-progress", "LYB-review"])
+
+    def test_red_fleet_gate_blocks_fallback_before_workspace_or_provider(self):
+        self.command("git", 'printf "git %s\\n" "$*" >> "$GEM_EVENTS"')
+        self.command("gh", "echo 0")
+        self.command("grok", 'printf "grok %s\\n" "$*" >> "$GEM_EVENTS"')
+        red = self.root / "red-gate.json"
+        red.write_text(json.dumps({
+            "schema": "jovie-fleet-gate/v1",
+            "state": "RED",
+            "workAdmission": {"allowed": False},
+        }))
+        result = subprocess.run(
+            [self.install_runtime() / GROK_SHIP.name, "JOV-7"],
+            capture_output=True,
+            text=True,
+            env=self.env(
+                GEM_EVENTS=self.events,
+                GEM_FLEET_GATE_RECEIPT=red,
+                LINEAR_API_KEY="linear-secret",
+                LINEAR_API_URL=self.grok_linear_url(),
+            ),
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("fleet gate blocks isolated work", result.stderr)
+        self.assertFalse(self.events.exists())
+
+    def test_revision_scoped_unit_names_prevent_same_revision_duplicates(self):
+        module = self.load_controller_module()
+        first = module._fallback_unit("JOV-1", "revision-a")
+        self.assertEqual(first, module._fallback_unit("JOV-1", "revision-a"))
+        self.assertNotEqual(first, module._fallback_unit("JOV-1", "revision-b"))
+        self.assertTrue(first.startswith("fallback-ship-JOV-1-"))
 
     def test_grok_ship_one_delegates_admission_and_respects_blocked(self):
         # grok-ship-one must not keep its own copy of the admission predicate:

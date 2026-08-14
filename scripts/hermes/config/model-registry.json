@@ -12,6 +12,16 @@
       "cost_tier": "free-local",
       "executable_env": "GEM_PR_DRAIN_QWEN",
       "executable_default": "/usr/local/bin/ollama",
+      "agent_executable_env": "GEM_QWEN_AGENT_EXECUTABLE",
+      "agent_executable_default": "/home/timwhite/.local/bin/hermes",
+      "agent_argv": [
+        "--provider",
+        "ollama",
+        "--model",
+        "{model}",
+        "--oneshot",
+        "{prompt}"
+      ],
       "probe_argv": ["{executable}", "list"],
       "cooldown_seconds": 900
     },
@@ -23,6 +33,18 @@
       "cost_tier": "gateway-budgeted-paid",
       "executable_env": "GEM_DEEPSEEK_EXECUTABLE",
       "executable_default": "/home/timwhite/.local/bin/hermes",
+      "agent_executable_env": "GEM_DEEPSEEK_EXECUTABLE",
+      "agent_executable_default": "/home/timwhite/.local/bin/hermes",
+      "agent_argv": [
+        "--profile",
+        "gem-shipper",
+        "--provider",
+        "custom:vercel-ai-gateway",
+        "--model",
+        "{model}",
+        "--oneshot",
+        "{prompt}"
+      ],
       "probe_argv": [
         "{executable}",
         "--profile",
@@ -43,6 +65,9 @@
       "cost_tier": "subscription",
       "executable_env": "GEM_GROK_EXECUTABLE",
       "executable_default": "grok",
+      "agent_executable_env": "GEM_GROK_EXECUTABLE",
+      "agent_executable_default": "grok",
+      "agent_argv": ["--always-approve", "--cwd", "{cwd}", "-p", "{prompt}"],
       "probe_argv": ["{executable}", "models"],
       "cooldown_seconds": 1800
     },
@@ -54,6 +79,9 @@
       "cost_tier": "subscription",
       "executable_env": "GEM_CLAUDE_EXECUTABLE",
       "executable_default": "claude",
+      "agent_executable_env": "GEM_CLAUDE_EXECUTABLE",
+      "agent_executable_default": "claude",
+      "agent_argv": ["--dangerously-skip-permissions", "--print", "{prompt}"],
       "probe_argv": ["{executable}", "--version"],
       "cooldown_seconds": 3600
     },

@@ -6,10 +6,21 @@ fail-closed: deterministic gates precede model selection; exception-only
 Codex routes require an explicit flag; cooldowns are persisted atomically.
 """
 from __future__ import annotations
-import argparse, json, os, pathlib, shutil, subprocess, sys, tempfile, time
+
+import argparse
+import json
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
 
 HERE = pathlib.Path(__file__).resolve()
-CONFIG = HERE.parent / "config" / "model-registry.json"
+CONFIG = HERE.with_name("model-registry.json")
+if not CONFIG.is_file():
+    CONFIG = HERE.parent / "config" / "model-registry.json"
 
 def load(path=None):
     p = pathlib.Path(path or os.environ.get("GEM_MODEL_REGISTRY", CONFIG))
@@ -36,7 +47,25 @@ def save_state(d):
 
 def model_map(cfg): return {m["id"]: m for m in cfg["models"]}
 
-def executable(m): return str(os.environ.get(m.get("executable_env", ""), m.get("executable_default", "")))
+def configured_executable(model, prefix=""):
+    env_key = model.get(f"{prefix}executable_env", "")
+    default = model.get(f"{prefix}executable_default", "")
+    return str(os.environ.get(env_key, default))
+
+
+def executable(model):
+    return configured_executable(model)
+
+
+def executor(model):
+    executable_value = configured_executable(model, "agent_")
+    argv = model.get("agent_argv")
+    if not executable_value or not isinstance(argv, list) or not all(isinstance(x, str) for x in argv):
+        return None
+    return {
+        "executable": executable_value,
+        "argv": argv,
+    }
 
 def probe(m, timeout=20):
     exe = executable(m)
@@ -63,8 +92,27 @@ def choose(workflow, capability, allow_exceptions=False, path=None):
         if until > now: candidates.append({"id": mid, "status": "cooldown", "until": until}); continue
         ok, reason = probe(m)
         candidates.append({"id": mid, "status": "ready" if ok else "unavailable", "reason": reason})
+        selected_executor = executor(m)
+        if ok and selected_executor is None:
+            candidates[-1] = {"id": mid, "status": "unavailable", "reason": "executor_invalid"}
+            continue
         if ok:
-            return {"schema_version": 1, "workflow": workflow, "capability": capability, "deterministic_first": True, "config": str(config_path), "selected": {"id": mid, "provider": m["provider"], "model": m["model"], "executable": executable(m), "cost_tier": m["cost_tier"]}, "candidates": candidates}
+            return {
+                "schema_version": 1,
+                "workflow": workflow,
+                "capability": capability,
+                "deterministic_first": True,
+                "config": str(config_path),
+                "selected": {
+                    "id": mid,
+                    "provider": m["provider"],
+                    "model": m["model"],
+                    "executable": executable(m),
+                    "executor": selected_executor,
+                    "cost_tier": m["cost_tier"],
+                },
+                "candidates": candidates,
+            }
     return {"schema_version": 1, "workflow": workflow, "capability": capability, "deterministic_first": True, "config": str(config_path), "selected": None, "candidates": candidates}
 
 def main():
