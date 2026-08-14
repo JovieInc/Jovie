@@ -104,6 +104,14 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST = [
+  '.github/workflows/fleet-gate-refresh.yml',
+  'scripts/hermes/launchd/README.md',
+  'scripts/hermes/launchd/co.jovie.hermes.cron-codex-issue-shipper.plist.template',
+  'scripts/hermes/shipper-gated-entrypoint.py',
+  'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/lib/__tests__/hermes-launchd.test.mjs',
+];
 const PR_SIZE_GUARD_MANIFEST = [
   '.github/workflows/pr-size-guard.yml',
   'scripts/lib/pr-size-guard-policy.mjs',
@@ -388,6 +396,57 @@ describe('automation-verify affected scope', () => {
   it('selects related tests instead of the whole affected workspace package', () => {
     expect(script).toContain('node scripts/run-affected-tests.mjs');
     expect(script).not.toContain('turbo-local.mjs test --affected');
+  });
+
+  it('routes the exact JOV-5006 ops diff to focused infrastructure contracts', () => {
+    const plan = buildAffectedTestPlan(EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST);
+
+    expect(plan).toMatchObject({
+      mode: 'selected',
+      relatedFiles: [],
+      selectedTests: [],
+      pythonUnittestTests: ['scripts/hermes/tests/gem-priority-gate.test.py'],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-harness.test.mjs',
+        'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
+        'scripts/lib/__tests__/ci-branching-guard.test.mjs',
+        'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+        'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
+        'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
+        'scripts/lib/__tests__/eval-main-health-action.test.mjs',
+        'scripts/lib/__tests__/pr-check-failures.test.mjs',
+        'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+        'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+        'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
+        'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
+        'scripts/lib/__tests__/golden-path-lock.test.mjs',
+        'scripts/lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
+        'scripts/lib/__tests__/queue-deferral-receipt.test.mjs',
+        'scripts/lib/__tests__/queue-deferred-release.test.mjs',
+        'scripts/lib/__tests__/setup-worktree-health.test.mjs',
+        'scripts/lib/__tests__/hermes-launchd.test.mjs',
+      ],
+    });
+  });
+
+  it('self-selects the focused JOV-5006 contracts while changing the selector', () => {
+    expect(
+      buildAffectedTestPlan([
+        ...EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST,
+        ...AFFECTED_TEST_SELECTOR_MANIFEST,
+      ]).mode
+    ).toBe('selected');
+  });
+
+  it('fails closed when the JOV-5006 ops signature includes unknown source', () => {
+    expect(
+      buildAffectedTestPlan([
+        ...EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST,
+        'scripts/hermes/unknown-shipper-control.py',
+      ]).mode
+    ).toBe('full');
   });
 
   it('selects the complete Symphony throughput control-plane test lanes', () => {

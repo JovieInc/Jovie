@@ -142,6 +142,46 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST = new Set([
+  '.github/workflows/fleet-gate-refresh.yml',
+  'scripts/hermes/launchd/README.md',
+  'scripts/hermes/launchd/co.jovie.hermes.cron-codex-issue-shipper.plist.template',
+  'scripts/hermes/shipper-gated-entrypoint.py',
+  'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/lib/__tests__/hermes-launchd.test.mjs',
+]);
+const EVENT_DRIVEN_SHIPPER_MANIFEST = new Set([
+  ...EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const CI_CONTROL_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/ci-harness.test.mjs',
+  'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
+  'scripts/lib/__tests__/ci-branching-guard.test.mjs',
+  'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
+  'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
+  'scripts/lib/__tests__/eval-main-health-action.test.mjs',
+  'scripts/lib/__tests__/pr-check-failures.test.mjs',
+  'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
+  'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/golden-path-lock.test.mjs',
+  'scripts/lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/queue-deferral-receipt.test.mjs',
+  'scripts/lib/__tests__/queue-deferred-release.test.mjs',
+  'scripts/lib/__tests__/setup-worktree-health.test.mjs',
+];
+const EVENT_DRIVEN_SHIPPER_SCRIPT_TESTS = [
+  ...CI_CONTROL_SCRIPT_TESTS,
+  'scripts/lib/__tests__/hermes-launchd.test.mjs',
+];
+const EVENT_DRIVEN_SHIPPER_PYTHON_TESTS = [
+  'scripts/hermes/tests/gem-priority-gate.test.py',
+];
 const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = new Set([
   '.husky/pre-push',
   'scripts/automation-verify.sh',
@@ -466,12 +506,21 @@ export function buildAffectedTestPlan(
       nodeTests: SYMPHONY_THROUGHPUT_NODE_TESTS,
     };
   }
+  const isExactEventDrivenShipperPrimary =
+    files.length === EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST.size &&
+    files.every(file => EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST.has(file));
+  const isExactEventDrivenShipperWithSelector =
+    files.length === EVENT_DRIVEN_SHIPPER_MANIFEST.size &&
+    files.every(file => EVENT_DRIVEN_SHIPPER_MANIFEST.has(file));
+  const isExactEventDrivenShipper =
+    isExactEventDrivenShipperPrimary || isExactEventDrivenShipperWithSelector;
   const isBoundedFleetPromotionGateChange =
     files.some(file => FLEET_PROMOTION_GATE_INPUTS.has(file)) &&
     files.every(file => FLEET_PROMOTION_GATE_LANE.has(file));
   const hasUnboundedFleetPromotionGateChange =
     files.some(file => FLEET_PROMOTION_GATE_INPUTS.has(file)) &&
-    !isBoundedFleetPromotionGateChange;
+    !isBoundedFleetPromotionGateChange &&
+    !isExactEventDrivenShipper;
   if (isBoundedFleetPromotionGateChange) {
     return {
       mode: 'selected',
@@ -778,7 +827,11 @@ export function buildAffectedTestPlan(
       ? VERCEL_CONGESTION_CONTROL_PYTHON_TESTS
       : []),
   ]);
+  const pythonUnittestTests = unique([
+    ...(isExactEventDrivenShipper ? EVENT_DRIVEN_SHIPPER_PYTHON_TESTS : []),
+  ]);
   const scriptVitestTests = unique([
+    ...(isExactEventDrivenShipper ? EVENT_DRIVEN_SHIPPER_SCRIPT_TESTS : []),
     ...(isExactPerformanceProfilerRepairPrimary ||
     isExactPerformanceProfilerRepairWithSelectorLegacy
       ? PERFORMANCE_PROFILER_REPAIR_SCRIPT_TESTS
@@ -835,6 +888,8 @@ export function buildAffectedTestPlan(
     if (file.startsWith('apps/web/tests/eval/promptfoo/')) return true;
     if (isInvestorNoteIngestionInput(file)) return true;
     if (isCiCancellationHealerInput(file)) return true;
+    if (isExactEventDrivenShipper && EVENT_DRIVEN_SHIPPER_MANIFEST.has(file))
+      return true;
     if (
       isExactAuthenticatedA11yRepair &&
       AUTHENTICATED_A11Y_REPAIR_CORE.has(file)
@@ -924,7 +979,12 @@ export function buildAffectedTestPlan(
     !isExactRunnerIoPressure &&
     !isExactRunnerPrerequisiteRepair &&
     !isExactLayoutGuardContract &&
+    !isExactEventDrivenShipper &&
     !isExactPrSizeGuardWithSelector;
+  const hasIncompleteEventDrivenShipper =
+    hasManifestInputBeyondDirectTests(EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST) &&
+    !isExactEventDrivenShipper &&
+    !isBoundedFleetPromotionGateChange;
   const hasIncompletePrSizeGuard =
     hasManifestInputBeyondDirectTests(PR_SIZE_GUARD_MANIFEST) &&
     !isExactPrSizeGuard &&
@@ -1033,23 +1093,25 @@ export function buildAffectedTestPlan(
     !isExactLayoutGuardContract &&
     !isExactPrSizeGuardWithSelector;
   const hasUncoveredSource =
-    relatedFiles.some(file => !isCoveredSource(file)) ||
-    hasUnboundedFleetPromotionGateChange ||
-    hasUnknownCiCancellationHealerPeer ||
-    hasStandaloneCiFastLanesChange ||
-    hasIncompletePrerequisiteTrain ||
-    hasStandalonePrerequisiteGlobal ||
-    hasUnknownPrerequisiteTrainPeer ||
-    hasIncompleteVercelCongestionControl ||
-    hasIncompleteAffectedTestSelector ||
-    hasIncompletePrSizeGuard ||
-    hasIncompletePerformanceProfilerRepair ||
-    hasIncompleteScannerLoadRepair ||
-    hasIncompleteMobileOverflowNavigationRace ||
-    hasIncompleteRunnerIoPressure ||
-    hasIncompleteRunnerPrerequisiteContract ||
-    hasIncompleteLayoutGuardContract ||
-    hasIncompleteNeonAttemptArtifactRepair;
+    !isExactEventDrivenShipper &&
+    (relatedFiles.some(file => !isCoveredSource(file)) ||
+      hasUnboundedFleetPromotionGateChange ||
+      hasUnknownCiCancellationHealerPeer ||
+      hasStandaloneCiFastLanesChange ||
+      hasIncompletePrerequisiteTrain ||
+      hasStandalonePrerequisiteGlobal ||
+      hasUnknownPrerequisiteTrainPeer ||
+      hasIncompleteVercelCongestionControl ||
+      hasIncompleteAffectedTestSelector ||
+      hasIncompletePrSizeGuard ||
+      hasIncompletePerformanceProfilerRepair ||
+      hasIncompleteScannerLoadRepair ||
+      hasIncompleteMobileOverflowNavigationRace ||
+      hasIncompleteRunnerIoPressure ||
+      hasIncompleteRunnerPrerequisiteContract ||
+      hasIncompleteLayoutGuardContract ||
+      hasIncompleteEventDrivenShipper ||
+      hasIncompleteNeonAttemptArtifactRepair);
   const hasSelectedTests =
     selectedTests.length > 0 ||
     rootVitestTests.length > 0 ||
@@ -1076,7 +1138,8 @@ export function buildAffectedTestPlan(
             isExactMobileOverflowNavigationRace ||
             isExactRunnerIoPressure ||
             isExactRunnerPrerequisiteRepair ||
-            isExactLayoutGuardContract)
+            isExactLayoutGuardContract ||
+            isExactEventDrivenShipper)
         ? 'selected'
         : relatedFiles.length === 0
           ? 'none'
@@ -1086,6 +1149,7 @@ export function buildAffectedTestPlan(
     selectedTests,
     rootVitestTests,
     pythonTests,
+    pythonUnittestTests,
     scriptVitestTests,
   };
 }
