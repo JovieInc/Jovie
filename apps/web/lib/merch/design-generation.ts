@@ -36,6 +36,17 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 import { resolveMerchCatalogSelection } from './catalog';
+import {
+  MERCH_CONTENT_CONTRACT_VERSION,
+  MERCH_PERSON_CONTENT_PUBLISH_BLOCKER,
+  type MerchContentReview,
+  MerchPersonContentRejectedError,
+  stampMerchContentReview,
+} from './content-contract';
+import {
+  evaluateMerchCandidateReadiness,
+  reviewMerchContent,
+} from './content-review';
 import { MERCH_DEFAULT_PRINTFUL_PRODUCT } from './default-catalog';
 import {
   MERCH_CANONICAL_PIPELINE_ID,
@@ -406,6 +417,32 @@ async function getRecentSelectedStrategyLabels(
  * Logs the batch-level production receipt: canonical path, contract version,
  * per-option terminal mockup disposition, and final batch disposition.
  */
+function toContentReviewView(review: MerchContentReview) {
+  return {
+    contract_version: review.contractVersion,
+    reviewer_version: review.reviewerVersion,
+    verdict: review.verdict,
+    failure_codes: review.failureCodes,
+    confidence: review.confidence,
+    reviewed_at: review.reviewedAt,
+  };
+}
+
+function toContentReviewReceipt(
+  optionId: string,
+  review: MerchContentReview
+): MerchGenerationReceipt['contentReviews'][number] {
+  return {
+    optionId,
+    contractVersion: review.contractVersion,
+    reviewerVersion: review.reviewerVersion,
+    verdict: review.verdict,
+    failureCodes: review.failureCodes,
+    confidence: review.confidence,
+    reviewedAt: review.reviewedAt,
+  };
+}
+
 function logMerchGenerationReceipt(receipt: MerchGenerationReceipt): void {
   logger.info('[merch-generation] production receipt', { ...receipt });
 }
@@ -422,6 +459,7 @@ function schedulePrintfulMockupEnrichment(params: {
   readonly profileId: string;
   readonly startedAt: number;
   readonly requestedDesignCount: number;
+  readonly contentReviews: MerchGenerationReceipt['contentReviews'];
   readonly designs: readonly {
     readonly optionId: string;
     readonly printFileUrl: string;
@@ -450,6 +488,7 @@ function schedulePrintfulMockupEnrichment(params: {
         requestedDesignCount: params.requestedDesignCount,
         readyDesignCount: params.designs.length,
         mockups: outcomes,
+        contentReviews: params.contentReviews,
         disposition: 'ready',
         durationMs: Date.now() - params.startedAt,
       });
@@ -517,10 +556,139 @@ export async function generateMerchDesigns(params: {
     pricing.stripeFeeEstimateCents -
     pricing.refundReserveCents;
 
-  const designs = await Promise.all(
+  const promptReview = reviewMerchContent({ prompt: params.prompt });
+  const catalogWarnings = catalog.productionWarnings.filter(
+    warning =>
+      !warning.toLowerCase().includes('printful is not configured') &&
+      !warning.toLowerCase().includes('catalog pricing unavailable')
+  );
+
+  const persistRejectedOption = async (input: {
+    readonly optionId: string;
+    readonly optionNumber: number;
+    readonly designName: string;
+    readonly concept: string;
+    readonly review: MerchContentReview;
+  }) => {
+    await db.insert(merchDesignOptions).values({
+      id: input.optionId,
+      generationBatchId: generationId,
+      creatorProfileId: params.profileId,
+      optionNumber: input.optionNumber,
+      status: 'rejected',
+      designLane: 'fashion_graphic_item',
+      designName: input.designName,
+      productType: catalog.productType,
+      printfulProductName: catalog.productName,
+      printfulCatalogProductId: catalog.catalogProductId,
+      printfulCatalogVariantIds: catalog.catalogVariantIds,
+      variantMap: catalog.variantMap,
+      colorway: catalog.colorway,
+      availableSizes: catalog.sizes,
+      placements: catalog.placements,
+      technique: catalog.technique,
+      retailPriceCents: pricing.retailPriceCents,
+      estimatedPrintfulProductCostCents:
+        pricing.estimatedPrintfulProductCostCents,
+      estimatedShippingCostCents: pricing.estimatedShippingCostCents,
+      estimatedGrossMarginCents: grossMargin,
+      artistShareCents: pricing.artistPayoutPerUnitEstimateCents,
+      jovieShareCents: pricing.jovieMarginPerUnitEstimateCents,
+      pricing,
+      concept: input.concept,
+      whyItFits: MERCH_PERSON_CONTENT_PUBLISH_BLOCKER,
+      mockupUrls: [],
+      printFileUrls: [],
+      productionWarnings: [
+        ...catalogWarnings,
+        MERCH_PERSON_CONTENT_PUBLISH_BLOCKER,
+      ],
+      qualityReview: {
+        copyrightRisk: 'low',
+        typography: 'generated',
+        printFeasible: false,
+        contractVersion: MERCH_GENERATION_CONTRACT_VERSION,
+        pipeline: MERCH_CANONICAL_PIPELINE_ID,
+        ...stampMerchContentReview(input.review),
+      },
+      learning: {
+        styleLane: 'fashion_graphic_item',
+        typographyStyle: 'rejected',
+        graphicDensity: 'minimal',
+        garmentColor: catalog.colorway,
+        motifs: [],
+        selectedOverOptionIds: [],
+        rejectedAttributes: [...input.review.failureCodes],
+      },
+    });
+  };
+
+  if (!evaluateMerchCandidateReadiness(promptReview).ready) {
+    const optionId = randomUUID();
+    await persistRejectedOption({
+      optionId,
+      optionNumber: 1,
+      designName: `${name} quarantined`,
+      concept: params.prompt,
+      review: promptReview,
+    });
+    const contentReviews = [toContentReviewReceipt(optionId, promptReview)];
+    logMerchGenerationReceipt({
+      pipeline: MERCH_CANONICAL_PIPELINE_ID,
+      contractVersion: MERCH_GENERATION_CONTRACT_VERSION,
+      generationId,
+      profileId: params.profileId,
+      requestedDesignCount: count,
+      readyDesignCount: 0,
+      mockups: [],
+      contentReviews,
+      disposition: 'failed',
+      durationMs: Date.now() - startedAt,
+    });
+    await db
+      .update(merchGenerationBatches)
+      .set({
+        status: 'failed',
+        completedAt: new Date(),
+      })
+      .where(eq(merchGenerationBatches.id, generationId));
+    return {
+      success: true,
+      generationId,
+      prompt: params.prompt,
+      contractVersion: MERCH_GENERATION_CONTRACT_VERSION,
+      contentContractVersion: MERCH_CONTENT_CONTRACT_VERSION,
+      contentReviews: contentReviews.map(review => ({
+        contract_version: review.contractVersion,
+        reviewer_version: review.reviewerVersion,
+        verdict: review.verdict,
+        failure_codes: review.failureCodes,
+        confidence: review.confidence,
+        reviewed_at: review.reviewedAt,
+      })),
+      nextStep: MERCH_PERSON_CONTENT_PUBLISH_BLOCKER,
+      designs: [],
+    };
+  }
+
+  const attempts = await Promise.all(
     directions.map(
-      async (direction, index): Promise<MerchDesignPreview | null> => {
+      async (
+        direction,
+        index
+      ): Promise<{
+        readonly optionId: string;
+        readonly preview: MerchDesignPreview | null;
+        readonly review: MerchContentReview | null;
+      }> => {
         const optionId = randomUUID();
+        const sourceLabel = params.source
+          ? `${params.source.sourceType.replaceAll('_', ' ')}: ${params.source.provenanceTitle}`
+          : null;
+        const designName = params.source
+          ? `${params.source.sourceText} ${direction.label}`
+          : `${name} ${direction.label}`;
+        const concept = `${direction.label} direction: ${params.prompt}${sourceLabel ? ` · Source: ${sourceLabel}` : ''}`;
         try {
           const graphic = await generatePrintGraphic({
             prompt: buildMerchImagePrompt(
@@ -531,18 +699,12 @@ export async function generateMerchDesigns(params: {
               recentSelectedLabels
             ),
             selection: { weights: modelWeights },
+            content: { prompt: params.prompt, concept },
           });
           const previewUrl = await uploadAlphaPng(
             `merch/generated/${params.profileId}/${generationId}/${optionId}.png`,
             graphic.image
           );
-          const sourceLabel = params.source
-            ? `${params.source.sourceType.replaceAll('_', ' ')}: ${params.source.provenanceTitle}`
-            : null;
-          const designName = params.source
-            ? `${params.source.sourceText} ${direction.label}`
-            : `${name} ${direction.label}`;
-          const concept = `${direction.label} direction: ${params.prompt}${sourceLabel ? ` · Source: ${sourceLabel}` : ''}`;
 
           await db.insert(merchDesignOptions).values({
             id: optionId,
@@ -575,22 +737,15 @@ export async function generateMerchDesigns(params: {
               : 'Illustrated graphic generated for this artist without an invented likeness.',
             mockupUrls: [previewUrl],
             printFileUrls: [previewUrl],
-            // Catalog warnings about unavailability stay; cost-source warnings
-            // that mark draft-only should not block when Printful is healthy.
-            productionWarnings: catalog.productionWarnings.filter(
-              warning =>
-                !warning.toLowerCase().includes('printful is not configured') &&
-                !warning.toLowerCase().includes('catalog pricing unavailable')
-            ),
+            productionWarnings: catalogWarnings,
             qualityReview: {
               copyrightRisk: 'low',
               typography: 'generated',
               printFeasible: true,
-              // Canonical-pipeline evidence (JOV-4743): the truthful Printful
-              // mockup is pending until enrichment reaches a terminal state.
               contractVersion: MERCH_GENERATION_CONTRACT_VERSION,
               pipeline: MERCH_CANONICAL_PIPELINE_ID,
               mockupStatus: 'pending_mockup',
+              ...stampMerchContentReview(graphic.contentReview),
             },
             learning: {
               styleLane: 'fashion_graphic_item',
@@ -609,66 +764,87 @@ export async function generateMerchDesigns(params: {
           });
 
           return {
-            id: optionId,
-            option_number: index + 1,
-            design_name: designName,
-            model_key: graphic.modelKey,
-            concept,
-            status: 'ready',
-            // The alpha print art is ready; the truthful Printful product
-            // mockup is not — this candidate stays pending_mockup until the
-            // enrichment worker reaches a terminal state. Never presented as
-            // a finished product photo (JOV-4743).
-            mockup_status: 'pending_mockup',
-            preview_url: previewUrl,
-            slots: {
-              artist_name: name,
-              short_text: params.source.sourceText,
-              source_label: sourceLabel ?? undefined,
-              source_type: params.source.sourceType,
-            },
-            recommended: index === 0,
-            product_name: catalog.productName,
-            product_type: catalog.productType,
-            colorway: catalog.colorway,
-            sale_price: formatMerchMoney(pricing.retailPriceCents),
-            artist_profit: formatMerchMoney(
-              pricing.artistPayoutPerUnitEstimateCents
-            ),
-            fulfillment: 'Printful standard US',
-            profile_destination: 'Artist profile merch section',
-            sellability: {
-              sellable: pricing.printfulCostSource === 'printful',
-              reasons:
-                pricing.printfulCostSource === 'printful'
-                  ? []
-                  : [
-                      'Catalog/fulfillment unavailable; approval will quarantine this item as a private draft.',
-                    ],
+            optionId,
+            review: graphic.contentReview,
+            preview: {
+              id: optionId,
+              option_number: index + 1,
+              design_name: designName,
+              model_key: graphic.modelKey,
+              concept,
+              status: 'ready',
+              mockup_status: 'pending_mockup',
+              preview_url: previewUrl,
+              slots: {
+                artist_name: name,
+                short_text: params.source.sourceText,
+                source_label: sourceLabel ?? undefined,
+                source_type: params.source.sourceType,
+              },
+              recommended: index === 0,
+              product_name: catalog.productName,
+              product_type: catalog.productType,
+              colorway: catalog.colorway,
+              sale_price: formatMerchMoney(pricing.retailPriceCents),
+              artist_profit: formatMerchMoney(
+                pricing.artistPayoutPerUnitEstimateCents
+              ),
+              fulfillment: 'Printful standard US',
+              profile_destination: 'Artist profile merch section',
+              sellability: {
+                sellable: pricing.printfulCostSource === 'printful',
+                reasons:
+                  pricing.printfulCostSource === 'printful'
+                    ? []
+                    : [
+                        'Catalog/fulfillment unavailable; approval will quarantine this item as a private draft.',
+                      ],
+              },
+              content_review: toContentReviewView(graphic.contentReview),
             },
           };
         } catch (error) {
+          if (error instanceof MerchPersonContentRejectedError) {
+            await persistRejectedOption({
+              optionId,
+              optionNumber: index + 1,
+              designName,
+              concept,
+              review: error.review,
+            });
+            logger.warn('[merch-designs] person-content rejected one design', {
+              optionId,
+              failureCodes: error.review.failureCodes,
+            });
+            return { optionId, preview: null, review: error.review };
+          }
           logger.warn('[merch-designs] generation failed for one design', {
             optionId,
             err: error instanceof Error ? error.message : String(error),
           });
-          return null;
+          return { optionId, preview: null, review: null };
         }
       }
     )
   );
 
-  const ready = designs.filter((d): d is MerchDesignPreview => d !== null);
+  const ready = attempts.flatMap(attempt =>
+    attempt.preview ? [attempt.preview] : []
+  );
+  const contentReviews = attempts.flatMap(attempt =>
+    attempt.review
+      ? [toContentReviewReceipt(attempt.optionId, attempt.review)]
+      : []
+  );
 
   logger.info('[merch-designs] generation response ready', {
     ms: Date.now() - startedAt,
     generationId,
     requestedDesignCount: count,
     readyDesignCount: ready.length,
+    contentReviews,
   });
 
-  // Durable + observable: attach the truthful Printful product mockup to each
-  // design and log the terminal production receipt when enrichment settles.
   const enrichmentDesigns = ready.flatMap(d =>
     d.preview_url ? [{ optionId: d.id, printFileUrl: d.preview_url }] : []
   );
@@ -678,6 +854,7 @@ export async function generateMerchDesigns(params: {
       profileId: params.profileId,
       startedAt,
       requestedDesignCount: count,
+      contentReviews,
       designs: enrichmentDesigns,
     });
   } else {
@@ -689,6 +866,7 @@ export async function generateMerchDesigns(params: {
       requestedDesignCount: count,
       readyDesignCount: 0,
       mockups: [],
+      contentReviews,
       disposition: 'failed',
       durationMs: Date.now() - startedAt,
     });
@@ -707,7 +885,20 @@ export async function generateMerchDesigns(params: {
     generationId,
     prompt: params.prompt,
     contractVersion: MERCH_GENERATION_CONTRACT_VERSION,
-    nextStep: 'Pick one and I’ll put it on products.',
+    contentContractVersion: MERCH_CONTENT_CONTRACT_VERSION,
+    contentReviews: contentReviews.map(review => ({
+      contract_version: review.contractVersion,
+      reviewer_version: review.reviewerVersion,
+      verdict: review.verdict,
+      failure_codes: review.failureCodes,
+      confidence: review.confidence,
+      reviewed_at: review.reviewedAt,
+    })),
+    nextStep:
+      ready.length === 0 &&
+      contentReviews.some(review => review.verdict === 'reject')
+        ? MERCH_PERSON_CONTENT_PUBLISH_BLOCKER
+        : 'Pick one and I’ll put it on products.',
     designs: ready,
   };
 }

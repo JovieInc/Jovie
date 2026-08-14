@@ -14,7 +14,8 @@ import 'server-only';
  * - the contract version stamped on every generated option,
  * - the truthful-mockup lifecycle states (`pending_mockup` until the real
  *   Printful mockup exists, then a terminal `mockup_ready`/`mockup_failed`),
- * - the production receipt shape logged for every generation batch.
+ * - the production receipt shape logged for every generation batch,
+ *   including merch content-review evidence (JOV-4740).
  */
 
 export const MERCH_GENERATION_CONTRACT_VERSION = 'merch-generation/v1';
@@ -75,6 +76,16 @@ export interface MerchGenerationReceipt {
     readonly status: MerchMockupStatus;
     readonly attempts: number;
     readonly error?: string;
+  }[];
+  /** Per-option merch content review evidence (JOV-4740). */
+  readonly contentReviews: readonly {
+    readonly optionId: string;
+    readonly contractVersion: string;
+    readonly reviewerVersion: string;
+    readonly verdict: 'pass' | 'reject';
+    readonly failureCodes: readonly string[];
+    readonly confidence: number;
+    readonly reviewedAt: string;
   }[];
   /** Final disposition of the batch: ready (options returned) or failed. */
   readonly disposition: 'ready' | 'failed';

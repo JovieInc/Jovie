@@ -5,6 +5,7 @@ import type {
   MerchPricingSnapshot,
   MerchPrintfulSnapshot,
 } from '@/lib/db/schema/merch';
+import { getMerchContentReviewBlockers } from './content-contract';
 import {
   getMerchSellability,
   type MerchSellabilityOptions,
@@ -21,7 +22,9 @@ type MerchCardSellabilityInput = Pick<
   | 'primaryImageUrl'
   | 'mockupUrls'
   | 'printful'
->;
+> & {
+  readonly qualityReview?: Record<string, unknown> | null;
+};
 
 export interface MerchOrderSellabilityInput {
   readonly quantity: number;
@@ -86,6 +89,7 @@ export function getMerchCardSellability(
   if (!card.primaryImageUrl || card.mockupUrls.length === 0) {
     reasons.push('Missing mockups.');
   }
+  reasons.push(...getMerchContentReviewBlockers(card.qualityReview));
   reasons.push(
     ...getMerchSellability(
       {

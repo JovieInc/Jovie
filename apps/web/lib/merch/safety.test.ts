@@ -3,6 +3,11 @@ import type {
   MerchPricingSnapshot,
   MerchPrintfulSnapshot,
 } from '@/lib/db/schema/merch';
+import {
+  MERCH_PERSON_CONTENT_PUBLISH_BLOCKER,
+  stampMerchContentReview,
+} from './content-contract';
+import { reviewMerchContent } from './content-review';
 import { buildMerchPricingSnapshot } from './pricing';
 import {
   getMerchCardSellability,
@@ -110,6 +115,33 @@ describe('merch safety', () => {
     );
 
     expect(result).toEqual({ sellable: true, reasons: [] });
+  });
+
+  it('blocks publishing when content review finds a generated person', () => {
+    const review = reviewMerchContent({
+      labels: ['photoreal person', 'face'],
+      imageDescription: 'A generated person looking at camera',
+    });
+    const result = getMerchCardSellability(
+      {
+        currency: 'USD',
+        retailPriceCents: 4500,
+        estimatedPrintfulProductCostCents: 1750,
+        artistRoyaltyRateBps: 5000,
+        pricing: pricing(),
+        primaryImageUrl: 'https://cdn.test/mockup.png',
+        mockupUrls: ['https://cdn.test/mockup.png'],
+        printful: printfulSnapshot(),
+        qualityReview: {
+          contractVersion: 'merch-generation/v1',
+          ...stampMerchContentReview(review),
+        },
+      },
+      { now: freshDate }
+    );
+
+    expect(result.sellable).toBe(false);
+    expect(result.reasons).toContain(MERCH_PERSON_CONTENT_PUBLISH_BLOCKER);
   });
 
   it('blocks fulfillment when order economics violate the card guard', () => {

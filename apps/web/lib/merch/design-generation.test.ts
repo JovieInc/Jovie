@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { reviewMerchContent } from './content-review';
 import {
   buildMerchImagePrompt,
   MERCH_DESIGN_STRATEGIES,
@@ -115,6 +116,7 @@ describe('merch design strategies', () => {
       expect(prompt).toContain('Provenance: Static Bloom');
       expect(prompt).toContain('Do not depict people, faces, portraits');
       expect(prompt).toContain('Do not recreate logos, trademarks, lyrics');
+      expect(reviewMerchContent({ prompt }).verdict).toBe('pass');
     }
   });
 
