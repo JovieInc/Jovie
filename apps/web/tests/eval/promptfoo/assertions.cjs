@@ -3639,6 +3639,20 @@ function assertSkillPromptContractCovered(output) {
   return pass();
 }
 
+function assertPackagingFormatSplitCase(output) {
+  const payload = parseOutput(output);
+  const packaging = payload.packaging ?? {};
+  if (packaging.skillId !== 'analyzePackaging') {
+    return fail('packaging format-split case is not tied to analyzePackaging');
+  }
+  if (packaging.ruleCasePassed !== true) {
+    return fail(
+      `packaging rule case failed: ${String(packaging.ruleCase)} ${String(packaging.ruleCaseReason)}`
+    );
+  }
+  return pass();
+}
+
 function assertAiToolPromptContractCovered(output) {
   const payload = parseOutput(output);
 
@@ -5128,6 +5142,7 @@ module.exports = {
   assertSkillCatalogSyncContractCovered,
   assertSkillCommandContractCovered,
   assertSkillPromptContractCovered,
+  assertPackagingFormatSplitCase,
   assertAlbumArtProviderContractCovered,
   assertAiToolPromptContractCovered,
   assertChatTitleContractCovered,

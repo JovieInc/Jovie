@@ -36,6 +36,10 @@ import {
   PACKAGING_AUDIT_SYSTEM_PROMPT,
 } from '@/lib/services/packaging-intelligence/analyze';
 import {
+  evaluateAllPackagingRuleCases,
+  evaluatePackagingRuleCase,
+} from '@/lib/services/packaging-intelligence/format-rules';
+import {
   extractFirst30sHookText,
   parseWebVtt,
 } from '@/lib/services/packaging-intelligence/transcript';
@@ -70,6 +74,7 @@ const llmOutput = {
   first30sAssessment: 'Opens with the first mistake immediately.',
   findings: [
     {
+      surface: 'title' as const,
       observation: 'Title promises three specific mistakes.',
       evidence: 'Title: 3 Money Mistakes Keeping You Broke',
       evidenceTier: 'observed' as const,
@@ -81,14 +86,18 @@ const llmOutput = {
     {
       headline: 'Three mistakes',
       wordCount: 2,
-      concept: 'High-contrast face plus wallet, three-word overlay.',
+      concept: 'High-contrast face plus wallet, hook off the face.',
       mobileLegible: true,
+      hookOffFace: true,
+      coversFace: false,
     },
     {
       headline: 'Stop broke',
       wordCount: 2,
       concept: 'Paycheck visual with two-word overlay, no URL.',
       mobileLegible: true,
+      hookOffFace: true,
+      coversFace: false,
     },
   ],
   safeZone: {
@@ -97,6 +106,8 @@ const llmOutput = {
     cover3000x3000JpgRgbNoUrls: 'unknown' as const,
     notes: 'Dimensions not measured from the thumbnail URL; specs still apply.',
   },
+  pixelsInspected: false,
+  artReadiness: 'uninspected' as const,
 };
 
 function mockLlmResult(
@@ -211,6 +222,8 @@ describe('packaging intelligence', () => {
       findings: llmOutput.findings,
       thumbnailVariants: llmOutput.thumbnailVariants,
       safeZone: llmOutput.safeZone,
+      pixelsInspected: false,
+      artReadiness: 'uninspected',
     });
     expect(result.thumbnailVariants).toHaveLength(2);
     expect(
@@ -227,6 +240,58 @@ describe('packaging intelligence', () => {
     expect(PACKAGING_AUDIT_SYSTEM_PROMPT).toContain('1546×423');
     expect(PACKAGING_AUDIT_SYSTEM_PROMPT).toContain('3000×3000');
     expect(PACKAGING_AUDIT_SYSTEM_PROMPT).toContain('No overall score');
+    expect(PACKAGING_AUDIT_SYSTEM_PROMPT).toContain('no hooky text');
+    expect(PACKAGING_AUDIT_SYSTEM_PROMPT).toContain('object-fit: contain');
+    expect(PACKAGING_AUDIT_SYSTEM_PROMPT).toContain('Hook words off the face');
+    expect(PACKAGING_AUDIT_SYSTEM_PROMPT).toContain('never cover a face');
+    expect(PACKAGING_AUDIT_SYSTEM_PROMPT).toContain('ANALYZE-GATE');
+    expect(PACKAGING_AUDIT_SYSTEM_PROMPT).toContain(
+      'not evidence the content is good'
+    );
+  });
+
+  it('encodes format-split and analyze-gate rule cases', () => {
+    for (const result of evaluateAllPackagingRuleCases()) {
+      expect(result.passed, result.reason).toBe(true);
+    }
+    expect(evaluatePackagingRuleCase('hook-text-on-face').passed).toBe(true);
+    expect(evaluatePackagingRuleCase('cover-with-hook-text').passed).toBe(true);
+    expect(evaluatePackagingRuleCase('no-image-unknown').passed).toBe(true);
+    expect(evaluatePackagingRuleCase('cover-vs-thumb').passed).toBe(true);
+  });
+
+  it('downgrades visual observed findings when pixels were not inspected', async () => {
+    mockGenerateObject.mockResolvedValueOnce({
+      object: mockLlmResult({
+        findings: [
+          {
+            surface: 'thumbnail',
+            observation: 'Thumbnail looks finished.',
+            evidence: 'Guessed from the URL.',
+            evidenceTier: 'observed',
+            recommendation: 'Art is ready.',
+          },
+        ],
+        pixelsInspected: true,
+        artReadiness: 'needs_work',
+      }),
+      usage: { inputTokens: 40, outputTokens: 20 },
+    });
+
+    const result = await analyzePackagingWithLlm({
+      videoId: 'no-pixels',
+      title: 'Untitled',
+      description: '',
+      transcriptText: '',
+      first30sHookText: '',
+    });
+
+    expect(result.output.pixelsInspected).toBe(false);
+    expect(result.output.artReadiness).toBe('uninspected');
+    expect(result.output.findings[0]?.evidenceTier).toBe('unknown');
+    expect(result.output.findings[0]?.recommendation).not.toMatch(
+      /\b(ready|good to go|art is good)\b/i
+    );
   });
 
   it('prefers provided transcript segments and falls back to ASR', async () => {

@@ -112,6 +112,12 @@ import {
 import { buildWelcomeMessage } from '@/lib/services/onboarding/welcome-message';
 import { PACKAGING_AUDIT_SYSTEM_PROMPT } from '@/lib/services/packaging-intelligence/analyze';
 import {
+  evaluateAllPackagingRuleCases,
+  evaluatePackagingRuleCase,
+  PACKAGING_RULE_CASE_IDS,
+  type PackagingRuleCaseId,
+} from '@/lib/services/packaging-intelligence/format-rules';
+import {
   getPitchChecklistStatus,
   PITCH_GRILL_PROCEDURE,
 } from '@/lib/services/pitch/curator-checklist';
@@ -5882,6 +5888,17 @@ function evaluateSkillPromptContract(vars: EvalVars) {
     promptAvoidsPrivateContactLeak:
       promptLeakPatterns(combinedPitchPrompt).length === 0,
   };
+  const packagingRuleCases = evaluateAllPackagingRuleCases();
+  const requestedPackagingRuleCase =
+    typeof vars.packagingRuleCase === 'string' &&
+    (PACKAGING_RULE_CASE_IDS as readonly string[]).includes(
+      vars.packagingRuleCase
+    )
+      ? (vars.packagingRuleCase as PackagingRuleCaseId)
+      : null;
+  const requestedPackagingRule = requestedPackagingRuleCase
+    ? evaluatePackagingRuleCase(requestedPackagingRuleCase)
+    : null;
   const packagingPromptFacts = {
     evidenceNotVibes: textIncludesAll(PACKAGING_AUDIT_SYSTEM_PROMPT, [
       'Evidence, not vibes',
@@ -5893,6 +5910,35 @@ function evaluateSkillPromptContract(vars: EvalVars) {
       '3000×3000',
       'No overall score',
     ]),
+    formatSplitCoverVsThumb: textIncludesAll(PACKAGING_AUDIT_SYSTEM_PROMPT, [
+      'no hooky text',
+      'object-fit: contain',
+      'Hook words off the face',
+      'Never overlay a face',
+      '≤3 words',
+    ]),
+    founderLockNoFaceCover: textIncludesAll(PACKAGING_AUDIT_SYSTEM_PROMPT, [
+      'Never cover a face',
+      'gradients',
+      'chrome',
+      'play button',
+    ]),
+    analyzeGateNoClaimWithoutLooking: textIncludesAll(
+      PACKAGING_AUDIT_SYSTEM_PROMPT,
+      ['ANALYZE-GATE', 'not evidence the content is good', 'unknown', 'ready']
+    ),
+    hookTextOnFaceRefused:
+      packagingRuleCases.find(item => item.id === 'hook-text-on-face')
+        ?.passed === true,
+    coverWithHookTextRefused:
+      packagingRuleCases.find(item => item.id === 'cover-with-hook-text')
+        ?.passed === true,
+    noImageUnknownNoReady:
+      packagingRuleCases.find(item => item.id === 'no-image-unknown')
+        ?.passed === true,
+    coverVsThumbOppositeRules:
+      packagingRuleCases.find(item => item.id === 'cover-vs-thumb')?.passed ===
+      true,
     channelReportIsChangePlan:
       packagingChangePlan.changePlan.length > 0 &&
       packagingChangePlan.changePlan[0]?.priority === 1 &&
@@ -5978,6 +6024,12 @@ function evaluateSkillPromptContract(vars: EvalVars) {
       changePlanPriorities: packagingChangePlan.changePlan.map(
         item => item.priority
       ),
+      ruleCases: packagingRuleCases,
+      ruleCase: requestedPackagingRule?.id ?? null,
+      ruleCasePassed: requestedPackagingRule
+        ? requestedPackagingRule.passed
+        : packagingRuleCases.every(item => item.passed),
+      ruleCaseReason: requestedPackagingRule?.reason ?? null,
     },
     retouch: {
       skillId: 'retouch',
