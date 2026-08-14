@@ -12,6 +12,7 @@ import {
 } from '@/lib/merch/service';
 import { generateMerchStructuredData } from '@/lib/seo/structured-data';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
+import { uuidSchema } from '@/lib/validation/schemas/base';
 import {
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
@@ -49,6 +50,10 @@ function isValidUsername(username: string): boolean {
 
 async function loadMerchPage(username: string, cardId: string) {
   if (!isValidUsername(username)) {
+    notFound();
+  }
+
+  if (!uuidSchema.safeParse(cardId).success) {
     notFound();
   }
 
