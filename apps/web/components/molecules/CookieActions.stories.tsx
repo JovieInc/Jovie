@@ -10,7 +10,7 @@ const meta: Meta<typeof CookieActions> = {
   },
   args: {
     onAcceptAll: fn(),
-    onReject: fn(),
+    onRejectAll: fn(),
     onCustomize: fn(),
   },
 };

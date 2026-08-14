@@ -46,7 +46,7 @@ describe('CookieBannerSection consent sync', () => {
     setCookie('jv_cc_required=1');
     render(<mod.CookieBannerSection />);
 
-    const btn = screen.getByRole('button', { name: /accept all/i });
+    const btn = screen.getByRole('button', { name: 'Accept all' });
     fireEvent.click(btn);
 
     await vi.waitFor(() => {
@@ -66,7 +66,7 @@ describe('CookieBannerSection consent sync', () => {
 
     expect(screen.getByTestId('cookie-banner')).toBeInTheDocument();
 
-    const btn = screen.getByRole('button', { name: /accept all/i });
+    const btn = screen.getByRole('button', { name: 'Accept all' });
     fireEvent.click(btn);
 
     await vi.waitFor(() => {
@@ -83,7 +83,7 @@ describe('CookieBannerSection consent sync', () => {
     setCookie('jv_cc_required=1');
     render(<mod.CookieBannerSection />);
 
-    fireEvent.click(screen.getByRole('button', { name: /accept all/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Accept all' }));
 
     await vi.waitFor(() => {
       const saved = localStorage.getItem('jv_cc');
@@ -96,13 +96,13 @@ describe('CookieBannerSection consent sync', () => {
     });
   });
 
-  it('calls setConsentState rejected on reject', async () => {
+  it('calls setConsentState rejected on reject all', async () => {
     const { setConsentState } = await import('@/lib/tracking/consent');
     const mod = await import('@/components/organisms/CookieBannerSection');
     setCookie('jv_cc_required=1');
     render(<mod.CookieBannerSection />);
 
-    const btn = screen.getByRole('button', { name: /reject/i });
+    const btn = screen.getByRole('button', { name: 'Reject all' });
     fireEvent.click(btn);
 
     await vi.waitFor(() => {
@@ -110,7 +110,55 @@ describe('CookieBannerSection consent sync', () => {
       const saved = localStorage.getItem('jv_cc');
       expect(saved).toBeTruthy();
       const parsed = JSON.parse(saved!);
-      expect(parsed.marketing).toBe(false);
+      expect(parsed).toMatchObject({
+        essential: true,
+        analytics: false,
+        marketing: false,
+      });
+    });
+  });
+
+  it('persists reject-all as essential-only after the server action', async () => {
+    const mod = await import('@/components/organisms/CookieBannerSection');
+    setCookie('jv_cc_required=1');
+    render(<mod.CookieBannerSection />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reject all' }));
+
+    await vi.waitFor(() => {
+      expect(JSON.parse(localStorage.getItem('jv_cc')!)).toEqual({
+        essential: true,
+        analytics: false,
+        marketing: false,
+      });
+    });
+    expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
+  });
+
+  it('customizes analytics only and leaves marketing blocked', async () => {
+    const { setConsentState } = await import('@/lib/tracking/consent');
+    const mod = await import('@/components/organisms/CookieBannerSection');
+    setCookie('jv_cc_required=1');
+    render(<mod.CookieBannerSection />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Customize' }));
+    expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('switch', { name: /analytics/i }));
+    fireEvent.click(screen.getByRole('button', { name: /save preferences/i }));
+
+    await vi.waitFor(() => {
+      expect(mockSaveConsent).toHaveBeenCalledWith({
+        essential: true,
+        analytics: true,
+        marketing: false,
+      });
+      expect(setConsentState).toHaveBeenCalledWith('accepted');
+      expect(JSON.parse(localStorage.getItem('jv_cc')!)).toMatchObject({
+        essential: true,
+        analytics: true,
+        marketing: false,
+      });
     });
   });
 
@@ -122,7 +170,7 @@ describe('CookieBannerSection consent sync', () => {
 
     expect(screen.getByTestId('cookie-banner')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /reject/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reject all' }));
 
     await vi.waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(
