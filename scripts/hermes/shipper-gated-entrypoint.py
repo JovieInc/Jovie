@@ -234,6 +234,11 @@ def provider_alive(agent: str) -> bool:
     return False
 
 
+def provider_abort_event(agent: str) -> str:
+    """Return the typed abort event for the selected provider."""
+    return f"{agent}_gate_abort"
+
+
 SHIPPER_CRITICAL_PATHS = {
     "scripts/hermes/jobs/codex-issue-shipper.ts",
     "scripts/hermes/lib/codex-issue-shipper.ts",
@@ -450,7 +455,7 @@ def main() -> int:
     if not provider_alive(agent):
         notify_abort(
             hermes_home,
-            f"{agent}_gate_abort",
+            provider_abort_event(agent),
             f"{agent} CLI is missing or unhealthy — refusing to dispatch blind",
         )
         return 4
