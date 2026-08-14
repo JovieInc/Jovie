@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **Public profiles keep every conversion action usable (JOV-5134/JOV-5132):** unclaimed artists expose a truthful ownership path; listening, alerts, tips, merch, shows, and payment actions resolve only when their inventory is real; mobile privacy controls avoid profile chrome and the action dock; and drawers plus carousels preserve keyboard and screen-reader access.
+
 ## [26.8.0] - 2026-08-14
 - **Mac app recovers from a black launch window (JOV-5086):** packaged Jovie.app now paints a loading splash immediately, and a hung or blank hosted page shows Retry instead of staying black forever.
 - [internal] **Production recovery reopens exact fleet holds (JOV-5048/JOV-5049):** Merge Queue Auto-Enroll now identifies successful Production Controller completions by the stable workflow path instead of the dynamic run title, and above-target queue pressure stays observable without reducing native queue capacity to zero, so source-green Symphony heads can return to and drain the native queue.

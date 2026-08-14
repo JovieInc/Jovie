@@ -317,16 +317,14 @@ describe('RightDrawer', () => {
       <>
         <button type='button'>Background action</button>
         <RightDrawer isOpen width={360} ariaLabel='Focus trap drawer'>
-          <a href='/app'>First action</a>
+          <button type='button'>First action</button>
           <button type='button'>Last action</button>
         </RightDrawer>
       </>
     );
 
-    const background = screen.getByRole('button', {
-      name: 'Background action',
-    });
-    const first = screen.getByRole('link', { name: 'First action' });
+    const background = screen.getByText('Background action');
+    const first = screen.getByRole('button', { name: 'First action' });
     const last = screen.getByRole('button', { name: 'Last action' });
 
     await waitFor(() => expect(background.inert).toBe(true));

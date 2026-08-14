@@ -48,7 +48,8 @@ function getModalBackgroundElements(modal: HTMLElement): HTMLElement[] {
  */
 export function useModalFocusBoundary(
   modalRef: RefObject<HTMLElement | null>,
-  isOpen: boolean
+  isOpen: boolean,
+  restoreFocus = true
 ): void {
   useEffect(() => {
     const modal = modalRef.current;
@@ -93,9 +94,11 @@ export function useModalFocusBoundary(
           element.setAttribute('aria-hidden', ariaHidden);
         }
       }
-      returnFocusTarget?.focus({ preventScroll: true });
+      if (restoreFocus) {
+        returnFocusTarget?.focus({ preventScroll: true });
+      }
     };
-  }, [isOpen, modalRef]);
+  }, [isOpen, modalRef, restoreFocus]);
 
   useEffect(() => {
     const modal = modalRef.current;
