@@ -121,6 +121,7 @@ class OnboardingChatTransport extends DefaultChatTransport<UIMessage> {
     const turnstileState = { token: null as string | null };
     super({
       api: '/api/chat',
+      body: { mode: 'onboarding' as const },
       prepareSendMessagesRequest: ({ messages, body }) => ({
         body: {
           ...body,
@@ -131,6 +132,33 @@ class OnboardingChatTransport extends DefaultChatTransport<UIMessage> {
             : {}),
         },
       }),
+      fetch: async (input, init) => {
+        // Last-resort guard: if a future AI SDK transport drops `mode`,
+        // anonymous /start must still hit the onboarding gate, not 401.
+        const rawBody = init?.body;
+        if (typeof rawBody === 'string') {
+          try {
+            const parsed: unknown = JSON.parse(rawBody);
+            if (
+              parsed &&
+              typeof parsed === 'object' &&
+              !Array.isArray(parsed) &&
+              (parsed as { mode?: unknown }).mode !== 'onboarding'
+            ) {
+              return await globalThis.fetch(input, {
+                ...init,
+                body: JSON.stringify({
+                  ...(parsed as Record<string, unknown>),
+                  mode: 'onboarding',
+                }),
+              });
+            }
+          } catch {
+            // Leave the original body alone if it is not JSON.
+          }
+        }
+        return await globalThis.fetch(input, init);
+      },
     });
     this.turnstileState = turnstileState;
   }

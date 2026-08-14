@@ -44,6 +44,15 @@ describe('getOnboardingErrorMessage', () => {
       expected: 'Too many messages were sent. Try again in a moment.',
     },
     {
+      status: 401,
+      body: {
+        error: 'Unauthorized',
+        errorCode: 'AUTH_REQUIRED',
+        requestId: '21f5b81f-31bb-4e48-98d0-85d160954836',
+      },
+      expected: 'Sign in to continue this chat.',
+    },
+    {
       status: 503,
       body: {
         error: 'Onboarding chat is temporarily unavailable',
@@ -81,6 +90,22 @@ describe('getOnboardingErrorMessage', () => {
         serialized.type
       )
     ).toBe(expected);
+  });
+
+  it('does not render a 401 Unauthorized transport body as a rate limit', () => {
+    const serialized = serializeApiError(401, {
+      error: 'Unauthorized',
+      requestId: '21f5b81f-31bb-4e48-98d0-85d160954836',
+    });
+
+    expect(serialized.type).not.toBe('rate_limit');
+    expect(
+      getOnboardingErrorMessage(
+        serialized.message,
+        serialized.errorCode,
+        serialized.type
+      )
+    ).toBe('Sign in to continue this chat.');
   });
 
   it('uses calm fallback copy for arbitrary plain-text errors', () => {

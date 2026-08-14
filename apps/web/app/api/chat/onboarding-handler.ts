@@ -75,8 +75,9 @@ const MAX_ONBOARDING_MESSAGE_LENGTH = 4000;
  *     tool palette, and the Stanley-style system prompt. Stream the
  *     UIMessage response back.
  *
- * Returns `null` when the request is not addressed to onboarding mode, so the
- * main `/api/chat` handler can fall through to the authenticated chat flow.
+ * Returns `null` when the request is not onboarding (explicit `mode` or a
+ * locator-less /start envelope), so the main `/api/chat` handler can fall
+ * through to the authenticated chat flow.
  */
 
 // eslint-disable-next-line @jovie/chat-tool-schema-strict -- HTTP request DTO, not LLM tool input
@@ -94,6 +95,44 @@ interface PeekedBody {
   readonly raw: unknown;
   readonly mode?: string;
   readonly turnstileToken?: string;
+}
+
+/**
+ * Keys the AI SDK /start transport actually sends. Anything outside this set
+ * is an authenticated-chat envelope and must keep the 401 session gate.
+ */
+const IMPLICIT_ONBOARDING_ENVELOPE_KEYS = new Set([
+  'mode',
+  'messages',
+  'turnstileToken',
+  'id',
+  'trigger',
+  'messageId',
+]);
+
+/**
+ * Authenticated app chat always sends a profile/conversation locator.
+ * Anonymous /start turns send `messages` (and usually `mode: 'onboarding'`).
+ * When the client drops `mode`, the locator-less envelope is still onboarding.
+ */
+function looksLikeAuthenticatedChatEnvelope(raw: unknown): boolean {
+  if (!raw || typeof raw !== 'object') return false;
+  const obj = raw as Record<string, unknown>;
+  return (
+    typeof obj.profileId === 'string' ||
+    typeof obj.conversationId === 'string' ||
+    (typeof obj.artistContext === 'object' && obj.artistContext !== null)
+  );
+}
+
+function looksLikeImplicitOnboardingEnvelope(raw: unknown): boolean {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+  const obj = raw as Record<string, unknown>;
+  if (!Array.isArray(obj.messages)) return false;
+  if (looksLikeAuthenticatedChatEnvelope(obj)) return false;
+  return Object.keys(obj).every(key =>
+    IMPLICIT_ONBOARDING_ENVELOPE_KEYS.has(key)
+  );
 }
 
 /**
@@ -190,7 +229,13 @@ export async function tryHandleAnonymousOnboardingChat(
   requestId: string
 ): Promise<Response | null> {
   const peeked = await peekOnboardingMode(req);
-  if (!peeked || peeked.mode !== 'onboarding') return null;
+  if (!peeked) return null;
+
+  const isExplicitOnboarding = peeked.mode === 'onboarding';
+  const isImplicitOnboarding =
+    peeked.mode === undefined &&
+    looksLikeImplicitOnboardingEnvelope(peeked.raw);
+  if (!isExplicitOnboarding && !isImplicitOnboarding) return null;
 
   const corsHeaders = createAuthenticatedCorsHeaders(
     req.headers.get('origin'),
@@ -198,7 +243,13 @@ export async function tryHandleAnonymousOnboardingChat(
   );
 
   // Validate the onboarding-shaped envelope (other fields validated in PR 2).
-  const parsed = onboardingPayloadSchema.safeParse(peeked.raw);
+  // Implicit /start turns dropped `mode`; inject it so the existing schema
+  // and abuse gates (Turnstile, rate limits) still run unchanged.
+  const parsed = onboardingPayloadSchema.safeParse(
+    isExplicitOnboarding
+      ? peeked.raw
+      : { ...(peeked.raw as Record<string, unknown>), mode: 'onboarding' }
+  );
   if (!parsed.success) {
     return NextResponse.json(
       {

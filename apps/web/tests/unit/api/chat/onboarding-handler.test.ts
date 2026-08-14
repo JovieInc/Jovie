@@ -160,6 +160,56 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(hoisted.checkGateForUserMock).not.toHaveBeenCalled();
   });
 
+  it('treats locator-less messages without mode as onboarding (JOV-5084)', async () => {
+    vi.resetModules();
+    stubRuntimeEnv({ nodeEnv: 'production', vercelEnv: 'production' });
+    hoisted.isTurnstileConfiguredMock.mockReturnValue(true);
+    hoisted.verifyTurnstileTokenMock.mockResolvedValue({
+      success: false,
+      reason: 'missing_token',
+    });
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest({
+      id: 'onboarding',
+      trigger: 'submit-message',
+      messages: [userMessage('hi')],
+    });
+    const result = await tryHandleAnonymousOnboardingChat(req, 'req-5084');
+    expect(result).not.toBeNull();
+    expect(result?.status).toBe(403);
+    await expect(result?.json()).resolves.toMatchObject({
+      errorCode: 'TURNSTILE_REQUIRED',
+    });
+  });
+
+  it('does not treat authenticated-chat envelopes without mode as onboarding', async () => {
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest({
+      messages: [userMessage('hi')],
+      profileId: 'profile_1',
+    });
+    const result = await tryHandleAnonymousOnboardingChat(req, 'req-5084b');
+    expect(result).toBeNull();
+    expect(hoisted.checkGateForUserMock).not.toHaveBeenCalled();
+  });
+
+  it('does not treat typed app-chat envelopes without a locator as onboarding', async () => {
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest({
+      messages: [userMessage('hi')],
+      source: 'typed',
+    });
+    const result = await tryHandleAnonymousOnboardingChat(req, 'req-5084c');
+    expect(result).toBeNull();
+    expect(hoisted.checkGateForUserMock).not.toHaveBeenCalled();
+  });
+
   it('does not let the removed onboarding rollout gate disable the live route', async () => {
     vi.resetModules();
     stubRuntimeEnv({ nodeEnv: 'production' });

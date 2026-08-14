@@ -38,6 +38,7 @@ const analyticsMocks = vi.hoisted(() => ({
 
 const transportMocks = vi.hoisted(() => ({
   options: [] as Array<{
+    body?: Record<string, unknown>;
     prepareSendMessagesRequest: (input: {
       messages: readonly unknown[];
       body?: Record<string, unknown>;
@@ -461,6 +462,9 @@ describe('OnboardingChat Turnstile gating', () => {
     );
 
     expect(transportMocks.options).toHaveLength(1);
+    expect(transportMocks.options[0]?.body).toMatchObject({
+      mode: 'onboarding',
+    });
     expect(
       transportMocks.options[0]?.prepareSendMessagesRequest({
         messages: [{ id: 'message-1', role: 'user', parts: [] }],

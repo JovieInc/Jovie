@@ -148,6 +148,8 @@ export function getOnboardingErrorMessage(
       return 'Complete the security check to send your message.';
     case 'RATE_LIMITED':
       return 'Too many messages were sent. Try again in a moment.';
+    case 'AUTH_REQUIRED':
+      return 'Sign in to continue this chat.';
     case 'INVALID_ONBOARDING_PAYLOAD':
     case 'INVALID_MESSAGES':
       return 'Jovie could not send that message. Try again.';
@@ -168,6 +170,9 @@ export function getOnboardingErrorMessage(
   }
   if (type === 'rate_limit') {
     return 'Too many messages were sent. Try again in a moment.';
+  }
+  if (/unauthorized|authentication required|auth_required/i.test(message)) {
+    return 'Sign in to continue this chat.';
   }
   return 'Jovie could not send your message. Try again.';
 }
