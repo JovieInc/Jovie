@@ -15,8 +15,8 @@ const DEFAULT_RESULT_FILES = (
     required: true,
   },
   {
-    name: 'synthetic-better-auth-account',
-    path: 'apps/web/test-results/synthetic-better-auth-account-results.json',
+    name: 'synthetic-production-waitlist',
+    path: 'apps/web/test-results/synthetic-production-waitlist-results.json',
     required: true,
   },
   {
