@@ -3227,7 +3227,7 @@ jobs:
       - name: Run packages/ui unit tests
         # This suite is not sharded; running it in every web-test shard was
         # identical duplicate work. Keep it in the existing required matrix.
-        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == '1/5'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == '1/10'
         run: pnpm turbo test --filter=@jovie/ui
 
       - name: Upload test results to Codecov
