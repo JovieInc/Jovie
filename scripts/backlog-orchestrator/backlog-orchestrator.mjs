@@ -328,13 +328,9 @@ async function admissionPreflight(team) {
   }
   const symphonyIssues = await linear.fetchTeamSymphonyIssues(team.id);
   const load = deterministicGates.admissionIntentLoad(symphonyIssues);
-  const maxConcurrentShipping = admitter.maxConcurrentShippingForTeam(team.key);
   return {
-    open: load.count < maxConcurrentShipping,
-    reason:
-      load.count < maxConcurrentShipping
-        ? 'open'
-        : `at capacity (${load.count}/${maxConcurrentShipping})`,
+    open: true,
+    reason: 'open',
     load,
     fleetGate,
   };
@@ -733,7 +729,6 @@ async function runTeamAdmitNext(team, isDryRun) {
     {
       currentlyShipping: state.count,
       fleetGate,
-      maxConcurrentShipping: admitter.maxConcurrentShippingForTeam(team.key),
     }
   );
 

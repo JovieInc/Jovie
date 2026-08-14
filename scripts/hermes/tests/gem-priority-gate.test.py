@@ -78,6 +78,12 @@ class ProductionHealthTests(unittest.TestCase):
 
         self.assertEqual(args.production_url, "https://jov.ie/api/health/deploy")
 
+    def test_default_queue_backpressure_threshold_is_fifteen(self):
+        with mock.patch.object(sys, "argv", [str(GATE)]):
+            args = MODULE.parse_args()
+
+        self.assertEqual(args.queue_target, 15)
+
     def test_deploy_health_healthy_is_green_and_bound_to_deployed_sha(self):
         url = "https://jov.ie/api/health/deploy"
         router = urlopen_router(
@@ -160,7 +166,12 @@ GREEN_SIGNALS: dict[str, object] = {
     "production": {"status": "green", "deployedSha": MAIN_SHA},
     "controller": {"status": "green"},
     "integrity": {"status": "clear"},
-    "queue": {"status": "known", "eligiblePrs": 0, "target": 5},
+    "queue": {
+        "status": "known",
+        "eligiblePrs": 0,
+        "greenReadyPrs": 0,
+        "target": 15,
+    },
     "concurrencyEvidence": None,
 }
 
@@ -405,6 +416,47 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["deploymentAdmission"]["allowed"])
         self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
 
+    def test_queue_observation_counts_only_green_ready_non_draft_prs(self):
+        prs = [
+            {
+                "isDraft": False,
+                "labels": [],
+                "mergeStateStatus": "CLEAN",
+                "statusCheckRollup": [
+                    {"conclusion": "SUCCESS"},
+                    {"state": "SUCCESS"},
+                ],
+            },
+            {
+                "isDraft": False,
+                "labels": [],
+                "mergeStateStatus": "BLOCKED",
+                "statusCheckRollup": [{"conclusion": "FAILURE"}],
+            },
+            {
+                "isDraft": True,
+                "labels": [],
+                "mergeStateStatus": "CLEAN",
+                "statusCheckRollup": [{"conclusion": "SUCCESS"}],
+            },
+            {
+                "isDraft": False,
+                "labels": [{"name": "queue-deferred"}],
+                "mergeStateStatus": "CLEAN",
+                "statusCheckRollup": [{"conclusion": "SUCCESS"}],
+            },
+        ]
+        completed = subprocess.CompletedProcess(
+            args=["gh"], returncode=0, stdout=json.dumps(prs), stderr=""
+        )
+
+        with mock.patch.object(MODULE.subprocess, "run", return_value=completed):
+            observed = MODULE.observe_queue("JovieInc/Jovie", 15)
+
+        self.assertEqual(observed["eligiblePrs"], 2)
+        self.assertEqual(observed["greenReadyPrs"], 1)
+        self.assertEqual(observed["target"], 15)
+
     def test_stale_deployment_sha_freezes_promotion_but_allows_catchup_deploy(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
@@ -415,13 +467,13 @@ class DeploymentBindingTests(unittest.TestCase):
             receipt["alreadyAdmittedCohort"],
             {
                 "preserve": True,
-                "newIntakeAllowed": False,
-                "semantics": "preserve-already-admitted-cohort-freeze-new-intake",
+                "newIntakeAllowed": True,
+                "semantics": "preserve-cohort-and-continue-isolated-implementation",
             },
         )
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
         self.assertTrue(receipt["deploymentAdmission"]["allowed"])
-        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertIn(
             "production-deployment-unbound",
             {reason["code"] for reason in receipt["reasons"]},
@@ -436,7 +488,7 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = self.evaluate(signals)
 
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
-        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertTrue(receipt["deploymentAdmission"]["allowed"])
 
     def test_cli_allows_catchup_deployment_while_promotion_stays_closed(self):
@@ -492,7 +544,12 @@ class DeploymentBindingTests(unittest.TestCase):
     def test_queue_blocker_does_not_deadlock_current_main_deployment(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
-        signals["queue"] = {"status": "known", "eligiblePrs": 6, "target": 5}
+        signals["queue"] = {
+            "status": "known",
+            "eligiblePrs": 6,
+            "greenReadyPrs": 1,
+            "target": 15,
+        }
         receipt = self.evaluate(signals)
         self.assertEqual(receipt["state"], "AMBER")
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
@@ -500,7 +557,12 @@ class DeploymentBindingTests(unittest.TestCase):
 
     def test_above_target_queue_remains_drainable_when_health_is_green(self):
         signals = dict(GREEN_SIGNALS)
-        signals["queue"] = {"status": "known", "eligiblePrs": 7, "target": 5}
+        signals["queue"] = {
+            "status": "known",
+            "eligiblePrs": 40,
+            "greenReadyPrs": 15,
+            "target": 15,
+        }
 
         receipt = self.evaluate(signals)
 
@@ -513,7 +575,11 @@ class DeploymentBindingTests(unittest.TestCase):
             {reason["code"] for reason in receipt["reasons"]},
         )
 
-    def test_malformed_queue_blocks_promotion_and_new_issue_leases(self):
+        signals["queue"]["greenReadyPrs"] = 14
+        one_landed = self.evaluate(signals)
+        self.assertTrue(one_landed["workAdmission"]["newIssueLeaseAllowed"])
+
+    def test_malformed_queue_blocks_promotion_but_not_new_issue_leases(self):
         signals = dict(GREEN_SIGNALS)
         signals["queue"] = {"status": "known"}
 
@@ -521,7 +587,7 @@ class DeploymentBindingTests(unittest.TestCase):
 
         self.assertEqual(receipt["state"], "AMBER")
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
-        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertIn(
             "queue-unknown",
             {reason["code"] for reason in receipt["reasons"]},

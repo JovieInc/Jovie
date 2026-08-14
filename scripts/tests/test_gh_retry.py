@@ -285,7 +285,7 @@ class TestDrainPrQueueWiring:
         assert "queue depth: 0/0 (0 slots)" in result.stdout
         assert "would +merge-queue" not in result.stdout
 
-    def test_hold_intake_preserves_queued_ordinary_pr_and_freezes_new_intake(
+    def test_hold_intake_preserves_queued_ordinary_pr_and_allows_implementation_intake(
         self, tmp_path: Path
     ) -> None:
         queued_head = "8" * 40
@@ -298,7 +298,12 @@ class TestDrainPrQueueWiring:
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},
                 "controller": {"status": "green"},
-                "queue": {"status": "known", "eligiblePrs": 1, "target": 5},
+                "queue": {
+                    "status": "known",
+                    "eligiblePrs": 1,
+                    "greenReadyPrs": 1,
+                    "target": 15,
+                },
                 "integrity": {"status": "clear"},
             },
             "promotionAdmission": {"allowed": False},
@@ -308,8 +313,8 @@ class TestDrainPrQueueWiring:
             },
             "alreadyAdmittedCohort": {
                 "preserve": True,
-                "newIntakeAllowed": False,
-                "semantics": "preserve-already-admitted-cohort-freeze-new-intake",
+                "newIntakeAllowed": True,
+                "semantics": "preserve-cohort-and-continue-isolated-implementation",
             },
         }
         encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
@@ -369,7 +374,12 @@ class TestDrainPrQueueWiring:
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},
                 "controller": {"status": "green"},
-                "queue": {"status": "known", "eligiblePrs": 2, "target": 5},
+                "queue": {
+                    "status": "known",
+                    "eligiblePrs": 2,
+                    "greenReadyPrs": 1,
+                    "target": 15,
+                },
                 "integrity": {"status": "clear"},
             },
             "promotionAdmission": {"allowed": False},
@@ -379,8 +389,8 @@ class TestDrainPrQueueWiring:
             },
             "alreadyAdmittedCohort": {
                 "preserve": True,
-                "newIntakeAllowed": False,
-                "semantics": "preserve-already-admitted-cohort-freeze-new-intake",
+                "newIntakeAllowed": True,
+                "semantics": "preserve-cohort-and-continue-isolated-implementation",
             },
         }
         encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
@@ -440,7 +450,12 @@ class TestDrainPrQueueWiring:
                 "main": {"status": "green", "sha": "a" * 40},
                 "production": {"status": "green", "deployedSha": "b" * 40},
                 "controller": {"status": "green"},
-                "queue": {"status": "known", "eligiblePrs": 1, "target": 5},
+                "queue": {
+                    "status": "known",
+                    "eligiblePrs": 1,
+                    "greenReadyPrs": 1,
+                    "target": 15,
+                },
                 "integrity": {"status": "clear"},
             },
             "promotionAdmission": {"allowed": False},
@@ -450,8 +465,8 @@ class TestDrainPrQueueWiring:
             },
             "alreadyAdmittedCohort": {
                 "preserve": True,
-                "newIntakeAllowed": False,
-                "semantics": "preserve-already-admitted-cohort-freeze-new-intake",
+                "newIntakeAllowed": True,
+                "semantics": "preserve-cohort-and-continue-isolated-implementation",
             },
         }
         encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
