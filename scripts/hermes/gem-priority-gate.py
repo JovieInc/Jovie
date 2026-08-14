@@ -26,6 +26,9 @@ from typing import Any
 SCHEMA = "jovie-fleet-gate/v1"
 INTEGRITY_SCHEMA = "jovie-integrity/v1"
 CONCURRENCY_SCHEMA = "gem-concurrency-evidence/v1"
+# Schema-padding sentinel for evaluation-failed receipts. Auto-Enroll jq
+# requires a 40-hex main SHA; this value never authorizes promotion.
+UNKNOWN_MAIN_SHA = "0" * 40
 # Keep in sync with the consumer fail-closed window
 # (scripts/backlog-orchestrator/admitter.mjs CONTROLLER_RECEIPT_MAX_AGE_MS).
 RECEIPT_STALE_AFTER = timedelta(minutes=10)
@@ -766,6 +769,127 @@ def verify_persisted_receipt(state_dir: Path, receipt: dict[str, Any]) -> None:
         raise ValueError("persisted fleet gate receipt failed semantic post-write readback")
 
 
+def failed_evaluation_receipt(
+    error: BaseException, observed_at: str | None = None
+) -> dict[str, Any]:
+    """Schema-valid blocked receipt so Auto-Enroll can skip instead of going red.
+
+    Built without calling evaluate(): that is the path that just failed.
+    The previous stub only printed schema + admission booleans. Auto-Enroll
+    jq then fail-closed (`Fleet gate emitted a malformed receipt.`) and the
+    whole event-driven admit lane went red. A blocked receipt must still
+    carry observedAt, signals, isolatedPromotionAdmission, and promotionMode.
+    """
+    promotion_mode = "blocked"
+    return {
+        "schema": SCHEMA,
+        "observedAt": observed_at or isoformat(utc_now()),
+        "state": "RED",
+        "promotionMode": promotion_mode,
+        "alreadyAdmittedCohort": already_admitted_cohort_semantics(promotion_mode),
+        "signals": {
+            "main": {"status": "unknown", "sha": UNKNOWN_MAIN_SHA},
+            "production": {"status": "unknown"},
+            "controller": {"status": "unknown"},
+            "integrity": {"status": "invalid", "detail": str(error)},
+            "queue": {"status": "unknown", "eligiblePrs": None, "target": 0},
+        },
+        "reasons": [
+            typed_reason(
+                "gate-evaluation-failed",
+                "integrity",
+                "critical",
+                str(error),
+            )
+        ],
+        "workAdmission": {
+            "allowed": False,
+            "activities": [],
+            "newIssueLeaseAllowed": False,
+        },
+        "promotionAdmission": {"allowed": False, "activities": []},
+        "deploymentAdmission": {
+            "allowed": False,
+            "activities": [],
+            "authority": "exact-main-production-controller",
+        },
+        "isolatedPromotionAdmission": {
+            "allowed": False,
+            "activities": [],
+            "deploymentsAllowed": False,
+            "scope": "exact-head-semantically-isolated-ui-docs",
+            "maxConcurrent": 1,
+            "authority": "canonical-merge-queue-controller",
+        },
+        "ownership": {
+            "controller": "Gem",
+            "implementation": "Symphony",
+            "directGemPickup": False,
+            "reason": "single implementation owner prevents duplicate pickup",
+        },
+        "concurrency": {
+            "gem": {
+                "maxConcurrent": DEFAULT_GEM_CONCURRENCY,
+                "evidenceAccepted": False,
+            },
+            "symphonyImplementation": 1,
+        },
+    }
+
+
+def warn_live_receipt_not_persisted(error: BaseException) -> None:
+    prefix = "::warning::" if os.environ.get("GITHUB_ACTIONS") == "true" else "WARNING:"
+    print(f"{prefix} fleet gate live receipt not persisted: {error}", file=sys.stderr)
+
+
+def persist_live_receipt(
+    receipt: dict[str, Any], state_dir: Path, now: datetime
+) -> dict[str, Any]:
+    """Best-effort persist. The live evaluation remains the printed authority.
+
+    GitHub-hosted runners (and any host without /home/timwhite/gem-workspace)
+    cannot create the Gem state dir. Throwing there used to replace a complete
+    live receipt with an incomplete stub. Consumers must still receive the
+    live evaluation so Auto-Enroll can skip or admit from schema-valid JSON.
+    """
+    try:
+        lock_fd = acquire_writer_lock(state_dir)
+    except (OSError, TimeoutError) as error:
+        warn_live_receipt_not_persisted(error)
+        return receipt
+    try:
+        persisted_at = persisted_observed_at(state_dir)
+        if persisted_at is not None and persisted_at >= now:
+            try:
+                return read_json(state_dir / "latest.json")
+            except (OSError, ValueError, json.JSONDecodeError) as error:
+                warn_live_receipt_not_persisted(error)
+                return receipt
+        write_receipt(receipt, state_dir)
+        verify_persisted_receipt(state_dir, receipt)
+        return receipt
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        warn_live_receipt_not_persisted(error)
+        return receipt
+    finally:
+        release_writer_lock(lock_fd)
+
+
+def consumer_exit_code(receipt: dict[str, Any], consumer: str) -> int:
+    allowed = {
+        "direct-gem": receipt["ownership"]["directGemPickup"],
+        "fleet": receipt["workAdmission"]["allowed"],
+        "promotion": receipt["promotionAdmission"]["allowed"],
+        "deployment": receipt["deploymentAdmission"]["allowed"],
+    }[consumer]
+    return 0 if allowed else 2
+
+
+def emit_receipt(receipt: dict[str, Any], consumer: str) -> int:
+    print(json.dumps(receipt, indent=2, sort_keys=True))
+    return consumer_exit_code(receipt, consumer)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
@@ -823,68 +947,32 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
 
 
 def main() -> int:
-    args = parse_args()
-    if args.evaluate_json:
-        signals = json.loads(args.evaluate_json)
-        if not isinstance(signals, dict):
-            raise ValueError("--evaluate-json must be a JSON object")
-        receipt = evaluate(signals, isoformat(utc_now()))
-    elif args.dry_run:
-        now = utc_now()
-        receipt = evaluate(observe_signals(args, now), isoformat(now))
-    else:
-        # Observe outside the writer lock: network observation can outlast
-        # the competing-writer timeout, so only the fast compare-and-commit
-        # section is serialized. A slower writer whose observation predates
-        # the persisted receipt never overwrites fresher state.
-        now = utc_now()
-        alarm_if_previous_receipt_stale(args.state_dir, now)
-        receipt = evaluate(observe_signals(args, now), isoformat(now))
-        lock_fd = acquire_writer_lock(args.state_dir)
-        try:
-            persisted_at = persisted_observed_at(args.state_dir)
-            if persisted_at is not None and persisted_at >= now:
-                # A concurrent writer committed a newer-or-equal receipt while
-                # this evaluation was observing; adopt that authority instead.
-                receipt = read_json(args.state_dir / "latest.json")
-            else:
-                write_receipt(receipt, args.state_dir)
-                verify_persisted_receipt(args.state_dir, receipt)
-        finally:
-            release_writer_lock(lock_fd)
-    print(json.dumps(receipt, indent=2, sort_keys=True))
-    allowed = {
-        "direct-gem": receipt["ownership"]["directGemPickup"],
-        "fleet": receipt["workAdmission"]["allowed"],
-        "promotion": receipt["promotionAdmission"]["allowed"],
-        "deployment": receipt["deploymentAdmission"]["allowed"],
-    }[args.consumer]
-    return 0 if allowed else 2
+    try:
+        args = parse_args()
+        if args.evaluate_json:
+            signals = json.loads(args.evaluate_json)
+            if not isinstance(signals, dict):
+                raise ValueError("--evaluate-json must be a JSON object")
+            receipt = evaluate(signals, isoformat(utc_now()))
+        elif args.dry_run:
+            now = utc_now()
+            receipt = evaluate(observe_signals(args, now), isoformat(now))
+        else:
+            # Observe outside the writer lock: network observation can outlast
+            # the competing-writer timeout, so only the fast compare-and-commit
+            # section is serialized. A slower writer whose observation predates
+            # the persisted receipt never overwrites fresher state.
+            now = utc_now()
+            alarm_if_previous_receipt_stale(args.state_dir, now)
+            receipt = evaluate(observe_signals(args, now), isoformat(now))
+            receipt = persist_live_receipt(receipt, args.state_dir, now)
+        return emit_receipt(receipt, args.consumer)
+    except (OSError, ValueError, json.JSONDecodeError, TimeoutError) as error:
+        return emit_receipt(failed_evaluation_receipt(error), "fleet")
 
 
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except (OSError, ValueError, json.JSONDecodeError) as error:
-        print(
-            json.dumps(
-                {
-                    "schema": SCHEMA,
-                    "state": "RED",
-                    "workAdmission": {"allowed": False},
-                    "promotionAdmission": {"allowed": False},
-                    "deploymentAdmission": {"allowed": False},
-                    "reasons": [
-                        typed_reason(
-                            "gate-evaluation-failed",
-                            "integrity",
-                            "critical",
-                            str(error),
-                        )
-                    ],
-                },
-                indent=2,
-                sort_keys=True,
-            )
-        )
-        raise SystemExit(2)
+    except Exception as error:  # noqa: BLE001 - last-resort schema-valid blocked receipt
+        raise SystemExit(emit_receipt(failed_evaluation_receipt(error), "fleet"))

@@ -94,6 +94,10 @@ jobs:
             --consumer fleet >"$receipt"
           gate_rc=$?
           set -e
+          # Persistence to gem-workspace is best-effort. The printed live
+          # receipt is the authority. A blocked or evaluation-failed receipt
+          # must stay schema-valid so this job skips admission instead of
+          # going red on a stub.
           jq -e '
             .schema == "jovie-fleet-gate/v1" and
             (.observedAt | type == "string") and

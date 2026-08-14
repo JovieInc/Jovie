@@ -9,6 +9,8 @@ import json
 import os
 import pathlib
 import re
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -17,6 +19,17 @@ from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 GATE = ROOT / "scripts/hermes/gem-priority-gate.py"
+AUTOENROLL_WORKFLOW = ROOT / ".github/workflows/merge-queue-autoenroll.yml"
+# Historical stub printed by the __main__ except block before JOV-5067.
+# Auto-Enroll jq fail-closed on this shape: missing observedAt, signals,
+# isolatedPromotionAdmission, and promotionMode.
+LEGACY_FLEET_GATE_STUB = {
+    "schema": "jovie-fleet-gate/v1",
+    "state": "RED",
+    "workAdmission": {"allowed": False},
+    "promotionAdmission": {"allowed": False},
+    "deploymentAdmission": {"allowed": False},
+}
 SPEC = importlib.util.spec_from_file_location("gem_priority_gate", GATE)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"could not load {GATE}")
@@ -169,6 +182,69 @@ def run_main(
     ):
         exit_code = MODULE.main()
     return exit_code, stdout.getvalue(), stderr.getvalue()
+
+
+AUTOENROLL_RECEIPT_JQ = """
+.schema == "jovie-fleet-gate/v1" and
+(.observedAt | type == "string") and
+(.signals.main.sha | test("^[0-9a-f]{40}$")) and
+(.signals.integrity.status | IN("clear", "resolved", "active", "invalid")) and
+(.promotionAdmission.allowed | type == "boolean") and
+(.isolatedPromotionAdmission.allowed | type == "boolean") and
+(.promotionMode | IN("normal", "isolated-only", "draft-only", "hold-intake", "blocked"))
+""".strip()
+
+
+def autoenroll_receipt_query() -> str:
+    content = AUTOENROLL_WORKFLOW.read_text(encoding="utf-8")
+    for clause in AUTOENROLL_RECEIPT_JQ.split(" and\n"):
+        if clause not in content:
+            raise AssertionError(
+                f"merge-queue-autoenroll.yml is missing fleet receipt jq clause: {clause}"
+            )
+    return AUTOENROLL_RECEIPT_JQ
+
+
+def receipt_satisfies_autoenroll(receipt: dict[str, object]) -> bool:
+    sha = (
+        receipt.get("signals", {}).get("main", {}).get("sha")
+        if isinstance(receipt.get("signals"), dict)
+        else None
+    )
+    integrity = (
+        receipt.get("signals", {}).get("integrity", {}).get("status")
+        if isinstance(receipt.get("signals"), dict)
+        else None
+    )
+    promotion = receipt.get("promotionAdmission")
+    isolated = receipt.get("isolatedPromotionAdmission")
+    return (
+        receipt.get("schema") == "jovie-fleet-gate/v1"
+        and isinstance(receipt.get("observedAt"), str)
+        and isinstance(sha, str)
+        and bool(re.fullmatch(r"[0-9a-f]{40}", sha))
+        and integrity in {"clear", "resolved", "active", "invalid"}
+        and isinstance(promotion, dict)
+        and isinstance(promotion.get("allowed"), bool)
+        and isinstance(isolated, dict)
+        and isinstance(isolated.get("allowed"), bool)
+        and receipt.get("promotionMode")
+        in {"normal", "isolated-only", "draft-only", "hold-intake", "blocked"}
+    )
+
+
+def jq_accepts_autoenroll_receipt(receipt: dict[str, object]) -> bool:
+    jq = shutil.which("jq")
+    if jq is None:
+        raise AssertionError("jq is required to prove the Auto-Enroll workflow contract")
+    result = subprocess.run(
+        [jq, "-e", autoenroll_receipt_query()],
+        input=json.dumps(receipt),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.returncode == 0
 
 
 class WriterLockTests(unittest.TestCase):
@@ -625,6 +701,8 @@ class WorkflowContractTests(unittest.TestCase):
         content = (self.WORKFLOWS / "merge-queue-autoenroll.yml").read_text(encoding="utf-8")
         self.assertIn("--consumer fleet", content)
         self.assertNotIn("--dry-run", content)
+        self.assertIn("receipt is the authority", content)
+        self.assertIn(AUTOENROLL_RECEIPT_JQ.split(" and\n")[0], content)
 
     def test_production_controller_uses_exact_subject_deployment_admission(self):
         content = (self.WORKFLOWS / "production-controller.yml").read_text(encoding="utf-8")
@@ -660,6 +738,61 @@ class WorkflowContractTests(unittest.TestCase):
         js_minutes = re.search(r"CONTROLLER_RECEIPT_MAX_AGE_MS = (\d+) \* 60 \* 1000", admitter)
         self.assertIsNotNone(js_minutes)
         self.assertEqual(python_minutes.group(1), js_minutes.group(1))
+
+
+class AutoEnrollStubReceiptTests(unittest.TestCase):
+    """JOV-5067: Auto-Enroll must skip on a schema-valid blocked receipt, not go red."""
+
+    def test_legacy_stub_is_the_fail_closed_shape(self):
+        self.assertFalse(receipt_satisfies_autoenroll(LEGACY_FLEET_GATE_STUB))
+        self.assertFalse(jq_accepts_autoenroll_receipt(LEGACY_FLEET_GATE_STUB))
+
+    def test_evaluation_failure_emits_schema_valid_blocked_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_dir = pathlib.Path(tmp) / "state" / "gem-priority-gate"
+            with mock.patch.object(
+                MODULE, "evaluate", side_effect=ValueError("no persisted receipt exists")
+            ):
+                exit_code, stdout, _stderr = run_main(
+                    [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
+                )
+
+        receipt = json.loads(stdout)
+        self.assertEqual(exit_code, 2)
+        self.assertTrue(receipt_satisfies_autoenroll(receipt))
+        self.assertTrue(jq_accepts_autoenroll_receipt(receipt))
+        self.assertEqual(receipt["promotionMode"], "blocked")
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertFalse(receipt["isolatedPromotionAdmission"]["allowed"])
+        self.assertEqual(
+            {reason["code"] for reason in receipt["reasons"]},
+            {"gate-evaluation-failed"},
+        )
+
+    def test_unwritable_gem_workspace_keeps_the_live_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            blocker = pathlib.Path(tmp) / "not-a-directory"
+            blocker.write_text("nope", encoding="utf-8")
+            state_dir = blocker / "state" / "gem-priority-gate"
+            exit_code, stdout, stderr = run_main(
+                [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
+            )
+
+        receipt = json.loads(stdout)
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertTrue(receipt["promotionAdmission"]["allowed"])
+        self.assertTrue(receipt_satisfies_autoenroll(receipt))
+        self.assertTrue(jq_accepts_autoenroll_receipt(receipt))
+        self.assertIn("live receipt not persisted", stderr)
+        self.assertFalse(state_dir.exists())
+
+    def test_failed_evaluation_receipt_helper_matches_autoenroll_jq(self):
+        receipt = MODULE.failed_evaluation_receipt(OSError("Permission denied"))
+        self.assertTrue(receipt_satisfies_autoenroll(receipt))
+        self.assertTrue(jq_accepts_autoenroll_receipt(receipt))
+        self.assertEqual(receipt["signals"]["main"]["sha"], MODULE.UNKNOWN_MAIN_SHA)
+        self.assertEqual(receipt["signals"]["integrity"]["status"], "invalid")
 
 
 class LeaseSignalTests(unittest.TestCase):
