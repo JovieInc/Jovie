@@ -32,6 +32,18 @@ variants. Receipts, mappings, duplicate explorations, status copy, and process
 notes belong in operator artifacts. Placeholder or explanatory filler is not
 review content.
 
+### Do not fuck with art (founder-locked 2026-08-13)
+
+Hard product and marketing rules. Not aesthetic taste.
+
+1. Never crop album art. Respect the square. `object-fit: contain`, not `cover`.
+2. Do not fuck with art. No gradient, overlay, play button, or chrome on album art, merch, or a face. Never cover a face or a person.
+3. Only acceptable control on art: optional mostly-transparent glass play/pause. Nothing else.
+4. Border radius scales down as the asset gets smaller. Hard radii break printed borders (Never Say A Word).
+5. Profile/avatar: no overlay except an approved tiny verification badge on an approved avatar component.
+6. Press photo: designed one-sheet ok only if it does not cover a face.
+7. Ad/marketing scale is not web scale. Pills and type can go larger.
+
 ### Logo asset normalization (founder-global 2026-08-12)
 
 Artist and third-party logos are normalized by visible non-transparent pixel

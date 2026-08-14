@@ -38,6 +38,7 @@
 - `founder-review-canonical-only` — Founder review contains canonical masters and intentional variants, without receipts, duplicates, or filler.
 - `pen-source-identity-boundary` — Pen is proposal/review evidence until source identity and required persistence receipts pass.
 - `logo-visible-bounds-normalization` — Logos normalize visible non-transparent ink through the shared asset registry, never route-local crop or scale CSS.
+- `do-not-fuck-with-art` — Never crop album art. Use object-fit: contain, not cover. No gradient, overlay, play button, or chrome on album art, merch, or a face except optional mostly-transparent glass play/pause.
 
 ## Canonical Tailwind Utilities
 

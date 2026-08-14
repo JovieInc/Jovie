@@ -108,6 +108,19 @@ accent colors between sections, ornament title text, or place decorative icons
 on colored squares. CTAs remain neutral high-contrast pills. Color never
 carries status alone.
 
+### Do not fuck with art (founder-locked 2026-08-13)
+
+Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
+`DESIGN.md` is authority.
+
+1. Never crop album art. Respect the square. `object-fit: contain`, not `cover`.
+2. Do not fuck with art. No gradient, overlay, play button, or chrome on album art, merch, or a face. Never cover a face or a person.
+3. Only acceptable control on art: optional mostly-transparent glass play/pause. Nothing else.
+4. Border radius scales down as the asset gets smaller. Hard radii break printed borders (Never Say A Word).
+5. Profile/avatar: no overlay except an approved tiny verification badge on an approved avatar component.
+6. Press photo: designed one-sheet ok only if it does not cover a face.
+7. Ad/marketing scale is not web scale. Pills and type can go larger.
+
 ### Locked Marketing Geometry and Review
 
 - Marketing pill controls are visibly 32px high inside a 44px minimum target.
