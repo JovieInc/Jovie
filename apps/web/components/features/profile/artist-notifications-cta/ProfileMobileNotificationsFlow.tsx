@@ -20,6 +20,7 @@ import {
   type CountryOption,
   CountrySelector,
 } from '@/features/profile/notifications';
+import { useModalFocusBoundary } from '@/lib/a11y/modal-focus-boundary';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 import { cn } from '@/lib/utils';
 import type { NotificationContentType } from '@/types/notifications';
@@ -411,7 +412,9 @@ export function ProfileMobileNotificationsFlow({
   onPreferencesSubmit,
 }: Readonly<ProfileMobileNotificationsFlowProps>) {
   const [mounted, setMounted] = useState(false);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   const isResendCooldownActive = resendCooldownEnd > Date.now();
+  useModalFocusBoundary(dialogRef, open && presentation !== 'inline');
 
   useEffect(() => {
     setMounted(true);
@@ -903,6 +906,7 @@ export function ProfileMobileNotificationsFlow({
   const content =
     presentation === 'overlay' ? (
       <div
+        ref={dialogRef}
         className={cn(
           overlayRootClassName,
           'bg-[color:var(--profile-stage-bg)] dark:text-white'
@@ -910,12 +914,14 @@ export function ProfileMobileNotificationsFlow({
         data-testid='profile-mobile-notifications-flow'
         role='dialog'
         aria-modal='true'
+        tabIndex={-1}
         style={contentStyle}
       >
         {contentBody}
       </div>
     ) : presentation === 'modal' ? (
       <div
+        ref={dialogRef}
         className={cn(
           overlayRootClassName,
           'flex items-center justify-center bg-black/52 px-4 py-6 dark:text-white backdrop-blur-sm'
@@ -923,6 +929,7 @@ export function ProfileMobileNotificationsFlow({
         data-testid='profile-mobile-notifications-flow'
         role='dialog'
         aria-modal='true'
+        tabIndex={-1}
         style={contentStyle}
       >
         <div className='relative flex h-[min(760px,calc(100dvh-48px))] w-full max-w-110 flex-col overflow-hidden rounded-(--profile-card-radius) border border-white/10 bg-[color:var(--profile-stage-bg)] shadow-[0_34px_96px_rgba(0,0,0,0.48)] min-[1180px]:max-w-160'>

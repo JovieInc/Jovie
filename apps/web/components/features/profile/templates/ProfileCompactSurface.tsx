@@ -453,7 +453,9 @@ export function ProfileCompactSurface({
   // collapse is gone. Media crops via object-cover, never squashes; the
   // carousel below owns the remaining viewport height.
   const heroHeightClassName = isHomeMode
-    ? 'h-(--cover-height) shrink-0'
+    ? resolvedHeroImageUrl
+      ? 'h-(--cover-height) shrink-0'
+      : 'profile-home-fluid-hero--no-media shrink-0'
     : 'h-[calc(3.5rem+max(env(safe-area-inset-top),0px))]';
   const homeContentColumnClassName = 'min-h-0 flex-1';
   const homeContentScrollClassName = 'min-h-0 flex-1';
@@ -711,7 +713,7 @@ export function ProfileCompactSurface({
                     data-testid='profile-identity-link'
                     href={profileHref}
                     prefetch={false}
-                    aria-label={`Go to ${artist.name}'s profile`}
+                    aria-label={artist.name}
                     className='inline-flex min-h-11 max-w-full min-w-0 flex-wrap items-center gap-1 rounded-md py-0 text-3xl font-semibold leading-8 tracking-normal text-(--profile-status-pill-fg) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [@media(max-height:820px)]:text-2xl [@media(max-height:760px)]:text-2xl'
                   >
                     <span className='min-w-0 max-w-full [overflow-wrap:anywhere]'>
@@ -727,7 +729,7 @@ export function ProfileCompactSurface({
                           fill='white'
                           stroke='black'
                           strokeWidth={2}
-                          aria-label='Verified Artist'
+                          aria-hidden='true'
                         />
                       </span>
                     ) : null}
@@ -863,6 +865,7 @@ export function ProfileCompactSurface({
                 featuredPlaylistFallback={featuredPlaylistFallback}
                 tourDates={tourDates}
                 hasPlayableDestinations={mergedDSPs.length > 0}
+                captureEnabled={allowFanCapture}
                 renderMode={renderMode}
                 onPlayClick={onPlayClick}
                 onAlertsClick={openNotifications}
@@ -874,7 +877,7 @@ export function ProfileCompactSurface({
                 merchCards={merchCards}
                 releases={releases}
                 hasTip={hasTip}
-                pacArtPriority
+                pacArtPriority={!resolvedHeroImageUrl}
               />
             ) : (
               <ProfilePrimaryTabPanel

@@ -460,7 +460,7 @@ async function ArtistPageContent({
             visitorState={visitorState}
           />
         }
-        allowFanCapture={!requiresVerifiedOwnership}
+        allowFanCapture={isClaimed}
         enableDynamicEngagement={creatorIsPro}
         latestRelease={latestRelease}
         photoDownloadSizes={photoDownloadSizes}

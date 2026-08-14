@@ -7,6 +7,12 @@ import {
   shouldSuppressCookieBannerForPathname,
 } from '@/lib/cookies/banner-visibility';
 
+const mockPathname = vi.hoisted(() => vi.fn(() => '/'));
+
+vi.mock('next/navigation', () => ({
+  usePathname: mockPathname,
+}));
+
 vi.mock('@/lib/cookies/consent', () => ({
   saveConsent: vi.fn(),
 }));
@@ -69,6 +75,11 @@ describe('CookieActions', () => {
     expect(rejectAll).toHaveTextContent('Reject all');
     expect(acceptAll).toHaveTextContent('Accept all');
     expect(customize).toHaveTextContent('Customize');
+    expect(Array.from(layer.children).map(child => child.textContent)).toEqual([
+      'Reject all',
+      'Accept all',
+      'Customize',
+    ]);
 
     for (const property of [
       'backgroundColor',
@@ -87,6 +98,8 @@ describe('CookieActions', () => {
 describe('CookieBannerSection', () => {
   afterEach(() => {
     setCookie('');
+    mockPathname.mockReturnValue('/');
+    document.documentElement.style.removeProperty('--cookie-banner-h');
   });
 
   it('renders banner and buttons when jv_cc_required cookie is 1', () => {
@@ -178,7 +191,9 @@ describe('CookieBannerSection', () => {
       expect(button).toHaveStyle({ height: '44px' });
     }
     // Privacy link present (condensed legal text)
-    expect(banner.textContent).toContain('essential functionality');
+    expect(banner.textContent).toContain(
+      'Essential cookies keep Jovie working'
+    );
     expect(screen.getByRole('link', { name: /privacy/i })).toHaveAttribute(
       'href',
       '/legal/privacy'
@@ -230,6 +245,38 @@ describe('CookieBannerSection', () => {
       // Non-empty when visible (exact px depends on jsdom layout, but presence + numeric)
       expect(h).toMatch(/^\d/);
     });
+  });
+
+  it('does not publish a bottom reservation for a nonzero top-positioned profile banner', async () => {
+    mockPathname.mockReturnValue('/tim');
+    setCookie('jv_cc_required=1');
+    const rectSpy = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({
+        x: 68,
+        y: 8,
+        top: 8,
+        right: 322,
+        bottom: 126,
+        left: 68,
+        width: 254,
+        height: 118,
+        toJSON: () => ({}),
+      });
+
+    try {
+      render(<CookieBannerSection />);
+      expect(screen.getByTestId('cookie-banner')).toHaveClass(
+        'cookie-banner-card--above-public-profile-dock'
+      );
+      await vi.waitFor(() => {
+        expect(
+          document.documentElement.style.getPropertyValue('--cookie-banner-h')
+        ).toBe('');
+      });
+    } finally {
+      rectSpy.mockRestore();
+    }
   });
 
   // The published reservation includes the rendered bottom inset plus a 12px

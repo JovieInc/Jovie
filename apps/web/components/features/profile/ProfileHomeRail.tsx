@@ -43,6 +43,7 @@ interface ProfileHomeRailProps {
   readonly featuredPlaylistFallback?: ConfirmedFeaturedPlaylistFallback | null;
   readonly tourDates?: readonly TourDateViewModel[];
   readonly hasPlayableDestinations: boolean;
+  readonly captureEnabled?: boolean;
   readonly renderMode?: ProfileRenderMode;
   readonly previewActionLabel?: string;
   readonly onPlayClick?: () => void;
@@ -172,6 +173,8 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   profileSettings,
   featuredPlaylistFallback,
   tourDates = [],
+  hasPlayableDestinations,
+  captureEnabled = true,
   renderMode = 'interactive',
   onAlertsClick,
   showAlertsCard = true,
@@ -359,6 +362,13 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
     upcomingTourDates.find(show => show.id === nearbyTourDateId) ??
     upcomingTourDates[0] ??
     null;
+  const hasPacSubject = Boolean(
+    pacRelease ||
+      merchCards[0] ||
+      pacNextShow ||
+      hasTip ||
+      hasPlayableDestinations
+  );
 
   const alertsCard =
     !showAlertsCard || isSubscribed ? null : (
@@ -386,25 +396,29 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
       className='flex min-h-0 min-w-0 flex-1 flex-col md:mx-auto md:w-full'
       data-testid='profile-home-rail'
     >
-      <h2 className='sr-only'>Latest From {artist.name}</h2>
+      <h2 className='sr-only'>Profile Highlights From {artist.name}</h2>
       <ReleaseCatalogCarousel
         items={carouselItems}
         artistHandle={artist.handle}
         artistId={artist.id}
         analyticsEnabled={renderMode !== 'preview'}
         leading={
-          <ProfilePacCard
-            artist={artist}
-            release={pacRelease}
-            merchCard={merchCards[0] ?? null}
-            nextShow={pacNextShow}
-            hasTip={hasTip}
-            assignment={profilePacAssignment}
-            isSubscribed={isSubscribed}
-            renderMode={renderMode}
-            layout='profile-landscape'
-            artPriority={pacArtPriority}
-          />
+          hasPacSubject ? (
+            <ProfilePacCard
+              artist={artist}
+              release={pacRelease}
+              merchCard={merchCards[0] ?? null}
+              nextShow={pacNextShow}
+              hasTip={hasTip}
+              assignment={profilePacAssignment}
+              isSubscribed={isSubscribed}
+              renderMode={renderMode}
+              layout='profile-landscape'
+              artPriority={pacArtPriority}
+              hasPlayableDestinations={hasPlayableDestinations}
+              captureEnabled={captureEnabled}
+            />
+          ) : null
         }
         trailing={alertsCard}
       />

@@ -1058,6 +1058,13 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
             };
           };
 
+          const banner = document.querySelector<HTMLElement>(
+            '[data-testid="cookie-banner"]'
+          );
+          const actions = document.querySelector<HTMLElement>(
+            '[data-testid="cookie-actions"]'
+          );
+
           return {
             shell: rect(document.querySelector('.profile-viewport')),
             frame: rect(document.querySelector('.public-profile-layout-frame')),
@@ -1067,9 +1074,25 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
             dock: rect(
               document.querySelector('[data-testid="profile-tab-bar"]')
             ),
-            banner: rect(
-              document.querySelector('[data-testid="cookie-banner"]')
+            primaryAction: rect(
+              document.querySelector(
+                '[data-testid="profile-pac"] a, [data-testid="profile-pac"] button'
+              )
             ),
+            topChromeButtons: Array.from(
+              document.querySelectorAll('.profile-cover-chrome button')
+            ).map(rect),
+            banner: rect(banner),
+            actions: rect(actions),
+            bannerScrollWidth: banner?.scrollWidth ?? null,
+            bannerClientWidth: banner?.clientWidth ?? null,
+            actionsScrollWidth: actions?.scrollWidth ?? null,
+            actionsClientWidth: actions?.clientWidth ?? null,
+            bannerActions: Array.from(
+              document.querySelectorAll(
+                '[data-testid="cookie-actions"] > button'
+              )
+            ).map(rect),
           };
         });
 
@@ -1081,16 +1104,76 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
         );
 
         const banner = document.createElement('aside');
+        banner.setAttribute('aria-label', 'Cookie Consent');
         banner.className =
-          'cookie-banner-card cookie-banner-card--above-public-profile-dock';
+          'cookie-banner-card fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-85 cookie-banner-card--above-public-profile-dock';
         banner.dataset.testid = 'cookie-banner';
-        Object.assign(banner.style, {
-          position: 'fixed',
-          right: '16px',
-          width: 'min(380px, calc(100vw - 32px))',
-          height: '118px',
-          zIndex: '60',
-        });
+
+        const surface = document.createElement('div');
+        surface.className =
+          'rounded-2xl border border-(--linear-app-frame-seam) bg-surface-1 px-4 py-3 shadow-card';
+        const content = document.createElement('div');
+        content.className = 'min-w-0';
+        const copy = document.createElement('p');
+        copy.className = 'text-xs leading-snug text-secondary-token';
+        copy.append(
+          'Essential cookies keep Jovie working. Choose whether to allow analytics and marketing cookies. '
+        );
+        const privacy = document.createElement('a');
+        privacy.href = '/legal/privacy';
+        privacy.className =
+          'underline hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent';
+        privacy.textContent = 'Privacy';
+        copy.append(privacy);
+
+        const actionsMargin = document.createElement('div');
+        actionsMargin.className = 'mt-3';
+        const actions = document.createElement('div');
+        actions.className =
+          'cookie-actions--compact flex shrink-0 flex-row flex-wrap items-center';
+        actions.dataset.testid = 'cookie-actions';
+        actions.style.gap = '4px';
+
+        const addAction = (
+          label: string,
+          testId: string,
+          variant: 'choice' | 'customize'
+        ) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = `min-w-0 flex-1 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent sm:flex-none cookie-action--${variant}`;
+          button.dataset.testid = testId;
+          button.textContent = label;
+          Object.assign(button.style, {
+            backgroundColor:
+              variant === 'choice'
+                ? 'var(--linear-btn-primary-bg)'
+                : 'var(--linear-bg-button)',
+            color:
+              variant === 'choice'
+                ? 'var(--linear-btn-primary-fg)'
+                : 'var(--linear-text-primary)',
+            border:
+              variant === 'choice'
+                ? '1px solid var(--linear-btn-primary-bg)'
+                : '1px solid var(--linear-border-default)',
+            borderRadius: 'var(--linear-radius-sm)',
+            fontSize: '12px',
+            fontWeight: 'var(--linear-font-weight-medium)',
+            padding: variant === 'choice' ? '6px 8px' : '6px',
+            whiteSpace: 'nowrap',
+            height: '44px',
+          });
+          actions.append(button);
+        };
+
+        addAction('Reject all', 'cookie-action-reject-all', 'choice');
+        addAction('Accept all', 'cookie-action-accept-all', 'choice');
+        addAction('Customize', 'cookie-action-customize', 'customize');
+        actionsMargin.append(actions);
+        content.append(copy, actionsMargin);
+        surface.append(content);
+        banner.append(surface);
         document.body.append(banner);
       });
       await page.evaluate(
@@ -1116,6 +1199,28 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
         `${viewport.label} dock must ignore delayed cookie height`
       ).toEqual(before.dock);
 
+      expect(
+        after.topChromeButtons.length,
+        `${viewport.label} profile should expose top-chrome buttons`
+      ).toBeGreaterThan(0);
+      for (const [index, topChromeButton] of after.topChromeButtons.entries()) {
+        if (!after.banner || !topChromeButton) {
+          throw new Error(
+            `${viewport.label} top-chrome overlap prerequisites disappeared`
+          );
+        }
+        const overlapsTopChromeHorizontally =
+          after.banner.left < topChromeButton.right &&
+          after.banner.right > topChromeButton.left;
+        const overlapsTopChromeVertically =
+          after.banner.top < topChromeButton.bottom &&
+          after.banner.bottom > topChromeButton.top;
+        expect(
+          overlapsTopChromeHorizontally && overlapsTopChromeVertically,
+          `${viewport.label} consent card must not cover top-chrome button ${index + 1}`
+        ).toBe(false);
+      }
+
       if (viewport.width < 768) {
         expect(after.banner, 'phone consent card should render').not.toBeNull();
         expect(after.dock, 'phone dock should render').not.toBeNull();
@@ -1137,6 +1242,131 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
           `${viewport.label} consent card must not cover the glass dock`
         ).toBe(false);
       }
+
+      expect(
+        after.banner,
+        `${viewport.label} consent card must render for overlap verification`
+      ).not.toBeNull();
+      expect(
+        after.primaryAction,
+        `${viewport.label} primary profile action must render for overlap verification`
+      ).not.toBeNull();
+      const banner = after.banner;
+      const primaryAction = after.primaryAction;
+      if (!banner || !primaryAction) {
+        throw new Error(
+          `${viewport.label} overlap prerequisites disappeared after assertion`
+        );
+      }
+      expect(
+        banner.height,
+        `${viewport.label} measured banner height`
+      ).toBeGreaterThan(0);
+      expect(
+        banner.left,
+        `${viewport.label} banner left in viewport`
+      ).toBeGreaterThanOrEqual(0);
+      expect(
+        banner.top,
+        `${viewport.label} banner top in viewport`
+      ).toBeGreaterThanOrEqual(0);
+      expect(
+        banner.right,
+        `${viewport.label} banner right in viewport`
+      ).toBeLessThanOrEqual(viewport.width);
+      expect(
+        banner.bottom,
+        `${viewport.label} banner bottom in viewport`
+      ).toBeLessThanOrEqual(viewport.height);
+      expect(
+        after.bannerScrollWidth,
+        `${viewport.label} banner content must not overflow horizontally`
+      ).toBeLessThanOrEqual(after.bannerClientWidth ?? -1);
+      expect(
+        after.actionsScrollWidth,
+        `${viewport.label} action row must not overflow horizontally`
+      ).toBeLessThanOrEqual(after.actionsClientWidth ?? -1);
+
+      expect(after.bannerActions).toHaveLength(3);
+      for (const [index, action] of after.bannerActions.entries()) {
+        if (!action) {
+          throw new Error(
+            `${viewport.label} cookie action ${index + 1} disappeared`
+          );
+        }
+        expect(
+          action.height,
+          `${viewport.label} action ${index + 1} touch floor`
+        ).toBeGreaterThanOrEqual(44);
+        expect(
+          action.left,
+          `${viewport.label} action ${index + 1} inside banner`
+        ).toBeGreaterThanOrEqual(banner.left);
+        expect(
+          action.right,
+          `${viewport.label} action ${index + 1} inside banner`
+        ).toBeLessThanOrEqual(banner.right);
+        expect(
+          action.top,
+          `${viewport.label} action ${index + 1} inside banner`
+        ).toBeGreaterThanOrEqual(banner.top);
+        expect(
+          action.bottom,
+          `${viewport.label} action ${index + 1} inside banner`
+        ).toBeLessThanOrEqual(banner.bottom);
+      }
+      for (let first = 0; first < after.bannerActions.length; first += 1) {
+        for (
+          let second = first + 1;
+          second < after.bannerActions.length;
+          second += 1
+        ) {
+          const a = after.bannerActions[first];
+          const b = after.bannerActions[second];
+          if (!a || !b) continue;
+          const intersect =
+            a.left < b.right &&
+            a.right > b.left &&
+            a.top < b.bottom &&
+            a.bottom > b.top;
+          expect(
+            intersect,
+            `${viewport.label} cookie actions ${first + 1} and ${second + 1} must not intersect`
+          ).toBe(false);
+        }
+      }
+      if (viewport.width <= 383) {
+        const [reject, accept, customize] = after.bannerActions;
+        if (!reject || !accept || !customize || !after.actions) {
+          throw new Error(
+            `${viewport.label} narrow consent layout prerequisites disappeared`
+          );
+        }
+        expect(
+          reject.top,
+          `${viewport.label} choices share the first row`
+        ).toBe(accept.top);
+        expect(
+          customize.top,
+          `${viewport.label} Customize occupies the second row`
+        ).toBeGreaterThanOrEqual(reject.bottom + 4);
+        expect(
+          customize.left,
+          `${viewport.label} Customize spans the action row`
+        ).toBe(after.actions.left);
+        expect(
+          customize.right,
+          `${viewport.label} Customize spans the action row`
+        ).toBe(after.actions.right);
+      }
+      const overlapsHorizontally =
+        banner.left < primaryAction.right && banner.right > primaryAction.left;
+      const overlapsVertically =
+        banner.top < primaryAction.bottom && banner.bottom > primaryAction.top;
+      expect(
+        overlapsHorizontally && overlapsVertically,
+        `${viewport.label} consent card must not cover the primary profile action`
+      ).toBe(false);
 
       await page.evaluate(() => {
         document.documentElement.style.removeProperty('--cookie-banner-h');

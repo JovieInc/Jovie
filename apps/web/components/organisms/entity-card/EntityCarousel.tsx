@@ -246,6 +246,7 @@ export function EntityCarousel({
   // exactly outside the viewport at rest. Portrait keeps a smaller gap for its
   // intentional card preview.
   const isProfileLandscape = layout === 'profile-landscape';
+  const hidesInactiveSlots = isProfileLandscape;
   const cardItemClassName = cn(
     CARD_ITEM_CLASSNAME,
     isProfileLandscape && 'w-full'
@@ -278,12 +279,19 @@ export function EntityCarousel({
           <li
             data-carousel-slot='leading'
             data-layout={layout}
+            data-carousel-active={currentIndex === 0 ? 'true' : 'false'}
+            aria-hidden={
+              hidesInactiveSlots && currentIndex !== 0 ? true : undefined
+            }
+            inert={hidesInactiveSlots && currentIndex !== 0 ? true : undefined}
             className={cardItemClassName}
           >
             {leading}
           </li>
         ) : null}
         {items.map((model, index) => {
+          const slotIndex = index + (leading ? 1 : 0);
+          const isActive = slotIndex === currentIndex;
           return (
             <li
               key={`${model.kind}-${model.id}`}
@@ -292,6 +300,9 @@ export function EntityCarousel({
               }}
               data-carousel-index={index}
               data-layout={layout}
+              data-carousel-active={isActive ? 'true' : 'false'}
+              aria-hidden={hidesInactiveSlots && !isActive ? true : undefined}
+              inert={hidesInactiveSlots && !isActive ? true : undefined}
               className={cardItemClassName}
             >
               <EntityCard
@@ -317,6 +328,19 @@ export function EntityCarousel({
           <li
             data-carousel-slot='trailing'
             data-layout={layout}
+            data-carousel-active={
+              currentIndex === slotCount - 1 ? 'true' : 'false'
+            }
+            aria-hidden={
+              hidesInactiveSlots && currentIndex !== slotCount - 1
+                ? true
+                : undefined
+            }
+            inert={
+              hidesInactiveSlots && currentIndex !== slotCount - 1
+                ? true
+                : undefined
+            }
             className={cardItemClassName}
           >
             {trailing}

@@ -28,7 +28,11 @@ function getModalBackgroundElements(modal: HTMLElement): HTMLElement[] {
 
   while (current?.parentElement) {
     for (const sibling of Array.from(current.parentElement.children)) {
-      if (sibling !== current && sibling instanceof HTMLElement) {
+      if (
+        sibling !== current &&
+        sibling instanceof HTMLElement &&
+        !sibling.hasAttribute('data-modal-backdrop')
+      ) {
         background.push(sibling);
       }
     }
@@ -50,19 +54,46 @@ export function useModalFocusBoundary(
     const modal = modalRef.current;
     if (!modal || !isOpen) return;
 
+    const returnFocusTarget =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
     const priorInertStates = getModalBackgroundElements(modal).map(element => ({
       element,
       wasInert: element.inert,
+      hadInertAttribute: element.hasAttribute('inert'),
+      ariaHidden: element.getAttribute('aria-hidden'),
     }));
 
     for (const { element } of priorInertStates) {
       element.inert = true;
+      element.setAttribute('inert', '');
+      element.setAttribute('aria-hidden', 'true');
     }
 
+    const focusable = getFocusableElements(modal);
+    (focusable[0] ?? modal).focus({ preventScroll: true });
+
     return () => {
-      for (const { element, wasInert } of priorInertStates) {
+      for (const {
+        element,
+        wasInert,
+        hadInertAttribute,
+        ariaHidden,
+      } of priorInertStates) {
         element.inert = wasInert;
+        if (hadInertAttribute) {
+          element.setAttribute('inert', '');
+        } else {
+          element.removeAttribute('inert');
+        }
+        if (ariaHidden === null) {
+          element.removeAttribute('aria-hidden');
+        } else {
+          element.setAttribute('aria-hidden', ariaHidden);
+        }
       }
+      returnFocusTarget?.focus({ preventScroll: true });
     };
   }, [isOpen, modalRef]);
 

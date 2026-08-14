@@ -495,14 +495,28 @@ export function ProfileUnifiedDrawer({
           {renderedView === 'pay' && (
             <div data-testid='profile-mode-drawer-pay'>
               {hasValidVenmoLink ? (
-                <PaySelector
-                  amounts={PAY_AMOUNTS}
-                  onContinue={handleTipAmountSelected}
-                  presentation='drawer'
-                  primaryLabel='Continue with Venmo'
-                  paymentLabel='Venmo'
-                  showOtherPaymentOptions={false}
-                />
+                <>
+                  <div
+                    className='mb-4 text-center'
+                    data-testid='profile-pay-recipient'
+                  >
+                    <p className='text-sm font-semibold text-primary-token'>
+                      Pay {artist.name}
+                    </p>
+                    <p className='mt-1 text-xs text-tertiary-token'>
+                      @{artist.handle} via Venmo
+                    </p>
+                  </div>
+                  <PaySelector
+                    amounts={PAY_AMOUNTS}
+                    onContinue={handleTipAmountSelected}
+                    presentation='drawer'
+                    primaryLabel='Continue with Venmo'
+                    paymentLabel='Venmo'
+                    screenReaderDescription={`Choose an amount to pay ${artist.name}, @${artist.handle}, with Venmo.`}
+                    showOtherPaymentOptions={false}
+                  />
+                </>
               ) : (
                 <div className='rounded-(--profile-drawer-radius-mobile) border border-subtle bg-[color:var(--color-interactive-hover)] px-4 py-5 text-center'>
                   <p className='text-sm font-semibold text-primary-token'>

@@ -10,6 +10,7 @@ import {
 } from '@/components/features/profile/pac/pac-machine';
 
 const fullInventory = {
+  hasListen: true,
   hasPreview: true,
   hasMerch: true,
   hasTip: true,
@@ -20,6 +21,7 @@ const fullInventory = {
 function ctx(overrides: Partial<PacContext> = {}): PacContext {
   return {
     tier: 'cold',
+    captureEnabled: true,
     s2Slot: 'merch',
     captureSuppressed: false,
     inventory: fullInventory,
@@ -53,12 +55,39 @@ describe('resolveInitialPacState', () => {
     });
   });
 
-  it('cold visitor without a preview lands in degraded S0 idle', () => {
+  it('cold visitor with a listen destination but no preview lands in degraded S0 idle', () => {
     const state = resolveInitialPacState(
       ctx({ inventory: { ...fullInventory, hasPreview: false } })
     );
     expect(state.kind).toBe('idle');
     expect(state.degraded).toBe(true);
+  });
+
+  it.each([
+    ['merch', { hasMerch: true }, 'merch'],
+    ['tip', { hasTip: true }, 'tip'],
+    [
+      'ticketed show',
+      { hasTicketedShow: true, hasUpcomingShow: true },
+      'tickets',
+    ],
+    ['unticketed show', { hasUpcomingShow: true }, 'rsvp'],
+  ] as const)('cold visitor with only %s inventory resolves to %s instead of an empty listen state', (_label, availableInventory, expectedKind) => {
+    expect(
+      resolveInitialPacState(
+        ctx({
+          inventory: {
+            hasListen: false,
+            hasPreview: false,
+            hasMerch: false,
+            hasTip: false,
+            hasTicketedShow: false,
+            hasUpcomingShow: false,
+            ...availableInventory,
+          },
+        })
+      ).kind
+    ).toBe(expectedKind);
   });
 
   it('warmed visitor lands in the capture prompt', () => {
@@ -76,6 +105,33 @@ describe('resolveInitialPacState', () => {
     expect(
       resolveInitialPacState(ctx({ tier: 'captured', s2Slot: 'tip' })).kind
     ).toBe('tip');
+  });
+
+  it('capture-disabled captured context resolves to truthful listen inventory instead of following', () => {
+    expect(
+      resolveInitialPacState(
+        ctx({ tier: 'captured', captureEnabled: false, s2Slot: 'tip' })
+      )
+    ).toEqual({ kind: 'idle', stage: 's0', degraded: false });
+  });
+
+  it('capture-disabled context with no inventory never fabricates a Following action', () => {
+    expect(
+      resolveInitialPacState(
+        ctx({
+          tier: 'captured',
+          captureEnabled: false,
+          inventory: {
+            hasListen: false,
+            hasPreview: false,
+            hasMerch: false,
+            hasTip: false,
+            hasTicketedShow: false,
+            hasUpcomingShow: false,
+          },
+        })
+      )
+    ).toEqual({ kind: 'idle', stage: 's0', degraded: true });
   });
 });
 
@@ -121,6 +177,7 @@ describe('resolveS2State degraded ladder', () => {
         tier: 'captured',
         s2Slot: 'merch',
         inventory: {
+          hasListen: false,
           hasPreview: false,
           hasMerch: false,
           hasTip: false,
@@ -180,6 +237,16 @@ describe('pacReducer transitions', () => {
         ctx({ captureSuppressed: true })
       ).kind
     ).toBe('playing');
+  });
+
+  it('capture-disabled contexts cannot enter or submit the capture stage', () => {
+    const disabled = ctx({ captureEnabled: false });
+    expect(
+      pacReducer(playing, { type: 'LISTEN_THRESHOLD' }, disabled).kind
+    ).toBe('playing');
+    expect(pacReducer(prompt, { type: 'CAPTURE_SUBMIT' }, disabled)).toBe(
+      prompt
+    );
   });
 
   it('capture happy path: prompt → submitting → success', () => {

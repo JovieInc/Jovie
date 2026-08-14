@@ -1,9 +1,8 @@
 'use client';
 
-import { Shield } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { CookieActions } from '@/components/molecules/CookieActions';
 import { CookieModal } from '@/components/organisms/CookieModal';
 import { APP_ROUTES } from '@/constants/routes';
@@ -44,7 +43,7 @@ export function CookieBannerSection() {
   const [isSavingConsent, setIsSavingConsent] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (isSuppressedPath) {
       setVisible(false);
       return;
@@ -71,17 +70,21 @@ export function CookieBannerSection() {
   }, [visible]);
 
   // Publish banner height + its rendered bottom offset + a separation gap as a
-  // CSS custom property on :root so floating surfaces (toasts, QR coordination)
-  // can reserve the exact space occupied by the fixed card. Public-profile
-  // phone navigation clears the card with route-stable CSS instead of reading
-  // this late measurement into page geometry (JOV-4783). Cleared on
-  // hide/consent; matches useCookieBannerHeight total offset for toasts.
+  // CSS custom property on :root so non-profile floating surfaces can reserve
+  // the exact space occupied by the fixed card. Public profiles place consent
+  // in a top overlay lane; publishing that rect as a bottom reservation would
+  // incorrectly reserve almost the entire viewport.
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
     const root = document.documentElement;
 
     if (!visible || isSuppressedPath || customize) {
+      root.style.removeProperty('--cookie-banner-h');
+      return;
+    }
+
+    if (shouldClearProfileDock) {
       root.style.removeProperty('--cookie-banner-h');
       return;
     }
@@ -209,40 +212,35 @@ export function CookieBannerSection() {
               : 'sm:max-w-95'
           }`}
         >
-          <div className='rounded-2xl border border-(--linear-app-frame-seam) bg-surface-1 shadow-card px-4 py-4'>
-            <div className='flex items-start gap-3'>
-              <div className='mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-0 text-secondary-token'>
-                <Shield className='h-3.5 w-3.5' aria-hidden='true' />
+          <div className='rounded-2xl border border-(--linear-app-frame-seam) bg-surface-1 px-4 py-3 shadow-card'>
+            <div className='min-w-0'>
+              <p className='text-xs leading-snug text-secondary-token'>
+                Essential cookies keep Jovie working. Choose whether to allow
+                analytics and marketing cookies.{' '}
+                <Link
+                  href={APP_ROUTES.LEGAL_PRIVACY}
+                  className='underline hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent'
+                >
+                  Privacy
+                </Link>
+              </p>
+              <div className='mt-3'>
+                <CookieActions
+                  compact
+                  onAcceptAll={acceptAll}
+                  onRejectAll={rejectAll}
+                  onCustomize={() => setCustomize(true)}
+                  disabled={isSavingConsent}
+                />
               </div>
-              <div className='min-w-0 flex-1'>
-                <p className='text-xs leading-normal text-secondary-token'>
-                  We use cookies for essential functionality and to improve your
-                  experience.{' '}
-                  <Link
-                    href={APP_ROUTES.LEGAL_PRIVACY}
-                    className='underline hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent'
-                  >
-                    Privacy
-                  </Link>
+              {saveError ? (
+                <p
+                  role='alert'
+                  className='mt-2 text-2xs leading-snug text-secondary-token'
+                >
+                  {saveError}
                 </p>
-                <div className='mt-3'>
-                  <CookieActions
-                    compact
-                    onAcceptAll={acceptAll}
-                    onRejectAll={rejectAll}
-                    onCustomize={() => setCustomize(true)}
-                    disabled={isSavingConsent}
-                  />
-                </div>
-                {saveError ? (
-                  <p
-                    role='alert'
-                    className='mt-2 text-2xs leading-snug text-secondary-token'
-                  >
-                    {saveError}
-                  </p>
-                ) : null}
-              </div>
+              ) : null}
             </div>
           </div>
         </aside>
