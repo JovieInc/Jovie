@@ -5,19 +5,21 @@
  * could reserve a legitimate creator. Add a handle only after verifying its
  * repository or production-fixture provenance.
  *
- * Every identity in this registry is:
- * - excluded from search and machine-readable discovery;
- * - permanently unavailable for create, rename, reserve, and claim flows; and
- * - still allowed to render when a production monitor needs the public route.
+ * Every identity in this registry is excluded from search and machine-readable
+ * discovery. All identities except the dedicated claim-flow fixture are also
+ * permanently unavailable for create, rename, reserve, and claim flows.
+ * Production monitors may still render their public routes directly.
  */
 
 export type PublicProfileIdentityExclusionReason =
+  | 'claim_flow_fixture'
   | 'fabricated_identity_fixture'
   | 'legacy_claim_fixture'
   | 'production_canary'
   | 'qa_auth_fixture';
 
 const EXCLUDED_HANDLES_BY_REASON = {
+  claim_flow_fixture: ['e2eclaimartist'],
   fabricated_identity_fixture: [
     'dualipa',
     'taylorswift',
@@ -49,7 +51,11 @@ export const PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE =
 
 /** Complete exact-handle reservation set, exported for cross-surface tests. */
 export const PUBLIC_PROFILE_RESERVED_IDENTITY_HANDLES: readonly string[] =
-  Object.freeze(Object.values(EXCLUDED_HANDLES_BY_REASON).flat());
+  Object.freeze(
+    Object.entries(EXCLUDED_HANDLES_BY_REASON)
+      .filter(([reason]) => reason !== 'claim_flow_fixture')
+      .flatMap(([, handles]) => handles)
+  );
 
 const EXCLUSION_REASON_BY_HANDLE = new Map<
   string,
@@ -73,7 +79,8 @@ export function getPublicProfileIdentityExclusionReason(
   return EXCLUSION_REASON_BY_HANDLE.get(normalizeHandle(handle)) ?? null;
 }
 
-/** Exact synthetic identities can never become legitimate claimed handles. */
+/** Exact protected identities can never become legitimate claimed handles. */
 export function isReservedPublicProfileIdentity(handle: string): boolean {
-  return getPublicProfileIdentityExclusionReason(handle) !== null;
+  const reason = getPublicProfileIdentityExclusionReason(handle);
+  return reason !== null && reason !== 'claim_flow_fixture';
 }

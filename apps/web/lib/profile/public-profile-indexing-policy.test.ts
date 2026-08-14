@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { isReservedPublicProfileIdentity } from './public-profile-identity-policy';
 import {
   getPublicProfileIndexingExclusionReason,
   getPublicProfileRobots,
@@ -13,6 +14,7 @@ describe('public profile indexing policy', () => {
     ['testartist', 'legacy_claim_fixture'],
     ['authqaprod', 'production_canary'],
     ['e2e-test-user', 'qa_auth_fixture'],
+    ['e2eclaimartist', 'claim_flow_fixture'],
   ] as const)('excludes verified synthetic handle %s', (handle, reason) => {
     expect(getPublicProfileIndexingExclusionReason(handle)).toBe(reason);
     expect(isPublicProfileIndexable(handle)).toBe(false);
@@ -47,6 +49,11 @@ describe('public profile indexing policy', () => {
       follow: false,
       googleBot: { index: false, follow: false },
     });
+  });
+
+  it('keeps the dedicated claim fixture claimable but non-indexable', () => {
+    expect(isPublicProfileIndexable('e2eclaimartist')).toBe(false);
+    expect(isReservedPublicProfileIdentity('e2eclaimartist')).toBe(false);
   });
 
   it('provides indexable metadata for legitimate profiles', () => {

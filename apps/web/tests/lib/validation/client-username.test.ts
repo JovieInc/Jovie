@@ -96,6 +96,13 @@ describe('validateUsernameFormat', () => {
     }
   });
 
+  it('keeps the non-indexed golden-path claim fixture claimable', () => {
+    expect(validateUsernameFormat('e2eclaimartist')).toEqual({
+      valid: true,
+      error: null,
+    });
+  });
+
   it('should handle empty usernames', () => {
     expect(validateUsernameFormat('')).toEqual({
       valid: false,

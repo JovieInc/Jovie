@@ -8,6 +8,10 @@ import {
   formatIcsTimestamp,
   sanitizeIcsUrl,
 } from '@/lib/ics/format';
+import {
+  isPublicProfileIndexable,
+  PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
+} from '@/lib/profile/public-profile-indexing-policy';
 import { apiLimiter, createRateLimitHeaders } from '@/lib/rate-limit';
 import { getConfirmedTourEventsForProfile } from '@/lib/tour-dates/queries';
 
@@ -37,6 +41,13 @@ export async function GET(
 
   if (!username || username.length === 0) {
     return NextResponse.json({ error: 'Invalid username' }, { status: 400 });
+  }
+
+  if (!isPublicProfileIndexable(username)) {
+    return NextResponse.json(
+      { error: 'Not found' },
+      { status: 404, headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS }
+    );
   }
 
   // Per-IP rate limit. Calendar clients poll on the order of every 1-24
@@ -76,6 +87,12 @@ export async function GET(
     // channel.
     if (!profile?.isPublic) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    if (!isPublicProfileIndexable(profile.usernameNormalized)) {
+      return NextResponse.json(
+        { error: 'Not found' },
+        { status: 404, headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS }
+      );
     }
 
     const artistName = profile.displayName || profile.username;

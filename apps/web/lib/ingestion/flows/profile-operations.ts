@@ -10,6 +10,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { IngestionStatusManager } from '@/lib/ingestion/status-manager';
 import { isValidHandle } from '@/lib/ingestion/strategies/linktree';
+import { isReservedPublicProfileIdentity } from '@/lib/profile/public-profile-identity-policy';
 
 /**
  * Result of checking for an existing profile.
@@ -55,7 +56,10 @@ export async function findAvailableHandle(
     const suffix = i === 0 ? '' : `_${i}`;
     const trimmedBase = normalizedBase.slice(0, MAX_LEN - suffix.length);
     const candidate = `${trimmedBase}${suffix}`;
-    if (isValidHandle(candidate)) {
+    if (
+      isValidHandle(candidate) &&
+      !isReservedPublicProfileIdentity(candidate)
+    ) {
       candidates.push(candidate);
     }
   }
@@ -108,7 +112,9 @@ export async function checkExistingProfile(
 
     let finalHandle: string | null;
     if (!existing) {
-      finalHandle = usernameNormalized;
+      finalHandle = isReservedPublicProfileIdentity(usernameNormalized)
+        ? await findAvailableHandle(tx, usernameNormalized)
+        : usernameNormalized;
     } else if (existing.isClaimed) {
       finalHandle = await findAvailableHandle(tx, usernameNormalized);
     } else {
