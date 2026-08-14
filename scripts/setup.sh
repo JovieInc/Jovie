@@ -291,27 +291,25 @@ if git rev-parse --is-inside-work-tree &>/dev/null && [ -f ".git" ]; then
   IS_WORKTREE=true
 fi
 
-hash_dependency_inputs() {
-  local hash_cmd
-  if command -v shasum &>/dev/null; then
-    hash_cmd=(shasum -a 256)
-  elif command -v sha256sum &>/dev/null; then
-    hash_cmd=(sha256sum)
-  else
-    return 1
-  fi
+# shellcheck source=lib/setup-worktree-health.sh
+. "$REPO_ROOT/scripts/lib/setup-worktree-health.sh"
 
-  git ls-files \
-    'package.json' \
-    '**/package.json' \
-    'pnpm-lock.yaml' \
-    'pnpm-workspace.yaml' \
-    '.npmrc' 2>/dev/null |
-    sort |
-    xargs "${hash_cmd[@]}" |
-    "${hash_cmd[@]}" |
-    awk '{print $1}'
+hash_dependency_inputs() {
+  jovie_setup_hash_dependency_inputs "$REPO_ROOT"
 }
+
+# Warm SessionStart skip. Claude and Codex both call this script on every
+# session. When the worktree is already healthy (deps fingerprint matches,
+# Node 22.23.1+, pnpm 9.15.4), do not rerun Doppler/gh/Clerk/migration/lsof.
+# Cold or stale worktrees fall through to the full body. Codex gbrain sync
+# is not part of this script and still runs after we return.
+# Force the full body with JOVIE_SETUP_FORCE=1.
+if jovie_setup_worktree_healthy "$REPO_ROOT"; then
+  SETUP_DURATION_SECONDS=$(( $(date +%s) - SETUP_START_SECONDS ))
+  success "Worktree already healthy — skipped setup body (${SETUP_DURATION_SECONDS}s)"
+  info "Deps fingerprint matches and Node/pnpm pins are ok. Set JOVIE_SETUP_FORCE=1 to run the full bootstrap."
+  exit 0
+fi
 
 # ─── 1. Node.js version check ───────────────────────────────────────────────
 echo ""

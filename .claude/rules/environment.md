@@ -142,6 +142,8 @@ Do **NOT** create Neon ephemeral branches automatically in `./scripts/setup.sh`.
 - verify GitHub CLI auth when present, including `GH_TOKEN`/`GITHUB_TOKEN` supplied by the environment or Doppler
 - avoid creating remote infrastructure by default
 
+Warm Claude/Codex SessionStart reuses this script. When the deps fingerprint at `node_modules/.cache/jovie-setup/deps.sha256` matches and Node/pnpm pins are ok, `setup.sh` exits before Doppler, gh, Clerk, migration drift, and cache lsof. Cold or stale worktrees still run the full body. Set `JOVIE_SETUP_FORCE=1` to force a full bootstrap. Codex SessionStart still runs gbrain sync after `setup.sh` returns.
+
 Creating an isolated database branch for every fresh worktree is wasteful and can exhaust Neon branch limits. Most agent tasks do not need a private mutable database.
 
 Use an ephemeral Neon branch **only when the task actually requires isolated DB state**:
