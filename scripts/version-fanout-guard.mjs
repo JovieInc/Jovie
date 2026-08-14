@@ -64,7 +64,14 @@ export function isStampAllowedBranch(branch) {
     return true;
   }
   // Integration / train branches roll up already-stamped commits.
-  return /^(integration|train|release|hotfix)\//.test(normalized);
+  if (/^(integration|train|release|hotfix)\//.test(normalized)) {
+    return true;
+  }
+  // Cloud-agent branches cannot use release/* (platform prefix is cursor/).
+  // Dedicated stamp / desktop-publish names are the release path.
+  return /^cursor\/[a-z0-9-]+-(desktop-publish|version-stamp)-[a-z0-9]+$/.test(
+    normalized
+  );
 }
 
 function parseJsonVersion(raw) {
