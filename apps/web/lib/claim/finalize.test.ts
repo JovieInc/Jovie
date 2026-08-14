@@ -252,6 +252,32 @@ describe('claimPrebuiltProfileForUser', () => {
     expect(mocks.insertMock).toHaveBeenCalledTimes(2);
   });
 
+  it.each([
+    ['missing', null],
+    ['expired', new Date('2026-02-01T00:00:00.000Z')],
+  ] as const)('refuses the claim fixture when token expiry is %s', async (_label, claimTokenExpiresAt) => {
+    const mocks = createTxMock([
+      [
+        profileRow({
+          usernameNormalized: 'e2eclaimartist',
+          claimToken: 'stored-hash',
+          claimTokenExpiresAt,
+        }),
+      ],
+    ]);
+
+    await expect(
+      claimPrebuiltProfileForUser(mocks.tx, {
+        ...baseParams,
+        expectedUsername: 'e2eclaimartist',
+        claimTokenHash: 'stored-hash',
+      })
+    ).rejects.toThrow(
+      '[PROFILE_CONFLICT] This synthetic profile identity cannot be claimed.'
+    );
+    assertNoWrites(mocks);
+  });
+
   it('refuses the claim fixture through direct Spotify finalization', async () => {
     const mocks = createTxMock([
       [

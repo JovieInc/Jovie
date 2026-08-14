@@ -83,8 +83,8 @@ function assertTokenBackedClaimAuthorization(
     isTokenBackedClaimFixture(profile.usernameNormalized) &&
     Boolean(params.claimTokenHash) &&
     profile.claimToken === params.claimTokenHash &&
-    (!profile.claimTokenExpiresAt ||
-      profile.claimTokenExpiresAt > new Date()) &&
+    profile.claimTokenExpiresAt !== null &&
+    profile.claimTokenExpiresAt > new Date() &&
     !profile.isClaimed &&
     !profile.userId;
 
