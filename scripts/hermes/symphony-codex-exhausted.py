@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
 import json
 import math
 import os
@@ -45,8 +47,14 @@ LEGACY_RUNTIME_NAMES = (
 RUNTIME_NAMES = (
     *LEGACY_RUNTIME_NAMES,
     "grok-ship-one",
+    "model-router.py",
+    "model-registry.json",
 )
-REQUIRED_ADMISSION_LABELS = frozenset(("symphony", "plan-approved", "admission-approved"))
+LAUNCHER_NAMES = (*LEGACY_RUNTIME_NAMES, "grok-ship-one")
+# `symphony` is the routing lease. Plan/admission labels are advisory evidence,
+# not a second waitlist: RED and explicit human/blocked labels remain the hard
+# integrity gates.
+REQUIRED_ADMISSION_LABELS = frozenset(("symphony",))
 # Single source of truth for the Grok sidecar admission predicate. `blocked` is
 # included because human-review flags (needs-human / needs:human / blocked / hold)
 # must gate out of auto-ship; reconcile and grok-ship-one both use this set.
@@ -79,7 +87,7 @@ query {
     }
   ) {
     nodes {
-      identifier
+      identifier updatedAt
       team { key }
       labels { nodes { name } }
     }
@@ -90,7 +98,7 @@ query {
 SINGLE_ISSUE_QUERY = """
 query($id: String!) {
   issue(id: $id) {
-    id identifier title description url
+    id identifier title description url updatedAt
     state { id name }
     team { key states { nodes { id name } } }
     labels { nodes { name } }
@@ -196,6 +204,91 @@ def _grok_canary_ready() -> tuple[bool, str]:
     return True, "grok_provider_ready"
 
 
+def _bundle_revision() -> str | None:
+    try:
+        digest = hashlib.sha256()
+        for name in ("symphony-codex-exhausted.py", "model-router.py", "model-registry.json"):
+            path = pathlib.Path(__file__).resolve().parent / name
+            if name == "model-registry.json" and not path.is_file():
+                path = path.parent / "config" / name
+            digest.update(path.read_bytes())
+        return digest.hexdigest()
+    except OSError:
+        return None
+
+
+def _model_router_selection() -> tuple[dict | None, str]:
+    root = pathlib.Path(__file__).resolve().parent
+    router = root / "model-router.py"
+    registry = root / "model-registry.json"
+    if not registry.is_file():
+        registry = root / "config" / "model-registry.json"
+    if not router.is_file() or not registry.is_file():
+        return None, "model_router_bundle_missing"
+    env = os.environ.copy()
+    env["GEM_MODEL_REGISTRY"] = str(registry)
+    try:
+        result = subprocess.run(
+            [sys.executable, str(router), "choose", "--workflow", "new_pr", "--capability", "code"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=CONTROL_TIMEOUT_SECONDS,
+            env=env,
+        )
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return None, "model_router_failed"
+    try:
+        payload = json.loads(result.stdout)
+        selected = payload["selected"]
+        executor = selected["executor"]
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return None, "model_router_invalid"
+    if (
+        result.returncode != 0
+        or payload.get("schema_version") != 1
+        or payload.get("deterministic_first") is not True
+        or selected.get("provider") == "codex"
+        or not isinstance(selected.get("id"), str)
+        or not isinstance(selected.get("model"), str)
+        or not isinstance(executor, dict)
+        or not isinstance(executor.get("executable"), str)
+        or not isinstance(executor.get("argv"), list)
+        or not all(isinstance(value, str) for value in executor["argv"])
+    ):
+        return None, "model_router_no_fallback"
+    executable = executor["executable"]
+    resolved = executable if pathlib.Path(executable).is_absolute() else shutil.which(executable)
+    if not resolved or not os.access(resolved, os.X_OK):
+        return None, "model_router_executor_missing"
+    executor["executable"] = resolved
+    return payload, "model_router_ready"
+
+
+def _fleet_gate_allows_isolated() -> tuple[bool, str]:
+    path = pathlib.Path(
+        os.path.expanduser(
+            os.environ.get(
+                "GEM_FLEET_GATE_RECEIPT",
+                "/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json",
+            )
+        )
+    )
+    try:
+        receipt = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return False, "fleet_gate_unavailable"
+    state = receipt.get("state")
+    if receipt.get("schema") != "jovie-fleet-gate/v1" or state not in ("GREEN", "AMBER", "RED"):
+        return False, "fleet_gate_invalid"
+    if state == "RED":
+        return False, "fleet_gate_red"
+    admission = receipt.get("workAdmission")
+    if not isinstance(admission, dict) or admission.get("allowed") is not True:
+        return False, "isolated_work_not_allowed"
+    return True, f"fleet_gate_{state.lower()}"
+
+
 def _grok_units_after_survival_window() -> list[str] | None:
     time.sleep(
         _bounded_seconds(
@@ -294,7 +387,15 @@ def _services_active() -> bool:
 
 def _active_grok_units() -> list[str] | None:
     result = _captured(
-        _systemctl("list-units", "--type=service", "--state=active", "grok-ship-*.service", "--no-legend", "--no-pager"),
+        _systemctl(
+            "list-units",
+            "--type=service",
+            "--state=active",
+            "grok-ship-*.service",
+            "fallback-ship-*.service",
+            "--no-legend",
+            "--no-pager",
+        ),
         CONTROL_TIMEOUT_SECONDS,
     )
     if result is None or result.returncode != 0:
@@ -478,6 +579,9 @@ def _issue_meta(issue: dict, identifier: str) -> tuple[bool, str, dict | None]:
                 states[node["name"].strip().lower()] = str(node.get("id") or "")
     if not states.get("in progress") or not states.get("in review"):
         return False, "required_workflow_states_missing", None
+    issue_revision = issue.get("updatedAt")
+    if not isinstance(issue_revision, str) or not issue_revision.strip():
+        return False, "issue_revision_missing", None
     meta = {
         "id": issue.get("id"),
         "title": issue.get("title") or identifier,
@@ -487,6 +591,7 @@ def _issue_meta(issue: dict, identifier: str) -> tuple[bool, str, dict | None]:
         "original_state_name": state.get("name") or "",
         "in_progress_state_id": states["in progress"],
         "in_review_state_id": states["in review"],
+        "issue_revision": issue_revision,
     }
     return True, "admitted", meta
 
@@ -509,10 +614,27 @@ def check_admission(identifier: str) -> int:
     return 0
 
 
-def _grok_command(identifier: str, executable: str) -> list[str]:
+def _fallback_unit(identifier: str, issue_revision: str) -> str:
+    revision = hashlib.sha256(issue_revision.encode()).hexdigest()[:12]
+    return f"fallback-ship-{identifier}-{revision}"
+
+
+def _grok_command(
+    identifier: str,
+    executable: str,
+    selection: dict,
+    issue_revision: str,
+    bundle_revision: str,
+) -> list[str]:
+    encoded = base64.b64encode(json.dumps(selection, separators=(",", ":")).encode()).decode()
+    unit = _fallback_unit(identifier, issue_revision)
     return [
-        "systemd-run", "--user", f"--unit=grok-ship-{identifier}", "--collect",
+        "systemd-run", "--user", f"--unit={unit}", "--collect",
         "-p", "Type=exec", "-p", f"Environment=PATH={pathlib.Path.home()}/.local/bin:/usr/bin:/bin",
+        "-p", f"Environment=SYMPHONY_FALLBACK_SELECTION_B64={encoded}",
+        "-p", f"Environment=SYMPHONY_FALLBACK_ISSUE_REVISION={issue_revision}",
+        "-p", f"Environment=SYMPHONY_FALLBACK_BUNDLE_REVISION={bundle_revision}",
+        "-p", f"Environment=SYMPHONY_FALLBACK_UNIT={unit}",
         executable, identifier,
     ]
 
@@ -585,15 +707,30 @@ def reconcile() -> int:
         )
         return EXIT_SAFE_FAIL_CLOSED
 
-    grok_ready, grok_reason = _grok_canary_ready()
-    if not grok_ready:
+    gate_ready, gate_reason = _fleet_gate_allows_isolated()
+    if not gate_ready:
         print(
-            f"codex_exhausted {grok_reason} symphony_unchanged",
+            f"codex_exhausted {gate_reason} symphony_unchanged",
             file=sys.stderr,
         )
         return EXIT_SAFE_FAIL_CLOSED
 
-    # The provider canary above makes the fallback available before Symphony is
+    selection, selection_reason = _model_router_selection()
+    if selection is None:
+        print(
+            f"codex_exhausted {selection_reason} symphony_unchanged",
+            file=sys.stderr,
+        )
+        return EXIT_SAFE_FAIL_CLOSED
+    bundle_revision = _bundle_revision()
+    if bundle_revision is None:
+        print(
+            "codex_exhausted bundle_revision_unavailable symphony_unchanged",
+            file=sys.stderr,
+        )
+        return EXIT_SAFE_FAIL_CLOSED
+
+    # The canonical router probe above makes the fallback available before Symphony is
     # released. Symphony remains the sole implementation owner until its
     # scheduler is stopped, so Todo/In Progress work can never have two owners.
     # This handoff is reversible: if no Grok worker survives the bounded launch
@@ -611,8 +748,9 @@ def reconcile() -> int:
     for identifier in identifiers:
         if capacity_used >= limit:
             break
-        unit = f"grok-ship-{identifier}.service"
-        if unit in active_units:
+        legacy_unit = f"grok-ship-{identifier}.service"
+        fallback_prefix = f"fallback-ship-{identifier}-"
+        if legacy_unit in active_units or any(unit.startswith(fallback_prefix) for unit in active_units):
             continue
         # Re-verify admission immediately before launch: a label/state guard
         # may have flagged the issue (blocked / needs-human) after the list
@@ -622,17 +760,24 @@ def reconcile() -> int:
         if issue is None:
             print(f"codex_exhausted skip {identifier} admission_unverifiable", file=sys.stderr)
             continue
-        ok, _reason, _meta = _issue_meta(issue, identifier)
+        ok, _reason, meta = _issue_meta(issue, identifier)
         if not ok:
             print(f"codex_exhausted skip {identifier} not admitted", file=sys.stderr)
             continue
-        if not _control(_grok_command(identifier, executable)):
+        command = _grok_command(
+            identifier,
+            executable,
+            selection,
+            meta["issue_revision"],
+            bundle_revision,
+        )
+        if not _control(command):
             print(f"codex_exhausted skip {identifier} grok_launch_failed", file=sys.stderr)
             continue
         # Reserve the slot as soon as systemd accepts the launch. Activation can
         # be delayed, but acceptance must never allow the batch to exceed its
         # configured concurrency ceiling.
-        launched_units.add(unit)
+        launched_units.add(next(arg.removeprefix("--unit=") + ".service" for arg in command if arg.startswith("--unit=")))
         capacity_used += 1
     final_active = _active_grok_units()
     if final_active is None:
@@ -714,7 +859,13 @@ class InstallValidationError(Exception):
 
 def _artifacts() -> dict[str, pathlib.Path]:
     root = pathlib.Path(__file__).resolve().parent
-    return {name: root / name for name in RUNTIME_NAMES}
+    registry = root / "model-registry.json"
+    if not registry.is_file():
+        registry = root / "config" / "model-registry.json"
+    return {
+        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "model-router.py")},
+        "model-registry.json": registry,
+    }
 
 
 def _stable_launcher(name: str) -> bytes:
@@ -771,6 +922,21 @@ def _valid_runtime_file(path: pathlib.Path) -> bool:
         return False
 
 
+def _valid_bundle_file(name: str, path: pathlib.Path) -> bool:
+    if name == "model-registry.json":
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            return not path.is_symlink() and path.is_file() and payload.get("schema_version") == 1
+        except (OSError, TypeError, ValueError):
+            return False
+    if name == "model-router.py":
+        try:
+            return not path.is_symlink() and path.is_file() and path.read_bytes().startswith(b"#!")
+        except OSError:
+            return False
+    return _valid_runtime_file(path)
+
+
 def _current_release(state: pathlib.Path, releases: pathlib.Path) -> pathlib.Path | None:
     link = state / "current"
     if not _path_exists(link):
@@ -786,7 +952,7 @@ def _current_release(state: pathlib.Path, releases: pathlib.Path) -> pathlib.Pat
         release.parent != releases
         or not release.is_dir()
         or not all(_valid_runtime_file(release / n) for n in LEGACY_RUNTIME_NAMES)
-        or any(_path_exists(release / n) and not _valid_runtime_file(release / n) for n in RUNTIME_NAMES)
+        or any(_path_exists(release / n) and not _valid_bundle_file(n, release / n) for n in RUNTIME_NAMES)
     ):
         raise InstallValidationError("current release is incomplete")
     return release
@@ -803,7 +969,7 @@ def _preflight_install(destination: pathlib.Path, contents: dict[str, bytes]) ->
     if any(not _valid_runtime_file(path) for path in installed.values()):
         raise InstallValidationError("installed launcher is invalid")
     if current is not None and any(
-        _path_exists(current / name) and not _valid_runtime_file(current / name) for name in contents
+        _path_exists(current / name) and not _valid_bundle_file(name, current / name) for name in contents
     ):
         raise InstallValidationError("current release is invalid")
 
@@ -835,11 +1001,9 @@ def install(destination_root: str | None) -> int:
     try:
         contents = {}
         for name, source in artifacts.items():
-            if source.is_symlink() or not source.is_file() or not (source.stat().st_mode & 0o111):
-                raise InstallValidationError("source is not executable")
+            if not _valid_bundle_file(name, source):
+                raise InstallValidationError("source is invalid")
             contents[name] = source.read_bytes()
-            if not contents[name].startswith(b"#!"):
-                raise InstallValidationError("source is not executable")
         destination = pathlib.Path(os.path.expanduser(destination_root or "~/.local/bin")).resolve()
         _preflight_install(destination, contents)
         destination.mkdir(parents=True, exist_ok=True)
@@ -851,11 +1015,15 @@ def install(destination_root: str | None) -> int:
         _fsync_directory(state)
         release = pathlib.Path(tempfile.mkdtemp(prefix=".install-", dir=releases))
         for name, data in contents.items():
-            _write_executable(release / name, data)
+            if name in ("model-router.py", "model-registry.json"):
+                (release / name).write_bytes(data)
+                os.chmod(release / name, 0o644)
+            else:
+                _write_executable(release / name, data)
         _fsync_directory(release)
         _fsync_directory(releases)
         _atomic_current(state, release)
-        for name in RUNTIME_NAMES:
+        for name in LAUNCHER_NAMES:
             _install_launcher(destination, name, _stable_launcher(name))
     except (InstallValidationError, OSError, ValueError):
         print("install validation failed" if "contents" not in locals() else "install failed", file=sys.stderr)

@@ -30,4 +30,28 @@ class RegistryTests(unittest.TestCase):
         doc = json.loads(self.run_router("probe").stdout)
         self.assertIn("qwen-coder-local", doc)
 
+    def test_ready_local_qwen_has_a_tool_capable_executor_contract(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            probe = root / "ollama"
+            probe.write_text("#!/bin/sh\necho qwen3-coder:30b\n")
+            probe.chmod(0o755)
+            agent = root / "hermes"
+            agent.write_text("#!/bin/sh\nexit 0\n")
+            agent.chmod(0o755)
+            result = self.run_router(
+                "choose", "--workflow", "new_pr", "--capability", "code",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(root / "state.json"),
+                    "GEM_PR_DRAIN_QWEN": str(probe),
+                    "GEM_QWEN_AGENT_EXECUTABLE": str(agent),
+                },
+            )
+            selected = json.loads(result.stdout)["selected"]
+            self.assertEqual(selected["id"], "qwen-coder-local")
+            self.assertEqual(selected["provider"], "ollama")
+            self.assertEqual(selected["model"], "qwen3-coder:30b")
+            self.assertEqual(selected["executor"]["executable"], str(agent))
+            self.assertIn("{prompt}", selected["executor"]["argv"])
+
 if __name__ == "__main__": unittest.main()

@@ -87,6 +87,28 @@ class UnitContractTests(unittest.TestCase):
 class ExitClassificationTests(unittest.TestCase):
     def setUp(self):
         self.module = load_controller_module()
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        root = pathlib.Path(self.tmp.name)
+        probe = root / "model-probe"
+        probe.write_text("#!/bin/sh\necho qwen3-coder:30b\n", encoding="utf-8")
+        probe.chmod(0o755)
+        agent = root / "model-agent"
+        agent.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        agent.chmod(0o755)
+        gate = root / "gate.json"
+        gate.write_text(json.dumps({
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "workAdmission": {"allowed": True},
+        }), encoding="utf-8")
+        environment = mock.patch.dict(os.environ, {
+            "GEM_FLEET_GATE_RECEIPT": str(gate),
+            "GEM_PR_DRAIN_QWEN": str(probe),
+            "GEM_QWEN_AGENT_EXECUTABLE": str(agent),
+        })
+        environment.start()
+        self.addCleanup(environment.stop)
 
     def test_indeterminate_probe_is_safe_fail_closed(self):
         module = self.module
@@ -151,7 +173,7 @@ class ExitClassificationTests(unittest.TestCase):
                     mock.patch.object(module, "_grok_canary_ready", return_value=(True, "grok_provider_ready")),
                     mock.patch.object(module, "_active_grok_units", side_effect=active_snapshots),
                     mock.patch.object(module, "_fetch_single_issue", return_value=issue),
-                    mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {})),
+                    mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {"issue_revision": "2026-08-14T19:00:00Z"})),
                     mock.patch.object(module, "_control", return_value=True),
                 ):
                     self.assertEqual(module.reconcile(), module.EXIT_DEGRADED)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ship one already-admitted Linear issue through the bounded Grok fallback.
+# Ship one already-admitted Linear issue through the canonical model-router fallback.
 set -euo pipefail
 
 ID="${1:?issue identifier required}"
@@ -16,23 +16,47 @@ set -a
 set +a
 : "${LINEAR_API_KEY:?LINEAR_API_KEY is required}"
 
-BRANCH="grok/${ID}-fix"
+BRANCH="fallback/${ID}-fix"
 WS_ROOT="${GROK_SHIP_WS_ROOT:-$HOME/grok-ship-workspaces}/$TEAM"
 WS="$WS_ROOT/$ID"
 LOG_DIR="${GROK_SHIP_LOG_DIR:-$HOME/grok-ship-logs}"
 LOG="$LOG_DIR/$ID.log"
-COOLDOWN="$LOG_DIR/provider-cooldown-until"
-mkdir -p "$LOG_DIR" "$WS_ROOT"
-
-now="$(date +%s)"
-if [ -f "$COOLDOWN" ]; then
-  read -r unavailable_until < "$COOLDOWN" || unavailable_until=0
-  case "$unavailable_until" in (*[!0-9]*|'') unavailable_until=0 ;; esac
-  if [ "$unavailable_until" -gt "$now" ]; then
-    echo "$(date -u +%FT%TZ) $ID provider_cooldown" >> "$LOG"
-    exit 0
-  fi
+LEASE_DIR="${SYMPHONY_FALLBACK_LEASE_DIR:-$HOME/.local/state/symphony-fallback/leases}"
+RECEIPT_DIR="${SYMPHONY_FALLBACK_RECEIPT_DIR:-$HOME/.local/state/symphony-fallback/receipts}"
+mkdir -p "$LOG_DIR" "$WS_ROOT" "$LEASE_DIR" "$RECEIPT_DIR"
+: "${SYMPHONY_FALLBACK_SELECTION_B64:?router selection is required}"
+: "${SYMPHONY_FALLBACK_ISSUE_REVISION:?issue revision is required}"
+: "${SYMPHONY_FALLBACK_BUNDLE_REVISION:?bundle revision is required}"
+: "${SYMPHONY_FALLBACK_UNIT:?fallback unit is required}"
+exec 9>"$LEASE_DIR/$ID.lock"
+if ! flock -n 9; then
+  echo "$(date -u +%FT%TZ) $ID duplicate_lease" >> "$LOG"
+  exit 0
 fi
+
+SELECTION_JSON="$(SELECTION_B64="$SYMPHONY_FALLBACK_SELECTION_B64" python3 - <<'PY'
+import base64, json, os
+try:
+    payload = json.loads(base64.b64decode(os.environ["SELECTION_B64"], validate=True))
+    selected = payload["selected"]
+    executor = selected["executor"]
+    valid = (
+        payload.get("schema_version") == 1
+        and payload.get("deterministic_first") is True
+        and selected.get("provider") != "codex"
+        and isinstance(selected.get("id"), str)
+        and isinstance(selected.get("model"), str)
+        and isinstance(executor.get("executable"), str)
+        and isinstance(executor.get("argv"), list)
+        and all(isinstance(value, str) for value in executor["argv"])
+    )
+except (KeyError, TypeError, ValueError):
+    valid = False
+if not valid:
+    raise SystemExit("invalid router selection")
+print(json.dumps(payload, separators=(",", ":")))
+PY
+)"
 
 if [ "$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq 'length' 2>/dev/null || printf 0)" -gt 0 ]; then
   echo "$(date -u +%FT%TZ) $ID open_pr_exists" >> "$LOG"
@@ -68,6 +92,28 @@ ORIGINAL_STATE_ID="$(json_value original_state_id)"
 ORIGINAL_STATE_NAME="$(json_value original_state_name)"
 IN_PROGRESS_STATE_ID="$(json_value in_progress_state_id)"
 IN_REVIEW_STATE_ID="$(json_value in_review_state_id)"
+ISSUE_REVISION="$(json_value issue_revision)"
+if [ "$ISSUE_REVISION" != "$SYMPHONY_FALLBACK_ISSUE_REVISION" ]; then
+  echo "issue revision changed before lease acquisition" >&2
+  exit 2
+fi
+
+GEM_FLEET_GATE_RECEIPT="${GEM_FLEET_GATE_RECEIPT:-$HOME/gem-workspace/state/gem-priority-gate/latest.json}" \
+python3 - <<'PY'
+import json, os, pathlib
+try:
+    receipt = json.loads(pathlib.Path(os.environ["GEM_FLEET_GATE_RECEIPT"]).read_text())
+except (OSError, ValueError):
+    raise SystemExit("fleet gate unavailable")
+admission = receipt.get("workAdmission")
+if (
+    receipt.get("schema") != "jovie-fleet-gate/v1"
+    or receipt.get("state") not in ("GREEN", "AMBER")
+    or not isinstance(admission, dict)
+    or admission.get("allowed") is not True
+):
+    raise SystemExit("fleet gate blocks isolated work")
+PY
 
 if [ ! -d "$WS/.git" ]; then
   if [ -e "$WS" ] && [ -n "$(find "$WS" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]; then
@@ -107,7 +153,7 @@ if [ "$original_state_lower" != "in progress" ]; then
   changed_state=1
 fi
 
-PROMPT="You are shipping admitted Linear issue $ID in $REPO.
+PROMPT="You are implementing admitted Linear issue $ID in $REPO under a revision-scoped fallback lease.
 
 Title: $TITLE
 URL: $URL
@@ -116,25 +162,80 @@ Description:
 $DESC
 
 Work only in this checkout. Make the smallest correct issue-scoped change. Do not weaken or skip gates.
-Create commits on $BRANCH, push normally, and open a draft PR to main with validation evidence and Fixes $ID.
-Do not merge. If blocked, write BLOCKER.md with the exact reason and exit. Start now."
+Create commits on $BRANCH, push normally, and open a ready PR to main with validation evidence, Fixes $ID, and the queue-deferred hold.
+Do not merge, deploy, promote, or remove queue-deferred. If blocked, write BLOCKER.md with the exact reason and exit. Start now."
+
+RECEIPT="$RECEIPT_DIR/$ID.json"
+RECEIPT_PATH="$RECEIPT" RECEIPT_ID="$ID" RECEIPT_ISSUE_REVISION="$ISSUE_REVISION" \
+RECEIPT_BUNDLE_REVISION="$SYMPHONY_FALLBACK_BUNDLE_REVISION" RECEIPT_SELECTION="$SELECTION_JSON" \
+RECEIPT_BASE_REVISION="$(git -C "$WS" rev-parse HEAD)" RECEIPT_UNIT="$SYMPHONY_FALLBACK_UNIT" python3 - <<'PY'
+import hashlib, json, os, pathlib, re, tempfile, time
+selection = json.loads(os.environ["RECEIPT_SELECTION"])["selected"]
+identifier = os.environ["RECEIPT_ID"]
+issue_revision = os.environ["RECEIPT_ISSUE_REVISION"]
+base_revision = os.environ["RECEIPT_BASE_REVISION"]
+bundle_revision = os.environ["RECEIPT_BUNDLE_REVISION"]
+expected_unit = f"fallback-ship-{identifier}-{hashlib.sha256(issue_revision.encode()).hexdigest()[:12]}"
+if (
+    not re.fullmatch(r"[0-9a-f]{40}", base_revision)
+    or not re.fullmatch(r"[0-9a-f]{64}", bundle_revision)
+    or os.environ["RECEIPT_UNIT"] != expected_unit
+):
+    raise SystemExit("fallback provenance is invalid")
+payload = {
+    "schema": "symphony-fallback-lease/v1",
+    "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    "identifier": identifier,
+    "issueRevision": issue_revision,
+    "baseRevision": base_revision,
+    "bundleRevision": bundle_revision,
+    "unit": expected_unit,
+    "provider": selection["provider"],
+    "model": selection["model"],
+    "modelId": selection["id"],
+    "ownership": "isolated-implementation-only",
+    "forbidden": ["merge", "deploy", "promote", "remove-queue-deferred"],
+}
+path = pathlib.Path(os.environ["RECEIPT_PATH"])
+fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+try:
+    with os.fdopen(fd, "w") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary, path)
+finally:
+    if os.path.exists(temporary):
+        os.unlink(temporary)
+PY
 
 attempt_log="$(mktemp "$LOG_DIR/.${ID}.attempt.XXXXXX")"
 trap 'rm -f "$attempt_log"' EXIT
 echo "START $ID $(date -u +%FT%TZ) repo=$REPO" | tee -a "$LOG"
 set +e
-grok --always-approve --cwd "$WS" -p "$PROMPT" 2>&1 | tee -a "$LOG" "$attempt_log"
+SELECTION_JSON="$SELECTION_JSON" FALLBACK_PROMPT="$PROMPT" FALLBACK_CWD="$WS" python3 - <<'PY' 2>&1 | tee -a "$LOG" "$attempt_log"
+import json, os, pathlib, subprocess
+selected = json.loads(os.environ["SELECTION_JSON"])["selected"]
+executor = selected["executor"]
+values = {
+    "cwd": os.environ["FALLBACK_CWD"],
+    "model": selected["model"],
+    "prompt": os.environ["FALLBACK_PROMPT"],
+}
+argv = [value.format(**values) for value in executor["argv"]]
+raise SystemExit(subprocess.run([executor["executable"], *argv], cwd=pathlib.Path(values["cwd"]), check=False).returncode)
+PY
 rc=${PIPESTATUS[0]}
 set -e
 
-if grep -Eqi 'usage limit|rate limit|try again later' "$attempt_log"; then
-  temporary="$COOLDOWN.$$.tmp"
-  printf '%s\n' "$((now + 21600))" > "$temporary"
-  mv "$temporary" "$COOLDOWN"
-fi
-
 pr_count="$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq 'length' 2>/dev/null || printf 0)"
 if [ "$pr_count" -gt 0 ]; then
+  pr_number="$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number --jq '.[0].number' 2>/dev/null || true)"
+  if [ -z "$pr_number" ] || ! gh pr edit "$pr_number" --repo "$REPO" --add-label queue-deferred >/dev/null; then
+    echo "PR exists but queue-deferred hold could not be proven" >&2
+    exit 2
+  fi
   update_state "$IN_REVIEW_STATE_ID"
   echo "END $ID rc=$rc pr=open $(date -u +%FT%TZ)" | tee -a "$LOG"
   exit "$rc"
