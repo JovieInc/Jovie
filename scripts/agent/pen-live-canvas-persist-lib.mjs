@@ -9,10 +9,7 @@ const persistSaveMethods = new Set([
   'editor-save',
   'save-document',
 ]);
-const backupOverlaySources = new Set([
-  'backup-copy',
-  'pencil-backup',
-]);
+const backupOverlaySources = new Set(['backup-copy', 'pencil-backup']);
 
 function text(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -93,10 +90,7 @@ export function buildPenLiveCanvasPersistReceipt(input = {}) {
     );
   }
   if (!isPenPath(activePath)) {
-    block(
-      'active_path_invalid',
-      'Active path must be an absolute .pen path.'
-    );
+    block('active_path_invalid', 'Active path must be an absolute .pen path.');
   } else if (expectedPath && activePath !== expectedPath) {
     block(
       'active_path_mismatch',
@@ -194,7 +188,9 @@ export function buildPenLiveCanvasPersistReceipt(input = {}) {
 
   let verdict = 'blocked';
   if (blockers.length === 0) {
-    verdict = persistVerified ? 'disk_persist_verified' : 'live_canvas_attached';
+    verdict = persistVerified
+      ? 'disk_persist_verified'
+      : 'live_canvas_attached';
   }
 
   return {
