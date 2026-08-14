@@ -843,7 +843,7 @@ def failed_evaluation_receipt(
                 "maxConcurrent": DEFAULT_GEM_CONCURRENCY,
                 "evidenceAccepted": False,
             },
-            "symphonyImplementation": 1,
+            "symphonyImplementation": "event-driven-backpressure",
         },
     }
 

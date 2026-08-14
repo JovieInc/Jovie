@@ -831,6 +831,10 @@ class AutoEnrollStubReceiptTests(unittest.TestCase):
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
         self.assertFalse(receipt["isolatedPromotionAdmission"]["allowed"])
         self.assertEqual(
+            receipt["concurrency"]["symphonyImplementation"],
+            "event-driven-backpressure",
+        )
+        self.assertEqual(
             {reason["code"] for reason in receipt["reasons"]},
             {"gate-evaluation-failed"},
         )
