@@ -76,7 +76,29 @@ export function getErrorType(error: Error): ChatErrorType {
     return 'tool';
   }
 
-  if (status === 429 || code === 'RATE_LIMITED') {
+  const parsed = tryParseJsonRecord(error.message);
+  const parsedErrorCode =
+    typeof parsed?.errorCode === 'string' ? parsed.errorCode : undefined;
+  const parsedError =
+    typeof parsed?.error === 'string' ? parsed.error : undefined;
+
+  // Auth failures must not fall through to the rate-limit regex. AI SDK
+  // throws `new Error(responseText)`, so a 401 body like
+  // `{"error":"Unauthorized","requestId":"..."}` is the entire message.
+  if (
+    status === 401 ||
+    code === 'AUTH_REQUIRED' ||
+    parsedErrorCode === 'AUTH_REQUIRED' ||
+    (typeof parsedError === 'string' && /unauthorized/i.test(parsedError))
+  ) {
+    return 'unknown';
+  }
+
+  if (
+    status === 429 ||
+    code === 'RATE_LIMITED' ||
+    parsedErrorCode === 'RATE_LIMITED'
+  ) {
     return 'rate_limit';
   }
 
@@ -84,12 +106,14 @@ export function getErrorType(error: Error): ChatErrorType {
     return 'server';
   }
 
-  // Fall back to message pattern matching with word boundaries
+  // Fall back to message pattern matching with word boundaries.
+  // Skip JSON transport bodies — requestId UUIDs can contain `429`, and
+  // "Unauthorized" must never become "Too many messages were sent".
   const msg = error.message.toLowerCase();
   if (/\b(network|fetch|offline)\b/.test(msg)) {
     return 'network';
   }
-  if (/\b(rate|limit|429)\b/.test(msg)) {
+  if (!parsed && /\b(rate|limit|429)\b/.test(msg)) {
     return 'rate_limit';
   }
   if (/\b(500|5\d{2}|server)\b/.test(msg)) {

@@ -73,6 +73,24 @@ describe('chat error classification', () => {
     expect(getErrorType(err)).toBe('rate_limit');
   });
 
+  it('does not classify a 401 Unauthorized JSON body as a rate limit', () => {
+    const err = new Error(
+      JSON.stringify({
+        error: 'Unauthorized',
+        requestId: '21f5b81f-31bb-4e48-98d0-85d160954836',
+      })
+    );
+    expect(getErrorType(err)).toBe('unknown');
+  });
+
+  it('classifies AUTH_REQUIRED as unknown instead of rate_limit', () => {
+    const err = Object.assign(new Error('Unauthorized'), {
+      status: 401,
+      code: 'AUTH_REQUIRED',
+    });
+    expect(getErrorType(err)).toBe('unknown');
+  });
+
   it('builds polished rate limit copy with retry time', () => {
     expect(getUserFriendlyMessage('rate_limit', 19)).toBe(
       'Too many requests. Please wait 19 seconds.'
