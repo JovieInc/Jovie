@@ -264,6 +264,11 @@ function applyMetadataFields(
     metadata.errorCode = source.errorCode;
   } else if (typeof source.code === 'string') {
     metadata.errorCode = source.code;
+  } else if (
+    typeof source.error === 'string' &&
+    /unauthorized/i.test(source.error)
+  ) {
+    metadata.errorCode = 'AUTH_REQUIRED';
   }
 
   if (typeof source.requestId === 'string') {

@@ -233,7 +233,8 @@ export async function tryHandleAnonymousOnboardingChat(
 
   const isExplicitOnboarding = peeked.mode === 'onboarding';
   const isImplicitOnboarding =
-    peeked.mode === undefined && looksLikeImplicitOnboardingEnvelope(peeked.raw);
+    peeked.mode === undefined &&
+    looksLikeImplicitOnboardingEnvelope(peeked.raw);
   if (!isExplicitOnboarding && !isImplicitOnboarding) return null;
 
   const corsHeaders = createAuthenticatedCorsHeaders(

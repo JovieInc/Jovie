@@ -11,6 +11,20 @@ import {
 } from '@/components/jovie/utils';
 
 describe('extractErrorMetadata', () => {
+  it('infers AUTH_REQUIRED from a 401 Unauthorized JSON body', () => {
+    const err = new Error(
+      JSON.stringify({
+        error: 'Unauthorized',
+        requestId: '21f5b81f-31bb-4e48-98d0-85d160954836',
+      })
+    );
+
+    expect(extractErrorMetadata(err)).toEqual({
+      errorCode: 'AUTH_REQUIRED',
+      requestId: '21f5b81f-31bb-4e48-98d0-85d160954836',
+    });
+  });
+
   it('parses metadata from JSON error message', () => {
     const err = new Error(
       JSON.stringify({
