@@ -135,6 +135,7 @@ describe('compiled dogfood playbooks', () => {
   it.each([
     'jovie-youtube-channel-optimization.playbook.md',
     'jovie-dsp-content-audit.playbook.md',
+    'jovie-release-planner.playbook.md',
   ])('%s validates and compiles to draft', fileName => {
     const raw = loadPlaybook(fileName);
     const validated = validatePlaybookSource(raw);
