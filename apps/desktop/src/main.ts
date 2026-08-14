@@ -49,10 +49,16 @@ import {
 } from './navigation';
 import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
 import {
+  decideAbortedMainFrameRecovery,
+  decideRendererLoadStart,
   decideRendererRecovery,
+  decideRendererWatchdogExpiry,
+  parseDidStartNavigation,
   RENDERER_BOOT_WATCHDOG_MS,
+  RENDERER_LOAD_WATCHDOG_MS,
   shouldRecoverAuthHandoffToCanonicalShell,
   shouldArmRendererBootWatchdog,
+  shouldSkipRendererWatchdogForAuthHandoff,
 } from './renderer-recovery';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
 import { sanitizeWindowState, type WindowState } from './window-state';
@@ -648,6 +654,17 @@ function isAuthHandoffOpen(): boolean {
   return Boolean(authHandoffWindow && !authHandoffWindow.isDestroyed());
 }
 
+function isAuthHandoffInteractive(): boolean {
+  return shouldSkipRendererWatchdogForAuthHandoff({
+    handoffOpen: isAuthHandoffOpen(),
+    handoffVisible: Boolean(
+      authHandoffWindow &&
+        !authHandoffWindow.isDestroyed() &&
+        authHandoffWindow.isVisible()
+    ),
+  });
+}
+
 function hideMainWindowForAuthHandoff(): void {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindowHiddenForAuthHandoff = true;
@@ -873,6 +890,10 @@ function showDesktopAuthHandoff(authUrl: string): void {
     `${authHandoffWindow.webContents.getUserAgent()} ${DESKTOP_USER_AGENT_PRODUCT}`
   );
 
+  attachRendererRecovery(authHandoffWindow, {
+    shouldSkipWatchdog: () => false,
+  });
+
   authHandoffWindow.once('ready-to-show', () => {
     hideMainWindowForAuthHandoff();
     if (authHandoffWindow) showWindow(authHandoffWindow);
@@ -912,7 +933,7 @@ function showDesktopAuthHandoff(authUrl: string): void {
     return { action: 'deny' };
   });
 
-  void authHandoffWindow.loadURL(handoffUrl);
+  loadHostedUrlAfterSplash(authHandoffWindow, handoffUrl);
   showWindow(authHandoffWindow);
 }
 
@@ -941,15 +962,18 @@ function escapeHtmlAttribute(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
 }
 
-function buildDesktopLoadFailureUrl(): string {
-  const retryUrl = escapeHtmlAttribute(APP_ENTRY_URL);
-  const appOrigin = escapeHtmlAttribute(APP_ORIGIN);
-  const html = `<!doctype html>
+function buildDesktopShellHtml(input: {
+  readonly title: string;
+  readonly heading: string;
+  readonly body: string;
+  readonly actions?: string;
+}): string {
+  return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Jovie Desktop</title>
+    <title>${input.title}</title>
     <style>
       :root { color-scheme: dark; --system-b-bg-base: ${SYSTEM_B_DESKTOP_TOKENS.backgroundColor}; --system-b-text-primary: ${SYSTEM_B_DESKTOP_TOKENS.textPrimary}; --system-b-text-secondary: ${SYSTEM_B_DESKTOP_TOKENS.textSecondary}; --system-b-primary-bg: ${SYSTEM_B_DESKTOP_TOKENS.primaryBackground}; --system-b-primary-fg: ${SYSTEM_B_DESKTOP_TOKENS.primaryForeground}; --system-b-radius-pill: ${SYSTEM_B_DESKTOP_TOKENS.radiusPill}; }
       html, body { margin: 0; min-height: 100vh; background: var(--system-b-bg-base); color: var(--system-b-text-primary); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif; }
@@ -971,18 +995,53 @@ function buildDesktopLoadFailureUrl(): string {
         <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
       </svg>
       <div class="copy">
-        <h1>Jovie couldn’t load</h1>
-        <p>Check your connection, then try again.</p>
+        <h1>${input.heading}</h1>
+        <p>${input.body}</p>
       </div>
-      <div class="actions">
-        <a class="primary" href="${retryUrl}">Retry</a>
-        <a class="secondary" href="${appOrigin}">Open Jovie</a>
-      </div>
+      ${input.actions ?? ''}
     </main>
   </body>
 </html>`;
+}
+
+function buildDesktopLoadFailureUrl(): string {
+  const retryUrl = escapeHtmlAttribute(APP_ENTRY_URL);
+  const appOrigin = escapeHtmlAttribute(APP_ORIGIN);
+  const html = buildDesktopShellHtml({
+    title: 'Jovie Desktop',
+    heading: 'Jovie couldn’t load',
+    body: 'Check your connection, then try again.',
+    actions: `<div class="actions">
+        <a class="primary" href="${retryUrl}">Retry</a>
+        <a class="secondary" href="${appOrigin}">Open Jovie</a>
+      </div>`,
+  });
 
   return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+}
+
+function buildDesktopBootSplashUrl(): string {
+  const html = buildDesktopShellHtml({
+    title: 'Jovie',
+    heading: 'Loading Jovie',
+    body: 'Starting the app…',
+  });
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+}
+
+function loadHostedUrlAfterSplash(win: BrowserWindow, hostedUrl: string): void {
+  const navigateToHosted = (): void => {
+    if (win.isDestroyed()) return;
+    void win.loadURL(hostedUrl);
+  };
+
+  if (win.webContents.getURL().startsWith('data:text/html')) {
+    navigateToHosted();
+    return;
+  }
+
+  win.webContents.once('did-finish-load', navigateToHosted);
+  void win.loadURL(buildDesktopBootSplashUrl());
 }
 
 function showDesktopLoadFailure(win: BrowserWindow): void {
@@ -1126,6 +1185,218 @@ function showPublicProfilePreview(urlString: string): boolean {
   return true;
 }
 
+function attachRendererRecovery(
+  win: BrowserWindow,
+  options: {
+    readonly shouldSkipWatchdog: () => boolean;
+    readonly onAbortedMainFrame?: (validatedURL: string) => boolean;
+  }
+): void {
+  let rendererCrashReloadCount = 0;
+  let rendererBooted = false;
+  let bootWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
+  let loadWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
+  const webContentsId = win.webContents.id;
+
+  const clearBootWatchdog = (): void => {
+    if (bootWatchdogTimer !== null) {
+      clearTimeout(bootWatchdogTimer);
+      bootWatchdogTimer = null;
+    }
+  };
+
+  const clearLoadWatchdog = (): void => {
+    if (loadWatchdogTimer !== null) {
+      clearTimeout(loadWatchdogTimer);
+      loadWatchdogTimer = null;
+    }
+  };
+
+  const clearAllWatchdogs = (): void => {
+    clearBootWatchdog();
+    clearLoadWatchdog();
+  };
+
+  const expireWatchdog = (reason: string, url: string): void => {
+    const action = decideRendererWatchdogExpiry({
+      booted: rendererBooted,
+      windowDestroyed: win.isDestroyed(),
+      skipForAuthHandoff: options.shouldSkipWatchdog(),
+    });
+    if (action === 'ignore') return;
+
+    console.error(
+      reason === 'load'
+        ? '[Jovie Desktop] Renderer load watchdog expired'
+        : '[Jovie Desktop] Renderer boot watchdog expired',
+      {
+        reason,
+        url: url.split('?')[0],
+        timeoutMs:
+          reason === 'load'
+            ? RENDERER_LOAD_WATCHDOG_MS
+            : RENDERER_BOOT_WATCHDOG_MS,
+      }
+    );
+    showDesktopLoadFailure(win);
+    if (win === mainWindow) {
+      showWindowNow(win);
+    }
+  };
+
+  const armLoadWatchdog = (url: string): void => {
+    clearAllWatchdogs();
+    rendererBooted = false;
+    if (win.isDestroyed()) return;
+    if (
+      decideRendererLoadStart({
+        url,
+        appOrigin: APP_ORIGIN,
+        isMainFrame: true,
+        isInPlace: false,
+      }) === 'ignore'
+    ) {
+      return;
+    }
+
+    loadWatchdogTimer = setTimeout(() => {
+      loadWatchdogTimer = null;
+      expireWatchdog('load', url);
+    }, RENDERER_LOAD_WATCHDOG_MS);
+  };
+
+  const armBootWatchdog = (): void => {
+    clearAllWatchdogs();
+    rendererBooted = false;
+    if (win.isDestroyed()) return;
+    const url = win.webContents.getURL();
+    if (!shouldArmRendererBootWatchdog(url, APP_ORIGIN)) return;
+
+    bootWatchdogTimer = setTimeout(() => {
+      bootWatchdogTimer = null;
+      expireWatchdog('boot', url);
+    }, RENDERER_BOOT_WATCHDOG_MS);
+  };
+
+  const markRendererBooted = (): void => {
+    rendererBooted = true;
+    rendererCrashReloadCount = 0;
+    clearAllWatchdogs();
+  };
+
+  rendererBootControllers.set(webContentsId, {
+    markBooted: markRendererBooted,
+    dispose: () => {
+      clearAllWatchdogs();
+      rendererBootControllers.delete(webContentsId);
+    },
+  });
+
+  win.on('closed', () => {
+    rendererBootControllers.get(webContentsId)?.dispose();
+  });
+
+  win.webContents.on('did-start-navigation', (...args: unknown[]) => {
+    const navigation = parseDidStartNavigation(args);
+    if (!navigation) return;
+    if (
+      decideRendererLoadStart({
+        url: navigation.url,
+        appOrigin: APP_ORIGIN,
+        isMainFrame: navigation.isMainFrame,
+        isInPlace: navigation.isInPlace,
+      }) === 'arm-load-watchdog'
+    ) {
+      armLoadWatchdog(navigation.url);
+    }
+  });
+
+  win.webContents.on('did-finish-load', () => {
+    armBootWatchdog();
+  });
+
+  win.webContents.on(
+    'did-fail-load',
+    (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      if (!isMainFrame) {
+        return;
+      }
+
+      if (errorCode === NAVIGATION_ABORTED_ERROR_CODE) {
+        if (APP_ENV !== 'production') {
+          console.warn('[Jovie Desktop] Main-frame load aborted', {
+            validatedURL:
+              typeof validatedURL === 'string'
+                ? validatedURL.split('?')[0]
+                : validatedURL,
+          });
+        }
+
+        const recoveredViaAuthHandoff =
+          typeof validatedURL === 'string' && options.onAbortedMainFrame
+            ? options.onAbortedMainFrame(validatedURL)
+            : false;
+        const abortAction = decideAbortedMainFrameRecovery({
+          recoveredViaAuthHandoff,
+          currentUrl: win.webContents.getURL(),
+        });
+        if (abortAction === 'canonical-auth-shell') {
+          const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
+          void win.loadURL(buildDesktopAuthHandoffUrl(authUrl));
+          showWindowNow(win);
+          return;
+        }
+        if (abortAction === 'arm-load-watchdog' && typeof validatedURL === 'string') {
+          armLoadWatchdog(resolveNavigationUrl(validatedURL));
+        }
+        return;
+      }
+
+      console.error('[Jovie Desktop] Shell load failure (graceful recovery)', {
+        errorCode,
+        errorDescription,
+        validatedURL:
+          typeof validatedURL === 'string'
+            ? validatedURL.split('?')[0]
+            : validatedURL,
+        appEntry: APP_ENTRY_URL,
+      });
+      showDesktopLoadFailure(win);
+    }
+  );
+
+  win.webContents.on('render-process-gone', (_event, details) => {
+    clearAllWatchdogs();
+    const action = decideRendererRecovery({
+      reason: details.reason,
+      reloadCount: rendererCrashReloadCount,
+      maxReloads: MAX_RENDERER_CRASH_RELOADS,
+    });
+    console.error('[Jovie Desktop] Renderer process gone', {
+      reason: details.reason,
+      exitCode: details.exitCode,
+      action,
+    });
+    if (win.isDestroyed() || action === 'ignore') return;
+    if (action === 'reload') {
+      rendererCrashReloadCount += 1;
+      win.webContents.reload();
+      return;
+    }
+    showDesktopLoadFailure(win);
+  });
+
+  win.webContents.on('unresponsive', () => {
+    console.warn('[Jovie Desktop] Renderer unresponsive', {
+      url: win.webContents.getURL().split('?')[0],
+    });
+    if (win.isDestroyed()) return;
+    if (options.shouldSkipWatchdog()) return;
+    clearAllWatchdogs();
+    showDesktopLoadFailure(win);
+  });
+}
+
 function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   const windowState = loadWindowState();
 
@@ -1170,7 +1441,8 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   // sign in. If nothing has become visible shortly after launch, force a
   // usable sign-in surface into THIS (main) window, which we know can render.
   const initialVisibilityFallback = setTimeout(() => {
-    if (win.isDestroyed() || isAuthHandoffOpen() || win.isVisible()) return;
+    if (win.isDestroyed() || isAuthHandoffInteractive() || win.isVisible())
+      return;
     const current = win.webContents.getURL();
     if (!current || current === 'about:blank') {
       const authUrl = buildCentralDesktopAuthUrl('sign_in', '/app');
@@ -1181,7 +1453,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
 
   win.once('ready-to-show', () => {
     clearTimeout(initialVisibilityFallback);
-    if (isAuthHandoffOpen()) {
+    if (isAuthHandoffInteractive()) {
       mainWindowHiddenForAuthHandoff = true;
       return;
     }
@@ -1201,147 +1473,10 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
     });
   });
 
-  win.webContents.on(
-    'did-fail-load',
-    (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
-      if (!isMainFrame) {
-        return;
-      }
-
-      if (errorCode === NAVIGATION_ABORTED_ERROR_CODE) {
-        if (APP_ENV !== 'production') {
-          console.warn('[Jovie Desktop] Main-frame load aborted', {
-            validatedURL:
-              typeof validatedURL === 'string'
-                ? validatedURL.split('?')[0]
-                : validatedURL,
-          });
-        }
-
-        if (
-          typeof validatedURL === 'string' &&
-          maybeShowDesktopAuthHandoff(resolveNavigationUrl(validatedURL))
-        ) {
-          return;
-        }
-
-        return;
-      }
-
-      console.error('[Jovie Desktop] Shell load failure (graceful recovery)', {
-        errorCode,
-        errorDescription,
-        validatedURL:
-          typeof validatedURL === 'string'
-            ? validatedURL.split('?')[0]
-            : validatedURL,
-        appEntry: APP_ENTRY_URL,
-      });
-      showDesktopLoadFailure(win);
-    }
-  );
-
-  // Renderer crash recovery. Electron leaves a crashed/killed renderer as a
-  // blank black window with no recovery, which strands the user. Reload the
-  // view on a crash, capped to avoid a crash loop, then fall back to the
-  // visible load-failure page (Retry) instead of black.
-  //
-  // JOV-3595 also covers the "HTTP 200 but never interactive" path: after a
-  // real hosted load finishes, the web app must ping APP_BOOTED_CHANNEL within
-  // RENDERER_BOOT_WATCHDOG_MS. If it never does (React crash / hung hydrate),
-  // show the recovery shell instead of a permanent black canvas.
-  let rendererCrashReloadCount = 0;
-  let rendererBooted = false;
-  let bootWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
-  const webContentsId = win.webContents.id;
-
-  const clearBootWatchdog = (): void => {
-    if (bootWatchdogTimer !== null) {
-      clearTimeout(bootWatchdogTimer);
-      bootWatchdogTimer = null;
-    }
-  };
-
-  const markRendererBooted = (): void => {
-    rendererBooted = true;
-    // Only a confirmed app-booted ping proves the renderer is healthy, so only
-    // now does the crash-reload budget reset. Resetting on did-finish-load let
-    // a renderer that crashes deterministically AFTER load (e.g. OOM during
-    // hydration) loop reloads forever without ever reaching the failure page.
-    rendererCrashReloadCount = 0;
-    clearBootWatchdog();
-  };
-
-  const armBootWatchdog = (): void => {
-    clearBootWatchdog();
-    rendererBooted = false;
-    if (win.isDestroyed()) return;
-    const url = win.webContents.getURL();
-    if (!shouldArmRendererBootWatchdog(url, APP_ORIGIN)) return;
-
-    bootWatchdogTimer = setTimeout(() => {
-      bootWatchdogTimer = null;
-      if (win.isDestroyed() || rendererBooted) return;
-      // Main window may sit on a transitional URL while the dedicated auth
-      // handoff window is the interactive surface — do not false-alarm.
-      if (win === mainWindow && isAuthHandoffOpen()) return;
-
-      console.error('[Jovie Desktop] Renderer boot watchdog expired', {
-        url: url.split('?')[0],
-        timeoutMs: RENDERER_BOOT_WATCHDOG_MS,
-      });
-      showDesktopLoadFailure(win);
-    }, RENDERER_BOOT_WATCHDOG_MS);
-  };
-
-  rendererBootControllers.set(webContentsId, {
-    markBooted: markRendererBooted,
-    dispose: () => {
-      clearBootWatchdog();
-      rendererBootControllers.delete(webContentsId);
-    },
-  });
-
-  win.on('closed', () => {
-    rendererBootControllers.get(webContentsId)?.dispose();
-  });
-
-  win.webContents.on('did-start-loading', () => {
-    clearBootWatchdog();
-    rendererBooted = false;
-  });
-
-  win.webContents.on('did-finish-load', () => {
-    armBootWatchdog();
-  });
-  win.webContents.on('render-process-gone', (_event, details) => {
-    clearBootWatchdog();
-    const action = decideRendererRecovery({
-      reason: details.reason,
-      reloadCount: rendererCrashReloadCount,
-      maxReloads: MAX_RENDERER_CRASH_RELOADS,
-    });
-    console.error('[Jovie Desktop] Renderer process gone', {
-      reason: details.reason,
-      exitCode: details.exitCode,
-      action,
-    });
-    if (win.isDestroyed() || action === 'ignore') return;
-    if (action === 'reload') {
-      rendererCrashReloadCount += 1;
-      win.webContents.reload();
-      return;
-    }
-    showDesktopLoadFailure(win);
-  });
-  win.webContents.on('unresponsive', () => {
-    console.warn('[Jovie Desktop] Renderer unresponsive', {
-      url: win.webContents.getURL().split('?')[0],
-    });
-    if (win.isDestroyed()) return;
-    if (win === mainWindow && isAuthHandoffOpen()) return;
-    clearBootWatchdog();
-    showDesktopLoadFailure(win);
+  attachRendererRecovery(win, {
+    shouldSkipWatchdog: isAuthHandoffInteractive,
+    onAbortedMainFrame: validatedURL =>
+      maybeShowDesktopAuthHandoff(resolveNavigationUrl(validatedURL)),
   });
 
   registerMainWindowPermissionHandlers(win.webContents.session);
@@ -1454,12 +1589,16 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   win.webContents.on('did-navigate', sendNavState);
 
   const initialAuthUrl = buildDesktopBrowserAuthUrl(initialUrl);
+  const hostedEntry = initialAuthUrl
+    ? buildDesktopAuthHandoffUrl(initialAuthUrl)
+    : initialUrl;
   if (initialAuthUrl) {
     showDesktopAuthHandoff(initialAuthUrl);
-    void win.loadURL(buildDesktopAuthHandoffUrl(initialAuthUrl));
-  } else {
-    void win.loadURL(initialUrl);
   }
+  // Paint a local splash first so ready-to-show is never an empty black
+  // canvas. The hosted entry loads after that first paint; the splash stays
+  // visible until the hosted navigation commits or a watchdog recovers.
+  loadHostedUrlAfterSplash(win, hostedEntry);
 
   return win;
 }

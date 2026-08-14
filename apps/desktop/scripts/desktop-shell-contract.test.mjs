@@ -128,9 +128,22 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   // JOV-3595: blank/crashed-renderer recovery (beyond network did-fail-load).
   assert.match(mainSource, /APP_BOOTED_CHANNEL/);
   assert.match(mainSource, /RENDERER_BOOT_WATCHDOG_MS/);
+  assert.match(mainSource, /RENDERER_LOAD_WATCHDOG_MS/);
   assert.match(mainSource, /shouldArmRendererBootWatchdog/);
+  assert.match(mainSource, /shouldSkipRendererWatchdogForAuthHandoff/);
+  assert.match(mainSource, /decideRendererLoadStart/);
+  assert.match(mainSource, /decideAbortedMainFrameRecovery/);
+  assert.match(mainSource, /parseDidStartNavigation/);
   assert.match(mainSource, /armBootWatchdog/);
+  assert.match(mainSource, /armLoadWatchdog/);
   assert.match(mainSource, /Renderer boot watchdog expired/);
+  assert.match(mainSource, /Renderer load watchdog expired/);
+  assert.match(mainSource, /did-start-navigation/);
+  assert.match(mainSource, /function attachRendererRecovery\(/);
+  assert.match(mainSource, /function buildDesktopBootSplashUrl\(\)/);
+  assert.match(mainSource, /function loadHostedUrlAfterSplash\(/);
+  assert.match(mainSource, /Loading Jovie/);
+  assert.match(mainSource, /Starting the app/);
   assert.match(mainSource, /render-process-gone/);
   assert.match(mainSource, /win\.webContents\.on\('unresponsive'/);
   assert.match(
@@ -138,6 +151,9 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
     /win\.webContents\.on\('unresponsive'[\s\S]*showDesktopLoadFailure\(win\)/
   );
   assert.match(mainSource, /ipcMain\.on\(APP_BOOTED_CHANNEL/);
+  // JOV-5086: did-start-loading must not clear the watchdog without re-arming.
+  // That hole left hung / intercepted first navigations on a black canvas.
+  assert.doesNotMatch(mainSource, /'did-start-loading'/);
   assert.match(mainSource, /viewBox="0 0 353\.68 347\.97"/);
   assert.match(mainSource, /START_DESKTOP_AUTH_HANDOFF_CHANNEL/);
   assert.match(mainSource, /OPEN_DESKTOP_AUTH_URL_CHANNEL/);
@@ -148,7 +164,12 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
     /function restoreMainWindowAfterAuthHandoff\(\): void/
   );
   assert.match(mainSource, /mainWindowHiddenForAuthHandoff/);
-  assert.match(mainSource, /win === mainWindow && isAuthHandoffOpen\(\)/);
+  assert.match(mainSource, /function isAuthHandoffInteractive\(\)/);
+  assert.match(mainSource, /shouldSkipWatchdog: isAuthHandoffInteractive/);
+  assert.match(
+    mainSource,
+    /attachRendererRecovery\(authHandoffWindow, \{[\s\S]*?shouldSkipWatchdog: \(\) => false/
+  );
   assert.match(
     mainSource,
     /hideMainWindowForAuthHandoff\(\);\s*if \(authHandoffWindow\) showWindow\(authHandoffWindow\);/
@@ -163,10 +184,7 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
     mainSource,
     /void win\.loadURL\(buildDesktopAuthHandoffUrl\(authUrl\)\);/
   );
-  assert.match(
-    mainSource,
-    /void win\.loadURL\(buildDesktopAuthHandoffUrl\(initialAuthUrl\)\);/
-  );
+  assert.match(mainSource, /loadHostedUrlAfterSplash\(win, hostedEntry\)/);
   assert.doesNotMatch(mainSource, /win\.loadURL\('about:blank'\)/);
   assert.doesNotMatch(mainSource, /parent: mainWindow/);
   assert.doesNotMatch(mainSource, /M31 10A20 20 0 0 0 11 30H31V10Z/);

@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
+- **Mac app recovers from a black launch window (JOV-5086):** packaged Jovie.app now paints a loading splash immediately, and a hung or blank hosted page shows Retry instead of staying black forever.
 - [internal] **Production recovery reopens exact fleet holds (JOV-5048/JOV-5049):** Merge Queue Auto-Enroll now identifies successful Production Controller completions by the stable workflow path instead of the dynamic run title, and above-target queue pressure stays observable without reducing native queue capacity to zero, so source-green Symphony heads can return to and drain the native queue.
 - **Loading indicators respect reduced-motion preferences (JOV-4921):** canonical spinners now become fully static while preserving their size, color, and accessible loading status.
 - [internal] **About Storybook provenance distinguishes extraction from containment (JOV-4943):** the web-016 receipt keeps the audited route-copy SHA separate from the merge that first contains the shared component and story, with regression proof for both named exports.
