@@ -3,6 +3,7 @@ import {
   type APIRequestContext,
   expect,
   Page,
+  request as playwrightRequest,
   type TestInfo,
   test,
 } from '@playwright/test';
@@ -85,12 +86,47 @@ function requiredResponseString(
   return value;
 }
 
+function describeOAuthHttpError(
+  status: number,
+  body: Record<string, unknown> | null
+): string {
+  const error = typeof body?.error === 'string' ? body.error : null;
+  const description =
+    typeof body?.error_description === 'string' ? body.error_description : null;
+  if (!error && !description) {
+    return `HTTP ${status}`;
+  }
+  return `HTTP ${status} (${[error, description].filter(Boolean).join(': ')})`;
+}
+
+async function readOAuthErrorBody(
+  response: Awaited<ReturnType<APIRequestContext['post']>>
+): Promise<Record<string, unknown> | null> {
+  const body = (await response.json().catch(() => null)) as unknown;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return null;
+  }
+  return body as Record<string, unknown>;
+}
+
+async function createNativeLikeOAuthRequest(): Promise<APIRequestContext> {
+  const bypassSecret = process.env.PLAYWRIGHT_VERCEL_BYPASS_SECRET;
+  return playwrightRequest.newContext({
+    extraHTTPHeaders: bypassSecret
+      ? { 'x-vercel-protection-bypass': bypassSecret }
+      : {},
+  });
+}
+
 async function readOAuthTokenSet(
   response: Awaited<ReturnType<APIRequestContext['post']>>,
   label: string
 ): Promise<OAuthTokenSet> {
   if (response.status() !== 200) {
-    throw new Error(`${label} returned HTTP ${response.status()}.`);
+    const body = await readOAuthErrorBody(response);
+    throw new Error(
+      `${label} returned ${describeOAuthHttpError(response.status(), body)}.`
+    );
   }
   const body = (await response.json().catch(() => null)) as unknown;
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -142,7 +178,7 @@ async function verifyOAuthUserInfo(
 }
 
 async function verifyProductionIosOAuthTokenFlow(
-  request: APIRequestContext,
+  sessionRequest: APIRequestContext,
   expectedOrigin: string
 ): Promise<void> {
   const codeVerifier = randomBytes(48).toString('base64url');
@@ -161,7 +197,7 @@ async function verifyProductionIosOAuthTokenFlow(
   authorizeUrl.searchParams.set('code_challenge', codeChallenge);
   authorizeUrl.searchParams.set('code_challenge_method', 'S256');
 
-  const authorizeResponse = await request.get(authorizeUrl.href, {
+  const authorizeResponse = await sessionRequest.get(authorizeUrl.href, {
     failOnStatusCode: false,
     maxRedirects: 0,
   });
@@ -190,15 +226,17 @@ async function verifyProductionIosOAuthTokenFlow(
     throw new Error('iOS OAuth authorization returned an invalid callback.');
   }
 
+  // Native iOS has no browser session cookies. Token POSTs from
+  // page.context().request send the smoke session + Vercel bypass cookies,
+  // which forces Better Auth CSRF/origin checks that the real client skips.
+  // Authorize still uses the session request so skip_consent can issue a code.
+  const nativeRequest = await createNativeLikeOAuthRequest();
   let activeAccessToken: string | undefined;
   let activeRefreshToken: string | undefined;
   try {
     const initialTokens = await readOAuthTokenSet(
-      await request.post(`${expectedOrigin}/api/auth/oauth2/token`, {
+      await nativeRequest.post(`${expectedOrigin}/api/auth/oauth2/token`, {
         failOnStatusCode: false,
-        // The exact Vercel deployment is protected by an origin-bound bypass
-        // cookie. Better Auth therefore requires a trusted Origin on POST even
-        // though the real native client has no cookies.
         headers: { origin: expectedOrigin },
         form: {
           grant_type: 'authorization_code',
@@ -214,14 +252,14 @@ async function verifyProductionIosOAuthTokenFlow(
     activeRefreshToken = initialTokens.refreshToken;
 
     await verifyOAuthUserInfo(
-      request,
+      nativeRequest,
       expectedOrigin,
       initialTokens.accessToken,
       'Initial iOS OAuth access token'
     );
 
     const refreshedTokens = await readOAuthTokenSet(
-      await request.post(`${expectedOrigin}/api/auth/oauth2/token`, {
+      await nativeRequest.post(`${expectedOrigin}/api/auth/oauth2/token`, {
         failOnStatusCode: false,
         headers: { origin: expectedOrigin },
         form: {
@@ -235,46 +273,50 @@ async function verifyProductionIosOAuthTokenFlow(
     activeAccessToken = refreshedTokens.accessToken;
     activeRefreshToken = refreshedTokens.refreshToken;
     await verifyOAuthUserInfo(
-      request,
+      nativeRequest,
       expectedOrigin,
       refreshedTokens.accessToken,
       'Refreshed iOS OAuth access token'
     );
   } finally {
-    if (activeRefreshToken) {
-      const revokeResponse = await request.post(
-        `${expectedOrigin}/api/auth/oauth2/revoke`,
-        {
-          failOnStatusCode: false,
-          headers: { origin: expectedOrigin },
-          form: {
-            client_id: IOS_OAUTH_CLIENT_ID,
-            token: activeRefreshToken,
-            token_type_hint: 'refresh_token',
-          },
-        }
-      );
-      expect
-        .soft(
-          revokeResponse.status(),
-          'Latest iOS OAuth refresh token revocation should succeed'
-        )
-        .toBe(200);
-      if (revokeResponse.status() === 200 && activeAccessToken) {
-        const revokedUserInfoResponse = await request.get(
-          `${expectedOrigin}/api/auth/oauth2/userinfo`,
+    try {
+      if (activeRefreshToken) {
+        const revokeResponse = await nativeRequest.post(
+          `${expectedOrigin}/api/auth/oauth2/revoke`,
           {
             failOnStatusCode: false,
-            headers: { authorization: `Bearer ${activeAccessToken}` },
+            headers: { origin: expectedOrigin },
+            form: {
+              client_id: IOS_OAUTH_CLIENT_ID,
+              token: activeRefreshToken,
+              token_type_hint: 'refresh_token',
+            },
           }
         );
         expect
           .soft(
-            revokedUserInfoResponse.status(),
-            'Revoked iOS OAuth token family should reject userinfo'
+            revokeResponse.status(),
+            'Latest iOS OAuth refresh token revocation should succeed'
           )
-          .toBe(401);
+          .toBe(200);
+        if (revokeResponse.status() === 200 && activeAccessToken) {
+          const revokedUserInfoResponse = await nativeRequest.get(
+            `${expectedOrigin}/api/auth/oauth2/userinfo`,
+            {
+              failOnStatusCode: false,
+              headers: { authorization: `Bearer ${activeAccessToken}` },
+            }
+          );
+          expect
+            .soft(
+              revokedUserInfoResponse.status(),
+              'Revoked iOS OAuth token family should reject userinfo'
+            )
+            .toBe(401);
+        }
       }
+    } finally {
+      await nativeRequest.dispose();
     }
   }
 }

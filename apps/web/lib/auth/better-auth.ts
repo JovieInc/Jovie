@@ -58,8 +58,11 @@ export const DETERMINISTIC_TEST_OTP = '424242';
 
 /**
  * Trusted origins: production + staging + local dev + native deep-link
- * schemes. Vercel previews are scoped to the exact deployment URL via the
- * function form — never a bare *.vercel.app wildcard (plan eng row 36).
+ * schemes. Exact Vercel deployment hosts (preview and production) are
+ * added from VERCEL_URL / VERCEL_BRANCH_URL — never a bare *.vercel.app
+ * wildcard (plan eng row 36). Production Controller smokes the staged
+ * `*.vercel.app` URL before the jov.ie alias binds; that host must be
+ * trusted for cookie-bearing POSTs or Better Auth CSRF rejects them.
  */
 export const STATIC_TRUSTED_ORIGINS = [
   'https://jov.ie',
@@ -71,12 +74,20 @@ export const STATIC_TRUSTED_ORIGINS = [
   'logyourbody://',
 ] as const;
 
-function resolveTrustedOrigins(): (string | undefined)[] {
-  const previewOrigin =
-    env.VERCEL_ENV === 'preview' && env.VERCEL_URL
-      ? `https://${env.VERCEL_URL}`
-      : undefined;
-  return [...STATIC_TRUSTED_ORIGINS, previewOrigin];
+function originFromVercelHost(host: string | undefined): string | undefined {
+  if (!host) return undefined;
+  const trimmed = host.replace(/\/$/, '');
+  if (!trimmed) return undefined;
+  return trimmed.startsWith('http://') || trimmed.startsWith('https://')
+    ? trimmed
+    : `https://${trimmed}`;
+}
+
+export function resolveTrustedOrigins(): string[] {
+  const vercelOrigins = [env.VERCEL_URL, env.VERCEL_BRANCH_URL]
+    .map(originFromVercelHost)
+    .filter((origin): origin is string => Boolean(origin));
+  return [...new Set([...STATIC_TRUSTED_ORIGINS, ...vercelOrigins])];
 }
 
 /**
