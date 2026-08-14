@@ -1,11 +1,15 @@
 import 'server-only';
 
+import { and, eq } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { sanitizeCacheTags } from '@/lib/cache/tags';
+import { db } from '@/lib/db';
 // eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for the contact type alias
 import type { CreatorContact as DbCreatorContact } from '@/lib/db/schema';
 import type { DiscogRelease } from '@/lib/db/schema/content';
+import { creatorPixels } from '@/lib/db/schema/pixels';
+import { checkBoolean } from '@/lib/entitlements/registry';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { mergeProfileTheme } from '@/lib/profile/profile-theme';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
@@ -29,6 +33,12 @@ export interface PublicProfileLoaderResult {
   readonly contacts: DbCreatorContact[];
   readonly creatorIsPro: boolean;
   readonly creatorClerkId: string | null;
+  /**
+   * Creator's own Meta pixel ID when the creator is entitled to ad pixels
+   * (canAccessAdPixels) and has Meta enabled in dashboard pixel config.
+   * Null otherwise — the browser pixel never fires for unentitled creators.
+   */
+  readonly creatorMetaPixelId: string | null;
   readonly genres: string[] | null;
   readonly latestRelease: DiscogRelease | null;
   readonly pressPhotos: PressPhoto[];
@@ -41,11 +51,48 @@ const RESERVED_PROFILE_NOT_FOUND: PublicProfileLoaderResult = {
   contacts: [],
   creatorIsPro: false,
   creatorClerkId: null,
+  creatorMetaPixelId: null,
   genres: null,
   latestRelease: null,
   pressPhotos: [],
   status: 'not_found',
 };
+
+/**
+ * Reads the creator's Meta pixel ID for browser fbq firing on public
+ * surfaces. Entitlement-gated (canAccessAdPixels); requires the master and
+ * Meta toggles plus a configured pixel ID. Fails closed to null.
+ */
+async function getCreatorMetaPixelId(
+  profileId: string,
+  plan: string | null
+): Promise<string | null> {
+  if (!checkBoolean(plan, 'canAccessAdPixels')) return null;
+
+  try {
+    const [row] = await db
+      .select({ facebookPixelId: creatorPixels.facebookPixelId })
+      .from(creatorPixels)
+      .where(
+        and(
+          eq(creatorPixels.profileId, profileId),
+          eq(creatorPixels.enabled, true),
+          eq(creatorPixels.facebookEnabled, true)
+        )
+      )
+      .limit(1);
+
+    const pixelId = row?.facebookPixelId?.trim();
+    return pixelId || null;
+  } catch (error) {
+    logger.warn(
+      'Creator Meta pixel lookup failed',
+      { error, creatorProfileId: profileId },
+      'public-profile'
+    );
+    return null;
+  }
+}
 
 function calculateProfileCompletion(result: {
   displayName?: string | null;
@@ -108,6 +155,7 @@ const fetchProfileAndLinks = async (
         contacts: [],
         creatorIsPro: false,
         creatorClerkId: null,
+        creatorMetaPixelId: null,
         genres: null,
         latestRelease: null,
         pressPhotos: [],
@@ -157,6 +205,10 @@ const fetchProfileAndLinks = async (
 
     const contacts: DbCreatorContact[] = result.contacts ?? [];
     const latestRelease = result.latestRelease ?? null;
+    const creatorMetaPixelId = await getCreatorMetaPixelId(
+      result.id,
+      result.userPlan ?? null
+    );
 
     return {
       profile,
@@ -164,6 +216,7 @@ const fetchProfileAndLinks = async (
       contacts,
       creatorIsPro,
       creatorClerkId,
+      creatorMetaPixelId,
       genres: result.genres ?? null,
       latestRelease,
       pressPhotos: result.pressPhotos ?? [],
@@ -185,6 +238,7 @@ const fetchProfileAndLinks = async (
       contacts: [],
       creatorIsPro: false,
       creatorClerkId: null,
+      creatorMetaPixelId: null,
       genres: null,
       latestRelease: null,
       pressPhotos: [],

@@ -134,6 +134,19 @@ describe('buildContentSecurityPolicy', () => {
     expect(connectSrc).toContain('https://*.google-analytics.com');
   });
 
+  it('includes Meta pixel domains in script-src and connect-src (JOV-5078)', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const scriptSrc = findDirective(csp, 'script-src');
+    const connectSrc = findDirective(csp, 'connect-src');
+
+    expect(scriptSrc).toContain('https://connect.facebook.net');
+    expect(connectSrc).toContain('https://connect.facebook.net');
+    expect(connectSrc).toContain('https://www.facebook.com');
+  });
+
   it('includes GTM domain in img-src for conversion tracking pixels', () => {
     const csp = buildContentSecurityPolicy({
       nonce: 'test-nonce',
