@@ -51,7 +51,7 @@ export async function probeRedisOperability(): Promise<RedisOperabilityResult> {
 
   try {
     await redis.set(key, nonce, { ex: PROBE_TTL_SECONDS });
-    const stored = await redis.get<string>(key);
+    const stored = await redis.getdel<string>(key);
     if (stored !== nonce) {
       throw new RedisOperabilityError('read_after_write_mismatch');
     }
@@ -59,5 +59,9 @@ export async function probeRedisOperability(): Promise<RedisOperabilityResult> {
   } catch (error) {
     if (error instanceof RedisOperabilityError) throw error;
     throw new RedisOperabilityError(classifyRedisFailure(error), error);
+  } finally {
+    // GETDEL is the normal cleanup path. DEL is deliberately retained as a
+    // bounded, idempotent cleanup/permission check when SET or GETDEL fails.
+    await redis.del(key).catch(() => undefined);
   }
 }

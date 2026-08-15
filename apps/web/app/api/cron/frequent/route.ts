@@ -117,7 +117,8 @@ export async function GET(request: Request) {
 
   // 1.5 Redis write/read canary — hourly. PING can remain green after a hard
   // command quota is exhausted, so only a real ephemeral write/read proves the
-  // auth-routing store is usable. Cost: 2 commands/run, <=1,488/month.
+  // auth-routing store is usable. GETDEL consumes the canary and DEL provides
+  // idempotent cleanup. Cost: 3 commands/run, <=2,232/month.
   results.redisOperability =
     minute < 15
       ? await runSubJob('redisOperability', async () => ({
