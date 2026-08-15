@@ -32,6 +32,8 @@ export type PacVisitorTier = 'cold' | 'warmed' | 'captured';
 
 /** What the profile actually has available to offer, per state family. */
 export interface PacInventory {
+  /** A real release or DSP destination can back the S0 listen action. */
+  readonly hasListen: boolean;
   /** A playable audio preview exists for the featured release. */
   readonly hasPreview: boolean;
   /** At least one live merch card. */
@@ -46,6 +48,8 @@ export interface PacInventory {
 
 export interface PacContext {
   readonly tier: PacVisitorTier;
+  /** Whether this profile may collect fan contact information. */
+  readonly captureEnabled: boolean;
   /** Experiment-assigned S2 slot (merch | tip | tickets | rsvp). */
   readonly s2Slot: ProfilePacS2Slot;
   /**
@@ -146,8 +150,28 @@ export function resolveS2State(ctx: PacContext): PacState {
  * once the anon cookie bootstrap lands.
  */
 export function resolveInitialPacState(ctx: PacContext): PacState {
-  if (ctx.tier === 'captured') {
+  if (ctx.tier === 'captured' && ctx.captureEnabled) {
     return resolveS2State(ctx);
+  }
+
+  // A cold PAC without a truthful listen destination must lead with real
+  // inventory instead of rendering an empty artist-name/Listen shell.
+  if (!ctx.inventory.hasListen) {
+    const inventoryState = resolveS2State(ctx);
+    if (!ctx.captureEnabled && inventoryState.kind === 'following') {
+      return { kind: 'idle', stage: 's0', degraded: true };
+    }
+    return inventoryState;
+  }
+
+  // Unclaimed/unverified profiles may advertise real inventory, but they may
+  // never enter the fan-capture stage.
+  if (!ctx.captureEnabled) {
+    return {
+      kind: 'idle',
+      stage: 's0',
+      degraded: !ctx.inventory.hasPreview,
+    };
   }
 
   if (ctx.tier === 'warmed') {
@@ -179,9 +203,10 @@ export function pacReducer(
       // elsewhere on the page). Never interrupt an in-flight submission,
       // an active S1 conversation, or inline playback.
       if (
-        state.kind === 'submitting' ||
-        state.kind === 'prompt' ||
-        state.kind === 'error' ||
+        (ctx.captureEnabled &&
+          (state.kind === 'submitting' ||
+            state.kind === 'prompt' ||
+            state.kind === 'error')) ||
         state.kind === 'playing'
       ) {
         return state;
@@ -210,13 +235,19 @@ export function pacReducer(
       if (ctx.tier === 'captured') {
         return state;
       }
+      if (!ctx.captureEnabled) {
+        return state;
+      }
       if (ctx.captureSuppressed) {
         return state;
       }
       return { kind: 'prompt', stage: 's1', degraded: false };
 
     case 'CAPTURE_SUBMIT':
-      if (state.kind === 'prompt' || state.kind === 'error') {
+      if (
+        ctx.captureEnabled &&
+        (state.kind === 'prompt' || state.kind === 'error')
+      ) {
         return { kind: 'submitting', stage: 's1', degraded: false };
       }
       return state;

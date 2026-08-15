@@ -158,15 +158,15 @@ describe('ReleaseCatalogCarousel', () => {
 
     trackMock.mockClear();
 
-    const link = screen.getByRole('link', { name: /Under Lights/i });
+    const link = screen.getByRole('link', { name: /The Deep End/i });
     link.addEventListener('click', event => event.preventDefault());
     fireEvent.click(link);
 
     expect(trackMock).toHaveBeenCalledWith(
       'catalog_carousel_listen_click',
       expect.objectContaining({
-        release_id: 'release-catalog',
-        index: 1,
+        release_id: 'release-featured',
+        index: 0,
         artist_handle: 'tim',
         cta_location: 'catalog_carousel',
       })

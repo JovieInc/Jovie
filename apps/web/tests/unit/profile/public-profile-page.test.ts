@@ -150,10 +150,8 @@ describe('Public Profile Page Logic', () => {
     );
   });
 
-  it('disables fan capture for structured-credit profiles pending verified ownership', () => {
-    expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-      'allowFanCapture={!requiresVerifiedOwnership}'
-    );
+  it('disables fan capture until the profile has a verified owner', () => {
+    expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('allowFanCapture={isClaimed}');
   });
 
   describe('public profile ISR boundary', () => {

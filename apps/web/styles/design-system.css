@@ -612,11 +612,17 @@
    static DOM, but out of mobile layout so it cannot add page scroll below the
    compact profile. Desktop keeps the readable AEO section. */
 @media (max-width: 767px) {
-  /* The consent card mounts lazily after geo/cookie checks. Its route-derived
-     modifier is present on first paint, keeping it above the canonical glass
-     dock without changing any profile box geometry or moving the card later. */
+  /* The consent card mounts lazily after geo/cookie checks. Keep it in the
+     safe-area top overlay on phones: the bottom region contains both the
+     profile's primary conversion action and the canonical glass dock. */
   .cookie-banner-card--above-public-profile-dock {
-    bottom: calc(var(--profile-bottom-nav-height) + 8px);
+    top: max(env(safe-area-inset-top), 8px);
+    bottom: auto;
+    left: min(50vw, calc(var(--profile-shell-max-width) / 2));
+    right: auto !important;
+    width: min(254px, calc(100vw - 136px)) !important;
+    max-width: none;
+    transform: translateX(-50%);
   }
 
   .profile-viewport ~ .profile-aeo-content {
@@ -633,17 +639,38 @@
   }
 }
 
+/* The compact consent action row fits as one line at the standard 254px
+   profile card width. At narrower phone widths, preserve visual and tab order
+   while giving the equally prominent choices one row and Customize its own
+   full-width row. */
+@media (max-width: 383px) {
+  .cookie-actions--compact {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cookie-actions--compact > .cookie-action--choice,
+  .cookie-actions--compact > .cookie-action--customize {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .cookie-actions--compact > .cookie-action--customize {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (min-width: 768px) and (max-width: 1179px) {
-  /* The compact card is vertically centered at tablet and narrow-desktop
-     widths. Include that centered shell's bottom inset before clearing its
-     dock; the phone-only offset would otherwise leave the two surfaces
-     overlapping. */
+  /* At tablet and narrow-desktop widths, the centered profile still uses its
+     lower region for the PAC and dock. Keep consent above the card instead. */
   .cookie-banner-card--above-public-profile-dock {
-    bottom: calc(
-      max(var(--page-pad), calc((100dvh - 740px) / 2)) +
-      var(--profile-bottom-nav-height) +
-      8px
-    );
+    top: var(--page-pad);
+    bottom: auto;
+    left: 50%;
+    right: auto !important;
+    width: 254px !important;
+    max-width: none;
+    transform: translateX(-50%);
   }
 }
 
@@ -667,6 +694,25 @@
      supported calc also reserves the non-overlay identity band. */
   min-height: calc(
     var(--cover-height) +
+    var(--profile-hero-identity-min-height)
+  );
+}
+
+/* Profiles without real hero media keep the identity chrome compact instead
+   of stretching a decorative gradient through most of the first viewport. */
+:where(
+  [data-testid="profile-compact-surface"][data-mode="profile"]
+    > .profile-home-fluid-hero--no-media
+) {
+  flex: 0 0 auto;
+  height: calc(
+    max(env(safe-area-inset-top), 16px) +
+    5rem +
+    var(--profile-hero-identity-min-height)
+  );
+  min-height: calc(
+    max(env(safe-area-inset-top), 16px) +
+    5rem +
     var(--profile-hero-identity-min-height)
   );
 }

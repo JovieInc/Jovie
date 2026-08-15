@@ -231,10 +231,11 @@ describe('ProfileDrawerShell', () => {
   });
 
   it('anchors embedded drawers flush to the phone shell instead of floating them', () => {
+    const onOpenChange = vi.fn();
     render(
       <ProfileDrawerShell
         open
-        onOpenChange={vi.fn()}
+        onOpenChange={onOpenChange}
         title='Contact'
         presentation='embedded'
         dataTestId='embedded-drawer'
@@ -246,5 +247,39 @@ describe('ProfileDrawerShell', () => {
     const dialog = screen.getByTestId('embedded-drawer');
     expect(dialog.className).toContain('inset-x-0');
     expect(dialog.className).toContain('bottom-0');
+    const backdrop = screen.getByRole('button', {
+      name: 'Close Drawer Overlay',
+    });
+    expect(backdrop).not.toHaveAttribute('inert');
+    expect(backdrop).not.toHaveAttribute('aria-hidden');
+    fireEvent.click(backdrop);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('keeps the modal backdrop interactive while isolating background content', () => {
+    const onOpenChange = vi.fn();
+    render(
+      <ProfileDrawerShell
+        open
+        onOpenChange={onOpenChange}
+        title='Pay'
+        presentation='modal'
+        dataTestId='modal-drawer'
+      >
+        <div>Drawer body</div>
+      </ProfileDrawerShell>
+    );
+
+    expect(screen.getByTestId('modal-drawer')).toHaveAttribute(
+      'aria-modal',
+      'true'
+    );
+    const backdrop = screen.getByRole('button', {
+      name: 'Close Modal Overlay',
+    });
+    expect(backdrop).not.toHaveAttribute('inert');
+    expect(backdrop).not.toHaveAttribute('aria-hidden');
+    fireEvent.click(backdrop);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

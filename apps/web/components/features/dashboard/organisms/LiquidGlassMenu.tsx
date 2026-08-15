@@ -281,7 +281,9 @@ export function LiquidGlassMenu({
   }, [closeMenuAndRestoreFocus, isExpanded]);
 
   useCloseOnEscapeOrOutside(menuRef, isExpanded, closeMenuAndRestoreFocus);
-  useModalFocusBoundary(expandedDialogRef, isExpanded);
+  // Escape/backdrop closures restore focus explicitly; route changes must not
+  // pull focus away from the destination page during modal cleanup.
+  useModalFocusBoundary(expandedDialogRef, isExpanded, false);
 
   // Move keyboard focus into the menu as soon as it opens.
   useEffect(() => {
@@ -325,6 +327,7 @@ export function LiquidGlassMenu({
         <div className='absolute inset-x-0 bottom-full'>
           {/* Backdrop */}
           <div
+            data-modal-backdrop
             className='fixed inset-0 z-50 bg-black/20 backdrop-blur-sm'
             onClick={closeMenuAndRestoreFocus}
             aria-hidden='true'

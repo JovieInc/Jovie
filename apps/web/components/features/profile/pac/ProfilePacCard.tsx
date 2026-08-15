@@ -109,6 +109,8 @@ interface ProfilePacCardProps {
   readonly merchCard?: PublicMerchCard | null;
   readonly nextShow?: TourDateViewModel | null;
   readonly hasTip?: boolean;
+  readonly hasPlayableDestinations?: boolean;
+  readonly captureEnabled?: boolean;
   readonly assignment: ProfilePacAssignment;
   readonly isSubscribed?: boolean;
   readonly renderMode?: ProfileRenderMode;
@@ -233,6 +235,8 @@ export function ProfilePacCard({
   merchCard = null,
   nextShow = null,
   hasTip = false,
+  hasPlayableDestinations = false,
+  captureEnabled = true,
   assignment,
   isSubscribed = false,
   renderMode = 'interactive',
@@ -250,9 +254,11 @@ export function ProfilePacCard({
   const ctx = useMemo<PacContext>(
     () => ({
       tier: isSubscribed ? 'captured' : 'cold',
+      captureEnabled,
       s2Slot: assignment.s2Slot,
       captureSuppressed,
       inventory: {
+        hasListen: Boolean(release || hasPlayableDestinations),
         hasPreview: Boolean(previewUrl && pacTrackId),
         hasMerch: Boolean(merchCard),
         hasTip,
@@ -262,13 +268,16 @@ export function ProfilePacCard({
     }),
     [
       assignment.s2Slot,
+      captureEnabled,
       captureSuppressed,
       hasTip,
+      hasPlayableDestinations,
       isSubscribed,
       merchCard,
       nextShow,
       pacTrackId,
       previewUrl,
+      release,
     ]
   );
 
@@ -312,7 +321,7 @@ export function ProfilePacCard({
   // is suppressed for this anonymous visitor. Best-effort — failures leave
   // the prompt eligible and the API re-validates on write.
   useEffect(() => {
-    if (!isInteractive || isSubscribed) return;
+    if (!captureEnabled || !isInteractive || isSubscribed) return;
     let cancelled = false;
     void getCaptureDismissalStatus(artist.id).then(data => {
       if (!cancelled && data?.suppressed) setCaptureSuppressed(true);
@@ -320,7 +329,7 @@ export function ProfilePacCard({
     return () => {
       cancelled = true;
     };
-  }, [artist.id, isInteractive, isSubscribed]);
+  }, [artist.id, captureEnabled, isInteractive, isSubscribed]);
 
   // --- Playback: register with the single global audio engine (#12330).
   const { playbackState, toggleTrack, seek } = useTrackAudioPlayer();
@@ -366,7 +375,9 @@ export function ProfilePacCard({
   // Capture moment trigger: listen threshold per experiment arm.
   const thresholdFiredRef = useRef(false);
   useEffect(() => {
-    if (!isPacTrackActive || thresholdFiredRef.current) return;
+    if (!captureEnabled || !isPacTrackActive || thresholdFiredRef.current) {
+      return;
+    }
     if (
       hasReachedListenThreshold(
         assignment.triggerThreshold,
@@ -379,6 +390,7 @@ export function ProfilePacCard({
     }
   }, [
     assignment.triggerThreshold,
+    captureEnabled,
     dispatch,
     isPacTrackActive,
     playbackState.currentTime,
@@ -388,7 +400,7 @@ export function ProfilePacCard({
   // capture_prompt_shown once per entry into the prompt state.
   const lastPromptShownRef = useRef(false);
   useEffect(() => {
-    if (state.kind === 'prompt') {
+    if (captureEnabled && state.kind === 'prompt') {
       if (!lastPromptShownRef.current) {
         lastPromptShownRef.current = true;
         emit('capture_prompt_shown', {
@@ -404,6 +416,7 @@ export function ProfilePacCard({
   }, [
     assignment.dismissAffordance,
     assignment.triggerThreshold,
+    captureEnabled,
     emit,
     state.kind,
   ]);
@@ -448,7 +461,7 @@ export function ProfilePacCard({
   const handleCaptureSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (!isInteractive) return;
+      if (!captureEnabled || !isInteractive) return;
       const email = normalizeSubscriptionEmail(emailInput);
       if (!email) {
         setFieldError('Enter a valid email address.');
@@ -494,11 +507,13 @@ export function ProfilePacCard({
       dispatch,
       emailInput,
       emit,
+      captureEnabled,
       isInteractive,
     ]
   );
 
   const handleDismiss = useCallback(() => {
+    if (!captureEnabled) return;
     dispatch({ type: 'DISMISS' });
     setCaptureSuppressed(true);
     emit(
@@ -521,7 +536,7 @@ export function ProfilePacCard({
       .catch(() => {
         // Best-effort — suppression is also held in memory for this session.
       });
-  }, [artist.id, assignment.dismissAffordance, dispatch, emit]);
+  }, [artist.id, assignment.dismissAffordance, captureEnabled, dispatch, emit]);
 
   const handleSecondaryClick = useCallback(
     (slot: string) => {
@@ -554,7 +569,12 @@ export function ProfilePacCard({
     case 'idle':
     case 'dismissed':
     case 'playing': {
-      contextLabel = state.kind === 'playing' ? 'Now Playing' : 'Latest';
+      contextLabel =
+        state.kind === 'playing'
+          ? 'Now Playing'
+          : release
+            ? 'Latest'
+            : 'Listen';
       subject = releaseSubject;
       if (ctx.inventory.hasPreview) {
         action = (
@@ -575,7 +595,7 @@ export function ProfilePacCard({
             {isPacPlaying ? 'Pause' : 'Play'}
           </PrimaryPill>
         );
-      } else {
+      } else if (release || hasPlayableDestinations) {
         // Degraded ladder: no inline preview — link out to listen.
         action = <PrimaryPill href={listenHref}>Listen</PrimaryPill>;
       }

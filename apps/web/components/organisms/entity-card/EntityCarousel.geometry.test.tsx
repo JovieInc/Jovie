@@ -187,6 +187,56 @@ describe('EntityCarousel profile geometry', () => {
     );
   });
 
+  it('keeps only the active card exposed to assistive technology and focus', () => {
+    render(
+      <EntityCarousel
+        items={items}
+        layout='profile-landscape'
+        leading={<button type='button'>Featured</button>}
+        trailing={<button type='button'>Updates</button>}
+      />
+    );
+
+    const carousel = screen.getByTestId('entity-carousel');
+    carousel.scrollTo = vi.fn();
+    const footprints = [
+      ...carousel.querySelectorAll<HTMLElement>(':scope > li'),
+    ];
+    expect(footprints[0]).toHaveAttribute('data-carousel-active', 'true');
+    expect(footprints[0]).not.toHaveAttribute('aria-hidden');
+    expect(footprints[0]).not.toHaveAttribute('inert');
+    for (const footprint of footprints.slice(1)) {
+      expect(footprint).toHaveAttribute('data-carousel-active', 'false');
+      expect(footprint).toHaveAttribute('aria-hidden', 'true');
+      expect(footprint).toHaveAttribute('inert');
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next Item' }));
+
+    expect(footprints[0]).toHaveAttribute('aria-hidden', 'true');
+    expect(footprints[0]).toHaveAttribute('inert');
+    expect(footprints[1]).toHaveAttribute('data-carousel-active', 'true');
+    expect(footprints[1]).not.toHaveAttribute('aria-hidden');
+    expect(footprints[1]).not.toHaveAttribute('inert');
+  });
+
+  it('keeps every portrait card available during native horizontal scrolling', () => {
+    render(
+      <EntityCarousel
+        items={items}
+        layout='portrait'
+        leading={<button type='button'>Featured</button>}
+        trailing={<button type='button'>Updates</button>}
+      />
+    );
+
+    const carousel = screen.getByTestId('entity-carousel');
+    for (const footprint of carousel.querySelectorAll(':scope > li')) {
+      expect(footprint).not.toHaveAttribute('aria-hidden');
+      expect(footprint).not.toHaveAttribute('inert');
+    }
+  });
+
   it('renders slot-only carousels (no entity items) without an empty shell', () => {
     render(
       <EntityCarousel
@@ -552,7 +602,7 @@ describe('EntityCarousel profile geometry', () => {
     expect(screen.getByRole('img', { name: 'Video still' })).toHaveClass(
       'object-contain'
     );
-    expect(screen.getByRole('img', { name: 'Tour shirt' })).toHaveClass(
+    expect(document.querySelector('img[alt="Tour shirt"]')).toHaveClass(
       'object-contain'
     );
   });

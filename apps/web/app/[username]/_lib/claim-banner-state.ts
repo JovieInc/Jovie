@@ -38,10 +38,13 @@ export function resolveClaimBannerState(params: {
     claimBannerVariant = 'claim_intent';
   } else if (visitorState === 'claim_intent_direct') {
     claimBannerVariant = 'direct_in_progress';
-  } else if (claimSearchParam === 'unsupported' && !directClaimSupported) {
-    claimBannerVariant = 'unsupported';
   } else if (directClaimSupported) {
     claimBannerVariant = 'organic';
+  } else {
+    // Never make an unclaimed public profile look artist-owned. Profiles
+    // without an exact Spotify identity cannot enter the direct claim flow,
+    // but they still need an honest, visible ownership state.
+    claimBannerVariant = 'unsupported';
   }
 
   return {

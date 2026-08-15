@@ -13,8 +13,11 @@ const PROFILE_COMPACT_SURFACE = join(
 const DESIGN_SYSTEM = join(process.cwd(), 'styles', 'design-system.css');
 
 /**
- * Public profile home hero has ONE definite token-driven height on every
- * viewport: h-(--cover-height) with --cover-height: clamp(220px, 34svh, 400px).
+ * Public profile home hero with real artwork has ONE definite token-driven
+ * height on every viewport: h-(--cover-height) with
+ * --cover-height: clamp(220px, 34svh, 400px). Profiles without real artwork
+ * use the compact no-media geometry so an empty decorative field cannot crowd
+ * the conversion inventory below it.
  * The old short-viewport shrink-wrap (flex-none + min-h-0 + ≤190px cap) made
  * the hero collapse to ~60px on viewports ≤820px tall, hiding the artist
  * photo and name — it must never come back. The carousel below the hero owns
@@ -24,7 +27,9 @@ describe('ProfileCompactSurface home hero layout', () => {
   it('locks the home hero to the token-driven cover height (no flex/shrink-wrap)', () => {
     const contents = readFileSync(PROFILE_COMPACT_SURFACE, 'utf8');
 
-    expect(contents).toMatch(/isHomeMode\s*\?\s*'h-\(--cover-height\) /);
+    expect(contents).toMatch(
+      /isHomeMode[\s\S]{0,120}resolvedHeroImageUrl[\s\S]{0,80}'h-\(--cover-height\) shrink-0'[\s\S]{0,80}'profile-home-fluid-hero--no-media shrink-0'/
+    );
     // The short-viewport shrink-wrap band must not come back.
     expect(contents).not.toMatch(/\[@media\(max-height:820px\)\]:flex-none/);
     expect(contents).not.toMatch(/\[@media\(max-height:820px\)\]:min-h-0/);
@@ -82,12 +87,11 @@ describe('ProfileCompactSurface home hero layout', () => {
     );
   });
 
-  it('eagerly loads the first visible home-card artwork', () => {
+  it('eagerly loads the first visible artwork without loading two hero images', () => {
     const contents = readFileSync(PROFILE_COMPACT_SURFACE, 'utf8');
 
     expect(contents).toMatch(
-      /<ProfileHomeRail[\s\S]{0,900}pacArtPriority\s*\/>/
+      /<ProfileHomeRail[\s\S]{0,900}pacArtPriority=\{!resolvedHeroImageUrl\}/
     );
-    expect(contents).not.toMatch(/pacArtPriority=\{!resolvedHeroImageUrl\}/);
   });
 });

@@ -47,7 +47,7 @@ export function CookieActions({
   compact = false,
 }: CookieActionsProps) {
   const containerClass = compact
-    ? `flex shrink-0 flex-row flex-wrap items-center ${className}`
+    ? `cookie-actions--compact flex shrink-0 flex-row flex-wrap items-center ${className}`
     : `flex shrink-0 flex-col sm:flex-row sm:flex-wrap ${className}`;
   const containerGap = compact ? '4px' : 'var(--linear-space-2)';
 
@@ -81,7 +81,7 @@ export function CookieActions({
         type='button'
         onClick={onRejectAll}
         disabled={disabled}
-        className={btnBase}
+        className={`${btnBase} cookie-action--choice`}
         style={choiceStyle}
         data-testid='cookie-action-reject-all'
       >
@@ -89,23 +89,23 @@ export function CookieActions({
       </button>
       <button
         type='button'
-        onClick={onCustomize}
-        disabled={disabled}
-        className={btnBase}
-        style={customizeStyle}
-        data-testid='cookie-action-customize'
-      >
-        Customize
-      </button>
-      <button
-        type='button'
         onClick={onAcceptAll}
         disabled={disabled}
-        className={btnBase}
+        className={`${btnBase} cookie-action--choice`}
         style={choiceStyle}
         data-testid='cookie-action-accept-all'
       >
         Accept all
+      </button>
+      <button
+        type='button'
+        onClick={onCustomize}
+        disabled={disabled}
+        className={`${btnBase} cookie-action--customize`}
+        style={customizeStyle}
+        data-testid='cookie-action-customize'
+      >
+        Customize
       </button>
     </div>
   );

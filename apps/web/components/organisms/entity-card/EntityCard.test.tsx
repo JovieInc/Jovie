@@ -8,6 +8,9 @@ import { EntityCard } from './EntityCard';
 import type { EntityCardModel } from './types';
 
 const mockUseTrackAudioPlayer = vi.hoisted(() => vi.fn());
+const mockPacEmit = vi.hoisted(() => vi.fn());
+const mockGetCaptureDismissalStatus = vi.hoisted(() => vi.fn());
+const mockSubscribeToNotifications = vi.hoisted(() => vi.fn());
 
 vi.mock('next/link', () => ({
   default: ({
@@ -50,7 +53,7 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
 vi.mock('@/features/profile/usePacEvents', () => ({
   usePacEvents: () => ({
     exposureRef: vi.fn(),
-    emit: vi.fn(),
+    emit: mockPacEmit,
     createPlayTracker: () => ({
       onPlay: vi.fn(),
       onPause: vi.fn(),
@@ -61,8 +64,12 @@ vi.mock('@/features/profile/usePacEvents', () => ({
 }));
 
 vi.mock('@/lib/profile/capture-dismissal-client', () => ({
-  getCaptureDismissalStatus: vi.fn().mockResolvedValue(null),
+  getCaptureDismissalStatus: mockGetCaptureDismissalStatus,
   invalidateCaptureDismissalStatus: vi.fn(),
+}));
+
+vi.mock('@/lib/notifications/client', () => ({
+  subscribeToNotifications: mockSubscribeToNotifications,
 }));
 
 const merchModel: EntityCardModel = {
@@ -303,6 +310,10 @@ describe('EntityCard', () => {
 
 describe('ProfilePacCard landscape states', () => {
   beforeEach(() => {
+    mockPacEmit.mockClear();
+    mockGetCaptureDismissalStatus.mockReset();
+    mockGetCaptureDismissalStatus.mockResolvedValue(null);
+    mockSubscribeToNotifications.mockReset();
     mockUseTrackAudioPlayer.mockReturnValue({
       playbackState: {
         activeTrackId: 'pac-artist-1-release',
@@ -313,6 +324,86 @@ describe('ProfilePacCard landscape states', () => {
       toggleTrack: vi.fn(),
       seek: vi.fn(),
     });
+  });
+
+  it('never prompts, submits, or emits capture events when capture is disabled', async () => {
+    render(
+      <ProfilePacCard
+        artist={pacArtist}
+        release={{
+          title: 'Release',
+          slug: 'release',
+          artworkUrl: '/release.jpg',
+          previewUrl: '/preview.mp3',
+        }}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        captureEnabled={false}
+      />
+    );
+
+    const card = screen.getByTestId('profile-pac');
+    await waitFor(() => expect(card).toHaveAttribute('data-state', 'idle'));
+    expect(
+      screen.queryByRole('textbox', { name: /email address/i })
+    ).toBeNull();
+    expect(mockGetCaptureDismissalStatus).not.toHaveBeenCalled();
+    expect(mockSubscribeToNotifications).not.toHaveBeenCalled();
+    expect(
+      mockPacEmit.mock.calls.some(([eventName]) =>
+        String(eventName).startsWith('capture_')
+      )
+    ).toBe(false);
+  });
+
+  it('re-resolves when playable destinations arrive without another inventory change', async () => {
+    mockUseTrackAudioPlayer.mockReturnValue({
+      playbackState: {
+        activeTrackId: null,
+        currentTime: 0,
+        duration: 0,
+        isPlaying: false,
+      },
+      toggleTrack: vi.fn(),
+      seek: vi.fn(),
+    });
+
+    const view = render(
+      <ProfilePacCard
+        artist={pacArtist}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        renderMode='preview'
+        captureEnabled={false}
+        hasTip
+        hasPlayableDestinations={false}
+      />
+    );
+    expect(screen.getByTestId('profile-pac')).toHaveAttribute(
+      'data-state',
+      'tip'
+    );
+
+    view.rerender(
+      <ProfilePacCard
+        artist={pacArtist}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        renderMode='preview'
+        captureEnabled={false}
+        hasTip
+        hasPlayableDestinations
+      />
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('profile-pac')).toHaveAttribute(
+        'data-state',
+        'idle'
+      )
+    );
+    expect(screen.getByRole('link', { name: 'Listen' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Manage' })).toBeNull();
   });
 
   it('gives the capture form the full compact row width after the listen threshold', async () => {

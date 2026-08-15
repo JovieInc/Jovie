@@ -109,6 +109,12 @@ test.describe('Profile Drawers - Mobile Open/Close Lifecycle', () => {
     await expect(drawerContent).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
+    await expect(page.getByTestId('profile-pay-recipient')).toContainText(
+      'Pay Tim White'
+    );
+    await expect(page.getByTestId('profile-pay-recipient')).toContainText(
+      '@tim via Venmo'
+    );
 
     await closeDrawer(page);
 

@@ -29,11 +29,10 @@ describe('resolveClaimBannerState', () => {
     });
   });
 
-  it('returns unsupported when direct claim is unavailable and requested', () => {
+  it('shows an unsupported ownership state when direct claim is unavailable', () => {
     expect(
       resolveClaimBannerState({
         visitorState: 'organic_unclaimed',
-        claimSearchParam: 'unsupported',
         directClaimSupported: false,
         isClaimed: false,
       })

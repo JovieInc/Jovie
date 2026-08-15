@@ -178,9 +178,7 @@ describe('DashboardMobileTabs', () => {
     });
     const first = within(menu).getByRole('link', { name: 'Inbox' });
     const last = within(dialog).getByRole('button', { name: 'Sign out' });
-    const background = screen.getByRole('button', {
-      name: 'Background action',
-    });
+    const background = screen.getByText('Background action');
 
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     expect(more).toHaveAttribute('aria-controls', dialog.id);

@@ -1,9 +1,10 @@
 'use client';
 
 import { ChevronLeft, X } from 'lucide-react';
-import { useId } from 'react';
+import { useId, useRef } from 'react';
 import { Drawer } from 'vaul';
 import type { ProfileSurfacePresentation } from '@/features/profile/contracts';
+import { useModalFocusBoundary } from '@/lib/a11y/modal-focus-boundary';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 import { cn } from '@/lib/utils';
 
@@ -42,10 +43,15 @@ export function ProfileDrawerShell({
   centerTitle = false,
 }: ProfileDrawerShellProps) {
   const titleId = useId();
+  const modalRef = useRef<HTMLElement | null>(null);
   const subtitleId = useId();
   const accessibleDescriptionId = useId();
   const accessibleDescription = subtitle ?? 'Profile menu and actions.';
   const isSecondaryHeader = navigationLevel === 'secondary' && Boolean(onBack);
+  useModalFocusBoundary(
+    modalRef,
+    open && (presentation === 'embedded' || presentation === 'modal')
+  );
   // The drawer uses one capped envelope across releases, pay, tour, and
   // subscribe so desktop preview shells never jump when swapping views.
   // `--profile-drawer-height-max` is intentionally shorter than the full phone
@@ -167,16 +173,22 @@ export function ProfileDrawerShell({
         <button
           type='button'
           aria-label='Close Drawer Overlay'
+          data-modal-backdrop
           className={`fixed inset-0 ${PROFILE_Z.LOCAL_CONTENT} bg-black/24`}
           onClick={() => onOpenChange(false)}
         />
         <dialog
+          ref={node => {
+            modalRef.current = node;
+          }}
           className={`absolute inset-x-0 bottom-0 ${PROFILE_Z.STICKY_CHROME} m-0 max-w-none border-0 bg-transparent p-0`}
           data-testid={dataTestId}
+          aria-modal='true'
           aria-describedby={accessibleDescriptionId}
           aria-labelledby={titleId}
           style={drawerHeightStyle}
           open
+          tabIndex={-1}
         >
           <div
             className={`relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-t-(--profile-drawer-radius-desktop) border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-16px_52px_rgba(0,0,0,0.5)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${contentClassName ?? ''}`}
@@ -204,15 +216,21 @@ export function ProfileDrawerShell({
         <button
           type='button'
           aria-label='Close Modal Overlay'
+          data-modal-backdrop
           className='absolute inset-0'
           onClick={() => onOpenChange(false)}
         />
         <div
+          ref={node => {
+            modalRef.current = node;
+          }}
           className='relative z-10 flex max-h-[min(760px,calc(100%-24px))] w-full max-w-108 flex-col overflow-hidden rounded-(--profile-card-radius) border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_34px_96px_rgba(0,0,0,0.48)]'
           data-testid={dataTestId}
           role='dialog'
+          aria-modal='true'
           aria-describedby={accessibleDescriptionId}
           aria-labelledby={titleId}
+          tabIndex={-1}
           style={{
             ['--profile-drawer-height-max' as string]:
               'min(760px, calc(100dvh - 48px))',

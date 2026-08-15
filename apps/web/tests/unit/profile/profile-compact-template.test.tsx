@@ -398,9 +398,10 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
-    expect(
-      screen.getByRole('link', { name: `Go to ${mockArtist.name}'s profile` })
-    ).toHaveAttribute('href', `/${mockArtist.handle}`);
+    expect(screen.getByRole('link', { name: mockArtist.name })).toHaveAttribute(
+      'href',
+      `/${mockArtist.handle}`
+    );
   });
 
   it('keeps the home identity grid tight without shrinking interaction targets', () => {
@@ -424,9 +425,11 @@ describe('ProfileCompactTemplate', () => {
 
     const identity = screen.getByTestId('profile-hero-identity-block');
     expect(identity).toHaveClass('py-1');
-    expect(
-      screen.getByRole('link', { name: `Go to ${mockArtist.name}'s profile` })
-    ).toHaveClass('min-h-11', 'items-center', 'py-0');
+    expect(screen.getByRole('link', { name: mockArtist.name })).toHaveClass(
+      'min-h-11',
+      'items-center',
+      'py-0'
+    );
     expect(
       within(screen.getByTestId('profile-hero-social-row')).getByRole('link')
     ).toHaveClass('h-11', 'w-11');
@@ -457,6 +460,36 @@ describe('ProfileCompactTemplate', () => {
     expect(
       cover.querySelector('[data-testid="profile-hero-identity-block"]')
     ).not.toBeNull();
+  });
+
+  it('names the document identity heading after the artist', () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={{ ...mockArtist, is_verified: true }}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: mockArtist.name })
+    ).toBeInTheDocument();
+  });
+
+  it('uses the compact no-media hero geometry when a profile has no real image', () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    expect(screen.getByTestId('profile-cover')).toHaveClass(
+      'profile-home-fluid-hero--no-media'
+    );
   });
 
   it('renders the Jovie menu trigger instead of a duplicate alerts trigger in the compact profile header', async () => {

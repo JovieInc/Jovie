@@ -7,6 +7,8 @@ import {
 } from '@/features/profile/ProfileHomeRail';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import type { PublicRelease } from '@/features/profile/releases/types';
+import type { PublicMerchCard } from '@/lib/merch/types';
+import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
 
 function makeArtist(overrides: Partial<Artist> = {}): Artist {
@@ -54,6 +56,52 @@ function makePublicRelease(
     artworkUrl: '/img/releases/back-catalog.jpg',
     artistNames: ['Tim White'],
     ...overrides,
+  };
+}
+
+function makeMerchCard(): PublicMerchCard {
+  return {
+    id: 'merch-1',
+    artistId: 'artist-1',
+    status: 'live',
+    title: 'Tour Tee',
+    description: 'Tour tee',
+    productType: 'shirt',
+    primaryImageUrl: '/img/merch/tour-tee.jpg',
+    mockupUrls: [],
+    printful: {},
+    pricing: {},
+    retailPriceCents: 4500,
+    rankScore: 1,
+    position: 0,
+    pinned: false,
+  } as unknown as PublicMerchCard;
+}
+
+function makeTourDate(ticketUrl: string | null): TourDateViewModel {
+  return {
+    id: 'show-1',
+    profileId: 'artist-1',
+    externalId: null,
+    provider: 'manual',
+    eventType: 'tour',
+    confirmationStatus: 'confirmed',
+    reviewedAt: null,
+    title: 'The Novo',
+    startDate: '2030-08-20T20:00:00.000Z',
+    startTime: null,
+    timezone: 'America/Los_Angeles',
+    venueName: 'The Novo',
+    city: 'Los Angeles',
+    region: 'CA',
+    country: 'US',
+    latitude: null,
+    longitude: null,
+    ticketUrl,
+    ticketStatus: 'available',
+    lastSyncedAt: null,
+    createdAt: '2026-08-14T00:00:00.000Z',
+    updatedAt: '2026-08-14T00:00:00.000Z',
   };
 }
 
@@ -137,7 +185,10 @@ describe('ProfileHomeRail', () => {
     const alertsCard = screen.getByTestId('profile-home-alerts-fallback-card');
 
     expect(
-      screen.getByRole('heading', { level: 2, name: 'Latest From Tim White' })
+      screen.getByRole('heading', {
+        level: 2,
+        name: 'Profile Highlights From Tim White',
+      })
     ).toBeInTheDocument();
 
     // Both live inside the single carousel — no stacked sections.
@@ -232,6 +283,93 @@ describe('ProfileHomeRail', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
   });
 
+  it('renders no false Latest or Listen card when the profile has no inventory', () => {
+    render(
+      <ProfileHomeRail
+        artist={makeArtist()}
+        latestRelease={null}
+        profileSettings={{ showOldReleases: true }}
+        featuredPlaylistFallback={null}
+        tourDates={[]}
+        hasPlayableDestinations={false}
+        renderMode='preview'
+        isSubscribed={false}
+        showAlertsCard={false}
+      />
+    );
+
+    expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
+    expect(screen.queryByTestId('profile-pac')).toBeNull();
+    expect(screen.queryByText('Latest')).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Listen' })).toBeNull();
+  });
+
+  it('renders merch-only inventory as a merch PAC instead of a blank Listen card', () => {
+    render(
+      <ProfileHomeRail
+        artist={makeArtist()}
+        latestRelease={null}
+        featuredPlaylistFallback={null}
+        tourDates={[]}
+        hasPlayableDestinations={false}
+        renderMode='preview'
+        showAlertsCard={false}
+        merchCards={[makeMerchCard()]}
+      />
+    );
+
+    expect(screen.getByTestId('profile-pac')).toHaveAttribute(
+      'data-state',
+      'merch'
+    );
+    expect(screen.getByRole('link', { name: 'Shop' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Listen' })).toBeNull();
+  });
+
+  it('renders show-only inventory as a ticket PAC instead of a blank Listen card', () => {
+    render(
+      <ProfileHomeRail
+        artist={makeArtist()}
+        latestRelease={null}
+        featuredPlaylistFallback={null}
+        tourDates={[makeTourDate('https://tickets.example.com/the-novo')]}
+        hasPlayableDestinations={false}
+        renderMode='preview'
+        resolveNearbyTour={false}
+        showAlertsCard={false}
+      />
+    );
+
+    expect(screen.getByTestId('profile-pac')).toHaveAttribute(
+      'data-state',
+      'tickets'
+    );
+    expect(screen.getByRole('link', { name: 'Tickets' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Listen' })).toBeNull();
+  });
+
+  it('renders tip-only inventory as a support PAC instead of a blank Listen card', () => {
+    render(
+      <ProfileHomeRail
+        artist={makeArtist()}
+        latestRelease={null}
+        featuredPlaylistFallback={null}
+        tourDates={[]}
+        hasPlayableDestinations={false}
+        renderMode='preview'
+        showAlertsCard={false}
+        hasTip
+      />
+    );
+
+    expect(screen.getByTestId('profile-pac')).toHaveAttribute(
+      'data-state',
+      'tip'
+    );
+    expect(screen.getByRole('link', { name: 'Tip' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Listen' })).toBeNull();
+  });
+
   it('keeps the carousel shell with PAC and alerts cards even when the catalog is empty', () => {
     render(
       <ProfileHomeRail
@@ -318,9 +456,7 @@ describe('ProfileHomeRail', () => {
     expect(screen.getByTestId('profile-home-carousel')).toBeInTheDocument();
     // The featured release appears exactly once (inside the PAC card).
     expect(screen.getAllByText('The Deep End')).toHaveLength(1);
-    expect(
-      screen.getByRole('heading', { name: 'Under Lights' })
-    ).toBeInTheDocument();
+    expect(screen.getByText('Under Lights')).toBeInTheDocument();
   });
 
   it('hides the alerts card once subscribed but keeps the carousel', () => {
