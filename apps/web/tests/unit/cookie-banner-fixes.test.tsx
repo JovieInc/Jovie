@@ -38,6 +38,20 @@ describe('CookieBannerSection consent sync', () => {
   afterEach(() => {
     setCookie('');
     globalThis.JVConsent = undefined;
+    vi.unstubAllEnvs();
+  });
+
+  it('uses the E2E-only pathname override to clear the public profile dock', async () => {
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+    const mod = await import('@/components/organisms/CookieBannerSection');
+    setCookie('jv_cc_required=1');
+    render(
+      <mod.CookieBannerSection testOnlyPathname='/profile-admission-fixture' />
+    );
+
+    expect(screen.getByTestId('cookie-banner')).toHaveClass(
+      'cookie-banner-card--above-public-profile-dock'
+    );
   });
 
   it('calls setConsentState accepted on acceptAll', async () => {
