@@ -14,7 +14,7 @@ enum APIClientError: Error, Equatable, LocalizedError {
     case .invalidResponse:
       return "The server returned an invalid response."
     case .missingToken:
-      return "No Clerk session token is available."
+      return "No Better Auth session token is available."
     case let .transportFailed(code):
       return "The network request failed with code \(code)."
     case let .requestFailed(statusCode):
@@ -57,8 +57,7 @@ struct APIClient: APIClientProtocol, Sendable {
 
   /**
    * Refresh the stored native session token + expiry from the bearer
-   * plugin's `set-auth-token` response header (Clerk → Better Auth
-   * migration, eng row 31). The server emits this header when the session
+   * plugin's `set-auth-token` response header. The server emits this header when the session
    * cookie rolls (per `updateAge`); the iOS client never needs to force a
    * refresh — every API call that returns the header updates Keychain
    * in-place. Returns silently when the header is absent (no roll this

@@ -241,8 +241,8 @@ describe('GET /api/mobile/v1/me', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     await expect(response.json()).resolves.toEqual({
       state: 'needs_onboarding',
-      displayName: null,
-      username: null,
+      displayName: 'DJ Shadow',
+      username: 'djshadow',
       publicProfileUrl: null,
       qrPayload: null,
       avatarUrl: null,

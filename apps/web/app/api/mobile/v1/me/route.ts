@@ -22,11 +22,14 @@ export interface MobileMeResponse {
   chatEnabled: boolean;
 }
 
-function buildNeedsOnboardingResponse(): NextResponse {
+function buildNeedsOnboardingResponse(profile?: {
+  readonly displayName: string | null;
+  readonly username: string | null;
+}): NextResponse {
   const payload: MobileMeResponse = {
     state: 'needs_onboarding',
-    displayName: null,
-    username: null,
+    displayName: profile?.displayName ?? null,
+    username: profile?.username ?? null,
     publicProfileUrl: null,
     qrPayload: null,
     avatarUrl: null,
@@ -92,7 +95,10 @@ export async function GET(request: Request) {
         onboardingCompletedAt: profile.onboardingCompletedAt,
       })
     ) {
-      return buildNeedsOnboardingResponse();
+      return buildNeedsOnboardingResponse({
+        displayName: profile.displayName,
+        username: profile.username,
+      });
     }
 
     const publicProfileUrl = getProfileUrl(profile.username!);

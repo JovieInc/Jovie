@@ -13,15 +13,14 @@ final class ChatRepository {
 
   private let client: MobileChatClientProtocol
   private let cache: ChatCache
-  private let clerkUserID: String
+  private let userID: String
   private let webBaseURL: URL
   private let activityDonator: (any ConversationActivityDonating)?
 
   /// Set by `seedTimelineForUITesting`. When `true`, network-backed methods
   /// (`refreshConversations`, and any future live-fetch entry point) no-op
   /// instead of calling `client` -- the fixture launch mode has no live
-  /// Clerk session, so `ClerkTokenProvider.bearerToken` would hit
-  /// `Clerk.shared`'s unconfigured-singleton fatalError. `MobileChatView`
+  /// Better Auth session. `MobileChatView`
   /// unconditionally calls `refreshConversations()` in a `.task` on
   /// appear, so this can't be solved by the call site alone.
   private var isFixtureSeeded = false
@@ -29,13 +28,13 @@ final class ChatRepository {
   init(
     client: MobileChatClientProtocol,
     cache: ChatCache,
-    clerkUserID: String,
+    userID: String,
     webBaseURL: URL,
     activityDonator: (any ConversationActivityDonating)? = LiveConversationActivityDonator()
   ) {
     self.client = client
     self.cache = cache
-    self.clerkUserID = clerkUserID
+    self.userID = userID
     self.webBaseURL = webBaseURL
     self.activityDonator = activityDonator
   }
@@ -278,7 +277,7 @@ final class ChatRepository {
   }
 
   private func hydrateFromCache() async {
-    guard let snapshot = await cache.load(for: clerkUserID) else { return }
+    guard let snapshot = await cache.load(for: userID) else { return }
     conversations = snapshot.conversations
     if let activeConversationID,
        let cachedMessages = snapshot.messagesByConversationID[activeConversationID]
@@ -289,7 +288,7 @@ final class ChatRepository {
 
   private func hydrateConversationFromCache(_ conversationID: String) async {
     guard
-      let snapshot = await cache.load(for: clerkUserID),
+      let snapshot = await cache.load(for: userID),
       let cachedMessages = snapshot.messagesByConversationID[conversationID]
     else {
       return
@@ -302,7 +301,7 @@ final class ChatRepository {
     conversationID: String? = nil
   ) async {
     var messagesByConversationID =
-      (await cache.load(for: clerkUserID))?.messagesByConversationID ?? [:]
+      (await cache.load(for: userID))?.messagesByConversationID ?? [:]
 
     if let messages, let conversationID {
       messagesByConversationID[conversationID] = messages
@@ -315,7 +314,7 @@ final class ChatRepository {
       messagesByConversationID: messagesByConversationID,
       cachedAt: Date()
     )
-    await cache.store(snapshot, for: clerkUserID)
+    await cache.store(snapshot, for: userID)
   }
 
   private func timelineItem(from message: MobileConversationMessage) -> MobileChatTimelineItem {

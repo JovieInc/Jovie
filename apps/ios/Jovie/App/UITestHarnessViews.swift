@@ -109,7 +109,7 @@ struct UITestingAuthCallbackRoot: View {
   @Bindable var appState: AppState
   @State private var authErrorMessage: String?
   @State private var handledStates: Set<String> = []
-  @State private var liveUserID: String?
+  @State private var authenticatedUserID: String?
 
   private let expectedCode = "test_code"
   private let expectedVerifier = "test_verifier"
@@ -128,7 +128,7 @@ struct UITestingAuthCallbackRoot: View {
       appState: appState,
       isAuthAvailable: false,
       isSignInUnavailable: false,
-      liveUserID: liveUserID,
+      authenticatedUserID: authenticatedUserID,
       authErrorMessage: authErrorMessage,
       onLogout: { await appState.signOut() },
       onAuthReturn: handleAuthReturn,
@@ -208,7 +208,7 @@ struct UITestingAuthCallbackRoot: View {
     }
 
     authErrorMessage = nil
-    liveUserID = "user_ui_auth_callback"
+    authenticatedUserID = "user_ui_auth_callback"
     appState.activeUserID = "user_ui_auth_callback"
     appState.route = .ready
     appState.dashboardState = .loaded(.previewReady)

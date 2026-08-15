@@ -6,8 +6,8 @@ struct MeRepositoryResult: Equatable, Sendable {
 }
 
 protocol MeRepositoryProtocol: Sendable {
-  func loadMe(for clerkUserID: String) async throws -> MeRepositoryResult
-  func cachedSnapshot(for clerkUserID: String) async -> MobileMeResponse?
+  func loadMe(for userID: String) async throws -> MeRepositoryResult
+  func cachedSnapshot(for userID: String) async -> MobileMeResponse?
 }
 
 struct MeRepository: MeRepositoryProtocol, Sendable {
@@ -22,24 +22,24 @@ struct MeRepository: MeRepositoryProtocol, Sendable {
   /// Returns the last persisted profile for this user without touching the
   /// network. Used to paint the dashboard instantly on launch while a fresh
   /// copy is revalidated in the background (stale-while-revalidate).
-  func cachedSnapshot(for clerkUserID: String) async -> MobileMeResponse? {
-    await cache.load(for: clerkUserID)?.response
+  func cachedSnapshot(for userID: String) async -> MobileMeResponse? {
+    await cache.load(for: userID)?.response
   }
 
-  func loadMe(for clerkUserID: String) async throws -> MeRepositoryResult {
+  func loadMe(for userID: String) async throws -> MeRepositoryResult {
     do {
       let response = try await apiClient.fetchMe()
-      await cache.store(response, for: clerkUserID)
+      await cache.store(response, for: userID)
       return MeRepositoryResult(response: response, isStale: false)
     } catch {
-      if let cached = await cache.load(for: clerkUserID) {
+      if let cached = await cache.load(for: userID) {
         return MeRepositoryResult(response: cached.response, isStale: true)
       }
       throw error
     }
   }
 
-  func clearCachedUser(_ clerkUserID: String) async {
-    await cache.remove(for: clerkUserID)
+  func clearCachedUser(_ userID: String) async {
+    await cache.remove(for: userID)
   }
 }

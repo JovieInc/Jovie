@@ -44,7 +44,7 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
     state: .ready,
     displayName: "Tim White",
     username: "tim",
-    publicProfileURL: "https://jov.ie/tim",
+    publicProfileURL: nil,
     qrPayload: nil,
     avatarURL: nil,
     appleWalletProfilePassAvailable: false,

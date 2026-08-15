@@ -9,9 +9,9 @@ enum DashboardLoadState: Equatable {
 }
 
 protocol AppStateRepository: Sendable {
-  func loadMe(for clerkUserID: String) async throws -> MeRepositoryResult
-  func clearCachedUser(_ clerkUserID: String) async
-  func cachedSnapshot(for clerkUserID: String) async -> MobileMeResponse?
+  func loadMe(for userID: String) async throws -> MeRepositoryResult
+  func clearCachedUser(_ userID: String) async
+  func cachedSnapshot(for userID: String) async -> MobileMeResponse?
 }
 
 extension AppStateRepository {
@@ -32,10 +32,11 @@ final class AppState {
   var route: AppRouter = .launching
   var dashboardState: DashboardLoadState = .idle
   var isOffline = false
-  var didLoadClerk = false
+  var didInitializeAuth = false
   var activeUserID: String?
 
   private let repository: AppStateRepository
+  private let sessionRevoker: NativeSessionRevoking
   private let launchDate = Date()
   private var loadingUserID: String?
   // Matches SplashView's cinematic entrance (JovieMotion.cinematicDuration)
@@ -46,12 +47,14 @@ final class AppState {
     configuration: AppConfiguration,
     launchMode: LaunchMode = .current(),
     repository: AppStateRepository,
-    brightnessManager: BrightnessControlling
+    brightnessManager: BrightnessControlling,
+    sessionRevoker: NativeSessionRevoking? = nil
   ) {
     self.configuration = configuration
     self.launchMode = launchMode
     self.repository = repository
     self.brightnessManager = brightnessManager
+    self.sessionRevoker = sessionRevoker ?? NativeSessionRevoker(baseURL: configuration.apiBaseURL)
   }
 
   func completeLaunch() async {
@@ -62,8 +65,8 @@ final class AppState {
     }
 
     switch launchMode {
-    case .live, .uiTestingAutoAuth, .uiTestingLiveAuth, .uiTestingRealBrowserAuth:
-      didLoadClerk = true
+    case .live, .uiTestingLiveAuth, .uiTestingRealBrowserAuth:
+      didInitializeAuth = true
     case .unitTesting:
       route = .signedOut
       dashboardState = .idle
@@ -121,7 +124,7 @@ final class AppState {
   }
 
   func handleSignedInUserChange(_ userID: String?) async {
-    guard launchMode.usesLiveClerk, didLoadClerk else { return }
+    guard launchMode.usesLiveAuth, didInitializeAuth else { return }
 
     if let userID, loadingUserID == userID {
       return
@@ -249,6 +252,16 @@ final class AppState {
   }
 
   func signOut() async {
+    let revocation = await sessionRevoker.revokeCurrentSession()
+    if case let .failed(statusCode) = revocation {
+      MobileAuthDiagnostics.record(
+        "native_session_revocation_failed",
+        detail: statusCode.map(String.init) ?? "transport"
+      )
+    }
+
+    // Always clear the device token even if the network is unavailable. A
+    // remote revocation failure must never trap someone in an authenticated UI.
     NativeSessionTokenStore.clear()
 
     let userID = activeUserID
@@ -276,5 +289,9 @@ final class AppState {
 
   var billingURL: URL {
     continueOnWebURL.appending(path: "settings/billing")
+  }
+
+  var accountURL: URL {
+    configuration.webBaseURL.appending(path: "app/settings/account")
   }
 }
