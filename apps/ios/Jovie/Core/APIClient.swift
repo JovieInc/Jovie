@@ -6,6 +6,7 @@ enum APIClientError: Error, Equatable, LocalizedError {
   case missingToken
   case transportFailed(code: Int)
   case requestFailed(statusCode: Int)
+  case profileCompletionFailed(statusCode: Int, message: String)
 
   var errorDescription: String? {
     switch self {
@@ -19,6 +20,8 @@ enum APIClientError: Error, Equatable, LocalizedError {
       return "The network request failed with code \(code)."
     case let .requestFailed(statusCode):
       return "The request failed with status code \(statusCode)."
+    case let .profileCompletionFailed(_, message):
+      return message
     }
   }
 }
@@ -36,6 +39,19 @@ protocol APIClientProtocol: Sendable {
 }
 
 struct APIClient: APIClientProtocol, Sendable {
+  private struct ProfileCompletionRequest: Encodable {
+    let displayName: String
+    let username: String
+  }
+
+  private struct ProfileCompletionResponse: Decodable {
+    let profileId: String
+  }
+
+  private struct ProfileCompletionErrorResponse: Decodable {
+    let error: String
+  }
+
   private let baseURL: URL
   private let session: URLSession
   private let tokenProvider: TokenProviding
@@ -113,6 +129,71 @@ struct APIClient: APIClientProtocol, Sendable {
 
   func fetchActionLoopCalendar() async throws -> MobileActionLoopCalendarResponse {
     try await sendActionLoopCalendarRequest(forceRefresh: false)
+  }
+
+  func completeProfile(displayName: String, username: String) async throws {
+    try await sendProfileCompletionRequest(
+      displayName: displayName,
+      username: username,
+      forceRefresh: false
+    )
+  }
+
+  private func sendProfileCompletionRequest(
+    displayName: String,
+    username: String,
+    forceRefresh: Bool
+  ) async throws {
+    let token = try await tokenProvider.bearerToken(forceRefresh: forceRefresh)
+    var request = URLRequest(
+      url: baseURL.appending(path: "/api/mobile/v1/profile/complete")
+    )
+    request.httpMethod = "POST"
+    request.timeoutInterval = requestTimeout
+    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = try JSONEncoder().encode(
+      ProfileCompletionRequest(displayName: displayName, username: username)
+    )
+
+    let data: Data
+    let response: URLResponse
+    do {
+      (data, response) = try await session.data(for: request)
+    } catch let error as URLError {
+      throw APIClientError.transportFailed(code: error.code.rawValue)
+    } catch {
+      throw APIClientError.invalidResponse
+    }
+
+    guard let httpResponse = response as? HTTPURLResponse else {
+      throw APIClientError.invalidResponse
+    }
+    if httpResponse.statusCode == 401, !forceRefresh {
+      return try await sendProfileCompletionRequest(
+        displayName: displayName,
+        username: username,
+        forceRefresh: true
+      )
+    }
+    if httpResponse.statusCode == 401, forceRefresh {
+      handleTerminalUnauthorized()
+    }
+
+    guard (200 ... 299).contains(httpResponse.statusCode) else {
+      let message = (try? decoder.decode(ProfileCompletionErrorResponse.self, from: data).error)
+        ?? "Couldn't complete your profile. Try again."
+      throw APIClientError.profileCompletionFailed(
+        statusCode: httpResponse.statusCode,
+        message: message
+      )
+    }
+
+    refreshStoredSessionFromResponse(response)
+    guard (try? decoder.decode(ProfileCompletionResponse.self, from: data)) != nil else {
+      throw APIClientError.decodingFailed
+    }
   }
 
   private func sendMeRequest(forceRefresh: Bool) async throws -> MobileMeResponse {

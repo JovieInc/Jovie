@@ -212,7 +212,7 @@ final class AppState {
           return
         case .transportFailed:
           didTransportFail = true
-        case .decodingFailed, .invalidResponse, .requestFailed:
+        case .decodingFailed, .invalidResponse, .requestFailed, .profileCompletionFailed:
           break
         }
       }

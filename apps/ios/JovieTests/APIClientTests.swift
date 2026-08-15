@@ -45,6 +45,29 @@ private final class MockURLProtocol: URLProtocol {
   override func stopLoading() {}
 }
 
+private func requestBodyData(_ request: URLRequest) throws -> Data {
+  if let body = request.httpBody {
+    return body
+  }
+  guard let stream = request.httpBodyStream else {
+    throw APIClientError.invalidResponse
+  }
+
+  stream.open()
+  defer { stream.close() }
+  var data = Data()
+  var buffer = [UInt8](repeating: 0, count: 1_024)
+  while stream.hasBytesAvailable {
+    let count = stream.read(&buffer, maxLength: buffer.count)
+    if count < 0 {
+      throw stream.streamError ?? APIClientError.invalidResponse
+    }
+    if count == 0 { break }
+    data.append(contentsOf: buffer.prefix(count))
+  }
+  return data
+}
+
 @Suite(.serialized)
 struct APIClientTests {
   private func makeSession() -> URLSession {
@@ -113,6 +136,70 @@ struct APIClientTests {
 
     #expect(response.state == .ready)
     #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
+  }
+
+  @Test func completesProfileWithBearerAuthenticatedJSON() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["token-1"])
+    MockURLProtocol.requestHandler = { request in
+      #expect(request.url?.path == "/api/mobile/v1/profile/complete")
+      #expect(request.httpMethod == "POST")
+      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token-1")
+      #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
+
+      let body = try requestBodyData(request)
+      let payload = try #require(
+        JSONSerialization.jsonObject(with: body) as? [String: String]
+      )
+      #expect(payload == ["displayName": "Tim White", "username": "tim"])
+
+      let response = HTTPURLResponse(
+        url: request.url!,
+        statusCode: 200,
+        httpVersion: nil,
+        headerFields: nil
+      )!
+      return (response, Data(#"{"profileId":"profile-1"}"#.utf8))
+    }
+
+    let client = APIClient(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider
+    )
+
+    try await client.completeProfile(displayName: "Tim White", username: "tim")
+    #expect(await tokenProvider.recordedForceRefreshValues() == [false])
+  }
+
+  @Test func surfacesProfileCompletionConflictMessage() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["token-1"])
+    MockURLProtocol.requestHandler = { request in
+      let response = HTTPURLResponse(
+        url: request.url!,
+        statusCode: 409,
+        httpVersion: nil,
+        headerFields: nil
+      )!
+      return (
+        response,
+        Data(#"{"code":"handle_taken","error":"That handle is already taken."}"#.utf8)
+      )
+    }
+
+    let client = APIClient(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider
+    )
+
+    await #expect(
+      throws: APIClientError.profileCompletionFailed(
+        statusCode: 409,
+        message: "That handle is already taken."
+      )
+    ) {
+      try await client.completeProfile(displayName: "Tim White", username: "tim")
+    }
   }
 
   @Test func fetchesActionLoopInboxWithBearerToken() async throws {

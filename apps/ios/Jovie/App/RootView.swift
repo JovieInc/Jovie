@@ -94,7 +94,26 @@ private struct AppContentView: View {
           onAutoSendMessage: handleAutoSendMessage,
           onLogout: onLogout
         ) {
-          NeedsOnboardingView(continueURL: appState.continueOnWebURL)
+          NeedsOnboardingView(
+            continueURL: appState.continueOnWebURL,
+            initialDisplayName: appState.loadedDashboardResponse?.displayName ?? "",
+            initialUsername: appState.loadedDashboardResponse?.username ?? "",
+            onComplete: { displayName, username in
+              do {
+                try await APIClient(
+                  baseURL: appState.configuration.apiBaseURL,
+                  tokenProvider: NativeSessionTokenProvider()
+                ).completeProfile(displayName: displayName, username: username)
+                await appState.retry()
+                guard appState.route == .ready else {
+                  return "Your profile was saved, but the app couldn't refresh it. Try again."
+                }
+                return nil
+              } catch {
+                return error.localizedDescription
+              }
+            }
+          )
         } audienceContent: { _ in
           EmptyView()
         } libraryContent: { _ in

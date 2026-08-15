@@ -152,14 +152,18 @@ final class JovieUITests: XCTestCase {
     )
   }
 
-  func testNeedsOnboardingLaunchShowsContinueOnWeb() {
+  func testNeedsOnboardingLaunchShowsNativeProfileCompletion() {
     let app = launchMockApp(
       launchArgument: "-ui-testing-needs-onboarding",
-      expectedElementDescription: "\"Continue on Web\""
+      expectedElementDescription: "\"Finish Your Profile\""
     ) {
-      $0.buttons["Continue on Web"]
+      $0.staticTexts["Finish Your Profile"]
     }
 
+    XCTAssertTrue(app.textFields["profile-completion-display-name"].exists)
+    XCTAssertTrue(app.textFields["profile-completion-handle"].exists)
+    XCTAssertTrue(app.buttons["profile-completion-submit"].exists)
+    XCTAssertTrue(app.buttons["profile-completion-web-fallback"].exists)
     attachScreenshot(named: "needs-onboarding", app: app)
   }
 
@@ -402,8 +406,8 @@ final class JovieUITests: XCTestCase {
     ) {
       $0.buttons["Continue on Web"]
     }
-    let continueButton = onboardingApp.buttons["Continue on Web"]
-    XCTAssertTrue(continueButton.waitForExistence(timeout: 3))
+    let completionButton = onboardingApp.buttons["profile-completion-submit"]
+    XCTAssertTrue(completionButton.waitForExistence(timeout: 3))
     XCTAssertFalse(
       shellControlExists(onboardingApp, identifier: "shell-talk-fab"),
       "Talk FAB should not render when chat is disabled.\n\(onboardingApp.debugDescription)"
