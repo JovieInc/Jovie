@@ -117,11 +117,7 @@ export type AgentFailureDisposition =
   | 'task_retryable'
   | 'provider_cooldown'
   | 'system_retryable';
-export type AgentFailureAction =
-  | 'fallback'
-  | 'release_incident'
-  | 'retry_task'
-  | 'block_task';
+export type AgentFailureAction = 'fallback' | 'release_incident' | 'retry_task';
 export type CodexSandboxMode =
   | 'read-only'
   | 'workspace-write'
@@ -236,7 +232,11 @@ export function actionForAgentFailure(
   ) {
     return 'release_incident';
   }
-  return disposition === 'task_terminal' ? 'block_task' : 'retry_task';
+  // An agent may diagnose an approval-shaped boundary, but it may not turn
+  // that self-report into a blocked task. Only the delivery liveness
+  // controller can validate a machine-readable external-authority packet
+  // after the remediation ladder is complete.
+  return 'retry_task';
 }
 
 const HIGH_RISK_PATTERN =

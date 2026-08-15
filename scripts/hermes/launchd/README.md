@@ -19,6 +19,13 @@ The Hermes gateway itself is managed by the installed Hermes CLI as `ai.hermes.g
 | `co.jovie.hermes.cron-pr-monitor.plist.template` | every 10 min | Detect stuck PRs |
 | `co.jovie.hermes.cron-ci-monitor.plist.template` | every 10 min | Detect CI failures on main |
 | `co.jovie.hermes.cron-codex-issue-shipper.plist.template` | load/crash recovery only | Manual fallback for the event-driven GitHub/Symphony admission lanes; never polls for work |
+| `co.jovie.hermes.delivery-liveness-watchdog.plist.template` | every 120s | Validate durable delivery receipts; retry/reassign active leases after five minutes without fresh proof |
+
+The delivery watchdog stores critical revenue/auth/runtime decision packets in
+`~/.hermes/state/summer-notification-outbox/`. It never sends them. A packet is
+marked `ready` only when both `HERMES_SUMMER_NOTIFICATION_DESTINATION` and
+`HERMES_SUMMER_NOTIFICATION_AUTHORITY` are configured; otherwise it remains
+`queued_unconfigured`.
 | `co.jovie.hermes.cron-pipeline-scoreboard.plist.template` | every 60 min | Write daily pipeline scoreboard to local state + gbrain, and alert on 12h shipper stalls |
 | `co.jovie.hermes.cron-gbrain-health-summary.plist.template` | 07:15 local daily | Probe the Tailscale HTTP endpoint, source freshness, and server count; write the latest health summary back to gbrain and notify ops |
 | `co.jovie.hermes.cron-agent-config-health.plist.template` | every 15 min | Detect invalid Hermes/OpenClaw agent config before gateway churn |

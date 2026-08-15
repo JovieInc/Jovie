@@ -1073,10 +1073,10 @@ describe('agent failure disposition', () => {
     expect(actionForAgentFailure(disposition, false)).toBe('release_incident');
   });
 
-  it('preserves deterministic task retry and terminal blocker behavior', () => {
+  it('preserves deterministic task retry without trusting terminal self-reports', () => {
     expect(actionForAgentFailure('task_retryable', true)).toBe('fallback');
     expect(actionForAgentFailure('task_retryable', false)).toBe('retry_task');
-    expect(actionForAgentFailure('task_terminal', true)).toBe('block_task');
+    expect(actionForAgentFailure('task_terminal', true)).toBe('retry_task');
   });
 });
 
