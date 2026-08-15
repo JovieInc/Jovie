@@ -23,6 +23,10 @@ const admission = readFileSync(
   resolve(repoRoot, 'scripts/lib/queue-deferred-release-admission.mjs'),
   'utf8'
 );
+const fleetGateRefreshWorkflow = readFileSync(
+  resolve(repoRoot, '.github/workflows/fleet-gate-refresh.yml'),
+  'utf8'
+);
 
 describe('queue-deferred release closed loop (JOV-5054)', () => {
   it('scans every queue-deferred PR, not only agent-branch PRs', () => {
@@ -69,5 +73,29 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
     expect(drain).toContain(
       'Fleet receipt does not authorize the exact queue-deferred release fallback'
     );
+  });
+
+  it('keeps Fleet Gate Refresh as the one-way workflow_run bridge', () => {
+    // CI and Production Controller are upstream semantic inputs. Fleet Gate
+    // Refresh turns them into one canonical receipt; Queue-Deferred Release
+    // consumes only that receipt and must never wake the gate again.
+    const upstream = fleetGateRefreshWorkflow.match(
+      /workflow_run:\s*\n(?:\s*#[^\n]*\n)*\s*workflows:\s*\[([^\]]+)\]/
+    )?.[1];
+    const downstream = workflow.match(
+      /workflow_run:\s*\n\s*workflows:\s*\[([^\]]+)\]/
+    )?.[1];
+
+    expect(upstream).toBe('CI, Production Controller');
+    expect(downstream).toBe("'Fleet Gate Refresh'");
+    expect(upstream).not.toContain('Queue-Deferred Release');
+    expect(downstream).not.toContain('CI');
+    expect(downstream).not.toContain('Production Controller');
+    expect(fleetGateRefreshWorkflow).toContain('pull_request:');
+    expect(fleetGateRefreshWorkflow).toContain(
+      'types: [closed, labeled, unlabeled, ready_for_review, reopened]'
+    );
+    expect(fleetGateRefreshWorkflow).toContain('push:\n    branches: [main]');
+    expect(workflow).toContain('workflow_dispatch:');
   });
 });

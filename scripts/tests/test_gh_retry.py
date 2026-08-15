@@ -894,6 +894,9 @@ JSON
 
 _RELEASE_SCRIPT = _REPO_ROOT / "scripts" / "release-queue-deferred.sh"
 _RELEASE_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "queue-deferred-release.yml"
+_FLEET_GATE_REFRESH_WORKFLOW = (
+    _REPO_ROOT / ".github" / "workflows" / "fleet-gate-refresh.yml"
+)
 
 
 def _release_command(tmp_path: Path, *, extra_env: str = "") -> str:
@@ -1041,9 +1044,19 @@ def _run_single_candidate_release(
 class TestReleaseQueueDeferred:
     def test_workflow_is_event_driven_with_no_cron(self) -> None:
         workflow = _RELEASE_WORKFLOW.read_text(encoding="utf-8")
+        fleet_gate_refresh = _FLEET_GATE_REFRESH_WORKFLOW.read_text(encoding="utf-8")
         assert "schedule:" not in workflow
         assert "workflow_run:" in workflow
-        assert "workflows: ['CI', 'Production Controller', 'Fleet Gate Refresh']" in workflow
+        # CI and Production Controller are upstream semantic inputs to Fleet
+        # Gate Refresh. Queue-Deferred Release consumes only the resulting
+        # fresh gate receipt, so the controllers cannot recursively wake each
+        # other without a new upstream capacity signal.
+        assert "workflows: [CI, Production Controller]" in fleet_gate_refresh
+        assert "Queue-Deferred Release]" not in fleet_gate_refresh
+        assert "workflows: ['Fleet Gate Refresh']" in workflow
+        assert "workflows: ['CI', 'Production Controller', 'Fleet Gate Refresh']" not in workflow
+        assert "pull_request:" in fleet_gate_refresh
+        assert "branches: [main]" in fleet_gate_refresh
         # The trigger allowlist owns workflow identity. Job admission must not
         # compare `workflow_run.name`: custom `run-name` values include dynamic
         # SHAs and caused successful Production Controller wakes to skip.
