@@ -147,7 +147,13 @@ struct AppShellView<
   @State private var entityContext: EntityContextItem?
   @State private var lastEntityContext: EntityContextItem?
   @State private var intentStore = IntentNavigationStore.shared
+  @State private var vlogActivationMonitor = VlogActivationMonitor()
+  @AppStorage(VlogActivationPreference.userDefaultsKey)
+  private var isRaiseToOpenVlogEnabled = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.accessibilitySwitchControlEnabled) private var isSwitchControlEnabled
+  @Environment(\.accessibilityVoiceOverEnabled) private var isVoiceOverEnabled
+  @Environment(\.scenePhase) private var scenePhase
 
   init(
     profile: AppShellProfile,
@@ -344,6 +350,24 @@ struct AppShellView<
       guard voiceCaptureTrigger > 0, chatEnabled else { return }
       openTalkOverlay()
     }
+    .onAppear {
+      updateVlogActivationMonitor()
+    }
+    .onDisappear {
+      vlogActivationMonitor.stop()
+    }
+    .onChange(of: isRaiseToOpenVlogEnabled) {
+      updateVlogActivationMonitor()
+    }
+    .onChange(of: scenePhase) {
+      updateVlogActivationMonitor()
+    }
+    .onChange(of: isVoiceOverEnabled) {
+      updateVlogActivationMonitor()
+    }
+    .onChange(of: isSwitchControlEnabled) {
+      updateVlogActivationMonitor()
+    }
   }
 
   // Elevated content plane: toolbar + page + tab bar ride together so the
@@ -491,6 +515,71 @@ struct AppShellView<
     guard chatEnabled else { return }
     dismissKeyboardIfNeeded()
     teleprompterProposal = proposal
+  }
+
+  private func openQuickVlogMode(source: String = "manual") {
+    vlogActivationMonitor.recordManualActivation()
+    Observability.captureMessage(
+      .vlogActivationSucceeded,
+      context: ["source": source]
+    )
+    if navigationPath.last == .settings {
+      navigationPath.removeLast()
+    }
+    presentVideoProposal(
+      MobileChatVideoProposalPayload(
+        kind: .bts,
+        title: "Quick vlog",
+        script: "What do you want to share? Tap Edit to replace this prompt."
+      )
+    )
+  }
+
+  private func updateVlogActivationMonitor() {
+    guard isRaiseToOpenVlogEnabled,
+          scenePhase == .active,
+          !isVoiceOverEnabled,
+          !isSwitchControlEnabled
+    else {
+      vlogActivationMonitor.stop()
+      return
+    }
+    let didStart = vlogActivationMonitor.start(
+      context: {
+        VlogActivationContext(
+          isEnabled: isRaiseToOpenVlogEnabled,
+          isAppActive: scenePhase == .active,
+          isEligibleSurface: selectedTab == .chat
+            && navigationPath.isEmpty
+            && !isShowingDrawer
+            && !isKeyboardVisible
+            && !isShowingTalkOverlay
+            && teleprompterProposal == nil
+            && entityContext == nil
+            && videoPlaybackAsset == nil,
+          allowsMotionActivation: !isVoiceOverEnabled && !isSwitchControlEnabled
+        )
+      },
+      onDecision: { decision in
+        switch decision {
+        case .activate:
+          openQuickVlogMode(source: "raise_landscape")
+        case let .candidateCancelled(reason):
+          Observability.captureMessage(
+            .vlogActivationCancelled,
+            context: ["reason": reason.rawValue]
+          )
+        case .candidateStarted, .none:
+          break
+        }
+      }
+    )
+    if !didStart {
+      Observability.captureMessage(
+        .vlogActivationCancelled,
+        context: ["reason": VlogActivationCancellationReason.motionUnavailable.rawValue]
+      )
+    }
   }
 
   private func presentEntity(_ item: EntityContextItem) {
@@ -689,6 +778,22 @@ struct AppShellView<
       }
 
       Spacer(minLength: 0)
+
+      if chatEnabled {
+        Menu {
+          Button("Open vlog mode", systemImage: "video.fill") {
+            openQuickVlogMode()
+          }
+
+          Toggle("Raise to open (Experimental)", isOn: $isRaiseToOpenVlogEnabled)
+        } label: {
+          Image(systemName: "video")
+        }
+        .buttonStyle(JovieIconButtonStyle())
+        .accessibilityLabel("Vlog mode")
+        .accessibilityHint("Open vlog mode manually or enable the experimental raise gesture")
+        .accessibilityIdentifier("shell-vlog-menu")
+      }
 
       Button {
         navigationPath.append(.settings)

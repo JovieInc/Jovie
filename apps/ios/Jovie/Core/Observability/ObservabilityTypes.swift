@@ -34,6 +34,8 @@ enum ObservabilityEvent: String, CaseIterable, Equatable {
   case teleprompterRecordingStarted = "teleprompter_recording_started"
   case teleprompterRecordingCompleted = "teleprompter_recording_completed"
   case teleprompterRecordingFailed = "teleprompter_recording_failed"
+  case vlogActivationSucceeded = "vlog_activation_succeeded"
+  case vlogActivationCancelled = "vlog_activation_cancelled"
 }
 
 struct ObservabilityConfiguration: Equatable {

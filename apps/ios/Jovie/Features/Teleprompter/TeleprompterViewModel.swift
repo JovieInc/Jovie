@@ -86,14 +86,14 @@ final class TeleprompterViewModel {
   init(
     proposal: MobileChatVideoProposalPayload,
     store: VlogSessionStore = .localDocuments(),
-    captureController: TeleprompterCaptureController = TeleprompterCaptureController()
+    captureController: TeleprompterCaptureController? = nil
   ) {
     self.proposal = proposal
     scriptTitle = proposal.title
     scriptText = proposal.script
     follower = KaraokeScriptFollower(script: proposal.script)
     self.store = store
-    self.captureController = captureController
+    self.captureController = captureController ?? TeleprompterCaptureController()
   }
 
   var displayWords: [String] {
