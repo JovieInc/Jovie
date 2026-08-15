@@ -7,6 +7,7 @@ struct MobileChatMessageRow: View {
   let onRetry: () -> Void
   let onSubmitPrompt: (String) -> Void
   let onEntityTap: (EntityContextItem) -> Void
+  var onRecordVideo: (MobileChatVideoProposalPayload) -> Void = { _ in }
 
   private var isStreamingAssistant: Bool {
     item.role == .assistant && item.status == .streaming
@@ -62,7 +63,7 @@ struct MobileChatMessageRow: View {
     let displayText = assistantDisplayText
     let hasRenderableSegments = segments.contains { segment in
       switch segment {
-      case .text, .toolCall, .merchArtifact:
+      case .text, .toolCall, .merchArtifact, .videoProposal:
         return true
       }
     }
@@ -107,6 +108,9 @@ struct MobileChatMessageRow: View {
           case let .merchArtifact(artifact):
             MobileChatMerchOptionsView(artifact: artifact, onSelectPrompt: onSubmitPrompt)
               .frame(maxWidth: .infinity, alignment: .leading)
+          case let .videoProposal(payload):
+            TeleprompterProposalCardView(payload: payload, onRecord: onRecordVideo)
+              .frame(maxWidth: 320, alignment: .leading)
           case .text:
             EmptyView()
           }

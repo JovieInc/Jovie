@@ -1,3 +1,4 @@
+import AVKit
 import SwiftUI
 
 enum AppShellTab: Equatable, Hashable {
@@ -143,7 +144,8 @@ struct AppShellView<
   let chatContent: (
     Binding<String>,
     Binding<Int>,
-    @escaping (EntityContextItem) -> Void
+    @escaping (EntityContextItem) -> Void,
+    @escaping (MobileChatVideoProposalPayload) -> Void
   ) -> ChatContent
 
   @State private var selectedTab: AppShellTab
@@ -156,6 +158,8 @@ struct AppShellView<
   @State private var voiceCaptureTrigger = 0
   @State private var isShowingTalkOverlay = false
   @State private var talkVoiceService = VoiceCaptureService()
+  @State private var teleprompterProposal: MobileChatVideoProposalPayload?
+  @State private var videoPlaybackAsset: LibraryAsset?
   @State private var entityContext: EntityContextItem?
   @State private var lastEntityContext: EntityContextItem?
   @State private var intentStore = IntentNavigationStore.shared
@@ -190,7 +194,8 @@ struct AppShellView<
     @ViewBuilder chatContent: @escaping (
       Binding<String>,
       Binding<Int>,
-      @escaping (EntityContextItem) -> Void
+      @escaping (EntityContextItem) -> Void,
+      @escaping (MobileChatVideoProposalPayload) -> Void
     ) -> ChatContent
   ) {
     self.profile = profile
@@ -289,6 +294,17 @@ struct AppShellView<
             .transition(.opacity)
             .zIndex(10)
           }
+
+          if let teleprompterProposal {
+            TeleprompterOverlayView(
+              viewModel: teleprompterViewModel(for: teleprompterProposal),
+              onClose: {
+                self.teleprompterProposal = nil
+              }
+            )
+            .transition(.opacity)
+            .zIndex(11)
+          }
         }
         .simultaneousGesture(
           edgeRailGesture(
@@ -309,6 +325,14 @@ struct AppShellView<
         },
         onDismiss: { entityContext = nil }
       )
+    }
+    .sheet(item: $videoPlaybackAsset) { asset in
+      if let url = asset.localVideoURL {
+        VideoPlayer(player: AVPlayer(url: url))
+          .ignoresSafeArea()
+          .background(Color.black)
+          .accessibilityIdentifier("library-video-player")
+      }
     }
     .task(id: opensSettingsOnLaunch) {
       guard opensSettingsOnLaunch, didOpenLaunchSettings == false else { return }
@@ -383,8 +407,8 @@ struct AppShellView<
           .navigationBarBackButtonHidden()
         }
       }
-      .allowsHitTesting(!isElevated && !isShowingTalkOverlay)
-      .accessibilityHidden(isElevated || isShowingTalkOverlay)
+      .allowsHitTesting(!isElevated && !isShowingTalkOverlay && teleprompterProposal == nil)
+      .accessibilityHidden(isElevated || isShowingTalkOverlay || teleprompterProposal != nil)
 
       if isElevated {
         Color.clear
@@ -481,17 +505,42 @@ struct AppShellView<
     isShowingTalkOverlay = true
   }
 
+  private func presentVideoProposal(_ proposal: MobileChatVideoProposalPayload) {
+    guard chatEnabled else { return }
+    dismissKeyboardIfNeeded()
+    teleprompterProposal = proposal
+  }
+
   private func presentEntity(_ item: EntityContextItem) {
     lastEntityContext = item
     entityContext = item
   }
 
+  /// The proposal's script auto-loads into the overlay; saving a recording
+  /// dismisses the overlay and lands the user on Library (JOV-5075).
+  private func teleprompterViewModel(
+    for proposal: MobileChatVideoProposalPayload
+  ) -> TeleprompterViewModel {
+    let viewModel = TeleprompterViewModel(proposal: proposal)
+    viewModel.onSaved = { _ in
+      self.teleprompterProposal = nil
+      self.selectTab(.library)
+    }
+    return viewModel
+  }
+
   private func presentEntityFromLibrary(_ asset: LibraryAsset) {
-    // Map library assets into the entity sheet for a shared context surface.
+    // Locally recorded teleprompter videos play back in place; every other
+    // asset maps into the entity sheet for a shared context surface.
+    if asset.type == .video, asset.localVideoURL != nil {
+      videoPlaybackAsset = asset
+      return
+    }
+
     let kind: MobileChatEntityKind
     switch asset.type {
     case .release: kind = .release
-    case .merch, .smartLink, .photo, .press: kind = .track
+    case .merch, .smartLink, .photo, .press, .video: kind = .track
     }
     presentEntity(
       EntityContextItem(kind: kind, entityID: asset.id, label: asset.name)
@@ -562,7 +611,7 @@ struct AppShellView<
 
     ZStack {
       if showsChatUnderlay {
-        chatContent($chatDraft, $voiceCaptureTrigger, presentEntity)
+        chatContent($chatDraft, $voiceCaptureTrigger, presentEntity, presentVideoProposal)
           .opacity(isChatSelected ? 1 : 0)
           .allowsHitTesting(isChatSelected)
           .accessibilityHidden(!isChatSelected)
@@ -600,7 +649,8 @@ struct AppShellView<
   private func edgeRailGesture(openOffset: CGFloat, containerWidth: CGFloat) -> some Gesture {
     DragGesture(minimumDistance: 8, coordinateSpace: .global)
       .onChanged { value in
-        guard !reduceMotion, !isKeyboardVisible, !isShowingTalkOverlay else { return }
+        guard !reduceMotion, !isKeyboardVisible, !isShowingTalkOverlay,
+              teleprompterProposal == nil else { return }
 
         if isShowingDrawer {
           drawerDragOffset = min(0, value.translation.width)
@@ -611,7 +661,8 @@ struct AppShellView<
         }
       }
       .onEnded { value in
-        guard !reduceMotion, !isKeyboardVisible, !isShowingTalkOverlay else { return }
+        guard !reduceMotion, !isKeyboardVisible, !isShowingTalkOverlay,
+              teleprompterProposal == nil else { return }
 
         let predicted = value.predictedEndTranslation.width
         if isShowingDrawer {
