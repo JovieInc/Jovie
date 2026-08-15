@@ -93,6 +93,13 @@ jobs:
           echo "gate_rc=$gate_rc" >> "$GITHUB_OUTPUT"
           echo "Fleet gate receipt refreshed (consumer rc=$gate_rc)."
 
+      - name: Reconcile Symphony pressure-driven concurrency
+        if: always() && steps.refresh.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/hermes/symphony-concurrency-controller.py
+
       - name: Admit one issue from the fresh event
         id: admit
         if: steps.refresh.outputs.work_allowed == 'true'

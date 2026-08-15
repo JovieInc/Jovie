@@ -31,11 +31,19 @@ const REQUIRED_CHECKS = Object.freeze([
   'PR Size Guard',
 ]);
 
-const PULL_REQUEST_STATE_FIELDS = `id number state isDraft headRefOid isInMergeQueue mergeQueueEntry { id state } autoMergeRequest { enabledAt }`;
+const PULL_REQUEST_STATE_FIELDS = `id number state isDraft headRefOid labels(first:100){nodes{name}} isInMergeQueue mergeQueueEntry { id state position } autoMergeRequest { enabledAt }`;
 const REQUIRED_NATIVE_STATE_FIELDS =
-  `id number state isDraft headRefOid isInMergeQueue mergeQueueEntry autoMergeRequest`.split(
+  `id number state isDraft headRefOid labels isInMergeQueue mergeQueueEntry autoMergeRequest`.split(
     ' '
   );
+const HARD_HOLD_LABELS = new Set([
+  'needs-human',
+  'hold',
+  'gated',
+  'queue-deferred',
+  'needs-conflict-resolution',
+  'fast',
+]);
 const PULL_REQUEST_STATE_QUERY = `query MergeQueuePullRequestState($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS}}}}`;
 const OPEN_PULL_REQUEST_STATES_QUERY = `query MergeQueueOpenPullRequestStates($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:100,after:$endCursor,states:OPEN){nodes{${PULL_REQUEST_STATE_FIELDS}} pageInfo{hasNextPage endCursor}}}}`;
 const BRANCH_PROTECTION_QUERY = `query MergeQueueBranchProtection($owner:String!,$name:String!,$refName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$refName){name branchProtectionRule{id}}}}`;
@@ -458,21 +466,32 @@ function normalizeNativePullRequest(pr) {
       `Native queue state is incomplete: ${missing.join(', ') || 'isInMergeQueue'}`
     );
   }
+  if (!Array.isArray(pr.labels?.nodes)) {
+    throw backendError(
+      'incomplete_queue_state',
+      'Native queue state is missing authoritative labels'
+    );
+  }
   if (
     pr.mergeQueueEntry !== null &&
-    typeof pr.mergeQueueEntry?.id !== 'string'
+    (typeof pr.mergeQueueEntry?.id !== 'string' ||
+      typeof pr.mergeQueueEntry?.state !== 'string' ||
+      !Number.isInteger(pr.mergeQueueEntry?.position) ||
+      pr.mergeQueueEntry.position < 1)
   ) {
     throw backendError(
       'incomplete_queue_state',
-      'Native mergeQueueEntry is missing its id'
+      'Native mergeQueueEntry must include id, state, and a positive position'
     );
   }
+  const hasAuthoritativeQueueEntry = Boolean(
+    pr.isInMergeQueue === true && pr.mergeQueueEntry !== null
+  );
   return {
     ...pr,
     backend: 'native',
-    queued: Boolean(
-      pr.isInMergeQueue || pr.mergeQueueEntry || pr.autoMergeRequest
-    ),
+    autoMergeEnabled: pr.autoMergeRequest !== null,
+    queued: hasAuthoritativeQueueEntry,
   };
 }
 
@@ -564,7 +583,10 @@ export function enrollmentPostcondition(state, expectedHeadOid) {
     state?.state === 'OPEN' &&
       state?.isDraft === false &&
       state?.headRefOid?.toLowerCase() === expectedHeadOid.toLowerCase() &&
-      state?.queued === true
+      state?.queued === true &&
+      typeof state?.mergeQueueEntry?.state === 'string' &&
+      Number.isInteger(state?.mergeQueueEntry?.position) &&
+      state.mergeQueueEntry.position > 0
   );
 }
 
@@ -589,6 +611,16 @@ function assertEnrollCandidate(state, expectedHeadOid) {
     throw backendError(
       'head_changed',
       `PR #${state.number} head changed from ${expectedHeadOid} to ${state.headRefOid}`
+    );
+  }
+  const heldLabels = state.labels.nodes
+    .map(label => label?.name)
+    .filter(name => HARD_HOLD_LABELS.has(name));
+  if (heldLabels.length > 0) {
+    throw backendError(
+      'held_pull_request',
+      `PR #${state.number} is held by ${heldLabels.join(', ')}`,
+      { labels: heldLabels }
     );
   }
 }
