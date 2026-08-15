@@ -179,6 +179,7 @@ struct APIClient: APIClientProtocol, Sendable {
     }
     if httpResponse.statusCode == 401, forceRefresh {
       handleTerminalUnauthorized()
+      throw APIClientError.requestFailed(statusCode: 401)
     }
 
     guard (200 ... 299).contains(httpResponse.statusCode) else {

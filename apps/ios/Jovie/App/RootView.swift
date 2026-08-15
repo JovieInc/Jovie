@@ -95,10 +95,18 @@ private struct AppContentView: View {
           onLogout: onLogout
         ) {
           NeedsOnboardingView(
-            continueURL: appState.continueOnWebURL,
             initialDisplayName: appState.loadedDashboardResponse?.displayName ?? "",
             initialUsername: appState.loadedDashboardResponse?.username ?? "",
             onComplete: { displayName, username in
+              if appState.launchMode == .uiTestingNeedsOnboardingUnauthorized {
+                await appState.handleExpiredSession()
+                return nil
+              }
+
+              if appState.launchMode == .uiTestingNeedsOnboarding {
+                return "Profile completion is temporarily unavailable. Try again."
+              }
+
               do {
                 try await APIClient(
                   baseURL: appState.configuration.apiBaseURL,
@@ -108,6 +116,11 @@ private struct AppContentView: View {
                 guard appState.route == .ready else {
                   return "Your profile was saved, but the app couldn't refresh it. Try again."
                 }
+                return nil
+              } catch APIClientError.missingToken,
+                      APIClientError.requestFailed(statusCode: 401)
+              {
+                await appState.handleExpiredSession()
                 return nil
               } catch {
                 return error.localizedDescription

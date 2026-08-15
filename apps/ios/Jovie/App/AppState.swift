@@ -112,7 +112,7 @@ final class AppState {
       route = .ready
       dashboardState = .error("Couldn't load your profile.")
       isOffline = false
-    case .uiTestingNeedsOnboarding:
+    case .uiTestingNeedsOnboarding, .uiTestingNeedsOnboardingUnauthorized:
       route = .needsOnboarding
       dashboardState = .idle
       isOffline = false
@@ -263,6 +263,18 @@ final class AppState {
     // Always clear the device token even if the network is unavailable. A
     // remote revocation failure must never trap someone in an authenticated UI.
     NativeSessionTokenStore.clear()
+
+    await resetToSignedOut()
+  }
+
+  /// A terminal authenticated request has already proven the local session unusable.
+  /// Return to native sign-in without attempting another remote revocation with that token.
+  func handleExpiredSession() async {
+    NativeSessionTokenStore.clear()
+    await resetToSignedOut()
+  }
+
+  private func resetToSignedOut() async {
 
     let userID = activeUserID
     Observability.clearUser()

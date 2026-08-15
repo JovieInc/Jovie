@@ -163,8 +163,52 @@ final class JovieUITests: XCTestCase {
     XCTAssertTrue(app.textFields["profile-completion-display-name"].exists)
     XCTAssertTrue(app.textFields["profile-completion-handle"].exists)
     XCTAssertTrue(app.buttons["profile-completion-submit"].exists)
-    XCTAssertTrue(app.buttons["profile-completion-web-fallback"].exists)
+    XCTAssertFalse(
+      app.buttons["profile-completion-web-fallback"].exists,
+      "Core profile completion must stay inside the iOS app."
+    )
+
+    let displayName = app.textFields["profile-completion-display-name"]
+    let handle = app.textFields["profile-completion-handle"]
+    displayName.tap()
+    displayName.typeText("Tim White")
+    handle.tap()
+    handle.typeText("timwhite")
+    app.buttons["profile-completion-submit"].tap()
+
+    XCTAssertTrue(
+      app.staticTexts["profile-completion-error"].waitForExistence(timeout: 3),
+      "A failed native submission must remain recoverable on the native form.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(displayName.exists)
+    XCTAssertTrue(handle.exists)
+    XCTAssertTrue(app.buttons["profile-completion-submit"].isEnabled)
+    XCTAssertFalse(app.buttons["profile-completion-web-fallback"].exists)
     attachScreenshot(named: "needs-onboarding", app: app)
+  }
+
+  func testExpiredProfileCompletionReturnsToNativeSignIn() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-needs-onboarding-unauthorized",
+      expectedElementDescription: "\"Finish Your Profile\""
+    ) {
+      $0.staticTexts["Finish Your Profile"]
+    }
+
+    let displayName = app.textFields["profile-completion-display-name"]
+    let handle = app.textFields["profile-completion-handle"]
+    displayName.tap()
+    displayName.typeText("Tim White")
+    handle.tap()
+    handle.typeText("timwhite")
+    app.buttons["profile-completion-submit"].tap()
+
+    XCTAssertTrue(
+      app.buttons["Continue in Browser"].waitForExistence(timeout: 3),
+      "An expired onboarding session must return to native sign-in.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(app.staticTexts["Finish Your Profile"].exists)
+    XCTAssertFalse(app.buttons["profile-completion-web-fallback"].exists)
   }
 
   func testFullScreenSettingsLogsOutToSignedOut() {

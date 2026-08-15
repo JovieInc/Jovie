@@ -302,6 +302,32 @@ struct AppStateTests {
     #expect(await repository.clearedUsers() == ["user_123"])
   }
 
+  @Test func expiredSessionReturnsToSignInWithoutRemoteRevocation() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let sessionRevoker = MockSessionRevoker(result: .revoked)
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController(),
+      sessionRevoker: sessionRevoker
+    )
+    appState.didInitializeAuth = true
+
+    await appState.handleSignedInUserChange("user_123")
+    await appState.handleExpiredSession()
+
+    #expect(appState.route == .signedOut)
+    #expect(appState.dashboardState == .idle)
+    #expect(appState.activeUserID == nil)
+    #expect(await sessionRevoker.calls() == 0)
+    #expect(await repository.clearedUsers() == ["user_123"])
+  }
+
   @Test func signedInUserSetsObservabilityUserID() async throws {
     let observability = RecordingObservabilityProvider()
     Observability.useProviderForTesting(observability)

@@ -1,10 +1,8 @@
 import SwiftUI
 
 struct NeedsOnboardingView: View {
-  let continueURL: URL
   let onComplete: @MainActor (String, String) async -> String?
 
-  @Environment(\.openURL) private var openURL
   @State private var displayName: String
   @State private var username: String
   @State private var isSubmitting = false
@@ -17,12 +15,10 @@ struct NeedsOnboardingView: View {
   }
 
   init(
-    continueURL: URL,
     initialDisplayName: String = "",
     initialUsername: String = "",
     onComplete: @escaping @MainActor (String, String) async -> String? = { _, _ in nil }
   ) {
-    self.continueURL = continueURL
     self.onComplete = onComplete
     _displayName = State(initialValue: initialDisplayName)
     _username = State(initialValue: initialUsername)
@@ -89,14 +85,6 @@ struct NeedsOnboardingView: View {
           .buttonStyle(JoviePillButtonStyle(filled: true))
           .disabled(!canSubmit)
           .accessibilityIdentifier("profile-completion-submit")
-
-          Button("Continue on web instead") {
-            openURL(continueURL)
-          }
-          .font(JovieFont.body(size: 14))
-          .foregroundStyle(JovieColor.textSecondary)
-          .frame(maxWidth: .infinity)
-          .accessibilityIdentifier("profile-completion-web-fallback")
         }
         .padding(JovieSpacing.xLarge)
       }
