@@ -59,6 +59,18 @@ import {
 import type { CompletionResult } from './types';
 import { ensureEmailAvailable, ensureHandleAvailable } from './validation';
 
+function hasVerifiedTokenBackedFixtureClaim(
+  normalizedUsername: string,
+  pendingClaim: PendingClaimContext | null
+): boolean {
+  return (
+    isTokenBackedClaimFixture(normalizedUsername) &&
+    pendingClaim?.mode === 'token_backed' &&
+    pendingClaim.username === normalizedUsername &&
+    Boolean(pendingClaim.claimTokenHash)
+  );
+}
+
 async function recoverConcurrentProfileClaim(
   clerkUserId: string,
   normalizedUsername: string
@@ -231,11 +243,10 @@ export async function completeOnboarding({
     pendingClaim = await readPendingClaimContext({
       username: normalizedUsername,
     });
-    const hasVerifiedFixtureClaimContext =
-      isTokenBackedClaimFixture(normalizedUsername) &&
-      pendingClaim?.mode === 'token_backed' &&
-      pendingClaim.username === normalizedUsername &&
-      Boolean(pendingClaim.claimTokenHash);
+    const hasVerifiedFixtureClaimContext = hasVerifiedTokenBackedFixtureClaim(
+      normalizedUsername,
+      pendingClaim
+    );
 
     // Step 2: Input validation. Reserved fixtures stay unavailable to general
     // onboarding; only a signed token-backed pending context may proceed to

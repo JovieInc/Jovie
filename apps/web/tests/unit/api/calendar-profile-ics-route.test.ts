@@ -183,4 +183,37 @@ describe('GET /api/calendar/profile/[username]', () => {
     expect(mockRateLimit).not.toHaveBeenCalled();
     expect(db.select).not.toHaveBeenCalled();
   });
+
+  it('skips events with invalid start dates', async () => {
+    mockLimit.mockResolvedValue([
+      {
+        id: 'profile-1',
+        displayName: 'Test Artist',
+        username: 'realartist',
+        usernameNormalized: 'realartist',
+        isPublic: true,
+      },
+    ]);
+    mockGetConfirmedTourEventsForProfile.mockResolvedValue([
+      {
+        id: 'invalid-event',
+        startDate: 'not-a-date',
+        venueName: 'Nowhere',
+        city: null,
+        region: null,
+        country: null,
+        startTime: null,
+        ticketUrl: null,
+        title: null,
+      },
+    ]);
+
+    const response = await GET(
+      new NextRequest('https://jov.ie/api/calendar/profile/realartist'),
+      { params: Promise.resolve({ username: 'realartist' }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).not.toContain('BEGIN:VEVENT');
+  });
 });

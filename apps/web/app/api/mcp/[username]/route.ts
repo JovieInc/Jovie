@@ -34,6 +34,7 @@ import {
   publishMerchCard,
   selectMerchDesign,
 } from '@/lib/merch/service';
+import { getPublicProfileDiscoveryExclusionResponse } from '@/lib/profile/public-profile-discovery-response';
 import {
   isPublicProfileIndexable,
   PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
@@ -74,11 +75,9 @@ export async function GET(
   { params }: { params: Promise<{ username: string }> }
 ) {
   const { username } = await params;
-  if (!isPublicProfileIndexable(username)) {
-    return NextResponse.json(
-      { error: 'Artist not found' },
-      { status: 404, headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS }
-    );
+  const requestExclusion = getPublicProfileDiscoveryExclusionResponse(username);
+  if (requestExclusion) {
+    return requestExclusion;
   }
 
   const profile = await getProfileByUsername(username);
@@ -89,11 +88,11 @@ export async function GET(
       { status: 404, headers: NO_STORE_HEADERS }
     );
   }
-  if (!isPublicProfileIndexable(profile.username)) {
-    return NextResponse.json(
-      { error: 'Artist not found' },
-      { status: 404, headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS }
-    );
+  const profileExclusion = getPublicProfileDiscoveryExclusionResponse(
+    profile.username
+  );
+  if (profileExclusion) {
+    return profileExclusion;
   }
 
   // Return MCP server manifest on GET (discovery)

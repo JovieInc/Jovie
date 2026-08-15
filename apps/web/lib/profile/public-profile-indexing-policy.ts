@@ -2,12 +2,11 @@ import type { Metadata } from 'next';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import {
   getPublicProfileIdentityExclusionReason,
-  PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE,
   type PublicProfileIdentityExclusionReason,
 } from './public-profile-identity-policy';
 
+export { PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE } from './public-profile-identity-policy';
 export {
-  PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE,
   type PublicProfileIdentityExclusionReason as PublicProfileIndexingExclusionReason,
 };
 

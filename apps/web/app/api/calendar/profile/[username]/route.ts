@@ -8,12 +8,57 @@ import {
   formatIcsTimestamp,
   sanitizeIcsUrl,
 } from '@/lib/ics/format';
-import {
-  isPublicProfileIndexable,
-  PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
-} from '@/lib/profile/public-profile-indexing-policy';
+import { getPublicProfileDiscoveryExclusionResponse } from '@/lib/profile/public-profile-discovery-response';
 import { apiLimiter, createRateLimitHeaders } from '@/lib/rate-limit';
 import { getConfirmedTourEventsForProfile } from '@/lib/tour-dates/queries';
+
+type ConfirmedTourEvent = Awaited<
+  ReturnType<typeof getConfirmedTourEventsForProfile>
+>[number];
+
+function buildEventLines(
+  event: ConfirmedTourEvent,
+  artistName: string,
+  stamp: string
+): string[] {
+  const startDate = new Date(event.startDate);
+  if (Number.isNaN(startDate.getTime())) {
+    return [];
+  }
+
+  const endDate = new Date(startDate.getTime() + 3 * 60 * 60 * 1000);
+  const venueLabel = event.venueName || event.city || 'TBA';
+  const location = [event.venueName, event.city, event.region, event.country]
+    .filter(Boolean)
+    .join(', ');
+  const summary = event.title
+    ? `${artistName}: ${event.title}`
+    : `${artistName} at ${venueLabel}`;
+  const descriptionParts = [`${artistName} live at ${venueLabel}`];
+
+  if (event.startTime) {
+    descriptionParts.push(`Doors: ${event.startTime}`);
+  }
+  const ticketUrl = sanitizeIcsUrl(event.ticketUrl);
+  if (ticketUrl) {
+    descriptionParts.push(`Tickets: ${ticketUrl}`);
+  }
+
+  return [
+    'BEGIN:VEVENT',
+    `UID:${event.id}@jov.ie`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART:${formatIcsTimestamp(startDate)}`,
+    `DTEND:${formatIcsTimestamp(endDate)}`,
+    `SUMMARY:${escapeIcsText(summary)}`,
+    `DESCRIPTION:${escapeIcsText(descriptionParts.join('\n'))}`,
+    `LOCATION:${escapeIcsText(location)}`,
+    ...(ticketUrl ? [`URL:${ticketUrl}`] : []),
+    'STATUS:CONFIRMED',
+    'TRANSP:OPAQUE',
+    'END:VEVENT',
+  ];
+}
 
 /**
  * Per-artist ICS subscribe feed.
@@ -43,11 +88,12 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid username' }, { status: 400 });
   }
 
-  if (!isPublicProfileIndexable(username)) {
-    return NextResponse.json(
-      { error: 'Not found' },
-      { status: 404, headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS }
-    );
+  const requestExclusion = getPublicProfileDiscoveryExclusionResponse(
+    username,
+    'Not found'
+  );
+  if (requestExclusion) {
+    return requestExclusion;
   }
 
   // Per-IP rate limit. Calendar clients poll on the order of every 1-24
@@ -88,11 +134,12 @@ export async function GET(
     if (!profile?.isPublic) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
-    if (!isPublicProfileIndexable(profile.usernameNormalized)) {
-      return NextResponse.json(
-        { error: 'Not found' },
-        { status: 404, headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS }
-      );
+    const profileExclusion = getPublicProfileDiscoveryExclusionResponse(
+      profile.usernameNormalized,
+      'Not found'
+    );
+    if (profileExclusion) {
+      return profileExclusion;
     }
 
     const artistName = profile.displayName || profile.username;
@@ -110,50 +157,7 @@ export async function GET(
 
     const stamp = formatIcsTimestamp(new Date());
     for (const event of events) {
-      const startDate = new Date(event.startDate);
-      if (Number.isNaN(startDate.getTime())) continue;
-      const endDate = new Date(startDate.getTime() + 3 * 60 * 60 * 1000);
-      const venueLabel = event.venueName || event.city || 'TBA';
-
-      const location = [
-        event.venueName,
-        event.city,
-        event.region,
-        event.country,
-      ]
-        .filter(Boolean)
-        .join(', ');
-
-      const summary = event.title
-        ? `${artistName}: ${event.title}`
-        : `${artistName} at ${venueLabel}`;
-
-      const descriptionParts: string[] = [
-        `${artistName} live at ${venueLabel}`,
-      ];
-      if (event.startTime) {
-        descriptionParts.push(`Doors: ${event.startTime}`);
-      }
-      const ticketUrl = sanitizeIcsUrl(event.ticketUrl);
-      if (ticketUrl) {
-        descriptionParts.push(`Tickets: ${ticketUrl}`);
-      }
-      const description = descriptionParts.join('\n');
-
-      lines.push(
-        'BEGIN:VEVENT',
-        `UID:${event.id}@jov.ie`,
-        `DTSTAMP:${stamp}`,
-        `DTSTART:${formatIcsTimestamp(startDate)}`,
-        `DTEND:${formatIcsTimestamp(endDate)}`,
-        `SUMMARY:${escapeIcsText(summary)}`,
-        `DESCRIPTION:${escapeIcsText(description)}`,
-        `LOCATION:${escapeIcsText(location)}`,
-        ...(ticketUrl ? [`URL:${ticketUrl}`] : []),
-        'STATUS:CONFIRMED',
-        'TRANSP:OPAQUE',
-        'END:VEVENT'
-      );
+      lines.push(...buildEventLines(event, artistName, stamp));
     }
     lines.push('END:VCALENDAR');
 
