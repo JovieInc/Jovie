@@ -46,15 +46,17 @@ def _drain_command(
     *,
     extra_env: str = "",
     expected_gh: Path | None = None,
+    backend: str = "test-label-fixture",
 ) -> str:
     fake_gh = tmp_path / "gh"
     assert fake_gh.is_file(), f"test must create isolated gh fixture first: {fake_gh}"
     expected = expected_gh or fake_gh
+    authorization = "test-fixture" if backend == "test-label-fixture" else "merge-queue-autoenroll"
     env_prefix = (
         f'PATH="{tmp_path}:$PATH" '
         f'DRAIN_EXPECT_GH="{expected}" '
-        'DRAIN_MUTATION_AUTHORIZATION=test-fixture '
-        'MERGE_QUEUE_BACKEND=test-label-fixture '
+        f'DRAIN_MUTATION_AUTHORIZATION={authorization} '
+        f'MERGE_QUEUE_BACKEND={backend} '
     )
     if extra_env:
         env_prefix += f"{extra_env} "
@@ -189,6 +191,116 @@ class TestGhRetryHelper:
 
 
 class TestDrainPrQueueWiring:
+    @pytest.mark.parametrize(
+        ("enroll_mode", "dequeue_mode", "expected_returncode", "expected_dequeues"),
+        [
+            ("failure", "success", 1, "1"),
+            ("malformed", "success", 1, "1"),
+            ("failure", "failure", 1, "1"),
+            ("valid", "success", 0, "0"),
+        ],
+    )
+    def test_native_enrollment_requires_receipt_and_compensates_once(
+        self,
+        tmp_path: Path,
+        enroll_mode: str,
+        dequeue_mode: str,
+        expected_returncode: int,
+        expected_dequeues: str,
+    ) -> None:
+        head = "a" * 40
+        dequeue_calls = tmp_path / "dequeue-calls"
+        dequeue_calls.write_text("0", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                command_name="${{2:-}}"
+                case "$command_name" in
+                  preflight) exit 0 ;;
+                  list-state) echo '{{"101":{{"headRefOid":"{head}","queued":false}}}}' ;;
+                  enroll)
+                    if [[ "${{FAKE_ENROLL_MODE:?}}" == "failure" ]]; then
+                      exit 1
+                    fi
+                    if [[ "${{FAKE_ENROLL_MODE:?}}" == "valid" ]]; then
+                      echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","state":"AWAITING_CHECKS","position":3}}}}}}'
+                      exit 0
+                    fi
+                    echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":null}}}}'
+                    ;;
+                  dequeue)
+                    count=$(<"${{FAKE_DEQUEUE_CALLS:?}}")
+                    echo "$((count + 1))" >"${{FAKE_DEQUEUE_CALLS:?}}"
+                    if [[ "${{FAKE_DEQUEUE_MODE:?}}" == "failure" ]]; then
+                      exit 1
+                    fi
+                    echo '{{"state":{{"queued":false}}}}'
+                    ;;
+                  max-queue-depth) echo 16 ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":101,"t":"Receipt regression","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/receipt","headOid":"{head}","base":"main","body":"","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  exit 1
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=101 DRAIN_ADMISSION_HEAD={head} "
+                    f"FAKE_ENROLL_MODE={enroll_mode} FAKE_DEQUEUE_MODE={dequeue_mode} "
+                    f"FAKE_DEQUEUE_CALLS={dequeue_calls}"
+                ),
+            )
+        )
+
+        assert result.returncode == expected_returncode, (
+            f"stdout={result.stdout}\nstderr={result.stderr}"
+        )
+        assert dequeue_calls.read_text(encoding="utf-8").strip() == expected_dequeues
+        if enroll_mode == "valid":
+            assert "+native-queue on #101" in result.stdout
+            assert "state AWAITING_CHECKS, position 3" in result.stdout
+        else:
+            assert "native enrollment" in result.stderr
+        if dequeue_mode == "failure":
+            assert "CRITICAL: could not compensate unproven" in result.stderr
+
     def test_constrained_mode_refuses_missing_receipt_before_calling_gh(
         self, tmp_path: Path
     ) -> None:

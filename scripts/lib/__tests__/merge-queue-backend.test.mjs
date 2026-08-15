@@ -980,6 +980,69 @@ describe('native enrollment', () => {
     expect(invokedEnrollment(runner)).toBe(false);
   });
 
+  it.each([
+    ['missing id', { state: 'QUEUED', position: 1 }],
+    ['unknown state', { ...QUEUE_ENTRY, state: 'UNKNOWN' }],
+    ['missing position', { id: ENTRY_ID, state: 'QUEUED' }],
+    ['zero position', { ...QUEUE_ENTRY, position: 0 }],
+    ['negative position', { ...QUEUE_ENTRY, position: -1 }],
+    ['fractional position', { ...QUEUE_ENTRY, position: 1.5 }],
+  ])('fails closed on a queue entry with %s', async (_name, mergeQueueEntry) => {
+    const runner = createNativeRunner({
+      states: [prState({ isInMergeQueue: true, mergeQueueEntry })],
+    });
+
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'incomplete_queue_state',
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('reconciles an errored mutation only when a later read proves queue membership', async () => {
+    const runner = createNativeRunner({
+      states: [
+        prState(),
+        prState({ isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY }),
+      ],
+      enableResult: {
+        code: 1,
+        stdout: '',
+        stderr: 'GraphQL transport closed after dispatch',
+      },
+    });
+
+    await expect(enroll(runner)).resolves.toMatchObject({
+      changed: true,
+      reconciledAfterCommandError: true,
+      state: { mergeQueueEntry: QUEUE_ENTRY },
+    });
+  });
+
+  it('fails closed when the head changes after the mutation', async () => {
+    const runner = createNativeRunner({
+      states: [prState(), prState({ headRefOid: OTHER_HEAD })],
+    });
+
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'head_changed',
+    });
+    expect(invokedEnrollment(runner)).toBe(true);
+  });
+
+  it('treats GraphQL errors as an unproven mutation and fails after bounded reads', async () => {
+    const runner = createNativeRunner({
+      states: [prState(), prState()],
+      enableResult: ok({ errors: [{ message: 'auto-merge unavailable' }] }),
+    });
+
+    await expect(
+      enroll(runner, { postconditionAttempts: 1 })
+    ).rejects.toMatchObject({
+      code: 'enrollment_postcondition_failed',
+      details: { mutationError: { code: 'github_graphql_error' } },
+    });
+  });
+
   it('does not accept a success-only auto-merge request without a queue entry', async () => {
     const wait = vi.fn(async () => {});
     const successOnly = prState({ autoMergeRequest: AUTO_MERGE });
