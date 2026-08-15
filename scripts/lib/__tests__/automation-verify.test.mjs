@@ -202,6 +202,18 @@ const PERSISTED_AUTH_FIXTURE_REPAIR_DIFF = [
   ...PERSISTED_AUTH_FIXTURE_REPAIR_CORE,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
+const AUTH_ROUTING_STATE_FALLBACK_DIFF = [
+  'apps/web/app/api/auth/native/exchange/route.ts',
+  'apps/web/app/auth/callback/route.test.ts',
+  'apps/web/app/auth/callback/route.ts',
+  'apps/web/app/auth/start/route.test.ts',
+  'apps/web/app/auth/start/route.ts',
+  'apps/web/lib/auth/routing-state-fallback.server.ts',
+  'apps/web/lib/auth/routing-state.server.ts',
+  'apps/web/tests/unit/api/auth/native-exchange.test.ts',
+  'apps/web/tests/unit/lib/auth/routing-state-fallback.server.test.ts',
+  'apps/web/tests/unit/lib/auth/routing-state.server.test.ts',
+];
 const MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST = [
   'apps/web/tests/e2e/mobile-overflow.spec.ts',
   'apps/web/tests/e2e/utils/mobile-overflow.ts',
@@ -915,6 +927,20 @@ describe('automation-verify affected scope', () => {
       'scripts/lib/__tests__/automation-verify.test.mjs',
       'scripts/hermes/lib/__tests__/ci-failure-classifier.test.ts',
       'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+    ]);
+  });
+
+  it('keeps a complete auth routing-state fallback slice on its exact focused coverage', () => {
+    const plan = buildAffectedTestPlan(AUTH_ROUTING_STATE_FALLBACK_DIFF);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/app/auth/callback/route.test.ts',
+      'apps/web/app/auth/start/route.test.ts',
+      'apps/web/tests/unit/api/auth/native-exchange.test.ts',
+      'apps/web/tests/unit/lib/auth/routing-state-fallback.server.test.ts',
+      'apps/web/tests/unit/lib/auth/routing-state.server.test.ts',
+      'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
     ]);
   });
 

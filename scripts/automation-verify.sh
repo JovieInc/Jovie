@@ -17,20 +17,39 @@ fi
 case "$SCOPE" in
   affected)
     echo "[automation-verify] Running affected verify bundle"
-    BASE_REF="${AUTOMATION_VERIFY_BASE:-origin/main}"
+    # A pre-push hook must validate the commits that are about to leave this
+    # branch, not every commit since main.  Using origin/main here made a
+    # long-lived branch rerun the full suite on every push after any broad
+    # earlier change (for example a lockfile or auth migration).  Prefer the
+    # branch's remote-tracking ref; brand-new branches still fall back to main.
+    if [[ -n "${AUTOMATION_VERIFY_BASE:-}" ]]; then
+      BASE_REF="$AUTOMATION_VERIFY_BASE"
+    elif UPSTREAM_REF="$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null)" && \
+      git rev-parse --verify --quiet "${UPSTREAM_REF}^{commit}" >/dev/null; then
+      BASE_REF="$UPSTREAM_REF"
+    else
+      BASE_REF="origin/main"
+    fi
     if ! git rev-parse --verify --quiet "${BASE_REF}^{commit}" >/dev/null; then
       echo "[automation-verify] Cannot resolve affected-test base: ${BASE_REF}" >&2
       exit 1
     fi
+    echo "[automation-verify] affected base: ${BASE_REF}"
     node scripts/turbo-local.mjs typecheck --affected
     node scripts/turbo-local.mjs lint --affected
     # Turbo's --affected flag selects packages, not tests. Any apps/web edit
     # therefore ran the entire web suite locally. Let Vitest follow the changed
     # module graph instead, while retaining the deterministic risk-policy gate.
-    node scripts/run-affected-tests.mjs \
-      --base "$BASE_REF" \
-      --max-workers "${AUTOMATION_VERIFY_MAX_WORKERS:-2}" \
+    AFFECTED_ARGS=(
+      --base "$BASE_REF"
+      --max-workers "${AUTOMATION_VERIFY_MAX_WORKERS:-2}"
       --shard-concurrency "${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-1}"
+    )
+    if [[ "${AUTOMATION_VERIFY_PUSH_LANE:-}" == "1" ]]; then
+      AFFECTED_ARGS+=(--fast)
+    fi
+    node scripts/run-affected-tests.mjs \
+      "${AFFECTED_ARGS[@]}"
     pnpm ci:harness:check
     ;;
   full)

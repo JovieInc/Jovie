@@ -306,6 +306,22 @@ const PERSISTED_AUTH_FIXTURE_SCRIPT_TESTS = [
   'scripts/hermes/lib/__tests__/ci-failure-classifier.test.ts',
   'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
+// Auth routing-state changes are security-sensitive, but the route and
+// fallback suites below exercise the exact start → callback → native-exchange
+// contract.  Keeping this narrow allows a push to validate the changed
+// contract quickly; the complete suite remains required in CI/merge.
+const AUTH_ROUTING_STATE_FALLBACK_MANIFEST = new Set([
+  'apps/web/app/api/auth/native/exchange/route.ts',
+  'apps/web/app/auth/callback/route.test.ts',
+  'apps/web/app/auth/callback/route.ts',
+  'apps/web/app/auth/start/route.test.ts',
+  'apps/web/app/auth/start/route.ts',
+  'apps/web/lib/auth/routing-state-fallback.server.ts',
+  'apps/web/lib/auth/routing-state.server.ts',
+  'apps/web/tests/unit/api/auth/native-exchange.test.ts',
+  'apps/web/tests/unit/lib/auth/routing-state-fallback.server.test.ts',
+  'apps/web/tests/unit/lib/auth/routing-state.server.test.ts',
+]);
 const VISUAL_QA_DIFF_ARTIFACTS_SOURCE =
   'apps/web/lib/agent-os/visual-qa/diff-artifacts.ts';
 const VISUAL_QA_DIFF_ARTIFACTS_TEST =
@@ -549,6 +565,9 @@ export function buildAffectedTestPlan(
     ) &&
     (affectedTestSelectorInputCount === 0 ||
       affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+  const isExactAuthRoutingStateFallback =
+    files.length === AUTH_ROUTING_STATE_FALLBACK_MANIFEST.size &&
+    files.every(file => AUTH_ROUTING_STATE_FALLBACK_MANIFEST.has(file));
   const visualQaDiffArtifactsInputCount = files.filter(file =>
     VISUAL_QA_DIFF_ARTIFACTS_MANIFEST.has(file)
   ).length;
@@ -824,6 +843,11 @@ export function buildAffectedTestPlan(
     )
       return true;
     if (
+      isExactAuthRoutingStateFallback &&
+      AUTH_ROUTING_STATE_FALLBACK_MANIFEST.has(file)
+    )
+      return true;
+    if (
       isExactMobileOverflowNavigationRace &&
       MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST.has(file)
     )
@@ -1039,6 +1063,7 @@ export function buildAffectedTestPlan(
             isExactNeonAttemptArtifactRepair ||
             isExactPerformanceProfilerRepair ||
             isExactPersistedAuthFixtureRepair ||
+            isExactAuthRoutingStateFallback ||
             isExactVisualQaSelectorRepair ||
             isExactMobileOverflowNavigationRace ||
             isExactRunnerIoPressure ||
@@ -1297,16 +1322,22 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     DEFAULT_PROGRESS_INTERVAL_MS
   );
   const plan = buildAffectedTestPlan(changedFiles(base));
+  // Local pre-push needs a fast, evidence-bearing feedback lane. Do not turn
+  // an unmapped but test-related source change into a 30+ minute workstation
+  // gate; CI and merge continue to execute the complete fail-closed suite.
+  const fast = args.includes('--fast');
+  const executionPlan =
+    fast && plan.mode === 'full' ? { ...plan, mode: 'selected' } : plan;
   if (args.includes('--dry-run')) {
-    console.log(JSON.stringify(plan, null, 2));
+    console.log(JSON.stringify({ ...executionPlan, fast }, null, 2));
     process.exit(0);
   }
   console.log(
-    `[affected-tests] mode=${plan.mode} related=${plan.relatedFiles.length} mandatory=${plan.mandatoryTests.length}`
+    `[affected-tests] mode=${executionPlan.mode}${fast ? ' (fast-push)' : ''} related=${executionPlan.relatedFiles.length} mandatory=${executionPlan.mandatoryTests.length}`
   );
 
-  if (plan.mode === 'none') process.exit(0);
-  if (plan.mode === 'full') {
+  if (executionPlan.mode === 'none') process.exit(0);
+  if (executionPlan.mode === 'full') {
     // A single Vitest process retains enough module/reporting state across the
     // 2k-file web suite to trigger host memory pressure near teardown. Keep
     // deterministic, bounded-memory shards, but schedule a small bounded set
@@ -1318,7 +1349,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     });
   }
 
-  await runCommands(buildSelectedTestCommands(plan, maxWorkers), 1, {
+  await runCommands(buildSelectedTestCommands(executionPlan, maxWorkers), 1, {
     timeoutMs: shardTimeoutMs,
     progressIntervalMs,
     labelPrefix: 'selected',

@@ -10,6 +10,9 @@ export AUTOMATION_VERIFY_MAX_WORKERS="${AUTOMATION_VERIFY_MAX_WORKERS:-1}"
 # Keep developer-machine pushes conservative. Dedicated orchestration hosts may
 # raise bounded shard concurrency after proving memory and timeout headroom.
 export AUTOMATION_VERIFY_SHARD_CONCURRENCY="${AUTOMATION_VERIFY_SHARD_CONCURRENCY:-1}"
+# A local push is a feedback gate, not the release gate. It runs changed-module
+# coverage; CI/merge remains responsible for the full suite.
+export AUTOMATION_VERIFY_PUSH_LANE="${AUTOMATION_VERIFY_PUSH_LANE:-1}"
 
 # NOTE: git holds the ssh receive-pack connection open across this hook.
 # GitHub kills it after ~10 idle minutes, and a long gate then surfaces as
