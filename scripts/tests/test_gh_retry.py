@@ -583,6 +583,13 @@ class TestDrainPrQueueWiring:
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert ("[dry-run] would +merge-queue on #904" in result.stdout) is expected_enrollment
+        # Ordinary clean work must not be admitted while production is unbound,
+        # but the controller has to leave an exact-head receipt so the first
+        # post-recovery Production Controller event can re-check and enroll it
+        # without a human workflow_dispatch.
+        assert (
+            "would record jovie-fleet-queue-hold/v1 on #904" in result.stdout
+        ) is (not expected_enrollment)
 
     def test_hold_intake_dequeues_deterministic_failing_member_and_keeps_green_sibling(
         self, tmp_path: Path
@@ -668,6 +675,70 @@ class TestDrainPrQueueWiring:
         assert "would -merge-queue on #902" in result.stdout
         assert "would -merge-queue on #901" not in result.stdout
         assert "fleet promotion constraint" not in result.stdout
+
+    def test_production_recovery_reenrolls_only_a_previously_exact_held_head(
+        self, tmp_path: Path
+    ) -> None:
+        """A hold-intake CI candidate resumes automatically after production binds."""
+        head = "a" * 40
+        state = tmp_path / "state"
+        state.write_text("unqueued", encoding="utf-8")
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                phase_file={state}
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":905,"t":"Exact held candidate","body":"ordinary PR","draft":false,"m":"MERGEABLE","head":"codex/jov-905","headOid":"{head}","base":"main","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  if [[ "$(cat "$phase_file")" == "queued" ]]; then labels='[{{"name":"merge-queue"}}]'; else labels='[]'; fi
+                  printf '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":%s,"headRefOid":"{head}","baseRefName":"main","body":"ordinary PR"}}\\n' "$labels"
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr edit" ]]; then
+                  printf queued >"$phase_file"
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  if [[ " $* " == *"/commits/{head}/status "* ]]; then
+                    echo '{{"statuses":[{{"context":"jovie-fleet-queue-hold/v1","state":"pending","creator":{{"type":"Bot"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"2026-08-15T12:00:00Z"}}]}}'
+                    exit 0
+                  fi
+                  if [[ " $* " == *"/statuses/{head} "* ]]; then exit 0; fi
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRAIN_RECOVER_FLEET_HOLDS=1 "
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert "exact fleet recovery at " + head in result.stdout
+        assert "+merge-queue on #905" in result.stdout
+        assert "-jovie-fleet-queue-hold/v1 on #905" in result.stdout
+        assert state.read_text(encoding="utf-8").strip() == "queued"
 
     def test_hold_intake_does_not_dequeue_transient_unknown_mergeable(
         self, tmp_path: Path
