@@ -70,6 +70,7 @@ describe('POST /api/webhooks/linear', () => {
         updatedAt: '2026-03-10T00:00:01.000Z',
         stateId: 'new',
         state: { name: 'Todo' },
+        team: { key: 'JOV' },
       },
     };
     const body = JSON.stringify(payload);
@@ -107,6 +108,7 @@ describe('POST /api/webhooks/linear', () => {
         updatedAt: '2026-03-10T00:00:01.000Z',
         stateId: 'new',
         state: { name: 'Todo' },
+        team: { key: 'JOV' },
       },
     };
     const body = JSON.stringify(payload);
@@ -157,6 +159,7 @@ describe('POST /api/webhooks/linear', () => {
         updatedAt: '2026-03-10T00:00:01.000Z',
         stateId: 'new',
         state: { name: 'Todo' },
+        team: { key: 'JOV' },
       },
     };
     const body = JSON.stringify(payload);
@@ -175,7 +178,7 @@ describe('POST /api/webhooks/linear', () => {
     expect(data).toEqual({ error: 'Dispatch timed out' });
     expect(mockClearRecentDispatch).toHaveBeenCalledWith(
       'linear',
-      'issue_123:2026-03-10T00:00:01.000Z:todo'
+      'issue_123:2026-03-10T00:00:01.000Z:intake'
     );
     expect(mockCaptureCriticalError).toHaveBeenCalledWith(
       'Linear webhook dispatch timed out',
@@ -209,6 +212,7 @@ describe('POST /api/webhooks/linear', () => {
         updatedAt: '2026-03-10T00:00:01.000Z',
         stateId: 'new',
         state: { name: 'Todo' },
+        team: { key: 'JOV' },
       },
     };
     const body = JSON.stringify(payload);
@@ -231,5 +235,47 @@ describe('POST /api/webhooks/linear', () => {
       })
     );
     expect(mockServerFetch.mock.calls[0]?.[1]).not.toHaveProperty('retry');
+  });
+
+  it('dispatches a label-free JOV backlog create as an intake event', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(new Response(null, { status: 204 }));
+
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const payload = {
+      type: 'Issue',
+      action: 'create',
+      createdAt: '2026-08-15T00:00:00.000Z',
+      data: {
+        id: 'issue_backlog',
+        identifier: 'JOV-100',
+        title: 'Bounded ordinary fix',
+        updatedAt: '2026-08-15T00:00:00.000Z',
+        team: { key: 'JOV' },
+        state: { name: 'Backlog' },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const response = await POST(
+      new Request('https://example.com/api/webhooks/linear', {
+        method: 'POST',
+        headers: { 'linear-signature': sign(body) },
+        body,
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ received: true, dispatched: true });
+    expect(mockServerFetch.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        body: expect.stringContaining('"event_type":"linear-intake-changed"'),
+      })
+    );
+    expect(mockServerFetch.mock.calls[0]?.[1]?.body).toContain(
+      '"team_key":"JOV"'
+    );
   });
 });

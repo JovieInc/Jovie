@@ -29,8 +29,10 @@ import * as admissionGate from './admission-gate.mjs';
 // Keep the complete control-plane dependency closure visible to source sync and
 // module tooling. These are canonical sibling modules, not host-only copies.
 import * as admitter from './admitter.mjs';
+import * as backlogReduction from './backlog-reduction.mjs';
 import * as classifier from './classifier.mjs';
 import * as deterministicGates from './deterministic-gates.mjs';
+import * as intakeReadiness from './intake-readiness.mjs';
 import * as linear from './linear-client.mjs';
 import * as planGate from './plan-gate.mjs';
 import * as reconciler from './reconcile.mjs';
@@ -132,6 +134,8 @@ Usage:
   node backlog-orchestrator.mjs admit-next            Admit next work item
   node backlog-orchestrator.mjs gate-next             Plan, approve, and admit one safe issue
   node backlog-orchestrator.mjs gate-next --dry-run   Show the next issue without mutations
+  node backlog-orchestrator.mjs intake-readiness      Classify changed intake work (always dry-run)
+  node backlog-orchestrator.mjs backlog-reduction     Audit high-confidence duplicate reduction (dry-run)
   node backlog-orchestrator.mjs approve-plan --issue=JOV-123 --evidence-file=/path/evidence.json
   node backlog-orchestrator.mjs report                Generate shadow report
 `);
@@ -148,12 +152,77 @@ Usage:
     await runAdmitNext(cache, isDryRun);
   } else if (command === 'gate-next') {
     await runGateNext(isDryRun, issueArg);
+  } else if (command === 'intake-readiness') {
+    await runIntakeReadiness(cache, issueArg);
+  } else if (command === 'backlog-reduction') {
+    await runBacklogReduction(cache);
   } else if (command === 'approve-plan') {
     await runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun);
   } else {
     console.error(`Unknown command: ${command}`);
     process.exit(1);
   }
+}
+
+async function runIntakeReadiness(cache, issueArg) {
+  const teams = [];
+  const nextFingerprints = {
+    ...(cache.intakeReadiness?.fingerprintsByIdentifier || {}),
+  };
+  const selectedTeams = issueArg
+    ? [teamForIdentifier(issueArg)].filter(Boolean)
+    : TEAM_CONFIGS;
+  if (issueArg && selectedTeams.length === 0)
+    throw new Error(`Issue ${issueArg} has no repository route`);
+  for (const team of selectedTeams) {
+    const issues = issueArg
+      ? [await linear.fetchIssue(issueArg)].filter(issue =>
+          ['Triage', 'Backlog', 'Todo', 'To Do'].includes(issue?.state?.name)
+        )
+      : await linear.fetchTeamIntakeIssues(team.id);
+    const receipt = intakeReadiness.buildIntakeControlLoopReceipt(issues, {
+      previousFingerprints: nextFingerprints,
+    });
+    for (const item of receipt.receipts) {
+      nextFingerprints[item.issue] = item.fingerprint;
+    }
+    teams.push({ team: team.key, ...receipt });
+  }
+  const result = {
+    schema: 'intake-control-loop/multiteam/v1',
+    mode: 'dry-run',
+    observedAt: new Date().toISOString(),
+    teams,
+    mutations: 0,
+  };
+  saveCache({
+    ...cache,
+    intakeReadiness: {
+      fingerprintsByIdentifier: nextFingerprints,
+      lastReceipt: result,
+    },
+  });
+  console.log(JSON.stringify(result, null, 2));
+}
+
+async function runBacklogReduction(cache) {
+  const teams = [];
+  for (const team of TEAM_CONFIGS) {
+    const issues = await linear.fetchTeamIntakeIssues(team.id);
+    teams.push({
+      team: team.key,
+      ...backlogReduction.buildBacklogReductionReceipt(issues),
+    });
+  }
+  const result = {
+    schema: 'backlog-reduction/multiteam/v1',
+    mode: 'dry-run',
+    observedAt: new Date().toISOString(),
+    teams,
+    mutations: 0,
+  };
+  saveCache({ ...cache, backlogReduction: { lastReceipt: result } });
+  console.log(JSON.stringify(result, null, 2));
 }
 
 async function runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun) {

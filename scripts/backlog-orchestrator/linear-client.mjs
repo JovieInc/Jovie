@@ -389,8 +389,10 @@ export async function fetchTeamInProgressIssues(teamId, maxResults = 1000) {
 }
 
 /**
- * Fetch the narrow deterministic gate pool. Filtering on readiness labels keeps
- * the five-minute control-plane poll bounded instead of scanning the backlog.
+ * Fetch the deterministic gate pool from every intake state. Readiness is
+ * derived from the issue contract, ownership, dependencies, and policy, never
+ * from a manually-applied label. Event callers remain responsible for bounded
+ * changed-item processing.
  */
 export async function fetchTeamGateCandidates(teamId, maxResults = 500) {
   const issues = [];
@@ -404,9 +406,53 @@ export async function fetchTeamGateCandidates(teamId, maxResults = 500) {
             first: 50,
             after: $cursor,
             filter: {
-              state: { name: { in: ["Triage", "Backlog", "Todo"] } },
-              labels: { some: { name: { in: ["ready-for-intake", "agent-ready"] } } }
+              state: { name: { in: ["Triage", "Backlog", "Todo", "To Do"] } }
             }
+          ) {
+            nodes {
+              id identifier title description url createdAt updatedAt priority estimate
+              assignee { id name }
+              creator { id name }
+              labels { nodes { id name } }
+              project { id name slugId }
+              parent { id identifier title }
+              children { nodes { id identifier title } }
+              relations { nodes { type relatedIssue { id identifier title } } }
+              state { id name type }
+              comments { nodes { id body createdAt } }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }
+    `,
+      { teamId, cursor }
+    );
+    const edge = data.team.issues;
+    issues.push(...edge.nodes);
+    if (!edge.pageInfo.hasNextPage) break;
+    cursor = edge.pageInfo.endCursor;
+  }
+  return issues.slice(0, maxResults);
+}
+
+/**
+ * Fetch the broad, unlabelled intake surface for a bounded readiness dry run.
+ * This is deliberately separate from the five-minute admission pool: callers
+ * must process only changed fingerprints and must not mutate from this read.
+ */
+export async function fetchTeamIntakeIssues(teamId, maxResults = 1500) {
+  const issues = [];
+  let cursor = null;
+  while (issues.length < maxResults) {
+    const data = await graphql(
+      `
+      query($teamId: String!, $cursor: String) {
+        team(id: $teamId) {
+          issues(
+            first: 50,
+            after: $cursor,
+            filter: { state: { name: { in: ["Triage", "Backlog", "Todo", "To Do"] } } }
           ) {
             nodes {
               id identifier title description url createdAt updatedAt priority estimate

@@ -1,0 +1,75 @@
+name: Jovie Intake Controller
+
+# Primary trigger: authenticated Linear sends a JOV create/update in an intake
+# state to the deployed webhook, which repository-dispatches this workflow.
+# The hourly reconciliation is a slow, receipt-only backstop. It must never
+# become an admission retry loop.
+on:
+  repository_dispatch:
+    types: [linear-intake-changed]
+  # Slow fail-safe only. It reconciles classifier receipts once an hour in case
+  # a provider delivery is lost; it neither replays events nor admits work.
+  schedule:
+    - cron: '17 * * * *'
+permissions:
+  contents: read
+
+concurrency:
+  # One controller writer for all events. The durable receipt is idempotent,
+  # and this serializes the governor's one-normal-candidate bound.
+  group: jovie-intake-admission
+  cancel-in-progress: false
+
+jobs:
+  receive:
+    name: Persist and classify one JOV intake event
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    timeout-minutes: 3
+    steps:
+      - name: Checkout exact main controller source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - name: Persist idempotent intake receipt
+        if: github.event_name == 'repository_dispatch'
+        env:
+          GEM_WORKSPACE: /home/timwhite/gem-workspace
+        run: |
+          set -euo pipefail
+          node scripts/backlog-orchestrator/intake-event-controller.mjs \
+            --event-file="$GITHUB_EVENT_PATH"
+      - name: Authoritatively classify the changed issue without labels
+        if: github.event_name == 'repository_dispatch'
+        env:
+          JOVIE_AGENT_PROFILE: no_agent
+          ISSUE_IDENTIFIER: ${{ github.event.client_payload.issue_identifier }}
+        run: |
+          set -euo pipefail
+          test -n "$ISSUE_IDENTIFIER"
+          # This command is explicitly dry-run. The existing bounded governor
+          # remains the only mutating admission path after its independent gate.
+          scripts/backlog-orchestrator/run-backlog.sh intake-readiness --issue="$ISSUE_IDENTIFIER"
+      - name: Admit at most one verified ordinary candidate through normal gates
+        if: github.event_name == 'repository_dispatch'
+        env:
+          JOVIE_AGENT_PROFILE: no_agent
+          ISSUE_IDENTIFIER: ${{ github.event.client_payload.issue_identifier }}
+        run: |
+          set -euo pipefail
+          test -n "$ISSUE_IDENTIFIER"
+          # gate-next rereads the exact issue, requires the canonical fleet
+          # receipt, plan and admission receipts, then verifies its single
+          # lease. A hold is a successful no-op, never a retry bypass.
+          scripts/backlog-orchestrator/run-backlog.sh gate-next --issue="$ISSUE_IDENTIFIER"
+      - name: Slowly reconcile missed intake events without admission
+        if: github.event_name == 'schedule'
+        env:
+          JOVIE_AGENT_PROFILE: no_agent
+        run: |
+          set -euo pipefail
+          scripts/backlog-orchestrator/run-backlog.sh intake-readiness
