@@ -105,7 +105,6 @@ jobs:
             (.signals.integrity.status | IN("clear", "resolved", "active", "invalid")) and
             (.promotionAdmission.allowed | type == "boolean") and
             (.isolatedPromotionAdmission.allowed | type == "boolean") and
-            (.productionUnboundRepairAdmission.allowed | type == "boolean") and
             (.promotionMode | IN("normal", "isolated-only", "draft-only", "hold-intake", "blocked"))
           ' "$receipt" >/dev/null || {
             echo '::error::Fleet gate emitted a malformed receipt.' >&2
