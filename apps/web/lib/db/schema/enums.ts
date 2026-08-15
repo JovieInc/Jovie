@@ -724,7 +724,6 @@ export const referralCommissionStatusEnum = pgEnum(
 export const connectorProviderEnum = pgEnum('connector_provider', [
   'google_calendar',
   'gmail',
-  'youtube',
 ]);
 
 /** TS union derived from the Postgres `connector_provider` enum (single source of truth). */

@@ -10,7 +10,6 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { Badge } from '@/components/atoms/Badge';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
 import {
   type ConnectorIconKey,
   type ConnectorProviderId,
@@ -29,8 +28,6 @@ interface ConnectorCardProps {
   readonly status: ConnectorStatus;
   readonly email?: string;
   readonly errorMessage?: string;
-  /** Granted OAuth scopes (shown when connected). */
-  readonly scopes?: readonly string[];
   readonly onConnect?: () => void;
   readonly onDisconnect?: () => void;
   readonly className?: string;
@@ -39,7 +36,7 @@ interface ConnectorCardProps {
 const CONNECTOR_ICONS = {
   mail: Mail,
   calendar: Calendar,
-} as const satisfies Partial<Record<ConnectorIconKey, typeof Mail>>;
+} as const satisfies Record<ConnectorIconKey, typeof Mail>;
 
 const STATUS_BADGE: Record<
   ConnectorStatus,
@@ -61,22 +58,14 @@ export function ConnectorCard({
   status,
   email,
   errorMessage,
-  scopes,
   onConnect,
   onDisconnect,
   className,
 }: ConnectorCardProps) {
   const definition = getConnectorDefinition(provider);
-  const Icon =
-    definition.iconKey === 'youtube'
-      ? null
-      : CONNECTOR_ICONS[definition.iconKey];
+  const Icon = CONNECTOR_ICONS[definition.iconKey];
   const { label: statusLabel, variant: statusVariant } = STATUS_BADGE[status];
   const isConnected = status === 'connected' || status === 'syncing';
-  const visibleScopes =
-    provider === 'youtube' && isConnected && scopes && scopes.length > 0
-      ? Array.from(new Set(scopes))
-      : [];
 
   return (
     <div
@@ -84,11 +73,7 @@ export function ConnectorCard({
     >
       <div className='flex items-start gap-3'>
         <div className='mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0'>
-          {provider === 'youtube' ? (
-            <SocialIcon platform='youtube' className='h-4 w-4' aria-hidden />
-          ) : (
-            Icon && <Icon className='h-4 w-4 text-secondary' />
-          )}
+          <Icon className='h-4 w-4 text-secondary' />
         </div>
         <div className='space-y-0.5'>
           <div className='flex items-center gap-2'>
@@ -112,16 +97,6 @@ export function ConnectorCard({
           <p className='text-xs text-secondary'>{definition.description}</p>
           {email && isConnected && (
             <p className='text-xs text-tertiary'>{email}</p>
-          )}
-          {visibleScopes.length > 0 && (
-            <div className='space-y-0.5 text-xs text-tertiary'>
-              <p>Granted scopes</p>
-              {visibleScopes.map(scope => (
-                <p key={scope} className='break-all font-mono text-[10px]'>
-                  {scope}
-                </p>
-              ))}
-            </div>
           )}
           {errorMessage &&
             (status === 'error' || status === 'needs_reauth') && (

@@ -17,7 +17,6 @@ import {
   type ConnectorDefinition,
   type ConnectorProviderId,
 } from './types';
-import { YOUTUBE_OAUTH_SCOPES } from './youtube/scopes';
 
 export {
   CONNECTOR_DB_STATUS_IDS,
@@ -35,7 +34,6 @@ export {
 export const CONNECTOR_PROVIDERS = {
   gmail: 'gmail',
   google_calendar: 'google_calendar',
-  youtube: 'youtube',
 } as const satisfies Record<string, ConnectorProviderId>;
 
 /** Google OAuth scope constants — referenced by registry entries and authorize. */
@@ -79,29 +77,11 @@ export const CONNECTOR_REGISTRY = {
     webhookHandler: null,
     displayOrder: 2,
   },
-  [CONNECTOR_PROVIDERS.youtube]: {
-    id: CONNECTOR_PROVIDERS.youtube,
-    label: 'YouTube',
-    description:
-      'Verify your channel before applying approved thumbnail changes.',
-    iconKey: 'youtube',
-    oauthBundle: 'youtube',
-    oauthScopes: YOUTUBE_OAUTH_SCOPES,
-    tokenHandler: 'shared_token_vault',
-    syncRunner: null,
-    webhookHandler: null,
-    displayOrder: 3,
-  },
 } as const satisfies Record<ConnectorProviderId, ConnectorDefinition>;
 
 /** Providers that share the Google OAuth authorize/callback/disconnect flow. */
 export const GOOGLE_CONNECTOR_PROVIDERS = CONNECTOR_PROVIDER_IDS.filter(
   providerId => CONNECTOR_REGISTRY[providerId].oauthBundle === 'google'
-) as ConnectorProviderId[];
-
-/** Providers that share the YouTube OAuth authorize/callback/disconnect flow. */
-export const YOUTUBE_CONNECTOR_PROVIDERS = CONNECTOR_PROVIDER_IDS.filter(
-  providerId => CONNECTOR_REGISTRY[providerId].oauthBundle === 'youtube'
 ) as ConnectorProviderId[];
 
 export const connectorProviderSchema = z.enum(CONNECTOR_PROVIDER_IDS);

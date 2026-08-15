@@ -7,7 +7,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-- **YouTube connections verify the mutation target (JOV-3188/JOV-3189):** creators can connect with a dedicated least-privilege Google consent flow and read back the exact channel identity and granted scopes before any thumbnail mutation is allowed.
 - **Public profiles keep every conversion action usable (JOV-5134/JOV-5132):** unclaimed artists expose a truthful ownership path; listening, alerts, tips, merch, shows, and payment actions resolve only when their inventory is real; mobile privacy controls avoid profile chrome and the action dock; and drawers plus carousels preserve keyboard and screen-reader access.
 - [internal] **Redis quota failures now surface before they break sign-in (JOV-5086):** production exercises a real write/read canary, groups quota exhaustion separately from outages, backs off degraded Redis traffic, filters known bots before metering high-volume anonymous telemetry, and makes every limiter's command-cost algorithm an explicit reviewed choice.
 
