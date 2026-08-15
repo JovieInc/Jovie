@@ -79,6 +79,7 @@ private struct AppContentView: View {
           isOffline: false,
           initialTab: .profile,
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
+          accountURL: appState.accountURL,
           billingURL: appState.billingURL,
           chatEnabled: false,
           audienceEnabled: false,
@@ -123,6 +124,7 @@ private struct AppContentView: View {
             ? .audience
             : (appState.launchMode.opensChatOnLaunch ? .chat : appState.launchMode.defaultInitialTab),
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
+          accountURL: appState.accountURL,
           billingURL: appState.billingURL,
           chatEnabled: appState.loadedDashboardResponse != nil,
           audienceEnabled: appState.loadedDashboardResponse != nil,
