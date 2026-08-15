@@ -236,6 +236,14 @@ class TestDrainPrQueueWiring:
                 "allowed": False,
                 "deploymentsAllowed": False,
             },
+            "productionUnboundRepairAdmission": {
+                "allowed": False,
+                "condition": None,
+                "mainSha": None,
+                "deployedSha": None,
+                "maxConcurrent": 1,
+                "deploymentsAllowed": False,
+            },
             "alreadyAdmittedCohort": {
                 "preserve": False,
                 "newIntakeAllowed": False,
@@ -311,6 +319,14 @@ class TestDrainPrQueueWiring:
                 "allowed": False,
                 "deploymentsAllowed": False,
             },
+            "productionUnboundRepairAdmission": {
+                "allowed": True,
+                "condition": "production-deployment-unbound",
+                "mainSha": "a" * 40,
+                "deployedSha": "b" * 40,
+                "maxConcurrent": 1,
+                "deploymentsAllowed": False,
+            },
             "alreadyAdmittedCohort": {
                 "preserve": True,
                 "newIntakeAllowed": True,
@@ -358,7 +374,103 @@ class TestDrainPrQueueWiring:
         assert "would dequeue #901" not in result.stdout
         assert "would +merge-queue" not in result.stdout
         assert "queue depth: 1/" in result.stdout
-        assert "(0 slots)" in result.stdout
+        assert "(1 slots)" in result.stdout
+
+    @pytest.mark.parametrize(
+        ("body", "expected_enrollment"),
+        [
+            ("Ordinary source-green PR", False),
+            (
+                "<!-- production-unbound-repair:production-deployment-unbound:"
+                + "a" * 40
+                + " -->",
+                True,
+            ),
+        ],
+    )
+    def test_hold_intake_admits_only_exact_active_condition_repair(
+        self, tmp_path: Path, body: str, expected_enrollment: bool
+    ) -> None:
+        head = "f" * 40
+        receipt = {
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "promotionMode": "hold-intake",
+            "observedAt": datetime.now(timezone.utc).isoformat(),
+            "signals": {
+                "main": {"status": "green", "sha": "a" * 40},
+                "production": {"status": "green", "deployedSha": "b" * 40},
+                "controller": {"status": "green"},
+                "queue": {
+                    "status": "known",
+                    "eligiblePrs": 1,
+                    "greenReadyPrs": 1,
+                    "target": 15,
+                },
+                "integrity": {"status": "clear"},
+            },
+            "promotionAdmission": {"allowed": False},
+            "isolatedPromotionAdmission": {
+                "allowed": False,
+                "deploymentsAllowed": False,
+            },
+            "productionUnboundRepairAdmission": {
+                "allowed": True,
+                "condition": "production-deployment-unbound",
+                "mainSha": "a" * 40,
+                "deployedSha": "b" * 40,
+                "maxConcurrent": 1,
+                "deploymentsAllowed": False,
+            },
+            "alreadyAdmittedCohort": {
+                "preserve": True,
+                "newIntakeAllowed": True,
+                "semantics": "preserve-cohort-and-continue-isolated-implementation",
+            },
+        }
+        encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
+        body_json = json.dumps(body)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":904,"t":"Candidate","body":{body_json},"draft":false,"m":"MERGEABLE","head":"codex/jov-904","headOid":"{head}","base":"main","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":{body_json}}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_PROMOTION_MODE=hold-intake "
+                    "DRAIN_ADMISSION_PR=904 "
+                    f"DRAIN_ADMISSION_HEAD={head} DRAIN_FLEET_GATE_B64={encoded}"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert ("[dry-run] would +merge-queue on #904" in result.stdout) is expected_enrollment
 
     def test_hold_intake_dequeues_deterministic_failing_member_and_keeps_green_sibling(
         self, tmp_path: Path
@@ -385,6 +497,14 @@ class TestDrainPrQueueWiring:
             "promotionAdmission": {"allowed": False},
             "isolatedPromotionAdmission": {
                 "allowed": False,
+                "deploymentsAllowed": False,
+            },
+            "productionUnboundRepairAdmission": {
+                "allowed": True,
+                "condition": "production-deployment-unbound",
+                "mainSha": "a" * 40,
+                "deployedSha": "b" * 40,
+                "maxConcurrent": 1,
                 "deploymentsAllowed": False,
             },
             "alreadyAdmittedCohort": {
@@ -461,6 +581,14 @@ class TestDrainPrQueueWiring:
             "promotionAdmission": {"allowed": False},
             "isolatedPromotionAdmission": {
                 "allowed": False,
+                "deploymentsAllowed": False,
+            },
+            "productionUnboundRepairAdmission": {
+                "allowed": True,
+                "condition": "production-deployment-unbound",
+                "mainSha": "a" * 40,
+                "deployedSha": "b" * 40,
+                "maxConcurrent": 1,
                 "deploymentsAllowed": False,
             },
             "alreadyAdmittedCohort": {

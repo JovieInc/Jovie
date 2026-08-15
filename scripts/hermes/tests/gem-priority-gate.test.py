@@ -474,6 +474,19 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
         self.assertTrue(receipt["deploymentAdmission"]["allowed"])
         self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertEqual(
+            receipt["productionUnboundRepairAdmission"],
+            {
+                "allowed": True,
+                "condition": "production-deployment-unbound",
+                "mainSha": MAIN_SHA,
+                "deployedSha": "b" * 7,
+                "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
+                "maxConcurrent": 1,
+                "deploymentsAllowed": False,
+                "authority": "canonical-merge-queue-controller",
+            },
+        )
         self.assertIn(
             "production-deployment-unbound",
             {reason["code"] for reason in receipt["reasons"]},
@@ -514,6 +527,7 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(receipt["state"], "AMBER")
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
         self.assertFalse(receipt["deploymentAdmission"]["allowed"])
+        self.assertFalse(receipt["productionUnboundRepairAdmission"]["allowed"])
         self.assertIn(
             "production-deployment-unbound",
             {reason["code"] for reason in receipt["reasons"]},
