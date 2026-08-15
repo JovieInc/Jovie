@@ -8,6 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		A0F17E100000000000000004 /* VlogTeleprompterCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F17E100000000000000003 /* VlogTeleprompterCore.swift */; };
+		A0F507500000000000000002 /* TeleprompterProposal.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000001 /* TeleprompterProposal.swift */; };
+		A0F507500000000000000004 /* TeleprompterCaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000003 /* TeleprompterCaptureController.swift */; };
+		A0F507500000000000000006 /* TeleprompterViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000005 /* TeleprompterViewModel.swift */; };
+		A0F507500000000000000008 /* TeleprompterOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000007 /* TeleprompterOverlayView.swift */; };
 		A0J0V3632A00000000000002 /* AppShellTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A00000000000001 /* AppShellTabBar.swift */; };
 		A0J0V3632A00000000000004 /* TalkOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A00000000000003 /* TalkOverlayView.swift */; };
 		A0J0V3632A00000000000006 /* EntityContextSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A00000000000005 /* EntityContextSheet.swift */; };
@@ -138,6 +142,10 @@
 
 /* Begin PBXFileReference section */
 		A0F17E100000000000000003 /* VlogTeleprompterCore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VlogTeleprompterCore.swift; sourceTree = "<group>"; };
+		A0F507500000000000000001 /* TeleprompterProposal.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterProposal.swift; sourceTree = "<group>"; };
+		A0F507500000000000000003 /* TeleprompterCaptureController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterCaptureController.swift; sourceTree = "<group>"; };
+		A0F507500000000000000005 /* TeleprompterViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterViewModel.swift; sourceTree = "<group>"; };
+		A0F507500000000000000007 /* TeleprompterOverlayView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterOverlayView.swift; sourceTree = "<group>"; };
 		A0J0V3632A00000000000001 /* AppShellTabBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellTabBar.swift; sourceTree = "<group>"; };
 		A0J0V3632A00000000000003 /* TalkOverlayView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TalkOverlayView.swift; sourceTree = "<group>"; };
 		A0J0V3632A00000000000005 /* EntityContextSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EntityContextSheet.swift; sourceTree = "<group>"; };
@@ -364,6 +372,7 @@
 				876FD84B7A3B40CAA0DDDBC8 /* Settings */,
 				D8C70D614390928784D627FC /* Splash */,
 				4F75D6D1A88984CBC96C6702 /* Intents */,
+				A0F507500000000000000009 /* Teleprompter */,
 			);
 			name = Features;
 			path = Features;
@@ -463,6 +472,18 @@
 			);
 			name = Intents;
 			path = Intents;
+			sourceTree = "<group>";
+		};
+		A0F507500000000000000009 /* Teleprompter */ = {
+			isa = PBXGroup;
+			children = (
+				A0F507500000000000000001 /* TeleprompterProposal.swift */,
+				A0F507500000000000000003 /* TeleprompterCaptureController.swift */,
+				A0F507500000000000000005 /* TeleprompterViewModel.swift */,
+				A0F507500000000000000007 /* TeleprompterOverlayView.swift */,
+			);
+			name = Teleprompter;
+			path = Teleprompter;
 			sourceTree = "<group>";
 		};
 		55D872945D057DBB23C014CF /* Products */ = {
@@ -830,6 +851,10 @@
 				A0J0V3632A00000000000002 /* AppShellTabBar.swift in Sources */,
 				A0J0V3632A00000000000004 /* TalkOverlayView.swift in Sources */,
 				A0F17E100000000000000004 /* VlogTeleprompterCore.swift in Sources */,
+				A0F507500000000000000002 /* TeleprompterProposal.swift in Sources */,
+				A0F507500000000000000004 /* TeleprompterCaptureController.swift in Sources */,
+				A0F507500000000000000006 /* TeleprompterViewModel.swift in Sources */,
+				A0F507500000000000000008 /* TeleprompterOverlayView.swift in Sources */,
 				A0J0V3632A00000000000006 /* EntityContextSheet.swift in Sources */,
 				A0J0V3632A00000000000008 /* LibraryModels.swift in Sources */,
 				A0J0V3632A0000000000000A /* LibrarySurfaceView.swift in Sources */,

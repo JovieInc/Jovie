@@ -47,7 +47,9 @@
     <true/>
   </dict>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Jovie uses the microphone while you talk so it can capture voice memos as action drafts.</string>
+  <string>Jovie uses the microphone while you talk so it can capture voice memos as action drafts and record teleprompter videos with on-device voice following.</string>
+  <key>NSCameraUsageDescription</key>
+  <string>Jovie uses the camera so you can record teleprompter videos. Recordings stay on your device until you choose to share them.</string>
   <key>NSSpeechRecognitionUsageDescription</key>
   <string>Jovie transcribes your voice on-device when available (Apple Speech may use a network path only if on-device is unavailable) so you can edit an action draft before sending. Jovie does not store the recording.</string>
   <key>UIAppFonts</key>
