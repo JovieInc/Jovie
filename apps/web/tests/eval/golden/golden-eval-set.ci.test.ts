@@ -12,6 +12,7 @@ import { tool as aiTool, generateText } from 'ai';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { buildReferencedEntitiesBlock } from '@/lib/chat/entity-hydration';
 import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
+import { buildPinnedOpportunityBlock } from '@/lib/chat/pinned-opportunity';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import { serializeEntity } from '@/lib/chat/tokens';
 import { TOOL_SCHEMAS } from '@/lib/chat/tool-schemas';
@@ -209,5 +210,85 @@ describe('Golden eval-set CI gate: referenced-entity hydration', () => {
     expect(lower).not.toContain("another artist's");
     expect(lower).not.toContain("someone else's");
     expect(lower).not.toContain('not your');
+  });
+});
+
+/**
+ * Pinned opportunity golden case (JOV-3933 / GH #13174).
+ *
+ * Regression guard: when a thread is opened from an opportunity card, the
+ * server must inject the card facts into the system prompt so the model
+ * answers from them without the artist restating anything. The generic
+ * golden loop above builds the prompt WITHOUT the pin, so this block builds
+ * it exactly the way executeChatTurn does and asserts the injection.
+ */
+describe('Golden eval-set CI gate: pinned-opportunity injection', () => {
+  const evalTools = buildEvalTools();
+
+  const PINNED_CARD = {
+    id: '11111111-1111-4111-8111-111111111111',
+    title: 'Refresh weak YouTube thumbnails',
+    why: '4 videos still use auto-generated thumbs',
+    typeLabel: 'YouTube',
+    primaryActionLabel: 'Generate variants',
+    signalType: 'new_song',
+  } as const;
+
+  const golden = GOLDEN_CASES.find(
+    entry =>
+      entry.name ===
+      'Pinned opportunity: answer from card facts without restating'
+  );
+  if (!golden) {
+    throw new Error('Pinned opportunity golden case is missing from cases.ts');
+  }
+
+  function buildPromptWithPinnedOpportunity(): string {
+    const artistContext = buildTestArtistContext();
+    const releases = buildTestReleases();
+
+    return buildSystemPrompt(artistContext, releases, {
+      aiCanUseTools: true,
+      aiDailyMessageLimit: 50,
+      knowledgeContext: selectKnowledgeContext(golden.userPrompt) || undefined,
+      pinnedOpportunity: buildPinnedOpportunityBlock(PINNED_CARD),
+    });
+  }
+
+  it('injects the pinned card facts into the system prompt', () => {
+    const systemPrompt = buildPromptWithPinnedOpportunity();
+
+    expect(systemPrompt).toContain('## Pinned opportunity');
+    // The suggested_actions id ties the turn back to the card row.
+    expect(systemPrompt).toContain(`suggested_actions id: ${PINNED_CARD.id}`);
+    expect(systemPrompt).toContain(PINNED_CARD.title);
+    expect(systemPrompt).toContain(PINNED_CARD.why);
+    expect(systemPrompt).toContain(PINNED_CARD.primaryActionLabel);
+  });
+
+  it('answers from the injected card facts without a restate', async () => {
+    const systemPrompt = buildPromptWithPinnedOpportunity();
+
+    mockGenerateText.mockResolvedValueOnce({
+      text: getGoldenMockResponse(golden.name),
+    });
+
+    const result = await generateText({
+      model: { __model: CHAT_MODEL },
+      system: systemPrompt,
+      prompt: golden.userPrompt,
+      tools: evalTools,
+      maxOutputTokens: 500,
+      temperature: 0,
+    });
+
+    expect(mockGenerateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: golden.userPrompt,
+        system: systemPrompt,
+      })
+    );
+
+    assertGoldenCaseQuality(result.text, golden);
   });
 });
