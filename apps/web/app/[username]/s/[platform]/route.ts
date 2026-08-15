@@ -1,6 +1,9 @@
 /**
  * Social shortcut redirects: jov.ie/{username}/s/{platform}
  *
+ * Also serves jov.ie/{username}/{platform} (ig, tt, x, yt, sp, web) via an
+ * afterFiles rewrite in next.config.js (JOV-5072).
+ *
  * Found social link → 301 to the artist's URL.
  * Profile exists but platform missing/unknown → 302 to /{username} (no 404s for fans).
  * Unknown username → 404.
