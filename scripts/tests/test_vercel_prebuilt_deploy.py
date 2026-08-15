@@ -17,6 +17,54 @@ CANARY_WORKFLOW = REPO_ROOT / ".github/workflows/canary-health-gate.yml"
 EXPECTED_COMMIT_SHA = "a" * 40
 
 
+def test_production_next_cache_experiment_is_bounded_and_restore_only_by_default() -> None:
+    """Keep the production cache experiment narrow enough to be reversible.
+
+    The production build cache may speed ``vercel build --prod``, but it must
+    never turn a prebuilt deploy artifact (or dependencies) into a cache input.
+    Cache writes also require an explicit repository opt-in and a measured
+    compressed archive below the documented ceiling.
+    """
+
+    workflow = PRODUCTION_RELEASE_WORKFLOW.read_text()
+    restore_match = re.search(
+        r"      - name: Restore production Next build cache\n(?P<body>.*?)"
+        r"      - name: Build and stage production deployment\n",
+        workflow,
+        re.DOTALL,
+    )
+    assert restore_match, "production release must restore only the Next cache"
+    restore = restore_match.group("body")
+    assert "actions/cache/restore@" in restore
+    assert "path: apps/web/.next/cache" in restore
+    assert "jovie-production-next-cache-v1-" in restore
+
+    save_match = re.search(
+        r"      - name: Save bounded production Next build cache\n(?P<body>.*?)"
+        r"\n  production-public-profile-alias-gate:",
+        workflow,
+        re.DOTALL,
+    )
+    assert save_match, "production release must save through the bounded cache step"
+    save = save_match.group("body")
+    assert "actions/cache/save@" in save
+    assert "path: apps/web/.next/cache" in save
+    assert "steps.verify-production.outcome == 'success'" in save
+    assert "steps.stage-production.outputs.next_cache_save_eligible == 'true'" in save
+
+    for cache_step in (restore, save):
+        assert ".vercel/output" not in cache_step
+        assert "node_modules" not in cache_step
+        assert ".next/server" not in cache_step
+        assert ".next/static" not in cache_step
+
+    assert "JOVIE_PRODUCTION_NEXT_CACHE_SAVE" in workflow
+    assert "PRODUCTION_NEXT_CACHE_MAX_ARCHIVE_BYTES: '536870912'" in workflow
+    assert "tar -C apps/web/.next -czf \"$next_cache_probe\" cache" in workflow
+    assert "next_cache_archive_bytes" in workflow
+    assert "next_cache_save_eligible" in workflow
+
+
 def test_timed_out_prebuilt_with_accepted_url_hands_off_to_health_gate(
     tmp_path: Path,
 ) -> None:
