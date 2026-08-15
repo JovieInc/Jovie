@@ -791,6 +791,19 @@ jobs:
             echo "superseded_sha=$current_sha" >> "$GITHUB_OUTPUT"
             echo "is_current=false" >> "$GITHUB_OUTPUT"
           fi
+      # This is deliberately a restore-only cache by default. The cache is a
+      # Next compiler/build cache, never a Vercel deployment artifact. Writes
+      # require the repository variable JOVIE_PRODUCTION_NEXT_CACHE_SAVE=true
+      # and an independently measured bounded archive after a successful build.
+      - name: Restore production Next build cache
+        id: production-next-cache-restore
+        if: ${{ steps.mutation-head.outputs.is_current == 'true' }}
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: apps/web/.next/cache
+          key: jovie-production-next-cache-v1-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js', 'apps/web/vercel.json') }}
+          restore-keys: |
+            jovie-production-next-cache-v1-${{ runner.os }}-
       - name: Build and stage production deployment
         id: stage-production
         if: ${{ steps.mutation-head.outputs.is_current == 'true' }}
@@ -802,6 +815,9 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          PRODUCTION_NEXT_CACHE_RESTORE_HIT: ${{ steps.production-next-cache-restore.outputs.cache-hit }}
+          PRODUCTION_NEXT_CACHE_SAVE_ENABLED: ${{ vars.JOVIE_PRODUCTION_NEXT_CACHE_SAVE || 'false' }}
+          PRODUCTION_NEXT_CACHE_MAX_ARCHIVE_BYTES: '536870912'
         run: |
           production_stage() {
             set -euo pipefail
@@ -883,6 +899,46 @@ jobs:
           if [ ! -f .vercel/output/config.json ]; then
             fail_stage "Production build did not create .vercel/output/config.json." production_artifact_failed
           fi
+
+          # Measure the exact cache subtree before a separate save action can
+          # archive it. This must remain limited to apps/web/.next/cache: do
+          # not persist .vercel/output, server/static output, or node_modules.
+          next_cache_root='apps/web/.next/cache'
+          next_cache_bytes=0
+          next_cache_files=0
+          next_cache_archive_bytes=0
+          next_cache_save_eligible=false
+          if [ -e "$next_cache_root" ]; then
+            if [ -L "$next_cache_root" ] || [ ! -d "$next_cache_root" ]; then
+              fail_stage "Production Next cache root is unsafe or not a directory." production_artifact_failed
+            fi
+            next_cache_bytes="$(du -sb "$next_cache_root" | awk '{print $1}')"
+            next_cache_files="$(find "$next_cache_root" -type f -print | wc -l | tr -d ' ')"
+            next_cache_probe="$(mktemp "${RUNNER_TEMP:-/tmp}/jovie-production-next-cache.XXXXXX.tgz")"
+            tar -C apps/web/.next -czf "$next_cache_probe" cache
+            next_cache_archive_bytes="$(stat -c '%s' "$next_cache_probe")"
+            rm -f "$next_cache_probe"
+
+            if [ "${PRODUCTION_NEXT_CACHE_SAVE_ENABLED:-false}" = 'true' ] && \
+              [ "$next_cache_archive_bytes" -le "${PRODUCTION_NEXT_CACHE_MAX_ARCHIVE_BYTES}" ]; then
+              next_cache_save_eligible=true
+            fi
+          fi
+          {
+            echo "next_cache_bytes=$next_cache_bytes"
+            echo "next_cache_files=$next_cache_files"
+            echo "next_cache_archive_bytes=$next_cache_archive_bytes"
+            echo "next_cache_save_eligible=$next_cache_save_eligible"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo '### Production Next build cache'
+            echo "- restored: ${PRODUCTION_NEXT_CACHE_RESTORE_HIT:-false}"
+            echo "- cache files: $next_cache_files"
+            echo "- cache bytes: $next_cache_bytes"
+            echo "- measured gzip archive bytes: $next_cache_archive_bytes"
+            echo "- write enabled: ${PRODUCTION_NEXT_CACHE_SAVE_ENABLED:-false}"
+            echo "- save eligible (<= ${PRODUCTION_NEXT_CACHE_MAX_ARCHIVE_BYTES} bytes): $next_cache_save_eligible"
+          } >> "$GITHUB_STEP_SUMMARY"
 
           deploy_json=""
           export VERCEL_GIT_COMMIT_SHA="$EXPECTED_SHA"
@@ -1125,6 +1181,16 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         run: bash .github/scripts/verify-production-alias.sh
+
+      - name: Save bounded production Next build cache
+        # Keep this after exact production verification. It is intentionally
+        # non-blocking for normal releases because writes are opt-in, but an
+        # enabled experiment may never cache an unverified staged build.
+        if: ${{ steps.verify-production.outcome == 'success' && steps.stage-production.outputs.next_cache_save_eligible == 'true' }}
+        uses: actions/cache/save@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.2.3
+        with:
+          path: apps/web/.next/cache
+          key: ${{ steps.production-next-cache-restore.outputs.cache-primary-key }}
 
   production-public-profile-alias-gate:
     name: Production public-profile alias usable-result gate
