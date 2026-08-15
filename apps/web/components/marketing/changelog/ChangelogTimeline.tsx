@@ -2,6 +2,7 @@
 
 import { Badge } from '@jovie/ui/atoms/badge';
 import { Button } from '@jovie/ui/atoms/button';
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import type {
@@ -11,13 +12,17 @@ import type {
 } from '@/lib/changelog-parser';
 import { parseChangelogInline } from '@/lib/changelog-parser';
 
-const INITIAL_RELEASE_COUNT = 10;
-const RELEASE_BATCH_SIZE = 10;
+const INITIAL_RELEASE_COUNT = 1;
+const RELEASE_BATCH_SIZE = 5;
 
 const SECTION_LABELS: Record<
   keyof ChangelogSection,
   { readonly label: string; readonly color: string }
 > = {
+  featured: {
+    label: 'Featured',
+    color: 'bg-accent-purple-subtle text-accent-purple',
+  },
   added: {
     label: 'New',
     color: 'bg-accent-green-subtle text-accent-green',
@@ -120,6 +125,7 @@ export function ChangelogTimeline({ releases }: ChangelogTimelineProps) {
         {visibleReleases.map((release, releaseIndex) => (
           <article
             key={`${release.version}-${release.date ?? 'unreleased'}`}
+            id={`v${release.version}`}
             className='relative border-l-2 border-subtle pl-6'
             aria-posinset={releaseIndex + 1}
             aria-setsize={releases.length}
@@ -127,13 +133,15 @@ export function ChangelogTimeline({ releases }: ChangelogTimelineProps) {
             <div className='absolute -left-1.5 top-1 h-3 w-3 rounded-full bg-tertiary-token opacity-30' />
 
             <div className='flex flex-wrap items-center gap-2 mb-4'>
-              <Badge
-                variant='outline'
-                className='font-mono text-xs motion-reduce:transition-none'
-              >
-                {/* ui-casing-allow: semantic version string */}v
-                {release.version}
-              </Badge>
+              <Link href={`/changelog/${encodeURIComponent(release.version)}`}>
+                <Badge
+                  variant='outline'
+                  className='font-mono text-xs motion-reduce:transition-none'
+                >
+                  {/* ui-casing-allow: semantic version string */}v
+                  {release.version}
+                </Badge>
+              </Link>
               {release.date && (
                 <span className='text-xs text-tertiary-token'>
                   {formatDate(release.date)}

@@ -8,6 +8,7 @@ import { getAlternativeSlugs } from '@/content/alternatives';
 import { getComparisonSlugs } from '@/content/comparisons';
 import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
 import { CACHE_TAGS } from '@/lib/cache/tags';
+import { getChangelogReleases } from '@/lib/changelog-source';
 import { db } from '@/lib/db';
 import {
   discogRecordings,
@@ -150,9 +151,10 @@ const getSitemapCatalog = unstable_cache(
 );
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [catalog, blogPosts] = await Promise.all([
+  const [catalog, blogPosts, changelogReleases] = await Promise.all([
     getSitemapCatalog(),
     getBlogPosts(),
+    getChangelogReleases(),
   ]);
 
   const now = new Date();
@@ -220,6 +222,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: 'monthly',
     priority: 0.7,
   }));
+
+  const changelogPages: MetadataRoute.Sitemap = changelogReleases.map(
+    release => ({
+      url: `${BASE_URL}/changelog/${encodeURIComponent(release.version)}`,
+      lastModified: release.date ? new Date(`${release.date}T00:00:00Z`) : now,
+      changeFrequency: 'monthly',
+      priority: 0.4,
+    })
+  );
 
   // Blog author pages
   const blogAuthors = [
@@ -333,6 +344,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return [
     ...staticPages,
+    ...changelogPages,
     ...blogPages,
     ...blogAuthorPages,
     ...blogCategoryPages,
