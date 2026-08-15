@@ -16,7 +16,7 @@ permissions:
 
 concurrency:
   # One controller writer for all events. The durable receipt is idempotent,
-  # and this serializes the governor's one-normal-candidate bound.
+  # while the governor independently bounds implementation leases to four.
   group: jovie-intake-admission
   cancel-in-progress: false
 

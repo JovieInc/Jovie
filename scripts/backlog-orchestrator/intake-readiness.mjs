@@ -177,10 +177,10 @@ export function changedIntakeIssues(issues, previousFingerprints = {}) {
   });
 }
 
-/** Select at most one ordinary and one explicitly low-risk Sentry candidate. */
+/** Select at most four independent ordinary and one explicitly low-risk Sentry candidate. */
 export function applyAdmissionThrottle(
   receipts,
-  { normalLimit = 1, lowRiskIncidentLimit = 1 } = {}
+  { normalLimit = 4, lowRiskIncidentLimit = 1 } = {}
 ) {
   const normal = receipts
     .filter(receipt => receipt.disposition === 'mechanical-ready')
