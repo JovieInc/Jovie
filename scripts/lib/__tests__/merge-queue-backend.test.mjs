@@ -898,9 +898,7 @@ describe('native enrollment', () => {
 
   it('refuses a held exact head before invoking the enrollment mutation', async () => {
     const runner = createNativeRunner({
-      states: [
-        prState({ labels: { nodes: [{ name: 'queue-deferred' }] } }),
-      ],
+      states: [prState({ labels: { nodes: [{ name: 'queue-deferred' }] } })],
     });
     await expect(enroll(runner)).rejects.toMatchObject({
       code: 'held_pull_request',
