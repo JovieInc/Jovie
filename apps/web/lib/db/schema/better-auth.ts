@@ -17,9 +17,9 @@ import {
  * separate from the app `users` table; the link column is
  * `users.better_auth_user_id` (nullable, unique).
  *
- * OAuth-provider tables (`oauthClient` / `oauthRefreshToken` /
+ * JWT signing keys and OAuth-provider tables (`oauthClient` / `oauthRefreshToken` /
  * `oauthAccessToken` / `oauthConsent`) must cover every field declared by the
- * pinned `@better-auth/oauth-provider` schema. Contract:
+ * pinned Better Auth plugin schemas. Contract:
  * `tests/unit/auth/oauth-provider-schema-contract.test.ts`.
  *
  * Field keys are camelCase to match Better Auth's default `fieldName`s — the
@@ -68,6 +68,8 @@ export const baJwks = pgTable('ba_jwks', {
   privateKey: text('private_key').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   expiresAt: timestamp('expires_at'),
+  alg: text('alg'),
+  crv: text('crv'),
 });
 
 export const baOauthClients = pgTable(

@@ -624,6 +624,13 @@
       "when": 1786147200000,
       "tag": "0088_discog_tracks_creator_slug_index",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1786757641966,
+      "tag": "0089_curious_exodus",
+      "breakpoints": true
     }
   ]
 }

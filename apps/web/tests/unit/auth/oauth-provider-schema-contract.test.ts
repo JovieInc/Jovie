@@ -1,7 +1,9 @@
 import { oauthProvider } from '@better-auth/oauth-provider';
+import { jwt } from 'better-auth/plugins';
 import { getTableColumns } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import {
+  baJwks,
   baOauthAccessTokens,
   baOauthClients,
   baOauthConsents,
@@ -15,8 +17,9 @@ import {
  * "fields including authorizationCodeId are missing from the mapped
  * oauthRefreshToken / oauthAccessToken schema").
  *
- * Derive the field set from the installed package at test time so a provider
- * bump that adds columns fails CI before production token exchange breaks.
+ * JOV-5111: the JWT plugin also participates in OAuth token signing, so its
+ * signing-key model must stay mapped too. Derive field sets from the installed
+ * packages so dependency bumps fail CI before production token exchange.
  */
 const MAPPED_OAUTH_MODELS = {
   oauthClient: baOauthClients,
@@ -51,7 +54,25 @@ function drizzleFieldNames(
     .sort();
 }
 
-describe('OAuth provider schema contract (JOV-4587)', () => {
+describe('OAuth provider schema contract (JOV-4587, JOV-5111)', () => {
+  it('maps every JWT signing-key field required by the pinned Better Auth plugin', () => {
+    const jwksSchema = jwt().schema?.jwks;
+    if (!jwksSchema?.fields) {
+      throw new Error('Pinned Better Auth JWT plugin has no jwks schema');
+    }
+
+    const required = Object.keys(jwksSchema.fields).sort();
+    const mapped = Object.keys(getTableColumns(baJwks))
+      .filter(name => name !== 'id')
+      .sort();
+    const missing = required.filter(field => !mapped.includes(field));
+
+    expect(
+      missing,
+      `Drizzle table for jwks is missing JWT plugin fields: ${missing.join(', ')}. Expand apps/web/lib/db/schema/better-auth.ts and generate a migration.`
+    ).toEqual([]);
+  });
+
   it.each(
     Object.keys(MAPPED_OAUTH_MODELS) as MappedOAuthModel[]
   )('maps every %s field declared by the pinned oauth-provider', model => {
