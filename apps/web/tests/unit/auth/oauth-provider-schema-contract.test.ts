@@ -1,7 +1,9 @@
 import { oauthProvider } from '@better-auth/oauth-provider';
+import { jwt } from 'better-auth/plugins';
 import { getTableColumns } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import {
+  baJwks,
   baOauthAccessTokens,
   baOauthClients,
   baOauthConsents,
@@ -75,5 +77,28 @@ describe('OAuth provider schema contract (JOV-4587)', () => {
     for (const model of Object.keys(MAPPED_OAUTH_MODELS)) {
       expect(providerModels).toContain(model);
     }
+  });
+});
+
+describe('JWT schema contract (JOV-5086)', () => {
+  it('maps every JWKS field declared by the pinned Better Auth JWT plugin', () => {
+    const plugin = jwt({
+      jwks: {
+        keyPairConfig: { alg: 'EdDSA', crv: 'Ed25519' },
+      },
+    });
+    const required = Object.keys(plugin.schema?.jwks?.fields ?? {}).sort();
+    const mapped = Object.keys(getTableColumns(baJwks))
+      .filter(name => name !== 'id')
+      .sort();
+    const missing = required.filter(field => !mapped.includes(field));
+
+    expect(required).toEqual(
+      expect.arrayContaining(['publicKey', 'privateKey', 'alg', 'crv'])
+    );
+    expect(
+      missing,
+      `Drizzle table for jwks is missing JWT fields: ${missing.join(', ')}. Expand apps/web/lib/db/schema/better-auth.ts and generate a migration.`
+    ).toEqual([]);
   });
 });
