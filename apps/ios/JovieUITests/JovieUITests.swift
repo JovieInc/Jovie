@@ -375,9 +375,22 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "no-ghost-footprint-chat", app: chatApp)
 
     chatApp.buttons["Open navigation drawer"].tap()
-    chatApp.buttons["shell-drawer-surface-shell-tab-profile"].tap()
+    let contentPlaneMarker = chatApp.buttons["Open navigation drawer"]
+    let profileSurface = chatApp.buttons["shell-drawer-surface-shell-tab-profile"]
+    XCTAssertTrue(
+      waitForDrawerSurfaceToBeUncovered(
+        profileSurface,
+        contentPlaneMarker: contentPlaneMarker,
+        timeout: 3
+      ),
+      "Profile surface stayed covered by the opening content plane.\n\(chatApp.debugDescription)"
+    )
+    profileSurface.tap()
     let copyURLButton = chatApp.buttons["Copy URL"]
-    XCTAssertTrue(copyURLButton.waitForExistence(timeout: 10))
+    XCTAssertTrue(
+      copyURLButton.waitForExistence(timeout: 10),
+      "Shell navigation did not switch to Profile.\n\(chatApp.debugDescription)"
+    )
     attachScreenshot(named: "no-ghost-footprint-profile", app: chatApp)
     endUITestSession(chatApp)
 
@@ -1187,14 +1200,17 @@ final class JovieUITests: XCTestCase {
   }
 
   /// SwiftUI reports recessed drawer controls hittable before the animated
-  /// content plane has physically cleared them. Wait on the actual frames so
-  /// XCUITest cannot synthesize a tap into the covering plane.
+  /// content plane and delayed row reveal have settled. Wait on the actual
+  /// frames and require a short stable interval so XCUITest cannot synthesize
+  /// a tap into either transition.
   private func waitForDrawerSurfaceToBeUncovered(
     _ surface: XCUIElement,
     contentPlaneMarker: XCUIElement,
     timeout: TimeInterval
   ) -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
+    let stableInterval: TimeInterval = 0.1
+    var uncoveredSince: Date?
 
     while Date() < deadline {
       if surface.exists,
@@ -1202,16 +1218,19 @@ final class JovieUITests: XCTestCase {
          contentPlaneMarker.exists,
          contentPlaneMarker.frame.minX >= surface.frame.maxX
       {
-        return true
+        let now = Date()
+        if let uncoveredSince, now.timeIntervalSince(uncoveredSince) >= stableInterval {
+          return true
+        }
+        uncoveredSince = uncoveredSince ?? now
+      } else {
+        uncoveredSince = nil
       }
 
       RunLoop.current.run(until: Date().addingTimeInterval(0.05))
     }
 
-    return surface.exists
-      && surface.isHittable
-      && contentPlaneMarker.exists
-      && contentPlaneMarker.frame.minX >= surface.frame.maxX
+    return false
   }
 
   /// Resolve a primary tab bar / Talk FAB control by accessibility identifier.
