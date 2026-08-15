@@ -176,9 +176,13 @@ describe('Rate Limit Config', () => {
         expect(capture.limit).toBe(20);
         expect(capture.window).toBe(RATE_LIMITERS.general.window);
         expect(capture.prefix).toBe('public:profile:capture-dismissal');
+        expect(capture.trafficClass).toBe('anonymous');
+        expect(capture.algorithm).toBe('fixed-window');
         expect(pac.limit).toBe(40);
         expect(pac.window).toBe(RATE_LIMITERS.general.window);
         expect(pac.prefix).toBe('public:profile:pac-event');
+        expect(pac.trafficClass).toBe('anonymous');
+        expect(pac.algorithm).toBe('fixed-window');
         expect(capture.prefix).not.toBe(pac.prefix);
         expect(capture.limit + pac.limit).toBe(RATE_LIMITERS.general.limit);
       });

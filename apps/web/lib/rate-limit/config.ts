@@ -431,6 +431,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'public:profile:capture-dismissal',
     analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   /**
@@ -445,6 +447,8 @@ export const RATE_LIMITERS = {
     window: '1 m',
     prefix: 'public:profile:pac-event',
     analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
