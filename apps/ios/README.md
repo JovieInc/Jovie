@@ -128,7 +128,7 @@ endpoints. The `beta` lane validates the WRITTEN
 `Configuration.local.plist` immediately before archiving and rejects any stale
 artifact that still embeds a retired provider publishable-key field.
 
-`bootstrap_signing` is intentionally manual. It creates or verifies the Apple bundle identifier, enables Associated Domains, creates or verifies the App Store Connect app record, and writes App Store distribution assets into match storage. Normal TestFlight uploads use readonly match in CI.
+`bootstrap_signing` is intentionally manual. It creates or verifies the Apple bundle identifier and App Store Connect app record, then writes App Store distribution assets into match storage. Normal TestFlight uploads use readonly match in CI.
 
 ## Notes
 

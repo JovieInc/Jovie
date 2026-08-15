@@ -745,8 +745,9 @@ describe('deploy workflow Vercel env resolution', () => {
     expect(uploadMarker).toContain('name: testflight-upload-verified');
     expect(uploadMarker).toContain('retention-days: 90');
 
-    expect(envValidator).toContain('CLERK_ASSOCIATED_DOMAIN');
+    expect(envValidator).not.toContain('CLERK_ASSOCIATED_DOMAIN');
     expect(envValidator).not.toContain('CLERK_PUBLISHABLE_KEY');
+    expect(fastlane).not.toContain('CLERK_ASSOCIATED_DOMAIN');
     expect(fastlane).not.toContain('require_env!("CLERK_PUBLISHABLE_KEY")');
     expect(fastlane).toContain('def verify_release_sha_is_current_main!');
     expect(fastlane).toContain('repos/#{repository}/commits/main');
