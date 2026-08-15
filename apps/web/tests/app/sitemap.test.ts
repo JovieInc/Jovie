@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/cache', () => ({
   unstable_cache: (callback: () => Promise<unknown>) => callback,
@@ -23,6 +23,9 @@ vi.mock('@/lib/blog/getBlogPosts', async importOriginal => {
     slugifyCategory: actual.slugifyCategory,
   };
 });
+
+const getChangelogReleases = vi.fn();
+vi.mock('@/lib/changelog-source', () => ({ getChangelogReleases }));
 
 const queryMock = vi.fn();
 const whereMock = vi.fn<() => Promise<unknown[]>>(() => Promise.resolve([]));
@@ -109,6 +112,23 @@ vi.mock('@sentry/nextjs', () => ({
 }));
 
 describe('sitemap', () => {
+  beforeEach(() => {
+    getChangelogReleases.mockResolvedValue([
+      {
+        version: '26.8.0',
+        date: '2026-08-14',
+        summary: 'A concise release.',
+        sections: {
+          featured: [],
+          added: [],
+          changed: [],
+          fixed: [],
+          removed: [],
+        },
+      },
+    ]);
+  });
+
   it('returns marketing, blog, profile, release, and deduplicated track URLs', async () => {
     getBlogPosts.mockResolvedValue([
       {
@@ -160,6 +180,7 @@ describe('sitemap', () => {
         'https://jov.ie',
         'https://jov.ie/blog',
         'https://jov.ie/blog/hello-world',
+        'https://jov.ie/changelog/26.8.0',
         'https://jov.ie/legal/privacy',
         'https://jov.ie/legal/terms',
         'https://jov.ie/tim',

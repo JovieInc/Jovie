@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseChangelog, parseChangelogInline } from '../changelog-parser';
+import {
+  changelogInlineText,
+  parseChangelog,
+  parseChangelogInline,
+} from '../changelog-parser';
 
 const BASIC_CHANGELOG = `# Changelog
 
@@ -128,12 +132,26 @@ describe('parseChangelog', () => {
     expect(releases[0].date).toBe('');
   });
 
+  it('omits impossible calendar dates', () => {
+    const releases = parseChangelog(`## [1.0.0] - 2026-99-99
+
+### Fixed
+
+- A safe fallback
+`);
+    expect(releases[0].date).toBe('');
+  });
+
   it('returns empty array for empty input', () => {
     expect(parseChangelog('')).toEqual([]);
   });
 
-  it('handles all four section types', () => {
+  it('handles all five section types', () => {
     const md = `## [1.0.0] - 2026-01-01
+
+### Featured
+
+- Featured thing
 
 ### Added
 
@@ -152,6 +170,7 @@ describe('parseChangelog', () => {
 - Old thing
 `;
     const releases = parseChangelog(md);
+    expect(releases[0].sections.featured).toEqual(['Featured thing']);
     expect(releases[0].sections.added).toEqual(['New thing']);
     expect(releases[0].sections.changed).toEqual(['Updated thing']);
     expect(releases[0].sections.fixed).toEqual(['Broken thing']);
@@ -388,6 +407,11 @@ describe('parseChangelog', () => {
 });
 
 describe('parseChangelogInline', () => {
+  it('normalizes supported inline Markdown to plain text', () => {
+    expect(changelogInlineText('**Public pitch at `/pitch`** is live.')).toBe(
+      'Public pitch at /pitch is live.'
+    );
+  });
   it('parses code nested inside strong changelog copy', () => {
     expect(
       parseChangelogInline('**Public pitch deck route at `/pitch`** is live.')
