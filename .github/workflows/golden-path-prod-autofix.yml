@@ -70,13 +70,13 @@ jobs:
             echo "::error::Golden-path prod probe wrote no receipt; refusing to skip."
             exit 1
           fi
-          if [[ -z "${CURSOR_API_KEY:-}" ]]; then
-            echo "::error::CURSOR_API_KEY is missing. Detect without a ship lock is a hole."
-            exit 1
-          fi
           if [[ "$PROBE_OUTCOME" == "success" ]]; then
             echo "Live golden path passed. Cursor-direct not launched."
             exit 0
+          fi
+          if [[ -z "${CURSOR_API_KEY:-}" ]]; then
+            echo "::error::CURSOR_API_KEY is missing. Detect without a ship lock is a hole."
+            exit 1
           fi
           node scripts/golden-path-lock.mjs autofix \
             --receipt /tmp/golden-path-lock/receipt.json
