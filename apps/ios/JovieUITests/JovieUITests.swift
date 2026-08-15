@@ -1045,9 +1045,16 @@ final class JovieUITests: XCTestCase {
     )
 
     XCTAssertTrue(
-      app.staticTexts["Couldn't finish sign-in. Try again."].waitForExistence(timeout: 10),
+      app.staticTexts["Sign-in was cancelled. Sign in again when you're ready."]
+        .waitForExistence(timeout: 10),
       "Provider error callback did not render the auth error.\n\(app.debugDescription)"
     )
+    let retryButton = app.buttons["Sign In Again"]
+    XCTAssertTrue(
+      retryButton.exists && retryButton.isEnabled && retryButton.isHittable,
+      "Provider error callback did not expose the retry action.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "auth-cancel-recovery", app: app)
   }
 
   private func makeLiveAuthApp(launchArgument: String) -> XCUIApplication {
