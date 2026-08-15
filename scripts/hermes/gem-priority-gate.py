@@ -599,6 +599,11 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and len(reasons) == 1
         and reasons[0]["code"] == "production-deployment-unbound"
     )
+    unbound_repair_allowed = (
+        hold_intake_allowed
+        and valid_commit_sha(main.get("sha"), exact=True)
+        and valid_commit_sha(production.get("deployedSha"))
+    )
     if isolated_promotion_allowed:
         promotion_mode = "isolated-only"
     elif state == "GREEN":
@@ -650,6 +655,20 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             if deployment_allowed
             else [],
             "authority": "exact-main-production-controller",
+        },
+        "productionUnboundRepairAdmission": {
+            "allowed": unbound_repair_allowed,
+            "condition": "production-deployment-unbound"
+            if unbound_repair_allowed
+            else None,
+            "mainSha": main.get("sha") if unbound_repair_allowed else None,
+            "deployedSha": production.get("deployedSha")
+            if unbound_repair_allowed
+            else None,
+            "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
+            "maxConcurrent": 1,
+            "deploymentsAllowed": False,
+            "authority": "canonical-merge-queue-controller",
         },
         "isolatedPromotionAdmission": {
             "allowed": isolated_promotion_allowed,

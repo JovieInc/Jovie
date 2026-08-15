@@ -128,6 +128,19 @@ case "$DRAIN_PROMOTION_MODE" in
         .signals.production.status == "green" and
         .promotionAdmission.allowed == false and
         .isolatedPromotionAdmission.allowed == false and
+        (.productionUnboundRepairAdmission.allowed | type == "boolean") and
+        (if .productionUnboundRepairAdmission.allowed then
+          .productionUnboundRepairAdmission.condition == "production-deployment-unbound" and
+          (.productionUnboundRepairAdmission.mainSha | test("^[0-9a-f]{40}$")) and
+          (.productionUnboundRepairAdmission.deployedSha | test("^[0-9a-f]{7,40}$")) and
+          .productionUnboundRepairAdmission.mainSha != .productionUnboundRepairAdmission.deployedSha
+        else
+          .productionUnboundRepairAdmission.condition == null and
+          .productionUnboundRepairAdmission.mainSha == null and
+          .productionUnboundRepairAdmission.deployedSha == null
+        end) and
+        .productionUnboundRepairAdmission.maxConcurrent == 1 and
+        .productionUnboundRepairAdmission.deploymentsAllowed == false and
         .alreadyAdmittedCohort.preserve == true and
         .alreadyAdmittedCohort.newIntakeAllowed == true
       else
@@ -407,7 +420,7 @@ reconcile_deferred_auto_merge_after_main_push() {
 enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr authorized-head]
   local n="$1" authorized_pr="${2:-$DRAIN_ADMISSION_PR}" authorized_head="${3:-$DRAIN_ADMISSION_HEAD}"
   local current head_oid expected_head json_fields
-  json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName"
+  json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName,body"
   if ! current="$(gh_retry pr view "$n" -R "$REPO" \
     --json "$json_fields" 2>/dev/null)"; then
     echo "    !! could not refresh #$n eligibility; refusing enrollment" >&2
@@ -468,6 +481,16 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       echo "    ⏸ exact-head isolated UI/docs receipt is absent or invalid for #$n"
       return 2
     fi
+  elif [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" ]]; then
+    local repair_main repair_marker
+    repair_main="$(jq -r '.productionUnboundRepairAdmission.mainSha // empty' <<<"$FLEET_GATE_JSON")"
+    repair_marker="<!-- production-unbound-repair:production-deployment-unbound:${repair_main} -->"
+    if ! jq -e --arg marker "$repair_marker" '
+      (.body // "") | contains($marker)
+    ' <<<"$current" >/dev/null; then
+      echo "    ⏸ exact active-condition repair attestation is absent for #$n"
+      return 2
+    fi
   elif [[ "$DRAIN_PROMOTION_MODE" != "normal" ]]; then
     echo "    ⏸ fleet mode $DRAIN_PROMOTION_MODE forbids queue enrollment"
     return 2
@@ -492,7 +515,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     # compensate immediately if a gated/held label appeared while the queue
     # mutation was in flight.
     if ! current="$(gh_retry pr view "$n" -R "$REPO" \
-      --json state,isDraft,mergeable,labels,headRefOid,baseRefName 2>/dev/null)"; then
+      --json state,isDraft,mergeable,labels,headRefOid,baseRefName,body 2>/dev/null)"; then
       echo "    !! could not refresh #$n after native enrollment; compensating" >&2
       if ! dequeue_strict "$n"; then
         echo "    !! CRITICAL: could not compensate uncertain native enrollment for #$n" >&2
@@ -518,6 +541,16 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
         return 1
       fi
       return 2
+    fi
+    if [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" ]]; then
+      repair_main="$(jq -r '.productionUnboundRepairAdmission.mainSha // empty' <<<"$FLEET_GATE_JSON")"
+      repair_marker="<!-- production-unbound-repair:production-deployment-unbound:${repair_main} -->"
+      if ! jq -e --arg marker "$repair_marker" '(.body // "") | contains($marker)' \
+        <<<"$current" >/dev/null; then
+        echo "    ⏸ repair attestation changed during native enrollment for #$n; compensating"
+        dequeue_strict "$n" || return 1
+        return 2
+      fi
     fi
 
     # PR descriptions and check state can change without changing the source
@@ -801,8 +834,14 @@ if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
       'map(if .n == $n then . + {iso: $eligible} else . end)' <<<"$CLASSIFIED")"
   done < <(jq -c '.[]' <<<"$SNAP")
   SNAP="$CLASSIFIED"
+elif [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" ]]; then
+  REPAIR_MAIN_SHA="$(jq -r '.productionUnboundRepairAdmission.mainSha // empty' <<<"$FLEET_GATE_JSON")"
+  REPAIR_MARKER="<!-- production-unbound-repair:production-deployment-unbound:${REPAIR_MAIN_SHA} -->"
+  SNAP="$(jq -c --arg marker "$REPAIR_MARKER" '
+    map(. + {iso: false, unboundRepair: ((.body // "") | contains($marker))})
+  ' <<<"$SNAP")"
 else
-  SNAP="$(jq -c 'map(. + {iso: false})' <<<"$SNAP")"
+  SNAP="$(jq -c 'map(. + {iso: false, unboundRepair: false})' <<<"$SNAP")"
 fi
 
 ENRICHED="$(jq -c 'map(. + {fail: ["required check status unavailable"]})' <<<"$SNAP")"
@@ -1018,6 +1057,14 @@ elif [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
   MAX_QUEUE_DEPTH=1
   QUEUED_NOW=$([[ -n "${ISOLATED_KEEP_PR:-}" ]] && echo 1 || echo 0)
   ENROLL_SLOTS=$((MAX_QUEUE_DEPTH - QUEUED_NOW))
+elif [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" ]]; then
+  QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select(.q == true)] | length')
+  REPAIR_QUEUED=$(echo "$SNAP" | jq '[.[] | select(.q == true and .unboundRepair == true)] | length')
+  if [[ "$REPAIR_QUEUED" -eq 0 && "$QUEUED_NOW" -lt "$MAX_QUEUE_DEPTH" ]]; then
+    ENROLL_SLOTS=1
+  else
+    ENROLL_SLOTS=0
+  fi
 elif [[ "$DRAIN_FREEZE_EXISTING_QUEUE" == "1" ]]; then
   MAX_QUEUE_DEPTH=0
   QUEUED_NOW=0
@@ -1060,7 +1107,11 @@ while read -r pr; do
     exit 1
   fi
 done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg promotion_mode "$DRAIN_PROMOTION_MODE" '.[]
-  | select($promotion_mode == "normal" or ($promotion_mode == "isolated-only" and .iso == true))
+  | select(
+      $promotion_mode == "normal"
+      or ($promotion_mode == "isolated-only" and .iso == true)
+      or ($promotion_mode == "hold-intake" and .unboundRepair == true)
+    )
   | select((.n | tostring) == $admission_pr)
   | select(.draft|not)
   | select(.m=="MERGEABLE")
