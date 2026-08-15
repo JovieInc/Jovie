@@ -44,6 +44,22 @@ const AUTOMATED_FAILURES = Object.freeze({
     owner: 'gem',
     action: 'restore-event-trigger-and-reconcile',
   },
+  'restart-failed': {
+    owner: 'gem',
+    action: 'rollback-attested-service-and-create-bounded-repair-task',
+  },
+  'toolchain-degraded': {
+    owner: 'gem',
+    action: 'degrade-to-safe-mode-and-create-toolchain-repair-task',
+  },
+  'capacity-saturated': {
+    owner: 'gem',
+    action: 'apply-backpressure-and-reconcile-lane-capacity',
+  },
+  'delivery-dead-letter': {
+    owner: 'symphony',
+    action: 'inspect-dead-letter-and-create-bounded-repair-pr',
+  },
 });
 
 const STAGES = new Set([
