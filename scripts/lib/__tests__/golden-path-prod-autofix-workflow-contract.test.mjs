@@ -34,6 +34,21 @@ describe('Golden Path prod autofix workflow contract', () => {
     );
   });
 
+  it('does not require Cursor when the live probe already passed', () => {
+    const receiptGuard = WORKFLOW.indexOf(
+      'Golden-path prod probe wrote no receipt; refusing to skip.'
+    );
+    const successGuard = WORKFLOW.indexOf(
+      'if [[ "$PROBE_OUTCOME" == "success" ]]; then'
+    );
+    const cursorGuard = WORKFLOW.indexOf(
+      'if [[ -z "${CURSOR_API_KEY:-}" ]]; then'
+    );
+    expect(receiptGuard).toBeGreaterThan(-1);
+    expect(successGuard).toBeGreaterThan(receiptGuard);
+    expect(cursorGuard).toBeGreaterThan(successGuard);
+  });
+
   it('does not live inside the read-only post-deploy probe workflow', () => {
     const postdeploy = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/postdeploy-probes.yml'),
