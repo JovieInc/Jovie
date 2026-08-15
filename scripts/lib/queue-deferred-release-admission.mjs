@@ -5,8 +5,7 @@
  * never authority while the fleet controller is degraded.
  */
 
-export const QUEUE_DEFERRED_RELEASE_SCHEMA =
-  'jovie-queue-deferred-release/v1';
+export const QUEUE_DEFERRED_RELEASE_SCHEMA = 'jovie-queue-deferred-release/v1';
 export const QUEUE_DEFERRED_RELEASE_MARKER =
   '<!-- bot-comment:queue-deferred-release -->';
 export const QUEUE_DEFERRED_RELEASE_ACTOR = 'jovie-bot[bot]';
@@ -26,7 +25,10 @@ function exactSha(value) {
  * failures below.  RED, unknown source/production, and any product/integrity
  * signal remain fail-closed.
  */
-export function evaluateQueueDeferredReleaseFleetGate(receipt, now = Date.now()) {
+export function evaluateQueueDeferredReleaseFleetGate(
+  receipt,
+  now = Date.now()
+) {
   if (!receipt || typeof receipt !== 'object') {
     return { allowed: false, mode: null, reason: 'fleet-receipt-malformed' };
   }
@@ -34,7 +36,10 @@ export function evaluateQueueDeferredReleaseFleetGate(receipt, now = Date.now())
   if (!Number.isFinite(observed) || Math.abs(now - observed) > 10 * 60_000) {
     return { allowed: false, mode: null, reason: 'fleet-receipt-stale' };
   }
-  if (receipt.state === 'GREEN' && receipt?.promotionAdmission?.allowed === true) {
+  if (
+    receipt.state === 'GREEN' &&
+    receipt?.promotionAdmission?.allowed === true
+  ) {
     return { allowed: true, mode: 'normal', reason: 'fleet-green' };
   }
 
@@ -86,8 +91,12 @@ export function validateQueueDeferredRelease(candidate, now = Date.now()) {
   if (!Number.isInteger(candidate.pr) || candidate.pr < 1) {
     errors.push('pr must be a positive integer');
   }
-  if (!exactSha(candidate.head)) errors.push('head must be an exact lowercase SHA');
-  if (typeof candidate.releasedAt !== 'string' || !Number.isFinite(Date.parse(candidate.releasedAt))) {
+  if (!exactSha(candidate.head))
+    errors.push('head must be an exact lowercase SHA');
+  if (
+    typeof candidate.releasedAt !== 'string' ||
+    !Number.isFinite(Date.parse(candidate.releasedAt))
+  ) {
     errors.push('releasedAt must be an ISO timestamp');
   }
   if (!['normal', 'deferred-release-only'].includes(candidate.mode)) {
@@ -122,7 +131,10 @@ export function renderQueueDeferredReleaseComment(input) {
 }
 
 export function extractQueueDeferredRelease(body, now = Date.now()) {
-  if (typeof body !== 'string' || !body.includes(QUEUE_DEFERRED_RELEASE_MARKER)) {
+  if (
+    typeof body !== 'string' ||
+    !body.includes(QUEUE_DEFERRED_RELEASE_MARKER)
+  ) {
     return null;
   }
   const match = body.match(/```json\s*\n([\s\S]*?)\n```/);
@@ -160,7 +172,9 @@ export async function runCli(argv = process.argv.slice(2)) {
     try {
       value = JSON.parse(await stdin());
     } catch {
-      process.stdout.write('{"allowed":false,"reason":"fleet-receipt-malformed"}\n');
+      process.stdout.write(
+        '{"allowed":false,"reason":"fleet-receipt-malformed"}\n'
+      );
       return 2;
     }
     const result = evaluateQueueDeferredReleaseFleetGate(value);
@@ -185,12 +199,16 @@ export async function runCli(argv = process.argv.slice(2)) {
     process.stdout.write(`${JSON.stringify(receipt)}\n`);
     return 0;
   }
-  throw new Error('Usage: queue-deferred-release-admission.mjs <fleet|render|extract>');
+  throw new Error(
+    'Usage: queue-deferred-release-admission.mjs <fleet|render|extract>'
+  );
 }
 
 if (import.meta.url === new URL(process.argv[1], 'file:').href) {
-  runCli().then(code => process.exitCode = code).catch(error => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  });
+  runCli()
+    .then(code => (process.exitCode = code))
+    .catch(error => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    });
 }

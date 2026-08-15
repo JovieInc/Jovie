@@ -15,7 +15,10 @@ const autoenroll = readFileSync(
   resolve(repoRoot, '.github/workflows/merge-queue-autoenroll.yml'),
   'utf8'
 );
-const drain = readFileSync(resolve(repoRoot, 'scripts/drain-pr-queue.sh'), 'utf8');
+const drain = readFileSync(
+  resolve(repoRoot, 'scripts/drain-pr-queue.sh'),
+  'utf8'
+);
 const admission = readFileSync(
   resolve(repoRoot, 'scripts/lib/queue-deferred-release-admission.mjs'),
   'utf8'
@@ -53,10 +56,18 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
   });
 
   it('carries the exact bot receipt through the degraded release lifecycle', () => {
-    expect(autoenroll).toContain("steps.admission.outputs.deferred_release == '1'");
+    expect(autoenroll).toContain(
+      "steps.admission.outputs.deferred_release == '1'"
+    );
     expect(autoenroll).toContain("'deferred-release-only'");
-    expect(drain).toContain('exact-head controller queue-deferred release receipt');
-    expect(drain).toContain('controller release evidence changed during native enrollment');
-    expect(drain).toContain('Fleet receipt does not authorize the exact queue-deferred release fallback');
+    expect(drain).toContain(
+      'exact-head controller queue-deferred release receipt'
+    );
+    expect(drain).toContain(
+      'controller release evidence changed during native enrollment'
+    );
+    expect(drain).toContain(
+      'Fleet receipt does not authorize the exact queue-deferred release fallback'
+    );
   });
 });
