@@ -5,12 +5,14 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
+  readFileSync,
   renameSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
 
 import {
+  buildTriageLivenessReceipt,
   DELIVERY_LIVENESS_DIR,
   type DeliveryLease,
   readDeliveryLease,
@@ -24,6 +26,11 @@ import { logJobEvent, withJobLogging } from '../lib/jobs-log';
 
 const JOB = 'delivery-liveness-watchdog';
 const SUMMER_OUTBOX = join(HERMES_PATHS.stateDir, 'summer-notification-outbox');
+const TRIAGE_RECEIPT = join(
+  HERMES_PATHS.stateDir,
+  'triage-liveness-latest.json'
+);
+const JOVIE_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
 
 function run(args: ReadonlyArray<string>, cwd?: string): string {
   return execFileSync(args[0], args.slice(1), {
@@ -31,6 +38,107 @@ function run(args: ReadonlyArray<string>, cwd?: string): string {
     encoding: 'utf8',
     timeout: 30_000,
     maxBuffer: 5 * 1024 * 1024,
+  });
+}
+
+function linearApiKey(): string {
+  if (process.env.LINEAR_API_KEY) return process.env.LINEAR_API_KEY;
+  const path = join(
+    process.env.HOME ?? '',
+    '.config',
+    'symphony',
+    'linear.env'
+  );
+  const match = existsSync(path)
+    ? /^LINEAR_API_KEY=(.+)$/m.exec(readFileSync(path, 'utf8'))
+    : null;
+  if (!match) throw new Error('Linear credential unavailable');
+  return match[1].trim().replace(/^['"]|['"]$/g, '');
+}
+
+async function refreshTriageLivenessReceipt(): Promise<void> {
+  const response = await fetch('https://api.linear.app/graphql', {
+    method: 'POST',
+    headers: {
+      Authorization: linearApiKey(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      query: `query($teamId: String!) {
+        team(id: $teamId) {
+          issues(
+            first: 100
+            filter: {
+              state: { name: { eq: "Triage" } }
+              labels: { some: { name: { in: ["agent-ready", "ready-for-intake"] } } }
+            }
+          ) {
+            nodes { identifier updatedAt }
+            pageInfo { hasNextPage }
+          }
+        }
+      }`,
+      variables: { teamId: JOVIE_TEAM_ID },
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok)
+    throw new Error(`Linear triage query failed (${response.status})`);
+  const payload = (await response.json()) as {
+    data?: {
+      team?: {
+        issues?: {
+          nodes?: ReadonlyArray<{ identifier: string; updatedAt: string }>;
+          pageInfo?: { hasNextPage?: boolean };
+        };
+      };
+    };
+    errors?: ReadonlyArray<unknown>;
+  };
+  if (payload.errors?.length)
+    throw new Error('Linear triage query returned errors');
+  const issues = payload.data?.team?.issues;
+  if (!issues || issues.pageInfo?.hasNextPage) {
+    throw new Error('Linear triage query was incomplete');
+  }
+  const receipt = buildTriageLivenessReceipt(issues.nodes ?? []);
+  mkdirSync(HERMES_PATHS.stateDir, { recursive: true });
+  const tmp = `${TRIAGE_RECEIPT}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify(receipt, null, 2)}\n`);
+  renameSync(tmp, TRIAGE_RECEIPT);
+  logJobEvent({
+    job: JOB,
+    event: 'triage_liveness_checked',
+    status: receipt.status,
+    violations: receipt.violations.map(issue => issue.identifier),
+  });
+}
+
+function recordTriageLivenessFailure(error: unknown): void {
+  mkdirSync(HERMES_PATHS.stateDir, { recursive: true });
+  const tmp = `${TRIAGE_RECEIPT}.tmp`;
+  const message = error instanceof Error ? error.message : String(error);
+  writeFileSync(
+    tmp,
+    `${JSON.stringify(
+      {
+        schema: 'jovie-triage-liveness/v1',
+        observedAt: new Date().toISOString(),
+        status: 'blocked',
+        staleAfterMs: 5 * 60 * 1000,
+        violations: [],
+        error: message,
+      },
+      null,
+      2
+    )}\n`
+  );
+  renameSync(tmp, TRIAGE_RECEIPT);
+  logJobEvent({
+    job: JOB,
+    event: 'triage_liveness_failed',
+    status: 'blocked',
+    error: message,
   });
 }
 
@@ -257,8 +365,10 @@ function retryOrReassign(
 
 async function main(): Promise<void> {
   await withJobLogging(JOB, async () => {
-    if (!existsSync(DELIVERY_LIVENESS_DIR)) return;
-    for (const name of readdirSync(DELIVERY_LIVENESS_DIR)) {
+    const leaseNames = existsSync(DELIVERY_LIVENESS_DIR)
+      ? readdirSync(DELIVERY_LIVENESS_DIR)
+      : [];
+    for (const name of leaseNames) {
       if (!name.endsWith('.json')) continue;
       const path = join(DELIVERY_LIVENESS_DIR, name);
       const lease = readDeliveryLease(path);
@@ -301,6 +411,12 @@ async function main(): Promise<void> {
         action: decision.action,
         lastReceiptAt: refreshed.lastReceiptAt,
       });
+    }
+    try {
+      await refreshTriageLivenessReceipt();
+    } catch (error) {
+      recordTriageLivenessFailure(error);
+      throw error;
     }
   });
 }

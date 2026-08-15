@@ -12,6 +12,42 @@ import { HERMES_PATHS } from './hermes-paths';
 export const DELIVERY_LIVENESS_SCHEMA = 'jovie-delivery-liveness/v1';
 export const DELIVERY_RECEIPT_STALE_MS = 5 * 60 * 1000;
 export const VERIFICATION_DEADLINE_MS = 10 * 60 * 1000;
+export const TRIAGE_RECEIPT_STALE_MS = 5 * 60 * 1000;
+
+export interface AgentReadyTriageIssue {
+  readonly identifier: string;
+  readonly updatedAt: string;
+}
+
+export interface TriageLivenessReceipt {
+  readonly schema: 'jovie-triage-liveness/v1';
+  readonly observedAt: string;
+  readonly status: 'healthy' | 'blocked';
+  readonly staleAfterMs: number;
+  readonly violations: ReadonlyArray<
+    AgentReadyTriageIssue & { readonly ageMs: number }
+  >;
+}
+
+export function buildTriageLivenessReceipt(
+  issues: ReadonlyArray<AgentReadyTriageIssue>,
+  now = new Date()
+): TriageLivenessReceipt {
+  const violations = issues
+    .map(issue => ({
+      ...issue,
+      ageMs: Math.max(0, now.getTime() - Date.parse(issue.updatedAt)),
+    }))
+    .filter(issue => issue.ageMs >= TRIAGE_RECEIPT_STALE_MS)
+    .sort((a, b) => a.identifier.localeCompare(b.identifier));
+  return {
+    schema: 'jovie-triage-liveness/v1',
+    observedAt: now.toISOString(),
+    status: violations.length === 0 ? 'healthy' : 'blocked',
+    staleAfterMs: TRIAGE_RECEIPT_STALE_MS,
+    violations,
+  };
+}
 
 export type DeliveryProofTier =
   | 'source'

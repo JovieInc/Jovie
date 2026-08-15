@@ -3,11 +3,28 @@ import { describe, expect, it } from 'vitest';
 import {
   beginAwaitingVerification,
   blockForExternalAuthority,
+  buildTriageLivenessReceipt,
   type DeliveryLease,
   recordReceipt,
   startInternalRemediation,
   watchdogDecision,
 } from '../delivery-liveness';
+
+describe('triage liveness receipt', () => {
+  it('blocks only agent-ready observations older than five minutes', () => {
+    const receipt = buildTriageLivenessReceipt(
+      [
+        { identifier: 'JOV-1', updatedAt: '2026-08-15T01:50:00.000Z' },
+        { identifier: 'JOV-2', updatedAt: '2026-08-15T01:59:00.000Z' },
+      ],
+      new Date('2026-08-15T02:00:00.000Z')
+    );
+    expect(receipt.status).toBe('blocked');
+    expect(receipt.violations.map(issue => issue.identifier)).toEqual([
+      'JOV-1',
+    ]);
+  });
+});
 
 const NOW = '2026-08-15T02:00:00.000Z';
 
