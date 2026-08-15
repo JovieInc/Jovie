@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import {
   decideAbortedMainFrameRecovery,
+  decideRendererBootWatchdogAfterLoad,
   decideRendererLoadStart,
   decideRendererRecovery,
   decideRendererWatchdogExpiry,
@@ -191,6 +192,25 @@ test('200-but-blank and hung load both expire to the failure page', () => {
       skipForAuthHandoff: false,
     })
   ).toBe('ignore');
+});
+
+test('an early app-booted ping survives did-finish-load', () => {
+  const appOrigin = 'https://jov.ie';
+
+  expect(
+    decideRendererBootWatchdogAfterLoad({
+      booted: true,
+      url: 'https://jov.ie/app/chat?runtime=electron',
+      appOrigin,
+    })
+  ).toBe('already-booted');
+  expect(
+    decideRendererBootWatchdogAfterLoad({
+      booted: false,
+      url: 'https://jov.ie/app/chat?runtime=electron',
+      appOrigin,
+    })
+  ).toBe('arm-boot-watchdog');
 });
 
 test('an open-but-invisible auth handoff does not suppress recovery', () => {
