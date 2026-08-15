@@ -239,10 +239,7 @@ describe('UnifiedSidebar library route', () => {
       APP_ROUTES.CHAT
     );
     expect(screen.getByRole('link', { name: 'Back to App' })).toHaveClass(
-      'focus-visible:ring-2',
-      'focus-visible:ring-(--linear-border-focus)/55',
-      'focus-visible:ring-offset-2',
-      'focus-visible:ring-offset-(--linear-bg-page)'
+      'focus-ring-themed'
     );
     expect(
       screen.queryByRole('button', { name: 'Search Sidebar' })
