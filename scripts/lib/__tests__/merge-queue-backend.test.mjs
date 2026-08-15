@@ -62,7 +62,7 @@ function prState(overrides = {}) {
 const nativeStatePayload = state => ({
   data: { repository: { pullRequest: state } },
 });
-const ok = (stdout = '') => ({
+const ok = (/** @type {unknown} */ stdout = '') => ({
   code: 0,
   stdout: typeof stdout === 'string' ? stdout : JSON.stringify(stdout),
   stderr: '',
@@ -919,7 +919,7 @@ describe('native enrollment', () => {
       code: 'held_pull_request',
       details: { labels: ['queue-deferred'] },
     });
-    expect(invokedMerge(runner)).toBe(false);
+    expect(invokedEnrollment(runner)).toBe(false);
   });
 
   it('rejects auto-merge success without an authoritative native queue entry', async () => {
@@ -941,7 +941,7 @@ describe('native enrollment', () => {
         },
       },
     });
-    expect(invokedMerge(runner)).toBe(true);
+    expect(invokedEnrollment(runner)).toBe(true);
   });
 
   it('no-ops only after GraphQL proves queue state and position', async () => {
@@ -962,7 +962,7 @@ describe('native enrollment', () => {
         mergeQueueEntry: { state: 'QUEUED', position: 1 },
       },
     });
-    expect(invokedMerge(runner)).toBe(false);
+    expect(invokedEnrollment(runner)).toBe(false);
   });
 
   it('accepts a positioned queue entry after GitHub advances it to checks', async () => {
