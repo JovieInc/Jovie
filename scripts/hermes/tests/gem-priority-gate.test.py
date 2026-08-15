@@ -809,7 +809,8 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("cancel-in-progress: false", content)
         self.assertIn("github.event.pull_request.merged != true", content)
         self.assertIn("JOVIE_AGENT_PROFILE: no_agent", content)
-        self.assertIn("timeout 240s scripts/backlog-orchestrator/run-backlog.sh gate-next", content)
+        self.assertIn("timeout 180s scripts/backlog-orchestrator/run-backlog.sh reconcile", content)
+        self.assertIn("timeout 60s scripts/backlog-orchestrator/run-backlog.sh gate-next", content)
         self.assertIn("symphony-event-admission-heartbeat/v1", content)
 
     def test_stale_window_matches_the_consumer_fail_closed_window(self):

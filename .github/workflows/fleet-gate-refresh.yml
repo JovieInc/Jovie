@@ -101,7 +101,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          timeout 240s scripts/backlog-orchestrator/run-backlog.sh gate-next
+          timeout 180s scripts/backlog-orchestrator/run-backlog.sh reconcile
+          timeout 60s scripts/backlog-orchestrator/run-backlog.sh gate-next
 
       - name: Record event admission heartbeat
         if: always()

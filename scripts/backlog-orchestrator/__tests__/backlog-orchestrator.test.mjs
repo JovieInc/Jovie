@@ -19,6 +19,8 @@ const reporter = await import('../reporter.mjs');
 const staleLease = await import('../stale-lease-guard.mjs');
 const admitter = await import('../admitter.mjs');
 const routing = await import('../symphony-routing.mjs');
+const triageRouter = await import('../triage-router.mjs');
+const deterministicGates = await import('../deterministic-gates.mjs');
 
 describe('team production health contract', () => {
   it('uses a direct bounded LYB artifact instead of the redirecting homepage', async () => {
@@ -58,7 +60,7 @@ function makeIssue(overrides = {}) {
     labels: {
       nodes: overrides.labels ? overrides.labels.map(n => ({ name: n })) : [],
     },
-    parent: null,
+    parent: overrides.parent ?? null,
     children: { nodes: [] },
     relations: { nodes: overrides.relations || [] },
     state: {
@@ -284,6 +286,101 @@ describe('reconciliation idempotency', () => {
     assert.equal(receipt.mutations, 0);
     assert.equal(receipt.classified, 1);
     assert.equal(receipt.results[0].identifier, 'JOV-4604');
+  });
+});
+
+describe('deterministic triage routing', () => {
+  it('fails the controller instead of reporting team errors as green', () => {
+    assert.throws(
+      () =>
+        deterministicGates.assertNoTeamControllerErrors([
+          { team: 'JOV', stage: 'team-error', status: 'blocked' },
+        ]),
+      /one or more team controllers errored/
+    );
+    assert.doesNotThrow(() =>
+      deterministicGates.assertNoTeamControllerErrors([
+        { team: 'JOV', stage: 'selection', status: 'blocked' },
+      ])
+    );
+  });
+
+  it('routes incidents, follow-ups, and ready work out of Triage', () => {
+    const states = { backlogStateId: 'backlog-id', todoStateId: 'todo-id' };
+    const classification = { category: 'triageable' };
+    assert.equal(
+      triageRouter.routeTriageIssue(
+        makeIssue({ labels: ['incident'] }),
+        classification,
+        states
+      ).desiredStateId,
+      'todo-id'
+    );
+    const followup = triageRouter.routeTriageIssue(
+      makeIssue({ description: '## Follow-up\nCurrent issue: JOV-42' }),
+      classification,
+      states
+    );
+    assert.equal(followup.desiredStateId, 'backlog-id');
+    assert.equal(followup.parentIdentifier, 'JOV-42');
+    assert.equal(
+      triageRouter.routeTriageIssue(
+        makeIssue({ labels: ['agent-ready'] }),
+        classification,
+        states
+      ).desiredStateId,
+      'todo-id'
+    );
+  });
+
+  it('keeps only genuine intake in Triage and flags stale ready work', () => {
+    const issue = makeIssue({ updatedAt: '2026-07-01T11:50:00Z' });
+    const route = triageRouter.routeTriageIssue(
+      issue,
+      { category: 'triageable' },
+      { backlogStateId: 'backlog-id', todoStateId: 'todo-id' }
+    );
+    assert.equal(route.reason, 'genuine-intake');
+    assert.equal(route.desiredStateId, null);
+
+    const watchdog = triageRouter.buildAgentReadyTriageWatchdog(
+      [
+        makeIssue({
+          labels: ['agent-ready'],
+          updatedAt: '2026-07-01T11:50:00Z',
+        }),
+      ],
+      { now: new Date('2026-07-01T12:00:00Z') }
+    );
+    assert.equal(watchdog.status, 'blocked');
+    assert.deepEqual(
+      watchdog.violations.map(item => item.identifier),
+      ['TEST-001']
+    );
+  });
+
+  it('routes an unchanged stored classification instead of skipping it', async () => {
+    const issue = makeIssue({ labels: ['agent-ready'] });
+    const classification = classifier.classifyDeterministic(issue, [issue]);
+    issue.comments.nodes.push({
+      id: 'stored',
+      body: classifier.buildStoredClassification(classification),
+      createdAt: issue.updatedAt,
+    });
+    const transitions = [];
+    const receipt = await reconcileIssues({
+      issues: [issue],
+      client: {
+        async transitionIssue(issueId, stateId) {
+          transitions.push({ issueId, stateId });
+        },
+      },
+      backlogStateId: 'backlog-id',
+      todoStateId: 'todo-id',
+    });
+    assert.equal(receipt.skipped, 0);
+    assert.equal(receipt.failed, 0);
+    assert.deepEqual(transitions, [{ issueId: 'test-id', stateId: 'todo-id' }]);
   });
 });
 
