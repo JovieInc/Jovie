@@ -7,6 +7,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+- **Mac app stays open after the workspace appears (JOV-5086):** a successful early app paint is no longer mistaken for a failed load and replaced by the Retry screen seconds later.
 - **Public profiles keep every conversion action usable (JOV-5134/JOV-5132):** unclaimed artists expose a truthful ownership path; listening, alerts, tips, merch, shows, and payment actions resolve only when their inventory is real; mobile privacy controls avoid profile chrome and the action dock; and drawers plus carousels preserve keyboard and screen-reader access.
 - [internal] **Redis quota failures now surface before they break sign-in (JOV-5086):** production exercises a real write/read canary, groups quota exhaustion separately from outages, backs off degraded Redis traffic, filters known bots before metering high-volume anonymous telemetry, and makes every limiter's command-cost algorithm an explicit reviewed choice.
 
