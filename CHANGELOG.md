@@ -14,7 +14,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- **Canceled sign-in stays recoverable:** Returning from a canceled browser sign-in restores the web provider actions, while the iPhone app explains the cancellation and keeps a clear Sign In Again action visible.
+- **Canceled sign-in stays recoverable:** Canceled browser sign-in restores provider actions, while the iPhone app explains what happened and keeps Sign In Again visible.
+- **iPhone profile setup stays in the app:** Failed saves remain retryable, while expired sessions return creators to sign-in without a generic web detour.
 - **The Mac app stays open after launch:** A successful first screen no longer switches to Retry seconds later.
 - [internal] **Redis quota failures now surface before they break sign-in (JOV-5086):** production exercises a real write/read canary, groups quota exhaustion separately from outages, backs off degraded Redis traffic, filters known bots before metering high-volume anonymous telemetry, and makes every limiter's command-cost algorithm an explicit reviewed choice.
 

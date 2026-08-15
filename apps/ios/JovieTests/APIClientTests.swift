@@ -202,6 +202,30 @@ struct APIClientTests {
     }
   }
 
+  @Test func surfacesTerminalProfileCompletionUnauthorizedAfterRefresh() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["stale-token", "fresh-token"])
+    MockURLProtocol.requestHandler = { request in
+      let response = HTTPURLResponse(
+        url: request.url!,
+        statusCode: 401,
+        httpVersion: nil,
+        headerFields: nil
+      )!
+      return (response, Data())
+    }
+
+    let client = APIClient(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider
+    )
+
+    await #expect(throws: APIClientError.requestFailed(statusCode: 401)) {
+      try await client.completeProfile(displayName: "Tim White", username: "tim")
+    }
+    #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
+  }
+
   @Test func fetchesActionLoopInboxWithBearerToken() async throws {
     let tokenProvider = MockTokenProvider(tokens: ["token-1"])
     MockURLProtocol.requestHandler = { request in
