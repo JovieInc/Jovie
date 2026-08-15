@@ -52,11 +52,11 @@ hooks:
     fi
     git config push.negotiate true
 agent:
-  # Approved throughput posture (JOV-4962): four concurrent agents. Symphony is
-  # the single implementation owner; admission and one-issue/one-workspace
-  # leases remain authoritative, so concurrency never duplicates ownership of
-  # an issue or workspace. Gem verification shard concurrency is a separate
-  # control and remains 4.
+  # Safe cold-start baseline. The event-driven JOV-5123 controller renders this
+  # scalar within 1..8 from Linux pressure, provider capacity, integrity, and
+  # live runtime evidence. Leases remain authoritative, so concurrency never
+  # duplicates ownership of an issue or workspace. Gem verification shard
+  # concurrency is a separate control and remains 4.
   max_concurrent_agents: 4
   max_turns: 24
 codex:
