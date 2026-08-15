@@ -97,6 +97,7 @@ DRAIN_RECONCILE_QUEUE_REENTRY="${DRAIN_RECONCILE_QUEUE_REENTRY:-0}"
 DRAIN_QUEUE_REENTRY_MAX_PER_RUN="${DRAIN_QUEUE_REENTRY_MAX_PER_RUN:-2}"
 QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"
 QUEUE_DEFERRED_RELEASE_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/queue-deferred-release-admission.mjs"
+PRODUCTION_UNBOUND_REPAIR_ATTESTATION_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/production-unbound-repair-attestation.mjs"
 QUEUE_DEFERRED_RELEASE_MARKER='<!-- bot-comment:queue-deferred-release -->'
 QUEUE_DEFERRED_RELEASE_ACTOR='jovie-bot[bot]'
 FLEET_GATE_JSON=""
@@ -224,6 +225,15 @@ deferred_release_receipt_for_pr() {  # <pr>
   ' <<<"$raw" 2>/dev/null || true)"
   [[ -n "$body" ]] || return 0
   node "$QUEUE_DEFERRED_RELEASE_LIB" extract <<<"$body" 2>/dev/null || true
+}
+
+# The production-unbound exception is a typed exact PR/head/current-main
+# statement, revalidated before and after native enrollment. Source checks and
+# hard holds remain independent enrollment gates.
+production_unbound_repair_attestation_matches() {  # <body> <pr> <head> <main-sha>
+  local body="$1" pr="$2" head="$3" main_sha="$4"
+  printf '%s' "$body" | node "$PRODUCTION_UNBOUND_REPAIR_ATTESTATION_LIB" matches \
+    --pr "$pr" --head "$head" --main-sha "$main_sha" >/dev/null 2>&1
 }
 
 # Keep one scheduled tick bounded. A single in-flight GitHub call may finish
@@ -596,12 +606,10 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       return 2
     fi
   elif [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" ]]; then
-    local repair_main repair_marker
+    local repair_main
     repair_main="$(jq -r '.productionUnboundRepairAdmission.mainSha // empty' <<<"$FLEET_GATE_JSON")"
-    repair_marker="<!-- production-unbound-repair:production-deployment-unbound:${repair_main} -->"
-    if ! jq -e --arg marker "$repair_marker" '
-      (.body // "") | contains($marker)
-    ' <<<"$current" >/dev/null; then
+    if ! production_unbound_repair_attestation_matches \
+      "$(jq -r '.body // ""' <<<"$current")" "$n" "$expected_head" "$repair_main"; then
       echo "    ⏸ exact active-condition repair attestation is absent for #$n"
       return 2
     fi
@@ -686,9 +694,8 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     fi
     if [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" ]]; then
       repair_main="$(jq -r '.productionUnboundRepairAdmission.mainSha // empty' <<<"$FLEET_GATE_JSON")"
-      repair_marker="<!-- production-unbound-repair:production-deployment-unbound:${repair_main} -->"
-      if ! jq -e --arg marker "$repair_marker" '(.body // "") | contains($marker)' \
-        <<<"$current" >/dev/null; then
+      if ! production_unbound_repair_attestation_matches \
+        "$(jq -r '.body // ""' <<<"$current")" "$n" "$expected_head" "$repair_main"; then
         echo "    ⏸ repair attestation changed during native enrollment for #$n; compensating"
         dequeue_strict "$n" || return 1
         return 2
@@ -1014,10 +1021,20 @@ if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
   SNAP="$CLASSIFIED"
 elif [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" ]]; then
   REPAIR_MAIN_SHA="$(jq -r '.productionUnboundRepairAdmission.mainSha // empty' <<<"$FLEET_GATE_JSON")"
-  REPAIR_MARKER="<!-- production-unbound-repair:production-deployment-unbound:${REPAIR_MAIN_SHA} -->"
-  SNAP="$(jq -c --arg marker "$REPAIR_MARKER" '
-    map(. + {iso: false, unboundRepair: ((.body // "") | contains($marker))})
-  ' <<<"$SNAP")"
+  CLASSIFIED="$(jq -c 'map(. + {iso: false, unboundRepair: false})' <<<"$SNAP")"
+  while IFS= read -r pr; do
+    n="$(jq -r '.n' <<<"$pr")"
+    head_oid="$(jq -r '.headOid // ""' <<<"$pr")"
+    eligible=false
+    if [[ "$head_oid" =~ ^[0-9a-f]{40}$ ]] \
+      && production_unbound_repair_attestation_matches \
+        "$(jq -r '.body // ""' <<<"$pr")" "$n" "$head_oid" "$REPAIR_MAIN_SHA"; then
+      eligible=true
+    fi
+    CLASSIFIED="$(jq -c --argjson n "$n" --argjson eligible "$eligible" \
+      'map(if .n == $n then . + {unboundRepair: $eligible} else . end)' <<<"$CLASSIFIED")"
+  done < <(jq -c '.[]' <<<"$SNAP")
+  SNAP="$CLASSIFIED"
 else
   SNAP="$(jq -c 'map(. + {iso: false, unboundRepair: false})' <<<"$SNAP")"
 fi

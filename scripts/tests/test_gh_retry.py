@@ -596,11 +596,50 @@ JSON
         ("body", "expected_enrollment"),
         [
             ("Ordinary source-green PR", False),
+            # The retired marker looked scoped but was neither typed nor bound
+            # to the source head/PR. It must never regain admission authority.
             (
                 "<!-- production-unbound-repair:production-deployment-unbound:"
                 + "a" * 40
                 + " -->",
+                False,
+            ),
+            (
+                "<!-- jovie-production-unbound-repair-attestation/v1 -->\n"
+                "```json\n"
+                + json.dumps(
+                    {
+                        "schema": "jovie-production-unbound-repair-attestation/v1",
+                        "kind": "production-release-repair",
+                        "condition": "production-deployment-unbound",
+                        "pr": 904,
+                        "head": "f" * 40,
+                        "mainSha": "a" * 40,
+                        "deploymentsAllowed": False,
+                    }
+                )
+                + "\n```",
                 True,
+            ),
+            # A typed document is still fail-closed when it is stale for the
+            # current exact source head (the controller re-reads before queue
+            # mutation, so a changed PR body cannot silently inherit it).
+            (
+                "<!-- jovie-production-unbound-repair-attestation/v1 -->\n"
+                "```json\n"
+                + json.dumps(
+                    {
+                        "schema": "jovie-production-unbound-repair-attestation/v1",
+                        "kind": "production-release-repair",
+                        "condition": "production-deployment-unbound",
+                        "pr": 904,
+                        "head": "e" * 40,
+                        "mainSha": "a" * 40,
+                        "deploymentsAllowed": False,
+                    }
+                )
+                + "\n```",
+                False,
             ),
         ],
     )
