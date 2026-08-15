@@ -267,6 +267,13 @@ class TestDrainPrQueueWiring:
                   exit 0
                 fi
                 if [[ "$1" == "api" ]]; then
+                  if [[ " $* " == *"/commits/{head}/status "* ]]; then
+                    echo '{{"statuses":[]}}'
+                    exit 0
+                  fi
+                  if [[ " $* " == *"/statuses/{head} "* ]]; then
+                    exit 0
+                  fi
                   exit 1
                 fi
                 echo "unexpected gh args: $*" >&2
@@ -284,7 +291,8 @@ class TestDrainPrQueueWiring:
                 extra_env=(
                     f"DRAIN_ADMISSION_PR=101 DRAIN_ADMISSION_HEAD={head} "
                     f"FAKE_ENROLL_MODE={enroll_mode} FAKE_DEQUEUE_MODE={dequeue_mode} "
-                    f"FAKE_DEQUEUE_CALLS={dequeue_calls}"
+                    f"FAKE_DEQUEUE_CALLS={dequeue_calls} "
+                    "GITHUB_RUN_ID=42 GITHUB_SERVER_URL=https://github.com"
                 ),
             )
         )
@@ -300,6 +308,102 @@ class TestDrainPrQueueWiring:
             assert "native enrollment" in result.stderr
         if dequeue_mode == "failure":
             assert "CRITICAL: could not compensate unproven" in result.stderr
+
+    def test_composite_ci_reentry_recovers_only_bounded_exact_bot_receipts(
+        self, tmp_path: Path
+    ) -> None:
+        """Synthetic merge-group events may recover only prior native members."""
+        heads = {"1001": "a" * 40, "1002": "b" * 40, "1003": "c" * 40}
+        enrolled = tmp_path / "enrolled"
+        enrolled.write_text("", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state)
+                    echo '{{"1001":{{"headRefOid":"{heads["1001"]}","queued":false}},"1002":{{"headRefOid":"{heads["1002"]}","queued":false}},"1003":{{"headRefOid":"{heads["1003"]}","queued":false}}}}'
+                    ;;
+                  enroll)
+                    echo "${{3:?}}" >>"{enrolled}"
+                    head_var="${{4:?}}"
+                    echo "{{\\"state\\":{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"headRefOid\\":\\"$head_var\\",\\"mergeQueueEntry\\":{{\\"id\\":\\"MQE_${{3}}\\",\\"state\\":\\"AWAITING_CHECKS\\",\\"position\\":1}}}}}}"
+                    ;;
+                  dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{{"n":1001,"t":"First exact receipt","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/one","headOid":"{heads["1001"]}","base":"main","body":"","L":[],"fail":[]}},{{"n":1002,"t":"Second exact receipt","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/two","headOid":"{heads["1002"]}","base":"main","body":"","L":[],"fail":[]}},{{"n":1003,"t":"Third exact receipt","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/three","headOid":"{heads["1003"]}","base":"main","body":"","L":[],"fail":[]}}]
+JSON
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  case "$3" in
+                    1001) head="{heads["1001"]}" ;;
+                    1002) head="{heads["1002"]}" ;;
+                    1003) head="{heads["1003"]}" ;;
+                    *) echo "unexpected PR view: $*" >&2; exit 2 ;;
+                  esac
+                  echo "{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"mergeable\\":\\"MERGEABLE\\",\\"labels\\":[],\\"headRefOid\\":\\"$head\\",\\"baseRefName\\":\\"main\\",\\"body\\":\\"\\"}}"
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  if [[ "$2" == *"/commits/"*"/status"* ]]; then
+                    head="${{2#*/commits/}}"; head="${{head%%/status*}}"
+                    echo "{{\\"statuses\\":[{{\\"context\\":\\"jovie-queue-reentry/v1\\",\\"state\\":\\"success\\",\\"description\\":\\"Native queue admission recorded at exact head\\",\\"creator\\":{{\\"type\\":\\"Bot\\"}},\\"target_url\\":\\"https://github.com/JovieInc/Jovie/actions/runs/77\\",\\"updated_at\\":\\"2026-08-15T12:00:00Z\\"}}]}}"
+                    exit 0
+                  fi
+                  # Merge-group churn is unknown in this isolated receipt test;
+                  # the guard must never block or mutate on that missing data.
+                  exit 1
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRAIN_RECONCILE_QUEUE_REENTRY=1 "
+                    "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=2 "
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert "bounded exact-head native re-entry after composite CI" in result.stdout
+        assert "exact native re-entry at " + heads["1001"] in result.stdout
+        assert "exact native re-entry at " + heads["1002"] in result.stdout
+        assert heads["1003"] not in result.stdout
+        assert enrolled.read_text(encoding="utf-8").splitlines() == ["1001", "1002"]
 
     def test_constrained_mode_refuses_missing_receipt_before_calling_gh(
         self, tmp_path: Path
