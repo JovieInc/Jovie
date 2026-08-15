@@ -30,6 +30,13 @@ const REQUIRED_CHECKS = Object.freeze([
   'Fork PR Gate',
   'PR Size Guard',
 ]);
+const NATIVE_QUEUE_ENTRY_STATES = new Set([
+  'QUEUED',
+  'AWAITING_CHECKS',
+  'MERGEABLE',
+  'UNMERGEABLE',
+  'LOCKED',
+]);
 
 const PULL_REQUEST_STATE_FIELDS = `id number state isDraft headRefOid labels(first:100){nodes{name}} isInMergeQueue mergeQueueEntry { id state position } autoMergeRequest { enabledAt }`;
 const REQUIRED_NATIVE_STATE_FIELDS =
@@ -48,6 +55,7 @@ const PULL_REQUEST_STATE_QUERY = `query MergeQueuePullRequestState($owner:String
 const OPEN_PULL_REQUEST_STATES_QUERY = `query MergeQueueOpenPullRequestStates($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:100,after:$endCursor,states:OPEN){nodes{${PULL_REQUEST_STATE_FIELDS}} pageInfo{hasNextPage endCursor}}}}`;
 const BRANCH_PROTECTION_QUERY = `query MergeQueueBranchProtection($owner:String!,$name:String!,$refName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$refName){name branchProtectionRule{id}}}}`;
 const DEQUEUE_PULL_REQUEST_MUTATION = `mutation DequeuePullRequest($id:ID!){dequeuePullRequest(input:{id:$id}){mergeQueueEntry{id}}}`;
+const ENABLE_AUTO_MERGE_MUTATION = `mutation EnablePullRequestAutoMerge($pullRequestId:ID!,$mergeMethod:PullRequestMergeMethod!){enablePullRequestAutoMerge(input:{pullRequestId:$pullRequestId,mergeMethod:$mergeMethod}){pullRequest{id}}}`;
 const DISABLE_AUTO_MERGE_MUTATION = `mutation DisablePullRequestAutoMerge($pullRequestId:ID!){disablePullRequestAutoMerge(input:{pullRequestId:$pullRequestId}){pullRequest{id}}}`;
 
 function backendError(code, message, details = {}) {
@@ -149,19 +157,6 @@ function graphqlArgs(query, variables, { paginate = false, typed = [] } = {}) {
     args.push(typed.includes(name) ? '-F' : '-f', `${name}=${value}`);
   }
   return args;
-}
-
-function prArgs(action, number, repository, ...flags) {
-  return ['pr', action, String(number), '-R', repository, ...flags];
-}
-
-async function attemptGh(runner, args, description) {
-  try {
-    await runGh(runner, args, description);
-    return null;
-  } catch (error) {
-    return error;
-  }
 }
 
 function errorEvidence(error) {
@@ -475,13 +470,13 @@ function normalizeNativePullRequest(pr) {
   if (
     pr.mergeQueueEntry !== null &&
     (typeof pr.mergeQueueEntry?.id !== 'string' ||
-      typeof pr.mergeQueueEntry?.state !== 'string' ||
+      !NATIVE_QUEUE_ENTRY_STATES.has(pr.mergeQueueEntry?.state) ||
       !Number.isInteger(pr.mergeQueueEntry?.position) ||
       pr.mergeQueueEntry.position < 1)
   ) {
     throw backendError(
       'incomplete_queue_state',
-      'Native mergeQueueEntry must include id, state, and a positive position'
+      'Native mergeQueueEntry is missing its id, recognized state, or positive position'
     );
   }
   const hasAuthoritativeQueueEntry = Boolean(
@@ -584,8 +579,8 @@ export function enrollmentPostcondition(state, expectedHeadOid) {
       state?.isDraft === false &&
       state?.headRefOid?.toLowerCase() === expectedHeadOid.toLowerCase() &&
       state?.queued === true &&
-      typeof state?.mergeQueueEntry?.state === 'string' &&
-      Number.isInteger(state?.mergeQueueEntry?.position) &&
+      NATIVE_QUEUE_ENTRY_STATES.has(state?.mergeQueueEntry?.state) &&
+      Number.isInteger(state.mergeQueueEntry.position) &&
       state.mergeQueueEntry.position > 0
   );
 }
@@ -682,20 +677,17 @@ export async function enrollPullRequest({
     return { backend: resolvedBackend, changed: false, state: before };
   }
 
-  const args = prArgs(
-    'merge',
-    parsedNumber,
-    repository,
-    '--auto',
-    '--squash',
-    '--match-head-commit',
-    expectedHead
-  );
-  const mutationError = await attemptGh(
-    runner,
-    args,
-    `enrolling PR #${parsedNumber} with ${resolvedBackend}`
-  );
+  let mutationError = null;
+  try {
+    await runGraphqlMutation(
+      runner,
+      ENABLE_AUTO_MERGE_MUTATION,
+      { pullRequestId: before.id, mergeMethod: 'SQUASH' },
+      `enrolling PR #${parsedNumber} with ${resolvedBackend}`
+    );
+  } catch (error) {
+    mutationError = error;
+  }
   const observation = await pollEnrollmentPostcondition({
     stateOptions,
     expectedHeadOid: expectedHead,

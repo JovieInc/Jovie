@@ -62,7 +62,7 @@ function prState(overrides = {}) {
 const nativeStatePayload = state => ({
   data: { repository: { pullRequest: state } },
 });
-const ok = (stdout = '') => ({
+const ok = (/** @type {unknown} */ stdout = '') => ({
   code: 0,
   stdout: typeof stdout === 'string' ? stdout : JSON.stringify(stdout),
   stderr: '',
@@ -75,7 +75,7 @@ function createNativeRunner({
   branchProtectionRef = VALID_BRANCH_PROTECTION_REF,
   states = [],
   listPages = null,
-  mergeResult = ok(),
+  enableResult = ok({ data: {} }),
 } = {}) {
   const stateQueue = [...states];
   const restResponses = new Map([
@@ -114,12 +114,12 @@ function createNativeRunner({
       if (!state) throw new Error('Test runner exhausted PR states');
       return ok(nativeStatePayload(state));
     }
+    if (query.includes('enablePullRequestAutoMerge')) return enableResult;
     if (
       query.includes('dequeuePullRequest') ||
       query.includes('disablePullRequestAutoMerge')
     )
       return ok({ data: {} });
-    if (args[0] === 'pr' && args[1] === 'merge') return mergeResult;
     throw new Error(`Unexpected gh command: ${args.join(' ')}`);
   });
 }
@@ -139,8 +139,10 @@ const enroll = (runner, overrides) =>
     nativeOptions(runner, { expectedHeadOid: HEAD, ...overrides })
   );
 const dequeue = runner => dequeuePullRequest(nativeOptions(runner));
-const invokedMerge = runner =>
-  runner.mock.calls.some(([args]) => args[0] === 'pr' && args[1] === 'merge');
+const invokedEnrollment = runner =>
+  runner.mock.calls.some(([args]) =>
+    queryText(args).includes('enablePullRequestAutoMerge')
+  );
 
 function readRepoFile(path) {
   return readFileSync(resolve(REPO_ROOT, path), 'utf8');
@@ -382,6 +384,19 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain('"$n" != "$authorized_pr"');
     expect(drain).toContain('"$expected_head" != "$authorized_head"');
     expect(drain).toContain('select((.n | tostring) == $admission_pr)');
+    expect(drain).toContain(
+      'enrollment_receipt="$(node scripts/merge-queue-backend.mjs enroll "$n" "$head_oid")"'
+    );
+    expect(drain).toContain(
+      '.state.mergeQueueEntry.state | IN("QUEUED", "AWAITING_CHECKS", "MERGEABLE", "UNMERGEABLE", "LOCKED")'
+    );
+    expect(drain).toContain(
+      '.state.mergeQueueEntry.position | type == "number" and floor == . and . > 0'
+    );
+    expect(drain).toContain('could not compensate unproven native enrollment');
+    expect(drain).toContain(
+      'could not compensate malformed native enrollment receipt'
+    );
   });
 
   it('excludes stacked non-main PRs from admission and live eligibility', () => {
@@ -395,7 +410,7 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('select(.baseRefName == "main")');
     expect(drain).toContain('baseRefName,baseRefOid');
     expect(drain).toContain(
-      'json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName"'
+      'json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName,body"'
     );
     expect(drain).toContain('.baseRefName == "main"');
     expect(drain).toContain('and (.base == "main")');
@@ -797,7 +812,7 @@ describe('native live preflight', () => {
 });
 
 describe('native enrollment', () => {
-  it('uses an exact-head protected native auto-merge command and proves queue state', async () => {
+  it('uses the native GraphQL mutation and proves a positioned queue receipt', async () => {
     const runner = createNativeRunner({
       states: [
         prState(),
@@ -809,15 +824,15 @@ describe('native enrollment', () => {
     });
     const result = await enroll(runner);
     expect(result).toMatchObject({ backend: 'native', changed: true });
-    const mergeCall = runner.mock.calls.find(
-      ([args]) => args[0] === 'pr' && args[1] === 'merge'
+    const mutationCall = runner.mock.calls.find(([args]) =>
+      queryText(args).includes('enablePullRequestAutoMerge')
     )?.[0];
-    expect(mergeCall).toEqual(
+    expect(mutationCall).toEqual(
       expect.arrayContaining([
-        '--auto',
-        '--squash',
-        '--match-head-commit',
-        HEAD,
+        '-f',
+        `pullRequestId=${PR_ID}`,
+        '-f',
+        'mergeMethod=SQUASH',
       ])
     );
   });
@@ -856,7 +871,7 @@ describe('native enrollment', () => {
     const wait = vi.fn(async () => {});
     const runner = createNativeRunner({
       states: [prState(), prState(), prState()],
-      mergeResult: {
+      enableResult: {
         code: 1,
         stdout: '',
         stderr: 'GraphQL: Pull request head SHA changed',
@@ -893,7 +908,7 @@ describe('native enrollment', () => {
     await expect(enroll(runner)).rejects.toMatchObject({
       code: 'head_changed',
     });
-    expect(invokedMerge(runner)).toBe(false);
+    expect(invokedEnrollment(runner)).toBe(false);
   });
 
   it('refuses a held exact head before invoking the enrollment mutation', async () => {
@@ -904,7 +919,7 @@ describe('native enrollment', () => {
       code: 'held_pull_request',
       details: { labels: ['queue-deferred'] },
     });
-    expect(invokedMerge(runner)).toBe(false);
+    expect(invokedEnrollment(runner)).toBe(false);
   });
 
   it('rejects auto-merge success without an authoritative native queue entry', async () => {
@@ -926,7 +941,7 @@ describe('native enrollment', () => {
         },
       },
     });
-    expect(invokedMerge(runner)).toBe(true);
+    expect(invokedEnrollment(runner)).toBe(true);
   });
 
   it('no-ops only after GraphQL proves queue state and position', async () => {
@@ -947,7 +962,111 @@ describe('native enrollment', () => {
         mergeQueueEntry: { state: 'QUEUED', position: 1 },
       },
     });
-    expect(invokedMerge(runner)).toBe(false);
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('accepts a positioned queue entry after GitHub advances it to checks', async () => {
+    const runner = createNativeRunner({
+      states: [
+        prState({
+          isInMergeQueue: true,
+          mergeQueueEntry: { ...QUEUE_ENTRY, state: 'AWAITING_CHECKS' },
+          autoMergeRequest: AUTO_MERGE,
+        }),
+      ],
+    });
+    const result = await enroll(runner);
+    expect(result.changed).toBe(false);
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it.each([
+    ['missing id', { state: 'QUEUED', position: 1 }],
+    ['unknown state', { ...QUEUE_ENTRY, state: 'UNKNOWN' }],
+    ['missing position', { id: ENTRY_ID, state: 'QUEUED' }],
+    ['zero position', { ...QUEUE_ENTRY, position: 0 }],
+    ['negative position', { ...QUEUE_ENTRY, position: -1 }],
+    ['fractional position', { ...QUEUE_ENTRY, position: 1.5 }],
+  ])('fails closed on a queue entry with %s', async (_name, mergeQueueEntry) => {
+    const runner = createNativeRunner({
+      states: [prState({ isInMergeQueue: true, mergeQueueEntry })],
+    });
+
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'incomplete_queue_state',
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('reconciles an errored mutation only when a later read proves queue membership', async () => {
+    const runner = createNativeRunner({
+      states: [
+        prState(),
+        prState({ isInMergeQueue: true, mergeQueueEntry: QUEUE_ENTRY }),
+      ],
+      enableResult: {
+        code: 1,
+        stdout: '',
+        stderr: 'GraphQL transport closed after dispatch',
+      },
+    });
+
+    await expect(enroll(runner)).resolves.toMatchObject({
+      changed: true,
+      reconciledAfterCommandError: true,
+      state: { mergeQueueEntry: QUEUE_ENTRY },
+    });
+  });
+
+  it('fails closed when the head changes after the mutation', async () => {
+    const runner = createNativeRunner({
+      states: [prState(), prState({ headRefOid: OTHER_HEAD })],
+    });
+
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'head_changed',
+    });
+    expect(invokedEnrollment(runner)).toBe(true);
+  });
+
+  it('treats GraphQL errors as an unproven mutation and fails after bounded reads', async () => {
+    const runner = createNativeRunner({
+      states: [prState(), prState()],
+      enableResult: ok({ errors: [{ message: 'auto-merge unavailable' }] }),
+    });
+
+    await expect(
+      enroll(runner, { postconditionAttempts: 1 })
+    ).rejects.toMatchObject({
+      code: 'enrollment_postcondition_failed',
+      details: { mutationError: { code: 'github_graphql_error' } },
+    });
+  });
+
+  it('does not accept a success-only auto-merge request without a queue entry', async () => {
+    const wait = vi.fn(async () => {});
+    const successOnly = prState({ autoMergeRequest: AUTO_MERGE });
+    const runner = createNativeRunner({
+      states: [successOnly, successOnly, successOnly],
+    });
+
+    await expect(
+      enroll(runner, {
+        postconditionAttempts: 2,
+        postconditionDelayMs: 2_000,
+        wait,
+      })
+    ).rejects.toMatchObject({
+      code: 'enrollment_postcondition_failed',
+      details: {
+        postconditionAttempts: 2,
+        state: {
+          autoMergeRequest: AUTO_MERGE,
+          mergeQueueEntry: null,
+        },
+      },
+    });
+    expect(invokedEnrollment(runner)).toBe(true);
   });
 });
 

@@ -41,6 +41,27 @@ const FLEET_PROMOTION_GATE_LANE = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/run-affected-tests.mjs',
 ];
+const MERGE_QUEUE_CONTROLLER_INPUTS = [
+  '.github/workflows/merge-queue-autoenroll.yml',
+  'scripts/ci-merge-queue-check.mjs',
+  'scripts/drain-pr-queue.sh',
+  'scripts/lib/merge-queue-guard.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+  'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/pr-check-failures.test.mjs',
+  'scripts/merge-queue-backend.mjs',
+  'scripts/tests/test_gh_retry.py',
+];
+const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+  'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/pr-check-failures.test.mjs',
+];
 
 const PREREQUISITE_TRAIN_CORNERS = [
   'scripts/ci/neon-orphan-reaper.mjs',
@@ -740,6 +761,49 @@ describe('automation-verify affected scope', () => {
     expect(buildAffectedTestPlan(['scripts/ci-fast-lanes.mjs']).mode).toBe(
       'full'
     );
+  });
+
+  it('selects the authoritative controller suite for a bounded merge-queue change', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/drain-pr-queue.sh',
+      'scripts/merge-queue-backend.mjs',
+      'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+      'scripts/tests/test_gh_retry.py',
+      ...AFFECTED_TEST_SELECTOR_MANIFEST,
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual(MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS);
+    expect(plan.pythonTests).toEqual(['scripts/tests/test_gh_retry.py']);
+    expect(plan.selectedTests).toEqual([]);
+  });
+
+  it.each(
+    MERGE_QUEUE_CONTROLLER_INPUTS
+  )('maps the merge-queue controller input %s independently', input => {
+    const plan = buildAffectedTestPlan([input]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual(MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS);
+    expect(plan.pythonTests).toEqual(['scripts/tests/test_gh_retry.py']);
+  });
+
+  it('fails closed when merge-queue controller changes include unknown automation', () => {
+    expect(
+      buildAffectedTestPlan([
+        'scripts/merge-queue-backend.mjs',
+        'scripts/lib/unknown-queue-transport.mjs',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('fails closed when merge-queue controller changes include only half the selector contract', () => {
+    expect(
+      buildAffectedTestPlan([
+        'scripts/merge-queue-backend.mjs',
+        'scripts/run-affected-tests.mjs',
+      ]).mode
+    ).toBe('full');
   });
 
   it('fails closed when the cancellation healer lane includes unknown automation', () => {
