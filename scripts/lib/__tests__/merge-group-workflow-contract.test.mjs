@@ -92,7 +92,68 @@ function getMergeGroupReachableJobText(jobBlock) {
   return reachable.join('\n');
 }
 
+const REQUIRED_CI_FAST_RESULTS = [
+  'TYPECHECK_RESULT',
+  'REMAINING_RESULT',
+  'PROFILE_BROWSER_RESULT',
+];
+
+function parseExactCiFastFailureOperands(script) {
+  const conditions = [
+    ...script.matchAll(/if\s+\[\[\s*(.+?)\s*\]\];\s*then/g),
+  ].map(match => match[1]);
+  const condition = conditions.find(candidate =>
+    REQUIRED_CI_FAST_RESULTS.some(result => candidate.includes(`$${result}`))
+  );
+  if (!condition) throw new Error('Missing ci-fast fail-closed condition');
+
+  const operands = condition.split(/\s+\|\|\s+/).map(clause => {
+    const match = clause.match(
+      /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT)"\s+!=\s+"success"$/
+    );
+    if (!match)
+      throw new Error(`Invalid ci-fast fail-closed operand: ${clause}`);
+    return match[1];
+  });
+
+  if (
+    operands.length !== REQUIRED_CI_FAST_RESULTS.length ||
+    new Set(operands).size !== REQUIRED_CI_FAST_RESULTS.length ||
+    REQUIRED_CI_FAST_RESULTS.some(result => !operands.includes(result))
+  ) {
+    throw new Error(
+      `Invalid ci-fast fail-closed result set: ${operands.join(', ')}`
+    );
+  }
+
+  return operands;
+}
+
 describe('merge_group workflow contract', () => {
+  it('accepts reordered exact ci-fast failure operands', () => {
+    expect(
+      parseExactCiFastFailureOperands(`
+        if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then
+          exit 1
+        fi
+      `)
+    ).toEqual([
+      'PROFILE_BROWSER_RESULT',
+      'TYPECHECK_RESULT',
+      'REMAINING_RESULT',
+    ]);
+  });
+
+  it('rejects a ci-fast failure condition missing a required operand', () => {
+    expect(() =>
+      parseExactCiFastFailureOperands(`
+        if [[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then
+          exit 1
+        fi
+      `)
+    ).toThrow('Invalid ci-fast fail-closed result set');
+  });
+
   it('models a checks_requested combined-head event', () => {
     expect(EVENT.action).toBe('checks_requested');
     expect(EVENT.merge_group.base_ref).toBe('refs/heads/main');
@@ -215,9 +276,8 @@ describe('merge_group workflow contract', () => {
     );
     expect(ciFast).toContain('TYPECHECK_RESULT');
     expect(ciFast).toContain('REMAINING_RESULT');
-    expect(ciFast).toContain(
-      '[[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]'
-    );
+    expect(ciFast).toContain('PROFILE_BROWSER_RESULT');
+    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(3);
     expect(ciFast).toContain('exit 1');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     expect(units).not.toContain('ci-unit-runner-route');
