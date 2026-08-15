@@ -76,6 +76,7 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 | 7 | outreach | Every invocation | Sends a batch of pending outreach emails after auto-approve |
 | 8 | alphabetCache | `hour % 6 === 0 && minute < 15` | Warms Spotify alphabet cache |
 | 9 | ingestionFallback | If elapsed < 50s | Claims/processes up to 2 ingestion jobs as fallback for dedicated cron |
+| 10 | redisOperability | Hourly (`minute < 15`) | Writes and reads an expiring canary key; emits a stable Sentry failure class on quota exhaustion, mismatch, or unavailability |
 
 Source: `apps/web/app/api/cron/frequent/route.ts`
 

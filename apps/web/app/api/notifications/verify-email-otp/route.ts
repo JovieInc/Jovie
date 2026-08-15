@@ -23,7 +23,9 @@ const emailOtpVerifyLimiter = createRateLimiter({
   limit: 10,
   window: '10 m',
   prefix: 'notifications:email-otp:verify',
-  analytics: true,
+  analytics: false,
+  algorithm: 'fixed-window',
+  trafficClass: 'anonymous',
 });
 
 export async function POST(request: NextRequest) {

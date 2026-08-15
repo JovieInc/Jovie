@@ -162,7 +162,7 @@ All routes live under `apps/web/app/api/`. Auth is via Clerk (`auth()`) unless n
 | `/api/health/env` | GET | Admin | Environment info |
 | `/api/health/homepage` | GET | Public | Homepage render check |
 | `/api/health/keys` | GET | Admin | API key health |
-| `/api/health/redis` | GET | Admin | Redis health |
+| `/api/health/redis` | GET | Admin or CRON_SECRET | Redis write/read operability probe |
 
 ### Images
 

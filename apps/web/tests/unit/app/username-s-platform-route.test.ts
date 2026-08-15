@@ -48,6 +48,7 @@ const mocks = vi.hoisted(() => {
       limit: vi.fn().mockResolvedValue({ success: true }),
     },
     detectBot: vi.fn().mockReturnValue({ isBot: false, reason: 'ok' }),
+    recordAnonymousBotMetric: vi.fn(),
     extractClientIP: vi.fn().mockReturnValue('1.2.3.4'),
     captureError: vi.fn().mockResolvedValue(undefined),
     validateSocialLinkUrl: vi.fn().mockReturnValue({ valid: true }),
@@ -109,6 +110,7 @@ vi.mock('@/lib/rate-limit', () => ({
 
 vi.mock('@/lib/utils/bot-detection', () => ({
   detectBot: mocks.detectBot,
+  recordAnonymousBotMetric: mocks.recordAnonymousBotMetric,
 }));
 
 vi.mock('@/lib/utils/ip-extraction', () => ({

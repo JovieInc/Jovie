@@ -33,7 +33,7 @@ export interface RateLimitResult {
 /**
  * Rate limit configuration for a specific limiter
  */
-export interface RateLimitConfig {
+interface RateLimitConfigBase {
   /** Human-readable name for this limiter */
   name: string;
   /** Maximum requests allowed in the window */
@@ -42,11 +42,32 @@ export interface RateLimitConfig {
   window: string;
   /** Redis key prefix */
   prefix: string;
-  /** Whether to enable Upstash analytics */
-  analytics?: boolean;
   /** Whether the limiter must fail closed without Redis */
   requireRedis?: boolean;
 }
+
+export type RateLimitConfig = RateLimitConfigBase &
+  (
+    | {
+        trafficClass: 'anonymous';
+        analytics: false;
+        algorithm: 'fixed-window';
+        anonymousCostException?: never;
+      }
+    | {
+        trafficClass: 'anonymous';
+        analytics: false;
+        algorithm: 'sliding-window';
+        /** Required review receipt for an anonymous boundary that needs sliding semantics. */
+        anonymousCostException: string;
+      }
+    | {
+        trafficClass: 'authenticated' | 'internal';
+        analytics: boolean;
+        algorithm: 'fixed-window' | 'sliding-window';
+        anonymousCostException?: never;
+      }
+  );
 
 /**
  * Rate limit status with additional metadata

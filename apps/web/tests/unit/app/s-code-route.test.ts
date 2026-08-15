@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from '@/app/s/[code]/route';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
+import { publicClickLimiter } from '@/lib/rate-limit';
+import { detectBot, recordAnonymousBotMetric } from '@/lib/utils/bot-detection';
 
 const mocks = vi.hoisted(() => {
   const sourceLink = {
@@ -116,6 +118,7 @@ vi.mock('@/lib/rate-limit', () => ({
 
 vi.mock('@/lib/utils/bot-detection', () => ({
   detectBot: vi.fn().mockReturnValue({ isBot: false }),
+  recordAnonymousBotMetric: vi.fn(),
 }));
 
 vi.mock('@/lib/utils/ip-extraction', () => ({
@@ -135,6 +138,29 @@ describe('GET /s/[code]', () => {
     vi.clearAllMocks();
     mocks.sourceLink.sourceType = 'qr';
     mocks.selectLimitMock.mockResolvedValue([mocks.sourceLink]);
+  });
+
+  it('redirects known bots without Redis or database mutations', async () => {
+    vi.mocked(detectBot).mockReturnValueOnce({
+      isBot: true,
+      reason: 'known_crawler',
+    });
+
+    const response = await GET(new NextRequest('http://localhost/s/abc123'), {
+      params: Promise.resolve({ code: 'abc123' }),
+    });
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(
+      'https://example.com/profile'
+    );
+    expect(recordAnonymousBotMetric).toHaveBeenCalledWith(
+      expect.objectContaining({ isBot: true }),
+      'redirect'
+    );
+    expect(publicClickLimiter.limit).not.toHaveBeenCalled();
+    expect(mocks.withSystemIngestionSession).not.toHaveBeenCalled();
+    expect(recordAudienceEvent).not.toHaveBeenCalled();
   });
 
   it('treats partial consent cookies as malformed through the shared parser', async () => {

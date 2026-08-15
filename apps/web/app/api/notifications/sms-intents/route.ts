@@ -37,7 +37,9 @@ const intentCreateIpLimiter = createRateLimiter({
   limit: 30,
   window: '1 m',
   prefix: 'notifications:sms-intent:create:ip',
-  analytics: true,
+  analytics: false,
+  algorithm: 'fixed-window',
+  trafficClass: 'anonymous',
 });
 
 const intentCreateArtistGlobalLimiter = createRateLimiter({
@@ -45,7 +47,9 @@ const intentCreateArtistGlobalLimiter = createRateLimiter({
   limit: 100,
   window: '1 m',
   prefix: 'notifications:sms-intent:create:artist',
-  analytics: true,
+  analytics: false,
+  algorithm: 'fixed-window',
+  trafficClass: 'anonymous',
 });
 
 const intentCreateVisitorLimiter = createRateLimiter({
@@ -53,7 +57,9 @@ const intentCreateVisitorLimiter = createRateLimiter({
   limit: 20,
   window: '1 m',
   prefix: 'notifications:sms-intent:create:visitor',
-  analytics: true,
+  analytics: false,
+  algorithm: 'fixed-window',
+  trafficClass: 'anonymous',
 });
 
 function buildSmsHref(

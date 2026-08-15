@@ -170,7 +170,6 @@ describe('Rate Limit Config', () => {
 
     describe('analytics configuration', () => {
       it('should enable analytics for critical operations', () => {
-        expect(RATE_LIMITERS.onboarding.analytics).toBe(true);
         expect(RATE_LIMITERS.paymentIntent.analytics).toBe(true);
         expect(RATE_LIMITERS.adminImpersonate.analytics).toBe(true);
       });
@@ -188,6 +187,21 @@ describe('Rate Limit Config', () => {
         expect(RATE_LIMITERS.publicProfile.analytics).toBe(false);
         expect(RATE_LIMITERS.publicClick.analytics).toBe(false);
         expect(RATE_LIMITERS.health.analytics).toBe(false);
+      });
+
+      it('keeps anonymous traffic on the lower-command fixed-window policy', () => {
+        const anonymousLimiters = Object.values(RATE_LIMITERS).filter(
+          limiter => limiter.trafficClass === 'anonymous'
+        );
+
+        expect(anonymousLimiters.length).toBeGreaterThan(15);
+
+        for (const limiter of anonymousLimiters) {
+          expect(limiter.analytics).toBe(false);
+          if (limiter.algorithm === 'sliding-window') {
+            expect(limiter.anonymousCostException).toMatch(/rolling-window/i);
+          }
+        }
       });
     });
 

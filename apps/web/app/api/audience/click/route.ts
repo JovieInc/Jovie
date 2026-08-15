@@ -21,7 +21,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { publicClickLimiter } from '@/lib/rate-limit';
-import { detectBot } from '@/lib/utils/bot-detection';
+import { detectBot, recordAnonymousBotMetric } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
 import { encryptIP } from '@/lib/utils/pii-encryption';
@@ -117,26 +117,6 @@ export async function POST(request: NextRequest) {
     // Extract client IP for rate limiting
     const clientIP = extractClientIP(request.headers);
 
-    // Atomically check-and-decrement to avoid TOCTOU race
-    const ipRateLimitResult = await publicClickLimiter.limit(clientIP);
-    if (!ipRateLimitResult.success) {
-      const retryAfterSeconds = Math.ceil(
-        (ipRateLimitResult.reset.getTime() - Date.now()) / 1000
-      );
-      return NextResponse.json(
-        { error: 'Rate limit exceeded' },
-        {
-          status: 429,
-          headers: {
-            ...NO_STORE_HEADERS,
-            'Retry-After': String(Math.max(retryAfterSeconds, 1)),
-            'X-RateLimit-Limit': String(ipRateLimitResult.limit),
-            'X-RateLimit-Remaining': String(ipRateLimitResult.remaining),
-          },
-        }
-      );
-    }
-
     let body: unknown;
     try {
       body = await request.json();
@@ -187,8 +167,37 @@ export async function POST(request: NextRequest) {
 
     // Resolve IP address from body or headers
     const resolvedIP = ipAddress ?? clientIP ?? undefined;
+    const preliminaryBotDetection = detectBot(request, '/api/audience/click', {
+      userAgent,
+    });
 
-    // Per-creator rate limiting (10k clicks/hour)
+    if (preliminaryBotDetection.isBot) {
+      recordAnonymousBotMetric(preliminaryBotDetection, 'audience_click');
+      return NextResponse.json(
+        { success: true, filtered: true },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const ipRateLimitResult = await publicClickLimiter.limit(clientIP);
+    if (!ipRateLimitResult.success) {
+      const retryAfterSeconds = Math.ceil(
+        (ipRateLimitResult.reset.getTime() - Date.now()) / 1000
+      );
+      return NextResponse.json(
+        { error: 'Rate limit exceeded' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            'Retry-After': String(Math.max(retryAfterSeconds, 1)),
+            'X-RateLimit-Limit': String(ipRateLimitResult.limit),
+            'X-RateLimit-Remaining': String(ipRateLimitResult.remaining),
+          },
+        }
+      );
+    }
+
     const rateLimitResult = await checkClickRateLimit(profileId, resolvedIP);
     if (!rateLimitResult.success) {
       return NextResponse.json(
@@ -236,12 +245,7 @@ export async function POST(request: NextRequest) {
     const fingerprint = createFingerprint(resolvedIP, userAgent);
     const normalizedDevice = deviceType ?? 'unknown';
     const now = new Date();
-    const preliminaryBotDetection = detectBot(request, '/api/audience/click', {
-      userAgent,
-    });
-    const preliminaryAudienceTags = preliminaryBotDetection.isBot
-      ? ['bot']
-      : [];
+    const preliminaryAudienceTags: string[] = [];
 
     // Encrypt IP address for storage (GDPR/CCPA compliance)
     const encryptedIP = encryptIP(resolvedIP);

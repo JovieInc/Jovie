@@ -22,7 +22,7 @@ import {
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { publicClickLimiter } from '@/lib/rate-limit';
-import { detectBot } from '@/lib/utils/bot-detection';
+import { detectBot, recordAnonymousBotMetric } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 
@@ -193,13 +193,16 @@ export async function GET(
       sourceLink.utmParams
     );
     const clientIP = extractClientIP(request.headers);
+    const userAgent = request.headers.get('user-agent');
+    const botDetection = detectBot(request, '/s/[code]');
+    if (botDetection.isBot) {
+      recordAnonymousBotMetric(botDetection, 'redirect');
+      return NextResponse.redirect(destinationUrl, { status: 302 });
+    }
     const rateLimitResult = await publicClickLimiter.limit(clientIP);
     if (!rateLimitResult.success) {
       return NextResponse.redirect(destinationUrl, { status: 302 });
     }
-
-    const userAgent = request.headers.get('user-agent');
-    const botDetection = detectBot(request, '/s/[code]');
     const geoCity = request.headers.get('x-vercel-ip-city');
     const geoCountry =
       request.headers.get('x-vercel-ip-country') ??

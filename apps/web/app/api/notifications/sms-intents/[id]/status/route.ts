@@ -18,7 +18,9 @@ const intentStatusLimiter = createRateLimiter({
   limit: 90,
   window: '1 m',
   prefix: 'notifications:sms-intent:status:ip',
-  analytics: true,
+  analytics: false,
+  algorithm: 'fixed-window',
+  trafficClass: 'anonymous',
 });
 
 const UUID_REGEX =

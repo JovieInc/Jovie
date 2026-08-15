@@ -60,6 +60,45 @@ This is the primary defense. Walk this checklist on initial setup and re-verify 
 - Already configured: compute autosuspend
 - Verify: autosuspend timeout = 5 minutes (Neon dashboard → branch settings)
 
+### Upstash Redis
+
+- Approved pre-revenue ceiling: **$5/month** for `Jovie-1` pay-as-you-go.
+  This is a hard maximum, not a target. Automated budget increases are disabled
+  while the verified active paid-subscriber count is zero. Upstash account
+  currently lacks a payment method, so the approved plan change remains
+  unapplied until billing setup is completed.
+- Hard tier limit: record the current monthly command quota in the production
+  operations dashboard; the free-tier reference value is 500,000 commands.
+- Provisioning status: the application emits the metrics and stable failure
+  classes below. Production operations owns the Sentry dashboard and alert
+  rules; do not claim continuous protection until those rules have been created
+  and a synthetic event has reached the on-call destination.
+- Quota early signal: configure alerts on the monthly sum of
+  `redis.rate_limit_command_estimate` at 80% (warning) and 95% (critical).
+  The metric uses the documented per-decision upper bound and a bounded limiter
+  prefix; multiply writes by the database's current Global replica count.
+- Anonymous anomaly signal: chart `anonymous.bot_detected` by its bounded
+  `surface`, `reason`, and `blocked` dimensions. Warn when a 15-minute count is
+  at least 100 and exceeds the same hour's four-week baseline by 5x; page at
+  1,000 in 15 minutes. Production operations owns triage: correlate the surface
+  with Vercel route volume, confirm that filtering happens before Redis, and
+  tighten only bot rules that preserve anti-cloaking and paid-resource safety.
+- Failure signal: configure paging for
+  `redis.rate_limit_failure{failure_kind=quota_exceeded}` and the hourly
+  `redis_operability_*` canary event.
+- Mitigation: high-volume anonymous telemetry uses fixed windows with provider
+  analytics off; documented payment-abuse exceptions retain sliding windows
+  with analytics off. Known crawlers skip durable telemetry limiters, and quota
+  errors open the shared Redis circuit for 15 minutes to stop retry
+  amplification. Authentication routing state and native exchange codes are
+  Postgres-backed, so Redis mitigation degrades analytics/rate-limit precision
+  instead of blocking login.
+- Recovery: restore write operability (quota reset, approved plan change, or
+  replacement datastore), run the authenticated `/api/health/redis` write/read
+  probe, then complete the production auth dogfood path before closing incident.
+  Automation may apply the approved pay-as-you-go plan and hard cap, but must
+  never delete/recreate the database, restore a backup, or rotate credentials.
+
 ### R2 / Cloudflare
 
 - R2 has no native spend cap as of writing; rely on Layer 2 and bandwidth alerts in Cloudflare dashboard
@@ -147,6 +186,9 @@ This is finer-grained than Layer 2 but slower to react (daily vs every-15-min). 
 ### Initial setup (one-time)
 
 - [ ] Layer 1: walk the checklist above. Screenshot every cap. Attach to the setup PR.
+- [ ] Upstash: create and verify the 80%/95% command alerts, anonymous bot-volume
+      warning/page rules, and quota-failure canary page before marking Redis
+      anomaly protection active.
 - [ ] Layer 2: confirm `cost-anomaly-gate.yml` is enabled and its 15-minute schedule is declared before treating it as continuous protection.
 - [ ] Layer 2: trigger a synthetic observer run manually and confirm one issue + Slack message arrives:
   ```bash

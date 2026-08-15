@@ -20,6 +20,8 @@ const requestRateLimiter = createRateLimiter({
   window: '1 m',
   prefix: 'rl:musicfetch',
   analytics: true,
+  algorithm: 'sliding-window',
+  trafficClass: 'internal',
 });
 
 const inFlightRequests = new Map<string, Promise<unknown>>();

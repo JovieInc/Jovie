@@ -4,11 +4,12 @@
  * Runs every 15 minutes. Orchestrates sub-jobs that need sub-hourly frequency.
  * One cold start + one DB connection serves all jobs.
  *
- * Sub-jobs:
+ * Representative sub-jobs (docs/CRON_REGISTRY.md is the complete registry):
  * - DB warm ping: every invocation (15 min) — keeps Neon from auto-suspending
  * - Process campaigns: every invocation (15 min)
  * - Pixel forwarding retry: every other invocation (~30 min)
  * - Schedule + send release notifications: every invocation (15 min)
+ * - Redis write/read operability canary: hourly
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
@@ -41,6 +42,10 @@ import { processOutreachBatch } from '@/lib/leads/outreach-batch';
 import { pipelineWarn } from '@/lib/leads/pipeline-logger';
 import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
+import {
+  probeRedisOperability,
+  RedisOperabilityError,
+} from '@/lib/redis-operability';
 import { warmAlphabetCache } from '@/lib/spotify/alphabet-cache';
 import { processPendingEvents } from '@/lib/tracking/forwarding';
 import { logger } from '@/lib/utils/logger';
@@ -83,6 +88,10 @@ async function runSubJob(
     await captureError(`Frequent cron: ${name} failed`, error, {
       route: '/api/cron/frequent',
       subjob: name,
+      error_class:
+        error instanceof RedisOperabilityError
+          ? `redis_operability_${error.kind}`
+          : undefined,
     });
     return { success: false, error: msg };
   }
@@ -105,6 +114,16 @@ export async function GET(request: Request) {
     await db.execute(drizzleSql`SELECT 1`);
     return { latencyMs: Date.now() - pingStart };
   });
+
+  // 1.5 Redis write/read canary — hourly. PING can remain green after a hard
+  // command quota is exhausted, so only a real ephemeral write/read proves the
+  // auth-routing store is usable. Cost: 2 commands/run, <=1,488/month.
+  results.redisOperability =
+    minute < 15
+      ? await runSubJob('redisOperability', async () => ({
+          ...(await probeRedisOperability()),
+        }))
+      : { success: true, skipped: true };
 
   // 2. Process campaigns — every invocation (15 min)
   results.campaigns = await runSubJob('campaigns', async () => {
