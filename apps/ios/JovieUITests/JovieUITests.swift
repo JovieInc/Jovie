@@ -115,7 +115,7 @@ final class JovieUITests: XCTestCase {
     }
 
     attachScreenshot(named: "settings", app: app)
-    for linkTitle in ["Support", "Billing", "Privacy", "Terms"] {
+    for linkTitle in ["Manage Account", "Support", "Billing", "Privacy", "Terms"] {
       XCTAssertTrue(
         app.buttons[linkTitle].waitForExistence(timeout: 2),
         "Settings row \(linkTitle) did not appear.\n\(app.debugDescription)"
@@ -129,6 +129,13 @@ final class JovieUITests: XCTestCase {
     }
 
     app.buttons["Log Out"].tap()
+
+    XCTAssertTrue(
+      app.buttons["Confirm Log Out"].waitForExistence(timeout: 3),
+      "Logout confirmation did not appear.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "settings-logout-confirmation", app: app)
+    app.buttons["Confirm Log Out"].tap()
 
     XCTAssertTrue(
       app.buttons["Continue in Browser"].waitForExistence(timeout: 5),

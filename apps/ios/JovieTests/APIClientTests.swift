@@ -256,4 +256,59 @@ struct APIClientTests {
       _ = try await client.fetchMe()
     }
   }
+
+  @Test func nativeSessionRevokerUsesCanonicalBetterAuthSignOut() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["native-token"])
+    MockURLProtocol.requestHandler = { request in
+      #expect(request.url?.path == "/api/auth/sign-out")
+      #expect(request.httpMethod == "POST")
+      #expect(request.httpBody == nil)
+      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer native-token")
+      #expect(request.timeoutInterval == 4)
+
+      return (
+        HTTPURLResponse(
+          url: request.url!,
+          statusCode: 200,
+          httpVersion: nil,
+          headerFields: nil
+        )!,
+        Data("{\"success\":true}".utf8)
+      )
+    }
+
+    let revoker = NativeSessionRevoker(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider,
+      requestTimeout: 4
+    )
+
+    #expect(await revoker.revokeCurrentSession() == .revoked)
+    #expect(await tokenProvider.recordedForceRefreshValues() == [false])
+  }
+
+  @Test func nativeSessionRevokerReportsServerFailureWithoutRetrying() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["native-token"])
+    MockURLProtocol.requestHandler = { request in
+      (
+        HTTPURLResponse(
+          url: request.url!,
+          statusCode: 503,
+          httpVersion: nil,
+          headerFields: nil
+        )!,
+        Data()
+      )
+    }
+
+    let revoker = NativeSessionRevoker(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider
+    )
+
+    #expect(await revoker.revokeCurrentSession() == .failed(statusCode: 503))
+    #expect(await tokenProvider.recordedForceRefreshValues() == [false])
+  }
 }

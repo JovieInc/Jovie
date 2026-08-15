@@ -53,6 +53,24 @@ private final class MockBrightnessController: BrightnessControlling, @unchecked 
   func restoreBrightness() async {}
 }
 
+private actor MockSessionRevoker: NativeSessionRevoking {
+  private let result: NativeSessionRevocationResult
+  private var callCount = 0
+
+  init(result: NativeSessionRevocationResult) {
+    self.result = result
+  }
+
+  func revokeCurrentSession() async -> NativeSessionRevocationResult {
+    callCount += 1
+    return result
+  }
+
+  func calls() -> Int {
+    callCount
+  }
+}
+
 @Suite(.serialized)
 @MainActor
 struct AppStateTests {
@@ -238,11 +256,13 @@ struct AppStateTests {
         MeRepositoryResult(response: .previewReady, isStale: false)
       )
     )
+    let sessionRevoker = MockSessionRevoker(result: .revoked)
     let appState = AppState(
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      sessionRevoker: sessionRevoker
     )
     appState.didInitializeAuth = true
 
@@ -253,6 +273,32 @@ struct AppStateTests {
     #expect(appState.dashboardState == .idle)
     #expect(appState.activeUserID == nil)
     #expect(appState.isOffline == false)
+    #expect(await sessionRevoker.calls() == 1)
+    #expect(await repository.clearedUsers() == ["user_123"])
+  }
+
+  @Test func signOutStillClearsLocalStateWhenRemoteRevocationFails() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let sessionRevoker = MockSessionRevoker(result: .failed(statusCode: 503))
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController(),
+      sessionRevoker: sessionRevoker
+    )
+    appState.didInitializeAuth = true
+
+    await appState.handleSignedInUserChange("user_123")
+    await appState.signOut()
+
+    #expect(appState.route == .signedOut)
+    #expect(appState.activeUserID == nil)
+    #expect(await sessionRevoker.calls() == 1)
     #expect(await repository.clearedUsers() == ["user_123"])
   }
 
@@ -710,6 +756,22 @@ struct AppStateTests {
     )
 
     #expect(appState.billingURL.absoluteString == "https://jov.ie/app/settings/billing")
+  }
+
+  @Test func accountURLUsesCanonicalWebSettingsRoute() {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    #expect(appState.accountURL.absoluteString == "https://jov.ie/app/settings/account")
   }
 }
 

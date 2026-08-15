@@ -109,6 +109,7 @@ struct AppShellView<
   let profile: AppShellProfile
   let isOffline: Bool
   let opensSettingsOnLaunch: Bool
+  let accountURL: URL
   let billingURL: URL
   let chatEnabled: Bool
   let audienceEnabled: Bool
@@ -150,6 +151,7 @@ struct AppShellView<
     isOffline: Bool,
     initialTab: AppShellTab = .chat,
     opensSettingsOnLaunch: Bool = false,
+    accountURL: URL,
     billingURL: URL,
     chatEnabled: Bool = false,
     audienceEnabled: Bool = true,
@@ -179,6 +181,7 @@ struct AppShellView<
     self.profile = profile
     self.isOffline = isOffline
     self.opensSettingsOnLaunch = opensSettingsOnLaunch
+    self.accountURL = accountURL
     self.billingURL = billingURL
     self.chatEnabled = chatEnabled
     self.audienceEnabled = audienceEnabled
@@ -358,6 +361,7 @@ struct AppShellView<
           SettingsView(
             profile: profile,
             buildInfo: .current(),
+            accountURL: accountURL,
             billingURL: billingURL,
             onClose: { navigationPath.removeLast() },
             onLogout: onLogout
