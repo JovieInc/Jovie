@@ -108,11 +108,11 @@ test.describe('public profile browser admission', () => {
     );
 
     const response = await page.goto(
-      '/profile-admission-fixture?width=390&chrome=true',
+      '/renders/profile-admission?width=390&chrome=true',
       { waitUntil: 'networkidle' }
     );
     expect(response?.status()).toBe(200);
-    expect(new URL(page.url()).pathname).toBe('/profile-admission-fixture');
+    expect(new URL(page.url()).pathname).toBe('/renders/profile-admission');
 
     const surface = page.getByTestId('marketing-render-surface');
     const pac = surface.getByTestId('profile-pac');
@@ -179,7 +179,7 @@ test.describe('public profile browser admission', () => {
     expect(accessibility.violations).toEqual([]);
 
     await page.goto(
-      '/profile-admission-fixture?width=390&chrome=true&mode=dsp',
+      '/renders/profile-admission?width=390&chrome=true&mode=dsp',
       { waitUntil: 'networkidle' }
     );
     await expect(surface).toBeVisible();

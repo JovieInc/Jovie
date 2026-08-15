@@ -278,7 +278,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(browser).toContain('git diff --diff-filter=ACDMRT --name-only');
     expect(browser).toContain(':(glob)apps/web/app/\\[username\\]/**');
     for (const requiredPath of [
-      'apps/web/app/(marketing)/profile-admission-fixture/**',
+      'apps/web/app/(marketing)/renders/profile-admission/**',
       'apps/web/components/features/release/SmartLinkProviderButton.tsx',
       'apps/web/components/organisms/CookieBannerMount.tsx',
       'apps/web/components/organisms/CookieBannerSection.tsx',

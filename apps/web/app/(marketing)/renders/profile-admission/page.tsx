@@ -1,13 +1,17 @@
+import { notFound } from 'next/navigation';
+import {
+  isProfileAdmissionFixtureEnabled,
+  PROFILE_ADMISSION_FIXTURE_METADATA,
+} from './guard';
 import { ProfileAdmissionFixtureClient } from './ProfileAdmissionFixtureClient';
 
 export const revalidate = false;
+export const metadata = PROFILE_ADMISSION_FIXTURE_METADATA;
 
-/**
- * Secret-free, profile-classified browser fixture for required CI admission.
- * The first path segment intentionally passes the canonical public-profile
- * classifier so consent-card versus profile-dock geometry is exercised.
- */
+/** Secret-free, E2E-only public-profile admission fixture. */
 export default function ProfileAdmissionFixturePage() {
+  if (!isProfileAdmissionFixtureEnabled()) notFound();
+
   return (
     <main className='flex h-dvh justify-center overflow-hidden bg-black dark:bg-black'>
       <ProfileAdmissionFixtureClient />

@@ -1244,7 +1244,7 @@ jobs:
 
           CHANGED_FILES="$(git diff --diff-filter=ACDMRT --name-only "$BASE" HEAD -- \
             ':(glob)apps/web/app/\[username\]/**' \
-            'apps/web/app/(marketing)/profile-admission-fixture/**' \
+            'apps/web/app/(marketing)/renders/profile-admission/**' \
             'apps/web/app/(marketing)/renders/**' \
             'apps/web/app/api/profile/**' \
             'apps/web/components/features/home/homepage-profile-preview-fixture.ts' \

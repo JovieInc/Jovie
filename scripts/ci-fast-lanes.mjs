@@ -330,7 +330,7 @@ function runIosFast() {
 function runProfileAdmission() {
   const files = changedFiles([
     ':(glob)apps/web/app/\\[username\\]/**',
-    'apps/web/app/(marketing)/profile-admission-fixture/**',
+    'apps/web/app/(marketing)/renders/profile-admission/**',
     'apps/web/app/api/profile/**',
     'apps/web/components/features/release/SmartLinkProviderButton.tsx',
     'apps/web/components/features/profile/**',
