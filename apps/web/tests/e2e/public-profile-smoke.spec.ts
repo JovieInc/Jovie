@@ -50,6 +50,13 @@ test('public profile renders core elements within budget', async ({ page }) => {
       profileApiFailures.push(`${apiResponse.status()} ${url.pathname}`);
     }
   });
+  const captureDismissalResponse = page.waitForResponse(apiResponse => {
+    const url = new URL(apiResponse.url());
+    return (
+      apiResponse.request().method() === 'GET' &&
+      url.pathname === '/api/profile/capture-dismissal'
+    );
+  });
 
   // Listen mode surfaces music links; default mode often hides them behind a
   // tab selector. Fan flow lands here from outreach messages.
@@ -130,7 +137,11 @@ test('public profile renders core elements within budget', async ({ page }) => {
 
   // These requests are part of ordinary anonymous profile navigation. A 429
   // or other error here is a runtime admission failure, not harmless telemetry.
-  await page.waitForTimeout(500);
+  const dismissalStatus = await captureDismissalResponse;
+  expect(
+    dismissalStatus.status(),
+    'Public profile capture-dismissal admission request failed'
+  ).toBeLessThan(400);
   expect(
     profileApiFailures,
     'Public profile emitted failed capture-dismissal or PAC requests'

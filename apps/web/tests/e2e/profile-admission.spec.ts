@@ -109,7 +109,7 @@ test.describe('public profile browser admission', () => {
 
     const response = await page.goto(
       '/renders/profile-admission?width=390&chrome=true',
-      { waitUntil: 'networkidle' }
+      { waitUntil: 'domcontentloaded' }
     );
     expect(response?.status()).toBe(200);
     expect(new URL(page.url()).pathname).toBe('/renders/profile-admission');
@@ -155,7 +155,7 @@ test.describe('public profile browser admission', () => {
       localStorage.removeItem('jv_cc');
       localStorage.removeItem('jovie_tracking_consent');
     });
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(banner).toBeVisible();
     await banner.getByRole('button', { name: 'Accept all' }).click();
     await expect(banner).toBeHidden();
@@ -180,7 +180,7 @@ test.describe('public profile browser admission', () => {
 
     await page.goto(
       '/renders/profile-admission?width=390&chrome=true&mode=dsp',
-      { waitUntil: 'networkidle' }
+      { waitUntil: 'domcontentloaded' }
     );
     await expect(surface).toBeVisible();
     await expect(page.getByTestId('profile-mode-drawer-listen')).toBeVisible();

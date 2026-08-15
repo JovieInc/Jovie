@@ -1,12 +1,9 @@
 import { notFound } from 'next/navigation';
-import {
-  isProfileAdmissionFixtureEnabled,
-  PROFILE_ADMISSION_FIXTURE_METADATA,
-} from './guard';
+import { isProfileAdmissionFixtureEnabled } from './guard';
 import { ProfileAdmissionFixtureClient } from './ProfileAdmissionFixtureClient';
 
 export const revalidate = false;
-export const metadata = PROFILE_ADMISSION_FIXTURE_METADATA;
+export { PROFILE_ADMISSION_FIXTURE_METADATA as metadata } from './guard';
 
 /** Secret-free, E2E-only public-profile admission fixture. */
 export default function ProfileAdmissionFixturePage() {
