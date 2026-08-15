@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGet, mockGetRedis, mockSet } = vi.hoisted(() => ({
-  mockGet: vi.fn(),
+const { mockDel, mockGetdel, mockGetRedis, mockSet } = vi.hoisted(() => ({
+  mockDel: vi.fn(),
+  mockGetdel: vi.fn(),
   mockGetRedis: vi.fn(),
   mockSet: vi.fn(),
 }));
@@ -19,14 +20,19 @@ import {
 describe('Redis operability', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetRedis.mockReturnValue({ set: mockSet, get: mockGet });
+    mockDel.mockResolvedValue(0);
+    mockGetRedis.mockReturnValue({
+      del: mockDel,
+      getdel: mockGetdel,
+      set: mockSet,
+    });
   });
 
-  it('requires a successful write followed by an exact read', async () => {
+  it('requires a successful write followed by an exact destructive read', async () => {
     const signal = new AbortController().signal;
     const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(signal);
     mockSet.mockResolvedValue('OK');
-    mockGet.mockImplementation(async (key: string) => key.split(':').at(-1));
+    mockGetdel.mockImplementation(async (key: string) => key.split(':').at(-1));
 
     await expect(probeRedisOperability()).resolves.toEqual({
       status: 'healthy',
@@ -39,6 +45,12 @@ describe('Redis operability', () => {
     );
     expect(timeoutSpy).toHaveBeenCalledWith(2_000);
     expect(mockGetRedis).toHaveBeenCalledWith({ signal });
+    expect(mockGetdel).toHaveBeenCalledWith(
+      expect.stringMatching(/^health:operability:/)
+    );
+    expect(mockDel).toHaveBeenCalledWith(
+      expect.stringMatching(/^health:operability:/)
+    );
     timeoutSpy.mockRestore();
   });
 
@@ -51,6 +63,7 @@ describe('Redis operability', () => {
       name: 'RedisOperabilityError',
       kind: 'quota_exceeded',
     });
+    expect(mockDel).toHaveBeenCalledTimes(1);
     expect(
       classifyRedisFailure(new Error('ERR max requests limit exceeded'))
     ).toBe('quota_exceeded');
@@ -77,7 +90,7 @@ describe('Redis operability', () => {
 
   it('fails when read-after-write does not return the canary value', async () => {
     mockSet.mockResolvedValue('OK');
-    mockGet.mockResolvedValue(null);
+    mockGetdel.mockResolvedValue(null);
     await expect(probeRedisOperability()).rejects.toMatchObject({
       kind: 'read_after_write_mismatch',
     });
