@@ -75,7 +75,7 @@ describe('auth routing state store', () => {
 
   it('consumes auth state once', async () => {
     const { consumeStoredAuthState } = await modulePromise;
-    hoisted.redisGetMock.mockResolvedValue(
+    hoisted.redisGetdelMock.mockResolvedValue(
       JSON.stringify({
         client: 'electron',
         intent: 'sign_in',
@@ -95,12 +95,16 @@ describe('auth routing state store', () => {
       returnTo: '/app/settings',
     });
 
-    expect(hoisted.redisDelMock).toHaveBeenCalledWith('auth:state:state_123');
+    expect(hoisted.redisGetdelMock).toHaveBeenCalledWith(
+      'auth:state:state_123'
+    );
+    expect(hoisted.redisDelMock).not.toHaveBeenCalled();
   });
 
   it('reads malformed auth state as expired without deleting it', async () => {
     const { consumeStoredAuthState, readStoredAuthState } = await modulePromise;
     hoisted.redisGetMock.mockResolvedValue('{not valid json');
+    hoisted.redisGetdelMock.mockResolvedValue('{not valid json');
 
     await expect(
       readStoredAuthState({ state: 'state_123', now: 2_000 })
@@ -109,7 +113,36 @@ describe('auth routing state store', () => {
       consumeStoredAuthState({ state: 'state_123', now: 2_000 })
     ).resolves.toBeNull();
 
+    expect(hoisted.redisGetdelMock).toHaveBeenCalledWith(
+      'auth:state:state_123'
+    );
     expect(hoisted.redisDelMock).not.toHaveBeenCalled();
+  });
+
+  it('allows only one concurrent auth-state consume to succeed', async () => {
+    const { consumeStoredAuthState } = await modulePromise;
+    const storedRecord = JSON.stringify({
+      client: 'web',
+      intent: 'sign_in',
+      returnTo: '/app',
+      state: 'state_123',
+      codeChallenge: null,
+      createdAt: 1_000,
+      expiresAt: 601_000,
+      consumedAt: null,
+    });
+    hoisted.redisGetdelMock
+      .mockResolvedValueOnce(storedRecord)
+      .mockResolvedValueOnce(null);
+
+    const [first, second] = await Promise.all([
+      consumeStoredAuthState({ state: 'state_123', now: 2_000 }),
+      consumeStoredAuthState({ state: 'state_123', now: 2_000 }),
+    ]);
+
+    expect(first).toMatchObject({ state: 'state_123' });
+    expect(second).toBeNull();
+    expect(hoisted.redisGetdelMock).toHaveBeenCalledTimes(2);
   });
 
   it('stores native exchange codes without putting tickets in URLs', async () => {

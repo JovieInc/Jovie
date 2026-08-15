@@ -4,6 +4,9 @@ const hoisted = vi.hoisted(() => ({
   authGetSession: vi.fn(),
   authGenerateOneTimeToken: vi.fn(),
   consumeStoredAuthState: vi.fn(),
+  readAuthStateFallback: vi.fn(),
+  clearAuthStateFallbackCookie: vi.fn(),
+  sealNativeExchangeFallback: vi.fn(() => 'jvex1.sealed_exchange'),
   captureError: vi.fn().mockResolvedValue(undefined),
   createStoredNativeExchangeCode: vi.fn(),
   trackServerEvent: vi.fn().mockResolvedValue(undefined),
@@ -21,6 +24,12 @@ vi.mock('@/lib/auth/better-auth', () => ({
 vi.mock('@/lib/auth/routing-state.server', () => ({
   consumeStoredAuthState: hoisted.consumeStoredAuthState,
   createStoredNativeExchangeCode: hoisted.createStoredNativeExchangeCode,
+}));
+
+vi.mock('@/lib/auth/routing-state-fallback.server', () => ({
+  readAuthStateFallback: hoisted.readAuthStateFallback,
+  clearAuthStateFallbackCookie: hoisted.clearAuthStateFallbackCookie,
+  sealNativeExchangeFallback: hoisted.sealNativeExchangeFallback,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -41,6 +50,7 @@ describe('GET /auth/callback', () => {
     );
     hoisted.authGetSession.mockResolvedValue({ user: { id: 'user_123' } });
     hoisted.authGenerateOneTimeToken.mockResolvedValue({ token: 'ott_123' });
+    hoisted.readAuthStateFallback.mockReturnValue(null);
     hoisted.consumeStoredAuthState.mockResolvedValue({
       client: 'electron',
       intent: 'sign_in',
@@ -154,6 +164,76 @@ describe('GET /auth/callback', () => {
     );
   });
 
+  it('completes a web callback from the cookie fallback when the Redis read fails', async () => {
+    hoisted.consumeStoredAuthState.mockRejectedValueOnce(
+      new Error('redis read unavailable')
+    );
+    hoisted.readAuthStateFallback.mockReturnValueOnce({
+      allowPrimaryMiss: false,
+      record: {
+        client: 'web',
+        intent: 'sign_in',
+        returnTo: '/app',
+        state: 'state_123',
+        codeChallenge: null,
+        desktopFlow: null,
+        createdAt: 1_000,
+        expiresAt: 601_000,
+        consumedAt: null,
+      },
+    });
+
+    const request = new Request('https://jov.ie/auth/callback?state=state_123');
+    const response = await GET(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('https://jov.ie/app');
+    expect(hoisted.readAuthStateFallback).toHaveBeenCalledWith({
+      request,
+      state: 'state_123',
+    });
+    expect(hoisted.clearAuthStateFallbackCookie).toHaveBeenCalledWith(response);
+  });
+
+  it('completes the iOS-shaped callback with encrypted exchange fallback on Redis failures', async () => {
+    hoisted.consumeStoredAuthState.mockRejectedValueOnce(
+      new Error('redis read unavailable')
+    );
+    hoisted.readAuthStateFallback.mockReturnValueOnce({
+      allowPrimaryMiss: false,
+      record: {
+        client: 'ios',
+        intent: 'sign_in',
+        returnTo: '/app',
+        state: 'state_123',
+        codeChallenge: 'challenge_123',
+        desktopFlow: null,
+        createdAt: 1_000,
+        expiresAt: 601_000,
+        consumedAt: null,
+      },
+    });
+    hoisted.createStoredNativeExchangeCode.mockRejectedValueOnce(
+      new Error('redis write unavailable')
+    );
+
+    const response = await GET(
+      new Request('https://jov.ie/auth/callback?state=state_123')
+    );
+
+    expect(hoisted.sealNativeExchangeFallback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        client: 'ios',
+        state: 'state_123',
+        codeChallenge: 'challenge_123',
+        ott: 'ott_123',
+      })
+    );
+    expect(response.headers.get('location')).toBe(
+      'ie.jov.jovie://auth/complete?code=jvex1.sealed_exchange&state=state_123'
+    );
+  });
+
   it('does not create a native exchange when the auth state was already consumed', async () => {
     hoisted.consumeStoredAuthState.mockResolvedValueOnce(null);
 
@@ -166,5 +246,54 @@ describe('GET /auth/callback', () => {
       error: 'Auth state expired',
     });
     expect(hoisted.createStoredNativeExchangeCode).not.toHaveBeenCalled();
+  });
+
+  it('does not replay a cookie continuity copy after a successful primary write', async () => {
+    hoisted.consumeStoredAuthState.mockResolvedValueOnce(null);
+    hoisted.readAuthStateFallback.mockReturnValueOnce({
+      allowPrimaryMiss: false,
+      record: {
+        client: 'web',
+        intent: 'sign_in',
+        returnTo: '/app',
+        state: 'state_123',
+        codeChallenge: null,
+        desktopFlow: null,
+        createdAt: 1_000,
+        expiresAt: 601_000,
+        consumedAt: null,
+      },
+    });
+
+    const response = await GET(
+      new Request('https://jov.ie/auth/callback?state=state_123')
+    );
+
+    expect(response.status).toBe(410);
+  });
+
+  it('accepts a primary miss only when the initial Redis write failed', async () => {
+    hoisted.consumeStoredAuthState.mockResolvedValueOnce(null);
+    hoisted.readAuthStateFallback.mockReturnValueOnce({
+      allowPrimaryMiss: true,
+      record: {
+        client: 'web',
+        intent: 'sign_in',
+        returnTo: '/app',
+        state: 'state_123',
+        codeChallenge: null,
+        desktopFlow: null,
+        createdAt: 1_000,
+        expiresAt: 601_000,
+        consumedAt: null,
+      },
+    });
+
+    const response = await GET(
+      new Request('https://jov.ie/auth/callback?state=state_123')
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('https://jov.ie/app');
   });
 });

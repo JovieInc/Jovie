@@ -11,6 +11,11 @@ import {
   consumeStoredAuthState,
   createStoredNativeExchangeCode,
 } from '@/lib/auth/routing-state.server';
+import {
+  clearAuthStateFallbackCookie,
+  readAuthStateFallback,
+  sealNativeExchangeFallback,
+} from '@/lib/auth/routing-state-fallback.server';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { trackServerEvent } from '@/lib/server-analytics';
@@ -79,12 +84,36 @@ export async function GET(request: Request) {
       return NextResponse.redirect(signInUrl, { headers: NO_STORE_HEADERS });
     }
 
-    const stateRecord = await consumeStoredAuthState({ state });
+    let stateRecord = null;
+    let primaryReadFailed = false;
+    try {
+      stateRecord = await consumeStoredAuthState({ state });
+    } catch (error) {
+      primaryReadFailed = true;
+      await captureError(
+        'Auth state Redis read failed; trying cookie fallback',
+        error,
+        {
+          route: '/auth/callback',
+          operation: 'consumeStoredAuthState',
+        }
+      );
+    }
+    const fallback = readAuthStateFallback({ request, state });
+    if (
+      !stateRecord &&
+      fallback &&
+      (primaryReadFailed || fallback.allowPrimaryMiss)
+    ) {
+      stateRecord = fallback.record;
+    }
     if (!stateRecord) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: 'Auth state expired' },
         { status: 410, headers: NO_STORE_HEADERS }
       );
+      clearAuthStateFallbackCookie(response);
+      return response;
     }
 
     void trackAuthEvent('auth_callback_received', {
@@ -118,7 +147,7 @@ export async function GET(request: Request) {
           }
         );
       }
-      await createStoredNativeExchangeCode({
+      const exchangeInput = {
         code: exchangeCode,
         client: nativeClient,
         state: stateRecord.state,
@@ -126,7 +155,27 @@ export async function GET(request: Request) {
         returnTo: stateRecord.returnTo,
         codeChallenge: stateRecord.codeChallenge,
         ott,
-      });
+      };
+      try {
+        await createStoredNativeExchangeCode(exchangeInput);
+      } catch (error) {
+        await captureError(
+          'Native exchange Redis write failed; using encrypted fallback',
+          error,
+          {
+            route: '/auth/callback',
+            operation: 'createStoredNativeExchangeCode',
+            client: nativeClient,
+          }
+        );
+        const now = Date.now();
+        exchangeCode = sealNativeExchangeFallback({
+          ...exchangeInput,
+          createdAt: now,
+          expiresAt: now + 5 * 60 * 1000,
+          consumedAt: null,
+        });
+      }
     }
 
     const resolved = resolveAuthCallback({ stateRecord, exchangeCode });
@@ -149,12 +198,21 @@ export async function GET(request: Request) {
       if (stateRecord.desktopFlow) {
         bounce.searchParams.set('desktop_flow', stateRecord.desktopFlow);
       }
-      return NextResponse.redirect(bounce, { headers: NO_STORE_HEADERS });
+      const response = NextResponse.redirect(bounce, {
+        headers: NO_STORE_HEADERS,
+      });
+      clearAuthStateFallbackCookie(response);
+      return response;
     }
 
-    return NextResponse.redirect(new URL(resolved.redirectUrl, request.url), {
-      headers: NO_STORE_HEADERS,
-    });
+    const response = NextResponse.redirect(
+      new URL(resolved.redirectUrl, request.url),
+      {
+        headers: NO_STORE_HEADERS,
+      }
+    );
+    clearAuthStateFallbackCookie(response);
+    return response;
   } catch (error) {
     await captureError('Auth callback route failed', error, {
       route: '/auth/callback',

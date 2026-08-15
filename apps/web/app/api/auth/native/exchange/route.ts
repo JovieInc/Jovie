@@ -7,6 +7,7 @@ import {
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/better-auth';
 import { consumeStoredNativeExchangeCode } from '@/lib/auth/routing-state.server';
+import { consumeNativeExchangeFallback } from '@/lib/auth/routing-state-fallback.server';
 import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
@@ -155,13 +156,31 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await consumeStoredNativeExchangeCode({
+    const exchangeInput = {
       client,
       code,
       state,
       codeVerifier,
       createCodeChallenge,
-    });
+    };
+    let result;
+    try {
+      result = await consumeStoredNativeExchangeCode(exchangeInput);
+    } catch (error) {
+      await captureError(
+        'Native exchange Redis read failed; trying encrypted fallback',
+        error,
+        {
+          route: '/api/auth/native/exchange',
+          operation: 'consumeStoredNativeExchangeCode',
+          client,
+        }
+      );
+      result = consumeNativeExchangeFallback(exchangeInput);
+    }
+    if (!result.ok && result.reason === 'missing') {
+      result = consumeNativeExchangeFallback(exchangeInput);
+    }
 
     if (!result.ok) {
       void trackAuthEvent('auth_exchange_failed', {

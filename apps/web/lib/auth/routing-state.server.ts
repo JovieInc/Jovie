@@ -192,11 +192,18 @@ export async function consumeStoredAuthState(input: {
   readonly state: string;
   readonly now?: number;
 }): Promise<AuthStateRecord | null> {
-  const record = await readStoredAuthState(input);
-  if (!record) return null;
-
   const redis = getRequiredRedis();
-  await redis.del(buildAuthStateKey(input.state));
+  const stored = await redis.getdel(buildAuthStateKey(input.state));
+  const record = parseStoredAuthState(stored);
+  const now = input.now ?? Date.now();
+  if (
+    !record ||
+    record.state !== input.state ||
+    record.consumedAt ||
+    now > record.expiresAt
+  ) {
+    return null;
+  }
   return record;
 }
 

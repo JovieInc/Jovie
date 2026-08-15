@@ -3,6 +3,7 @@ import {
   type AuthIntent,
   buildAuthCallbackPath,
   createAuthAnalyticsEvent,
+  createAuthStateRecord,
   isAuthClient,
   isAuthIntent,
   sanitizeReturnTo,
@@ -11,6 +12,10 @@ import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { createStoredAuthState } from '@/lib/auth/routing-state.server';
+import {
+  sealAuthStateFallback,
+  setAuthStateFallbackCookie,
+} from '@/lib/auth/routing-state-fallback.server';
 import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
@@ -227,13 +232,36 @@ export async function GET(request: Request) {
 
   try {
     const state = createState();
-    const record = await createStoredAuthState({
+    const recordInput = {
       client: rawClient,
       intent: rawIntent,
       returnTo,
       state,
       codeChallenge,
       desktopFlow,
+    };
+    let record;
+    let durableStateWritten = true;
+    try {
+      record = await createStoredAuthState(recordInput);
+    } catch (error) {
+      durableStateWritten = false;
+      await captureError(
+        'Auth state Redis write failed; using cookie fallback',
+        error,
+        {
+          route: '/auth/start',
+          operation: 'createStoredAuthState',
+          client: rawClient,
+        }
+      );
+      record = createAuthStateRecord({ ...recordInput, now: Date.now() });
+    }
+    // Always issue the client-bound continuity copy. Redis remains the
+    // atomic primary, while this preserves an in-flight flow if a later read
+    // fails after the initial write succeeded.
+    const fallbackCookie = sealAuthStateFallback(record, {
+      allowPrimaryMiss: !durableStateWritten,
     });
 
     void trackAuthEvent('auth_started', {
@@ -245,10 +273,12 @@ export async function GET(request: Request) {
 
     const { userId } = await getCachedAuth();
     if (userId) {
-      return NextResponse.redirect(
+      const response = NextResponse.redirect(
         new URL(buildAuthCallbackPath(record.state), request.url),
         { headers: NO_STORE_HEADERS }
       );
+      setAuthStateFallbackCookie(response, fallbackCookie);
+      return response;
     }
 
     const authPage = new URL(getAuthPageForIntent(rawIntent), request.url);
@@ -260,7 +290,11 @@ export async function GET(request: Request) {
       returnTo,
     });
 
-    return NextResponse.redirect(authPage, { headers: NO_STORE_HEADERS });
+    const response = NextResponse.redirect(authPage, {
+      headers: NO_STORE_HEADERS,
+    });
+    setAuthStateFallbackCookie(response, fallbackCookie);
+    return response;
   } catch (error) {
     await captureError('Auth start route failed', error, {
       route: '/auth/start',

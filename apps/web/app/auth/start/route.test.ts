@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const hoisted = vi.hoisted(() => ({
   getCachedAuth: vi.fn(),
   createStoredAuthState: vi.fn(),
+  sealAuthStateFallback: vi.fn(() => 'sealed_auth_state'),
+  setAuthStateFallbackCookie: vi.fn(),
   captureError: vi.fn().mockResolvedValue(undefined),
   generalLimiter: {
     limit: vi.fn().mockResolvedValue({ success: true }),
@@ -19,6 +21,11 @@ vi.mock('@/lib/auth/cached', () => ({
 
 vi.mock('@/lib/auth/routing-state.server', () => ({
   createStoredAuthState: hoisted.createStoredAuthState,
+}));
+
+vi.mock('@/lib/auth/routing-state-fallback.server', () => ({
+  sealAuthStateFallback: hoisted.sealAuthStateFallback,
+  setAuthStateFallbackCookie: hoisted.setAuthStateFallbackCookie,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -98,6 +105,65 @@ describe('GET /auth/start', () => {
         returnTo: '/app/chat?runtime=electron',
         state: '00000000000040008000000000000123',
       })
+    );
+    expect(hoisted.setAuthStateFallbackCookie).toHaveBeenCalledWith(
+      response,
+      'sealed_auth_state'
+    );
+    expect(hoisted.sealAuthStateFallback).toHaveBeenCalledWith(
+      expect.objectContaining({ state: 'state_123' }),
+      { allowPrimaryMiss: false }
+    );
+  });
+
+  it('uses the sealed cookie fallback when the auth-state Redis write fails for web', async () => {
+    hoisted.createStoredAuthState.mockRejectedValueOnce(
+      new Error('redis write unavailable')
+    );
+    hoisted.getCachedAuth.mockResolvedValueOnce({ userId: null });
+
+    const response = await GET(
+      new Request(
+        'https://jov.ie/auth/start?client=web&intent=sign_in&return_to=%2Fapp'
+      )
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'https://jov.ie/signin?auth_state=00000000000040008000000000000123'
+    );
+    expect(hoisted.sealAuthStateFallback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        client: 'web',
+        returnTo: '/app',
+        state: '00000000000040008000000000000123',
+      }),
+      { allowPrimaryMiss: true }
+    );
+    expect(hoisted.setAuthStateFallbackCookie).toHaveBeenCalledWith(
+      response,
+      'sealed_auth_state'
+    );
+  });
+
+  it('preserves iOS PKCE in the sealed fallback when the Redis write fails', async () => {
+    hoisted.createStoredAuthState.mockRejectedValueOnce(
+      new Error('redis write unavailable')
+    );
+    hoisted.getCachedAuth.mockResolvedValueOnce({ userId: null });
+    const challenge = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ';
+
+    const response = await GET(
+      new Request(
+        `https://jov.ie/auth/start?client=ios&intent=sign_in&return_to=%2Fapp&code_challenge=${challenge}&code_challenge_method=S256`
+      )
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toContain('/signin?auth_state=');
+    expect(hoisted.sealAuthStateFallback).toHaveBeenCalledWith(
+      expect.objectContaining({ client: 'ios', codeChallenge: challenge }),
+      { allowPrimaryMiss: true }
     );
   });
 

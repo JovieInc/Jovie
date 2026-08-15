@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   mockCaptureError,
   mockConsumeStoredNativeExchangeCode,
+  mockConsumeNativeExchangeFallback,
   mockCreateAuthAnalyticsEvent,
   mockCreateRateLimitHeaders,
   mockGeneralLimiterLimit,
@@ -27,6 +28,7 @@ const {
 } = vi.hoisted(() => ({
   mockCaptureError: vi.fn(),
   mockConsumeStoredNativeExchangeCode: vi.fn(),
+  mockConsumeNativeExchangeFallback: vi.fn(),
   mockCreateAuthAnalyticsEvent: vi.fn(),
   mockCreateRateLimitHeaders: vi.fn(),
   mockGeneralLimiterLimit: vi.fn(),
@@ -54,6 +56,10 @@ vi.mock('@jovie/auth-routing', () => ({
 
 vi.mock('@/lib/auth/routing-state.server', () => ({
   consumeStoredNativeExchangeCode: mockConsumeStoredNativeExchangeCode,
+}));
+
+vi.mock('@/lib/auth/routing-state-fallback.server', () => ({
+  consumeNativeExchangeFallback: mockConsumeNativeExchangeFallback,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -130,6 +136,10 @@ describe('native auth exchange route (Better Auth)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGeneralLimiterLimit.mockResolvedValue({ success: true });
+    mockConsumeNativeExchangeFallback.mockReturnValue({
+      ok: false,
+      reason: 'missing',
+    });
   });
 
   it('returns a fresh session token for iOS clients', async () => {
@@ -293,19 +303,34 @@ describe('native auth exchange route (Better Auth)', () => {
     expect(response.status).toBe(400);
   });
 
-  it('returns 500 on unexpected error', async () => {
+  it('uses the encrypted exchange fallback when the Redis read fails', async () => {
     mockConsumeStoredNativeExchangeCode.mockRejectedValue(
       new Error('Redis down')
     );
+    mockConsumeNativeExchangeFallback.mockReturnValue({
+      ok: true,
+      userId: 'user_ba_123',
+      returnTo: '/app',
+      ott: 'ott_123',
+    });
     mockGeneralLimiterLimit.mockResolvedValue({ success: true });
     mockCaptureError.mockResolvedValue(undefined);
+    setupIosSessionCreation();
 
     const { POST } = await import('@/app/api/auth/native/exchange/route');
     const response = await POST(createExchangeRequest('ios'));
     const data = await response.json();
 
-    expect(response.status).toBe(500);
-    expect(data.error).toBe('Native auth exchange failed');
+    expect(response.status).toBe(200);
+    expect(data.sessionToken).toBe('session_token_abc');
+    expect(mockConsumeNativeExchangeFallback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        client: 'ios',
+        code: 'native_code',
+        state: 'native_state',
+        codeVerifier: 'native_verifier',
+      })
+    );
     expect(mockCaptureError).toHaveBeenCalled();
   });
 });
