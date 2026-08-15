@@ -224,7 +224,7 @@ describe('onboarding tool artifacts', () => {
         />
         <OnboardingHandleCheckCard
           state='output-available'
-          output={{ action: 'check_handle', handle: 'testartist' }}
+          output={{ action: 'check_handle', handle: 'validartist' }}
         />
       </>
     );
@@ -272,17 +272,17 @@ describe('onboarding tool artifacts', () => {
     fastRender(
       <OnboardingHandleCheckCard
         state='output-available'
-        output={{ action: 'check_handle', handle: 'testartist' }}
+        output={{ action: 'check_handle', handle: 'validartist' }}
         onHandleCandidateChange={onHandleCandidateChange}
       />
     );
 
-    expect(screen.getByText('@testartist')).toBeDefined();
+    expect(screen.getByText('@validartist')).toBeDefined();
     expect(screen.getByText('is available')).toBeDefined();
     expect(screen.getByLabelText('Edit Proposed Handle')).toHaveValue(
-      'testartist'
+      'validartist'
     );
-    expect(screen.getByText('jov.ie/testartist')).toBeDefined();
+    expect(screen.getByText('jov.ie/validartist')).toBeDefined();
     expect(screen.queryByText('checkHandle')).toBeNull();
 
     fireEvent.change(screen.getByLabelText('Edit Proposed Handle'), {
@@ -305,13 +305,13 @@ describe('onboarding tool artifacts', () => {
     fastRender(
       <OnboardingHandleCheckCard
         state='output-available'
-        output={{ action: 'check_handle', handle: 'testartist' }}
+        output={{ action: 'check_handle', handle: 'validartist' }}
         onConfirmHandle={onConfirmHandle}
       />
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Confirm Handle' }));
-    expect(onConfirmHandle).toHaveBeenCalledWith('testartist');
+    expect(onConfirmHandle).toHaveBeenCalledWith('validartist');
     expect(
       screen.getByRole('button', { name: 'Handle Confirmed' })
     ).toBeDefined();
