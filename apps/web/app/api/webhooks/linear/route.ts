@@ -4,7 +4,9 @@
  * Bridges Linear → GitHub repository_dispatch so Claude Code can pick up work
  * autonomously. Two trigger types:
  *
- * 1. Issue moved to "Todo" / unstarted state → dispatches `linear_todo_ready`
+ * 1. JOV issue create/update in Triage, Backlog, Todo, or To Do → dispatches
+ *    `linear-intake-changed`. The downstream controller performs the full,
+ *    label-free authoritative read before any admission decision.
  * 2. CodeRabbit posts an implementation-plan comment → dispatches
  *    `linear_plan_ready` (with verify_required / simplify_bounded / model_tier
  *    parsed from the comment body's automation contract)
@@ -106,25 +108,23 @@ function verifySignature(
   }
 }
 
-function isTodoTransition(payload: LinearWebhookPayload): boolean {
-  if (payload.type !== 'Issue' || payload.action !== 'update') {
+function isJovieIntakeIssueEvent(payload: LinearWebhookPayload): boolean {
+  if (
+    payload.type !== 'Issue' ||
+    (payload.action !== 'create' && payload.action !== 'update')
+  ) {
     return false;
   }
 
   const issueData = payload.data as LinearIssueData | undefined;
   const stateName = issueData?.state?.name?.trim().toLowerCase();
-  const stateType = issueData?.state?.type?.trim().toLowerCase();
-  const previousStateId = payload.updatedFrom?.stateId;
-  const currentStateId = issueData?.stateId;
-
-  const isTodoName = stateName === 'todo';
-  const isUnstartedType = stateType === 'unstarted';
-  const changedState =
-    typeof previousStateId === 'string' &&
-    typeof currentStateId === 'string' &&
-    previousStateId !== currentStateId;
-
-  return changedState && (isTodoName || isUnstartedType);
+  const teamKey = issueData?.team?.key?.trim().toUpperCase();
+  return (
+    teamKey === 'JOV' &&
+    Boolean(
+      stateName && ['triage', 'backlog', 'todo', 'to do'].includes(stateName)
+    )
+  );
 }
 
 function isCodeRabbitPlanComment(payload: LinearWebhookPayload): boolean {
@@ -221,10 +221,10 @@ export async function POST(request: NextRequest) {
 
     const payload = JSON.parse(body) as LinearWebhookPayload;
 
-    const isTodoReadyEvent = isTodoTransition(payload);
+    const isIntakeIssueEvent = isJovieIntakeIssueEvent(payload);
     const isPlanReadyEvent = isCodeRabbitPlanComment(payload);
 
-    if (!isTodoReadyEvent && !isPlanReadyEvent) {
+    if (!isIntakeIssueEvent && !isPlanReadyEvent) {
       return NextResponse.json(
         { received: true, ignored: true },
         { headers: NO_STORE_HEADERS }
@@ -240,7 +240,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const dedupeKey = `${issueId}:${issueData?.updatedAt ?? payload.createdAt ?? ''}:${isPlanReadyEvent ? 'plan' : 'todo'}`;
+    const dedupeKey = `${issueId}:${issueData?.updatedAt ?? payload.createdAt ?? ''}:${isPlanReadyEvent ? 'plan' : 'intake'}`;
     dedupeKeyForRetry = dedupeKey;
     const dedupeResult = await acquireRecentDispatch(
       'linear',
@@ -284,7 +284,7 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           event_type: isPlanReadyEvent
             ? 'linear_plan_ready'
-            : 'linear_todo_ready',
+            : 'linear-intake-changed',
           client_payload: {
             issue_id: issueId,
             issue_identifier: issueData?.identifier ?? null,
@@ -294,6 +294,7 @@ export async function POST(request: NextRequest) {
             issue_updated_at: issueData?.updatedAt ?? null,
             team_key: issueData?.team?.key ?? null,
             state_name: issueData?.state?.name ?? null,
+            intake_action: payload.action ?? null,
             plan_ready: isPlanReadyEvent,
             verify_required: automationContract.verifyRequired,
             simplify_bounded: automationContract.simplifyBounded,
