@@ -367,6 +367,9 @@ describe('queue workflow mutation safety', () => {
     const enroll = workflowStep(workflow, 'Enroll clean PRs');
     const drain = readRepoFile('scripts/drain-pr-queue.sh');
 
+    expect(workflow).toContain('types: [reopened, labeled, unlabeled]');
+    expect(workflow).not.toContain('ready_for_review, reopened');
+
     expect(scope).toContain('case "$EVENT_NAME" in');
     expect(scope).toContain('pull_request)');
     expect(scope).toContain('workflow_run)');

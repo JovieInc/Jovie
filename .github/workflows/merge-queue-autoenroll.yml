@@ -8,7 +8,7 @@ name: Merge Queue Auto-Enroll
 # Existing labels are intent/audit evidence, never an alternate transport.
 #
 # Triggers:
-#   pull_request      — PR label changes, ready, reopen (eligibility change)
+#   pull_request      — PR label changes and reopen (maintenance only)
 #   workflow_run      — CI completion (green PRs are now enrollable)
 #   push (main)       — main moved → queued PRs may conflict or get stale
 #   workflow_dispatch — maintenance-only unless exact PR + head are supplied
@@ -27,7 +27,10 @@ name: Merge Queue Auto-Enroll
 
 on:
   pull_request:
-    types: [ready_for_review, reopened, labeled, unlabeled]
+    # `ready_for_review` starts a fresh CI run. New admission must wait for its
+    # completed CI workflow_run; otherwise GitHub legitimately cannot prove a
+    # native queue entry while required checks are pending.
+    types: [reopened, labeled, unlabeled]
   workflow_run:
     workflows: ['CI', 'Production Controller']
     types: [completed]
