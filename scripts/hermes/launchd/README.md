@@ -19,7 +19,14 @@ The Hermes gateway itself is managed by the installed Hermes CLI as `ai.hermes.g
 | `co.jovie.hermes.cron-pr-monitor.plist.template` | every 10 min | Detect stuck PRs |
 | `co.jovie.hermes.cron-ci-monitor.plist.template` | every 10 min | Detect CI failures on main |
 | `co.jovie.hermes.cron-codex-issue-shipper.plist.template` | load/crash recovery only | Manual fallback for the event-driven GitHub/Symphony admission lanes; never polls for work |
-| `co.jovie.hermes.delivery-liveness-watchdog.plist.template` | every 120s | Validate durable delivery receipts; retry/reassign active leases after five minutes without fresh proof |
+| `co.jovie.hermes.delivery-liveness-watchdog.plist.template` | every 120s | Validate durable delivery receipts; retry/reassign active leases and reclaim Linear In Progress items after five minutes without a matching accepted-owner machine receipt |
+
+Linear active leases are accepted only from a comment containing a
+`<!-- jovie-active-lease:v1 -->` JSON envelope with `owner`, `leaseId`,
+`observedAt`, and `evidence`, closed by `<!-- /jovie-active-lease -->`. The
+owner must match the current assignee or delegate, and `observedAt` must be less
+than five minutes old. Ordinary comments and issue `updatedAt` never refresh a
+lease.
 
 The delivery watchdog stores critical revenue/auth/runtime decision packets in
 `~/.hermes/state/summer-notification-outbox/`. It never sends them. A packet is
