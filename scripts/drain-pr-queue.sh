@@ -88,6 +88,14 @@ DRAIN_PROMOTION_MODE="${DRAIN_PROMOTION_MODE:-normal}"
 DRAIN_FLEET_GATE_B64="${DRAIN_FLEET_GATE_B64:-}"
 DRAIN_RECOVER_FLEET_HOLDS="${DRAIN_RECOVER_FLEET_HOLDS:-0}"
 FLEET_HOLD_CONTEXT="jovie-fleet-queue-hold/v1"
+# A successful native enrollment leaves a bot-authored, exact-head receipt.
+# A completed CI merge_group has no source PR head to admit, but it is the
+# authoritative signal that GitHub may just have ejected unmerged cohort
+# members while main advanced. The controller may reconcile only these
+# receipts, never the whole clean backlog.
+DRAIN_RECONCILE_QUEUE_REENTRY="${DRAIN_RECONCILE_QUEUE_REENTRY:-0}"
+DRAIN_QUEUE_REENTRY_MAX_PER_RUN="${DRAIN_QUEUE_REENTRY_MAX_PER_RUN:-2}"
+QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"
 QUEUE_DEFERRED_RELEASE_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/queue-deferred-release-admission.mjs"
 QUEUE_DEFERRED_RELEASE_MARKER='<!-- bot-comment:queue-deferred-release -->'
 QUEUE_DEFERRED_RELEASE_ACTOR='jovie-bot[bot]'
@@ -172,6 +180,19 @@ if [[ "$DRAIN_RECOVER_FLEET_HOLDS" != "0" && "$DRAIN_RECOVER_FLEET_HOLDS" != "1"
 fi
 if [[ "$DRAIN_RECOVER_FLEET_HOLDS" == "1" && "$DRAIN_PROMOTION_MODE" != "normal" ]]; then
   echo "::error::Fleet holds may recover only under normal GREEN promotion" >&2
+  exit 2
+fi
+if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" != "0" && "$DRAIN_RECONCILE_QUEUE_REENTRY" != "1" ]]; then
+  echo "::error::DRAIN_RECONCILE_QUEUE_REENTRY must be 0 or 1" >&2
+  exit 2
+fi
+if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" && "$DRAIN_PROMOTION_MODE" != "normal" ]]; then
+  echo "::error::Queue re-entry recovery may run only under normal GREEN promotion" >&2
+  exit 2
+fi
+if [[ ! "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" =~ ^[1-9][0-9]*$ ]] \
+  || (( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 3 )); then
+  echo "::error::DRAIN_QUEUE_REENTRY_MAX_PER_RUN must be an integer from 1 through 3" >&2
   exit 2
 fi
 if [[ -z "$DRAIN_ADMISSION_PR" && -z "$DRAIN_ADMISSION_HEAD" ]]; then
@@ -306,6 +327,71 @@ clear_fleet_hold() {  # clear_fleet_hold <num> <head>
   fi
   echo "    !! #$n enrolled, but exact-head fleet hold receipt did not close" >&2
   return 1
+}
+
+# A native queue admission is durable only when a bot-authored, exact-head
+# receipt survives the transient queue membership. It is deliberately a commit
+# status rather than a label: labels are intent/audit only and can be mutated
+# without changing the source revision. The receipt is never sufficient on its
+# own; recovery still re-reads current PR state, current source checks, and the
+# native queue postcondition.
+queue_reentry_receipt_is_recoverable() {  # <head>
+  local head="$1" statuses
+  [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
+  if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)"; then
+    return 1
+  fi
+  jq -e --arg context "$QUEUE_REENTRY_CONTEXT" --arg repo "$REPO" '
+    [ .statuses[]? | select(.context == $context) ]
+    | sort_by(.updated_at)
+    | last
+    | .state == "success"
+      and (.creator.type == "Bot")
+      and (.description == "Native queue admission recorded at exact head")
+      and (.target_url | test("^https://github\\.com/" + $repo + "/actions/runs/[1-9][0-9]*$"))
+  ' <<<"$statuses" >/dev/null
+}
+
+record_queue_reentry_receipt() {  # <pr> <expected-head>
+  local n="$1" expected_head="$2" current live_head target_url
+  if [[ ! "$expected_head" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "    !! cannot record queue re-entry receipt for #$n without an exact head" >&2
+    return 1
+  fi
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would record $QUEUE_REENTRY_CONTEXT on #$n at $expected_head"
+    return 0
+  fi
+  # Re-enrollment of an already-receipted immutable head is intentionally
+  # idempotent. Do not create an unbounded stream of duplicate statuses.
+  if queue_reentry_receipt_is_recoverable "$expected_head"; then
+    echo "    =$QUEUE_REENTRY_CONTEXT on #$n at $expected_head (already recorded)"
+    return 0
+  fi
+  if ! target_url="$(fleet_hold_target_url)"; then
+    echo "    !! canonical workflow run identity is missing for queue re-entry receipt #$n" >&2
+    return 1
+  fi
+  if ! current="$(gh_retry pr view "$n" -R "$REPO" --json state,headRefOid 2>/dev/null)"; then
+    echo "    !! could not refresh #$n before recording queue re-entry receipt" >&2
+    return 1
+  fi
+  live_head="$(jq -r '(.headRefOid // "") | ascii_downcase' <<<"$current")"
+  if ! jq -e --arg head "$expected_head" '
+    .state == "OPEN" and ((.headRefOid // "") | ascii_downcase) == $head
+  ' <<<"$current" >/dev/null; then
+    echo "    ⏸ #$n head changed before queue re-entry receipt; compensating enrollment"
+    return 2
+  fi
+  if ! gh_retry api -X POST "repos/$REPO/statuses/$live_head" \
+    -f state=success \
+    -f context="$QUEUE_REENTRY_CONTEXT" \
+    -f description="Native queue admission recorded at exact head" \
+    -f target_url="$target_url" >/dev/null; then
+    echo "    !! failed to record exact-head queue re-entry receipt for #$n" >&2
+    return 1
+  fi
+  echo "    +$QUEUE_REENTRY_CONTEXT on #$n at $live_head"
 }
 
 deferred_state_is_releasable() {  # state json <expected head> <expected base>
@@ -648,6 +734,20 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
         fi
         return 2
       fi
+    fi
+
+    # Retain a typed exact-head record before treating the native queue
+    # mutation as complete. A later merge_group workflow_run has a composite
+    # head, not a PR head; this receipt is the only bounded bridge that can
+    # recover a member GitHub ejects after main advances. If it cannot be
+    # written, compensate the just-proven queue membership rather than leave
+    # a PR that future event loss cannot safely recover.
+    if ! record_queue_reentry_receipt "$n" "$expected_head"; then
+      echo "    !! native enrollment lacks durable exact-head re-entry receipt; compensating" >&2
+      if ! dequeue_strict "$n"; then
+        echo "    !! CRITICAL: could not compensate native enrollment without re-entry receipt for #$n" >&2
+      fi
+      return 1
     fi
 
     # The degraded-observation fallback is intentionally allowed to clear only
@@ -1229,6 +1329,63 @@ done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg pro
   | select(.fail|length==0)
   | select(.q | not)
   | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or .=="needs-conflict-resolution" or .=="fast") | not)')
+
+# A completed merge_group CI run is not attributable to an individual source
+# PR: GitHub reports its synthetic composite SHA. If it completes after main
+# moved, GitHub can leave previously admitted members unqueued with no future
+# PR-head event to re-trigger admission. Reconcile only a tiny, exact-head
+# cohort which this controller itself recorded after a prior native admission.
+# This is not a clean-backlog sweep: no receipt, changed head, red source gate,
+# hard hold, or non-normal fleet policy is a no-op. The cap protects the queue
+# from one composite event fanning out into a full cohort rebuild.
+if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" ]]; then
+  echo "=== RECOVER (bounded exact-head native re-entry after composite CI) ==="
+  REENTRY_RECOVERED=0
+  while read -r pr; do
+    stop_if_budget_exhausted && break
+    if [[ "$REENTRY_RECOVERED" -ge "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" ]]; then
+      echo "  ~ reached exact re-entry cap ($DRAIN_QUEUE_REENTRY_MAX_PER_RUN)"
+      break
+    fi
+    if [[ "$ENROLLED_THIS_RUN" -ge "$ENROLL_SLOTS" ]]; then
+      echo "  ~ queue depth cap reached before re-entry recovery"
+      break
+    fi
+    n="$(jq -r '.n' <<<"$pr")"
+    t="$(jq -r '.t' <<<"$pr")"
+    head_oid="$(jq -r '.headOid // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
+    if ! queue_reentry_receipt_is_recoverable "$head_oid"; then
+      continue
+    fi
+    # The snapshot's check result can be stale. This is an exact-current-head
+    # gate, independently re-read immediately before the native enrollment.
+    fresh_failures="$(check_failures_for_pr "$n")"
+    if [[ "$(jq 'length' <<<"$fresh_failures")" -ne 0 ]]; then
+      echo "  #$n  $t  ⏸ current exact-head checks are not green"
+      continue
+    fi
+    echo "  #$n  $t  ↻ exact native re-entry at $head_oid"
+    if enroll_if_still_eligible "$n" "$n" "$head_oid"; then
+      REENTRY_RECOVERED=$((REENTRY_RECOVERED + 1))
+      ENROLLED_THIS_RUN=$((ENROLLED_THIS_RUN + 1))
+    else
+      reentry_result=$?
+      if [[ "$reentry_result" -ne 2 ]]; then
+        echo "::error::Failed exact native re-entry recovery for #$n" >&2
+        exit 1
+      fi
+    fi
+  done < <(echo "$SNAP" | jq -c '[ .[]
+    | select(.q | not)
+    | select(.draft | not)
+    | select(.m == "MERGEABLE")
+    | select(.base == "main")
+    | select(.fail | length == 0)
+    | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast") | not)
+    | select((.headOid // "") | test("^[0-9a-f]{40}$"))
+    | {n, t, headOid}
+  ] | sort_by(.n)[]')
+fi
 
 # A completed Production Controller event is the only global recovery signal.
 # Exact pending status receipts were written before fleet-driven dequeue, are

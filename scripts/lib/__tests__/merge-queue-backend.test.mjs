@@ -208,7 +208,12 @@ function workflowRunScript(workflow, name) {
     .join('\n');
 }
 
-function executeAdmissionScope({ path, conclusion, name }) {
+function executeAdmissionScope({
+  path,
+  conclusion,
+  name,
+  workflowEvent = 'pull_request',
+}) {
   const workflow = readRepoFile('.github/workflows/merge-queue-autoenroll.yml');
   const script = workflowRunScript(workflow, 'Resolve exact admission scope');
   const directory = mkdtempSync(join(tmpdir(), 'merge-queue-admission-'));
@@ -216,7 +221,15 @@ function executeAdmissionScope({ path, conclusion, name }) {
   const outputPath = join(directory, 'output.txt');
   writeFileSync(
     eventPath,
-    JSON.stringify({ workflow_run: { path, conclusion, name, head_sha: HEAD } })
+    JSON.stringify({
+      workflow_run: {
+        path,
+        conclusion,
+        name,
+        event: workflowEvent,
+        head_sha: HEAD,
+      },
+    })
   );
   writeFileSync(outputPath, '');
   try {
@@ -397,6 +410,41 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain(
       'could not compensate malformed native enrollment receipt'
     );
+  });
+
+  it('reconciles only native exact-head receipts after an unattributable successful composite CI run', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const scope = workflowStep(workflow, 'Resolve exact admission scope');
+    const enroll = workflowStep(workflow, 'Enroll clean PRs');
+    const drain = readRepoFile('scripts/drain-pr-queue.sh');
+    const outputs = executeAdmissionScope({
+      path: '.github/workflows/ci.yml',
+      conclusion: 'success',
+      name: 'CI',
+      workflowEvent: 'merge_group',
+    });
+
+    expect(outputs).toEqual(
+      expect.objectContaining({
+        pr_number: '',
+        head_sha: '',
+        reconcile_queue_reentry: '1',
+      })
+    );
+    expect(scope).toContain('"$workflow_path" == ".github/workflows/ci.yml"');
+    expect(scope).toContain('.workflow_run.event // empty');
+    expect(scope).toContain('== "merge_group"');
+    expect(enroll).toContain('DRAIN_RECONCILE_QUEUE_REENTRY:');
+    expect(enroll).toContain("DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '2'");
+    expect(drain).toContain('QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"');
+    expect(drain).toContain(
+      'bounded exact-head native re-entry after composite CI'
+    );
+    expect(drain).toContain('DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 3');
+    expect(drain).toContain('queue_reentry_receipt_is_recoverable "$head_oid"');
+    expect(drain).toContain('check_failures_for_pr "$n"');
   });
 
   it('excludes stacked non-main PRs from admission and live eligibility', () => {
