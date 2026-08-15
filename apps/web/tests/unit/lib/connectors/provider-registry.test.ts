@@ -12,6 +12,7 @@ import {
   getConnectorDefinitions,
   getOAuthScopesForBundle,
   isConnectorProviderId,
+  YOUTUBE_CONNECTOR_PROVIDERS,
 } from '@/lib/connectors/registry';
 import {
   connectorProviderEnum,
@@ -37,11 +38,12 @@ describe('connector provider registry', () => {
     }
   });
 
-  it('registers the launch Google providers', () => {
+  it('registers Google + YouTube providers from the manifest only', () => {
     const definitions = getConnectorDefinitions();
     expect(definitions.map(definition => definition.id)).toEqual([
       CONNECTOR_PROVIDERS.gmail,
       CONNECTOR_PROVIDERS.google_calendar,
+      CONNECTOR_PROVIDERS.youtube,
     ]);
   });
 
@@ -52,6 +54,12 @@ describe('connector provider registry', () => {
     expect(
       getConnectorDefinition(CONNECTOR_PROVIDERS.google_calendar).iconKey
     ).toBe('calendar');
+    expect(getConnectorDefinition(CONNECTOR_PROVIDERS.youtube).iconKey).toBe(
+      'youtube'
+    );
+    expect(
+      getConnectorDefinition(CONNECTOR_PROVIDERS.youtube).oauthBundle
+    ).toBe('youtube');
   });
 
   it('exposes oauth scopes, token handler, sync runner, and webhook key', () => {
@@ -92,10 +100,12 @@ describe('connector provider registry', () => {
       CONNECTOR_PROVIDERS.gmail,
       CONNECTOR_PROVIDERS.google_calendar,
     ]);
+    expect(YOUTUBE_CONNECTOR_PROVIDERS).toEqual([CONNECTOR_PROVIDERS.youtube]);
   });
 
   it('validates provider ids', () => {
     expect(isConnectorProviderId('gmail')).toBe(true);
+    expect(isConnectorProviderId('youtube')).toBe(true);
     expect(isConnectorProviderId('spotify')).toBe(false);
     expect(() => assertConnectorProviderId('spotify')).toThrow(
       'Unknown connector provider'
@@ -105,6 +115,9 @@ describe('connector provider registry', () => {
   it('accepts only registered providers in zod schema', () => {
     expect(
       connectorProviderSchema.safeParse(CONNECTOR_PROVIDERS.gmail).success
+    ).toBe(true);
+    expect(
+      connectorProviderSchema.safeParse(CONNECTOR_PROVIDERS.youtube).success
     ).toBe(true);
     expect(connectorProviderSchema.safeParse('instagram').success).toBe(false);
   });

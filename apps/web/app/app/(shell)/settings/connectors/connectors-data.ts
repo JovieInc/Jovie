@@ -1,8 +1,12 @@
 import 'server-only';
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { ConnectorStatus } from '@/components/features/connectors/ConnectorCard';
-import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
+import {
+  type ConnectorOAuthBundle,
+  type ConnectorProviderId,
+  getConnectorDefinitions,
+} from '@/lib/connectors/registry';
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
@@ -12,16 +16,35 @@ import {
 } from '@/lib/db/schema/connectors';
 
 interface ConnectorAccountRow {
+  readonly provider: string;
   readonly status: string;
   readonly providerAccountId: string | null;
   readonly lastErrorUserMessage: string | null;
+  readonly scopes: string[] | null;
+  readonly capabilities: unknown;
 }
 
-export interface SettingsConnectorState {
-  readonly status: ConnectorStatus;
-  readonly email?: string;
-  readonly errorMessage?: string;
+function getChannelTitle(capabilities: unknown): string | null {
+  if (!capabilities || typeof capabilities !== 'object') return null;
+  const value = Reflect.get(capabilities, 'channelTitle');
+  return typeof value === 'string' && value.length > 0 ? value : null;
 }
+
+export interface SettingsConnectorProviderState {
+  readonly provider: ConnectorProviderId;
+  readonly label: string;
+  readonly oauthBundle: ConnectorOAuthBundle;
+  readonly status: ConnectorStatus;
+  readonly accountLabel?: string;
+  readonly errorMessage?: string;
+  readonly scopes?: string[];
+}
+
+/** Backward-compatible status shape consumed by the profiles workspace. */
+export type SettingsConnectorState = Pick<
+  SettingsConnectorProviderState,
+  'status' | 'errorMessage'
+>;
 
 export interface SettingsSuggestedActionPreview {
   readonly id: string;
@@ -45,8 +68,7 @@ export interface SettingsSuggestedActionPreview {
 }
 
 export interface SettingsConnectorsData {
-  readonly gmail: SettingsConnectorState;
-  readonly calendar: SettingsConnectorState;
+  readonly providers: SettingsConnectorProviderState[];
   readonly suggestedActions: SettingsSuggestedActionPreview[];
 }
 
@@ -61,18 +83,13 @@ function toConnectorStatus(
   };
 }
 
-function toConnectorState(row: ConnectorAccountRow | null) {
-  const state = toConnectorStatus(row);
-  return {
-    status: state.status,
-    email: row?.providerAccountId ?? undefined,
-    errorMessage: state.errorMessage,
-  };
-}
-
 const EMPTY_CONNECTORS_DATA: SettingsConnectorsData = {
-  gmail: { status: 'not_connected' },
-  calendar: { status: 'not_connected' },
+  providers: getConnectorDefinitions().map(definition => ({
+    provider: definition.id,
+    label: definition.label,
+    oauthBundle: definition.oauthBundle,
+    status: 'not_connected',
+  })),
   suggestedActions: [],
 };
 
@@ -98,38 +115,51 @@ export async function loadSettingsConnectorsData(
 async function loadSettingsConnectorsDataForUser(
   userId: string
 ): Promise<SettingsConnectorsData> {
-  const [gmailRow, calendarRow] = await Promise.all([
-    db
-      .select({
-        status: connectorAccounts.status,
-        providerAccountId: connectorAccounts.providerAccountId,
-        lastErrorUserMessage: connectorAccounts.lastErrorUserMessage,
-      })
-      .from(connectorAccounts)
-      .where(
-        and(
-          eq(connectorAccounts.userId, userId),
-          eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.gmail)
-        )
+  const definitions = getConnectorDefinitions();
+  const providerIds = definitions.map(d => d.id);
+
+  const accountRows = await db
+    .select({
+      provider: connectorAccounts.provider,
+      status: connectorAccounts.status,
+      providerAccountId: connectorAccounts.providerAccountId,
+      lastErrorUserMessage: connectorAccounts.lastErrorUserMessage,
+      scopes: connectorAccounts.scopes,
+      capabilities: connectorAccounts.capabilities,
+    })
+    .from(connectorAccounts)
+    .where(
+      and(
+        eq(connectorAccounts.userId, userId),
+        inArray(connectorAccounts.provider, providerIds)
       )
-      .limit(1)
-      .then(rows => rows[0] ?? null),
-    db
-      .select({
-        status: connectorAccounts.status,
-        providerAccountId: connectorAccounts.providerAccountId,
-        lastErrorUserMessage: connectorAccounts.lastErrorUserMessage,
-      })
-      .from(connectorAccounts)
-      .where(
-        and(
-          eq(connectorAccounts.userId, userId),
-          eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.google_calendar)
-        )
-      )
-      .limit(1)
-      .then(rows => rows[0] ?? null),
-  ]);
+    );
+
+  const byProvider = new Map(
+    accountRows.map(row => [row.provider as ConnectorProviderId, row])
+  );
+
+  const providers: SettingsConnectorProviderState[] = definitions.map(
+    definition => {
+      const row = byProvider.get(definition.id) ?? null;
+      const state = toConnectorStatus(row);
+      const channelTitle = getChannelTitle(row?.capabilities);
+      return {
+        provider: definition.id,
+        label: definition.label,
+        oauthBundle: definition.oauthBundle,
+        status: state.status,
+        accountLabel: row?.providerAccountId
+          ? channelTitle
+            ? `${channelTitle} · ${row.providerAccountId}`
+            : row.providerAccountId
+          : undefined,
+        errorMessage: state.errorMessage,
+        scopes:
+          row?.scopes && row.scopes.length > 0 ? [...row.scopes] : undefined,
+      };
+    }
+  );
 
   const actionRows = await db
     .select({
@@ -170,8 +200,7 @@ async function loadSettingsConnectorsDataForUser(
   });
 
   return {
-    gmail: toConnectorState(gmailRow),
-    calendar: toConnectorState(calendarRow),
+    providers,
     suggestedActions: pendingActions,
   };
 }

@@ -57,6 +57,18 @@ export async function POST(request: Request) {
       ? [parsed.data.provider]
       : [...GOOGLE_CONNECTOR_PROVIDERS];
 
+    // Refuse non-Google providers on this endpoint (YouTube has its own disconnect).
+    if (
+      providersToDisconnect.some(
+        provider => !GOOGLE_CONNECTOR_PROVIDERS.includes(provider)
+      )
+    ) {
+      return NextResponse.json(
+        { error: 'Provider is not a Google connector' },
+        { status: 400 }
+      );
+    }
+
     for (const provider of providersToDisconnect) {
       await db
         .update(connectorAccounts)
