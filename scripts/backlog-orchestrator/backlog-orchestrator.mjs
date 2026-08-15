@@ -44,6 +44,7 @@ import {
   selectSymphonyRoute,
   verifyRoutingReceipt,
 } from './symphony-routing.mjs';
+import { buildAgentReadyTriageWatchdog } from './triage-router.mjs';
 import * as workstreamer from './workstreamer.mjs';
 
 // ----- Config -----
@@ -376,6 +377,7 @@ async function runGateNext(isDryRun, issueArg) {
       2
     )
   );
+  deterministicGates.assertNoTeamControllerErrors(results);
 }
 
 async function runTeamGateNext(team, isDryRun, issueArg) {
@@ -579,7 +581,7 @@ async function runAudit(cache, isDryRun) {
           c => c.category === 'duplicate' || c.category === 'obsolete'
         ).length,
         mutations: 0,
-        note: 'Triageable issues intentionally remain in Triage; only duplicate/obsolete classifications are move candidates.',
+        note: 'Incidents, follow-ups, duplicates, and agent-ready work route deterministically; only genuine intake remains in Triage.',
       },
       null,
       2
@@ -612,9 +614,13 @@ async function runReconcile(cache, isDryRun, issueArg) {
       client: linear,
       isDryRun,
       backlogStateId: team.backlogStateId,
+      todoStateId: team.todoStateId,
     });
     console.log('Reconciliation receipt:');
     console.log(JSON.stringify(receipt, null, 2));
+    if (receipt.failed > 0) {
+      throw new Error('reconcile failed: one or more mutations failed');
+    }
     console.log('Reconciliation complete.');
     return;
   }
@@ -633,8 +639,23 @@ async function runReconcile(cache, isDryRun, issueArg) {
         client: linear,
         isDryRun,
         backlogStateId: team.backlogStateId,
+        todoStateId: team.todoStateId,
       });
-      teamReceipts.push({ team: team.key, status: 'ok', ...receipt });
+      const remaining = await linear.fetchTeamTriageIssues(
+        team.id,
+        1000,
+        team.intakeStates
+      );
+      const watchdog = buildAgentReadyTriageWatchdog(remaining);
+      teamReceipts.push({
+        team: team.key,
+        status:
+          (isDryRun || watchdog.status === 'healthy') && receipt.failed === 0
+            ? 'ok'
+            : 'failed',
+        ...receipt,
+        watchdog,
+      });
     } catch (error) {
       teamReceipts.push({
         team: team.key,
@@ -673,6 +694,11 @@ async function runReconcile(cache, isDryRun, issueArg) {
     )
   );
   console.log('Reconciliation complete.');
+  if (teamReceipts.some(receipt => receipt.status === 'failed')) {
+    throw new Error(
+      'reconcile failed: team error or stalled agent-ready Triage'
+    );
+  }
 }
 
 async function runAdmitNext(cache, isDryRun) {

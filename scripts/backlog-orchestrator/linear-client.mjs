@@ -573,6 +573,21 @@ export async function transitionIssue(issueId, stateId, options = {}) {
   );
 }
 
+/** Attach a follow-up to its canonical parent issue. */
+export async function setIssueParent(issueId, parentId, options = {}) {
+  return graphql(
+    `
+    mutation($id: String!, $parentId: String!) {
+      issueUpdate(id: $id, input: { parentId: $parentId }) {
+        success
+      }
+    }
+  `,
+    { id: issueId, parentId },
+    options
+  );
+}
+
 export async function fetchTeamLabel(teamId, name) {
   const data = await graphql(
     `

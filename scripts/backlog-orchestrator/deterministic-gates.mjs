@@ -265,3 +265,9 @@ export function admissionIntentLoad(issues) {
   });
   return { count: active.length, identifiers: active.map(x => x.identifier) };
 }
+
+export function assertNoTeamControllerErrors(results) {
+  if (results.some(result => result.stage === 'team-error')) {
+    throw new Error('gate-next failed: one or more team controllers errored');
+  }
+}
