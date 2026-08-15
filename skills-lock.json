@@ -7,7 +7,8 @@
     "gstack",
     "nightly-test-agent",
     "vercel-composition-patterns",
-    "vercel-react-best-practices"
+    "vercel-react-best-practices",
+    "youtube-thumbnail-growth"
   ],
   "ownedSkills": [
     "auth-console-sync",
@@ -69,7 +70,8 @@
     "ship",
     "sync-gbrain",
     "tool-discovery",
-    "unfreeze"
+    "unfreeze",
+    "youtube-thumbnail-growth"
   ],
   "skills": {
     "ai-sdk": {

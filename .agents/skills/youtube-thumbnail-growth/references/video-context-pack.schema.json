@@ -1,0 +1,391 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jov.ie/schemas/video-context-pack-v1.json",
+  "title": "VideoContextPack v1.2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "key", "retrieval", "metadata", "currentThumbnail", "sourceFrames", "creativeBrief", "channelIdentityPack", "qa"],
+  "properties": {
+    "version": { "const": "1.2.0" },
+    "key": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channelId", "videoId"],
+      "properties": {
+        "channelId": { "type": "string", "minLength": 1 },
+        "videoId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "retrieval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "retrievedAt", "expiresAt", "contentHash", "budgets", "sources"],
+      "properties": {
+        "status": { "enum": ["ready", "missing_context", "stale", "conflict"] },
+        "retrievedAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "contentHash": { "$ref": "#/$defs/hash" },
+        "budgets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxTokens", "maxAssets", "maxTranscriptCharacters"],
+          "properties": {
+            "maxTokens": { "type": "integer", "minimum": 1 },
+            "maxAssets": { "type": "integer", "minimum": 1 },
+            "maxTranscriptCharacters": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "sources": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/source" } },
+        "missingReasons": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "canonicalUrl", "publishedAt", "provenance"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "canonicalUrl": { "type": "string", "format": "uri" },
+        "publishedAt": { "type": "string", "format": "date-time" },
+        "descriptionExcerpt": { "type": "string" },
+        "provenance": { "$ref": "#/$defs/source" }
+      }
+    },
+    "currentThumbnail": { "$ref": "#/$defs/asset" },
+    "sourceFrames": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/frame" } },
+    "transcriptExcerpts": { "type": "array", "items": { "$ref": "#/$defs/transcript" } },
+    "analyticsBaseline": { "$ref": "#/$defs/analytics" },
+    "creativeBrief": { "$ref": "#/$defs/brief" },
+    "channelIdentityPack": { "$ref": "#/$defs/channelIdentityPack" },
+    "qa": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rubricVersion", "perCard", "batch"],
+      "properties": {
+        "rubricVersion": { "const": "thumbnail-qa-v1" },
+        "perCard": { "$ref": "#/$defs/perCardQa" },
+        "batch": { "$ref": "#/$defs/batchQa" }
+      }
+    },
+    "founderFeedback": { "type": "array", "items": { "$ref": "#/$defs/feedback" } },
+    "providerReceipts": { "type": "array", "items": { "$ref": "#/$defs/providerReceipt" } }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^(sha256:)?[a-fA-F0-9]{64}$" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceId", "kind", "uri", "authority", "retrievedAt", "contentHash"],
+      "properties": {
+        "sourceId": { "type": "string" },
+        "kind": { "enum": ["youtube_api", "channel_profile", "video_frame", "current_thumbnail", "caption", "transcript", "analytics", "founder_feedback", "identity_reference", "guest_reference"] },
+        "uri": { "type": "string" },
+        "authority": { "enum": ["first_party", "authorized_connector", "founder_supplied"] },
+        "retrievedAt": { "type": "string", "format": "date-time" },
+        "contentHash": { "$ref": "#/$defs/hash" },
+        "qualityScore": { "type": "number", "minimum": 0, "maximum": 1 },
+        "rankReason": { "type": "string" }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri", "width", "height", "contentHash", "provenance"],
+      "properties": {
+        "assetId": { "type": "string", "minLength": 1 },
+        "uri": { "type": "string" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "contentHash": { "$ref": "#/$defs/hash" },
+        "provenance": { "$ref": "#/$defs/source" },
+        "quality": { "type": "string" }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uri", "width", "height", "contentHash", "provenance", "timestampSeconds", "selectionReason", "portraitIntent"],
+      "properties": {
+        "uri": { "type": "string" },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "contentHash": { "$ref": "#/$defs/hash" },
+        "provenance": { "$ref": "#/$defs/source" },
+        "timestampSeconds": { "type": "number", "minimum": 0 },
+        "selectionReason": { "type": "string" },
+        "portraitIntent": { "enum": ["forward_visible", "intentionally_closed", "verified_look_away", "no_portrait"] }
+      }
+    },
+    "transcript": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "startSeconds", "endSeconds", "authorized", "provenance"],
+      "properties": {
+        "text": { "type": "string" },
+        "startSeconds": { "type": "number", "minimum": 0 },
+        "endSeconds": { "type": "number", "minimum": 0 },
+        "authorized": { "const": true },
+        "provenance": { "$ref": "#/$defs/source" }
+      }
+    },
+    "analytics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["windowStart", "windowEnd", "metrics", "provenance"],
+      "properties": {
+        "windowStart": { "type": "string", "format": "date-time" },
+        "windowEnd": { "type": "string", "format": "date-time" },
+        "metrics": { "type": "object", "additionalProperties": { "type": "number" } },
+        "provenance": { "$ref": "#/$defs/source" }
+      }
+    },
+    "brief": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "contentHash", "viewerPromise", "hypothesis", "evidenceSourceIds", "copy", "composition", "mobileHierarchy", "subjectPlan", "portraitPlan", "colorPolicy", "propRequirements", "claimGuardrails"],
+      "properties": {
+        "status": { "enum": ["draft", "locked", "revised"] },
+        "contentHash": { "$ref": "#/$defs/hash" },
+        "viewerPromise": { "type": "string", "minLength": 1 },
+        "hypothesis": { "type": "string", "minLength": 1 },
+        "evidenceSourceIds": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "copy": { "type": "string" },
+        "composition": { "type": "string" },
+        "mobileHierarchy": { "type": "string" },
+        "subjectPlan": { "$ref": "#/$defs/subjectPlan" },
+        "portraitPlan": { "type": "string" },
+        "colorPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["base", "accentMode", "rationale"],
+          "properties": {
+            "base": { "enum": ["neutral", "jovie_consistent", "verified_video_world"] },
+            "accentMode": { "enum": ["none", "verified_video_world", "semantic", "single_variable_experiment"] },
+            "rationale": { "type": "string" },
+            "invariantVariables": { "type": "array", "items": { "type": "string" } },
+            "experimentHypothesis": { "type": "string" }
+          }
+        },
+        "propRequirements": { "type": "array", "items": { "type": "string" } },
+        "claimGuardrails": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "channelIdentityPack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "channelId", "contentHash", "generatedAt", "expiresAt", "creatorEvidenceSourceIds", "creators", "featuredGuests", "policy"],
+      "properties": {
+        "version": { "const": "1.0.0" },
+        "channelId": { "type": "string", "minLength": 1 },
+        "contentHash": { "$ref": "#/$defs/hash" },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "creatorEvidenceSourceIds": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "creators": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/identity" } },
+        "featuredGuests": { "type": "array", "items": { "$ref": "#/$defs/identity" } },
+        "contactSheet": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["uri", "contentHash", "assetOrder"],
+          "properties": {
+            "uri": { "type": "string" },
+            "contentHash": { "$ref": "#/$defs/hash" },
+            "assetOrder": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+          }
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["creatorAdmission", "guestAdmission", "missingReferenceAction", "unknownPersonSubstitution"],
+          "properties": {
+            "creatorAdmission": { "const": "approved_or_high_confidence_repeated_appearance" },
+            "guestAdmission": { "const": "high_relevance_and_approved_reference_quality" },
+            "missingReferenceAction": { "const": "omit_person" },
+            "unknownPersonSubstitution": { "const": "prohibited" }
+          }
+        }
+      }
+    },
+    "subjectPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "evidenceSourceIds", "referenceAssetIds", "decision"],
+      "properties": {
+        "role": { "enum": ["creator", "featured_collaborator", "featured_guest", "non_identifying_third_party", "no_person"] },
+        "subjectId": { "type": "string" },
+        "evidenceSourceIds": { "type": "array", "items": { "type": "string" } },
+        "referenceAssetIds": { "type": "array", "items": { "type": "string" } },
+        "decision": { "enum": ["approved", "high_confidence", "omit_unverified_person"] },
+        "omissionReason": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "role": { "enum": ["creator", "featured_collaborator", "featured_guest"] } } },
+          "then": {
+            "required": ["subjectId"],
+            "properties": {
+              "evidenceSourceIds": { "minItems": 1 },
+              "referenceAssetIds": { "minItems": 1 },
+              "decision": { "enum": ["approved", "high_confidence"] }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "role": { "const": "no_person" } } },
+          "then": {
+            "properties": {
+              "referenceAssetIds": { "maxItems": 0 },
+              "decision": { "const": "omit_unverified_person" }
+            }
+          }
+        }
+      ]
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subjectId", "displayName", "role", "confidence", "evidenceSourceIds", "referenceAssets", "naturalSkin", "hair", "eyes", "faceProportions", "prohibitions"],
+      "properties": {
+        "subjectId": { "type": "string" },
+        "displayName": { "type": "string", "minLength": 1 },
+        "role": { "enum": ["creator", "featured_collaborator", "featured_guest"] },
+        "confidence": { "enum": ["approved", "high_confidence"] },
+        "evidenceSourceIds": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "referenceAssets": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/asset" } },
+        "appearanceProfile": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["colorMasterAssetId", "colorMasterApproval", "complexionTarget", "whiteBalance", "facialContrast", "approvedWardrobeAssetIds", "wardrobePolicy", "stylingProhibitions", "normalizationPolicy"],
+          "properties": {
+            "colorMasterAssetId": { "type": "string" },
+            "colorMasterApproval": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["status", "sourceId", "approvedAt", "comparisonDerived"],
+              "properties": {
+                "status": { "const": "explicitly_approved" },
+                "sourceId": { "type": "string", "minLength": 1 },
+                "approvedAt": { "type": "string", "format": "date-time" },
+                "comparisonDerived": { "const": false }
+              }
+            },
+            "complexionTarget": { "type": "string" },
+            "whiteBalance": { "type": "string" },
+            "facialContrast": { "type": "string" },
+            "approvedWardrobeAssetIds": { "type": "array", "items": { "type": "string" } },
+            "wardrobePolicy": { "const": "source_evidenced_or_crop_omit" },
+            "stylingProhibitions": { "type": "array", "items": { "type": "string" } },
+            "normalizationPolicy": { "const": "match_color_master_under_scene_lighting_reject_material_drift" }
+          }
+        },
+        "naturalSkin": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["hue", "luminance", "contrast"],
+          "properties": {
+            "hue": { "type": "string" },
+            "luminance": { "type": "string" },
+            "contrast": { "type": "string" }
+          }
+        },
+        "hair": { "type": "string" },
+        "eyes": { "type": "string" },
+        "faceProportions": { "type": "string" },
+        "prohibitions": { "type": "array", "items": { "enum": ["whitening", "orange_bronze_drift", "gray_green_cast", "plastic_smoothing", "eye_enlargement", "beauty_manipulation", "identity_altering_retouch"] } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "role": { "const": "creator" } } },
+          "then": {
+            "required": ["appearanceProfile"],
+            "properties": { "referenceAssets": { "minItems": 3 } }
+          }
+        },
+        {
+          "if": { "properties": { "role": { "enum": ["featured_collaborator", "featured_guest"] } } },
+          "then": { "properties": { "referenceAssets": { "minItems": 1 } } }
+        }
+      ]
+    },
+    "gate": { "enum": ["pass", "fail", "not_applicable"] },
+    "perCardQa": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["semanticPromiseClarity", "videoSpecificity", "genericCoverNewsFraming", "creatorNameFiller", "subjectRoleEvidence", "unknownPersonSubstitution", "identityFidelity", "eyes", "flatteringPortrait", "skin", "naturalTexture", "text", "perWordLocalContrast", "lyricNotebookTruth", "factualGrounding", "propRealism", "mobileHierarchy", "colorRationale", "overall"],
+      "properties": {
+        "semanticPromiseClarity": { "$ref": "#/$defs/gate" },
+        "videoSpecificity": { "$ref": "#/$defs/gate" },
+        "genericCoverNewsFraming": { "$ref": "#/$defs/gate" },
+        "creatorNameFiller": { "$ref": "#/$defs/gate" },
+        "subjectRoleEvidence": { "$ref": "#/$defs/gate" },
+        "unknownPersonSubstitution": { "$ref": "#/$defs/gate" },
+        "identityFidelity": { "$ref": "#/$defs/gate" },
+        "eyes": { "$ref": "#/$defs/gate" },
+        "flatteringPortrait": { "$ref": "#/$defs/gate" },
+        "skin": { "$ref": "#/$defs/gate" },
+        "naturalTexture": { "$ref": "#/$defs/gate" },
+        "text": { "$ref": "#/$defs/gate" },
+        "perWordLocalContrast": { "$ref": "#/$defs/gate" },
+        "lyricNotebookTruth": { "$ref": "#/$defs/gate" },
+        "factualGrounding": { "$ref": "#/$defs/gate" },
+        "propRealism": { "$ref": "#/$defs/gate" },
+        "mobileHierarchy": { "$ref": "#/$defs/gate" },
+        "colorRationale": { "$ref": "#/$defs/gate" },
+        "overall": { "$ref": "#/$defs/gate" },
+        "reasonCodes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "batchQa": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contactSheetUri", "contactSheetHash", "identityConsistency", "skinConsistency", "colorConsistency", "repetitionCheck", "overall"],
+      "properties": {
+        "contactSheetUri": { "type": "string" },
+        "contactSheetHash": { "$ref": "#/$defs/hash" },
+        "identityConsistency": { "$ref": "#/$defs/gate" },
+        "skinConsistency": { "$ref": "#/$defs/gate" },
+        "colorConsistency": { "$ref": "#/$defs/gate" },
+        "repetitionCheck": { "$ref": "#/$defs/gate" },
+        "overall": { "$ref": "#/$defs/gate" },
+        "reasonCodes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "feedback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "candidateHash", "reasonCodes", "recordedAt"],
+      "properties": {
+        "decision": { "enum": ["lock", "reject", "revise"] },
+        "candidateHash": { "$ref": "#/$defs/hash" },
+        "reasonCodes": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "notes": { "type": "string" },
+        "recordedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "providerReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blindLabel", "provider", "requestedModelId", "resolvedModelId", "officialApi", "requestedAt", "briefHash", "usageCost", "moderationResult", "provenance"],
+      "properties": {
+        "blindLabel": { "type": "string" },
+        "provider": { "type": "string" },
+        "requestedModelId": { "type": "string" },
+        "resolvedModelId": { "type": "string" },
+        "modelVersion": { "type": "string" },
+        "officialApi": { "type": "boolean" },
+        "endpoint": { "type": "string" },
+        "aspectRatio": { "type": "string" },
+        "resolution": { "enum": ["1k", "2k"] },
+        "quality": { "enum": ["low", "medium"] },
+        "responseFormat": { "enum": ["url", "b64_json"] },
+        "artifactHash": { "$ref": "#/$defs/hash" },
+        "requestedAt": { "type": "string", "format": "date-time" },
+        "briefHash": { "$ref": "#/$defs/hash" },
+        "usageCost": { "type": "object", "additionalProperties": true },
+        "moderationResult": { "type": "object", "additionalProperties": true },
+        "provenance": { "type": "object", "additionalProperties": true },
+        "adapterDelta": { "type": "string" }
+      }
+    }
+  }
+}
