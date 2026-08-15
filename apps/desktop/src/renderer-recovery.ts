@@ -35,6 +35,11 @@ export const RENDERER_LOAD_WATCHDOG_MS = 18_000;
 
 export type RendererWatchdogExpiryAction = 'ignore' | 'failure-page';
 
+export type RendererBootWatchdogAfterLoadAction =
+  | 'already-booted'
+  | 'arm-boot-watchdog'
+  | 'ignore';
+
 export type RendererLoadStartAction = 'arm-load-watchdog' | 'ignore';
 
 export type AbortedMainFrameRecoveryAction =
@@ -80,6 +85,23 @@ export function shouldArmRendererBootWatchdog(
   } catch {
     return false;
   }
+}
+
+/**
+ * React can paint and send app-booted before Chromium emits did-finish-load
+ * (for example while a non-blocking resource is still loading). The later
+ * load-finished event must preserve that valid heartbeat instead of resetting
+ * the renderer to unbooted and scheduling a false failure 14 seconds later.
+ */
+export function decideRendererBootWatchdogAfterLoad(input: {
+  readonly booted: boolean;
+  readonly url: string;
+  readonly appOrigin: string;
+}): RendererBootWatchdogAfterLoadAction {
+  if (input.booted) return 'already-booted';
+  return shouldArmRendererBootWatchdog(input.url, input.appOrigin)
+    ? 'arm-boot-watchdog'
+    : 'ignore';
 }
 
 /**

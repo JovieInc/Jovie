@@ -129,7 +129,7 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /APP_BOOTED_CHANNEL/);
   assert.match(mainSource, /RENDERER_BOOT_WATCHDOG_MS/);
   assert.match(mainSource, /RENDERER_LOAD_WATCHDOG_MS/);
-  assert.match(mainSource, /shouldArmRendererBootWatchdog/);
+  assert.match(mainSource, /decideRendererBootWatchdogAfterLoad/);
   assert.match(mainSource, /shouldSkipRendererWatchdogForAuthHandoff/);
   assert.match(mainSource, /decideRendererLoadStart/);
   assert.match(mainSource, /decideAbortedMainFrameRecovery/);
@@ -621,8 +621,14 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
     /'did-finish-load'[\s\S]{0,160}?rendererCrashReloadCount = 0/
   );
 
-  // Fix: the boot watchdog arms only for the app origin.
-  assert.match(mainSource, /shouldArmRendererBootWatchdog\(url, APP_ORIGIN\)/);
+  // Fix: an app-booted ping that arrives before did-finish-load remains valid.
+  // The load-finished handler must not reset a visibly healthy renderer and
+  // schedule a false failure-page transition 14 seconds later.
+  assert.match(mainSource, /decideRendererBootWatchdogAfterLoad\(\{/);
+  assert.doesNotMatch(
+    mainSource,
+    /const armBootWatchdog = \(\): void => \{[\s\S]{0,240}?rendererBooted = false/
+  );
 
   // Fix: window state persists normal bounds and never minimized garbage.
   assert.match(mainSource, /if \(win\.isMinimized\(\)\) return;/);
