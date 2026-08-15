@@ -199,7 +199,7 @@ export function applyAdmissionThrottle(
 
 export function buildIntakeControlLoopReceipt(
   issues,
-  { previousFingerprints = {}, now } = {}
+  { previousFingerprints = {}, now = undefined } = {}
 ) {
   const changed = changedIntakeIssues(issues, previousFingerprints);
   const receipts = changed.map(issue =>
