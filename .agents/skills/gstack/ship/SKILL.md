@@ -1772,44 +1772,43 @@ If output shows `ALREADY_BUMPED`, VERSION was already bumped on this branch (pri
 
 ## CHANGELOG (auto-generate)
 
-**Jovie main-only version stamping override:** On feature branches, do NOT add a dated release heading and do NOT bump any version fan-out file. Write notes under the existing `## [Unreleased]` section only. The main/release path runs `pnpm version:stamp` after merge to promote `[Unreleased]` to a dated release.
+**Jovie override:** Feature branches edit only `## [Unreleased]`; main runs
+`pnpm version:stamp`. Never bump version fan-out or add a dated heading here.
 
-1. Read `CHANGELOG.md` header and locate the `## [Unreleased]` section.
+1. Read `CHANGELOG.md`, `git log <base>..HEAD --oneline`, and
+   `git diff <base>...HEAD`.
+2. Build a private source map first. For every commit or issue record a canonical
+   outcome key, audience, availability, action, outcome, and public/internal
+   disposition. Keep issue IDs and SHAs private.
+3. **Group by customer outcome.** Squash only when audience, availability,
+   action, and outcome match; otherwise split. Prioritize revenue/activation,
+   reliability, discovery, then polish.
+4. Write one unified `[Unreleased]` entry using `### Featured`, `### Added`,
+   `### Changed`, `### Fixed`, and `### Removed` as needed.
+   - Public bullets use `**Headline:** summary`.
+   - Headlines are 8 words or fewer.
+   - Summaries are 2 sentences and 22 words or fewer.
+   - Lead with what the user can now **do**, using concrete product nouns.
+   - Never mention ticket IDs, vendors, TODOS.md, or implementation jargon.
+   - Never claim availability without exact release evidence.
+5. Save the complete source map, ordered stories, and structured availability
+   evidence in the project-local gstack directory; never commit it. Released
+   stories require `git_tag` evidence formatted `v<release>@<40-char SHA>`;
+   Unreleased stories require `publication` evidence formatted
+   `CHANGELOG.md#Unreleased`.
+6. Run the **independent per-changelog eval**:
+   `bun run <gstack-root>/scripts/changelog-eval.ts <input.json> --changelog CHANGELOG.md --receipt <result.json>`.
+   It verifies reciprocal mapping, exclusions, squash/split grouping, priority,
+   evidence, copy limits, leaks, hashes the exact changelog, and matches the
+   published bullets.
+7. Fix only failed dimensions and retry for at most 3 total iterations. Still
+   failing means stop; never publish without a passing receipt.
+8. **Cross-check:** Every commit must map to exactly one public story or one
+   documented internal exclusion.
 
-2. **First, enumerate every commit on the branch:**
-   ```bash
-   git log <base>..HEAD --oneline
-   ```
-   Copy the full list. Count the commits. You will use this as a checklist.
-
-3. **Read the full diff** to understand what each commit actually changed:
-   ```bash
-   git diff <base>...HEAD
-   ```
-
-4. **Group commits by theme** before writing anything. Common themes:
-   - New features / capabilities
-   - Performance improvements
-   - Bug fixes
-   - Dead code removal / cleanup
-   - Infrastructure / tooling / tests
-   - Refactoring
-
-5. **Write or update the `[Unreleased]` entry** covering ALL groups:
-   - If existing `[Unreleased]` entries on the branch already cover some commits, replace them with one unified `[Unreleased]` entry
-   - Categorize changes into applicable sections:
-     - `### Added` — new features
-     - `### Changed` — changes to existing functionality
-     - `### Fixed` — bug fixes
-     - `### Removed` — removed features
-   - Write concise, descriptive bullet points
-   - Keep the heading exactly `## [Unreleased]` — do NOT add `## [X.Y.Z] - YYYY-MM-DD` on a feature branch
-   - **Voice:** Lead with what the user can now **do** that they couldn't before. Use plain language, not implementation details. Never mention TODOS.md, internal tracking, or contributor-facing details.
-
-6. **Cross-check:** Compare your `[Unreleased]` entry against the commit list from step 2.
-   Every commit must map to at least one bullet point. If any commit is unrepresented,
-   add it now. If the branch has N commits spanning K themes, the CHANGELOG must
-   reflect all K themes.
+The evaluator itself has a separate golden-fixture regression suite at
+`test/changelog-eval.test.ts`. Changes to this workflow or evaluator must pass
+that skill eval; a passing real release cannot substitute for it.
 
 **Do NOT ask the user to describe changes.** Infer from the diff and commit history.
 
