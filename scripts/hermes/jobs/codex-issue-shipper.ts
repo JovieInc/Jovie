@@ -71,6 +71,14 @@ import {
   shouldEscalateRetry,
   worktreeHasWork,
 } from '../lib/codex-issue-shipper';
+import {
+  beginAwaitingVerification,
+  beginImplementing,
+  deliveryLeasePath,
+  readDeliveryLease,
+  startInternalRemediation,
+  writeDeliveryLease,
+} from '../lib/delivery-liveness';
 import { tryWithHeavyJobLock } from '../lib/heavy-job-lock';
 import { HERMES_PATHS } from '../lib/hermes-paths';
 import { logJobEvent, withJobLogging } from '../lib/jobs-log';
@@ -835,56 +843,6 @@ function claimIssue(config: ShipperConfig, plan: DispatchPlan): boolean {
   return true;
 }
 
-function markBlocked(
-  config: ShipperConfig,
-  plan: DispatchPlan,
-  reason: string
-): void {
-  removeClaimLabel(config, plan, 'mark_blocked_claim_remove_failed');
-
-  try {
-    run(
-      [
-        'gh',
-        'issue',
-        'edit',
-        String(plan.issue.number),
-        '--repo',
-        config.repo,
-        '--add-label',
-        CODEX_BLOCKED_LABEL,
-      ],
-      config
-    );
-  } catch (err) {
-    logJobEvent({
-      job: JOB,
-      event: 'mark_blocked_label_failed',
-      issue: plan.issue.number,
-      error: shortError(err),
-    });
-  }
-
-  try {
-    commentIssue(
-      config,
-      plan.issue.number,
-      [
-        `Jovie agent (codex issue shipper) stopped on a real blocker.`,
-        '',
-        reason,
-      ].join('\n')
-    );
-  } catch (err) {
-    logJobEvent({
-      job: JOB,
-      event: 'mark_blocked_comment_failed',
-      issue: plan.issue.number,
-      error: shortError(err),
-    });
-  }
-}
-
 function removeClaimLabel(
   config: ShipperConfig,
   plan: DispatchPlan,
@@ -1050,14 +1008,27 @@ function releaseOrEscalate(
     fetchIssueComments(config, plan.issue.number)
   );
   if (shouldEscalateRetry(priorReleases)) {
-    markBlocked(
-      config,
-      plan,
-      buildRetryEscalationReason(priorReleases, reason)
+    const path = deliveryLeasePath(config.repo, plan.issue.number);
+    const existing =
+      readDeliveryLease(path) ??
+      beginImplementing({
+        repo: config.repo,
+        issue: plan.issue.number,
+        issueText: `${plan.issue.title}\n${plan.issue.body ?? ''}`,
+        owner: 'codex-issue-shipper',
+        startReceipt: `claim:${config.repo}#${plan.issue.number}`,
+      });
+    writeDeliveryLease(
+      startInternalRemediation({
+        lease: existing,
+        evidence: buildRetryEscalationReason(priorReleases, reason),
+      }),
+      path
     );
+    releaseClaimForRetry(config, plan, reason);
     logJobEvent({
       job: JOB,
-      event: 'retry_escalated_blocked',
+      event: 'retry_escalated_remediation',
       issue: plan.issue.number,
       priorReleases,
     });
@@ -1269,7 +1240,7 @@ function runAgent(
 function findPrForBranch(
   config: ShipperConfig,
   branchName: string
-): { number: number; url: string } | null {
+): { number: number; url: string; headRefOid: string } | null {
   try {
     const raw = run(
       [
@@ -1283,13 +1254,14 @@ function findPrForBranch(
         '--state',
         'open',
         '--json',
-        'number,url',
+        'number,url,headRefOid',
       ],
       config
     );
     const prs = JSON.parse(raw) as ReadonlyArray<{
       number: number;
       url: string;
+      headRefOid: string;
     }>;
     return prs[0] ?? null;
   } catch {
@@ -1333,6 +1305,15 @@ async function dispatchPlan(
       pid: process.pid,
       startedAt: new Date().toISOString(),
     });
+    writeDeliveryLease(
+      beginImplementing({
+        repo: config.repo,
+        issue: dispatch.issue.number,
+        issueText: `${dispatch.issue.title}\n${dispatch.issue.body ?? ''}`,
+        owner: `${config.agent}:${process.pid}`,
+        startReceipt: `journal:${config.repo}#${dispatch.issue.number}:${process.pid}`,
+      })
+    );
 
     const runInWorktree: FinisherRunner = (args, opts) =>
       execFileSync(args[0], args.slice(1), {
@@ -1354,7 +1335,7 @@ async function dispatchPlan(
     // dispatch to the next harness instead of burning a claim-release cycle.
     const chain = parseAgentChain(process.env, config.agent);
     let agentResult!: AgentRunResult;
-    let pr: { number: number; url: string } | null = null;
+    let pr: { number: number; url: string; headRefOid: string } | null = null;
     let failureDisposition: AgentFailureDisposition | null = null;
     let finalRouteIndex = 0;
 
@@ -1471,9 +1452,7 @@ async function dispatchPlan(
         .filter((line): line is string => line !== null)
         .join('\n');
       const action = actionForAgentFailure(disposition, false);
-      if (action === 'block_task') {
-        markBlocked(config, dispatch, reason);
-      } else if (action === 'retry_task') {
+      if (action === 'retry_task') {
         releaseOrEscalate(config, dispatch, reason);
       } else {
         releaseClaimForIncident(config, dispatch, {
@@ -1548,18 +1527,30 @@ async function dispatchPlan(
       return;
     }
 
+    const liveness = beginAwaitingVerification({
+      repo: config.repo,
+      issue: dispatch.issue.number,
+      issueText: `${dispatch.issue.title}\n${dispatch.issue.body ?? ''}`,
+      pr: pr.number,
+      prUrl: pr.url,
+      sourceSubject: pr.headRefOid,
+    });
+    writeDeliveryLease(liveness);
+
     let successCommentPosted = true;
     try {
       commentIssue(
         config,
         dispatch.issue.number,
         [
-          `Jovie agent completed this issue and opened PR #${pr.number}.`,
+          `Jovie agent implemented this issue and opened PR #${pr.number}; delivery remains active pending verification.`,
           '',
           `PR: ${pr.url}`,
           `GBrain dispatch slug: \`${gbrain.captureSlug}\``,
           `Log: \`${agentResult.logPath}\``,
           `State: \`${agentResult.statePath}\``,
+          `Verification deadline: \`${liveness.verificationDeadlineAt}\``,
+          `Requested proof: ${liveness.requestedOutcomes.map(tier => `\`${tier}\``).join(', ')}`,
         ].join('\n')
       );
     } catch (err) {
@@ -1573,11 +1564,9 @@ async function dispatchPlan(
       });
     }
 
-    removeClaimLabel(config, dispatch, 'success_claim_remove_failed');
-
     logJobEvent({
       job: JOB,
-      event: 'pr_found_after_success',
+      event: 'awaiting_verification',
       issue: dispatch.issue.number,
       pr: pr.number,
       url: pr.url,

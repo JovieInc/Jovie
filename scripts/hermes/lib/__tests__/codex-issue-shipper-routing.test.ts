@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  actionForAgentFailure,
   buildAgentCommand,
   type GithubIssue,
   loadShipperConfig,
@@ -15,6 +16,10 @@ const issue = (title: string, labels: string[] = []): GithubIssue => ({
 });
 
 describe('Codex shipper routing', () => {
+  it('never trusts an agent self-report as authority to block a task', () => {
+    expect(actionForAgentFailure('task_terminal', false)).toBe('retry_task');
+  });
+
   it('defaults Codex reasoning to max without changing the caller environment', () => {
     const config = loadShipperConfig(
       {
