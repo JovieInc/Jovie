@@ -16,6 +16,7 @@
 import { isInternalEntry } from './changelog-filter-rules';
 
 export interface ChangelogSection {
+  featured: string[];
   added: string[];
   changed: string[];
   fixed: string[];
@@ -38,8 +39,16 @@ export type ChangelogInlineNode =
     };
 
 const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
-const SECTION_HEADING_RE = /^### (Added|Changed|Fixed|Removed)$/;
+const SECTION_HEADING_RE = /^### (Featured|Added|Changed|Fixed|Removed)$/;
 const INTERNAL_MARKER_RE = /\[\s*internal\s*\]/i;
+
+function isValidDate(value: string): boolean {
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return (
+    !Number.isNaN(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value
+  );
+}
 
 function appendInlineText(nodes: ChangelogInlineNode[], value: string): void {
   if (!value) return;
@@ -144,6 +153,16 @@ export function parseChangelogInline(value: string): ChangelogInlineNode[] {
   return parseInlineNodes(value, true);
 }
 
+function inlineNodeText(node: ChangelogInlineNode): string {
+  return node.type === 'strong'
+    ? node.children.map(inlineNodeText).join('')
+    : node.value;
+}
+
+export function changelogInlineText(value: string): string {
+  return parseChangelogInline(value).map(inlineNodeText).join('');
+}
+
 /** Try to parse a version heading; returns a new release or 'unreleased' sentinel. */
 function parseVersionHeading(
   line: string
@@ -154,9 +173,15 @@ function parseVersionHeading(
   if (version.toLowerCase() === 'unreleased') return 'unreleased';
   return {
     version,
-    date: date || '',
+    date: date && isValidDate(date) ? date : '',
     summary: '',
-    sections: { added: [], changed: [], fixed: [], removed: [] },
+    sections: {
+      featured: [],
+      added: [],
+      changed: [],
+      fixed: [],
+      removed: [],
+    },
   };
 }
 

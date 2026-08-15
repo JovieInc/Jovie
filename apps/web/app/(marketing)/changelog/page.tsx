@@ -1,40 +1,13 @@
-import fs from 'node:fs';
 import { Badge } from '@jovie/ui/atoms/badge';
 import type { Metadata } from 'next';
-import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { ChangelogTimeline } from '@/components/marketing/changelog/ChangelogTimeline';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { type ChangelogRelease, parseChangelog } from '@/lib/changelog-parser';
-import { resolveMonorepoPath } from '@/lib/filesystem-paths';
+import { getChangelogReleases } from '@/lib/changelog-source';
 import { ChangelogEmailSignup } from './ChangelogEmailSignup';
 
-// ---------------------------------------------------------------------------
-// File resolution & caching
-// ---------------------------------------------------------------------------
-
-function resolveChangelogPath(): string | null {
-  const changelogPath = resolveMonorepoPath('CHANGELOG.md');
-  return fs.existsSync(changelogPath) ? changelogPath : null;
-}
-
 export const revalidate = false;
-
-const getReleases = unstable_cache(
-  async (): Promise<ChangelogRelease[]> => {
-    const changelogPath = resolveChangelogPath();
-    if (!changelogPath) return [];
-    try {
-      const md = fs.readFileSync(changelogPath, 'utf8');
-      return parseChangelog(md);
-    } catch {
-      return [];
-    }
-  },
-  ['changelog-releases'],
-  { revalidate: false, tags: ['changelog'] }
-);
 
 // ---------------------------------------------------------------------------
 // Metadata
@@ -45,7 +18,10 @@ export const metadata: Metadata = {
   description: `Product updates and improvements to ${APP_NAME}. See what we've been shipping.`,
   alternates: {
     canonical: `${BASE_URL}/changelog`,
-    types: { 'application/atom+xml': `${BASE_URL}/changelog/feed.xml` },
+    types: {
+      'application/atom+xml': `${BASE_URL}/changelog/feed.xml`,
+      'application/feed+json': `${BASE_URL}/changelog/feed.json`,
+    },
   },
 };
 
@@ -54,7 +30,7 @@ export const metadata: Metadata = {
 // ---------------------------------------------------------------------------
 
 export default async function ChangelogPage() {
-  const releases = await getReleases();
+  const releases = await getChangelogReleases();
 
   // Count releases in current month for velocity counter
   const now = new Date();
@@ -86,6 +62,12 @@ export default async function ChangelogPage() {
             className='text-xs text-secondary-token transition-colors hover:text-primary-token'
           >
             RSS Feed
+          </Link>
+          <Link
+            href='/changelog/feed.json'
+            className='text-xs text-secondary-token transition-colors hover:text-primary-token'
+          >
+            JSON Feed
           </Link>
         </div>
       </MarketingHero>
