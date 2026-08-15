@@ -2,6 +2,11 @@ import PassKit
 import SwiftUI
 import UIKit
 
+private struct PublicProfileBrowserDestination: Identifiable {
+  let url: URL
+  var id: URL { url }
+}
+
 struct DashboardAvatarView: View {
   let name: String
   let avatarURL: URL?
@@ -22,6 +27,7 @@ struct DashboardAvatarView: View {
 struct DashboardView: View {
   let state: DashboardLoadState
   let brightnessManager: BrightnessControlling
+  let webBaseURL: URL
   let showVenueModeOnLaunch: Bool
   let loadAppleWalletProfilePass: @Sendable () async throws -> Data
   let onRetry: () async -> Void
@@ -32,10 +38,12 @@ struct DashboardView: View {
   @State private var isAddingAppleWalletPass = false
   @State private var appleWalletPassSheet: AppleWalletPassSheet?
   @State private var appleWalletErrorMessage: String?
+  @State private var publicProfileBrowserDestination: PublicProfileBrowserDestination?
 
   init(
     state: DashboardLoadState,
     brightnessManager: BrightnessControlling,
+    webBaseURL: URL,
     showVenueModeOnLaunch: Bool = false,
     loadAppleWalletProfilePass: @escaping @Sendable () async throws -> Data = {
       throw APIClientError.missingToken
@@ -44,6 +52,7 @@ struct DashboardView: View {
   ) {
     self.state = state
     self.brightnessManager = brightnessManager
+    self.webBaseURL = webBaseURL
     self.showVenueModeOnLaunch = showVenueModeOnLaunch
     self.loadAppleWalletProfilePass = loadAppleWalletProfilePass
     self.onRetry = onRetry
@@ -66,6 +75,11 @@ struct DashboardView: View {
           brightnessManager: brightnessManager,
           onDismiss: { isShowingVenueMode = false }
         )
+      }
+    }
+    .fullScreenCover(item: $publicProfileBrowserDestination) { destination in
+      if let policy = PublicProfileURLPolicy(webBaseURL: webBaseURL) {
+        PublicProfileBrowserView(initialURL: destination.url, policy: policy)
       }
     }
     .sheet(item: $appleWalletPassSheet) { sheet in
@@ -153,7 +167,7 @@ struct DashboardView: View {
   }
 
   // Mirrors the loaded layout exactly (full-width square QR, single URL line,
-  // two full-width pills, top-aligned) so the skeleton → loaded transition
+  // one full-width pill, two half-width pills, top-aligned) so the skeleton → loaded transition
   // causes zero layout shift on a cold (uncached) first load.
   private var skeleton: some View {
     VStack(spacing: JovieSpacing.large) {
@@ -164,6 +178,10 @@ struct DashboardView: View {
       RoundedRectangle(cornerRadius: JovieRadius.small, style: .continuous)
         .fill(JovieColor.surface1)
         .frame(width: 180, height: 16)
+      RoundedRectangle(cornerRadius: JovieRadius.pill, style: .continuous)
+        .fill(JovieColor.surface1)
+        .frame(height: 46)
+
       HStack(spacing: JovieSpacing.medium) {
         RoundedRectangle(cornerRadius: JovieRadius.pill, style: .continuous)
           .fill(JovieColor.surface1)
@@ -194,6 +212,15 @@ struct DashboardView: View {
         .font(JovieFont.body(size: 14))
         .foregroundStyle(JovieColor.textTertiary)
 
+      Button("Open Public Profile") {
+        if let url = validatedPublicProfileURL(response.publicProfileURL) {
+          publicProfileBrowserDestination = PublicProfileBrowserDestination(url: url)
+        }
+      }
+      .buttonStyle(JoviePillButtonStyle(filled: true))
+      .disabled(validatedPublicProfileURL(response.publicProfileURL) == nil)
+      .accessibilityIdentifier("dashboard-open-public-profile-button")
+
       HStack(spacing: JovieSpacing.medium) {
         Button(didCopyURL ? "Copied" : "Copy URL") {
           copyURL(response.publicProfileURL)
@@ -205,7 +232,7 @@ struct DashboardView: View {
         ShareLink(item: response.publicProfileURL ?? response.continueOnWebURL) {
           Text("Share")
         }
-        .buttonStyle(JoviePillButtonStyle(filled: true))
+        .buttonStyle(JoviePillButtonStyle(filled: false))
       }
 
       if response.appleWalletProfilePassAvailable && PKAddPassesViewController.canAddPasses() {
@@ -228,6 +255,10 @@ struct DashboardView: View {
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+  }
+
+  private func validatedPublicProfileURL(_ value: String?) -> URL? {
+    PublicProfileURLPolicy(webBaseURL: webBaseURL)?.validatedURL(from: value)
   }
 
   private func addAppleWalletPass() async {

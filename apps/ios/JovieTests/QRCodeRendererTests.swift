@@ -44,6 +44,24 @@ struct QRCodeRendererTests {
   }
 }
 
+struct PublicProfileURLPolicyTests {
+  private let policy = PublicProfileURLPolicy(webBaseURL: URL(string: "https://jov.ie")!)!
+
+  @Test func acceptsConfiguredHTTPSHost() {
+    #expect(policy.validatedURL(from: "https://jov.ie/tim") == URL(string: "https://jov.ie/tim"))
+  }
+
+  @Test func rejectsHTTPAndUnrelatedHosts() {
+    #expect(policy.validatedURL(from: "http://jov.ie/tim") == nil)
+    #expect(policy.validatedURL(from: "https://example.com/tim") == nil)
+    #expect(policy.validatedURL(from: nil) == nil)
+  }
+
+  @Test func rejectsInvalidConfiguredBaseURL() {
+    #expect(PublicProfileURLPolicy(webBaseURL: URL(string: "http://jov.ie")!) == nil)
+  }
+}
+
 struct AvatarImageCacheTests {
   @Test func storesAndReturnsDecodedImageForURL() throws {
     let url = URL(string: "https://example.com/avatar-\(UUID().uuidString).png")!
