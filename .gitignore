@@ -214,7 +214,17 @@ apps/desktop/src/*
 !apps/desktop/scripts/desktop-csp-watchdog.test.ts
 !apps/desktop/electron-builder.local.yml
 apps/extension/
-.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/gstack/
+.agents/skills/gstack/*
+!.agents/skills/gstack/scripts/
+!.agents/skills/gstack/test/
+.agents/skills/gstack/scripts/*
+.agents/skills/gstack/test/*
+!.agents/skills/gstack/scripts/changelog-eval.ts
+!.agents/skills/gstack/test/changelog-eval.test.ts
 
 # Vitest junit output (generated; never commit — caused recurring PR conflicts)
 *.junit.xml
