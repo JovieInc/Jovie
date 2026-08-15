@@ -14,13 +14,10 @@ const database = {
 };
 
 function jsonResponse(body, status = 200) {
-  return {
-    ok: status >= 200 && status < 300,
+  return new Response(JSON.stringify(body), {
     status,
-    async json() {
-      return body;
-    },
-  };
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
 test('status only calls the exact database and stats endpoints', async () => {
@@ -30,7 +27,9 @@ test('status only calls the exact database and stats endpoints', async () => {
     apiKey: 'secret',
     async fetchImpl(url, init) {
       calls.push({ url, method: init.method });
-      return jsonResponse(url.includes('/stats/') ? { daily: [] } : database);
+      return jsonResponse(
+        String(url).includes('/stats/') ? { daily: [] } : database
+      );
     },
   });
 
@@ -83,7 +82,9 @@ test('reset-password requires exact confirmation and re-verifies identity', asyn
     async fetchImpl(url, init) {
       calls.push({ url, method: init.method });
       return jsonResponse(
-        url.includes('/reset-password/') ? { password: 'new' } : database
+        String(url).includes('/reset-password/')
+          ? { password: 'new' }
+          : database
       );
     },
   });
@@ -111,6 +112,6 @@ test('no arbitrary management operation is exposed', () => {
     fetchImpl: async () => jsonResponse({}),
   });
   assert.deepEqual(Object.keys(operator).sort(), ['resetPassword', 'status']);
-  assert.equal(operator.changePlan, undefined);
-  assert.equal(operator.deleteDatabase, undefined);
+  assert.equal('changePlan' in operator, false);
+  assert.equal('deleteDatabase' in operator, false);
 });
