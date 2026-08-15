@@ -1312,12 +1312,14 @@ describe('LibrarySurface', () => {
       {
         access: 'public',
         handleUploadUrl: '/api/library/audio/upload-token',
+        contentType: 'audio/mpeg',
       }
     );
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/library/audio/confirm',
       expect.objectContaining({
         method: 'POST',
+        body: expect.stringContaining('"fileMimeType":"audio/mpeg"'),
       })
     );
     expect(navigationMock.refresh).toHaveBeenCalledTimes(1);

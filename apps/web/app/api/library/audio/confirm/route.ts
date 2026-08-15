@@ -10,7 +10,7 @@ import { and, eq } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ALLOWED_AUDIO_MIME_TYPES } from '@/lib/audio/constants';
+import { resolveAudioUploadMime } from '@/lib/audio/constants';
 import { resolvePrimaryRecordingForRelease } from '@/lib/audio/resolve-release-recording';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
@@ -27,7 +27,7 @@ const confirmSchema = z.object({
   blobUrl: z.string().url(),
   blobPathname: z.string().min(1),
   fileName: z.string().min(1),
-  fileMimeType: z.string().min(1),
+  fileMimeType: z.string(),
   fileSizeBytes: z.number().int().positive().optional(),
 });
 
@@ -44,8 +44,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { releaseId, blobUrl, fileMimeType } = parsed.data;
-    if (!ALLOWED_AUDIO_MIME_TYPES.has(fileMimeType)) {
+    const { releaseId, blobUrl, fileName, fileMimeType } = parsed.data;
+    // Resolve the canonical upload MIME: blank/octet-stream falls back to the
+    // file extension; contradictory non-audio MIME is rejected.
+    const canonicalMimeType = resolveAudioUploadMime({
+      name: fileName,
+      type: fileMimeType,
+    });
+    if (!canonicalMimeType) {
       return NextResponse.json(
         { error: 'Unsupported audio file type' },
         { status: 400, headers: NO_STORE_HEADERS }
@@ -89,7 +95,7 @@ export async function POST(request: NextRequest) {
       .set({
         previewUrl: blobUrl,
         audioUrl: blobUrl,
-        audioFormat: fileMimeType,
+        audioFormat: canonicalMimeType,
         updatedAt: new Date(),
       })
       .where(

@@ -1,6 +1,7 @@
 import {
   AUDIO_FILE_ACCEPT,
   AUDIO_MAX_FILE_SIZE_BYTES,
+  getAudioFormat,
   isSupportedAudioFile,
   SUPPORTED_AUDIO_FORMAT_LABELS,
   SUPPORTED_AUDIO_MIME_TYPES_SET,
@@ -41,6 +42,18 @@ export const AUDIO_ACCEPT = AUDIO_FILE_ACCEPT;
 
 /** @deprecated Prefer SUPPORTED_AUDIO_MIME_TYPES_SET */
 export const ALLOWED_AUDIO_MIME_TYPES = SUPPORTED_AUDIO_MIME_TYPES_SET;
+
+/**
+ * Resolves the canonical upload MIME for a browser File. Blank or
+ * `application/octet-stream` MIME falls back to the extension; a
+ * contradictory non-audio MIME (e.g. `text/plain` on `x.mp3`) returns null.
+ */
+export function resolveAudioUploadMime(file: {
+  name: string;
+  type: string;
+}): string | null {
+  return getAudioFormat(file)?.canonicalMimeType ?? null;
+}
 
 /** Named-rule codes for rejected audio uploads (JOV-3688). */
 export type AudioUploadRuleCode =

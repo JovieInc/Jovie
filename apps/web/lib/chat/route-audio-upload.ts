@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 import {
-  SUPPORTED_AUDIO_MIME_TYPES_SET,
+  resolveAudioUploadMime,
   validateAudioFile,
 } from '@/lib/audio/constants';
 import { createSmartLinkContentTag } from '@/lib/cache/tags';
@@ -216,7 +216,13 @@ export async function routeChatAudioUpload(
     throw new Error(validationError);
   }
 
-  if (!SUPPORTED_AUDIO_MIME_TYPES_SET.has(input.fileMimeType)) {
+  // Canonicalize the upload MIME: blank/octet-stream falls back to the file
+  // extension; contradictory non-audio MIME is rejected.
+  const canonicalMimeType = resolveAudioUploadMime({
+    name: input.fileName,
+    type: input.fileMimeType,
+  });
+  if (!canonicalMimeType) {
     throw new Error('Unsupported audio file type');
   }
 
@@ -245,14 +251,14 @@ export async function routeChatAudioUpload(
       profileId: input.profileId,
       releaseId,
       blobUrl: input.blobUrl,
-      fileMimeType: input.fileMimeType,
+      fileMimeType: canonicalMimeType,
     });
   } else if (inference.kind === 'reference' && releaseId) {
     await storeReferenceAudio({
       profileId: input.profileId,
       title: inference.suggestedTitle,
       blobUrl: input.blobUrl,
-      fileMimeType: input.fileMimeType,
+      fileMimeType: canonicalMimeType,
       releaseId,
     });
   } else {
@@ -260,7 +266,7 @@ export async function routeChatAudioUpload(
       profileId: input.profileId,
       title: inference.suggestedTitle,
       blobUrl: input.blobUrl,
-      fileMimeType: input.fileMimeType,
+      fileMimeType: canonicalMimeType,
     });
     releaseId = created.releaseId;
     releaseTitle = created.releaseTitle;

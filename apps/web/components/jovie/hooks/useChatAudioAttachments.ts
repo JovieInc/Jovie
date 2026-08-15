@@ -3,7 +3,11 @@
 import { upload } from '@vercel/blob/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { AUDIO_FILE_ACCEPT, validateAudioFile } from '@/lib/audio/constants';
+import {
+  AUDIO_FILE_ACCEPT,
+  resolveAudioUploadMime,
+  validateAudioFile,
+} from '@/lib/audio/constants';
 import type { AudioEntityInference } from '@/lib/chat/infer-audio-entity';
 import {
   canTransitionMediaLifecycle,
@@ -89,6 +93,24 @@ export function useChatAudioAttachments({
         status: 'uploading',
       });
 
+      const uploadMime = resolveAudioUploadMime({
+        name: file.name,
+        type: file.type,
+      });
+      if (!uploadMime) {
+        const message = 'Unsupported audio file type';
+        onError(message);
+        setPendingAudio({
+          id: pendingId,
+          name: file.name,
+          mediaType: file.type,
+          status: 'failed',
+          error: message,
+        });
+        setIsProcessing(false);
+        return;
+      }
+
       const updatePendingAudio = (patch: Partial<PendingAudio>) => {
         setPendingAudio(current => {
           if (!current || current.id !== pendingId) return current;
@@ -106,6 +128,7 @@ export function useChatAudioAttachments({
         const blob = await upload(file.name, file, {
           access: 'public',
           handleUploadUrl: '/api/library/audio/upload-token',
+          contentType: uploadMime,
         });
 
         updatePendingAudio({ status: 'processing' });
@@ -117,7 +140,7 @@ export function useChatAudioAttachments({
             blobUrl: blob.url,
             blobPathname: blob.pathname,
             fileName: file.name,
-            fileMimeType: file.type,
+            fileMimeType: uploadMime,
             fileSizeBytes: file.size,
           }),
         });
