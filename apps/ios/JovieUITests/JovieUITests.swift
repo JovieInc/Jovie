@@ -62,7 +62,52 @@ final class JovieUITests: XCTestCase {
     XCTAssertTrue(app.buttons["Open Settings"].exists)
     XCTAssertTrue(app.buttons["dashboard-copy-url-button"].isEnabled)
     XCTAssertTrue(app.buttons["dashboard-share-profile-button"].isEnabled)
+    XCTAssertTrue(app.buttons["Open Public Profile"].exists)
     attachScreenshot(named: "profile", app: app)
+  }
+
+  func testPublicProfileOpensInFullScreenEmbeddedBrowser() {
+    let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Open Public Profile\"") {
+      $0.buttons["Open Public Profile"]
+    }
+
+    app.buttons["Open Public Profile"].tap()
+
+    XCTAssertTrue(
+      app.buttons["Close Public Profile"].waitForExistence(timeout: 3),
+      "Embedded public-profile browser did not open.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(app.buttons["Reload"].exists)
+    XCTAssertTrue(
+      app.staticTexts["Public Profile"].waitForExistence(timeout: 3),
+      "Embedded public-profile content did not finish loading.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "public-profile-browser", app: app)
+
+    app.buttons["Close Public Profile"].tap()
+    XCTAssertTrue(app.buttons["Open Public Profile"].waitForExistence(timeout: 3))
+  }
+
+  func testPublicProfileBrowserErrorRetriesToLoadedContent() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-ready",
+      additionalLaunchArguments: ["-ui-testing-public-profile-error"],
+      expectedElementDescription: "\"Open Public Profile\""
+    ) {
+      $0.buttons["Open Public Profile"]
+    }
+
+    app.buttons["Open Public Profile"].tap()
+
+    XCTAssertTrue(
+      app.staticTexts["Couldn't load this profile."].waitForExistence(timeout: 3),
+      "Embedded browser did not expose its recoverable error state.\n\(app.debugDescription)"
+    )
+    app.buttons["Retry"].tap()
+    XCTAssertTrue(
+      app.staticTexts["Public Profile"].waitForExistence(timeout: 3),
+      "Retry did not recover the embedded browser.\n\(app.debugDescription)"
+    )
   }
 
   func testReadyLaunchWithoutQRShowsUnavailableFallback() {

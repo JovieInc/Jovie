@@ -140,6 +140,7 @@ private struct AppContentView: View {
           DashboardView(
             state: appState.dashboardState,
             brightnessManager: appState.brightnessManager,
+            webBaseURL: appState.configuration.webBaseURL,
             showVenueModeOnLaunch: appState.launchMode.opensVenueModeOnLaunch,
             loadAppleWalletProfilePass: {
               try await APIClient(
