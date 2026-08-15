@@ -15,6 +15,8 @@ import {
   buildTriageLivenessReceipt,
   DELIVERY_LIVENESS_DIR,
   type DeliveryLease,
+  type LinearActiveIssue,
+  linearActiveIssueDecision,
   readDeliveryLease,
   recordReceipt,
   startInternalRemediation,
@@ -29,6 +31,10 @@ const SUMMER_OUTBOX = join(HERMES_PATHS.stateDir, 'summer-notification-outbox');
 const TRIAGE_RECEIPT = join(
   HERMES_PATHS.stateDir,
   'triage-liveness-latest.json'
+);
+const IN_PROGRESS_RECEIPT = join(
+  HERMES_PATHS.stateDir,
+  'linear-in-progress-liveness-latest.json'
 );
 const JOVIE_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
 
@@ -54,6 +60,137 @@ function linearApiKey(): string {
     : null;
   if (!match) throw new Error('Linear credential unavailable');
   return match[1].trim().replace(/^['"]|['"]$/g, '');
+}
+
+async function linearGraphql<T>(
+  query: string,
+  variables: Record<string, unknown>
+): Promise<T> {
+  const response = await fetch('https://api.linear.app/graphql', {
+    method: 'POST',
+    headers: {
+      Authorization: linearApiKey(),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query, variables }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok)
+    throw new Error(`Linear request failed (${response.status})`);
+  const payload = (await response.json()) as {
+    data?: T;
+    errors?: ReadonlyArray<unknown>;
+  };
+  if (payload.errors?.length) throw new Error('Linear GraphQL returned errors');
+  if (!payload.data) throw new Error('Linear GraphQL returned no data');
+  return payload.data;
+}
+
+async function refreshLinearInProgressLiveness(): Promise<void> {
+  const now = new Date();
+  const data = await linearGraphql<{
+    team: {
+      states: { nodes: ReadonlyArray<{ id: string; name: string }> };
+      issues: {
+        nodes: ReadonlyArray<
+          Omit<LinearActiveIssue, 'comments'> & {
+            comments: {
+              nodes: LinearActiveIssue['comments'];
+              pageInfo: { hasPreviousPage: boolean };
+            };
+          }
+        >;
+        pageInfo: { hasNextPage: boolean };
+      };
+    };
+  }>(
+    `query ActiveIssues($teamId: String!) {
+      team(id: $teamId) {
+        states { nodes { id name } }
+        issues(first: 250, filter: { state: { name: { eq: "In Progress" } } }) {
+          nodes {
+            id identifier
+            assignee { id name }
+            delegate { id name }
+            comments(last: 50) {
+              nodes { body updatedAt }
+              pageInfo { hasPreviousPage }
+            }
+          }
+          pageInfo { hasNextPage }
+        }
+      }
+    }`,
+    { teamId: JOVIE_TEAM_ID }
+  );
+  if (data.team.issues.pageInfo.hasNextPage) {
+    throw new Error('Linear In Progress query was incomplete');
+  }
+  if (
+    data.team.issues.nodes.some(
+      issue => issue.comments.pageInfo.hasPreviousPage
+    )
+  ) {
+    throw new Error('Linear In Progress comment query was incomplete');
+  }
+  const backlog = data.team.states.nodes.find(
+    state => state.name === 'Backlog'
+  );
+  if (!backlog) throw new Error('Linear Backlog state unavailable');
+
+  const retained: string[] = [];
+  const reclaimed: Array<{ identifier: string; reason: string }> = [];
+  for (const issue of data.team.issues.nodes) {
+    const decision = linearActiveIssueDecision(
+      { ...issue, comments: issue.comments.nodes },
+      now
+    );
+    if (decision.action === 'retain') {
+      retained.push(issue.identifier);
+      continue;
+    }
+    await linearGraphql(
+      `mutation Reclaim($id: String!, $input: IssueUpdateInput!) {
+        issueUpdate(id: $id, input: $input) { success }
+      }`,
+      {
+        id: issue.id,
+        input: { stateId: backlog.id, assigneeId: null, delegateId: null },
+      }
+    );
+    await linearGraphql(
+      `mutation Receipt($input: CommentCreateInput!) {
+        commentCreate(input: $input) { success }
+      }`,
+      {
+        input: {
+          issueId: issue.id,
+          body: `Automated liveness reclaim: moved to Backlog without closing because the In Progress lease failed the five-minute machine-receipt check (${decision.reason}). Stale assignee/delegate claims were cleared.`,
+        },
+      }
+    );
+    reclaimed.push({ identifier: issue.identifier, reason: decision.reason });
+  }
+
+  mkdirSync(HERMES_PATHS.stateDir, { recursive: true });
+  const receipt = {
+    schema: 'jovie-linear-in-progress-liveness/v1',
+    observedAt: now.toISOString(),
+    staleAfterMs: 5 * 60 * 1000,
+    before: data.team.issues.nodes.length,
+    retained,
+    reclaimed,
+  };
+  const tmp = `${IN_PROGRESS_RECEIPT}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify(receipt, null, 2)}\n`);
+  renameSync(tmp, IN_PROGRESS_RECEIPT);
+  logJobEvent({
+    job: JOB,
+    event: 'linear_in_progress_liveness_checked',
+    before: receipt.before,
+    retained: retained.length,
+    reclaimed: reclaimed.length,
+  });
 }
 
 async function refreshTriageLivenessReceipt(): Promise<void> {
@@ -418,6 +555,7 @@ async function main(): Promise<void> {
       recordTriageLivenessFailure(error);
       throw error;
     }
+    await refreshLinearInProgressLiveness();
   });
 }
 
