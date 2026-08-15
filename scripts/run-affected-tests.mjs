@@ -182,6 +182,23 @@ const EVENT_DRIVEN_SHIPPER_SCRIPT_TESTS = [
 const EVENT_DRIVEN_SHIPPER_PYTHON_TESTS = [
   'scripts/hermes/tests/gem-priority-gate.test.py',
 ];
+const DELIVERY_LIVENESS_LANE = new Set([
+  'scripts/hermes/jobs/codex-issue-shipper.ts',
+  'scripts/hermes/jobs/delivery-liveness-watchdog.ts',
+  'scripts/hermes/launchd/README.md',
+  'scripts/hermes/launchd/co.jovie.hermes.delivery-liveness-watchdog.plist.template',
+  'scripts/hermes/lib/__tests__/codex-issue-shipper-routing.test.ts',
+  'scripts/hermes/lib/__tests__/delivery-liveness.test.ts',
+  'scripts/hermes/lib/codex-issue-shipper.ts',
+  'scripts/hermes/lib/delivery-liveness.ts',
+  'scripts/lib/__tests__/codex-issue-shipper.test.mjs',
+]);
+const DELIVERY_LIVENESS_TESTS = [
+  'scripts/hermes/lib/__tests__/codex-issue-shipper-routing.test.ts',
+  'scripts/hermes/lib/__tests__/delivery-liveness.test.ts',
+  'scripts/lib/__tests__/codex-issue-shipper.test.mjs',
+  'scripts/lib/__tests__/hermes-launchd.test.mjs',
+];
 const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = new Set([
   '.husky/pre-push',
   'scripts/automation-verify.sh',
@@ -504,6 +521,37 @@ export function buildAffectedTestPlan(
       pythonUnittestTests: SYMPHONY_THROUGHPUT_PYTHON_TESTS,
       scriptVitestTests: SYMPHONY_THROUGHPUT_SCRIPT_TESTS,
       nodeTests: SYMPHONY_THROUGHPUT_NODE_TESTS,
+    };
+  }
+  const deliveryLivenessInputCount = files.filter(file =>
+    DELIVERY_LIVENESS_LANE.has(file)
+  ).length;
+  const earlySelectorInputCount = files.filter(file =>
+    AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+  ).length;
+  const isBoundedDeliveryLivenessChange =
+    deliveryLivenessInputCount > 0 &&
+    files.every(
+      file =>
+        DELIVERY_LIVENESS_LANE.has(file) ||
+        AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+    ) &&
+    (earlySelectorInputCount === 0 ||
+      earlySelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+  if (isBoundedDeliveryLivenessChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: unique([
+        ...DELIVERY_LIVENESS_TESTS,
+        ...(earlySelectorInputCount > 0 ? AFFECTED_TEST_SELECTOR_TESTS : []),
+      ]),
+      nodeTests: [],
     };
   }
   const isExactEventDrivenShipperPrimary =
