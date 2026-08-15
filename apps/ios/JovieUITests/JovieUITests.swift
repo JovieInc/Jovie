@@ -60,6 +60,8 @@ final class JovieUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["Tim White"].exists)
     XCTAssertTrue(app.buttons["Open navigation drawer"].exists)
     XCTAssertTrue(app.buttons["Open Settings"].exists)
+    XCTAssertTrue(app.buttons["dashboard-copy-url-button"].isEnabled)
+    XCTAssertTrue(app.buttons["dashboard-share-profile-button"].isEnabled)
     attachScreenshot(named: "profile", app: app)
   }
 
@@ -72,11 +74,18 @@ final class JovieUITests: XCTestCase {
     }
 
     XCTAssertTrue(app.staticTexts["Tim White"].exists)
-    XCTAssertTrue(app.buttons["Copy URL"].exists)
+    let copyButton = app.buttons["dashboard-copy-url-button"]
+    let shareButton = app.buttons["dashboard-share-profile-button"]
+    XCTAssertTrue(copyButton.exists)
+    XCTAssertFalse(copyButton.isEnabled)
+    XCTAssertTrue(shareButton.exists)
+    XCTAssertFalse(shareButton.isEnabled)
+    XCTAssertTrue(app.staticTexts["Profile link unavailable"].exists)
     XCTAssertTrue(
       app.buttons["QR unavailable"].exists,
       "Dashboard did not show the no-payload QR fallback.\n\(app.debugDescription)"
     )
+    attachScreenshot(named: "profile-controls-unavailable", app: app)
   }
 
   func testProfileLoadErrorRetryRestoresDashboard() {

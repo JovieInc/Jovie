@@ -190,22 +190,28 @@ struct DashboardView: View {
       .accessibilityLabel(response.qrPayload == nil ? "QR unavailable" : "Profile QR Code")
       .accessibilityIdentifier("profile-qr-button")
 
-      Text(response.publicProfileURL ?? "jov.ie")
+      Text(response.publicProfileURL ?? "Profile link unavailable")
         .font(JovieFont.body(size: 14))
         .foregroundStyle(JovieColor.textTertiary)
+        .accessibilityIdentifier("dashboard-profile-url")
 
       HStack(spacing: JovieSpacing.medium) {
         Button(didCopyURL ? "Copied" : "Copy URL") {
           copyURL(response.publicProfileURL)
         }
         .buttonStyle(JoviePillButtonStyle(filled: false))
+        .disabled(response.publicProfileURL == nil)
+        .opacity(response.publicProfileURL == nil ? 0.35 : 1)
         .accessibilityIdentifier("dashboard-copy-url-button")
         .accessibilityValue(didCopyURL ? "Copied" : "Copy URL")
 
-        ShareLink(item: response.publicProfileURL ?? response.continueOnWebURL) {
+        ShareLink(item: response.publicProfileURL ?? "") {
           Text("Share")
         }
         .buttonStyle(JoviePillButtonStyle(filled: true))
+        .disabled(response.publicProfileURL == nil)
+        .opacity(response.publicProfileURL == nil ? 0.35 : 1)
+        .accessibilityIdentifier("dashboard-share-profile-button")
       }
 
       if response.appleWalletProfilePassAvailable && PKAddPassesViewController.canAddPasses() {
