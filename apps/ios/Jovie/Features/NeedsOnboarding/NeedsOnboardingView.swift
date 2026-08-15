@@ -2,27 +2,155 @@ import SwiftUI
 
 struct NeedsOnboardingView: View {
   let continueURL: URL
+  let onComplete: @MainActor (String, String) async -> String?
+
   @Environment(\.openURL) private var openURL
+  @State private var displayName: String
+  @State private var username: String
+  @State private var isSubmitting = false
+  @State private var errorMessage: String?
+  @FocusState private var focusedField: Field?
+
+  private enum Field {
+    case displayName
+    case username
+  }
+
+  init(
+    continueURL: URL,
+    initialDisplayName: String = "",
+    initialUsername: String = "",
+    onComplete: @escaping @MainActor (String, String) async -> String? = { _, _ in nil }
+  ) {
+    self.continueURL = continueURL
+    self.onComplete = onComplete
+    _displayName = State(initialValue: initialDisplayName)
+    _username = State(initialValue: initialUsername)
+  }
+
+  private var canSubmit: Bool {
+    !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+      !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+      !isSubmitting
+  }
 
   var body: some View {
     ZStack {
       JovieColor.backgroundBase.ignoresSafeArea()
 
-      VStack(alignment: .leading, spacing: JovieSpacing.large) {
-        Text("Complete Your Profile on Web")
-          .font(JovieFont.display(size: 28))
-          .foregroundStyle(JovieColor.textPrimary)
+      ScrollView {
+        VStack(alignment: .leading, spacing: JovieSpacing.large) {
+          VStack(alignment: .leading, spacing: JovieSpacing.small) {
+            Text("Finish Your Profile")
+              .font(JovieFont.display(size: 28))
+              .foregroundStyle(JovieColor.textPrimary)
 
-        Text("Complete your profile at jov.ie to use the app.")
-          .font(JovieFont.body(size: 16))
+            Text("Choose how fans will see you on Jovie.")
+              .font(JovieFont.body(size: 16))
+              .foregroundStyle(JovieColor.textSecondary)
+          }
+
+          VStack(alignment: .leading, spacing: JovieSpacing.medium) {
+            profileField(
+              title: "Display name",
+              text: $displayName,
+              field: .displayName,
+              contentType: .name
+            )
+            profileField(
+              title: "Public handle",
+              text: $username,
+              field: .username,
+              contentType: .username
+            )
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+          }
+
+          if let errorMessage {
+            Text(errorMessage)
+              .font(JovieFont.body(size: 14))
+              .foregroundStyle(JovieColor.errorText)
+              .accessibilityIdentifier("profile-completion-error")
+          }
+
+          Button {
+            submit()
+          } label: {
+            HStack(spacing: JovieSpacing.small) {
+              if isSubmitting {
+                ProgressView()
+                  .tint(JovieColor.backgroundBase)
+              }
+              Text(isSubmitting ? "Saving…" : "Finish Profile")
+            }
+            .frame(maxWidth: .infinity)
+          }
+          .buttonStyle(JoviePillButtonStyle(filled: true))
+          .disabled(!canSubmit)
+          .accessibilityIdentifier("profile-completion-submit")
+
+          Button("Continue on web instead") {
+            openURL(continueURL)
+          }
+          .font(JovieFont.body(size: 14))
           .foregroundStyle(JovieColor.textSecondary)
-
-        Button("Continue on Web") {
-          openURL(continueURL)
+          .frame(maxWidth: .infinity)
+          .accessibilityIdentifier("profile-completion-web-fallback")
         }
-        .buttonStyle(JoviePillButtonStyle(filled: true))
+        .padding(JovieSpacing.xLarge)
       }
-      .padding(JovieSpacing.xLarge)
+      .scrollDismissesKeyboard(.interactively)
+    }
+  }
+
+  private func profileField(
+    title: String,
+    text: Binding<String>,
+    field: Field,
+    contentType: UITextContentType
+  ) -> some View {
+    VStack(alignment: .leading, spacing: JovieSpacing.small) {
+      Text(title)
+        .font(JovieFont.body(size: 13))
+        .foregroundStyle(JovieColor.textSecondary)
+      TextField(title, text: text)
+        .textContentType(contentType)
+        .focused($focusedField, equals: field)
+        .submitLabel(field == .displayName ? .next : .done)
+        .onSubmit {
+          if field == .displayName {
+            focusedField = .username
+          } else if canSubmit {
+            submit()
+          }
+        }
+        .padding(.horizontal, JovieSpacing.medium)
+        .frame(minHeight: 52)
+        .background(JovieColor.surface1)
+        .clipShape(RoundedRectangle(cornerRadius: JovieRadius.medium))
+        .overlay {
+          RoundedRectangle(cornerRadius: JovieRadius.medium)
+            .stroke(JovieColor.borderSubtle, lineWidth: 1)
+        }
+        .foregroundStyle(JovieColor.textPrimary)
+        .accessibilityIdentifier(
+          field == .displayName
+            ? "profile-completion-display-name"
+            : "profile-completion-handle"
+        )
+    }
+  }
+
+  private func submit() {
+    guard canSubmit else { return }
+    focusedField = nil
+    errorMessage = nil
+    isSubmitting = true
+
+    Task { @MainActor in
+      errorMessage = await onComplete(displayName, username)
+      isSubmitting = false
     }
   }
 }

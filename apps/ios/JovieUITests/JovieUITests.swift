@@ -152,14 +152,18 @@ final class JovieUITests: XCTestCase {
     )
   }
 
-  func testNeedsOnboardingLaunchShowsContinueOnWeb() {
+  func testNeedsOnboardingLaunchShowsNativeProfileCompletion() {
     let app = launchMockApp(
       launchArgument: "-ui-testing-needs-onboarding",
-      expectedElementDescription: "\"Continue on Web\""
+      expectedElementDescription: "\"Finish Your Profile\""
     ) {
-      $0.buttons["Continue on Web"]
+      $0.staticTexts["Finish Your Profile"]
     }
 
+    XCTAssertTrue(app.textFields["profile-completion-display-name"].exists)
+    XCTAssertTrue(app.textFields["profile-completion-handle"].exists)
+    XCTAssertTrue(app.buttons["profile-completion-submit"].exists)
+    XCTAssertTrue(app.buttons["profile-completion-web-fallback"].exists)
     attachScreenshot(named: "needs-onboarding", app: app)
   }
 
@@ -381,7 +385,10 @@ final class JovieUITests: XCTestCase {
       waitForDrawerSurfaceToBeUncovered(
         profileSurface,
         contentPlaneMarker: contentPlaneMarker,
-        timeout: 3
+        // Hosted runners can spend more than a second on each accessibility
+        // snapshot. Keep the geometry + stable-interval contract intact while
+        // allowing enough time for two settled samples.
+        timeout: 10
       ),
       "Profile surface stayed covered by the opening content plane.\n\(chatApp.debugDescription)"
     )
@@ -398,12 +405,12 @@ final class JovieUITests: XCTestCase {
     // all, and no leftover blank strip reserved at the bottom of the shell.
     let onboardingApp = launchMockApp(
       launchArgument: "-ui-testing-needs-onboarding",
-      expectedElementDescription: "\"Continue on Web\""
+      expectedElementDescription: "\"Finish Your Profile\""
     ) {
-      $0.buttons["Continue on Web"]
+      $0.staticTexts["Finish Your Profile"]
     }
-    let continueButton = onboardingApp.buttons["Continue on Web"]
-    XCTAssertTrue(continueButton.waitForExistence(timeout: 3))
+    let completionButton = onboardingApp.buttons["profile-completion-submit"]
+    XCTAssertTrue(completionButton.waitForExistence(timeout: 3))
     XCTAssertFalse(
       shellControlExists(onboardingApp, identifier: "shell-talk-fab"),
       "Talk FAB should not render when chat is disabled.\n\(onboardingApp.debugDescription)"
