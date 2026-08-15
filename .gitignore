@@ -223,8 +223,16 @@ apps/extension/
 !.agents/skills/gstack/test/
 .agents/skills/gstack/scripts/*
 .agents/skills/gstack/test/*
+!.agents/skills/gstack/package.json
 !.agents/skills/gstack/scripts/changelog-eval.ts
+!.agents/skills/gstack/scripts/resolvers/
+.agents/skills/gstack/scripts/resolvers/*
+!.agents/skills/gstack/scripts/resolvers/utility.ts
+!.agents/skills/gstack/ship/
+.agents/skills/gstack/ship/*
+!.agents/skills/gstack/ship/SKILL.md
 !.agents/skills/gstack/test/changelog-eval.test.ts
+!.agents/skills/gstack/test/gen-skill-docs.test.ts
 
 # Vitest junit output (generated; never commit — caused recurring PR conflicts)
 *.junit.xml
