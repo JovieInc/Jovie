@@ -385,7 +385,10 @@ final class JovieUITests: XCTestCase {
       waitForDrawerSurfaceToBeUncovered(
         profileSurface,
         contentPlaneMarker: contentPlaneMarker,
-        timeout: 3
+        // Hosted runners can spend more than a second on each accessibility
+        // snapshot. Keep the geometry + stable-interval contract intact while
+        // allowing enough time for two settled samples.
+        timeout: 10
       ),
       "Profile surface stayed covered by the opening content plane.\n\(chatApp.debugDescription)"
     )
