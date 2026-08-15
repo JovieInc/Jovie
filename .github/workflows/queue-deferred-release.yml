@@ -11,10 +11,11 @@ name: Queue-Deferred Release
 # green PRs sat indefinitely (#15808/#15810/#15811/#15849).
 #
 # Triggers:
-#   workflow_run      — PR CI completion, successful Production Controller,
-#                       or successful five-minute Fleet Gate Refresh. The last
-#                       two wake holds that were checked while the fleet was
-#                       AMBER, so an idle repository still self-heals to GREEN.
+#   workflow_run      — successful Fleet Gate Refresh only. That gate already
+#                       consumes CI, Production Controller, PR, and main
+#                       signals, then writes the canonical capacity receipt.
+#                       Keeping this downstream edge one-way prevents an
+#                       unbounded workflow_run loop between the two controllers.
 #   workflow_dispatch — manual report/release sweep
 #
 # Two jobs run:
@@ -33,7 +34,7 @@ name: Queue-Deferred Release
 
 on:
   workflow_run:
-    workflows: ['CI', 'Production Controller', 'Fleet Gate Refresh']
+    workflows: ['Fleet Gate Refresh']
     types: [completed]
   workflow_dispatch:
 

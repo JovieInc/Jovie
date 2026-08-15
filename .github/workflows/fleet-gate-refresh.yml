@@ -14,7 +14,10 @@ on:
   pull_request:
     types: [closed, labeled, unlabeled, ready_for_review, reopened]
   workflow_run:
-    workflows: [CI, Production Controller, Queue-Deferred Release]
+    # Queue-Deferred Release is downstream of this gate. Listening to it here
+    # formed a reciprocal workflow_run loop that could retrigger both
+    # controllers without a new upstream capacity signal.
+    workflows: [CI, Production Controller]
     types: [completed]
   push:
     branches: [main]
