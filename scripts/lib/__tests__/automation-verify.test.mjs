@@ -112,6 +112,17 @@ const EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST = [
   'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/lib/__tests__/hermes-launchd.test.mjs',
 ];
+const DELIVERY_LIVENESS_LANE = [
+  'scripts/hermes/jobs/codex-issue-shipper.ts',
+  'scripts/hermes/jobs/delivery-liveness-watchdog.ts',
+  'scripts/hermes/launchd/README.md',
+  'scripts/hermes/launchd/co.jovie.hermes.delivery-liveness-watchdog.plist.template',
+  'scripts/hermes/lib/__tests__/codex-issue-shipper-routing.test.ts',
+  'scripts/hermes/lib/__tests__/delivery-liveness.test.ts',
+  'scripts/hermes/lib/codex-issue-shipper.ts',
+  'scripts/hermes/lib/delivery-liveness.ts',
+  'scripts/lib/__tests__/codex-issue-shipper.test.mjs',
+];
 const PR_SIZE_GUARD_MANIFEST = [
   '.github/workflows/pr-size-guard.yml',
   'scripts/lib/pr-size-guard-policy.mjs',
@@ -445,6 +456,48 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan([
         ...EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST,
         'scripts/hermes/unknown-shipper-control.py',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('routes delivery-liveness changes to their complete script contracts', () => {
+    const plan = buildAffectedTestPlan(DELIVERY_LIVENESS_LANE);
+
+    expect(plan).toMatchObject({
+      mode: 'selected',
+      relatedFiles: [],
+      selectedTests: [],
+      scriptVitestTests: [
+        'scripts/hermes/lib/__tests__/codex-issue-shipper-routing.test.ts',
+        'scripts/hermes/lib/__tests__/delivery-liveness.test.ts',
+        'scripts/lib/__tests__/codex-issue-shipper.test.mjs',
+        'scripts/lib/__tests__/hermes-launchd.test.mjs',
+      ],
+    });
+  });
+
+  it('keeps a focused delivery-liveness follow-up on the same contracts', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/hermes/jobs/delivery-liveness-watchdog.ts',
+      'scripts/hermes/launchd/README.md',
+      'scripts/hermes/lib/__tests__/delivery-liveness.test.ts',
+      'scripts/hermes/lib/delivery-liveness.ts',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual([
+      'scripts/hermes/lib/__tests__/codex-issue-shipper-routing.test.ts',
+      'scripts/hermes/lib/__tests__/delivery-liveness.test.ts',
+      'scripts/lib/__tests__/codex-issue-shipper.test.mjs',
+      'scripts/lib/__tests__/hermes-launchd.test.mjs',
+    ]);
+  });
+
+  it('fails closed when delivery-liveness changes include an unknown peer', () => {
+    expect(
+      buildAffectedTestPlan([
+        ...DELIVERY_LIVENESS_LANE,
+        'scripts/hermes/lib/unknown-delivery-control.ts',
       ]).mode
     ).toBe('full');
   });
