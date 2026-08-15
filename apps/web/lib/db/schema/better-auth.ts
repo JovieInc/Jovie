@@ -68,6 +68,8 @@ export const baJwks = pgTable('ba_jwks', {
   privateKey: text('private_key').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   expiresAt: timestamp('expires_at'),
+  alg: text('alg'),
+  crv: text('crv'),
 });
 
 export const baOauthClients = pgTable(
