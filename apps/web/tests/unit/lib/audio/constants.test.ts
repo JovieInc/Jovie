@@ -4,6 +4,7 @@ import {
   AUDIO_MAX_FILE_SIZE_BYTES,
   isSupportedAudioFile,
   parseAudioTitleFromFileName,
+  resolveAudioUploadMime,
   validateAudioFile,
   validateAudioUpload,
 } from '@/lib/audio/constants';
@@ -50,5 +51,49 @@ describe('audio constants', () => {
     expect(parseAudioTitleFromFileName('Take_Me_Over-final.wav')).toBe(
       'Take Me Over final'
     );
+  });
+
+  describe('resolveAudioUploadMime', () => {
+    it('returns the canonical MIME for a declared audio MIME', () => {
+      expect(
+        resolveAudioUploadMime({ name: 'track.mp3', type: 'audio/mpeg' })
+      ).toBe('audio/mpeg');
+      expect(
+        resolveAudioUploadMime({ name: 'track.mp3', type: 'audio/mp3' })
+      ).toBe('audio/mpeg');
+      expect(
+        resolveAudioUploadMime({ name: 'mix.wav', type: 'audio/x-wav' })
+      ).toBe('audio/wav');
+    });
+
+    it('falls back to the extension for blank or octet-stream MIME', () => {
+      expect(resolveAudioUploadMime({ name: 'track.mp3', type: '' })).toBe(
+        'audio/mpeg'
+      );
+      expect(
+        resolveAudioUploadMime({
+          name: 'song.wav',
+          type: 'application/octet-stream',
+        })
+      ).toBe('audio/wav');
+    });
+
+    it('rejects contradictory non-audio MIME even with a supported extension', () => {
+      expect(
+        resolveAudioUploadMime({ name: 'track.mp3', type: 'text/plain' })
+      ).toBeNull();
+    });
+
+    it('rejects unsupported extensions and unknown blank MIME', () => {
+      expect(
+        resolveAudioUploadMime({ name: 'notes.txt', type: 'text/plain' })
+      ).toBeNull();
+      expect(
+        resolveAudioUploadMime({ name: 'archive.zip', type: '' })
+      ).toBeNull();
+      expect(
+        resolveAudioUploadMime({ name: 'no-extension', type: '' })
+      ).toBeNull();
+    });
   });
 });

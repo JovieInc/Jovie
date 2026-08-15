@@ -9,6 +9,10 @@
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import {
+  AUDIO_UPLOAD_POLICIES,
+  resolveAudioUploadMime,
+} from '@/lib/audio/constants';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
@@ -25,7 +29,7 @@ const confirmSchema = z.object({
   blobUrl: z.string().url(),
   blobPathname: z.string().min(1),
   fileName: z.string().min(1),
-  fileMimeType: z.string().min(1),
+  fileMimeType: z.string(),
   fileSizeBytes: z.number().int().positive().optional(),
 });
 
@@ -86,6 +90,30 @@ export async function POST(request: NextRequest) {
       fileMimeType,
       fileSizeBytes,
     } = parsed.data;
+
+    // Enforce the promo audio policy server-side: resolve the canonical MIME
+    // (blank/octet-stream falls back to extension; contradictory non-audio
+    // MIME is rejected) and re-check the size cap.
+    const canonicalMimeType = resolveAudioUploadMime({
+      name: fileName,
+      type: fileMimeType,
+    });
+    if (!canonicalMimeType) {
+      return NextResponse.json(
+        { error: 'Unsupported audio file type' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (
+      fileSizeBytes !== undefined &&
+      fileSizeBytes > AUDIO_UPLOAD_POLICIES.promo_download.maxFileSizeBytes
+    ) {
+      return NextResponse.json(
+        { error: 'File too large' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
 
     // Verify user owns this release via their creator profile and has Pro
     const { user, profile } = await getSessionContext({
@@ -152,7 +180,7 @@ export async function POST(request: NextRequest) {
         fileUrl: blobPathname,
         fileName,
         fileSizeBytes: fileSizeBytes ?? null,
-        fileMimeType,
+        fileMimeType: canonicalMimeType,
         position: nextPosition,
       })
       .returning();

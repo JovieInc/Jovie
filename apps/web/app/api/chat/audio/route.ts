@@ -20,7 +20,7 @@ const chatAudioSchema = chatToolSchema({
   blobUrl: z.string().url(),
   blobPathname: z.string().min(1),
   fileName: z.string().min(1),
-  fileMimeType: z.string().min(1),
+  fileMimeType: z.string(),
   fileSizeBytes: z.number().int().positive().optional(),
 });
 

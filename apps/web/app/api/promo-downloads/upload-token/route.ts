@@ -8,22 +8,23 @@
 
 import { type HandleUploadBody, handleUpload } from '@vercel/blob/client';
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  AUDIO_FORMAT_REGISTRY,
+  AUDIO_UPLOAD_POLICIES,
+} from '@/lib/audio/constants';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
 
-const MAX_FILE_SIZE_BYTES = 150 * 1024 * 1024; // 150MB
+const PROMO_POLICY = AUDIO_UPLOAD_POLICIES.promo_download;
 
-const ALLOWED_MIME_TYPES = new Set([
-  'audio/mpeg',
-  'audio/wav',
-  'audio/flac',
-  'audio/aiff',
-  'audio/mp4',
-  'audio/x-m4a',
-]);
+const MAX_FILE_SIZE_BYTES = PROMO_POLICY.maxFileSizeBytes;
+
+const ALLOWED_MIME_TYPES = AUDIO_FORMAT_REGISTRY.filter(format =>
+  (PROMO_POLICY.formatIds as readonly string[]).includes(format.id)
+).flatMap(format => format.mimeTypes);
 
 export async function POST(request: NextRequest) {
   const { userId: clerkUserId, error } = await requireAuth();

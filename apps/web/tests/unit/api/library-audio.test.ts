@@ -168,6 +168,98 @@ describe('library audio upload API', () => {
     );
   });
 
+  it('confirms a blank MIME upload using the canonical MIME from the file name', async () => {
+    hoisted.resolvePrimaryRecordingForReleaseMock.mockResolvedValue({
+      recordingId: 'recording_123',
+      previewUrl: null,
+      audioUrl: null,
+      durationMs: null,
+      metadata: {},
+    });
+    hoisted.updateWhereMock.mockResolvedValue({ rowCount: 1 });
+
+    const { POST } = await import('@/app/api/library/audio/confirm/route');
+    const response = await POST(
+      new Request('http://localhost/api/library/audio/confirm', {
+        method: 'POST',
+        body: JSON.stringify({
+          releaseId: '00000000-0000-4000-8000-000000000001',
+          blobUrl: 'https://cdn.example.com/take-me-over.mp3',
+          blobPathname: 'library/audio/take-me-over.mp3',
+          fileName: 'take-me-over.mp3',
+          fileMimeType: '',
+          fileSizeBytes: 1024,
+        }),
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(hoisted.updateSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        audioFormat: 'audio/mpeg',
+      })
+    );
+  });
+
+  it('confirms an octet-stream MIME upload using the canonical MIME', async () => {
+    hoisted.resolvePrimaryRecordingForReleaseMock.mockResolvedValue({
+      recordingId: 'recording_123',
+      previewUrl: null,
+      audioUrl: null,
+      durationMs: null,
+      metadata: {},
+    });
+    hoisted.updateWhereMock.mockResolvedValue({ rowCount: 1 });
+
+    const { POST } = await import('@/app/api/library/audio/confirm/route');
+    const response = await POST(
+      new Request('http://localhost/api/library/audio/confirm', {
+        method: 'POST',
+        body: JSON.stringify({
+          releaseId: '00000000-0000-4000-8000-000000000001',
+          blobUrl: 'https://cdn.example.com/take-me-over.wav',
+          blobPathname: 'library/audio/take-me-over.wav',
+          fileName: 'take-me-over.wav',
+          fileMimeType: 'application/octet-stream',
+          fileSizeBytes: 1024,
+        }),
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(hoisted.updateSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        audioFormat: 'audio/wav',
+      })
+    );
+  });
+
+  it('rejects a contradictory non-audio MIME even with a supported extension', async () => {
+    const { POST } = await import('@/app/api/library/audio/confirm/route');
+    const response = await POST(
+      new Request('http://localhost/api/library/audio/confirm', {
+        method: 'POST',
+        body: JSON.stringify({
+          releaseId: '00000000-0000-4000-8000-000000000001',
+          blobUrl: 'https://cdn.example.com/take-me-over.mp3',
+          blobPathname: 'library/audio/take-me-over.mp3',
+          fileName: 'take-me-over.mp3',
+          fileMimeType: 'text/plain',
+          fileSizeBytes: 1024,
+        }),
+      }) as never
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Unsupported audio file type',
+    });
+    expect(
+      hoisted.resolvePrimaryRecordingForReleaseMock
+    ).not.toHaveBeenCalled();
+    expect(hoisted.updateMock).not.toHaveBeenCalled();
+  });
+
   it('refuses to overwrite existing release audio', async () => {
     hoisted.resolvePrimaryRecordingForReleaseMock.mockResolvedValue({
       recordingId: 'recording_123',
