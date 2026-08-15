@@ -92,65 +92,40 @@ function getMergeGroupReachableJobText(jobBlock) {
   return reachable.join('\n');
 }
 
-const REQUIRED_CI_FAST_RESULTS = [
-  'TYPECHECK_RESULT',
-  'REMAINING_RESULT',
-  'PROFILE_BROWSER_RESULT',
-];
-
 function parseExactCiFastFailureOperands(script) {
-  const conditions = [
-    ...script.matchAll(/if\s+\[\[\s*(.+?)\s*\]\];\s*then/g),
-  ].map(match => match[1]);
-  const condition = conditions.find(candidate =>
-    REQUIRED_CI_FAST_RESULTS.some(result => candidate.includes(`$${result}`))
-  );
-  if (!condition) throw new Error('Missing ci-fast fail-closed condition');
-
-  const operands = condition.split(/\s+\|\|\s+/).map(clause => {
-    const match = clause.match(
-      /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT)"\s+!=\s+"success"$/
+  const condition = [...script.matchAll(/if\s+\[\[\s*(.+?)\s*\]\];\s*then/g)]
+    .map(match => match[1])
+    .find(candidate => candidate.includes('$TYPECHECK_RESULT'));
+  const operands = (condition ?? '')
+    .split(/\s+\|\|\s+/)
+    .map(
+      clause =>
+        clause.match(
+          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT)"\s+!=\s+"success"$/
+        )?.[1]
     );
-    if (!match)
-      throw new Error(`Invalid ci-fast fail-closed operand: ${clause}`);
-    return match[1];
-  });
-
   if (
-    operands.length !== REQUIRED_CI_FAST_RESULTS.length ||
-    new Set(operands).size !== REQUIRED_CI_FAST_RESULTS.length ||
-    REQUIRED_CI_FAST_RESULTS.some(result => !operands.includes(result))
-  ) {
-    throw new Error(
-      `Invalid ci-fast fail-closed result set: ${operands.join(', ')}`
-    );
-  }
-
+    operands.sort().join() !==
+    'PROFILE_BROWSER_RESULT,REMAINING_RESULT,TYPECHECK_RESULT'
+  )
+    throw new Error('Invalid ci-fast fail-closed result set');
   return operands;
 }
 
 describe('merge_group workflow contract', () => {
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
-      parseExactCiFastFailureOperands(`
-        if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then
-          exit 1
-        fi
-      `)
-    ).toEqual([
-      'PROFILE_BROWSER_RESULT',
-      'TYPECHECK_RESULT',
-      'REMAINING_RESULT',
-    ]);
+      parseExactCiFastFailureOperands(
+        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
+      )
+    ).toHaveLength(3);
   });
 
   it('rejects a ci-fast failure condition missing a required operand', () => {
     expect(() =>
-      parseExactCiFastFailureOperands(`
-        if [[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then
-          exit 1
-        fi
-      `)
+      parseExactCiFastFailureOperands(
+        'if [[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
+      )
     ).toThrow('Invalid ci-fast fail-closed result set');
   });
 
