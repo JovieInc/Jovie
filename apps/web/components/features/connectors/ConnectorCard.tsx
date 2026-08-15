@@ -10,6 +10,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { Badge } from '@/components/atoms/Badge';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import {
   type ConnectorIconKey,
   type ConnectorProviderId,
@@ -36,7 +37,7 @@ interface ConnectorCardProps {
 const CONNECTOR_ICONS = {
   mail: Mail,
   calendar: Calendar,
-} as const satisfies Record<ConnectorIconKey, typeof Mail>;
+} as const satisfies Partial<Record<ConnectorIconKey, typeof Mail>>;
 
 const STATUS_BADGE: Record<
   ConnectorStatus,
@@ -63,7 +64,10 @@ export function ConnectorCard({
   className,
 }: ConnectorCardProps) {
   const definition = getConnectorDefinition(provider);
-  const Icon = CONNECTOR_ICONS[definition.iconKey];
+  const Icon =
+    definition.iconKey === 'youtube'
+      ? null
+      : CONNECTOR_ICONS[definition.iconKey];
   const { label: statusLabel, variant: statusVariant } = STATUS_BADGE[status];
   const isConnected = status === 'connected' || status === 'syncing';
 
@@ -72,9 +76,15 @@ export function ConnectorCard({
       className={cn('flex items-start justify-between gap-4 py-4', className)}
     >
       <div className='flex items-start gap-3'>
-        <div className='mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0'>
-          <Icon className='h-4 w-4 text-secondary' />
-        </div>
+        {provider === 'youtube' ? (
+          <div className='mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center'>
+            <SocialIcon platform='youtube' className='h-4 w-4' aria-hidden />
+          </div>
+        ) : (
+          <div className='mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0'>
+            {Icon && <Icon className='h-4 w-4 text-secondary' />}
+          </div>
+        )}
         <div className='space-y-0.5'>
           <div className='flex items-center gap-2'>
             <span className='text-sm font-medium text-primary'>
