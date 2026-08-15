@@ -1160,6 +1160,36 @@ if [[ -z "$DRAIN_ADMISSION_PR" ]]; then
 else
   echo "  admission scope: #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD"
 fi
+
+# A clean PR whose CI completed while the exact-main production binding was
+# unavailable cannot enter the queue unless it is the single attested repair.
+# Preserve that *event-scoped exact head* as a pending fleet receipt before
+# declining admission. A later successful Production Controller event may use
+# only this receipt as a selector; it still re-runs every current eligibility,
+# source-gate, native-queue, and postcondition check before enrollment. Without
+# the receipt, the CI event is lost once production recovers and an operator
+# has to redispatch the exact PR manually.
+if [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" && -n "$DRAIN_ADMISSION_PR" ]]; then
+  while read -r pr; do
+    n="$(jq -r '.n' <<<"$pr")"
+    head_oid="$(jq -r '.headOid // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
+    echo "=== DEFER (production-unbound exact-head recovery receipt) ==="
+    echo "  #$n  $(jq -r '.t' <<<"$pr")  ⏸ hold-intake"
+    if ! record_fleet_hold "$n" "$head_oid"; then
+      echo "::error::Failed to record exact-head recovery receipt for deferred PR #$n" >&2
+      exit 1
+    fi
+  done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg admission_head "$DRAIN_ADMISSION_HEAD" '.[]
+    | select((.n | tostring) == $admission_pr)
+    | select((.headOid // "") | ascii_downcase == $admission_head)
+    | select(.q | not)
+    | select(.unboundRepair | not)
+    | select(.draft | not)
+    | select(.m == "MERGEABLE")
+    | select(.base == "main")
+    | select(.fail | length == 0)
+    | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast") | not)')
+fi
 ENROLLED_THIS_RUN=0
 while read -r pr; do
   stop_if_budget_exhausted && break
