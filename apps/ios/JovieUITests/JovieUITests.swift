@@ -843,39 +843,16 @@ final class JovieUITests: XCTestCase {
 
   func testLiveAuthViewRenders() throws {
     guard testEnvironmentValue("JOVIE_IOS_LIVE_AUTH_UI") == "1" else {
-      throw XCTSkip("Set JOVIE_IOS_LIVE_AUTH_UI=1 to run the live Clerk UI spike.")
+      throw XCTSkip("Set JOVIE_IOS_LIVE_AUTH_UI=1 to run the live Better Auth UI flow.")
     }
 
-    let app = try makeLiveClerkApp(launchArgument: "-ui-testing-live-auth")
+    let app = makeLiveAuthApp(launchArgument: "-ui-testing-live-auth")
     app.launch()
 
     XCTAssertTrue(
       app.buttons["Continue in Browser"].waitForExistence(timeout: 10),
       "Browser auth entry button did not appear.\n\(app.debugDescription)"
     )
-  }
-
-  func testLiveNativeSessionCanReachAnAuthenticatedMobileState() throws {
-    guard testEnvironmentValue("JOVIE_IOS_LIVE_AUTH_UI") == "1" else {
-      throw XCTSkip("Set JOVIE_IOS_LIVE_AUTH_UI=1 to run the live Clerk UI spike.")
-    }
-
-    let app = try makeLiveClerkApp(launchArgument: "-ui-testing-auto-auth")
-    app.launch()
-
-    let copyURLButton = app.buttons["Copy URL"]
-    let continueOnWebButton = app.buttons["Continue on Web"]
-    let deadline = Date().addingTimeInterval(25)
-
-    while Date() < deadline {
-      if copyURLButton.exists || continueOnWebButton.exists {
-        return
-      }
-
-      RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-    }
-
-    XCTFail("Live auth did not reach dashboard or onboarding.\n\(app.debugDescription)")
   }
 
   func testRealBrowserAuthProviderCompleteReachesAuthenticatedShell() throws {
@@ -992,30 +969,15 @@ final class JovieUITests: XCTestCase {
     )
   }
 
-  private func makeLiveClerkApp(launchArgument: String) throws -> XCUIApplication {
-    let publishableKey =
-      testEnvironmentValue("CLERK_PUBLISHABLE_KEY") ??
-      testEnvironmentValue("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY") ??
-      ""
+  private func makeLiveAuthApp(launchArgument: String) -> XCUIApplication {
     let apiBaseURL =
       testEnvironmentValue("JOVIE_IOS_API_BASE_URL") ??
       testEnvironmentValue("API_BASE_URL") ??
       "http://localhost:3003"
-    let emailAddress = try requiredEnvironmentValue("E2E_CLERK_USER_USERNAME")
-    let verificationCode = testEnvironmentValue("JOVIE_IOS_LIVE_AUTH_CODE") ?? "424242"
-
     let app = XCUIApplication()
     app.launchArguments.append(launchArgument)
     app.launchArguments.append("-ui-testing-allow-exit")
     app.launchEnvironment["API_BASE_URL"] = apiBaseURL
-    app.launchEnvironment["E2E_CLERK_USER_USERNAME"] = emailAddress
-    app.launchEnvironment["JOVIE_IOS_LIVE_AUTH_CODE"] = verificationCode
-
-    if !publishableKey.isEmpty {
-      app.launchEnvironment["CLERK_PUBLISHABLE_KEY"] = publishableKey
-      app.launchEnvironment["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"] = publishableKey
-    }
-
     addTeardownBlock { [app] in
       self.endUITestSession(app)
     }
@@ -1024,16 +986,8 @@ final class JovieUITests: XCTestCase {
   }
 
   private func makeRealBrowserAuthApp() throws -> XCUIApplication {
-    let publishableKey =
-      testEnvironmentValue("CLERK_PUBLISHABLE_KEY") ??
-      testEnvironmentValue("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY") ??
-      ""
     let apiBaseURL = try requiredHTTPSURL("API_BASE_URL")
     let webBaseURL = try requiredHTTPSURL("WEB_BASE_URL")
-
-    guard !publishableKey.isEmpty else {
-      throw XCTSkip("Missing CLERK_PUBLISHABLE_KEY for HTTPS browser auth testing.")
-    }
 
     let app = XCUIApplication()
     app.launchArguments.append("-ui-testing-real-browser-auth")
@@ -1043,9 +997,6 @@ final class JovieUITests: XCTestCase {
     app.launchEnvironment["JOVIE_IOS_REAL_BROWSER_AUTH"] = "1"
     app.launchEnvironment["JOVIE_IOS_REAL_BROWSER_AUTH_PERSONA"] =
       testEnvironmentValue("JOVIE_IOS_REAL_BROWSER_AUTH_PERSONA") ?? "creator-ready"
-    app.launchEnvironment["CLERK_PUBLISHABLE_KEY"] = publishableKey
-    app.launchEnvironment["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"] = publishableKey
-
     if let token = testEnvironmentValue("JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN"),
        !token.isEmpty
     {
@@ -1062,7 +1013,7 @@ final class JovieUITests: XCTestCase {
   private func requiredEnvironmentValue(_ key: String) throws -> String {
     let value = testEnvironmentValue(key) ?? ""
     guard !value.isEmpty else {
-      throw XCTSkip("Missing \(key) or TEST_RUNNER_\(key) for live Clerk UI testing.")
+      throw XCTSkip("Missing \(key) or TEST_RUNNER_\(key) for live auth UI testing.")
     }
 
     return value

@@ -9,7 +9,7 @@ struct ChatRepositoryTests {
     let repository = ChatRepository(
       client: SuccessfulChatClient(),
       cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-activity")!),
-      clerkUserID: "user_activity_test",
+      userID: "user_activity_test",
       webBaseURL: URL(string: "https://preview.example")!,
       activityDonator: donator
     )
@@ -25,7 +25,7 @@ struct ChatRepositoryTests {
     let repository = ChatRepository(
       client: FailingChatClient(),
       cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo")!),
-      clerkUserID: "user_repo_test",
+      userID: "user_repo_test",
       webBaseURL: URL(string: "https://preview.example")!
     )
 
@@ -42,7 +42,7 @@ struct ChatRepositoryTests {
     let repository = ChatRepository(
       client: FailingChatClient(),
       cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-empty")!),
-      clerkUserID: "user_repo_empty",
+      userID: "user_repo_empty",
       webBaseURL: URL(string: "https://preview.example")!
     )
 
@@ -101,7 +101,7 @@ struct ChatRepositoryTests {
     let repository = ChatRepository(
       client: client,
       cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-success")!),
-      clerkUserID: "user_repo_success",
+      userID: "user_repo_success",
       webBaseURL: URL(string: "https://preview.example")!
     )
 
@@ -131,7 +131,7 @@ struct ChatRepositoryTests {
     let repository = ChatRepository(
       client: client,
       cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-stream")!),
-      clerkUserID: "user_repo_stream",
+      userID: "user_repo_stream",
       webBaseURL: URL(string: "https://preview.example")!
     )
 
@@ -160,7 +160,7 @@ struct ChatRepositoryTests {
     let repository = ChatRepository(
       client: client,
       cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-handoff")!),
-      clerkUserID: "user_repo_handoff",
+      userID: "user_repo_handoff",
       webBaseURL: URL(string: "https://preview.example")!
     )
 
@@ -191,7 +191,7 @@ struct ChatRepositoryTests {
     let repository = ChatRepository(
       client: client,
       cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-error-event")!),
-      clerkUserID: "user_repo_error_event",
+      userID: "user_repo_error_event",
       webBaseURL: URL(string: "https://preview.example")!
     )
 
@@ -222,7 +222,7 @@ struct ChatRepositoryTests {
     let repository = ChatRepository(
       client: client,
       cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-retry")!),
-      clerkUserID: "user_repo_retry",
+      userID: "user_repo_retry",
       webBaseURL: URL(string: "https://preview.example")!
     )
 
@@ -245,7 +245,7 @@ struct ChatRepositoryTests {
     let repository = ChatRepository(
       client: FailingChatClient(),
       cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-retry-noop")!),
-      clerkUserID: "user_repo_retry_noop",
+      userID: "user_repo_retry_noop",
       webBaseURL: URL(string: "https://preview.example")!
     )
 
@@ -284,7 +284,7 @@ struct ChatRepositoryTests {
     let repository = ChatRepository(
       client: client,
       cache: cache,
-      clerkUserID: "user_repo_refresh",
+      userID: "user_repo_refresh",
       webBaseURL: URL(string: "https://preview.example")!
     )
 
@@ -315,7 +315,7 @@ struct ChatRepositoryTests {
     let repository = ChatRepository(
       client: client,
       cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-refresh-ok")!),
-      clerkUserID: "user_repo_refresh_ok",
+      userID: "user_repo_refresh_ok",
       webBaseURL: URL(string: "https://preview.example")!
     )
 
@@ -353,7 +353,7 @@ struct ChatRepositoryTests {
     let repository = ChatRepository(
       client: FailingChatClient(),
       cache: cache,
-      clerkUserID: "user_repo_open_fail",
+      userID: "user_repo_open_fail",
       webBaseURL: URL(string: "https://preview.example")!
     )
 
@@ -396,7 +396,7 @@ struct ChatRepositoryTests {
     let repository = ChatRepository(
       client: client,
       cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-open-ok")!),
-      clerkUserID: "user_repo_open_ok",
+      userID: "user_repo_open_ok",
       webBaseURL: URL(string: "https://preview.example")!
     )
 
@@ -431,7 +431,7 @@ struct ChatRepositoryTests {
     let repository = ChatRepository(
       client: client,
       cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-newconvo")!),
-      clerkUserID: "user_repo_newconvo",
+      userID: "user_repo_newconvo",
       webBaseURL: URL(string: "https://preview.example")!
     )
 

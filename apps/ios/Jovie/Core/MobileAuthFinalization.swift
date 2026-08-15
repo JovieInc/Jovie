@@ -1,14 +1,57 @@
 import Foundation
 
 /**
- * Mobile auth finalization plan (Clerk → Better Auth migration, plan
- * decision 9). Under BA there is exactly one path: the native exchange
+ * Better Auth mobile finalization has exactly one path: the native exchange
  * route returns a freshly minted `ba_sessions` row's `sessionToken` for
  * iOS (independent of the completing browser session — audit row 12). The
- * old `requiresClerkTicketFlow` case is deleted — no Clerk ticket flow.
  */
 enum MobileAuthFinalizationPlan: Equatable {
   case completeWithNativeSession(token: String, userID: String, expiresInSeconds: Int)
+}
+
+enum MobileAuthReturnError: LocalizedError {
+  case missingExchangeCredential
+
+  var errorDescription: String? {
+    switch self {
+    case .missingExchangeCredential:
+      "The native auth exchange did not return a usable session credential."
+    }
+  }
+}
+
+private struct MobileAuthFinalizationStageError: LocalizedError, CustomNSError {
+  let stage: String
+  let underlyingError: Error
+
+  static let errorDomain = "MobileAuthFinalizationStageError"
+  var errorCode: Int { 1 }
+
+  var errorUserInfo: [String: Any] {
+    [NSUnderlyingErrorKey: underlyingError as NSError]
+  }
+
+  var errorDescription: String? {
+    let message = underlyingError.localizedDescription.isEmpty
+      ? String(describing: underlyingError)
+      : underlyingError.localizedDescription
+    return "Native auth \(stage) failed: \(message)"
+  }
+}
+
+@MainActor
+func runMobileAuthFinalizationStage<Value>(
+  _ stage: String,
+  operation: () async throws -> Value
+) async throws -> Value {
+  do {
+    return try await operation()
+  } catch {
+    throw MobileAuthFinalizationStageError(
+      stage: stage,
+      underlyingError: error
+    )
+  }
 }
 
 enum MobileAuthFinalizationPlanner {

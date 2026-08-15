@@ -6,7 +6,7 @@ struct AudienceHighlightsRepositoryResult: Equatable, Sendable {
 }
 
 protocol AudienceHighlightsRepositoryProtocol: Sendable {
-  func load(for clerkUserID: String) async throws -> AudienceHighlightsRepositoryResult
+  func load(for userID: String) async throws -> AudienceHighlightsRepositoryResult
 }
 
 struct AudienceHighlightsRepository: AudienceHighlightsRepositoryProtocol, Sendable {

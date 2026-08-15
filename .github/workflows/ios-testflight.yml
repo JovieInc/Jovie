@@ -689,9 +689,6 @@ jobs:
       MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
       MATCH_GIT_PRIVATE_KEY: ${{ secrets.MATCH_GIT_PRIVATE_KEY }}
       MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
-      # Associated Domains remains an Apple entitlement even though native auth
-      # no longer embeds a Clerk publishable key after the Better Auth cutover.
-      CLERK_ASSOCIATED_DOMAIN: ${{ secrets.CLERK_ASSOCIATED_DOMAIN }}
       APP_STORE_COMPANY_NAME: ${{ secrets.APP_STORE_COMPANY_NAME }}
       JOVIE_IOS_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
       JOVIE_IOS_OBSERVABILITY_ENVIRONMENT: production

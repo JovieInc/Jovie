@@ -19,7 +19,7 @@ private actor MockRepository: AppStateRepository {
     self.cached = cached
   }
 
-  func loadMe(for clerkUserID: String) async throws -> MeRepositoryResult {
+  func loadMe(for userID: String) async throws -> MeRepositoryResult {
     loadCallCount += 1
     if let loadDelay {
       try await Task.sleep(for: loadDelay)
@@ -27,12 +27,12 @@ private actor MockRepository: AppStateRepository {
     return try nextResult.get()
   }
 
-  func cachedSnapshot(for clerkUserID: String) -> MobileMeResponse? {
+  func cachedSnapshot(for userID: String) -> MobileMeResponse? {
     cached
   }
 
-  func clearCachedUser(_ clerkUserID: String) {
-    clearedUserIDs.append(clerkUserID)
+  func clearCachedUser(_ userID: String) {
+    clearedUserIDs.append(userID)
   }
 
   func clearedUsers() -> [String] {
@@ -62,8 +62,7 @@ struct AppStateTests {
     sentryDSN: nil,
     observabilityIngestURL: nil,
     observabilityIngestSecret: nil,
-    observabilityEnvironment: "test",
-    clerkCallbackUrlScheme: "ie.jov.jovie"
+    observabilityEnvironment: "test"
   )
 
   @Test func mapsReadyResponseToReadyRoute() async throws {
@@ -78,7 +77,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("user_123")
 
@@ -109,7 +108,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     async let change: Void = appState.handleSignedInUserChange("user_123")
 
@@ -140,7 +139,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     async let first: Void = appState.handleSignedInUserChange("user_123")
     async let second: Void = appState.handleSignedInUserChange("user_123")
@@ -162,7 +161,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("user_123")
 
@@ -188,7 +187,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     async let change: Void = appState.handleSignedInUserChange("user_123")
 
@@ -225,7 +224,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("user_123")
 
@@ -245,7 +244,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("user_123")
     await appState.signOut()
@@ -274,7 +273,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange(userID)
 
@@ -297,7 +296,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("observability_user_123")
     await appState.handleSignedInUserChange(nil)
@@ -318,7 +317,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     async let first: Void = appState.handleSignedInUserChange("user_123")
     async let second: Void = appState.handleSignedInUserChange("user_123")
@@ -341,7 +340,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     async let load: Void = appState.handleSignedInUserChange("user_123")
     try await Task.sleep(for: .milliseconds(10))
@@ -364,7 +363,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("user_123")
 
@@ -422,7 +421,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("user_123")
 
@@ -457,7 +456,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("user_123")
 

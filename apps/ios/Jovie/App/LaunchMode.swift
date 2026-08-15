@@ -3,7 +3,6 @@ import Foundation
 enum LaunchMode: Equatable {
   case live
   case unitTesting
-  case uiTestingAutoAuth
   case uiTestingLiveAuth
   case uiTestingRealBrowserAuth
   case uiTestingAuthCallback
@@ -20,9 +19,9 @@ enum LaunchMode: Equatable {
   case uiTestingSplash
   case uiTestingAudience
 
-  var usesLiveClerk: Bool {
+  var usesLiveAuth: Bool {
     switch self {
-    case .live, .uiTestingAutoAuth, .uiTestingLiveAuth, .uiTestingRealBrowserAuth:
+    case .live, .uiTestingLiveAuth, .uiTestingRealBrowserAuth:
       return true
     case .unitTesting,
          .uiTestingAuthCallback,
@@ -42,10 +41,6 @@ enum LaunchMode: Equatable {
     }
   }
 
-  var requiresAutoAuth: Bool {
-    self == .uiTestingAutoAuth
-  }
-
   var opensSettingsOnLaunch: Bool {
     self == .uiTestingSettings
   }
@@ -61,11 +56,10 @@ enum LaunchMode: Equatable {
     self == .uiTestingChatEntityFixture ? MobileChatEntityFixture.default : nil
   }
 
-  /// UI-testing launch modes without live Clerk must not spin up a
-  /// `ChatRepository` backed by `ClerkTokenProvider` -- that crashes on
-  /// `Clerk.shared` when the singleton is unconfigured (auth-callback harness).
+  /// Live auth and chat fixtures need a repository. Other deterministic UI
+  /// modes stay network-free.
   var needsChatRepository: Bool {
-    usesLiveClerk || opensChatOnLaunch || chatEntityFixture != nil
+    usesLiveAuth || opensChatOnLaunch || chatEntityFixture != nil
   }
 
   var opensAudienceOnLaunch: Bool {
@@ -96,42 +90,8 @@ enum LaunchMode: Equatable {
     self == .uiTestingProfileError
   }
 
-  var clearsStoredClerkSession: Bool {
-    self == .uiTestingLiveAuth
-  }
-
-  var clerkKeychainService: String {
-    switch self {
-    case .uiTestingAutoAuth:
-      return "ie.jov.Jovie.ui-testing-auto-auth"
-    case .uiTestingLiveAuth:
-      return "ie.jov.Jovie.ui-testing-live-auth"
-    case .live,
-         .unitTesting,
-         .uiTestingRealBrowserAuth,
-         .uiTestingAuthCallback,
-         .uiTestingSignedOut,
-         .uiTestingReady,
-         .uiTestingProfileError,
-         .uiTestingChat,
-         .uiTestingChatOffline,
-         .uiTestingChatEntityFixture,
-         .uiTestingSettings,
-         .uiTestingVenueMode,
-         .uiTestingQRUnavailable,
-         .uiTestingNeedsOnboarding,
-         .uiTestingSplash,
-         .uiTestingAudience:
-      return "ie.jov.Jovie"
-    }
-  }
-
   static func current(processInfo: ProcessInfo = .processInfo) -> LaunchMode {
     let arguments = processInfo.arguments
-
-    if arguments.contains("-ui-testing-auto-auth") {
-      return .uiTestingAutoAuth
-    }
 
     if arguments.contains("-ui-testing-live-auth") {
       return .uiTestingLiveAuth

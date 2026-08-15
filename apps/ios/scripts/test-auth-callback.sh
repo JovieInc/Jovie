@@ -61,62 +61,6 @@ run_xcodebuild_test() {
   done
 }
 
-resolve_publishable_key() {
-  local web_base_url="$1"
-  local existing_key="${CLERK_PUBLISHABLE_KEY:-${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}}"
-
-  if [[ -n "$existing_key" && "$existing_key" != "pk_test_ci_placeholder" ]]; then
-    printf '%s' "$existing_key"
-    return 0
-  fi
-
-  local discovered_key
-  if discovered_key="$(node --input-type=module - "$web_base_url" <<'NODE'
-const [webBaseUrl] = process.argv.slice(2);
-const signinUrl = new URL('/signin', webBaseUrl);
-const response = await fetch(signinUrl, { redirect: 'follow' });
-const html = await response.text();
-const match = html.match(/pk_(?:test|live)_[A-Za-z0-9_-]+/);
-if (!match) {
-  process.exit(1);
-}
-process.stdout.write(match[0]);
-NODE
-  )"; then
-    printf '%s' "$discovered_key"
-    return 0
-  fi
-
-  if command -v doppler >/dev/null 2>&1; then
-    discovered_key="$(
-      doppler run --project jovie-web --config dev -- \
-        bash -lc 'printf %s "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"' 2>/dev/null || true
-    )"
-
-    if [[ -n "$discovered_key" ]]; then
-      printf '%s' "$discovered_key"
-      return 0
-    fi
-  fi
-
-  echo "Unable to discover Clerk publishable key from $web_base_url/signin or Doppler dev config." >&2
-  return 1
-}
-
-require_publishable_key() {
-  local web_base_url="$1"
-  local publishable_key
-
-  publishable_key="$(resolve_publishable_key "$web_base_url" || true)"
-  if [[ -z "$publishable_key" || "$publishable_key" == "pk_test_ci_placeholder" ]]; then
-    echo "Unable to run iOS auth smoke without a real Clerk publishable key." >&2
-    echo "Set CLERK_PUBLISHABLE_KEY/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, start WEB_BASE_URL, or ensure Doppler dev is available." >&2
-    return 1
-  fi
-
-  printf '%s' "$publishable_key"
-}
-
 run_real_browser_auth_simulator_test() {
   local api_base_url="${API_BASE_URL:-}"
   local web_base_url="${WEB_BASE_URL:-}"
@@ -124,10 +68,6 @@ run_real_browser_auth_simulator_test() {
   require_https_url "API_BASE_URL" "$api_base_url"
   require_https_url "WEB_BASE_URL" "$web_base_url"
 
-  local publishable_key
-  publishable_key="$(require_publishable_key "$web_base_url")"
-  export CLERK_PUBLISHABLE_KEY="$publishable_key"
-  export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="$publishable_key"
   export API_BASE_URL="$api_base_url"
   export WEB_BASE_URL="$web_base_url"
   export JOVIE_IOS_REAL_BROWSER_AUTH=1
@@ -138,8 +78,6 @@ JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN=${JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN:-}
 JOVIE_IOS_REAL_BROWSER_AUTH_PERSONA=${JOVIE_IOS_REAL_BROWSER_AUTH_PERSONA:-creator-ready}
 API_BASE_URL=$api_base_url
 WEB_BASE_URL=$web_base_url
-CLERK_PUBLISHABLE_KEY=$publishable_key
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$publishable_key
 EOF
 
   echo "Running HTTPS ASWebAuthenticationSession auth test against $web_base_url..."
@@ -157,10 +95,7 @@ run_live_auth_simulator_smoke() {
   local api_base_url="${API_BASE_URL:-http://localhost:3100}"
   local web_base_url="${WEB_BASE_URL:-$api_base_url}"
   local persona="${JOVIE_IOS_LIVE_AUTH_PERSONA:-creator-ready}"
-  local publishable_key
   local callback_response
-
-  publishable_key="$(require_publishable_key "$web_base_url")"
 
   echo "Creating dev native auth callback against $api_base_url..."
   callback_response="$(
@@ -233,11 +168,6 @@ NODE
     "SIMCTL_CHILD_JOVIE_IOS_PENDING_CODE_VERIFIER=$code_verifier"
     "SIMCTL_CHILD_JOVIE_IOS_LIVE_AUTH_STATUS=1"
   )
-
-  if [[ -n "$publishable_key" ]]; then
-    launch_env+=("SIMCTL_CHILD_CLERK_PUBLISHABLE_KEY=$publishable_key")
-    launch_env+=("SIMCTL_CHILD_NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$publishable_key")
-  fi
 
   env "${launch_env[@]}" xcrun simctl launch \
     --terminate-running-process \

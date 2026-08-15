@@ -22,7 +22,6 @@
 		2C6C36E98540C94E3F1EF74A /* Configuration.local.plist in Resources */ = {isa = PBXBuildFile; fileRef = D24EEA621BFC0D5C4F57065C /* Configuration.local.plist */; };
 		3397C6D45B48BBDAF736A405 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71290AE6A5F14D6941193B70 /* AppRouter.swift */; };
 		33F1DF8D4B8D292316335711 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6FDEFEB6D7C1D0251FDA1E61 /* Foundation.framework */; };
-		4C46B1496145C062FB2FE978 /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 0199C257CC5EA4F6FD36397D /* ClerkKit */; };
 		4CA1C477ECC6B7B40EA17787 /* LaunchMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD30F57584F71E958D8C0514 /* LaunchMode.swift */; };
 		52C5CBF9C24E4C502FA64955 /* MobileMeResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EC2367922F1F00AB0AF1164 /* MobileMeResponse.swift */; };
 		5E40E80F8AFF20CF3CE9A09B /* IntentNavigationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26F157EB66EC5E06F7EE8974 /* IntentNavigationStore.swift */; };
@@ -39,10 +38,8 @@
 		A0J0V11070000000000000002 /* ConversationUserActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V11070000000000000001 /* ConversationUserActivity.swift */; };
 		8747690FEEF7BD069EBF7430 /* MeRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28FBA9F0D12E0BD1CB8B0B09 /* MeRepository.swift */; };
 		89B2D98342D65781B5E80A72 /* JovieApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */; };
-		82B34E9D6204496286345E07 /* ClerkNetworkMiddleware.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6800CFABBE2A4946936C7C44 /* ClerkNetworkMiddleware.swift */; };
 		964DEFE0F4D4206832B6888E /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 969DB5F8041C9A004CDB5234 /* RootView.swift */; };
 		1B178328D9174F7D903FA1E3 /* LiveRootContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE7701B410E4EC0AF199EF8 /* LiveRootContainer.swift */; };
-		D4229B10537D487D93C634D4 /* LiveAuthBootstrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5E6FE6D208645ADBC8CB3C2 /* LiveAuthBootstrapper.swift */; };
 		36A99669D08546B2A5146BE9 /* UITestHarnessViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D65C5C4A874DD29736473D /* UITestHarnessViews.swift */; };
 		99FBB80FCDBD4660BE1B0DCC /* MobileChatPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25CADBED3F6B431494F2C0DF /* MobileChatPlaceholderView.swift */; };
 		A0B10F000000000000000006 /* ObservabilityTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B10F000000000000000001 /* ObservabilityTypes.swift */; };
@@ -108,7 +105,6 @@
 		DA762182661489283A851F6B /* ScreenBrightnessManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 178C37B20F46EAF919EB2031 /* ScreenBrightnessManagerTests.swift */; };
 		E26FB0F0CBAA2DE24B6BC572 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9924B177AFB753A4C23A4098 /* APIClient.swift */; };
 		49BA0DAF46944303A411D3C0 /* AuthTokenExchange.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBCC1BE3DF9E4B0785CD0D83 /* AuthTokenExchange.swift */; };
-		E6EA9EC85A52208BEFC20DF0 /* ClerkKitUI in Frameworks */ = {isa = PBXBuildFile; productRef = 37321F1DC431FDA58D969E72 /* ClerkKitUI */; };
 		EBDA8137B767F16402C41C24 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4EAFC467F76300BCFC2659F /* Configuration.swift */; };
 		EE4CBA88057592FAFCD7F926 /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A93DB506915B418D06E897A4 /* AppStateTests.swift */; };
 		F178AB3E908746C78645E4EE /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35E151E782B5462F89618579 /* SettingsView.swift */; };
@@ -151,7 +147,6 @@
 		A0J0V3632A0000000000000F /* AppShellTabBarTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellTabBarTests.swift; sourceTree = "<group>"; };
 		000F426E1AB94DD5401C3341 /* QRCodeRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QRCodeRenderer.swift; sourceTree = "<group>"; };
 		00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieApp.swift; sourceTree = "<group>"; };
-		6800CFABBE2A4946936C7C44 /* ClerkNetworkMiddleware.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClerkNetworkMiddleware.swift; sourceTree = "<group>"; };
 		0A40F1B3BFCC6AD8FF8EAF93 /* JovieAppIntents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieAppIntents.swift; sourceTree = "<group>"; };
 		A0J0V11070000000000000001 /* ConversationUserActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConversationUserActivity.swift; sourceTree = "<group>"; };
 		A0J0V11070000000000000003 /* ConversationUserActivityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConversationUserActivityTests.swift; sourceTree = "<group>"; };
@@ -183,7 +178,6 @@
 		969C5D08D3E71A2D9824375A /* Jovie-logo.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; path = "Jovie-logo.png"; sourceTree = "<group>"; };
 		969DB5F8041C9A004CDB5234 /* RootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		FFE7701B410E4EC0AF199EF8 /* LiveRootContainer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveRootContainer.swift; sourceTree = "<group>"; };
-		B5E6FE6D208645ADBC8CB3C2 /* LiveAuthBootstrapper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveAuthBootstrapper.swift; sourceTree = "<group>"; };
 		15D65C5C4A874DD29736473D /* UITestHarnessViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UITestHarnessViews.swift; sourceTree = "<group>"; };
 		25CADBED3F6B431494F2C0DF /* MobileChatPlaceholderView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatPlaceholderView.swift; sourceTree = "<group>"; };
 		989D4251AFCEB0A633337F2C /* JovieUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JovieUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -278,8 +272,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				33F1DF8D4B8D292316335711 /* Foundation.framework in Frameworks */,
-				4C46B1496145C062FB2FE978 /* ClerkKit in Frameworks */,
-				E6EA9EC85A52208BEFC20DF0 /* ClerkKitUI in Frameworks */,
 				A0B10F000000000000000012 /* Sentry in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -589,12 +581,10 @@
 				71445144CE0970267C0508C6 /* AppState.swift */,
 				E4EAFC467F76300BCFC2659F /* Configuration.swift */,
 				00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */,
-				6800CFABBE2A4946936C7C44 /* ClerkNetworkMiddleware.swift */,
 				DD30F57584F71E958D8C0514 /* LaunchMode.swift */,
 				2EBA07D5CBE04B0BBF053706 /* MobileAuthReturn.swift */,
 				969DB5F8041C9A004CDB5234 /* RootView.swift */,
 				FFE7701B410E4EC0AF199EF8 /* LiveRootContainer.swift */,
-				B5E6FE6D208645ADBC8CB3C2 /* LiveAuthBootstrapper.swift */,
 				15D65C5C4A874DD29736473D /* UITestHarnessViews.swift */,
 			);
 			name = App;
@@ -645,8 +635,6 @@
 			);
 			name = Jovie;
 			packageProductDependencies = (
-				0199C257CC5EA4F6FD36397D /* ClerkKit */,
-				37321F1DC431FDA58D969E72 /* ClerkKitUI */,
 				A0B10F000000000000000011 /* Sentry */,
 			);
 			productName = Jovie;
@@ -711,7 +699,6 @@
 			mainGroup = 05015460AF84AD8DF5276AD4;
 			minimizedProjectReferenceProxies = 0;
 			packageReferences = (
-				5AD3ED31588BC6880D95DAC6 /* XCRemoteSwiftPackageReference "clerk-ios" */,
 				A0B10F000000000000000010 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -798,12 +785,10 @@
 				045FC6E446AFF7FFD3ED0FE2 /* AppState.swift in Sources */,
 				EBDA8137B767F16402C41C24 /* Configuration.swift in Sources */,
 				89B2D98342D65781B5E80A72 /* JovieApp.swift in Sources */,
-				82B34E9D6204496286345E07 /* ClerkNetworkMiddleware.swift in Sources */,
 				4CA1C477ECC6B7B40EA17787 /* LaunchMode.swift in Sources */,
 				61A81E78D0B448B6A68F45AD /* MobileAuthReturn.swift in Sources */,
 				964DEFE0F4D4206832B6888E /* RootView.swift in Sources */,
 				1B178328D9174F7D903FA1E3 /* LiveRootContainer.swift in Sources */,
-				D4229B10537D487D93C634D4 /* LiveAuthBootstrapper.swift in Sources */,
 				36A99669D08546B2A5146BE9 /* UITestHarnessViews.swift in Sources */,
 				A0B10F000000000000000006 /* ObservabilityTypes.swift in Sources */,
 				A0B10F000000000000000007 /* NoopObservabilityProvider.swift in Sources */,
@@ -904,7 +889,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_WEAK = NO;
-				CLERK_ASSOCIATED_DOMAIN = "distinct-giraffe-5.clerk.accounts.dev";
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_ENTITLEMENTS = Jovie/Jovie.entitlements;
@@ -936,7 +920,6 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_WEAK = NO;
-				CLERK_ASSOCIATED_DOMAIN = "distinct-giraffe-5.clerk.accounts.dev";
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_ENTITLEMENTS = Jovie/Jovie.entitlements;
@@ -1211,14 +1194,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		5AD3ED31588BC6880D95DAC6 /* XCRemoteSwiftPackageReference "clerk-ios" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/clerk/clerk-ios.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.0.0;
-			};
-		};
 		A0B10F000000000000000010 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/getsentry/sentry-cocoa.git";
@@ -1230,16 +1205,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		0199C257CC5EA4F6FD36397D /* ClerkKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 5AD3ED31588BC6880D95DAC6 /* XCRemoteSwiftPackageReference "clerk-ios" */;
-			productName = ClerkKit;
-		};
-		37321F1DC431FDA58D969E72 /* ClerkKitUI */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 5AD3ED31588BC6880D95DAC6 /* XCRemoteSwiftPackageReference "clerk-ios" */;
-			productName = ClerkKitUI;
-		};
 		A0B10F000000000000000011 /* Sentry */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A0B10F000000000000000010 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;

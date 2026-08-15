@@ -9,9 +9,9 @@ enum DashboardLoadState: Equatable {
 }
 
 protocol AppStateRepository: Sendable {
-  func loadMe(for clerkUserID: String) async throws -> MeRepositoryResult
-  func clearCachedUser(_ clerkUserID: String) async
-  func cachedSnapshot(for clerkUserID: String) async -> MobileMeResponse?
+  func loadMe(for userID: String) async throws -> MeRepositoryResult
+  func clearCachedUser(_ userID: String) async
+  func cachedSnapshot(for userID: String) async -> MobileMeResponse?
 }
 
 extension AppStateRepository {
@@ -32,7 +32,7 @@ final class AppState {
   var route: AppRouter = .launching
   var dashboardState: DashboardLoadState = .idle
   var isOffline = false
-  var didLoadClerk = false
+  var didInitializeAuth = false
   var activeUserID: String?
 
   private let repository: AppStateRepository
@@ -62,8 +62,8 @@ final class AppState {
     }
 
     switch launchMode {
-    case .live, .uiTestingAutoAuth, .uiTestingLiveAuth, .uiTestingRealBrowserAuth:
-      didLoadClerk = true
+    case .live, .uiTestingLiveAuth, .uiTestingRealBrowserAuth:
+      didInitializeAuth = true
     case .unitTesting:
       route = .signedOut
       dashboardState = .idle
@@ -121,7 +121,7 @@ final class AppState {
   }
 
   func handleSignedInUserChange(_ userID: String?) async {
-    guard launchMode.usesLiveClerk, didLoadClerk else { return }
+    guard launchMode.usesLiveAuth, didInitializeAuth else { return }
 
     if let userID, loadingUserID == userID {
       return

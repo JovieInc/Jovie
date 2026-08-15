@@ -232,7 +232,7 @@ private struct AppContentView: View {
             tokenProvider: NativeSessionTokenProvider()
           ),
           cache: ChatCache(),
-          clerkUserID: activeUserID,
+          userID: activeUserID,
           webBaseURL: appState.configuration.webBaseURL
         )
         chatRepository = repository
@@ -278,7 +278,7 @@ private struct AppContentView: View {
          .uiTestingAuthCallback:
       return true
     default:
-      return !appState.launchMode.usesLiveClerk
+      return !appState.launchMode.usesLiveAuth
     }
   }
 
@@ -324,7 +324,7 @@ private struct AppContentView: View {
 
   @MainActor
   private func reloadAudienceHighlights(for userID: String?) async {
-    guard appState.launchMode.usesLiveClerk else {
+    guard appState.launchMode.usesLiveAuth else {
       audienceHighlightsState = Self.previewAudienceHighlightsState(for: appState.launchMode)
       return
     }
@@ -369,7 +369,7 @@ struct RootView: View {
   @Bindable var appState: AppState
   let isAuthAvailable: Bool
   let isSignInUnavailable: Bool
-  let liveUserID: String?
+  let authenticatedUserID: String?
   let authErrorMessage: String?
   let onLogout: @MainActor () async -> Void
   let onAuthReturn: @MainActor (MobileAuthReturn) -> Void
@@ -393,20 +393,16 @@ struct RootView: View {
       }
 #endif
     }
-      .task(id: "\(appState.didLoadClerk)-\(liveUserID ?? "signed-out")") {
-        if appState.launchMode.requiresAutoAuth, liveUserID == nil {
+      .task(id: "\(appState.didInitializeAuth)-\(authenticatedUserID ?? "signed-out")") {
+        if appState.launchMode == .uiTestingAuthCallback, authenticatedUserID == nil {
           return
         }
 
-        if appState.launchMode == .uiTestingAuthCallback, liveUserID == nil {
+        if let authenticatedUserID, appState.activeUserID == authenticatedUserID {
           return
         }
 
-        if let liveUserID, appState.activeUserID == liveUserID {
-          return
-        }
-
-        await appState.handleSignedInUserChange(liveUserID)
+        await appState.handleSignedInUserChange(authenticatedUserID)
       }
   }
 }

@@ -121,8 +121,7 @@ enum NativeSessionTokenStore {
 }
 
 /**
- * Sole token provider under Better Auth (Clerk → Better Auth migration,
- * plan decision 9 + eng row 31). The raw session token lives in Keychain;
+ * Sole token provider under Better Auth. The raw session token lives in Keychain;
  * the bearer plugin authenticates API calls with it. No client refresh —
  * the server rolls `expiresAt` per `updateAge`, and the bearer plugin's
  * `set-auth-token` response header refreshes the stored token + expiry on
