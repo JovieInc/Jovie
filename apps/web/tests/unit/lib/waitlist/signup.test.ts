@@ -72,7 +72,7 @@ describe('markWaitlistSignedUpInTx', () => {
     expect(mockEnqueueSignedUpWelcomeEmail).not.toHaveBeenCalled();
   });
 
-  it('marks an approved entry signed up and queues the welcome email', async () => {
+  it('marks an approved entry signed up for an app UUID and queues the welcome email', async () => {
     const { tx, updateSet } = createTxMock(
       [
         {
@@ -85,7 +85,7 @@ describe('markWaitlistSignedUpInTx', () => {
       [{ id: 'entry-1', status: 'approved' }]
     );
 
-    const result = await markWaitlistSignedUpInTx(tx, 'clerk_123');
+    const result = await markWaitlistSignedUpInTx(tx, 'app-user-uuid');
 
     expect(result).toEqual({ entryId: 'entry-1' });
     expect(updateSet).toHaveBeenCalledWith(
@@ -97,6 +97,7 @@ describe('markWaitlistSignedUpInTx', () => {
     expect(mockInsertWaitlistAuditLog).toHaveBeenCalledWith(
       tx,
       expect.objectContaining({
+        actorUserId: 'app-user-uuid',
         fromStatus: 'approved',
         toStatus: 'signed_up',
       })
