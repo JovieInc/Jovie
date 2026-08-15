@@ -31,7 +31,20 @@ from gem_gate_contract import drain_state_dir, gate_state_dir, validate_gate_res
 
 REPO = os.environ.get("GEM_PR_DRAIN_REPO", "JovieInc/Jovie")
 REPO_POLICY = by_github(REPO)
-POLICY_ENABLED = bool(REPO_POLICY.pr_drain)
+JOVIE_REPOSITORIES = frozenset({"jovieinc/jovie", "itstimwhite/jovie"})
+
+
+def is_jovie_repository(repo):
+    return repo.casefold() in JOVIE_REPOSITORIES
+
+
+def repo_drain_enabled(repo, policy_enabled):
+    """Gem may observe Jovie, but Symphony is its only implementation owner."""
+    return bool(policy_enabled) and not is_jovie_repository(repo)
+
+
+IS_JOVIE_REPOSITORY = is_jovie_repository(REPO)
+POLICY_ENABLED = repo_drain_enabled(REPO, bool(REPO_POLICY.pr_drain))
 ROOT = pathlib.Path(os.environ.get("GEM_WORKSPACE", "/home/timwhite/gem-workspace"))
 STATE = drain_state_dir(ROOT, REPO)
 ARTIFACT = STATE / "latest.json"
@@ -334,6 +347,17 @@ def main():
         "errors": [],
     }
     try:
+        if IS_JOVIE_REPOSITORY:
+            document.update(
+                status="ok",
+                work_admission="disabled",
+                intake="disabled_symphony_implementation_owner",
+                selected=[],
+                reason="gem_ship_disabled_for_jovie",
+            )
+            write_artifact(document)
+            print(json.dumps(document, indent=2))
+            return 0
         if not POLICY_ENABLED:
             raise RuntimeError(
                 f"PR drain disabled by Gem repo policy for {REPO} "
