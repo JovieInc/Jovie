@@ -1347,6 +1347,27 @@ done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg pro
   | select(.q | not)
   | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or .=="needs-conflict-resolution" or .=="fast") | not)')
 
+# A scoped CI-completion event that reaches this point without an exact-head
+# native queue receipt is not a successful controller pass. Previously this
+# returned success and left the PR invisible until an unrelated event happened.
+# Fail with a classified machine-owned condition so Delivery Control Receipts
+# emits a durable Gem repair task; it still cannot merge or bypass any gate.
+if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
+  ADMISSION_ALREADY_QUEUED="$(echo "$SNAP" | jq -r \
+    --arg admission_pr "$DRAIN_ADMISSION_PR" \
+    --arg admission_head "$DRAIN_ADMISSION_HEAD" '
+      any(.[];
+        ((.n | tostring) == $admission_pr)
+        and ((.headOid // "") | ascii_downcase == $admission_head)
+        and (.q == true)
+      )
+    ')"
+  if [[ "$ADMISSION_ALREADY_QUEUED" != "true" ]]; then
+    echo "::error::queue-noop: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD has no native queue receipt" >&2
+    exit 3
+  fi
+fi
+
 # A completed merge_group CI run is not attributable to an individual source
 # PR: GitHub reports its synthetic composite SHA. If it completes after main
 # moved, GitHub can leave previously admitted members unqueued with no future
