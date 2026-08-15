@@ -26,6 +26,11 @@ const PROFILE_MODE_ALIAS_CACHEABLE_SOURCES = new Set(['link', 'qr']);
 // cadence as the underlying collision data.
 export const revalidate = 300;
 
+// Keep the database-adjacent home region while also serving the cached alias
+// resolver from the West Coast ingress observed by the production budget gate.
+// Collision misses still fail closed through the unchanged resolver below.
+export const preferredRegion = ['iad1', 'sfo1'];
+
 // Opt unknown catch-all params into on-demand ISR. Returning an empty set is
 // intentional: real handles/slugs are discovered at request time, then the
 // resulting redirect, smart-link, or 404 is refreshed by `revalidate` above.
