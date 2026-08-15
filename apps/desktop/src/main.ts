@@ -57,7 +57,7 @@ import {
   RENDERER_BOOT_WATCHDOG_MS,
   RENDERER_LOAD_WATCHDOG_MS,
   shouldRecoverAuthHandoffToCanonicalShell,
-  shouldArmRendererBootWatchdog,
+  shouldArmRendererBootWatchdogAfterLoad,
   shouldSkipRendererWatchdogForAuthHandoff,
 } from './renderer-recovery';
 import { SYSTEM_B_DESKTOP_TOKENS } from './system-b-tokens';
@@ -1267,10 +1267,17 @@ function attachRendererRecovery(
 
   const armBootWatchdog = (): void => {
     clearAllWatchdogs();
-    rendererBooted = false;
     if (win.isDestroyed()) return;
     const url = win.webContents.getURL();
-    if (!shouldArmRendererBootWatchdog(url, APP_ORIGIN)) return;
+    if (
+      !shouldArmRendererBootWatchdogAfterLoad({
+        rendererBooted,
+        url,
+        appOrigin: APP_ORIGIN,
+      })
+    ) {
+      return;
+    }
 
     bootWatchdogTimer = setTimeout(() => {
       bootWatchdogTimer = null;

@@ -83,6 +83,24 @@ export function shouldArmRendererBootWatchdog(
 }
 
 /**
+ * React can mount and send `app-booted` before Electron emits
+ * `did-finish-load`. In that ordering the successful boot signal wins: the
+ * finish event must not reset it and arm a false failure timer.
+ *
+ * A new main-frame navigation resets `rendererBooted` in the load-watchdog
+ * path before this function is consulted, so a prior page cannot suppress
+ * recovery for the next navigation.
+ */
+export function shouldArmRendererBootWatchdogAfterLoad(input: {
+  readonly rendererBooted: boolean;
+  readonly url: string;
+  readonly appOrigin: string;
+}): boolean {
+  if (input.rendererBooted) return false;
+  return shouldArmRendererBootWatchdog(input.url, input.appOrigin);
+}
+
+/**
  * The main window is hidden while the dedicated desktop auth handoff is open.
  * If its initial auth redirect was intercepted, Electron can leave that hidden
  * renderer at about:blank. Revealing it after cancellation would look like a

@@ -8,6 +8,7 @@ import {
   RENDERER_BOOT_WATCHDOG_MS,
   RENDERER_LOAD_WATCHDOG_MS,
   shouldArmRendererBootWatchdog,
+  shouldArmRendererBootWatchdogAfterLoad,
   shouldRecoverAuthHandoffToCanonicalShell,
   shouldSkipRendererWatchdogForAuthHandoff,
 } from '../src/renderer-recovery.ts';
@@ -108,6 +109,26 @@ test('boot watchdog arms only for real hosted app-origin navigations', () => {
     false
   );
   expect(shouldArmRendererBootWatchdog('not a url', appOrigin)).toBe(false);
+});
+
+test('an app-booted signal that beats did-finish-load is never reset', () => {
+  const input = {
+    url: 'https://jov.ie/app/chat?runtime=electron',
+    appOrigin: 'https://jov.ie',
+  } as const;
+
+  expect(
+    shouldArmRendererBootWatchdogAfterLoad({
+      ...input,
+      rendererBooted: false,
+    })
+  ).toBe(true);
+  expect(
+    shouldArmRendererBootWatchdogAfterLoad({
+      ...input,
+      rendererBooted: true,
+    })
+  ).toBe(false);
 });
 
 test('load watchdog covers hung navigation before did-finish-load', () => {
