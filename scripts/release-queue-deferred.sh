@@ -36,8 +36,9 @@ ALARM_MINUTES="${ALARM_MINUTES:-12}"
 ATTEMPT_COOLDOWN_MINUTES="${ATTEMPT_COOLDOWN_MINUTES:-5}"
 RELEASE_RETRY_FILE="${RELEASE_RETRY_FILE:-}"
 DEFERRAL_MARKER='<!-- bot-comment:queue-deferral -->'
-RELEASE_MARKER="queue-deferral-release"
+RELEASE_STATUS_MARKER="queue-deferral-release-status"
 LIB="$(dirname "${BASH_SOURCE[0]}")/lib/queue-deferral-receipt.mjs"
+RELEASE_ADMISSION_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/queue-deferred-release-admission.mjs"
 # Receipt comments are controller authority, not public-input authority. These
 # are the only identities used by the current workflow/Symphony writers.
 TRUSTED_DEFERRAL_AUTHORS='["itstimwhite","jovie-bot[bot]"]'
@@ -167,7 +168,7 @@ check_failures_for_pr() {  # check_failures_for_pr <num> — JSON array of block
 last_attempt_age_minutes() {  # last_attempt_age_minutes <num>
   local updated_at updated_epoch
   updated_at="$(gh_retry api "repos/${REPO}/issues/${1}/comments" --paginate \
-    --jq "[.[] | select(.body | contains(\"<!-- bot-comment:${RELEASE_MARKER} -->\")) | .updated_at] | last" \
+    --jq "[.[] | select(.body | contains(\"<!-- bot-comment:${RELEASE_STATUS_MARKER} -->\")) | .updated_at] | last" \
     2>/dev/null | grep -E '^[0-9]{4}-' | tail -n1 || true)"
   [[ -z "$updated_at" || "$updated_at" == "null" ]] && return 0
   updated_epoch="$(iso_to_epoch "$updated_at")"
@@ -177,7 +178,7 @@ last_attempt_age_minutes() {  # last_attempt_age_minutes <num>
 
 upsert_status_comment() {  # upsert_status_comment <num> <body>
   [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would upsert release comment on #$1"; return 0; }
-  GITHUB_REPOSITORY="$REPO" bash "$(dirname "${BASH_SOURCE[0]}")/lib/upsert-pr-comment.sh" "$1" "$RELEASE_MARKER" "$2" \
+  GITHUB_REPOSITORY="$REPO" bash "$(dirname "${BASH_SOURCE[0]}")/lib/upsert-pr-comment.sh" "$1" "$RELEASE_STATUS_MARKER" "$2" \
     && echo "    ✓ upserted release comment on #$1" || echo "    !! failed to upsert release comment on #$1"
 }
 
@@ -274,6 +275,7 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
   echo "=== RELEASE: mechanical holds under a fresh GREEN fleet gate ==="
 
   release_allowed=0
+  release_admission_mode=""
   release_block_reason=""
   if [[ -z "$FLEET_RECEIPT_FILE" || ! -f "$FLEET_RECEIPT_FILE" ]]; then
     release_block_reason="fleet-receipt-unavailable"
@@ -286,18 +288,22 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
       release_block_reason="fleet-receipt-malformed"
     elif (( now_epoch - observed_epoch > FLEET_MAX_AGE_SECONDS || observed_epoch - now_epoch > FLEET_MAX_AGE_SECONDS )); then
       release_block_reason="fleet-receipt-stale"
-    elif ! jq -e '.state == "GREEN" and .promotionAdmission.allowed == true' \
-        "$FLEET_RECEIPT_FILE" >/dev/null 2>&1; then
-      release_block_reason="fleet-gate-not-green:$(jq -r '.state // "unknown"' "$FLEET_RECEIPT_FILE")"
     else
-      release_allowed=1
+      release_admission="$(node "$RELEASE_ADMISSION_LIB" fleet <"$FLEET_RECEIPT_FILE" 2>/dev/null || true)"
+      if ! jq -e '.allowed == true and (.mode | IN("normal", "deferred-release-only"))' \
+          <<<"$release_admission" >/dev/null 2>&1; then
+        release_block_reason="$(jq -r '.reason // "fleet-receipt-malformed"' <<<"$release_admission" 2>/dev/null || echo fleet-receipt-malformed)"
+      else
+        release_allowed=1
+        release_admission_mode="$(jq -r '.mode' <<<"$release_admission")"
+      fi
     fi
   fi
 
   if [[ "$release_allowed" != "1" ]]; then
     echo "  ~ release disabled: ${release_block_reason}; every queue-deferred hold stays in place"
   else
-    echo "  ✓ fresh GREEN fleet receipt; evaluating candidates"
+    echo "  ✓ fresh fleet release admission (${release_admission_mode}); evaluating candidates"
     while read -r pr; do
       [[ -z "$pr" ]] && continue
       n=$(jq -r '.n' <<<"$pr")
@@ -330,7 +336,7 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
           echo "    ~ deferral-receipt-head-stale (receipt=${receipt_head:0:12}, live=${expected_head:0:12}); evaluating live head"
         fi
       else
-        echo "    ~ untyped hold (no valid ${DEFERRAL_MARKER} receipt); releasing if live state is ready under GREEN"
+        echo "    ~ untyped hold (no valid ${DEFERRAL_MARKER} receipt); releasing only after fresh controller admission"
       fi
 
       attempt_age_m="$(last_attempt_age_minutes "$n")"
@@ -369,6 +375,28 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
         continue
       fi
 
+      # Write the exact-head release receipt before changing the label. The
+      # ensuing App-authored `unlabeled` event can enter the AMBER fallback
+      # only when the shared enqueue guard reads this fresh controller receipt.
+      # A comment is the durable audit trail; a bare label removal is not
+      # enrollment authority.
+      if [[ "$DRY_RUN" != "1" ]]; then
+        release_receipt="$(node "$RELEASE_ADMISSION_LIB" render \
+          --pr "$n" --head "$expected_head" \
+          --mode "$release_admission_mode" \
+          --reason "$reason" \
+          --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" 2>/dev/null)" || {
+            echo "    !! could not render exact-head release receipt; leaving hold" >&2
+            continue
+          }
+        if ! GITHUB_REPOSITORY="$REPO" bash "$(dirname "${BASH_SOURCE[0]}")/lib/upsert-pr-comment.sh" \
+          "$n" "queue-deferred-release" "$release_receipt"; then
+          echo "    !! could not persist controller release receipt; leaving hold" >&2
+          request_retry_after "$(( ATTEMPT_COOLDOWN_MINUTES * 60 ))"
+          continue
+        fi
+      fi
+
       # Symphony PRs are born ready and immediately hard-held by this label.
       # The App-authored `unlabeled` event wakes autoenrollment only after the
       # exact-head checks and fleet receipt have passed.
@@ -396,7 +424,7 @@ if [[ "$RELEASE_MODE" == "release" || "$RELEASE_MODE" == "both" ]]; then
       held_after="$(jq -r --arg other_hold_re "$OTHER_HOLD_RE" '[.labels[] | select(. == "queue-deferred" or test($other_hold_re))] | join(",")' <<<"$after")"
 
       if [[ "$state_after" == "OPEN" && "$draft_after" == "false" && "$head_after" == "$expected_head" && -z "$held_after" ]]; then
-        upsert_status_comment "$n" "🤖 Queue-deferred release: typed hold (\`${reason}\`) lifted under a fresh GREEN fleet receipt with all required checks passing — PR is ready for review; the merge-queue controller revalidates this exact head before enrollment. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+        upsert_status_comment "$n" "🤖 Queue-deferred release: typed hold (\`${reason}\`) lifted under fresh \`${release_admission_mode}\` controller admission with all required checks passing — the merge-queue controller revalidates this exact head before enrollment. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
       else
         restore_hold_label "$n" || true
         upsert_status_comment "$n" "⚠️ Queue-deferred release: the PR changed during release (head=\`${head_after:0:12}\`, holds=\`${held_after:-none}\`, state=${state_after}, draft=${draft_after}), so the hold was restored. Re-run checks on the live head before releasing again. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"

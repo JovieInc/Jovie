@@ -11,6 +11,18 @@ const workflow = readFileSync(
   resolve(repoRoot, '.github/workflows/queue-deferred-release.yml'),
   'utf8'
 );
+const autoenroll = readFileSync(
+  resolve(repoRoot, '.github/workflows/merge-queue-autoenroll.yml'),
+  'utf8'
+);
+const drain = readFileSync(
+  resolve(repoRoot, 'scripts/drain-pr-queue.sh'),
+  'utf8'
+);
+const admission = readFileSync(
+  resolve(repoRoot, 'scripts/lib/queue-deferred-release-admission.mjs'),
+  'utf8'
+);
 
 describe('queue-deferred release closed loop (JOV-5054)', () => {
   it('scans every queue-deferred PR, not only agent-branch PRs', () => {
@@ -25,20 +37,37 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
     expect(workflow).not.toContain('Untyped holds are never');
   });
 
-  it('releases untyped ready holds under GREEN instead of requiring a human', () => {
+  it('releases untyped ready holds only through fresh controller admission', () => {
     expect(releaseScript).toContain('classify-hold');
     expect(releaseScript).toContain('untyped-ready-hold');
     expect(releaseScript).toContain(
-      'releasing if live state is ready under GREEN'
+      'releasing only after fresh controller admission'
     );
     expect(releaseScript).not.toContain('never released automatically');
     expect(releaseScript).toContain('node "$LIB" human-policy-re');
   });
 
-  it('still fail-closes human-policy holds and non-GREEN fleet receipts', () => {
+  it('still fail-closes human-policy holds and non-admitted fleet receipts', () => {
     expect(releaseScript).toContain('human-policy-re');
-    expect(releaseScript).toContain('fleet-gate-not-green');
+    expect(releaseScript).toContain('queue-deferred-release-admission.mjs');
+    expect(admission).toContain('fleet-gate-not-releasable');
     expect(releaseScript).toContain('fleet-receipt-stale');
     expect(releaseScript).toContain('every queue-deferred hold stays in place');
+  });
+
+  it('carries the exact bot receipt through the degraded release lifecycle', () => {
+    expect(autoenroll).toContain(
+      "steps.admission.outputs.deferred_release == '1'"
+    );
+    expect(autoenroll).toContain("'deferred-release-only'");
+    expect(drain).toContain(
+      'exact-head controller queue-deferred release receipt'
+    );
+    expect(drain).toContain(
+      'controller release evidence changed during native enrollment'
+    );
+    expect(drain).toContain(
+      'Fleet receipt does not authorize the exact queue-deferred release fallback'
+    );
   });
 });
