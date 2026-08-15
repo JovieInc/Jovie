@@ -5,10 +5,60 @@ import {
   blockForExternalAuthority,
   buildTriageLivenessReceipt,
   type DeliveryLease,
+  linearActiveIssueDecision,
   recordReceipt,
   startInternalRemediation,
   watchdogDecision,
 } from '../delivery-liveness';
+
+describe('Linear In Progress liveness', () => {
+  const issue = {
+    id: 'issue-id',
+    identifier: 'JOV-5142',
+    assignee: { id: 'owner-id', name: 'Codex' },
+    delegate: null,
+    comments: [] as Array<{ body: string; updatedAt: string }>,
+  };
+
+  it('reclaims assignee metadata without a machine receipt', () => {
+    expect(linearActiveIssueDecision(issue)).toEqual({
+      action: 'reclaim',
+      reason: 'missing_receipt',
+    });
+  });
+
+  it('retains only a matching accepted owner with a receipt under five minutes old', () => {
+    const observedAt = '2026-08-15T02:58:00.000Z';
+    const body = `<!-- jovie-active-lease:v1 -->\n${JSON.stringify({
+      owner: 'owner-id',
+      leaseId: 'lease-1',
+      observedAt,
+      evidence: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+    })}\n<!-- /jovie-active-lease -->`;
+    expect(
+      linearActiveIssueDecision(
+        { ...issue, comments: [{ body, updatedAt: observedAt }] },
+        new Date('2026-08-15T03:02:59.000Z')
+      )
+    ).toMatchObject({ action: 'retain' });
+  });
+
+  it('reclaims a matching owner when the receipt reaches five minutes old', () => {
+    const observedAt = '2026-08-15T02:58:00.000Z';
+    const body = `<!-- jovie-active-lease:v1 -->\n${JSON.stringify({
+      owner: 'Codex',
+      leaseId: 'lease-1',
+      observedAt,
+      evidence: 'source:abc123',
+    })}\n<!-- /jovie-active-lease -->`;
+    expect(
+      linearActiveIssueDecision(
+        { ...issue, comments: [{ body, updatedAt: observedAt }] },
+        new Date('2026-08-15T03:03:00.000Z')
+      )
+    ).toEqual({ action: 'reclaim', reason: 'stale_receipt' });
+  });
+});
 
 describe('triage liveness receipt', () => {
   it('blocks only agent-ready observations older than five minutes', () => {

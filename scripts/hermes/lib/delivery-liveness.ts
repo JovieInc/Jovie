@@ -13,6 +13,87 @@ export const DELIVERY_LIVENESS_SCHEMA = 'jovie-delivery-liveness/v1';
 export const DELIVERY_RECEIPT_STALE_MS = 5 * 60 * 1000;
 export const VERIFICATION_DEADLINE_MS = 10 * 60 * 1000;
 export const TRIAGE_RECEIPT_STALE_MS = 5 * 60 * 1000;
+export const LINEAR_ACTIVE_LEASE_MARKER = 'jovie-active-lease:v1';
+
+export interface LinearActiveLeaseReceipt {
+  readonly owner: string;
+  readonly leaseId: string;
+  readonly observedAt: string;
+  readonly evidence: string;
+}
+
+export interface LinearActiveIssue {
+  readonly id: string;
+  readonly identifier: string;
+  readonly assignee: { readonly id: string; readonly name: string } | null;
+  readonly delegate: { readonly id: string; readonly name: string } | null;
+  readonly comments: ReadonlyArray<{
+    readonly body: string;
+    readonly updatedAt: string;
+  }>;
+}
+
+export type LinearActiveIssueDecision =
+  | { readonly action: 'retain'; readonly receipt: LinearActiveLeaseReceipt }
+  | {
+      readonly action: 'reclaim';
+      readonly reason:
+        | 'no_accepted_owner'
+        | 'missing_receipt'
+        | 'stale_receipt';
+    };
+
+export function parseLinearActiveLeaseReceipt(
+  body: string
+): LinearActiveLeaseReceipt | null {
+  const match = new RegExp(
+    `<!--\\s*${LINEAR_ACTIVE_LEASE_MARKER}\\s*-->([\\s\\S]*?)<!--\\s*/jovie-active-lease\\s*-->`
+  ).exec(body);
+  if (!match) return null;
+  try {
+    const value = JSON.parse(match[1]) as Partial<LinearActiveLeaseReceipt>;
+    if (
+      !value.owner ||
+      !value.leaseId ||
+      !value.observedAt ||
+      !value.evidence ||
+      !Number.isFinite(Date.parse(value.observedAt))
+    ) {
+      return null;
+    }
+    return value as LinearActiveLeaseReceipt;
+  } catch {
+    return null;
+  }
+}
+
+export function linearActiveIssueDecision(
+  issue: LinearActiveIssue,
+  now = new Date()
+): LinearActiveIssueDecision {
+  const owners = [issue.assignee, issue.delegate].filter(
+    (owner): owner is { id: string; name: string } => owner !== null
+  );
+  if (owners.length === 0) {
+    return { action: 'reclaim', reason: 'no_accepted_owner' };
+  }
+  const receipts = issue.comments
+    .map(comment => parseLinearActiveLeaseReceipt(comment.body))
+    .filter((receipt): receipt is LinearActiveLeaseReceipt => receipt !== null)
+    .filter(receipt =>
+      owners.some(owner =>
+        [owner.id, owner.name].some(value => value === receipt.owner)
+      )
+    )
+    .sort((a, b) => b.observedAt.localeCompare(a.observedAt));
+  const receipt = receipts[0];
+  if (!receipt) return { action: 'reclaim', reason: 'missing_receipt' };
+  const ageMs = now.getTime() - Date.parse(receipt.observedAt);
+  if (ageMs < -30_000 || ageMs >= DELIVERY_RECEIPT_STALE_MS) {
+    return { action: 'reclaim', reason: 'stale_receipt' };
+  }
+  return { action: 'retain', receipt };
+}
 
 export interface AgentReadyTriageIssue {
   readonly identifier: string;
