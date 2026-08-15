@@ -371,27 +371,61 @@ def observe_concurrency(path: Path, now: datetime) -> dict[str, Any] | None:
     return {**receipt, "accepted": eligible}
 
 
-def observe_queue(repo: str, target: int) -> dict[str, Any]:
-    try:
-        result = subprocess.run(
-            [
-                "gh",
-                "pr",
-                "list",
-                "--repo",
-                repo,
-                "--state",
-                "open",
-                "--json",
-                "isDraft,labels,mergeStateStatus,statusCheckRollup",
-                "--limit",
-                "100",
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=20,
+def transient_gh_observation_error(error: BaseException) -> bool:
+    """Whether a GitHub CLI failure is worth a bounded observer retry."""
+    if isinstance(error, subprocess.TimeoutExpired):
+        return True
+    if not isinstance(error, subprocess.CalledProcessError):
+        return False
+    detail = " ".join(
+        str(value or "") for value in (error.stdout, error.stderr)
+    ).lower()
+    return any(
+        marker in detail
+        for marker in (
+            "http 502",
+            "http 503",
+            "http 504",
+            "gateway timeout",
+            "timed out",
+            "connection reset",
+            "connection refused",
+            "temporarily unavailable",
         )
+    )
+
+
+def run_gh_queue_snapshot(repo: str) -> subprocess.CompletedProcess[str]:
+    """Fetch a compact queue snapshot with a short bounded retry budget."""
+    command = [
+        "gh", "pr", "list", "--repo", repo, "--state", "open", "--json",
+        "number,isDraft,labels,mergeStateStatus", "--limit", "100",
+    ]
+    last_error: BaseException | None = None
+    for attempt in range(3):
+        try:
+            return subprocess.run(
+                command, check=True, capture_output=True, text=True, timeout=12
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            last_error = error
+            if attempt == 2 or not transient_gh_observation_error(error):
+                raise
+            # Observation only: provider blips get at most three seconds total.
+            time.sleep(attempt + 1)
+    assert last_error is not None
+    raise last_error
+
+
+def observe_queue(repo: str, target: int) -> dict[str, Any]:
+    """Observe queue demand without a 100-PR nested check-rollup query.
+
+    GitHub's ``mergeStateStatus == CLEAN`` is the compact merge-ready signal
+    used here for throughput/backpressure. Exact-head queue admission still
+    fetches and classifies required checks immediately before mutation.
+    """
+    try:
+        result = run_gh_queue_snapshot(repo)
         prs = json.loads(result.stdout)
         eligible = [
             pr
@@ -401,16 +435,7 @@ def observe_queue(repo: str, target: int) -> dict[str, Any]:
                 str(label.get("name")) for label in pr.get("labels", [])
             }.intersection({"hold", "gated", "queue-deferred", "needs-human"})
         ]
-        green_ready = [
-            pr
-            for pr in eligible
-            if pr.get("mergeStateStatus") == "CLEAN"
-            and all(
-                (check.get("conclusion") or check.get("state"))
-                in {"SUCCESS", "NEUTRAL", "SKIPPED"}
-                for check in pr.get("statusCheckRollup") or []
-            )
-        ]
+        green_ready = [pr for pr in eligible if pr.get("mergeStateStatus") == "CLEAN"]
         return {
             "status": "known",
             "eligiblePrs": len(eligible),

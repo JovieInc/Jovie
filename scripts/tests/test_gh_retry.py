@@ -1135,7 +1135,7 @@ JSON
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "fleet-gate-not-green:AMBER" in result.stdout
+        assert "fleet-gate-not-releasable:AMBER" in result.stdout
         log = (tmp_path / "gh-calls.log").read_text(encoding="utf-8")
         assert "pr edit" not in log
         assert "pr ready" not in log
@@ -1217,7 +1217,7 @@ JSON
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "untyped hold" in result.stdout
-        assert "releasing if live state is ready under GREEN" in result.stdout
+        assert "releasing only after fresh controller admission" in result.stdout
         assert "never released automatically" not in result.stdout
         assert "would remove `queue-deferred` from #900" in result.stdout
 
@@ -1274,7 +1274,7 @@ JSON
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "fleet-gate-not-green:RED" in result.stdout
+        assert "fleet-gate-not-releasable:RED" in result.stdout
         assert "would remove" not in result.stdout
 
     def test_untyped_hold_stays_held_when_production_receipt_is_stale(

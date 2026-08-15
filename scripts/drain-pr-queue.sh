@@ -88,10 +88,13 @@ DRAIN_PROMOTION_MODE="${DRAIN_PROMOTION_MODE:-normal}"
 DRAIN_FLEET_GATE_B64="${DRAIN_FLEET_GATE_B64:-}"
 DRAIN_RECOVER_FLEET_HOLDS="${DRAIN_RECOVER_FLEET_HOLDS:-0}"
 FLEET_HOLD_CONTEXT="jovie-fleet-queue-hold/v1"
+QUEUE_DEFERRED_RELEASE_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/queue-deferred-release-admission.mjs"
+QUEUE_DEFERRED_RELEASE_MARKER='<!-- bot-comment:queue-deferred-release -->'
+QUEUE_DEFERRED_RELEASE_ACTOR='jovie-bot[bot]'
 FLEET_GATE_JSON=""
 case "$DRAIN_PROMOTION_MODE" in
   normal) ;;
-  isolated-only | draft-only | blocked | hold-intake)
+  isolated-only | draft-only | blocked | hold-intake | deferred-release-only)
     if [[ -z "$DRAIN_FLEET_GATE_B64" ]]; then
       echo "::error::Refusing $DRAIN_PROMOTION_MODE without a fresh typed fleet receipt" >&2
       exit 2
@@ -109,7 +112,13 @@ case "$DRAIN_PROMOTION_MODE" in
       echo "::error::Refusing $DRAIN_PROMOTION_MODE with a malformed or stale fleet receipt" >&2
       exit 2
     fi
-    if ! jq -e --arg mode "$DRAIN_PROMOTION_MODE" '
+    if [[ "$DRAIN_PROMOTION_MODE" == "deferred-release-only" ]]; then
+      if ! node "$QUEUE_DEFERRED_RELEASE_LIB" fleet <<<"$FLEET_GATE_JSON" \
+        | jq -e '.allowed == true and .mode == "deferred-release-only"' >/dev/null; then
+        echo "::error::Fleet receipt does not authorize the exact queue-deferred release fallback" >&2
+        exit 2
+      fi
+    elif ! jq -e --arg mode "$DRAIN_PROMOTION_MODE" '
       .schema == "jovie-fleet-gate/v1" and
       .promotionMode == $mode and
       if $mode == "isolated-only" then
@@ -176,6 +185,25 @@ else
     exit 2
   fi
 fi
+
+# The queue-deferred release workflow writes this receipt *before* removing
+# the hold. It is the shared pre-enqueue guard for the narrow fallback mode:
+# an `unlabeled` event, a green check, or a matching PR number alone is never
+# enough authority to enroll while ordinary promotion is blocked.
+deferred_release_receipt_for_pr() {  # <pr>
+  local raw body
+  raw="$(gh_retry api "repos/${REPO}/issues/${1}/comments" --paginate --slurp 2>/dev/null || true)"
+  [[ -n "$raw" ]] || return 0
+  body="$(jq -r --arg marker "$QUEUE_DEFERRED_RELEASE_MARKER" --arg actor "$QUEUE_DEFERRED_RELEASE_ACTOR" '
+    [ .[][]?
+      | select(.user.login == $actor)
+      | select((.body | type == "string") and (.body | contains($marker)))
+      | .body
+    ] | last // empty
+  ' <<<"$raw" 2>/dev/null || true)"
+  [[ -n "$body" ]] || return 0
+  node "$QUEUE_DEFERRED_RELEASE_LIB" extract <<<"$body" 2>/dev/null || true
+}
 
 # Keep one scheduled tick bounded. A single in-flight GitHub call may finish
 # after the deadline, but no subsequent per-PR operation is started.
@@ -491,6 +519,18 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       echo "    ⏸ exact active-condition repair attestation is absent for #$n"
       return 2
     fi
+  elif [[ "$DRAIN_PROMOTION_MODE" == "deferred-release-only" ]]; then
+    local release_receipt
+    release_receipt="$(deferred_release_receipt_for_pr "$n")"
+    if ! jq -e --arg head "$expected_head" --argjson pr "$n" '
+      .schema == "jovie-queue-deferred-release/v1" and
+      .pr == $pr and
+      .head == $head and
+      .mode == "deferred-release-only"
+    ' <<<"$release_receipt" >/dev/null 2>&1; then
+      echo "    ⏸ exact-head controller queue-deferred release receipt is absent or invalid for #$n"
+      return 2
+    fi
   elif [[ "$DRAIN_PROMOTION_MODE" != "normal" ]]; then
     echo "    ⏸ fleet mode $DRAIN_PROMOTION_MODE forbids queue enrollment"
     return 2
@@ -553,6 +593,18 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       fi
     fi
 
+    if [[ "$DRAIN_PROMOTION_MODE" == "deferred-release-only" ]]; then
+      release_receipt="$(deferred_release_receipt_for_pr "$n")"
+      if ! jq -e --arg head "$expected_head" --argjson pr "$n" '
+        .schema == "jovie-queue-deferred-release/v1" and
+        .pr == $pr and .head == $head and .mode == "deferred-release-only"
+      ' <<<"$release_receipt" >/dev/null 2>&1; then
+        echo "    ⏸ controller release evidence changed during native enrollment for #$n; compensating"
+        dequeue_strict "$n" || return 1
+        return 2
+      fi
+    fi
+
     # PR descriptions and check state can change without changing the source
     # head. Re-evaluate the semantic/evidence receipt after enrollment and
     # compensate if any exact-head prerequisite changed during mutation.
@@ -582,6 +634,14 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       fi
     fi
 
+    # The degraded-observation fallback is intentionally allowed to clear only
+    # a bot-authored, exact-head fleet hold after enrollment. It cannot clear
+    # a human label or an arbitrary pending status, and it does not recover
+    # any other queued member.
+    if [[ "$DRAIN_PROMOTION_MODE" == "deferred-release-only" ]] \
+      && fleet_hold_is_recoverable "$expected_head"; then
+      clear_fleet_hold "$n" "$expected_head" || return 1
+    fi
     echo "    +native-queue on #$n at $head_oid"
     return 0
   fi
@@ -874,7 +934,9 @@ SNAP="$ENRICHED"
 # isolated-only may keep one freshly proven isolated entry; draft-only and
 # blocked preserve none.
 DRAIN_FREEZE_EXISTING_QUEUE=0
-if [[ "$DRAIN_PROMOTION_MODE" != "normal" && "$DRAIN_PROMOTION_MODE" != "hold-intake" ]]; then
+if [[ "$DRAIN_PROMOTION_MODE" != "normal" \
+  && "$DRAIN_PROMOTION_MODE" != "hold-intake" \
+  && "$DRAIN_PROMOTION_MODE" != "deferred-release-only" ]]; then
   DRAIN_FREEZE_EXISTING_QUEUE=1
 fi
 
