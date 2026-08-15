@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AuthAppleIcon } from '@/components/features/auth/atoms';
 import { AuthLayout } from '@/features/auth';
 import { authClient } from '@/lib/auth/client';
@@ -15,17 +15,36 @@ export function IdentityPageClient() {
     : 'your account';
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const oauthAttemptRef = useRef(0);
+
+  useEffect(() => {
+    const restoreSignInAction = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        oauthAttemptRef.current += 1;
+        setPending(false);
+      }
+    };
+
+    globalThis.addEventListener('pageshow', restoreSignInAction);
+    return () =>
+      globalThis.removeEventListener('pageshow', restoreSignInAction);
+  }, []);
 
   async function signInWithApple() {
+    const attempt = ++oauthAttemptRef.current;
     setPending(true);
     setError(null);
     try {
       const result = await authClient.signIn.social({ provider: 'apple' });
       if (result.error) {
+        if (oauthAttemptRef.current !== attempt) return;
+
         setError('Apple sign in could not be started. Try again.');
         setPending(false);
       }
     } catch {
+      if (oauthAttemptRef.current !== attempt) return;
+
       setError('Apple sign in could not be started. Try again.');
       setPending(false);
     }

@@ -82,7 +82,7 @@ struct AuthScreen: View {
   }
 
   private func startBrowserAuth() {
-    guard !isMock else {
+    guard canStartMobileAuth(isMock: isMock, isOpening: didRequestBrowserAuth) else {
       return
     }
 
@@ -110,6 +110,12 @@ struct AuthScreen: View {
               .authSessionClosed,
               context: ["reason": "user_cancelled"]
             )
+            onAuthError(mobileAuthFailureMessage(for: error))
+            return
+          }
+
+          if case MobileAuthCoordinatorError.providerError = error {
+            onAuthError(mobileAuthFailureMessage(for: error))
             return
           }
 
@@ -126,12 +132,24 @@ struct AuthScreen: View {
               "error_type": String(describing: type(of: error)),
             ]
           )
-          onAuthError("Couldn't finish sign-in. Try again.")
+          onAuthError(mobileAuthFailureMessage(for: error))
           authLogger.error("Mobile browser auth failed: \(error.localizedDescription, privacy: .public)")
         }
       }
     }
   }
+}
+
+func mobileAuthFailureMessage(for error: Error) -> String {
+  if isAuthSessionCancellation(error) {
+    return MobileAuthCopy.cancellation
+  }
+
+  if case let MobileAuthCoordinatorError.providerError(providerError) = error {
+    return providerError.userMessage
+  }
+
+  return MobileAuthCopy.failure
 }
 
 private struct BrowserAuthActions: View {
@@ -142,7 +160,12 @@ private struct BrowserAuthActions: View {
 
   var body: some View {
     VStack(spacing: JovieSpacing.large) {
-      ContinueInBrowserButton(isOpening: isOpening, isDisabled: isDisabled, action: action)
+      ContinueInBrowserButton(
+        isOpening: isOpening,
+        isDisabled: isDisabled,
+        hasRecoveryMessage: errorMessage != nil,
+        action: action
+      )
 
       AuthErrorText(message: errorMessage)
     }
@@ -153,6 +176,7 @@ private struct BrowserAuthActions: View {
 private struct ContinueInBrowserButton: View {
   let isOpening: Bool
   let isDisabled: Bool
+  let hasRecoveryMessage: Bool
   let action: () -> Void
 
   var body: some View {
@@ -174,7 +198,7 @@ private struct ContinueInBrowserButton: View {
       .frame(height: 56)
       .contentShape(Rectangle())
     }
-    .disabled(isDisabled)
+    .disabled(mobileAuthButtonIsDisabled(isDisabled: isDisabled, isOpening: isOpening))
     .buttonStyle(.plain)
     .background(
       Capsule(style: .continuous)
@@ -184,12 +208,36 @@ private struct ContinueInBrowserButton: View {
   }
 
   private var buttonTitle: String {
-    if isDisabled {
-      return "Sign-in Unavailable"
-    }
-
-    return isOpening ? "Opening Browser..." : "Continue in Browser"
+    mobileAuthButtonTitle(
+      isOpening: isOpening,
+      isDisabled: isDisabled,
+      hasRecoveryMessage: hasRecoveryMessage
+    )
   }
+}
+
+func mobileAuthButtonTitle(
+  isOpening: Bool,
+  isDisabled: Bool,
+  hasRecoveryMessage: Bool
+) -> String {
+  if isDisabled {
+    return "Sign-in Unavailable"
+  }
+
+  if isOpening {
+    return "Opening Browser..."
+  }
+
+  return hasRecoveryMessage ? "Sign In Again" : "Continue in Browser"
+}
+
+func canStartMobileAuth(isMock: Bool, isOpening: Bool) -> Bool {
+  !isMock && !isOpening
+}
+
+func mobileAuthButtonIsDisabled(isDisabled: Bool, isOpening: Bool) -> Bool {
+  isDisabled || isOpening
 }
 
 private struct AuthErrorText: View {

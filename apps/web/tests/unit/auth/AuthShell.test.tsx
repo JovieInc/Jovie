@@ -209,6 +209,44 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     await waitFor(() => expect(google).toBeEnabled());
   });
 
+  it('restores every sign-in action when OAuth cancellation returns from browser history', async () => {
+    const user = userEvent.setup();
+    let rejectFirstAttempt: (reason?: unknown) => void = () => {};
+    signInSocialMock
+      .mockReturnValueOnce(
+        new Promise((_, reject) => {
+          rejectFirstAttempt = reject;
+        })
+      )
+      .mockReturnValueOnce(new Promise(() => {}));
+    render(<AuthShell mode='sign-in' />);
+
+    const google = await screen.findByRole('button', { name: /google/i });
+    const apple = await screen.findByRole('button', { name: /apple/i });
+    await waitFor(() => expect(google).toBeEnabled());
+    await user.click(google);
+
+    expect(google).toBeDisabled();
+    expect(apple).toBeDisabled();
+
+    const pageShow = new Event('pageshow');
+    Object.defineProperty(pageShow, 'persisted', { value: true });
+    globalThis.dispatchEvent(pageShow);
+
+    await waitFor(() => expect(google).toBeEnabled());
+    expect(apple).toBeEnabled();
+
+    await user.click(apple);
+    expect(google).toBeDisabled();
+    expect(apple).toBeDisabled();
+
+    rejectFirstAttempt(new Error('cancelled attempt settled late'));
+
+    await waitFor(() => expect(apple).toBeDisabled());
+    expect(google).toBeDisabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('keeps the signed-in first render deterministic, then hides after hydration', async () => {
     authState.isSignedIn = true;
 

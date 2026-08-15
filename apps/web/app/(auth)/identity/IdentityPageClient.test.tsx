@@ -77,4 +77,34 @@ describe('IdentityPageClient', () => {
       'Apple sign in could not be started. Try again.'
     );
   });
+
+  it('restores the Apple sign-in action after a cancelled browser round trip', async () => {
+    let rejectFirstAttempt: (reason?: unknown) => void = () => {};
+    signInSocial
+      .mockReturnValueOnce(
+        new Promise((_, reject) => {
+          rejectFirstAttempt = reject;
+        })
+      )
+      .mockReturnValueOnce(new Promise(() => {}));
+    render(<IdentityPageClient />);
+
+    const apple = screen.getByRole('button', { name: 'Continue with Apple' });
+    fireEvent.click(apple);
+    expect(apple).toBeDisabled();
+
+    const pageShow = new Event('pageshow');
+    Object.defineProperty(pageShow, 'persisted', { value: true });
+    globalThis.dispatchEvent(pageShow);
+
+    await waitFor(() => expect(apple).toBeEnabled());
+
+    fireEvent.click(apple);
+    expect(apple).toBeDisabled();
+
+    rejectFirstAttempt(new Error('cancelled attempt settled late'));
+
+    await waitFor(() => expect(apple).toBeDisabled());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
 });

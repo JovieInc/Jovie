@@ -97,6 +97,19 @@ struct LiveRootContainer: View {
 
     Task { @MainActor in
       if let providerError = MobileAuthReturnParser.parseProviderError(url) {
+        guard shouldHandleMobileAuthProviderError(
+          route: appState.route,
+          hasPendingVerifier: MobileAuthPendingStore.shared.hasCodeVerifier()
+        ) else {
+          Observability.addBreadcrumb(
+            .deepLinkParseFailed,
+            level: .warning,
+            context: ["reason": "provider_error_without_pending_auth"]
+          )
+          return
+        }
+
+        MobileAuthPendingStore.shared.clear()
         Observability.addBreadcrumb(
           .deepLinkRouteMatched,
           level: .warning,
@@ -104,7 +117,6 @@ struct LiveRootContainer: View {
         )
         authReturnTask?.cancel()
         authReturnTask = nil
-        await appState.signOut()
         authErrorMessage = providerError.userMessage
         MobileAuthDiagnostics.record("auth_callback_provider_error", detail: providerError.error)
 #if DEBUG

@@ -617,7 +617,9 @@ struct AppStateTests {
         state: "state_123"
       )
     )
-    #expect(result?.userMessage == "Couldn't finish sign-in. Try again.")
+    #expect(
+      result?.userMessage == "Sign-in was cancelled. Sign in again when you're ready."
+    )
   }
 
   @Test func mobileAuthReturnParserAcceptsSanitizedServerErrorCallback() {
@@ -635,6 +637,71 @@ struct AppStateTests {
       )
     )
     #expect(result?.userMessage == "Couldn't finish sign-in. Try again.")
+  }
+
+  @Test func mobileAuthRecoveryMessageMakesRetryActionExplicit() {
+    #expect(
+      mobileAuthButtonTitle(
+        isOpening: false,
+        isDisabled: false,
+        hasRecoveryMessage: true
+      ) == "Sign In Again"
+    )
+    #expect(
+      mobileAuthButtonTitle(
+        isOpening: false,
+        isDisabled: false,
+        hasRecoveryMessage: false
+      ) == "Continue in Browser"
+    )
+    #expect(canStartMobileAuth(isMock: false, isOpening: false))
+    #expect(!canStartMobileAuth(isMock: false, isOpening: true))
+    #expect(
+      mobileAuthButtonIsDisabled(isDisabled: false, isOpening: true)
+    )
+  }
+
+  @Test func mobileAuthFailuresPreserveCancellationRecoveryCopy() {
+    #expect(
+      mobileAuthFailureMessage(for: CancellationError()) == MobileAuthCopy.cancellation
+    )
+
+    let providerError = MobileAuthCoordinatorError.providerError(
+      MobileAuthProviderError(
+        error: "access_denied",
+        errorDescription: nil,
+        state: "state_123"
+      )
+    )
+
+    #expect(
+      mobileAuthFailureMessage(for: providerError) == MobileAuthCopy.cancellation
+    )
+    #expect(
+      mobileAuthFailureMessage(for: MobileAuthCoordinatorError.invalidAuthURL) ==
+        MobileAuthCopy.failure
+    )
+  }
+
+  @Test func providerErrorCallbacksRequirePendingSignedOutAuth() {
+    #expect(
+      shouldHandleMobileAuthProviderError(
+        route: .signedOut,
+        hasPendingVerifier: true
+      )
+    )
+    #expect(
+      !shouldHandleMobileAuthProviderError(
+        route: .ready,
+        hasPendingVerifier: true
+      )
+    )
+    #expect(
+      !shouldHandleMobileAuthProviderError(
+        route: .signedOut,
+        hasPendingVerifier: false
+      )
+    )
   }
 
   @Test func mobileAuthReturnParserConsumesStoredVerifierForOpenURLCallback() async {
