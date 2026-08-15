@@ -1353,6 +1353,14 @@ done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg pro
 # Fail with a classified machine-owned condition so Delivery Control Receipts
 # emits a durable Gem repair task; it still cannot merge or bypass any gate.
 if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
+  ADMISSION_TARGET_OBSERVED="$(echo "$SNAP" | jq -r \
+    --arg admission_pr "$DRAIN_ADMISSION_PR" \
+    --arg admission_head "$DRAIN_ADMISSION_HEAD" '
+      any(.[];
+        ((.n | tostring) == $admission_pr)
+        and ((.headOid // "") | ascii_downcase == $admission_head)
+      )
+    ')"
   ADMISSION_ALREADY_QUEUED="$(echo "$SNAP" | jq -r \
     --arg admission_pr "$DRAIN_ADMISSION_PR" \
     --arg admission_head "$DRAIN_ADMISSION_HEAD" '
@@ -1362,7 +1370,9 @@ if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
         and (.q == true)
       )
     ')"
-  if [[ "$ADMISSION_ALREADY_QUEUED" != "true" ]]; then
+  # A changed head has invalidated the event scope. It must never inherit this
+  # event's queue intent; the newer head's own event creates its receipt.
+  if [[ "$ADMISSION_TARGET_OBSERVED" == "true" && "$ADMISSION_ALREADY_QUEUED" != "true" ]]; then
     echo "::error::queue-noop: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD has no native queue receipt" >&2
     exit 3
   fi
