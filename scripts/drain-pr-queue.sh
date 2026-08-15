@@ -447,7 +447,7 @@ reconcile_deferred_auto_merge_after_main_push() {
 # a queue-deferred hold cannot be overwritten by this controller.
 enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr authorized-head]
   local n="$1" authorized_pr="${2:-$DRAIN_ADMISSION_PR}" authorized_head="${3:-$DRAIN_ADMISSION_HEAD}"
-  local current head_oid expected_head json_fields
+  local current enrollment_receipt head_oid expected_head json_fields queue_position queue_state
   json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName,body"
   if ! current="$(gh_retry pr view "$n" -R "$REPO" \
     --json "$json_fields" 2>/dev/null)"; then
@@ -545,8 +545,24 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
   fi
   # native-queue-transport:enrollment:start
   if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
-    if ! node scripts/merge-queue-backend.mjs enroll "$n" "$head_oid" >/dev/null; then
+    if ! enrollment_receipt="$(node scripts/merge-queue-backend.mjs enroll "$n" "$head_oid")"; then
       echo "    !! native enrollment/postcondition failed for #$n" >&2
+      if ! dequeue_strict "$n"; then
+        echo "    !! CRITICAL: could not compensate unproven native enrollment for #$n" >&2
+      fi
+      return 1
+    fi
+    if ! jq -e --arg expected_head "$expected_head" '
+      .state.state == "OPEN"
+      and (.state.isDraft | not)
+      and ((.state.headRefOid // "") | ascii_downcase) == $expected_head
+      and (.state.mergeQueueEntry.state | IN("QUEUED", "AWAITING_CHECKS", "MERGEABLE", "UNMERGEABLE", "LOCKED"))
+      and (.state.mergeQueueEntry.position | type == "number" and floor == . and . > 0)
+    ' <<<"$enrollment_receipt" >/dev/null; then
+      echo "    !! native enrollment returned no exact-head positioned queue receipt for #$n" >&2
+      if ! dequeue_strict "$n"; then
+        echo "    !! CRITICAL: could not compensate malformed native enrollment receipt for #$n" >&2
+      fi
       return 1
     fi
 
@@ -642,7 +658,9 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       && fleet_hold_is_recoverable "$expected_head"; then
       clear_fleet_hold "$n" "$expected_head" || return 1
     fi
-    echo "    +native-queue on #$n at $head_oid"
+    queue_position="$(jq -r '.state.mergeQueueEntry.position' <<<"$enrollment_receipt")"
+    queue_state="$(jq -r '.state.mergeQueueEntry.state' <<<"$enrollment_receipt")"
+    echo "    +native-queue on #$n at $head_oid (state $queue_state, position $queue_position)"
     return 0
   fi
   # native-queue-transport:enrollment:end
