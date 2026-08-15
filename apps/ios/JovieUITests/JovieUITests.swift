@@ -402,9 +402,9 @@ final class JovieUITests: XCTestCase {
     // all, and no leftover blank strip reserved at the bottom of the shell.
     let onboardingApp = launchMockApp(
       launchArgument: "-ui-testing-needs-onboarding",
-      expectedElementDescription: "\"Continue on Web\""
+      expectedElementDescription: "\"Finish Your Profile\""
     ) {
-      $0.buttons["Continue on Web"]
+      $0.staticTexts["Finish Your Profile"]
     }
     let completionButton = onboardingApp.buttons["profile-completion-submit"]
     XCTAssertTrue(completionButton.waitForExistence(timeout: 3))
