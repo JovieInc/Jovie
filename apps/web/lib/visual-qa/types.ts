@@ -9,6 +9,20 @@ export type VisualQaViewport = 'desktop' | 'mobile';
 
 export type VisualQaCaptureTarget = 'page' | 'locator';
 
+export interface VisualQaViewportRegion {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface VisualQaDynamicMask {
+  readonly id: string;
+  readonly selector?: string;
+  readonly region?: VisualQaViewportRegion;
+  readonly reason: string;
+}
+
 export interface VisualQaCaptureConfig {
   readonly route: string;
   readonly waitFor: string;
@@ -20,6 +34,7 @@ export interface VisualQaCaptureConfig {
   readonly flagOverrides?: Readonly<Record<string, boolean>>;
   readonly fixedNow?: string;
   readonly reducedMotion?: boolean;
+  readonly dynamicMasks?: readonly VisualQaDynamicMask[];
 }
 
 export interface VisualQaSurface {
@@ -45,12 +60,25 @@ export interface VisualQaPhaseCaptureRecord {
   readonly afterCapturedAt: string | null;
 }
 
+export interface VisualQaLockedRegionHashRecord {
+  readonly id: string;
+  readonly sha256: string;
+}
+
 export interface VisualQaSurfaceCaptureRecord {
   readonly surfaceId: string;
   readonly title: string;
   readonly viewport: VisualQaViewportSize;
   readonly themes: Partial<
     Record<VisualQaColorScheme, VisualQaPhaseCaptureRecord>
+  >;
+  readonly lockedRegionHashes?: Partial<
+    Record<
+      VisualQaPhase,
+      Partial<
+        Record<VisualQaColorScheme, readonly VisualQaLockedRegionHashRecord[]>
+      >
+    >
   >;
 }
 
@@ -112,7 +140,27 @@ export function isVisualQaRunManifest(
         typeof surface.title === 'string' &&
         hasValidThemes &&
         typeof surface.viewport?.width === 'number' &&
-        typeof surface.viewport?.height === 'number'
+        typeof surface.viewport?.height === 'number' &&
+        (surface.lockedRegionHashes === undefined ||
+          (!!surface.lockedRegionHashes &&
+            typeof surface.lockedRegionHashes === 'object' &&
+            Object.values(surface.lockedRegionHashes).every(hashByTheme => {
+              if (!hashByTheme || typeof hashByTheme !== 'object') {
+                return false;
+              }
+
+              return Object.values(hashByTheme).every(
+                hashes =>
+                  Array.isArray(hashes) &&
+                  hashes.every(
+                    hash =>
+                      !!hash &&
+                      typeof hash === 'object' &&
+                      typeof hash.id === 'string' &&
+                      /^[a-f0-9]{64}$/i.test(hash.sha256)
+                  )
+              );
+            })))
       );
     })
   );

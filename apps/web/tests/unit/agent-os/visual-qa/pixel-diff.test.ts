@@ -56,4 +56,18 @@ describe('computePixelDiff', () => {
     });
     expect(weighted.overlay.byteLength).toBeGreaterThan(0);
   });
+
+  it('excludes registered dynamic masks from drift scoring', async () => {
+    const baseline = await createSolidPng({ r: 0, g: 0, b: 0 });
+    const after = await createSolidPng({ r: 255, g: 255, b: 255 });
+
+    const result = await computePixelDiff(baseline, after, {
+      masks: [{ x: 0, y: 0, width: 0.5, height: 1 }],
+    });
+
+    expect(result.maskedPixelCount).toBe(8);
+    expect(result.diffPixelCount).toBe(8);
+    expect(result.rawDiffRatio).toBe(0.5);
+    expect(result.weightedDriftScore).toBe(1);
+  });
 });

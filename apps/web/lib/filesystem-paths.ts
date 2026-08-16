@@ -1,9 +1,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { validatePathTraversal } from '@/lib/security/path-traversal';
 
-const LIB_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
+// Playwright's TypeScript loader executes test dependencies as CommonJS while
+// the app source is authored as ESM. Keep root discovery cwd-based so shared
+// path helpers remain loadable in both runners.
+const LIB_DIRECTORY = path.join(process.cwd(), 'lib');
 const safeExistsSync: (candidatePath: string) => boolean =
   typeof fs.existsSync === 'function' ? fs.existsSync : () => false;
 

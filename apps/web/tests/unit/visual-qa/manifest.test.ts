@@ -36,6 +36,33 @@ describe('visual-qa manifest', () => {
     ).toBe(true);
   });
 
+  it('accepts valid locked-region hashes on each phase and theme', () => {
+    expect(
+      isVisualQaRunManifest({
+        runId: 'proposal-locked',
+        createdAt: '2026-06-08T12:00:00.000Z',
+        updatedAt: '2026-06-08T12:05:00.000Z',
+        gitSha: 'abc123',
+        surfaces: [
+          {
+            surfaceId: 'shell-desktop-idle',
+            title: 'Shell — desktop idle',
+            viewport: { width: 1440, height: 900 },
+            themes: {},
+            lockedRegionHashes: {
+              baseline: {
+                dark: [{ id: 'app-shell-chrome', sha256: 'a'.repeat(64) }],
+              },
+              after: {
+                dark: [{ id: 'app-shell-chrome', sha256: 'b'.repeat(64) }],
+              },
+            },
+          },
+        ],
+      })
+    ).toBe(true);
+  });
+
   it('rejects malformed manifests', () => {
     expect(isVisualQaRunManifest(null)).toBe(false);
     expect(
@@ -51,6 +78,27 @@ describe('visual-qa manifest', () => {
       isVisualQaRunManifest({
         runId: 'proposal-001',
         surfaces: [{ surfaceId: 'shell-desktop-idle' }],
+      })
+    ).toBe(false);
+    expect(
+      isVisualQaRunManifest({
+        runId: 'proposal-001',
+        createdAt: '2026-06-08T12:00:00.000Z',
+        updatedAt: '2026-06-08T12:05:00.000Z',
+        gitSha: null,
+        surfaces: [
+          {
+            surfaceId: 'shell-desktop-idle',
+            title: 'Shell — desktop idle',
+            viewport: { width: 1440, height: 900 },
+            themes: {},
+            lockedRegionHashes: {
+              baseline: {
+                dark: [{ id: 'app-shell-chrome', sha256: 'not-a-hash' }],
+              },
+            },
+          },
+        ],
       })
     ).toBe(false);
   });
