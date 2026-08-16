@@ -57,23 +57,27 @@ describe('synthetic monitoring workflow parser', () => {
     expect(uploadStep).toContain('retention-days: 30');
   });
 
-  it('runs the required Better Auth account suite behind explicit production gates', () => {
+  it('replaces the destructive account canary with the retained waitlist traversal', () => {
     for (const path of [workflowPath, agentTickWorkflowPath]) {
       const workflow = readFileSync(path, 'utf8');
       const canaryStep = getStepBlock(
         workflow,
-        'Run Better Auth Production Account Canary'
+        'Run Production Waitlist Canary'
       );
 
       expect(canaryStep).toContain("E2E_SYNTHETIC_MODE: 'true'");
-      expect(canaryStep).toContain("E2E_PROD_ACCOUNT_CANARY_ENABLED: 'true'");
-      expect(canaryStep).toContain('VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}');
+      expect(canaryStep).toContain("E2E_PROD_WAITLIST_CANARY_ENABLED: 'true'");
       expect(canaryStep).toContain(
-        'tests/e2e/synthetic-better-auth-account.spec.ts'
+        'tests/e2e/synthetic-production-waitlist.spec.ts'
       );
+      expect(canaryStep).toContain('--only-secrets=E2E_PROD_SIGNUP_EMAIL_BASE');
+      expect(canaryStep).toContain('--no-fallback -- env -u DOPPLER_TOKEN');
+      expect(canaryStep).not.toContain('DATABASE_URL');
       expect(workflow).toContain(
-        'SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-better-auth-account-results.json'
+        'SYNTHETIC_PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/synthetic-production-waitlist-results.json'
       );
+      expect(workflow).not.toContain('synthetic-better-auth-account');
+      expect(workflow).not.toContain('E2E_PROD_ACCOUNT_CANARY_ENABLED');
     }
   });
 });
