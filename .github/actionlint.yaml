@@ -3,7 +3,6 @@
 # without treating the repository's declared infrastructure as a syntax error.
 self-hosted-runner:
   labels:
-    - gem
     - hermes
     - jovie-eph-isolation
     - jovie-ephemeral

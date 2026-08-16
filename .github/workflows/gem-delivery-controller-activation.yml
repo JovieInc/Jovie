@@ -21,7 +21,9 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_branch == 'main'
     name: Activate exact production-proven Gem controller
-    runs-on: [self-hosted, Linux, X64, jovie-fixed, gem]
+    # The fixed fleet is provisioned on the Gem host. The installer establishes
+    # and verifies the shared user-systemd context before any controller write.
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 8
     steps:
       - name: Checkout the exact successful production revision
