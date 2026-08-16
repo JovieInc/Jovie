@@ -1,26 +1,12 @@
 name: Ownerless Recovery Sweep
-
-# Hosted, GitHub-only fallback for focused recovery PRs. This lane does not
-# consume Gem fleet receipts or Symphony leases. It promotes only an exact
-# current-main head after one ownerless hour and records native queue proof.
 on:
   schedule:
     - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: Classify without changing pull requests
-        required: false
-        default: false
-        type: boolean
-
 permissions:
   contents: read
-
 concurrency:
   group: ownerless-recovery-sweep
-  cancel-in-progress: false
-
 jobs:
   sweep:
     runs-on: ubuntu-latest
@@ -35,7 +21,7 @@ jobs:
           permission-contents: write
           permission-pull-requests: write
           permission-issues: write
-          permission-checks: read
+          permission-checks: read # No Gem or Symphony dependency.
       - name: Checkout exact main recovery policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,6 +35,4 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
-          DRY_RUN: ${{ inputs.dry_run || 'false' }}
         run: node scripts/ownerless-recovery-sweeper.mjs
-

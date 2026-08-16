@@ -54,7 +54,7 @@ const FOCUSED_PATHS = Object.freeze([
 ]);
 
 const MATERIAL_RISK_CHANGE =
-  /(?:secrets?\.|private[-_ ]key|api[-_ ]key|credential|(?:actions|checks|contents|deployments|id-token|issues|packages|pull-requests|security-events|statuses):\s*write|pull_request_target|drop\s+table|delete\s+from|rm\s+-rf|production\s+(?:deploy|promotion)|--force\b)/i;
+  /(?:secrets?\.|private[-_ ]key|api[-_ ]key|credential|(?:actions|checks|contents|deployments|id-token|issues|packages|pull-requests|security-events|statuses):\s*write|permissions:\s*write-all|pull_request_target|\b(?:GH_TOKEN|GITHUB_TOKEN)\b|\bgh\s+(?:api|pr|repo|run|workflow)\b|\b(?:curl|wget|nc|sudo|chmod|chown)\b|\bfind\b.*\s-delete\b|drop\s+table|delete\s+from|\b(?:rm\s+-rf|rmSync|unlink|truncate)\b|\b(?:fetch|https?\.request)\s*\(|continue-on-error:\s*true|\|\|\s*true|\b(?:bypass|skip)[-_ ]?(?:ci|check|gate)|production\s+(?:deploy|promotion)|--force\b|^[-+]\s*uses:\s)/im;
 
 const SHA = /^[0-9a-f]{40}$/;
 
@@ -64,9 +64,16 @@ function labelsOf(pr) {
   );
 }
 
-export function classifyRecoveryFiles(files = [], patch = '') {
+export function classifyRecoveryFiles(
+  files = [],
+  patch = '',
+  { patchComplete = true } = {}
+) {
   if (!Array.isArray(files) || files.length === 0) {
     return { eligible: false, lanes: [], reason: 'changed-files-unavailable' };
+  }
+  if (patchComplete !== true) {
+    return { eligible: false, lanes: [], reason: 'changed-patch-incomplete' };
   }
   const lanes = new Set();
   for (const file of files) {
@@ -121,6 +128,8 @@ export function evaluateRecoveryCandidate({
   timeline,
   files,
   patch,
+  patchComplete = true,
+  containsOpenPrHead = false,
   checksPassing,
   now = Date.now(),
   minimumOwnerlessMs = 60 * 60_000,
@@ -140,6 +149,9 @@ export function evaluateRecoveryCandidate({
   if (!SHA.test(pr.head?.sha ?? '')) {
     return { eligible: false, reason: 'invalid-head' };
   }
+  if (containsOpenPrHead === true) {
+    return { eligible: false, reason: 'stacked-open-head' };
+  }
   const holds = labelsOf(pr).filter(label => HOLD_LABELS.has(label));
   if (holds.length > 0)
     return { eligible: false, reason: `held:${holds.join(',')}` };
@@ -148,7 +160,7 @@ export function evaluateRecoveryCandidate({
   if (!Number.isFinite(sinceMs) || now - sinceMs < minimumOwnerlessMs) {
     return { eligible: false, reason: 'ownerless-under-threshold' };
   }
-  const scope = classifyRecoveryFiles(files, patch);
+  const scope = classifyRecoveryFiles(files, patch, { patchComplete });
   if (!scope.eligible) return scope;
   if (checksPassing !== true) {
     return {
@@ -165,6 +177,38 @@ export function evaluateRecoveryCandidate({
   };
 }
 
+const QUEUED_STATES = new Set([
+  'AWAITING_CHECKS',
+  'LOCKED',
+  'MERGEABLE',
+  'QUEUED',
+]);
+
+export function validateRecoveryMergeProof(proof, expectedHead) {
+  if (!SHA.test(expectedHead) || proof?.headRefOid !== expectedHead) {
+    return { proven: false, outcome: 'requested-unproven' };
+  }
+  if (
+    proof.state === 'MERGED' &&
+    typeof proof.mergedAt === 'string' &&
+    SHA.test(proof?.mergeCommit?.oid ?? '')
+  ) {
+    return { proven: true, outcome: 'merged' };
+  }
+  const entry = proof?.mergeQueueEntry;
+  if (
+    proof?.isInMergeQueue === true &&
+    typeof entry?.id === 'string' &&
+    entry.id.length > 0 &&
+    Number.isInteger(entry.position) &&
+    entry.position > 0 &&
+    QUEUED_STATES.has(entry.state)
+  ) {
+    return { proven: true, outcome: 'queued' };
+  }
+  return { proven: false, outcome: 'requested-unproven' };
+}
+
 export function renderRecoveryReceipt(receipt) {
   const normalized = {
     schema: RECOVERY_RECEIPT_SCHEMA,
@@ -177,6 +221,7 @@ export function renderRecoveryReceipt(receipt) {
     outcome: receipt.outcome,
     mergeQueueState: receipt.mergeQueueState ?? null,
     mergeQueuePosition: receipt.mergeQueuePosition ?? null,
+    mergeQueueEntryId: receipt.mergeQueueEntryId ?? null,
     observedAt: receipt.observedAt,
   };
   normalized.evidenceSha256 = createHash('sha256')

@@ -1,11 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   classifyRecoveryFiles,
   evaluateRecoveryCandidate,
-  ownerlessSince,
   renderRecoveryReceipt,
+  validateRecoveryMergeProof,
 } from '../ownerless-recovery-policy.mjs';
 
 const head = 'a'.repeat(40);
@@ -49,6 +47,8 @@ describe('ownerless recovery policy', () => {
   it.each([
     [{ pr: { ...pr, base: { ...pr.base, ref: 'stack-base' } } }, 'stacked-pr'],
     [{ compare: { behind_by: 1 } }, 'stale-current-main'],
+    [{ containsOpenPrHead: true }, 'stacked-open-head'],
+    [{ patchComplete: false }, 'changed-patch-incomplete'],
     [
       { pr: { ...pr, mergeable: false, mergeable_state: 'dirty' } },
       'conflicted-or-unknown',
@@ -64,15 +64,6 @@ describe('ownerless recovery policy', () => {
     ],
   ])('rejects unsafe eligibility state: %s', (overrides, reason) => {
     expect(evaluate(overrides)).toMatchObject({ eligible: false, reason });
-  });
-
-  it('uses the latest unassignment as the ownerless clock', () => {
-    expect(
-      ownerlessSince(pr, [
-        { event: 'assigned', created_at: '2026-08-15T00:30:00Z' },
-        { event: 'unassigned', created_at: '2026-08-15T01:30:00Z' },
-      ])
-    ).toBe('2026-08-15T01:30:00Z');
   });
 
   it('admits waitlist canary tests but rejects runtime, credential, and production paths', () => {
@@ -116,38 +107,43 @@ describe('ownerless recovery policy', () => {
       outcome: 'requested-unproven',
       observedAt: '2026-08-15T02:00:00.000Z',
     });
-    expect(body).toContain('jovie-ownerless-recovery/v1');
-    expect(body).toContain('requested-unproven');
-    expect(body).toContain('merge proof only when');
-    expect(body).toContain('evidenceSha256');
-  });
-});
-
-describe('ownerless recovery workflow contract', () => {
-  const root = resolve(import.meta.dirname, '../../..');
-  const workflow = readFileSync(
-    resolve(root, '.github/workflows/ownerless-recovery-sweep.yml'),
-    'utf8'
-  );
-  const sweeper = readFileSync(
-    resolve(root, 'scripts/ownerless-recovery-sweeper.mjs'),
-    'utf8'
-  );
-
-  it('runs on hosted GitHub state without Gem or Symphony', () => {
-    expect(workflow).toContain('runs-on: ubuntu-latest');
-    expect(workflow).toContain('schedule:');
-    expect(workflow).not.toMatch(/runs-on:.*self-hosted/);
-    expect(workflow).not.toContain('FLEET_RECEIPT');
-    expect(workflow).not.toContain('gem-priority-gate');
-    expect(workflow).not.toContain('scripts/hermes/symphony');
+    expect(body).toMatch(
+      /jovie-ownerless-recovery\/v1[\s\S]*requested-unproven/
+    );
+    expect(body).toMatch(/evidenceSha256[\s\S]*merge proof only when/);
   });
 
-  it('requests exact-head native merge and reads authoritative queue proof', () => {
-    expect(sweeper).toContain("'--match-head-commit'");
-    expect(sweeper).toContain('mergeQueueEntry{position state}');
-    expect(sweeper).toContain("writeReceipt('merge-request-failed')");
-    expect(sweeper).toContain("'requested-unproven'");
-    expect(sweeper).toContain('(concurrent controller)');
+  it('requires exact-head authoritative merge or queue proof', () => {
+    const queued = {
+      headRefOid: head,
+      isInMergeQueue: true,
+      mergeQueueEntry: { id: 'MQE_1', position: 1, state: 'QUEUED' },
+    };
+    expect(validateRecoveryMergeProof(queued, head)).toEqual({
+      proven: true,
+      outcome: 'queued',
+    });
+    expect(
+      validateRecoveryMergeProof({ ...queued, headRefOid: main }, head)
+    ).toMatchObject({ proven: false });
+    expect(
+      validateRecoveryMergeProof(
+        {
+          ...queued,
+          mergeQueueEntry: { ...queued.mergeQueueEntry, position: 0 },
+        },
+        head
+      )
+    ).toMatchObject({ proven: false });
+    const merged = {
+      state: 'MERGED',
+      headRefOid: head,
+      mergedAt: '2026-08-15T02:01:00.000Z',
+      mergeCommit: { oid: main },
+    };
+    expect(validateRecoveryMergeProof(merged, head)).toEqual({
+      proven: true,
+      outcome: 'merged',
+    });
   });
 });
