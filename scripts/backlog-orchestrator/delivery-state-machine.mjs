@@ -69,6 +69,7 @@ const STAGES = new Set([
   'leased',
   'draft-pr',
   'ci-pending',
+  'ci-green',
   'queue-pending',
   'queued',
   'merged',
@@ -219,6 +220,7 @@ export function transitionDeliveryReceipt(
   const prBoundStages = new Set([
     'draft-pr',
     'ci-pending',
+    'ci-green',
     'queue-pending',
     'queued',
     'merged',
