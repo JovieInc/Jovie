@@ -3,7 +3,7 @@
 # Symphony UI pilot runtime on gem (JOV-4962).
 #
 # The repo is the source of truth for the versioned workflow, the systemd
-# user unit, and the lease guard (JOV-5031). This script materializes them
+# user units, lease guard (JOV-5031), and durable stopped-work reconciler. This script materializes them
 # onto the host with timestamped backups and reloads the user systemd manager.
 # It NEVER starts, stops, or restarts the service and never kills a running
 # process — draining active leases before swapping the runtime is a separate,
@@ -25,9 +25,19 @@ TARGET_HOME="${SYMPHONY_UI_PILOT_HOME:-$HOME}"
 WORKFLOW_SRC="$REPO_ROOT/scripts/hermes/WORKFLOW.jovie-ui-pilot.md"
 UNIT_SRC="$REPO_ROOT/scripts/hermes/systemd/symphony-ui-pilot.service"
 GUARD_SRC="$REPO_ROOT/scripts/hermes/symphony-lease-guard"
+RECONCILER_SRC="$REPO_ROOT/scripts/hermes/symphony-reconciler.py"
+MODEL_ROUTER_SRC="$REPO_ROOT/scripts/hermes/model-router.py"
+MODEL_REGISTRY_SRC="$REPO_ROOT/scripts/hermes/config/model-registry.json"
+RECONCILER_SERVICE_SRC="$REPO_ROOT/scripts/hermes/systemd/symphony-reconciler.service"
+RECONCILER_TIMER_SRC="$REPO_ROOT/scripts/hermes/systemd/symphony-reconciler.timer"
 WORKFLOW_DST="$TARGET_HOME/symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
 UNIT_DST="$TARGET_HOME/.config/systemd/user/symphony-ui-pilot.service"
 GUARD_DST="$TARGET_HOME/.local/bin/symphony-lease-guard"
+RECONCILER_DST="$TARGET_HOME/.local/bin/symphony-reconciler"
+MODEL_ROUTER_DST="$TARGET_HOME/.local/lib/symphony-reconciler/model-router.py"
+MODEL_REGISTRY_DST="$TARGET_HOME/.local/lib/symphony-reconciler/model-registry.json"
+RECONCILER_SERVICE_DST="$TARGET_HOME/.config/systemd/user/symphony-reconciler.service"
+RECONCILER_TIMER_DST="$TARGET_HOME/.config/systemd/user/symphony-reconciler.timer"
 
 CHECK_ONLY=0
 DAEMON_RELOAD=1
@@ -85,6 +95,11 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
   if [ "$LEASE_GUARD_ONLY" -eq 0 ]; then
     check_one "$WORKFLOW_SRC" "$WORKFLOW_DST" || rc=1
     check_one "$UNIT_SRC" "$UNIT_DST" || rc=1
+    check_one "$RECONCILER_SRC" "$RECONCILER_DST" || rc=1
+    check_one "$MODEL_ROUTER_SRC" "$MODEL_ROUTER_DST" || rc=1
+    check_one "$MODEL_REGISTRY_SRC" "$MODEL_REGISTRY_DST" || rc=1
+    check_one "$RECONCILER_SERVICE_SRC" "$RECONCILER_SERVICE_DST" || rc=1
+    check_one "$RECONCILER_TIMER_SRC" "$RECONCILER_TIMER_DST" || rc=1
   fi
   check_one "$GUARD_SRC" "$GUARD_DST" || rc=1
   exit "$rc"
@@ -93,6 +108,11 @@ fi
 if [ "$LEASE_GUARD_ONLY" -eq 0 ]; then
   install_one "$WORKFLOW_SRC" "$WORKFLOW_DST"
   install_one "$UNIT_SRC" "$UNIT_DST"
+  install_one "$RECONCILER_SRC" "$RECONCILER_DST" 0755
+  install_one "$MODEL_ROUTER_SRC" "$MODEL_ROUTER_DST" 0755
+  install_one "$MODEL_REGISTRY_SRC" "$MODEL_REGISTRY_DST"
+  install_one "$RECONCILER_SERVICE_SRC" "$RECONCILER_SERVICE_DST"
+  install_one "$RECONCILER_TIMER_SRC" "$RECONCILER_TIMER_DST"
 fi
 install_one "$GUARD_SRC" "$GUARD_DST" 0755
 
