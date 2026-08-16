@@ -287,12 +287,19 @@ if [[ "${JOVIE_SETUP_CACHE_SKIP_OWNER_CHECK:-0}" == "1" ]]; then
   exit 2
 fi
 
+# shellcheck source=lib/setup-worktree-health.sh
+. "$REPO_ROOT/scripts/lib/setup-worktree-health.sh"
+
+# Repair the linked-worktree-local setting before the first ordinary Git
+# command. A primary checkout with core.bare=true otherwise makes even
+# `git rev-parse` fail inside every linked worktree.
+if ! jovie_setup_repair_linked_worktree_git_config "$REPO_ROOT"; then
+  warn "Could not normalize linked worktree Git configuration"
+fi
+
 if git rev-parse --is-inside-work-tree &>/dev/null && [ -f ".git" ]; then
   IS_WORKTREE=true
 fi
-
-# shellcheck source=lib/setup-worktree-health.sh
-. "$REPO_ROOT/scripts/lib/setup-worktree-health.sh"
 
 # Keep the gate reachable in linked worktrees even when dependency setup can
 # cheap-exit. Husky's generated wrapper directory is untracked per worktree;

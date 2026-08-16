@@ -17,6 +17,39 @@
 # Fingerprint miss, missing modules, or wrong pins return 1 so full setup runs.
 # Source this file; do not execute it.
 
+# A linked worktree inherits core.bare from the primary checkout unless it has
+# its own worktree config. If a prior local repair accidentally set the primary
+# checkout to bare, normal git commands and hooks fail before setup can install
+# dependencies. Pin this linked worktree to non-bare without changing the
+# primary checkout or any global Git setting.
+jovie_setup_repair_linked_worktree_git_config() {
+  local repo_root="${1:-${REPO_ROOT:?REPO_ROOT is required}}"
+  local git_file="$repo_root/.git"
+  local git_dir_line git_dir common_dir_ref common_dir
+
+  [[ -f "$git_file" && ! -L "$git_file" ]] || return 0
+  git_dir_line="$(sed -n '1p' "$git_file" 2>/dev/null || true)"
+  [[ "$git_dir_line" == "gitdir: "* ]] || return 1
+  git_dir="${git_dir_line#gitdir: }"
+  [[ -n "$git_dir" && -d "$git_dir" && -f "$git_dir/commondir" ]] || return 1
+
+  common_dir_ref="$(tr -d '\r\n' <"$git_dir/commondir")"
+  [[ -n "$common_dir_ref" ]] || return 1
+  if [[ "$common_dir_ref" = /* ]]; then
+    common_dir="$common_dir_ref"
+  else
+    common_dir="$git_dir/$common_dir_ref"
+  fi
+  common_dir="$(cd "$common_dir" && pwd -P)" || return 1
+
+  # Git rejects per-worktree config until the repository opts into it. This is
+  # repository-local metadata; it does not change the user's global Git config.
+  git --git-dir="$common_dir" config extensions.worktreeConfig true
+
+  git --git-dir="$git_dir" --work-tree="$repo_root" \
+    config --worktree core.bare false
+}
+
 jovie_setup_hash_dependency_inputs() {
   local repo_root="${1:-${REPO_ROOT:-.}}"
   local hash_cmd
