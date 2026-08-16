@@ -811,6 +811,134 @@ struct AppStateTests {
     #expect(appState.launchMode.opensChatOnLaunch == true)
   }
 
+  @Test func libraryLaunchModeOpensLibraryWithoutChangingReadyState() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .uiTestingLibrary,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    await appState.completeLaunch()
+
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loaded(.previewReady))
+    #expect(appState.isOffline == false)
+    #expect(appState.launchMode.defaultInitialTab == .library)
+    #expect(appState.launchMode.usesEmptyLibraryPreview == false)
+  }
+
+  @Test func libraryEmptyLaunchModeOpensEmptyLibraryPreview() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .uiTestingLibraryEmpty,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    await appState.completeLaunch()
+
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loaded(.previewReady))
+    #expect(appState.isOffline == false)
+    #expect(appState.launchMode.defaultInitialTab == .library)
+    #expect(appState.launchMode.usesEmptyLibraryPreview)
+  }
+
+  @Test func inboxLaunchModeOpensInboxWithoutChangingReadyState() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .uiTestingInbox,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    await appState.completeLaunch()
+
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loaded(.previewReady))
+    #expect(appState.isOffline == false)
+    #expect(appState.launchMode.defaultInitialTab == .inbox)
+  }
+
+  @Test func offlineInboxLaunchModeOpensInboxWithOfflineState() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .uiTestingInboxOffline,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    await appState.completeLaunch()
+
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loaded(.previewReady))
+    #expect(appState.isOffline == true)
+    #expect(appState.launchMode.defaultInitialTab == .inbox)
+  }
+
+  @Test func calendarLaunchModeOpensCalendarWithoutChangingReadyState() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .uiTestingCalendar,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    await appState.completeLaunch()
+
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loaded(.previewReady))
+    #expect(appState.isOffline == false)
+    #expect(appState.launchMode.defaultInitialTab == .calendar)
+  }
+
+  @Test func offlineCalendarLaunchModeOpensCalendarWithOfflineState() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .uiTestingCalendarOffline,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    await appState.completeLaunch()
+
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loaded(.previewReady))
+    #expect(appState.isOffline == true)
+    #expect(appState.launchMode.defaultInitialTab == .calendar)
+  }
+
   @Test func qrUnavailableLaunchModeLoadsReadyProfileWithoutQRPayload() async throws {
     let repository = MockRepository(
       nextResult: .success(

@@ -850,6 +850,119 @@ final class JovieUITests: XCTestCase {
     )
   }
 
+  func testLibraryLaunchShowsPopulatedAssets() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-library",
+      expectedElementDescription: "\"library-surface\""
+    ) {
+      $0.descendants(matching: .any)["library-surface"]
+    }
+
+    XCTAssertTrue(
+      app.descendants(matching: .any)["library-surface"].exists,
+      "Library launch did not expose library-surface.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.descendants(matching: .any)["library-asset-lib-release-midnight"].exists,
+      "Populated library fixture did not render at least one asset card.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "library-populated", app: app)
+  }
+
+  func testLibraryEmptyLaunchShowsEmptyFilterCopy() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-library-empty",
+      expectedElementDescription: "\"No assets in this filter.\""
+    ) {
+      $0.staticTexts["No assets in this filter."]
+    }
+
+    XCTAssertTrue(
+      app.descendants(matching: .any)["library-surface"].exists,
+      "Empty library launch did not expose library-surface.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(app.staticTexts["No assets in this filter."].exists)
+    XCTAssertFalse(
+      app.descendants(matching: .any)["library-asset-lib-release-midnight"].exists,
+      "Empty library fixture unexpectedly rendered a preview asset card.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "library-empty", app: app)
+  }
+
+  func testInboxLaunchShowsPreviewActions() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-inbox",
+      expectedElementDescription: "\"inbox-surface\""
+    ) {
+      $0.descendants(matching: .any)["inbox-surface"]
+    }
+
+    XCTAssertTrue(
+      app.descendants(matching: .any)["inbox-surface"].exists,
+      "Inbox launch did not expose inbox-surface.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.staticTexts["1 pending action"].exists,
+      "Preview inbox did not show the pending action count.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.descendants(matching: .any)["inbox-item-action-1"].exists,
+      "Preview inbox did not render the cached action card.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.buttons["inbox-ask-jovie"].exists,
+      "Preview inbox did not expose inbox-ask-jovie.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "inbox-preview", app: app)
+  }
+
+  func testInboxOfflineLaunchShowsCachedActionsCopy() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-inbox-offline",
+      expectedElementDescription: "\"Offline — showing cached actions when available.\""
+    ) {
+      $0.staticTexts["Offline — showing cached actions when available."]
+    }
+
+    XCTAssertTrue(
+      app.descendants(matching: .any)["inbox-surface"].exists,
+      "Offline inbox launch did not expose inbox-surface.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(app.staticTexts["Offline — showing cached actions when available."].exists)
+    attachScreenshot(named: "inbox-offline", app: app)
+  }
+
+  func testCalendarLaunchShowsSurface() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-calendar",
+      expectedElementDescription: "\"calendar-surface\""
+    ) {
+      $0.descendants(matching: .any)["calendar-surface"]
+    }
+
+    XCTAssertTrue(
+      app.descendants(matching: .any)["calendar-surface"].exists,
+      "Calendar launch did not expose calendar-surface.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "calendar-preview", app: app)
+  }
+
+  func testCalendarOfflineLaunchShowsCachedCalendarCopy() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-calendar-offline",
+      expectedElementDescription: "\"Offline — showing cached calendar when available.\""
+    ) {
+      $0.staticTexts["Offline — showing cached calendar when available."]
+    }
+
+    XCTAssertTrue(
+      app.descendants(matching: .any)["calendar-surface"].exists,
+      "Offline calendar launch did not expose calendar-surface.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(app.staticTexts["Offline — showing cached calendar when available."].exists)
+    attachScreenshot(named: "calendar-offline", app: app)
+  }
+
   func testShellDrawerAndSettingsNavigation() {
     let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Copy URL\"") {
       $0.buttons["Copy URL"]

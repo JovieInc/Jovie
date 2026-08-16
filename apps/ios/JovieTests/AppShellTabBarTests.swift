@@ -89,6 +89,51 @@ struct LibraryFeedTests {
     #expect(LibraryFilter.chips.first == .all)
     #expect(LibraryFilter.chips.count == LibraryAssetType.allCases.count + 1)
   }
+
+  @Test func emptyAssetsStayEmptyForEveryChip() {
+    for chip in LibraryFilter.chips {
+      #expect(LibraryFeed.filtered(assets: [], filter: chip).isEmpty)
+    }
+  }
+}
+
+struct LibraryInboxCalendarLaunchModeTests {
+  @Test func libraryArgumentsParseToLibraryFixtures() {
+    #expect(LaunchMode.resolving(arguments: ["-ui-testing-library"], isXCTest: false) == .uiTestingLibrary)
+    #expect(
+      LaunchMode.resolving(arguments: ["-ui-testing-library-empty"], isXCTest: false)
+        == .uiTestingLibraryEmpty
+    )
+    #expect(LaunchMode.uiTestingLibrary.defaultInitialTab == .library)
+    #expect(LaunchMode.uiTestingLibraryEmpty.defaultInitialTab == .library)
+    #expect(LaunchMode.uiTestingLibrary.usesEmptyLibraryPreview == false)
+    #expect(LaunchMode.uiTestingLibraryEmpty.usesEmptyLibraryPreview)
+  }
+
+  @Test func inboxArgumentsParseToInboxFixtures() {
+    #expect(LaunchMode.resolving(arguments: ["-ui-testing-inbox"], isXCTest: false) == .uiTestingInbox)
+    #expect(
+      LaunchMode.resolving(arguments: ["-ui-testing-inbox-offline"], isXCTest: false)
+        == .uiTestingInboxOffline
+    )
+    #expect(LaunchMode.uiTestingInbox.defaultInitialTab == .inbox)
+    #expect(LaunchMode.uiTestingInboxOffline.defaultInitialTab == .inbox)
+    #expect(LaunchMode.uiTestingInbox.usesLiveAuth == false)
+    #expect(LaunchMode.uiTestingInboxOffline.usesLiveAuth == false)
+  }
+
+  @Test func calendarArgumentsParseToCalendarFixtures() {
+    #expect(
+      LaunchMode.resolving(arguments: ["-ui-testing-calendar"], isXCTest: false)
+        == .uiTestingCalendar
+    )
+    #expect(
+      LaunchMode.resolving(arguments: ["-ui-testing-calendar-offline"], isXCTest: false)
+        == .uiTestingCalendarOffline
+    )
+    #expect(LaunchMode.uiTestingCalendar.defaultInitialTab == .calendar)
+    #expect(LaunchMode.uiTestingCalendarOffline.defaultInitialTab == .calendar)
+  }
 }
 
 struct EntityContextTests {
