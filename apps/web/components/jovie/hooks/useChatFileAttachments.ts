@@ -2,7 +2,8 @@
 
 import { upload } from '@vercel/blob/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-
+import { useAuthSafe } from '@/hooks/useJovieAuth';
+import { buildAudioBlobPath } from '@/lib/audio/blob-path';
 import {
   AUDIO_MAX_FILE_SIZE_BYTES,
   getAudioFormatByFileName,
@@ -343,6 +344,7 @@ async function uploadAudioAttachment(
   file: File,
   id: string,
   updateFile: UploadFileUpdater,
+  userId: string,
   onAudioUploaded?: UseChatFileAttachmentsOptions['onAudioUploaded']
 ): Promise<void> {
   updateFile(id, { status: 'uploading', progress: 0 });
@@ -355,11 +357,15 @@ async function uploadAudioAttachment(
       throw new Error('Unsupported audio file type');
     }
 
-    const blob = await upload(file.name, file, {
-      access: 'public',
-      handleUploadUrl: '/api/library/audio/upload-token',
-      contentType: uploadMime,
-    });
+    const blob = await upload(
+      buildAudioBlobPath('chat', userId, file.name),
+      file,
+      {
+        access: 'public',
+        handleUploadUrl: '/api/library/audio/upload-token',
+        contentType: uploadMime,
+      }
+    );
     updateFile(id, { status: 'processing' });
     const response = await fetch('/api/chat/audio', {
       method: 'POST',
@@ -533,6 +539,7 @@ export function useChatFileAttachments({
   onAudioUploaded,
   disabled = false,
 }: UseChatFileAttachmentsOptions): UseChatFileAttachmentsReturn {
+  const { userId } = useAuthSafe();
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -579,12 +586,18 @@ export function useChatFileAttachments({
         return;
       }
       if (kind === 'audio') {
-        await uploadAudioAttachment(file, id, updateFile, onAudioUploaded);
+        await uploadAudioAttachment(
+          file,
+          id,
+          updateFile,
+          userId ?? 'unknown',
+          onAudioUploaded
+        );
         return;
       }
       await uploadGenericAttachment(file, id, updateFile);
     },
-    [onAudioUploaded, updateFile]
+    [onAudioUploaded, updateFile, userId]
   );
 
   const processBatch = useCallback(

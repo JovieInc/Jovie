@@ -62,6 +62,23 @@ vi.mock('@/lib/audio/resolve-release-recording', () => ({
     hoisted.resolvePrimaryRecordingForReleaseMock,
 }));
 
+vi.mock('@/lib/audio/blob-verifier', () => ({
+  AudioBlobVerificationError: class AudioBlobVerificationError extends Error {},
+  verifyAudioBlob: vi.fn().mockImplementation(({ fileName }) => {
+    const wav = fileName.endsWith('.wav');
+    return Promise.resolve({
+      pathname: `jovie/audio/library/clerk_user_123/file.${wav ? 'wav' : 'mp3'}`,
+      url: `https://cdn.example.com/take-me-over.${wav ? 'wav' : 'mp3'}`,
+      sizeBytes: 1024,
+      contentType: wav ? 'audio/wav' : 'audio/mpeg',
+      formatId: wav ? 'wav' : 'mp3',
+      canonicalMimeType: wav ? 'audio/wav' : 'audio/mpeg',
+      bytesInspected: 1024,
+      latencyMs: 1,
+    });
+  }),
+}));
+
 vi.mock('@/lib/db', () => ({
   db: {
     select: hoisted.selectMock,
@@ -124,7 +141,9 @@ describe('library audio upload API', () => {
     expect(response.status).toBe(200);
     expect(hoisted.handleUploadMock).toHaveBeenCalledTimes(1);
     const options = hoisted.handleUploadMock.mock.calls[0][0];
-    const token = await options.onBeforeGenerateToken('take-me-over.mp3');
+    const token = await options.onBeforeGenerateToken(
+      'jovie/audio/library/clerk_user_123/take-me-over.mp3'
+    );
     expect(token.maximumSizeInBytes).toBe(150 * 1024 * 1024);
     expect(token.allowedContentTypes).toContain('audio/mpeg');
   });

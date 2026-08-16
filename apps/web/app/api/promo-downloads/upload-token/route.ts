@@ -8,6 +8,7 @@
 
 import { type HandleUploadBody, handleUpload } from '@vercel/blob/client';
 import { NextRequest, NextResponse } from 'next/server';
+import { getAudioBlobPathPrefix } from '@/lib/audio/blob-path';
 import {
   AUDIO_FORMAT_REGISTRY,
   AUDIO_UPLOAD_POLICIES,
@@ -41,9 +42,16 @@ export async function POST(request: NextRequest) {
     const jsonResponse = await handleUpload({
       body,
       request,
-      onBeforeGenerateToken: async _pathname => {
+      onBeforeGenerateToken: async pathname => {
         if (!profile) {
           throw new Error('Creator profile not found');
+        }
+        if (
+          !pathname.startsWith(
+            getAudioBlobPathPrefix('promo_download', clerkUserId)
+          )
+        ) {
+          throw new Error('Invalid audio upload pathname');
         }
 
         if (!user.isPro) {
