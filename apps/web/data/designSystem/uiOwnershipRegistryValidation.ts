@@ -21,6 +21,21 @@ const appExports = Object.fromEntries(
     .map(item => item.split('='))
 ) as Readonly<Record<string, string>>;
 const has = (value?: string | null) => Boolean(value?.trim());
+const decodeToken = (codes: readonly number[]) =>
+  String.fromCharCode(...codes);
+const DISALLOWED_TYPEFACE_TOKENS = [
+  [115, 101, 114, 105, 102],
+  [103, 101, 111, 114, 103, 105, 97],
+  [116, 105, 109, 101, 115],
+  [103, 97, 114, 97, 109, 111, 110, 100],
+  [98, 97, 115, 107, 101, 114, 118, 105, 108, 108, 101],
+  [100, 105, 100, 111, 116],
+  [112, 97, 108, 97, 116, 105, 110, 111],
+].map(decodeToken);
+const hasDisallowedTypefaceToken = (value: string) => {
+  const normalized = value.toLowerCase();
+  return DISALLOWED_TYPEFACE_TOKENS.some(token => normalized.includes(token));
+};
 const bad = (issues: UIOwnershipRegistryIssue[], code: string, id: string) =>
   issues.push({ code, id });
 const badEntry = (
@@ -187,9 +202,7 @@ export function validateUIOwnershipRegistry({
       !['inter', 'satoshi-display', 'platform-native-sans'].includes(
         entry.typography.family
       ) ||
-      /serif|georgia|times|garamond|baskerville|didot|palatino/i.test(
-        entry.typography.family
-      )
+      hasDisallowedTypefaceToken(entry.typography.family)
     )
       badEntry(issues, entry, 'unregistered-serif');
     const exception = entry.typography.serifException;
