@@ -77,6 +77,33 @@ function makeWorktree() {
   return root;
 }
 
+function makeLinkedWorktreeWithBarePrimary() {
+  const primary = makeWorktree();
+  const commit = spawnSync('git', ['commit', '-m', 'fixture'], {
+    cwd: primary,
+    encoding: 'utf8',
+  });
+  expect(commit.status, commit.stderr).toBe(0);
+
+  const linked = join(primary, 'linked-worktree');
+  const add = spawnSync(
+    'git',
+    ['worktree', 'add', '-b', 'linked-fixture', linked],
+    {
+      cwd: primary,
+      encoding: 'utf8',
+    }
+  );
+  expect(add.status, add.stderr).toBe(0);
+
+  const makeBare = spawnSync('git', ['config', 'core.bare', 'true'], {
+    cwd: primary,
+    encoding: 'utf8',
+  });
+  expect(makeBare.status, makeBare.stderr).toBe(0);
+  return { linked, primary };
+}
+
 /**
  * @param {string} script
  * @param {{
@@ -204,11 +231,38 @@ describe('setup worktree health skip', () => {
   });
 });
 
+describe('linked worktree Git repair', () => {
+  it('pins only the linked worktree to non-bare before normal Git commands', () => {
+    const { linked, primary } = makeLinkedWorktreeWithBarePrimary();
+    const result = runHelper(
+      `set -euo pipefail
+       . ${JSON.stringify(helperPath)}
+       jovie_setup_repair_linked_worktree_git_config ${JSON.stringify(linked)}
+       git -C ${JSON.stringify(linked)} rev-parse --is-inside-work-tree
+       git -C ${JSON.stringify(linked)} config --worktree --get core.bare
+       git -C ${JSON.stringify(primary)} config --get core.bare
+       git -C ${JSON.stringify(primary)} config --get extensions.worktreeConfig`
+    );
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout.trim().split('\n')).toEqual([
+      'true',
+      'false',
+      'true',
+      'true',
+    ]);
+  });
+});
+
 describe('SessionStart still uses setup.sh for the skip', () => {
   it('setup.sh sources the helper and cheap-exits before Doppler/Clerk/migrations', () => {
     expect(setupSh).toContain('scripts/lib/setup-worktree-health.sh');
     expect(setupSh).toContain('jovie_setup_worktree_healthy');
+    expect(setupSh).toContain('jovie_setup_repair_linked_worktree_git_config');
     expect(setupSh).toContain('Worktree already healthy — skipped setup body');
+    expect(
+      setupSh.indexOf('jovie_setup_repair_linked_worktree_git_config')
+    ).toBeLessThan(setupSh.indexOf('git rev-parse --is-inside-work-tree'));
     expect(setupSh.indexOf('jovie_setup_worktree_healthy')).toBeLessThan(
       setupSh.indexOf('── Doppler auth')
     );
