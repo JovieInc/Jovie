@@ -52,6 +52,8 @@ class PauseLatticeTests(unittest.TestCase):
         for arguments in (
             {"state": "UNKNOWN"},
             {"expected_head": "short"},
+            {"expected_head": "A" * 40},
+            {"expected_head": "z" * 40},
             {"attempt": -1},
         ):
             base = dict(state="GREEN", push_allowed=True, mergeable_state="behind", expected_head=HEAD, attempt=0)
@@ -71,6 +73,10 @@ class ThroughputAndOwnershipTests(unittest.TestCase):
         selected = POLICY.bounded_selection(self.candidates(), 4)
         self.assertEqual([item["number"] for item in selected], [1, 2, 3, 4])
         self.assertEqual(len({POLICY.lease_key("JovieInc/Jovie", item["number"], item["head"]["sha"]) for item in selected}), 4)
+
+    def test_twenty_held_prs_respect_a_low_typed_worker_cap(self):
+        selected = POLICY.bounded_selection(self.candidates(), 1)
+        self.assertEqual([item["number"] for item in selected], [1])
 
     def test_duplicate_exact_head_gets_one_writer(self):
         items = self.candidates()[:2]

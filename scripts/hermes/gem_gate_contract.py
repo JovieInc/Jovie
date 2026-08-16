@@ -95,6 +95,11 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
         raise GateContractError("remediation push admission is missing or is not boolean")
     if push_allowed != (state != "RED"):
         raise GateContractError("remote remediation must fail closed only on RED")
+    maximum = remediation.get("maxConcurrent")
+    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 1:
+        raise GateContractError("remediation concurrency must be a positive integer")
+    if remediation.get("authority") != "single-pr-writer-exact-head":
+        raise GateContractError("remediation authority must require one exact-head writer")
     reasons = receipt.get("reasons")
     if not isinstance(reasons, list) or any(
         not isinstance(reason, dict)
