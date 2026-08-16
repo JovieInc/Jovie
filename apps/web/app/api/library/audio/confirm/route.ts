@@ -10,6 +10,10 @@ import { and, eq } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import {
+  AudioBlobVerificationError,
+  verifyAudioBlob,
+} from '@/lib/audio/blob-verifier';
 import { resolveAudioUploadMime } from '@/lib/audio/constants';
 import { resolvePrimaryRecordingForRelease } from '@/lib/audio/resolve-release-recording';
 import { requireAuth } from '@/lib/auth/require-auth';
@@ -44,7 +48,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { releaseId, blobUrl, fileName, fileMimeType } = parsed.data;
+    const { releaseId, blobUrl, blobPathname, fileName, fileMimeType } =
+      parsed.data;
     // Resolve the canonical upload MIME: blank/octet-stream falls back to the
     // file extension; contradictory non-audio MIME is rejected.
     const canonicalMimeType = resolveAudioUploadMime({
@@ -71,6 +76,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const verifiedBlob = await verifyAudioBlob({
+      blobUrl,
+      blobPathname,
+      userId: clerkUserId,
+      surface: 'library',
+      fileName,
+      fileMimeType,
+      maxSizeBytes: 157_286_400,
+    });
+
     const recording = await resolvePrimaryRecordingForRelease(
       releaseId,
       profile.id
@@ -93,9 +108,9 @@ export async function POST(request: NextRequest) {
     await db
       .update(discogRecordings)
       .set({
-        previewUrl: blobUrl,
-        audioUrl: blobUrl,
-        audioFormat: canonicalMimeType,
+        previewUrl: verifiedBlob.url,
+        audioUrl: verifiedBlob.url,
+        audioFormat: verifiedBlob.canonicalMimeType,
         updatedAt: new Date(),
       })
       .where(
@@ -111,12 +126,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        previewUrl: blobUrl,
+        previewUrl: verifiedBlob.url,
         recordingId: recording.recordingId,
       },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (err) {
+    if (err instanceof AudioBlobVerificationError) {
+      return NextResponse.json(
+        { error: err.message, code: err.code, rule: err.rule, cta: err.cta },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
     captureError('Library audio confirm error', err);
     return NextResponse.json(
       { error: 'Failed to confirm audio upload' },
