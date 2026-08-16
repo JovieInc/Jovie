@@ -91,18 +91,29 @@ pick_destination_from_simctl() {
         candidates << {
           "destination" => "platform=iOS Simulator,id=#{id}",
           "name" => name,
-          "os_parts" => os.split(".").map(&:to_i)
+          "os_parts" => os.split(".").map(&:to_i),
+          # Prefer a conventional iPhone over a named form factor. The latter
+          # can be present during an Xcode migration but fail to create a
+          # usable test process (for example, a migrated iPhone Air).
+          "model_rank" => case name
+                          when /\AiPhone \d+\z/ then 3
+                          when /\AiPhone \d+ Pro(?: Max)?\z/ then 2
+                          when /\AiPhone \d+[ec]\z/ then 1
+                          else 0
+                          end,
+          "state_rank" => device["state"] == "Booted" ? 1 : 0
         }
       end
     end
 
     if candidates.any?
       selected = candidates.max_by do |candidate|
-        [
-          candidate.fetch("os_parts"),
-          candidate.fetch("name") == "iPhone 17" ? 1 : 0,
-          candidate.fetch("name")
-        ]
+          [
+            candidate.fetch("os_parts"),
+            candidate.fetch("model_rank"),
+            candidate.fetch("state_rank"),
+            candidate.fetch("name")
+          ]
       end
 
       puts selected.fetch("destination")
@@ -157,14 +168,20 @@ pick_destination() {
     candidates << {
       "destination" => "platform=iOS Simulator,id=#{id}",
       "name" => name,
-      "os_parts" => os.split(".").map(&:to_i)
+      "os_parts" => os.split(".").map(&:to_i),
+      "model_rank" => case name
+                      when /\AiPhone \d+\z/ then 3
+                      when /\AiPhone \d+ Pro(?: Max)?\z/ then 2
+                      when /\AiPhone \d+[ec]\z/ then 1
+                      else 0
+                      end
     }
     END {
       if candidates.any?
         selected = candidates.max_by do |candidate|
           [
             candidate.fetch("os_parts"),
-            candidate.fetch("name") == "iPhone 17" ? 1 : 0,
+            candidate.fetch("model_rank"),
             candidate.fetch("name")
           ]
         end
