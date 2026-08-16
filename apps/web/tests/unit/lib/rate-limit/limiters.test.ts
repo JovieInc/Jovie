@@ -164,6 +164,18 @@ vi.mock('@/lib/rate-limit/config', () => ({
       window: '1 m',
       prefix: 'public:visit',
     },
+    publicProfileCaptureDismissal: {
+      name: 'Public Profile Capture Dismissal',
+      limit: 20,
+      window: '1 m',
+      prefix: 'public:profile:capture-dismissal',
+    },
+    publicProfilePacEvent: {
+      name: 'Public Profile PAC Event',
+      limit: 40,
+      window: '1 m',
+      prefix: 'public:profile:pac-event',
+    },
     health: { name: 'Health', limit: 30, window: '1 m', prefix: 'health' },
     general: { name: 'General', limit: 60, window: '1 m', prefix: 'general' },
     spotifySearch: {
@@ -356,6 +368,8 @@ describe('limiters.ts', () => {
         'claimTokenAccess',
         'publicClick',
         'publicVisit',
+        'publicProfileCaptureDismissal',
+        'publicProfilePacEvent',
         'health',
         'general',
         'spotifySearch',

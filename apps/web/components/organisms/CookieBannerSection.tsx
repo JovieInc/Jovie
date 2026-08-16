@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/cookie-banner-fixes.test.tsx
 'use client';
 
 import Link from 'next/link';
@@ -31,11 +32,18 @@ function isBannerRequiredFromCookie(): boolean {
   return match.split('=')[1]?.trim() !== '0';
 }
 
-export function CookieBannerSection() {
+export function CookieBannerSection({
+  testOnlyPathname,
+}: Readonly<{ testOnlyPathname?: string }>) {
   const pathname = usePathname();
-  const isSuppressedPath = shouldSuppressCookieBannerForPathname(pathname);
+  const effectivePathname =
+    process.env.NEXT_PUBLIC_E2E_MODE === '1' && testOnlyPathname
+      ? testOnlyPathname
+      : pathname;
+  const isSuppressedPath =
+    shouldSuppressCookieBannerForPathname(effectivePathname);
   const shouldClearProfileDock =
-    shouldPlaceCookieBannerAbovePublicProfileDock(pathname);
+    shouldPlaceCookieBannerAbovePublicProfileDock(effectivePathname);
 
   const [visible, setVisible] = useState(false);
   const [customize, setCustomize] = useState(false);

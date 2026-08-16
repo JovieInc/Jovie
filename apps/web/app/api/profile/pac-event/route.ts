@@ -13,7 +13,7 @@ import {
 } from '@/lib/cookies/consent-state';
 import { captureError } from '@/lib/error-tracking';
 import { logStatsigEvent } from '@/lib/flags/statsig';
-import { generalLimiter, getClientIP } from '@/lib/rate-limit';
+import { getClientIP, publicProfilePacEventLimiter } from '@/lib/rate-limit';
 import { pacEventBeaconSchema } from '@/lib/tracking/pac-events-contract';
 import { PAC_IDENTITY_BLOCKED_CONSENTS } from '@/lib/tracking/pac-events-shared';
 import { logger } from '@/lib/utils/logger';
@@ -40,9 +40,17 @@ const LEGACY_TRACKING_CONSENT_COOKIE = 'jv_tracking_consent';
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const clientIp = getClientIP(request);
-    const rateLimitResult = await generalLimiter.limit(clientIp);
-    if (!rateLimitResult.success) {
+    const rateLimitResult = await publicProfilePacEventLimiter.limit(clientIp);
+    const backendDegraded =
+      rateLimitResult.degraded === true || rateLimitResult.unavailable === true;
+    if (!rateLimitResult.success && !backendDegraded) {
       return createRateLimitedResponse(rateLimitResult);
+    }
+    if (backendDegraded) {
+      // PAC is best-effort telemetry. During an Upstash outage, acknowledge
+      // the beacon without parsing or forwarding it so visitors never see a
+      // conversion-path failure and downstream analytics cannot be amplified.
+      return new NextResponse(null, { status: 204 });
     }
 
     const raw = await request.text();

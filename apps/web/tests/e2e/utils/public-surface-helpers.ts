@@ -1,4 +1,11 @@
-import { expect, type Locator, type Page } from '@playwright/test';
+import {
+  expect,
+  type Locator,
+  type Page,
+  type Request,
+} from '@playwright/test';
+import { isValidDspUrl } from '@/lib/dsp';
+import { getRegistryEntry } from '@/lib/dsp-registry';
 import type {
   PublicInteractionSpec,
   ResolvedPublicSurfaceSpec,
@@ -473,11 +480,54 @@ async function runNotificationFormInteraction(page: Page) {
   const visible = await field.isVisible().catch(() => false);
 
   if (!visible) {
-    return;
+    return false;
   }
 
-  await field.fill('not-an-email');
-  await field.blur();
+  const mutationRequests: Request[] = [];
+  const recordNotificationMutation = (request: Request) => {
+    if (
+      request.method() !== 'GET' &&
+      request.url().includes('/api/notifications/')
+    ) {
+      mutationRequests.push(request);
+    }
+  };
+  page.on('request', recordNotificationMutation);
+
+  try {
+    await field.fill('not-an-email');
+    const form = field.locator('xpath=ancestor::form[1]');
+    const submit = form
+      .locator('button[type="submit"], input[type="submit"]')
+      .first();
+
+    if (await submit.isVisible().catch(() => false)) {
+      await submit.click();
+    } else {
+      await field.blur();
+    }
+    await page.waitForTimeout(100);
+
+    expect(
+      await field.evaluate(element =>
+        element instanceof HTMLInputElement ? element.checkValidity() : true
+      ),
+      'invalid notification input should fail native validation'
+    ).toBe(false);
+    await expect(field).toBeVisible();
+
+    expect(
+      await field.evaluate(element => element.matches(':invalid')),
+      'invalid notification input should remain in a blocked validation state'
+    ).toBe(true);
+    expect(
+      mutationRequests,
+      'invalid notification input must not reach a mutation endpoint'
+    ).toHaveLength(0);
+  } finally {
+    page.off('request', recordNotificationMutation);
+  }
+  return true;
 }
 
 async function runAudioPreviewInteraction(page: Page) {
@@ -523,27 +573,143 @@ async function runArtworkMenuInteraction(page: Page) {
   await assertOverlayLifecycle(page, trigger);
 }
 
-async function runDspInteraction(page: Page) {
-  const dspSelectors = [
-    'a[href*="spotify"]',
-    'a[href*="apple"]',
-    'a[href*="youtube"]',
-    'a[aria-label^="Open "]',
-    'button[aria-label^="Open "]',
-    'a:has-text("Spotify")',
-    'a:has-text("Apple Music")',
-    'a:has-text("YouTube Music")',
-    'button:has-text("Spotify")',
-    'button:has-text("Apple Music")',
-    'button:has-text("YouTube Music")',
-  ] as const;
-  const visibleActions = await visibleLocators(page, dspSelectors);
+export async function runDspInteraction(page: Page) {
+  const visibleActions = page
+    .locator('[data-dsp-provider]')
+    .filter({ visible: true });
 
-  if (visibleActions.length === 0) {
-    return;
+  const actionCount = await visibleActions.count();
+  if (actionCount === 0) {
+    return false;
   }
 
-  await expect(visibleActions[0]).toBeVisible({ timeout: 5_000 });
+  const assertSafeHandoff = (
+    provider: string,
+    urlValue: string,
+    target: string | null,
+    relOrFeatures: string | null
+  ) => {
+    const url = new URL(urlValue, page.url());
+    expect(url.protocol, 'DSP handoff must use HTTPS').toBe('https:');
+    expect(
+      url.hostname.length,
+      'DSP handoff must have an absolute hostname'
+    ).toBeGreaterThan(0);
+    expect(url.username, 'DSP handoff must not embed credentials').toBe('');
+    expect(url.password, 'DSP handoff must not embed credentials').toBe('');
+    expect(
+      isValidDspUrl(provider, url.href),
+      `DSP handoff host is not canonical for ${provider}: ${url.hostname}`
+    ).toBe(true);
+    if (target === '_blank') {
+      const protections = new Set(
+        (relOrFeatures ?? '')
+          .toLowerCase()
+          .split(/[\s,]+/)
+          .filter(Boolean)
+      );
+      expect(protections.has('noopener')).toBe(true);
+      expect(protections.has('noreferrer')).toBe(true);
+    }
+  };
+
+  await page.evaluate(() => {
+    Object.defineProperty(globalThis, '__publicSurfaceDspHandoff', {
+      configurable: true,
+      value: null,
+      writable: true,
+    });
+    globalThis.open = ((
+      url?: string | URL,
+      target?: string,
+      features?: string
+    ) => {
+      Object.assign(globalThis, {
+        __publicSurfaceDspHandoff: {
+          url: String(url ?? ''),
+          target: target ?? null,
+          features: features ?? null,
+        },
+      });
+      return null;
+    }) as typeof globalThis.open;
+  });
+
+  const exercisedProviders = new Set<string>();
+  for (let index = 0; index < actionCount; index += 1) {
+    const action = visibleActions.nth(index);
+    const provider = await action.getAttribute('data-dsp-provider');
+    expect(
+      provider,
+      'DSP action is missing its canonical provider key'
+    ).toBeTruthy();
+    if (!provider) continue;
+    const registryEntry = getRegistryEntry(provider);
+    expect(
+      registryEntry,
+      `Unknown DSP provider key: ${provider}`
+    ).toBeDefined();
+    expect(registryEntry?.showOnListenPage).toBe(true);
+    exercisedProviders.add(provider);
+
+    const href = await action.getAttribute('href');
+    if (href) {
+      assertSafeHandoff(
+        provider,
+        href,
+        await action.getAttribute('target'),
+        await action.getAttribute('rel')
+      );
+      continue;
+    }
+
+    await expect(action).toBeEnabled();
+    await page.evaluate(() => {
+      Object.assign(globalThis, { __publicSurfaceDspHandoff: null });
+    });
+    await action.click();
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () =>
+              (
+                globalThis as typeof globalThis & {
+                  __publicSurfaceDspHandoff?: unknown;
+                }
+              ).__publicSurfaceDspHandoff ?? null
+          ),
+        {
+          message: `${provider} control did not initiate a handoff`,
+          timeout: 5_000,
+        }
+      )
+      .not.toBeNull();
+    const handoff = await page.evaluate(
+      () =>
+        (
+          globalThis as typeof globalThis & {
+            __publicSurfaceDspHandoff: {
+              url: string;
+              target: string | null;
+              features: string | null;
+            };
+          }
+        ).__publicSurfaceDspHandoff
+    );
+    expect(
+      handoff.target,
+      'programmatic DSP handoff must open in an isolated browsing context'
+    ).toBe('_blank');
+    assertSafeHandoff(provider, handoff.url, handoff.target, handoff.features);
+    await expect(action).toBeEnabled({ timeout: 2_000 });
+  }
+
+  expect(
+    [...exercisedProviders].some(provider => provider !== 'spotify'),
+    'DSP admission must exercise at least one non-Spotify provider'
+  ).toBe(true);
+  return true;
 }
 
 export async function runDeclaredPublicInteractions(
@@ -565,6 +731,8 @@ export async function runDeclaredPublicInteractions(
       continue;
     }
 
+    let exercised = true;
+
     switch (interaction.id) {
       case 'cookie-banner':
         await runCookieBannerInteraction(page);
@@ -573,7 +741,7 @@ export async function runDeclaredPublicInteractions(
         await runHeaderNavigationInteraction(page);
         break;
       case 'notification-form':
-        await runNotificationFormInteraction(page);
+        exercised = await runNotificationFormInteraction(page);
         break;
       case 'audio-preview':
         await runAudioPreviewInteraction(page);
@@ -585,7 +753,7 @@ export async function runDeclaredPublicInteractions(
         await runArtworkMenuInteraction(page);
         break;
       case 'dsp-actions':
-        await runDspInteraction(page);
+        exercised = await runDspInteraction(page);
         break;
       case 'profile-mode-drawer':
         if (!page.url().includes('mode=')) {
@@ -617,6 +785,12 @@ export async function runDeclaredPublicInteractions(
         break;
       default:
         break;
+    }
+
+    if (!exercised && interaction.optional !== true) {
+      throw new Error(
+        `${surface.id}: required ${interaction.id} interaction is unavailable`
+      );
     }
   }
 
