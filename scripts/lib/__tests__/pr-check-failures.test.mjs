@@ -53,6 +53,30 @@ describe('pr-check-failures', () => {
     ).toEqual(['Typecheck']);
   });
 
+  it('keeps fleet-queue-hold receipts out of product gate classification', () => {
+    const required = [
+      { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Migration Guard' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'Fork PR Gate' },
+      { bucket: 'pass', state: 'SUCCESS', name: 'PR Size Guard' },
+    ];
+    expect(
+      classifyQueueCheckBlockers([
+        ...required,
+        {
+          bucket: 'pending',
+          state: 'PENDING',
+          name: 'jovie-fleet-queue-hold/v1',
+        },
+        {
+          bucket: 'fail',
+          state: 'FAILURE',
+          name: 'jovie-fleet-queue-hold/v1',
+        },
+      ])
+    ).toEqual([]);
+  });
+
   it('keeps failed merge-queue controller receipts out of product gate classification', () => {
     const required = [
       { bucket: 'pass', state: 'SUCCESS', name: 'PR Ready' },
@@ -170,6 +194,7 @@ describe('pr-check-failures', () => {
     expect(ADVISORY_CHECK_NAMES).toContain('SonarCloud Code Analysis');
     expect(ADVISORY_CHECK_NAMES).toContain('Vercel Agent Review');
     expect(ADVISORY_CHECK_NAMES).toContain('Fork PR Gate Controller');
+    expect(ADVISORY_CHECK_NAMES).toContain('jovie-fleet-queue-hold/v1');
     expect(ADVISORY_CHECK_NAMES).not.toContain('Fork PR Gate');
     expect(ADVISORY_CHECK_NAMES).not.toContain('Brand Scrub');
     expect(
