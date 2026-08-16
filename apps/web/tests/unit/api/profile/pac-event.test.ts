@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockCookiesGet,
-  mockGeneralLimiterLimit,
+  mockPublicProfilePacEventLimiterLimit,
   mockLogStatsigEvent,
   mockTrackEvent,
   mockCaptureError,
@@ -11,7 +11,7 @@ const {
   mockLoggerError,
 } = vi.hoisted(() => ({
   mockCookiesGet: vi.fn(),
-  mockGeneralLimiterLimit: vi.fn(),
+  mockPublicProfilePacEventLimiterLimit: vi.fn(),
   mockLogStatsigEvent: vi.fn(async () => undefined),
   mockTrackEvent: vi.fn(async () => undefined),
   mockCaptureError: vi.fn(async () => undefined),
@@ -35,7 +35,9 @@ vi.mock('@/app/api/notifications/route-helpers', () => ({
 }));
 
 vi.mock('@/lib/rate-limit', () => ({
-  generalLimiter: { limit: mockGeneralLimiterLimit },
+  publicProfilePacEventLimiter: {
+    limit: mockPublicProfilePacEventLimiterLimit,
+  },
   getClientIP: vi.fn(() => '127.0.0.1'),
 }));
 
@@ -106,7 +108,7 @@ function buildRequest(
 describe('POST /api/profile/pac-event', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGeneralLimiterLimit.mockResolvedValue({ success: true });
+    mockPublicProfilePacEventLimiterLimit.mockResolvedValue({ success: true });
     setCookieValues({
       [AUDIENCE_ANON_COOKIE]: JV_AID,
       [COOKIE_BANNER_REQUIRED_COOKIE]: '0',
@@ -343,11 +345,32 @@ describe('POST /api/profile/pac-event', () => {
   });
 
   it('returns 429 when rate limited', async () => {
-    mockGeneralLimiterLimit.mockResolvedValue({ success: false });
+    mockPublicProfilePacEventLimiterLimit.mockResolvedValue({
+      success: false,
+      degraded: false,
+      unavailable: false,
+    });
 
     const response = await POST(buildRequest(buildPayload()));
 
     expect(response.status).toBe(429);
+    expect(mockPublicProfilePacEventLimiterLimit).toHaveBeenCalledWith(
+      '127.0.0.1'
+    );
     expect(mockLogStatsigEvent).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { success: true, degraded: true },
+    { success: false, unavailable: true },
+  ])('acknowledges without forwarding when the limiter backend is degraded (%o)', async degradedResult => {
+    mockPublicProfilePacEventLimiterLimit.mockResolvedValue(degradedResult);
+
+    const response = await POST(buildRequest('not-json{'));
+
+    expect(response.status).toBe(204);
+    expect(mockLogStatsigEvent).not.toHaveBeenCalled();
+    expect(mockTrackEvent).not.toHaveBeenCalled();
+    expect(mockLoggerInfo).not.toHaveBeenCalled();
   });
 });

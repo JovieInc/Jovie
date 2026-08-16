@@ -420,6 +420,37 @@ export const RATE_LIMITERS = {
     trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
+  /**
+   * Public profile capture dismissal reads/writes: 20 requests per minute per
+   * IP. Keep this isolated from the general API bucket so unrelated same-origin
+   * traffic cannot suppress a conversion control on a healthy profile page.
+   */
+  publicProfileCaptureDismissal: {
+    name: 'Public Profile Capture Dismissal',
+    limit: 20,
+    window: '1 m',
+    prefix: 'public:profile:capture-dismissal',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+  } satisfies RateLimitConfig,
+
+  /**
+   * Primary Action Card telemetry: 40 events per minute per IP. Together with
+   * capture dismissal this preserves the former aggregate 60/minute public
+   * profile budget while preventing unrelated general API calls from consuming
+   * either endpoint's durable Redis bucket.
+   */
+  publicProfilePacEvent: {
+    name: 'Public Profile PAC Event',
+    limit: 40,
+    window: '1 m',
+    prefix: 'public:profile:pac-event',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+  } satisfies RateLimitConfig,
+
   // ---------------------------------------------------------------------------
   // Health & Monitoring
   // ---------------------------------------------------------------------------

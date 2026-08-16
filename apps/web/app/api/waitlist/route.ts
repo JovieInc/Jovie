@@ -1,6 +1,11 @@
 import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
+import {
+  isExactProductionWaitlistCanaryEmail,
+  PRODUCTION_WAITLIST_CANARY_RUN_HEADER,
+  parseProductionWaitlistCanaryRunId,
+} from '@/lib/canaries/production-waitlist';
 import { db, doesTableExist } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries, waitlistInvites } from '@/lib/db/schema/waitlist';
@@ -191,6 +196,29 @@ export async function POST(request: Request) {
     }
 
     const email = normalizeEmail(emailRaw);
+    let syntheticRunId: string | undefined;
+    const syntheticRunHeader = request.headers.get(
+      PRODUCTION_WAITLIST_CANARY_RUN_HEADER
+    );
+    if (syntheticRunHeader) {
+      try {
+        syntheticRunId =
+          parseProductionWaitlistCanaryRunId(syntheticRunHeader) ?? undefined;
+      } catch {
+        return badRequestResponse('Invalid production canary run id');
+      }
+      if (
+        !isExactProductionWaitlistCanaryEmail(
+          email,
+          process.env.E2E_PROD_SIGNUP_EMAIL_BASE
+        )
+      ) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden' },
+          { status: 403, headers: NO_STORE_HEADERS }
+        );
+      }
+    }
     const fullName = deriveFullName({
       userFullName: user?.fullName,
       userUsername: user?.username,
@@ -210,6 +238,7 @@ export async function POST(request: Request) {
       fullName,
       data: parseResult.data,
       source: 'waitlist_form',
+      syntheticRunId,
     });
 
     return NextResponse.json(

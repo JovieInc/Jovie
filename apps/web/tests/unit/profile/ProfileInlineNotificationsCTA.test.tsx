@@ -51,7 +51,7 @@ vi.mock('@/lib/analytics', () => ({
 vi.mock('@/lib/profile/capture-dismissal-client', () => ({
   getCaptureDismissalStatus: (...args: unknown[]) =>
     mockGetCaptureDismissalStatus(...args),
-  invalidateCaptureDismissalStatus: vi.fn(),
+  handleCaptureDismissalResponse: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock(
