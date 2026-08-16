@@ -63,12 +63,7 @@ struct NeedsOnboardingView: View {
             .autocorrectionDisabled()
           }
 
-          if let errorMessage {
-            Text(errorMessage)
-              .font(JovieFont.body(size: 14))
-              .foregroundStyle(JovieColor.errorText)
-              .accessibilityIdentifier("profile-completion-error")
-          }
+          errorSlot
 
           Button {
             submit()
@@ -91,6 +86,23 @@ struct NeedsOnboardingView: View {
       .scrollDismissesKeyboard(.interactively)
     }
   }
+
+  /// Idle and error share one reserved footprint so a server error cannot
+  /// insert height and shift Finish Profile.
+  private var errorSlot: some View {
+    Text(errorMessage ?? " ")
+      .font(JovieFont.body(size: 14))
+      .foregroundStyle(JovieColor.errorText)
+      .lineLimit(2)
+      .multilineTextAlignment(.leading)
+      .frame(maxWidth: .infinity, alignment: .topLeading)
+      .frame(height: Self.errorSlotHeight)
+      .opacity(errorMessage == nil ? 0 : 1)
+      .accessibilityHidden(errorMessage == nil)
+      .accessibilityIdentifier(errorMessage == nil ? "" : "profile-completion-error")
+  }
+
+  private static let errorSlotHeight: CGFloat = 40
 
   private func profileField(
     title: String,

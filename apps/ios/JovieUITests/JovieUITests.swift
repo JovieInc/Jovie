@@ -170,19 +170,29 @@ final class JovieUITests: XCTestCase {
 
     let displayName = app.textFields["profile-completion-display-name"]
     let handle = app.textFields["profile-completion-handle"]
+    let submit = app.buttons["profile-completion-submit"]
     displayName.tap()
     displayName.typeText("Tim White")
     handle.tap()
     handle.typeText("timwhite")
-    app.buttons["profile-completion-submit"].tap()
+    app.swipeDown()
+    _ = app.keyboards.firstMatch.waitForNonExistence(timeout: 2)
+    let submitMinYBeforeError = submit.frame.minY
+    submit.tap()
 
     XCTAssertTrue(
       app.staticTexts["profile-completion-error"].waitForExistence(timeout: 3),
       "A failed native submission must remain recoverable on the native form.\n\(app.debugDescription)"
     )
+    XCTAssertEqual(
+      submit.frame.minY,
+      submitMinYBeforeError,
+      accuracy: 1,
+      "A server error must swap into a reserved slot without moving Finish Profile.\n\(app.debugDescription)"
+    )
     XCTAssertTrue(displayName.exists)
     XCTAssertTrue(handle.exists)
-    XCTAssertTrue(app.buttons["profile-completion-submit"].isEnabled)
+    XCTAssertTrue(submit.isEnabled)
     XCTAssertFalse(app.buttons["profile-completion-web-fallback"].exists)
     attachScreenshot(named: "needs-onboarding", app: app)
   }
