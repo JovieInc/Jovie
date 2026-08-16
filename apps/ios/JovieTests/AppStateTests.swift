@@ -897,6 +897,28 @@ struct AppStateTests {
     #expect(appState.launchMode.defaultInitialTab == .inbox)
   }
 
+  @Test func inboxLoadingLaunchModeOpensInboxReadyWithoutOffline() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .uiTestingInboxLoading,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    await appState.completeLaunch()
+
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loaded(.previewReady))
+    #expect(appState.isOffline == false)
+    #expect(appState.launchMode.defaultInitialTab == .inbox)
+    #expect(appState.launchMode.holdsActionLoopLoading)
+  }
+
   @Test func calendarLaunchModeOpensCalendarWithoutChangingReadyState() async throws {
     let repository = MockRepository(
       nextResult: .success(
@@ -916,6 +938,28 @@ struct AppStateTests {
     #expect(appState.dashboardState == .loaded(.previewReady))
     #expect(appState.isOffline == false)
     #expect(appState.launchMode.defaultInitialTab == .calendar)
+  }
+
+  @Test func calendarLoadingLaunchModeOpensCalendarReadyWithoutOffline() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .uiTestingCalendarLoading,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    await appState.completeLaunch()
+
+    #expect(appState.route == .ready)
+    #expect(appState.dashboardState == .loaded(.previewReady))
+    #expect(appState.isOffline == false)
+    #expect(appState.launchMode.defaultInitialTab == .calendar)
+    #expect(appState.launchMode.holdsActionLoopLoading)
   }
 
   @Test func offlineCalendarLaunchModeOpensCalendarWithOfflineState() async throws {

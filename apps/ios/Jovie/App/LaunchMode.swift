@@ -23,8 +23,10 @@ enum LaunchMode: Equatable {
   case uiTestingLibraryEmpty
   case uiTestingInbox
   case uiTestingInboxOffline
+  case uiTestingInboxLoading
   case uiTestingCalendar
   case uiTestingCalendarOffline
+  case uiTestingCalendarLoading
 
   var usesLiveAuth: Bool {
     switch self {
@@ -49,8 +51,10 @@ enum LaunchMode: Equatable {
          .uiTestingLibraryEmpty,
          .uiTestingInbox,
          .uiTestingInboxOffline,
+         .uiTestingInboxLoading,
          .uiTestingCalendar,
-         .uiTestingCalendarOffline:
+         .uiTestingCalendarOffline,
+         .uiTestingCalendarLoading:
       return false
     }
   }
@@ -97,9 +101,9 @@ enum LaunchMode: Equatable {
       return .profile
     case .uiTestingLibrary, .uiTestingLibraryEmpty:
       return .library
-    case .uiTestingInbox, .uiTestingInboxOffline:
+    case .uiTestingInbox, .uiTestingInboxOffline, .uiTestingInboxLoading:
       return .inbox
-    case .uiTestingCalendar, .uiTestingCalendarOffline:
+    case .uiTestingCalendar, .uiTestingCalendarOffline, .uiTestingCalendarLoading:
       return .calendar
     default:
       return .chat
@@ -110,6 +114,12 @@ enum LaunchMode: Equatable {
   /// `LibraryFeed.previewAssets` until a dedicated mobile library API ships.
   var usesEmptyLibraryPreview: Bool {
     self == .uiTestingLibraryEmpty
+  }
+
+  /// Holds Inbox/Calendar on the loading skeleton so CI can assert reserved
+  /// CTA/header slots without a live network wait.
+  var holdsActionLoopLoading: Bool {
+    self == .uiTestingInboxLoading || self == .uiTestingCalendarLoading
   }
 
   var recoversProfileErrorOnRetry: Bool {
@@ -202,12 +212,20 @@ enum LaunchMode: Equatable {
       return .uiTestingInboxOffline
     }
 
+    if arguments.contains("-ui-testing-inbox-loading") {
+      return .uiTestingInboxLoading
+    }
+
     if arguments.contains("-ui-testing-inbox") {
       return .uiTestingInbox
     }
 
     if arguments.contains("-ui-testing-calendar-offline") {
       return .uiTestingCalendarOffline
+    }
+
+    if arguments.contains("-ui-testing-calendar-loading") {
+      return .uiTestingCalendarLoading
     }
 
     if arguments.contains("-ui-testing-calendar") {

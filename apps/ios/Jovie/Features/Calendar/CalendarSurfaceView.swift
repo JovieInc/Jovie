@@ -30,16 +30,23 @@ struct CalendarSurfaceView: View {
         .font(JovieFont.display(size: 22))
         .foregroundStyle(JovieColor.textPrimary)
 
-      if isOffline {
-        Text("Offline — showing cached calendar when available.")
-          .font(JovieFont.body(size: 13))
-          .foregroundStyle(JovieColor.textTertiary)
-      } else if let pending = response?.pendingReviewCount, pending > 0 {
-        Text("\(pending) pending review")
-          .font(JovieFont.body(size: 13, weight: .medium))
-          .foregroundStyle(JovieColor.textSecondary)
-      }
+      Text(headerSubtitle)
+        .font(JovieFont.body(size: 13, weight: isOffline ? .regular : .medium))
+        .foregroundStyle(isOffline ? JovieColor.textTertiary : JovieColor.textSecondary)
+        .frame(maxWidth: .infinity, minHeight: 18, alignment: .leading)
+        .opacity(headerSubtitle.trimmingCharacters(in: .whitespaces).isEmpty ? 0 : 1)
+        .accessibilityHidden(headerSubtitle.trimmingCharacters(in: .whitespaces).isEmpty)
     }
+  }
+
+  private var headerSubtitle: String {
+    if isOffline {
+      return "Offline — showing cached calendar when available."
+    }
+    if let pending = response?.pendingReviewCount, pending > 0 {
+      return "\(pending) pending review"
+    }
+    return " "
   }
 
   @ViewBuilder
@@ -122,9 +129,17 @@ struct CalendarSurfaceView: View {
           .fill(JovieColor.surface1)
           .frame(height: 72)
       }
+
+      Button {
+        onAskJovie("Help me plan my calendar.")
+      } label: {
+        Text("Ask Jovie")
+          .frame(maxWidth: .infinity)
+      }
+      .buttonStyle(JoviePillButtonStyle(filled: false))
+      .accessibilityIdentifier("calendar-ask-jovie")
+      .disabled(true)
     }
-    .redacted(reason: .placeholder)
-    .accessibilityHidden(true)
   }
 
   private func section<Content: View>(

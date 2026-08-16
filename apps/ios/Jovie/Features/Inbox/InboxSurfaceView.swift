@@ -33,16 +33,23 @@ struct InboxSurfaceView: View {
         .font(JovieFont.display(size: 22))
         .foregroundStyle(JovieColor.textPrimary)
 
-      if isOffline {
-        Text("Offline — showing cached actions when available.")
-          .font(JovieFont.body(size: 13))
-          .foregroundStyle(JovieColor.textTertiary)
-      } else if let count = response?.pendingCount {
-        Text(count == 1 ? "1 pending action" : "\(count) pending actions")
-          .font(JovieFont.body(size: 13, weight: .medium))
-          .foregroundStyle(JovieColor.textSecondary)
-      }
+      Text(headerSubtitle)
+        .font(JovieFont.body(size: 13, weight: isOffline ? .regular : .medium))
+        .foregroundStyle(isOffline ? JovieColor.textTertiary : JovieColor.textSecondary)
+        .frame(maxWidth: .infinity, minHeight: 18, alignment: .leading)
+        .opacity(headerSubtitle.trimmingCharacters(in: .whitespaces).isEmpty ? 0 : 1)
+        .accessibilityHidden(headerSubtitle.trimmingCharacters(in: .whitespaces).isEmpty)
     }
+  }
+
+  private var headerSubtitle: String {
+    if isOffline {
+      return "Offline — showing cached actions when available."
+    }
+    if let count = response?.pendingCount {
+      return count == 1 ? "1 pending action" : "\(count) pending actions"
+    }
+    return " "
   }
 
   @ViewBuilder
@@ -135,9 +142,17 @@ struct InboxSurfaceView: View {
           .fill(JovieColor.surface1)
           .frame(height: 110)
       }
+
+      Button {
+        onAskJovie("Help me triage my inbox.")
+      } label: {
+        Text("Ask Jovie")
+          .frame(maxWidth: .infinity)
+      }
+      .buttonStyle(JoviePillButtonStyle(filled: false))
+      .accessibilityIdentifier("inbox-ask-jovie")
+      .disabled(true)
     }
-    .redacted(reason: .placeholder)
-    .accessibilityHidden(true)
   }
 }
 
