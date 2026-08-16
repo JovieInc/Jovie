@@ -62,6 +62,7 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/hermes/config/gem-repo-registry.json',
   'scripts/hermes/config/model-registry.json',
   'scripts/hermes/gem-pr-drain.py',
+  'scripts/hermes/gem-ops-hud.py',
   'scripts/hermes/gem-priority-gate.py',
   'scripts/hermes/gem-repo-drain-cycle.py',
   'scripts/hermes/gem_gate_contract.py',
@@ -72,6 +73,7 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/hermes/systemd/gem-pr-drain.service',
   'scripts/hermes/systemd/gem-pr-drain.timer',
   'scripts/hermes/tests/gem-pr-drain.test.py',
+  'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
@@ -637,6 +639,7 @@ describe('automation-verify affected scope', () => {
       pythonUnittestTests: [
         'scripts/hermes/tests/gem-priority-gate.test.py',
         'scripts/hermes/tests/gem-pr-drain.test.py',
+        'scripts/hermes/tests/gem-ops-hud.test.py',
         'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
         'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
         'scripts/hermes/tests/test-model-router.py',

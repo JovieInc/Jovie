@@ -14,6 +14,7 @@ readonly BACKUP_DIR="${GEM_ROOT}/state/backups/gem-pr-rehabilitation-${STAMP}"
 
 readonly -a RELATIVE_SOURCES=(
   scripts/hermes/gem-priority-gate.py
+  scripts/hermes/gem-ops-hud.py
   scripts/hermes/gem_gate_contract.py
   scripts/hermes/gem-pr-drain.py
   scripts/hermes/gem-repo-drain-cycle.py
@@ -27,6 +28,7 @@ readonly -a RELATIVE_SOURCES=(
 )
 readonly -a TARGETS=(
   "${GEM_ROOT}/scripts/gem-priority-gate.py"
+  "${HOME}/.local/bin/gem-ops-hud"
   "${GEM_ROOT}/scripts/gem_gate_contract.py"
   "${GEM_ROOT}/scripts/gem-pr-drain.py"
   "${GEM_ROOT}/scripts/gem-repo-drain-cycle.py"
@@ -63,6 +65,7 @@ fi
 
 python3 -m py_compile \
   "${SOURCE_ROOT}/scripts/hermes/gem-priority-gate.py" \
+  "${SOURCE_ROOT}/scripts/hermes/gem-ops-hud.py" \
   "${SOURCE_ROOT}/scripts/hermes/gem_gate_contract.py" \
   "${SOURCE_ROOT}/scripts/hermes/gem-pr-drain.py" \
   "${SOURCE_ROOT}/scripts/hermes/gem-repo-drain-cycle.py" \
@@ -147,6 +150,7 @@ done
 
 python3 -m py_compile \
   "${GEM_ROOT}/scripts/gem-priority-gate.py" \
+  "${HOME}/.local/bin/gem-ops-hud" \
   "${GEM_ROOT}/scripts/gem_gate_contract.py" \
   "${GEM_ROOT}/scripts/gem-pr-drain.py" \
   "${GEM_ROOT}/scripts/gem-repo-drain-cycle.py" \
@@ -173,6 +177,7 @@ gem_root = Path(os.environ["GEM_ROOT"])
 unit_root = Path(os.environ["UNIT_ROOT"])
 pairs = {
     "gate": (source_root / "scripts/hermes/gem-priority-gate.py", gem_root / "scripts/gem-priority-gate.py"),
+    "hud": (source_root / "scripts/hermes/gem-ops-hud.py", Path.home() / ".local/bin/gem-ops-hud"),
     "contract": (source_root / "scripts/hermes/gem_gate_contract.py", gem_root / "scripts/gem_gate_contract.py"),
     "drain": (source_root / "scripts/hermes/gem-pr-drain.py", gem_root / "scripts/gem-pr-drain.py"),
     "cycle": (source_root / "scripts/hermes/gem-repo-drain-cycle.py", gem_root / "scripts/gem-repo-drain-cycle.py"),
