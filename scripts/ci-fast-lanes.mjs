@@ -392,8 +392,10 @@ function runStructural() {
     // closed when the file cannot be resolved or contains no tests.
     'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts',
     'pnpm --filter @jovie/web run test:reliability-detectors',
-    // Optional: structural regression tests need pytest; soft-skip if unavailable.
-    'if command -v pytest >/dev/null 2>&1; then pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py scripts/tests/test_symphony_ui_pilot_runtime.py -v; elif python3 -c "import pytest" 2>/dev/null; then python3 -m pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py scripts/tests/test_symphony_ui_pilot_runtime.py -v; else echo "pytest not installed — skip structural regressions"; fi',
+    // CI installs the hash-pinned pytest + coverage toolchain. The pure policy
+    // is the safety boundary for holds, retry budgets, exact-head leases, and
+    // bounded fanout, so branch-aware coverage is a hard structural gate.
+    'if python3 -c "import coverage, pytest" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage run --branch scripts/hermes/tests/gem-rehabilitation-policy.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage report --include="*/scripts/hermes/gem_rehabilitation_policy.py" --fail-under=90 && python3 -m pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py scripts/tests/test_symphony_ui_pilot_runtime.py -v; else echo "pytest/coverage not installed — skip structural regressions"; fi',
   ];
 
   let combined = '';

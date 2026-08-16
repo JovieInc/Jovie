@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gem PR drain: typed fleet admission with observer-only branch refreshes."""
+"""Gem PR rehabilitation: bounded exact-head repair without issue pickup."""
 
 from __future__ import annotations
 
@@ -28,6 +28,7 @@ except ImportError:  # pragma: no cover - deployed Gem supplies this module
 
 
 from gem_gate_contract import drain_state_dir, gate_state_dir, validate_gate_result
+from gem_rehabilitation_policy import bounded_selection, decide_action
 
 REPO = os.environ.get("GEM_PR_DRAIN_REPO", "JovieInc/Jovie")
 REPO_POLICY = by_github(REPO)
@@ -39,8 +40,8 @@ def is_jovie_repository(repo):
 
 
 def repo_drain_enabled(repo, policy_enabled):
-    """Gem may observe Jovie, but Symphony is its only implementation owner."""
-    return bool(policy_enabled) and not is_jovie_repository(repo)
+    """Registry admission enables stabilization, never direct issue pickup."""
+    return bool(policy_enabled)
 
 
 IS_JOVIE_REPOSITORY = is_jovie_repository(REPO)
@@ -96,7 +97,7 @@ def gate_args(*, dry_run=False):
         "python3",
         str(GATE),
         "--consumer",
-        "fleet",
+        "remediation",
         "--repo",
         REPO,
         "--state-dir",
@@ -111,9 +112,9 @@ def gate_args(*, dry_run=False):
     return args
 
 
-def evaluate_work_gate(*, dry_run=False, timeout=300):
+def evaluate_remediation_gate(*, dry_run=False, timeout=300):
     gate = run_process(gate_args(dry_run=dry_run), timeout=timeout)
-    return validate_gate_result(gate.returncode, gate.stdout, "fleet")
+    return validate_gate_result(gate.returncode, gate.stdout, "remediation")
 
 
 def work_mutation_blocker(max_age=15.0):
@@ -121,11 +122,11 @@ def work_mutation_blocker(max_age=15.0):
     if now - WORK_GATE_CACHE["checked_at"] < max_age:
         return WORK_GATE_CACHE["blocker"]
     try:
-        receipt = evaluate_work_gate(dry_run=True)
+        receipt = evaluate_remediation_gate(dry_run=True)
         blocker = (
             None
-            if receipt["workAdmission"]["allowed"]
-            else f"fleet_gate_{receipt['state'].lower()}"
+            if receipt["remediationAdmission"]["pushAllowed"]
+            else f"remediation_push_gate_{receipt['state'].lower()}"
         )
     except Exception as error:
         blocker = f"fleet_gate_invalid_fail_closed:{type(error).__name__}"
@@ -223,10 +224,10 @@ def select_prs(prs, *, main_green, worker_capacity):
         pr["priority_class"] = priority_class(pr)
     eligible.sort(key=lambda pr: (pr.get("created_at", ""), pr.get("number", 0)))
     if main_green:
-        return eligible[: max(0, worker_capacity)]
+        return bounded_selection(eligible, max(0, worker_capacity))
     main_repairs = [pr for pr in eligible if pr["priority_class"] == "main_green_fix"]
     others = [pr for pr in eligible if pr["priority_class"] != "main_green_fix"]
-    return (main_repairs + others)[: max(0, worker_capacity)]
+    return bounded_selection(main_repairs + others, max(0, worker_capacity))
 
 
 def inventory():
@@ -281,13 +282,6 @@ def update_one(pr):
             "result": "skipped",
             "reason": blocker,
         }
-    if pr.get("mergeable_state") != "behind":
-        return {
-            **result,
-            "action": "controller_observe_only",
-            "result": "skipped",
-            "reason": "implementation_owner_symphony",
-        }
     head_sha = pr.get("head", {}).get("sha")
     if not isinstance(head_sha, str) or not head_sha:
         return {
@@ -295,6 +289,20 @@ def update_one(pr):
             "action": "api_update_branch",
             "result": "skipped",
             "reason": "expected_head_sha_missing_fail_closed",
+        }
+    action = decide_action(
+        state="GREEN",
+        push_allowed=True,
+        mergeable_state=pr.get("mergeable_state", "unknown"),
+        expected_head=head_sha,
+        attempt=int(pr.get("repair_attempt", 0)),
+    )
+    if action != "exact_head_branch_update":
+        return {
+            **result,
+            "action": action,
+            "result": "skipped",
+            "reason": "classified_for_bounded_rehabilitation",
         }
     try:
         response = run(
@@ -341,37 +349,28 @@ def main():
         "ownership": {
             "controller": "Gem",
             "implementation": "Symphony",
+            "stabilization": "Gem",
+            "promotion": "Gem native merge queue controller",
             "directGemPickup": False,
         },
         "processed": [],
         "errors": [],
     }
     try:
-        if IS_JOVIE_REPOSITORY:
-            document.update(
-                status="ok",
-                work_admission="disabled",
-                intake="disabled_symphony_implementation_owner",
-                selected=[],
-                reason="gem_ship_disabled_for_jovie",
-            )
-            write_artifact(document)
-            print(json.dumps(document, indent=2))
-            return 0
         if not POLICY_ENABLED:
             raise RuntimeError(
                 f"PR drain disabled by Gem repo policy for {REPO} "
                 f"({REPO_POLICY.repo_class}); monitor only"
             )
         gate_timeout = int(os.environ.get("GEM_PRIORITY_GATE_TIMEOUT", "300"))
-        gate = evaluate_work_gate(dry_run=args.dry_run, timeout=gate_timeout)
+        gate = evaluate_remediation_gate(dry_run=args.dry_run, timeout=gate_timeout)
         document["priority_gate"] = gate
-        if not gate["workAdmission"]["allowed"]:
+        if not gate["remediationAdmission"]["localAllowed"]:
             document.update(
                 status="ok",
-                work_admission="blocked",
+                remediation_admission="blocked",
                 capacity=capacity(),
-                intake="blocked_work_admission",
+                intake="blocked_remediation_admission",
                 selected=[],
             )
             write_artifact(document)

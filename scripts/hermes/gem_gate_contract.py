@@ -50,6 +50,8 @@ def _typed_allowed(receipt: dict[str, Any], consumer: str) -> bool:
         value = receipt.get("workAdmission", {}).get("allowed")
     elif consumer == "promotion":
         value = receipt.get("promotionAdmission", {}).get("allowed")
+    elif consumer == "remediation":
+        value = receipt.get("remediationAdmission", {}).get("allowed")
     elif consumer == "direct-gem":
         value = receipt.get("ownership", {}).get("directGemPickup")
     else:
@@ -73,6 +75,7 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
     work_allowed = _typed_allowed(receipt, "fleet")
     promotion_allowed = _typed_allowed(receipt, "promotion")
     direct_gem_allowed = _typed_allowed(receipt, "direct-gem")
+    remediation_allowed = _typed_allowed(receipt, "remediation")
     expected_admission = {
         "GREEN": (True, True),
         "AMBER": (True, False),
@@ -84,6 +87,14 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
         )
     if direct_gem_allowed:
         raise GateContractError("direct Gem pickup must remain disabled")
+    remediation = receipt.get("remediationAdmission", {})
+    if not remediation_allowed or remediation.get("localAllowed") is not True:
+        raise GateContractError("observation and bounded local remediation must remain live")
+    push_allowed = remediation.get("pushAllowed")
+    if not isinstance(push_allowed, bool):
+        raise GateContractError("remediation push admission is missing or is not boolean")
+    if push_allowed != (state != "RED"):
+        raise GateContractError("remote remediation must fail closed only on RED")
     reasons = receipt.get("reasons")
     if not isinstance(reasons, list) or any(
         not isinstance(reason, dict)

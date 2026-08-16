@@ -655,6 +655,19 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             + ["isolated-implementation", "tests", "review", "draft-pr"]
         )
     )
+    # Remediation is a liveness capability, not issue intake or promotion.
+    # A fleet hold must never hide the evidence or disable the bounded local
+    # work needed to diagnose and repair the hold.  Only a non-RED receipt may
+    # authorize updating the remote PR head; merge/deploy remain separately
+    # governed by their own typed admissions.
+    remediation_local_activities = [
+        "observe-pr",
+        "diagnose-pr",
+        "isolated-pr-repair",
+        "focused-tests",
+        "review",
+    ]
+    remediation_push_allowed = state != "RED"
     return {
         "schema": SCHEMA,
         "observedAt": observed_at,
@@ -673,6 +686,15 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             "activities": ["ready-for-merge", "merge"]
             if state == "GREEN"
             else [],
+        },
+        "remediationAdmission": {
+            "allowed": True,
+            "localAllowed": True,
+            "pushAllowed": remediation_push_allowed,
+            "activities": remediation_local_activities
+            + (["expected-head-pr-update"] if remediation_push_allowed else []),
+            "maxConcurrent": gem_concurrency,
+            "authority": "single-pr-writer-exact-head",
         },
         "deploymentAdmission": {
             "allowed": deployment_allowed,
@@ -863,6 +885,20 @@ def failed_evaluation_receipt(
             "newIssueLeaseAllowed": False,
         },
         "promotionAdmission": {"allowed": False, "activities": []},
+        "remediationAdmission": {
+            "allowed": True,
+            "localAllowed": True,
+            "pushAllowed": False,
+            "activities": [
+                "observe-pr",
+                "diagnose-pr",
+                "isolated-pr-repair",
+                "focused-tests",
+                "review",
+            ],
+            "maxConcurrent": DEFAULT_GEM_CONCURRENCY,
+            "authority": "single-pr-writer-exact-head",
+        },
         "deploymentAdmission": {
             "allowed": False,
             "activities": [],
@@ -934,6 +970,7 @@ def consumer_exit_code(receipt: dict[str, Any], consumer: str) -> int:
     allowed = {
         "direct-gem": receipt["ownership"]["directGemPickup"],
         "fleet": receipt["workAdmission"]["allowed"],
+        "remediation": receipt["remediationAdmission"]["allowed"],
         "promotion": receipt["promotionAdmission"]["allowed"],
         "deployment": receipt["deploymentAdmission"]["allowed"],
     }[consumer]
@@ -951,7 +988,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--evaluate-json")
     parser.add_argument(
         "--consumer",
-        choices=("direct-gem", "fleet", "promotion", "deployment"),
+        choices=("direct-gem", "fleet", "remediation", "promotion", "deployment"),
         default="direct-gem",
     )
     parser.add_argument(
