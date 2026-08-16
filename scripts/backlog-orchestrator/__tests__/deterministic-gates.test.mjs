@@ -74,7 +74,7 @@ describe('deterministic no-model gates', () => {
     );
   });
 
-  it('treats agent-ready as explicit machine-execution authorization', () => {
+  it('accepts agent-ready as durable evidence without requiring more labels', () => {
     const candidate = issue({
       labels: { nodes: [{ id: 'agent-ready-id', name: 'agent-ready' }] },
     });
@@ -84,15 +84,13 @@ describe('deterministic no-model gates', () => {
     );
   });
 
-  it('still requires execution evidence for generic ready-for-intake work', () => {
+  it('does not require a human readiness label for ordinary safe work', () => {
     const candidate = issue({
-      labels: {
-        nodes: [{ id: 'ready-id', name: 'ready-for-intake' }],
-      },
+      labels: { nodes: [] },
     });
     assert.equal(
       deterministicGates.validateDeterministicPlanCandidate(candidate),
-      'execution-evidence-label-missing'
+      null
     );
   });
 
