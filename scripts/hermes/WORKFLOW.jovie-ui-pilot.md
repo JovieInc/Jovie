@@ -3,9 +3,12 @@ tracker:
   kind: linear
   project_slug: "team:JOV"
   required_labels:
+    # This is a derived lease marker, not a manual readiness toll. The
+    # event-driven intake controller writes it only after its deterministic
+    # plan, routing, and admission receipts have been verified. `before_run`
+    # independently re-verifies the routing receipt before an agent can use a
+    # workspace or model slot.
     - symphony
-    - plan-approved
-    - admission-approved
   # Ownership boundary (JOV-4973): Symphony owns implementation only, through
   # a ready-but-held PR and the transition to In Review. Once an issue reaches
   # In Review, its lane must stop and release its slot, so In Review is NOT an active
@@ -23,7 +26,10 @@ tracker:
     - Duplicate
     - Closed
 polling:
-  interval_ms: 8000
+  # `POST /api/v1/refresh` is the primary wake-up from a verified admission.
+  # This interval is only a slow missed-event reconciliation backstop, never
+  # a source of new admission authority.
+  interval_ms: 300000
 workspace:
   root: /home/timwhite/symphony-workspaces
 hooks:
