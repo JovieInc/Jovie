@@ -5,8 +5,9 @@
  * Used by the dedicated `ci-fast-typecheck` and `ci-fast-remaining` jobs in
  * `.github/workflows/ci.yml` (JOV-4477). Each hosted job checks out and installs
  * once, invokes one value from LANE_GROUPS, and publishes an isolated lane
- * artifact; the aggregate `ci-fast` job fails closed unless both child jobs
- * pass. Never aborts mid-group — always reports every selected lane, writes
+ * artifact; the aggregate `ci-fast` job also requires the dedicated profile
+ * browser admission job. Never aborts mid-group — always reports every
+ * selected lane, writes
  * $GITHUB_STEP_SUMMARY, emits lane records for the harness, and exits non-zero
  * only after all selected lanes finish if any failed. Local callers may omit
  * the selector to retain the historical all-lanes behavior.
@@ -69,6 +70,13 @@ const LANES = [
     run: runIosFast,
   },
   {
+    id: 'profile-admission',
+    name: 'Public Profile Admission',
+    nextLocalCommand:
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
+    run: runProfileAdmission,
+  },
+  {
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
@@ -92,6 +100,7 @@ export const LANE_GROUPS = Object.freeze({
     'scripts-typecheck',
     'guardrails',
     'ios-fast',
+    'profile-admission',
     'structural',
   ]),
 });
@@ -192,7 +201,7 @@ function changedFiles(patterns) {
 
   const pathspecs = patterns.map(p => `'${p}'`).join(' ');
   const result = shell(
-    `git diff --diff-filter=d --name-only ${diffBase} HEAD -- ${pathspecs}`
+    `git diff --diff-filter=ACDMRT --name-only ${diffBase} HEAD -- ${pathspecs}`
   );
   if (result.code !== 0) {
     // Fall back to full set (caller decides).
@@ -318,6 +327,37 @@ function runIosFast() {
   return shell('pnpm run ios:lint');
 }
 
+function runProfileAdmission() {
+  const files = changedFiles([
+    ':(glob)apps/web/app/\\[username\\]/**',
+    'apps/web/app/(marketing)/renders/profile-admission/**',
+    'apps/web/app/api/profile/**',
+    'apps/web/components/features/release/SmartLinkProviderButton.tsx',
+    'apps/web/components/features/profile/**',
+    'apps/web/components/organisms/CookieBannerMount.tsx',
+    'apps/web/components/organisms/CookieBannerSection.tsx',
+    'apps/web/lib/cookies/**',
+    'apps/web/lib/profile/**',
+    'apps/web/lib/rate-limit/**',
+    'apps/web/lib/tracking/pac-**',
+    'apps/web/styles/design-system.css',
+    'apps/web/tests/e2e/profile/**',
+    'apps/web/tests/e2e/public-profile-smoke.spec.ts',
+    'apps/web/tests/e2e/utils/public-surface-**',
+    '.github/workflows/ci.yml',
+    'scripts/ci-fast-lanes.mjs',
+  ]);
+  if (files && files.length === 0) {
+    return {
+      code: 0,
+      output: 'No public-profile admission files changed\n',
+      skipped: true,
+    };
+  }
+
+  return shell(LANE_COMMANDS['profile-admission']);
+}
+
 function runStructural() {
   if (process.env.CI_FAST_SKIP_STRUCTURAL === 'true') {
     return {
@@ -352,8 +392,15 @@ function runStructural() {
     // closed when the file cannot be resolved or contains no tests.
     'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts',
     'pnpm --filter @jovie/web run test:reliability-detectors',
-    // Optional: structural regression tests need pytest; soft-skip if unavailable.
-    'if command -v pytest >/dev/null 2>&1; then pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py scripts/tests/test_symphony_ui_pilot_runtime.py -v; elif python3 -c "import pytest" 2>/dev/null; then python3 -m pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py scripts/tests/test_symphony_ui_pilot_runtime.py -v; else echo "pytest not installed — skip structural regressions"; fi',
+    // The Gem contract is embedded in the broader Symphony controller suite.
+    // Select the exact subtest so typed remediation admission, leases, and
+    // expected-head mutation remain executable CI behavior without adding the
+    // full backlog suite to every structural lane.
+    "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs",
+    // CI installs the hash-pinned pytest + coverage toolchain. The pure policy
+    // is the safety boundary for holds, retry budgets, exact-head leases, and
+    // bounded fanout, so branch-aware coverage is a hard structural gate.
+    'if python3 -c "import coverage, pytest" 2>/dev/null; then COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage run --branch scripts/hermes/tests/gem-rehabilitation-policy.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-gem-rehabilitation.coverage" python3 -m coverage report --include="*/scripts/hermes/gem_rehabilitation_policy.py" --fail-under=90 && python3 -m pytest scripts/tests/test_gh_retry.py scripts/tests/test_vercel_prebuilt_deploy.py scripts/tests/test_brand_scrub.py scripts/tests/test_agent_workflow_hygiene.py scripts/tests/test_runner_routing.py scripts/tests/test_symphony_ui_pilot_runtime.py -v; else echo "pytest/coverage not installed — skip structural regressions"; fi',
   ];
 
   let combined = '';

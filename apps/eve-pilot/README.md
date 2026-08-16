@@ -25,11 +25,19 @@ Requires Node 24 or later because Eve 0.27.8 requires it. This requirement is
 isolated to this deploy unit; the monorepo root remains on its established Node
 22 contract.
 
-    cd apps/eve-pilot
-    pnpm install --frozen-lockfile
-    pnpm run typecheck
-    pnpm run test
-    pnpm run build
+Install the isolated package from the repository root:
+
+    pnpm --dir apps/eve-pilot install --frozen-lockfile --ignore-workspace
+
+Run the deterministic, credential-free Eve discovery smoke:
+
+    pnpm --dir apps/eve-pilot --ignore-workspace run smoke
+
+For the complete local verification set:
+
+    pnpm --dir apps/eve-pilot --ignore-workspace run typecheck
+    pnpm --dir apps/eve-pilot --ignore-workspace run test
+    pnpm --dir apps/eve-pilot --ignore-workspace run build
 
 ## Core-chat bridge guardrails
 

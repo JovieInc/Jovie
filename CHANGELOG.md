@@ -9,6 +9,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- [internal] **Local Eve verification is deterministic and credential-free (JOV-5171):** the isolated `eve@0.27.8` pilot now has one root-invokable smoke command that runs from a cold app root, blocks model-catalog network access, and fails when the allowed skills, tools, channels, subagents, or schedules drift.
+
+## [26.8.1] - 2026-08-16
+
+### Changed
+
 - **Profile actions stay truthful and usable:** Unclaimed profiles show a clear ownership path. Listening, alerts, tips, merch, shows, and payments appear only when available.
 - **Changelog updates are easier to explore:** Featured outcomes lead each release, older updates stay collapsed, and every version has a permanent page plus RSS and JSON feeds.
 
@@ -17,6 +23,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - **Canceled sign-in stays recoverable:** Canceled browser sign-in restores provider actions, while the iPhone app explains what happened and keeps Sign In Again visible.
 - **iPhone profile setup stays in the app:** Failed saves remain retryable, while expired sessions return creators to sign-in without a generic web detour.
 - **The Mac app stays open after launch:** A successful first screen no longer switches to Retry seconds later.
+- **Public profile conversion controls stay usable under load (JOV-5135/JOV-5132):** consent, capture dismissal, primary actions, and canonical DSP handoffs now retain isolated abuse budgets, safe Redis-degraded behavior, and required secret-free browser admission coverage.
 - [internal] **Redis quota failures now surface before they break sign-in (JOV-5086):** production exercises a real write/read canary, groups quota exhaustion separately from outages, backs off degraded Redis traffic, filters known bots before metering high-volume anonymous telemetry, and makes every limiter's command-cost algorithm an explicit reviewed choice.
 - [internal] **Waitlist invite, auth/legal, and legacy profile-footer links now use the shared route registry:** existing destinations and email copy remain unchanged, and the public-profile spec records desktop source parity as not proven.
 

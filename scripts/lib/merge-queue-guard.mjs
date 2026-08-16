@@ -62,11 +62,11 @@ export function isPendingNativeCohortCutoverField(field) {
 export const NATIVE_QUEUE_POLICY = Object.freeze({
   check_response_timeout_minutes: 60,
   grouping_strategy: 'ALLGREEN',
-  // 2→8 on 2026-07-21: org Actions concurrency headroom ~120 jobs.
-  // merge_group peak ~10 concurrent jobs/entry → 8 builds ≈ 80 peak MQ jobs,
-  // leaving room for source-PR CI + release. Re-evaluate toward 10–12 if
-  // queue depth stays >8 while runner/job queue wait stays <3m.
-  max_entries_to_build: 8,
+  // 8→3 on 2026-08-15 after a five-prefix wave showed contention: one unit
+  // matrix completed in ~1–2m while four peers inflated to ~5–7m and kept the
+  // critical path near 7m. Re-evaluate from same-method queue-wait and duration
+  // evidence after the three-prefix canary.
+  max_entries_to_build: 3,
   max_entries_to_merge: 10,
   merge_method: 'SQUASH',
   min_entries_to_merge: NATIVE_QUEUE_COHORT_POLICY.minEntriesToMerge,

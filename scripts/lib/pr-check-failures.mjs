@@ -93,6 +93,9 @@ export const ADVISORY_CHECK_NAMES = Object.freeze(
     ...harnessManifest.jobs
       .filter(job => job.mergeGate !== true)
       .map(job => job.name),
+    // Bounded fleet recovery selector. A pending/expired hold must never
+    // classify as a product-quality gate or pin CLEAN enroll (JOV-5169).
+    'jovie-fleet-queue-hold/v1',
   ].filter((name, index, names) => names.indexOf(name) === index)
 );
 

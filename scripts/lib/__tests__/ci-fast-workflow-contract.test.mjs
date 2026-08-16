@@ -15,13 +15,20 @@ const WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ci.yml'),
   'utf8'
 );
+const CI_FAST_SOURCE = readFileSync(
+  resolve(REPO_ROOT, 'scripts/ci-fast-lanes.mjs'),
+  'utf8'
+);
 const PACKAGE_JSON = JSON.parse(
   readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8')
 );
 
 const HOSTED_GROUP_JOBS = [
   { jobId: 'ci-fast-typecheck', nextJobId: 'ci-fast-remaining' },
-  { jobId: 'ci-fast-remaining', nextJobId: 'ci-fast' },
+  {
+    jobId: 'ci-fast-remaining',
+    nextJobId: 'ci-profile-admission-browser',
+  },
 ];
 
 function jobBlock(jobId, nextJobId) {
@@ -48,6 +55,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'eslint-server-boundaries',
       'guardrails',
       'ios-fast',
+      'profile-admission',
       'scripts-typecheck',
       'structural',
       'typecheck',
@@ -97,6 +105,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts-typecheck',
       'guardrails',
       'ios-fast',
+      'profile-admission',
       'structural',
     ]);
     expect(selectLanes('typecheck').map(lane => lane.id)).toEqual([
@@ -118,6 +127,8 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts-typecheck': 'pnpm run typecheck:scripts',
       guardrails: 'pnpm next:proxy-guard',
       'ios-fast': 'pnpm run ios:lint',
+      'profile-admission':
+        'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
       structural:
         'pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
     });
@@ -129,13 +140,8 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(preflight).toContain(
       'run: pnpm exec node scripts/lockfile-specifier-preflight.mjs'
     );
-    for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
-      expect(
-        jobBlock(
-          jobId,
-          jobId === 'ci-fast-typecheck' ? 'ci-fast-remaining' : 'ci-fast'
-        )
-      ).toMatch(
+    for (const { jobId, nextJobId } of HOSTED_GROUP_JOBS) {
+      expect(jobBlock(jobId, nextJobId)).toMatch(
         /needs: \[ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission\]/
       );
     }
@@ -149,6 +155,26 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     expect(controlTest).toContain(
       'lib/__tests__/merge-group-workflow-contract.test.mjs'
+    );
+  });
+
+  it('enforces meaningful Gem rehabilitation policy coverage in structural CI', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+
+    expect(remaining).toContain(
+      'scripts/hermes/(gem-|gem_|install-gem-pr-rehabilitation)'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'coverage run --branch scripts/hermes/tests/gem-rehabilitation-policy.test.py'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'coverage report --include="*/scripts/hermes/gem_rehabilitation_policy.py" --fail-under=90'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs"
     );
   });
 
@@ -197,7 +223,10 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('keeps structural setup out of typecheck and fails closed in the aggregate', () => {
     const typecheck = jobBlock('ci-fast-typecheck', 'ci-fast-remaining');
-    const remaining = jobBlock('ci-fast-remaining', 'ci-fast');
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
     const aggregate = jobBlock('ci-fast', 'ci-promptfoo-evals');
 
     expect(typecheck).not.toMatch(
@@ -210,7 +239,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(remaining).not.toContain('ci-fast-typecheck');
 
     expect(aggregate).toMatch(
-      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*\]/s
+      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*\]/s
     );
     expect(aggregate).toMatch(/^  ci-fast:\n    name: ci-fast$/m);
     expect(aggregate).toMatch(/if: >-\s+always\(\)/);
@@ -226,14 +255,78 @@ describe('ci-fast bounded parallel workflow', () => {
       /REMAINING_RESULT: \$\{\{ needs\.ci-fast-remaining\.result \}\}/
     );
     expect(aggregate).toMatch(
-      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \]\]/
+      /PROFILE_BROWSER_RESULT: \$\{\{ needs\.ci-profile-admission-browser\.result \}\}/
+    );
+    expect(aggregate).toMatch(
+      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \]\]/
     );
     expect(aggregate).not.toContain('GROUP_RESULT');
     expect(aggregate).toMatch(/exit 1/);
   });
 
+  it('runs a bounded public-profile admission subset on source and merge-group heads', () => {
+    expect(LANE_GROUPS.remaining).toContain('profile-admission');
+    expect(LANE_COMMANDS['profile-admission']).toContain(
+      'tests/unit/api/profile/capture-dismissal.test.ts'
+    );
+    expect(LANE_COMMANDS['profile-admission']).toContain(
+      'lib/profile/capture-dismissal-client.test.ts'
+    );
+    expect(LANE_COMMANDS['profile-admission']).toContain(
+      'components/features/release/SmartLinkProviderButton.test.tsx'
+    );
+    expect(LANE_COMMANDS['profile-admission']).toContain(
+      'tests/unit/api/profile/pac-event.test.ts'
+    );
+    expect(LANE_COMMANDS['profile-admission']).toContain(
+      'tests/unit/cookie-banner-fixes.test.tsx'
+    );
+    expect(LANE_COMMANDS['profile-admission']).toContain(
+      'tests/unit/profile/ProfileHomeRail.test.tsx'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      ':(glob)apps/web/app/\\\\[username\\\\]/**'
+    );
+    expect(CI_FAST_SOURCE).not.toContain("'apps/web/app/[username]/**'");
+
+    const browser = jobBlock('ci-profile-admission-browser', 'ci-fast');
+    expect(browser).toContain('tests/e2e/profile-admission.spec.ts');
+    expect(browser).toContain('--config=playwright.config.noauth.ts');
+    expect(browser).toContain('--project=chromium');
+    expect(browser).toMatch(/github\.event_name.*merge_group/);
+    expect(browser).toMatch(/github\.event_name.*pull_request/);
+    expect(browser).toContain('git diff --diff-filter=ACDMRT --name-only');
+    expect(browser).toContain(':(glob)apps/web/app/\\[username\\]/**');
+    for (const requiredPath of [
+      'apps/web/app/(marketing)/renders/profile-admission/**',
+      'apps/web/components/features/release/SmartLinkProviderButton.tsx',
+      'apps/web/components/organisms/CookieBannerMount.tsx',
+      'apps/web/components/organisms/CookieBannerSection.tsx',
+      'apps/web/lib/cookies/**',
+      'apps/web/lib/tracking/pac-**',
+      'apps/web/styles/design-system.css',
+    ]) {
+      expect(browser).toContain(requiredPath);
+      expect(CI_FAST_SOURCE).toContain(requiredPath);
+    }
+  });
+
+  it('keeps deleted files in public-profile admission selection', () => {
+    expect(CI_FAST_SOURCE).toContain(
+      'git diff --diff-filter=ACDMRT --name-only'
+    );
+    expect(CI_FAST_SOURCE).not.toContain(
+      'git diff --diff-filter=d --name-only'
+    );
+    const browser = jobBlock('ci-profile-admission-browser', 'ci-fast');
+    expect(browser).toContain('git diff --diff-filter=ACDMRT --name-only');
+  });
+
   it('path-selects both workflow contracts and excludes unrelated tests', () => {
-    const remaining = jobBlock('ci-fast-remaining', 'ci-fast');
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
     const selectorPattern = remaining.match(
       /git diff --name-only[^\n]*\|\s*grep -qE '([^']+)'/
     )?.[1];

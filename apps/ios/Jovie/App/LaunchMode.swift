@@ -19,6 +19,12 @@ enum LaunchMode: Equatable {
   case uiTestingNeedsOnboardingUnauthorized
   case uiTestingSplash
   case uiTestingAudience
+  case uiTestingLibrary
+  case uiTestingLibraryEmpty
+  case uiTestingInbox
+  case uiTestingInboxOffline
+  case uiTestingCalendar
+  case uiTestingCalendarOffline
 
   var usesLiveAuth: Bool {
     switch self {
@@ -38,7 +44,13 @@ enum LaunchMode: Equatable {
          .uiTestingNeedsOnboarding,
          .uiTestingNeedsOnboardingUnauthorized,
          .uiTestingSplash,
-         .uiTestingAudience:
+         .uiTestingAudience,
+         .uiTestingLibrary,
+         .uiTestingLibraryEmpty,
+         .uiTestingInbox,
+         .uiTestingInboxOffline,
+         .uiTestingCalendar,
+         .uiTestingCalendarOffline:
       return false
     }
   }
@@ -83,9 +95,21 @@ enum LaunchMode: Equatable {
          .uiTestingAuthCallback,
          .uiTestingVenueMode:
       return .profile
+    case .uiTestingLibrary, .uiTestingLibraryEmpty:
+      return .library
+    case .uiTestingInbox, .uiTestingInboxOffline:
+      return .inbox
+    case .uiTestingCalendar, .uiTestingCalendarOffline:
+      return .calendar
     default:
       return .chat
     }
+  }
+
+  /// Empty-library fixture for CI. Other deterministic ready modes keep
+  /// `LibraryFeed.previewAssets` until a dedicated mobile library API ships.
+  var usesEmptyLibraryPreview: Bool {
+    self == .uiTestingLibraryEmpty
   }
 
   var recoversProfileErrorOnRetry: Bool {
@@ -93,8 +117,15 @@ enum LaunchMode: Equatable {
   }
 
   static func current(processInfo: ProcessInfo = .processInfo) -> LaunchMode {
-    let arguments = processInfo.arguments
+    resolving(
+      arguments: processInfo.arguments,
+      isXCTest: processInfo.environment["XCTestConfigurationFilePath"] != nil
+    )
+  }
 
+  /// Parses launch arguments independently of `ProcessInfo` so unit tests can
+  /// cover Library / Inbox / Calendar fixtures without spinning up XCUITest.
+  static func resolving(arguments: [String], isXCTest: Bool) -> LaunchMode {
     if arguments.contains("-ui-testing-live-auth") {
       return .uiTestingLiveAuth
     }
@@ -159,7 +190,31 @@ enum LaunchMode: Equatable {
       return .uiTestingAudience
     }
 
-    if processInfo.environment["XCTestConfigurationFilePath"] != nil {
+    if arguments.contains("-ui-testing-library-empty") {
+      return .uiTestingLibraryEmpty
+    }
+
+    if arguments.contains("-ui-testing-library") {
+      return .uiTestingLibrary
+    }
+
+    if arguments.contains("-ui-testing-inbox-offline") {
+      return .uiTestingInboxOffline
+    }
+
+    if arguments.contains("-ui-testing-inbox") {
+      return .uiTestingInbox
+    }
+
+    if arguments.contains("-ui-testing-calendar-offline") {
+      return .uiTestingCalendarOffline
+    }
+
+    if arguments.contains("-ui-testing-calendar") {
+      return .uiTestingCalendar
+    }
+
+    if isXCTest {
       return .unitTesting
     }
 

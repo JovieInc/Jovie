@@ -50,11 +50,21 @@ private struct AppContentView: View {
          .uiTestingChat,
          .uiTestingChatEntityFixture,
          .uiTestingSettings,
-         .uiTestingVenueMode:
+         .uiTestingVenueMode,
+         .uiTestingLibrary,
+         .uiTestingLibraryEmpty,
+         .uiTestingInbox,
+         .uiTestingInboxOffline,
+         .uiTestingCalendar,
+         .uiTestingCalendarOffline:
       return .loaded(.preview)
     default:
       return .idle
     }
+  }
+
+  private static func previewLibraryAssets(for launchMode: LaunchMode) -> [LibraryAsset] {
+    launchMode.usesEmptyLibraryPreview ? [] : LibraryFeed.previewAssets
   }
 
   var body: some View {
@@ -193,7 +203,7 @@ private struct AppContentView: View {
           )
         } libraryContent: { onSelectAsset in
           LibrarySurfaceView(
-            assets: LibraryFeed.previewAssets,
+            assets: Self.previewLibraryAssets(for: appState.launchMode),
             onSelectAsset: onSelectAsset
           )
         } calendarContent: { askJovie in
@@ -310,7 +320,13 @@ private struct AppContentView: View {
          .uiTestingChatEntityFixture,
          .uiTestingSettings,
          .uiTestingVenueMode,
-         .uiTestingAuthCallback:
+         .uiTestingAuthCallback,
+         .uiTestingLibrary,
+         .uiTestingLibraryEmpty,
+         .uiTestingInbox,
+         .uiTestingInboxOffline,
+         .uiTestingCalendar,
+         .uiTestingCalendarOffline:
       return true
     default:
       return !appState.launchMode.usesLiveAuth

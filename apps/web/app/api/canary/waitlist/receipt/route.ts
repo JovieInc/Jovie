@@ -22,7 +22,6 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { baSessions, baUsers } from '@/lib/db/schema/better-auth';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
-import { userInterviews } from '@/lib/db/schema/user-interviews';
 import { waitlistAuditLogs, waitlistEntries } from '@/lib/db/schema/waitlist';
 import { env } from '@/lib/env';
 import { NO_CACHE_HEADERS } from '@/lib/http/headers';
@@ -132,7 +131,7 @@ export async function GET(request: Request) {
     const entry = entries.length === 1 ? entries[0] : null;
     const exactEntryClaim = entry?.id === entryId;
 
-    const [sessions, auditRows, interviews, emailJobs] = await Promise.all([
+    const [sessions, auditRows, emailJobs] = await Promise.all([
       baUser
         ? db
             .select({ id: baSessions.id })
@@ -147,23 +146,13 @@ export async function GET(request: Request) {
         : Promise.resolve([]),
       exactEntryClaim
         ? db
-            .select({ metadata: waitlistAuditLogs.metadata })
+            .select({
+              id: waitlistAuditLogs.id,
+              metadata: waitlistAuditLogs.metadata,
+            })
             .from(waitlistAuditLogs)
             .where(eq(waitlistAuditLogs.waitlistEntryId, entry.id))
             .orderBy(desc(waitlistAuditLogs.createdAt))
-            .limit(50)
-        : Promise.resolve([]),
-      appUser
-        ? db
-            .select({ metadata: userInterviews.metadata })
-            .from(userInterviews)
-            .where(
-              and(
-                eq(userInterviews.userId, appUser.id),
-                eq(userInterviews.source, 'onboarding_chat')
-              )
-            )
-            .orderBy(desc(userInterviews.createdAt))
             .limit(50)
         : Promise.resolve([]),
       exactEntryClaim
@@ -186,23 +175,8 @@ export async function GET(request: Request) {
       );
       return marker?.runId === runId;
     });
-    const interview = interviews.find(row => {
-      const marker = readProductionWaitlistCanaryMarker(
-        row.metadata.syntheticCanary
-      );
-      return (
-        marker?.runId === runId &&
-        row.metadata.waitlistEntryId === entryId &&
-        ['waitlisted_gate_on', 'already_waitlisted'].includes(
-          row.metadata.accessOutcome ?? ''
-        )
-      );
-    });
-    const interviewMarker = readProductionWaitlistCanaryMarker(
-      interview?.metadata.syntheticCanary
-    );
     const analyticsReceipt = readProductionWaitlistAnalyticsReceipt(
-      interview?.metadata.syntheticAnalyticsReceipt
+      audit?.metadata?.syntheticAnalyticsReceipt
     );
 
     const missing: string[] = [];
@@ -212,7 +186,7 @@ export async function GET(request: Request) {
       !entry ||
       !exactEntryClaim ||
       entry.status !== 'waitlisted' ||
-      entry.source !== 'onboarding_chat' ||
+      entry.source !== 'waitlist_form' ||
       !entry.canonical ||
       appUser?.waitlistEntryId !== entryId ||
       appUser.userStatus !== 'waitlist_pending'
@@ -221,13 +195,9 @@ export async function GET(request: Request) {
     }
     if (!audit) missing.push('waitlist_audit');
     if (
-      !interview ||
-      interviewMarker?.runId !== runId ||
+      !audit ||
       analyticsReceipt?.runId !== runId ||
-      interview.metadata.waitlistEntryId !== entryId ||
-      !['waitlisted_gate_on', 'already_waitlisted'].includes(
-        interview.metadata.accessOutcome ?? ''
-      )
+      analyticsReceipt.event !== PRODUCTION_WAITLIST_CANARY_ANALYTICS_EVENT
     ) {
       missing.push('analytics_receipt');
     }
@@ -307,28 +277,28 @@ export async function POST(request: Request) {
 
   try {
     const rows = await db
-      .select({ id: userInterviews.id, metadata: userInterviews.metadata })
-      .from(userInterviews)
-      .where(
-        and(
-          eq(userInterviews.userId, appUserId),
-          eq(userInterviews.source, 'onboarding_chat')
-        )
-      )
+      .select({
+        id: waitlistAuditLogs.id,
+        metadata: waitlistAuditLogs.metadata,
+      })
+      .from(waitlistAuditLogs)
+      .where(eq(waitlistAuditLogs.actorUserId, appUserId))
+      .orderBy(desc(waitlistAuditLogs.createdAt))
       .limit(2);
-    const interview = rows.length === 1 ? rows[0] : null;
-    const marker = readProductionWaitlistCanaryMarker(
-      interview?.metadata.syntheticCanary
+    const audit = rows.find(
+      row =>
+        readProductionWaitlistCanaryMarker(row.metadata?.syntheticCanary)
+          ?.runId === runId
     );
-    if (!interview || marker?.runId !== runId) {
+    if (!audit) {
       return json({ error: 'Canary traversal not found' }, 409);
     }
 
     await db
-      .update(userInterviews)
+      .update(waitlistAuditLogs)
       .set({
         metadata: {
-          ...interview.metadata,
+          ...(audit.metadata ?? {}),
           syntheticAnalyticsReceipt: {
             schemaVersion: 1,
             name: PRODUCTION_WAITLIST_CANARY_NAME,
@@ -336,9 +306,8 @@ export async function POST(request: Request) {
             event: PRODUCTION_WAITLIST_CANARY_ANALYTICS_EVENT,
           },
         },
-        updatedAt: new Date(),
       })
-      .where(eq(userInterviews.id, interview.id));
+      .where(eq(waitlistAuditLogs.id, audit.id));
 
     return json({
       schemaVersion: 1,

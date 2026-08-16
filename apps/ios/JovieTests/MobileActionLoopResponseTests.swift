@@ -78,4 +78,18 @@ struct MobileActionLoopResponseTests {
     #expect(response.pendingReviewCount == 1)
     #expect(response.upcomingReleases.first?.title == "Midnight Drive")
   }
+
+  @Test func previewInboxExposesPendingActionAndChatPrompt() {
+    let preview = MobileActionLoopInboxResponse.preview
+    #expect(preview.pendingCount == 1)
+    #expect(preview.items.isEmpty == false)
+    #expect(preview.chatPrompt.isEmpty == false)
+  }
+
+  @Test func previewCalendarExposesUpcomingRangeAndCachedEvents() {
+    let preview = MobileActionLoopCalendarResponse.preview
+    #expect(preview.rangeLabel == "Upcoming")
+    #expect(preview.upcomingEvents.isEmpty == false)
+    #expect(preview.chatPrompt.isEmpty == false)
+  }
 }

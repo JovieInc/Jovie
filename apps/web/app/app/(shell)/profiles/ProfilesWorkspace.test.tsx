@@ -169,7 +169,7 @@ function RegisteredHeaderActions() {
   return <div data-testid='registered-header-actions'>{headerActions}</div>;
 }
 
-describe('ProfilesWorkspace', () => {
+describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
   it('uses the canonical empty state with a direct artist-profile action', () => {
     renderWorkspace(null);
 

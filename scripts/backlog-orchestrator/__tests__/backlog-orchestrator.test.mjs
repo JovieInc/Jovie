@@ -1429,9 +1429,17 @@ receipt = {
     "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "main red"}],
     "workAdmission": {"allowed": True},
     "promotionAdmission": {"allowed": False},
+    "remediationAdmission": {
+        "allowed": True,
+        "localAllowed": True,
+        "pushAllowed": True,
+        "maxConcurrent": 1,
+        "authority": "single-pr-writer-exact-head",
+    },
     "ownership": {"directGemPickup": False},
 }
 validate_gate_result(0, json.dumps(receipt), "fleet")
+validate_gate_result(0, json.dumps(receipt), "remediation")
 validate_gate_result(2, json.dumps(receipt), "promotion")
 try:
     validate_gate_result(0, json.dumps(receipt), "promotion")
@@ -1452,16 +1460,33 @@ except GateContractError:
     pass
 else:
     raise AssertionError("RED plus work allowed must fail closed")
+for invalid in (0, True, None):
+    malformed = json.loads(json.dumps(receipt))
+    malformed["remediationAdmission"]["maxConcurrent"] = invalid
+    try:
+        validate_gate_result(0, json.dumps(malformed), "remediation")
+    except GateContractError:
+        pass
+    else:
+        raise AssertionError("invalid remediation concurrency must fail closed")
+malformed = json.loads(json.dumps(receipt))
+malformed["remediationAdmission"]["authority"] = "descriptive-only"
+try:
+    validate_gate_result(0, json.dumps(malformed), "remediation")
+except GateContractError:
+    pass
+else:
+    raise AssertionError("invalid remediation authority must fail closed")
 `;
 
     await execFileAsync('python3', ['-c', contractProbe, hermesDir]);
-    assert.match(consumer, /"--consumer",\s*"fleet"/);
+    assert.match(consumer, /"--consumer",\s*"remediation"/);
     assert.match(
       consumer,
-      /validate_gate_result\(gate\.returncode, gate\.stdout, "fleet"\)/
+      /validate_gate_result\(gate\.returncode, gate\.stdout, "remediation"\)/
     );
     assert.ok(
-      consumer.indexOf('if not gate["workAdmission"]["allowed"]') <
+      consumer.indexOf('if not gate["remediationAdmission"]["localAllowed"]') <
         consumer.indexOf('authenticated, reason = auth_status()')
     );
 
@@ -1487,33 +1512,19 @@ receipt = {
     "reasons": [{"code": "repository-or-artifact-corruption", "layer": "integrity", "severity": "critical", "detail": "test"}],
     "workAdmission": {"allowed": False},
     "promotionAdmission": {"allowed": False},
+    "remediationAdmission": {
+        "allowed": True,
+        "localAllowed": True,
+        "pushAllowed": False,
+        "maxConcurrent": 1,
+        "authority": "single-pr-writer-exact-head",
+    },
     "ownership": {"directGemPickup": False},
 }
 print(json.dumps(receipt))
-raise SystemExit(2)
+raise SystemExit(0)
 `
     );
-    const { stdout } = await execFileAsync(
-      'python3',
-      [resolve(hermesDir, 'gem-pr-drain.py'), '--dry-run'],
-      {
-        env: {
-          ...process.env,
-          GEM_WORKSPACE: workspace,
-          GEM_PR_DRAIN_REPO: 'JovieInc/Jovie',
-          PYTHONPATH: workspace,
-        },
-      }
-    );
-    const blocked = JSON.parse(stdout);
-    assert.equal(blocked.status, 'ok');
-    assert.equal(blocked.work_admission, 'disabled');
-    assert.equal(blocked.intake, 'disabled_symphony_implementation_owner');
-    assert.equal(blocked.reason, 'gem_ship_disabled_for_jovie');
-    assert.ok(!('priority_gate' in blocked));
-    assert.deepEqual(blocked.selected, []);
-    assert.deepEqual(blocked.processed, []);
-
     const updateProbe = `
 import importlib.util
 import json
@@ -1526,7 +1537,7 @@ spec.loader.exec_module(module)
 result = module.update_one({
     "number": 1,
     "mergeable_state": "behind",
-    "head": {"ref": "test"},
+    "head": {"ref": "test", "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
     "labels": [],
     "statusCheckRollup": [],
 })
@@ -1558,6 +1569,13 @@ receipt = {
     "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "test"}],
     "workAdmission": {"allowed": True},
     "promotionAdmission": {"allowed": False},
+    "remediationAdmission": {
+        "allowed": True,
+        "localAllowed": True,
+        "pushAllowed": True,
+        "maxConcurrent": 1,
+        "authority": "single-pr-writer-exact-head",
+    },
     "ownership": {"directGemPickup": False},
 }
 print(json.dumps(receipt))
@@ -1581,14 +1599,14 @@ module.run = fake_run
 behind = module.update_one({
     "number": 1,
     "mergeable_state": "behind",
-    "head": {"ref": "test", "sha": "abc123"},
+    "head": {"ref": "test", "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
     "labels": [],
     "statusCheckRollup": [],
 })
 clean = module.update_one({
     "number": 2,
     "mergeable_state": "clean",
-    "head": {"ref": "test-2"},
+    "head": {"ref": "test-2", "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
     "labels": [],
     "statusCheckRollup": [],
 })
@@ -1609,9 +1627,16 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
     const allowedResult = JSON.parse(allowed.stdout);
     assert.equal(allowedResult.behind.action, 'api_update_branch');
     assert.equal(allowedResult.behind.result, 'ok');
-    assert.ok(allowedResult.calls[0].includes('expected_head_sha=abc123'));
-    assert.equal(allowedResult.clean.action, 'controller_observe_only');
-    assert.equal(allowedResult.clean.reason, 'implementation_owner_symphony');
+    assert.ok(
+      allowedResult.calls[0].includes(
+        'expected_head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+      )
+    );
+    assert.equal(allowedResult.clean.action, 'observe_only');
+    assert.equal(
+      allowedResult.clean.reason,
+      'classified_for_bounded_rehabilitation'
+    );
   });
 
   it('runs stale-lease recovery before gate-next admission preflight', async () => {

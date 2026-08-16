@@ -11,7 +11,7 @@ import { readArtistEmailReadyFromSettings } from '@/lib/notifications/artist-ema
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
 import {
   getCaptureDismissalStatus,
-  invalidateCaptureDismissalStatus,
+  handleCaptureDismissalResponse,
 } from '@/lib/profile/capture-dismissal-client';
 import { readProfileAccentTheme } from '@/lib/profile/profile-theme';
 import {
@@ -591,11 +591,7 @@ export function ProfileInlineNotificationsCTA({
         source: resolvedSource,
       }),
     })
-      .then(response => {
-        if (response.ok) {
-          invalidateCaptureDismissalStatus(artist.id);
-        }
-      })
+      .then(response => handleCaptureDismissalResponse(artist.id, response))
       .catch(() => {
         // Suppression remains in memory for this session.
       });

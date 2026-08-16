@@ -92,7 +92,43 @@ function getMergeGroupReachableJobText(jobBlock) {
   return reachable.join('\n');
 }
 
+function parseExactCiFastFailureOperands(script) {
+  const condition = [...script.matchAll(/if\s+\[\[\s*(.+?)\s*\]\];\s*then/g)]
+    .map(match => match[1])
+    .find(candidate => candidate.includes('$TYPECHECK_RESULT'));
+  const operands = (condition ?? '')
+    .split(/\s+\|\|\s+/)
+    .map(
+      clause =>
+        clause.match(
+          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT)"\s+!=\s+"success"$/
+        )?.[1]
+    );
+  if (
+    operands.sort().join() !==
+    'PROFILE_BROWSER_RESULT,REMAINING_RESULT,TYPECHECK_RESULT'
+  )
+    throw new Error('Invalid ci-fast fail-closed result set');
+  return operands;
+}
+
 describe('merge_group workflow contract', () => {
+  it('accepts reordered exact ci-fast failure operands', () => {
+    expect(
+      parseExactCiFastFailureOperands(
+        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
+      )
+    ).toHaveLength(3);
+  });
+
+  it('rejects a ci-fast failure condition missing a required operand', () => {
+    expect(() =>
+      parseExactCiFastFailureOperands(
+        'if [[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
+      )
+    ).toThrow('Invalid ci-fast fail-closed result set');
+  });
+
   it('models a checks_requested combined-head event', () => {
     expect(EVENT.action).toBe('checks_requested');
     expect(EVENT.merge_group.base_ref).toBe('refs/heads/main');
@@ -215,9 +251,8 @@ describe('merge_group workflow contract', () => {
     );
     expect(ciFast).toContain('TYPECHECK_RESULT');
     expect(ciFast).toContain('REMAINING_RESULT');
-    expect(ciFast).toContain(
-      '[[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]'
-    );
+    expect(ciFast).toContain('PROFILE_BROWSER_RESULT');
+    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(3);
     expect(ciFast).toContain('exit 1');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     expect(units).not.toContain('ci-unit-runner-route');
@@ -320,8 +355,14 @@ describe('merge_group workflow contract', () => {
       "shard: ['1/10', '2/10', '3/10', '4/10', '5/10', '6/10', '7/10', '8/10', '9/10', '10/10']"
     );
     expect(unitTests).toContain(
-      "matrix.shard == '1/10'\n        run: pnpm turbo test --filter=@jovie/ui"
+      "github.event_name == 'merge_group' && matrix.shard == '4/10'"
     );
+    expect(unitTests).toContain(
+      "github.event_name != 'merge_group' && matrix.shard == '1/10'"
+    );
+    expect(
+      unitTests.match(/pnpm turbo test --filter=@jovie\/ui/g)
+    ).toHaveLength(1);
     expect(unitTests).not.toContain("matrix.shard == '1/5'");
     expect(unitTests).toContain('max-parallel: 120');
     expect(getJobBlock(CI_WORKFLOW, 'ci-a11y')).not.toContain(

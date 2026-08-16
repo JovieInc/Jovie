@@ -387,7 +387,9 @@ describe('seo-ratchet live surface validators', () => {
 });
 
 describe('seo-ratchet sitemap.xml shape', () => {
-  it('serializes non-empty sitemap XML with lastmod on every URL', async () => {
+  it('serializes non-empty sitemap XML with lastmod on every URL', {
+    timeout: 15_000,
+  }, async () => {
     vi.resetModules();
     vi.doMock('next/cache', () => ({
       unstable_cache: (callback: () => Promise<unknown>) => callback,

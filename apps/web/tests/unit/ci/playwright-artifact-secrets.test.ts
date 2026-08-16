@@ -49,7 +49,7 @@ const localTrace = Object.fromEntries(
     .map(value => value.split('='))
 );
 const uploadInventory =
-  'agent-tick.yml:public-profile-smoke-screenshots|agent-tick.yml:synthetic-test-results|ci.yml:${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:mobile-overflow-report-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:smoke-required-report-${{ github.run_id }}|e2e-full-matrix.yml:e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-candidate-validation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-context-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-deterministic-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-mutation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}|nightly-tests.yml:full-surface-chaos-${{ github.run_id }}|nightly-tests.yml:nightly-e2e-results-${{ github.run_id }}|nightly-tests.yml:nightly-route-qa-${{ github.run_id }}|postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}|production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}|synthetic-monitoring.yml:synthetic-test-results|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
+  'agent-tick.yml:public-profile-smoke-screenshots|agent-tick.yml:synthetic-test-results|ci.yml:${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-authed-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:golden-path-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:mobile-overflow-report-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:public-lighthouse-mobile-report-${{ github.run_id }}-${{ github.run_attempt }}|ci.yml:smoke-required-report-${{ github.run_id }}|e2e-full-matrix.yml:e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-candidate-validation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-context-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-deterministic-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-mutation-${{ github.run_id }}|nightly-testing-agent.yml:nightly-agent-report-${{ github.run_id }}|nightly-tests.yml:full-surface-chaos-${{ github.run_id }}|nightly-tests.yml:nightly-e2e-results-${{ github.run_id }}|nightly-tests.yml:nightly-route-qa-${{ github.run_id }}|postdeploy-probes.yml:postdeploy-auth-smoke-${{ github.run_id }}|production-controller.yml:post-deploy-auth-smoke-${{ github.run_id }}|synthetic-monitoring.yml:synthetic-test-results|visual-regression.yml:visual-regression-report-${{ github.run_id }}-${{ github.run_attempt }}'.split(
     '|'
   );
 const imageUploads =
@@ -80,7 +80,7 @@ const protectedJobs: Record<string, string[]> = {
 const producerCounts: Record<string, number> = {
   'agent-tick.yml': 6,
   'canary-health-gate.yml': 1,
-  'ci.yml': 15,
+  'ci.yml': 14,
   'e2e-full-matrix.yml': 2,
   'nightly-testing-agent.yml': 2,
   'nightly-tests.yml': 4,
@@ -791,13 +791,13 @@ describe('Playwright artifact secret boundary', () => {
     expect(uploads.sort()).toEqual(uploadInventory.sort());
     expect(images.sort()).toEqual(imageUploads.sort());
     expect(markdown.sort()).toEqual(markdownUploads.sort());
-    expect(safeUploadJobs).toHaveLength(23);
+    expect(safeUploadJobs).toHaveLength(24);
     expect(
       safeUploadJobs.reduce(
         (count, job) => count + safeUploadJobAudit(job).uploadCount,
         0
       )
-    ).toBe(26);
+    ).toBe(27);
     for (const job of safeUploadJobs) {
       const audit = safeUploadJobAudit(job);
       expect(
@@ -959,6 +959,8 @@ ${fixtureCheckout}
           );
       }
     }
+    const waitlistDopplerCommand =
+      'run: doppler run --project jovie-web --config prd --only-secrets=E2E_PROD_SIGNUP_EMAIL_BASE,E2E_PROD_MAILBOX_PROVIDER,E2E_PROD_OTP_CHECK_ORIGIN,E2E_PROD_OTP_CHECK_TOKEN,E2E_PROD_OTP_CHECK_URL,PRODUCTION_WAITLIST_CANARY_READ_TOKEN --no-fallback -- env -u DOPPLER_TOKEN node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-production-waitlist.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-production-waitlist';
     for (const file of ['agent-tick.yml', 'synthetic-monitoring.yml']) {
       const doppler = readFileSync(join(workflowsRoot, file), 'utf8')
         .split('\n')
@@ -967,12 +969,16 @@ ${fixtureCheckout}
       const guarded = doppler.filter(line => line.includes(guardScriptName));
       expect(guarded).toHaveLength(6);
       expect(
-        guarded.every(line =>
-          line.includes(
-            'doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm'
-          )
+        guarded.every(
+          line =>
+            line.includes(
+              'doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm'
+            ) || line.trim() === waitlistDopplerCommand
         )
       ).toBe(true);
+      expect(
+        guarded.filter(line => line.trim() === waitlistDopplerCommand)
+      ).toHaveLength(1);
       expect(doppler.filter(line => !line.includes(guardScriptName))).toEqual([
         expect.stringContaining('scripts/check-signup-readiness.ts'),
       ]);
