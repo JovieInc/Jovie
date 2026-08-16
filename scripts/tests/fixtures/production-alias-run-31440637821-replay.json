@@ -1,0 +1,21 @@
+{
+  "description": "Replay of Production Controller run 31440637821 (OAuth job 93628867652). Exact main b8bbdc9181c1d42635c091cc4a8ae4e7cfdd2104 was deployed as immutable dpl_HsdoJs7y99GRJMyEDbDwNVrUWxND; plain and canary reached 2/2 exact HTTP 200 while stable alternated exact 200 and transport HTTP 000. Transport unknown is non-contradictory, so the exact generation resolves to verified.",
+  "controllerRun": 31440637821,
+  "oauthJob": 93628867652,
+  "sha": "b8bbdc9181c1d42635c091cc4a8ae4e7cfdd2104",
+  "shortSha": "b8bbdc9",
+  "deploymentId": "dpl_HsdoJs7y99GRJMyEDbDwNVrUWxND",
+  "verifier": {
+    "maxAttempts": 8,
+    "requiredRounds": 2,
+    "retrySeconds": 5
+  },
+  "routes": ["plain", "stable", "canary"],
+  "observationRounds": [
+    ["match", "match", "match"],
+    ["match", "transient", "match"],
+    ["match", "match", "transient"],
+    ["match", "match", "match"]
+  ],
+  "expected": "verified"
+}

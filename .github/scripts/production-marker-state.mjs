@@ -9,6 +9,7 @@ import { pathToFileURL } from 'node:url';
 const MARKER_FILE = 'production-generation-verified.json';
 const RECOVERY_FILE = 'production-generation-recovery.json';
 const CONTROLLER_PATH = '.github/workflows/production-controller.yml';
+const MARKER_RECOVERY_PATH = '.github/workflows/production-marker-recovery.yml';
 const INTERRUPTED_CONCLUSIONS = new Set([
   'cancelled',
   'failure',
@@ -112,9 +113,93 @@ function markerNameForAttempt(sha, attempt) {
   return null;
 }
 
+/**
+ * A recovered marker is written by the bounded workflow_dispatch recovery
+ * path after it re-proves canonical ownership and every exact runtime probe
+ * for a generation whose original controller run never preserved a marker.
+ * The uploading recovery run replaces the controller-run binding; the payload
+ * must name the exact original controller run attempt it recovers.
+ */
+function validateMarkerRecoveryRun(run, context, attempt) {
+  if (!run || typeof run !== 'object') return false;
+  return (
+    sameInteger(run.id, context.controllerRun) &&
+    sameInteger(run.run_attempt, attempt) &&
+    run.path === MARKER_RECOVERY_PATH &&
+    run.head_branch === 'main' &&
+    run.head_repository?.full_name === context.repo &&
+    run.event === 'workflow_dispatch' &&
+    run.status === 'completed' &&
+    run.conclusion === 'success'
+  );
+}
+
+function classifyRecoveredMarkerEntry(entry, context) {
+  const artifact = entry.artifact;
+  const payload = entry.payload;
+  const expectedName = `production-generation-verified-${context.sha}`;
+  if (
+    !validateArtifact(artifact, expectedName) ||
+    artifact.expired ||
+    !validateMarkerPayload(payload, context, artifact)
+  ) {
+    return { error: 'malformed_or_contradictory_marker' };
+  }
+  const controllerRun = positiveInteger(payload.controllerRun);
+  const attempt = positiveInteger(payload.controllerAttempt);
+  const sourceRun = positiveInteger(payload.recoveredFromControllerRun);
+  const sourceAttempt = positiveInteger(payload.recoveredFromControllerAttempt);
+  if (!controllerRun || !attempt || !sourceRun || !sourceAttempt) {
+    return { error: 'malformed_or_contradictory_marker' };
+  }
+  const markerContext = { ...context, controllerRun };
+  if (!validateMarkerRecoveryRun(entry.attemptRun, markerContext, attempt)) {
+    return { error: 'contradictory_marker_attempt' };
+  }
+  const sourceContext = { ...context, controllerRun: sourceRun };
+  if (
+    !validateControllerRun(entry.originalRun, sourceContext, sourceAttempt) ||
+    entry.originalRun.status !== 'completed'
+  ) {
+    return { error: 'contradictory_recovery_source_run' };
+  }
+  if (!Array.isArray(entry.originalJobs)) {
+    return { error: 'malformed_recovery_source_jobs' };
+  }
+  // The generation is recoverable only while it still owns production: the
+  // original run's centralized rollback must have been skipped, never run.
+  const rollbackJobs = entry.originalJobs.filter(
+    job =>
+      typeof job?.name === 'string' &&
+      job.name.endsWith('Centralized production rollback')
+  );
+  if (
+    rollbackJobs.length !== 1 ||
+    !validateControllerJob(rollbackJobs[0], sourceContext, sourceAttempt) ||
+    rollbackJobs[0].status !== 'completed' ||
+    rollbackJobs[0].conclusion !== 'skipped'
+  ) {
+    return { error: 'unsafe_or_contradictory_rollback' };
+  }
+  return {
+    kind: 'verified',
+    attempt,
+    controllerRun,
+    deploymentId: payload.deploymentId,
+    markerContext,
+    recovered: true,
+  };
+}
+
 function classifyMarkerEntry(entry, context) {
   if (!entry || typeof entry !== 'object') {
     return { error: 'malformed_marker_entry' };
+  }
+  if (
+    entry.payload?.recoveredFromControllerRun !== undefined ||
+    entry.attemptRun?.path === MARKER_RECOVERY_PATH
+  ) {
+    return classifyRecoveredMarkerEntry(entry, context);
   }
   const artifact = entry.artifact;
   const attempt = positiveInteger(entry.payload?.controllerAttempt);
@@ -220,8 +305,12 @@ export function classifyProductionMarkerEvidence(evidence) {
     if (new Set(attempts).size !== attempts.length) {
       return manual('duplicate_marker_attempt');
     }
-    const primary = classified.find(entry => entry.attempt === 1);
-    const recovery = classified.find(entry => entry.attempt === 2);
+    const primary =
+      classified.find(entry => entry.attempt === 1) ??
+      classified.find(entry => entry.recovered);
+    const recovery = classified.find(
+      entry => entry.attempt === 2 && !entry.recovered
+    );
     const recoveryName = `production-generation-recovery-${sha}`;
     const recoveryArtifacts = evidence.recoveryArtifacts;
     if (!Array.isArray(recoveryArtifacts)) {
@@ -245,9 +334,11 @@ export function classifyProductionMarkerEvidence(evidence) {
       }
       return {
         state: 'verified',
-        reason: 'exact_attempt_verified',
+        reason: primary.recovered
+          ? 'exact_recovered_generation_verified'
+          : 'exact_attempt_verified',
         controllerRun: primary.controllerRun,
-        controllerAttempt: 1,
+        controllerAttempt: primary.attempt,
         deploymentId: primary.deploymentId,
       };
     }
@@ -548,6 +639,22 @@ function inspectOnline(args) {
         `repos/${repo}/actions/runs/${controllerRun}/attempts/${controllerAttempt}/jobs?per_page=100`
       )
     );
+    const sourceRun = positiveInteger(
+      marker.payload?.recoveredFromControllerRun
+    );
+    const sourceAttempt = positiveInteger(
+      marker.payload?.recoveredFromControllerAttempt
+    );
+    if (sourceRun && sourceAttempt) {
+      marker.originalRun = ghJson(
+        `repos/${repo}/actions/runs/${sourceRun}/attempts/${sourceAttempt}`
+      );
+      marker.originalJobs = normalizeProductionJobs(
+        ghJson(
+          `repos/${repo}/actions/runs/${sourceRun}/attempts/${sourceAttempt}/jobs?per_page=100`
+        )
+      );
+    }
   }
 
   const recoveryName = `production-generation-recovery-${sha}`;

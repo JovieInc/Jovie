@@ -428,3 +428,138 @@ describe('production marker attempt state', () => {
     ).toMatchObject({ state: 'manual' });
   });
 });
+
+describe('recovered production marker state', () => {
+  const recoveryRunId = 789;
+
+  function recoveryDispatchRun(status: string, conclusion: string | null) {
+    return {
+      id: recoveryRunId,
+      run_attempt: 1,
+      workflow_id: workflowId + 1,
+      path: '.github/workflows/production-marker-recovery.yml',
+      head_sha: 'c'.repeat(40),
+      head_branch: 'main',
+      head_repository: { full_name: repo },
+      event: 'workflow_dispatch',
+      status,
+      conclusion,
+    };
+  }
+
+  function recoveredMarker() {
+    return {
+      artifact: {
+        id: 21,
+        name: `production-generation-verified-${sha}`,
+        expired: false,
+        workflowRunId: recoveryRunId,
+      },
+      payload: {
+        sha,
+        deploymentId: 'dpl_recovered123',
+        controllerRun: String(recoveryRunId),
+        controllerAttempt: '1',
+        recoveredFromControllerRun: String(controllerRun),
+        recoveredFromControllerAttempt: '1',
+      },
+      attemptRun: recoveryDispatchRun('completed', 'success'),
+      attemptJobs: [],
+      originalRun: run(1, 'completed', 'failure'),
+      originalJobs: [
+        job(
+          'Production Release / Centralized production rollback',
+          1,
+          'completed',
+          'skipped'
+        ),
+      ],
+    };
+  }
+
+  it('verifies a bounded recovered marker with exact source evidence', () => {
+    const result = classifyProductionMarkerEvidence(
+      evidence({ markers: [recoveredMarker()], latestRun: undefined })
+    );
+
+    expect(result).toMatchObject({
+      state: 'verified',
+      reason: 'exact_recovered_generation_verified',
+      controllerRun: recoveryRunId,
+      controllerAttempt: 1,
+      deploymentId: 'dpl_recovered123',
+    });
+  });
+
+  it('fails closed when the recovered source run was rolled back', () => {
+    const marker = recoveredMarker();
+    marker.originalJobs = [
+      job(
+        'Production Release / Centralized production rollback',
+        1,
+        'completed',
+        'success'
+      ),
+    ];
+    expect(
+      classifyProductionMarkerEvidence(evidence({ markers: [marker] }))
+    ).toMatchObject({
+      state: 'manual',
+      reason: 'unsafe_or_contradictory_rollback',
+    });
+  });
+
+  it('fails closed when the recovery run did not complete successfully', () => {
+    const marker = recoveredMarker();
+    marker.attemptRun = recoveryDispatchRun('completed', 'failure');
+    expect(
+      classifyProductionMarkerEvidence(evidence({ markers: [marker] }))
+    ).toMatchObject({
+      state: 'manual',
+      reason: 'contradictory_marker_attempt',
+    });
+  });
+
+  it('fails closed when the source run is not the exact controller attempt', () => {
+    const marker = recoveredMarker();
+    marker.originalRun = {
+      ...run(1, 'completed', 'failure'),
+      head_sha: 'd'.repeat(40),
+    };
+    expect(
+      classifyProductionMarkerEvidence(evidence({ markers: [marker] }))
+    ).toMatchObject({
+      state: 'manual',
+      reason: 'contradictory_recovery_source_run',
+    });
+  });
+
+  it('fails closed when recovery provenance fields are missing', () => {
+    const marker = recoveredMarker();
+    delete (marker.payload as Record<string, unknown>)
+      .recoveredFromControllerAttempt;
+    expect(
+      classifyProductionMarkerEvidence(evidence({ markers: [marker] }))
+    ).toMatchObject({
+      state: 'manual',
+      reason: 'malformed_or_contradictory_marker',
+    });
+  });
+
+  it('rejects rerun-lease evidence alongside a recovered verified marker', () => {
+    const lease = recoveryLease();
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({
+          markers: [recoveredMarker()],
+          recoveryArtifacts: [lease.artifact],
+          recoveryPayload: lease.payload,
+          recoveryAttemptRun: run(2, 'completed', 'success'),
+        })
+      )
+    ).toMatchObject({
+      state: 'manual',
+      reason: 'recovery_evidence_after_verified_primary',
+    });
+  });
+});
