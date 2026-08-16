@@ -53,8 +53,8 @@ const FOCUSED_PATHS = Object.freeze([
   },
 ]);
 
-const MATERIAL_RISK_ADDITION =
-  /(?:secrets?\.|private[-_ ]key|api[-_ ]key|credential|id-token:\s*write|pull_request_target|drop\s+table|delete\s+from|rm\s+-rf|production\s+(?:deploy|promotion)|--force\b)/i;
+const MATERIAL_RISK_CHANGE =
+  /(?:secrets?\.|private[-_ ]key|api[-_ ]key|credential|(?:actions|checks|contents|deployments|id-token|issues|packages|pull-requests|security-events|statuses):\s*write|pull_request_target|drop\s+table|delete\s+from|rm\s+-rf|production\s+(?:deploy|promotion)|--force\b)/i;
 
 const SHA = /^[0-9a-f]{40}$/;
 
@@ -86,12 +86,16 @@ export function classifyRecoveryFiles(files = [], patch = '') {
   if (lanes.size === 0) {
     return { eligible: false, lanes: [], reason: 'tests-or-docs-only' };
   }
-  const additions = String(patch)
+  const changedLines = String(patch)
     .split('\n')
-    .filter(line => line.startsWith('+') && !line.startsWith('+++'))
+    .filter(
+      line =>
+        (line.startsWith('+') && !line.startsWith('+++')) ||
+        (line.startsWith('-') && !line.startsWith('---'))
+    )
     .join('\n');
-  if (MATERIAL_RISK_ADDITION.test(additions)) {
-    return { eligible: false, lanes: [], reason: 'material-risk-addition' };
+  if (MATERIAL_RISK_CHANGE.test(changedLines)) {
+    return { eligible: false, lanes: [], reason: 'material-risk-change' };
   }
   return {
     eligible: true,

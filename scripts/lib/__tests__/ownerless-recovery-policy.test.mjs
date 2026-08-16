@@ -97,6 +97,12 @@ describe('ownerless recovery policy', () => {
         '+private-key: ${{ secrets.KEY }}'
       ).eligible
     ).toBe(false);
+    expect(
+      classifyRecoveryFiles(
+        ['.github/workflows/ci.yml'],
+        '-  contents: read\n+  contents: write'
+      )
+    ).toMatchObject({ eligible: false, reason: 'material-risk-change' });
   });
 
   it('renders an exact-head action receipt without claiming unproven merge', () => {
@@ -140,7 +146,8 @@ describe('ownerless recovery workflow contract', () => {
   it('requests exact-head native merge and reads authoritative queue proof', () => {
     expect(sweeper).toContain("'--match-head-commit'");
     expect(sweeper).toContain('mergeQueueEntry{position state}');
-    expect(sweeper).toContain("outcome: 'merge-request-failed'");
+    expect(sweeper).toContain("writeReceipt('merge-request-failed')");
     expect(sweeper).toContain("'requested-unproven'");
+    expect(sweeper).toContain('(concurrent controller)');
   });
 });

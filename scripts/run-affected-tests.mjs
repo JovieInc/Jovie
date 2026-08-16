@@ -176,6 +176,16 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/queue-deferred-release-admission.test.mjs',
   'scripts/lib/__tests__/setup-worktree-health.test.mjs',
 ];
+const OWNERLESS_RECOVERY_INPUTS = new Set([
+  '.github/workflows/ownerless-recovery-sweep.yml',
+  'scripts/ownerless-recovery-sweeper.mjs',
+  'scripts/lib/ownerless-recovery-policy.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+]);
+const OWNERLESS_RECOVERY_TESTS = [
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+  'scripts/lib/__tests__/pr-check-failures.test.mjs',
+];
 const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   '.github/workflows/merge-queue-autoenroll.yml',
   'scripts/ci-merge-queue-check.mjs',
@@ -821,6 +831,9 @@ export function buildAffectedTestPlan(
         (hasUnsupportedAutomationPeer || !directlyRunnableTestFiles.has(file))
     );
   const mandatoryTests = [];
+  const hasOwnerlessRecoveryChange = files.some(file =>
+    OWNERLESS_RECOVERY_INPUTS.has(file)
+  );
   const hasSeedConfirmationChange = files.some(
     file =>
       file === 'apps/web/tests/seed-test-data.ts' ||
@@ -966,6 +979,7 @@ export function buildAffectedTestPlan(
       ? RUNNER_PREREQUISITE_CONTROL_TESTS
       : []),
     ...(isExactLayoutGuardContract ? LAYOUT_GUARD_CONTRACT_SCRIPT_TESTS : []),
+    ...(hasOwnerlessRecoveryChange ? OWNERLESS_RECOVERY_TESTS : []),
   ]);
   const isCoveredSource = file => {
     if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file)) return true;
@@ -984,6 +998,7 @@ export function buildAffectedTestPlan(
     if (file.startsWith('apps/web/tests/eval/promptfoo/')) return true;
     if (isInvestorNoteIngestionInput(file)) return true;
     if (isCiCancellationHealerInput(file)) return true;
+    if (OWNERLESS_RECOVERY_INPUTS.has(file)) return true;
     if (isExactEventDrivenShipper && EVENT_DRIVEN_SHIPPER_MANIFEST.has(file))
       return true;
     if (
@@ -1239,7 +1254,8 @@ export function buildAffectedTestPlan(
             isExactRunnerIoPressure ||
             isExactRunnerPrerequisiteRepair ||
             isExactLayoutGuardContract ||
-            isExactEventDrivenShipper)
+            isExactEventDrivenShipper ||
+            hasOwnerlessRecoveryChange)
         ? 'selected'
         : relatedFiles.length === 0
           ? 'none'

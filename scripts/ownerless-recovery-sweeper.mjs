@@ -146,19 +146,36 @@ async function promote(summary, mainSha, evidence, decision) {
     return { queued: false };
   }
 
-  if (live.draft) await gh(['pr', 'ready', String(number), '-R', repo]);
-  if ((live.labels ?? []).some(label => label.name === 'queue-deferred')) {
-    await gh([
-      'pr',
-      'edit',
-      String(number),
-      '-R',
-      repo,
-      '--remove-label',
-      'queue-deferred',
-    ]);
-  }
+  const writeReceipt = (outcome, proof = null) =>
+    upsertReceipt(
+      number,
+      renderRecoveryReceipt({
+        pr: number,
+        head: expectedHead,
+        main: mainSha,
+        ownerlessSince: liveDecision.ownerlessSince,
+        lanes: liveDecision.lanes,
+        action: 'gh-pr-merge-auto-squash',
+        outcome,
+        mergeQueueState: proof?.mergeQueueEntry?.state,
+        mergeQueuePosition: proof?.mergeQueueEntry?.position,
+        observedAt: new Date().toISOString(),
+      })
+    );
+
   try {
+    if (live.draft) await gh(['pr', 'ready', String(number), '-R', repo]);
+    if ((live.labels ?? []).some(label => label.name === 'queue-deferred')) {
+      await gh([
+        'pr',
+        'edit',
+        String(number),
+        '-R',
+        repo,
+        '--remove-label',
+        'queue-deferred',
+      ]);
+    }
     await gh([
       'pr',
       'merge',
@@ -171,19 +188,16 @@ async function promote(summary, mainSha, evidence, decision) {
       expectedHead,
     ]);
   } catch (error) {
-    await upsertReceipt(
-      number,
-      renderRecoveryReceipt({
-        pr: number,
-        head: expectedHead,
-        main: mainSha,
-        ownerlessSince: liveDecision.ownerlessSince,
-        lanes: liveDecision.lanes,
-        action: 'gh-pr-merge-auto-squash',
-        outcome: 'merge-request-failed',
-        observedAt: new Date().toISOString(),
-      })
-    );
+    const racedProof = await readQueueProof(number).catch(() => null);
+    if (racedProof?.state === 'MERGED' || racedProof?.mergeQueueEntry) {
+      const outcome = racedProof.state === 'MERGED' ? 'merged' : 'queued';
+      await writeReceipt(outcome, racedProof);
+      console.log(
+        `#${number} recovery action: ${outcome} (concurrent controller)`
+      );
+      return { queued: true };
+    }
+    await writeReceipt('merge-request-failed');
     throw error;
   }
 
@@ -199,21 +213,7 @@ async function promote(summary, mainSha, evidence, decision) {
       : proof?.mergeQueueEntry
         ? 'queued'
         : 'requested-unproven';
-  await upsertReceipt(
-    number,
-    renderRecoveryReceipt({
-      pr: number,
-      head: expectedHead,
-      main: mainSha,
-      ownerlessSince: liveDecision.ownerlessSince,
-      lanes: liveDecision.lanes,
-      action: 'gh-pr-merge-auto-squash',
-      outcome,
-      mergeQueueState: proof?.mergeQueueEntry?.state,
-      mergeQueuePosition: proof?.mergeQueueEntry?.position,
-      observedAt: new Date().toISOString(),
-    })
-  );
+  await writeReceipt(outcome, proof);
   console.log(`#${number} recovery action: ${outcome}`);
   return { queued: outcome === 'queued' || outcome === 'merged' };
 }
