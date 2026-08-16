@@ -1,0 +1,15 @@
+[Unit]
+Description=Durable Symphony stopped-work reconciler
+After=symphony-ui-pilot.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/symphony-reconciler
+Environment=SYMPHONY_MODEL_ROUTER=%h/.local/lib/symphony-reconciler/model-router.py
+Environment=SYMPHONY_MODEL_REGISTRY=%h/.local/lib/symphony-reconciler/model-registry.json
+TimeoutStartSec=15min
+Nice=10
+
+# A temporarily unavailable local API is an observable fail-closed result. The
+# timer retries it; durable receipts are never deleted by the service.
+SuccessExitStatus=0 2

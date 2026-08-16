@@ -18,15 +18,23 @@ exactly the keys this contract depends on.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / "scripts/hermes/WORKFLOW.jovie-ui-pilot.md"
 UNIT = ROOT / "scripts/hermes/systemd/symphony-ui-pilot.service"
 GUARD = ROOT / "scripts/hermes/symphony-lease-guard"
+RECONCILER = ROOT / "scripts/hermes/symphony-reconciler.py"
+MODEL_ROUTER = ROOT / "scripts/hermes/model-router.py"
+MODEL_REGISTRY = ROOT / "scripts/hermes/config/model-registry.json"
+RECONCILER_SERVICE = ROOT / "scripts/hermes/systemd/symphony-reconciler.service"
+RECONCILER_TIMER = ROOT / "scripts/hermes/systemd/symphony-reconciler.timer"
 INSTALLER = ROOT / "scripts/hermes/install-symphony-ui-pilot.sh"
 FLEET_INSTALLER = ROOT / "scripts/hermes/install-gem-fleet-controller.sh"
 INTAKE_WORKFLOW = ROOT / ".github/workflows/jovie-intake-controller.yml"
@@ -227,16 +235,208 @@ def test_installer_deploys_workflow_and_unit(tmp_path: Path) -> None:
     workflow = tmp_path / "symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
     unit = tmp_path / ".config/systemd/user/symphony-ui-pilot.service"
     guard = tmp_path / ".local/bin/symphony-lease-guard"
+    reconciler = tmp_path / ".local/bin/symphony-reconciler"
+    model_router = tmp_path / ".local/lib/symphony-reconciler/model-router.py"
+    model_registry = tmp_path / ".local/lib/symphony-reconciler/model-registry.json"
+    reconciler_service = tmp_path / ".config/systemd/user/symphony-reconciler.service"
+    reconciler_timer = tmp_path / ".config/systemd/user/symphony-reconciler.timer"
     assert workflow.read_text() == WORKFLOW.read_text()
     assert unit.read_text() == UNIT.read_text()
     # JOV-5031: the lease guard installs executable so the before_run hook can
     # enforce the monotonic tombstone before a provider account is seized.
     assert guard.read_text() == GUARD.read_text()
     assert guard.stat().st_mode & 0o111
+    assert reconciler.read_text() == RECONCILER.read_text()
+    assert reconciler.stat().st_mode & 0o111
+    assert model_router.read_text() == MODEL_ROUTER.read_text()
+    assert model_router.stat().st_mode & 0o111
+    assert model_registry.read_text() == MODEL_REGISTRY.read_text()
+    assert reconciler_service.read_text() == RECONCILER_SERVICE.read_text()
+    assert reconciler_timer.read_text() == RECONCILER_TIMER.read_text()
     # Freshly installed state must pass drift detection.
     check = _run_installer(tmp_path, "--check")
     assert check.returncode == 0, check.stdout
-    assert check.stdout.count("OK") == 3
+    assert check.stdout.count("OK") == 8
+
+
+def test_reconciler_records_exact_first_failure_without_escalating(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "workspaces"
+    workspace = workspace_root / "JOV-1"
+    workspace.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=workspace, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=workspace, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=workspace, check=True)
+    (workspace / "proof.txt").write_text("base\n")
+    subprocess.run(["git", "add", "proof.txt"], cwd=workspace, check=True)
+    subprocess.run(["git", "commit", "-qm", "base"], cwd=workspace, check=True)
+    subprocess.run(["git", "remote", "add", "origin", "."], cwd=workspace, check=True)
+    subprocess.run(["git", "update-ref", "refs/remotes/origin/main", "HEAD"], cwd=workspace, check=True)
+    head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=workspace, text=True).strip()
+
+    payload = {
+        "retrying": [{
+            "issue_identifier": "JOV-1",
+            "issue_id": "linear-id",
+            "issue_url": "https://linear.app/example/JOV-1",
+            "workspace_path": str(workspace),
+            "attempt": 1,
+            "error": "normal model failed",
+            "due_at": "2030-01-01T00:00:00Z",
+        }],
+        "blocked": [],
+    }
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            body = json.dumps(payload).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_args: object) -> None:
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    env = dict(
+        os.environ,
+        SYMPHONY_STATE_URL=f"http://127.0.0.1:{server.server_port}/api/v1/state",
+        SYMPHONY_WORKSPACE_ROOT=str(workspace_root),
+        SYMPHONY_RECONCILER_STATE=str(tmp_path / "state"),
+    )
+    try:
+        result = subprocess.run(["python3", str(RECONCILER)], env=env, capture_output=True, text=True, check=False)
+    finally:
+        server.shutdown()
+        thread.join()
+    assert result.returncode == 0, result.stderr
+    receipt = json.loads((tmp_path / "state/receipts/JOV-1.json").read_text())
+    assert receipt["schema"] == "symphony-reconciliation-receipt/v1"
+    assert receipt["headBaseCurrent"]["head"] == head
+    assert receipt["headBaseCurrent"]["base"] == head
+    assert receipt["attemptedRepairs"][0]["kind"] == "normal_model_bounded_retry"
+    assert receipt["alternateModel"]["nominatedModel"] == "qwen-coder-local"
+    assert receipt["nextAutomatedAction"] == "normal_model_retry"
+    assert "transition=normal_retry_scheduled" in result.stdout
+
+
+def test_reconciler_hands_repeated_failure_to_local_model_then_returns_to_normal_loop(
+    tmp_path: Path,
+) -> None:
+    workspace_root = tmp_path / "workspaces"
+    workspace = workspace_root / "JOV-2"
+    workspace.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=workspace, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=workspace, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=workspace, check=True)
+    (workspace / "proof.txt").write_text("base\n")
+    subprocess.run(["git", "add", "proof.txt"], cwd=workspace, check=True)
+    subprocess.run(["git", "commit", "-qm", "base"], cwd=workspace, check=True)
+    subprocess.run(["git", "remote", "add", "origin", "."], cwd=workspace, check=True)
+    subprocess.run(["git", "update-ref", "refs/remotes/origin/main", "HEAD"], cwd=workspace, check=True)
+
+    fake_ollama = tmp_path / "ollama"
+    fake_ollama.write_text("#!/bin/sh\necho 'qwen3-coder:30b latest'\n")
+    fake_ollama.chmod(0o755)
+    fake_agent = tmp_path / "hermes"
+    fake_agent.write_text("#!/bin/sh\nprintf 'repaired by local model\\n' > repair.txt\necho repair-complete\n")
+    fake_agent.chmod(0o755)
+    fake_systemctl_state = tmp_path / "systemctl-state"
+    fake_systemctl_state.write_text("active\n")
+    fake_systemctl = tmp_path / "systemctl"
+    fake_systemctl.write_text(
+        "#!/bin/sh\n"
+        f"state='{fake_systemctl_state}'\n"
+        "case \"$2\" in\n"
+        "  stop) echo inactive > \"$state\"; exit 0;;\n"
+        "  start) echo active > \"$state\"; exit 0;;\n"
+        "  is-active) grep -qx active \"$state\";;\n"
+        "  *) exit 2;;\n"
+        "esac\n"
+    )
+    fake_systemctl.chmod(0o755)
+
+    payload = {
+        "retrying": [{
+            "issue_identifier": "JOV-2",
+            "issue_id": "linear-id-2",
+            "issue_url": "https://linear.app/example/JOV-2",
+            "workspace_path": str(workspace),
+            "attempt": 3,
+            "error": "repeated source repair failure",
+            "due_at": "2030-01-01T00:00:00Z",
+        }],
+        "blocked": [],
+    }
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            body = json.dumps(payload).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_args: object) -> None:
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    env = dict(
+        os.environ,
+        SYMPHONY_STATE_URL=f"http://127.0.0.1:{server.server_port}/api/v1/state",
+        SYMPHONY_WORKSPACE_ROOT=str(workspace_root),
+        SYMPHONY_RECONCILER_STATE=str(tmp_path / "state"),
+        GEM_PR_DRAIN_QWEN=str(fake_ollama),
+        GEM_QWEN_AGENT_EXECUTABLE=str(fake_agent),
+        GEM_MODEL_ROUTER_STATE=str(tmp_path / "router-state.json"),
+        SYMPHONY_SYSTEMCTL=str(fake_systemctl),
+    )
+    try:
+        result = subprocess.run(["python3", str(RECONCILER)], env=env, capture_output=True, text=True, check=False)
+        first_receipt = json.loads((tmp_path / "state/receipts/JOV-2.json").read_text())
+        subprocess.run(["git", "add", "repair.txt"], cwd=workspace, check=True)
+        subprocess.run(["git", "commit", "-qm", "alternate handoff"], cwd=workspace, check=True)
+        changed_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=workspace, text=True).strip()
+        fake_agent.write_text("#!/bin/sh\nsleep 2\n")
+        env["SYMPHONY_ALTERNATE_TIMEOUT_SECONDS"] = "1"
+        timeout_result = subprocess.run(
+            ["python3", str(RECONCILER)], env=env, capture_output=True, text=True, check=False
+        )
+        timeout_receipt = json.loads((tmp_path / "state/receipts/JOV-2.json").read_text())
+        waiting_result = subprocess.run(
+            ["python3", str(RECONCILER)], env=env, capture_output=True, text=True, check=False
+        )
+        waiting_receipt = json.loads((tmp_path / "state/receipts/JOV-2.json").read_text())
+    finally:
+        server.shutdown()
+        thread.join()
+    assert result.returncode == 0, result.stderr
+    assert (workspace / "repair.txt").read_text() == "repaired by local model\n"
+    assert first_receipt["alternateModel"]["status"] == "repair_handoff_ready"
+    assert first_receipt["transition"] == "returned_to_normal_loop"
+    assert first_receipt["nextAutomatedAction"] == "normal_model_update_test_ready_native_merge"
+    assert first_receipt["headBaseCurrent"]["dirty"] is True
+    assert first_receipt["authoritativeOwner"] == "symphony-reconciler"
+    assert first_receipt["attemptedRepairs"][1]["result"] == "acquired"
+    assert "transition=alternate_local_repair_started" in result.stdout
+    assert "transition=returned_to_normal_loop" in result.stdout
+    assert "transition=normal_owner_restored" in result.stdout
+    assert timeout_result.returncode == 0, timeout_result.stderr
+    assert timeout_receipt["generation"] != first_receipt["generation"]
+    assert timeout_receipt["headBaseCurrent"]["head"] == changed_head
+    assert timeout_receipt["alternateModel"]["status"] == "repair_timed_out"
+    assert timeout_receipt["nextAutomatedAction"] == "retry_alternate_local_model"
+    assert "transition=alternate_local_repair_deferred" in timeout_result.stdout
+    assert waiting_result.returncode == 0, waiting_result.stderr
+    assert waiting_receipt["nextRetryAt"] == timeout_receipt["nextRetryAt"]
+    assert waiting_receipt["nextAutomatedAction"] == "retry_scheduler_handoff_then_alternate_local_model"
+    assert fake_systemctl_state.read_text() == "active\n"
 
 
 def test_installer_backs_up_and_detects_drift(tmp_path: Path) -> None:

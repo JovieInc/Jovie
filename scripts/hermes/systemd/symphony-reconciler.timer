@@ -1,0 +1,11 @@
+[Unit]
+Description=Reconcile stopped Symphony work every two minutes
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=2m
+RandomizedDelaySec=15s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
