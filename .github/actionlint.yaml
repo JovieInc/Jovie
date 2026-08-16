@@ -1,35 +1,22 @@
+# The structural CI action discovers this repository-local file directly.
+# Keep every non-hosted runner label explicit so runner placement remains linted
+# without treating the repository's declared infrastructure as a syntax error.
 self-hosted-runner:
   labels:
-    - jovie-runner
-    - jovie-fixed
+    - gem
     - hermes
+    - jovie-eph-isolation
+    - jovie-ephemeral
+    - jovie-fixed
+    - jovie-runner
+    - jovie-runner-image-canary
     - ubicloud-standard-2
     - ubicloud-standard-8
 
-# GitHub added concurrency.queue before actionlint v1.7.12 learned the schema.
-# Keep this exact, path-scoped compatibility suppression while enforcing every
-# other workflow syntax rule. Remove it when the pinned actionlint accepts it.
+# GitHub supports this repository's bounded production queue setting, while
+# the pinned actionlint version does not yet recognize it. Keep the exception
+# exact and path-scoped; every other workflow syntax check remains enforced.
 paths:
   .github/workflows/production-controller.yml:
     ignore:
       - 'unexpected key "queue" for "concurrency" section.*'
-
-# Suppress noisy shellcheck codes that are style/info, not bugs.
-# SC2028: echo may not expand escape sequences (info)
-# SC2034: variable appears unused (false positive with GITHUB_OUTPUT)
-# SC2086: double quote to prevent globbing (info, intentional in CI scripts)
-# SC2126: grep -c instead of grep|wc (style)
-# SC2129: use { } >> file (style)
-# SC2001: use ${var//} instead of sed (style)
-# SC2016: expressions don't expand in single quotes (info, intentional)
-# SC2329: function never invoked (info, invoked indirectly)
-shellcheck:
-  exclude:
-    - SC2028
-    - SC2034
-    - SC2086
-    - SC2126
-    - SC2129
-    - SC2001
-    - SC2016
-    - SC2329
