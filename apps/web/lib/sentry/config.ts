@@ -101,6 +101,15 @@ export const SENTRY_DSN_SERVER = isDevelopment
   ? process.env.SENTRY_DSN_DEV
   : process.env.SENTRY_DSN;
 
+// Production deployments inject the exact build revision into
+// NEXT_PUBLIC_SENTRY_RELEASE. Tagging every event lets the release gate
+// distinguish a candidate regression from unrelated production noise without
+// exposing a secret or relying on deployment timing alone.
+export const SENTRY_RELEASE =
+  process.env.NEXT_PUBLIC_SENTRY_RELEASE ||
+  process.env.VERCEL_GIT_COMMIT_SHA ||
+  process.env.NEXT_PUBLIC_BUILD_SHA;
+
 /**
  * Trace sample rate for performance monitoring.
  *
@@ -515,6 +524,7 @@ export function createBeforeSendHook(
  */
 export interface BaseSentryClientConfig {
   dsn: string | undefined;
+  release: string | undefined;
   tracesSampleRate: number;
   enableLogs: boolean;
   sendDefaultPii: boolean;
@@ -565,6 +575,7 @@ export interface BaseSentryClientConfig {
 export function getBaseClientConfig(): BaseSentryClientConfig {
   return {
     dsn: SENTRY_DSN_CLIENT,
+    release: SENTRY_RELEASE,
     tracesSampleRate: TRACES_SAMPLE_RATE,
     enableLogs: true,
     sendDefaultPii: false, // Disabled on client - user context set server-side only
@@ -592,6 +603,7 @@ export function getBaseClientConfig(): BaseSentryClientConfig {
  */
 export interface BaseSentryServerConfig {
   dsn: string | undefined;
+  release: string | undefined;
   tracesSampleRate: number;
   enableLogs: boolean;
   sendDefaultPii: boolean;
@@ -622,6 +634,7 @@ export interface BaseSentryServerConfig {
 export function getBaseServerConfig(): BaseSentryServerConfig {
   return {
     dsn: SENTRY_DSN_SERVER,
+    release: SENTRY_RELEASE,
     tracesSampleRate: TRACES_SAMPLE_RATE,
     enableLogs: true,
     sendDefaultPii: true, // Enabled on server - scrubbed via beforeSend hook

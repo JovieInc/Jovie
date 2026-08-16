@@ -4253,6 +4253,7 @@ describe('production promotion exact-artifact contract', () => {
     expect(sentryJob).toContain(
       'sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}'
     );
+    expect(sentryJob).toContain('expected_sha: ${{ inputs.expected_sha }}');
     expect(sentryJob).not.toContain(
       'uses: ./.github/workflows/sentry-error-gate.yml'
     );
@@ -4271,6 +4272,8 @@ describe('production promotion exact-artifact contract', () => {
     expect(sentryAction).toContain(
       'START_EPOCH=$((END_EPOCH - WINDOW_MINUTES * 60))'
     );
+    expect(sentryAction).toContain('expected_sha="${{ inputs.expected_sha }}"');
+    expect(sentryAction).toContain('candidate_release=$expected_sha');
     expect(sentryAction).toContain(
       'POST_RATE_SCALED=$((POST_DEPLOY * BASELINE_MINUTES))'
     );
@@ -4278,15 +4281,18 @@ describe('production promotion exact-artifact contract', () => {
       'BASELINE_RATE_LIMIT_SCALED=$((BASELINE * THRESHOLD * POST_MINUTES))'
     );
     const statsRequests = getSentryStatsRequests(sentryAction);
-    expect(statsRequests).toHaveLength(2);
+    expect(statsRequests).toHaveLength(3);
     const exactProductionErrorQuery =
       '--data-urlencode "query=event.type:error environment:vercel-production"';
-    for (const request of statsRequests) {
+    for (const request of statsRequests.slice(0, 2)) {
       expect(request).toContain('curl --fail --silent --show-error --get');
       expect(request.match(/--data-urlencode "query=[^"]+"/g)).toEqual([
         exactProductionErrorQuery,
       ]);
     }
+    expect(statsRequests[2]).toContain(
+      '--data-urlencode "query=event.type:error environment:vercel-production release:$CANDIDATE_RELEASE"'
+    );
     expect(sentryAction).not.toContain('events-stats/?project=');
     expect(sentryAction).not.toContain('SENTRY_ORG:\n        required: true');
   });
@@ -4311,12 +4317,13 @@ describe('production promotion exact-artifact contract', () => {
     // A genuine error-rate increase remains blocking after filtering.
     expect(isRateSpike(6, 4)).toBe(true);
     const statsRequests = getSentryStatsRequests(sentryAction);
-    expect(statsRequests).toHaveLength(2);
-    for (const request of statsRequests) {
+    expect(statsRequests).toHaveLength(3);
+    for (const request of statsRequests.slice(0, 2)) {
       expect(request).toContain(
         '--data-urlencode "query=event.type:error environment:vercel-production"'
       );
     }
+    expect(statsRequests[2]).toContain('release:$CANDIDATE_RELEASE');
     expect(sentryAction).toContain('echo "gate_status=failed"');
   });
 

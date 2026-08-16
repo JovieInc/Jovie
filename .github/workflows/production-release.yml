@@ -1269,6 +1269,7 @@ jobs:
           baseline_window_minutes: 30
           threshold_multiplier: 3
           min_baseline_errors: 5
+          expected_sha: ${{ inputs.expected_sha }}
 
   production-oauth-gate:
     name: Production OAuth Gate (observational)
