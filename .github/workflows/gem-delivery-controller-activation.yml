@@ -21,7 +21,10 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_branch == 'main'
     name: Activate exact production-proven Gem controller
-    runs-on: [self-hosted, Linux, X64, jovie-fixed, gem]
+    # `jovie-fixed` is the provisioned Gem-host runner contract. Do not add a
+    # host alias here unless runner registration proves that label first: an
+    # unmatched label leaves the controller generation queued indefinitely.
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 8
     steps:
       - name: Checkout the exact successful production revision

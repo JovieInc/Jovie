@@ -145,6 +145,12 @@ def test_activation_requires_exact_production_revision_and_attestation() -> None
     assert 'gem-service-attestation/v1' in activation
 
 
+def test_activation_uses_the_provisioned_gem_host_runner_contract() -> None:
+    activation = ACTIVATION_WORKFLOW.read_text()
+    assert "runs-on: [self-hosted, Linux, X64, jovie-fixed]" in activation
+    assert "runs-on: [self-hosted, Linux, X64, jovie-fixed, gem]" not in activation
+
+
 def test_workflow_server_and_workspace() -> None:
     lines = _front_matter_lines()
     assert _scalar(_section(lines, "server"), "port") == "4041"
