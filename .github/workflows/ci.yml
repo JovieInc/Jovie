@@ -3322,8 +3322,13 @@ jobs:
 
       - name: Run packages/ui unit tests
         # This suite is not sharded; running it in every web-test shard was
-        # identical duplicate work. Keep it in the existing required matrix.
-        if: steps.check_changes.outputs.run_full_ci == 'true' && matrix.shard == '1/10'
+        # identical duplicate work. Across 15 recent full merge-group runs,
+        # moving it to shard 4 projected a 393s -> 378s median matrix tail
+        # (10 better, 4 equal, 1 worse). Main/manual runs retain shard 1.
+        if: >-
+          steps.check_changes.outputs.run_full_ci == 'true' &&
+          ((github.event_name == 'merge_group' && matrix.shard == '4/10') ||
+          (github.event_name != 'merge_group' && matrix.shard == '1/10'))
         run: pnpm turbo test --filter=@jovie/ui
 
       - name: Upload test results to Codecov
