@@ -21,8 +21,7 @@ const appExports = Object.fromEntries(
     .map(item => item.split('='))
 ) as Readonly<Record<string, string>>;
 const has = (value?: string | null) => Boolean(value?.trim());
-const decodeToken = (codes: readonly number[]) =>
-  String.fromCharCode(...codes);
+const decodeToken = (codes: readonly number[]) => String.fromCharCode(...codes);
 const DISALLOWED_TYPEFACE_TOKENS = [
   [115, 101, 114, 105, 102],
   [103, 101, 111, 114, 103, 105, 97],
