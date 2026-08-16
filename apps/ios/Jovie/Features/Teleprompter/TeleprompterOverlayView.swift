@@ -31,6 +31,29 @@ private final class TeleprompterPreviewUIView: UIView {
   }
 }
 
+private struct TeleprompterFramingGridView: View {
+  var body: some View {
+    GeometryReader { proxy in
+      let thirdWidth = proxy.size.width / 3
+      let thirdHeight = proxy.size.height / 3
+
+      Path { path in
+        path.move(to: CGPoint(x: thirdWidth, y: 0))
+        path.addLine(to: CGPoint(x: thirdWidth, y: proxy.size.height))
+        path.move(to: CGPoint(x: thirdWidth * 2, y: 0))
+        path.addLine(to: CGPoint(x: thirdWidth * 2, y: proxy.size.height))
+        path.move(to: CGPoint(x: 0, y: thirdHeight))
+        path.addLine(to: CGPoint(x: proxy.size.width, y: thirdHeight))
+        path.move(to: CGPoint(x: 0, y: thirdHeight * 2))
+        path.addLine(to: CGPoint(x: proxy.size.width, y: thirdHeight * 2))
+      }
+      .stroke(Color.white.opacity(0.22), lineWidth: 1)
+    }
+    .allowsHitTesting(false)
+    .accessibilityHidden(true)
+  }
+}
+
 /// Wrapping horizontal layout for per-word prompt views. Kept minimal: words
 /// flow left→right, top→bottom, with a constant gap; row height is the
 /// tallest word in the row.
@@ -195,30 +218,54 @@ struct TeleprompterOverlayView: View {
       TeleprompterCameraPreview(session: viewModel.captureController.captureSession)
         .ignoresSafeArea()
 
-      // Readability scrim behind the script strip; fixed, no animation.
-      LinearGradient(
-        colors: [Color.black.opacity(0.72), Color.black.opacity(0)],
-        startPoint: .top,
-        endPoint: .bottom
-      )
-      .frame(height: scriptRegionHeight + 120)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-      .ignoresSafeArea()
-      .allowsHitTesting(false)
+      if viewModel.framingGrid == .thirds {
+        TeleprompterFramingGridView()
+          .ignoresSafeArea()
+      }
 
-      LinearGradient(
-        colors: [Color.black.opacity(0), Color.black.opacity(0.82)],
-        startPoint: .top,
-        endPoint: .bottom
-      )
-      .frame(height: 260)
-      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-      .ignoresSafeArea()
-      .allowsHitTesting(false)
+      if viewModel.overlayVisibility == .visible, viewModel.contentMode == .script {
+        // Script mode retains the existing lens-adjacent readability treatment.
+        LinearGradient(
+          colors: [Color.black.opacity(0.72), Color.black.opacity(0)],
+          startPoint: .top,
+          endPoint: .bottom
+        )
+        .frame(height: scriptRegionHeight + 120)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+
+        LinearGradient(
+          colors: [Color.black.opacity(0), Color.black.opacity(0.82)],
+          startPoint: .top,
+          endPoint: .bottom
+        )
+        .frame(height: 260)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+      }
 
       VStack(spacing: 0) {
-        scriptRegion
-          .frame(height: scriptRegionHeight)
+        ViewThatFits(in: .horizontal) {
+          captureHeader
+          compactCaptureHeader
+        }
+          .padding(.horizontal, JovieSpacing.large)
+          .padding(.top, JovieSpacing.medium)
+
+        if viewModel.overlayVisibility == .visible {
+          if viewModel.contentMode == .script {
+            scriptRegion
+              .frame(height: scriptRegionHeight)
+          } else {
+            Spacer(minLength: 0)
+            promptRegion
+            Spacer(minLength: 0)
+          }
+        } else {
+          Spacer(minLength: 0)
+        }
 
         // Reserved error/status slot — opacity only, no height collapse.
         Text(viewModel.errorMessage ?? " ")
@@ -232,19 +279,281 @@ struct TeleprompterOverlayView: View {
           .accessibilityIdentifier("teleprompter-error")
           .accessibilityHidden(viewModel.errorMessage == nil)
 
-        Spacer(minLength: 0)
+        if viewModel.overlayVisibility == .visible, viewModel.contentMode == .script {
+          Spacer(minLength: 0)
+        }
 
-        speedControls
+        if viewModel.overlayVisibility == .visible, viewModel.contentMode == .prompt {
+          promptFeedbackControls
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, JovieSpacing.large)
+            .padding(.bottom, JovieSpacing.medium)
+        }
 
-        controlBar
-          .padding(.horizontal, JovieSpacing.large)
-          .padding(.bottom, JovieSpacing.xxLarge)
+        if viewModel.contentMode == .script, viewModel.overlayVisibility == .visible {
+          speedControls
+          controlBar
+            .padding(.horizontal, JovieSpacing.large)
+            .padding(.bottom, JovieSpacing.xxLarge)
+        } else {
+          promptRecordControl
+            .padding(.bottom, JovieSpacing.xxLarge)
+        }
       }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    .accessibilityIdentifier("teleprompter-overlay")
+    .task {
+      await viewModel.startPreview()
+    }
     .onDisappear {
       viewModel.cancelRecording()
     }
+  }
+
+  private var captureHeader: some View {
+    HStack(spacing: JovieSpacing.small) {
+      Button(action: handleClose) {
+        Image(systemName: "xmark")
+          .font(.system(size: 16, weight: .semibold))
+          .foregroundStyle(JovieColor.textPrimary)
+          .frame(width: 56, height: 56)
+          .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel("Close capture")
+      .accessibilityIdentifier("teleprompter-header-close")
+
+      HStack(spacing: 6) {
+        Circle()
+          .fill(viewModel.isRecording ? Color.red : Color.clear)
+          .frame(width: 8, height: 8)
+        Text(viewModel.isRecording ? Self.elapsedLabel(for: viewModel.elapsedSeconds) : "Ready")
+          .font(JovieFont.body(size: 13, weight: .medium))
+          .monospacedDigit()
+      }
+      .foregroundStyle(JovieColor.textPrimary)
+      .padding(.horizontal, JovieSpacing.medium)
+      .frame(minHeight: 44)
+      .background(Color.black.opacity(0.58), in: Capsule())
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel(
+        viewModel.isRecording
+          ? "Recording, \(Self.elapsedLabel(for: viewModel.elapsedSeconds))"
+          : "Ready to record"
+      )
+
+      Spacer(minLength: JovieSpacing.small)
+
+      HStack(spacing: 2) {
+        contentModeButton(.script, title: "Script")
+        contentModeButton(.prompt, title: "Prompt")
+      }
+      .padding(3)
+      .background(Color.black.opacity(0.58), in: Capsule())
+      .accessibilityElement(children: .contain)
+
+      overlayVisibilityButton
+      framingGridButton
+    }
+  }
+
+  private var compactCaptureHeader: some View {
+    VStack(spacing: JovieSpacing.small) {
+      HStack(spacing: JovieSpacing.small) {
+        headerCloseButton
+        recordingStatus
+        Spacer(minLength: 0)
+        overlayVisibilityButton
+        framingGridButton
+      }
+
+      HStack(spacing: 2) {
+        contentModeButton(.script, title: "Script")
+        contentModeButton(.prompt, title: "Prompt")
+      }
+      .padding(3)
+      .background(Color.black.opacity(0.58), in: Capsule())
+      .accessibilityElement(children: .contain)
+    }
+  }
+
+  private var headerCloseButton: some View {
+    Button(action: handleClose) {
+      Image(systemName: "xmark")
+        .font(.system(size: 16, weight: .semibold))
+        .foregroundStyle(JovieColor.textPrimary)
+        .frame(width: 56, height: 56)
+        .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel("Close capture")
+    .accessibilityIdentifier("teleprompter-header-close")
+  }
+
+  private var recordingStatus: some View {
+    HStack(spacing: 6) {
+      Circle()
+        .fill(viewModel.isRecording ? Color.red : Color.clear)
+        .frame(width: 8, height: 8)
+      Text(viewModel.isRecording ? Self.elapsedLabel(for: viewModel.elapsedSeconds) : "Ready")
+        .font(JovieFont.body(size: 13, weight: .medium))
+        .monospacedDigit()
+    }
+    .foregroundStyle(JovieColor.textPrimary)
+    .padding(.horizontal, JovieSpacing.medium)
+    .frame(minHeight: 44)
+    .background(Color.black.opacity(0.58), in: Capsule())
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel(
+      viewModel.isRecording
+        ? "Recording, \(Self.elapsedLabel(for: viewModel.elapsedSeconds))"
+        : "Ready to record"
+    )
+  }
+
+  private func contentModeButton(
+    _ mode: TeleprompterContentMode,
+    title: String
+  ) -> some View {
+    Button {
+      viewModel.contentMode = mode
+      viewModel.setOverlayVisible(true)
+    } label: {
+      Text(title)
+        .font(JovieFont.body(size: 13, weight: .semibold))
+        .foregroundStyle(
+          viewModel.contentMode == mode
+            ? JovieColor.backgroundBase
+            : JovieColor.textSecondary
+        )
+        .padding(.horizontal, JovieSpacing.medium)
+        .frame(minWidth: 72, minHeight: 44)
+        .background(
+          viewModel.contentMode == mode ? Color.white : Color.clear,
+          in: Capsule()
+        )
+    }
+    .buttonStyle(.plain)
+    .accessibilityIdentifier("teleprompter-content-\(mode.rawValue)")
+    .accessibilityAddTraits(viewModel.contentMode == mode ? .isSelected : [])
+  }
+
+  private var overlayVisibilityButton: some View {
+    Button {
+      viewModel.setOverlayVisible(viewModel.overlayVisibility != .visible)
+    } label: {
+      Image(systemName: viewModel.overlayVisibility == .visible ? "eye.fill" : "eye.slash.fill")
+        .font(.system(size: 16, weight: .semibold))
+        .foregroundStyle(JovieColor.accent)
+        .frame(width: 56, height: 56)
+        .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(
+      viewModel.overlayVisibility == .visible ? "Temporarily hide overlay" : "Show overlay now"
+    )
+    .accessibilityHint(
+      viewModel.overlayVisibility == .visible
+        ? "Shows the live camera for three seconds, then restores the prompt. Recording continues."
+        : "Restores the prompt immediately. Recording continues."
+    )
+    .accessibilityIdentifier("teleprompter-overlay-toggle")
+  }
+
+  private var framingGridButton: some View {
+    Button {
+      viewModel.setFramingGridEnabled(viewModel.framingGrid == .off)
+    } label: {
+      Image(systemName: "grid")
+        .font(.system(size: 16, weight: .semibold))
+        .foregroundStyle(viewModel.framingGrid == .thirds ? JovieColor.accent : JovieColor.textPrimary)
+        .frame(width: 56, height: 56)
+        .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(viewModel.framingGrid == .thirds ? "Hide framing grid" : "Show framing grid")
+    .accessibilityIdentifier("teleprompter-grid-toggle")
+  }
+
+  private var promptRegion: some View {
+    GeometryReader { proxy in
+      Text(viewModel.promptText)
+        .font(JovieFont.display(size: 34))
+        .foregroundStyle(JovieColor.textPrimary)
+        .multilineTextAlignment(.center)
+        .lineLimit(3)
+        .minimumScaleFactor(0.6)
+        .allowsTightening(true)
+        .padding(.horizontal, JovieSpacing.xxLarge)
+        .frame(width: proxy.size.width, height: proxy.size.height)
+        .background(Color.black.opacity(0.46))
+        .accessibilityIdentifier("teleprompter-prompt")
+    }
+    .frame(height: 180)
+  }
+
+  private var promptFeedbackControls: some View {
+    HStack(spacing: 4) {
+      promptFeedbackButton(.useful, systemImage: "hand.thumbsup.fill", label: "Useful prompt")
+      promptFeedbackButton(.notUseful, systemImage: "hand.thumbsdown.fill", label: "Not useful prompt")
+    }
+    .padding(4)
+    .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    .accessibilityElement(children: .contain)
+  }
+
+  private func promptFeedbackButton(
+    _ feedback: TeleprompterPromptFeedback,
+    systemImage: String,
+    label: String
+  ) -> some View {
+    Button {
+      viewModel.submitPromptFeedback(feedback)
+    } label: {
+      Image(systemName: systemImage)
+        .font(.system(size: 17, weight: .semibold))
+        .foregroundStyle(
+          viewModel.pendingPromptFeedback == feedback
+            ? JovieColor.accent
+            : JovieColor.textPrimary
+        )
+        .frame(width: 56, height: 56)
+    }
+    .frame(width: 56, height: 56)
+    .contentShape(Rectangle())
+    .buttonStyle(.plain)
+    .accessibilityLabel(label)
+    .accessibilityHint("Saved privately on this iPhone while offline")
+    .accessibilityIdentifier("teleprompter-feedback-\(feedback.rawValue)")
+  }
+
+  private var promptRecordControl: some View {
+    Button {
+      if viewModel.isRecording {
+        Task { await viewModel.stopRecording() }
+      } else {
+        Task { await viewModel.startRecording() }
+      }
+    } label: {
+      ZStack {
+        Circle()
+          .fill(Color.white)
+          .frame(width: 80, height: 80)
+        if viewModel.isRecording {
+          RoundedRectangle(cornerRadius: 5, style: .continuous)
+            .fill(Color.red)
+            .frame(width: 28, height: 28)
+        } else {
+          Circle()
+            .fill(Color.red)
+            .frame(width: 58, height: 58)
+        }
+      }
+    }
+    .buttonStyle(.plain)
+    .disabled(viewModel.isStarting || viewModel.isFinishing)
+    .accessibilityLabel(viewModel.isRecording ? "Stop recording" : "Start recording")
+    .accessibilityIdentifier("teleprompter-prompt-record")
   }
 
   @ViewBuilder

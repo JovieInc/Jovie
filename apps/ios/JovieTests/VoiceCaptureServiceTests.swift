@@ -294,4 +294,52 @@ struct VoiceCaptureServiceTests {
     #expect(viewModel.followMode == .voice)
     #expect(viewModel.currentWordIndex == 2)
   }
+
+  @MainActor
+  @Test func teleprompterOverlayStatesStayIndependentAndFeedbackQueuesLocally() async throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let proposal = MobileChatVideoProposalPayload(
+      kind: .bts,
+      title: "What changed when the ferry arrived?",
+      script: "The ferry is not where the story starts."
+    )
+    let store = VlogSessionStore(rootURL: root)
+    let viewModel = TeleprompterViewModel(
+      proposal: proposal,
+      store: store,
+      overlayAutoResumeDelay: .milliseconds(20)
+    )
+
+    #expect(viewModel.promptText == "What changed when the ferry arrived?")
+    #expect(viewModel.overlayVisibility == .visible)
+    #expect(viewModel.framingGrid == .off)
+    #expect(viewModel.promptFeedback == .idle)
+
+    viewModel.setFramingGridEnabled(true)
+    viewModel.setOverlayVisible(false)
+    #expect(viewModel.overlayVisibility == .liveOnly)
+    #expect(viewModel.framingGrid == .thirds)
+
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(viewModel.overlayVisibility == .visible)
+    #expect(viewModel.framingGrid == .thirds)
+
+    // The still-visible control can restore the prompt immediately, without
+    // waiting for the temporary live-only window to expire.
+    viewModel.setOverlayVisible(false)
+    viewModel.setOverlayVisible(true)
+    #expect(viewModel.overlayVisibility == .visible)
+
+    viewModel.submitPromptFeedback(.useful)
+    #expect(viewModel.promptFeedback == .queuedOffline)
+    #expect(viewModel.pendingPromptFeedback == .useful)
+    let queuedFeedback = store.queuedPromptFeedback()
+    #expect(queuedFeedback.count == 1)
+    #expect(queuedFeedback[0].proposalID == proposal.id)
+    #expect(queuedFeedback[0].feedback == TeleprompterPromptFeedback.useful.rawValue)
+    #expect(queuedFeedback[0].storageMode == "local_only_no_upload")
+  }
 }

@@ -198,6 +198,9 @@ struct AppShellView<
       @escaping (MobileChatVideoProposalPayload) -> Void
     ) -> ChatContent
   ) {
+    let opensTeleprompterFixture = ProcessInfo.processInfo.arguments.contains(
+      "-ui-testing-teleprompter"
+    )
     self.profile = profile
     self.isOffline = isOffline
     self.opensSettingsOnLaunch = opensSettingsOnLaunch
@@ -218,6 +221,15 @@ struct AppShellView<
     self.calendarContent = calendarContent
     self.inboxContent = inboxContent
     self.chatContent = chatContent
+    _teleprompterProposal = State(
+      initialValue: opensTeleprompterFixture
+        ? MobileChatVideoProposalPayload(
+          kind: .bts,
+          title: "What changed the moment you stepped onto the ferry?",
+          script: "Tell the story in your own words."
+        )
+        : nil
+    )
     _selectedTab = State(
       initialValue: Self.resolvedInitialTab(initialTab: initialTab, chatEnabled: chatEnabled)
     )
@@ -522,6 +534,9 @@ struct AppShellView<
     for proposal: MobileChatVideoProposalPayload
   ) -> TeleprompterViewModel {
     let viewModel = TeleprompterViewModel(proposal: proposal)
+    if ProcessInfo.processInfo.arguments.contains("-ui-testing-teleprompter") {
+      viewModel.contentMode = .prompt
+    }
     viewModel.onSaved = { _ in
       self.teleprompterProposal = nil
       self.selectTab(.library)

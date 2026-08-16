@@ -161,6 +161,14 @@ struct VlogSessionRecord: Codable, Equatable, Identifiable, Sendable {
   let storageMode: String
 }
 
+struct VlogPromptFeedbackRecord: Codable, Equatable, Identifiable, Sendable {
+  let id: UUID
+  let proposalID: String
+  let feedback: String
+  let createdAt: Date
+  let storageMode: String
+}
+
 struct VlogSessionStore: Sendable {
   let rootURL: URL
 
@@ -229,6 +237,51 @@ struct VlogSessionStore: Sendable {
     .sorted { $0.createdAt > $1.createdAt }
     .prefix(limit)
     .map { $0 }
+  }
+
+  func queuePromptFeedback(
+    proposalID: String,
+    feedback: String
+  ) throws -> VlogPromptFeedbackRecord {
+    let record = VlogPromptFeedbackRecord(
+      id: UUID(),
+      proposalID: proposalID,
+      feedback: feedback,
+      createdAt: Date(),
+      storageMode: "local_only_no_upload"
+    )
+    let directory = rootURL.appendingPathComponent("PromptFeedback", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .iso8601
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    let data = try encoder.encode(record)
+    try data.write(
+      to: directory.appendingPathComponent("\(record.id.uuidString).json"),
+      options: .atomic
+    )
+    return record
+  }
+
+  func queuedPromptFeedback() -> [VlogPromptFeedbackRecord] {
+    let directory = rootURL.appendingPathComponent("PromptFeedback", isDirectory: true)
+    guard let files = try? FileManager.default.contentsOfDirectory(
+      at: directory,
+      includingPropertiesForKeys: nil,
+      options: [.skipsHiddenFiles]
+    ) else {
+      return []
+    }
+
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    return files.compactMap { file in
+      guard let handle = try? FileHandle(forReadingFrom: file) else { return nil }
+      defer { try? handle.close() }
+      guard let data = try? handle.readToEnd() else { return nil }
+      return try? decoder.decode(VlogPromptFeedbackRecord.self, from: data)
+    }
+    .sorted { $0.createdAt > $1.createdAt }
   }
 
   func videoURL(for record: VlogSessionRecord) -> URL {

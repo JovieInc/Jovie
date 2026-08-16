@@ -23,6 +23,28 @@ enum TeleprompterPresentationMode: String, Equatable, Sendable, CaseIterable {
   }
 }
 
+enum TeleprompterContentMode: String, Equatable, Sendable, CaseIterable {
+  case script
+  case prompt
+}
+
+enum TeleprompterOverlayVisibility: String, Equatable, Sendable {
+  case visible
+  case liveOnly
+}
+
+enum TeleprompterFramingGrid: String, Equatable, Sendable {
+  case off
+  case thirds
+}
+
+enum TeleprompterPromptFeedback: String, Equatable, Sendable {
+  case idle
+  case useful
+  case notUseful
+  case queuedOffline
+}
+
 /// Pure speed-override math (unit-testable without audio/camera hardware):
 /// advances the prompt at a fixed reading speed from the word where auto
 /// mode was engaged.
@@ -58,6 +80,11 @@ final class TeleprompterViewModel {
 
   private(set) var follower: KaraokeScriptFollower
   var presentationMode: TeleprompterPresentationMode = .notch
+  var contentMode: TeleprompterContentMode = .script
+  private(set) var overlayVisibility: TeleprompterOverlayVisibility = .visible
+  private(set) var framingGrid: TeleprompterFramingGrid = .off
+  private(set) var promptFeedback: TeleprompterPromptFeedback = .idle
+  private(set) var pendingPromptFeedback: TeleprompterPromptFeedback?
   private(set) var followMode: TeleprompterFollowMode = .voice
   var speedWordsPerMinute: Double = TeleprompterAutoScroller.defaultWordsPerMinute
   var isEditingScript = false
@@ -78,6 +105,8 @@ final class TeleprompterViewModel {
   private var autoStartElapsed: TimeInterval = 0
   private var autoIndex = 0
   private var tickerTask: Task<Void, Never>?
+  private var overlayAutoResumeTask: Task<Void, Never>?
+  private let overlayAutoResumeDelay: Duration
 
   /// Called after a recording is saved to the on-disk session store. The
   /// shell uses this to dismiss the overlay and surface Library.
@@ -86,6 +115,7 @@ final class TeleprompterViewModel {
   init(
     proposal: MobileChatVideoProposalPayload,
     store: VlogSessionStore = .localDocuments(),
+    overlayAutoResumeDelay: Duration = .seconds(3),
     // Default-argument expressions are evaluated outside the enclosing
     // @MainActor context. Keep the default inert and construct the actor-
     // isolated controller inside this initializer instead.
@@ -96,6 +126,7 @@ final class TeleprompterViewModel {
     scriptText = proposal.script
     follower = KaraokeScriptFollower(script: proposal.script)
     self.store = store
+    self.overlayAutoResumeDelay = overlayAutoResumeDelay
     self.captureController = captureController ?? TeleprompterCaptureController()
   }
 
@@ -122,6 +153,53 @@ final class TeleprompterViewModel {
 
   var progress: Double {
     follower.progress
+  }
+
+  var promptText: String {
+    proposal.title
+  }
+
+  func setOverlayVisible(_ isVisible: Bool) {
+    overlayAutoResumeTask?.cancel()
+    overlayVisibility = isVisible ? .visible : .liveOnly
+    guard !isVisible else { return }
+
+    overlayAutoResumeTask = Task { [weak self, overlayAutoResumeDelay] in
+      try? await Task.sleep(for: overlayAutoResumeDelay)
+      guard !Task.isCancelled else { return }
+      self?.overlayVisibility = .visible
+    }
+  }
+
+  func setFramingGridEnabled(_ isEnabled: Bool) {
+    framingGrid = isEnabled ? .thirds : .off
+  }
+
+  func submitPromptFeedback(_ feedback: TeleprompterPromptFeedback) {
+    guard feedback == .useful || feedback == .notUseful else { return }
+    promptFeedback = feedback
+    pendingPromptFeedback = feedback
+    do {
+      _ = try store.queuePromptFeedback(
+        proposalID: proposal.id,
+        feedback: feedback.rawValue
+      )
+      promptFeedback = .queuedOffline
+    } catch {
+      promptFeedback = .idle
+      pendingPromptFeedback = nil
+      errorMessage = "Couldn't save feedback on this iPhone. Try again."
+    }
+  }
+
+  func startPreview() async {
+    errorMessage = nil
+    do {
+      try await captureController.startPreview()
+    } catch {
+      errorMessage = (error as? LocalizedError)?.errorDescription
+        ?? "Couldn't start the camera preview."
+    }
   }
 
   /// Inline script edit (pre-recording only): rebuild the follower so the
@@ -226,8 +304,9 @@ final class TeleprompterViewModel {
   /// Dismiss path: stop capture, mark the session failed, keep whatever
   /// partial file exists for debugging but never surface it in Library.
   func cancelRecording() {
+    overlayAutoResumeTask?.cancel()
+    overlayAutoResumeTask = nil
     stopTicker()
-    guard isRecording || isStarting else { return }
     isRecording = false
     isStarting = false
     markActiveRecordFailed()

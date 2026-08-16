@@ -1,4 +1,4 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import Foundation
 import Observation
 import Speech
@@ -84,6 +84,7 @@ final class TeleprompterCaptureController {
   private var finishDelegate: RecordingFinishDelegate?
 
   private(set) var isRecording = false
+  private(set) var isPreviewing = false
   private(set) var lastErrorMessage: String?
   /// Whether the current/last session preferred on-device recognition.
   private(set) var isUsingOnDeviceRecognition = false
@@ -100,6 +101,23 @@ final class TeleprompterCaptureController {
 
   var supportsOnDeviceRecognition: Bool {
     VoiceCaptureRecognitionConfig.preferOnDevice(for: recognizer)
+  }
+
+  func startPreview() async throws {
+    guard !isPreviewing else { return }
+    let cameraGranted = await AVCaptureDevice.requestAccess(for: .video)
+    guard cameraGranted else { throw TeleprompterCaptureError.cameraDenied }
+    try await configureSessionIfNeeded()
+
+    await withCheckedContinuation { continuation in
+      sessionQueue.async { [captureSession] in
+        if !captureSession.isRunning {
+          captureSession.startRunning()
+        }
+        continuation.resume()
+      }
+    }
+    isPreviewing = true
   }
 
   func start(videoURL: URL) async throws {
@@ -173,9 +191,12 @@ final class TeleprompterCaptureController {
     let delegate = RecordingFinishDelegate()
     finishDelegate = delegate
     sessionQueue.async { [captureSession, movieOutput] in
-      captureSession.startRunning()
+      if !captureSession.isRunning {
+        captureSession.startRunning()
+      }
       movieOutput.startRecording(to: videoURL, recordingDelegate: delegate)
     }
+    isPreviewing = true
     isRecording = true
   }
 
@@ -217,6 +238,7 @@ final class TeleprompterCaptureController {
     finishDelegate = nil
 
     let captureSession = self.captureSession
+    isPreviewing = false
     sessionQueue.async {
       captureSession.stopRunning()
     }
@@ -247,7 +269,7 @@ final class TeleprompterCaptureController {
   }
 
   func cancel() {
-    guard isRecording || recognitionRequest != nil else { return }
+    guard isPreviewing || isRecording || recognitionRequest != nil else { return }
     sessionID &+= 1
     isRecording = false
     recognitionRequest?.endAudio()
@@ -255,6 +277,7 @@ final class TeleprompterCaptureController {
     recognitionTask = nil
     recognitionRequest = nil
     isSpeechRecognitionActive = false
+    isPreviewing = false
     let movieOutput = self.movieOutput
     let captureSession = self.captureSession
     let delegate = finishDelegate
