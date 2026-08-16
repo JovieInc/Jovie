@@ -207,21 +207,28 @@ async function promote(summary, mainSha, evidence, decision) {
     const current = await apiJson(`repos/${repo}/pulls/${number}`).catch(
       () => null
     );
+    if (!current) failures.push('state-read');
     if (
       restoreDeferred &&
-      !(current?.labels ?? []).some(label => label.name === 'queue-deferred')
+      (!current ||
+        !current.labels.some(label => label.name === 'queue-deferred'))
     ) {
       await prCommand('edit', number, '--add-label', 'queue-deferred').catch(
         () => failures.push('queue-deferred-restore')
       );
     }
-    if (restoreDraft && current?.draft === false) {
+    if (restoreDraft && current?.draft !== true) {
       await prCommand('ready', number, '--undo').catch(() =>
         failures.push('draft-restore')
       );
     }
     return failures;
   };
+  const disableAuto = () =>
+    prCommand('merge', number, '--disable-auto').then(
+      () => true,
+      () => false
+    );
 
   try {
     if (live.draft) {
@@ -240,7 +247,7 @@ async function promote(summary, mainSha, evidence, decision) {
     const postMutationDecision = evaluateRecoveryCandidate({
       ...postMutationEvidence,
       mainSha: postMutationMain,
-      checksPassing: await checksAreGreen(number),
+      checksPassing: true,
     });
     if (
       postMutationMain !== mainSha ||
@@ -252,6 +259,19 @@ async function promote(summary, mainSha, evidence, decision) {
         failures.length === 0
           ? 'promotion-compensated'
           : `promotion-compensation-failed:${failures.join(',')}`
+      );
+      return { queued: false };
+    }
+    if (restoreDraft) {
+      await writeReceipt('promoted-awaiting-checks');
+      return { queued: false, pending: true };
+    }
+    if (!(await checksAreGreen(number))) {
+      const failures = await compensate();
+      await writeReceipt(
+        failures.length === 0
+          ? 'checks-changed-compensated'
+          : `checks-changed-compensation-failed:${failures.join(',')}`
       );
       return { queued: false };
     }
@@ -274,6 +294,11 @@ async function promote(summary, mainSha, evidence, decision) {
       );
       return { queued: true };
     }
+    const autoDisabled = await disableAuto();
+    if (!autoDisabled) {
+      await writeReceipt('merge-request-unproven-disable-failed', racedProof);
+      return { queued: false };
+    }
     const failures = await compensate();
     await writeReceipt(
       failures.length === 0
@@ -291,14 +316,7 @@ async function promote(summary, mainSha, evidence, decision) {
   }
   const verified = validateRecoveryMergeProof(proof, expectedHead);
   if (!verified.proven) {
-    const autoDisabled = await prCommand(
-      'merge',
-      number,
-      '--disable-auto'
-    ).then(
-      () => true,
-      () => false
-    );
+    const autoDisabled = await disableAuto();
     if (!autoDisabled) {
       await writeReceipt('requested-unproven-disable-failed', proof);
       console.log(
@@ -348,7 +366,7 @@ export async function run() {
       }
       const result = await promote(summary, mainSha, evidence, decision);
       if (result.queued) promoted += 1;
-      else if (!result.dryRun) unproven += 1;
+      else if (!result.dryRun && !result.pending) unproven += 1;
     } catch (error) {
       unproven += 1;
       console.error(
