@@ -213,7 +213,6 @@ apps/desktop/src/*
 !apps/desktop/scripts/
 !apps/desktop/scripts/desktop-csp-watchdog.test.ts
 !apps/desktop/electron-builder.local.yml
-apps/extension/
 .agents/*
 !.agents/skills/
 .agents/skills/*

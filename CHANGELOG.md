@@ -7,6 +7,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+## [26.8.1] - 2026-08-16
+
 ### Changed
 
 - **Profile actions stay truthful and usable:** Unclaimed profiles show a clear ownership path. Listening, alerts, tips, merch, shows, and payments appear only when available.
