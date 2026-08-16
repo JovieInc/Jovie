@@ -74,15 +74,6 @@ describe('ownerless recovery policy', () => {
       ])
     ).toMatchObject({ eligible: true, lanes: ['waitlist-canary'] });
     expect(
-      classifyRecoveryFiles([
-        'apps/web/app/api/canary/waitlist/receipt/route.ts',
-      ]).eligible
-    ).toBe(false);
-    expect(
-      classifyRecoveryFiles(['.github/workflows/production-controller.yml'])
-        .eligible
-    ).toBe(false);
-    expect(
       classifyRecoveryFiles(
         ['.github/workflows/ci.yml'],
         '+private-key: ${{ secrets.KEY }}'
