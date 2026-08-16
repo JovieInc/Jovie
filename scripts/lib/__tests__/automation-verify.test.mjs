@@ -34,6 +34,19 @@ const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
   'scripts/run-affected-tests.mjs',
 ];
+const CI_UI_DRIFT_GUARDRAIL_INPUTS = [
+  '.github/workflows/ci.yml',
+  'apps/desktop/scripts/desktop-shell-contract.test.mjs',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/hooks/configure-git-hooks.sh',
+  'scripts/hooks/pre-push-gate.test.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/pre-push-gate.test.mjs',
+  'scripts/lib/__tests__/setup-worktree-health.test.mjs',
+  'scripts/run-affected-tests.mjs',
+  'scripts/setup.sh',
+];
 const FLEET_PROMOTION_GATE_LANE = [
   'apps/web/tests/unit/api/health/deploy.critical.test.ts',
   'scripts/hermes/gem-priority-gate.py',
@@ -572,6 +585,22 @@ describe('automation-verify affected scope', () => {
         'scripts/backlog-orchestrator/unknown.mjs',
       ]).mode
     ).toBe('full');
+  });
+
+  it('selects CI/UI guardrail contracts without widening to the web suite', () => {
+    expect(buildAffectedTestPlan(CI_UI_DRIFT_GUARDRAIL_INPUTS)).toMatchObject({
+      mode: 'selected',
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+        'scripts/lib/__tests__/pre-push-gate.test.mjs',
+        'scripts/lib/__tests__/setup-worktree-health.test.mjs',
+      ],
+      nodeTests: [
+        'apps/desktop/scripts/desktop-shell-contract.test.mjs',
+        'scripts/hooks/pre-push-gate.test.mjs',
+      ],
+    });
   });
 
   it('selects the fleet promotion gate regression lane', () => {

@@ -1259,7 +1259,6 @@ jobs:
             'apps/web/styles/design-system.css' \
             'apps/web/tests/e2e/profile-admission.spec.ts' \
             'apps/web/tests/e2e/utils/public-surface-helpers.ts' \
-            '.github/workflows/ci.yml' \
             'scripts/ci-fast-lanes.mjs')"
           if [[ -n "$CHANGED_FILES" ]]; then
             echo "run=true" >> "$GITHUB_OUTPUT"

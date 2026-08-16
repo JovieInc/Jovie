@@ -344,7 +344,6 @@ function runProfileAdmission() {
     'apps/web/tests/e2e/profile/**',
     'apps/web/tests/e2e/public-profile-smoke.spec.ts',
     'apps/web/tests/e2e/utils/public-surface-**',
-    '.github/workflows/ci.yml',
     'scripts/ci-fast-lanes.mjs',
   ]);
   if (files && files.length === 0) {
