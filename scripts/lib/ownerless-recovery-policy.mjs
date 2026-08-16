@@ -54,9 +54,17 @@ const FOCUSED_PATHS = Object.freeze([
 ]);
 
 const MATERIAL_RISK_CHANGE =
-  /(?:secrets?\.|private[-_ ]key|api[-_ ]key|credential|(?:actions|checks|contents|deployments|id-token|issues|packages|pull-requests|security-events|statuses):\s*write|permissions:\s*write-all|pull_request_target|\b(?:GH_TOKEN|GITHUB_TOKEN)\b|\bgh\s+(?:api|pr|repo|run|workflow)\b|\b(?:curl|wget|nc|sudo|chmod|chown)\b|\bfind\b.*\s-delete\b|drop\s+table|delete\s+from|\b(?:rm\s+-rf|rmSync|unlink|truncate)\b|\b(?:fetch|https?\.request)\s*\(|continue-on-error:\s*true|\|\|\s*true|\b(?:bypass|skip)[-_ ]?(?:ci|check|gate)|production\s+(?:deploy|promotion)|--force\b|^[-+]\s*uses:\s)/im;
+  /(?:secrets?\.|private[-_ ]key|api[-_ ]key|credential|(?:actions|checks|contents|deployments|id-token|issues|packages|pull-requests|security-events|statuses):\s*write|permissions:\s*write-all|pull_request_target|\b(?:GH_TOKEN|GITHUB_TOKEN)\b|\bgh\s+(?:api|pr|repo|run|workflow)\b|\bgit\s+(?:push|tag|reset|clean)\b|\b(?:curl|wget|nc|sudo|chmod|chown)\b|\bfind\b.*\s-delete\b|drop\s+table|delete\s+from|\b(?:rm\s+-rf|rmSync|unlink|truncate)\b|\b(?:fetch|https?\.request)\s*\(|continue-on-error:\s*true|\|\|\s*true|\b(?:bypass|skip)[-_ ]?(?:ci|check|gate)|production\s+(?:deploy|promotion)|--force\b|^[-+]\s*(?:uses:|run:.*(?:scripts\/|\.\/)))/im;
 
 const SHA = /^[0-9a-f]{40}$/;
+
+export function hasCompletePatch(file) {
+  if (typeof file?.patch !== 'string') return false;
+  const changedLines = file.patch
+    .split('\n')
+    .filter(line => /^[+-](?![+-]{2})/.test(line)).length;
+  return changedLines === file.changes;
+}
 
 function labelsOf(pr) {
   return (pr?.labels ?? []).map(label =>

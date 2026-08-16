@@ -160,7 +160,6 @@ the repository is otherwise idle. It runs `scripts/release-queue-deferred.sh`:
 ## Ownerless focused recovery
 
 `ownerless-recovery-sweep.yml` is a hosted fallback independent of Gem, Symphony, and fleet health. Every 15 minutes it may promote a PR unassigned for at least one hour only when the exact head is same-repo, current with `main`, unstacked, conflict-free, focused to CI, DevEx, delivery control, or waitlist-canary files, and has passing focused checks. Incomplete patches and credential, privacy, destructive, production-promotion, or check-bypass changes fail closed. It records an attempt receipt before mutation; success requires the same head to be merged or to have a positive authoritative native queue position.
-
 ### Update Branch convergence
 
 Update Branch can advance the branch Git ref before the PR database, timeline,

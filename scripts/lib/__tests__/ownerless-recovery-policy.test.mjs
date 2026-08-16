@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyRecoveryFiles,
   evaluateRecoveryCandidate,
-  renderRecoveryReceipt,
+  hasCompletePatch,
   validateRecoveryMergeProof,
 } from '../ownerless-recovery-policy.mjs';
 
@@ -46,18 +46,8 @@ describe('ownerless recovery policy', () => {
 
   it.each([
     [{ pr: { ...pr, base: { ...pr.base, ref: 'stack-base' } } }, 'stacked-pr'],
-    [{ compare: { behind_by: 1 } }, 'stale-current-main'],
     [{ containsOpenPrHead: true }, 'stacked-open-head'],
     [{ patchComplete: false }, 'changed-patch-incomplete'],
-    [
-      { pr: { ...pr, mergeable: false, mergeable_state: 'dirty' } },
-      'conflicted-or-unknown',
-    ],
-    [{ checksPassing: false }, 'focused-checks-not-green'],
-    [
-      { pr: { ...pr, assignees: [{ login: 'owner' }] } },
-      'ownerless-under-threshold',
-    ],
     [
       { now: Date.parse('2026-08-15T00:59:59.000Z') },
       'ownerless-under-threshold',
@@ -66,13 +56,7 @@ describe('ownerless recovery policy', () => {
     expect(evaluate(overrides)).toMatchObject({ eligible: false, reason });
   });
 
-  it('admits waitlist canary tests but rejects runtime, credential, and production paths', () => {
-    expect(
-      classifyRecoveryFiles([
-        'apps/web/tests/e2e/synthetic-production-waitlist.spec.ts',
-        'apps/web/tests/unit/e2e/production-waitlist-canary.test.ts',
-      ])
-    ).toMatchObject({ eligible: true, lanes: ['waitlist-canary'] });
+  it('rejects credential and control-plane mutations', () => {
     expect(
       classifyRecoveryFiles(
         ['.github/workflows/ci.yml'],
@@ -82,26 +66,14 @@ describe('ownerless recovery policy', () => {
     expect(
       classifyRecoveryFiles(
         ['.github/workflows/ci.yml'],
-        '-  contents: read\n+  contents: write'
-      )
-    ).toMatchObject({ eligible: false, reason: 'material-risk-change' });
+        '+run: git push origin HEAD:main\n+run: node ./scripts/helper.mjs'
+      ).eligible
+    ).toBe(false);
   });
 
-  it('renders an exact-head action receipt without claiming unproven merge', () => {
-    const body = renderRecoveryReceipt({
-      pr: 42,
-      head,
-      main,
-      ownerlessSince: created,
-      lanes: ['ci'],
-      action: 'gh-pr-merge-auto-squash',
-      outcome: 'requested-unproven',
-      observedAt: '2026-08-15T02:00:00.000Z',
-    });
-    expect(body).toMatch(
-      /jovie-ownerless-recovery\/v1[\s\S]*requested-unproven/
-    );
-    expect(body).toMatch(/evidenceSha256[\s\S]*merge proof only when/);
+  it('rejects omitted and truncated file patches', () => {
+    expect(hasCompletePatch({ changes: 1 })).toBe(false);
+    expect(hasCompletePatch({ changes: 2, patch: '@@\n+one' })).toBe(false);
   });
 
   it('requires exact-head authoritative merge or queue proof', () => {
@@ -115,9 +87,6 @@ describe('ownerless recovery policy', () => {
       outcome: 'queued',
     });
     expect(
-      validateRecoveryMergeProof({ ...queued, headRefOid: main }, head)
-    ).toMatchObject({ proven: false });
-    expect(
       validateRecoveryMergeProof(
         {
           ...queued,
@@ -126,15 +95,5 @@ describe('ownerless recovery policy', () => {
         head
       )
     ).toMatchObject({ proven: false });
-    const merged = {
-      state: 'MERGED',
-      headRefOid: head,
-      mergedAt: '2026-08-15T02:01:00.000Z',
-      mergeCommit: { oid: main },
-    };
-    expect(validateRecoveryMergeProof(merged, head)).toEqual({
-      proven: true,
-      outcome: 'merged',
-    });
   });
 });

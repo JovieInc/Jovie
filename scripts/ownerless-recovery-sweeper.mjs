@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
   evaluateRecoveryCandidate,
+  hasCompletePatch,
   renderRecoveryReceipt,
   validateRecoveryMergeProof,
 } from './lib/ownerless-recovery-policy.mjs';
@@ -76,22 +77,45 @@ async function checksAreGreen(number) {
   }
 }
 
-async function readQueueProof(number) {
+async function repoGraph(query, fields = {}) {
   const [owner, name] = repo.split('/');
-  const query = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){state headRefOid isInMergeQueue mergedAt mergeCommit{oid} mergeQueueEntry{id position state}}}}`;
+  const variables = Object.entries({ owner, name, ...fields }).flatMap(
+    ([key, value]) => ['-F', `${key}=${value}`]
+  );
   const data = await ghJson([
     'api',
     'graphql',
     '-f',
     `query=${query}`,
-    '-F',
-    `owner=${owner}`,
-    '-F',
-    `name=${name}`,
-    '-F',
-    `number=${number}`,
+    ...variables,
   ]);
-  return data?.data?.repository?.pullRequest ?? null;
+  return data?.data?.repository;
+}
+
+async function readQueueProof(number) {
+  const query = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){state headRefOid isInMergeQueue autoMergeRequest{enabledAt} mergedAt mergeCommit{oid} mergeQueueEntry{id position state}}}}`;
+  return (await repoGraph(query, { number }))?.pullRequest ?? null;
+}
+
+async function openStackHeadShas() {
+  const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:100){pageInfo{hasNextPage} nodes{number headRefOid timelineItems(itemTypes:[HEAD_REF_FORCE_PUSHED_EVENT],first:100){pageInfo{hasNextPage} nodes{... on HeadRefForcePushedEvent{beforeCommit{oid} afterCommit{oid}}}}}}}}`;
+  const pulls = (await repoGraph(query))?.pullRequests;
+  if (!pulls || pulls.pageInfo.hasNextPage)
+    throw new Error('open PR heads incomplete');
+  if (pulls.nodes.some(pr => pr.timelineItems.pageInfo.hasNextPage)) {
+    throw new Error('open PR head history incomplete');
+  }
+  return pulls.nodes.flatMap(pr =>
+    [
+      pr.headRefOid,
+      ...pr.timelineItems.nodes.flatMap(event => [
+        event.beforeCommit?.oid,
+        event.afterCommit?.oid,
+      ]),
+    ]
+      .filter(Boolean)
+      .map(sha => ({ number: pr.number, sha }))
+  );
 }
 
 async function upsertReceipt(number, body) {
@@ -120,7 +144,7 @@ async function candidateEvidence(summary, mainSha, openHeadShas) {
     `repos/${repo}/pulls/${number}/files?per_page=100`
   );
   const files = changed.map(file => file.filename);
-  const patchComplete = changed.every(file => typeof file.patch === 'string');
+  const patchComplete = changed.every(hasCompletePatch);
   const patch = changed
     .filter(file => typeof file.patch === 'string')
     .map(file => file.patch)
@@ -132,8 +156,7 @@ async function candidateEvidence(summary, mainSha, openHeadShas) {
   const containsOpenPrHead =
     commits.length !== pr.commits ||
     openHeadShas.some(
-      candidateHead =>
-        candidateHead !== pr.head.sha && commitShas.has(candidateHead)
+      candidate => candidate.number !== number && commitShas.has(candidate.sha)
     );
   const compare = await apiJson(
     `repos/${repo}/compare/${mainSha}...${pr.head.sha}`
@@ -224,11 +247,16 @@ async function promote(summary, mainSha, evidence, decision) {
     }
     return failures;
   };
-  const disableAuto = () =>
-    prCommand('merge', number, '--disable-auto').then(
-      () => true,
-      () => false
+  const disableAuto = async () => {
+    await prCommand('merge', number, '--disable-auto').catch(() => null);
+    const current = await readQueueProof(number).catch(() => null);
+    return (
+      current?.state === 'OPEN' &&
+      current.headRefOid === expectedHead &&
+      current.autoMergeRequest == null &&
+      current.isInMergeQueue === false
     );
+  };
 
   try {
     if (live.draft) {
@@ -238,20 +266,26 @@ async function promote(summary, mainSha, evidence, decision) {
       await prCommand('edit', number, '--remove-label', 'queue-deferred');
     }
 
+    const postMutationChecksPassing =
+      restoreDraft || (await checksAreGreen(number));
     const postMutationEvidence = await candidateEvidence(
       summary,
       mainSha,
-      (await openPulls()).map(pr => pr.head.sha)
+      await openStackHeadShas()
     );
-    const postMutationMain = await mainHead();
+    const [postMutationMain, postMutationPr] = await Promise.all([
+      mainHead(),
+      apiJson(`repos/${repo}/pulls/${number}`),
+    ]);
     const postMutationDecision = evaluateRecoveryCandidate({
       ...postMutationEvidence,
+      pr: postMutationPr,
       mainSha: postMutationMain,
       checksPassing: true,
     });
     if (
       postMutationMain !== mainSha ||
-      postMutationEvidence.pr.head.sha !== expectedHead ||
+      postMutationPr.head.sha !== expectedHead ||
       !postMutationDecision.eligible
     ) {
       const failures = await compensate();
@@ -266,7 +300,7 @@ async function promote(summary, mainSha, evidence, decision) {
       await writeReceipt('promoted-awaiting-checks');
       return { queued: false, pending: true };
     }
-    if (!(await checksAreGreen(number))) {
+    if (!postMutationChecksPassing) {
       const failures = await compensate();
       await writeReceipt(
         failures.length === 0
@@ -341,7 +375,7 @@ async function promote(summary, mainSha, evidence, decision) {
 export async function run() {
   const mainSha = await mainHead();
   const open = await openPulls('main');
-  const openHeadShas = (await openPulls()).map(pr => pr.head.sha);
+  const openHeadShas = await openStackHeadShas();
   let promoted = 0;
   let unproven = 0;
   for (const summary of open) {
