@@ -24,3 +24,5 @@ export {
   BUTTON_PEN_PROPAGATION_FIXTURES,
   normalizeButtonPenRef,
 } from './penRefs';
+export * from './uiOwnershipRegistry';
+export * from './uiOwnershipRegistryValidation';
