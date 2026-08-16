@@ -56,6 +56,9 @@ const FOCUSED_PATHS = Object.freeze([
 const MATERIAL_RISK_CHANGE =
   /(?:secrets?\.|private[-_ ]key|api[-_ ]key|credential|(?:actions|checks|contents|deployments|id-token|issues|packages|pull-requests|security-events|statuses):\s*write|permissions:\s*write-all|pull_request_target|\b(?:GH_TOKEN|GITHUB_TOKEN)\b|\bgh\s+(?:api|pr|repo|run|workflow)\b|\bgit\s+(?:push|tag|reset|clean)\b|\b(?:curl|wget|nc|sudo|chmod|chown)\b|\bfind\b.*\s-delete\b|drop\s+table|delete\s+from|\b(?:rm\s+-rf|rmSync|unlink|truncate)\b|\b(?:fetch|https?\.request)\s*\(|continue-on-error:\s*true|\|\|\s*true|\b(?:bypass|skip)[-_ ]?(?:ci|check|gate)|production\s+(?:deploy|promotion)|--force\b|^[-+]\s*(?:uses:|run:.*(?:scripts\/|\.\/)))/im;
 
+const SAFE_WORKFLOW_CHANGE =
+  /^[-+]\s*(?:#.*|(?:timeout-minutes|max-parallel|retention-days):\s*\d+|cancel-in-progress:\s*(?:true|false))$/;
+
 const SHA = /^[0-9a-f]{40}$/;
 
 export function hasCompletePatch(file) {
@@ -108,8 +111,14 @@ export function classifyRecoveryFiles(
         (line.startsWith('+') && !line.startsWith('+++')) ||
         (line.startsWith('-') && !line.startsWith('---'))
     )
-    .join('\n');
-  if (MATERIAL_RISK_CHANGE.test(changedLines)) {
+    .map(line => line.trimEnd());
+  if (
+    files.some(file => /^\.github\/workflows\/.*\.ya?ml$/i.test(file)) &&
+    changedLines.some(line => !SAFE_WORKFLOW_CHANGE.test(line))
+  ) {
+    return { eligible: false, lanes: [], reason: 'workflow-control-change' };
+  }
+  if (MATERIAL_RISK_CHANGE.test(changedLines.join('\n'))) {
     return { eligible: false, lanes: [], reason: 'material-risk-change' };
   }
   return {

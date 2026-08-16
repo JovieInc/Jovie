@@ -98,16 +98,22 @@ async function readQueueProof(number) {
 }
 
 async function openStackHeadShas() {
-  const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:100){pageInfo{hasNextPage} nodes{number headRefOid timelineItems(itemTypes:[HEAD_REF_FORCE_PUSHED_EVENT],first:100){pageInfo{hasNextPage} nodes{... on HeadRefForcePushedEvent{beforeCommit{oid} afterCommit{oid}}}}}}}}`;
+  const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:100){pageInfo{hasNextPage} nodes{number headRefOid commits(first:100){pageInfo{hasNextPage} nodes{commit{oid}}} timelineItems(itemTypes:[HEAD_REF_FORCE_PUSHED_EVENT],first:100){pageInfo{hasNextPage} nodes{... on HeadRefForcePushedEvent{beforeCommit{oid} afterCommit{oid}}}}}}}}`;
   const pulls = (await repoGraph(query))?.pullRequests;
   if (!pulls || pulls.pageInfo.hasNextPage)
     throw new Error('open PR heads incomplete');
-  if (pulls.nodes.some(pr => pr.timelineItems.pageInfo.hasNextPage)) {
+  if (
+    pulls.nodes.some(
+      pr =>
+        pr.commits.pageInfo.hasNextPage || pr.timelineItems.pageInfo.hasNextPage
+    )
+  ) {
     throw new Error('open PR head history incomplete');
   }
   return pulls.nodes.flatMap(pr =>
     [
       pr.headRefOid,
+      ...pr.commits.nodes.map(node => node.commit.oid),
       ...pr.timelineItems.nodes.flatMap(event => [
         event.beforeCommit?.oid,
         event.afterCommit?.oid,
@@ -249,13 +255,13 @@ async function promote(summary, mainSha, evidence, decision) {
   };
   const disableAuto = async () => {
     await prCommand('merge', number, '--disable-auto').catch(() => null);
-    const current = await readQueueProof(number).catch(() => null);
-    return (
-      current?.state === 'OPEN' &&
-      current.headRefOid === expectedHead &&
-      current.autoMergeRequest == null &&
-      current.isInMergeQueue === false
-    );
+    const proof = await readQueueProof(number).catch(() => null);
+    const safe =
+      proof?.state === 'OPEN' &&
+      proof.headRefOid === expectedHead &&
+      proof.autoMergeRequest == null &&
+      proof.isInMergeQueue === false;
+    return { proof, safe };
   };
 
   try {
@@ -266,13 +272,13 @@ async function promote(summary, mainSha, evidence, decision) {
       await prCommand('edit', number, '--remove-label', 'queue-deferred');
     }
 
-    const postMutationChecksPassing =
-      restoreDraft || (await checksAreGreen(number));
     const postMutationEvidence = await candidateEvidence(
       summary,
       mainSha,
       await openStackHeadShas()
     );
+    const postMutationChecksPassing =
+      restoreDraft || (await checksAreGreen(number));
     const [postMutationMain, postMutationPr] = await Promise.all([
       mainHead(),
       apiJson(`repos/${repo}/pulls/${number}`),
@@ -328,9 +334,17 @@ async function promote(summary, mainSha, evidence, decision) {
       );
       return { queued: true };
     }
-    const autoDisabled = await disableAuto();
-    if (!autoDisabled) {
-      await writeReceipt('merge-request-unproven-disable-failed', racedProof);
+    const disabled = await disableAuto();
+    const concurrent = validateRecoveryMergeProof(disabled.proof, expectedHead);
+    if (concurrent.proven) {
+      await writeReceipt(concurrent.outcome, disabled.proof);
+      return { queued: true };
+    }
+    if (!disabled.safe) {
+      await writeReceipt(
+        'merge-request-unproven-disable-failed',
+        disabled.proof
+      );
       return { queued: false };
     }
     const failures = await compensate();
@@ -350,9 +364,14 @@ async function promote(summary, mainSha, evidence, decision) {
   }
   const verified = validateRecoveryMergeProof(proof, expectedHead);
   if (!verified.proven) {
-    const autoDisabled = await disableAuto();
-    if (!autoDisabled) {
-      await writeReceipt('requested-unproven-disable-failed', proof);
+    const disabled = await disableAuto();
+    const concurrent = validateRecoveryMergeProof(disabled.proof, expectedHead);
+    if (concurrent.proven) {
+      await writeReceipt(concurrent.outcome, disabled.proof);
+      return { queued: true };
+    }
+    if (!disabled.safe) {
+      await writeReceipt('requested-unproven-disable-failed', disabled.proof);
       console.log(
         `#${number} recovery action: requested-unproven-disable-failed`
       );
