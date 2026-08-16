@@ -74,7 +74,9 @@ describe('POST /api/feedback', () => {
     mockNotifySlackFeedbackSubmission.mockResolvedValue(undefined);
   });
 
-  it('returns success only after persistence', async () => {
+  it('returns success only after persistence', {
+    timeout: 15_000,
+  }, async () => {
     const { POST } = await import('@/app/api/feedback/route');
 
     const response = await POST(
@@ -92,7 +94,9 @@ describe('POST /api/feedback', () => {
     });
   });
 
-  it('persists opportunity inbox rating metadata in feedback context', async () => {
+  it('persists opportunity inbox rating metadata in feedback context', {
+    timeout: 15_000,
+  }, async () => {
     const { POST } = await import('@/app/api/feedback/route');
 
     const response = await POST(

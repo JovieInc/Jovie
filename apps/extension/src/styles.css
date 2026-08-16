@@ -145,9 +145,9 @@ button {
   cursor: pointer;
   transition:
     border-color var(--extension-system-b-motion-fast)
-      var(--extension-system-b-ease),
+    var(--extension-system-b-ease),
     background-color var(--extension-system-b-motion-fast)
-      var(--extension-system-b-ease);
+    var(--extension-system-b-ease);
 }
 
 .entity-card:hover {
@@ -303,9 +303,9 @@ button {
   cursor: pointer;
   transition:
     border-color var(--extension-system-b-motion-fast)
-      var(--extension-system-b-ease),
+    var(--extension-system-b-ease),
     background-color var(--extension-system-b-motion-fast)
-      var(--extension-system-b-ease),
+    var(--extension-system-b-ease),
     color var(--extension-system-b-motion-fast) var(--extension-system-b-ease);
 }
 
@@ -416,9 +416,9 @@ button {
   cursor: pointer;
   transition:
     border-color var(--extension-system-b-motion-fast)
-      var(--extension-system-b-ease),
+    var(--extension-system-b-ease),
     background-color var(--extension-system-b-motion-fast)
-      var(--extension-system-b-ease);
+    var(--extension-system-b-ease);
 }
 
 .prompt-button:hover {
