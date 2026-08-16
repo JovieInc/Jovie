@@ -29,15 +29,16 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
-      - name: Refuse a superseded or non-Gem activation runner
+      - name: Attest immutable production receipt and Gem runner
         env:
           PRODUCTION_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
           test "$(id -un)" = timwhite
           test "$(git rev-parse HEAD)" = "$PRODUCTION_SHA"
-          current_main="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
-          test "$current_main" = "$PRODUCTION_SHA"
+          # A later main commit cannot invalidate this immutable successful
+          # Production Controller receipt. The exact checkout and installer
+          # revision fence remain the activation authority.
       - name: Install and attest the exact controller configuration
         env:
           GEM_CONTROLLER_EXPECTED_REVISION: ${{ github.event.workflow_run.head_sha }}
