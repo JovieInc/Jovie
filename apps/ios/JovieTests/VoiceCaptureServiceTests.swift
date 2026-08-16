@@ -118,6 +118,76 @@ struct VoiceCaptureServiceTests {
     }
   }
 
+  @MainActor
+  @Test func cancelKeepsRestartBlockedUntilPrivateTakeTeardownFinishes() async throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = VlogSessionStore(rootURL: root)
+    let controller = SuspendingTeleprompterCaptureController()
+    controller.suspendCancel = true
+    let viewModel = TeleprompterViewModel(
+      proposal: .quickVlog,
+      store: store,
+      captureController: controller
+    )
+
+    await viewModel.startRecording()
+    #expect(viewModel.isRecording)
+    #expect(controller.startCallCount == 1)
+    #expect(store.recent().count == 1)
+
+    let cancelTask = Task { @MainActor in
+      await viewModel.cancelRecording()
+    }
+    await controller.waitUntilCancelStarts()
+
+    #expect(viewModel.isFinishing)
+    #expect(!viewModel.isRecording)
+    await viewModel.startRecording()
+    #expect(controller.startCallCount == 1)
+    #expect(store.recent().count == 1)
+
+    controller.resumeCancel()
+    #expect(await cancelTask.value)
+    #expect(!viewModel.isFinishing)
+    #expect(store.recent().isEmpty)
+  }
+
+  @MainActor
+  @Test func cancelInvalidatesAStartThatFinishesAfterDismissal() async throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = VlogSessionStore(rootURL: root)
+    let controller = SuspendingTeleprompterCaptureController()
+    controller.suspendStart = true
+    let viewModel = TeleprompterViewModel(
+      proposal: .quickVlog,
+      store: store,
+      captureController: controller
+    )
+
+    let startTask = Task { @MainActor in
+      await viewModel.startRecording()
+    }
+    await controller.waitUntilStartBegins()
+    #expect(viewModel.isStarting)
+    #expect(store.recent().count == 1)
+
+    #expect(await viewModel.cancelRecording())
+    #expect(viewModel.isStarting)
+    #expect(!viewModel.isRecording)
+    #expect(store.recent().isEmpty)
+
+    controller.resumeStart()
+    await startTask.value
+    #expect(!viewModel.isStarting)
+    #expect(!viewModel.isRecording)
+    #expect(controller.cancelCallCount == 2)
+    #expect(store.recent().isEmpty)
+  }
+
   #if !targetEnvironment(simulator)
     @MainActor
     @Test func cameraPreviewDoesNotActivateAudioCaptureBeforeRecord() async throws {
@@ -443,5 +513,64 @@ struct VoiceCaptureServiceTests {
     let queuedCount = store.queuedPromptFeedback().count
     viewModel.submitPromptFeedback(.idle)
     #expect(store.queuedPromptFeedback().count == queuedCount)
+  }
+}
+
+@MainActor
+private final class SuspendingTeleprompterCaptureController: TeleprompterCaptureControlling {
+  let captureSession = AVCaptureSession()
+  var isUsingOnDeviceRecognition = false
+  var isSpeechRecognitionActive = false
+  var onPartialTranscript: ((String) -> Void)?
+  var suspendStart = false
+  var suspendCancel = false
+  private(set) var startCallCount = 0
+  private(set) var cancelCallCount = 0
+
+  private var startContinuation: CheckedContinuation<Void, Never>?
+  private var cancelContinuation: CheckedContinuation<Void, Never>?
+
+  func startPreview() async throws {}
+
+  func start(videoURL _: URL) async throws {
+    startCallCount += 1
+    guard suspendStart else { return }
+    await withCheckedContinuation { continuation in
+      startContinuation = continuation
+    }
+  }
+
+  func stop() async throws -> TeleprompterCaptureResult {
+    throw TeleprompterCaptureError.notRecording
+  }
+
+  func cancel() async {
+    cancelCallCount += 1
+    guard suspendCancel else { return }
+    await withCheckedContinuation { continuation in
+      cancelContinuation = continuation
+    }
+  }
+
+  func waitUntilStartBegins() async {
+    while startCallCount == 0 || startContinuation == nil {
+      await Task.yield()
+    }
+  }
+
+  func waitUntilCancelStarts() async {
+    while cancelCallCount == 0 || cancelContinuation == nil {
+      await Task.yield()
+    }
+  }
+
+  func resumeStart() {
+    startContinuation?.resume()
+    startContinuation = nil
+  }
+
+  func resumeCancel() {
+    cancelContinuation?.resume()
+    cancelContinuation = nil
   }
 }
