@@ -415,6 +415,34 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["promotionAdmission"]["allowed"])
         self.assertTrue(receipt["deploymentAdmission"]["allowed"])
         self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
+        self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
+
+    def test_fleet_hold_does_not_pause_pr_remediation(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["main"] = {"status": "red", "sha": MAIN_SHA}
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertTrue(receipt["remediationAdmission"]["allowed"])
+        self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
+        self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
+        self.assertIn(
+            "expected-head-pr-update", receipt["remediationAdmission"]["activities"]
+        )
+
+    def test_severe_gate_failure_keeps_diagnosis_live_but_blocks_remote_push(self):
+        receipt = MODULE.failed_evaluation_receipt(ValueError("integrity unknown"))
+
+        self.assertEqual(receipt["state"], "RED")
+        self.assertFalse(receipt["workAdmission"]["allowed"])
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertTrue(receipt["remediationAdmission"]["allowed"])
+        self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
+        self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+        self.assertIn("diagnose-pr", receipt["remediationAdmission"]["activities"])
 
     def test_queue_observation_uses_compact_merge_state_without_nested_rollups(self):
         prs = [
@@ -825,7 +853,8 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("cron:", content)
         self.assertIn("pull_request:", content)
         self.assertIn("workflow_run:", content)
-        self.assertIn("workflows: [CI, Production Controller, Queue-Deferred Release]", content)
+        self.assertIn("workflows: [CI, Production Controller]", content)
+        self.assertNotIn("workflows: [CI, Production Controller, Queue-Deferred Release]", content)
         self.assertIn("push:", content)
         self.assertIn("branches: [main]", content)
         self.assertIn("ref: main", content)

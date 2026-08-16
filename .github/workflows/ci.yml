@@ -1170,7 +1170,7 @@ jobs:
           # origin/<base>; a --depth=1 fetch leaves the base tip shallow and fails
           # desktop-release-guard / version-fanout-guard on PRs.
           git fetch origin "${{ github.base_ref }}" --no-tags
-          if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE '^(\.github/|\.claude/|AGENTS\.md|CODEX\.md|scripts/lib/(ci-|merge-queue)|scripts/lib/__tests__/(ci-fast-workflow-contract|merge-group-workflow-contract)\.test\.mjs|scripts/ci-|scripts/brand-scrub\.py|scripts/tests/test_(brand_scrub|agent_workflow_hygiene|vercel_prebuilt_deploy)\.py)'; then
+          if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE '^(\.github/|\.claude/|AGENTS\.md|CODEX\.md|scripts/lib/(ci-|merge-queue)|scripts/lib/__tests__/(ci-fast-workflow-contract|merge-group-workflow-contract)\.test\.mjs|scripts/ci-|scripts/hermes/(gem-|gem_|install-gem-pr-rehabilitation)|scripts/brand-scrub\.py|scripts/tests/test_(brand_scrub|agent_workflow_hygiene|vercel_prebuilt_deploy)\.py)'; then
             echo "skip=false" >> "$GITHUB_OUTPUT"
           else
             echo "skip=true" >> "$GITHUB_OUTPUT"
