@@ -64,6 +64,12 @@ const LANES = [
     run: runGuardrails,
   },
   {
+    id: 'design-conformance',
+    name: 'Design Conformance',
+    nextLocalCommand: 'pnpm design:conformance:gate',
+    run: runDesignConformance,
+  },
+  {
     id: 'ios-fast',
     name: 'iOS Fast Contract',
     nextLocalCommand: 'pnpm run ios:lint',
@@ -99,6 +105,7 @@ export const LANE_GROUPS = Object.freeze({
     'eslint-server-boundaries',
     'scripts-typecheck',
     'guardrails',
+    'design-conformance',
     'ios-fast',
     'profile-admission',
     'structural',
@@ -306,6 +313,12 @@ function runGuardrails() {
     }
   }
   return { code: 0, output: combined };
+}
+
+function runDesignConformance() {
+  // Always validate the normalized manifest. The selector inside the command
+  // reports affected design domains but never invokes Gem/Symphony/Ubuntu ops.
+  return shell(LANE_COMMANDS['design-conformance']);
 }
 
 function runIosFast() {
