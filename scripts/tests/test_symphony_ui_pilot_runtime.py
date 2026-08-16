@@ -31,6 +31,7 @@ INSTALLER = ROOT / "scripts/hermes/install-symphony-ui-pilot.sh"
 FLEET_INSTALLER = ROOT / "scripts/hermes/install-gem-fleet-controller.sh"
 INTAKE_WORKFLOW = ROOT / ".github/workflows/jovie-intake-controller.yml"
 ACTIVATION_WORKFLOW = ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
+ACTIONLINT_CONFIG = ROOT / ".github/actionlint.yaml"
 
 
 def _front_matter_lines() -> list[str]:
@@ -143,6 +144,81 @@ def test_activation_requires_exact_production_revision_and_attestation() -> None
     assert "immutable successful" in activation
     assert "GEM_CONTROLLER_EXPECTED_REVISION" in activation
     assert 'gem-service-attestation/v1' in activation
+
+
+def test_activation_uses_the_provisioned_gem_host_runner_contract() -> None:
+    activation = ACTIVATION_WORKFLOW.read_text()
+    assert "runs-on: [self-hosted, Linux, X64, jovie-fixed]" in activation
+    assert "runs-on: [self-hosted, Linux, X64, jovie-fixed, gem]" not in activation
+    assert "\n    - gem\n" not in ACTIONLINT_CONFIG.read_text()
+
+
+def _run_fleet_systemd_preflight(
+    tmp_path: Path, systemctl_returncode: int
+) -> tuple[subprocess.CompletedProcess[str], Path]:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake_id = bin_dir / "id"
+    fake_id.write_text(
+        "#!/usr/bin/env bash\n"
+        "if [[ \"${1:-}\" == -u ]]; then printf '4242\\n'; else /usr/bin/id \"$@\"; fi\n"
+    )
+    fake_id.chmod(0o755)
+    log = tmp_path / "systemctl.log"
+    fake_systemctl = bin_dir / "systemctl"
+    fake_systemctl.write_text(
+        "#!/usr/bin/env bash\n"
+        "printf 'command=%s\\n' \"$*\" > \"$FLEET_PREFLIGHT_LOG\"\n"
+        "printf 'XDG_RUNTIME_DIR=%s\\n' \"${XDG_RUNTIME_DIR:-}\" >> \"$FLEET_PREFLIGHT_LOG\"\n"
+        "printf 'DBUS_SESSION_BUS_ADDRESS=%s\\n' \"${DBUS_SESSION_BUS_ADDRESS:-}\" >> \"$FLEET_PREFLIGHT_LOG\"\n"
+        "exit \"$FLEET_SYSTEMCTL_RETURNCODE\"\n"
+    )
+    fake_systemctl.chmod(0o755)
+    env = dict(os.environ)
+    env.pop("XDG_RUNTIME_DIR", None)
+    env.pop("DBUS_SESSION_BUS_ADDRESS", None)
+    env.update(
+        {
+            "FLEET_INSTALL_PREFLIGHT_ONLY": "true",
+            "FLEET_PREFLIGHT_LOG": str(log),
+            "FLEET_SYSTEMCTL_RETURNCODE": str(systemctl_returncode),
+            "GEM_WORKSPACE": str(tmp_path / "gem-workspace"),
+            "PATH": f"{bin_dir}:{env['PATH']}",
+            "SYMPHONY_RUNTIME": str(tmp_path / "symphony-runtime"),
+        }
+    )
+    result = subprocess.run(
+        ["bash", str(FLEET_INSTALLER)],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result, log
+
+
+def test_fleet_installer_establishes_user_systemd_context_before_writes(
+    tmp_path: Path,
+) -> None:
+    result, log = _run_fleet_systemd_preflight(tmp_path, 0)
+    assert result.returncode == 0, result.stderr
+    assert "Gem user systemd preflight passed" in result.stdout
+    assert log.read_text().splitlines() == [
+        "command=--user show-environment",
+        "XDG_RUNTIME_DIR=/run/user/4242",
+        "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/4242/bus",
+    ]
+    assert not (tmp_path / "gem-workspace/state/backups").exists()
+
+
+def test_fleet_installer_fails_visible_before_writes_without_user_systemd(
+    tmp_path: Path,
+) -> None:
+    result, _ = _run_fleet_systemd_preflight(tmp_path, 1)
+    assert result.returncode == 4
+    assert "Gem user systemd preflight failed; refusing controller writes" in result.stderr
+    assert not (tmp_path / "gem-workspace/state/backups").exists()
 
 
 def test_workflow_server_and_workspace() -> None:

@@ -7,6 +7,7 @@ readonly SYMPHONY_ROOT="${SYMPHONY_RUNTIME:-/home/timwhite/symphony-runtime/elix
 readonly TIMER="gem-pr-drain.timer"
 readonly SERVICE="symphony-ui-pilot.service"
 readonly VERIFY_ONLY="${FLEET_INSTALL_VERIFY_ONLY:-false}"
+readonly PREFLIGHT_ONLY="${FLEET_INSTALL_PREFLIGHT_ONLY:-false}"
 readonly EXPECTED_SOURCE_REVISION="${GEM_CONTROLLER_EXPECTED_REVISION:-}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 readonly STAMP
@@ -22,6 +23,26 @@ readonly CONTRACT_TARGET="${GEM_ROOT}/scripts/gem_gate_contract.py"
 readonly CONSUMER_TARGET="${GEM_ROOT}/scripts/gem-pr-drain.py"
 readonly WORKFLOW_TARGET="${SYMPHONY_ROOT}/WORKFLOW.jovie-ui-pilot.md"
 readonly SERVICE_UNIT_TARGET="${HOME}/.config/systemd/user/symphony-ui-pilot.service"
+
+prepare_user_systemd_context() {
+  if [[ -z "${XDG_RUNTIME_DIR:-}" ]]; then
+    XDG_RUNTIME_DIR="/run/user/$(id -u)"
+    export XDG_RUNTIME_DIR
+  fi
+  DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+  export DBUS_SESSION_BUS_ADDRESS
+  if ! systemctl --user show-environment >/dev/null; then
+    printf 'Gem user systemd preflight failed; refusing controller writes (XDG_RUNTIME_DIR=%s)\n' \
+      "${XDG_RUNTIME_DIR}" >&2
+    return 4
+  fi
+}
+
+if [[ "${PREFLIGHT_ONLY}" == true ]]; then
+  prepare_user_systemd_context
+  printf 'Gem user systemd preflight passed (XDG_RUNTIME_DIR=%s)\n' "${XDG_RUNTIME_DIR}"
+  exit 0
+fi
 
 for source in "${GATE_SOURCE}" "${CONTRACT_SOURCE}" "${CONSUMER_SOURCE}" "${WORKFLOW_SOURCE}" "${SERVICE_UNIT_SOURCE}"; do
   [[ -f "${source}" ]] || { printf 'missing install source: %s\n' "${source}" >&2; exit 2; }
@@ -58,6 +79,7 @@ if [[ "${VERIFY_ONLY}" == true ]]; then
   sha256sum "${GATE_SOURCE}" "${CONTRACT_SOURCE}" "${CONSUMER_SOURCE}" "${WORKFLOW_SOURCE}" "${SERVICE_UNIT_SOURCE}"
   exit 0
 fi
+prepare_user_systemd_context
 mkdir -p "${BACKUP_DIR}"
 cp -p "${GATE_TARGET}" "${BACKUP_DIR}/gem-priority-gate.py"
 cp -p "${CONSUMER_TARGET}" "${BACKUP_DIR}/gem-pr-drain.py"
