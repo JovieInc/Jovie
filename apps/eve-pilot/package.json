@@ -11,6 +11,7 @@
   "scripts": {
     "build": "eve build",
     "dev": "eve dev",
+    "smoke": "vitest run --config vitest.config.ts tests/eve-framework-smoke.test.ts",
     "start": "eve start",
     "test": "vitest run --config vitest.config.ts",
     "typecheck": "tsc --noEmit"
