@@ -65,7 +65,7 @@ Checked-in source: `.github/rulesets/branch-protection.yml`.
 - Maximum entries per merge: `10`
 - Maximum entries building concurrently: `3` (measured starting point after concurrent prefix waves inflated unit matrices from ~1–2 minutes to ~5–7 minutes)
 - Check response timeout: `60` minutes
-- Stale exact-production: freeze new intake (`hold-intake`); preserve already-admitted cohort members. Do not dequeue green siblings while Production Controller binds the latest exact main.
+- Stale exact-production: `hold-intake` preserves the admitted cohort and continues isolated implementation. It must not freeze enroll of CLEAN unrelated PRs. `jovie-fleet-queue-hold/v1` is a bounded recovery selector (default 12m TTL) and must expire, succeed, or fail with a terminal reason — never sit pending.
 - Live ruleset `10512119` remains `min_entries_to_merge=1` / wait `0` until the post-merge apply. Source and preflight readback already describe the 5/10 cohort; auto-enroll stays up during that pending cutover.
 - Signed-commit and non-fast-forward rules: dormant/not applied. The checked-in
   payload intentionally matches live ruleset `10512119`; enabling either is a
@@ -221,14 +221,18 @@ receipt immediately before and after native enrollment and compensates by
 dequeueing if mutable evidence changes during the operation. Ordinary queued
 PRs are held outside the native queue until production returns green; no second
 queue, alternate transport, label authority, or CI bypass exists. Before a
-fleet-driven dequeue, the controller writes a pending
-`jovie-fleet-queue-hold/v1` commit status on that exact head. Only a successful
-`Production Controller` completion under a fresh normal `GREEN` gate may
-consume those receipts and re-enroll the still-current heads through the same
-native preflight and postcondition checks. The recovery signal binds the stable
-workflow path (including GitHub's optional `@ref` suffix), not the controller's
-dynamic run title. Main-push and untargeted manual runs cannot perform this
-recovery.
+fleet-driven dequeue in `isolated-only`, the controller writes a pending
+`jovie-fleet-queue-hold/v1` commit status on that exact head with an explicit
+expiry. Waiting lanes (`hold-intake`, `draft-only` / main-not-green, and
+blocked-unknown) must not stamp an unbounded pending hold or strip enroll from
+CLEAN unrelated PRs. A later successful `Production Controller` completion
+under a fresh normal `GREEN` gate may still consume remaining receipts and
+re-enroll the still-current heads through the same native preflight and
+postcondition checks. Any pending hold that outlives `FLEET_HOLD_TTL_SECONDS`
+(default 12 minutes) is closed to success or failure with a terminal reason.
+The recovery signal binds the stable workflow path (including GitHub's optional
+`@ref` suffix), not the controller's dynamic run title. Main-push and
+untargeted manual runs cannot perform this recovery.
 
 ## Monitoring and troubleshooting
 
