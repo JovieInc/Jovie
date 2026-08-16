@@ -5,6 +5,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   HOMEPAGE_PROFILE_PREVIEW_ARTIST,
   HOMEPAGE_PROFILE_PREVIEW_CONTACTS,
+  HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES,
   HOMEPAGE_PROFILE_PREVIEW_RELEASES,
   HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS,
   HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES,
@@ -18,6 +19,7 @@ import { ProfileCompactSurface } from '@/features/profile/templates/ProfileCompa
 
 interface MarketingStateRenderClientProps {
   readonly stateId: ProfileShowcaseStateId;
+  readonly interactive?: boolean;
 }
 
 function getLatestRelease(stateId: ProfileShowcaseStateId) {
@@ -54,18 +56,39 @@ function getRenderWidth(value: string | null) {
 
 export function MarketingStateRenderClient({
   stateId,
+  interactive = false,
 }: MarketingStateRenderClientProps) {
   const searchParams = useSearchParams();
   const state = HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId];
   const hideChrome = searchParams.get('chrome') !== 'true';
   const width = getRenderWidth(searchParams.get('width'));
+  const requestedMode = searchParams.get('mode');
+  const showDspDrawer = interactive && requestedMode === 'dsp';
+  const activeMode =
+    interactive && requestedMode === 'listen'
+      ? 'listen'
+      : getPreviewActiveMode(stateId);
+  const artist = interactive
+    ? {
+        ...HOMEPAGE_PROFILE_PREVIEW_ARTIST,
+        id: '123e4567-e89b-12d3-a456-426614174000',
+      }
+    : HOMEPAGE_PROFILE_PREVIEW_ARTIST;
+  const releases = interactive
+    ? HOMEPAGE_PROFILE_PREVIEW_DRAWER_RELEASES.map((release, index) =>
+        index === 0
+          ? { ...release, previewUrl: '/audio/profile-admission-preview.wav' }
+          : release
+      )
+    : undefined;
 
   return (
     <div
       style={{
         width: `${width}px`,
         maxWidth: '100%',
-        borderRadius: '2rem',
+        height: interactive ? '100dvh' : undefined,
+        borderRadius: interactive ? 0 : '2rem',
         overflow: 'hidden',
         background: '#030507',
       }}
@@ -74,9 +97,9 @@ export function MarketingStateRenderClient({
     >
       <ProfileCompactSurface
         dataTestId='marketing-render-surface'
-        renderMode='preview'
-        presentation='embedded'
-        artist={HOMEPAGE_PROFILE_PREVIEW_ARTIST}
+        renderMode={interactive ? 'interactive' : 'preview'}
+        presentation={interactive ? 'standalone' : 'embedded'}
+        artist={artist}
         socialLinks={[...HOMEPAGE_PROFILE_PREVIEW_SOCIAL_LINKS]}
         contacts={[...HOMEPAGE_PROFILE_PREVIEW_CONTACTS]}
         latestRelease={getLatestRelease(stateId)}
@@ -87,9 +110,9 @@ export function MarketingStateRenderClient({
         allowPhotoDownloads={false}
         tourDates={[...HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES]}
         showSubscriptionConfirmedBanner={state.showSubscriptionConfirmedBanner}
-        drawerOpen={state.drawerView !== null}
-        drawerView={state.drawerView ?? 'menu'}
-        activeMode={getPreviewActiveMode(stateId)}
+        drawerOpen={showDspDrawer || state.drawerView !== null}
+        drawerView={showDspDrawer ? 'listen' : (state.drawerView ?? 'menu')}
+        activeMode={activeMode}
         onDrawerOpenChange={() => {}}
         onDrawerViewChange={() => {}}
         onModeSelect={() => {}}
@@ -111,6 +134,7 @@ export function MarketingStateRenderClient({
         onRevealNotifications={() => {}}
         previewNotificationsState={state.notifications}
         previewReleaseActionLabel={state.releaseActionLabel}
+        releases={releases}
         hideJovieBranding={hideChrome}
         hideMoreMenu={hideChrome}
       />

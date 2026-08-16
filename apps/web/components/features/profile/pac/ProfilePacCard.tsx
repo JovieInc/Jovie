@@ -36,7 +36,7 @@ import { subscribeToNotifications } from '@/lib/notifications/client';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
 import {
   getCaptureDismissalStatus,
-  invalidateCaptureDismissalStatus,
+  handleCaptureDismissalResponse,
 } from '@/lib/profile/capture-dismissal-client';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PacState as PacEventState } from '@/lib/tracking/pac-events-shared';
@@ -530,9 +530,7 @@ export function ProfilePacCard({
       credentials: 'same-origin',
       body: JSON.stringify({ artist_id: artist.id, source: 'profile_pac' }),
     })
-      .then(res => {
-        if (res.ok) invalidateCaptureDismissalStatus(artist.id);
-      })
+      .then(res => handleCaptureDismissalResponse(artist.id, res))
       .catch(() => {
         // Best-effort — suppression is also held in memory for this session.
       });

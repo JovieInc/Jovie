@@ -8,7 +8,10 @@ import { db } from '@/lib/db';
 import { publicProfileCaptureDismissals } from '@/lib/db/schema/analytics';
 import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
-import { generalLimiter, getClientIP } from '@/lib/rate-limit';
+import {
+  getClientIP,
+  publicProfileCaptureDismissalLimiter,
+} from '@/lib/rate-limit';
 import { uuidSchema } from '@/lib/validation/schemas/base';
 
 export const runtime = 'nodejs';
@@ -21,6 +24,40 @@ const dismissalSchema = z.object({
   artist_id: uuidSchema,
   source: z.string().min(1).max(80).optional(),
 });
+
+function isRateLimitBackendDegraded(result: {
+  readonly degraded?: boolean;
+  readonly unavailable?: boolean;
+}) {
+  return result.degraded === true || result.unavailable === true;
+}
+
+function degradedGetResponse() {
+  return NextResponse.json(
+    {
+      success: true,
+      suppressed: false,
+      sessionCount: 0,
+      nextEligibleAt: null,
+      degraded: true,
+    },
+    { headers: { 'Cache-Control': 'no-store' } }
+  );
+}
+
+function degradedPostResponse(nextEligibleAt: Date) {
+  return NextResponse.json(
+    {
+      success: true,
+      accepted: true,
+      suppressed: true,
+      persisted: false,
+      degraded: true,
+      nextEligibleAt: nextEligibleAt.toISOString(),
+    },
+    { headers: { 'Cache-Control': 'no-store' } }
+  );
+}
 
 function buildNextEligibleAt(now = new Date()) {
   return new Date(now.getTime() + DISMISSAL_DAYS * 24 * 60 * 60 * 1000);
@@ -47,9 +84,11 @@ function setAudienceCookie(response: NextResponse, audienceId: string) {
 
 export async function GET(request: NextRequest) {
   const clientIp = getClientIP(request);
-  const rateLimitResult = await generalLimiter.limit(clientIp);
+  const rateLimitResult =
+    await publicProfileCaptureDismissalLimiter.limit(clientIp);
 
-  if (!rateLimitResult.success) {
+  const backendDegraded = isRateLimitBackendDegraded(rateLimitResult);
+  if (!rateLimitResult.success && !backendDegraded) {
     return createRateLimitedResponse(rateLimitResult);
   }
 
@@ -62,6 +101,13 @@ export async function GET(request: NextRequest) {
       { success: false, error: 'Invalid request data' },
       { status: 400, headers: { 'Cache-Control': 'no-store' } }
     );
+  }
+
+  // An Upstash outage must not turn an optional conversion control into a
+  // visible 429. Return a neutral state without touching the database; the
+  // per-instance fallback still bounds CPU while the backend is degraded.
+  if (backendDegraded) {
+    return degradedGetResponse();
   }
 
   const { audienceId, shouldSetCookie } = await resolveAudienceId();
@@ -129,9 +175,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const clientIp = getClientIP(request);
-  const rateLimitResult = await generalLimiter.limit(clientIp);
+  const rateLimitResult =
+    await publicProfileCaptureDismissalLimiter.limit(clientIp);
 
-  if (!rateLimitResult.success) {
+  const backendDegraded = isRateLimitBackendDegraded(rateLimitResult);
+  if (!rateLimitResult.success && !backendDegraded) {
     return createRateLimitedResponse(rateLimitResult);
   }
 
@@ -153,9 +201,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { audienceId, shouldSetCookie } = await resolveAudienceId();
   const now = new Date();
   const nextEligibleAt = buildNextEligibleAt(now);
+
+  // The client suppresses the capture immediately in memory. A successful
+  // degraded response preserves that preference while avoiding DB write
+  // amplification when the durable abuse-control backend is unavailable.
+  if (backendDegraded) {
+    return degradedPostResponse(nextEligibleAt);
+  }
+
+  const { audienceId, shouldSetCookie } = await resolveAudienceId();
 
   try {
     await db
@@ -187,7 +243,9 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json(
       {
         success: true,
+        accepted: true,
         suppressed: true,
+        persisted: true,
         sessionCap: DISMISSAL_SESSION_CAP,
         nextEligibleAt: nextEligibleAt.toISOString(),
       },

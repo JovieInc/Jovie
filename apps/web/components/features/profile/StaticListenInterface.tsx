@@ -185,6 +185,8 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
                   void handleDSPClick(dsp);
                 }}
                 label={isSelected ? `Opening ${dsp.name}...` : dsp.name}
+                providerKey={dsp.key}
+                disabled={isLoading}
                 iconPath={logoConfig?.iconPath}
                 iconColor={logoConfig?.color}
                 className={cn(providerButtonClassName, buttonClassName)}
