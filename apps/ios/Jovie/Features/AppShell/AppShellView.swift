@@ -523,6 +523,10 @@ struct AppShellView<
     teleprompterProposal = proposal
   }
 
+  private func openQuickVlogMode() {
+    presentVideoProposal(.quickVlog)
+  }
+
   private func presentEntity(_ item: EntityContextItem) {
     lastEntityContext = item
     entityContext = item
@@ -740,6 +744,16 @@ struct AppShellView<
       }
 
       Spacer(minLength: 0)
+
+      if chatEnabled {
+        Button(action: openQuickVlogMode) {
+          Image(systemName: "video")
+        }
+        .buttonStyle(JovieIconButtonStyle())
+        .accessibilityLabel("Open Vlog Mode")
+        .accessibilityHint("Start a private on-device vlog in Prompt Mode")
+        .accessibilityIdentifier("shell-vlog-open")
+      }
 
       Button {
         navigationPath.append(.settings)
