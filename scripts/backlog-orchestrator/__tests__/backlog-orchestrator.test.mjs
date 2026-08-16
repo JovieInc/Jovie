@@ -1507,7 +1507,10 @@ raise SystemExit(2)
     );
     const blocked = JSON.parse(stdout);
     assert.equal(blocked.status, 'ok');
-    assert.equal(blocked.work_admission, 'blocked');
+    assert.equal(blocked.work_admission, 'disabled');
+    assert.equal(blocked.intake, 'disabled_symphony_implementation_owner');
+    assert.equal(blocked.reason, 'gem_ship_disabled_for_jovie');
+    assert.ok(!('priority_gate' in blocked));
     assert.deepEqual(blocked.selected, []);
     assert.deepEqual(blocked.processed, []);
 
