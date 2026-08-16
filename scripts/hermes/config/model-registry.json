@@ -58,16 +58,32 @@
       "cooldown_seconds": 1800
     },
     {
-      "id": "grok-composer-2.5-fast",
+      "id": "grok-4.6",
       "provider": "grok",
-      "model": "grok-composer-2.5-fast",
+      "model": "grok-4.6",
       "capabilities": ["mechanical", "code", "review", "semantic"],
       "cost_tier": "subscription",
       "executable_env": "GEM_GROK_EXECUTABLE",
       "executable_default": "grok",
       "agent_executable_env": "GEM_GROK_EXECUTABLE",
       "agent_executable_default": "grok",
-      "agent_argv": ["--always-approve", "--cwd", "{cwd}", "-p", "{prompt}"],
+      "agent_argv": [
+        "agent",
+        "--model",
+        "{model}",
+        "--permission-mode",
+        "acceptEdits",
+        "--cwd",
+        "{cwd}",
+        "--tools",
+        "Read,Edit,Write,Glob,Grep",
+        "--disallowed-tools",
+        "Bash,WebFetch,WebSearch",
+        "--disable-web-search",
+        "--no-subagents",
+        "-p",
+        "{prompt}"
+      ],
       "probe_argv": ["{executable}", "models"],
       "cooldown_seconds": 1800
     },
@@ -153,7 +169,7 @@
     "remediation": [
       "qwen-coder-local",
       "deepseek-v4-flash",
-      "grok-composer-2.5-fast",
+      "grok-4.6",
       "claude",
       "codex-terra",
       "codex-sol"
@@ -161,7 +177,7 @@
     "new_pr": [
       "qwen-coder-local",
       "deepseek-v4-flash",
-      "grok-composer-2.5-fast",
+      "grok-4.6",
       "claude",
       "codex-luna",
       "codex-terra",

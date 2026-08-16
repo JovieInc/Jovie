@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "owner": "Gem",
+  "policy": {
+    "deterministic_first": true,
+    "no_merge_or_admin": true,
+    "one_writer_per_pr": true,
+    "native_merge_queue_only": true,
+    "pr_drain_default": "allowlist_only"
+  },
+  "repos": [
+    {
+      "id": "jovie",
+      "github": "JovieInc/Jovie",
+      "class": "active_shippable",
+      "owner": "Jovie product",
+      "kpi": "qualified PR handoff to landed",
+      "local_path": "/home/timwhite/gem-workspace/Jovie-ship",
+      "default_branch": "main",
+      "policies": { "health": true, "pr_drain": true, "issue_intake": true }
+    },
+    {
+      "id": "logyourbody",
+      "github": "JovieInc/LogYourBody",
+      "class": "active_shippable",
+      "owner": "LogYourBody product",
+      "kpi": "PR cycle time and CI health",
+      "local_path": "/home/timwhite/conductor/repos/logyourbody",
+      "default_branch": "main",
+      "policies": { "health": true, "pr_drain": true, "issue_intake": true }
+    },
+    {
+      "id": "ovie",
+      "github": "JovieInc/ovie",
+      "class": "active_shippable",
+      "owner": "Ovie product/ops",
+      "kpi": "PR cycle time and CI health",
+      "local_path": "/home/timwhite/JovieInc/ovie",
+      "default_branch": "main",
+      "policies": { "health": true, "pr_drain": true, "issue_intake": true }
+    },
+    {
+      "id": "bubblegumfactory",
+      "github": "JovieInc/BubblegumFactory",
+      "class": "active_shippable",
+      "owner": "BubblegumFactory product",
+      "kpi": "PR cycle time and CI health",
+      "local_path": "/home/timwhite/conductor/repos/BubblegumFactory",
+      "default_branch": "main",
+      "policies": { "health": true, "pr_drain": true, "issue_intake": true }
+    },
+    {
+      "id": "gbrain-org",
+      "github": "JovieInc/gbrain",
+      "class": "active_shippable",
+      "owner": "Jovie brain/platform",
+      "kpi": "release health and open queue",
+      "local_path": "/home/timwhite/conductor/repos/gbrain",
+      "default_branch": "main",
+      "policies": { "health": true, "pr_drain": true, "issue_intake": true }
+    },
+    {
+      "id": "retouching",
+      "github": "JovieInc/retouching",
+      "class": "active_shippable",
+      "owner": "Retouching workflow",
+      "kpi": "workflow CI health and open queue",
+      "local_path": "/home/timwhite/conductor/repos/retouching",
+      "default_branch": "main",
+      "policies": { "health": true, "pr_drain": true, "issue_intake": false }
+    },
+    {
+      "id": "gbrain-personal",
+      "github": "itstimwhite/gbrain",
+      "class": "active_shippable",
+      "owner": "itstimwhite",
+      "kpi": "release health and open queue",
+      "local_path": "/home/timwhite/gbrain",
+      "default_branch": "master",
+      "policies": { "health": true, "pr_drain": true, "issue_intake": false }
+    },
+    {
+      "id": "ci",
+      "github": "JovieInc/ci",
+      "class": "infra",
+      "owner": "Jovie CI/platform",
+      "kpi": "runner availability and queue depth",
+      "local_path": "/home/timwhite/conductor/repos/jovie-ci",
+      "default_branch": "main",
+      "policies": { "health": true, "pr_drain": false, "issue_intake": false }
+    },
+    {
+      "id": "ops",
+      "github": "JovieInc/Ops",
+      "class": "infra",
+      "owner": "Jovie operations",
+      "kpi": "workflow health and incident queue",
+      "local_path": "/home/timwhite/conductor/repos/ops",
+      "default_branch": "main",
+      "policies": { "health": true, "pr_drain": false, "issue_intake": false }
+    },
+    {
+      "id": "zoe-config",
+      "github": "JovieInc/zoe-config",
+      "class": "config",
+      "owner": "Zoe/OpenClaw fleet",
+      "kpi": "config validity and drift",
+      "local_path": "/home/timwhite/conductor/repos/zoe-config",
+      "default_branch": "main",
+      "policies": { "health": true, "pr_drain": false, "issue_intake": false }
+    },
+    {
+      "id": "ios-certificates",
+      "github": "JovieInc/ios-certificates",
+      "class": "archive",
+      "owner": "iOS release/signing",
+      "kpi": "signing asset availability",
+      "local_path": "/home/timwhite/conductor/repos/ios-certificates",
+      "default_branch": "main",
+      "policies": { "health": true, "pr_drain": false, "issue_intake": false }
+    }
+  ]
+}

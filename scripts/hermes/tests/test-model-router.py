@@ -15,8 +15,33 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(cfg["schema_version"], 1)
         self.assertTrue(cfg["deterministic_first"])
         ids = {m["id"] for m in cfg["models"]}
-        self.assertTrue({"qwen-coder-local", "deepseek-v4-flash", "grok-composer-2.5-fast", "claude", "codex-luna", "codex-terra", "codex-sol"} <= ids)
-        self.assertEqual(cfg["route_chains"]["remediation"][:3], ["qwen-coder-local", "deepseek-v4-flash", "grok-composer-2.5-fast"])
+        self.assertTrue({"qwen-coder-local", "deepseek-v4-flash", "grok-4.6", "claude", "codex-luna", "codex-terra", "codex-sol"} <= ids)
+        self.assertEqual(cfg["route_chains"]["remediation"][:3], ["qwen-coder-local", "deepseek-v4-flash", "grok-4.6"])
+
+    def test_remediation_rejects_executor_without_isolated_cwd(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            ready = root / "ollama"
+            ready.write_text("#!/bin/sh\necho qwen3-coder:30b\n")
+            ready.chmod(0o755)
+            agent = root / "hermes"
+            agent.write_text("#!/bin/sh\nexit 0\n")
+            agent.chmod(0o755)
+            result = self.run_router(
+                "choose", "--workflow", "remediation", "--capability", "mechanical",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(root / "state.json"),
+                    "GEM_PR_DRAIN_QWEN": str(ready),
+                    "GEM_QWEN_AGENT_EXECUTABLE": str(agent),
+                    "GEM_DEEPSEEK_EXECUTABLE": "/missing",
+                    "GEM_GROK_EXECUTABLE": "/missing",
+                    "GEM_CLAUDE_EXECUTABLE": "/missing",
+                    "GEM_PR_DRAIN_CODEX": "/missing",
+                },
+            )
+            document = json.loads(result.stdout)
+            self.assertEqual(document["candidates"][0]["reason"], "executor_invalid")
+            self.assertIsNone(document["selected"])
 
     def test_codex_is_exception_only(self):
         with tempfile.TemporaryDirectory() as td:
