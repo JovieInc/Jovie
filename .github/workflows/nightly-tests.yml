@@ -83,6 +83,9 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
+      # playwright-artifact-secrets.test.ts launches Chromium (JOV-5101).
+      - uses: ./.github/actions/setup-playwright
+
       - name: Run full unit test suite
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.coverage }}" = "true" ]; then
