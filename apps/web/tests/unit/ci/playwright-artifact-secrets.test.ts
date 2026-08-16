@@ -959,6 +959,8 @@ ${fixtureCheckout}
           );
       }
     }
+    const waitlistDopplerCommand =
+      'run: doppler run --project jovie-web --config prd --only-secrets=E2E_PROD_SIGNUP_EMAIL_BASE,E2E_PROD_MAILBOX_PROVIDER,E2E_PROD_OTP_CHECK_ORIGIN,E2E_PROD_OTP_CHECK_TOKEN,E2E_PROD_OTP_CHECK_URL,PRODUCTION_WAITLIST_CANARY_READ_TOKEN --no-fallback -- env -u DOPPLER_TOKEN node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-production-waitlist.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-production-waitlist';
     for (const file of ['agent-tick.yml', 'synthetic-monitoring.yml']) {
       const doppler = readFileSync(join(workflowsRoot, file), 'utf8')
         .split('\n')
@@ -967,12 +969,16 @@ ${fixtureCheckout}
       const guarded = doppler.filter(line => line.includes(guardScriptName));
       expect(guarded).toHaveLength(6);
       expect(
-        guarded.every(line =>
-          line.includes(
-            'doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm'
-          )
+        guarded.every(
+          line =>
+            line.includes(
+              'doppler run -- node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm'
+            ) || line.trim() === waitlistDopplerCommand
         )
       ).toBe(true);
+      expect(
+        guarded.filter(line => line.trim() === waitlistDopplerCommand)
+      ).toHaveLength(1);
       expect(doppler.filter(line => !line.includes(guardScriptName))).toEqual([
         expect.stringContaining('scripts/check-signup-readiness.ts'),
       ]);
