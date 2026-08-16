@@ -81,6 +81,7 @@ export type ProfileWithUser = ProfileData & {
   userIsPro: boolean | null;
   userClerkId: string | null;
   userEmail: string | null;
+  userPlan: string | null;
 };
 
 /**

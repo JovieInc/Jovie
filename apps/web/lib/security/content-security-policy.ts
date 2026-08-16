@@ -91,6 +91,9 @@ const STATIC_CSP_PARTS = {
     'https://tag.trovo-tag.com',
     // Google Analytics 4 / gtag.js (JOV-3664)
     'https://www.googletagmanager.com',
+    // Meta pixel fbevents.js — browser retargeting pixel on public artist
+    // profiles (JOV-5078)
+    'https://connect.facebook.net',
     // Google Identity Services (accounts.google.com/gsi/client) — required
     // for Google One Tap / Google sign-in (JOV-4369).
     'https://accounts.google.com',
@@ -126,6 +129,9 @@ const STATIC_CSP_PARTS = {
     'https://www.google-analytics.com',
     'https://analytics.google.com',
     'https://*.google-analytics.com',
+    // Meta pixel event beacons (facebook.com/tr) + fbevents.js (JOV-5078)
+    'https://www.facebook.com',
+    'https://connect.facebook.net',
   ].join(' '),
 
   // Pre-computed frame-src prefix (excludes dev-only vercel.live)

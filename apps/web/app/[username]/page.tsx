@@ -15,6 +15,7 @@ import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 import { getProfileModeDefinition } from '@/features/profile/registry';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import { JoviePixel } from '@/features/tracking/JoviePixel';
+import { MetaPixel } from '@/features/tracking/MetaPixel';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
 import {
   getProfileVisitorState,
@@ -27,6 +28,7 @@ import {
 } from '@/lib/discography/artist-queries';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { getEntityIdentityLinks } from '@/lib/entity/queries';
+import { env } from '@/lib/env-server';
 import { DEFAULT_PROFILE_PAC_ASSIGNMENT } from '@/lib/flags/profile-pac';
 // ISR-safe: profile-variant.ts does NOT import cookies() — no dynamic opt-in
 import {
@@ -237,6 +239,7 @@ async function ArtistPageContent({
     status,
     creatorIsPro,
     creatorClerkId,
+    creatorMetaPixelId,
     latestRelease: fetchedLatestRelease,
     pressPhotos,
   } = profileResult;
@@ -440,6 +443,17 @@ async function ArtistPageContent({
       )}
       {/* Server-side pixel tracking */}
       {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
+      {/* Browser Meta pixel (fbq) — builds the retargeting website custom
+          audience; CAPI alone cannot (JOV-5078). Creator pixel is
+          entitlement-gated in the loader; the Jovie platform pixel is the
+          customer-one retarget path. */}
+      {isPublicNoAuthSmoke ? null : (
+        <MetaPixel
+          pixelIds={[creatorMetaPixelId, env.JOVIE_FACEBOOK_PIXEL_ID].filter(
+            (id): id is string => Boolean(id)
+          )}
+        />
+      )}
       <StaticArtistPage
         mode={initialMode}
         artist={artist}

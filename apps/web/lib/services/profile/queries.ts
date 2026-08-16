@@ -168,6 +168,7 @@ export async function getProfileWithUser(
       userIsPro: users.isPro,
       userClerkId: users.clerkId,
       userEmail: users.email,
+      userPlan: users.plan,
     })
     .from(creatorProfiles)
     .leftJoin(users, eq(users.id, creatorProfiles.userId))
@@ -487,6 +488,7 @@ function buildProfileFallbackDefaults(
     userIsPro: false,
     userClerkId: null,
     userEmail: null,
+    userPlan: null,
   };
 }
 
@@ -499,6 +501,7 @@ async function selectProfileWithUser(
       userIsPro: users.isPro,
       userClerkId: users.clerkId,
       userEmail: users.email,
+      userPlan: users.plan,
     })
     .from(creatorProfiles)
     .leftJoin(users, eq(users.id, creatorProfiles.userId))
