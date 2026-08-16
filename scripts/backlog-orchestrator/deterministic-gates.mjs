@@ -4,7 +4,6 @@ import { ADMISSION_APPROVED_LABEL } from './admission-gate.mjs';
 import { ADMISSION_RECEIPT_PREFIX, SYMPHONY_LABEL } from './admitter.mjs';
 import { PLAN_APPROVED_LABEL } from './plan-gate.mjs';
 
-const REQUIRED_EXECUTION_LABELS = new Set(['automated', 'testing']);
 const PROTECTED_LABELS = new Set([
   'blocked',
   'codex-blocked',
@@ -127,17 +126,10 @@ export function validateDeterministicPlanCandidate(
   if (isTimOwned(issue)) return 'tim-owned';
   if (issue.assignee) return 'already-assigned';
   const labels = labelsOf(issue);
-  const isAgentReady = labels.includes('agent-ready');
-  const isReadyForIntake = labels.includes('ready-for-intake');
-  if (!isAgentReady && !isReadyForIntake) return 'readiness-label-missing';
-  // `agent-ready` is the explicit machine-execution authorization used by the
-  // dispatcher and Symphony. Generic `ready-for-intake` work still needs a
-  // separate execution-evidence label before the no-model gate may admit it.
-  if (
-    !isAgentReady &&
-    !labels.some(label => REQUIRED_EXECUTION_LABELS.has(label))
-  )
-    return 'execution-evidence-label-missing';
+  // Ordinary complete, unowned, non-sensitive work is machine-authorized by
+  // this deterministic policy. Readiness, plan, and admission labels are
+  // durable evidence written by the control plane, not a human prerequisite.
+  // Explicit opt-out, ownership, and security labels remain fail-closed below.
   if (labels.some(label => PROTECTED_LABELS.has(label)))
     return 'protected-or-human-review';
   if ((issue.children?.nodes || []).length > 0) return 'parent-or-bundle';

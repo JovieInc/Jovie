@@ -19,6 +19,8 @@ export const LINEAR_REQUEST_TIMEOUT_MS = 10_000;
 export const LINEAR_MAX_ATTEMPTS = 3;
 export const LINEAR_RETRY_BASE_MS = 100;
 export const LINEAR_MAX_ERROR_BODY_LENGTH = 256;
+export const LINEAR_PAGE_SIZE = 50;
+export const LINEAR_MAX_PAGES = 1000;
 
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const JSON_CONTENT_TYPE = /(^|;)\s*application\/json\s*(;|$)/i;
@@ -53,6 +55,171 @@ export class LinearTransportError extends Error {
     this.attempts = attempts;
     this.metadata = metadata;
     if (body !== undefined) this.body = redactBody(body);
+  }
+}
+
+export class LinearPaginationError extends Error {
+  /** @param {string} message @param {any} [options] */
+  constructor(message, { code, coverage, cause } = {}) {
+    super(message, { cause });
+    this.name = 'LinearPaginationError';
+    this.code = code;
+    this.coverage = coverage;
+  }
+}
+
+function paginationCoverage({
+  complete,
+  pages,
+  scanned,
+  hasNextPage,
+  endCursor,
+  reason = null,
+}) {
+  return {
+    complete,
+    pages,
+    scanned,
+    hasNextPage,
+    endCursor,
+    reason,
+  };
+}
+
+/**
+ * Collect one complete Linear connection without silently truncating it.
+ * The caller supplies the page query so this invariant remains source-blind
+ * and unit-testable. A partial connection is an error, never an empty result.
+ */
+export async function collectLinearConnectionPages(
+  fetchPage,
+  { maxPages = LINEAR_MAX_PAGES } = {}
+) {
+  if (!Number.isInteger(maxPages) || maxPages < 1)
+    throw new TypeError('maxPages must be a positive integer');
+
+  const issues = [];
+  const seenIds = new Set();
+  const seenCursors = new Set();
+  let cursor = null;
+  let pages = 0;
+
+  while (true) {
+    if (pages >= maxPages) {
+      const coverage = paginationCoverage({
+        complete: false,
+        pages,
+        scanned: issues.length,
+        hasNextPage: true,
+        endCursor: cursor,
+        reason: 'page-limit-reached',
+      });
+      throw new LinearPaginationError(
+        `Linear pagination remained open after ${pages} pages`,
+        { code: 'PAGE_LIMIT', coverage }
+      );
+    }
+
+    let edge;
+    try {
+      edge = await fetchPage(cursor);
+    } catch (cause) {
+      const coverage = paginationCoverage({
+        complete: false,
+        pages,
+        scanned: issues.length,
+        hasNextPage: true,
+        endCursor: cursor,
+        reason: 'page-fetch-failed',
+      });
+      throw new LinearPaginationError('Linear pagination page fetch failed', {
+        code: 'PAGE_FETCH_FAILED',
+        coverage,
+        cause,
+      });
+    }
+
+    const pageInfo = edge?.pageInfo;
+    if (
+      !Array.isArray(edge?.nodes) ||
+      !pageInfo ||
+      typeof pageInfo.hasNextPage !== 'boolean'
+    ) {
+      const coverage = paginationCoverage({
+        complete: false,
+        pages,
+        scanned: issues.length,
+        hasNextPage: true,
+        endCursor: cursor,
+        reason: 'malformed-page',
+      });
+      throw new LinearPaginationError('Linear pagination page was malformed', {
+        code: 'MALFORMED_PAGE',
+        coverage,
+      });
+    }
+
+    pages += 1;
+    for (const issue of edge.nodes) {
+      const id = issue?.id;
+      if (typeof id !== 'string' || id.length === 0 || seenIds.has(id)) {
+        const coverage = paginationCoverage({
+          complete: false,
+          pages,
+          scanned: issues.length,
+          hasNextPage: pageInfo.hasNextPage,
+          endCursor: pageInfo.endCursor ?? null,
+          reason: id ? 'duplicate-issue' : 'issue-id-missing',
+        });
+        throw new LinearPaginationError(
+          id
+            ? `Linear pagination repeated issue ${id}`
+            : 'Linear pagination issue was missing an id',
+          {
+            code: id ? 'DUPLICATE_ISSUE' : 'ISSUE_ID_MISSING',
+            coverage,
+          }
+        );
+      }
+      seenIds.add(id);
+      issues.push(issue);
+    }
+
+    if (!pageInfo.hasNextPage) {
+      return {
+        issues,
+        coverage: paginationCoverage({
+          complete: true,
+          pages,
+          scanned: issues.length,
+          hasNextPage: false,
+          endCursor: pageInfo.endCursor ?? cursor,
+        }),
+      };
+    }
+
+    const nextCursor = pageInfo.endCursor;
+    if (
+      typeof nextCursor !== 'string' ||
+      nextCursor.length === 0 ||
+      nextCursor === cursor ||
+      seenCursors.has(nextCursor)
+    ) {
+      const coverage = paginationCoverage({
+        complete: false,
+        pages,
+        scanned: issues.length,
+        hasNextPage: true,
+        endCursor: nextCursor ?? null,
+        reason: 'cursor-did-not-advance',
+      });
+      throw new LinearPaginationError(
+        'Linear pagination cursor did not advance',
+        { code: 'CURSOR_STALLED', coverage }
+      );
+    }
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
   }
 }
 
@@ -291,14 +458,17 @@ export async function fetchTeamTriageIssues(
 }
 
 /**
- * Fetch issues in specific states (Triage, Backlog, Todo, In Progress, In Review).
+ * Fetch an exhaustive active-issue snapshot plus a machine-readable coverage
+ * receipt. Callers must not treat a pagination error as an empty team.
  */
-export async function fetchTeamActiveIssues(teamId, maxResults = 1000) {
-  const issues = [];
-  let cursor = null;
-  while (issues.length < maxResults) {
-    const data = await graphql(
-      `
+export async function fetchTeamActiveIssueSnapshot(
+  teamId,
+  { graphqlImpl = graphql, maxPages = LINEAR_MAX_PAGES } = {}
+) {
+  return collectLinearConnectionPages(
+    async cursor => {
+      const data = await graphqlImpl(
+        `
       query($teamId: String!, $cursor: String) {
         team(id: $teamId) {
           issues(
@@ -320,27 +490,43 @@ export async function fetchTeamActiveIssues(teamId, maxResults = 1000) {
               estimate
               assignee { id name }
               creator { id name }
-              labels { nodes { id name } }
+              labels(first: 50) {
+                nodes { id name }
+                pageInfo { hasNextPage endCursor }
+              }
               project { id name slugId }
               parent { id identifier title }
-              children { nodes { id identifier title } }
-              relations { nodes { type relatedIssue { id identifier title } } }
+              children(first: 50) {
+                nodes { id identifier title }
+                pageInfo { hasNextPage endCursor }
+              }
+              relations(first: 50) {
+                nodes { type relatedIssue { id identifier title } }
+                pageInfo { hasNextPage endCursor }
+              }
               state { id name type }
-              comments { nodes { id body createdAt } }
+              comments(first: 50) {
+                nodes { id body createdAt }
+                pageInfo { hasNextPage endCursor }
+              }
             }
             pageInfo { hasNextPage endCursor }
           }
         }
       }
     `,
-      { teamId, cursor }
-    );
-    const edge = data.team.issues;
-    issues.push(...edge.nodes);
-    if (!edge.pageInfo.hasNextPage) break;
-    cursor = edge.pageInfo.endCursor;
-  }
-  return issues;
+        { teamId, cursor }
+      );
+      return data?.team?.issues;
+    },
+    { maxPages }
+  );
+}
+
+/** Fetch only the issues while retaining exhaustive snapshot semantics. */
+export async function fetchTeamActiveIssues(teamId, options = {}) {
+  const snapshot = await fetchTeamActiveIssueSnapshot(teamId, options);
+  return snapshot.issues;
 }
 
 /**
