@@ -1,4 +1,22 @@
-self-hosted-runner-labels:
-  - jovie-fixed
-  - jovie-runner
-  - gem
+# The structural CI action discovers this repository-local file directly.
+# Keep every non-hosted runner label explicit so runner placement remains linted
+# without treating the repository's declared infrastructure as a syntax error.
+self-hosted-runner:
+  labels:
+    - gem
+    - hermes
+    - jovie-eph-isolation
+    - jovie-ephemeral
+    - jovie-fixed
+    - jovie-runner
+    - jovie-runner-image-canary
+    - ubicloud-standard-2
+    - ubicloud-standard-8
+
+# GitHub supports this repository's bounded production queue setting, while
+# the pinned actionlint version does not yet recognize it. Keep the exception
+# exact and path-scoped; every other workflow syntax check remains enforced.
+paths:
+  .github/workflows/production-controller.yml:
+    ignore:
+      - 'unexpected key "queue" for "concurrency" section.*'
