@@ -7,12 +7,14 @@ const {
   mockReadPendingClaimContext,
   mockClearPendingClaimContext,
   mockWritePendingClaimContext,
+  mockIsClaimTokenValid,
 } = vi.hoisted(() => ({
   mockGetOptionalAuth: vi.fn(),
   mockGetProfileByUsername: vi.fn(),
   mockReadPendingClaimContext: vi.fn(),
   mockClearPendingClaimContext: vi.fn(),
   mockWritePendingClaimContext: vi.fn(),
+  mockIsClaimTokenValid: vi.fn(),
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -54,7 +56,7 @@ vi.mock('@/lib/security/claim-token', () => ({
 
 vi.mock('@/lib/services/profile', () => ({
   getProfileByUsername: mockGetProfileByUsername,
-  isClaimTokenValid: vi.fn(),
+  isClaimTokenValid: mockIsClaimTokenValid,
 }));
 
 import { GET } from '../../../../../app/[username]/claim/route';
@@ -66,9 +68,9 @@ describe('Claim route', () => {
     mockReadPendingClaimContext.mockResolvedValue(null);
     mockGetProfileByUsername.mockResolvedValue({
       id: 'profile_1',
-      username: 'testartist',
-      usernameNormalized: 'testartist',
-      displayName: 'Test Artist',
+      username: 'claimableartist',
+      usernameNormalized: 'claimableartist',
+      displayName: 'Claimable Artist',
       spotifyId: 'spotify_123',
       spotifyUrl: 'https://open.spotify.com/artist/spotify_123',
       isClaimed: false,
@@ -78,17 +80,84 @@ describe('Claim route', () => {
 
   it('canonicalizes legacy claim routes back to the public profile preview', async () => {
     const response = await GET(
-      new NextRequest('http://localhost/TestArtist/claim'),
+      new NextRequest('http://localhost/ClaimableArtist/claim'),
       {
-        params: Promise.resolve({ username: 'TestArtist' }),
+        params: Promise.resolve({ username: 'ClaimableArtist' }),
       }
     );
 
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe(
-      'http://localhost/testartist?claim=1'
+      'http://localhost/claimableartist?claim=1'
     );
-    expect(mockGetProfileByUsername).toHaveBeenCalledWith('testartist');
+    expect(mockGetProfileByUsername).toHaveBeenCalledWith('claimableartist');
+  });
+
+  it('refuses protected synthetic identities before profile lookup', async () => {
+    const response = await GET(
+      new NextRequest('http://localhost/dualipa/claim?next=auth'),
+      { params: Promise.resolve({ username: 'dualipa' }) }
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/');
+    expect(mockGetProfileByUsername).not.toHaveBeenCalled();
+    expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
+  });
+
+  it('refuses general onboarding assignment of the token-only claim fixture', async () => {
+    mockGetProfileByUsername.mockResolvedValueOnce({
+      id: 'fixture-profile',
+      username: 'e2eclaimartist',
+      usernameNormalized: 'e2eclaimartist',
+      displayName: 'E2E Claim Artist',
+      spotifyId: 'fixture_spotify',
+      spotifyUrl: 'https://open.spotify.com/artist/fixture_spotify',
+      isClaimed: false,
+      settings: {},
+    });
+
+    const response = await GET(
+      new NextRequest('http://localhost/e2eclaimartist/claim?next=auth'),
+      { params: Promise.resolve({ username: 'e2eclaimartist' }) }
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/');
+    expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
+  });
+
+  it('allows the token-only fixture to continue with signed token context', async () => {
+    mockGetProfileByUsername.mockResolvedValueOnce({
+      id: 'fixture-profile',
+      username: 'e2eclaimartist',
+      usernameNormalized: 'e2eclaimartist',
+      displayName: 'E2E Claim Artist',
+      spotifyId: 'fixture_spotify',
+      spotifyUrl: 'https://open.spotify.com/artist/fixture_spotify',
+      isClaimed: false,
+      settings: {},
+    });
+    mockReadPendingClaimContext.mockResolvedValueOnce({
+      mode: 'token_backed',
+      creatorProfileId: 'fixture-profile',
+      username: 'e2eclaimartist',
+      claimTokenHash: 'verified-hash',
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+    });
+
+    const response = await GET(
+      new NextRequest('http://localhost/e2eclaimartist/claim?next=auth'),
+      { params: Promise.resolve({ username: 'e2eclaimartist' }) }
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toContain(
+      'http://localhost/signup?'
+    );
+    expect(response.headers.get('location')).toContain('handle=e2eclaimartist');
+    expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
   });
 
   it('redirects to / for invalid username (length or pattern)', async () => {

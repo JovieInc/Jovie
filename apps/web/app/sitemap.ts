@@ -18,6 +18,7 @@ import {
 import { joviePlaylists } from '@/lib/db/schema/playlists';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
+import { isPublicProfileIndexable } from '@/lib/profile/public-profile-indexing-policy';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
 
@@ -134,11 +135,16 @@ const getSitemapCatalog = unstable_cache(
       return {
         profiles: profiles.filter(
           profile =>
-            profile.isClaimed === true ||
-            !isUnclaimedStructuredCreditProfile(profile.settings)
+            isPublicProfileIndexable(profile.username) &&
+            (profile.isClaimed === true ||
+              !isUnclaimedStructuredCreditProfile(profile.settings))
         ),
-        releases,
-        tracks,
+        releases: releases.filter(release =>
+          isPublicProfileIndexable(release.username)
+        ),
+        tracks: tracks.filter(track =>
+          isPublicProfileIndexable(track.username)
+        ),
         playlists,
       };
     } catch (error) {
@@ -146,7 +152,7 @@ const getSitemapCatalog = unstable_cache(
       return { profiles: [], releases: [], tracks: [], playlists: [] };
     }
   },
-  ['sitemap-catalog-v2'],
+  ['sitemap-catalog-v3'],
   { revalidate: 3600, tags: [CACHE_TAGS.SITEMAP_CATALOG] }
 );
 

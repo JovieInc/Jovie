@@ -5,13 +5,13 @@ describe('buildReleaseDaySmsBody', () => {
   it('formats a standard release into a single-segment-friendly body', () => {
     const body = buildReleaseDaySmsBody({
       artistName: 'Tim White',
-      releaseTitle: 'Blessings',
+      releaseTitle: 'Never Say a Word',
       username: 'tim',
-      slug: 'blessings',
+      slug: 'never-say-a-word',
     });
 
     expect(body).toBe(
-      'New from Tim White: "Blessings" - https://jov.ie/tim/blessings'
+      'New from Tim White: "Never Say a Word" - https://jov.ie/tim/never-say-a-word'
     );
   });
 

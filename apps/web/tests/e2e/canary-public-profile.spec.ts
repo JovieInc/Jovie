@@ -13,7 +13,7 @@
  *  JOV-2050 / JOV-2018 (profile 404 / ISR)        → "profile renders 200 + h1"
  *
  * Anonymous visitor — no auth required. The dev server must be running and
- * the `/tim` profile must be seeded in the DB for profile checks to pass.
+ * the dedicated canary profile must be seeded in the DB for checks to pass.
  *
  * @canary @nightly @public-profile
  */
@@ -118,9 +118,11 @@ async function goAndWait(
 
 test.describe('Public-profile canary', () => {
   // --------------------------------------------------------------------------
-  // 1. /tim renders 200 with h1 and no console errors
+  // 1. Dedicated canary profile renders 200 with h1 and no console errors
   // --------------------------------------------------------------------------
-  test('profile /tim renders 200 with artist name in h1', async ({ page }) => {
+  test('canary profile renders 200 with artist name in h1', async ({
+    page,
+  }) => {
     test.setTimeout(90_000);
     await allowAnalyticsPassthrough(page);
 
@@ -130,7 +132,7 @@ test.describe('Public-profile canary', () => {
 
     if (!ok) {
       if (status === 404) {
-        test.skip(true, '/tim profile not seeded in this environment');
+        test.skip(true, 'Canary profile not seeded in this environment');
         return;
       }
       expectPageSuccessStatus(
@@ -163,9 +165,9 @@ test.describe('Public-profile canary', () => {
   });
 
   // --------------------------------------------------------------------------
-  // 2. /tim/alerts renders 200 with notification subscription form
+  // 2. Canary alerts route renders a notification subscription form
   // --------------------------------------------------------------------------
-  test('alerts /tim/alerts renders 200 with subscription form', async ({
+  test('canary alerts route renders 200 with subscription form', async ({
     page,
   }) => {
     test.setTimeout(60_000);
@@ -175,10 +177,13 @@ test.describe('Public-profile canary', () => {
 
     if (!ok) {
       if (status === 404) {
-        test.skip(true, '/tim/alerts not available in this environment');
+        test.skip(
+          true,
+          'Canary alerts route not available in this environment'
+        );
         return;
       }
-      expectPageSuccessStatus(status, '/tim/alerts returned error');
+      expectPageSuccessStatus(status, 'Canary alerts route returned error');
     }
 
     // The page must have a way for fans to subscribe (email input or CTA button)
@@ -202,36 +207,35 @@ test.describe('Public-profile canary', () => {
   });
 
   // --------------------------------------------------------------------------
-  // 3. /tim/pay renders 200 (follows 307 redirect → ?mode=pay)
+  // 3. /authqaprod/listen renders 200 without requiring payment setup
   // --------------------------------------------------------------------------
-  test('pay /tim/pay renders 200 (follows 307 redirect)', async ({ page }) => {
+  test('listen /authqaprod/listen renders 200', async ({ page }) => {
     test.setTimeout(60_000);
     await allowAnalyticsPassthrough(page);
 
-    // /pay issues a 307 to /{handle}?mode=pay — Playwright follows it
-    const response = await smokeNavigate(page, CANARY_SPEC_ROUTES.pay, {
+    const response = await smokeNavigate(page, CANARY_SPEC_ROUTES.listen, {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
     const status = response?.status() ?? 0;
 
     if (status === 404) {
-      test.skip(true, '/tim/pay not available in this environment');
+      test.skip(true, '/authqaprod/listen not available in this environment');
       return;
     }
 
     // After following the redirect, the final page should be 200
     expectPageSuccessStatus(
       status,
-      '/tim/pay (or final redirect destination) returned error'
+      '/authqaprod/listen (or final redirect destination) returned error'
     );
 
     await waitForHydration(page);
 
-    // After the 307, the URL should contain the profile handle
+    // Any canonical redirect must keep the dedicated canary handle.
     const finalUrl = page.url();
     expect(
       finalUrl,
-      'Redirect destination should still be the /tim profile'
+      'Redirect destination should still be the /authqaprod profile'
     ).toContain(CANARY_CREATOR.handle);
   });
 
@@ -251,13 +255,13 @@ test.describe('Public-profile canary', () => {
       return;
     }
 
-    // We need a real profile ID for this test. Navigate to /tim first so we
+    // We need a real profile ID for this test. Navigate to the canary first so we
     // can extract it from the page's embedded JSON.
     const { status, ok } = await goAndWait(page, CANARY_SPEC_ROUTES.profile);
 
     if (!ok) {
       if (status === 404) {
-        test.skip(true, '/tim not seeded — skipping audience-visit check');
+        test.skip(true, 'Canary not seeded — skipping audience-visit check');
         return;
       }
     }
@@ -332,10 +336,10 @@ test.describe('Public-profile canary', () => {
 
     if (!ok) {
       if (status === 404) {
-        test.skip(true, '/tim/alerts not seeded');
+        test.skip(true, 'Canary alerts route not seeded');
         return;
       }
-      expectPageSuccessStatus(status, '/tim/alerts returned error');
+      expectPageSuccessStatus(status, 'Canary alerts route returned error');
     }
 
     // Locate email input
@@ -410,13 +414,11 @@ test.describe('Public-profile canary', () => {
   });
 
   // --------------------------------------------------------------------------
-  // 6. Claim view: /tim?noredirect=1 renders the public profile (not a redirect)
+  // 6. Claim view renders the canary public profile (not a dashboard redirect)
   //    Catches regressions where the profile owner is redirected away before
   //    audience tracking can run.
   // --------------------------------------------------------------------------
-  test('claim view /tim?noredirect=1 renders public profile', async ({
-    page,
-  }) => {
+  test('canary claim view renders public profile', async ({ page }) => {
     test.setTimeout(60_000);
     await allowAnalyticsPassthrough(page);
 
@@ -427,10 +429,10 @@ test.describe('Public-profile canary', () => {
 
     if (!ok) {
       if (status === 404) {
-        test.skip(true, '/tim not seeded');
+        test.skip(true, 'Canary profile not seeded');
         return;
       }
-      expectPageSuccessStatus(status, '/tim?noredirect=1 returned error');
+      expectPageSuccessStatus(status, 'Canary claim view returned error');
     }
 
     // Should still be on the /tim route (not redirected to /app/dashboard)
@@ -460,7 +462,7 @@ test.describe('Public-profile canary', () => {
   // --------------------------------------------------------------------------
   // 7. No React hydration warnings on the profile page (catches JOV-2202)
   // --------------------------------------------------------------------------
-  test('no React hydration warnings on /tim (regression: JOV-2202)', async ({
+  test('no React hydration warnings on canary profile (regression: JOV-2202)', async ({
     page,
   }) => {
     test.setTimeout(60_000);
@@ -473,12 +475,12 @@ test.describe('Public-profile canary', () => {
     if (!ok) {
       hydrationErrors.cleanup();
       if (status === 404) {
-        test.skip(true, '/tim not seeded');
+        test.skip(true, 'Canary profile not seeded');
         return;
       }
       expectPageSuccessStatus(
         status,
-        `/tim returned ${status} before hydration check`
+        `Canary profile returned ${status} before hydration check`
       );
       return;
     }
@@ -509,10 +511,10 @@ test.describe('Public-profile canary', () => {
 
     if (!ok) {
       if (status === 404) {
-        test.skip(true, '/tim/alerts not seeded');
+        test.skip(true, 'Canary alerts route not seeded');
         return;
       }
-      expectPageSuccessStatus(status, '/tim/alerts returned error');
+      expectPageSuccessStatus(status, 'Canary alerts route returned error');
     }
 
     // At least one of email or SMS input must be present

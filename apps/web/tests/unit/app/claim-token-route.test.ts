@@ -85,13 +85,13 @@ describe('Claim token route', () => {
     mockHashClaimToken.mockResolvedValue('hashed-token');
     mockGetProfileByUsername.mockResolvedValue({
       id: 'profile_1',
-      usernameNormalized: 'testartist',
+      usernameNormalized: 'claimableartist',
       spotifyId: 'spotify_123',
     });
   });
 
   it('redirects invalid tokens to the public profile preview instead of throwing', async () => {
-    mockLookupUsernameByClaimToken.mockResolvedValue('testartist');
+    mockLookupUsernameByClaimToken.mockResolvedValue('claimableartist');
     mockIsClaimTokenValid.mockResolvedValue(false);
 
     const response = await GET(
@@ -103,14 +103,14 @@ describe('Claim token route', () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe(
-      'http://localhost/testartist?claim=1'
+      'http://localhost/claimableartist?claim=1'
     );
     expect(mockClearLeadAttributionCookie).toHaveBeenCalledTimes(1);
     expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
   });
 
   it('stores claim context and redirects valid tokens to the public profile preview', async () => {
-    mockLookupUsernameByClaimToken.mockResolvedValue('testartist');
+    mockLookupUsernameByClaimToken.mockResolvedValue('claimableartist');
     mockIsClaimTokenValid.mockResolvedValue(true);
     mockLookupLeadByClaimToken.mockResolvedValue({ id: 'lead_1' });
 
@@ -123,7 +123,7 @@ describe('Claim token route', () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe(
-      'http://localhost/testartist?claim=1'
+      'http://localhost/claimableartist?claim=1'
     );
     expect(mockSetLeadAttributionCookieFromToken).toHaveBeenCalledWith(
       'valid-token'
@@ -134,11 +134,43 @@ describe('Claim token route', () => {
     expect(mockWritePendingClaimContext).toHaveBeenCalledWith({
       mode: 'token_backed',
       creatorProfileId: 'profile_1',
-      username: 'testartist',
+      username: 'claimableartist',
       claimTokenHash: 'hashed-token',
       leadId: 'lead_1',
       expectedSpotifyArtistId: 'spotify_123',
     });
+  });
+
+  it('admits the dedicated fixture only after token verification', async () => {
+    mockLookupUsernameByClaimToken.mockResolvedValue('e2eclaimartist');
+    mockIsClaimTokenValid.mockResolvedValue(true);
+    mockGetProfileByUsername.mockResolvedValue({
+      id: 'fixture-profile',
+      usernameNormalized: 'e2eclaimartist',
+      spotifyId: 'fixture_spotify',
+    });
+
+    const response = await GET(
+      new NextRequest('http://localhost/claim/fixture-token'),
+      { params: Promise.resolve({ token: 'fixture-token' }) }
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe(
+      'http://localhost/e2eclaimartist?claim=1'
+    );
+    expect(mockIsClaimTokenValid).toHaveBeenCalledWith(
+      'e2eclaimartist',
+      'fixture-token'
+    );
+    expect(mockWritePendingClaimContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'token_backed',
+        creatorProfileId: 'fixture-profile',
+        username: 'e2eclaimartist',
+        claimTokenHash: 'hashed-token',
+      })
+    );
   });
 
   it('redirects to root with no token provided (early exit, no side effects)', async () => {
@@ -165,6 +197,22 @@ describe('Claim token route', () => {
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe('http://localhost/');
     expect(mockClearLeadAttributionCookie).toHaveBeenCalledTimes(1);
+    expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
+  });
+
+  it('refuses claim tokens for protected synthetic identities without claim side effects', async () => {
+    mockLookupUsernameByClaimToken.mockResolvedValue('testartist');
+
+    const response = await GET(
+      new NextRequest('http://localhost/claim/synthetic-token'),
+      { params: Promise.resolve({ token: 'synthetic-token' }) }
+    );
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/');
+    expect(mockClearLeadAttributionCookie).toHaveBeenCalledOnce();
+    expect(mockIsClaimTokenValid).not.toHaveBeenCalled();
+    expect(mockSetLeadAttributionCookieFromToken).not.toHaveBeenCalled();
     expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
   });
 
@@ -213,7 +261,7 @@ describe('Claim token route', () => {
   });
 
   it('keys the limiter by the client IP', async () => {
-    mockLookupUsernameByClaimToken.mockResolvedValue('testartist');
+    mockLookupUsernameByClaimToken.mockResolvedValue('claimableartist');
     mockIsClaimTokenValid.mockResolvedValue(true);
 
     await GET(new NextRequest('http://localhost/claim/valid-token'), {
@@ -231,7 +279,7 @@ describe('Claim token route', () => {
       remaining: 0,
       reset: 60,
     });
-    mockLookupUsernameByClaimToken.mockResolvedValue('testartist');
+    mockLookupUsernameByClaimToken.mockResolvedValue('claimableartist');
     mockIsClaimTokenValid.mockResolvedValue(true);
 
     const response = await GET(
@@ -243,7 +291,7 @@ describe('Claim token route', () => {
 
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe(
-      'http://localhost/testartist?claim=1'
+      'http://localhost/claimableartist?claim=1'
     );
     expect(mockWritePendingClaimContext).toHaveBeenCalledTimes(1);
   });

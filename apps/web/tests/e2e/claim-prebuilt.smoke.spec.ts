@@ -17,7 +17,7 @@ import {
  * Acceptance (JOV-1880):
  * - Seed artist is prebuilt (public, unclaimed, claimable, has fan/release data)
  * - Claim token link works
- * - CTA routes into the onboarding auth funnel with the reserved handle
+ * - CTA routes into the onboarding auth funnel with the dedicated handle
  *
  * Full claim ownership mutation + first publish remain covered by golden-path
  * / onboarding robot lanes. This smoke is the deploy-gated claim-link canary.

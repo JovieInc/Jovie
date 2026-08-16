@@ -20,6 +20,7 @@ import {
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
 import { getArtistEntitySameAs } from '@/lib/entity/queries';
+import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
 import { generateMusicStructuredData } from '@/lib/seo/structured-data';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
@@ -278,17 +279,7 @@ export async function generateMetadata({
     creator: artistName,
     metadataBase: new URL(BASE_URL),
     alternates: { canonical: canonicalUrl },
-    robots: {
-      index: true,
-      follow: true,
-      googleBot: {
-        index: true,
-        follow: true,
-        'max-video-preview': -1,
-        'max-image-preview': 'large',
-        'max-snippet': -1,
-      },
-    },
+    robots: getPublicProfileRobots(creator.usernameNormalized),
     openGraph: {
       type: 'music.song',
       title,

@@ -88,8 +88,8 @@ describe('GET /api/calendar/profile/[username]', () => {
       {
         id: 'profile-1',
         displayName: 'Test Artist',
-        username: 'testartist',
-        usernameNormalized: 'testartist',
+        username: 'realartist',
+        usernameNormalized: 'realartist',
         isPublic: true,
       },
     ]);
@@ -108,11 +108,11 @@ describe('GET /api/calendar/profile/[username]', () => {
     ]);
 
     const request = new NextRequest(
-      'https://jov.ie/api/calendar/profile/testartist'
+      'https://jov.ie/api/calendar/profile/realartist'
     );
 
     const response = await GET(request, {
-      params: Promise.resolve({ username: 'testartist' }),
+      params: Promise.resolve({ username: 'realartist' }),
     });
 
     expect(response.status).toBe(200);
@@ -132,8 +132,8 @@ describe('GET /api/calendar/profile/[username]', () => {
       {
         id: 'profile-1',
         displayName: 'Test Artist',
-        username: 'testartist',
-        usernameNormalized: 'testartist',
+        username: 'realartist',
+        usernameNormalized: 'realartist',
         isPublic: true,
       },
     ]);
@@ -152,11 +152,11 @@ describe('GET /api/calendar/profile/[username]', () => {
     ]);
 
     const request = new NextRequest(
-      'https://jov.ie/api/calendar/profile/testartist'
+      'https://jov.ie/api/calendar/profile/realartist'
     );
 
     const response = await GET(request, {
-      params: Promise.resolve({ username: 'testartist' }),
+      params: Promise.resolve({ username: 'realartist' }),
     });
 
     expect(response.status).toBe(200);
@@ -166,5 +166,54 @@ describe('GET /api/calendar/profile/[username]', () => {
     expect(body).toContain('DESCRIPTION:Test Artist live at Berlin');
     expect(body).not.toContain('javascript:alert(1)');
     expect(body).not.toContain('URL:javascript:alert(1)');
+  });
+
+  it('returns a discovery-safe 404 for protected identities before database access', async () => {
+    const request = new NextRequest(
+      'https://jov.ie/api/calendar/profile/dualipa'
+    );
+
+    const response = await GET(request, {
+      params: Promise.resolve({ username: 'dualipa' }),
+    });
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get('X-Robots-Tag')).toContain('noindex');
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(mockRateLimit).not.toHaveBeenCalled();
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('skips events with invalid start dates', async () => {
+    mockLimit.mockResolvedValue([
+      {
+        id: 'profile-1',
+        displayName: 'Test Artist',
+        username: 'realartist',
+        usernameNormalized: 'realartist',
+        isPublic: true,
+      },
+    ]);
+    mockGetConfirmedTourEventsForProfile.mockResolvedValue([
+      {
+        id: 'invalid-event',
+        startDate: 'not-a-date',
+        venueName: 'Nowhere',
+        city: null,
+        region: null,
+        country: null,
+        startTime: null,
+        ticketUrl: null,
+        title: null,
+      },
+    ]);
+
+    const response = await GET(
+      new NextRequest('https://jov.ie/api/calendar/profile/realartist'),
+      { params: Promise.resolve({ username: 'realartist' }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).not.toContain('BEGIN:VEVENT');
   });
 });

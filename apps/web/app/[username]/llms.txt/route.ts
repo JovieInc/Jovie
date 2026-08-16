@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { BASE_URL } from '@/constants/app';
 import {
+  isPublicProfileIndexable,
+  PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
+} from '@/lib/profile/public-profile-indexing-policy';
+import {
   isReservedUsername,
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
@@ -29,9 +33,13 @@ export async function GET(_req: Request, { params }: RouteParams) {
     username.length < USERNAME_MIN_LENGTH ||
     username.length > USERNAME_MAX_LENGTH ||
     !USERNAME_PATTERN.test(username) ||
-    isReservedUsername(username)
+    isReservedUsername(username) ||
+    !isPublicProfileIndexable(username)
   ) {
-    return new NextResponse('Not found', { status: 404 });
+    return new NextResponse('Not found', {
+      status: 404,
+      headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
+    });
   }
 
   const result = await getProfileAndLinks(username);
@@ -43,6 +51,12 @@ export async function GET(_req: Request, { params }: RouteParams) {
   const { profile, links, genres, latestRelease } = result;
   const artistName = profile.display_name || profile.username;
   const handle = profile.username_normalized || profile.username.toLowerCase();
+  if (!isPublicProfileIndexable(handle)) {
+    return new NextResponse('Not found', {
+      status: 404,
+      headers: PUBLIC_PROFILE_DISCOVERY_EXCLUSION_HEADERS,
+    });
+  }
   const profileUrl = `${BASE_URL}/${handle}`;
   const isClaimed = profile.is_claimed === true;
 

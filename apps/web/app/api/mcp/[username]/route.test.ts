@@ -132,6 +132,39 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
     expect(body.result).toBeDefined();
   });
 
+  it('excludes protected synthetic identities from GET discovery', async () => {
+    const { GET } = await import('./route');
+    const res = await GET(new Request('https://jov.ie/api/mcp/dualipa'), {
+      params: Promise.resolve({ username: 'dualipa' }),
+    });
+
+    expect(res.status).toBe(404);
+    expect(res.headers.get('X-Robots-Tag')).toContain('noindex');
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    expect(hoisted.getProfileByUsername).not.toHaveBeenCalled();
+  });
+
+  it('excludes protected synthetic identities from POST resources', async () => {
+    const { POST } = await import('./route');
+    const res = await POST(
+      new Request('https://jov.ie/api/mcp/authqaprod', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 17,
+          method: 'resources/list',
+        }),
+      }),
+      { params: Promise.resolve({ username: 'authqaprod' }) }
+    );
+
+    expect(res.status).toBe(404);
+    expect(res.headers.get('X-Robots-Tag')).toContain('noindex');
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    expect(hoisted.getProfileByUsername).not.toHaveBeenCalled();
+  });
+
   it('echoes a string request id in the success response', async () => {
     const { POST } = await import('./route');
     const res = await POST(

@@ -19,6 +19,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - **The Mac app stays open after launch:** A successful first screen no longer switches to Retry seconds later.
 - **Public profile conversion controls stay usable under load (JOV-5135/JOV-5132):** consent, capture dismissal, primary actions, and canonical DSP handoffs now retain isolated abuse budgets, safe Redis-degraded behavior, and required secret-free browser admission coverage.
 - [internal] **Redis quota failures now surface before they break sign-in (JOV-5086):** production exercises a real write/read canary, groups quota exhaustion separately from outages, backs off degraded Redis traffic, filters known bots before metering high-volume anonymous telemetry, and makes every limiter's command-cost algorithm an explicit reviewed choice.
+- **Internal QA profiles stay out of public discovery (JOV-5133):** synthetic and claim-test identities no longer appear in search engines, feeds, public APIs, sitemaps, or ordinary username assignment flows.
 
 ## [26.8.0] - 2026-08-14
 > Brand deals, online visibility, and clearer recovery in one focused release.

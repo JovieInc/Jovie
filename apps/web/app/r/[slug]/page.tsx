@@ -27,6 +27,7 @@ import {
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
+import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { appendUTMParamsToUrl, extractUTMParams } from '@/lib/utm';
@@ -358,9 +359,8 @@ export async function generateMetadata({
         },
       ],
     },
-    robots: {
-      index: true,
-      follow: true,
-    },
+    robots: getPublicProfileRobots(
+      creator.usernameNormalized ?? creator.username
+    ),
   };
 }

@@ -3,6 +3,7 @@ import { BASE_URL } from '@/constants/app';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { getLiveMerchCardsForProfile } from '@/lib/merch/service';
+import { getPublicProfileDiscoveryExclusionResponse } from '@/lib/profile/public-profile-discovery-response';
 import { getProfileByUsername } from '@/lib/services/profile';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 
@@ -13,6 +14,11 @@ export async function GET(
   { params }: { params: Promise<{ username: string }> }
 ) {
   const { username } = await params;
+  const requestExclusion = getPublicProfileDiscoveryExclusionResponse(username);
+  if (requestExclusion) {
+    return requestExclusion;
+  }
+
   const profile = await getProfileByUsername(username);
 
   if (!profile || !profile.isPublic) {
@@ -20,6 +26,12 @@ export async function GET(
       { error: 'Artist not found' },
       { status: 404, headers: NO_STORE_HEADERS }
     );
+  }
+  const profileExclusion = getPublicProfileDiscoveryExclusionResponse(
+    profile.username
+  );
+  if (profileExclusion) {
+    return profileExclusion;
   }
 
   const [releases, merch, events] = await Promise.all([

@@ -403,7 +403,7 @@ describe('Notification Service', () => {
     const smsMessage: NotificationMessage = {
       id: 'sms-1',
       subject: 'unused for sms',
-      text: 'New from Tim: "Blessings" — https://jov.ie/tim/blessings',
+      text: 'New from Tim: "Never Say a Word" — https://jov.ie/tim/never-say-a-word',
       channels: ['sms'],
       category: 'marketing',
     };
