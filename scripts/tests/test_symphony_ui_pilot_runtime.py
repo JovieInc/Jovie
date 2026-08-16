@@ -154,7 +154,7 @@ def test_activation_uses_the_provisioned_gem_host_runner_contract() -> None:
 
 
 def _run_fleet_systemd_preflight(
-    tmp_path: Path, systemctl_returncode: int
+    tmp_path: Path, systemctl_returncode: int, *, preflight_only: bool = True
 ) -> tuple[subprocess.CompletedProcess[str], Path]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -179,14 +179,18 @@ def _run_fleet_systemd_preflight(
     env.pop("DBUS_SESSION_BUS_ADDRESS", None)
     env.update(
         {
-            "FLEET_INSTALL_PREFLIGHT_ONLY": "true",
             "FLEET_PREFLIGHT_LOG": str(log),
             "FLEET_SYSTEMCTL_RETURNCODE": str(systemctl_returncode),
             "GEM_WORKSPACE": str(tmp_path / "gem-workspace"),
+            "HOME": str(tmp_path / "home"),
             "PATH": f"{bin_dir}:{env['PATH']}",
             "SYMPHONY_RUNTIME": str(tmp_path / "symphony-runtime"),
         }
     )
+    if preflight_only:
+        env["FLEET_INSTALL_PREFLIGHT_ONLY"] = "true"
+    else:
+        env.pop("FLEET_INSTALL_PREFLIGHT_ONLY", None)
     result = subprocess.run(
         ["bash", str(FLEET_INSTALLER)],
         cwd=ROOT,
@@ -218,6 +222,31 @@ def test_fleet_installer_fails_visible_before_writes_without_user_systemd(
     result, _ = _run_fleet_systemd_preflight(tmp_path, 1)
     assert result.returncode == 4
     assert "Gem user systemd preflight failed; refusing controller writes" in result.stderr
+    assert not (tmp_path / "gem-workspace/state/backups").exists()
+
+
+def test_fleet_installer_normal_path_preflights_before_backup_writes(
+    tmp_path: Path,
+) -> None:
+    targets = [
+        tmp_path / "gem-workspace/scripts/gem-priority-gate.py",
+        tmp_path / "gem-workspace/scripts/gem_gate_contract.py",
+        tmp_path / "gem-workspace/scripts/gem-pr-drain.py",
+        tmp_path / "symphony-runtime/WORKFLOW.jovie-ui-pilot.md",
+        tmp_path / "home/.config/systemd/user/symphony-ui-pilot.service",
+    ]
+    for index, target in enumerate(targets):
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(f"deployed-sentinel-{index}\n")
+    before = {target: target.read_bytes() for target in targets}
+
+    result, _ = _run_fleet_systemd_preflight(
+        tmp_path, 1, preflight_only=False
+    )
+
+    assert result.returncode == 4, result.stderr
+    assert "Gem user systemd preflight failed; refusing controller writes" in result.stderr
+    assert {target: target.read_bytes() for target in targets} == before
     assert not (tmp_path / "gem-workspace/state/backups").exists()
 
 
