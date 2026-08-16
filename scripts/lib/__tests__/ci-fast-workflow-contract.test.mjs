@@ -158,6 +158,26 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
+  it('enforces meaningful Gem rehabilitation policy coverage in structural CI', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+
+    expect(remaining).toContain(
+      'scripts/hermes/(gem-|gem_|install-gem-pr-rehabilitation)'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'coverage run --branch scripts/hermes/tests/gem-rehabilitation-policy.test.py'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'coverage report --include="*/scripts/hermes/gem_rehabilitation_policy.py" --fail-under=90'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs"
+    );
+  });
+
   it('always materializes ci-fast-lanes.json even when setup fails (JOV-4446)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'ci-fast-lanes-'));
     const outPath = join(dir, 'ci-fast-lanes.json');

@@ -26,6 +26,7 @@
 #   DRAIN_PROMOTION_MODE  normal, isolated-only, draft-only, hold-intake, or blocked
 #   DRAIN_FLEET_GATE_B64  fresh typed fleet receipt; mandatory outside normal
 #   DRAIN_RECOVER_FLEET_HOLDS  exact production-controller recovery event only
+#   FLEET_HOLD_TTL_SECONDS  pending jovie-fleet-queue-hold/v1 deadline (default 720)
 #   MERGE_QUEUE_BACKEND  native (default); test-label-fixture is test-only
 set -euo pipefail
 
@@ -88,6 +89,10 @@ DRAIN_PROMOTION_MODE="${DRAIN_PROMOTION_MODE:-normal}"
 DRAIN_FLEET_GATE_B64="${DRAIN_FLEET_GATE_B64:-}"
 DRAIN_RECOVER_FLEET_HOLDS="${DRAIN_RECOVER_FLEET_HOLDS:-0}"
 FLEET_HOLD_CONTEXT="jovie-fleet-queue-hold/v1"
+# Pending fleet holds are a recovery selector, never an unbounded required
+# check. Waiting lanes (hold-intake / draft-only / main-not-green) must close
+# them on the next controller pass. Isolated-only holds expire at this TTL.
+FLEET_HOLD_TTL_SECONDS="${FLEET_HOLD_TTL_SECONDS:-720}"
 # A successful native enrollment leaves a bot-authored, exact-head receipt.
 # A completed CI merge_group has no source PR head to admit, but it is the
 # authoritative signal that GitHub may just have ejected unmerged cohort
@@ -175,6 +180,11 @@ case "$DRAIN_PROMOTION_MODE" in
     exit 2
     ;;
 esac
+if [[ ! "$FLEET_HOLD_TTL_SECONDS" =~ ^[1-9][0-9]*$ ]] \
+  || (( FLEET_HOLD_TTL_SECONDS > 3600 )); then
+  echo "::error::FLEET_HOLD_TTL_SECONDS must be an integer from 1 through 3600" >&2
+  exit 2
+fi
 if [[ "$DRAIN_RECOVER_FLEET_HOLDS" != "0" && "$DRAIN_RECOVER_FLEET_HOLDS" != "1" ]]; then
   echo "::error::DRAIN_RECOVER_FLEET_HOLDS must be 0 or 1" >&2
   exit 2
@@ -269,19 +279,73 @@ fleet_hold_target_url() {
   printf '%s/%s/actions/runs/%s' "$server_url" "$REPO" "$run_id"
 }
 
+waiting_lane_allows_clean_enroll() {
+  case "$DRAIN_PROMOTION_MODE" in
+    normal | hold-intake | draft-only) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+fleet_hold_expires_at() {
+  node -e '
+    const ttl = Number(process.argv[1]);
+    if (!Number.isFinite(ttl) || ttl <= 0) process.exit(2);
+    process.stdout.write(new Date(Date.now() + ttl * 1000).toISOString().replace(".000Z", "Z"));
+  ' "$FLEET_HOLD_TTL_SECONDS"
+}
+
+fleet_hold_latest() {  # fleet_hold_latest <head> → latest status JSON or empty
+  local head="$1" statuses
+  [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
+  if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)"; then
+    return 1
+  fi
+  jq -c --arg context "$FLEET_HOLD_CONTEXT" --arg repo "$REPO" '
+    [ .statuses[]? | select(.context == $context) ]
+    | sort_by(.updated_at)
+    | last
+    | select(. != null)
+    | select(.creator.type == "Bot")
+    | select(.target_url | test("^https://github\\.com/" + ($repo | gsub("/"; "\\/")) + "/actions/runs/[1-9][0-9]*$"))
+  ' <<<"$statuses" 2>/dev/null
+}
+
+fleet_hold_is_expired() {  # fleet_hold_is_expired <updated_at>
+  local updated_at="$1"
+  node -e '
+    const updated = Date.parse(process.argv[1] || "");
+    const ttl = Number(process.argv[2]);
+    if (!Number.isFinite(updated) || !Number.isFinite(ttl) || ttl <= 0) process.exit(2);
+    process.exit(Date.now() - updated >= ttl * 1000 ? 0 : 1);
+  ' "$updated_at" "$FLEET_HOLD_TTL_SECONDS"
+}
+
+write_fleet_hold_status() {  # write_fleet_hold_status <head> <state> <description>
+  local head="$1" state="$2" description="$3" target_url
+  if ! target_url="$(fleet_hold_target_url)"; then
+    return 1
+  fi
+  gh_retry api -X POST "repos/$REPO/statuses/$head" \
+    -f state="$state" \
+    -f context="$FLEET_HOLD_CONTEXT" \
+    -f description="$description" \
+    -f target_url="$target_url" >/dev/null
+}
+
 record_fleet_hold() {  # record_fleet_hold <num> <expected-head>
-  local n="$1" expected_head="$2" current live_head target_url
+  local n="$1" expected_head="$2" current live_head expires description
   if [[ ! "$expected_head" =~ ^[0-9a-f]{40}$ ]]; then
     echo "    !! cannot record fleet hold for #$n without an exact head" >&2
     return 1
   fi
-  if [[ "$DRY_RUN" == "1" ]]; then
-    echo "    [dry-run] would record $FLEET_HOLD_CONTEXT on #$n at $expected_head"
-    return 0
-  fi
-  if ! target_url="$(fleet_hold_target_url)"; then
-    echo "    !! canonical workflow run identity is missing for fleet hold #$n" >&2
+  if ! expires="$(fleet_hold_expires_at)"; then
+    echo "    !! cannot compute fleet hold deadline for #$n" >&2
     return 1
+  fi
+  description="Held until ${expires} (${DRAIN_PROMOTION_MODE}); next: expire/enroll"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would record $FLEET_HOLD_CONTEXT on #$n at $expected_head until $expires"
+    return 0
   fi
   if ! current="$(gh_retry pr view "$n" -R "$REPO" --json state,headRefOid 2>/dev/null)"; then
     echo "    !! could not refresh #$n before recording fleet hold" >&2
@@ -294,48 +358,40 @@ record_fleet_hold() {  # record_fleet_hold <num> <expected-head>
     echo "    ⏸ #$n head changed before fleet hold; refusing dequeue"
     return 2
   fi
-  if ! gh_retry api -X POST "repos/$REPO/statuses/$live_head" \
-    -f state=pending \
-    -f context="$FLEET_HOLD_CONTEXT" \
-    -f description="Held by canonical fleet controller ($DRAIN_PROMOTION_MODE)" \
-    -f target_url="$target_url" >/dev/null; then
+  if ! write_fleet_hold_status "$live_head" pending "$description"; then
     echo "    !! failed to record exact-head fleet hold for #$n" >&2
     return 1
   fi
-  echo "    +$FLEET_HOLD_CONTEXT on #$n at $live_head"
+  echo "    +$FLEET_HOLD_CONTEXT on #$n at $live_head until $expires"
 }
 
 fleet_hold_is_recoverable() {  # fleet_hold_is_recoverable <head>
-  local head="$1" statuses
-  [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
-  if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)"; then
-    return 1
+  local latest
+  latest="$(fleet_hold_latest "$1" || true)"
+  [[ -n "$latest" ]] || return 1
+  jq -e '.state == "pending"' <<<"$latest" >/dev/null
+}
+
+close_fleet_hold() {  # close_fleet_hold <num> <head> <state> <reason>
+  local n="$1" head="$2" state="$3" reason="$4"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would close $FLEET_HOLD_CONTEXT on #$n -> $state ($reason)"
+    return 0
   fi
-  jq -e --arg context "$FLEET_HOLD_CONTEXT" --arg repo "$REPO" '
-    [ .statuses[]? | select(.context == $context) ]
-    | sort_by(.updated_at)
-    | last
-    | .state == "pending"
-      and (.creator.type == "Bot")
-      and (.target_url | test("^https://github\\.com/" + ($repo | gsub("/"; "\\/")) + "/actions/runs/[1-9][0-9]*$"))
-  ' <<<"$statuses" >/dev/null
+  if write_fleet_hold_status "$head" "$state" "$reason"; then
+    echo "    -$FLEET_HOLD_CONTEXT on #$n -> $state ($reason)"
+    return 0
+  fi
+  echo "    !! failed to close exact-head fleet hold for #$n" >&2
+  return 1
 }
 
 clear_fleet_hold() {  # clear_fleet_hold <num> <head>
-  local n="$1" head="$2" target_url
-  if ! target_url="$(fleet_hold_target_url)"; then
-    echo "    !! could not resolve controller run while clearing fleet hold #$n" >&2
-    return 1
-  fi
-  if gh_retry api -X POST "repos/$REPO/statuses/$head" \
-    -f state=success \
-    -f context="$FLEET_HOLD_CONTEXT" \
-    -f description="Recovered by canonical fleet controller at exact head" \
-    -f target_url="$target_url" >/dev/null; then
-    echo "    -$FLEET_HOLD_CONTEXT on #$n at $head"
+  if close_fleet_hold "$1" "$2" success \
+    "Recovered by canonical fleet controller at exact head"; then
     return 0
   fi
-  echo "    !! #$n enrolled, but exact-head fleet hold receipt did not close" >&2
+  echo "    !! #$1 enrolled, but exact-head fleet hold receipt did not close" >&2
   return 1
 }
 
@@ -605,14 +661,8 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       echo "    ⏸ exact-head isolated UI/docs receipt is absent or invalid for #$n"
       return 2
     fi
-  elif [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" ]]; then
-    local repair_main
-    repair_main="$(jq -r '.productionUnboundRepairAdmission.mainSha // empty' <<<"$FLEET_GATE_JSON")"
-    if ! production_unbound_repair_attestation_matches \
-      "$(jq -r '.body // ""' <<<"$current")" "$n" "$expected_head" "$repair_main"; then
-      echo "    ⏸ exact active-condition repair attestation is absent for #$n"
-      return 2
-    fi
+  elif [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" || "$DRAIN_PROMOTION_MODE" == "draft-only" ]]; then
+    : # Waiting lanes must not strip enroll from CLEAN unrelated PRs.
   elif [[ "$DRAIN_PROMOTION_MODE" == "deferred-release-only" ]]; then
     local release_receipt
     release_receipt="$(deferred_release_receipt_for_pr "$n")"
@@ -692,16 +742,6 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       fi
       return 2
     fi
-    if [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" ]]; then
-      repair_main="$(jq -r '.productionUnboundRepairAdmission.mainSha // empty' <<<"$FLEET_GATE_JSON")"
-      if ! production_unbound_repair_attestation_matches \
-        "$(jq -r '.body // ""' <<<"$current")" "$n" "$expected_head" "$repair_main"; then
-        echo "    ⏸ repair attestation changed during native enrollment for #$n; compensating"
-        dequeue_strict "$n" || return 1
-        return 2
-      fi
-    fi
-
     if [[ "$DRAIN_PROMOTION_MODE" == "deferred-release-only" ]]; then
       release_receipt="$(deferred_release_receipt_for_pr "$n")"
       if ! jq -e --arg head "$expected_head" --argjson pr "$n" '
@@ -1062,16 +1102,12 @@ while IFS= read -r pr; do
 done < <(jq -c '.[]' <<<"$SNAP")
 SNAP="$ENRICHED"
 
-# Non-normal modes freeze existing native queue entries except hold-intake.
-# hold-intake preserves the promotion cohort while isolated implementation
-# intake continues; it does not authorize new promotion or deployment. This
-# prevents Production Controller latency from serializing coding work.
-# isolated-only may keep one freshly proven isolated entry; draft-only and
-# blocked preserve none.
+# isolated-only (production-red) may keep one freshly proven isolated entry
+# and dequeues ordinary members. Waiting lanes — hold-intake, draft-only /
+# main-not-green, and blocked-unknown — must not dequeue CLEAN unrelated PRs
+# or stamp an unbounded pending hold on them. JOV-5169.
 DRAIN_FREEZE_EXISTING_QUEUE=0
-if [[ "$DRAIN_PROMOTION_MODE" != "normal" \
-  && "$DRAIN_PROMOTION_MODE" != "hold-intake" \
-  && "$DRAIN_PROMOTION_MODE" != "deferred-release-only" ]]; then
+if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
   DRAIN_FREEZE_EXISTING_QUEUE=1
 fi
 
@@ -1172,7 +1208,7 @@ fi
 # (m == CONFLICTING, never UNKNOWN), or actually-failing checks (.fail).
 echo "=== DEQUEUE (conflict / failing → queue removal) ==="
 echo "$SNAP" | jq -c --arg promotion_mode "$DRAIN_PROMOTION_MODE" --arg freeze "$DRAIN_FREEZE_EXISTING_QUEUE" '.[]
-  | select($promotion_mode == "normal" or $promotion_mode == "hold-intake" or ($promotion_mode == "blocked" and $freeze == "0"))
+  | select($promotion_mode == "normal" or $promotion_mode == "hold-intake" or $promotion_mode == "draft-only" or ($promotion_mode == "blocked" and $freeze == "0"))
   | select(.q == true)
   | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred")) | not)
   | select(
@@ -1214,7 +1250,7 @@ echo "$SNAP" | jq -c --arg promotion_mode "$DRAIN_PROMOTION_MODE" --arg freeze "
 # anything re-added the unchanged head, and the ENROLL guard below refuses to
 # re-admit it. Action 'unknown' (missing evidence) never dequeues. Fleet
 # promotion modes are excluded: those passes above already hold the queue.
-if [[ "$DRAIN_PROMOTION_MODE" == "normal" || ( "$DRAIN_PROMOTION_MODE" == "blocked" && "$DRAIN_FREEZE_EXISTING_QUEUE" == "0" ) ]]; then
+if waiting_lane_allows_clean_enroll || [[ "$DRAIN_PROMOTION_MODE" == "blocked" && "$DRAIN_FREEZE_EXISTING_QUEUE" == "0" ]]; then
   echo "=== DEQUEUE (non-progressing front → queue removal) ==="
   while read -r pr; do
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
@@ -1247,21 +1283,13 @@ echo "=== ENROLL (mergeable + not failing → queue admission) ==="
 # than a pipe so ENROLLED_THIS_RUN remains in the parent shell and the cap is
 # actually enforced.
 MAX_QUEUE_DEPTH=$(node scripts/ci-merge-queue-check.mjs max-queue-depth 2>/dev/null || echo 16)
-if [[ "$DRAIN_PROMOTION_MODE" == "normal" ]]; then
+if waiting_lane_allows_clean_enroll; then
   QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select(.q == true)] | length')
   ENROLL_SLOTS=$((MAX_QUEUE_DEPTH - QUEUED_NOW))
 elif [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
   MAX_QUEUE_DEPTH=1
   QUEUED_NOW=$([[ -n "${ISOLATED_KEEP_PR:-}" ]] && echo 1 || echo 0)
   ENROLL_SLOTS=$((MAX_QUEUE_DEPTH - QUEUED_NOW))
-elif [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" ]]; then
-  QUEUED_NOW=$(echo "$SNAP" | jq '[.[] | select(.q == true)] | length')
-  REPAIR_QUEUED=$(echo "$SNAP" | jq '[.[] | select(.q == true and .unboundRepair == true)] | length')
-  if [[ "$REPAIR_QUEUED" -eq 0 && "$QUEUED_NOW" -lt "$MAX_QUEUE_DEPTH" ]]; then
-    ENROLL_SLOTS=1
-  else
-    ENROLL_SLOTS=0
-  fi
 elif [[ "$DRAIN_FREEZE_EXISTING_QUEUE" == "1" ]]; then
   MAX_QUEUE_DEPTH=0
   QUEUED_NOW=0
@@ -1278,35 +1306,54 @@ else
   echo "  admission scope: #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD"
 fi
 
-# A clean PR whose CI completed while the exact-main production binding was
-# unavailable cannot enter the queue unless it is the single attested repair.
-# Preserve that *event-scoped exact head* as a pending fleet receipt before
-# declining admission. A later successful Production Controller event may use
-# only this receipt as a selector; it still re-runs every current eligibility,
-# source-gate, native-queue, and postcondition check before enrollment. Without
-# the receipt, the CI event is lost once production recovers and an operator
-# has to redispatch the exact PR manually.
-if [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" && -n "$DRAIN_ADMISSION_PR" ]]; then
-  while read -r pr; do
-    n="$(jq -r '.n' <<<"$pr")"
-    head_oid="$(jq -r '.headOid // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
-    echo "=== DEFER (production-unbound exact-head recovery receipt) ==="
-    echo "  #$n  $(jq -r '.t' <<<"$pr")  ⏸ hold-intake"
-    if ! record_fleet_hold "$n" "$head_oid"; then
-      echo "::error::Failed to record exact-head recovery receipt for deferred PR #$n" >&2
-      exit 1
-    fi
-  done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg admission_head "$DRAIN_ADMISSION_HEAD" '.[]
-    | select((.n | tostring) == $admission_pr)
-    | select((.headOid // "") | ascii_downcase == $admission_head)
-    | select(.q | not)
-    | select(.unboundRepair | not)
-    | select(.draft | not)
-    | select(.m == "MERGEABLE")
-    | select(.base == "main")
-    | select(.fail | length == 0)
-    | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast") | not)')
-fi
+# Pending fleet-queue-hold statuses are never allowed to sit forever.
+# Waiting lanes close them immediately so they cannot pin mergeStateStatus.
+# Isolated-only holds expire at FLEET_HOLD_TTL_SECONDS with a terminal reason.
+echo "=== RECONCILE (terminal fleet-queue-hold) ==="
+while read -r pr; do
+  stop_if_budget_exhausted && break
+  n="$(jq -r '.n' <<<"$pr")"
+  t="$(jq -r '.t' <<<"$pr")"
+  head_oid="$(jq -r '.headOid // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
+  [[ "$head_oid" =~ ^[0-9a-f]{40}$ ]] || continue
+  latest="$(fleet_hold_latest "$head_oid" || true)"
+  [[ -n "$latest" ]] || continue
+  jq -e '.state == "pending"' <<<"$latest" >/dev/null || continue
+  updated_at="$(jq -r '.updated_at // empty' <<<"$latest")"
+  close_now=0
+  close_why=""
+  if waiting_lane_allows_clean_enroll || [[ "$DRAIN_PROMOTION_MODE" == "blocked" ]]; then
+    close_now=1
+    close_why="waiting-lane"
+  elif fleet_hold_is_expired "$updated_at"; then
+    close_now=1
+    close_why="expired"
+  fi
+  [[ "$close_now" -eq 1 ]] || continue
+  clean_eligible=0
+  if jq -e '
+    (.draft | not)
+    and (.m == "MERGEABLE")
+    and (.base == "main")
+    and ((.fail // []) | length == 0)
+    and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast")) | not)
+  ' <<<"$pr" >/dev/null; then
+    clean_eligible=1
+  fi
+  if [[ "$clean_eligible" -eq 1 ]]; then
+    close_state=success
+    close_reason="Hold ${close_why} (${DRAIN_PROMOTION_MODE}); CLEAN enroll is not frozen"
+  else
+    close_state=failure
+    close_reason="Hold ${close_why} (${DRAIN_PROMOTION_MODE}); terminal: not CLEAN-eligible"
+  fi
+  echo "  #$n  $t  ✳ $close_why -> $close_state"
+  if ! close_fleet_hold "$n" "$head_oid" "$close_state" "$close_reason"; then
+    echo "::error::Failed to close unbounded fleet hold on #$n" >&2
+    exit 1
+  fi
+done < <(echo "$SNAP" | jq -c '.[] | select((.headOid // "") | test("^[0-9a-f]{40}$"))')
+
 ENROLLED_THIS_RUN=0
 while read -r pr; do
   stop_if_budget_exhausted && break
@@ -1318,7 +1365,7 @@ while read -r pr; do
   ENROLLED_THIS_RUN=$((ENROLLED_THIS_RUN + 1))
   echo "  #$n  $t"
   if enroll_if_still_eligible "$n"; then
-    if [[ "$DRAIN_PROMOTION_MODE" == "normal" && "$DRY_RUN" != "1" ]]; then
+    if waiting_lane_allows_clean_enroll && [[ "$DRY_RUN" != "1" ]]; then
       enrolled_head="$(jq -r '.headOid // ""' <<<"$pr")"
       if fleet_hold_is_recoverable "$enrolled_head"; then
         clear_fleet_hold "$n" "$enrolled_head" || true
@@ -1336,8 +1383,9 @@ while read -r pr; do
 done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg promotion_mode "$DRAIN_PROMOTION_MODE" '.[]
   | select(
       $promotion_mode == "normal"
+      or $promotion_mode == "hold-intake"
+      or $promotion_mode == "draft-only"
       or ($promotion_mode == "isolated-only" and .iso == true)
-      or ($promotion_mode == "hold-intake" and .unboundRepair == true)
     )
   | select((.n | tostring) == $admission_pr)
   | select(.draft|not)

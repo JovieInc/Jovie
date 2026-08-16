@@ -41,6 +41,34 @@ const FLEET_PROMOTION_GATE_LANE = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/run-affected-tests.mjs',
 ];
+const GEM_PR_REHABILITATION_LANE = [
+  '.github/requirements/pytest.in',
+  '.github/requirements/pytest.txt',
+  '.github/workflows/gem-delivery-controller-activation.yml',
+  '.github/workflows/ci.yml',
+  'scripts/hermes/config/gem-repo-registry.json',
+  'scripts/hermes/config/model-registry.json',
+  'scripts/hermes/gem-pr-drain.py',
+  'scripts/hermes/gem-priority-gate.py',
+  'scripts/hermes/gem-repo-drain-cycle.py',
+  'scripts/hermes/gem_gate_contract.py',
+  'scripts/hermes/gem_repo_registry.py',
+  'scripts/hermes/gem_rehabilitation_policy.py',
+  'scripts/hermes/install-gem-pr-rehabilitation.sh',
+  'scripts/hermes/model-router.py',
+  'scripts/hermes/systemd/gem-pr-drain.service',
+  'scripts/hermes/systemd/gem-pr-drain.timer',
+  'scripts/hermes/tests/gem-pr-drain.test.py',
+  'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+  'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+  'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
+  'scripts/hermes/tests/test-model-router.py',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/run-affected-tests.mjs',
+];
 const MERGE_QUEUE_CONTROLLER_INPUTS = [
   '.github/workflows/merge-queue-autoenroll.yml',
   'scripts/ci-merge-queue-check.mjs',
@@ -568,6 +596,29 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan([
         'scripts/hermes/gem-priority-gate.py',
         'scripts/hermes/unknown-fleet-peer.py',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects every Gem PR rehabilitation contract without unrelated product tests', () => {
+    const plan = buildAffectedTestPlan(GEM_PR_REHABILITATION_LANE);
+    expect(plan).toMatchObject({
+      mode: 'selected',
+      selectedTests: [],
+      pythonUnittestTests: [
+        'scripts/hermes/tests/gem-priority-gate.test.py',
+        'scripts/hermes/tests/gem-pr-drain.test.py',
+        'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+      ],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ],
+    });
+    expect(
+      buildAffectedTestPlan([
+        ...GEM_PR_REHABILITATION_LANE,
+        'apps/ios/Jovie/RootView.swift',
       ]).mode
     ).toBe('full');
   });

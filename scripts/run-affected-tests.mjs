@@ -260,6 +260,52 @@ const FLEET_PROMOTION_GATE_LANE = new Set([
 const FLEET_PROMOTION_GATE_PYTHON_TESTS = [
   'scripts/hermes/tests/gem-priority-gate.test.py',
 ];
+const GEM_PR_REHABILITATION_LANE = new Set([
+  '.github/requirements/pytest.in',
+  '.github/requirements/pytest.txt',
+  '.github/workflows/gem-delivery-controller-activation.yml',
+  '.github/workflows/ci.yml',
+  'scripts/hermes/config/gem-repo-registry.json',
+  'scripts/hermes/config/model-registry.json',
+  'scripts/hermes/gem-pr-drain.py',
+  'scripts/hermes/gem-priority-gate.py',
+  'scripts/hermes/gem-repo-drain-cycle.py',
+  'scripts/hermes/gem_gate_contract.py',
+  'scripts/hermes/gem_repo_registry.py',
+  'scripts/hermes/gem_rehabilitation_policy.py',
+  'scripts/hermes/install-gem-pr-rehabilitation.sh',
+  'scripts/hermes/model-router.py',
+  'scripts/hermes/systemd/gem-pr-drain.service',
+  'scripts/hermes/systemd/gem-pr-drain.timer',
+  'scripts/hermes/tests/gem-pr-drain.test.py',
+  'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+  'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+  'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
+  'scripts/hermes/tests/test-model-router.py',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/run-affected-tests.mjs',
+]);
+const GEM_PR_REHABILITATION_PYTHON_TESTS = [
+  'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/gem-pr-drain.test.py',
+  'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+];
+const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
+  'scripts/hermes/config/gem-repo-registry.json',
+  'scripts/hermes/gem-pr-drain.py',
+  'scripts/hermes/gem-repo-drain-cycle.py',
+  'scripts/hermes/gem_repo_registry.py',
+  'scripts/hermes/gem_rehabilitation_policy.py',
+  'scripts/hermes/install-gem-pr-rehabilitation.sh',
+  'scripts/hermes/systemd/gem-pr-drain.service',
+  'scripts/hermes/systemd/gem-pr-drain.timer',
+  'scripts/hermes/tests/gem-pr-drain.test.py',
+  'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+  'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+]);
 const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
   'apps/web/app/exp/shell-v1/page.tsx',
   'apps/web/components/jovie/components/ChatInput.tsx',
@@ -544,6 +590,25 @@ export function buildAffectedTestPlan(
       pythonUnittestTests: SYMPHONY_THROUGHPUT_PYTHON_TESTS,
       scriptVitestTests: SYMPHONY_THROUGHPUT_SCRIPT_TESTS,
       nodeTests: SYMPHONY_THROUGHPUT_NODE_TESTS,
+    };
+  }
+  const isBoundedGemPrRehabilitationChange =
+    files.some(file => GEM_PR_REHABILITATION_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => GEM_PR_REHABILITATION_LANE.has(file));
+  if (isBoundedGemPrRehabilitationChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: GEM_PR_REHABILITATION_PYTHON_TESTS,
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ],
+      nodeTests: [],
     };
   }
   const deliveryLivenessInputCount = files.filter(file =>

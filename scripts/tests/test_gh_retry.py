@@ -427,12 +427,8 @@ JSON
         assert "fresh typed fleet receipt" in result.stderr
         assert not called.exists(), "drain invoked gh before receipt preflight"
 
-    @pytest.mark.parametrize(
-        ("budget_env", "list_delay"),
-        [("", ""), ("DRAIN_MAX_SECONDS=1 DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS=1", "sleep 2")],
-    )
-    def test_blocked_receipt_dry_run_dequeues_ordinary_native_intent(
-        self, tmp_path: Path, budget_env: str, list_delay: str
+    def test_blocked_receipt_dry_run_preserves_clean_queued_pr(
+        self, tmp_path: Path
     ) -> None:
         queued_head = "9" * 40
         receipt = {
@@ -474,7 +470,6 @@ JSON
                 #!/usr/bin/env bash
                 set -euo pipefail
                 if [[ "$1 $2" == "pr list" ]]; then
-                  {list_delay}
                   echo '[{{"n":909,"t":"Ordinary queued PR","draft":false,"m":"MERGEABLE","head":"codex/jov-909","headOid":"{queued_head}","base":"main","L":["merge-queue"],"fail":[]}}]'
                   exit 0
                 fi
@@ -497,16 +492,17 @@ JSON
                 tmp_path,
                 extra_env=(
                     "DRY_RUN=1 DRAIN_PROMOTION_MODE=blocked "
-                    f"DRAIN_FLEET_GATE_B64={encoded} {budget_env}"
+                    f"DRAIN_FLEET_GATE_B64={encoded}"
                 ),
             )
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "fleet promotion constraint" in result.stdout
-        assert "would record jovie-fleet-queue-hold/v1" in result.stdout
-        assert "[dry-run] would -merge-queue on #909" in result.stdout
-        assert "queue depth: 0/0 (0 slots)" in result.stdout
+        assert "fleet promotion constraint" not in result.stdout
+        assert "would record jovie-fleet-queue-hold/v1" not in result.stdout
+        assert "[dry-run] would -merge-queue on #909" not in result.stdout
+        assert "queue depth: 1/" in result.stdout
+        assert "(0 slots)" in result.stdout
         assert "would +merge-queue" not in result.stdout
 
     def test_hold_intake_preserves_queued_ordinary_pr_and_allows_implementation_intake(
@@ -590,19 +586,16 @@ JSON
         assert "would dequeue #901" not in result.stdout
         assert "would +merge-queue" not in result.stdout
         assert "queue depth: 1/" in result.stdout
-        assert "(1 slots)" in result.stdout
+        assert "(15 slots)" in result.stdout
 
     @pytest.mark.parametrize(
-        ("body", "expected_enrollment"),
+        "body",
         [
-            ("Ordinary source-green PR", False),
-            # The retired marker looked scoped but was neither typed nor bound
-            # to the source head/PR. It must never regain admission authority.
+            "Ordinary source-green PR",
             (
                 "<!-- production-unbound-repair:production-deployment-unbound:"
                 + "a" * 40
-                + " -->",
-                False,
+                + " -->"
             ),
             (
                 "<!-- jovie-production-unbound-repair-attestation/v1 -->\n"
@@ -618,12 +611,8 @@ JSON
                         "deploymentsAllowed": False,
                     }
                 )
-                + "\n```",
-                True,
+                + "\n```"
             ),
-            # A typed document is still fail-closed when it is stale for the
-            # current exact source head (the controller re-reads before queue
-            # mutation, so a changed PR body cannot silently inherit it).
             (
                 "<!-- jovie-production-unbound-repair-attestation/v1 -->\n"
                 "```json\n"
@@ -638,13 +627,12 @@ JSON
                         "deploymentsAllowed": False,
                     }
                 )
-                + "\n```",
-                False,
+                + "\n```"
             ),
         ],
     )
-    def test_hold_intake_admits_only_exact_active_condition_repair(
-        self, tmp_path: Path, body: str, expected_enrollment: bool
+    def test_hold_intake_enrolls_clean_unrelated_prs(
+        self, tmp_path: Path, body: str
     ) -> None:
         head = "f" * 40
         receipt = {
@@ -725,14 +713,272 @@ JSON
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert ("[dry-run] would +merge-queue on #904" in result.stdout) is expected_enrollment
-        # Ordinary clean work must not be admitted while production is unbound,
-        # but the controller has to leave an exact-head receipt so the first
-        # post-recovery Production Controller event can re-check and enroll it
-        # without a human workflow_dispatch.
-        assert (
-            "would record jovie-fleet-queue-hold/v1 on #904" in result.stdout
-        ) is (not expected_enrollment)
+        assert "[dry-run] would +merge-queue on #904" in result.stdout
+        assert "would record jovie-fleet-queue-hold/v1 on #904" not in result.stdout
+
+    def test_draft_only_enrolls_clean_unrelated_pr(self, tmp_path: Path) -> None:
+        head = "c" * 40
+        receipt = {
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "promotionMode": "draft-only",
+            "observedAt": datetime.now(timezone.utc).isoformat(),
+            "signals": {
+                "main": {"status": "red", "sha": "a" * 40},
+                "production": {"status": "green", "deployedSha": "b" * 40},
+                "controller": {"status": "green"},
+                "queue": {
+                    "status": "known",
+                    "eligiblePrs": 1,
+                    "greenReadyPrs": 1,
+                    "target": 15,
+                },
+                "integrity": {"status": "clear"},
+            },
+            "promotionAdmission": {"allowed": False},
+            "isolatedPromotionAdmission": {
+                "allowed": False,
+                "deploymentsAllowed": False,
+            },
+            "productionUnboundRepairAdmission": {
+                "allowed": False,
+                "condition": None,
+                "mainSha": None,
+                "deployedSha": None,
+                "maxConcurrent": 1,
+                "deploymentsAllowed": False,
+            },
+            "alreadyAdmittedCohort": {
+                "preserve": False,
+                "newIntakeAllowed": False,
+                "semantics": "draft-only",
+            },
+        }
+        encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":907,"t":"Clean unrelated","draft":false,"m":"MERGEABLE","head":"codex/jov-907","headOid":"{head}","base":"main","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":"ordinary PR"}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_PROMOTION_MODE=draft-only "
+                    "DRAIN_ADMISSION_PR=907 "
+                    f"DRAIN_ADMISSION_HEAD={head} DRAIN_FLEET_GATE_B64={encoded}"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "[dry-run] would +merge-queue on #907" in result.stdout
+        assert "fleet promotion constraint" not in result.stdout
+        assert "would record jovie-fleet-queue-hold/v1" not in result.stdout
+
+    def test_stale_pending_fleet_hold_expires_to_terminal_reason(
+        self, tmp_path: Path
+    ) -> None:
+        head = "d" * 40
+        receipt = {
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "promotionMode": "isolated-only",
+            "observedAt": datetime.now(timezone.utc).isoformat(),
+            "signals": {
+                "main": {"status": "green", "sha": "a" * 40},
+                "production": {"status": "red"},
+                "controller": {"status": "green"},
+                "queue": {
+                    "status": "known",
+                    "eligiblePrs": 1,
+                    "greenReadyPrs": 1,
+                    "target": 15,
+                },
+                "integrity": {"status": "clear"},
+            },
+            "promotionAdmission": {"allowed": False},
+            "isolatedPromotionAdmission": {
+                "allowed": True,
+                "deploymentsAllowed": False,
+            },
+            "productionUnboundRepairAdmission": {
+                "allowed": False,
+                "condition": None,
+                "mainSha": None,
+                "deployedSha": None,
+                "maxConcurrent": 1,
+                "deploymentsAllowed": False,
+            },
+            "alreadyAdmittedCohort": {
+                "preserve": False,
+                "newIntakeAllowed": True,
+                "semantics": "isolated-only",
+            },
+        }
+        encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
+        stale = (datetime.now(timezone.utc) - timedelta(minutes=20)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":908,"t":"Stale held clean PR","draft":false,"m":"MERGEABLE","head":"codex/jov-908","headOid":"{head}","base":"main","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && " $* " == *"/commits/{head}/status "* ]]; then
+                  echo '{{"statuses":[{{"context":"jovie-fleet-queue-hold/v1","state":"pending","creator":{{"type":"Bot"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"{stale}"}}]}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_PROMOTION_MODE=isolated-only "
+                    f"DRAIN_FLEET_GATE_B64={encoded} "
+                    "FLEET_HOLD_TTL_SECONDS=60 GITHUB_RUN_ID=77 "
+                    "GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "terminal fleet-queue-hold" in result.stdout
+        assert "would close jovie-fleet-queue-hold/v1 on #908 -> success" in result.stdout
+        assert "expired" in result.stdout
+
+    def test_hold_intake_closes_fresh_pending_hold_without_waiting_for_ttl(
+        self, tmp_path: Path
+    ) -> None:
+        head = "e" * 40
+        receipt = {
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "promotionMode": "hold-intake",
+            "observedAt": datetime.now(timezone.utc).isoformat(),
+            "signals": {
+                "main": {"status": "green", "sha": "a" * 40},
+                "production": {"status": "green", "deployedSha": "b" * 40},
+                "controller": {"status": "green"},
+                "queue": {
+                    "status": "known",
+                    "eligiblePrs": 1,
+                    "greenReadyPrs": 1,
+                    "target": 15,
+                },
+                "integrity": {"status": "clear"},
+            },
+            "promotionAdmission": {"allowed": False},
+            "isolatedPromotionAdmission": {
+                "allowed": False,
+                "deploymentsAllowed": False,
+            },
+            "productionUnboundRepairAdmission": {
+                "allowed": True,
+                "condition": "production-deployment-unbound",
+                "mainSha": "a" * 40,
+                "deployedSha": "b" * 40,
+                "maxConcurrent": 1,
+                "deploymentsAllowed": False,
+            },
+            "alreadyAdmittedCohort": {
+                "preserve": True,
+                "newIntakeAllowed": True,
+                "semantics": "preserve-cohort-and-continue-isolated-implementation",
+            },
+        }
+        encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
+        fresh = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":910,"t":"Fresh held clean PR","draft":false,"m":"MERGEABLE","head":"codex/jov-910","headOid":"{head}","base":"main","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":"ordinary PR"}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && " $* " == *"/commits/{head}/status "* ]]; then
+                  echo '{{"statuses":[{{"context":"jovie-fleet-queue-hold/v1","state":"pending","creator":{{"type":"Bot"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"{fresh}"}}]}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_PROMOTION_MODE=hold-intake "
+                    "DRAIN_ADMISSION_PR=910 "
+                    f"DRAIN_ADMISSION_HEAD={head} DRAIN_FLEET_GATE_B64={encoded} "
+                    "FLEET_HOLD_TTL_SECONDS=3600 GITHUB_RUN_ID=77 "
+                    "GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "would close jovie-fleet-queue-hold/v1 on #910 -> success" in result.stdout
+        assert "waiting-lane" in result.stdout
+        assert "[dry-run] would +merge-queue on #910" in result.stdout
 
     def test_hold_intake_dequeues_deterministic_failing_member_and_keeps_green_sibling(
         self, tmp_path: Path
