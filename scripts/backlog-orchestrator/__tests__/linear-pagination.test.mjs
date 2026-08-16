@@ -56,10 +56,14 @@ describe('exhaustive Linear pagination', () => {
           pageInfo: { hasNextPage: true, endCursor: 'same' },
         };
       }),
-      error =>
-        error?.code === 'CURSOR_STALLED' &&
-        error?.coverage?.complete === false &&
-        error?.coverage?.reason === 'cursor-did-not-advance'
+      error => {
+        const err = /** @type {any} */ (error);
+        return (
+          err?.code === 'CURSOR_STALLED' &&
+          err?.coverage?.complete === false &&
+          err?.coverage?.reason === 'cursor-did-not-advance'
+        );
+      }
     );
   });
 
@@ -76,9 +80,13 @@ describe('exhaustive Linear pagination', () => {
           },
         };
       }),
-      error =>
-        error?.code === 'DUPLICATE_ISSUE' &&
-        error?.coverage?.reason === 'duplicate-issue'
+      error => {
+        const err = /** @type {any} */ (error);
+        return (
+          err?.code === 'DUPLICATE_ISSUE' &&
+          err?.coverage?.reason === 'duplicate-issue'
+        );
+      }
     );
 
     await assert.rejects(
@@ -89,10 +97,14 @@ describe('exhaustive Linear pagination', () => {
         }),
         { maxPages: 2 }
       ),
-      error =>
-        error?.code === 'PAGE_LIMIT' &&
-        error?.coverage?.pages === 2 &&
-        error?.coverage?.hasNextPage === true
+      error => {
+        const err = /** @type {any} */ (error);
+        return (
+          err?.code === 'PAGE_LIMIT' &&
+          err?.coverage?.pages === 2 &&
+          err?.coverage?.hasNextPage === true
+        );
+      }
     );
   });
 
