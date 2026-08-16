@@ -34,8 +34,10 @@ async function mainHead() {
   return gh(['api', `repos/${repo}/git/ref/heads/main`, '--jq', '.object.sha']);
 }
 
-const openPulls = () =>
-  pages(`repos/${repo}/pulls?state=open&base=main&per_page=100`);
+const openPulls = (base = '') =>
+  pages(
+    `repos/${repo}/pulls?state=open${base ? `&base=${base}` : ''}&per_page=100`
+  );
 
 async function pages(endpoint) {
   const value = await ghJson([
@@ -127,10 +129,12 @@ async function candidateEvidence(summary, mainSha, openHeadShas) {
     `repos/${repo}/pulls/${number}/commits?per_page=100`
   );
   const commitShas = new Set(commits.map(commit => commit.sha));
-  const containsOpenPrHead = openHeadShas.some(
-    candidateHead =>
-      candidateHead !== pr.head.sha && commitShas.has(candidateHead)
-  );
+  const containsOpenPrHead =
+    commits.length !== pr.commits ||
+    openHeadShas.some(
+      candidateHead =>
+        candidateHead !== pr.head.sha && commitShas.has(candidateHead)
+    );
   const compare = await apiJson(
     `repos/${repo}/compare/${mainSha}...${pr.head.sha}`
   );
@@ -318,8 +322,8 @@ async function promote(summary, mainSha, evidence, decision) {
 
 export async function run() {
   const mainSha = await mainHead();
-  const open = await openPulls();
-  const openHeadShas = open.map(pr => pr.head.sha);
+  const open = await openPulls('main');
+  const openHeadShas = (await openPulls()).map(pr => pr.head.sha);
   let promoted = 0;
   let unproven = 0;
   for (const summary of open) {
