@@ -26,7 +26,7 @@ const managedWebServerPort = managedWebServerUrl.port;
 export default defineConfig({
   captureGitInfo: { commit: false, diff: false },
   testDir: './tests/visual-qa',
-  testMatch: '**/capture.spec.ts',
+  testMatch: /(?:capture|coverage)\.spec\.ts/,
   fullyParallel: false,
   forbidOnly: true,
   retries: 1,
@@ -50,10 +50,21 @@ export default defineConfig({
   projects: [
     {
       name: 'visual-qa',
+      testMatch: /capture\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1440, height: 900 },
         deviceScaleFactor: 2,
+        colorScheme: 'dark',
+      },
+    },
+    {
+      name: 'visual-qa-coverage',
+      testMatch: /coverage\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 800 },
+        deviceScaleFactor: 1,
         colorScheme: 'dark',
       },
     },
