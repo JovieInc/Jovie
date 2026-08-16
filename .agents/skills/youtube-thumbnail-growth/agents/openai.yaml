@@ -1,0 +1,4 @@
+interface:
+  display_name: "YouTube Thumbnail Growth"
+  short_description: "Evidence-backed thumbnails built to earn clicks"
+  default_prompt: "Use $youtube-thumbnail-growth to create truthful, testable thumbnail challengers from verified video context."

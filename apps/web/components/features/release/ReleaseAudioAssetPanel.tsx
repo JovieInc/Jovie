@@ -12,8 +12,9 @@ import {
 } from 'react';
 import { toast } from '@/components/feedback';
 import {
-  AUDIO_ACCEPT,
+  AUDIO_FILE_ACCEPT,
   type AudioUploadRejection,
+  resolveAudioUploadMime,
   SUPPORTED_AUDIO_FORMAT_LABELS,
   validateAudioUpload,
 } from '@/lib/audio/constants';
@@ -131,6 +132,16 @@ export function ReleaseAudioAssetPanel({
         return;
       }
 
+      const uploadMime = resolveAudioUploadMime({
+        name: file.name,
+        type: file.type,
+      });
+      if (!uploadMime) {
+        setUploadRejection(null);
+        setUploadError('Unsupported audio file type');
+        return;
+      }
+
       setIsUploading(true);
       setUploadError(null);
       setUploadRejection(null);
@@ -139,6 +150,7 @@ export function ReleaseAudioAssetPanel({
         const blob = await upload(file.name, file, {
           access: 'public',
           handleUploadUrl: '/api/library/audio/upload-token',
+          contentType: uploadMime,
         });
 
         const response = await fetch('/api/library/audio/confirm', {
@@ -149,7 +161,7 @@ export function ReleaseAudioAssetPanel({
             blobUrl: blob.url,
             blobPathname: blob.pathname,
             fileName: file.name,
-            fileMimeType: file.type,
+            fileMimeType: uploadMime,
             fileSizeBytes: file.size,
           }),
         });
@@ -282,7 +294,7 @@ export function ReleaseAudioAssetPanel({
         <input
           ref={inputRef}
           type='file'
-          accept={AUDIO_ACCEPT}
+          accept={AUDIO_FILE_ACCEPT}
           onChange={handleInputChange}
           disabled={!isEditable || isUploading}
           tabIndex={disabledTabIndex}

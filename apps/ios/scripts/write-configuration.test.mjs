@@ -59,12 +59,12 @@ test('succeeds even when python3 on PATH is broken', t => {
 
   const contents = readFileSync(plistPath, 'utf8');
   assert.match(contents, /<key>ApiBaseUrl<\/key>/);
-  assert.doesNotMatch(contents, /<key>ClerkPublishableKey<\/key>/);
+  assert.doesNotMatch(contents, /Clerk/i);
 });
 
 // --- correctness tests ---
 
-test('writes all eight expected plist keys without a retired Clerk key', t => {
+test('writes the six Better Auth configuration keys', t => {
   const { plistPath } = runScript(t, {
     API_BASE_URL: 'https://api.jov.ie',
     WEB_BASE_URL: 'https://jov.ie',
@@ -72,8 +72,6 @@ test('writes all eight expected plist keys without a retired Clerk key', t => {
     JOVIE_IOS_OBSERVABILITY_ENVIRONMENT: 'staging',
     JOVIE_IOS_OBSERVABILITY_INGEST_URL: 'https://ingest.example.com',
     JOVIE_IOS_OBSERVABILITY_INGEST_SECRET: 'secret-token',
-    CLERK_REDIRECT_URL: 'ie.jov.jovie://callback',
-    CLERK_CALLBACK_URL_SCHEME: 'ie.jov.jovie',
   });
 
   const contents = readFileSync(plistPath, 'utf8');
@@ -84,8 +82,6 @@ test('writes all eight expected plist keys without a retired Clerk key', t => {
     'ObservabilityEnvironment',
     'ObservabilityIngestUrl',
     'ObservabilityIngestSecret',
-    'ClerkRedirectUrl',
-    'ClerkCallbackUrlScheme',
   ]) {
     assert.match(
       contents,
@@ -95,8 +91,7 @@ test('writes all eight expected plist keys without a retired Clerk key', t => {
   }
   assert.match(contents, /<string>https:\/\/api\.jov\.ie<\/string>/);
   assert.match(contents, /<string>staging<\/string>/);
-  assert.match(contents, /<string>ie\.jov\.jovie:\/\/callback<\/string>/);
-  assert.doesNotMatch(contents, /<key>ClerkPublishableKey<\/key>/);
+  assert.doesNotMatch(contents, /Clerk/i);
 });
 
 test('handles empty optional values without breaking the plist', t => {
@@ -106,7 +101,7 @@ test('handles empty optional values without breaking the plist', t => {
   const contents = readFileSync(plistPath, 'utf8');
   assert.match(contents, /^<\?xml/, 'not a valid XML plist');
   assert.match(contents, /<key>SentryDsn<\/key>/, 'SentryDsn key absent');
-  assert.doesNotMatch(contents, /<key>ClerkPublishableKey<\/key>/);
+  assert.doesNotMatch(contents, /Clerk/i);
 });
 
 test('produces a well-formed plist that plutil accepts', t => {

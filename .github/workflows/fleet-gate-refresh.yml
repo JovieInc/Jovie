@@ -14,7 +14,10 @@ on:
   pull_request:
     types: [closed, labeled, unlabeled, ready_for_review, reopened]
   workflow_run:
-    workflows: [CI, Production Controller, Queue-Deferred Release]
+    # Queue-Deferred Release is downstream of this gate. Listening to it here
+    # formed a reciprocal workflow_run loop that could retrigger both
+    # controllers without a new upstream capacity signal.
+    workflows: [CI, Production Controller]
     types: [completed]
   push:
     branches: [main]
@@ -93,6 +96,13 @@ jobs:
           echo "gate_rc=$gate_rc" >> "$GITHUB_OUTPUT"
           echo "Fleet gate receipt refreshed (consumer rc=$gate_rc)."
 
+      - name: Reconcile Symphony pressure-driven concurrency
+        if: always() && steps.refresh.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/hermes/symphony-concurrency-controller.py
+
       - name: Admit one issue from the fresh event
         id: admit
         if: steps.refresh.outputs.work_allowed == 'true'
@@ -101,7 +111,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          timeout 240s scripts/backlog-orchestrator/run-backlog.sh gate-next
+          timeout 180s scripts/backlog-orchestrator/run-backlog.sh reconcile
+          timeout 60s scripts/backlog-orchestrator/run-backlog.sh gate-next
 
       - name: Record event admission heartbeat
         if: always()

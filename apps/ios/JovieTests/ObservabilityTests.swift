@@ -136,7 +136,7 @@ struct ObservabilityTests {
     Observability.captureMessage(.authProviderSelected)
     Observability.captureError(
       TestError.example,
-      event: .clerkSessionExchangeFailed
+      event: .nativeAuthExchangeFailed
     )
     Observability.setUser(id: "user_123")
     Observability.clearUser()
@@ -206,7 +206,7 @@ struct ObservabilityTests {
     defer { Observability.resetForTesting() }
 
     let span = Observability.startSpan(
-      name: .clerkSessionExchangeStarted,
+      name: .nativeAuthExchangeStarted,
       context: [
         "token": "abcdefghijklmnopqrstuvwxyz1234567890",
         "stage": "native_auth_return",
@@ -216,7 +216,7 @@ struct ObservabilityTests {
     span.finish()
 
     let recordedSpan = try #require(provider.spans.first)
-    #expect(recordedSpan.name == .clerkSessionExchangeStarted)
+    #expect(recordedSpan.name == .nativeAuthExchangeStarted)
     #expect(recordedSpan.context["token"] as? String == ObservabilityRedactor.filteredValue)
     #expect(recordedSpan.context["stage"] as? String == "native_auth_return")
     #expect(recordedSpan.span.finishCount == 1)

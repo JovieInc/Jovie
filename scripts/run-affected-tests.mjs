@@ -173,14 +173,54 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
   'scripts/lib/__tests__/queue-deferral-receipt.test.mjs',
   'scripts/lib/__tests__/queue-deferred-release.test.mjs',
+  'scripts/lib/__tests__/queue-deferred-release-admission.test.mjs',
   'scripts/lib/__tests__/setup-worktree-health.test.mjs',
 ];
+const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
+  '.github/workflows/merge-queue-autoenroll.yml',
+  'scripts/ci-merge-queue-check.mjs',
+  'scripts/drain-pr-queue.sh',
+  'scripts/lib/merge-queue-guard.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+  'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/pr-check-failures.test.mjs',
+  'scripts/merge-queue-backend.mjs',
+  'scripts/tests/test_gh_retry.py',
+]);
+const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+  'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/pr-check-failures.test.mjs',
+];
+const MERGE_QUEUE_CONTROLLER_PYTHON_TESTS = ['scripts/tests/test_gh_retry.py'];
 const EVENT_DRIVEN_SHIPPER_SCRIPT_TESTS = [
   ...CI_CONTROL_SCRIPT_TESTS,
   'scripts/lib/__tests__/hermes-launchd.test.mjs',
 ];
 const EVENT_DRIVEN_SHIPPER_PYTHON_TESTS = [
   'scripts/hermes/tests/gem-priority-gate.test.py',
+];
+const DELIVERY_LIVENESS_LANE = new Set([
+  'scripts/hermes/jobs/codex-issue-shipper.ts',
+  'scripts/hermes/jobs/delivery-liveness-watchdog.ts',
+  'scripts/hermes/launchd/README.md',
+  'scripts/hermes/launchd/co.jovie.hermes.delivery-liveness-watchdog.plist.template',
+  'scripts/hermes/lib/__tests__/codex-issue-shipper-routing.test.ts',
+  'scripts/hermes/lib/__tests__/delivery-liveness.test.ts',
+  'scripts/hermes/lib/codex-issue-shipper.ts',
+  'scripts/hermes/lib/delivery-liveness.ts',
+  'scripts/lib/__tests__/codex-issue-shipper.test.mjs',
+]);
+const DELIVERY_LIVENESS_TESTS = [
+  'scripts/hermes/lib/__tests__/codex-issue-shipper-routing.test.ts',
+  'scripts/hermes/lib/__tests__/delivery-liveness.test.ts',
+  'scripts/lib/__tests__/codex-issue-shipper.test.mjs',
+  'scripts/lib/__tests__/hermes-launchd.test.mjs',
 ];
 const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = new Set([
   '.husky/pre-push',
@@ -504,6 +544,62 @@ export function buildAffectedTestPlan(
       pythonUnittestTests: SYMPHONY_THROUGHPUT_PYTHON_TESTS,
       scriptVitestTests: SYMPHONY_THROUGHPUT_SCRIPT_TESTS,
       nodeTests: SYMPHONY_THROUGHPUT_NODE_TESTS,
+    };
+  }
+  const deliveryLivenessInputCount = files.filter(file =>
+    DELIVERY_LIVENESS_LANE.has(file)
+  ).length;
+  const earlySelectorInputCount = files.filter(file =>
+    AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+  ).length;
+  const mergeQueueControllerInputCount = files.filter(file =>
+    MERGE_QUEUE_CONTROLLER_INPUTS.has(file)
+  ).length;
+  const isBoundedMergeQueueControllerChange =
+    mergeQueueControllerInputCount > 0 &&
+    files.every(
+      file =>
+        MERGE_QUEUE_CONTROLLER_INPUTS.has(file) ||
+        AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+    ) &&
+    (earlySelectorInputCount === 0 ||
+      earlySelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+  if (isBoundedMergeQueueControllerChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: MERGE_QUEUE_CONTROLLER_PYTHON_TESTS,
+      pythonUnittestTests: [],
+      scriptVitestTests: MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS,
+      nodeTests: [],
+    };
+  }
+  const isBoundedDeliveryLivenessChange =
+    deliveryLivenessInputCount > 0 &&
+    files.every(
+      file =>
+        DELIVERY_LIVENESS_LANE.has(file) ||
+        AFFECTED_TEST_SELECTOR_MANIFEST.has(file)
+    ) &&
+    (earlySelectorInputCount === 0 ||
+      earlySelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size);
+  if (isBoundedDeliveryLivenessChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: unique([
+        ...DELIVERY_LIVENESS_TESTS,
+        ...(earlySelectorInputCount > 0 ? AFFECTED_TEST_SELECTOR_TESTS : []),
+      ]),
+      nodeTests: [],
     };
   }
   const isExactEventDrivenShipperPrimary =
@@ -1095,6 +1191,10 @@ export function buildAffectedTestPlan(
   const hasUncoveredSource =
     !isExactEventDrivenShipper &&
     (relatedFiles.some(file => !isCoveredSource(file)) ||
+      (mergeQueueControllerInputCount > 0 &&
+        !isBoundedMergeQueueControllerChange &&
+        !isExactScannerLoadRepairPrimary &&
+        !isExactScannerLoadRepairWithSelector) ||
       hasUnboundedFleetPromotionGateChange ||
       hasUnknownCiCancellationHealerPeer ||
       hasStandaloneCiFastLanesChange ||

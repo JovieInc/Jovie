@@ -34,6 +34,24 @@ const mockChatState = {
   },
 };
 
+let mockSearchParams = new URLSearchParams();
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    prefetch: vi.fn().mockResolvedValue(undefined),
+  }),
+  usePathname: () => '/app/chat',
+  useSearchParams: () => mockSearchParams,
+  useParams: () => ({}),
+  redirect: vi.fn(),
+  notFound: vi.fn(),
+}));
+
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: ({ count }: { count: number }) => ({
     getTotalSize: () => count * 80,
@@ -170,6 +188,7 @@ vi.mock('@/components/jovie/components/ChatUsageAlert', () => ({
 describe('JovieChat empty state', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
     mockPendingOpportunityCards.length = 0;
     mockChatState.input = '';
     mockChatState.messages = [];
@@ -531,6 +550,54 @@ describe('JovieChat empty state', () => {
     expect(getByTestId('chat-composer-dock')).toBeTruthy();
     expect(queryByTestId('chat-empty-state-opportunity-cards')).toBeNull();
     expect(queryByTestId('chat-empty-state-viewport')).toBeNull();
+  });
+
+  it('reproduces pinned-card mode from the ?opportunityId= deep link (JOV-3933)', () => {
+    mockPendingOpportunityCards.push({
+      id: 'opp-deep',
+      typeLabel: 'YouTube',
+      createdAt: '2026-07-01T12:00:00.000Z',
+      title: 'Refresh weak YouTube thumbnails',
+      why: '4 videos still use auto-generated thumbs',
+      primaryActionLabel: 'Generate variants',
+      status: 'pending',
+      category: 'suggestion',
+    });
+    mockSearchParams = new URLSearchParams('opportunityId=opp-deep');
+
+    const { getByTestId, queryByTestId } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    expect(getByTestId('chat-pinned-opportunity-header')).toBeTruthy();
+    expect(getByTestId('chat-composer-dock')).toBeTruthy();
+    expect(queryByTestId('chat-empty-state-opportunity-cards')).toBeNull();
+  });
+
+  it('collapses the pinned header when the unpin affordance is used (JOV-3933)', () => {
+    mockPendingOpportunityCards.push({
+      id: 'opp-pin',
+      typeLabel: 'Suggestion',
+      createdAt: '2026-07-01T12:00:00.000Z',
+      title: 'Playlist window this week',
+      why: 'Your latest single is peaking.',
+      primaryActionLabel: 'Draft pitch',
+      status: 'pending',
+      category: 'suggestion',
+    });
+
+    const { getByTestId, queryByTestId } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    fireEvent.click(getByTestId('chat-empty-opportunity-card-opp-pin'));
+    expect(getByTestId('chat-pinned-opportunity-header')).toBeTruthy();
+
+    fireEvent.click(getByTestId('chat-pinned-opportunity-unpin'));
+
+    expect(queryByTestId('chat-pinned-opportunity-header')).toBeNull();
+    // Thread scaffolding falls back to the empty-state cards once unpinned.
+    expect(getByTestId('chat-empty-state-opportunity-cards')).toBeTruthy();
   });
 
   it('does not render opportunity cards when there are none pending', () => {

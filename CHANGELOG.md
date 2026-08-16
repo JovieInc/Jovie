@@ -7,10 +7,23 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-- **Public profiles keep every conversion action usable (JOV-5134/JOV-5132):** unclaimed artists expose a truthful ownership path; listening, alerts, tips, merch, shows, and payment actions resolve only when their inventory is real; mobile privacy controls avoid profile chrome and the action dock; and drawers plus carousels preserve keyboard and screen-reader access.
+### Changed
+
+- **Profile actions stay truthful and usable:** Unclaimed profiles show a clear ownership path. Listening, alerts, tips, merch, shows, and payments appear only when available.
+- **Changelog updates are easier to explore:** Featured outcomes lead each release, older updates stay collapsed, and every version has a permanent page plus RSS and JSON feeds.
+
+### Fixed
+
+- **Canceled sign-in stays recoverable:** Canceled browser sign-in restores provider actions, while the iPhone app explains what happened and keeps Sign In Again visible.
+- **iPhone profile setup stays in the app:** Failed saves remain retryable, while expired sessions return creators to sign-in without a generic web detour.
+- **The Mac app stays open after launch:** A successful first screen no longer switches to Retry seconds later.
 - [internal] **Redis quota failures now surface before they break sign-in (JOV-5086):** production exercises a real write/read canary, groups quota exhaustion separately from outages, backs off degraded Redis traffic, filters known bots before metering high-volume anonymous telemetry, and makes every limiter's command-cost algorithm an explicit reviewed choice.
 
 ## [26.8.0] - 2026-08-14
+> Brand deals, online visibility, and clearer recovery in one focused release.
+
+<!-- Internal source ledger. The concise public release sections follow. -->
+
 - **Mac app recovers from a black launch window (JOV-5086):** packaged Jovie.app now paints a loading splash immediately, and a hung or blank hosted page shows Retry instead of staying black forever.
 - [internal] **Production recovery reopens exact fleet holds (JOV-5048/JOV-5049):** Merge Queue Auto-Enroll now identifies successful Production Controller completions by the stable workflow path instead of the dynamic run title, and above-target queue pressure stays observable without reducing native queue capacity to zero, so source-green Symphony heads can return to and drain the native queue.
 - **Loading indicators respect reduced-motion preferences (JOV-4921):** canonical spinners now become fully static while preserving their size, color, and accessible loading status.
@@ -85,6 +98,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - **[internal] Audio playback has one canonical transition contract (JOV-3689):** loading, audible playback, buffering, seeking, stalls, interruptions, completion, and errors are defined in a typed, mutation-tested state machine for playback surfaces to adopt.
 - **[internal] Canonical audio contract foundation (JOV-3685):** one typed package now defines Jovie's MP3, WAV, FLAC, AIFF, AAC, and M4A format registry, MIME aliases, extensions, upload policies, and branded time/BPM units with mutation-tested invariants.
 - **[internal] Staging Better Auth Google OAuth credentials now reach the Vercel build and runtime deploy (#14659):** the release workflow allowlists and forwards both Google client keys, failing closed when either is absent.
+
+### Featured
+
+- **Review qualified brand deals in your Inbox:** See the buyer, budget, and source. Approve preparation or pass; Jovie never sends outreach without your approval.
+- **See how visible you are online:** Presence brings search visibility, answer readiness, audience quality, and monitored pages into one workspace.
+
+### Fixed
+
+- **The Mac app recovers from blank screens:** Blank launches, failed pages, and canceled sign-ins now return to clear recovery actions instead of leaving you stuck.
 
 ## [26.7.0] - 2026-07-21
 

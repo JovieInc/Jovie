@@ -484,36 +484,34 @@ async function loadInboxNavigationAvailability(
   if (!profileId) return UNKNOWN_INBOX_NAVIGATION_AVAILABILITY;
 
   try {
-    const [pendingSuggestedActions, pendingTourDates] = await Promise.all([
-      dashboardQuery(
-        () =>
-          tx
-            .select({ count: drizzleSql<number>`count(*)` })
-            .from(suggestedActions)
-            .where(
-              and(
-                eq(suggestedActions.userId, userId),
-                eq(suggestedActions.status, 'pending')
-              )
-            ),
-        'Inbox navigation suggested actions count query',
-        { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
-      ),
-      dashboardQuery(
-        () =>
-          tx
-            .select({ count: drizzleSql<number>`count(*)` })
-            .from(tourDates)
-            .where(
-              and(
-                eq(tourDates.profileId, profileId),
-                eq(tourDates.confirmationStatus, 'pending')
-              )
-            ),
-        'Inbox navigation tour dates count query',
-        { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
-      ),
-    ]);
+    const pendingSuggestedActions = await dashboardQuery(
+      () =>
+        tx
+          .select({ count: drizzleSql<number>`count(*)` })
+          .from(suggestedActions)
+          .where(
+            and(
+              eq(suggestedActions.userId, userId),
+              eq(suggestedActions.status, 'pending')
+            )
+          ),
+      'Inbox navigation suggested actions count query',
+      { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
+    );
+    const pendingTourDates = await dashboardQuery(
+      () =>
+        tx
+          .select({ count: drizzleSql<number>`count(*)` })
+          .from(tourDates)
+          .where(
+            and(
+              eq(tourDates.profileId, profileId),
+              eq(tourDates.confirmationStatus, 'pending')
+            )
+          ),
+      'Inbox navigation tour dates count query',
+      { db: tx, timeoutMs: QUERY_TIMEOUTS.api }
+    );
 
     return resolveInboxNavigationAvailability(
       Number(pendingSuggestedActions[0]?.count ?? 0),

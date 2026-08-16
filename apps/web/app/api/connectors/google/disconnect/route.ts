@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { asConnectorStatusSql } from '@/lib/connectors/db-expressions';
 import {
+  CONNECTOR_PROVIDERS,
   type ConnectorProviderId,
-  connectorProviderSchema,
   GOOGLE_CONNECTOR_PROVIDERS,
 } from '@/lib/connectors/registry';
 import { db } from '@/lib/db';
@@ -19,7 +19,9 @@ export const dynamic = 'force-dynamic';
 
 const bodySchema = z.object({
   /** Which provider to disconnect. Omit to disconnect both Gmail + Google Calendar. */
-  provider: connectorProviderSchema.optional(),
+  provider: z
+    .enum([CONNECTOR_PROVIDERS.gmail, CONNECTOR_PROVIDERS.google_calendar])
+    .optional(),
 });
 
 /**

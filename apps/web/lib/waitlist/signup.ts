@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq, or } from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
@@ -11,7 +11,7 @@ import { isStatusUpgrade } from '@/lib/waitlist/status-precedence';
 
 export async function markWaitlistSignedUpInTx(
   tx: DbOrTransaction,
-  clerkUserId: string
+  authUserId: string
 ): Promise<{ entryId: string | null }> {
   const now = new Date();
   const [user] = await tx
@@ -22,7 +22,13 @@ export async function markWaitlistSignedUpInTx(
       waitlistEntryId: users.waitlistEntryId,
     })
     .from(users)
-    .where(eq(users.clerkId, clerkUserId))
+    .where(
+      or(
+        eq(users.id, authUserId),
+        eq(users.betterAuthUserId, authUserId),
+        eq(users.clerkId, authUserId)
+      )
+    )
     .for('update')
     .limit(1);
 
@@ -97,7 +103,7 @@ export async function markWaitlistSignedUpInTx(
     waitlistEntryId: entry.id,
     fromStatus: entry.status,
     toStatus: 'signed_up',
-    actorUserId: clerkUserId,
+    actorUserId: authUserId,
     actorType: 'user',
     reason: 'onboarding_completed',
   });

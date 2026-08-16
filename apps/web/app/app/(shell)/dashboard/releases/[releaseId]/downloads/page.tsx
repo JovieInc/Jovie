@@ -15,22 +15,19 @@ import { Icon } from '@/components/atoms/Icon';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import {
+  AUDIO_FILE_ACCEPT,
+  AUDIO_UPLOAD_POLICIES,
+  resolveAudioUploadMime,
+  SUPPORTED_AUDIO_FORMAT_LABELS,
+} from '@/lib/audio/constants';
 import { cn } from '@/lib/utils';
 import {
   type PromoDownloadFile,
   PromoDownloadsTable,
 } from './PromoDownloadsTable';
 
-const MAX_FILE_SIZE = 150 * 1024 * 1024; // 150MB
-
-const ALLOWED_TYPES = new Set<PromoDownloadFile['fileMimeType']>([
-  'audio/mpeg',
-  'audio/wav',
-  'audio/flac',
-  'audio/aiff',
-  'audio/mp4',
-  'audio/x-m4a',
-]);
+const MAX_FILE_SIZE = AUDIO_UPLOAD_POLICIES.promo_download.maxFileSizeBytes;
 
 export default function PromoDownloadsPage() {
   const { releaseId } = useParams<{ releaseId: string }>();
@@ -75,9 +72,13 @@ export default function PromoDownloadsPage() {
 
   const uploadFile = useCallback(
     async (file: File) => {
-      if (!ALLOWED_TYPES.has(file.type)) {
+      const uploadMime = resolveAudioUploadMime({
+        name: file.name,
+        type: file.type,
+      });
+      if (!uploadMime) {
         setUploadError(
-          'Invalid file type. Supported: MP3, WAV, FLAC, AIFF, M4A.'
+          `Invalid file type. Supported: ${SUPPORTED_AUDIO_FORMAT_LABELS.join(', ')}.`
         );
         return;
       }
@@ -96,6 +97,7 @@ export default function PromoDownloadsPage() {
         const blob = await upload(file.name, file, {
           access: 'public',
           handleUploadUrl: '/api/promo-downloads/upload-token',
+          contentType: uploadMime,
         });
 
         // Confirm upload and create DB record
@@ -109,7 +111,7 @@ export default function PromoDownloadsPage() {
             blobUrl: blob.url,
             blobPathname: blob.pathname,
             fileName: file.name,
-            fileMimeType: file.type,
+            fileMimeType: uploadMime,
             fileSizeBytes: file.size,
           }),
         });
@@ -249,7 +251,7 @@ export default function PromoDownloadsPage() {
                   {uploading ? 'Uploading audio...' : 'Drop an audio file here'}
                 </p>
                 <p className='mt-1 text-2xs text-tertiary-token'>
-                  MP3, WAV, FLAC, AIFF, M4A. Max 150 MB.
+                  {SUPPORTED_AUDIO_FORMAT_LABELS.join(', ')}. Max 150 MB.
                 </p>
                 <span
                   className={buttonVariants({
@@ -265,7 +267,7 @@ export default function PromoDownloadsPage() {
             <input
               ref={fileInputRef}
               type='file'
-              accept='audio/mpeg,audio/wav,audio/flac,audio/aiff,audio/mp4,audio/x-m4a'
+              accept={AUDIO_FILE_ACCEPT}
               onChange={handleFileSelect}
               disabled={uploading}
               className='sr-only'

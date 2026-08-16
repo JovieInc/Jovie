@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthProviderButtonSlot } from '@/features/auth/AuthProviderButtons';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
@@ -124,6 +124,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
   const [hasHydrated, setHasHydrated] = useState(false);
   const [pendingProvider, setPendingProvider] =
     useState<PrimaryAuthOAuthProvider | null>(null);
+  const oauthAttemptRef = useRef(0);
   const [oauthError, setOauthError] = useState<string | null>(null);
   // OTP step state lifted from EmailCodeAuthForm so One Tap can be suppressed
   // while the code-entry/lockout step is active (plan design row 20).
@@ -149,6 +150,18 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     setHasHydrated(true);
   }, []);
 
+  useEffect(() => {
+    const restoreAuthActions = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        oauthAttemptRef.current += 1;
+        setPendingProvider(null);
+      }
+    };
+
+    globalThis.addEventListener('pageshow', restoreAuthActions);
+    return () => globalThis.removeEventListener('pageshow', restoreAuthActions);
+  }, []);
+
   const _redirectSignedInVisitor = useCallback(() => {
     const destination = getClientAuthenticatedAuthEntryRedirect(searchParams);
     globalThis.location?.assign(destination);
@@ -164,6 +177,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       const callbackURL = getCallbackUrl(mode);
       const errorCallbackURL = getErrorCallbackUrl(mode);
       const newUserCallbackURL = getNewUserCallbackUrl();
+      const attempt = ++oauthAttemptRef.current;
 
       setPendingProvider(provider);
       setOauthError(null);
@@ -193,6 +207,8 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
           );
         }
       } catch (error) {
+        if (oauthAttemptRef.current !== attempt) return;
+
         setOauthError(getAuthStartErrorMessage(mode));
         setPendingProvider(null);
         logger.warn(

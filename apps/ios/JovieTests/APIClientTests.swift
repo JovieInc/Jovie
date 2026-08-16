@@ -1,4 +1,3 @@
-import ClerkKit
 import Foundation
 import Testing
 @testable import Jovie
@@ -44,6 +43,29 @@ private final class MockURLProtocol: URLProtocol {
   }
 
   override func stopLoading() {}
+}
+
+private func requestBodyData(_ request: URLRequest) throws -> Data {
+  if let body = request.httpBody {
+    return body
+  }
+  guard let stream = request.httpBodyStream else {
+    throw APIClientError.invalidResponse
+  }
+
+  stream.open()
+  defer { stream.close() }
+  var data = Data()
+  var buffer = [UInt8](repeating: 0, count: 1_024)
+  while stream.hasBytesAvailable {
+    let count = stream.read(&buffer, maxLength: buffer.count)
+    if count < 0 {
+      throw stream.streamError ?? APIClientError.invalidResponse
+    }
+    if count == 0 { break }
+    data.append(contentsOf: buffer.prefix(count))
+  }
+  return data
 }
 
 @Suite(.serialized)
@@ -113,6 +135,94 @@ struct APIClientTests {
     let response = try await client.fetchMe()
 
     #expect(response.state == .ready)
+    #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
+  }
+
+  @Test func completesProfileWithBearerAuthenticatedJSON() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["token-1"])
+    MockURLProtocol.requestHandler = { request in
+      #expect(request.url?.path == "/api/mobile/v1/profile/complete")
+      #expect(request.httpMethod == "POST")
+      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer token-1")
+      #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
+
+      let body = try requestBodyData(request)
+      let payload = try #require(
+        JSONSerialization.jsonObject(with: body) as? [String: String]
+      )
+      #expect(payload == ["displayName": "Tim White", "username": "tim"])
+
+      let response = HTTPURLResponse(
+        url: request.url!,
+        statusCode: 200,
+        httpVersion: nil,
+        headerFields: nil
+      )!
+      return (response, Data(#"{"profileId":"profile-1"}"#.utf8))
+    }
+
+    let client = APIClient(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider
+    )
+
+    try await client.completeProfile(displayName: "Tim White", username: "tim")
+    #expect(await tokenProvider.recordedForceRefreshValues() == [false])
+  }
+
+  @Test func surfacesProfileCompletionConflictMessage() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["token-1"])
+    MockURLProtocol.requestHandler = { request in
+      let response = HTTPURLResponse(
+        url: request.url!,
+        statusCode: 409,
+        httpVersion: nil,
+        headerFields: nil
+      )!
+      return (
+        response,
+        Data(#"{"code":"handle_taken","error":"That handle is already taken."}"#.utf8)
+      )
+    }
+
+    let client = APIClient(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider
+    )
+
+    await #expect(
+      throws: APIClientError.profileCompletionFailed(
+        statusCode: 409,
+        message: "That handle is already taken."
+      )
+    ) {
+      try await client.completeProfile(displayName: "Tim White", username: "tim")
+    }
+  }
+
+  @Test func surfacesTerminalProfileCompletionUnauthorizedAfterRefresh() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["stale-token", "fresh-token"])
+    MockURLProtocol.requestHandler = { request in
+      let response = HTTPURLResponse(
+        url: request.url!,
+        statusCode: 401,
+        httpVersion: nil,
+        headerFields: nil
+      )!
+      return (response, Data())
+    }
+
+    let client = APIClient(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider
+    )
+
+    await #expect(throws: APIClientError.requestFailed(statusCode: 401)) {
+      try await client.completeProfile(displayName: "Tim White", username: "tim")
+    }
     #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
   }
 
@@ -257,149 +367,59 @@ struct APIClientTests {
       _ = try await client.fetchMe()
     }
   }
-}
 
-@MainActor
-@Suite(.serialized, .disabled("Clerk live auth integration test — disabled under Better Auth. Commit ⑫ of the Clerk→BA migration will delete this suite. The native session flow is covered by MobileAuthFinalization + native-exchange.test.ts."))
-struct ClerkLiveAuthIntegrationTests {
-  private static let verificationCode = "424242"
+  @Test func nativeSessionRevokerUsesCanonicalBetterAuthSignOut() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["native-token"])
+    MockURLProtocol.requestHandler = { request in
+      #expect(request.url?.path == "/api/auth/sign-out")
+      #expect(request.httpMethod == "POST")
+      #expect(request.httpBody == nil)
+      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer native-token")
+      #expect(request.timeoutInterval == 4)
 
-  private struct LiveAuthConfig {
-    let publishableKey: String
-    let apiBaseURL: URL
-    let emailAddress: String
+      return (
+        HTTPURLResponse(
+          url: request.url!,
+          statusCode: 200,
+          httpVersion: nil,
+          headerFields: nil
+        )!,
+        Data("{\"success\":true}".utf8)
+      )
+    }
+
+    let revoker = NativeSessionRevoker(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider,
+      requestTimeout: 4
+    )
+
+    #expect(await revoker.revokeCurrentSession() == .revoked)
+    #expect(await tokenProvider.recordedForceRefreshValues() == [false])
   }
 
-  @Test func exchangesNativeClerkSessionForMobileProfile() async throws {
-    guard let config = try liveAuthConfig() else {
-      return
+  @Test func nativeSessionRevokerReportsServerFailureWithoutRetrying() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["native-token"])
+    MockURLProtocol.requestHandler = { request in
+      (
+        HTTPURLResponse(
+          url: request.url!,
+          statusCode: 503,
+          httpVersion: nil,
+          headerFields: nil
+        )!,
+        Data()
+      )
     }
 
-    try await configureClerk(with: config)
-    try? await Clerk.shared.auth.signOut()
-
-    let initialSignIn = try await Clerk.shared.auth.signInWithEmailCode(
-      emailAddress: config.emailAddress
-    )
-    let completedSignIn = try await initialSignIn.verifyCode(
-      Self.verificationCode
-    )
-
-    if let sessionID = completedSignIn.createdSessionId,
-       Clerk.shared.session?.id != sessionID
-    {
-      try await Clerk.shared.auth.setActive(sessionId: sessionID)
-    }
-
-    let tokenProvider = NativeSessionTokenProvider()
-    let token = try await tokenProvider.bearerToken(forceRefresh: false)
-    #expect(token.isEmpty == false)
-
-    let client = APIClient(
-      baseURL: config.apiBaseURL,
+    let revoker = NativeSessionRevoker(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
       tokenProvider: tokenProvider
     )
-    let response = try await client.fetchMe()
 
-    #expect(response.continueOnWebURL.isEmpty == false)
-
-    let refreshedToken = try await tokenProvider.bearerToken(forceRefresh: true)
-    #expect(refreshedToken.isEmpty == false)
-    #expect(
-      try await liveMobileMeStatusCode(
-        baseURL: config.apiBaseURL,
-        token: refreshedToken
-      ) == 200
-    )
-  }
-
-  private func liveAuthConfig() throws -> LiveAuthConfig? {
-    guard Self.forwardedEnvironmentValue("JOVIE_IOS_LIVE_AUTH") == "1" else {
-      return nil
-    }
-
-    let publishableKey =
-      Self.forwardedEnvironmentValue("CLERK_PUBLISHABLE_KEY", "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY")
-    let emailAddress = Self.forwardedEnvironmentValue("E2E_CLERK_USER_USERNAME")
-    let configuredAPIBaseURL = Self.forwardedEnvironmentValue("JOVIE_IOS_API_BASE_URL", "API_BASE_URL")
-    let apiBaseURLString = configuredAPIBaseURL.isEmpty ? "http://localhost:3100" : configuredAPIBaseURL
-
-    guard !publishableKey.isEmpty else {
-      throw LiveAuthConfigurationError.missingPublishableKey
-    }
-
-    guard !emailAddress.isEmpty else {
-      throw LiveAuthConfigurationError.missingEmailAddress
-    }
-
-    guard let apiBaseURL = URL(string: apiBaseURLString) else {
-      throw LiveAuthConfigurationError.invalidAPIBaseURL(apiBaseURLString)
-    }
-
-    return LiveAuthConfig(
-      publishableKey: publishableKey,
-      apiBaseURL: apiBaseURL,
-      emailAddress: emailAddress
-    )
-  }
-
-  private static func forwardedEnvironmentValue(_ keys: String...) -> String {
-    let environment = ProcessInfo.processInfo.environment
-
-    for key in keys {
-      if let value = environment[key], !value.isEmpty {
-        return value
-      }
-
-      if let value = environment["TEST_RUNNER_\(key)"], !value.isEmpty {
-        return value
-      }
-    }
-
-    return ""
-  }
-
-  private func configureClerk(with config: LiveAuthConfig) async throws {
-    Clerk.configure(
-      publishableKey: config.publishableKey,
-      options: Clerk.Options(
-        keychainConfig: .init(service: "ie.jov.Jovie"),
-        redirectConfig: .init(
-          redirectUrl: "ie.jov.Jovie://callback",
-          callbackUrlScheme: "ie.jov.Jovie"
-        )
-      )
-    )
-
-    _ = try await Clerk.shared.refreshEnvironment()
-    _ = try await Clerk.shared.refreshClient()
-  }
-
-  private func liveMobileMeStatusCode(baseURL: URL, token: String) async throws -> Int {
-    var request = URLRequest(url: baseURL.appending(path: "/api/mobile/v1/me"))
-    request.httpMethod = "GET"
-    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-    request.setValue("application/json", forHTTPHeaderField: "Accept")
-
-    let (_, response) = try await URLSession.shared.data(for: request)
-    let httpResponse = try #require(response as? HTTPURLResponse)
-    return httpResponse.statusCode
-  }
-}
-
-private enum LiveAuthConfigurationError: Error, Equatable, LocalizedError {
-  case invalidAPIBaseURL(String)
-  case missingEmailAddress
-  case missingPublishableKey
-
-  var errorDescription: String? {
-    switch self {
-    case let .invalidAPIBaseURL(value):
-      return "Invalid API base URL: \(value)"
-    case .missingEmailAddress:
-      return "Missing E2E_CLERK_USER_USERNAME for live auth integration."
-    case .missingPublishableKey:
-      return "Missing Clerk publishable key for live auth integration."
-    }
+    #expect(await revoker.revokeCurrentSession() == .failed(statusCode: 503))
+    #expect(await tokenProvider.recordedForceRefreshValues() == [false])
   }
 }

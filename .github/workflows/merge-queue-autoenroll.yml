@@ -8,7 +8,7 @@ name: Merge Queue Auto-Enroll
 # Existing labels are intent/audit evidence, never an alternate transport.
 #
 # Triggers:
-#   pull_request      — PR label changes, ready, reopen (eligibility change)
+#   pull_request      — PR label changes and reopen (maintenance only)
 #   workflow_run      — CI completion (green PRs are now enrollable)
 #   push (main)       — main moved → queued PRs may conflict or get stale
 #   workflow_dispatch — maintenance-only unless exact PR + head are supplied
@@ -27,7 +27,10 @@ name: Merge Queue Auto-Enroll
 
 on:
   pull_request:
-    types: [ready_for_review, reopened, labeled, unlabeled]
+    # `ready_for_review` starts a fresh CI run. New admission must wait for its
+    # completed CI workflow_run; otherwise GitHub legitimately cannot prove a
+    # native queue entry while required checks are pending.
+    types: [reopened, labeled, unlabeled]
   workflow_run:
     workflows: ['CI', 'Production Controller']
     types: [completed]
@@ -166,6 +169,8 @@ jobs:
           pr_number=''
           head_sha=''
           recover_holds=0
+          deferred_release=0
+          reconcile_queue_reentry=0
 
           case "$EVENT_NAME" in
             pull_request)
@@ -173,6 +178,18 @@ jobs:
               if [[ "$base_ref" == "main" ]]; then
                 pr_number="$(jq -er '.pull_request.number | tostring' "$GITHUB_EVENT_PATH")"
                 head_sha="$(jq -er '.pull_request.head.sha | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
+                # A `queue-deferred` unlabeled event is special only when the
+                # canonical Jovie App actor emitted it. The drain still reads
+                # a fresh exact-head controller release receipt before native
+                # enrollment; this event discriminator merely prevents a
+                # manual/untrusted label mutation from selecting that path.
+                if jq -e '
+                  .action == "unlabeled" and
+                  .label.name == "queue-deferred" and
+                  .sender.login == "jovie-bot[bot]"
+                ' "$GITHUB_EVENT_PATH" >/dev/null; then
+                  deferred_release=1
+                fi
               else
                 echo "PR targets $base_ref, not main; maintenance-only"
               fi
@@ -188,7 +205,10 @@ jobs:
                 head_sha=''
               else
                 prs_json="$(gh pr list -R "$REPO" --state open --limit 200 --json number,headRefOid,baseRefName)"
-                mapfile -t matching_prs < <(jq -r --arg head "$head_sha" '
+                matching_prs=()
+                while IFS= read -r matching_pr; do
+                  [[ -n "$matching_pr" ]] && matching_prs+=("$matching_pr")
+                done < <(jq -r --arg head "$head_sha" '
                   .[]
                   | select(.baseRefName == "main")
                   | select(((.headRefOid // "") | ascii_downcase) == $head)
@@ -198,6 +218,17 @@ jobs:
                   pr_number="${matching_prs[0]}"
                 else
                   echo "No unique open main PR owns workflow_run head $head_sha; maintenance-only"
+                  # A merge-group CI run carries GitHub's synthetic composite
+                  # SHA, so no source PR can own it. This is the sole event
+                  # that may reconcile prior bot-authored exact-head native
+                  # admission receipts; the drain revalidates all live gates
+                  # and admits at most a tiny bounded cohort.
+                  if [[ "$workflow_path" == ".github/workflows/ci.yml" \
+                    && "$(jq -r '.workflow_run.event // empty' "$GITHUB_EVENT_PATH")" == "merge_group" \
+                    && "$workflow_conclusion" == "success" ]]; then
+                    reconcile_queue_reentry=1
+                    echo 'Composite merge-group CI completed; bounded exact-head re-entry recovery enabled'
+                  fi
                   head_sha=''
                 fi
               fi
@@ -226,6 +257,8 @@ jobs:
             echo "pr_number=$pr_number"
             echo "head_sha=$head_sha"
             echo "recover_holds=$recover_holds"
+            echo "deferred_release=$deferred_release"
+            echo "reconcile_queue_reentry=$reconcile_queue_reentry"
           } >>"$GITHUB_OUTPUT"
       - name: Enroll clean PRs
         env:
@@ -241,9 +274,19 @@ jobs:
           # global dequeue/reconciliation authority but cannot admit a PR.
           DRAIN_ADMISSION_PR: ${{ steps.admission.outputs.pr_number }}
           DRAIN_ADMISSION_HEAD: ${{ steps.admission.outputs.head_sha }}
-          DRAIN_PROMOTION_MODE: ${{ needs.fleet-policy.outputs.mode }}
+          # A Jovie Bot queue-deferred release can proceed through the narrow
+          # exact-head fallback while Gem's *observation endpoint* is down.
+          # The shared Bash pre-enqueue guard requires the bot-authored typed
+          # release receipt plus green source/main/production evidence. It is
+          # not a general AMBER admission path.
+          DRAIN_PROMOTION_MODE: ${{ steps.admission.outputs.deferred_release == '1' && 'deferred-release-only' || needs.fleet-policy.outputs.mode }}
           DRAIN_FLEET_GATE_B64: ${{ needs.fleet-policy.outputs.receipt_b64 }}
           DRAIN_RECOVER_FLEET_HOLDS: ${{ needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.recover_holds == '1' && '1' || '0' }}
+          # Composite CI heads cannot map to source PRs. The drain consumes
+          # only bot-authored exact-head native-admission receipts, with fresh
+          # checks and a cap of two re-entries; it is never a global sweep.
+          DRAIN_RECONCILE_QUEUE_REENTRY: ${{ needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.reconcile_queue_reentry == '1' && '1' || '0' }}
+          DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '2'
           # `queue-deferred` has no typed provenance separating a temporary
           # pressure deferral from an explicit repair/human hold. Main-push
           # maintenance must preserve it until an owner explicitly releases it.

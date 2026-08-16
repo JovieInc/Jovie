@@ -1,5 +1,10 @@
 import Foundation
 
+enum MobileAuthCopy {
+  static let cancellation = "Sign-in was cancelled. Sign in again when you're ready."
+  static let failure = "Couldn't finish sign-in. Try again."
+}
+
 extension Notification.Name {
   static let jovieAuthCallbackURL = Notification.Name("ie.jov.Jovie.auth.callbackURL")
 }
@@ -35,7 +40,9 @@ struct MobileAuthProviderError: Equatable {
   let state: String?
 
   var userMessage: String {
-    "Couldn't finish sign-in. Try again."
+    error == "access_denied"
+      ? MobileAuthCopy.cancellation
+      : MobileAuthCopy.failure
   }
 }
 
@@ -72,9 +79,26 @@ final class MobileAuthPendingStore {
     return verifier
   }
 
+  func hasCodeVerifier() -> Bool {
+    guard let verifier = defaults.string(forKey: codeVerifierKey)?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    else {
+      return false
+    }
+
+    return !verifier.isEmpty
+  }
+
   func clear() {
     defaults.removeObject(forKey: codeVerifierKey)
   }
+}
+
+func shouldHandleMobileAuthProviderError(
+  route: AppRouter,
+  hasPendingVerifier: Bool
+) -> Bool {
+  route == .signedOut && hasPendingVerifier
 }
 
 @MainActor

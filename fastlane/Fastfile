@@ -158,13 +158,6 @@ def ensure_app_store_assets!(api_key:, apple_team_id:)
     )
   end
 
-  associated_domains = Spaceship::ConnectAPI::BundleIdCapability::Type::ASSOCIATED_DOMAINS
-  capabilities = bundle_id.get_capabilities
-  unless capabilities.any? { |capability| capability.is_type?(associated_domains) }
-    UI.message("Enabling Associated Domains for #{APP_IDENTIFIER}")
-    bundle_id.create_capability(associated_domains)
-  end
-
   app = Spaceship::ConnectAPI::App.find(APP_IDENTIFIER)
   if app
     UI.message("Found App Store Connect app record for #{APP_IDENTIFIER}")
@@ -234,7 +227,6 @@ platform :ios do
     require_env!("MATCH_PASSWORD")
     require_match_git_auth!
 
-    clerk_domain = require_env!("CLERK_ASSOCIATED_DOMAIN")
     api_base_url = ENV.fetch("API_BASE_URL", "https://jov.ie")
     web_base_url = ENV.fetch("WEB_BASE_URL", "https://jov.ie")
     sentry_dsn = ENV.fetch("JOVIE_IOS_SENTRY_DSN", ENV.fetch("SENTRY_DSN", ""))
@@ -284,8 +276,7 @@ platform :ios do
     signing_xcargs = [
       "CODE_SIGNING_ALLOWED=YES",
       "CODE_SIGNING_REQUIRED=YES",
-      "CURRENT_PROJECT_VERSION=#{current_build_number.shellescape}",
-      "CLERK_ASSOCIATED_DOMAIN=#{clerk_domain.shellescape}"
+      "CURRENT_PROJECT_VERSION=#{current_build_number.shellescape}"
     ].join(" ")
 
     gym(

@@ -11,6 +11,7 @@ import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
+  allowIfRateLimitBackendDegraded,
   createRateLimitHeaders,
   generalLimiter,
   getClientIP,
@@ -115,10 +116,13 @@ export async function POST(request: Request) {
     const state = payload.state;
     const codeVerifier = payload.codeVerifier;
     if (!isRealBrowserAuthHarnessEnabled()) {
-      const rateLimit = await generalLimiter.limit(
-        `auth:exchange:${
-          typeof client === 'string' ? client.trim() || 'unknown' : 'unknown'
-        }:${getClientIP(request)}`
+      const rateLimit = allowIfRateLimitBackendDegraded(
+        await generalLimiter.limit(
+          `auth:exchange:${
+            typeof client === 'string' ? client.trim() || 'unknown' : 'unknown'
+          }:${getClientIP(request)}`
+        ),
+        { route: '/api/auth/native/exchange' }
       );
       if (!rateLimit.success) {
         if (isNativeClient(client)) {

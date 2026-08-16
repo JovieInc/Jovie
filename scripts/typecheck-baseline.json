@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-08-13T20:33:00.607Z",
-  "totalErrors": 183,
+  "generatedAt": "2026-08-15T09:43:19.861Z",
+  "totalErrors": 180,
   "files": {
     ".github/scripts/verify-main-release-readiness.mjs": {
       "TS2339": 3
@@ -94,7 +94,6 @@
       "TS2322": 5
     },
     "scripts/lib/__tests__/merge-queue-backend.test.mjs": {
-      "TS2345": 3,
       "TS2353": 4
     },
     "scripts/lib/__tests__/merge-queue-guard.test.mjs": {

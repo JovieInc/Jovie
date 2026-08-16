@@ -5,7 +5,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   AUDIO_MAX_FILE_SIZE_BYTES,
+  getAudioFormatByFileName,
+  getCanonicalAudioMimeType,
   isSupportedAudioFile,
+  resolveAudioUploadMime,
+  SUPPORTED_AUDIO_MIME_TYPES,
 } from '@/lib/audio/constants';
 import {
   convertHeicToJpeg,
@@ -39,16 +43,7 @@ const ACCEPTED_TYPES = [
   'image/heif',
   'image/gif',
   'image/tiff',
-  'audio/aac',
-  'audio/aiff',
-  'audio/flac',
-  'audio/mp4',
-  'audio/mpeg',
-  'audio/wav',
-  'audio/x-aiff',
-  'audio/x-flac',
-  'audio/x-m4a',
-  'audio/x-wav',
+  ...SUPPORTED_AUDIO_MIME_TYPES,
   'video/mp4',
   'video/quicktime',
   'video/webm',
@@ -156,8 +151,7 @@ function detectKind(file: File): FileKind {
   if (file.type === 'application/pdf' || file.type === 'text/plain')
     return 'document';
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-  if (['wav', 'aiff', 'flac', 'mp3', 'aac', 'm4a'].includes(ext))
-    return 'audio';
+  if (getAudioFormatByFileName(file.name)) return 'audio';
   if (['mp4', 'mov', 'webm', 'avi'].includes(ext)) return 'video';
   if (
     ['png', 'jpg', 'jpeg', 'webp', 'avif', 'heic', 'gif', 'tiff'].includes(ext)
@@ -238,9 +232,8 @@ function shouldSkipZipEntry(name: string): boolean {
 }
 
 function guessMimeFromExtension(ext: string): string {
-  if (['wav', 'aiff', 'flac', 'mp3', 'aac', 'm4a'].includes(ext)) {
-    return `audio/${ext === 'mp3' ? 'mpeg' : ext}`;
-  }
+  const audioMime = getCanonicalAudioMimeType(`file.${ext}`);
+  if (audioMime) return audioMime;
   if (['mp4', 'mov', 'webm', 'avi'].includes(ext)) {
     return `video/${ext === 'mov' ? 'quicktime' : ext}`;
   }
@@ -354,9 +347,18 @@ async function uploadAudioAttachment(
 ): Promise<void> {
   updateFile(id, { status: 'uploading', progress: 0 });
   try {
+    const uploadMime = resolveAudioUploadMime({
+      name: file.name,
+      type: file.type,
+    });
+    if (!uploadMime) {
+      throw new Error('Unsupported audio file type');
+    }
+
     const blob = await upload(file.name, file, {
       access: 'public',
       handleUploadUrl: '/api/library/audio/upload-token',
+      contentType: uploadMime,
     });
     updateFile(id, { status: 'processing' });
     const response = await fetch('/api/chat/audio', {
@@ -366,7 +368,7 @@ async function uploadAudioAttachment(
         blobUrl: blob.url,
         blobPathname: blob.pathname,
         fileName: file.name,
-        fileMimeType: file.type,
+        fileMimeType: uploadMime,
         fileSizeBytes: file.size,
       }),
     });

@@ -46,15 +46,17 @@ def _drain_command(
     *,
     extra_env: str = "",
     expected_gh: Path | None = None,
+    backend: str = "test-label-fixture",
 ) -> str:
     fake_gh = tmp_path / "gh"
     assert fake_gh.is_file(), f"test must create isolated gh fixture first: {fake_gh}"
     expected = expected_gh or fake_gh
+    authorization = "test-fixture" if backend == "test-label-fixture" else "merge-queue-autoenroll"
     env_prefix = (
         f'PATH="{tmp_path}:$PATH" '
         f'DRAIN_EXPECT_GH="{expected}" '
-        'DRAIN_MUTATION_AUTHORIZATION=test-fixture '
-        'MERGE_QUEUE_BACKEND=test-label-fixture '
+        f'DRAIN_MUTATION_AUTHORIZATION={authorization} '
+        f'MERGE_QUEUE_BACKEND={backend} '
     )
     if extra_env:
         env_prefix += f"{extra_env} "
@@ -189,6 +191,220 @@ class TestGhRetryHelper:
 
 
 class TestDrainPrQueueWiring:
+    @pytest.mark.parametrize(
+        ("enroll_mode", "dequeue_mode", "expected_returncode", "expected_dequeues"),
+        [
+            ("failure", "success", 1, "1"),
+            ("malformed", "success", 1, "1"),
+            ("failure", "failure", 1, "1"),
+            ("valid", "success", 0, "0"),
+        ],
+    )
+    def test_native_enrollment_requires_receipt_and_compensates_once(
+        self,
+        tmp_path: Path,
+        enroll_mode: str,
+        dequeue_mode: str,
+        expected_returncode: int,
+        expected_dequeues: str,
+    ) -> None:
+        head = "a" * 40
+        dequeue_calls = tmp_path / "dequeue-calls"
+        dequeue_calls.write_text("0", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                command_name="${{2:-}}"
+                case "$command_name" in
+                  preflight) exit 0 ;;
+                  list-state) echo '{{"101":{{"headRefOid":"{head}","queued":false}}}}' ;;
+                  enroll)
+                    if [[ "${{FAKE_ENROLL_MODE:?}}" == "failure" ]]; then
+                      exit 1
+                    fi
+                    if [[ "${{FAKE_ENROLL_MODE:?}}" == "valid" ]]; then
+                      echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","state":"AWAITING_CHECKS","position":3}}}}}}'
+                      exit 0
+                    fi
+                    echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":null}}}}'
+                    ;;
+                  dequeue)
+                    count=$(<"${{FAKE_DEQUEUE_CALLS:?}}")
+                    echo "$((count + 1))" >"${{FAKE_DEQUEUE_CALLS:?}}"
+                    if [[ "${{FAKE_DEQUEUE_MODE:?}}" == "failure" ]]; then
+                      exit 1
+                    fi
+                    echo '{{"state":{{"queued":false}}}}'
+                    ;;
+                  max-queue-depth) echo 16 ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":101,"t":"Receipt regression","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/receipt","headOid":"{head}","base":"main","body":"","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":[],"headRefOid":"{head}","baseRefName":"main","body":""}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  if [[ " $* " == *"/commits/{head}/status "* ]]; then
+                    echo '{{"statuses":[]}}'
+                    exit 0
+                  fi
+                  if [[ " $* " == *"/statuses/{head} "* ]]; then
+                    exit 0
+                  fi
+                  exit 1
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=101 DRAIN_ADMISSION_HEAD={head} "
+                    f"FAKE_ENROLL_MODE={enroll_mode} FAKE_DEQUEUE_MODE={dequeue_mode} "
+                    f"FAKE_DEQUEUE_CALLS={dequeue_calls} "
+                    "GITHUB_RUN_ID=42 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == expected_returncode, (
+            f"stdout={result.stdout}\nstderr={result.stderr}"
+        )
+        assert dequeue_calls.read_text(encoding="utf-8").strip() == expected_dequeues
+        if enroll_mode == "valid":
+            assert "+native-queue on #101" in result.stdout
+            assert "state AWAITING_CHECKS, position 3" in result.stdout
+        else:
+            assert "native enrollment" in result.stderr
+        if dequeue_mode == "failure":
+            assert "CRITICAL: could not compensate unproven" in result.stderr
+
+    def test_composite_ci_reentry_recovers_only_bounded_exact_bot_receipts(
+        self, tmp_path: Path
+    ) -> None:
+        """Synthetic merge-group events may recover only prior native members."""
+        heads = {"1001": "a" * 40, "1002": "b" * 40, "1003": "c" * 40}
+        enrolled = tmp_path / "enrolled"
+        enrolled.write_text("", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state)
+                    echo '{{"1001":{{"headRefOid":"{heads["1001"]}","queued":false}},"1002":{{"headRefOid":"{heads["1002"]}","queued":false}},"1003":{{"headRefOid":"{heads["1003"]}","queued":false}}}}'
+                    ;;
+                  enroll)
+                    echo "${{3:?}}" >>"{enrolled}"
+                    head_var="${{4:?}}"
+                    echo "{{\\"state\\":{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"headRefOid\\":\\"$head_var\\",\\"mergeQueueEntry\\":{{\\"id\\":\\"MQE_${{3}}\\",\\"state\\":\\"AWAITING_CHECKS\\",\\"position\\":1}}}}}}"
+                    ;;
+                  dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  cat <<'JSON'
+                [{{"n":1001,"t":"First exact receipt","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/one","headOid":"{heads["1001"]}","base":"main","body":"","L":[],"fail":[]}},{{"n":1002,"t":"Second exact receipt","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/two","headOid":"{heads["1002"]}","base":"main","body":"","L":[],"fail":[]}},{{"n":1003,"t":"Third exact receipt","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/three","headOid":"{heads["1003"]}","base":"main","body":"","L":[],"fail":[]}}]
+JSON
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  case "$3" in
+                    1001) head="{heads["1001"]}" ;;
+                    1002) head="{heads["1002"]}" ;;
+                    1003) head="{heads["1003"]}" ;;
+                    *) echo "unexpected PR view: $*" >&2; exit 2 ;;
+                  esac
+                  echo "{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"mergeable\\":\\"MERGEABLE\\",\\"labels\\":[],\\"headRefOid\\":\\"$head\\",\\"baseRefName\\":\\"main\\",\\"body\\":\\"\\"}}"
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  if [[ "$2" == *"/commits/"*"/status"* ]]; then
+                    head="${{2#*/commits/}}"; head="${{head%%/status*}}"
+                    echo "{{\\"statuses\\":[{{\\"context\\":\\"jovie-queue-reentry/v1\\",\\"state\\":\\"success\\",\\"description\\":\\"Native queue admission recorded at exact head\\",\\"creator\\":{{\\"type\\":\\"Bot\\"}},\\"target_url\\":\\"https://github.com/JovieInc/Jovie/actions/runs/77\\",\\"updated_at\\":\\"2026-08-15T12:00:00Z\\"}}]}}"
+                    exit 0
+                  fi
+                  # Merge-group churn is unknown in this isolated receipt test;
+                  # the guard must never block or mutate on that missing data.
+                  exit 1
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRAIN_RECONCILE_QUEUE_REENTRY=1 "
+                    "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=2 "
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert "bounded exact-head native re-entry after composite CI" in result.stdout
+        assert "exact native re-entry at " + heads["1001"] in result.stdout
+        assert "exact native re-entry at " + heads["1002"] in result.stdout
+        assert heads["1003"] not in result.stdout
+        assert enrolled.read_text(encoding="utf-8").splitlines() == ["1001", "1002"]
+
     def test_constrained_mode_refuses_missing_receipt_before_calling_gh(
         self, tmp_path: Path
     ) -> None:
@@ -380,11 +596,50 @@ class TestDrainPrQueueWiring:
         ("body", "expected_enrollment"),
         [
             ("Ordinary source-green PR", False),
+            # The retired marker looked scoped but was neither typed nor bound
+            # to the source head/PR. It must never regain admission authority.
             (
                 "<!-- production-unbound-repair:production-deployment-unbound:"
                 + "a" * 40
                 + " -->",
+                False,
+            ),
+            (
+                "<!-- jovie-production-unbound-repair-attestation/v1 -->\n"
+                "```json\n"
+                + json.dumps(
+                    {
+                        "schema": "jovie-production-unbound-repair-attestation/v1",
+                        "kind": "production-release-repair",
+                        "condition": "production-deployment-unbound",
+                        "pr": 904,
+                        "head": "f" * 40,
+                        "mainSha": "a" * 40,
+                        "deploymentsAllowed": False,
+                    }
+                )
+                + "\n```",
                 True,
+            ),
+            # A typed document is still fail-closed when it is stale for the
+            # current exact source head (the controller re-reads before queue
+            # mutation, so a changed PR body cannot silently inherit it).
+            (
+                "<!-- jovie-production-unbound-repair-attestation/v1 -->\n"
+                "```json\n"
+                + json.dumps(
+                    {
+                        "schema": "jovie-production-unbound-repair-attestation/v1",
+                        "kind": "production-release-repair",
+                        "condition": "production-deployment-unbound",
+                        "pr": 904,
+                        "head": "e" * 40,
+                        "mainSha": "a" * 40,
+                        "deploymentsAllowed": False,
+                    }
+                )
+                + "\n```",
+                False,
             ),
         ],
     )
@@ -471,6 +726,13 @@ class TestDrainPrQueueWiring:
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert ("[dry-run] would +merge-queue on #904" in result.stdout) is expected_enrollment
+        # Ordinary clean work must not be admitted while production is unbound,
+        # but the controller has to leave an exact-head receipt so the first
+        # post-recovery Production Controller event can re-check and enroll it
+        # without a human workflow_dispatch.
+        assert (
+            "would record jovie-fleet-queue-hold/v1 on #904" in result.stdout
+        ) is (not expected_enrollment)
 
     def test_hold_intake_dequeues_deterministic_failing_member_and_keeps_green_sibling(
         self, tmp_path: Path
@@ -556,6 +818,70 @@ class TestDrainPrQueueWiring:
         assert "would -merge-queue on #902" in result.stdout
         assert "would -merge-queue on #901" not in result.stdout
         assert "fleet promotion constraint" not in result.stdout
+
+    def test_production_recovery_reenrolls_only_a_previously_exact_held_head(
+        self, tmp_path: Path
+    ) -> None:
+        """A hold-intake CI candidate resumes automatically after production binds."""
+        head = "a" * 40
+        state = tmp_path / "state"
+        state.write_text("unqueued", encoding="utf-8")
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                phase_file={state}
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":905,"t":"Exact held candidate","body":"ordinary PR","draft":false,"m":"MERGEABLE","head":"codex/jov-905","headOid":"{head}","base":"main","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  if [[ "$(cat "$phase_file")" == "queued" ]]; then labels='[{{"name":"merge-queue"}}]'; else labels='[]'; fi
+                  printf '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":%s,"headRefOid":"{head}","baseRefName":"main","body":"ordinary PR"}}\\n' "$labels"
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr edit" ]]; then
+                  printf queued >"$phase_file"
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then
+                  if [[ " $* " == *"/commits/{head}/status "* ]]; then
+                    echo '{{"statuses":[{{"context":"jovie-fleet-queue-hold/v1","state":"pending","creator":{{"type":"Bot"}},"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"2026-08-15T12:00:00Z"}}]}}'
+                    exit 0
+                  fi
+                  if [[ " $* " == *"/statuses/{head} "* ]]; then exit 0; fi
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRAIN_RECOVER_FLEET_HOLDS=1 "
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert "exact fleet recovery at " + head in result.stdout
+        assert "+merge-queue on #905" in result.stdout
+        assert "-jovie-fleet-queue-hold/v1 on #905" in result.stdout
+        assert state.read_text(encoding="utf-8").strip() == "queued"
 
     def test_hold_intake_does_not_dequeue_transient_unknown_mergeable(
         self, tmp_path: Path
@@ -894,6 +1220,9 @@ JSON
 
 _RELEASE_SCRIPT = _REPO_ROOT / "scripts" / "release-queue-deferred.sh"
 _RELEASE_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "queue-deferred-release.yml"
+_FLEET_GATE_REFRESH_WORKFLOW = (
+    _REPO_ROOT / ".github" / "workflows" / "fleet-gate-refresh.yml"
+)
 
 
 def _release_command(tmp_path: Path, *, extra_env: str = "") -> str:
@@ -1041,9 +1370,19 @@ def _run_single_candidate_release(
 class TestReleaseQueueDeferred:
     def test_workflow_is_event_driven_with_no_cron(self) -> None:
         workflow = _RELEASE_WORKFLOW.read_text(encoding="utf-8")
+        fleet_gate_refresh = _FLEET_GATE_REFRESH_WORKFLOW.read_text(encoding="utf-8")
         assert "schedule:" not in workflow
         assert "workflow_run:" in workflow
-        assert "workflows: ['CI', 'Production Controller', 'Fleet Gate Refresh']" in workflow
+        # CI and Production Controller are upstream semantic inputs to Fleet
+        # Gate Refresh. Queue-Deferred Release consumes only the resulting
+        # fresh gate receipt, so the controllers cannot recursively wake each
+        # other without a new upstream capacity signal.
+        assert "workflows: [CI, Production Controller]" in fleet_gate_refresh
+        assert "Queue-Deferred Release]" not in fleet_gate_refresh
+        assert "workflows: ['Fleet Gate Refresh']" in workflow
+        assert "workflows: ['CI', 'Production Controller', 'Fleet Gate Refresh']" not in workflow
+        assert "pull_request:" in fleet_gate_refresh
+        assert "branches: [main]" in fleet_gate_refresh
         # The trigger allowlist owns workflow identity. Job admission must not
         # compare `workflow_run.name`: custom `run-name` values include dynamic
         # SHAs and caused successful Production Controller wakes to skip.
@@ -1135,7 +1474,7 @@ JSON
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "fleet-gate-not-green:AMBER" in result.stdout
+        assert "fleet-gate-not-releasable:AMBER" in result.stdout
         log = (tmp_path / "gh-calls.log").read_text(encoding="utf-8")
         assert "pr edit" not in log
         assert "pr ready" not in log
@@ -1217,7 +1556,7 @@ JSON
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "untyped hold" in result.stdout
-        assert "releasing if live state is ready under GREEN" in result.stdout
+        assert "releasing only after fresh controller admission" in result.stdout
         assert "never released automatically" not in result.stdout
         assert "would remove `queue-deferred` from #900" in result.stdout
 
@@ -1274,7 +1613,7 @@ JSON
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "fleet-gate-not-green:RED" in result.stdout
+        assert "fleet-gate-not-releasable:RED" in result.stdout
         assert "would remove" not in result.stdout
 
     def test_untyped_hold_stays_held_when_production_receipt_is_stale(

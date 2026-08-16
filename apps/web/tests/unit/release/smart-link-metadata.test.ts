@@ -207,12 +207,13 @@ describe('smart-link metadata', () => {
   });
 
   it('keeps collision-safe alias decisions eligible for on-demand ISR', async () => {
-    const { generateStaticParams, revalidate } = await import(
+    const { generateStaticParams, preferredRegion, revalidate } = await import(
       '@/app/[username]/[...slug]/page'
     );
 
     expect(generateStaticParams()).toEqual([]);
     expect(revalidate).toBe(300);
+    expect(preferredRegion).toEqual(['iad1', 'sfo1']);
   });
 
   it('returns redirect-sink metadata without loading the smart-link resolver after definite content misses', async () => {

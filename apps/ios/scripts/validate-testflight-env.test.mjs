@@ -18,7 +18,6 @@ const validEnv = {
   MATCH_GIT_URL: 'git@example.com:signing.git',
   MATCH_PASSWORD: 'password',
   MATCH_GIT_BASIC_AUTHORIZATION: 'authorization',
-  CLERK_ASSOCIATED_DOMAIN: 'accounts.jov.ie',
 };
 
 function runValidator(env) {
@@ -28,21 +27,7 @@ function runValidator(env) {
   });
 }
 
-test('accepts the Better Auth release contract without a Clerk client key', () => {
+test('accepts the Better Auth release contract', () => {
   const output = runValidator(validEnv);
   assert.match(output, /Validated TestFlight release configuration/);
-});
-
-test('still requires the associated domain used by the Apple entitlement', () => {
-  const { CLERK_ASSOCIATED_DOMAIN: _removed, ...missingDomainEnv } = validEnv;
-  assert.throws(
-    () => runValidator(missingDomainEnv),
-    error => {
-      assert.match(
-        `${error.stdout ?? ''}${error.stderr ?? ''}`,
-        /Missing required secret or env var: CLERK_ASSOCIATED_DOMAIN/
-      );
-      return true;
-    }
-  );
 });

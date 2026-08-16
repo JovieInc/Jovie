@@ -1,12 +1,16 @@
 import fs from 'node:fs';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { parseChangelog } from '@/lib/changelog-parser';
+import { changelogInlineText, parseChangelog } from '@/lib/changelog-parser';
 import { resolveMonorepoPath } from '@/lib/filesystem-paths';
 
 // Fully static
 export const revalidate = false;
 
 const CHANGELOG_PATH = resolveMonorepoPath('CHANGELOG.md');
+
+export function atomEntryId(version: string): string {
+  return `${BASE_URL}/changelog#v${version}`;
+}
 
 function escapeXml(s: string): string {
   return s
@@ -32,22 +36,25 @@ export async function GET() {
         ? `${release.date}T00:00:00Z`
         : new Date().toISOString();
       const summaryHtml = release.summary
-        ? `<p>${escapeXml(release.summary)}</p>`
+        ? `<p>${escapeXml(changelogInlineText(release.summary))}</p>`
         : '';
       const allEntries = [
+        ...release.sections.featured,
         ...release.sections.added,
         ...release.sections.changed,
         ...release.sections.fixed,
         ...release.sections.removed,
       ];
-      const listHtml = allEntries.map(c => `<li>${escapeXml(c)}</li>`).join('');
+      const listHtml = allEntries
+        .map(c => `<li>${escapeXml(changelogInlineText(c))}</li>`)
+        .join('');
       const contentHtml = summaryHtml + `<ul>${listHtml}</ul>`;
 
       return `
     <entry>
       <title>${escapeXml(APP_NAME)} v${escapeXml(release.version)}</title>
-      <id>${escapeXml(BASE_URL)}/changelog#v${escapeXml(release.version)}</id>
-      <link href="${escapeXml(BASE_URL)}/changelog" rel="alternate"/>
+      <id>${escapeXml(atomEntryId(release.version))}</id>
+      <link href="${escapeXml(BASE_URL)}/changelog/${escapeXml(release.version)}" rel="alternate"/>
       <updated>${updated}</updated>
       <content type="html">${escapeXml(contentHtml)}</content>
     </entry>`;

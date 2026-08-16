@@ -60,7 +60,54 @@ final class JovieUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["Tim White"].exists)
     XCTAssertTrue(app.buttons["Open navigation drawer"].exists)
     XCTAssertTrue(app.buttons["Open Settings"].exists)
+    XCTAssertTrue(app.buttons["dashboard-copy-url-button"].isEnabled)
+    XCTAssertTrue(app.buttons["dashboard-share-profile-button"].isEnabled)
+    XCTAssertTrue(app.buttons["Open Public Profile"].exists)
     attachScreenshot(named: "profile", app: app)
+  }
+
+  func testPublicProfileOpensInFullScreenEmbeddedBrowser() {
+    let app = launchMockApp(launchArgument: "-ui-testing-ready", expectedElementDescription: "\"Open Public Profile\"") {
+      $0.buttons["Open Public Profile"]
+    }
+
+    app.buttons["Open Public Profile"].tap()
+
+    XCTAssertTrue(
+      app.buttons["Close Public Profile"].waitForExistence(timeout: 3),
+      "Embedded public-profile browser did not open.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(app.buttons["Reload"].exists)
+    XCTAssertTrue(
+      app.staticTexts["Public Profile"].waitForExistence(timeout: 3),
+      "Embedded public-profile content did not finish loading.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "public-profile-browser", app: app)
+
+    app.buttons["Close Public Profile"].tap()
+    XCTAssertTrue(app.buttons["Open Public Profile"].waitForExistence(timeout: 3))
+  }
+
+  func testPublicProfileBrowserErrorRetriesToLoadedContent() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-ready",
+      additionalLaunchArguments: ["-ui-testing-public-profile-error"],
+      expectedElementDescription: "\"Open Public Profile\""
+    ) {
+      $0.buttons["Open Public Profile"]
+    }
+
+    app.buttons["Open Public Profile"].tap()
+
+    XCTAssertTrue(
+      app.staticTexts["Couldn't load this profile."].waitForExistence(timeout: 3),
+      "Embedded browser did not expose its recoverable error state.\n\(app.debugDescription)"
+    )
+    app.buttons["Retry"].tap()
+    XCTAssertTrue(
+      app.staticTexts["Public Profile"].waitForExistence(timeout: 3),
+      "Retry did not recover the embedded browser.\n\(app.debugDescription)"
+    )
   }
 
   func testReadyLaunchWithoutQRShowsUnavailableFallback() {
@@ -72,11 +119,18 @@ final class JovieUITests: XCTestCase {
     }
 
     XCTAssertTrue(app.staticTexts["Tim White"].exists)
-    XCTAssertTrue(app.buttons["Copy URL"].exists)
+    let copyButton = app.buttons["dashboard-copy-url-button"]
+    let shareButton = app.buttons["dashboard-share-profile-button"]
+    XCTAssertTrue(copyButton.exists)
+    XCTAssertFalse(copyButton.isEnabled)
+    XCTAssertTrue(shareButton.exists)
+    XCTAssertFalse(shareButton.isEnabled)
+    XCTAssertTrue(app.staticTexts["Profile link unavailable"].exists)
     XCTAssertTrue(
       app.buttons["QR unavailable"].exists,
       "Dashboard did not show the no-payload QR fallback.\n\(app.debugDescription)"
     )
+    attachScreenshot(named: "profile-controls-unavailable", app: app)
   }
 
   func testProfileLoadErrorRetryRestoresDashboard() {
@@ -98,15 +152,63 @@ final class JovieUITests: XCTestCase {
     )
   }
 
-  func testNeedsOnboardingLaunchShowsContinueOnWeb() {
+  func testNeedsOnboardingLaunchShowsNativeProfileCompletion() {
     let app = launchMockApp(
       launchArgument: "-ui-testing-needs-onboarding",
-      expectedElementDescription: "\"Continue on Web\""
+      expectedElementDescription: "\"Finish Your Profile\""
     ) {
-      $0.buttons["Continue on Web"]
+      $0.staticTexts["Finish Your Profile"]
     }
 
+    XCTAssertTrue(app.textFields["profile-completion-display-name"].exists)
+    XCTAssertTrue(app.textFields["profile-completion-handle"].exists)
+    XCTAssertTrue(app.buttons["profile-completion-submit"].exists)
+    XCTAssertFalse(
+      app.buttons["profile-completion-web-fallback"].exists,
+      "Core profile completion must stay inside the iOS app."
+    )
+
+    let displayName = app.textFields["profile-completion-display-name"]
+    let handle = app.textFields["profile-completion-handle"]
+    displayName.tap()
+    displayName.typeText("Tim White")
+    handle.tap()
+    handle.typeText("timwhite")
+    app.buttons["profile-completion-submit"].tap()
+
+    XCTAssertTrue(
+      app.staticTexts["profile-completion-error"].waitForExistence(timeout: 3),
+      "A failed native submission must remain recoverable on the native form.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(displayName.exists)
+    XCTAssertTrue(handle.exists)
+    XCTAssertTrue(app.buttons["profile-completion-submit"].isEnabled)
+    XCTAssertFalse(app.buttons["profile-completion-web-fallback"].exists)
     attachScreenshot(named: "needs-onboarding", app: app)
+  }
+
+  func testExpiredProfileCompletionReturnsToNativeSignIn() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-needs-onboarding-unauthorized",
+      expectedElementDescription: "\"Finish Your Profile\""
+    ) {
+      $0.staticTexts["Finish Your Profile"]
+    }
+
+    let displayName = app.textFields["profile-completion-display-name"]
+    let handle = app.textFields["profile-completion-handle"]
+    displayName.tap()
+    displayName.typeText("Tim White")
+    handle.tap()
+    handle.typeText("timwhite")
+    app.buttons["profile-completion-submit"].tap()
+
+    XCTAssertTrue(
+      app.buttons["Continue in Browser"].waitForExistence(timeout: 3),
+      "An expired onboarding session must return to native sign-in.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(app.staticTexts["Finish Your Profile"].exists)
+    XCTAssertFalse(app.buttons["profile-completion-web-fallback"].exists)
   }
 
   func testFullScreenSettingsLogsOutToSignedOut() {
@@ -115,7 +217,7 @@ final class JovieUITests: XCTestCase {
     }
 
     attachScreenshot(named: "settings", app: app)
-    for linkTitle in ["Support", "Billing", "Privacy", "Terms"] {
+    for linkTitle in ["Manage Account", "Support", "Billing", "Privacy", "Terms"] {
       XCTAssertTrue(
         app.buttons[linkTitle].waitForExistence(timeout: 2),
         "Settings row \(linkTitle) did not appear.\n\(app.debugDescription)"
@@ -129,6 +231,13 @@ final class JovieUITests: XCTestCase {
     }
 
     app.buttons["Log Out"].tap()
+
+    XCTAssertTrue(
+      app.buttons["Confirm Log Out"].waitForExistence(timeout: 3),
+      "Logout confirmation did not appear.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "settings-logout-confirmation", app: app)
+    app.buttons["Confirm Log Out"].tap()
 
     XCTAssertTrue(
       app.buttons["Continue in Browser"].waitForExistence(timeout: 5),
@@ -314,9 +423,25 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "no-ghost-footprint-chat", app: chatApp)
 
     chatApp.buttons["Open navigation drawer"].tap()
-    chatApp.buttons["shell-drawer-surface-shell-tab-profile"].tap()
+    let contentPlaneMarker = chatApp.buttons["Open navigation drawer"]
+    let profileSurface = chatApp.buttons["shell-drawer-surface-shell-tab-profile"]
+    XCTAssertTrue(
+      waitForDrawerSurfaceToBeUncovered(
+        profileSurface,
+        contentPlaneMarker: contentPlaneMarker,
+        // Hosted runners can spend more than a second on each accessibility
+        // snapshot. Keep the geometry + stable-interval contract intact while
+        // allowing enough time for two settled samples.
+        timeout: 10
+      ),
+      "Profile surface stayed covered by the opening content plane.\n\(chatApp.debugDescription)"
+    )
+    profileSurface.tap()
     let copyURLButton = chatApp.buttons["Copy URL"]
-    XCTAssertTrue(copyURLButton.waitForExistence(timeout: 10))
+    XCTAssertTrue(
+      copyURLButton.waitForExistence(timeout: 10),
+      "Shell navigation did not switch to Profile.\n\(chatApp.debugDescription)"
+    )
     attachScreenshot(named: "no-ghost-footprint-profile", app: chatApp)
     endUITestSession(chatApp)
 
@@ -324,12 +449,12 @@ final class JovieUITests: XCTestCase {
     // all, and no leftover blank strip reserved at the bottom of the shell.
     let onboardingApp = launchMockApp(
       launchArgument: "-ui-testing-needs-onboarding",
-      expectedElementDescription: "\"Continue on Web\""
+      expectedElementDescription: "\"Finish Your Profile\""
     ) {
-      $0.buttons["Continue on Web"]
+      $0.staticTexts["Finish Your Profile"]
     }
-    let continueButton = onboardingApp.buttons["Continue on Web"]
-    XCTAssertTrue(continueButton.waitForExistence(timeout: 3))
+    let completionButton = onboardingApp.buttons["profile-completion-submit"]
+    XCTAssertTrue(completionButton.waitForExistence(timeout: 3))
     XCTAssertFalse(
       shellControlExists(onboardingApp, identifier: "shell-talk-fab"),
       "Talk FAB should not render when chat is disabled.\n\(onboardingApp.debugDescription)"
@@ -843,39 +968,16 @@ final class JovieUITests: XCTestCase {
 
   func testLiveAuthViewRenders() throws {
     guard testEnvironmentValue("JOVIE_IOS_LIVE_AUTH_UI") == "1" else {
-      throw XCTSkip("Set JOVIE_IOS_LIVE_AUTH_UI=1 to run the live Clerk UI spike.")
+      throw XCTSkip("Set JOVIE_IOS_LIVE_AUTH_UI=1 to run the live Better Auth UI flow.")
     }
 
-    let app = try makeLiveClerkApp(launchArgument: "-ui-testing-live-auth")
+    let app = makeLiveAuthApp(launchArgument: "-ui-testing-live-auth")
     app.launch()
 
     XCTAssertTrue(
       app.buttons["Continue in Browser"].waitForExistence(timeout: 10),
       "Browser auth entry button did not appear.\n\(app.debugDescription)"
     )
-  }
-
-  func testLiveNativeSessionCanReachAnAuthenticatedMobileState() throws {
-    guard testEnvironmentValue("JOVIE_IOS_LIVE_AUTH_UI") == "1" else {
-      throw XCTSkip("Set JOVIE_IOS_LIVE_AUTH_UI=1 to run the live Clerk UI spike.")
-    }
-
-    let app = try makeLiveClerkApp(launchArgument: "-ui-testing-auto-auth")
-    app.launch()
-
-    let copyURLButton = app.buttons["Copy URL"]
-    let continueOnWebButton = app.buttons["Continue on Web"]
-    let deadline = Date().addingTimeInterval(25)
-
-    while Date() < deadline {
-      if copyURLButton.exists || continueOnWebButton.exists {
-        return
-      }
-
-      RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-    }
-
-    XCTFail("Live auth did not reach dashboard or onboarding.\n\(app.debugDescription)")
   }
 
   func testRealBrowserAuthProviderCompleteReachesAuthenticatedShell() throws {
@@ -987,35 +1089,27 @@ final class JovieUITests: XCTestCase {
     )
 
     XCTAssertTrue(
-      app.staticTexts["Couldn't finish sign-in. Try again."].waitForExistence(timeout: 10),
+      app.staticTexts["Sign-in was cancelled. Sign in again when you're ready."]
+        .waitForExistence(timeout: 10),
       "Provider error callback did not render the auth error.\n\(app.debugDescription)"
     )
+    let retryButton = app.buttons["Sign In Again"]
+    XCTAssertTrue(
+      retryButton.exists && retryButton.isEnabled && retryButton.isHittable,
+      "Provider error callback did not expose the retry action.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "auth-cancel-recovery", app: app)
   }
 
-  private func makeLiveClerkApp(launchArgument: String) throws -> XCUIApplication {
-    let publishableKey =
-      testEnvironmentValue("CLERK_PUBLISHABLE_KEY") ??
-      testEnvironmentValue("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY") ??
-      ""
+  private func makeLiveAuthApp(launchArgument: String) -> XCUIApplication {
     let apiBaseURL =
       testEnvironmentValue("JOVIE_IOS_API_BASE_URL") ??
       testEnvironmentValue("API_BASE_URL") ??
       "http://localhost:3003"
-    let emailAddress = try requiredEnvironmentValue("E2E_CLERK_USER_USERNAME")
-    let verificationCode = testEnvironmentValue("JOVIE_IOS_LIVE_AUTH_CODE") ?? "424242"
-
     let app = XCUIApplication()
     app.launchArguments.append(launchArgument)
     app.launchArguments.append("-ui-testing-allow-exit")
     app.launchEnvironment["API_BASE_URL"] = apiBaseURL
-    app.launchEnvironment["E2E_CLERK_USER_USERNAME"] = emailAddress
-    app.launchEnvironment["JOVIE_IOS_LIVE_AUTH_CODE"] = verificationCode
-
-    if !publishableKey.isEmpty {
-      app.launchEnvironment["CLERK_PUBLISHABLE_KEY"] = publishableKey
-      app.launchEnvironment["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"] = publishableKey
-    }
-
     addTeardownBlock { [app] in
       self.endUITestSession(app)
     }
@@ -1024,16 +1118,8 @@ final class JovieUITests: XCTestCase {
   }
 
   private func makeRealBrowserAuthApp() throws -> XCUIApplication {
-    let publishableKey =
-      testEnvironmentValue("CLERK_PUBLISHABLE_KEY") ??
-      testEnvironmentValue("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY") ??
-      ""
     let apiBaseURL = try requiredHTTPSURL("API_BASE_URL")
     let webBaseURL = try requiredHTTPSURL("WEB_BASE_URL")
-
-    guard !publishableKey.isEmpty else {
-      throw XCTSkip("Missing CLERK_PUBLISHABLE_KEY for HTTPS browser auth testing.")
-    }
 
     let app = XCUIApplication()
     app.launchArguments.append("-ui-testing-real-browser-auth")
@@ -1043,9 +1129,6 @@ final class JovieUITests: XCTestCase {
     app.launchEnvironment["JOVIE_IOS_REAL_BROWSER_AUTH"] = "1"
     app.launchEnvironment["JOVIE_IOS_REAL_BROWSER_AUTH_PERSONA"] =
       testEnvironmentValue("JOVIE_IOS_REAL_BROWSER_AUTH_PERSONA") ?? "creator-ready"
-    app.launchEnvironment["CLERK_PUBLISHABLE_KEY"] = publishableKey
-    app.launchEnvironment["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"] = publishableKey
-
     if let token = testEnvironmentValue("JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN"),
        !token.isEmpty
     {
@@ -1062,7 +1145,7 @@ final class JovieUITests: XCTestCase {
   private func requiredEnvironmentValue(_ key: String) throws -> String {
     let value = testEnvironmentValue(key) ?? ""
     guard !value.isEmpty else {
-      throw XCTSkip("Missing \(key) or TEST_RUNNER_\(key) for live Clerk UI testing.")
+      throw XCTSkip("Missing \(key) or TEST_RUNNER_\(key) for live auth UI testing.")
     }
 
     return value
@@ -1175,14 +1258,17 @@ final class JovieUITests: XCTestCase {
   }
 
   /// SwiftUI reports recessed drawer controls hittable before the animated
-  /// content plane has physically cleared them. Wait on the actual frames so
-  /// XCUITest cannot synthesize a tap into the covering plane.
+  /// content plane and delayed row reveal have settled. Wait on the actual
+  /// frames and require a short stable interval so XCUITest cannot synthesize
+  /// a tap into either transition.
   private func waitForDrawerSurfaceToBeUncovered(
     _ surface: XCUIElement,
     contentPlaneMarker: XCUIElement,
     timeout: TimeInterval
   ) -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
+    let stableInterval: TimeInterval = 0.1
+    var uncoveredSince: Date?
 
     while Date() < deadline {
       if surface.exists,
@@ -1190,16 +1276,19 @@ final class JovieUITests: XCTestCase {
          contentPlaneMarker.exists,
          contentPlaneMarker.frame.minX >= surface.frame.maxX
       {
-        return true
+        let now = Date()
+        if let uncoveredSince, now.timeIntervalSince(uncoveredSince) >= stableInterval {
+          return true
+        }
+        uncoveredSince = uncoveredSince ?? now
+      } else {
+        uncoveredSince = nil
       }
 
       RunLoop.current.run(until: Date().addingTimeInterval(0.05))
     }
 
-    return surface.exists
-      && surface.isHittable
-      && contentPlaneMarker.exists
-      && contentPlaneMarker.frame.minX >= surface.frame.maxX
+    return false
   }
 
   /// Resolve a primary tab bar / Talk FAB control by accessibility identifier.

@@ -15,12 +15,14 @@ struct AppBuildInfo: Equatable {
 struct SettingsView: View {
   let profile: AppShellProfile
   let buildInfo: AppBuildInfo
+  let accountURL: URL
   let billingURL: URL
   var onClose: (() -> Void)?
   let onLogout: @MainActor () async -> Void
 
   @Environment(\.openURL) private var openURL
   @State private var isLoggingOut = false
+  @State private var isShowingLogoutConfirmation = false
 
   var body: some View {
     ScrollView {
@@ -37,6 +39,20 @@ struct SettingsView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .background(JovieColor.backgroundBase)
     .accessibilityIdentifier("settings-view")
+    .confirmationDialog(
+      "Log out of Jovie?",
+      isPresented: $isShowingLogoutConfirmation,
+      titleVisibility: .visible
+    ) {
+      Button("Log Out", role: .destructive) {
+        performLogout()
+      }
+      .accessibilityLabel("Confirm Log Out")
+
+      Button("Cancel", role: .cancel) {}
+    } message: {
+      Text("You'll need to sign in again to use your creator account on this device.")
+    }
   }
 
   private var header: some View {
@@ -83,6 +99,12 @@ struct SettingsView: View {
         Spacer(minLength: 0)
       }
       .padding(JovieSpacing.medium)
+      .background(JovieColor.surface0, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
+
+      SettingsLinkRow(title: "Manage Account", systemImage: "person.crop.circle") {
+        openURL(accountURL)
+      }
+      .padding(.vertical, JovieSpacing.xSmall)
       .background(JovieColor.surface0, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
     }
   }
@@ -136,12 +158,7 @@ struct SettingsView: View {
   private var logoutButton: some View {
     Button {
       guard !isLoggingOut else { return }
-      isLoggingOut = true
-
-      Task {
-        await onLogout()
-        isLoggingOut = false
-      }
+      isShowingLogoutConfirmation = true
     } label: {
       // Reserve a stable footprint across the Log Out / Logging Out states:
       // fixed-height spinner slot + single-line, non-wrapping label so the
@@ -162,6 +179,16 @@ struct SettingsView: View {
     .buttonStyle(JoviePillButtonStyle(filled: false))
     .disabled(isLoggingOut)
     .accessibilityLabel("Log Out")
+  }
+
+  private func performLogout() {
+    guard !isLoggingOut else { return }
+    isLoggingOut = true
+
+    Task {
+      await onLogout()
+      isLoggingOut = false
+    }
   }
 }
 

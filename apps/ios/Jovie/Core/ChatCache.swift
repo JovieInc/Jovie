@@ -10,35 +10,35 @@ actor ChatCache {
     self.defaults = defaults
   }
 
-  func load(for clerkUserID: String) -> CachedChatSnapshot? {
-    if let snapshot = memory[clerkUserID] {
+  func load(for userID: String) -> CachedChatSnapshot? {
+    if let snapshot = memory[userID] {
       return snapshot
     }
 
     guard
-      let data = defaults.data(forKey: cacheKey(for: clerkUserID)),
+      let data = defaults.data(forKey: cacheKey(for: userID)),
       let snapshot = try? decoder.decode(CachedChatSnapshot.self, from: data)
     else {
       return nil
     }
 
-    memory[clerkUserID] = snapshot
+    memory[userID] = snapshot
     return snapshot
   }
 
-  func store(_ snapshot: CachedChatSnapshot, for clerkUserID: String) {
-    memory[clerkUserID] = snapshot
+  func store(_ snapshot: CachedChatSnapshot, for userID: String) {
+    memory[userID] = snapshot
     if let data = try? encoder.encode(snapshot) {
-      defaults.set(data, forKey: cacheKey(for: clerkUserID))
+      defaults.set(data, forKey: cacheKey(for: userID))
     }
   }
 
-  func remove(for clerkUserID: String) {
-    memory[clerkUserID] = nil
-    defaults.removeObject(forKey: cacheKey(for: clerkUserID))
+  func remove(for userID: String) {
+    memory[userID] = nil
+    defaults.removeObject(forKey: cacheKey(for: userID))
   }
 
-  private func cacheKey(for clerkUserID: String) -> String {
-    "ie.jov.Jovie.mobileChat.\(clerkUserID)"
+  private func cacheKey(for userID: String) -> String {
+    "ie.jov.Jovie.mobileChat.\(userID)"
   }
 }

@@ -416,34 +416,31 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["deploymentAdmission"]["allowed"])
         self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
 
-    def test_queue_observation_counts_only_green_ready_non_draft_prs(self):
+    def test_queue_observation_uses_compact_merge_state_without_nested_rollups(self):
         prs = [
             {
+                "number": 1,
                 "isDraft": False,
                 "labels": [],
                 "mergeStateStatus": "CLEAN",
-                "statusCheckRollup": [
-                    {"conclusion": "SUCCESS"},
-                    {"state": "SUCCESS"},
-                ],
             },
             {
+                "number": 2,
                 "isDraft": False,
                 "labels": [],
                 "mergeStateStatus": "BLOCKED",
-                "statusCheckRollup": [{"conclusion": "FAILURE"}],
             },
             {
+                "number": 3,
                 "isDraft": True,
                 "labels": [],
                 "mergeStateStatus": "CLEAN",
-                "statusCheckRollup": [{"conclusion": "SUCCESS"}],
             },
             {
+                "number": 4,
                 "isDraft": False,
                 "labels": [{"name": "queue-deferred"}],
                 "mergeStateStatus": "CLEAN",
-                "statusCheckRollup": [{"conclusion": "SUCCESS"}],
             },
         ]
         completed = subprocess.CompletedProcess(
@@ -456,6 +453,36 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(observed["eligiblePrs"], 2)
         self.assertEqual(observed["greenReadyPrs"], 1)
         self.assertEqual(observed["target"], 15)
+
+    def test_queue_observation_retries_transient_gateway_failure(self):
+        timeout = subprocess.CalledProcessError(
+            1, ["gh"], stderr="GraphQL: HTTP 504 Gateway Timeout"
+        )
+        completed = subprocess.CompletedProcess(
+            args=["gh"],
+            returncode=0,
+            stdout=json.dumps([
+                {"number": 1, "isDraft": False, "labels": [], "mergeStateStatus": "CLEAN"}
+            ]),
+            stderr="",
+        )
+        with (
+            mock.patch.object(MODULE.subprocess, "run", side_effect=[timeout, completed]) as run,
+            mock.patch.object(MODULE.time, "sleep") as sleep,
+        ):
+            observed = MODULE.observe_queue("JovieInc/Jovie", 15)
+
+        self.assertEqual(observed["status"], "known")
+        self.assertEqual(observed["greenReadyPrs"], 1)
+        self.assertEqual(run.call_count, 2)
+        sleep.assert_called_once_with(1)
+
+    def test_queue_observation_preserves_unknown_after_nontransient_failure(self):
+        failure = subprocess.CalledProcessError(1, ["gh"], stderr="authentication required")
+        with mock.patch.object(MODULE.subprocess, "run", side_effect=failure):
+            observed = MODULE.observe_queue("JovieInc/Jovie", 15)
+
+        self.assertEqual(observed["status"], "unknown")
 
     def test_stale_deployment_sha_freezes_promotion_but_allows_catchup_deploy(self):
         signals = dict(GREEN_SIGNALS)
@@ -809,7 +836,8 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("cancel-in-progress: false", content)
         self.assertIn("github.event.pull_request.merged != true", content)
         self.assertIn("JOVIE_AGENT_PROFILE: no_agent", content)
-        self.assertIn("timeout 240s scripts/backlog-orchestrator/run-backlog.sh gate-next", content)
+        self.assertIn("timeout 180s scripts/backlog-orchestrator/run-backlog.sh reconcile", content)
+        self.assertIn("timeout 60s scripts/backlog-orchestrator/run-backlog.sh gate-next", content)
         self.assertIn("symphony-event-admission-heartbeat/v1", content)
 
     def test_stale_window_matches_the_consumer_fail_closed_window(self):

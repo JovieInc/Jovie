@@ -19,7 +19,7 @@ private actor MockRepository: AppStateRepository {
     self.cached = cached
   }
 
-  func loadMe(for clerkUserID: String) async throws -> MeRepositoryResult {
+  func loadMe(for userID: String) async throws -> MeRepositoryResult {
     loadCallCount += 1
     if let loadDelay {
       try await Task.sleep(for: loadDelay)
@@ -27,12 +27,12 @@ private actor MockRepository: AppStateRepository {
     return try nextResult.get()
   }
 
-  func cachedSnapshot(for clerkUserID: String) -> MobileMeResponse? {
+  func cachedSnapshot(for userID: String) -> MobileMeResponse? {
     cached
   }
 
-  func clearCachedUser(_ clerkUserID: String) {
-    clearedUserIDs.append(clerkUserID)
+  func clearCachedUser(_ userID: String) {
+    clearedUserIDs.append(userID)
   }
 
   func clearedUsers() -> [String] {
@@ -53,6 +53,24 @@ private final class MockBrightnessController: BrightnessControlling, @unchecked 
   func restoreBrightness() async {}
 }
 
+private actor MockSessionRevoker: NativeSessionRevoking {
+  private let result: NativeSessionRevocationResult
+  private var callCount = 0
+
+  init(result: NativeSessionRevocationResult) {
+    self.result = result
+  }
+
+  func revokeCurrentSession() async -> NativeSessionRevocationResult {
+    callCount += 1
+    return result
+  }
+
+  func calls() -> Int {
+    callCount
+  }
+}
+
 @Suite(.serialized)
 @MainActor
 struct AppStateTests {
@@ -62,8 +80,7 @@ struct AppStateTests {
     sentryDSN: nil,
     observabilityIngestURL: nil,
     observabilityIngestSecret: nil,
-    observabilityEnvironment: "test",
-    clerkCallbackUrlScheme: "ie.jov.jovie"
+    observabilityEnvironment: "test"
   )
 
   @Test func mapsReadyResponseToReadyRoute() async throws {
@@ -78,7 +95,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("user_123")
 
@@ -109,7 +126,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     async let change: Void = appState.handleSignedInUserChange("user_123")
 
@@ -140,7 +157,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     async let first: Void = appState.handleSignedInUserChange("user_123")
     async let second: Void = appState.handleSignedInUserChange("user_123")
@@ -162,7 +179,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("user_123")
 
@@ -188,7 +205,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     async let change: Void = appState.handleSignedInUserChange("user_123")
 
@@ -225,7 +242,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("user_123")
 
@@ -239,13 +256,15 @@ struct AppStateTests {
         MeRepositoryResult(response: .previewReady, isStale: false)
       )
     )
+    let sessionRevoker = MockSessionRevoker(result: .revoked)
     let appState = AppState(
       configuration: configuration,
       launchMode: .live,
       repository: repository,
-      brightnessManager: MockBrightnessController()
+      brightnessManager: MockBrightnessController(),
+      sessionRevoker: sessionRevoker
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("user_123")
     await appState.signOut()
@@ -254,6 +273,58 @@ struct AppStateTests {
     #expect(appState.dashboardState == .idle)
     #expect(appState.activeUserID == nil)
     #expect(appState.isOffline == false)
+    #expect(await sessionRevoker.calls() == 1)
+    #expect(await repository.clearedUsers() == ["user_123"])
+  }
+
+  @Test func signOutStillClearsLocalStateWhenRemoteRevocationFails() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let sessionRevoker = MockSessionRevoker(result: .failed(statusCode: 503))
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController(),
+      sessionRevoker: sessionRevoker
+    )
+    appState.didInitializeAuth = true
+
+    await appState.handleSignedInUserChange("user_123")
+    await appState.signOut()
+
+    #expect(appState.route == .signedOut)
+    #expect(appState.activeUserID == nil)
+    #expect(await sessionRevoker.calls() == 1)
+    #expect(await repository.clearedUsers() == ["user_123"])
+  }
+
+  @Test func expiredSessionReturnsToSignInWithoutRemoteRevocation() async throws {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let sessionRevoker = MockSessionRevoker(result: .revoked)
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController(),
+      sessionRevoker: sessionRevoker
+    )
+    appState.didInitializeAuth = true
+
+    await appState.handleSignedInUserChange("user_123")
+    await appState.handleExpiredSession()
+
+    #expect(appState.route == .signedOut)
+    #expect(appState.dashboardState == .idle)
+    #expect(appState.activeUserID == nil)
+    #expect(await sessionRevoker.calls() == 0)
     #expect(await repository.clearedUsers() == ["user_123"])
   }
 
@@ -274,7 +345,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange(userID)
 
@@ -297,7 +368,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("observability_user_123")
     await appState.handleSignedInUserChange(nil)
@@ -318,7 +389,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     async let first: Void = appState.handleSignedInUserChange("user_123")
     async let second: Void = appState.handleSignedInUserChange("user_123")
@@ -341,7 +412,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     async let load: Void = appState.handleSignedInUserChange("user_123")
     try await Task.sleep(for: .milliseconds(10))
@@ -364,7 +435,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("user_123")
 
@@ -422,7 +493,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("user_123")
 
@@ -457,7 +528,7 @@ struct AppStateTests {
       repository: repository,
       brightnessManager: MockBrightnessController()
     )
-    appState.didLoadClerk = true
+    appState.didInitializeAuth = true
 
     await appState.handleSignedInUserChange("user_123")
 
@@ -572,7 +643,9 @@ struct AppStateTests {
         state: "state_123"
       )
     )
-    #expect(result?.userMessage == "Couldn't finish sign-in. Try again.")
+    #expect(
+      result?.userMessage == "Sign-in was cancelled. Sign in again when you're ready."
+    )
   }
 
   @Test func mobileAuthReturnParserAcceptsSanitizedServerErrorCallback() {
@@ -590,6 +663,71 @@ struct AppStateTests {
       )
     )
     #expect(result?.userMessage == "Couldn't finish sign-in. Try again.")
+  }
+
+  @Test func mobileAuthRecoveryMessageMakesRetryActionExplicit() {
+    #expect(
+      mobileAuthButtonTitle(
+        isOpening: false,
+        isDisabled: false,
+        hasRecoveryMessage: true
+      ) == "Sign In Again"
+    )
+    #expect(
+      mobileAuthButtonTitle(
+        isOpening: false,
+        isDisabled: false,
+        hasRecoveryMessage: false
+      ) == "Continue in Browser"
+    )
+    #expect(canStartMobileAuth(isMock: false, isOpening: false))
+    #expect(!canStartMobileAuth(isMock: false, isOpening: true))
+    #expect(
+      mobileAuthButtonIsDisabled(isDisabled: false, isOpening: true)
+    )
+  }
+
+  @Test func mobileAuthFailuresPreserveCancellationRecoveryCopy() {
+    #expect(
+      mobileAuthFailureMessage(for: CancellationError()) == MobileAuthCopy.cancellation
+    )
+
+    let providerError = MobileAuthCoordinatorError.providerError(
+      MobileAuthProviderError(
+        error: "access_denied",
+        errorDescription: nil,
+        state: "state_123"
+      )
+    )
+
+    #expect(
+      mobileAuthFailureMessage(for: providerError) == MobileAuthCopy.cancellation
+    )
+    #expect(
+      mobileAuthFailureMessage(for: MobileAuthCoordinatorError.invalidAuthURL) ==
+        MobileAuthCopy.failure
+    )
+  }
+
+  @Test func providerErrorCallbacksRequirePendingSignedOutAuth() {
+    #expect(
+      shouldHandleMobileAuthProviderError(
+        route: .signedOut,
+        hasPendingVerifier: true
+      )
+    )
+    #expect(
+      !shouldHandleMobileAuthProviderError(
+        route: .ready,
+        hasPendingVerifier: true
+      )
+    )
+    #expect(
+      !shouldHandleMobileAuthProviderError(
+        route: .signedOut,
+        hasPendingVerifier: false
+      )
+    )
   }
 
   @Test func mobileAuthReturnParserConsumesStoredVerifierForOpenURLCallback() async {
@@ -711,6 +849,22 @@ struct AppStateTests {
     )
 
     #expect(appState.billingURL.absoluteString == "https://jov.ie/app/settings/billing")
+  }
+
+  @Test func accountURLUsesCanonicalWebSettingsRoute() {
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+
+    #expect(appState.accountURL.absoluteString == "https://jov.ie/app/settings/account")
   }
 }
 

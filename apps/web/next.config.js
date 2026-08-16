@@ -472,6 +472,19 @@ const nextConfig = {
       },
     ]);
 
+    // Social shortcut aliases: jov.ie/{username}/{platform} (ig, tt, x, yt,
+    // sp, web) serve the live /{username}/s/{platform} route handler, so the
+    // bare slug 301s to the artist's social URL and records the same
+    // 'social_shortcut' click. Keep this alternation in sync with
+    // SOCIAL_SHORTCUT_SLUG_MAP in lib/social/shortcut-platforms.ts.
+    // @see JOV-5072
+    const socialShortcutAliasRewrites = [
+      {
+        source: '/:username/:platform(ig|tt|x|yt|sp|web)',
+        destination: '/:username/s/:platform',
+      },
+    ];
+
     return {
       beforeFiles: [],
       // Run after concrete filesystem routes but before /[username]/[slug].
@@ -479,6 +492,7 @@ const nextConfig = {
       // content before falling back to the legacy profile-mode redirect.
       afterFiles: [
         ...profileModeAliasRewrites,
+        ...socialShortcutAliasRewrites,
         {
           source: '/:username',
           has: [

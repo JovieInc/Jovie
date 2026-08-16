@@ -4,7 +4,7 @@ import Testing
 
 @Suite(.serialized)
 struct MobileAuthFinalizationTests {
-  @Test func sessionTokenPlanSkipsClerkStartup() {
+  @Test func sessionTokenPlanUsesBetterAuthSession() {
     let response = NativeAuthExchangeResponse(
       ticket: "ticket_should_be_ignored",
       sessionToken: "native-session-token",
@@ -111,11 +111,11 @@ struct MobileAuthFinalizationTests {
       }
     )
 
-    #expect(result.shouldConfigureClerk == false)
+    #expect(result.shouldUseLiveAuth == false)
     #expect(result.authErrorMessage == nil)
   }
 
-  @Test func liveLaunchConfigurationEnablesClerkForValidLiveConfig() {
+  @Test func liveLaunchConfigurationEnablesBetterAuthForValidLiveConfig() {
     let configuration = testConfiguration()
 
     let result = LiveLaunchConfigurationResolver.resolve(
@@ -124,7 +124,7 @@ struct MobileAuthFinalizationTests {
       loadUnvalidatedConfiguration: { testConfiguration() }
     )
 
-    #expect(result.shouldConfigureClerk == true)
+    #expect(result.shouldUseLiveAuth == true)
     #expect(result.authErrorMessage == nil)
   }
 
@@ -135,8 +135,7 @@ struct MobileAuthFinalizationTests {
       sentryDSN: nil,
       observabilityIngestURL: nil,
       observabilityIngestSecret: nil,
-      observabilityEnvironment: "test",
-      clerkCallbackUrlScheme: "ie.jov.jovie"
+      observabilityEnvironment: "test"
     )
   }
 }

@@ -238,6 +238,9 @@ describe('UnifiedSidebar library route', () => {
       'href',
       APP_ROUTES.CHAT
     );
+    expect(screen.getByRole('link', { name: 'Back to App' })).toHaveClass(
+      'focus-ring-themed'
+    );
     expect(
       screen.queryByRole('button', { name: 'Search Sidebar' })
     ).not.toBeInTheDocument();

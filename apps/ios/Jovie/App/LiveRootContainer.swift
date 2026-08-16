@@ -1,10 +1,7 @@
-import ClerkKit
 import SwiftUI
 
 struct LiveRootContainer: View {
-  @Environment(Clerk.self) private var clerk
   @Bindable var appState: AppState
-  @State private var didBootstrapLiveAuth = false
   @State private var didHydrateNativeSession = false
   @State private var didHandleLaunchAuthCallback = false
   @State private var authReturnTask: Task<Void, Never>?
@@ -16,10 +13,9 @@ struct LiveRootContainer: View {
       appState: appState,
       isAuthAvailable: true,
       isSignInUnavailable: false,
-      liveUserID: clerk.user?.id,
+      authenticatedUserID: appState.activeUserID,
       authErrorMessage: authErrorMessage,
       onLogout: {
-        try? await clerk.auth.signOut()
         await appState.signOut()
       },
       onAuthReturn: handleAuthReturn,
@@ -37,18 +33,18 @@ struct LiveRootContainer: View {
           handleAuthReturn(url)
         }
       }
-      .task(id: appState.didLoadClerk) {
-        guard appState.didLoadClerk,
-              didHydrateNativeSession == false,
-              clerk.user == nil,
-              let nativeSession = NativeSessionTokenStore.load()
-        else {
+      .task(id: appState.didInitializeAuth) {
+        guard appState.didInitializeAuth, didHydrateNativeSession == false else {
           return
         }
 
         didHydrateNativeSession = true
-        MobileAuthDiagnostics.record("native_session_hydrated")
-        await appState.handleSignedInUserChange(nativeSession.userID)
+        if let nativeSession = NativeSessionTokenStore.load() {
+          MobileAuthDiagnostics.record("native_session_hydrated")
+          await appState.handleSignedInUserChange(nativeSession.userID)
+        } else {
+          await appState.handleSignedInUserChange(nil)
+        }
       }
 #if DEBUG
       .task(id: appState.route) {
@@ -80,60 +76,6 @@ struct LiveRootContainer: View {
         }
       }
 #endif
-      .task(id: appState.launchMode.requiresAutoAuth) {
-        guard appState.launchMode.requiresAutoAuth, didBootstrapLiveAuth == false else {
-          return
-        }
-
-        didBootstrapLiveAuth = true
-
-        do {
-#if DEBUG
-          LiveAuthUITestStatus.set("starting")
-#endif
-          let userID = try await LiveAuthBootstrapper.signInFromEnvironment()
-          Observability.addBreadcrumb(
-            .clerkSessionExchangeSucceeded,
-            context: ["stage": "live_auth_bootstrap"]
-          )
-          await appState.handleSignedInUserChange(userID)
-
-#if DEBUG
-          LiveAuthUITestStatus.setRouteStatus(appState.route, userID: userID)
-#endif
-        } catch {
-          Observability.addBreadcrumb(
-            .clerkSessionExchangeFailed,
-            level: .error,
-            context: observabilityFailureContext(
-              stage: "live_auth_bootstrap",
-              error: error
-            )
-          )
-          Observability.captureError(
-            error,
-            event: .clerkSessionExchangeFailed,
-            context: observabilityFailureContext(
-              stage: "live_auth_bootstrap",
-              error: error
-            )
-          )
-#if DEBUG
-          LiveAuthUITestStatus.set(
-            "error",
-            error: error.localizedDescription.isEmpty
-              ? "Live auth bootstrap failed."
-              : error.localizedDescription
-          )
-#endif
-          appState.route = .ready
-          appState.dashboardState = .error(
-            error.localizedDescription.isEmpty
-              ? "Live auth bootstrap failed."
-              : error.localizedDescription
-          )
-        }
-      }
       .onDisappear {
         authReturnTask?.cancel()
         authReturnTask = nil
@@ -155,6 +97,19 @@ struct LiveRootContainer: View {
 
     Task { @MainActor in
       if let providerError = MobileAuthReturnParser.parseProviderError(url) {
+        guard shouldHandleMobileAuthProviderError(
+          route: appState.route,
+          hasPendingVerifier: MobileAuthPendingStore.shared.hasCodeVerifier()
+        ) else {
+          Observability.addBreadcrumb(
+            .deepLinkParseFailed,
+            level: .warning,
+            context: ["reason": "provider_error_without_pending_auth"]
+          )
+          return
+        }
+
+        MobileAuthPendingStore.shared.clear()
         Observability.addBreadcrumb(
           .deepLinkRouteMatched,
           level: .warning,
@@ -162,7 +117,6 @@ struct LiveRootContainer: View {
         )
         authReturnTask?.cancel()
         authReturnTask = nil
-        await appState.signOut()
         authErrorMessage = providerError.userMessage
         MobileAuthDiagnostics.record("auth_callback_provider_error", detail: providerError.error)
 #if DEBUG
@@ -238,13 +192,12 @@ struct LiveRootContainer: View {
     appState.route = .launching
     MobileAuthDiagnostics.record("auth_finalization_started")
 #if DEBUG
-    NativeTicketSignInDiagnostics.clear()
     LiveAuthUITestStatus.set("exchanging")
 #endif
 
     authReturnTask = Task { @MainActor in
       let span = Observability.startSpan(
-        name: .clerkSessionExchangeStarted,
+        name: .nativeAuthExchangeStarted,
         context: ["stage": "native_auth_return"]
       )
       defer {
@@ -254,7 +207,7 @@ struct LiveRootContainer: View {
 
       do {
         Observability.addBreadcrumb(
-          .clerkSessionExchangeStarted,
+          .nativeAuthExchangeStarted,
           context: ["stage": "native_auth_return"]
         )
         let exchangeResponse = try await runMobileAuthFinalizationStage("exchange") {
@@ -263,7 +216,7 @@ struct LiveRootContainer: View {
           ).exchange(authReturn)
         }
         Observability.addBreadcrumb(
-          .clerkSessionExchangeSucceeded,
+          .nativeAuthExchangeSucceeded,
           context: ["stage": "native_auth_exchange"]
         )
 
@@ -280,7 +233,7 @@ struct LiveRootContainer: View {
           )
           MobileAuthDiagnostics.record("native_exchange_session_token_received")
           Observability.addBreadcrumb(
-            .clerkSessionExchangeSucceeded,
+            .nativeAuthExchangeSucceeded,
             context: ["stage": "native_session_token"]
           )
           Observability.addBreadcrumb(.nativeSessionPersisted)
@@ -290,13 +243,6 @@ struct LiveRootContainer: View {
 #endif
           return
         }
-
-        // MobileAuthFinalizationPlan is now exhaustive under Better Auth
-        // (plan decision 9 — the `requiresClerkTicketFlow` case is deleted).
-        // The control-flow reachability here is impossible; the switch above
-        // returns on the only case. The code below is unreachable but kept
-        // for defensive clarity until the next-purge commit removes it.
-        throw MobileAuthReturnError.missingExchangeCredential
       } catch {
         guard !(error is CancellationError), !Task.isCancelled else {
           return
@@ -307,20 +253,18 @@ struct LiveRootContainer: View {
           error: error
         )
         Observability.addBreadcrumb(
-          .clerkSessionExchangeFailed,
+          .nativeAuthExchangeFailed,
           level: .error,
           context: context
         )
         Observability.captureError(
           error,
-          event: .clerkSessionExchangeFailed,
+          event: .nativeAuthExchangeFailed,
           context: context
         )
 
         if error is MobileAuthReturnError {
-          // Clerk → Better Auth migration: `clerk.auth.signOut()` is gone.
-          // `appState.signOut()` clears Keychain + state, which is the
-          // complete signed-out transition under BA.
+          // Better Auth sign-out clears the native Keychain token and state.
           await appState.signOut()
           authErrorMessage = "Couldn't finish sign-in. Try again."
           MobileAuthDiagnostics.record("auth_finalization_failed", detail: error.localizedDescription)
@@ -374,4 +318,3 @@ struct LiveRootContainer: View {
     return context
   }
 }
-

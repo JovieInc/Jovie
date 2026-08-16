@@ -88,10 +88,22 @@ DRAIN_PROMOTION_MODE="${DRAIN_PROMOTION_MODE:-normal}"
 DRAIN_FLEET_GATE_B64="${DRAIN_FLEET_GATE_B64:-}"
 DRAIN_RECOVER_FLEET_HOLDS="${DRAIN_RECOVER_FLEET_HOLDS:-0}"
 FLEET_HOLD_CONTEXT="jovie-fleet-queue-hold/v1"
+# A successful native enrollment leaves a bot-authored, exact-head receipt.
+# A completed CI merge_group has no source PR head to admit, but it is the
+# authoritative signal that GitHub may just have ejected unmerged cohort
+# members while main advanced. The controller may reconcile only these
+# receipts, never the whole clean backlog.
+DRAIN_RECONCILE_QUEUE_REENTRY="${DRAIN_RECONCILE_QUEUE_REENTRY:-0}"
+DRAIN_QUEUE_REENTRY_MAX_PER_RUN="${DRAIN_QUEUE_REENTRY_MAX_PER_RUN:-2}"
+QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"
+QUEUE_DEFERRED_RELEASE_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/queue-deferred-release-admission.mjs"
+PRODUCTION_UNBOUND_REPAIR_ATTESTATION_LIB="$(dirname "${BASH_SOURCE[0]}")/lib/production-unbound-repair-attestation.mjs"
+QUEUE_DEFERRED_RELEASE_MARKER='<!-- bot-comment:queue-deferred-release -->'
+QUEUE_DEFERRED_RELEASE_ACTOR='jovie-bot[bot]'
 FLEET_GATE_JSON=""
 case "$DRAIN_PROMOTION_MODE" in
   normal) ;;
-  isolated-only | draft-only | blocked | hold-intake)
+  isolated-only | draft-only | blocked | hold-intake | deferred-release-only)
     if [[ -z "$DRAIN_FLEET_GATE_B64" ]]; then
       echo "::error::Refusing $DRAIN_PROMOTION_MODE without a fresh typed fleet receipt" >&2
       exit 2
@@ -109,7 +121,13 @@ case "$DRAIN_PROMOTION_MODE" in
       echo "::error::Refusing $DRAIN_PROMOTION_MODE with a malformed or stale fleet receipt" >&2
       exit 2
     fi
-    if ! jq -e --arg mode "$DRAIN_PROMOTION_MODE" '
+    if [[ "$DRAIN_PROMOTION_MODE" == "deferred-release-only" ]]; then
+      if ! node "$QUEUE_DEFERRED_RELEASE_LIB" fleet <<<"$FLEET_GATE_JSON" \
+        | jq -e '.allowed == true and .mode == "deferred-release-only"' >/dev/null; then
+        echo "::error::Fleet receipt does not authorize the exact queue-deferred release fallback" >&2
+        exit 2
+      fi
+    elif ! jq -e --arg mode "$DRAIN_PROMOTION_MODE" '
       .schema == "jovie-fleet-gate/v1" and
       .promotionMode == $mode and
       if $mode == "isolated-only" then
@@ -165,6 +183,19 @@ if [[ "$DRAIN_RECOVER_FLEET_HOLDS" == "1" && "$DRAIN_PROMOTION_MODE" != "normal"
   echo "::error::Fleet holds may recover only under normal GREEN promotion" >&2
   exit 2
 fi
+if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" != "0" && "$DRAIN_RECONCILE_QUEUE_REENTRY" != "1" ]]; then
+  echo "::error::DRAIN_RECONCILE_QUEUE_REENTRY must be 0 or 1" >&2
+  exit 2
+fi
+if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" && "$DRAIN_PROMOTION_MODE" != "normal" ]]; then
+  echo "::error::Queue re-entry recovery may run only under normal GREEN promotion" >&2
+  exit 2
+fi
+if [[ ! "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" =~ ^[1-9][0-9]*$ ]] \
+  || (( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 3 )); then
+  echo "::error::DRAIN_QUEUE_REENTRY_MAX_PER_RUN must be an integer from 1 through 3" >&2
+  exit 2
+fi
 if [[ -z "$DRAIN_ADMISSION_PR" && -z "$DRAIN_ADMISSION_HEAD" ]]; then
   : # Maintenance-only: global dequeue/reconciliation remains authorized.
 else
@@ -176,6 +207,34 @@ else
     exit 2
   fi
 fi
+
+# The queue-deferred release workflow writes this receipt *before* removing
+# the hold. It is the shared pre-enqueue guard for the narrow fallback mode:
+# an `unlabeled` event, a green check, or a matching PR number alone is never
+# enough authority to enroll while ordinary promotion is blocked.
+deferred_release_receipt_for_pr() {  # <pr>
+  local raw body
+  raw="$(gh_retry api "repos/${REPO}/issues/${1}/comments" --paginate --slurp 2>/dev/null || true)"
+  [[ -n "$raw" ]] || return 0
+  body="$(jq -r --arg marker "$QUEUE_DEFERRED_RELEASE_MARKER" --arg actor "$QUEUE_DEFERRED_RELEASE_ACTOR" '
+    [ .[][]?
+      | select(.user.login == $actor)
+      | select((.body | type == "string") and (.body | contains($marker)))
+      | .body
+    ] | last // empty
+  ' <<<"$raw" 2>/dev/null || true)"
+  [[ -n "$body" ]] || return 0
+  node "$QUEUE_DEFERRED_RELEASE_LIB" extract <<<"$body" 2>/dev/null || true
+}
+
+# The production-unbound exception is a typed exact PR/head/current-main
+# statement, revalidated before and after native enrollment. Source checks and
+# hard holds remain independent enrollment gates.
+production_unbound_repair_attestation_matches() {  # <body> <pr> <head> <main-sha>
+  local body="$1" pr="$2" head="$3" main_sha="$4"
+  printf '%s' "$body" | node "$PRODUCTION_UNBOUND_REPAIR_ATTESTATION_LIB" matches \
+    --pr "$pr" --head "$head" --main-sha "$main_sha" >/dev/null 2>&1
+}
 
 # Keep one scheduled tick bounded. A single in-flight GitHub call may finish
 # after the deadline, but no subsequent per-PR operation is started.
@@ -278,6 +337,71 @@ clear_fleet_hold() {  # clear_fleet_hold <num> <head>
   fi
   echo "    !! #$n enrolled, but exact-head fleet hold receipt did not close" >&2
   return 1
+}
+
+# A native queue admission is durable only when a bot-authored, exact-head
+# receipt survives the transient queue membership. It is deliberately a commit
+# status rather than a label: labels are intent/audit only and can be mutated
+# without changing the source revision. The receipt is never sufficient on its
+# own; recovery still re-reads current PR state, current source checks, and the
+# native queue postcondition.
+queue_reentry_receipt_is_recoverable() {  # <head>
+  local head="$1" statuses
+  [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
+  if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)"; then
+    return 1
+  fi
+  jq -e --arg context "$QUEUE_REENTRY_CONTEXT" --arg repo "$REPO" '
+    [ .statuses[]? | select(.context == $context) ]
+    | sort_by(.updated_at)
+    | last
+    | .state == "success"
+      and (.creator.type == "Bot")
+      and (.description == "Native queue admission recorded at exact head")
+      and (.target_url | test("^https://github\\.com/" + $repo + "/actions/runs/[1-9][0-9]*$"))
+  ' <<<"$statuses" >/dev/null
+}
+
+record_queue_reentry_receipt() {  # <pr> <expected-head>
+  local n="$1" expected_head="$2" current live_head target_url
+  if [[ ! "$expected_head" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "    !! cannot record queue re-entry receipt for #$n without an exact head" >&2
+    return 1
+  fi
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would record $QUEUE_REENTRY_CONTEXT on #$n at $expected_head"
+    return 0
+  fi
+  # Re-enrollment of an already-receipted immutable head is intentionally
+  # idempotent. Do not create an unbounded stream of duplicate statuses.
+  if queue_reentry_receipt_is_recoverable "$expected_head"; then
+    echo "    =$QUEUE_REENTRY_CONTEXT on #$n at $expected_head (already recorded)"
+    return 0
+  fi
+  if ! target_url="$(fleet_hold_target_url)"; then
+    echo "    !! canonical workflow run identity is missing for queue re-entry receipt #$n" >&2
+    return 1
+  fi
+  if ! current="$(gh_retry pr view "$n" -R "$REPO" --json state,headRefOid 2>/dev/null)"; then
+    echo "    !! could not refresh #$n before recording queue re-entry receipt" >&2
+    return 1
+  fi
+  live_head="$(jq -r '(.headRefOid // "") | ascii_downcase' <<<"$current")"
+  if ! jq -e --arg head "$expected_head" '
+    .state == "OPEN" and ((.headRefOid // "") | ascii_downcase) == $head
+  ' <<<"$current" >/dev/null; then
+    echo "    ⏸ #$n head changed before queue re-entry receipt; compensating enrollment"
+    return 2
+  fi
+  if ! gh_retry api -X POST "repos/$REPO/statuses/$live_head" \
+    -f state=success \
+    -f context="$QUEUE_REENTRY_CONTEXT" \
+    -f description="Native queue admission recorded at exact head" \
+    -f target_url="$target_url" >/dev/null; then
+    echo "    !! failed to record exact-head queue re-entry receipt for #$n" >&2
+    return 1
+  fi
+  echo "    +$QUEUE_REENTRY_CONTEXT on #$n at $live_head"
 }
 
 deferred_state_is_releasable() {  # state json <expected head> <expected base>
@@ -419,7 +543,7 @@ reconcile_deferred_auto_merge_after_main_push() {
 # a queue-deferred hold cannot be overwritten by this controller.
 enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr authorized-head]
   local n="$1" authorized_pr="${2:-$DRAIN_ADMISSION_PR}" authorized_head="${3:-$DRAIN_ADMISSION_HEAD}"
-  local current head_oid expected_head json_fields
+  local current enrollment_receipt head_oid expected_head json_fields queue_position queue_state
   json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName,body"
   if ! current="$(gh_retry pr view "$n" -R "$REPO" \
     --json "$json_fields" 2>/dev/null)"; then
@@ -482,13 +606,23 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       return 2
     fi
   elif [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" ]]; then
-    local repair_main repair_marker
+    local repair_main
     repair_main="$(jq -r '.productionUnboundRepairAdmission.mainSha // empty' <<<"$FLEET_GATE_JSON")"
-    repair_marker="<!-- production-unbound-repair:production-deployment-unbound:${repair_main} -->"
-    if ! jq -e --arg marker "$repair_marker" '
-      (.body // "") | contains($marker)
-    ' <<<"$current" >/dev/null; then
+    if ! production_unbound_repair_attestation_matches \
+      "$(jq -r '.body // ""' <<<"$current")" "$n" "$expected_head" "$repair_main"; then
       echo "    ⏸ exact active-condition repair attestation is absent for #$n"
+      return 2
+    fi
+  elif [[ "$DRAIN_PROMOTION_MODE" == "deferred-release-only" ]]; then
+    local release_receipt
+    release_receipt="$(deferred_release_receipt_for_pr "$n")"
+    if ! jq -e --arg head "$expected_head" --argjson pr "$n" '
+      .schema == "jovie-queue-deferred-release/v1" and
+      .pr == $pr and
+      .head == $head and
+      .mode == "deferred-release-only"
+    ' <<<"$release_receipt" >/dev/null 2>&1; then
+      echo "    ⏸ exact-head controller queue-deferred release receipt is absent or invalid for #$n"
       return 2
     fi
   elif [[ "$DRAIN_PROMOTION_MODE" != "normal" ]]; then
@@ -505,8 +639,24 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
   fi
   # native-queue-transport:enrollment:start
   if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
-    if ! node scripts/merge-queue-backend.mjs enroll "$n" "$head_oid" >/dev/null; then
+    if ! enrollment_receipt="$(node scripts/merge-queue-backend.mjs enroll "$n" "$head_oid")"; then
       echo "    !! native enrollment/postcondition failed for #$n" >&2
+      if ! dequeue_strict "$n"; then
+        echo "    !! CRITICAL: could not compensate unproven native enrollment for #$n" >&2
+      fi
+      return 1
+    fi
+    if ! jq -e --arg expected_head "$expected_head" '
+      .state.state == "OPEN"
+      and (.state.isDraft | not)
+      and ((.state.headRefOid // "") | ascii_downcase) == $expected_head
+      and (.state.mergeQueueEntry.state | IN("QUEUED", "AWAITING_CHECKS", "MERGEABLE", "UNMERGEABLE", "LOCKED"))
+      and (.state.mergeQueueEntry.position | type == "number" and floor == . and . > 0)
+    ' <<<"$enrollment_receipt" >/dev/null; then
+      echo "    !! native enrollment returned no exact-head positioned queue receipt for #$n" >&2
+      if ! dequeue_strict "$n"; then
+        echo "    !! CRITICAL: could not compensate malformed native enrollment receipt for #$n" >&2
+      fi
       return 1
     fi
 
@@ -544,10 +694,21 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     fi
     if [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" ]]; then
       repair_main="$(jq -r '.productionUnboundRepairAdmission.mainSha // empty' <<<"$FLEET_GATE_JSON")"
-      repair_marker="<!-- production-unbound-repair:production-deployment-unbound:${repair_main} -->"
-      if ! jq -e --arg marker "$repair_marker" '(.body // "") | contains($marker)' \
-        <<<"$current" >/dev/null; then
+      if ! production_unbound_repair_attestation_matches \
+        "$(jq -r '.body // ""' <<<"$current")" "$n" "$expected_head" "$repair_main"; then
         echo "    ⏸ repair attestation changed during native enrollment for #$n; compensating"
+        dequeue_strict "$n" || return 1
+        return 2
+      fi
+    fi
+
+    if [[ "$DRAIN_PROMOTION_MODE" == "deferred-release-only" ]]; then
+      release_receipt="$(deferred_release_receipt_for_pr "$n")"
+      if ! jq -e --arg head "$expected_head" --argjson pr "$n" '
+        .schema == "jovie-queue-deferred-release/v1" and
+        .pr == $pr and .head == $head and .mode == "deferred-release-only"
+      ' <<<"$release_receipt" >/dev/null 2>&1; then
+        echo "    ⏸ controller release evidence changed during native enrollment for #$n; compensating"
         dequeue_strict "$n" || return 1
         return 2
       fi
@@ -582,7 +743,31 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       fi
     fi
 
-    echo "    +native-queue on #$n at $head_oid"
+    # Retain a typed exact-head record before treating the native queue
+    # mutation as complete. A later merge_group workflow_run has a composite
+    # head, not a PR head; this receipt is the only bounded bridge that can
+    # recover a member GitHub ejects after main advances. If it cannot be
+    # written, compensate the just-proven queue membership rather than leave
+    # a PR that future event loss cannot safely recover.
+    if ! record_queue_reentry_receipt "$n" "$expected_head"; then
+      echo "    !! native enrollment lacks durable exact-head re-entry receipt; compensating" >&2
+      if ! dequeue_strict "$n"; then
+        echo "    !! CRITICAL: could not compensate native enrollment without re-entry receipt for #$n" >&2
+      fi
+      return 1
+    fi
+
+    # The degraded-observation fallback is intentionally allowed to clear only
+    # a bot-authored, exact-head fleet hold after enrollment. It cannot clear
+    # a human label or an arbitrary pending status, and it does not recover
+    # any other queued member.
+    if [[ "$DRAIN_PROMOTION_MODE" == "deferred-release-only" ]] \
+      && fleet_hold_is_recoverable "$expected_head"; then
+      clear_fleet_hold "$n" "$expected_head" || return 1
+    fi
+    queue_position="$(jq -r '.state.mergeQueueEntry.position' <<<"$enrollment_receipt")"
+    queue_state="$(jq -r '.state.mergeQueueEntry.state' <<<"$enrollment_receipt")"
+    echo "    +native-queue on #$n at $head_oid (state $queue_state, position $queue_position)"
     return 0
   fi
   # native-queue-transport:enrollment:end
@@ -836,10 +1021,20 @@ if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" ]]; then
   SNAP="$CLASSIFIED"
 elif [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" ]]; then
   REPAIR_MAIN_SHA="$(jq -r '.productionUnboundRepairAdmission.mainSha // empty' <<<"$FLEET_GATE_JSON")"
-  REPAIR_MARKER="<!-- production-unbound-repair:production-deployment-unbound:${REPAIR_MAIN_SHA} -->"
-  SNAP="$(jq -c --arg marker "$REPAIR_MARKER" '
-    map(. + {iso: false, unboundRepair: ((.body // "") | contains($marker))})
-  ' <<<"$SNAP")"
+  CLASSIFIED="$(jq -c 'map(. + {iso: false, unboundRepair: false})' <<<"$SNAP")"
+  while IFS= read -r pr; do
+    n="$(jq -r '.n' <<<"$pr")"
+    head_oid="$(jq -r '.headOid // ""' <<<"$pr")"
+    eligible=false
+    if [[ "$head_oid" =~ ^[0-9a-f]{40}$ ]] \
+      && production_unbound_repair_attestation_matches \
+        "$(jq -r '.body // ""' <<<"$pr")" "$n" "$head_oid" "$REPAIR_MAIN_SHA"; then
+      eligible=true
+    fi
+    CLASSIFIED="$(jq -c --argjson n "$n" --argjson eligible "$eligible" \
+      'map(if .n == $n then . + {unboundRepair: $eligible} else . end)' <<<"$CLASSIFIED")"
+  done < <(jq -c '.[]' <<<"$SNAP")
+  SNAP="$CLASSIFIED"
 else
   SNAP="$(jq -c 'map(. + {iso: false, unboundRepair: false})' <<<"$SNAP")"
 fi
@@ -874,7 +1069,9 @@ SNAP="$ENRICHED"
 # isolated-only may keep one freshly proven isolated entry; draft-only and
 # blocked preserve none.
 DRAIN_FREEZE_EXISTING_QUEUE=0
-if [[ "$DRAIN_PROMOTION_MODE" != "normal" && "$DRAIN_PROMOTION_MODE" != "hold-intake" ]]; then
+if [[ "$DRAIN_PROMOTION_MODE" != "normal" \
+  && "$DRAIN_PROMOTION_MODE" != "hold-intake" \
+  && "$DRAIN_PROMOTION_MODE" != "deferred-release-only" ]]; then
   DRAIN_FREEZE_EXISTING_QUEUE=1
 fi
 
@@ -1080,6 +1277,36 @@ if [[ -z "$DRAIN_ADMISSION_PR" ]]; then
 else
   echo "  admission scope: #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD"
 fi
+
+# A clean PR whose CI completed while the exact-main production binding was
+# unavailable cannot enter the queue unless it is the single attested repair.
+# Preserve that *event-scoped exact head* as a pending fleet receipt before
+# declining admission. A later successful Production Controller event may use
+# only this receipt as a selector; it still re-runs every current eligibility,
+# source-gate, native-queue, and postcondition check before enrollment. Without
+# the receipt, the CI event is lost once production recovers and an operator
+# has to redispatch the exact PR manually.
+if [[ "$DRAIN_PROMOTION_MODE" == "hold-intake" && -n "$DRAIN_ADMISSION_PR" ]]; then
+  while read -r pr; do
+    n="$(jq -r '.n' <<<"$pr")"
+    head_oid="$(jq -r '.headOid // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
+    echo "=== DEFER (production-unbound exact-head recovery receipt) ==="
+    echo "  #$n  $(jq -r '.t' <<<"$pr")  ⏸ hold-intake"
+    if ! record_fleet_hold "$n" "$head_oid"; then
+      echo "::error::Failed to record exact-head recovery receipt for deferred PR #$n" >&2
+      exit 1
+    fi
+  done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg admission_head "$DRAIN_ADMISSION_HEAD" '.[]
+    | select((.n | tostring) == $admission_pr)
+    | select((.headOid // "") | ascii_downcase == $admission_head)
+    | select(.q | not)
+    | select(.unboundRepair | not)
+    | select(.draft | not)
+    | select(.m == "MERGEABLE")
+    | select(.base == "main")
+    | select(.fail | length == 0)
+    | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast") | not)')
+fi
 ENROLLED_THIS_RUN=0
 while read -r pr; do
   stop_if_budget_exhausted && break
@@ -1119,6 +1346,94 @@ done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg pro
   | select(.fail|length==0)
   | select(.q | not)
   | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or .=="needs-conflict-resolution" or .=="fast") | not)')
+
+# A scoped CI-completion event that reaches this point without an exact-head
+# native queue receipt is not a successful controller pass. Previously this
+# returned success and left the PR invisible until an unrelated event happened.
+# Fail with a classified machine-owned condition so Delivery Control Receipts
+# emits a durable Gem repair task; it still cannot merge or bypass any gate.
+if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
+  ADMISSION_TARGET_OBSERVED="$(echo "$SNAP" | jq -r \
+    --arg admission_pr "$DRAIN_ADMISSION_PR" \
+    --arg admission_head "$DRAIN_ADMISSION_HEAD" '
+      any(.[];
+        ((.n | tostring) == $admission_pr)
+        and ((.headOid // "") | ascii_downcase == $admission_head)
+      )
+    ')"
+  ADMISSION_ALREADY_QUEUED="$(echo "$SNAP" | jq -r \
+    --arg admission_pr "$DRAIN_ADMISSION_PR" \
+    --arg admission_head "$DRAIN_ADMISSION_HEAD" '
+      any(.[];
+        ((.n | tostring) == $admission_pr)
+        and ((.headOid // "") | ascii_downcase == $admission_head)
+        and (.q == true)
+      )
+    ')"
+  # A changed head has invalidated the event scope. It must never inherit this
+  # event's queue intent; the newer head's own event creates its receipt.
+if [[ "$DRY_RUN" != "1" && "$ADMISSION_TARGET_OBSERVED" == "true" && "$ADMISSION_ALREADY_QUEUED" != "true" ]]; then
+    echo "::error::queue-noop: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD has no native queue receipt" >&2
+    exit 3
+  fi
+fi
+
+# A completed merge_group CI run is not attributable to an individual source
+# PR: GitHub reports its synthetic composite SHA. If it completes after main
+# moved, GitHub can leave previously admitted members unqueued with no future
+# PR-head event to re-trigger admission. Reconcile only a tiny, exact-head
+# cohort which this controller itself recorded after a prior native admission.
+# This is not a clean-backlog sweep: no receipt, changed head, red source gate,
+# hard hold, or non-normal fleet policy is a no-op. The cap protects the queue
+# from one composite event fanning out into a full cohort rebuild.
+if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" ]]; then
+  echo "=== RECOVER (bounded exact-head native re-entry after composite CI) ==="
+  REENTRY_RECOVERED=0
+  while read -r pr; do
+    stop_if_budget_exhausted && break
+    if [[ "$REENTRY_RECOVERED" -ge "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" ]]; then
+      echo "  ~ reached exact re-entry cap ($DRAIN_QUEUE_REENTRY_MAX_PER_RUN)"
+      break
+    fi
+    if [[ "$ENROLLED_THIS_RUN" -ge "$ENROLL_SLOTS" ]]; then
+      echo "  ~ queue depth cap reached before re-entry recovery"
+      break
+    fi
+    n="$(jq -r '.n' <<<"$pr")"
+    t="$(jq -r '.t' <<<"$pr")"
+    head_oid="$(jq -r '.headOid // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
+    if ! queue_reentry_receipt_is_recoverable "$head_oid"; then
+      continue
+    fi
+    # The snapshot's check result can be stale. This is an exact-current-head
+    # gate, independently re-read immediately before the native enrollment.
+    fresh_failures="$(check_failures_for_pr "$n")"
+    if [[ "$(jq 'length' <<<"$fresh_failures")" -ne 0 ]]; then
+      echo "  #$n  $t  ⏸ current exact-head checks are not green"
+      continue
+    fi
+    echo "  #$n  $t  ↻ exact native re-entry at $head_oid"
+    if enroll_if_still_eligible "$n" "$n" "$head_oid"; then
+      REENTRY_RECOVERED=$((REENTRY_RECOVERED + 1))
+      ENROLLED_THIS_RUN=$((ENROLLED_THIS_RUN + 1))
+    else
+      reentry_result=$?
+      if [[ "$reentry_result" -ne 2 ]]; then
+        echo "::error::Failed exact native re-entry recovery for #$n" >&2
+        exit 1
+      fi
+    fi
+  done < <(echo "$SNAP" | jq -c '[ .[]
+    | select(.q | not)
+    | select(.draft | not)
+    | select(.m == "MERGEABLE")
+    | select(.base == "main")
+    | select(.fail | length == 0)
+    | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast") | not)
+    | select((.headOid // "") | test("^[0-9a-f]{40}$"))
+    | {n, t, headOid}
+  ] | sort_by(.n)[]')
+fi
 
 # A completed Production Controller event is the only global recovery signal.
 # Exact pending status receipts were written before fleet-driven dequeue, are

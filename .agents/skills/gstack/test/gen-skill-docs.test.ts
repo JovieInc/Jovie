@@ -1240,7 +1240,7 @@ describe('CHANGELOG_WORKFLOW resolver', () => {
 
   test('changelog workflow includes cross-check step', () => {
     expect(shipContent).toContain('Cross-check');
-    expect(shipContent).toContain('Every commit must map to at least one bullet point');
+    expect(shipContent).toContain('Every commit must map to exactly one public story');
   });
 
   test('changelog workflow includes voice guidance', () => {
@@ -1255,8 +1255,27 @@ describe('CHANGELOG_WORKFLOW resolver', () => {
   });
 
   test('changelog workflow includes keep-changelog format', () => {
+    expect(shipContent).toContain('### Featured');
     expect(shipContent).toContain('### Added');
     expect(shipContent).toContain('### Fixed');
+  });
+
+  test('changelog workflow requires outcome grouping and both eval layers', () => {
+    expect(shipContent).toContain('Group by customer outcome');
+    expect(shipContent).toContain('audience, availability');
+    expect(shipContent).toContain('at most 3 total iterations');
+    expect(shipContent).toContain('independent per-changelog eval');
+    expect(shipContent).toContain('--changelog CHANGELOG.md');
+    expect(shipContent).toContain('hashes the exact changelog');
+    expect(shipContent).toContain('golden-fixture regression suite');
+    expect(shipContent).toContain('a passing real release cannot substitute');
+  });
+
+  test('changelog workflow enforces strict public language rules', () => {
+    expect(shipContent).toContain('Headlines are 8 words or fewer');
+    expect(shipContent).toContain('2 sentences and 22 words or fewer');
+    expect(shipContent).toContain('Never mention ticket IDs, vendors');
+    expect(shipContent).toContain('Never claim availability without exact release evidence');
   });
 });
 

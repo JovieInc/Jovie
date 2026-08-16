@@ -1,11 +1,10 @@
-import ClerkKit
 import Foundation
 import SwiftUI
 import UIKit
 
 struct LiveLaunchConfiguration: Sendable {
   let configuration: AppConfiguration
-  let shouldConfigureClerk: Bool
+  let shouldUseLiveAuth: Bool
   let authErrorMessage: String?
 }
 
@@ -22,10 +21,10 @@ enum LiveLaunchConfigurationResolver {
       AppConfiguration.load()
     }
   ) -> LiveLaunchConfiguration {
-    guard launchMode.usesLiveClerk else {
+    guard launchMode.usesLiveAuth else {
       return LiveLaunchConfiguration(
         configuration: .mock,
-        shouldConfigureClerk: false,
+        shouldUseLiveAuth: false,
         authErrorMessage: nil
       )
     }
@@ -33,13 +32,13 @@ enum LiveLaunchConfigurationResolver {
     do {
       return LiveLaunchConfiguration(
         configuration: try loadLiveConfiguration(),
-        shouldConfigureClerk: true,
+        shouldUseLiveAuth: true,
         authErrorMessage: nil
       )
     } catch {
       return LiveLaunchConfiguration(
         configuration: loadUnvalidatedConfiguration(),
-        shouldConfigureClerk: false,
+        shouldUseLiveAuth: false,
         authErrorMessage: unavailableMessage
       )
     }
@@ -59,7 +58,7 @@ struct JovieApp: App {
       launchMode: launchMode
     )
     let configuration = launchConfiguration.configuration
-    isLiveAuthAvailable = launchConfiguration.shouldConfigureClerk
+    isLiveAuthAvailable = launchConfiguration.shouldUseLiveAuth
     launchAuthErrorMessage = launchConfiguration.authErrorMessage
 
     Observability.configure(
@@ -74,25 +73,6 @@ struct JovieApp: App {
       key: "launch_mode",
       value: String(describing: launchMode)
     )
-
-    if launchConfiguration.shouldConfigureClerk {
-      // Better Auth migration: no client-side Clerk publishable key — the
-      // native handoff uses OTT + deep-link callback scheme only. Clerk SDK
-      // is configured with an empty key so its singleton stays initialized
-      // for the remaining sign-out paths during the cutover.
-      Clerk.configure(
-        publishableKey: "",
-        options: makeJovieClerkOptions(
-          redirectUrl: "ie.jov.jovie://callback",
-          callbackUrlScheme: configuration.clerkCallbackUrlScheme,
-          keychainService: launchMode.clerkKeychainService
-        )
-      )
-
-      if launchMode.clearsStoredClerkSession {
-        Clerk.clearAllKeychainItems()
-      }
-    }
 
     let repository = MeRepository(
       apiClient: APIClient(
@@ -118,15 +98,14 @@ struct JovieApp: App {
 #if DEBUG
         if appState.launchMode == .uiTestingAuthCallback {
           UITestingAuthCallbackRoot(appState: appState)
-        } else if appState.launchMode.usesLiveClerk, isLiveAuthAvailable {
+        } else if appState.launchMode.usesLiveAuth, isLiveAuthAvailable {
           LiveRootContainer(appState: appState)
-            .environment(Clerk.shared)
         } else {
           RootView(
             appState: appState,
             isAuthAvailable: isLiveAuthAvailable,
             isSignInUnavailable: launchAuthErrorMessage != nil,
-            liveUserID: nil,
+            authenticatedUserID: nil,
             authErrorMessage: launchAuthErrorMessage,
             onLogout: { await appState.signOut() },
             onAuthReturn: { _ in },
@@ -134,15 +113,14 @@ struct JovieApp: App {
           )
         }
 #else
-        if appState.launchMode.usesLiveClerk, isLiveAuthAvailable {
+        if appState.launchMode.usesLiveAuth, isLiveAuthAvailable {
           LiveRootContainer(appState: appState)
-            .environment(Clerk.shared)
         } else {
           RootView(
             appState: appState,
             isAuthAvailable: isLiveAuthAvailable,
             isSignInUnavailable: launchAuthErrorMessage != nil,
-            liveUserID: nil,
+            authenticatedUserID: nil,
             authErrorMessage: launchAuthErrorMessage,
             onLogout: { await appState.signOut() },
             onAuthReturn: { _ in },
@@ -153,11 +131,9 @@ struct JovieApp: App {
       }
       .preferredColorScheme(.dark)
       .onOpenURL { url in
-        // Jovie native auth callbacks + Clerk SDK redirects (configured via
-        // AppConfiguration.clerkRedirectUrl from env/plist, gh-9806/JOV-2652).
-        // Clerk dashboard must whitelist the exact redirectUrl for the key.
-        // If ClerkKit exposes handle (e.g. Clerk.shared.handle(url:)), forward
-        // matching Clerk callbacks here for full SDK redirect support.
+        // Better Auth returns the PKCE callback through Jovie's custom URL
+        // scheme. The inbox covers callbacks received before the live root is
+        // ready to consume them.
         MobileAuthCallbackURLInbox.shared.enqueue(url)
       }
       .task {
@@ -175,7 +151,7 @@ final class JovieAppDelegate: NSObject, UIApplicationDelegate {
   ) -> Bool {
     Task { @MainActor in
       // Mirror of onOpenURL for universal links / external launches.
-      // See above for Clerk iOS auth config notes (HOT ZONE).
+      // Mirror onOpenURL for callbacks delivered through the app delegate.
       MobileAuthCallbackURLInbox.shared.enqueue(url)
     }
     return true

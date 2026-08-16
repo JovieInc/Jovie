@@ -13,7 +13,6 @@ required=(
   APPLE_TEAM_ID
   MATCH_GIT_URL
   MATCH_PASSWORD
-  CLERK_ASSOCIATED_DOMAIN
 )
 
 for key in "${required[@]}"; do

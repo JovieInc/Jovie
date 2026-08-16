@@ -9,6 +9,7 @@ const BOUNDED_RELEASES: readonly ChangelogRelease[] = [
     date: '2026-07-21',
     summary: 'A focused set of **public-facing** workflow improvements.',
     sections: {
+      featured: [],
       added: ['**Release workspace:** keeps status and links together.'],
       changed: ['Profile cards share one `responsive` spacing contract.'],
       fixed: ['Compact layouts keep their labels visible.'],
@@ -20,6 +21,7 @@ const BOUNDED_RELEASES: readonly ChangelogRelease[] = [
     date: '2026-06-28',
     summary: 'Reliability and accessibility refinements.',
     sections: {
+      featured: [],
       added: [],
       changed: ['Keyboard focus follows the visible reading order.'],
       fixed: ['Empty states remain stable at narrow widths.'],

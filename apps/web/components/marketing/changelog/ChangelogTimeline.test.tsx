@@ -12,6 +12,7 @@ const RELEASES: readonly ChangelogRelease[] = [
     date: '2026-08-09',
     summary: 'A **deterministic release with `/pitch`** and `inline code`.',
     sections: {
+      featured: [],
       added: ['**New workspace:** Review `release:status`.'],
       changed: ['One canonical navigation model.'],
       fixed: ['Stable compact layout.', 'Stable compact layout.'],
@@ -28,6 +29,11 @@ describe('ChangelogTimeline', () => {
     const { container } = render(<ChangelogTimeline releases={RELEASES} />);
 
     expect(screen.getByText('v26.8.0')).toBeVisible();
+    expect(screen.getByText('v26.8.0').closest('a')).toHaveAttribute(
+      'href',
+      '/changelog/26.8.0'
+    );
+    expect(container.querySelector('article')).toHaveAttribute('id', 'v26.8.0');
     expect(screen.getByText('Aug 9, 2026')).toBeVisible();
     expect(
       screen.getByText('deterministic release with', { exact: false })
@@ -67,33 +73,33 @@ describe('ChangelogTimeline', () => {
   });
 
   it('bounds the initial release list and progressively exposes every update', () => {
-    const releases = Array.from({ length: 23 }, (_, index) => ({
+    const releases = Array.from({ length: 8 }, (_, index) => ({
       ...RELEASES[0],
-      version: `26.8.${23 - index}`,
-      date: `2026-08-${String(23 - index).padStart(2, '0')}`,
+      version: `26.8.${8 - index}`,
+      date: `2026-08-${String(8 - index).padStart(2, '0')}`,
     }));
     const { container } = render(<ChangelogTimeline releases={releases} />);
 
-    expect(container.querySelectorAll('article')).toHaveLength(10);
+    expect(container.querySelectorAll('article')).toHaveLength(1);
     expect(
-      screen.getByRole('button', { name: 'Show 10 More Updates' })
+      screen.getByRole('button', { name: 'Show 5 More Updates' })
     ).toBeVisible();
     expect(screen.queryByText('v26.8.1')).not.toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Show 10 More Updates' })
+      screen.getByRole('button', { name: 'Show 5 More Updates' })
     );
-    expect(container.querySelectorAll('article')).toHaveLength(20);
+    expect(container.querySelectorAll('article')).toHaveLength(6);
     expect(
-      screen.getByRole('button', { name: 'Show 3 More Updates' })
+      screen.getByRole('button', { name: 'Show 2 More Updates' })
     ).toBeVisible();
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Show 3 More Updates' })
+      screen.getByRole('button', { name: 'Show 2 More Updates' })
     );
-    expect(container.querySelectorAll('article')).toHaveLength(23);
+    expect(container.querySelectorAll('article')).toHaveLength(8);
     expect(screen.getByText('v26.8.1')).toBeVisible();
-    expect(screen.getByText('Showing 23 of 23 updates')).toBeVisible();
+    expect(screen.getByText('Showing 8 of 8 updates')).toBeVisible();
     expect(screen.queryByRole('button', { name: /More Updates/ })).toBeNull();
   });
 });

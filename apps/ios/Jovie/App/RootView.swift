@@ -79,6 +79,7 @@ private struct AppContentView: View {
           isOffline: false,
           initialTab: .profile,
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
+          accountURL: appState.accountURL,
           billingURL: appState.billingURL,
           chatEnabled: false,
           audienceEnabled: false,
@@ -93,7 +94,39 @@ private struct AppContentView: View {
           onAutoSendMessage: handleAutoSendMessage,
           onLogout: onLogout
         ) {
-          NeedsOnboardingView(continueURL: appState.continueOnWebURL)
+          NeedsOnboardingView(
+            initialDisplayName: appState.loadedDashboardResponse?.displayName ?? "",
+            initialUsername: appState.loadedDashboardResponse?.username ?? "",
+            onComplete: { displayName, username in
+              if appState.launchMode == .uiTestingNeedsOnboardingUnauthorized {
+                await appState.handleExpiredSession()
+                return nil
+              }
+
+              if appState.launchMode == .uiTestingNeedsOnboarding {
+                return "Profile completion is temporarily unavailable. Try again."
+              }
+
+              do {
+                try await APIClient(
+                  baseURL: appState.configuration.apiBaseURL,
+                  tokenProvider: NativeSessionTokenProvider()
+                ).completeProfile(displayName: displayName, username: username)
+                await appState.retry()
+                guard appState.route == .ready else {
+                  return "Your profile was saved, but the app couldn't refresh it. Try again."
+                }
+                return nil
+              } catch APIClientError.missingToken,
+                      APIClientError.requestFailed(statusCode: 401)
+              {
+                await appState.handleExpiredSession()
+                return nil
+              } catch {
+                return error.localizedDescription
+              }
+            }
+          )
         } audienceContent: { _ in
           EmptyView()
         } libraryContent: { _ in
@@ -123,6 +156,7 @@ private struct AppContentView: View {
             ? .audience
             : (appState.launchMode.opensChatOnLaunch ? .chat : appState.launchMode.defaultInitialTab),
           opensSettingsOnLaunch: appState.launchMode.opensSettingsOnLaunch,
+          accountURL: appState.accountURL,
           billingURL: appState.billingURL,
           chatEnabled: appState.loadedDashboardResponse != nil,
           audienceEnabled: appState.loadedDashboardResponse != nil,
@@ -140,6 +174,7 @@ private struct AppContentView: View {
           DashboardView(
             state: appState.dashboardState,
             brightnessManager: appState.brightnessManager,
+            webBaseURL: appState.configuration.webBaseURL,
             showVenueModeOnLaunch: appState.launchMode.opensVenueModeOnLaunch,
             loadAppleWalletProfilePass: {
               try await APIClient(
@@ -232,7 +267,7 @@ private struct AppContentView: View {
             tokenProvider: NativeSessionTokenProvider()
           ),
           cache: ChatCache(),
-          clerkUserID: activeUserID,
+          userID: activeUserID,
           webBaseURL: appState.configuration.webBaseURL
         )
         chatRepository = repository
@@ -278,7 +313,7 @@ private struct AppContentView: View {
          .uiTestingAuthCallback:
       return true
     default:
-      return !appState.launchMode.usesLiveClerk
+      return !appState.launchMode.usesLiveAuth
     }
   }
 
@@ -324,7 +359,7 @@ private struct AppContentView: View {
 
   @MainActor
   private func reloadAudienceHighlights(for userID: String?) async {
-    guard appState.launchMode.usesLiveClerk else {
+    guard appState.launchMode.usesLiveAuth else {
       audienceHighlightsState = Self.previewAudienceHighlightsState(for: appState.launchMode)
       return
     }
@@ -369,7 +404,7 @@ struct RootView: View {
   @Bindable var appState: AppState
   let isAuthAvailable: Bool
   let isSignInUnavailable: Bool
-  let liveUserID: String?
+  let authenticatedUserID: String?
   let authErrorMessage: String?
   let onLogout: @MainActor () async -> Void
   let onAuthReturn: @MainActor (MobileAuthReturn) -> Void
@@ -393,20 +428,16 @@ struct RootView: View {
       }
 #endif
     }
-      .task(id: "\(appState.didLoadClerk)-\(liveUserID ?? "signed-out")") {
-        if appState.launchMode.requiresAutoAuth, liveUserID == nil {
+      .task(id: "\(appState.didInitializeAuth)-\(authenticatedUserID ?? "signed-out")") {
+        if appState.launchMode == .uiTestingAuthCallback, authenticatedUserID == nil {
           return
         }
 
-        if appState.launchMode == .uiTestingAuthCallback, liveUserID == nil {
+        if let authenticatedUserID, appState.activeUserID == authenticatedUserID {
           return
         }
 
-        if let liveUserID, appState.activeUserID == liveUserID {
-          return
-        }
-
-        await appState.handleSignedInUserChange(liveUserID)
+        await appState.handleSignedInUserChange(authenticatedUserID)
       }
   }
 }
