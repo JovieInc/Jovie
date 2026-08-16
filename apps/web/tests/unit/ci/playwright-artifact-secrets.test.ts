@@ -24,6 +24,8 @@ import {
   guardPlaywrightArtifacts,
   inspectPlaywrightArtifacts,
   isCredentialBearingName,
+  markdownContainsSecret,
+  redactSecretValues,
   resolveArtifactFiles,
   validPlaywrightPng,
 } from '../../../../../.github/scripts/guard-playwright-artifacts.mjs';
@@ -1683,6 +1685,148 @@ ${fixtureCheckout}
       path: join(contextDir, 'context.json'),
       category: 'credential-text',
     });
+  });
+
+  it('sanitizes Playwright error-context.md without treating page snapshots as leaks', () => {
+    const email = 'standing-user@example.test';
+    const authCode = 'oauth-authorization-code-value';
+    const snapshot = `# Page snapshot
+
+\`\`\`yaml
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - link "Jovie" [ref=e3]:
+      - /url: /app?code=${authCode}
+  - main [ref=e4]:
+    - heading "Inbox" [level=1] [ref=e5]
+    - paragraph [ref=e6]: ${email}
+    - button "Accept cookies" [ref=e7]
+    - textbox "Password" [ref=e8]
+\`\`\`
+
+\`\`\`ts
+  45 |   const cookies = await page.context().cookies();
+  93 |     throw new Error('iOS OAuth authorization-code exchange returned HTTP 500.');
+\`\`\`
+`;
+    const environment = {
+      E2E_PROD_USER_EMAIL: email,
+      PLAYWRIGHT_DYNAMIC_COOKIE_SECRET_0: authCode,
+    };
+    expect(markdownContainsSecret(snapshot, environment)).toBe(false);
+    expect(redactSecretValues(snapshot, environment)).toContain('[redacted]');
+    expect(redactSecretValues(snapshot, environment)).not.toContain(email);
+    expect(redactSecretValues(snapshot, environment)).not.toContain(authCode);
+    expect(artifactContainsSecret(snapshot, environment, false)).toBe(true);
+
+    const workspace = fixture();
+    write(join(workspace, 'error-context.md'), snapshot);
+    write(
+      join(workspace, 'connection.md'),
+      'postgresql://user:fake-password@example.test/db' // trufflehog:ignore
+    );
+    write(
+      join(workspace, 'bearer.md'),
+      'Authorization: Bearer uploaded-markdown-token'
+    );
+    expect(
+      inspectPlaywrightArtifacts(['error-context.md'], environment, {
+        workspace,
+        allowMarkdown: true,
+      })
+    ).toEqual([]);
+    expect(
+      inspectPlaywrightArtifacts(
+        ['connection.md'],
+        {},
+        { workspace, allowMarkdown: true }
+      )
+    ).toContainEqual({
+      path: join(workspace, 'connection.md'),
+      category: 'credential-text',
+    });
+    expect(
+      inspectPlaywrightArtifacts(
+        ['bearer.md'],
+        {},
+        { workspace, allowMarkdown: true }
+      )
+    ).toContainEqual({
+      path: join(workspace, 'bearer.md'),
+      category: 'credential-text',
+    });
+    expect(
+      inspectPlaywrightArtifacts(['error-context.md'], environment, {
+        workspace,
+      })
+    ).toContainEqual({
+      path: join(workspace, 'error-context.md'),
+      category: 'unknown-binary',
+    });
+  });
+
+  it('stages sanitized error-context.md and does not poison markdown-only failures', () => {
+    const email = 'standing-user@example.test';
+    const authCode = 'oauth-authorization-code-value';
+    const workspace = fixture();
+    const runner = fixture();
+    const receipt = join(runner, 'dynamic-cookie-values');
+    const child = [
+      "const f=require('node:fs');",
+      "const path=require('node:path');",
+      "f.writeFileSync(process.env.PLAYWRIGHT_DYNAMIC_SECRETS_FILE,'" +
+        authCode +
+        "\\n',{mode:0o600});",
+      "const dir=path.join('out','smoke-prod-auth-retry1');",
+      'f.mkdirSync(dir,{recursive:true});',
+      "f.writeFileSync(path.join(dir,'error-context.md'),[",
+      "'# Page snapshot',",
+      "'',",
+      `'- paragraph [ref=e6]: ${email}',`,
+      `'- /url: /app?code=${authCode}',`,
+      "'const cookies = await page.context().cookies();',",
+      "].join('\\n'));",
+      'process.exit(1);',
+    ].join('');
+
+    const result = runChild(workspace, runner, child, {
+      E2E_PROD_USER_EMAIL: email,
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true',
+      PLAYWRIGHT_DYNAMIC_SECRETS_FILE: receipt,
+    });
+
+    expect(result.status).toBe(1);
+    const output = `${result.stdout}\n${result.stderr}`;
+    expect(output).toContain('secret guard passed');
+    expect(output).not.toContain('PLAYWRIGHT_ARTIFACT_SECRET_EXPOSURE');
+    expect(
+      existsSync(join(runner, 'safe-playwright-producer', 'blocked'))
+    ).toBe(false);
+    const staged = readFileSync(
+      join(
+        currentStage(runner).stage,
+        'out/smoke-prod-auth-retry1/error-context.md'
+      ),
+      'utf8'
+    );
+    expect(staged).toContain('[redacted]');
+    expect(staged).not.toContain(email);
+    expect(staged).not.toContain(authCode);
+    expect(staged).toContain('const cookies = await');
+
+    const leak = runChild(
+      fixture(),
+      fixture(),
+      [
+        "const f=require('node:fs');",
+        "f.mkdirSync('out',{recursive:true});",
+        "f.writeFileSync('out/error-context.md','DATABASE_URL=fake-password');",
+        'process.exit(1);',
+      ].join(''),
+      { PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true' }
+    );
+    expect(leak.status).toBe(1);
+    expect(`${leak.stdout}\n${leak.stderr}`).toContain('credential-text:1');
   });
 
   it('accepts only decoded metadata-free Playwright PNG bytes', () => {
