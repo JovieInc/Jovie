@@ -597,7 +597,7 @@ const PROFILE_SURFACES = [
     allowMissingMain: true,
     lighthouse: false,
     perfGroups: ['public-profile-core'],
-    interactions: PROFILE_INTERACTIONS,
+    interactions: [...PROFILE_INTERACTIONS, { id: 'dsp-actions' }],
   },
   {
     id: 'profile-music',
@@ -612,7 +612,7 @@ const PROFILE_SURFACES = [
     allowMissingMain: true,
     lighthouse: false,
     perfGroups: ['public-profile-core'],
-    interactions: PROFILE_INTERACTIONS,
+    interactions: [...PROFILE_INTERACTIONS, { id: 'dsp-actions' }],
   },
   {
     id: 'profile-notifications',
@@ -630,10 +630,7 @@ const PROFILE_SURFACES = [
     allowMissingMain: true,
     lighthouse: true,
     perfGroups: ['public-profile-core'],
-    interactions: [
-      ...PROFILE_INTERACTIONS,
-      { id: 'notification-form', optional: true },
-    ],
+    interactions: [...PROFILE_INTERACTIONS, { id: 'notification-form' }],
   },
   {
     id: 'profile-pay',
@@ -801,7 +798,7 @@ const PROFILE_MODE_SURFACES = [
     allowedFinalPaths: [/^\/[^/?#]+\?mode=listen$/],
     lighthouse: true,
     perfGroups: ['public-profile-mode-shell'],
-    interactions: PROFILE_INTERACTIONS,
+    interactions: [...PROFILE_INTERACTIONS, { id: 'dsp-actions' }],
   },
   {
     id: 'profile-mode-subscribe',
@@ -822,10 +819,7 @@ const PROFILE_MODE_SURFACES = [
     allowedFinalPaths: [/^\/[^/?#]+\?mode=subscribe$/],
     lighthouse: true,
     perfGroups: ['public-profile-mode-shell'],
-    interactions: [
-      ...PROFILE_INTERACTIONS,
-      { id: 'notification-form', optional: true },
-    ],
+    interactions: [...PROFILE_INTERACTIONS, { id: 'notification-form' }],
   },
   {
     id: 'profile-mode-pay',

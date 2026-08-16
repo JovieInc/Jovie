@@ -12,7 +12,6 @@ const TABLES = vi.hoisted(() => ({
   baUsers: { name: 'baUsers' },
   baSessions: { name: 'baSessions' },
   ingestionJobs: { name: 'ingestionJobs' },
-  userInterviews: { name: 'userInterviews' },
   waitlistAuditLogs: { name: 'waitlistAuditLogs' },
   waitlistEntries: { name: 'waitlistEntries' },
 }));
@@ -31,9 +30,6 @@ vi.mock('@/lib/db/schema/better-auth', () => ({
 }));
 vi.mock('@/lib/db/schema/ingestion', () => ({
   ingestionJobs: TABLES.ingestionJobs,
-}));
-vi.mock('@/lib/db/schema/user-interviews', () => ({
-  userInterviews: TABLES.userInterviews,
 }));
 vi.mock('@/lib/db/schema/waitlist', () => ({
   waitlistAuditLogs: TABLES.waitlistAuditLogs,
@@ -89,32 +85,29 @@ const COMPLETE_ROWS = new Map<unknown, unknown[]>([
       {
         id: ENTRY_ID,
         status: 'waitlisted',
-        source: 'onboarding_chat',
+        source: 'waitlist_form',
         canonical: true,
       },
     ],
   ],
-  [TABLES.waitlistAuditLogs, [{ metadata: { syntheticCanary: MARKER } }]],
   [
-    TABLES.userInterviews,
+    TABLES.waitlistAuditLogs,
     [
       {
+        id: 'audit-prior',
         metadata: {
           syntheticCanary: { ...MARKER, runId: '123-0' },
           syntheticAnalyticsReceipt: {
             ...ANALYTICS_RECEIPT,
             runId: '123-0',
           },
-          waitlistEntryId: ENTRY_ID,
-          accessOutcome: 'already_waitlisted',
         },
       },
       {
+        id: 'audit-current',
         metadata: {
           syntheticCanary: MARKER,
           syntheticAnalyticsReceipt: ANALYTICS_RECEIPT,
-          waitlistEntryId: ENTRY_ID,
-          accessOutcome: 'waitlisted_gate_on',
         },
       },
     ],
@@ -201,7 +194,7 @@ describe('GET /api/canary/waitlist/receipt', () => {
     expect(JSON.stringify(body)).not.toContain('synthetic+');
   });
 
-  it('accepts the current run among retained prior interview receipts', async () => {
+  it('accepts the current run among retained prior audit receipts', async () => {
     const response = await GET(request(`?run_id=123-1&entry_id=${ENTRY_ID}`));
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ runId: '123-1' });
@@ -235,7 +228,7 @@ describe('GET /api/canary/waitlist/receipt', () => {
         {
           id: ENTRY_ID,
           status: 'approved',
-          source: 'onboarding_chat',
+          source: 'waitlist_form',
           canonical: true,
         },
       ],
@@ -243,28 +236,26 @@ describe('GET /api/canary/waitlist/receipt', () => {
     ],
     ['missing audit marker', TABLES.waitlistAuditLogs, [], ['waitlist_audit']],
     [
-      'mismatched interview marker',
-      TABLES.userInterviews,
+      'mismatched audit marker',
+      TABLES.waitlistAuditLogs,
       [
         {
+          id: 'audit-other-run',
           metadata: {
             syntheticCanary: { ...MARKER, runId: '123-2' },
-            waitlistEntryId: ENTRY_ID,
-            accessOutcome: 'waitlisted_gate_on',
           },
         },
       ],
-      ['analytics_receipt'],
+      ['waitlist_audit', 'analytics_receipt'],
     ],
     [
       'missing rendered analytics receipt',
-      TABLES.userInterviews,
+      TABLES.waitlistAuditLogs,
       [
         {
+          id: 'audit-current',
           metadata: {
             syntheticCanary: MARKER,
-            waitlistEntryId: ENTRY_ID,
-            accessOutcome: 'waitlisted_gate_on',
           },
         },
       ],
@@ -292,13 +283,11 @@ describe('GET /api/canary/waitlist/receipt', () => {
 
   it('records a run-bound first-party analytics receipt for the exact identity', async () => {
     const rows = new Map(COMPLETE_ROWS);
-    rows.set(TABLES.userInterviews, [
+    rows.set(TABLES.waitlistAuditLogs, [
       {
-        id: 'interview-1',
+        id: 'audit-current',
         metadata: {
           syntheticCanary: MARKER,
-          waitlistEntryId: ENTRY_ID,
-          accessOutcome: 'waitlisted_gate_on',
         },
       },
     ]);
@@ -312,7 +301,7 @@ describe('GET /api/canary/waitlist/receipt', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockDbUpdate).toHaveBeenCalledWith(TABLES.userInterviews);
+    expect(mockDbUpdate).toHaveBeenCalledWith(TABLES.waitlistAuditLogs);
     expect(mockDbSet).toHaveBeenCalledWith(
       expect.objectContaining({
         metadata: expect.objectContaining({

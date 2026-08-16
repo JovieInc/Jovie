@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getCaptureDismissalStatus,
+  handleCaptureDismissalResponse,
   invalidateCaptureDismissalStatus,
 } from './capture-dismissal-client';
 
@@ -22,6 +23,7 @@ function mockFetchOnce(payload: unknown, ok = true) {
 describe('getCaptureDismissalStatus', () => {
   beforeEach(() => {
     invalidateCaptureDismissalStatus(ARTIST_ID);
+    globalThis.localStorage?.clear();
   });
 
   afterEach(() => {
@@ -76,6 +78,63 @@ describe('getCaptureDismissalStatus', () => {
   });
 
   it('resolves null on network failure without rejecting', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+
+    await expect(getCaptureDismissalStatus(ARTIST_ID)).resolves.toBeNull();
+  });
+
+  it('preserves an accepted degraded dismissal across a cache reset and reload', async () => {
+    const nextEligibleAt = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000 - 1_000
+    ).toISOString();
+    await handleCaptureDismissalResponse(
+      ARTIST_ID,
+      new Response(
+        JSON.stringify({
+          success: true,
+          accepted: true,
+          suppressed: true,
+          persisted: false,
+          degraded: true,
+          nextEligibleAt,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    // A page reload clears the in-memory request cache but retains same-origin
+    // storage. The degraded GET is neutral, so the client fallback must win.
+    invalidateCaptureDismissalStatus(ARTIST_ID);
+    const fetchMock = mockFetchOnce({
+      success: true,
+      suppressed: false,
+      degraded: true,
+      nextEligibleAt: null,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(getCaptureDismissalStatus(ARTIST_ID)).resolves.toEqual({
+      suppressed: true,
+      nextEligibleAt,
+      degraded: true,
+      clientFallback: true,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not persist an expired degraded acceptance', async () => {
+    await handleCaptureDismissalResponse(
+      ARTIST_ID,
+      new Response(
+        JSON.stringify({
+          accepted: true,
+          degraded: true,
+          nextEligibleAt: new Date(Date.now() - 1_000).toISOString(),
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+    invalidateCaptureDismissalStatus(ARTIST_ID);
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 
     await expect(getCaptureDismissalStatus(ARTIST_ID)).resolves.toBeNull();

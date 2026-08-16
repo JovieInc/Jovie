@@ -1,4 +1,5 @@
 import { APP_NAME } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import { getFounderWelcomeEmail } from '@/lib/email/templates/founder-welcome';
 import { escapeHtml } from '@/lib/email/utils';
 import { NOTIFICATIONS_APP_URL } from '@/lib/notifications/config';
@@ -33,7 +34,7 @@ export function buildWaitlistInviteEmail({
   const name = (fullName ?? '').trim();
   const greeting = name ? `Hi ${name},` : 'Hi,';
 
-  const inviteUrl = new URL('/waitlist/invite', appUrl);
+  const inviteUrl = new URL(APP_ROUTES.WAITLIST_INVITE, appUrl);
   if (token) inviteUrl.searchParams.set('token', token);
   const subject = "You're off the waitlist!";
 
@@ -71,7 +72,7 @@ export function buildWaitlistConfirmationEmail({
 } {
   const name = (fullName ?? '').trim();
   const greeting = name ? `Hi ${name},` : 'Hi,';
-  const waitlistUrl = new URL('/waitlist', appUrl).toString();
+  const waitlistUrl = new URL(APP_ROUTES.WAITLIST, appUrl).toString();
 
   const text = `${greeting}\n\nYou're on the ${APP_NAME} waitlist. We'll email you when your access is ready.\n\nYou can check your status here:\n${waitlistUrl}\n\nIf you didn't request this, you can ignore this email.`;
 

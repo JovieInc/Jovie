@@ -61,7 +61,7 @@ async function globalSetup() {
   }
 
   // Set up monitoring context
-  process.env.SYNTHETIC_RUN_ID = `synthetic-${Date.now()}`;
+  process.env.SYNTHETIC_RUN_ID ??= `synthetic-${Date.now()}`;
   process.env.SYNTHETIC_START_TIME = new Date().toISOString();
 
   console.log(`📊 Synthetic run ID: ${process.env.SYNTHETIC_RUN_ID}`);

@@ -194,7 +194,7 @@ export function AuthLayout({
   showSkipLink = true,
   showLogo = true,
   showLogoutButton = false,
-  logoutRedirectUrl = '/signin',
+  logoutRedirectUrl = APP_ROUTES.SIGNIN,
   layoutVariant = 'stack',
   contentPlacement = 'default',
   showcaseVariant = 'page',
@@ -277,7 +277,7 @@ export function AuthLayout({
           aria-hidden={isKeyboardVisible}
         >
           <Link
-            href='/'
+            href={APP_ROUTES.HOME}
             className='inline-flex size-11 shrink-0 items-center justify-center text-white/45 transition-colors duration-subtle hover:text-white/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20'
             // ui-casing-allow: must match canonical sentence-case HOME_LINK_LABEL in useNormalizeClerkHomeLink
             aria-label='Go to homepage'

@@ -491,6 +491,23 @@ After the JOV-2023 fix:
 
 ---
 
+## Source parity status (2026-08-13 audit)
+
+`StaticArtistPage` is the active public-profile adapter and renders
+`ProfileCompactTemplate` (`apps/web/components/features/profile/StaticArtistPage.tsx:124-161`).
+The template reads the 768px and 1180px breakpoints and renders
+`ProfileCompactSurface` in its active production composition
+(`apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx:314-352,795-885`).
+`ProfileDesktopSurface` remains source-visible and barrel/test-covered, but no
+production import from the active template was found in this checkout
+(`apps/web/components/features/profile/shell/index.ts:36-42`; tests at
+`apps/web/tests/unit/profile/profile-compact-template.test.tsx:1364-1455`).
+Desktop source parity is therefore **not_proven**. Treat the desktop behavior
+described in §2.7 as a specification claim pending source reconciliation, not
+as verified production parity.
+
+---
+
 ## Appendix: Canonical Component Stack (Active, Not Legacy)
 
 | Layer | Component | File |
