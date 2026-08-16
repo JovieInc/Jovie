@@ -6,9 +6,11 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import datetime as dt
+import fcntl
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import time
@@ -28,7 +30,7 @@ except ImportError:  # pragma: no cover - deployed Gem supplies this module
 
 
 from gem_gate_contract import drain_state_dir, gate_state_dir, validate_gate_result
-from gem_rehabilitation_policy import bounded_selection, decide_action
+from gem_rehabilitation_policy import bounded_selection, decide_action, lease_key
 
 REPO = os.environ.get("GEM_PR_DRAIN_REPO", "JovieInc/Jovie")
 REPO_POLICY = by_github(REPO)
@@ -150,6 +152,55 @@ def capacity():
         pass
     by_memory = max(1, memory // (2 * 1024**3)) if memory else 1
     return max(1, min(MAX_CAP, cpus, by_memory))
+
+
+def effective_capacity(host_capacity, gate):
+    maximum = gate.get("remediationAdmission", {}).get("maxConcurrent")
+    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 1:
+        raise ValueError("typed remediation maxConcurrent is missing or invalid")
+    return min(host_capacity, maximum)
+
+
+def acquire_pr_lease(pr):
+    """Acquire the cross-process single-writer fence for one exact PR head."""
+    number = pr.get("number")
+    head_sha = pr.get("head", {}).get("sha")
+    if isinstance(number, bool) or not isinstance(number, int) or number < 1:
+        raise ValueError("PR lease requires a positive PR number")
+    if not isinstance(head_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", head_sha):
+        raise ValueError("PR lease requires an exact lowercase hexadecimal head")
+    key = lease_key(REPO, number, head_sha)
+    directory = STATE / "leases"
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    handle = (directory / f"{key}.lock").open("a+", encoding="utf-8")
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        handle.close()
+        return None
+    handle.seek(0)
+    handle.truncate()
+    json.dump(
+        {
+            "schema": "gem-pr-rehabilitation-lease/v1",
+            "repo": REPO,
+            "pr": number,
+            "expectedHead": head_sha,
+            "pid": os.getpid(),
+            "acquiredAt": dt.datetime.now(dt.timezone.utc).isoformat(),
+        },
+        handle,
+        sort_keys=True,
+    )
+    handle.write("\n")
+    handle.flush()
+    os.fsync(handle.fileno())
+    return handle
+
+
+def release_pr_lease(handle):
+    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    handle.close()
 
 
 def labels(pr):
@@ -274,60 +325,66 @@ def update_one(pr):
         "before_state": pr.get("mergeable_state"),
         "priority_class": pr.get("priority_class") or priority_class(pr),
     }
-    blocker = work_mutation_blocker(max_age=0)
-    if blocker:
-        return {
-            **result,
-            "action": "work_admission_blocked",
-            "result": "skipped",
-            "reason": blocker,
-        }
     head_sha = pr.get("head", {}).get("sha")
-    if not isinstance(head_sha, str) or not head_sha:
+    if not isinstance(head_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", head_sha):
         return {
             **result,
             "action": "api_update_branch",
             "result": "skipped",
-            "reason": "expected_head_sha_missing_fail_closed",
+            "reason": "expected_head_sha_invalid_fail_closed",
         }
-    action = decide_action(
-        state="GREEN",
-        push_allowed=True,
-        mergeable_state=pr.get("mergeable_state", "unknown"),
-        expected_head=head_sha,
-        attempt=int(pr.get("repair_attempt", 0)),
-    )
-    if action != "exact_head_branch_update":
-        return {
-            **result,
-            "action": action,
-            "result": "skipped",
-            "reason": "classified_for_bounded_rehabilitation",
-        }
+    lease = acquire_pr_lease(pr)
+    if lease is None:
+        return {**result, "action": "pr_lease_busy", "result": "skipped", "reason": "single_writer_active"}
     try:
-        response = run(
-            "gh",
-            "api",
-            "-X",
-            "PUT",
-            f"repos/{REPO}/pulls/{pr['number']}/update-branch",
-            "-f",
-            f"expected_head_sha={head_sha}",
-            timeout=90,
+        blocker = work_mutation_blocker(max_age=0)
+        if blocker:
+            return {
+                **result,
+                "action": "work_admission_blocked",
+                "result": "skipped",
+                "reason": blocker,
+            }
+        action = decide_action(
+            state="GREEN",
+            push_allowed=True,
+            mergeable_state=pr.get("mergeable_state", "unknown"),
+            expected_head=head_sha,
+            attempt=int(pr.get("repair_attempt", 0)),
         )
-        return {
-            **result,
-            "action": "api_update_branch",
-            "result": "ok",
-            "response": response.strip()[:500],
-        }
-    except Exception as error:
-        return {
-            **result,
-            "action": "api_update_branch",
-            "result": "error",
-            "error": f"{type(error).__name__}",
-        }
+        if action != "exact_head_branch_update":
+            return {
+                **result,
+                "action": action,
+                "result": "skipped",
+                "reason": "classified_for_bounded_rehabilitation",
+            }
+        try:
+            response = run(
+                "gh",
+                "api",
+                "-X",
+                "PUT",
+                f"repos/{REPO}/pulls/{pr['number']}/update-branch",
+                "-f",
+                f"expected_head_sha={head_sha}",
+                timeout=90,
+            )
+            return {
+                **result,
+                "action": "api_update_branch",
+                "result": "ok",
+                "response": response.strip()[:500],
+            }
+        except Exception as error:
+            return {
+                **result,
+                "action": "api_update_branch",
+                "result": "error",
+                "error": f"{type(error).__name__}",
+            }
+    finally:
+        release_pr_lease(lease)
 
 
 def write_artifact(document):
@@ -382,7 +439,7 @@ def main():
         if not authenticated:
             raise RuntimeError(reason)
         all_open, eligible = inventory()
-        worker_capacity = capacity()
+        worker_capacity = effective_capacity(capacity(), gate)
         document.update(
             open_count=len(all_open),
             eligible_count=len(eligible),

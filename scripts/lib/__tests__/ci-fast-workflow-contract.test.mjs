@@ -173,6 +173,9 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain(
       'coverage report --include="*/scripts/hermes/gem_rehabilitation_policy.py" --fail-under=90'
     );
+    expect(CI_FAST_SOURCE).toContain(
+      "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs"
+    );
   });
 
   it('always materializes ci-fast-lanes.json even when setup fails (JOV-4446)', () => {

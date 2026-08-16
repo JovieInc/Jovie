@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from typing import Any
 
 
@@ -46,7 +47,7 @@ def decide_action(
     """Return one mutation-free policy decision for an exact PR head."""
     if state not in {"GREEN", "AMBER", "RED"}:
         raise PolicyError("unknown fleet state")
-    if not isinstance(expected_head, str) or len(expected_head) != 40:
+    if not isinstance(expected_head, str) or not re.fullmatch(r"[0-9a-f]{40}", expected_head):
         raise PolicyError("exact full PR head is required")
     if attempt < 0:
         raise PolicyError("attempt cannot be negative")
@@ -94,7 +95,7 @@ def validate_handoff(receipt: dict[str, Any]) -> None:
     if receipt.get("schema") != SCHEMA:
         raise PolicyError("unsupported handoff schema")
     expected_head = receipt.get("expectedHead")
-    if not isinstance(expected_head, str) or len(expected_head) != 40:
+    if not isinstance(expected_head, str) or not re.fullmatch(r"[0-9a-f]{40}", expected_head):
         raise PolicyError("handoff exact head is invalid")
     if receipt.get("leaseKey") != lease_key(receipt.get("repo", ""), receipt.get("pr"), expected_head):
         raise PolicyError("handoff lease does not bind the exact head")

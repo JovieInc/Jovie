@@ -392,6 +392,11 @@ function runStructural() {
     // closed when the file cannot be resolved or contains no tests.
     'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts',
     'pnpm --filter @jovie/web run test:reliability-detectors',
+    // The Gem contract is embedded in the broader Symphony controller suite.
+    // Select the exact subtest so typed remediation admission, leases, and
+    // expected-head mutation remain executable CI behavior without adding the
+    // full backlog suite to every structural lane.
+    "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs",
     // CI installs the hash-pinned pytest + coverage toolchain. The pure policy
     // is the safety boundary for holds, retry budgets, exact-head leases, and
     // bounded fanout, so branch-aware coverage is a hard structural gate.

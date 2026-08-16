@@ -429,6 +429,11 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
         self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 4)
+        self.assertEqual(
+            receipt["remediationAdmission"]["authority"],
+            "single-pr-writer-exact-head",
+        )
         self.assertIn(
             "expected-head-pr-update", receipt["remediationAdmission"]["activities"]
         )
