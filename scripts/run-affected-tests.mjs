@@ -281,6 +281,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+  'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
   'scripts/hermes/tests/test-model-router.py',
   'scripts/ci-fast-lanes.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
