@@ -4,6 +4,203 @@ import Testing
 @testable import Jovie
 
 struct VoiceCaptureServiceTests {
+  private let enabledVlogContext = VlogActivationContext(
+    isEnabled: true,
+    isAppActive: true,
+    isEligibleSurface: true,
+    allowsMotionActivation: true
+  )
+
+  @Test func vlogActivationRequiresOptIn() {
+    var policy = VlogActivationPolicy()
+    let disabled = VlogActivationContext(
+      isEnabled: false,
+      isAppActive: true,
+      isEligibleSurface: true,
+      allowsMotionActivation: true
+    )
+
+    #expect(policy.ingest(vlogLiftSample(at: 0), context: disabled) == .none)
+    #expect(policy.ingest(vlogSteadyLandscapeSample(at: 1), context: disabled) == .none)
+  }
+
+  @Test func vlogActivationRejectsLandscapeWithoutRecentLift() {
+    var policy = VlogActivationPolicy()
+
+    #expect(
+      policy.ingest(vlogSteadyLandscapeSample(at: 0), context: enabledVlogContext) == .none
+    )
+    #expect(
+      policy.ingest(vlogSteadyLandscapeSample(at: 2), context: enabledVlogContext) == .none
+    )
+  }
+
+  @Test func vlogActivationRequiresStableDwellAfterLift() {
+    var policy = VlogActivationPolicy()
+
+    #expect(policy.ingest(vlogLiftSample(at: 0), context: enabledVlogContext) == .none)
+    #expect(
+      policy.ingest(vlogSteadyLandscapeSample(at: 0.2), context: enabledVlogContext)
+        == .candidateStarted
+    )
+    #expect(
+      policy.ingest(vlogSteadyLandscapeSample(at: 0.4), context: enabledVlogContext) == .none
+    )
+    #expect(
+      policy.ingest(vlogSteadyLandscapeSample(at: 0.6), context: enabledVlogContext) == .none
+    )
+    #expect(
+      policy.ingest(vlogSteadyLandscapeSample(at: 0.8), context: enabledVlogContext) == .none
+    )
+    #expect(
+      policy.ingest(vlogSteadyLandscapeSample(at: 1.0), context: enabledVlogContext)
+        == .activate
+    )
+  }
+
+  @Test func vlogActivationCancelsWhenPostureIsLost() {
+    var policy = VlogActivationPolicy()
+
+    _ = policy.ingest(vlogLiftSample(at: 0), context: enabledVlogContext)
+    _ = policy.ingest(vlogSteadyLandscapeSample(at: 0.2), context: enabledVlogContext)
+    let portrait = VlogActivationSample(
+      timestamp: 0.5,
+      isLandscape: false,
+      gravityX: 0,
+      gravityZ: 0,
+      userAccelerationMagnitude: 0.01
+    )
+
+    #expect(
+      policy.ingest(portrait, context: enabledVlogContext)
+        == .candidateCancelled(.postureLost)
+    )
+    #expect(
+      policy.ingest(vlogSteadyLandscapeSample(at: 1.2), context: enabledVlogContext) == .none
+    )
+  }
+
+  @Test func vlogActivationCooldownPreventsImmediateReentry() {
+    var policy = VlogActivationPolicy()
+    _ = policy.ingest(vlogLiftSample(at: 0), context: enabledVlogContext)
+    _ = policy.ingest(vlogSteadyLandscapeSample(at: 0.2), context: enabledVlogContext)
+    _ = policy.ingest(vlogSteadyLandscapeSample(at: 0.4), context: enabledVlogContext)
+    _ = policy.ingest(vlogSteadyLandscapeSample(at: 0.6), context: enabledVlogContext)
+    _ = policy.ingest(vlogSteadyLandscapeSample(at: 0.8), context: enabledVlogContext)
+    #expect(
+      policy.ingest(vlogSteadyLandscapeSample(at: 1.0), context: enabledVlogContext)
+        == .activate
+    )
+
+    #expect(policy.ingest(vlogLiftSample(at: 2), context: enabledVlogContext) == .none)
+    #expect(
+      policy.ingest(vlogSteadyLandscapeSample(at: 3), context: enabledVlogContext) == .none
+    )
+  }
+
+  @Test func vlogActivationDisablesAutomaticPathForAssistiveControl() {
+    var policy = VlogActivationPolicy()
+    let accessibilityContext = VlogActivationContext(
+      isEnabled: true,
+      isAppActive: true,
+      isEligibleSurface: true,
+      allowsMotionActivation: false
+    )
+
+    _ = policy.ingest(vlogLiftSample(at: 0), context: accessibilityContext)
+    #expect(
+      policy.ingest(vlogSteadyLandscapeSample(at: 1), context: accessibilityContext) == .none
+    )
+  }
+
+  @Test func vlogActivationCancelsWhenSurfaceBecomesBlocked() {
+    var policy = VlogActivationPolicy()
+    _ = policy.ingest(vlogLiftSample(at: 0), context: enabledVlogContext)
+    _ = policy.ingest(vlogSteadyLandscapeSample(at: 0.2), context: enabledVlogContext)
+    let blocked = VlogActivationContext(
+      isEnabled: true,
+      isAppActive: true,
+      isEligibleSurface: false,
+      allowsMotionActivation: true
+    )
+
+    #expect(
+      policy.ingest(vlogSteadyLandscapeSample(at: 0.5), context: blocked)
+        == .candidateCancelled(.surfaceBlocked)
+    )
+  }
+
+  @Test func vlogActivationRejectsExpiredLift() {
+    var policy = VlogActivationPolicy()
+    _ = policy.ingest(vlogLiftSample(at: 0), context: enabledVlogContext)
+
+    #expect(
+      policy.ingest(vlogSteadyLandscapeSample(at: 2.6), context: enabledVlogContext) == .none
+    )
+  }
+
+  @Test func vlogActivationRequiresNewLiftAfterCandidateMovesAgain() {
+    var policy = VlogActivationPolicy()
+    _ = policy.ingest(vlogLiftSample(at: 0), context: enabledVlogContext)
+    _ = policy.ingest(vlogSteadyLandscapeSample(at: 0.2), context: enabledVlogContext)
+    let movingLandscape = VlogActivationSample(
+      timestamp: 0.4,
+      isLandscape: true,
+      gravityX: 0.9,
+      gravityZ: 0.1,
+      userAccelerationMagnitude: 0.16
+    )
+
+    #expect(
+      policy.ingest(movingLandscape, context: enabledVlogContext)
+        == .candidateCancelled(.motionContinued)
+    )
+    #expect(
+      policy.ingest(vlogSteadyLandscapeSample(at: 1.2), context: enabledVlogContext) == .none
+    )
+  }
+
+  @Test func manualVlogActivationStartsCooldown() {
+    var policy = VlogActivationPolicy()
+    policy.recordManualActivation(at: 0)
+
+    #expect(policy.ingest(vlogLiftSample(at: 1), context: enabledVlogContext) == .none)
+    #expect(
+      policy.ingest(vlogSteadyLandscapeSample(at: 2), context: enabledVlogContext) == .none
+    )
+  }
+
+  @Test func vlogActivationRejectsDroppedSamplesDuringDwell() {
+    var policy = VlogActivationPolicy()
+    _ = policy.ingest(vlogLiftSample(at: 0), context: enabledVlogContext)
+    _ = policy.ingest(vlogSteadyLandscapeSample(at: 0.2), context: enabledVlogContext)
+
+    #expect(
+      policy.ingest(vlogSteadyLandscapeSample(at: 0.6), context: enabledVlogContext)
+        == .candidateCancelled(.sampleGap)
+    )
+  }
+
+  private func vlogLiftSample(at timestamp: TimeInterval) -> VlogActivationSample {
+    VlogActivationSample(
+      timestamp: timestamp,
+      isLandscape: false,
+      gravityX: 0.1,
+      gravityZ: -0.9,
+      userAccelerationMagnitude: 0.24
+    )
+  }
+
+  private func vlogSteadyLandscapeSample(at timestamp: TimeInterval) -> VlogActivationSample {
+    VlogActivationSample(
+      timestamp: timestamp,
+      isLandscape: true,
+      gravityX: 0.92,
+      gravityZ: 0.08,
+      userAccelerationMagnitude: 0.02
+    )
+  }
+
   @Test func teleprompterFollowsWordsAndRecoversAfterOffScriptSpeech() {
     var follower = KaraokeScriptFollower(
       script: "Today we are building a calmer path for independent artists"
