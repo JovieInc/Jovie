@@ -1372,6 +1372,20 @@ if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
     ')"
   # A changed head has invalidated the event scope. It must never inherit this
   # event's queue intent; the newer head's own event creates its receipt.
+  # The pre-enrollment snapshot can race GitHub's native queue write. Before
+  # publishing a terminal queue-noop, re-read the authoritative native state.
+  # Only a valid exact-head receipt suppresses the error; unknown state stays
+  # fail-closed and cannot manufacture a hold-clearing success.
+  if [[ "$MERGE_QUEUE_BACKEND" == "native" && "$DRY_RUN" != "1" \
+    && "$ADMISSION_TARGET_OBSERVED" == "true" && "$ADMISSION_ALREADY_QUEUED" != "true" ]]; then
+    LIVE_NATIVE_QUEUE_STATE="$(node scripts/merge-queue-backend.mjs list-state)"
+    ADMISSION_ALREADY_QUEUED="$(jq -r --arg pr "$DRAIN_ADMISSION_PR" --arg head "$DRAIN_ADMISSION_HEAD" '
+      ($ARGS.named.pr as $pr | $ARGS.named.head as $head
+       | .[$pr] // null
+       | (.queued == true)
+       and ((.headRefOid // "") | ascii_downcase) == $head)
+    ' <<<"$LIVE_NATIVE_QUEUE_STATE")"
+  fi
 if [[ "$DRY_RUN" != "1" && "$ADMISSION_TARGET_OBSERVED" == "true" && "$ADMISSION_ALREADY_QUEUED" != "true" ]]; then
     echo "::error::queue-noop: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD has no native queue receipt" >&2
     exit 3
