@@ -888,6 +888,121 @@ JSON
         assert "would close jovie-fleet-queue-hold/v1 on #908 -> success" in result.stdout
         assert "expired" in result.stdout
 
+    @pytest.mark.parametrize(
+        ("workflow_name", "run_head_matches", "expect_close"),
+        [
+            ("Merge Queue Auto-Enroll", True, True),
+            ("Unrelated Workflow", True, False),
+            ("Merge Queue Auto-Enroll", False, False),
+        ],
+    )
+    def test_null_creator_fleet_hold_requires_exact_app_and_run_provenance(
+        self,
+        tmp_path: Path,
+        workflow_name: str,
+        run_head_matches: bool,
+        expect_close: bool,
+    ) -> None:
+        head = "f" * 40
+        run_head = head if run_head_matches else "e" * 40
+        receipt = {
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "promotionMode": "isolated-only",
+            "observedAt": datetime.now(timezone.utc).isoformat(),
+            "signals": {
+                "main": {"status": "green", "sha": "a" * 40},
+                "production": {"status": "red"},
+                "controller": {"status": "green"},
+                "queue": {
+                    "status": "known",
+                    "eligiblePrs": 1,
+                    "greenReadyPrs": 1,
+                    "target": 15,
+                },
+                "integrity": {"status": "clear"},
+            },
+            "promotionAdmission": {"allowed": False},
+            "isolatedPromotionAdmission": {
+                "allowed": True,
+                "deploymentsAllowed": False,
+            },
+            "productionUnboundRepairAdmission": {
+                "allowed": False,
+                "condition": None,
+                "mainSha": None,
+                "deployedSha": None,
+                "maxConcurrent": 1,
+                "deploymentsAllowed": False,
+            },
+            "alreadyAdmittedCohort": {
+                "preserve": False,
+                "newIntakeAllowed": True,
+                "semantics": "isolated-only",
+            },
+        }
+        encoded = base64.b64encode(json.dumps(receipt).encode()).decode()
+        stale = (datetime.now(timezone.utc) - timedelta(minutes=20)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        avatar_url = "https://avatars.githubusercontent.com/in/2934433?v=4"
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":911,"t":"Null creator held PR","draft":false,"m":"MERGEABLE","head":"codex/jov-911","headOid":"{head}","base":"main","L":[],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && " $* " == *"/commits/{head}/status "* ]]; then
+                  echo '{{"statuses":[{{"url":"https://api.github.com/repos/JovieInc/Jovie/statuses/{head}","avatar_url":"{avatar_url}","context":"jovie-fleet-queue-hold/v1","state":"pending","creator":null,"target_url":"https://github.com/JovieInc/Jovie/actions/runs/77","updated_at":"{stale}"}}]}}'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "api users/jovie-bot%5Bbot%5D" ]]; then
+                  echo '{{"login":"jovie-bot[bot]","type":"Bot","avatar_url":"{avatar_url}"}}'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "api repos/JovieInc/Jovie/actions/runs/77" ]]; then
+                  echo '{{"id":77,"name":"{workflow_name}","path":".github/workflows/merge-queue-autoenroll.yml","head_sha":"{run_head}","html_url":"https://github.com/JovieInc/Jovie/actions/runs/77","repository":{{"full_name":"JovieInc/Jovie"}},"head_repository":{{"full_name":"JovieInc/Jovie"}},"workflow_id":299216194,"run_attempt":1}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRY_RUN=1 DRAIN_PROMOTION_MODE=isolated-only "
+                    f"DRAIN_FLEET_GATE_B64={encoded} "
+                    "FLEET_HOLD_TTL_SECONDS=60 GITHUB_RUN_ID=77 "
+                    "GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        close_message = "would close jovie-fleet-queue-hold/v1 on #911 -> success"
+        if expect_close:
+            assert close_message in result.stdout
+            assert "expired" in result.stdout
+        else:
+            assert close_message not in result.stdout
+
     def test_hold_intake_closes_fresh_pending_hold_without_waiting_for_ttl(
         self, tmp_path: Path
     ) -> None:
