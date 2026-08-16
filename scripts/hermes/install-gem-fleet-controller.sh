@@ -7,6 +7,7 @@ readonly SYMPHONY_ROOT="${SYMPHONY_RUNTIME:-/home/timwhite/symphony-runtime/elix
 readonly TIMER="gem-pr-drain.timer"
 readonly SERVICE="symphony-ui-pilot.service"
 readonly VERIFY_ONLY="${FLEET_INSTALL_VERIFY_ONLY:-false}"
+readonly EXPECTED_SOURCE_REVISION="${GEM_CONTROLLER_EXPECTED_REVISION:-}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 readonly STAMP
 readonly BACKUP_DIR="${GEM_ROOT}/state/backups/fleet-controller-${STAMP}"
@@ -37,6 +38,19 @@ git -C "${SOURCE_ROOT}" diff --cached --quiet -- \
   scripts/hermes/gem_gate_contract.py \
   scripts/hermes/gem-pr-drain.py \
   scripts/hermes/WORKFLOW.jovie-ui-pilot.md
+
+SOURCE_REVISION="$(git -C "${SOURCE_ROOT}" rev-parse HEAD)"
+if [[ -n "${EXPECTED_SOURCE_REVISION}" ]]; then
+  [[ "${EXPECTED_SOURCE_REVISION}" =~ ^[0-9a-f]{40}$ ]] || {
+    printf 'GEM_CONTROLLER_EXPECTED_REVISION must be a full lowercase SHA\n' >&2
+    exit 2
+  }
+  [[ "${SOURCE_REVISION}" == "${EXPECTED_SOURCE_REVISION}" ]] || {
+    printf 'refusing controller install from %s; expected %s\n' \
+      "${SOURCE_REVISION}" "${EXPECTED_SOURCE_REVISION}" >&2
+    exit 3
+  }
+fi
 
 python3 -m py_compile "${GATE_SOURCE}" "${CONTRACT_SOURCE}" "${CONSUMER_SOURCE}"
 if [[ "${VERIFY_ONLY}" == true ]]; then
@@ -141,7 +155,6 @@ curl --fail --silent --show-error --max-time 5 http://127.0.0.1:4041/api/v1/stat
 # deployed configuration surfaces only after daemon-reload, service activation,
 # and the local state endpoint have all succeeded. This receipt contains hashes
 # and state only; it never serializes credentials or configuration contents.
-SOURCE_REVISION="$(git -C "${SOURCE_ROOT}" rev-parse HEAD)"
 WORKFLOW_SOURCE_SHA="$(sha256sum "${WORKFLOW_SOURCE}" | awk '{print $1}')"
 WORKFLOW_TARGET_SHA="$(sha256sum "${WORKFLOW_TARGET}" | awk '{print $1}')"
 UNIT_SOURCE_SHA="$(sha256sum "${SERVICE_UNIT_SOURCE}" | awk '{print $1}')"

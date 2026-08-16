@@ -56,6 +56,7 @@ jobs:
           scripts/backlog-orchestrator/run-backlog.sh intake-readiness --issue="$ISSUE_IDENTIFIER"
       - name: Admit at most one verified ordinary candidate through normal gates
         if: github.event_name == 'repository_dispatch'
+        id: admission
         env:
           JOVIE_AGENT_PROFILE: no_agent
           ISSUE_IDENTIFIER: ${{ github.event.client_payload.issue_identifier }}
@@ -65,7 +66,25 @@ jobs:
           # gate-next rereads the exact issue, requires the canonical fleet
           # receipt, plan and admission receipts, then verifies its single
           # lease. A hold is a successful no-op, never a retry bypass.
-          scripts/backlog-orchestrator/run-backlog.sh gate-next --issue="$ISSUE_IDENTIFIER"
+          receipt="$RUNNER_TEMP/intake-admission.json"
+          scripts/backlog-orchestrator/run-backlog.sh gate-next --issue="$ISSUE_IDENTIFIER" | tee "$receipt"
+          if jq -e --arg issue "$ISSUE_IDENTIFIER" '
+            .status == "admitted" and
+            any(.teams[]; .status == "admitted" and .issue == $issue and .mutations == "verified")
+          ' "$receipt" >/dev/null; then
+            echo "admitted=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "admitted=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Wake the local lease executor for an admitted event
+        if: github.event_name == 'repository_dispatch' && steps.admission.outputs.admitted == 'true'
+        run: |
+          set -euo pipefail
+          # The service is loopback-only. This coalesced refresh is the primary
+          # event wake-up; the workflow's five-minute poll is only a backstop.
+          curl --fail --silent --show-error --max-time 5 \
+            -X POST http://127.0.0.1:4041/api/v1/refresh \
+            | jq -e '.queued == true and (.operations | index("poll")) != null' >/dev/null
       - name: Slowly reconcile missed intake events without admission
         if: github.event_name == 'schedule'
         env:

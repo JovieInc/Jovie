@@ -1,0 +1,63 @@
+name: Activate Gem Delivery Controller
+
+# A production receipt is the only authority to replace Gem's local controller
+# configuration. The installer refuses a dirty or mismatched source revision,
+# keeps a timestamped rollback copy, reloads systemd, and writes the attestation.
+on:
+  workflow_run:
+    workflows: ["Production Controller"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gem-delivery-controller-activation
+  cancel-in-progress: false
+
+jobs:
+  activate:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
+    name: Activate exact production-proven Gem controller
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    timeout-minutes: 8
+    steps:
+      - name: Checkout the exact successful production revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - name: Refuse a superseded or non-Gem activation runner
+        env:
+          PRODUCTION_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          test "$(id -un)" = timwhite
+          test "$(git rev-parse HEAD)" = "$PRODUCTION_SHA"
+          current_main="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test "$current_main" = "$PRODUCTION_SHA"
+      - name: Install and attest the exact controller configuration
+        env:
+          GEM_CONTROLLER_EXPECTED_REVISION: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          bash scripts/hermes/install-gem-fleet-controller.sh
+      - name: Verify runtime identity after reload
+        env:
+          GEM_WORKSPACE: /home/timwhite/gem-workspace
+          PRODUCTION_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          jq -e --arg sha "$PRODUCTION_SHA" '
+            .schema == "gem-service-attestation/v1" and
+            .sourceRevision == $sha and
+            .daemonReloaded == true and
+            .active == true and
+            .healthy == true and
+            .workflow.matches == true and
+            .unit.matches == true
+          ' "$GEM_WORKSPACE/state/gem-service-attestation.json" >/dev/null
+          curl --fail --silent --show-error --max-time 5 http://127.0.0.1:4041/api/v1/state \
+            | jq -e '.counts | has("running") and has("retrying") and has("blocked")' >/dev/null

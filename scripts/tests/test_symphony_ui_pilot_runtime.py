@@ -28,6 +28,9 @@ WORKFLOW = ROOT / "scripts/hermes/WORKFLOW.jovie-ui-pilot.md"
 UNIT = ROOT / "scripts/hermes/systemd/symphony-ui-pilot.service"
 GUARD = ROOT / "scripts/hermes/symphony-lease-guard"
 INSTALLER = ROOT / "scripts/hermes/install-symphony-ui-pilot.sh"
+FLEET_INSTALLER = ROOT / "scripts/hermes/install-gem-fleet-controller.sh"
+INTAKE_WORKFLOW = ROOT / ".github/workflows/jovie-intake-controller.yml"
+ACTIVATION_WORKFLOW = ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
 
 
 def _front_matter_lines() -> list[str]:
@@ -71,7 +74,7 @@ def _list_items(body: list[str], key: str) -> list[str]:
             m = re.match(r"^\s+-\s*(.+?)\s*$", line)
             if m:
                 items.append(m.group(1))
-            elif line.strip():
+            elif line.strip() and not line.lstrip().startswith("#"):
                 break
     return items
 
@@ -104,11 +107,10 @@ def test_workflow_restores_approved_concurrency_posture() -> None:
 def test_workflow_admission_contract() -> None:
     lines = _front_matter_lines()
     tracker = _section(lines, "tracker")
-    assert _list_items(tracker, "required_labels") == [
-        "symphony",
-        "plan-approved",
-        "admission-approved",
-    ]
+    # The only selector is a controller-derived lease marker. Plan and
+    # admission labels are evidence, not manual runtime admission switches;
+    # `before_run` independently verifies the routing receipt.
+    assert _list_items(tracker, "required_labels") == ["symphony"]
     # JOV-4973: In Review is deliberately NOT implementation-active. An issue
     # transitioned to In Review stops its agent, releases its slot, and is
     # never redispatched; Gem/GitHub own review, promotion, queue, merge,
@@ -116,6 +118,30 @@ def test_workflow_admission_contract() -> None:
     assert _list_items(tracker, "active_states") == ["Todo", "In Progress"]
     for state in ("Done", "Canceled"):
         assert state in _list_items(tracker, "terminal_states")
+
+
+def test_workflow_uses_event_wake_with_slow_poll_backstop() -> None:
+    polling = _section(_front_matter_lines(), "polling")
+    assert int(_scalar(polling, "interval_ms")) >= 300_000
+    intake = INTAKE_WORKFLOW.read_text()
+    assert "Wake the local lease executor for an admitted event" in intake
+    assert "steps.admission.outputs.admitted == 'true'" in intake
+    assert "-X POST http://127.0.0.1:4041/api/v1/refresh" in intake
+    assert 'any(.teams[]; .status == "admitted"' in intake
+
+
+def test_activation_requires_exact_production_revision_and_attestation() -> None:
+    installer = FLEET_INSTALLER.read_text()
+    assert "GEM_CONTROLLER_EXPECTED_REVISION" in installer
+    assert "refusing controller install" in installer
+    activation = ACTIVATION_WORKFLOW.read_text()
+    assert "workflow_run:" in activation
+    assert 'workflows: ["Production Controller"]' in activation
+    assert "ref: ${{ github.event.workflow_run.head_sha }}" in activation
+    assert 'test "$(id -un)" = timwhite' in activation
+    assert "git ls-remote origin refs/heads/main" in activation
+    assert "GEM_CONTROLLER_EXPECTED_REVISION" in activation
+    assert 'gem-service-attestation/v1' in activation
 
 
 def test_workflow_server_and_workspace() -> None:
