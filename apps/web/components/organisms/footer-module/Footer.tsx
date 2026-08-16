@@ -12,17 +12,17 @@ const FOOTER_COLUMNS = [
     id: 'product',
     heading: 'Product',
     links: [
-      { href: '/artist-profiles', label: 'Artist Profiles' },
-      { href: '/pricing', label: 'Pricing' },
-      { href: '/support', label: 'Support' },
+      { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
+      { href: APP_ROUTES.PRICING, label: 'Pricing' },
+      { href: APP_ROUTES.SUPPORT, label: 'Support' },
     ],
   },
   {
     id: 'company',
     heading: 'Company',
     links: [
-      { href: '/blog', label: 'Blog' },
-      { href: '/changelog', label: 'Changelog' },
+      { href: APP_ROUTES.BLOG, label: 'Blog' },
+      { href: APP_ROUTES.CHANGELOG, label: 'Changelog' },
     ],
   },
   {

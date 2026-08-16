@@ -23,8 +23,8 @@ import { GoogleOneTap } from './GoogleOneTap';
 export type AuthShellMode = 'sign-in' | 'sign-up';
 
 const AUTH_LEGAL_FALLBACK_HREFS = {
-  privacy: '/legal/privacy',
-  terms: '/legal/terms',
+  privacy: APP_ROUTES.LEGAL_PRIVACY,
+  terms: APP_ROUTES.LEGAL_TERMS,
 } as const;
 
 function resolveLegalHref(value: string | undefined, fallback: string) {

@@ -30,8 +30,10 @@ export default async function WaitlistInvitePage({
 
   const { userId } = await getCachedAuth();
   if (!userId) {
-    const redirectUrl = `/waitlist/invite?token=${encodeURIComponent(token)}`;
-    redirect(`/signin?redirect_url=${encodeURIComponent(redirectUrl)}`);
+    const redirectUrl = `${APP_ROUTES.WAITLIST_INVITE}?token=${encodeURIComponent(token)}`;
+    redirect(
+      `${APP_ROUTES.SIGNIN}?redirect_url=${encodeURIComponent(redirectUrl)}`
+    );
   }
 
   const currentUser = await getCachedCurrentUser();
@@ -79,7 +81,7 @@ export default async function WaitlistInvitePage({
   }
 
   if (result.outcome === 'signed_up') {
-    redirect('/app');
+    redirect(APP_ROUTES.DASHBOARD);
   }
 
   if (result.outcome === 'expired') {
