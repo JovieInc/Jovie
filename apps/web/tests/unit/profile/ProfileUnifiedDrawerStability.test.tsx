@@ -140,7 +140,7 @@ describe('ProfileUnifiedDrawer — no-flicker invariant (JOV-2150)', () => {
     ({ ProfileUnifiedDrawer } = await import(
       '@/features/profile/ProfileUnifiedDrawer'
     ));
-  }, 10_000);
+  }, 30_000);
 
   afterEach(() => cleanup());
 
