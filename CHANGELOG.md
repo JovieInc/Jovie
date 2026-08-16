@@ -9,6 +9,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- [internal] **Gem activation targets provisioned runners:** controller generations no longer wait on an unprovisioned host label. A regression contract binds activation to the fixed runner fleet.
 - [internal] **Local Eve verification is deterministic and credential-free (JOV-5171):** the isolated `eve@0.27.8` pilot now has one root-invokable smoke command that runs from a cold app root, blocks model-catalog network access, and fails when the allowed skills, tools, channels, subagents, or schedules drift.
 
 ## [26.8.1] - 2026-08-16
