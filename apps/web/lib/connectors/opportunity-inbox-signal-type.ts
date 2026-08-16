@@ -13,6 +13,8 @@ export const OPPORTUNITY_SIGNAL_TYPES = [
   'new_song',
   'new_event',
   'new_profile_match',
+  'fan_reply',
+  'collab_request',
   'brand_deal',
   'other',
 ] as const;
@@ -43,7 +45,9 @@ const KIND_PREFIX_RULES: readonly (readonly [
 ])[] = [
   ['new_song', ['release.', 'song.', 'track.', 'music.']],
   ['new_event', ['calendar.', 'event.', 'tour.', 'booking.', 'show.']],
-  ['new_profile_match', ['profile.', 'profile_match.', 'match.', 'collab.']],
+  ['new_profile_match', ['profile.', 'profile_match.', 'match.']],
+  ['fan_reply', ['social.reply', 'fan.reply', 'comment.reply']],
+  ['collab_request', ['collab.', 'collaboration.']],
   ['brand_deal', [BRAND_DEAL_OPPORTUNITY_KIND]],
 ];
 
@@ -117,6 +121,11 @@ export const OPPORTUNITY_SIGNAL_TYPE_META: Readonly<
   new_profile_match: {
     label: 'Profile Match',
     filterLabel: 'Profile Matches',
+  },
+  fan_reply: { label: 'Fan Reply', filterLabel: 'Fan Replies' },
+  collab_request: {
+    label: 'Collab Request',
+    filterLabel: 'Collab Requests',
   },
   brand_deal: { label: 'Brand Deal', filterLabel: 'Brand Deals' },
   other: { label: 'Suggestion', filterLabel: 'Other' },

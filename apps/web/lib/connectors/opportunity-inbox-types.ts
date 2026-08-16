@@ -6,7 +6,9 @@ export type OpportunityInboxCardCategory =
   | 'suggestion'
   | 'tour_date'
   | 'report'
-  | 'brand_deal';
+  | 'brand_deal'
+  | 'fan_reply'
+  | 'collab_request';
 
 export interface OpportunityInboxReportBreakdownItem {
   readonly label: string;

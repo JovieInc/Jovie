@@ -31,6 +31,8 @@ const SIGNAL_TYPE_VISUALS: Readonly<
   new_song: { icon: Music2, accentClassName: 'text-accent-blue' },
   new_event: { icon: CalendarDays, accentClassName: 'text-accent-purple' },
   new_profile_match: { icon: UserRound, accentClassName: 'text-accent-pink' },
+  fan_reply: { icon: MessageSquare, accentClassName: 'text-accent-blue' },
+  collab_request: { icon: Handshake, accentClassName: 'text-accent-purple' },
   brand_deal: { icon: Handshake, accentClassName: 'text-accent-orange' },
   other: { icon: Sparkles, accentClassName: '' },
 };
