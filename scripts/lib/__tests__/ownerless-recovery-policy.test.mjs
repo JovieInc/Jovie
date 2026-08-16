@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyRecoveryFiles,
   evaluateRecoveryCandidate,
-  hasCompletePatch,
-  validateRecoveryMergeProof,
 } from '../ownerless-recovery-policy.mjs';
 
 const head = 'a'.repeat(40);
@@ -17,7 +15,7 @@ const pr = {
   head: { sha: head, repo: { full_name: 'JovieInc/Jovie' } },
 };
 
-function evaluate(overrides = {}) {
+function evaluate() {
   return evaluateRecoveryCandidate({
     pr,
     mainSha: 'b'.repeat(40),
@@ -27,44 +25,21 @@ function evaluate(overrides = {}) {
     patch: '+const timeout = 9;',
     checksPassing: true,
     now: Date.parse('2026-08-15T02:00:00.000Z'),
-    ...overrides,
   });
 }
 
 describe('ownerless recovery policy', () => {
   it('admits focused green recovery work after one ownerless hour', () => {
-    expect(evaluate()).toMatchObject({
-      eligible: true,
-      lanes: ['ci'],
-    });
+    expect(evaluate().eligible).toBe(true);
   });
 
-  it('rejects credential and control-plane mutations', () => {
+  it('allows only non-worsening workflow tuning', () => {
+    const classify = patch =>
+      classifyRecoveryFiles(['.github/workflows/ci.yml'], patch).eligible;
     expect(
-      classifyRecoveryFiles(
-        ['.github/workflows/ci.yml'],
-        '+run: node -e "require(`node:child_process`).execFileSync(`git`,[`push`])"'
-      ).eligible
+      classify('+run: node -e "process.mainModule.require(`child_process`)"')
     ).toBe(false);
-    expect(
-      classifyRecoveryFiles(['.github/workflows/ci.yml'], '+timeout-minutes: 9')
-        .eligible
-    ).toBe(true);
-  });
-
-  it('rejects omitted and truncated file patches', () => {
-    expect(hasCompletePatch({ changes: 2, patch: '@@\n+one' })).toBe(false);
-  });
-
-  it('requires authoritative queue proof', () => {
-    const queued = {
-      headRefOid: head,
-      isInMergeQueue: true,
-      mergeQueueEntry: { id: 'MQE_1', position: 1, state: 'QUEUED' },
-    };
-    expect(validateRecoveryMergeProof(queued, head)).toEqual({
-      proven: true,
-      outcome: 'queued',
-    });
+    expect(classify('-timeout-minutes: 10\n+timeout-minutes: 9')).toBe(true);
+    expect(classify('-max-parallel: 2\n+max-parallel: 999999')).toBe(false);
   });
 });

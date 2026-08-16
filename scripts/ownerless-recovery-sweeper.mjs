@@ -97,7 +97,7 @@ async function readQueueProof(number) {
   return (await repoGraph(query, { number }))?.pullRequest ?? null;
 }
 
-async function openStackHeadShas() {
+async function openStackHeadShas(mainSha) {
   const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,first:100){pageInfo{hasNextPage} nodes{number headRefOid commits(first:100){pageInfo{hasNextPage} nodes{commit{oid}}} timelineItems(itemTypes:[HEAD_REF_FORCE_PUSHED_EVENT],first:100){pageInfo{hasNextPage} nodes{... on HeadRefForcePushedEvent{beforeCommit{oid} afterCommit{oid}}}}}}}}`;
   const pulls = (await repoGraph(query))?.pullRequests;
   if (!pulls || pulls.pageInfo.hasNextPage)
@@ -110,18 +110,32 @@ async function openStackHeadShas() {
   ) {
     throw new Error('open PR head history incomplete');
   }
-  return pulls.nodes.flatMap(pr =>
-    [
-      pr.headRefOid,
-      ...pr.commits.nodes.map(node => node.commit.oid),
-      ...pr.timelineItems.nodes.flatMap(event => [
-        event.beforeCommit?.oid,
-        event.afterCommit?.oid,
-      ]),
-    ]
+  const stackHeads = pulls.nodes.flatMap(pr =>
+    [pr.headRefOid, ...pr.commits.nodes.map(node => node.commit.oid)]
       .filter(Boolean)
       .map(sha => ({ number: pr.number, sha }))
   );
+  const priorHeads = pulls.nodes.flatMap(pr =>
+    pr.timelineItems.nodes
+      .map(event => event.beforeCommit?.oid)
+      .filter(Boolean)
+      .map(sha => ({ number: pr.number, sha }))
+  );
+  const priorCommits = await Promise.all(
+    priorHeads.map(async prior => {
+      const comparison = await apiJson(
+        `repos/${repo}/compare/${mainSha}...${prior.sha}`
+      );
+      if (comparison.commits.length !== comparison.total_commits) {
+        throw new Error('open PR force-push ancestry incomplete');
+      }
+      return comparison.commits.map(commit => ({
+        number: prior.number,
+        sha: commit.sha,
+      }));
+    })
+  );
+  return [...stackHeads, ...priorCommits.flat()];
 }
 
 async function upsertReceipt(number, body) {
@@ -275,7 +289,7 @@ async function promote(summary, mainSha, evidence, decision) {
     const postMutationEvidence = await candidateEvidence(
       summary,
       mainSha,
-      await openStackHeadShas()
+      await openStackHeadShas(mainSha)
     );
     const postMutationChecksPassing =
       restoreDraft || (await checksAreGreen(number));
@@ -394,7 +408,7 @@ async function promote(summary, mainSha, evidence, decision) {
 export async function run() {
   const mainSha = await mainHead();
   const open = await openPulls('main');
-  const openHeadShas = await openStackHeadShas();
+  const openHeadShas = await openStackHeadShas(mainSha);
   let promoted = 0;
   let unproven = 0;
   for (const summary of open) {

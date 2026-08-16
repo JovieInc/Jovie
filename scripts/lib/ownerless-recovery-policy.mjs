@@ -20,7 +20,7 @@ const FOCUSED_PATHS = Object.freeze([
   {
     lane: 'ci',
     pattern:
-      /^\.github\/(?:actions|scripts|workflows)\/.*(?:ci|test|lint|runner|merge|queue|agent|delivery|canary|workflow|fork|pr-|auto-ready|nightly)/i,
+      /^\.github\/workflows\/.*(?:ci|test|lint|runner|merge|queue|agent|delivery|canary|workflow|fork|pr-|auto-ready|nightly)/i,
   },
   {
     lane: 'ci',
@@ -43,10 +43,6 @@ const FOCUSED_PATHS = Object.freeze([
       /^(?:\.node-version|\.nvmrc|biome\.jsonc?|pnpm-workspace\.yaml|turbo\.json|tsconfig\.json)$/,
   },
   {
-    lane: 'devex',
-    pattern: /^\.github\/actions\/setup-node-pnpm\//,
-  },
-  {
     lane: 'docs-tests',
     pattern:
       /^(?:docs\/.*(?:CI|DEVEX|TEST|WORKFLOW|QUEUE|DELIVERY|CANARY)|scripts\/(?:lib\/__tests__|tests)\/.*(?:ci|gh-retry|workflow|queue|merge|agent|delivery|canary|devex|worktree)|apps\/web\/tests\/unit\/ci\/)/i,
@@ -56,10 +52,26 @@ const FOCUSED_PATHS = Object.freeze([
 const MATERIAL_RISK_CHANGE =
   /(?:secrets?\.|private[-_ ]key|api[-_ ]key|credential|(?:actions|checks|contents|deployments|id-token|issues|packages|pull-requests|security-events|statuses):\s*write|permissions:\s*write-all|pull_request_target|\b(?:GH_TOKEN|GITHUB_TOKEN)\b|\bgh\s+(?:api|pr|repo|run|workflow)\b|\bgit\s+(?:push|tag|reset|clean)\b|\b(?:curl|wget|nc|sudo|chmod|chown)\b|\bfind\b.*\s-delete\b|drop\s+table|delete\s+from|\b(?:rm\s+-rf|rmSync|unlink|truncate)\b|\b(?:fetch|https?\.request)\s*\(|continue-on-error:\s*true|\|\|\s*true|\b(?:bypass|skip)[-_ ]?(?:ci|check|gate)|production\s+(?:deploy|promotion)|--force\b|^[-+]\s*(?:uses:|run:.*(?:scripts\/|\.\/)))/im;
 
-const SAFE_WORKFLOW_CHANGE =
-  /^[-+]\s*(?:#.*|(?:timeout-minutes|max-parallel|retention-days):\s*\d+|cancel-in-progress:\s*(?:true|false))$/;
-
 const SHA = /^[0-9a-f]{40}$/;
+
+function safeWorkflowChange(lines) {
+  const settings = new Map();
+  for (const line of lines.filter(line => !/^[-+]\s*#/.test(line))) {
+    const match = line.match(
+      /^([-+])\s*(timeout-minutes|max-parallel|retention-days|cancel-in-progress):\s*(\d+|true|false)$/
+    );
+    if (!match) return false;
+    const values = settings.get(match[2]) ?? {};
+    if (values[match[1]]) return false;
+    values[match[1]] = match[3];
+    settings.set(match[2], values);
+  }
+  return [...settings].every(([key, values]) => {
+    if (key === 'cancel-in-progress')
+      return values['-'] === 'false' && values['+'] === 'true';
+    return Number(values['+']) <= Number(values['-']);
+  });
+}
 
 export function hasCompletePatch(file) {
   if (typeof file?.patch !== 'string') return false;
@@ -114,7 +126,7 @@ export function classifyRecoveryFiles(
     .map(line => line.trimEnd());
   if (
     files.some(file => /^\.github\/workflows\/.*\.ya?ml$/i.test(file)) &&
-    changedLines.some(line => !SAFE_WORKFLOW_CHANGE.test(line))
+    !safeWorkflowChange(changedLines)
   ) {
     return { eligible: false, lanes: [], reason: 'workflow-control-change' };
   }
