@@ -413,6 +413,10 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain(
       'could not compensate malformed native enrollment receipt'
     );
+    expect(drain).toContain(
+      'exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD has no native queue receipt'
+    );
+    expect(drain).toContain('exit 3');
   });
 
   it('reconciles only native exact-head receipts after an unattributable successful composite CI run', () => {
