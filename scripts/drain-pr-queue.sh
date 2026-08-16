@@ -89,6 +89,9 @@ DRAIN_PROMOTION_MODE="${DRAIN_PROMOTION_MODE:-normal}"
 DRAIN_FLEET_GATE_B64="${DRAIN_FLEET_GATE_B64:-}"
 DRAIN_RECOVER_FLEET_HOLDS="${DRAIN_RECOVER_FLEET_HOLDS:-0}"
 FLEET_HOLD_CONTEXT="jovie-fleet-queue-hold/v1"
+FLEET_HOLD_APP_USER="jovie-bot[bot]"
+FLEET_HOLD_WORKFLOW_NAME="Merge Queue Auto-Enroll"
+FLEET_HOLD_WORKFLOW_PATH=".github/workflows/merge-queue-autoenroll.yml"
 # Pending fleet holds are a recovery selector, never an unbounded required
 # check. Waiting lanes (hold-intake / draft-only / main-not-green) must close
 # them on the next controller pass. Isolated-only holds expire at this TTL.
@@ -294,20 +297,78 @@ fleet_hold_expires_at() {
   ' "$FLEET_HOLD_TTL_SECONDS"
 }
 
+fleet_hold_null_creator_has_provenance() {  # <head> <status-json>
+  local head="$1" status="$2" run_id target_url status_url
+  local app_identity app_avatar run
+  [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
+  if ! run_id="$(jq -er --arg repo "$REPO" '
+    .target_url
+    | capture("^https://github\\.com/" + ($repo | gsub("/"; "\\/")) + "/actions/runs/(?<id>[1-9][0-9]*)$")
+    | .id
+  ' <<<"$status" 2>/dev/null)"; then
+    return 1
+  fi
+  target_url="https://github.com/$REPO/actions/runs/$run_id"
+  status_url="${GITHUB_API_URL:-https://api.github.com}/repos/$REPO/statuses/$head"
+  if ! app_identity="$(gh_retry api "users/jovie-bot%5Bbot%5D" 2>/dev/null)" \
+    || ! app_avatar="$(jq -er --arg login "$FLEET_HOLD_APP_USER" '
+      select(.login == $login and .type == "Bot") | .avatar_url
+    ' <<<"$app_identity" 2>/dev/null)"; then
+    return 1
+  fi
+  if ! jq -e --arg avatar "$app_avatar" --arg status_url "$status_url" '
+    .creator == null and
+    .avatar_url == $avatar and
+    .url == $status_url
+  ' <<<"$status" >/dev/null; then
+    return 1
+  fi
+  if ! run="$(gh_retry api "repos/$REPO/actions/runs/$run_id" 2>/dev/null)"; then
+    return 1
+  fi
+  jq -e \
+    --arg run_id "$run_id" \
+    --arg repo "$REPO" \
+    --arg head "$head" \
+    --arg target_url "$target_url" \
+    --arg workflow_name "$FLEET_HOLD_WORKFLOW_NAME" \
+    --arg workflow_path "$FLEET_HOLD_WORKFLOW_PATH" '
+      (.id | tostring) == $run_id and
+      .name == $workflow_name and
+      .path == $workflow_path and
+      .html_url == $target_url and
+      .repository.full_name == $repo and
+      .head_repository.full_name == $repo and
+      .head_sha == $head and
+      (.workflow_id | type == "number") and
+      (.run_attempt | type == "number" and . >= 1)
+    ' <<<"$run" >/dev/null
+}
+
 fleet_hold_latest() {  # fleet_hold_latest <head> → latest status JSON or empty
-  local head="$1" statuses
+  local head="$1" statuses latest
   [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
   if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)"; then
     return 1
   fi
-  jq -c --arg context "$FLEET_HOLD_CONTEXT" --arg repo "$REPO" '
+  if ! latest="$(jq -c --arg context "$FLEET_HOLD_CONTEXT" --arg repo "$REPO" '
     [ .statuses[]? | select(.context == $context) ]
     | sort_by(.updated_at)
     | last
     | select(. != null)
-    | select(.creator.type == "Bot")
     | select(.target_url | test("^https://github\\.com/" + ($repo | gsub("/"; "\\/")) + "/actions/runs/[1-9][0-9]*$"))
-  ' <<<"$statuses" 2>/dev/null
+  ' <<<"$statuses" 2>/dev/null)"; then
+    return 1
+  fi
+  if jq -e '.creator.type == "Bot"' <<<"$latest" >/dev/null; then
+    printf '%s\n' "$latest"
+    return 0
+  fi
+  if fleet_hold_null_creator_has_provenance "$head" "$latest"; then
+    printf '%s\n' "$latest"
+    return 0
+  fi
+  return 1
 }
 
 fleet_hold_is_expired() {  # fleet_hold_is_expired <updated_at>
