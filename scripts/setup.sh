@@ -294,6 +294,11 @@ fi
 # shellcheck source=lib/setup-worktree-health.sh
 . "$REPO_ROOT/scripts/lib/setup-worktree-health.sh"
 
+# Keep the gate reachable in linked worktrees even when dependency setup can
+# cheap-exit. Husky's generated wrapper directory is untracked per worktree;
+# this config uses the tracked hook entrypoints instead.
+bash "$REPO_ROOT/scripts/hooks/configure-git-hooks.sh"
+
 hash_dependency_inputs() {
   jovie_setup_hash_dependency_inputs "$REPO_ROOT"
 }
@@ -474,6 +479,10 @@ if command -v pnpm &>/dev/null; then
     fi
     success "Dependencies installed"
   fi
+
+  # `pnpm install` runs Husky, which otherwise rewrites core.hooksPath to its
+  # untracked wrapper directory. Restore the tracked, worktree-safe path.
+  bash "$REPO_ROOT/scripts/hooks/configure-git-hooks.sh"
 else
   warn "Skipping pnpm install — pnpm not available"
   MISSING+=("pnpm install")

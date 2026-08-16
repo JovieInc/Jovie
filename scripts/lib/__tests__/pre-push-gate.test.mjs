@@ -23,6 +23,11 @@ const automationVerify = readFileSync(
   'utf8'
 );
 const huskyPrePush = readFileSync(resolve(repoRoot, '.husky/pre-push'), 'utf8');
+const hookConfigurator = readFileSync(
+  resolve(repoRoot, 'scripts/hooks/configure-git-hooks.sh'),
+  'utf8'
+);
+const setupScript = readFileSync(resolve(repoRoot, 'scripts/setup.sh'), 'utf8');
 
 describe('resolve-repo-node.sh', () => {
   const temporaryDirectories = [];
@@ -126,6 +131,13 @@ describe('resolve-repo-node.sh', () => {
 });
 
 describe('pre-push gate Node and fanout wiring (JOV-4329)', () => {
+  it('uses tracked hook entrypoints so a linked worktree cannot skip pre-push verification', () => {
+    expect(hookConfigurator).toContain('config core.hooksPath .husky');
+    expect(hookConfigurator).toContain('.husky/pre-push');
+    expect(setupScript).toContain('scripts/hooks/configure-git-hooks.sh');
+    expect(setupScript).toContain('untracked wrapper directory');
+  });
+
   it('resolves a repo-conforming Node before the gate dispatches', () => {
     expect(gate).toContain('bash scripts/hooks/resolve-repo-node.sh');
     expect(gate).toContain('export PATH="$RESOLVED_NODE_BIN:$PATH"');

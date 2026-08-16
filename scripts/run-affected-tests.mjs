@@ -142,6 +142,29 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const CI_UI_DRIFT_GUARDRAIL_INPUTS = new Set([
+  '.github/workflows/ci.yml',
+  'apps/desktop/scripts/desktop-shell-contract.test.mjs',
+  'scripts/ci-fast-lanes.mjs',
+  'scripts/hooks/configure-git-hooks.sh',
+  'scripts/hooks/pre-push-gate.test.mjs',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/pre-push-gate.test.mjs',
+  'scripts/lib/__tests__/setup-worktree-health.test.mjs',
+  'scripts/run-affected-tests.mjs',
+  'scripts/setup.sh',
+]);
+const CI_UI_DRIFT_GUARDRAIL_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/pre-push-gate.test.mjs',
+  'scripts/lib/__tests__/setup-worktree-health.test.mjs',
+];
+const CI_UI_DRIFT_GUARDRAIL_NODE_TESTS = [
+  'apps/desktop/scripts/desktop-shell-contract.test.mjs',
+  'scripts/hooks/pre-push-gate.test.mjs',
+];
 const EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST = new Set([
   '.github/workflows/fleet-gate-refresh.yml',
   'scripts/hermes/launchd/README.md',
@@ -609,6 +632,31 @@ export function buildAffectedTestPlan(
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
       ],
       nodeTests: [],
+    };
+  }
+  const ciUiDriftGuardrailInputCount = files.filter(file =>
+    CI_UI_DRIFT_GUARDRAIL_INPUTS.has(file)
+  ).length;
+  const hasCiUiDriftGuardrailAnchor = files.some(
+    file =>
+      file === 'apps/desktop/scripts/desktop-shell-contract.test.mjs' ||
+      file === 'scripts/hooks/configure-git-hooks.sh'
+  );
+  const isBoundedCiUiDriftGuardrailChange =
+    ciUiDriftGuardrailInputCount > 0 &&
+    hasCiUiDriftGuardrailAnchor &&
+    files.every(file => CI_UI_DRIFT_GUARDRAIL_INPUTS.has(file));
+  if (isBoundedCiUiDriftGuardrailChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: CI_UI_DRIFT_GUARDRAIL_SCRIPT_TESTS,
+      nodeTests: CI_UI_DRIFT_GUARDRAIL_NODE_TESTS,
     };
   }
   const deliveryLivenessInputCount = files.filter(file =>

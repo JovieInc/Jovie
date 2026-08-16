@@ -716,3 +716,50 @@ test('hosted web app has an early Electron runtime marker before first paint', a
   assert.match(titlebarSource, /w-\(--electron-traffic-light-safe-width\)/);
   assert.doesNotMatch(titlebarSource, /w-\[72px\]/);
 });
+
+test('macOS titlebar reserve safely contains traffic lights at every supported window size', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const webRoot = join(desktopRoot, '..', 'web');
+  const globalsCss = await readFile(join(webRoot, 'app/globals.css'), 'utf8');
+
+  // These values deliberately cross the native-window and hosted-renderer
+  // boundary. The renderer must reserve enough room for the native controls;
+  // a route cannot paper over a collision at compact width or after resize.
+  const x = Number(
+    mainSource.match(/const MACOS_TRAFFIC_LIGHT_X = (\d+);/)?.[1]
+  );
+  const y = Number(
+    mainSource.match(/const MACOS_TRAFFIC_LIGHT_Y = (\d+);/)?.[1]
+  );
+  const titlebarHeight = Number(
+    globalsCss.match(/--electron-titlebar-height: (\d+)px;/)?.[1]
+  );
+  const safeWidth = Number(
+    globalsCss.match(/--electron-traffic-light-safe-width: (\d+)px;/)?.[1]
+  );
+
+  assert.ok(Number.isFinite(x) && Number.isFinite(y));
+  assert.ok(Number.isFinite(titlebarHeight) && Number.isFinite(safeWidth));
+
+  // macOS traffic-light controls are 14px wide. Keep an 8px trailing buffer
+  // so controls remain clear of interactive titlebar chrome at standard,
+  // minimum-width, resized, and full-screen window states.
+  const controlDiameter = 14;
+  const trailingClearance = 8;
+  assert.ok(
+    safeWidth >= x + controlDiameter + trailingClearance,
+    `traffic-light reserve (${safeWidth}px) must contain x=${x}px + control + clearance`
+  );
+  assert.ok(
+    titlebarHeight >= y + controlDiameter,
+    `titlebar height (${titlebarHeight}px) must contain y=${y}px + traffic-light height`
+  );
+
+  // The second grid cell must absorb every window resize instead of letting
+  // sidebar/titlebar chrome overflow back into the native control reserve.
+  assert.match(
+    globalsCss,
+    /grid-template-columns: var\(--electron-sidebar-width\) minmax\(0, 1fr\);/
+  );
+  assert.match(mainSource, /minWidth: 800,/);
+});

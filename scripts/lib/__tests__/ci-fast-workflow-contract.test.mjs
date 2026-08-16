@@ -297,6 +297,11 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(browser).toMatch(/github\.event_name.*pull_request/);
     expect(browser).toContain('git diff --diff-filter=ACDMRT --name-only');
     expect(browser).toContain(':(glob)apps/web/app/\\[username\\]/**');
+    // Workflow-only changes are covered by the deterministic CI contract
+    // suite. They must not boot a public-profile runtime server and browser
+    // unless a profile surface or its selector changed.
+    expect(browser).not.toContain("'.github/workflows/ci.yml'");
+    expect(CI_FAST_SOURCE).not.toContain("    '.github/workflows/ci.yml',");
     for (const requiredPath of [
       'apps/web/app/(marketing)/renders/profile-admission/**',
       'apps/web/components/features/release/SmartLinkProviderButton.tsx',
