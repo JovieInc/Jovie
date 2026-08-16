@@ -79,7 +79,15 @@ final class AppState {
     case .uiTestingSignedOut:
       route = .signedOut
       dashboardState = .idle
-    case .uiTestingReady, .uiTestingChat, .uiTestingSettings, .uiTestingVenueMode:
+    case .uiTestingReady,
+         .uiTestingChat,
+         .uiTestingSettings,
+         .uiTestingVenueMode,
+         .uiTestingAudience,
+         .uiTestingLibrary,
+         .uiTestingLibraryEmpty,
+         .uiTestingInbox,
+         .uiTestingCalendar:
       route = .ready
       dashboardState = .loaded(.previewReady)
       isOffline = false
@@ -96,15 +104,11 @@ final class AppState {
       dashboardState = .loaded(.previewReady)
       isOffline = false
       activeUserID = "user_ui_testing_chat_entity_fixture"
-    case .uiTestingAudience:
-      route = .ready
-      dashboardState = .loaded(.previewReady)
-      isOffline = false
     case .uiTestingQRUnavailable:
       route = .ready
       dashboardState = .loaded(.previewReadyWithoutQR)
       isOffline = false
-    case .uiTestingChatOffline:
+    case .uiTestingChatOffline, .uiTestingInboxOffline, .uiTestingCalendarOffline:
       route = .ready
       dashboardState = .loaded(.previewReady)
       isOffline = true
