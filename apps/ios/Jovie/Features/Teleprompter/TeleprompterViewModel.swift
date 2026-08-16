@@ -74,6 +74,8 @@ struct TeleprompterAutoScroller: Equatable, Sendable {
 @MainActor
 @Observable
 final class TeleprompterViewModel {
+  nonisolated static let defaultOverlayAutoResumeDelay: Duration = .seconds(3)
+
   let proposal: MobileChatVideoProposalPayload
   var scriptTitle: String
   var scriptText: String
@@ -94,12 +96,10 @@ final class TeleprompterViewModel {
   private(set) var isFinishing = false
   private(set) var elapsedSeconds: TimeInterval = 0
   private(set) var errorMessage: String?
-  private(set) var savedRecord: VlogSessionRecord?
 
   let captureController: TeleprompterCaptureController
   private let store: VlogSessionStore
   private var activeRecord: VlogSessionRecord?
-  private var activeVideoURL: URL?
   private var autoScroller = TeleprompterAutoScroller()
   private var autoStartIndex = 0
   private var autoStartElapsed: TimeInterval = 0
@@ -107,6 +107,7 @@ final class TeleprompterViewModel {
   private var tickerTask: Task<Void, Never>?
   private var overlayAutoResumeTask: Task<Void, Never>?
   private let overlayAutoResumeDelay: Duration
+  private let overlayAutoResumeSleeper: (Duration) async -> Void
 
   /// Called after a recording is saved to the on-disk session store. The
   /// shell uses this to dismiss the overlay and surface Library.
@@ -115,7 +116,10 @@ final class TeleprompterViewModel {
   init(
     proposal: MobileChatVideoProposalPayload,
     store: VlogSessionStore = .localDocuments(),
-    overlayAutoResumeDelay: Duration = .seconds(3),
+    overlayAutoResumeDelay: Duration = TeleprompterViewModel.defaultOverlayAutoResumeDelay,
+    overlayAutoResumeSleeper: @escaping (Duration) async -> Void = { duration in
+      try? await Task.sleep(for: duration)
+    },
     // Default-argument expressions are evaluated outside the enclosing
     // @MainActor context. Keep the default inert and construct the actor-
     // isolated controller inside this initializer instead.
@@ -127,6 +131,7 @@ final class TeleprompterViewModel {
     follower = KaraokeScriptFollower(script: proposal.script)
     self.store = store
     self.overlayAutoResumeDelay = overlayAutoResumeDelay
+    self.overlayAutoResumeSleeper = overlayAutoResumeSleeper
     self.captureController = captureController ?? TeleprompterCaptureController()
   }
 
@@ -164,8 +169,8 @@ final class TeleprompterViewModel {
     overlayVisibility = isVisible ? .visible : .liveOnly
     guard !isVisible else { return }
 
-    overlayAutoResumeTask = Task { [weak self, overlayAutoResumeDelay] in
-      try? await Task.sleep(for: overlayAutoResumeDelay)
+    overlayAutoResumeTask = Task { [weak self, overlayAutoResumeDelay, overlayAutoResumeSleeper] in
+      await overlayAutoResumeSleeper(overlayAutoResumeDelay)
       guard !Task.isCancelled else { return }
       self?.overlayVisibility = .visible
     }
@@ -253,7 +258,6 @@ final class TeleprompterViewModel {
         scriptText: scriptText
       )
       activeRecord = record
-      activeVideoURL = videoURL
 
       captureController.onPartialTranscript = { [weak self] transcript in
         guard let self else { return }
@@ -268,7 +272,7 @@ final class TeleprompterViewModel {
       errorMessage = (error as? LocalizedError)?.errorDescription
         ?? "Couldn't start the recording."
       markActiveRecordFailed()
-      captureController.cancel()
+      await captureController.cancel()
     }
   }
 
@@ -289,28 +293,36 @@ final class TeleprompterViewModel {
       record.segments = result.segments
       try store.save(record)
       activeRecord = nil
-      activeVideoURL = nil
-      savedRecord = record
       onSaved?(record)
     } catch {
       isRecording = false
       errorMessage = (error as? LocalizedError)?.errorDescription
         ?? "The recording couldn't be saved."
       markActiveRecordFailed()
-      captureController.cancel()
+      await captureController.cancel()
     }
   }
 
-  /// Dismiss path: stop capture, mark the session failed, keep whatever
-  /// partial file exists for debugging but never surface it in Library.
-  func cancelRecording() {
+  /// Dismiss path: close the capture file before deleting the private draft.
+  /// A failed deletion keeps the overlay visible so the creator is never left
+  /// with hidden, unreviewable media.
+  func cancelRecording() async -> Bool {
     overlayAutoResumeTask?.cancel()
     overlayAutoResumeTask = nil
     stopTicker()
     isRecording = false
     isStarting = false
-    markActiveRecordFailed()
-    captureController.cancel()
+    await captureController.cancel()
+
+    guard let record = activeRecord else { return true }
+    do {
+      try store.delete(record)
+      activeRecord = nil
+      return true
+    } catch {
+      errorMessage = "Couldn't discard this private take. Try again before closing."
+      return false
+    }
   }
 
   private func startTicker() {
@@ -349,6 +361,5 @@ final class TeleprompterViewModel {
     record.endedAt = Date()
     try? store.save(record)
     activeRecord = nil
-    activeVideoURL = nil
   }
 }

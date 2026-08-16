@@ -306,41 +306,14 @@ struct TeleprompterOverlayView: View {
       await viewModel.startPreview()
     }
     .onDisappear {
-      viewModel.cancelRecording()
+      Task { await viewModel.cancelRecording() }
     }
   }
 
   private var captureHeader: some View {
     HStack(spacing: JovieSpacing.small) {
-      Button(action: handleClose) {
-        Image(systemName: "xmark")
-          .font(.system(size: 16, weight: .semibold))
-          .foregroundStyle(JovieColor.textPrimary)
-          .frame(width: 56, height: 56)
-          .background(Color.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-      }
-      .buttonStyle(.plain)
-      .accessibilityLabel("Close capture")
-      .accessibilityIdentifier("teleprompter-header-close")
-
-      HStack(spacing: 6) {
-        Circle()
-          .fill(viewModel.isRecording ? Color.red : Color.clear)
-          .frame(width: 8, height: 8)
-        Text(viewModel.isRecording ? Self.elapsedLabel(for: viewModel.elapsedSeconds) : "Ready")
-          .font(JovieFont.body(size: 13, weight: .medium))
-          .monospacedDigit()
-      }
-      .foregroundStyle(JovieColor.textPrimary)
-      .padding(.horizontal, JovieSpacing.medium)
-      .frame(minHeight: 44)
-      .background(Color.black.opacity(0.58), in: Capsule())
-      .accessibilityElement(children: .combine)
-      .accessibilityLabel(
-        viewModel.isRecording
-          ? "Recording, \(Self.elapsedLabel(for: viewModel.elapsedSeconds))"
-          : "Ready to record"
-      )
+      headerCloseButton
+      recordingStatus
 
       Spacer(minLength: JovieSpacing.small)
 
@@ -771,8 +744,11 @@ struct TeleprompterOverlayView: View {
   }
 
   private func handleClose() {
-    viewModel.cancelRecording()
-    onClose()
+    Task {
+      if await viewModel.cancelRecording() {
+        onClose()
+      }
+    }
   }
 
   static func elapsedLabel(for seconds: TimeInterval) -> String {

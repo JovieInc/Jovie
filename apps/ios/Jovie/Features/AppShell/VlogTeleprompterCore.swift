@@ -209,6 +209,12 @@ struct VlogSessionStore: Sendable {
     try data.write(to: directory.appendingPathComponent("session.json"), options: .atomic)
   }
 
+  func delete(_ record: VlogSessionRecord) throws {
+    let directory = rootURL.appendingPathComponent(record.id.uuidString, isDirectory: true)
+    guard FileManager.default.fileExists(atPath: directory.path) else { return }
+    try FileManager.default.removeItem(at: directory)
+  }
+
   func load(id: UUID) throws -> VlogSessionRecord {
     let url = rootURL
       .appendingPathComponent(id.uuidString, isDirectory: true)

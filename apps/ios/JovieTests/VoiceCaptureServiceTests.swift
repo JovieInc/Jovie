@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Speech
 import Testing
@@ -75,6 +76,60 @@ struct VoiceCaptureServiceTests {
     #expect(loaded.storageMode == "local_only_no_upload")
     #expect(FileManager.default.fileExists(atPath: store.metadataURL(for: loaded).path))
   }
+
+  @Test func localVlogStoreDeletesCancelledPrivateTake() throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = VlogSessionStore(rootURL: root)
+    let (record, videoURL) = try store.create(
+      scriptTitle: "Cancelled take",
+      scriptText: "private draft"
+    )
+    try Data("partial creator media".utf8).write(to: videoURL)
+
+    try store.delete(record)
+
+    #expect(!FileManager.default.fileExists(atPath: store.metadataURL(for: record).path))
+    #expect(!FileManager.default.fileExists(atPath: videoURL.path))
+  }
+
+  @Test func recordingFinishDelegateResumesOnlyOnceWhenCancelRacesCallback() async {
+    for _ in 0..<100 {
+      let delegate = RecordingFinishDelegate()
+      let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+
+      _ = try? await withCheckedThrowingContinuation {
+        (continuation: CheckedContinuation<URL, Error>) in
+        delegate.arm(continuation)
+        DispatchQueue.global().async {
+          delegate.discard()
+        }
+        DispatchQueue.global().async {
+          delegate.fileOutput(
+            AVCaptureMovieFileOutput(),
+            didFinishRecordingTo: url,
+            from: [],
+            error: nil
+          )
+        }
+      }
+    }
+  }
+
+  #if !targetEnvironment(simulator)
+    @MainActor
+    @Test func cameraPreviewDoesNotActivateAudioCaptureBeforeRecord() async throws {
+      let controller = TeleprompterCaptureController()
+      try await controller.startPreview()
+
+      #expect(controller.isPreviewing)
+      #expect(!controller.isAudioCaptureConfigured)
+
+      await controller.cancel()
+    }
+  #endif
 
   @Test func actionDraftTrimsWhitespace() {
     #expect(VoiceMemoActionDraft.make(fromTranscript: "  launch single Friday  ") == "launch single Friday")
@@ -310,22 +365,29 @@ struct VoiceCaptureServiceTests {
     let viewModel = TeleprompterViewModel(
       proposal: proposal,
       store: store,
-      overlayAutoResumeDelay: .milliseconds(20)
+      overlayAutoResumeDelay: .milliseconds(20),
+      overlayAutoResumeSleeper: { _ in }
     )
 
     #expect(viewModel.promptText == "What changed when the ferry arrived?")
     #expect(viewModel.overlayVisibility == .visible)
     #expect(viewModel.framingGrid == .off)
     #expect(viewModel.promptFeedback == .idle)
+    #expect(TeleprompterViewModel.defaultOverlayAutoResumeDelay == .seconds(3))
 
     viewModel.setFramingGridEnabled(true)
     viewModel.setOverlayVisible(false)
     #expect(viewModel.overlayVisibility == .liveOnly)
     #expect(viewModel.framingGrid == .thirds)
 
-    try await Task.sleep(for: .milliseconds(50))
+    for _ in 0..<20 where viewModel.overlayVisibility == .liveOnly {
+      await Task.yield()
+    }
     #expect(viewModel.overlayVisibility == .visible)
     #expect(viewModel.framingGrid == .thirds)
+
+    viewModel.setFramingGridEnabled(false)
+    #expect(viewModel.framingGrid == .off)
 
     // The still-visible control can restore the prompt immediately, without
     // waiting for the temporary live-only window to expire.
@@ -341,5 +403,16 @@ struct VoiceCaptureServiceTests {
     #expect(queuedFeedback[0].proposalID == proposal.id)
     #expect(queuedFeedback[0].feedback == TeleprompterPromptFeedback.useful.rawValue)
     #expect(queuedFeedback[0].storageMode == "local_only_no_upload")
+
+    viewModel.submitPromptFeedback(.notUseful)
+    #expect(viewModel.promptFeedback == .queuedOffline)
+    #expect(viewModel.pendingPromptFeedback == .notUseful)
+    #expect(store.queuedPromptFeedback().contains { record in
+      record.feedback == TeleprompterPromptFeedback.notUseful.rawValue
+    })
+
+    let queuedCount = store.queuedPromptFeedback().count
+    viewModel.submitPromptFeedback(.idle)
+    #expect(store.queuedPromptFeedback().count == queuedCount)
   }
 }
