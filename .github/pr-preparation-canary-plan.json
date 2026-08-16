@@ -1,0 +1,9 @@
+{
+  "schema": "jovie-pr-preparation-canary-plan/v1",
+  "repository": "JovieInc/Jovie",
+  "baseRef": "main",
+  "enabled": false,
+  "expiresAt": null,
+  "maxParallel": 4,
+  "entries": []
+}

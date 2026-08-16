@@ -179,6 +179,98 @@ def _assert_local_runtime_closure(materialized: set[str], entrypoint: str) -> No
             assert_materialized(resource_path)
 
 
+def test_pr_preparation_canary_contract() -> None:
+    driver = r"""
+import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const canary = await import(process.argv[1]);
+const update = await import(process.argv[2]);
+const now = Date.parse('2026-08-16T19:00:00Z');
+const sha = 'a'.repeat(40);
+const entry = {number:16001,action:'update_branch_rebase',expectedAuthor:'itstimwhite',
+  expectedHeadOwner:'JovieInc',headRefName:'codex/preparation-16001',headOid:'1'.repeat(40)};
+const plan = {schema:canary.PLAN_SCHEMA,repository:'JovieInc/Jovie',baseRef:'main',
+  enabled:true,expiresAt:'2026-08-16T20:00:00Z',maxParallel:4,entries:[entry]};
+assert.equal(canary.validatePlan(plan,{nowMs:now}).ok,true);
+assert.match(canary.validatePlan({...plan,entries:Array(5).fill(entry)},{nowMs:now}).errors.join(),/exceed 4/);
+assert.match(canary.validatePlan({...plan,expiresAt:'2026-08-16T18:00:00Z'},{nowMs:now}).errors.join(),/expired/);
+const rawPlan = Buffer.from(JSON.stringify(plan));
+const dryBundle = canary.createPlanBundle({rawPlan,plan,trustedDefaultBranchSha:sha,
+  livePolicy:{defaultBranch:'main',sha},nowMs:now});
+assert.equal(dryBundle.matrix.include.length,1);
+assert.throws(() => canary.createPlanBundle({rawPlan,plan,trustedDefaultBranchSha:sha,
+  livePolicy:{defaultBranch:'main',sha:'b'.repeat(40)},nowMs:now}),/live default-branch head/);
+assert.throws(() => canary.createPlanBundle({rawPlan,plan,trustedDefaultBranchSha:sha,
+  livePolicy:{defaultBranch:'main',sha},mode:'apply',confirmation:'wrong',nowMs:now}),/exact SHA-256/);
+const checks = ['PR Ready','Migration Guard','Fork PR Gate','PR Size Guard'].map(name =>
+  ({__typename:'CheckRun',name,status:'COMPLETED',conclusion:'SUCCESS'}));
+const pr = {number:16001,state:'OPEN',isDraft:false,baseRefName:'main',baseRefOid:sha,
+  headRefName:entry.headRefName,headRefOid:entry.headOid,isCrossRepository:false,
+  mergeable:'MERGEABLE',mergeStateStatus:'BEHIND',reviewDecision:'APPROVED',
+  author:{login:'itstimwhite'},headRepositoryOwner:{login:'JovieInc'},
+  headRepository:{nameWithOwner:'JovieInc/Jovie'},mergeQueueEntry:null,autoMergeRequest:null,
+  labels:[],statusCheckRollup:checks};
+const policy = {defaultBranch:'main',sha};
+assert.equal(canary.evaluateEligibility({entry,plan,pr,livePolicy:policy}).eligible,true);
+assert.equal(canary.evaluateEligibility({entry,plan,pr:{...pr,labels:[{name:'merge-queue'}]},livePolicy:policy}).eligible,true);
+for (const [patch,outcome] of [[{labels:[{name:'hold'}]},'no_op_held'],[{mergeQueueEntry:{id:'MQE'}},'no_op_already_admitted'],[{headRefOid:'b'.repeat(40)},'no_op_stale_head'],[{statusCheckRollup:[]},'no_op_checks_not_green']]) {
+  assert.equal(canary.evaluateEligibility({entry,plan,pr:{...pr,...patch},livePolicy:policy}).outcome,outcome);
+}
+const temp = await mkdtemp(join(tmpdir(),'jovie-preparation-'));
+try {
+  const planPath = join(temp,'plan.json'); await writeFile(planPath,rawPlan);
+  const receipts=[]; const calls=[];
+  const result = await canary.runPreparedEntry({planPath,planHash:dryBundle.planHash,
+    trustedDefaultBranchSha:sha,mode:'dry-run',confirmation:'',prNumber:16001,
+    receiptPath:join(temp,'receipt.json'),runId:'1',runAttempt:'1'},
+    {nowImpl:()=>now,fetchRepositoryPolicyImpl:async()=>policy,fetchPrImpl:async()=>pr,
+      rebaseImpl:async args=>{calls.push(args);return {ok:true,updated:true,reason:'dry-run'};},
+      writeReceiptImpl:async(_path,receipt)=>receipts.push(receipt)});
+  assert.equal(result.outcome,'eligible_dry_run'); assert.deepEqual(receipts.map(x=>x.outcome),['started','eligible_dry_run']);
+  assert.equal(calls[0].expectedHeadOid,entry.headOid); assert.equal(calls[0].expectedBaseOid,sha);
+} finally { await rm(temp,{recursive:true,force:true}); }
+const cancelled=canary.cancelledReceipt({outcome:'started',mutationAttempted:false},'SIGTERM',now); assert.equal(cancelled.outcome,'cancelled_indeterminate'); assert.equal(cancelled.mutationAttempted,null);
+const snapshot = {...pr,id:'PR_1',potentialMergeCommit:null};
+for (const expected of [{expectedBaseOid:'e'.repeat(40)},{expectedHeadOid:'f'.repeat(40)}]) { let proofs=0;
+  const result = await update.tryGitHubRebase({repo:'JovieInc/Jovie',
+    pr:{number:16001,headRefName:entry.headRefName},expectedBaseRefName:'main',...expected,
+    dryRun:false,ghJsonImpl:async args=>args[0]==='api'?{object:{sha}}:snapshot,
+    integrationProofImpl:async()=>{proofs+=1;}});
+  assert.equal(result.ok,false); assert.equal(result.mutationAttempted,false); assert.equal(proofs,0);
+}
+"""
+    result = subprocess.run(
+        [
+            "node",
+            "--input-type=module",
+            "-e",
+            driver,
+            (REPO_ROOT / "scripts/pr-preparation-canary.mjs").as_uri(),
+            (REPO_ROOT / "scripts/lib/github-update-branch.mjs").as_uri(),
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_pr_preparation_canary_workflow_is_manual_bounded_and_queue_inert() -> None:
+    workflow = (WORKFLOWS / "pr-preparation-canary.yml").read_text(encoding="utf-8")
+    trigger = workflow.split("\non:\n", 1)[1].split("\nconcurrency:", 1)[0]
+    assert "workflow_dispatch:" in trigger
+    assert all(event not in trigger for event in ("schedule:", "push:", "pull_request:"))
+    assert "max-parallel: 4" in workflow and "fail-fast: false" in workflow
+    assert "ref: main" in workflow
+    assert "ref: ${{ needs.plan.outputs.trusted_default_sha }}" in workflow
+    source = (REPO_ROOT / "scripts/pr-preparation-canary.mjs").read_text(encoding="utf-8")
+    for forbidden in ("gh pr merge", "--add-label", "enqueuePullRequest", "--force"):
+        assert forbidden not in workflow + source
+
+
 def test_agent_hot_paths_do_not_run_repo_tests() -> None:
     """Fleet scans must not fail on a contaminated sparse self-hosted checkout."""
     for workflow_name in HOT_PATH_WORKFLOWS:
