@@ -133,6 +133,10 @@ struct NativeSessionTokenProvider: TokenProviding {
     guard let session = NativeSessionTokenStore.load() else {
       throw APIClientError.missingToken
     }
+    // No client-side mint; a 401 cannot be recovered by retrying this token.
+    if forceRefresh {
+      throw APIClientError.missingToken
+    }
     return session.token
   }
 }

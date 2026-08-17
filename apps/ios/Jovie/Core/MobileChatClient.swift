@@ -193,12 +193,14 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
   private func sendTurn(
     _ request: MobileChatTurnRequest,
     forceRefresh: Bool,
-    onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
+    onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?,
+    tokenOverride: String? = nil
   ) async throws -> [MobileChatStreamEvent] {
     var urlRequest = try await authorizedRequest(
       url: baseURL.appending(path: "/api/mobile/v1/chat/turns"),
       method: "POST",
-      forceRefresh: forceRefresh
+      forceRefresh: forceRefresh,
+      tokenOverride: tokenOverride
     )
     urlRequest.setValue("application/x-ndjson", forHTTPHeaderField: "Accept")
     urlRequest.httpBody = try encoder.encode(request)
@@ -210,9 +212,15 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     }
 
     if httpResponse.statusCode == 401, !forceRefresh {
-      return try await sendTurn(request, forceRefresh: true, onEvent: onEvent)
+      let token = try await retryTokenOrTerminal(after: failedBearerToken(from: urlRequest))
+      return try await sendTurn(
+        request,
+        forceRefresh: true,
+        onEvent: onEvent,
+        tokenOverride: token
+      )
     }
-    if httpResponse.statusCode == 401, forceRefresh {
+    if httpResponse.statusCode == 401 {
       NativeSessionTokenStore.clear()
     }
 
@@ -227,15 +235,40 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
   private func authorizedRequest(
     url: URL,
     method: String,
-    forceRefresh: Bool = false
+    forceRefresh: Bool = false,
+    tokenOverride: String? = nil
   ) async throws -> URLRequest {
-    let token = try await tokenProvider.bearerToken(forceRefresh: forceRefresh)
+    let token: String
+    if let tokenOverride {
+      token = tokenOverride
+    } else {
+      token = try await tokenProvider.bearerToken(forceRefresh: forceRefresh)
+    }
     var request = URLRequest(url: url)
     request.httpMethod = method
     request.timeoutInterval = requestTimeout
     request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     request.setValue("application/json", forHTTPHeaderField: "Accept")
     return request
+  }
+
+  private func failedBearerToken(from request: URLRequest) -> String {
+    guard
+      let value = request.value(forHTTPHeaderField: "Authorization"),
+      value.hasPrefix("Bearer ")
+    else {
+      return ""
+    }
+    return String(value.dropFirst("Bearer ".count))
+  }
+
+  private func retryTokenOrTerminal(after failedToken: String) async throws -> String {
+    do {
+      return try await tokenProvider.refreshedBearerToken(after: failedToken)
+    } catch APIClientError.missingToken {
+      NativeSessionTokenStore.clear()
+      throw MobileChatClientError.requestFailed(statusCode: 401)
+    }
   }
 
   private func sendJSON<Response: Decodable>(
@@ -249,15 +282,21 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     }
 
     if httpResponse.statusCode == 401, !forceRefresh {
+      let token = try await retryTokenOrTerminal(after: failedBearerToken(from: request))
       var refreshed = request
-      let token = try await tokenProvider.bearerToken(forceRefresh: true)
       refreshed.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
       return try await sendJSON(request: refreshed, forceRefresh: true)
+    }
+
+    if httpResponse.statusCode == 401 {
+      NativeSessionTokenStore.clear()
     }
 
     guard (200 ... 299).contains(httpResponse.statusCode) else {
       throw MobileChatClientError.requestFailed(statusCode: httpResponse.statusCode)
     }
+
+    NativeSessionTokenStore.refresh(from: response)
 
     do {
       return try decoder.decode(Response.self, from: data)

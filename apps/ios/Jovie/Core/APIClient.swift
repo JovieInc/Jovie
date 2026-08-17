@@ -30,6 +30,17 @@ protocol TokenProviding: Sendable {
   func bearerToken(forceRefresh: Bool) async throws -> String
 }
 
+extension TokenProviding {
+  /// Throws `missingToken` when force-refresh cannot mint a different token.
+  func refreshedBearerToken(after failedToken: String) async throws -> String {
+    let token = try await bearerToken(forceRefresh: true)
+    guard token != failedToken else {
+      throw APIClientError.missingToken
+    }
+    return token
+  }
+}
+
 protocol APIClientProtocol: Sendable {
   func fetchMe() async throws -> MobileMeResponse
   func fetchAppleWalletProfilePass() async throws -> Data
@@ -111,6 +122,22 @@ struct APIClient: APIClientProtocol, Sendable {
     MobileAuthDiagnostics.record("native_session_cleared_terminal_401")
   }
 
+  private func resolveToken(forceRefresh: Bool, tokenOverride: String?) async throws -> String {
+    if let tokenOverride {
+      return tokenOverride
+    }
+    return try await tokenProvider.bearerToken(forceRefresh: forceRefresh)
+  }
+
+  private func retryTokenOrTerminal(after failedToken: String) async throws -> String {
+    do {
+      return try await tokenProvider.refreshedBearerToken(after: failedToken)
+    } catch APIClientError.missingToken {
+      handleTerminalUnauthorized()
+      throw APIClientError.missingToken
+    }
+  }
+
   func fetchMe() async throws -> MobileMeResponse {
     try await sendMeRequest(forceRefresh: false)
   }
@@ -142,9 +169,10 @@ struct APIClient: APIClientProtocol, Sendable {
   private func sendProfileCompletionRequest(
     displayName: String,
     username: String,
-    forceRefresh: Bool
+    forceRefresh: Bool,
+    tokenOverride: String? = nil
   ) async throws {
-    let token = try await tokenProvider.bearerToken(forceRefresh: forceRefresh)
+    let token = try await resolveToken(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
     var request = URLRequest(
       url: baseURL.appending(path: "/api/mobile/v1/profile/complete")
     )
@@ -171,10 +199,12 @@ struct APIClient: APIClientProtocol, Sendable {
       throw APIClientError.invalidResponse
     }
     if httpResponse.statusCode == 401, !forceRefresh {
+      let refreshed = try await retryTokenOrTerminal(after: token)
       return try await sendProfileCompletionRequest(
         displayName: displayName,
         username: username,
-        forceRefresh: true
+        forceRefresh: true,
+        tokenOverride: refreshed
       )
     }
     if httpResponse.statusCode == 401, forceRefresh {
@@ -197,8 +227,11 @@ struct APIClient: APIClientProtocol, Sendable {
     }
   }
 
-  private func sendMeRequest(forceRefresh: Bool) async throws -> MobileMeResponse {
-    let token = try await tokenProvider.bearerToken(forceRefresh: forceRefresh)
+  private func sendMeRequest(
+    forceRefresh: Bool,
+    tokenOverride: String? = nil
+  ) async throws -> MobileMeResponse {
+    let token = try await resolveToken(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
     var request = URLRequest(url: baseURL.appending(path: "/api/mobile/v1/me"))
     request.httpMethod = "GET"
     request.timeoutInterval = requestTimeout
@@ -222,8 +255,9 @@ struct APIClient: APIClientProtocol, Sendable {
     }
 
     if httpResponse.statusCode == 401, !forceRefresh {
+      let refreshed = try await retryTokenOrTerminal(after: token)
       MobileAuthDiagnostics.record("mobile_me_retrying", detail: "status=401")
-      return try await sendMeRequest(forceRefresh: true)
+      return try await sendMeRequest(forceRefresh: true, tokenOverride: refreshed)
     }
     if httpResponse.statusCode == 401, forceRefresh {
       handleTerminalUnauthorized()
@@ -251,8 +285,11 @@ struct APIClient: APIClientProtocol, Sendable {
     }
   }
 
-  private func sendAppleWalletProfilePassRequest(forceRefresh: Bool) async throws -> Data {
-    let token = try await tokenProvider.bearerToken(forceRefresh: forceRefresh)
+  private func sendAppleWalletProfilePassRequest(
+    forceRefresh: Bool,
+    tokenOverride: String? = nil
+  ) async throws -> Data {
+    let token = try await resolveToken(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
     var request = URLRequest(url: baseURL.appending(path: "/api/wallet/apple/profile-pass"))
     request.httpMethod = "GET"
     request.timeoutInterval = requestTimeout
@@ -275,7 +312,11 @@ struct APIClient: APIClientProtocol, Sendable {
     }
 
     if httpResponse.statusCode == 401, !forceRefresh {
-      return try await sendAppleWalletProfilePassRequest(forceRefresh: true)
+      let refreshed = try await retryTokenOrTerminal(after: token)
+      return try await sendAppleWalletProfilePassRequest(
+        forceRefresh: true,
+        tokenOverride: refreshed
+      )
     }
     if httpResponse.statusCode == 401, forceRefresh {
       handleTerminalUnauthorized()
@@ -291,9 +332,10 @@ struct APIClient: APIClientProtocol, Sendable {
   }
 
   private func sendAudienceHighlightsRequest(
-    forceRefresh: Bool
+    forceRefresh: Bool,
+    tokenOverride: String? = nil
   ) async throws -> MobileAudienceHighlightsResponse {
-    let token = try await tokenProvider.bearerToken(forceRefresh: forceRefresh)
+    let token = try await resolveToken(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
     var request = URLRequest(
       url: baseURL.appending(path: "/api/mobile/v1/audience/highlights")
     )
@@ -318,7 +360,11 @@ struct APIClient: APIClientProtocol, Sendable {
     }
 
     if httpResponse.statusCode == 401, !forceRefresh {
-      return try await sendAudienceHighlightsRequest(forceRefresh: true)
+      let refreshed = try await retryTokenOrTerminal(after: token)
+      return try await sendAudienceHighlightsRequest(
+        forceRefresh: true,
+        tokenOverride: refreshed
+      )
     }
     if httpResponse.statusCode == 401, forceRefresh {
       handleTerminalUnauthorized()
@@ -338,9 +384,10 @@ struct APIClient: APIClientProtocol, Sendable {
   }
 
   private func sendActionLoopInboxRequest(
-    forceRefresh: Bool
+    forceRefresh: Bool,
+    tokenOverride: String? = nil
   ) async throws -> MobileActionLoopInboxResponse {
-    let token = try await tokenProvider.bearerToken(forceRefresh: forceRefresh)
+    let token = try await resolveToken(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
     var request = URLRequest(url: baseURL.appending(path: "/api/mobile/v1/inbox"))
     request.httpMethod = "GET"
     request.timeoutInterval = requestTimeout
@@ -363,7 +410,8 @@ struct APIClient: APIClientProtocol, Sendable {
     }
 
     if httpResponse.statusCode == 401, !forceRefresh {
-      return try await sendActionLoopInboxRequest(forceRefresh: true)
+      let refreshed = try await retryTokenOrTerminal(after: token)
+      return try await sendActionLoopInboxRequest(forceRefresh: true, tokenOverride: refreshed)
     }
     if httpResponse.statusCode == 401, forceRefresh {
       handleTerminalUnauthorized()
@@ -383,9 +431,10 @@ struct APIClient: APIClientProtocol, Sendable {
   }
 
   private func sendActionLoopCalendarRequest(
-    forceRefresh: Bool
+    forceRefresh: Bool,
+    tokenOverride: String? = nil
   ) async throws -> MobileActionLoopCalendarResponse {
-    let token = try await tokenProvider.bearerToken(forceRefresh: forceRefresh)
+    let token = try await resolveToken(forceRefresh: forceRefresh, tokenOverride: tokenOverride)
     var request = URLRequest(url: baseURL.appending(path: "/api/mobile/v1/calendar"))
     request.httpMethod = "GET"
     request.timeoutInterval = requestTimeout
@@ -408,7 +457,11 @@ struct APIClient: APIClientProtocol, Sendable {
     }
 
     if httpResponse.statusCode == 401, !forceRefresh {
-      return try await sendActionLoopCalendarRequest(forceRefresh: true)
+      let refreshed = try await retryTokenOrTerminal(after: token)
+      return try await sendActionLoopCalendarRequest(
+        forceRefresh: true,
+        tokenOverride: refreshed
+      )
     }
     if httpResponse.statusCode == 401, forceRefresh {
       handleTerminalUnauthorized()
