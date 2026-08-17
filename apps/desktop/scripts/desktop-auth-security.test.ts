@@ -12,6 +12,8 @@ import { evaluateTrustedOriginCspHeaders } from '../src/desktop-csp-watchdog.ts'
 import {
   shouldGrantTrustedAudioPermission,
   shouldGrantTrustedAudioPermissionCheck,
+  shouldGrantTrustedHudScreenPermission,
+  shouldGrantTrustedHudScreenPermissionCheck,
 } from '../src/desktop-permissions.ts';
 import { sanitizeWindowState } from '../src/window-state.ts';
 
@@ -219,6 +221,44 @@ test('desktop permission matrix grants only trusted audio requests', () => {
       appOrigin,
     })
   ).toBe(false);
+});
+
+test('HUD screen capture is granted only on /hud from the app origin', () => {
+  const appOrigin = 'https://jov.ie';
+  const parseUrl = parseTestUrl;
+
+  expect(
+    shouldGrantTrustedHudScreenPermission({
+      permission: 'display-capture',
+      details: { mediaTypes: ['video', 'audio'] },
+      webContents: null,
+      requestingOrigin: `${appOrigin}/hud`,
+      parseUrl,
+      appOrigin,
+    })
+  ).toBe(true);
+
+  expect(
+    shouldGrantTrustedHudScreenPermission({
+      permission: 'media',
+      details: { mediaTypes: ['video'] },
+      webContents: null,
+      requestingOrigin: `${appOrigin}/app/chat`,
+      parseUrl,
+      appOrigin,
+    })
+  ).toBe(false);
+
+  expect(
+    shouldGrantTrustedHudScreenPermissionCheck({
+      permission: 'display-capture',
+      details: { mediaType: 'video' },
+      webContents: null,
+      requestingOrigin: `${appOrigin}/hud`,
+      parseUrl,
+      appOrigin,
+    })
+  ).toBe(true);
 });
 
 test('csp watchdog classifies missing and weakened upstream policies', () => {

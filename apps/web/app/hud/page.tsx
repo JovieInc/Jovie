@@ -1,84 +1,118 @@
-import { Button } from '@jovie/ui';
-import { Maximize2 } from 'lucide-react';
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import { forbidden, redirect, unauthorized } from 'next/navigation';
+import { forbidden, unauthorized } from 'next/navigation';
 import { HudDashboardClient } from '@/app/app/(shell)/admin/ops/HudDashboardClient';
+import { FounderMorningWalkCard } from '@/components/features/admin/hud/FounderMorningWalkCard';
+import { HudFullscreenControl } from '@/components/features/admin/hud/HudFullscreenControl';
 import { HudShipperPanels } from '@/components/features/admin/hud/HudShipperPanels';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { OperationalControlPanel } from '@/components/features/admin/OperationalControlPanel';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
-import { APP_ROUTES } from '@/constants/routes';
 import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { authorizeHud } from '@/lib/auth/hud';
 import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
+import { isHudMetricValueAvailable } from '@/lib/hud/source-trust';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
-  title: 'HUD',
-  description: 'Operator HUD: shipper status, KPIs, and live ops metrics.',
+  title: 'Ovie',
+  description: 'One operator HUD.',
   robots: NOINDEX_ROBOTS,
 };
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
-const TV_VIEW_HREF = `${APP_ROUTES.HUD_TV}`;
+function firstString(value: string | string[] | undefined): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function formatUsd(value: number): string {
+  return value.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: value >= 1000 ? 0 : 2,
+  });
+}
 
 /**
- * /hud — admin Ops HUD surface for the Ovie menu bar and operator bookmarks.
- *
- * Kiosk token bookmarks still redirect to /hud-tv. Authenticated admins get the
- * full ops dashboard (KPI grid + shipper panels). Non-admins receive 403.
+ * Ovie is one screen: /hud.
+ * ?fs=1 is fullscreen for a signed-in admin.
+ * ?kiosk=TOKEN is the unattended TV path.
  */
 export default async function HudPage({
   searchParams,
 }: Readonly<{ readonly searchParams: Promise<SearchParams> }>) {
   const params = await searchParams;
-  const rawKiosk = params.kiosk;
-  const kioskToken = typeof rawKiosk === 'string' ? rawKiosk : null;
+  const kioskToken = firstString(params.kiosk);
+  const fullscreen =
+    firstString(params.fs) === '1' || firstString(params.mode) === 'kiosk';
 
-  if (kioskToken) {
-    redirect(`${APP_ROUTES.HUD_TV}?kiosk=${encodeURIComponent(kioskToken)}`);
+  const tokenAuth = kioskToken ? await authorizeHud(kioskToken) : null;
+  const tokenOk = tokenAuth?.ok === true && tokenAuth.mode === 'kiosk';
+
+  if (kioskToken && !tokenOk) {
+    const adminAccess = await getCurrentAdminPageAccess();
+    if (!adminAccess.isAuthenticated) unauthorized();
+    if (!adminAccess.hasAdminRole) forbidden();
+  } else if (!tokenOk) {
+    const adminAccess = await getCurrentAdminPageAccess();
+    if (!adminAccess.isAuthenticated) unauthorized();
+    if (!adminAccess.hasAdminRole) forbidden();
   }
 
-  const adminAccess = await getCurrentAdminPageAccess();
-  if (!adminAccess.isAuthenticated) {
-    unauthorized();
-  }
-  if (!adminAccess.hasAdminRole) {
-    forbidden();
-  }
+  const metrics = await getHudMetrics(tokenOk ? 'kiosk' : 'admin');
+  const walk = (
+    <FounderMorningWalkCard
+      mrrLabel={
+        isHudMetricValueAvailable(metrics.sources.stripe)
+          ? formatUsd(metrics.overview.mrrUsd)
+          : '—'
+      }
+      cashLabel={
+        isHudMetricValueAvailable(metrics.sources.mercury)
+          ? formatUsd(metrics.overview.balanceUsd)
+          : '—'
+      }
+      defaultStatus={metrics.overview.defaultStatusDetail}
+    />
+  );
 
-  const metrics = await getHudMetrics('admin');
+  const dashboard = (
+    <HudDashboardClient
+      initialMetrics={metrics}
+      density={tokenOk || fullscreen ? 'kiosk' : 'shell'}
+      presentationMode={tokenOk ? 'token' : 'shell'}
+      kioskToken={tokenOk ? kioskToken : null}
+      useFixtureAgentRuns={env.HUD_AGENT_RUNS_FIXTURES === '1'}
+    />
+  );
+
+  if (tokenOk || fullscreen) {
+    return (
+      <main className='hud-kiosk-viewport min-h-screen bg-page text-primary-token'>
+        <div className='flex flex-col gap-3 p-4'>
+          {walk}
+          {tokenOk ? null : <HudShipperPanels />}
+          {dashboard}
+        </div>
+      </main>
+    );
+  }
 
   return (
     <StandaloneProductPage width='xl' className='hud-admin-viewport'>
       <AdminPage
-        title='HUD'
-        description='Shipper status, in-flight ledger, what shipped, and live KPIs.'
+        title='Ovie'
+        description='Need, then noise.'
         testId='hud-admin-page'
-        actions={
-          <Button asChild variant='secondary' size='sm'>
-            <Link
-              href={TV_VIEW_HREF}
-              target='_blank'
-              rel='noopener'
-              aria-label='Open TV View In A New Tab'
-            >
-              <Maximize2 className='h-3.5 w-3.5' aria-hidden='true' />
-              TV view
-            </Link>
-          </Button>
-        }
+        actions={<HudFullscreenControl />}
       >
+        {walk}
         <HudShipperPanels />
-        <HudDashboardClient
-          initialMetrics={metrics}
-          density='shell'
-          presentationMode='shell'
-          useFixtureAgentRuns={env.HUD_AGENT_RUNS_FIXTURES === '1'}
-        />
+        {dashboard}
+        <OperationalControlPanel />
       </AdminPage>
     </StandaloneProductPage>
   );

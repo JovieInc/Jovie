@@ -71,9 +71,7 @@ describe('admin nav IA copy (JOV-2098)', () => {
     expect(source).toContain(
       'Health dashboard — one signal per area linking to detail screens'
     );
-    expect(source).toContain(
-      'Live operational state, canaries, control panel, and incidents'
-    );
+    expect(source).toContain('One operator HUD — need first, noise below');
     expect(source).toContain(
       'Acquisition funnel, referral, outreach, and conversion'
     );

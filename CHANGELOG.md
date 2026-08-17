@@ -7,8 +7,14 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+### Added
+
+- **Ovie is one morning screen:** `/hud` now carries the brief, a Loom-style screen walk, shipper, and dashboard. Fullscreen asks the logged-in admin for the kiosk token and reloads `/hud?fs=1&kiosk=…`. `/app/ov/ops` and `/hud-tv` redirect there.
+- **Screen walks reuse one account-video store:** founder walks and later creator screen recordings upload through `lib/capture` into the Jovie account blob. The walk is stored and not admitted until Summer classifies it.
+
 ### Changed
 
+- **Ops and the TV HUD are aliases now:** admin nav “Ovie” opens `/hud`. The Mac app grants display-capture only on that route.
 - [internal] **Demo-video stories preserve document scrolling (JOV-4946):** both canonical route aliases now inherit the production marketing context without fixed-height overflow clipping at tablet or mobile viewports.
 - [internal] **Product UI no longer uses raw black/white color utilities:** remaining contrast-ratchet hits now use named Noir Ion tokens, and the owned baseline buckets are at zero.
 - [internal] **Token-drift eval drives the shipped contrast scanner:** a fail-closed unit eval imports `lint-contrast-ratchet.mjs` and requires owned raw-token buckets to stay at zero.

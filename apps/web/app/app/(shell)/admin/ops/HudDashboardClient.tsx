@@ -799,12 +799,9 @@ export function HudDashboardClient({
   if (isShell) {
     return (
       <div className={outerClass}>
-        <WhatShipped kioskToken={kioskToken} />
+        <HudSystemHealthStrip metrics={metrics} />
         <TimActionRequiredSection />
         <HudKpiSubgrid metrics={metrics} />
-        <HudSystemHealthStrip metrics={metrics} />
-        <DesignProposalReviewPanel />
-        <VisualQaReviewPanel />
 
         <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-4'>
           <ContentMetricCard
@@ -882,37 +879,20 @@ export function HudDashboardClient({
           />
         ) : null}
 
-        <div className='grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]'>
-          <ContentSurfaceCard surface='details' className='overflow-hidden p-0'>
-            <ShippingVelocityChart
-              initialData={initialShippingData}
-              initialRange='7d'
-              cachedAt={initialShippingCachedAt}
-            />
-          </ContentSurfaceCard>
-
-          <ContentSurfaceCard
-            surface='details'
-            className='p-3'
-            data-testid='hud-bottom-marker'
-          >
-            <div className='flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'>
-              <div className='space-y-2'>
-                <SectionLabel>Default status</SectionLabel>
-                <p className='text-2xl font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-3xl'>
-                  {formatDefaultStatusLabel(metrics.overview.defaultStatus)}
-                </p>
-                <p className='max-w-4xl text-app leading-6 text-secondary-token'>
-                  {metrics.overview.defaultStatusDetail}
-                </p>
-              </div>
-              <HudStatusPill
-                label={formatDefaultStatusLabel(metrics.overview.defaultStatus)}
-                tone={defaultTone}
-              />
-            </div>
-          </ContentSurfaceCard>
-        </div>
+        <WhatShipped kioskToken={kioskToken} />
+        <DesignProposalReviewPanel />
+        <VisualQaReviewPanel />
+        <ContentSurfaceCard
+          surface='details'
+          className='overflow-hidden p-0'
+          data-testid='hud-bottom-marker'
+        >
+          <ShippingVelocityChart
+            initialData={initialShippingData}
+            initialRange='7d'
+            cachedAt={initialShippingCachedAt}
+          />
+        </ContentSurfaceCard>
       </div>
     );
   }

@@ -82,7 +82,7 @@ describe('AdminHealthDashboard', () => {
     expect(growth).toHaveTextContent('12');
 
     const ops = screen.getByTestId('admin-health-ops');
-    expect(ops).toHaveAttribute('href', '/app/ov/ops');
+    expect(ops).toHaveAttribute('href', '/hud');
     expect(ops).toHaveTextContent('Healthy');
 
     const people = screen.getByTestId('admin-health-people');
