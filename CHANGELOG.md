@@ -13,6 +13,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] **Token-drift eval drives the shipped contrast scanner:** a fail-closed unit eval imports `lint-contrast-ratchet.mjs` and requires owned raw-token buckets to stay at zero.
 - [internal] **Gem activation has a direct host preflight:** production-proven controller activation uses the fixed fleet and fails before writes when user supervision is unavailable.
 - [internal] **Local Eve verification is deterministic and credential-free (JOV-5171):** the isolated `eve@0.27.8` pilot now has one root-invokable smoke command that runs from a cold app root, blocks model-catalog network access, and fails when the allowed skills, tools, channels, subagents, or schedules drift.
+- **Label logo bars now align by visible artwork instead of file padding:** one shared asset registry measures transparent bounds, preserves aspect ratio, and propagates approved optical corrections across homepage, artist-profile, and experimental review surfaces.
 
 ## [26.8.1] - 2026-08-16
 

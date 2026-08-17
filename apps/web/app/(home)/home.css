@@ -3428,47 +3428,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   user-select: none;
 }
 
-/* Optical balance: heavy solid marks (AWAL, Orchard) run smaller; thin
-   tracked letterforms (UMG, Black Hole) run larger so the row reads as one
-   quiet line of equal visual weight. */
-.system-b-mounted-home-trust-strip
-.system-b-mounted-home-trust-strip-logo--awal {
-  height: clamp(var(--space-6), 1.9vw, calc(var(--space-6) + var(--space-2)));
-  width: auto;
-}
-
-.system-b-mounted-home-trust-strip
-  .system-b-mounted-home-trust-strip-logo--orchard {
-  height: clamp(var(--space-10), 3.3vw, var(--space-12));
-  width: auto;
-}
-
-.system-b-mounted-home-trust-strip
-  .system-b-mounted-home-trust-strip-logo--umg {
-  height: clamp(
-    calc(var(--space-2) + var(--space-1)),
-    0.95vw,
-    calc(var(--space-3) + var(--space-1))
-  );
-  width: auto;
-}
-
-.system-b-mounted-home-trust-strip
-  .system-b-mounted-home-trust-strip-logo--armada {
-  height: clamp(calc(var(--space-6) + var(--space-1)), 2.1vw, var(--space-8));
-  width: auto;
-}
-
-.system-b-mounted-home-trust-strip
-  .system-b-mounted-home-trust-strip-logo--black-hole {
-  width: clamp(
-    calc(var(--space-20) + var(--space-12)),
-    11.5vw,
-    calc(var(--space-24) + var(--space-16))
-  );
-  height: auto;
-}
-
 @media (max-width: 767px) {
   .system-b-mounted-home-trust-strip-shell
     > .system-b-mounted-home-trust-strip[data-presentation="inline-strip"]
@@ -3500,32 +3459,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
     grid-column: 1 / -1;
     height: calc(var(--space-8) + var(--space-1));
     justify-content: center;
-  }
-
-  .system-b-mounted-home-trust-strip
-    .system-b-mounted-home-trust-strip-logo--awal {
-    height: var(--space-6);
-  }
-
-  .system-b-mounted-home-trust-strip
-    .system-b-mounted-home-trust-strip-logo--orchard {
-    height: var(--space-10);
-  }
-
-  .system-b-mounted-home-trust-strip
-    .system-b-mounted-home-trust-strip-logo--umg {
-    height: var(--space-3);
-    width: auto;
-  }
-
-  .system-b-mounted-home-trust-strip
-    .system-b-mounted-home-trust-strip-logo--armada {
-    height: calc(var(--space-6) + var(--space-1));
-  }
-
-  .system-b-mounted-home-trust-strip
-    .system-b-mounted-home-trust-strip-logo--black-hole {
-    width: min(calc(var(--space-20) + var(--space-16)), 100%);
   }
 }
 

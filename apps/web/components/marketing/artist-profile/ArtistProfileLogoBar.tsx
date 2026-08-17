@@ -1,3 +1,5 @@
+// @coverage-via apps/web/tests/unit/home/HomeTrustSection.test.tsx
+import { NormalizedTrustLogo } from '@/components/media/NormalizedTrustLogo';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import type { ArtistProfileSocialProofData } from '@/data/socialProof';
 import { ArtistProfileModeSwitcher } from './ArtistProfileModeSwitcher';
@@ -21,16 +23,13 @@ export function ArtistProfileLogoBar({
     <ArtistProfileSectionShell className='ap-logo-bar py-10 sm:py-12 lg:py-16'>
       <div className='flex flex-col items-center text-center'>
         <div className='flex w-full flex-wrap items-center justify-center gap-x-11 gap-y-6 text-primary-token/72'>
-          {proofData.logos.map(logo => {
-            const Logo = logo.component;
-            return (
-              <Logo
-                key={logo.id}
-                className='h-6 w-auto max-w-43'
-                aria-label={logo.label}
-              />
-            );
-          })}
+          {proofData.logos.map(logo => (
+            <NormalizedTrustLogo
+              key={logo.id}
+              id={logo.id}
+              className='max-w-43'
+            />
+          ))}
         </div>
         <ArtistProfileModeSwitcher
           adaptive={adaptive}
