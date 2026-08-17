@@ -57,10 +57,15 @@ def executable(model):
     return configured_executable(model)
 
 
-def executor(model):
+def executor(model, *, require_cwd=False):
     executable_value = configured_executable(model, "agent_")
     argv = model.get("agent_argv")
     if not executable_value or not isinstance(argv, list) or not all(isinstance(x, str) for x in argv):
+        return None
+    if require_cwd and not (
+        any("{cwd}" in argument for argument in argv)
+        or model.get("agent_cwd_mode") == "process"
+    ):
         return None
     return {
         "executable": executable_value,
@@ -92,7 +97,7 @@ def choose(workflow, capability, allow_exceptions=False, path=None):
         if until > now: candidates.append({"id": mid, "status": "cooldown", "until": until}); continue
         ok, reason = probe(m)
         candidates.append({"id": mid, "status": "ready" if ok else "unavailable", "reason": reason})
-        selected_executor = executor(m)
+        selected_executor = executor(m, require_cwd=workflow == "remediation")
         if ok and selected_executor is None:
             candidates[-1] = {"id": mid, "status": "unavailable", "reason": "executor_invalid"}
             continue

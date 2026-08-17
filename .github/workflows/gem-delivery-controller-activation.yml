@@ -47,6 +47,7 @@ jobs:
         run: |
           set -euo pipefail
           bash scripts/hermes/install-gem-fleet-controller.sh
+          bash scripts/hermes/install-gem-pr-rehabilitation.sh
       - name: Verify runtime identity after reload
         env:
           GEM_WORKSPACE: /home/timwhite/gem-workspace
@@ -64,3 +65,10 @@ jobs:
           ' "$GEM_WORKSPACE/state/gem-service-attestation.json" >/dev/null
           curl --fail --silent --show-error --max-time 5 http://127.0.0.1:4041/api/v1/state \
             | jq -e '.counts | has("running") and has("retrying") and has("blocked")' >/dev/null
+          jq -e --arg sha "$PRODUCTION_SHA" '
+            .schema == "gem-pr-rehabilitation-attestation/v1" and
+            .sourceRevision == $sha and
+            .timerActive == true and
+            .lastCycleResult == "success" and
+            ([.artifacts[].matches] | all)
+          ' "$GEM_WORKSPACE/state/gem-pr-rehabilitation-attestation.json" >/dev/null

@@ -314,7 +314,9 @@ const GEM_PR_REHABILITATION_LANE = new Set([
 const GEM_PR_REHABILITATION_PYTHON_TESTS = [
   'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-pr-drain.test.py',
+  'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+  'scripts/hermes/tests/test-model-router.py',
 ];
 const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/config/gem-repo-registry.json',
