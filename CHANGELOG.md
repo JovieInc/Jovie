@@ -9,6 +9,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- [internal] **Demo-video stories preserve document scrolling (JOV-4946):** both canonical route aliases now inherit the production marketing context without fixed-height overflow clipping at tablet or mobile viewports.
 - [internal] **Product UI no longer uses raw black/white color utilities:** remaining contrast-ratchet hits now use named Noir Ion tokens, and the owned baseline buckets are at zero.
 - [internal] **Token-drift eval drives the shipped contrast scanner:** a fail-closed unit eval imports `lint-contrast-ratchet.mjs` and requires owned raw-token buckets to stay at zero.
 - [internal] **Gem activation has a direct host preflight:** production-proven controller activation uses the fixed fleet and fails before writes when user supervision is unavailable.
