@@ -174,6 +174,51 @@ describe('GET /auth/start', () => {
     expect(hoisted.readStoredAuthState).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['malformed state', 'auth_state=short&intent=sign_in'],
+    ['wrong intent', 'auth_state=state_1234567890&intent=sign_up'],
+  ])('rejects %s without signing out', async (_label, body) => {
+    const response = await POST(
+      new Request('http://localhost:3112/auth/start', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          origin: 'http://localhost:3112',
+        },
+        body,
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(hoisted.signOut).not.toHaveBeenCalled();
+    expect(hoisted.readStoredAuthState).not.toHaveBeenCalled();
+  });
+
+  it('returns a recoverable error when browser sign-out fails', async () => {
+    const error = new Error('sign-out unavailable');
+    hoisted.signOut.mockRejectedValueOnce(error);
+
+    const response = await POST(
+      new Request('http://localhost:3112/auth/start', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          origin: 'http://localhost:3112',
+        },
+        body: 'auth_state=state_1234567890&intent=sign_in',
+      })
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('location')).toBeNull();
+    expect(response.headers.getSetCookie()).toEqual([]);
+    expect(hoisted.captureError).toHaveBeenCalledWith(
+      'Auth account switch failed',
+      error,
+      { route: '/auth/start' }
+    );
+  });
+
   it('preserves the browser session when account-switch state is expired', async () => {
     hoisted.readStoredAuthState.mockResolvedValueOnce(null);
     const response = await POST(

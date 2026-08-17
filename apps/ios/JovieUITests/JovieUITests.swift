@@ -197,6 +197,26 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "needs-onboarding", app: app)
   }
 
+  func testWaitlistPendingCanReturnToAccountSelection() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-waitlist-pending",
+      expectedElementDescription: "\"Use a Different Account\"",
+      timeout: 10
+    ) {
+      $0.buttons["waitlist-use-different-account"]
+    }
+
+    XCTAssertTrue(app.staticTexts["You're on the Waitlist"].exists)
+    XCTAssertFalse(app.buttons["Open navigation drawer"].exists)
+
+    let switchAccount = app.buttons["waitlist-use-different-account"]
+    switchAccount.tap()
+    XCTAssertTrue(
+      app.buttons["Continue in Browser"].waitForExistence(timeout: 10),
+      "Waitlist account switch did not return to signed-out account selection.\n\(app.debugDescription)"
+    )
+  }
+
   func testExpiredProfileCompletionReturnsToNativeSignIn() {
     let app = launchMockApp(
       launchArgument: "-ui-testing-needs-onboarding-unauthorized",

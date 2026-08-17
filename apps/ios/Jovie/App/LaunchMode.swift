@@ -17,6 +17,7 @@ enum LaunchMode: Equatable {
   case uiTestingQRUnavailable
   case uiTestingNeedsOnboarding
   case uiTestingNeedsOnboardingUnauthorized
+  case uiTestingWaitlistPending
   case uiTestingSplash
   case uiTestingAudience
   case uiTestingLibrary
@@ -45,6 +46,7 @@ enum LaunchMode: Equatable {
          .uiTestingQRUnavailable,
          .uiTestingNeedsOnboarding,
          .uiTestingNeedsOnboardingUnauthorized,
+         .uiTestingWaitlistPending,
          .uiTestingSplash,
          .uiTestingAudience,
          .uiTestingLibrary,
@@ -190,6 +192,10 @@ enum LaunchMode: Equatable {
 
     if arguments.contains("-ui-testing-needs-onboarding-unauthorized") {
       return .uiTestingNeedsOnboardingUnauthorized
+    }
+
+    if arguments.contains("-ui-testing-waitlist-pending") {
+      return .uiTestingWaitlistPending
     }
 
     if arguments.contains("-ui-testing-splash") {

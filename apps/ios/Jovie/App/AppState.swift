@@ -131,6 +131,10 @@ final class AppState {
       route = .needsOnboarding
       dashboardState = .idle
       isOffline = false
+    case .uiTestingWaitlistPending:
+      route = .waitlistPending
+      dashboardState = .loaded(.previewWaitlistPending)
+      isOffline = false
     case .uiTestingSplash:
       route = .launching
       dashboardState = .idle
