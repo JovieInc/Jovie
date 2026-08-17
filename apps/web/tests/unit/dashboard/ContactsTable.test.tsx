@@ -193,6 +193,9 @@ describe('ContactsTable', () => {
       'data-loading',
       'true'
     );
+    expect(screen.getByTestId('contacts-toolbar-count')).toHaveTextContent(
+      'Loading contacts'
+    );
     expect(screen.queryByText('No Contacts Yet')).not.toBeInTheDocument();
   });
 
@@ -211,6 +214,9 @@ describe('ContactsTable', () => {
     expect(
       screen.getByRole('heading', { name: 'No Contacts Yet' })
     ).toBeVisible();
+    expect(screen.getByTestId('contacts-toolbar-count')).toHaveTextContent(
+      '0 contacts'
+    );
     expect(
       screen.getByText('Add bookings, management, and press contacts.')
     ).toBeVisible();
