@@ -297,8 +297,8 @@ function Toolbar({
                 className={cn(
                   'inline-flex h-7 items-center gap-1.5 rounded px-2.5 text-2xs font-semibold transition-colors',
                   mode === option.value
-                    ? 'bg-white text-black dark:text-white'
-                    : 'text-white/70 hover:text-white'
+                    ? 'bg-btn-primary text-btn-primary-foreground'
+                    : 'text-primary-token/70 hover:text-primary-token'
                 )}
               >
                 <Icon className='h-3 w-3' />
@@ -344,7 +344,7 @@ function Toolbar({
           <button
             type='button'
             onClick={onOpenDrawer}
-            className='ml-auto inline-flex h-8 items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 text-xs font-semibold text-white dark:text-white transition-colors hover:bg-white/10'
+            className='ml-auto inline-flex h-8 items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 text-xs font-semibold text-primary-token transition-colors hover:bg-white/10'
           >
             <Plus className='h-3.5 w-3.5' />
             Sections ({bodyCount})
@@ -388,8 +388,8 @@ function Toggle<T extends string>({
             className={cn(
               'inline-flex h-6 items-center rounded px-2.5 text-2xs font-semibold transition-colors',
               opt.value === value
-                ? 'bg-white text-black dark:text-white'
-                : 'text-white/70 hover:text-white'
+                ? 'bg-btn-primary text-btn-primary-foreground'
+                : 'text-primary-token/70 hover:text-primary-token'
             )}
           >
             {opt.label}

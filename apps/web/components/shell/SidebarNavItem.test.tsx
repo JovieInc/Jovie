@@ -7,11 +7,11 @@ import {
 } from './SidebarNavItem';
 
 describe('SidebarNavItem active chrome', () => {
-  it('uses white text and a Jovie teal icon without a left rail or decoration', () => {
+  it('uses primary-token text and a Jovie teal icon without a left rail or decoration', () => {
     const row = getSidebarNavRowClassName({ active: true });
     const icon = getSidebarNavIconClassName({ active: true });
 
-    expect(row).toContain('text-white');
+    expect(row).toContain('text-primary-token');
     expect(row).toContain('shadow-none');
     expect(row).not.toContain('inset_2px_0');
     expect(row).not.toContain('before:');

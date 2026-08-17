@@ -3,7 +3,7 @@ import { Tooltip } from './Tooltip';
 
 // SidebarNavItem — single nav row in the shell sidebar. Icon + label with
 // collapsed (icon-only) + nested (workspace child) + tight density modes.
-// Active state: filled bg + white text, no border (borderless chrome per #13217).
+// Active state: filled bg + primary-token text, no border (borderless chrome per #13217).
 // Nested inactive: dimmer icon.
 // Always wrapped in a Tooltip so collapsed mode still shows the label.
 
@@ -47,11 +47,11 @@ const SIDEBAR_SECONDARY_CHROME =
 const SIDEBAR_PRIMARY_CHROME =
   'w-fit grid-cols-[18px_auto] gap-x-1.5 bg-sidebar-accent/40 px-2.5 text-sidebar-item-foreground font-medium shadow-none hover:bg-sidebar-accent/70';
 
-// Active state uses a quiet neutral fill with white type and a Jovie teal icon.
+// Active state uses a quiet neutral fill with primary-token type and a Jovie teal icon.
 // Avoid a left rail or guide decoration so every shared sidebar consumer keeps
 // the same compact geometry.
 const SIDEBAR_ACTIVE_CHROME =
-  'bg-sidebar-accent-active text-white font-medium shadow-none';
+  'bg-sidebar-accent-active text-primary-token font-medium shadow-none';
 
 const SIDEBAR_INACTIVE_CHROME =
   'text-sidebar-item-foreground hover:bg-sidebar-accent hover:text-sidebar-item-foreground';

@@ -179,7 +179,7 @@ describe('Sidebar row alignment', () => {
       'text-sidebar-muted/65'
     );
     expect(activeRowClassName).toContain('bg-sidebar-accent-active');
-    expect(activeRowClassName).toContain('text-white');
+    expect(activeRowClassName).toContain('text-primary-token');
     expect(activeRowClassName).toContain('font-medium');
     expect(activeRowClassName).toContain('shadow-none');
     expect(activeRowClassName).not.toContain('inset_2px_0');

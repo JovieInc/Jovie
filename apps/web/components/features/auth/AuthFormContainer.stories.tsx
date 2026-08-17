@@ -77,7 +77,7 @@ export const WithBranding: Story = {
   render: () => (
     <div className='flex min-h-screen'>
       <div className='hidden lg:flex lg:flex-1 lg:flex-col lg:justify-center lg:px-12 xl:px-16 bg-linear-to-br from-blue-600 via-purple-600 to-cyan-600'>
-        <div className='text-center text-white'>
+        <div className='text-center text-primary-token'>
           <h1 className='text-3xl font-bold mb-4'>Welcome to Jovie</h1>
           <p className='text-blue-100'>Create your artist profile today.</p>
         </div>

@@ -221,7 +221,7 @@ export const ResponsiveLayout: Story = {
 export const DarkMode: Story = {
   render: () => (
     <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
-      <div className='p-6 bg-white rounded-lg'>
+      <div className='p-6 bg-surface-1 rounded-lg'>
         <h3 className='text-lg font-semibold mb-4'>Light Theme</h3>
         <MockAnalyticsCards
           totalClicks={1250}
@@ -231,7 +231,9 @@ export const DarkMode: Story = {
         />
       </div>
       <div className='p-6 bg-gray-900 rounded-lg'>
-        <h3 className='text-lg font-semibold mb-4 text-white'>Dark Theme</h3>
+        <h3 className='text-lg font-semibold mb-4 text-primary-token'>
+          Dark Theme
+        </h3>
         <div className='dark'>
           <MockAnalyticsCards
             totalClicks={1250}
