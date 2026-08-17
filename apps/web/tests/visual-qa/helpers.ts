@@ -149,15 +149,25 @@ export async function writeVisualQaScreenshot(
   config: VisualQaCaptureConfig,
   outputPath: string
 ) {
+  const maskSelectors = (config.dynamicMasks ?? [])
+    .map(mask => mask.selector)
+    .filter((selector): selector is string => Boolean(selector));
+  const masks = maskSelectors.map(selector => page.locator(selector));
+  const screenshotOptions = {
+    path: outputPath,
+    ...(masks.length > 0 && { mask: masks, maskColor: '#000000' }),
+  } as const;
+
   if (config.captureTarget === 'locator' && config.captureSelector) {
-    await page.locator(config.captureSelector).first().screenshot({
-      path: outputPath,
-    });
+    await page
+      .locator(config.captureSelector)
+      .first()
+      .screenshot(screenshotOptions);
     return;
   }
 
   await page.screenshot({
-    path: outputPath,
+    ...screenshotOptions,
     fullPage: config.fullPage ?? false,
   });
 }
