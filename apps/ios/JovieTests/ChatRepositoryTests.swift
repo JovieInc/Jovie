@@ -35,6 +35,7 @@ struct ChatRepositoryTests {
     #expect(repository.timeline.first?.role == .user)
     #expect(repository.timeline.last?.status == .failed)
     #expect(repository.isOffline == true)
+    #expect(repository.sessionExpired == false)
     #expect(repository.lastErrorMessage?.isEmpty == false)
   }
 
@@ -289,6 +290,7 @@ struct ChatRepositoryTests {
 
     #expect(repository.conversations.map(\.id) == ["conv_cached"])
     #expect(repository.isOffline == true)
+    #expect(repository.sessionExpired == false)
     #expect(repository.isLoadingConversations == false)
     #expect(repository.lastErrorMessage?.isEmpty == false)
   }
@@ -359,6 +361,7 @@ struct ChatRepositoryTests {
     #expect(repository.activeConversationID == "conv_offline")
     #expect(repository.timeline.map(\.content) == ["Cached reply"])
     #expect(repository.isOffline == true)
+    #expect(repository.sessionExpired == false)
   }
 
   @Test func openConversationOnSuccessMapsWebHandoffMessagesWithHandoffURL() async {
@@ -441,6 +444,113 @@ struct ChatRepositoryTests {
     #expect(repository.timeline.isEmpty)
     #expect(repository.lastErrorMessage == nil)
   }
+
+  @Test func refreshConversationsOn401SetsSessionExpiredNotOffline() async {
+    let repository = ChatRepository(
+      client: UnauthorizedChatClient(),
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-401-refresh")!),
+      userID: "user_repo_401_refresh",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    await repository.refreshConversations()
+
+    #expect(repository.isOffline == false)
+    #expect(repository.sessionExpired == true)
+    #expect(repository.lastErrorMessage == nil)
+  }
+
+  @Test func openConversationOn401SetsSessionExpiredNotOffline() async {
+    let repository = ChatRepository(
+      client: UnauthorizedChatClient(),
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-401-open")!),
+      userID: "user_repo_401_open",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    await repository.openConversation("conv_401")
+
+    #expect(repository.isOffline == false)
+    #expect(repository.sessionExpired == true)
+    #expect(repository.lastErrorMessage == nil)
+    #expect(repository.activeConversationID == "conv_401")
+  }
+
+  @Test func sendOn401SetsSessionExpiredNotOffline() async {
+    let repository = ChatRepository(
+      client: UnauthorizedChatClient(),
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-401-send")!),
+      userID: "user_repo_401_send",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    await repository.send(text: "This should expire the session")
+
+    #expect(repository.isOffline == false)
+    #expect(repository.sessionExpired == true)
+    #expect(repository.lastErrorMessage == nil)
+    #expect(repository.timeline.last?.status == .failed)
+  }
+
+  @Test func retryOn401SetsSessionExpiredNotOffline() async {
+    let repository = ChatRepository(
+      client: UnauthorizedChatClient(),
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-401-retry")!),
+      userID: "user_repo_401_retry",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    await repository.send(text: "Retry after 401")
+    let originalClientTurnId = repository.timeline.first?.clientTurnId ?? ""
+    #expect(originalClientTurnId.isEmpty == false)
+
+    await repository.retry(clientTurnId: originalClientTurnId)
+
+    #expect(repository.isOffline == false)
+    #expect(repository.sessionExpired == true)
+    #expect(repository.lastErrorMessage == nil)
+  }
+
+  @Test func refreshConversationsOn500MarksOfflineAndDoesNotExpireSession() async {
+    let client = ScriptedChatClient(
+      sendTurnResult: .failure(MobileChatClientError.transportFailed(code: -1009)),
+      listConversationsResult: .failure(MobileChatClientError.requestFailed(statusCode: 500)),
+      fetchConversationResult: .failure(MobileChatClientError.requestFailed(statusCode: 500))
+    )
+
+    let repository = ChatRepository(
+      client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-500-refresh")!),
+      userID: "user_repo_500_refresh",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    await repository.refreshConversations()
+
+    #expect(repository.isOffline == true)
+    #expect(repository.sessionExpired == false)
+  }
+
+  @Test func sendOnTransportFailureMarksOfflineAndDoesNotExpireSession() async {
+    let client = ScriptedChatClient(
+      sendTurnResult: .failure(MobileChatClientError.transportFailed(code: -1009)),
+      listConversationsResult: .success([]),
+      fetchConversationResult: .failure(MobileChatClientError.requestFailed(statusCode: 500))
+    )
+
+    let repository = ChatRepository(
+      client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-500-send")!),
+      userID: "user_repo_500_send",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    await repository.send(text: "Transport failed")
+
+    #expect(repository.isOffline == true)
+    #expect(repository.sessionExpired == false)
+    #expect(repository.timeline.last?.status == .failed)
+  }
 }
 
 private final class RecordingConversationActivityDonator: ConversationActivityDonating, @unchecked Sendable {
@@ -479,6 +589,24 @@ private struct SuccessfulChatClient: MobileChatClientProtocol {
     onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
   ) async throws -> [MobileChatStreamEvent] {
     []
+  }
+}
+
+
+private struct UnauthorizedChatClient: MobileChatClientProtocol {
+  func listConversations(limit: Int) async throws -> [MobileConversationSummary] {
+    throw MobileChatClientError.requestFailed(statusCode: 401)
+  }
+
+  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+    throw MobileChatClientError.requestFailed(statusCode: 401)
+  }
+
+  func sendTurn(
+    _ request: MobileChatTurnRequest,
+    onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
+  ) async throws -> [MobileChatStreamEvent] {
+    throw MobileChatClientError.requestFailed(statusCode: 401)
   }
 }
 
