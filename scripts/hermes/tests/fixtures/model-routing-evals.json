@@ -1,0 +1,45 @@
+{
+  "schema": "model-routing-eval/v1",
+  "source": [
+    "gbrain:central-model-registry",
+    "gbrain:company-resources",
+    "gbrain:symphony-model-routing-economics-2026-08-15"
+  ],
+  "cases": [
+    {
+      "id": "included-grok-beats-gateway",
+      "capability": "code",
+      "ready": ["grok-4.6", "deepseek-v4-flash"],
+      "exhausted": ["cursor-models"],
+      "expect": "grok-4.6"
+    },
+    {
+      "id": "codex-sol-beats-luna-when-included",
+      "capability": "architecture",
+      "ready": ["codex-sol", "codex-luna", "deepseek-v4-flash"],
+      "exhausted": ["cursor-models", "grok-build"],
+      "expect": "codex-sol"
+    },
+    {
+      "id": "kimi-after-grok-and-codex-empty",
+      "capability": "code",
+      "ready": ["kimi-k3", "deepseek-v4-flash"],
+      "exhausted": ["grok-build", "cursor-models", "codex"],
+      "expect": "kimi-k3"
+    },
+    {
+      "id": "local-beats-gateway-when-subs-empty",
+      "capability": "code",
+      "ready": ["deepseek-v4-flash", "qwen-coder-local"],
+      "exhausted": ["grok-build", "cursor-models", "codex", "kimi", "cursor-other-models"],
+      "expect": "qwen-coder-local"
+    },
+    {
+      "id": "gateway-only-after-included-and-local-gone",
+      "capability": "code",
+      "ready": ["deepseek-v4-flash"],
+      "exhausted": ["grok-build", "cursor-models", "codex", "kimi", "cursor-other-models", "local"],
+      "expect": "deepseek-v4-flash"
+    }
+  ]
+}

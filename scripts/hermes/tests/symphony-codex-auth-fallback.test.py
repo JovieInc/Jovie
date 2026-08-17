@@ -230,6 +230,11 @@ class FallbackTests(unittest.TestCase):
             "GEM_FLEET_GATE_RECEIPT": str(self.gate),
             "GEM_PR_DRAIN_QWEN": str(self.model_probe),
             "GEM_QWEN_AGENT_EXECUTABLE": str(self.model_agent),
+            "GEM_CURSOR_EXECUTABLE": "/missing",
+            "GEM_KIMI_EXECUTABLE": "/missing",
+            "GEM_GROK_EXECUTABLE": "/missing",
+            "GEM_CLAUDE_EXECUTABLE": "/missing",
+            "GEM_DEEPSEEK_EXECUTABLE": "/missing",
         })
         self.environment.start()
         self.addCleanup(self.environment.stop)
@@ -259,6 +264,11 @@ class FallbackTests(unittest.TestCase):
             "GEM_FLEET_GATE_RECEIPT": str(self.gate),
             "GEM_PR_DRAIN_QWEN": str(self.model_probe),
             "GEM_QWEN_AGENT_EXECUTABLE": str(self.model_agent),
+            "GEM_CURSOR_EXECUTABLE": "/missing",
+            "GEM_KIMI_EXECUTABLE": "/missing",
+            "GEM_GROK_EXECUTABLE": "/missing",
+            "GEM_CLAUDE_EXECUTABLE": "/missing",
+            "GEM_DEEPSEEK_EXECUTABLE": "/missing",
             "SYMPHONY_FALLBACK_SELECTION_B64": base64.b64encode(json.dumps({
                 "schema_version": 1,
                 "deterministic_first": True,
@@ -704,7 +714,7 @@ class FallbackTests(unittest.TestCase):
         canary = self.command("codex-rotate", "echo GEM_MODEL_READY")
         self.command("systemctl", "printf 'systemctl %s\\n' \"$*\" >> \"$GEM_EVENTS\"; [ \"$2\" != is-active ] || exit \"${GEM_ACTIVE_RC:-0}\"")
         destination = self.install_runtime()
-        result = subprocess.run([destination / "symphony-grok-sidecar"], capture_output=True, text=True, env=self.env(GEM_CODEX_ROTATE_BIN=canary, GEM_EVENTS=self.events), check=False)
+        result = subprocess.run([destination / "symphony-grok-sidecar"], capture_output=True, text=True, env=self.env(GEM_CODEX_ROTATE_BIN=canary, GEM_EVENTS=self.events, GEM_CODEX_CANARY_TIMEOUT_SECONDS="5"), check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.events.read_text().splitlines(), [
             "systemctl --user list-units --type=service --state=active grok-ship-*.service fallback-ship-*.service --no-legend --no-pager",

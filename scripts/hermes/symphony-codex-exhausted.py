@@ -251,7 +251,7 @@ def _model_router_selection() -> tuple[dict | None, str]:
     env["GEM_MODEL_REGISTRY"] = str(registry)
     try:
         result = subprocess.run(
-            [sys.executable, str(router), "choose", "--workflow", "new_pr", "--capability", "code"],
+            [sys.executable, str(router), "choose", "--workflow", "new_pr", "--capability", "code", "--exclude-pool", "codex"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=False,
@@ -676,6 +676,48 @@ def _fallback_unit(identifier: str, issue_revision: str) -> str:
     return f"fallback-ship-{identifier}-{revision}"
 
 
+def _launch_fallback_workers(
+    identifiers: list[str],
+    active: list[str],
+    executable: str,
+    bundle_revision: str,
+    selection: dict,
+    limit: int,
+) -> tuple[set[str], int]:
+    """Start isolated fallback units up to *limit*. Never stops Symphony."""
+    active_units = set(active)
+    capacity_used = len(active_units)
+    launched_units: set[str] = set()
+    for identifier in identifiers:
+        if capacity_used >= limit:
+            break
+        legacy_unit = f"grok-ship-{identifier}.service"
+        fallback_prefix = f"fallback-ship-{identifier}-"
+        if legacy_unit in active_units or any(unit.startswith(fallback_prefix) for unit in active_units):
+            continue
+        issue = _fetch_single_issue(identifier)
+        if issue is None:
+            print(f"fallback skip {identifier} admission_unverifiable", file=sys.stderr)
+            continue
+        ok, _reason, meta = _issue_meta(issue, identifier)
+        if not ok:
+            print(f"fallback skip {identifier} not admitted", file=sys.stderr)
+            continue
+        command = _grok_command(
+            identifier,
+            executable,
+            selection,
+            meta["issue_revision"],
+            bundle_revision,
+        )
+        if not _control(command):
+            print(f"fallback skip {identifier} grok_launch_failed", file=sys.stderr)
+            continue
+        launched_units.add(next(arg.removeprefix("--unit=") + ".service" for arg in command if arg.startswith("--unit=")))
+        capacity_used += 1
+    return launched_units, capacity_used
+
+
 def _grok_command(
     identifier: str,
     executable: str,
@@ -712,9 +754,51 @@ def reconcile() -> int:
         if not _services_active():
             print("codex_not_exhausted symphony_not_active", file=sys.stderr)
             return EXIT_DEGRADED
-        print("codex_not_exhausted symphony_active idle", file=sys.stderr)
+        drain_reason = _drain_included_pools(active)
+        idle = "idle " if drain_reason.startswith("drain_skipped=") or drain_reason.startswith("drain_idle") else ""
+        print(f"codex_not_exhausted symphony_active {idle}{drain_reason}", file=sys.stderr)
         return 0
+    return _continue_exhausted_reconcile(reason)
 
+
+def _drain_included_pools(active: list[str]) -> str:
+    """Use leftover included Cursor/Grok/Kimi quota while Codex still owns Symphony.
+
+    One issue still has one implementation owner: grok-ship-one and
+    symphony-codex-router share the fallback lease flock.
+    """
+    executable = _grok_ship_one_executable()
+    if executable is None:
+        return "drain_skipped=grok_executable_missing"
+    gate_ready, gate_reason = _fleet_gate_allows_isolated()
+    if not gate_ready:
+        return f"drain_skipped={gate_reason}"
+    selection, selection_reason = _model_router_selection()
+    if selection is None:
+        return f"drain_skipped={selection_reason}"
+    pool = (selection.get("selected") or {}).get("pool") or "unknown"
+    if pool == "codex":
+        return "drain_skipped=codex_pool"
+    bundle_revision = _bundle_revision()
+    if bundle_revision is None:
+        return "drain_skipped=bundle_revision_unavailable"
+    identifiers = _linear_identifiers()
+    if identifiers is None:
+        return "drain_skipped=linear_query_failed"
+    if not identifiers:
+        return f"drain_idle pool={pool}"
+    limit = _grok_limit()
+    if limit <= 0:
+        return "drain_skipped=grok_capacity_zero"
+    launched, _used = _launch_fallback_workers(
+        identifiers, active, executable, bundle_revision, selection, limit
+    )
+    if not launched:
+        return f"drain_idle pool={pool}"
+    return f"drain_started={len(launched)} pool={pool} model={selection['selected'].get('id')}"
+
+
+def _continue_exhausted_reconcile(reason: str) -> int:
     # A failed readiness probe is not proof that Codex is exhausted. Only the
     # typed cooldown state authorizes the destructive primary-to-fallback
     # handoff. Preserve the running services on missing state, missing binaries,
@@ -798,44 +882,10 @@ def reconcile() -> int:
         print("codex_exhausted symphony_stop_failed grok_unchanged", file=sys.stderr)
         return EXIT_SAFE_FAIL_CLOSED
 
-    active_units = set(active)
-    capacity_used = len(active_units)
-    launched_units: set[str] = set()
+    launched_units, _capacity_used = _launch_fallback_workers(
+        identifiers, active, executable, bundle_revision, selection, limit
+    )
     started = 0
-    for identifier in identifiers:
-        if capacity_used >= limit:
-            break
-        legacy_unit = f"grok-ship-{identifier}.service"
-        fallback_prefix = f"fallback-ship-{identifier}-"
-        if legacy_unit in active_units or any(unit.startswith(fallback_prefix) for unit in active_units):
-            continue
-        # Re-verify admission immediately before launch: a label/state guard
-        # may have flagged the issue (blocked / needs-human) after the list
-        # query, and reconcile must never launch work grok-ship-one will
-        # reject. Same predicate as grok-ship-one's check-admission.
-        issue = _fetch_single_issue(identifier)
-        if issue is None:
-            print(f"codex_exhausted skip {identifier} admission_unverifiable", file=sys.stderr)
-            continue
-        ok, _reason, meta = _issue_meta(issue, identifier)
-        if not ok:
-            print(f"codex_exhausted skip {identifier} not admitted", file=sys.stderr)
-            continue
-        command = _grok_command(
-            identifier,
-            executable,
-            selection,
-            meta["issue_revision"],
-            bundle_revision,
-        )
-        if not _control(command):
-            print(f"codex_exhausted skip {identifier} grok_launch_failed", file=sys.stderr)
-            continue
-        # Reserve the slot as soon as systemd accepts the launch. Activation can
-        # be delayed, but acceptance must never allow the batch to exceed its
-        # configured concurrency ceiling.
-        launched_units.add(next(arg.removeprefix("--unit=") + ".service" for arg in command if arg.startswith("--unit=")))
-        capacity_used += 1
     final_active = _active_grok_units()
     if final_active is None:
         # Exclusivity cannot be proven. Do not restart Symphony while an

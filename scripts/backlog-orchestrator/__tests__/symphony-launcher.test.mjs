@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import {
   chmodSync,
   mkdirSync,
@@ -69,6 +69,7 @@ function runRouter({ root, workspace, accounts, stub }, issue) {
       SYMPHONY_ISSUE_IDENTIFIER: issue.identifier,
       SYMPHONY_WORKSPACE: workspace,
       SYMPHONY_CODEX_ROTATE: stub,
+      SYMPHONY_FALLBACK_LEASE_DIR: join(root, 'fallback-leases'),
       CODEX_ACCOUNTS_ROOT: accounts,
       CODEX_ACCOUNTS_STATE: join(accounts, 'state.json'),
     },
@@ -116,6 +117,48 @@ describe('Symphony launcher closed loop', () => {
         }
       );
       assert.throws(() => readFileSync(env.rotateLog, 'utf8'));
+    } finally {
+      rmSync(env.root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed when the fallback sidecar already holds the issue lease', async () => {
+    const env = fixture();
+    try {
+      const { issue } = issueWithReceipt('Fix README typo');
+      const leaseDir = join(env.root, 'fallback-leases');
+      mkdirSync(leaseDir, { recursive: true });
+      const lease = join(leaseDir, `${issue.identifier}.lock`);
+      writeFileSync(lease, '');
+      const holder = spawn(
+        'python3',
+        [
+          '-c',
+          'import fcntl, sys, time; f=open(sys.argv[1],"a+"); fcntl.flock(f, fcntl.LOCK_EX); time.sleep(8)',
+          lease,
+        ],
+        { stdio: 'ignore', detached: true },
+      );
+      await new Promise(resolve => setTimeout(resolve, 80));
+      try {
+        assert.throws(
+          () => runRouter(env, issue),
+          error => {
+            assert.equal(/** @type {any} */ (error).status, 78);
+            assert.match(
+              String(/** @type {any} */ (error).stderr),
+              /fallback-lease-held/
+            );
+            return true;
+          }
+        );
+      } finally {
+        try {
+          process.kill(-holder.pid, 'SIGTERM');
+        } catch {
+          /* holder may have already exited */
+        }
+      }
     } finally {
       rmSync(env.root, { recursive: true, force: true });
     }

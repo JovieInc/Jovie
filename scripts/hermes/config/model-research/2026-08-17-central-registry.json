@@ -1,0 +1,93 @@
+{
+  "schema": "model-research/v1",
+  "observed_at": "2026-08-17T18:00:00Z",
+  "source": "gbrain:central-model-registry+symphony-model-routing-economics-2026-08-15+cursor-docs-models-and-pricing",
+  "updates": [
+    {
+      "id": "cursor-grok-4.6",
+      "list_price_in": 2.0,
+      "list_price_out": 6.0,
+      "quality": 100,
+      "strengths": ["long-running-agents", "included-cursor-models", "architecture"],
+      "weaknesses": ["requires-cursor-agent", "fast-tier-is-2x"]
+    },
+    {
+      "id": "grok-4.6",
+      "list_price_in": 2.0,
+      "list_price_out": 6.0,
+      "quality": 100,
+      "strengths": ["local-grok-cli", "included-supergrok", "architecture"],
+      "weaknesses": ["weekly-grok-build-pool", "not-portable-to-cursor-models"]
+    },
+    {
+      "id": "codex-sol",
+      "list_price_in": 5.0,
+      "list_price_out": 30.0,
+      "quality": 88,
+      "sub_monthly_usd": 200,
+      "sub_included_multiplier": 4.0,
+      "strengths": ["terminal-bench", "root-cause", "subsidized-codex-sub"],
+      "weaknesses": ["api-equivalent-is-expensive", "never-buy-as-gateway"]
+    },
+    {
+      "id": "codex-terra",
+      "list_price_in": 2.0,
+      "list_price_out": 12.0,
+      "quality": 82,
+      "sub_monthly_usd": 200,
+      "sub_included_multiplier": 4.0,
+      "strengths": ["default-implementation", "subsidized-codex-sub"],
+      "weaknesses": ["same-pool-as-sol-and-luna"]
+    },
+    {
+      "id": "codex-luna",
+      "list_price_in": 0.2,
+      "list_price_out": 1.2,
+      "quality": 74,
+      "sub_monthly_usd": 200,
+      "sub_included_multiplier": 4.0,
+      "strengths": ["high-volume", "cheap-gpt-5-6", "openai-product"],
+      "weaknesses": ["mrcr-recall-cliff", "not-for-long-context"]
+    },
+    {
+      "id": "cursor-luna",
+      "list_price_in": 0.2,
+      "list_price_out": 1.2,
+      "quality": 74,
+      "strengths": ["same-openai-luna", "cursor-other-models-400"],
+      "weaknesses": ["mrcr-recall-cliff", "requires-cursor-agent"]
+    },
+    {
+      "id": "kimi-k3",
+      "list_price_in": 0.3,
+      "list_price_out": 1.5,
+      "quality": 86,
+      "strengths": ["included-kimi-sub", "1m-context"],
+      "weaknesses": ["not-codex-lane"]
+    },
+    {
+      "id": "kimi-coding",
+      "list_price_in": 0.3,
+      "list_price_out": 1.5,
+      "quality": 78,
+      "strengths": ["mechanical-coding", "included-kimi-sub"],
+      "weaknesses": ["narrower-than-k3"]
+    },
+    {
+      "id": "deepseek-v4-flash",
+      "list_price_in": 0.15,
+      "list_price_out": 0.6,
+      "quality": 65,
+      "strengths": ["cheapest-capable-api", "post-included-fallback"],
+      "weaknesses": ["paid-gateway", "not-a-sub-replacement-for-sol"]
+    },
+    {
+      "id": "qwen-coder-local",
+      "list_price_in": 0.0,
+      "list_price_out": 0.0,
+      "quality": 50,
+      "strengths": ["free-local", "mechanical"],
+      "weaknesses": ["often-missing-on-gem", "not-architecture"]
+    }
+  ]
+}

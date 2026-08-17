@@ -38,6 +38,7 @@ marked `ready` only when both `HERMES_SUMMER_NOTIFICATION_DESTINATION` and
 | `co.jovie.hermes.cron-agent-config-health.plist.template` | every 15 min | Detect invalid Hermes/OpenClaw agent config before gateway churn |
 | `co.jovie.hermes.cron-cost-monitor.plist.template` | every 60 min | Cost kill switch |
 | `co.jovie.hermes.cron-daily-briefing.plist.template` | 07:00 daily | Morning briefing to Telegram |
+| `co.jovie.hermes.cron-model-registry-research.plist.template` | Monday 09:00 | Apply newest researched model prices/quality/strengths into the live registry |
 | `co.jovie.hermes.cron-deterministic-tracker.plist.template` | 03:00 daily | Self-improvement clustering |
 | `co.jovie.hermes.cron-free-model-health.plist.template` | 02:00 daily | Free-model rankings refresh |
 | `co.jovie.hermes.cron-gstack-upgrade.plist.template` | 03:30 daily | Out-of-band gstack upgrade (backup/restore); agent runs stay pinned (JOV-4184) |

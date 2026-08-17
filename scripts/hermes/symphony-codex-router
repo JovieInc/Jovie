@@ -11,6 +11,34 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 workspace="${SYMPHONY_WORKSPACE:-$PWD}"
 issue="${SYMPHONY_ISSUE_IDENTIFIER:-$(basename "$workspace")}"
 
+# One implementation owner per issue: the fallback sidecar takes the same
+# lease before it starts grok/cursor/kimi. If that lock is held, refuse Codex.
+LEASE_DIR="${SYMPHONY_FALLBACK_LEASE_DIR:-$HOME/.local/state/symphony-fallback/leases}"
+mkdir -p "$LEASE_DIR"
+LOCK_FILE="$LEASE_DIR/$issue.lock"
+if ! python3 - "$LOCK_FILE" <<'PY'
+import fcntl
+import sys
+
+path = sys.argv[1]
+with open(path, "a+") as handle:
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        raise SystemExit(1)
+PY
+then
+  echo "SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 class=fallback-lease-held retryable=false maxAttempts=1 reason=\"fallback owns $issue\"" >&2
+  exit 78
+fi
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"$LOCK_FILE"
+  flock -n 9 || {
+    echo "SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 class=fallback-lease-held retryable=false maxAttempts=1 reason=\"fallback owns $issue\"" >&2
+    exit 78
+  }
+fi
+
 model="$(node "$SCRIPT_DIR/../backlog-orchestrator/symphony-routing.mjs" launch \
   --workspace "$workspace" \
   --issue "$issue")"

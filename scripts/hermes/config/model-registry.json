@@ -1,14 +1,263 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-07-11",
+  "updated_at": "2026-08-17",
   "deterministic_first": true,
   "state_file_env": "GEM_MODEL_ROUTER_STATE",
+  "routing_policy": {
+    "source": [
+      "gbrain:central-model-registry",
+      "gbrain:company-resources",
+      "gbrain:symphony-model-routing-economics-2026-08-15"
+    ],
+    "rules": [
+      "included_subscription_is_zero_marginal",
+      "never_pay_api_for_a_family_with_remaining_included_pool",
+      "never_spend_api_that_would_have_been_cheaper_as_a_renewed_sub",
+      "gateway_only_after_included_pools_are_exhausted",
+      "no_claude",
+      "no_composer",
+      "no_on_demand_overage"
+    ],
+    "api_burn_fraction_of_sub": 0.15,
+    "job_token_estimates": {
+      "mechanical": {
+        "input": 20000,
+        "output": 8000
+      },
+      "code": {
+        "input": 80000,
+        "output": 40000
+      },
+      "tests": {
+        "input": 40000,
+        "output": 16000
+      },
+      "review": {
+        "input": 60000,
+        "output": 20000
+      },
+      "semantic": {
+        "input": 60000,
+        "output": 20000
+      },
+      "architecture": {
+        "input": 150000,
+        "output": 60000
+      },
+      "root-cause": {
+        "input": 150000,
+        "output": 60000
+      }
+    }
+  },
   "models": [
+    {
+      "id": "cursor-grok-4.6",
+      "provider": "cursor",
+      "model": "grok-4.6",
+      "family": "grok-4.6",
+      "channel": "subscription",
+      "pool": "cursor-models",
+      "quality": 100,
+      "list_price_in": 2.0,
+      "list_price_out": 6.0,
+      "capabilities": [
+        "mechanical",
+        "code",
+        "review",
+        "semantic",
+        "architecture",
+        "root-cause"
+      ],
+      "cost_tier": "subscription-included",
+      "executable_env": "GEM_CURSOR_EXECUTABLE",
+      "executable_default": "cursor-agent",
+      "agent_executable_env": "GEM_CURSOR_EXECUTABLE",
+      "agent_executable_default": "cursor-agent",
+      "agent_cwd_mode": "process",
+      "agent_argv": [
+        "-p",
+        "--force",
+        "--model",
+        "{model}",
+        "{prompt}"
+      ],
+      "probe_argv": [
+        "{executable}",
+        "--version"
+      ],
+      "probe_mode": "exit-zero",
+      "cooldown_seconds": 1800,
+      "pool_cooldown_seconds": 3600,
+      "strengths": [
+        "long-running-agents",
+        "included-cursor-models",
+        "architecture"
+      ],
+      "weaknesses": [
+        "requires-cursor-agent",
+        "fast-tier-is-2x"
+      ]
+    },
+    {
+      "id": "grok-4.6",
+      "provider": "grok",
+      "model": "grok-4.6",
+      "family": "grok-4.6",
+      "channel": "subscription",
+      "pool": "grok-build",
+      "quality": 100,
+      "list_price_in": 2.0,
+      "list_price_out": 6.0,
+      "capabilities": [
+        "mechanical",
+        "code",
+        "review",
+        "semantic",
+        "architecture",
+        "root-cause"
+      ],
+      "cost_tier": "subscription-included",
+      "executable_env": "GEM_GROK_EXECUTABLE",
+      "executable_default": "grok",
+      "agent_executable_env": "GEM_GROK_EXECUTABLE",
+      "agent_executable_default": "grok",
+      "agent_argv": [
+        "agent",
+        "--model",
+        "{model}",
+        "--permission-mode",
+        "acceptEdits",
+        "--cwd",
+        "{cwd}",
+        "--tools",
+        "Read,Edit,Write,Glob,Grep",
+        "--disallowed-tools",
+        "Bash,WebFetch,WebSearch",
+        "--disable-web-search",
+        "--no-subagents",
+        "-p",
+        "{prompt}"
+      ],
+      "probe_argv": [
+        "{executable}",
+        "models"
+      ],
+      "cooldown_seconds": 1800,
+      "pool_cooldown_seconds": 21600,
+      "strengths": [
+        "local-grok-cli",
+        "included-supergrok",
+        "architecture"
+      ],
+      "weaknesses": [
+        "weekly-grok-build-pool",
+        "not-portable-to-cursor-models"
+      ]
+    },
+    {
+      "id": "kimi-k3",
+      "provider": "kimi",
+      "model": "kimi-code/k3",
+      "family": "kimi",
+      "channel": "subscription",
+      "pool": "kimi",
+      "quality": 86,
+      "list_price_in": 0.3,
+      "list_price_out": 1.5,
+      "capabilities": [
+        "mechanical",
+        "code",
+        "review",
+        "semantic",
+        "architecture"
+      ],
+      "cost_tier": "subscription-included",
+      "executable_env": "GEM_KIMI_EXECUTABLE",
+      "executable_default": "kimi",
+      "agent_executable_env": "GEM_KIMI_EXECUTABLE",
+      "agent_executable_default": "kimi",
+      "agent_cwd_mode": "process",
+      "agent_argv": [
+        "--auto",
+        "-m",
+        "{model}",
+        "-p",
+        "{prompt}"
+      ],
+      "probe_argv": [
+        "{executable}",
+        "--version"
+      ],
+      "probe_mode": "exit-zero",
+      "cooldown_seconds": 1800,
+      "pool_cooldown_seconds": 3600,
+      "strengths": [
+        "included-kimi-sub",
+        "1m-context"
+      ],
+      "weaknesses": [
+        "not-codex-lane"
+      ]
+    },
+    {
+      "id": "kimi-coding",
+      "provider": "kimi",
+      "model": "kimi-code/kimi-for-coding",
+      "family": "kimi",
+      "channel": "subscription",
+      "pool": "kimi",
+      "quality": 78,
+      "list_price_in": 0.3,
+      "list_price_out": 1.5,
+      "capabilities": [
+        "mechanical",
+        "code",
+        "tests"
+      ],
+      "cost_tier": "subscription-included",
+      "executable_env": "GEM_KIMI_EXECUTABLE",
+      "executable_default": "kimi",
+      "agent_executable_env": "GEM_KIMI_EXECUTABLE",
+      "agent_executable_default": "kimi",
+      "agent_cwd_mode": "process",
+      "agent_argv": [
+        "--auto",
+        "-m",
+        "{model}",
+        "-p",
+        "{prompt}"
+      ],
+      "probe_argv": [
+        "{executable}",
+        "--version"
+      ],
+      "probe_mode": "exit-zero",
+      "cooldown_seconds": 1800,
+      "pool_cooldown_seconds": 3600,
+      "strengths": [
+        "mechanical-coding",
+        "included-kimi-sub"
+      ],
+      "weaknesses": [
+        "narrower-than-k3"
+      ]
+    },
     {
       "id": "qwen-coder-local",
       "provider": "ollama",
       "model": "qwen3-coder:30b",
-      "capabilities": ["mechanical", "code", "tests"],
+      "family": "local",
+      "channel": "local",
+      "pool": "local",
+      "quality": 50,
+      "list_price_in": 0.0,
+      "list_price_out": 0.0,
+      "capabilities": [
+        "mechanical",
+        "code",
+        "tests"
+      ],
       "cost_tier": "free-local",
       "executable_env": "GEM_PR_DRAIN_QWEN",
       "executable_default": "/usr/local/bin/ollama",
@@ -23,14 +272,36 @@
         "--oneshot",
         "{prompt}"
       ],
-      "probe_argv": ["{executable}", "list"],
-      "cooldown_seconds": 900
+      "probe_argv": [
+        "{executable}",
+        "list"
+      ],
+      "cooldown_seconds": 900,
+      "strengths": [
+        "free-local",
+        "mechanical"
+      ],
+      "weaknesses": [
+        "often-missing-on-gem",
+        "not-architecture"
+      ]
     },
     {
       "id": "deepseek-v4-flash",
       "provider": "vercel-ai-gateway",
       "model": "deepseek/deepseek-v4-flash",
-      "capabilities": ["mechanical", "code", "review", "semantic"],
+      "family": "deepseek",
+      "channel": "api",
+      "pool": "vercel-gateway",
+      "quality": 65,
+      "list_price_in": 0.15,
+      "list_price_out": 0.6,
+      "capabilities": [
+        "mechanical",
+        "code",
+        "review",
+        "semantic"
+      ],
       "cost_tier": "gateway-budgeted-paid",
       "executable_env": "GEM_DEEPSEEK_EXECUTABLE",
       "executable_default": "/home/timwhite/.local/bin/hermes",
@@ -56,61 +327,94 @@
         "{model}",
         "--help"
       ],
-      "cooldown_seconds": 1800
+      "cooldown_seconds": 1800,
+      "strengths": [
+        "cheapest-capable-api",
+        "post-included-fallback"
+      ],
+      "weaknesses": [
+        "paid-gateway",
+        "not-a-sub-replacement-for-sol"
+      ]
     },
     {
-      "id": "grok-4.6",
-      "provider": "grok",
-      "model": "grok-4.6",
-      "capabilities": ["mechanical", "code", "review", "semantic"],
-      "cost_tier": "subscription",
-      "executable_env": "GEM_GROK_EXECUTABLE",
-      "executable_default": "grok",
-      "agent_executable_env": "GEM_GROK_EXECUTABLE",
-      "agent_executable_default": "grok",
+      "id": "cursor-luna",
+      "provider": "cursor",
+      "model": "gpt-5.6-luna",
+      "family": "gpt-5.6",
+      "channel": "subscription",
+      "pool": "cursor-other-models",
+      "quality": 74,
+      "list_price_in": 0.2,
+      "list_price_out": 1.2,
+      "capabilities": [
+        "mechanical",
+        "code",
+        "tests",
+        "review"
+      ],
+      "cost_tier": "subscription-included",
+      "executable_env": "GEM_CURSOR_EXECUTABLE",
+      "executable_default": "cursor-agent",
+      "agent_executable_env": "GEM_CURSOR_EXECUTABLE",
+      "agent_executable_default": "cursor-agent",
+      "agent_cwd_mode": "process",
       "agent_argv": [
-        "agent",
+        "-p",
+        "--force",
         "--model",
         "{model}",
-        "--permission-mode",
-        "acceptEdits",
-        "--cwd",
-        "{cwd}",
-        "--tools",
-        "Read,Edit,Write,Glob,Grep",
-        "--disallowed-tools",
-        "Bash,WebFetch,WebSearch",
-        "--disable-web-search",
-        "--no-subagents",
-        "-p",
         "{prompt}"
       ],
-      "probe_argv": ["{executable}", "models"],
-      "cooldown_seconds": 1800
-    },
-    {
-      "id": "claude",
-      "provider": "claude",
-      "model": "sonnet",
-      "capabilities": ["code", "review", "semantic", "architecture"],
-      "cost_tier": "subscription",
-      "executable_env": "GEM_CLAUDE_EXECUTABLE",
-      "executable_default": "claude",
-      "agent_executable_env": "GEM_CLAUDE_EXECUTABLE",
-      "agent_executable_default": "claude",
-      "agent_argv": ["--dangerously-skip-permissions", "--print", "{prompt}"],
-      "probe_argv": ["{executable}", "--version"],
-      "cooldown_seconds": 3600
+      "probe_argv": [
+        "{executable}",
+        "--version"
+      ],
+      "probe_mode": "exit-zero",
+      "cooldown_seconds": 1800,
+      "pool_cooldown_seconds": 3600,
+      "strengths": [
+        "same-openai-luna",
+        "cursor-other-models-400"
+      ],
+      "weaknesses": [
+        "mrcr-recall-cliff",
+        "requires-cursor-agent"
+      ]
     },
     {
       "id": "codex-luna",
       "provider": "codex",
       "model": "gpt-5.6-luna",
-      "capabilities": ["code", "review"],
-      "cost_tier": "subscription-exception",
-      "exception_only": true,
+      "family": "gpt-5.6",
+      "channel": "subscription",
+      "pool": "codex",
+      "quality": 74,
+      "list_price_in": 0.2,
+      "list_price_out": 1.2,
+      "sub_monthly_usd": 200,
+      "sub_included_multiplier": 4.0,
+      "capabilities": [
+        "code",
+        "review",
+        "mechanical",
+        "tests"
+      ],
+      "cost_tier": "subscription-included",
       "executable_env": "GEM_PR_DRAIN_CODEX",
       "executable_default": "/home/timwhite/.npm-global/bin/codex",
+      "agent_executable_env": "GEM_PR_DRAIN_CODEX",
+      "agent_executable_default": "/home/timwhite/.npm-global/bin/codex",
+      "agent_cwd_mode": "process",
+      "agent_argv": [
+        "exec",
+        "--model",
+        "{model}",
+        "--sandbox",
+        "workspace-write",
+        "--skip-git-repo-check",
+        "{prompt}"
+      ],
       "probe_argv": [
         "{executable}",
         "exec",
@@ -121,17 +425,49 @@
         "--skip-git-repo-check",
         "Reply with exactly: GEM_MODEL_READY"
       ],
-      "cooldown_seconds": 21600
+      "cooldown_seconds": 21600,
+      "strengths": [
+        "high-volume",
+        "cheap-gpt-5-6",
+        "openai-product"
+      ],
+      "weaknesses": [
+        "mrcr-recall-cliff",
+        "not-for-long-context"
+      ]
     },
     {
       "id": "codex-terra",
       "provider": "codex",
       "model": "gpt-5.6-terra",
-      "capabilities": ["code", "review", "architecture"],
-      "cost_tier": "subscription-exception",
-      "exception_only": true,
+      "family": "gpt-5.6",
+      "channel": "subscription",
+      "pool": "codex",
+      "quality": 82,
+      "list_price_in": 2.0,
+      "list_price_out": 12.0,
+      "sub_monthly_usd": 200,
+      "sub_included_multiplier": 4.0,
+      "capabilities": [
+        "code",
+        "review",
+        "architecture"
+      ],
+      "cost_tier": "subscription-included",
       "executable_env": "GEM_PR_DRAIN_CODEX",
       "executable_default": "/home/timwhite/.npm-global/bin/codex",
+      "agent_executable_env": "GEM_PR_DRAIN_CODEX",
+      "agent_executable_default": "/home/timwhite/.npm-global/bin/codex",
+      "agent_cwd_mode": "process",
+      "agent_argv": [
+        "exec",
+        "--model",
+        "{model}",
+        "--sandbox",
+        "workspace-write",
+        "--skip-git-repo-check",
+        "{prompt}"
+      ],
       "probe_argv": [
         "{executable}",
         "exec",
@@ -142,17 +478,47 @@
         "--skip-git-repo-check",
         "Reply with exactly: GEM_MODEL_READY"
       ],
-      "cooldown_seconds": 21600
+      "cooldown_seconds": 21600,
+      "strengths": [
+        "default-implementation",
+        "subsidized-codex-sub"
+      ],
+      "weaknesses": [
+        "same-pool-as-sol-and-luna"
+      ]
     },
     {
       "id": "codex-sol",
       "provider": "codex",
       "model": "gpt-5.6-sol",
-      "capabilities": ["architecture", "root-cause"],
-      "cost_tier": "subscription-exception",
-      "exception_only": true,
+      "family": "gpt-5.6",
+      "channel": "subscription",
+      "pool": "codex",
+      "quality": 88,
+      "list_price_in": 5.0,
+      "list_price_out": 30.0,
+      "sub_monthly_usd": 200,
+      "sub_included_multiplier": 4.0,
+      "capabilities": [
+        "architecture",
+        "root-cause",
+        "code"
+      ],
+      "cost_tier": "subscription-included",
       "executable_env": "GEM_PR_DRAIN_CODEX",
       "executable_default": "/home/timwhite/.npm-global/bin/codex",
+      "agent_executable_env": "GEM_PR_DRAIN_CODEX",
+      "agent_executable_default": "/home/timwhite/.npm-global/bin/codex",
+      "agent_cwd_mode": "process",
+      "agent_argv": [
+        "exec",
+        "--model",
+        "{model}",
+        "--sandbox",
+        "workspace-write",
+        "--skip-git-repo-check",
+        "{prompt}"
+      ],
       "probe_argv": [
         "{executable}",
         "exec",
@@ -163,26 +529,42 @@
         "--skip-git-repo-check",
         "Reply with exactly: GEM_MODEL_READY"
       ],
-      "cooldown_seconds": 21600
+      "cooldown_seconds": 21600,
+      "strengths": [
+        "terminal-bench",
+        "root-cause",
+        "subsidized-codex-sub"
+      ],
+      "weaknesses": [
+        "api-equivalent-is-expensive",
+        "never-buy-as-gateway"
+      ]
     }
   ],
   "route_chains": {
     "remediation": [
-      "qwen-coder-local",
-      "deepseek-v4-flash",
+      "cursor-grok-4.6",
       "grok-4.6",
-      "claude",
+      "codex-sol",
       "codex-terra",
-      "codex-sol"
+      "kimi-k3",
+      "codex-luna",
+      "cursor-luna",
+      "kimi-coding",
+      "deepseek-v4-flash",
+      "qwen-coder-local"
     ],
     "new_pr": [
-      "qwen-coder-local",
-      "deepseek-v4-flash",
+      "cursor-grok-4.6",
       "grok-4.6",
-      "claude",
-      "codex-luna",
+      "codex-sol",
       "codex-terra",
-      "codex-sol"
+      "kimi-k3",
+      "codex-luna",
+      "cursor-luna",
+      "kimi-coding",
+      "deepseek-v4-flash",
+      "qwen-coder-local"
     ]
   },
   "deterministic_gates": [
@@ -197,6 +579,10 @@
     "auto-merge",
     "admin",
     "taste-gates",
-    "codex-for-ordinary-remediation"
-  ]
+    "on-demand-overage",
+    "pay-api-while-family-sub-remaining",
+    "pay-sol-api-instead-of-codex-renew"
+  ],
+  "research_applied_at": "2026-08-17T19:13:12Z",
+  "research_source": "gbrain:central-model-registry+symphony-model-routing-economics-2026-08-15+cursor-docs-models-and-pricing"
 }
