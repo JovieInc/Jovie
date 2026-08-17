@@ -1,0 +1,54 @@
+{
+  "schema": "jovie.design-conformance/v1",
+  "authority": {
+    "profile": "jovie-founder-design-studio",
+    "canonicalPath": "$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.pen",
+    "ciReadsLivePen": false,
+    "penWritesAllowed": false,
+    "verifiedExport": {
+      "status": "unavailable",
+      "penSha256": null,
+      "receiptVerdict": null,
+      "reason": "No current canonical save/readback export is committed. Source-bound contracts may be validated, but founder-locked Pen promotion must fail closed."
+    }
+  },
+  "policy": {
+    "legacyMode": "shrink-only",
+    "allowedStates": [
+      "candidate",
+      "deprecated",
+      "draft",
+      "founder-locked",
+      "source-bound"
+    ],
+    "founderLockedRequires": [
+      "canonical-pen-sha256",
+      "saved-state-verified-receipt",
+      "source-digest",
+      "unique-pen-root"
+    ]
+  },
+  "components": [
+    {
+      "id": "atom.button",
+      "state": "source-bound",
+      "revision": 2,
+      "platforms": ["web"],
+      "source": "packages/ui/atoms/button.tsx",
+      "contractSource": "packages/ui/atoms/button-contract.ts",
+      "tokenSources": ["packages/ui/theme/tokens.ts"],
+      "storySources": ["packages/ui/atoms/button.stories.tsx"],
+      "testSources": ["packages/ui/atoms/button.test.tsx"],
+      "penRootId": "g3IC1",
+      "sourceDigest": "9a6992d7c2dc531adcea913ce68f67003c2f05454addb8ab40a3db54115b74a5"
+    }
+  ],
+  "legacy": {
+    "unboundComponentIds": [
+      "atom.brand-logo",
+      "atom.link",
+      "atom.logo",
+      "atom.logo-link"
+    ]
+  }
+}
