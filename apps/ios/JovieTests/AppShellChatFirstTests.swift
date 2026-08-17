@@ -59,4 +59,22 @@ struct AppShellChatFirstTests {
   @Test func keyboardStaysOpenOnStreamingStartWhenUserEditedSinceSend() {
     #expect(MobileChatKeyboardPolicy.shouldDismissOnStreamingStart(userEditedSinceSend: true) == false)
   }
+
+  @Test func keepsChatMountedAcrossTabs() {
+    #expect(appShellKeepsChatMountedAcrossTabs())
+  }
+
+  @Test func showsChatUnderlayForEveryTabWhenChatEnabled() {
+    #expect(appShellShowsChatUnderlay(selectedTab: .chat, chatEnabled: true))
+    #expect(appShellShowsChatUnderlay(selectedTab: .library, chatEnabled: true))
+    #expect(appShellShowsChatUnderlay(selectedTab: .calendar, chatEnabled: true))
+    #expect(appShellShowsChatUnderlay(selectedTab: .inbox, chatEnabled: true))
+    #expect(appShellShowsChatUnderlay(selectedTab: .profile, chatEnabled: true))
+    #expect(appShellShowsChatUnderlay(selectedTab: .audience, chatEnabled: true))
+  }
+
+  @Test func hidesChatUnderlayWhenChatDisabled() {
+    #expect(appShellShowsChatUnderlay(selectedTab: .chat, chatEnabled: false) == false)
+    #expect(appShellShowsChatUnderlay(selectedTab: .library, chatEnabled: false) == false)
+  }
 }
