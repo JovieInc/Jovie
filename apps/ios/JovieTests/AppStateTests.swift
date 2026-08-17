@@ -533,7 +533,37 @@ struct AppStateTests {
 
     #expect(appState.route == .signedOut)
     #expect(appState.dashboardState == .idle)
+    #expect(appState.activeUserID == nil)
     #expect(appState.isOffline == false)
+    #expect(await repository.clearedUsers() == ["user_123"])
+  }
+
+  @Test func cachedMeThen401ThroughRealRepositorySignsOut() async throws {
+    let suiteName = "AppStateMe401Composed"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    let cache = MeCache(defaults: defaults)
+    let apiClient = MutableAPIClient(mode: .success(.previewReady))
+    let repository = MeRepository(apiClient: apiClient, cache: cache)
+
+    _ = try await repository.loadMe(for: "user_123")
+    await apiClient.updateMode(.failure(APIClientError.requestFailed(statusCode: 401)))
+
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+    appState.didInitializeAuth = true
+
+    await appState.handleSignedInUserChange("user_123")
+
+    #expect(appState.route == .signedOut)
+    #expect(appState.activeUserID == nil)
+    #expect(appState.dashboardState == .idle)
+    #expect(appState.isOffline == false)
+    #expect(await cache.load(for: "user_123") == nil)
   }
 
   @Test func staleProfileSnapshotShowsOfflineStateAndRetryClearsIt() async throws {

@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Jovie
 
-private actor MutableAPIClient: APIClientProtocol {
+actor MutableAPIClient: APIClientProtocol {
   var mode: Mode
 
   enum Mode {
