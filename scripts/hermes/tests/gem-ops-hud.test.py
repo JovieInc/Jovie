@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import datetime as dt
-import hashlib
 import importlib.util
 import pathlib
 import sys
@@ -53,16 +52,19 @@ def fixture_state():
             "production_completions": 2,
             "latency": {"ci": {"sample": 4, "typical_seconds": 240, "slow_tail_seconds": 420}},
         },
+        "issues": {
+            "updated": stamp,
+            "error": None,
+            "source": "linear",
+            "degraded": False,
+            "open": 30,
+            "backlog": 20,
+            "ready": 7,
+        },
     }
 
 
 class VersionedHudContractTests(unittest.TestCase):
-    def test_seed_is_byte_identical_to_the_observed_ubuntu_renderer(self):
-        self.assertEqual(
-            hashlib.sha256(SOURCE.read_bytes()).hexdigest(),
-            "13827761718cd891f5eb4378d1c863fd61ad5f19332565dd36cd88d083746dfd",
-        )
-
     def test_fixture_renders_fixed_width_operational_sections(self):
         moment = dt.datetime(2026, 8, 16, 12, 0, 30, tzinfo=dt.timezone.utc)
         with (
@@ -79,6 +81,146 @@ class VersionedHudContractTests(unittest.TestCase):
             "[ DELIVERY FUNNEL ]", "[ CYCLE TIME ]", "[ DETAILS / NEXT ACTION ]",
         ):
             self.assertIn(title, output)
+        self.assertIn("LINEAR", output)
+        self.assertIn("AUTHORITATIVE", output)
+        self.assertIn("Linear Backlog state", output)
+
+    def test_linear_is_authoritative_when_available(self):
+        with (
+            mock.patch.object(
+                HUD,
+                "fetch_linear_issues",
+                return_value={"open": 13, "backlog": 8, "ready": 3},
+            ),
+            mock.patch.object(HUD, "fetch_github_issues") as github,
+        ):
+            result = HUD.fetch_issue_source()
+
+        self.assertEqual(result["source"], "linear")
+        self.assertFalse(result["degraded"])
+        self.assertEqual(result["backlog"], 8)
+        self.assertEqual(result["ready"], 3)
+        github.assert_not_called()
+
+    def test_linear_counts_paginated_workflow_states(self):
+        pages = [
+            {"teams": {"nodes": [{"id": "team-id"}]}},
+            {
+                "issues": {
+                    "nodes": [
+                        {"state": {"type": "backlog"}},
+                        {"state": {"type": "unstarted"}},
+                        {"state": {"type": "started"}},
+                    ],
+                    "pageInfo": {"hasNextPage": True, "endCursor": "next"},
+                }
+            },
+            {
+                "issues": {
+                    "nodes": [
+                        {"state": {"type": "backlog"}},
+                        {"state": {"type": "unstarted"}},
+                    ],
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                }
+            },
+        ]
+        with mock.patch.object(HUD, "linear_graphql", side_effect=pages) as graphql:
+            result = HUD.fetch_linear_issues()
+
+        self.assertEqual(result, {"open": 5, "backlog": 2, "ready": 2})
+        self.assertEqual(graphql.call_count, 3)
+        self.assertEqual(graphql.call_args_list[2].args[1]["after"], "next")
+
+    def test_github_fallback_is_explicitly_degraded(self):
+        with (
+            mock.patch.object(
+                HUD,
+                "fetch_linear_issues",
+                side_effect=HUD.urllib.error.HTTPError(
+                    HUD.LINEAR_API, 401, "unauthorized", {}, None
+                ),
+            ),
+            mock.patch.object(
+                HUD,
+                "fetch_github_issues",
+                return_value={"open": 11, "backlog": 11, "ready": 2},
+            ),
+        ):
+            result = HUD.fetch_issue_source()
+
+        self.assertEqual(result["source"], "github")
+        self.assertTrue(result["degraded"])
+        self.assertEqual(result["linear_error"], "unauthorized")
+
+        state = fixture_state()
+        state["issues"] = result
+        with mock.patch.dict(HUD.os.environ, {"HUD_COLOR": "never"}):
+            output = HUD.render(state)
+        self.assertIn("GITHUB", output)
+        self.assertIn("DEGRADED", output)
+        self.assertIn("read-only GitHub fallback", output)
+
+    def test_github_counts_only_issues_and_ready_labels(self):
+        pages = [
+            [
+                {"number": 1, "labels": [{"name": "agent-ready"}]},
+                {"number": 2, "labels": [{"name": "ready-for-intake"}]},
+                {"number": 3, "labels": [{"name": "infra"}]},
+                {
+                    "number": 4,
+                    "pull_request": {"url": "ignored"},
+                    "labels": [{"name": "agent-ready"}],
+                },
+            ]
+        ]
+        with mock.patch.object(HUD, "run_json", return_value=pages):
+            result = HUD.fetch_github_issues()
+
+        self.assertEqual(result, {"open": 3, "backlog": 3, "ready": 2})
+
+    def test_refresh_retains_last_good_counts_when_both_sources_fail(self):
+        state = fixture_state()
+        with (
+            mock.patch.object(HUD, "fetch_symphony", return_value=state["symphony"]),
+            mock.patch.object(HUD, "fetch_delivery", return_value=state["delivery"]),
+            mock.patch.object(
+                HUD,
+                "fetch_issue_source",
+                side_effect=HUD.IssueSourceUnavailable("linear_unavailable;github_timeout"),
+            ),
+            mock.patch.object(HUD, "save_state"),
+        ):
+            result = HUD.refresh(state, remote=True)
+
+        self.assertEqual(result["issues"]["backlog"], 20)
+        self.assertEqual(result["issues"]["ready"], 7)
+        self.assertEqual(result["issues"]["error"], "linear_unavailable;github_timeout")
+        self.assertTrue(result["issues"]["degraded"])
+        with mock.patch.dict(HUD.os.environ, {"HUD_COLOR": "never"}):
+            output = HUD.render(result)
+        self.assertIn("LAST GOOD", output)
+        self.assertIn("last-known counts", output)
+
+    def test_refresh_marks_sources_unavailable_without_last_good_counts(self):
+        state = fixture_state()
+        del state["issues"]
+        with (
+            mock.patch.object(HUD, "fetch_symphony", return_value=state["symphony"]),
+            mock.patch.object(HUD, "fetch_delivery", return_value=state["delivery"]),
+            mock.patch.object(
+                HUD,
+                "fetch_issue_source",
+                side_effect=HUD.IssueSourceUnavailable("linear_error;github_timeout"),
+            ),
+            mock.patch.object(HUD, "save_state"),
+        ):
+            result = HUD.refresh(state, remote=True)
+
+        with mock.patch.dict(HUD.os.environ, {"HUD_COLOR": "never"}):
+            output = HUD.render(result)
+        self.assertIn("UNAVAILABLE", output)
+        self.assertIn("both read-only sources unavailable", output)
 
 
 if __name__ == "__main__":
