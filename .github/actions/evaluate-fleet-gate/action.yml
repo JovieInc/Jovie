@@ -1,0 +1,52 @@
+name: Evaluate fleet gate
+description: >
+  One evaluate path for Fleet Gate Refresh, Queue-Deferred Release, and
+  merge-queue fleet-policy. Runs the shipped gem-priority-gate CLI and
+  writes typed outputs. Requires a prior checkout of gate source.
+
+inputs:
+  dry-run:
+    description: Pass --dry-run (do not persist latest.json).
+    required: false
+    default: 'false'
+  github-token:
+    description: Token for live GitHub observation.
+    required: true
+
+outputs:
+  gate_rc:
+    description: CLI exit code (0 allowed, 2 denied, unexpected fails the step).
+    value: ${{ steps.evaluate.outputs.gate_rc }}
+  work_allowed:
+    description: workAdmission.allowed
+    value: ${{ steps.evaluate.outputs.work_allowed }}
+  promotion_allowed:
+    description: promotionAdmission.allowed
+    value: ${{ steps.evaluate.outputs.promotion_allowed }}
+  promotion_mode:
+    description: Receipt promotionMode when present.
+    value: ${{ steps.evaluate.outputs.promotion_mode }}
+  mode:
+    description: normal when GREEN+promotion, else receipt promotionMode or blocked.
+    value: ${{ steps.evaluate.outputs.mode }}
+  state:
+    description: GREEN, AMBER, or RED.
+    value: ${{ steps.evaluate.outputs.state }}
+  receipt_path:
+    description: Path to the written receipt JSON.
+    value: ${{ steps.evaluate.outputs.receipt_path }}
+  receipt_b64:
+    description: Base64 receipt for job outputs.
+    value: ${{ steps.evaluate.outputs.receipt_b64 }}
+
+runs:
+  using: composite
+  steps:
+    - name: Evaluate fleet gate
+      id: evaluate
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        GEM_PRIORITY_GATE_REPO: ${{ github.repository }}
+        FLEET_GATE_DRY_RUN: ${{ inputs.dry-run == 'true' && '1' || '0' }}
+      shell: bash
+      run: bash scripts/hermes/evaluate-fleet-gate.sh

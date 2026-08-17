@@ -67,7 +67,7 @@ jobs:
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 5
     outputs:
-      mode: ${{ steps.policy.outputs.mode }}
+      mode: ${{ steps.policy.outputs.promotion_mode }}
       receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}
     steps:
       - name: Generate read-only Jovie Bot token
@@ -85,46 +85,10 @@ jobs:
           persist-credentials: false
       - name: Evaluate fresh fleet policy
         id: policy
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          GEM_PRIORITY_GATE_REPO: ${{ github.repository }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          receipt="$RUNNER_TEMP/jovie-fleet-gate.json"
-          set +e
-          python3 scripts/hermes/gem-priority-gate.py \
-            --consumer fleet >"$receipt"
-          gate_rc=$?
-          set -e
-          # Persistence to gem-workspace is best-effort. The printed live
-          # receipt is the authority. A blocked or evaluation-failed receipt
-          # must stay schema-valid so this job skips admission instead of
-          # going red on a stub.
-          jq -e '
-            .schema == "jovie-fleet-gate/v1" and
-            (.observedAt | type == "string") and
-            (.signals.main.sha | test("^[0-9a-f]{40}$")) and
-            (.signals.integrity.status | IN("clear", "resolved", "active", "invalid")) and
-            (.promotionAdmission.allowed | type == "boolean") and
-            (.isolatedPromotionAdmission.allowed | type == "boolean") and
-            (.promotionMode | IN("normal", "isolated-only", "draft-only", "hold-intake", "blocked"))
-          ' "$receipt" >/dev/null || {
-            echo '::error::Fleet gate emitted a malformed receipt.' >&2
-            exit 2
-          }
-          if [ "$gate_rc" -ne 0 ] && [ "$gate_rc" -ne 2 ]; then
-            echo "::error::Fleet gate exited unexpectedly: $gate_rc" >&2
-            exit 2
-          fi
-
-          mode="$(jq -r '.promotionMode' "$receipt")"
-          receipt_b64="$(base64 -w0 <"$receipt")"
-          {
-            echo "mode=$mode"
-            echo "receipt_b64=$receipt_b64"
-          } >>"$GITHUB_OUTPUT"
-          echo "Fleet promotion mode: $mode"
+        uses: ./.github/actions/evaluate-fleet-gate
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          dry-run: 'false'
 
   enroll:
     needs: fleet-policy

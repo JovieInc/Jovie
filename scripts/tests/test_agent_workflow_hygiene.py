@@ -833,6 +833,22 @@ def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None
     assert scheduled_fixed == ["runner-heartbeat.yml"]
 
 
+def test_fleet_controllers_share_one_evaluate_action() -> None:
+    """FGR, QDR, and merge-queue must not copy-paste the gate CLI."""
+    action = ".github/actions/evaluate-fleet-gate"
+    script = REPO_ROOT / "scripts/hermes/evaluate-fleet-gate.sh"
+    assert script.is_file(), "shared evaluate script missing"
+    callers = (
+        ("fleet-gate-refresh.yml", "refresh", "refresh"),
+        ("queue-deferred-release.yml", "fleet-policy", "policy"),
+        ("merge-queue-autoenroll.yml", "fleet-policy", "policy"),
+    )
+    for workflow, job_name, _step in callers:
+        text = (WORKFLOWS / workflow).read_text(encoding="utf-8")
+        assert f"uses: ./{action}" in text, workflow
+        assert "python3 scripts/hermes/gem-priority-gate.py" not in text, workflow
+
+
 def test_github_ai_dispatcher_wakes_on_capacity_and_uses_idle_slots() -> None:
     """Agent-ready work must not sit while org runner concurrency is idle."""
     workflow = (WORKFLOWS / "github-ai-dispatcher.yml").read_text(encoding="utf-8")
