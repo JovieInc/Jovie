@@ -261,8 +261,14 @@ for (const expected of [{expectedBaseOid:'e'.repeat(40)},{expectedHeadOid:'f'.re
 def test_pr_preparation_canary_workflow_is_manual_bounded_and_queue_inert() -> None:
     workflow = (WORKFLOWS / "pr-preparation-canary.yml").read_text(encoding="utf-8")
     trigger = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+    permissions = workflow.split("\npermissions:\n", 1)[1].split("\njobs:\n", 1)[0]
     assert "workflow_dispatch:" in trigger
     assert all(event not in trigger for event in ("schedule:", "push:", "pull_request:"))
+    assert workflow.count("\npermissions:\n") == 1
+    assert permissions == "  contents: read\n  pull-requests: read"
+    assert "${{ secrets." not in workflow
+    assert "${{ secrets[" not in workflow
+    assert ": write" not in workflow
     assert "max-parallel: 4" in workflow and "fail-fast: false" in workflow
     assert workflow.count("timeout-minutes: 10") == 2
     assert "merge-queue-drain-mutex" not in workflow
