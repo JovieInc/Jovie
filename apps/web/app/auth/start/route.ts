@@ -138,8 +138,8 @@ body { margin: 0; min-height: 100dvh; display: flex; align-items: center; justif
 main { max-width: 400px; padding: max(32px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); text-align: center; }
 h1 { margin: 0 0 12px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
 p { margin: 0 0 24px; font-size: 16px; line-height: 1.5; color: GrayText; }
-button { appearance: none; min-height: 44px; border: 0; cursor: pointer; background: CanvasText; color: Canvas; font: 600 15px/1 Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 10px 24px; border-radius: 9999px; }
-button:focus-visible { outline: 2px solid Highlight; outline-offset: 3px; }
+input[type=submit] { appearance: none; min-height: 44px; border: 0; cursor: pointer; background: CanvasText; color: Canvas; font: 600 15px/1 Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 10px 24px; border-radius: 9999px; }
+input[type=submit]:focus-visible { outline: 2px solid Highlight; outline-offset: 3px; }
 </style>
 </head>
 <body>
@@ -149,7 +149,7 @@ button:focus-visible { outline: 2px solid Highlight; outline-offset: 3px; }
 <form method="post" action="/auth/start">
 <input type="hidden" name="auth_state" value="${state}" />
 <input type="hidden" name="intent" value="sign_in" />
-<button type="submit">Choose an Account</button>
+<input type="submit" value="Choose an Account" />
 </form>
 </main>
 </body>
