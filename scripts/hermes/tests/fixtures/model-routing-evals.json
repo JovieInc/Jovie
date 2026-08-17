@@ -31,14 +31,27 @@
       "id": "local-beats-gateway-when-subs-empty",
       "capability": "code",
       "ready": ["deepseek-v4-flash", "qwen-coder-local"],
-      "exhausted": ["grok-build", "cursor-models", "codex", "kimi", "cursor-other-models"],
+      "exhausted": [
+        "grok-build",
+        "cursor-models",
+        "codex",
+        "kimi",
+        "cursor-other-models"
+      ],
       "expect": "qwen-coder-local"
     },
     {
       "id": "gateway-only-after-included-and-local-gone",
       "capability": "code",
       "ready": ["deepseek-v4-flash"],
-      "exhausted": ["grok-build", "cursor-models", "codex", "kimi", "cursor-other-models", "local"],
+      "exhausted": [
+        "grok-build",
+        "cursor-models",
+        "codex",
+        "kimi",
+        "cursor-other-models",
+        "local"
+      ],
       "expect": "deepseek-v4-flash"
     }
   ]

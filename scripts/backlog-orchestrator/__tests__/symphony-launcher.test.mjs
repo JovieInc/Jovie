@@ -137,7 +137,7 @@ describe('Symphony launcher closed loop', () => {
           'import fcntl, sys, time; f=open(sys.argv[1],"a+"); fcntl.flock(f, fcntl.LOCK_EX); time.sleep(8)',
           lease,
         ],
-        { stdio: 'ignore', detached: true },
+        { stdio: 'ignore', detached: true }
       );
       await new Promise(resolve => setTimeout(resolve, 80));
       try {

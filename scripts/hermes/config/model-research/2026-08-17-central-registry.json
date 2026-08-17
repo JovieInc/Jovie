@@ -8,7 +8,11 @@
       "list_price_in": 2.0,
       "list_price_out": 6.0,
       "quality": 100,
-      "strengths": ["long-running-agents", "included-cursor-models", "architecture"],
+      "strengths": [
+        "long-running-agents",
+        "included-cursor-models",
+        "architecture"
+      ],
       "weaknesses": ["requires-cursor-agent", "fast-tier-is-2x"]
     },
     {

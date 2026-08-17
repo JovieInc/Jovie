@@ -75,17 +75,8 @@
       "agent_executable_env": "GEM_CURSOR_EXECUTABLE",
       "agent_executable_default": "cursor-agent",
       "agent_cwd_mode": "process",
-      "agent_argv": [
-        "-p",
-        "--force",
-        "--model",
-        "{model}",
-        "{prompt}"
-      ],
-      "probe_argv": [
-        "{executable}",
-        "--version"
-      ],
+      "agent_argv": ["-p", "--force", "--model", "{model}", "{prompt}"],
+      "probe_argv": ["{executable}", "--version"],
       "probe_mode": "exit-zero",
       "cooldown_seconds": 1800,
       "pool_cooldown_seconds": 3600,
@@ -94,10 +85,7 @@
         "included-cursor-models",
         "architecture"
       ],
-      "weaknesses": [
-        "requires-cursor-agent",
-        "fast-tier-is-2x"
-      ]
+      "weaknesses": ["requires-cursor-agent", "fast-tier-is-2x"]
     },
     {
       "id": "grok-4.6",
@@ -139,21 +127,11 @@
         "-p",
         "{prompt}"
       ],
-      "probe_argv": [
-        "{executable}",
-        "models"
-      ],
+      "probe_argv": ["{executable}", "models"],
       "cooldown_seconds": 1800,
       "pool_cooldown_seconds": 21600,
-      "strengths": [
-        "local-grok-cli",
-        "included-supergrok",
-        "architecture"
-      ],
-      "weaknesses": [
-        "weekly-grok-build-pool",
-        "not-portable-to-cursor-models"
-      ]
+      "strengths": ["local-grok-cli", "included-supergrok", "architecture"],
+      "weaknesses": ["weekly-grok-build-pool", "not-portable-to-cursor-models"]
     },
     {
       "id": "kimi-k3",
@@ -178,27 +156,13 @@
       "agent_executable_env": "GEM_KIMI_EXECUTABLE",
       "agent_executable_default": "kimi",
       "agent_cwd_mode": "process",
-      "agent_argv": [
-        "--auto",
-        "-m",
-        "{model}",
-        "-p",
-        "{prompt}"
-      ],
-      "probe_argv": [
-        "{executable}",
-        "--version"
-      ],
+      "agent_argv": ["--auto", "-m", "{model}", "-p", "{prompt}"],
+      "probe_argv": ["{executable}", "--version"],
       "probe_mode": "exit-zero",
       "cooldown_seconds": 1800,
       "pool_cooldown_seconds": 3600,
-      "strengths": [
-        "included-kimi-sub",
-        "1m-context"
-      ],
-      "weaknesses": [
-        "not-codex-lane"
-      ]
+      "strengths": ["included-kimi-sub", "1m-context"],
+      "weaknesses": ["not-codex-lane"]
     },
     {
       "id": "kimi-coding",
@@ -210,38 +174,20 @@
       "quality": 78,
       "list_price_in": 0.3,
       "list_price_out": 1.5,
-      "capabilities": [
-        "mechanical",
-        "code",
-        "tests"
-      ],
+      "capabilities": ["mechanical", "code", "tests"],
       "cost_tier": "subscription-included",
       "executable_env": "GEM_KIMI_EXECUTABLE",
       "executable_default": "kimi",
       "agent_executable_env": "GEM_KIMI_EXECUTABLE",
       "agent_executable_default": "kimi",
       "agent_cwd_mode": "process",
-      "agent_argv": [
-        "--auto",
-        "-m",
-        "{model}",
-        "-p",
-        "{prompt}"
-      ],
-      "probe_argv": [
-        "{executable}",
-        "--version"
-      ],
+      "agent_argv": ["--auto", "-m", "{model}", "-p", "{prompt}"],
+      "probe_argv": ["{executable}", "--version"],
       "probe_mode": "exit-zero",
       "cooldown_seconds": 1800,
       "pool_cooldown_seconds": 3600,
-      "strengths": [
-        "mechanical-coding",
-        "included-kimi-sub"
-      ],
-      "weaknesses": [
-        "narrower-than-k3"
-      ]
+      "strengths": ["mechanical-coding", "included-kimi-sub"],
+      "weaknesses": ["narrower-than-k3"]
     },
     {
       "id": "qwen-coder-local",
@@ -253,11 +199,7 @@
       "quality": 50,
       "list_price_in": 0.0,
       "list_price_out": 0.0,
-      "capabilities": [
-        "mechanical",
-        "code",
-        "tests"
-      ],
+      "capabilities": ["mechanical", "code", "tests"],
       "cost_tier": "free-local",
       "executable_env": "GEM_PR_DRAIN_QWEN",
       "executable_default": "/usr/local/bin/ollama",
@@ -272,19 +214,10 @@
         "--oneshot",
         "{prompt}"
       ],
-      "probe_argv": [
-        "{executable}",
-        "list"
-      ],
+      "probe_argv": ["{executable}", "list"],
       "cooldown_seconds": 900,
-      "strengths": [
-        "free-local",
-        "mechanical"
-      ],
-      "weaknesses": [
-        "often-missing-on-gem",
-        "not-architecture"
-      ]
+      "strengths": ["free-local", "mechanical"],
+      "weaknesses": ["often-missing-on-gem", "not-architecture"]
     },
     {
       "id": "deepseek-v4-flash",
@@ -296,12 +229,7 @@
       "quality": 65,
       "list_price_in": 0.15,
       "list_price_out": 0.6,
-      "capabilities": [
-        "mechanical",
-        "code",
-        "review",
-        "semantic"
-      ],
+      "capabilities": ["mechanical", "code", "review", "semantic"],
       "cost_tier": "gateway-budgeted-paid",
       "executable_env": "GEM_DEEPSEEK_EXECUTABLE",
       "executable_default": "/home/timwhite/.local/bin/hermes",
@@ -328,14 +256,8 @@
         "--help"
       ],
       "cooldown_seconds": 1800,
-      "strengths": [
-        "cheapest-capable-api",
-        "post-included-fallback"
-      ],
-      "weaknesses": [
-        "paid-gateway",
-        "not-a-sub-replacement-for-sol"
-      ]
+      "strengths": ["cheapest-capable-api", "post-included-fallback"],
+      "weaknesses": ["paid-gateway", "not-a-sub-replacement-for-sol"]
     },
     {
       "id": "cursor-luna",
@@ -347,40 +269,20 @@
       "quality": 74,
       "list_price_in": 0.2,
       "list_price_out": 1.2,
-      "capabilities": [
-        "mechanical",
-        "code",
-        "tests",
-        "review"
-      ],
+      "capabilities": ["mechanical", "code", "tests", "review"],
       "cost_tier": "subscription-included",
       "executable_env": "GEM_CURSOR_EXECUTABLE",
       "executable_default": "cursor-agent",
       "agent_executable_env": "GEM_CURSOR_EXECUTABLE",
       "agent_executable_default": "cursor-agent",
       "agent_cwd_mode": "process",
-      "agent_argv": [
-        "-p",
-        "--force",
-        "--model",
-        "{model}",
-        "{prompt}"
-      ],
-      "probe_argv": [
-        "{executable}",
-        "--version"
-      ],
+      "agent_argv": ["-p", "--force", "--model", "{model}", "{prompt}"],
+      "probe_argv": ["{executable}", "--version"],
       "probe_mode": "exit-zero",
       "cooldown_seconds": 1800,
       "pool_cooldown_seconds": 3600,
-      "strengths": [
-        "same-openai-luna",
-        "cursor-other-models-400"
-      ],
-      "weaknesses": [
-        "mrcr-recall-cliff",
-        "requires-cursor-agent"
-      ]
+      "strengths": ["same-openai-luna", "cursor-other-models-400"],
+      "weaknesses": ["mrcr-recall-cliff", "requires-cursor-agent"]
     },
     {
       "id": "codex-luna",
@@ -394,12 +296,7 @@
       "list_price_out": 1.2,
       "sub_monthly_usd": 200,
       "sub_included_multiplier": 4.0,
-      "capabilities": [
-        "code",
-        "review",
-        "mechanical",
-        "tests"
-      ],
+      "capabilities": ["code", "review", "mechanical", "tests"],
       "cost_tier": "subscription-included",
       "executable_env": "GEM_PR_DRAIN_CODEX",
       "executable_default": "/home/timwhite/.npm-global/bin/codex",
@@ -426,15 +323,8 @@
         "Reply with exactly: GEM_MODEL_READY"
       ],
       "cooldown_seconds": 21600,
-      "strengths": [
-        "high-volume",
-        "cheap-gpt-5-6",
-        "openai-product"
-      ],
-      "weaknesses": [
-        "mrcr-recall-cliff",
-        "not-for-long-context"
-      ]
+      "strengths": ["high-volume", "cheap-gpt-5-6", "openai-product"],
+      "weaknesses": ["mrcr-recall-cliff", "not-for-long-context"]
     },
     {
       "id": "codex-terra",
@@ -448,11 +338,7 @@
       "list_price_out": 12.0,
       "sub_monthly_usd": 200,
       "sub_included_multiplier": 4.0,
-      "capabilities": [
-        "code",
-        "review",
-        "architecture"
-      ],
+      "capabilities": ["code", "review", "architecture"],
       "cost_tier": "subscription-included",
       "executable_env": "GEM_PR_DRAIN_CODEX",
       "executable_default": "/home/timwhite/.npm-global/bin/codex",
@@ -479,13 +365,8 @@
         "Reply with exactly: GEM_MODEL_READY"
       ],
       "cooldown_seconds": 21600,
-      "strengths": [
-        "default-implementation",
-        "subsidized-codex-sub"
-      ],
-      "weaknesses": [
-        "same-pool-as-sol-and-luna"
-      ]
+      "strengths": ["default-implementation", "subsidized-codex-sub"],
+      "weaknesses": ["same-pool-as-sol-and-luna"]
     },
     {
       "id": "codex-sol",
@@ -499,11 +380,7 @@
       "list_price_out": 30.0,
       "sub_monthly_usd": 200,
       "sub_included_multiplier": 4.0,
-      "capabilities": [
-        "architecture",
-        "root-cause",
-        "code"
-      ],
+      "capabilities": ["architecture", "root-cause", "code"],
       "cost_tier": "subscription-included",
       "executable_env": "GEM_PR_DRAIN_CODEX",
       "executable_default": "/home/timwhite/.npm-global/bin/codex",
@@ -530,15 +407,8 @@
         "Reply with exactly: GEM_MODEL_READY"
       ],
       "cooldown_seconds": 21600,
-      "strengths": [
-        "terminal-bench",
-        "root-cause",
-        "subsidized-codex-sub"
-      ],
-      "weaknesses": [
-        "api-equivalent-is-expensive",
-        "never-buy-as-gateway"
-      ]
+      "strengths": ["terminal-bench", "root-cause", "subsidized-codex-sub"],
+      "weaknesses": ["api-equivalent-is-expensive", "never-buy-as-gateway"]
     }
   ],
   "route_chains": {
