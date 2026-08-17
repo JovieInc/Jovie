@@ -1073,25 +1073,29 @@ struct AuthenticatedUserIDChangePolicyTests {
     #expect(
       shouldApplyAuthenticatedUserIDChange(
         launchMode: .live,
-        authenticatedUserID: nil
+        authenticatedUserID: nil,
+        liveHydrateOwnsSession: true
       ) == false
     )
     #expect(
       shouldApplyAuthenticatedUserIDChange(
         launchMode: .live,
-        authenticatedUserID: "user"
+        authenticatedUserID: nil,
+        liveHydrateOwnsSession: false
+      )
+    )
+    #expect(
+      shouldApplyAuthenticatedUserIDChange(
+        launchMode: .live,
+        authenticatedUserID: "user",
+        liveHydrateOwnsSession: true
       )
     )
     #expect(
       shouldApplyAuthenticatedUserIDChange(
         launchMode: .uiTestingReady,
-        authenticatedUserID: nil
-      )
-    )
-    #expect(
-      shouldApplyAuthenticatedUserIDChange(
-        launchMode: .unitTesting,
-        authenticatedUserID: nil
+        authenticatedUserID: nil,
+        liveHydrateOwnsSession: false
       )
     )
   }

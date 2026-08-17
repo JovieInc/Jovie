@@ -428,13 +428,14 @@ private struct AppContentView: View {
 }
 
 
-/// Live hydrate is owned by `LiveRootContainer`. Applying nil here on the
-/// first `didInitializeAuth` flip would wipe a just-hydrated session.
+/// Skip nil only when `LiveRootContainer` is mounted. The JovieApp fallback
+/// still applies nil so an unavailable live build can leave `.launching`.
 func shouldApplyAuthenticatedUserIDChange(
-  launchMode: LaunchMode,
-  authenticatedUserID: String?
+  launchMode _: LaunchMode,
+  authenticatedUserID: String?,
+  liveHydrateOwnsSession: Bool
 ) -> Bool {
-  authenticatedUserID != nil || launchMode.usesLiveAuth == false
+  authenticatedUserID != nil || liveHydrateOwnsSession == false
 }
 
 struct RootView: View {
@@ -476,7 +477,8 @@ struct RootView: View {
 
         guard shouldApplyAuthenticatedUserIDChange(
           launchMode: appState.launchMode,
-          authenticatedUserID: authenticatedUserID
+          authenticatedUserID: authenticatedUserID,
+          liveHydrateOwnsSession: isAuthAvailable && appState.launchMode.usesLiveAuth
         ) else {
           return
         }
