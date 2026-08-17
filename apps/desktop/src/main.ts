@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import {
   app,
   BrowserWindow,
+  desktopCapturer,
   type IpcMainInvokeEvent,
   ipcMain,
   Menu,
@@ -29,8 +30,11 @@ import {
 } from './desktop-auth-security';
 import { installDesktopCspWatchdog } from './desktop-csp-watchdog';
 import {
+  isDesktopCaptureRouteUrl,
   shouldGrantTrustedAudioPermission,
   shouldGrantTrustedAudioPermissionCheck,
+  shouldGrantTrustedHudScreenPermission,
+  shouldGrantTrustedHudScreenPermissionCheck,
 } from './desktop-permissions';
 import { createDesktopSecurityReporter } from './desktop-security-reporting';
 import { APP_ENV, APP_URL } from './env';
@@ -708,7 +712,15 @@ function registerMainWindowPermissionHandlers(session: Session): void {
           requestingOrigin,
           parseUrl,
           appOrigin: APP_ORIGIN,
-        })
+        }) ||
+          shouldGrantTrustedHudScreenPermission({
+            permission,
+            details,
+            webContents,
+            requestingOrigin,
+            parseUrl,
+            appOrigin: APP_ORIGIN,
+          })
       );
     }
   );
@@ -722,8 +734,37 @@ function registerMainWindowPermissionHandlers(session: Session): void {
         requestingOrigin,
         parseUrl,
         appOrigin: APP_ORIGIN,
+      }) ||
+      shouldGrantTrustedHudScreenPermissionCheck({
+        permission,
+        details,
+        webContents,
+        requestingOrigin,
+        parseUrl,
+        appOrigin: APP_ORIGIN,
       })
   );
+
+  session.setDisplayMediaRequestHandler((request, callback) => {
+    const frameUrl = request.frame?.url;
+    if (!isDesktopCaptureRouteUrl(frameUrl, parseUrl)) {
+      callback({});
+      return;
+    }
+    void desktopCapturer
+      .getSources({ types: ['screen'] })
+      .then(sources => {
+        const firstScreen = sources[0];
+        if (!firstScreen) {
+          callback({});
+          return;
+        }
+        callback({ video: firstScreen });
+      })
+      .catch(() => {
+        callback({});
+      });
+  });
 }
 
 function buildAuthCompletionUrl(completion: DesktopAuthCompletion): string {

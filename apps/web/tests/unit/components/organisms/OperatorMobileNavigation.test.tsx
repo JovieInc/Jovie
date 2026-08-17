@@ -105,7 +105,7 @@ describe('OperatorMobileNavigation', () => {
     expect(within(menu).getByRole('link', { name: 'Chat' })).toHaveFocus();
 
     await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Ops' })).toHaveFocus();
+    expect(within(menu).getByRole('link', { name: 'Ovie' })).toHaveFocus();
 
     await user.keyboard('{Escape}');
     expect(
@@ -157,7 +157,7 @@ describe('OperatorMobileNavigation', () => {
       within(primaryNavigation).getByRole('link', { name: 'Overview' })
     ).not.toHaveAttribute('aria-current');
     expect(
-      within(primaryNavigation).getByRole('link', { name: 'Ops' })
+      within(primaryNavigation).getByRole('link', { name: 'Ovie' })
     ).toHaveAttribute('aria-current', 'page');
     expect(
       primaryNavigation.querySelectorAll('[aria-current="page"]')
@@ -171,7 +171,7 @@ describe('OperatorMobileNavigation', () => {
       within(expandedNavigation).getByRole('link', { name: 'Overview' })
     ).not.toHaveAttribute('aria-current');
     expect(
-      within(expandedNavigation).getByRole('link', { name: 'Ops' })
+      within(expandedNavigation).getByRole('link', { name: 'Ovie' })
     ).toHaveAttribute('aria-current', 'page');
     expect(
       expandedNavigation.querySelectorAll('[aria-current="page"]')

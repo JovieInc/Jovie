@@ -225,7 +225,7 @@ describe('proxy.ts middleware', () => {
   describe('trusted app-shell mode header', () => {
     it('overwrites a spoofed customer mode for canonical OV requests', async () => {
       const req = createAuthenticatedRequest('admin_test', {
-        pathname: APP_ROUTES.ADMIN_OPS,
+        pathname: APP_ROUTES.ADMIN_CHAT,
         headers: { 'x-jovie-app-shell-mode': 'customer' },
       });
 

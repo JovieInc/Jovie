@@ -210,12 +210,13 @@ Success is increasing company throughput. Everything else is secondary.
 
 ## Relationship to Existing Canon
 
-This constitution sits **above** the four operating principles in [`../docs/company/operating-principles.md`](../docs/company/operating-principles.md). Those principles (Ship Fast, Run Experiments, Document Everything, MRR Is King) remain valid and are the operational mechanism for this constitution:
+This constitution sits **above** the four operating principles in [`../docs/company/operating-principles.md`](../docs/company/operating-principles.md) and the fleet contract in [`FLEET.md`](./FLEET.md). Those principles (Ship Fast, Run Experiments, Document Everything, MRR Is King) remain valid and are the operational mechanism for this constitution:
 
-- **MRR Is King** is how we measure throughput in dollars — the customer paying is the strongest signal (Law 7).
+- **MRR Is King** is how we measure throughput in dollars — the customer paying is the strongest signal (Law 7). Default alive is MRR ≥ all-in burn ([`FLEET.md`](./FLEET.md)).
 - **Ship Fast, Iterate** is Law 6 in practice.
 - **Run Experiments When in Doubt** is Law 2 in practice.
 - **Document Everything** is how the closed loop keeps compounding (Laws 1–2 depend on durable evidence).
+- **Fleet** is how one human steers: Summer admits, Gem drains, Tim does not babysit the queue.
 
 When operating-principles or a `.claude/rules/*` file gives concrete implementation, follow it. When it is silent or in tension, resolve upward to this document.
 
@@ -225,4 +226,5 @@ When operating-principles or a `.claude/rules/*` file gives concrete implementat
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-08-17 | Point at `FLEET.md` as the closed-loop / default-alive operating contract. | Tim White interview |
 | 2026-07-17 | Created `/canon/OPERATING_SYSTEM.md` as company constitution (Theory of Constraints operating model). | Tim White |

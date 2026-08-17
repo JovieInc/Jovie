@@ -23,7 +23,7 @@ const CONTENT_SECTION_HEADER = 'components/molecules/ContentSectionHeader.tsx';
 const SETTINGS_PANEL = 'components/molecules/settings/SettingsPanel.tsx';
 const OPERATIONAL_CONTROLS =
   'components/features/admin/OperationalControlPanel.tsx';
-const OPS_PAGE = 'app/app/(shell)/admin/ops/page.tsx';
+const HUD_PAGE = 'app/hud/page.tsx';
 
 describe('admin page header dedupe (JOV-3527)', () => {
   it('does not render the route title via ContentSectionHeader', () => {
@@ -37,14 +37,13 @@ describe('admin page header dedupe (JOV-3527)', () => {
     expect(source).toContain('DashboardHeader');
   });
 
-  it('keeps ops inside AdminPage without a second page-title block', () => {
-    const source = read(OPS_PAGE);
+  it('keeps Ovie inside AdminPage without a second page-title block', () => {
+    const source = read(HUD_PAGE);
 
     expect(source).toContain('<AdminPage');
-    expect(source).toContain("title='Ops'");
-    // Page must not mount its own ContentSectionHeader page chrome.
+    expect(source).toContain("title='Ovie'");
     expect(source).not.toMatch(
-      /ContentSectionHeader[\s\S]{0,120}title=['"]Ops['"]/
+      /ContentSectionHeader[\s\S]{0,120}title=['"]Ovie['"]/
     );
   });
 

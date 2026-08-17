@@ -17,6 +17,8 @@ mac:
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.inherit.plist
   extendInfo:
+    NSMicrophoneUsageDescription: Jovie records your voice on morning product walks.
+    NSScreenCaptureUsageDescription: Jovie records your screen on morning product walks.
     NSAppTransportSecurity:
       NSAllowsArbitraryLoads: false
     CFBundleURLTypes:

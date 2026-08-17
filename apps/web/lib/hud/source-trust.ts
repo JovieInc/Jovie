@@ -105,7 +105,7 @@ function buildDatabaseSourceTrust(
       state === 'unavailable'
         ? 'Database health check reported degraded status.'
         : null,
-    dashboardUrl: APP_ROUTES.ADMIN_OPS,
+    dashboardUrl: APP_ROUTES.HUD,
     configureUrl: null,
     nextStep:
       state === 'unavailable'

@@ -91,10 +91,9 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
   },
   {
     id: 'ops',
-    label: 'Ops',
+    label: 'Ovie',
     href: APP_ROUTES.ADMIN_OPS,
-    description:
-      'Live operational state, canaries, control panel, and incidents',
+    description: 'One operator HUD — need first, noise below',
     section: 'workspaces',
   },
   {

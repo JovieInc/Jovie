@@ -85,7 +85,7 @@ export const APP_ROUTES = {
   LEGACY_ADMIN: '/app/admin',
   ADMIN: '/app/ov',
   ADMIN_CHAT: '/app/ov/chat',
-  ADMIN_OPS: '/app/ov/ops',
+  ADMIN_OPS: '/hud',
   ADMIN_PEOPLE: '/app/ov/people',
   ADMIN_GROWTH: '/app/ov/growth',
   ADMIN_WAITLIST: '/app/ov/waitlist',
@@ -135,7 +135,7 @@ export const APP_ROUTES = {
   DESIGN_STUDIO: '/exp/page-builder',
   /** Admin Ops HUD — shipper status, KPIs, and live metrics (admin-gated). */
   HUD: '/hud',
-  /** Token-only TV/wallboard view of the Ops HUD. */
+  /** Legacy TV URL. Redirects to /hud. */
   HUD_TV: '/hud-tv',
   HUD_WIKI: '/hud/wiki' as const,
 

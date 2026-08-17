@@ -291,7 +291,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     await settleAdminNavigation(page);
 
     await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.ADMIN_OPS}$`));
-    await expect(page.getByTestId('operational-control-panel')).toBeVisible({
+    await expect(page.getByTestId('hud-admin-page')).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
   });

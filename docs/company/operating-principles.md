@@ -47,7 +47,7 @@ This is core thesis of Jovie. Every decision, every fix, every dead-end, every m
 When you have something to record, pick the right surface:
 
 1. **[`/LESSONS.md`](../../LESSONS.md)** — post-mortems from human corrections. "I got something wrong; here's how to not get it wrong again."
-2. **`docs/company/`** — strategy, philosophy, principles. The canon for how Jovie operates.
+2. **`docs/company/`** — strategy, philosophy, principles. The canon for how Jovie operates. Fleet org and default-alive live in [`/canon/FLEET.md`](../../canon/FLEET.md).
 3. **`docs/`** — reference indexes (schema map, API map, cron registry, webhook map, lib module index). The lookup tables.
 4. **`.claude/rules/`** — enforced operating rules per topic. The narrow, scope-bound contracts (auth, db, ui, release, security, testing).
 5. **Linear issues** — every actionable follow-up, every "consider later," every candidate task. The work queue.
