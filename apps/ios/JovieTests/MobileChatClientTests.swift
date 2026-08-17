@@ -152,6 +152,58 @@ struct MobileChatClientTests {
     #expect(await tokenProvider.recordedForceRefreshValues() == [false])
   }
 
+  @Test func incrementalParserEmitsEventsAsCompleteLinesArrive() throws {
+    let baseURL = URL(string: "https://jov.ie")!
+    let ndjson = """
+    {"type":"turn.reserved","conversationId":"conv_1","turnId":"turn_1","clientTurnId":"client_turn_1"}
+    {"type":"assistant.delta","clientTurnId":"client_turn_1","text":"Hel"}
+    {"type":"ignored.event","clientTurnId":"client_turn_1"}
+    {"type":"assistant.completed","clientTurnId":"client_turn_1","conversationId":"conv_1","turnId":"turn_1","text":"Hello"}
+    """
+    let data = Data(ndjson.utf8)
+    let firstNewline = try #require(data.firstIndex(of: UInt8(ascii: "\n")))
+    let firstChunk = data[...firstNewline]
+    let splitIndex = data.index(firstNewline, offsetBy: 20, limitedBy: data.endIndex) ?? data.endIndex
+    let secondChunk = data[data.index(after: firstNewline)..<splitIndex]
+    let remainder = data[splitIndex...]
+
+    var leftover = Data()
+    let firstEvents = try MobileChatNDJSONParser.consume(
+      chunk: Data(firstChunk),
+      leftover: &leftover,
+      baseURL: baseURL
+    )
+    #expect(firstEvents == [
+      .turnReserved(conversationId: "conv_1", turnId: "turn_1", clientTurnId: "client_turn_1"),
+    ])
+    #expect(leftover.isEmpty)
+
+    let midEvents = try MobileChatNDJSONParser.consume(
+      chunk: Data(secondChunk),
+      leftover: &leftover,
+      baseURL: baseURL
+    )
+    #expect(midEvents.isEmpty)
+    #expect(!leftover.isEmpty)
+
+    let restEvents = try MobileChatNDJSONParser.consume(
+      chunk: Data(remainder),
+      leftover: &leftover,
+      baseURL: baseURL
+    )
+    let trailing = try MobileChatNDJSONParser.finish(leftover: &leftover, baseURL: baseURL)
+    #expect(restEvents + trailing == [
+      .assistantDelta(clientTurnId: "client_turn_1", text: "Hel"),
+      .assistantCompleted(
+        clientTurnId: "client_turn_1",
+        conversationId: "conv_1",
+        turnId: "turn_1",
+        text: "Hello"
+      ),
+    ])
+    #expect(leftover.isEmpty)
+  }
+
   @Test func mapsMalformedChatStreamToDecodingFailed() async throws {
     MockChatURLProtocol.requestHandler = { request in
       (makeResponse(for: request), Data("{".utf8))

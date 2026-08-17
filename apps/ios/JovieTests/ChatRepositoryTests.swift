@@ -52,7 +52,8 @@ struct ChatRepositoryTests {
     #expect(repository.isSending == false)
   }
 
-  @Test func sendOnSuccessAppliesAssistantCompletedAndRefetchesConversation() async {
+  @Test func sendAppliesStreamEventsWithoutRefetchAndDoesNotMarkOfflineWhenListOrFetchWouldFail() async {
+    let cache = ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-success")!)
     let client = ScriptedChatClient(
       sendTurnResult: .success([
         .turnReserved(conversationId: "conv_new", turnId: "turn_1", clientTurnId: "PLACEHOLDER"),
@@ -63,57 +64,65 @@ struct ChatRepositoryTests {
           text: "Here is your plan"
         ),
       ]),
-      listConversationsResult: .success([
-        MobileConversationSummary(
-          id: "conv_new",
-          title: "New chat",
-          createdAt: "2026-06-01T00:00:00.000Z",
-          updatedAt: "2026-06-01T00:00:00.000Z",
-          latestMessageRole: "assistant",
-          latestTurnStatus: "completed"
-        ),
-      ]),
-      fetchConversationResult: .success(
-        MobileConversationDetailResponse(
-          conversation: MobileConversationRecord(
-            id: "conv_new",
-            title: "New chat",
-            createdAt: "2026-06-01T00:00:00.000Z",
-            updatedAt: "2026-06-01T00:00:00.000Z"
-          ),
-          messages: [
-            MobileConversationMessage(
-              id: "msg_1",
-              role: "assistant",
-              content: "Here is your plan",
-              clientMessageId: "client_1",
-              turnId: "turn_1",
-              turnStatus: "completed",
-              createdAt: "2026-06-01T00:00:00.000Z",
-              requiresWebHandoff: false
-            ),
-          ],
-          hasMore: false
-        )
-      )
+      listConversationsResult: .failure(MobileChatClientError.requestFailed(statusCode: 500)),
+      fetchConversationResult: .failure(MobileChatClientError.requestFailed(statusCode: 404))
     )
 
     let repository = ChatRepository(
       client: client,
-      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-success")!),
+      cache: cache,
       userID: "user_repo_success",
       webBaseURL: URL(string: "https://preview.example")!
     )
 
     await repository.send(text: "Plan my next release")
 
+    #expect(repository.isSending == false)
     #expect(repository.isOffline == false)
     #expect(repository.lastErrorMessage == nil)
     #expect(repository.activeConversationID == "conv_new")
-    #expect(repository.conversations.map(\.id) == ["conv_new"])
-    // openConversation replaces the optimistic timeline with the server's
-    // canonical messages for the now-known conversation ID.
-    #expect(repository.timeline.map(\.content) == ["Here is your plan"])
+    #expect(repository.conversations.isEmpty)
+    #expect(client.listConversationsCallCount == 0)
+    #expect(client.fetchConversationCallCount == 0)
+    #expect(repository.timeline.map(\.role) == [.user, .assistant])
+    #expect(repository.timeline.map(\.content) == ["Plan my next release", "Here is your plan"])
+    #expect(repository.timeline.last?.status == .completed)
+
+    let snapshot = await cache.load(for: "user_repo_success")
+    #expect(snapshot?.messagesByConversationID["conv_new"]?.map(\.content) == [
+      "Plan my next release",
+      "Here is your plan",
+    ])
+  }
+
+  @Test func sendKeepsCompletedAssistantWhenLaterStreamLineIsMalformed() async {
+    let client = StreamingThenFailingChatClient(
+      events: [
+        .turnReserved(conversationId: "conv_kept", turnId: "turn_1", clientTurnId: "PLACEHOLDER"),
+        .assistantCompleted(
+          clientTurnId: "PLACEHOLDER",
+          conversationId: "conv_kept",
+          turnId: "turn_1",
+          text: "Kept reply"
+        ),
+      ]
+    )
+
+    let repository = ChatRepository(
+      client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-malformed")!),
+      userID: "user_repo_malformed",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    await repository.send(text: "Keep this")
+
+    let assistantItem = repository.timeline.first { $0.role == .assistant }
+    #expect(assistantItem?.status == .completed)
+    #expect(assistantItem?.content == "Kept reply")
+    #expect(repository.isOffline == false)
+    #expect(repository.lastErrorMessage?.isEmpty == false)
+    #expect(repository.isSending == false)
   }
 
   @Test func sendCoalescesStreamDeltasIntoAssistantTimeline() async {
@@ -138,7 +147,7 @@ struct ChatRepositoryTests {
     await repository.send(text: "Stream this")
 
     let assistantItem = repository.timeline.first { $0.role == .assistant }
-    #expect(assistantItem?.status == .completed)
+    #expect(assistantItem?.status == .streaming)
     #expect(assistantItem?.content == "A streamed answer")
   }
 
@@ -169,13 +178,7 @@ struct ChatRepositoryTests {
     #expect(repository.activeConversationID == "conv_handoff")
     let assistantItem = repository.timeline.first { $0.role == .assistant }
     #expect(assistantItem?.requiresWebHandoff == true)
-    // refreshConversations() persists the post-apply() timeline to cache under
-    // the now-known conversation ID before openConversation() runs; since the
-    // subsequent fetchConversation() fails, openConversation() rehydrates from
-    // that just-written cache entry. Cache rehydration recomputes handoffURL
-    // from webBaseURL (see ChatRepository.timelineItem(from:)) rather than
-    // preserving the raw URL carried on the original stream event.
-    #expect(assistantItem?.handoffURL == URL(string: "https://preview.example/app/chat/conv_handoff"))
+    #expect(assistantItem?.handoffURL == handoffURL)
     #expect(assistantItem?.content == "Continue on web to finish this")
   }
 
@@ -200,13 +203,7 @@ struct ChatRepositoryTests {
     let assistantItem = repository.timeline.first { $0.role == .assistant }
     #expect(assistantItem?.status == .failed)
     #expect(assistantItem?.content == "Slow down and try again")
-    // markAssistantFailed sets lastErrorMessage synchronously inside apply(events:),
-    // but send() unconditionally awaits refreshConversations() right after, which
-    // succeeds here and resets lastErrorMessage to nil on its success path. Because
-    // a bare .error event carries no conversationId, resolvedConversationID(from:)
-    // returns nil and activeConversationID is never set, so openConversation() is
-    // skipped entirely -- refreshConversations()'s success branch is the last writer.
-    #expect(repository.lastErrorMessage == nil)
+    #expect(repository.lastErrorMessage == "Slow down and try again")
     // An in-band error event is not a transport failure, so isOffline must stay false.
     #expect(repository.isOffline == false)
     #expect(repository.activeConversationID == nil)
@@ -477,7 +474,10 @@ private struct SuccessfulChatClient: MobileChatClientProtocol {
     )
   }
 
-  func sendTurn(_ request: MobileChatTurnRequest) async throws -> [MobileChatStreamEvent] {
+  func sendTurn(
+    _ request: MobileChatTurnRequest,
+    onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
+  ) async throws -> [MobileChatStreamEvent] {
     []
   }
 }
@@ -491,7 +491,10 @@ private struct FailingChatClient: MobileChatClientProtocol {
     throw MobileChatClientError.requestFailed(statusCode: 500)
   }
 
-  func sendTurn(_ request: MobileChatTurnRequest) async throws -> [MobileChatStreamEvent] {
+  func sendTurn(
+    _ request: MobileChatTurnRequest,
+    onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
+  ) async throws -> [MobileChatStreamEvent] {
     throw MobileChatClientError.transportFailed(code: -1009)
   }
 }
@@ -504,6 +507,8 @@ private final class ScriptedChatClient: MobileChatClientProtocol, @unchecked Sen
   private let sendTurnResult: Result<[MobileChatStreamEvent], Error>
   private let listConversationsResult: Result<[MobileConversationSummary], Error>
   private let fetchConversationResult: Result<MobileConversationDetailResponse, Error>
+  private(set) var listConversationsCallCount = 0
+  private(set) var fetchConversationCallCount = 0
 
   init(
     sendTurnResult: Result<[MobileChatStreamEvent], Error>,
@@ -516,16 +521,26 @@ private final class ScriptedChatClient: MobileChatClientProtocol, @unchecked Sen
   }
 
   func listConversations(limit: Int) async throws -> [MobileConversationSummary] {
-    try listConversationsResult.get()
+    listConversationsCallCount += 1
+    return try listConversationsResult.get()
   }
 
   func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
-    try fetchConversationResult.get()
+    fetchConversationCallCount += 1
+    return try fetchConversationResult.get()
   }
 
-  func sendTurn(_ request: MobileChatTurnRequest) async throws -> [MobileChatStreamEvent] {
-    let events = try sendTurnResult.get()
-    return events.map { rewriteClientTurnId($0, to: request.clientTurnId) }
+  func sendTurn(
+    _ request: MobileChatTurnRequest,
+    onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
+  ) async throws -> [MobileChatStreamEvent] {
+    let events = try sendTurnResult.get().map { rewriteClientTurnId($0, to: request.clientTurnId) }
+    if let onEvent {
+      for event in events {
+        await onEvent(event)
+      }
+    }
+    return events
   }
 
   private func rewriteClientTurnId(
@@ -549,5 +564,54 @@ private final class ScriptedChatClient: MobileChatClientProtocol, @unchecked Sen
     case .error:
       return event
     }
+  }
+}
+
+/// Delivers completed stream events through `onEvent`, then fails the turn
+/// the way a malformed later NDJSON line would.
+private final class StreamingThenFailingChatClient: MobileChatClientProtocol, @unchecked Sendable {
+  private let events: [MobileChatStreamEvent]
+
+  init(events: [MobileChatStreamEvent]) {
+    self.events = events
+  }
+
+  func listConversations(limit: Int) async throws -> [MobileConversationSummary] {
+    throw MobileChatClientError.requestFailed(statusCode: 500)
+  }
+
+  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+    throw MobileChatClientError.requestFailed(statusCode: 404)
+  }
+
+  func sendTurn(
+    _ request: MobileChatTurnRequest,
+    onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
+  ) async throws -> [MobileChatStreamEvent] {
+    let delivered = events.map { event -> MobileChatStreamEvent in
+      switch event {
+      case let .turnReserved(conversationId, turnId, _):
+        return .turnReserved(
+          conversationId: conversationId,
+          turnId: turnId,
+          clientTurnId: request.clientTurnId
+        )
+      case let .assistantCompleted(_, conversationId, turnId, text):
+        return .assistantCompleted(
+          clientTurnId: request.clientTurnId,
+          conversationId: conversationId,
+          turnId: turnId,
+          text: text
+        )
+      default:
+        return event
+      }
+    }
+    if let onEvent {
+      for event in delivered {
+        await onEvent(event)
+      }
+    }
+    throw MobileChatClientError.decodingFailed
   }
 }

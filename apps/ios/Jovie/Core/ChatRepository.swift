@@ -143,7 +143,10 @@ final class ChatRepository {
     defer { isSending = false }
 
     do {
-      let events = try await client.sendTurn(
+      // Apply each NDJSON event as it arrives so tokens paint before the
+      // body finishes. Do not refetch list/detail here — those GETs can
+      // replace this timeline and mark a successful turn offline.
+      _ = try await client.sendTurn(
         MobileChatTurnRequest(
           conversationId: activeConversationID,
           clientTurnId: clientTurnId,
@@ -151,19 +154,22 @@ final class ChatRepository {
           text: trimmed,
           source: "typed"
         )
-      )
+      ) { [weak self] event in
+        await self?.apply(events: [event], clientTurnId: clientTurnId)
+      }
 
       isOffline = false
-      lastErrorMessage = nil
-      apply(events: events, clientTurnId: clientTurnId)
-      await refreshConversations()
-      if let conversationID = activeConversationID ?? resolvedConversationID(from: events) {
-        await openConversation(conversationID)
+      if assistantStatus(clientTurnId: clientTurnId) != .failed {
+        lastErrorMessage = nil
       }
+      await persistCache()
     } catch {
-      markAssistantFailed(clientTurnId: clientTurnId, message: error.localizedDescription)
-      isOffline = true
-      lastErrorMessage = error.localizedDescription
+      if assistantStatus(clientTurnId: clientTurnId) != .completed {
+        markAssistantFailed(clientTurnId: clientTurnId, message: error.localizedDescription)
+        isOffline = true
+      } else {
+        lastErrorMessage = error.localizedDescription
+      }
       await persistCache()
     }
   }
@@ -238,20 +244,8 @@ final class ChatRepository {
     }
   }
 
-  private func resolvedConversationID(from events: [MobileChatStreamEvent]) -> String? {
-    for event in events {
-      switch event {
-      case let .turnReserved(conversationId, _, _):
-        return conversationId
-      case let .assistantCompleted(_, conversationId, _, _):
-        return conversationId
-      case let .webHandoff(_, conversationId, _, _):
-        return conversationId
-      default:
-        continue
-      }
-    }
-    return nil
+  private func assistantStatus(clientTurnId: String) -> MobileChatTimelineStatus? {
+    timeline.first { $0.clientTurnId == clientTurnId && $0.role == .assistant }?.status
   }
 
   private func markAssistantFailed(clientTurnId: String, message: String) {
