@@ -6,6 +6,8 @@ struct LiveRootContainer: View {
   @State private var didHandleLaunchAuthCallback = false
   @State private var authReturnTask: Task<Void, Never>?
   @State private var handledAuthReturnStates: Set<String> = []
+  @State private var startedAuthFinalizeStates: Set<String> = []
+  @State private var seenAuthCallbackURLs: Set<String> = []
   @State private var authErrorMessage: String?
 
   var body: some View {
@@ -22,16 +24,13 @@ struct LiveRootContainer: View {
       onAuthError: { authErrorMessage = $0 }
     )
       .onOpenURL { url in
-        handleAuthReturn(url)
+        MobileAuthCallbackURLInbox.shared.enqueue(url)
       }
-      .onReceive(NotificationCenter.default.publisher(for: .jovieAuthCallbackURL)) { notification in
-        guard let url = notification.object as? URL else { return }
-        handleAuthReturn(url)
+      .onReceive(NotificationCenter.default.publisher(for: .jovieAuthCallbackURL)) { _ in
+        drainPendingAuthCallbackURLs()
       }
       .task {
-        for url in MobileAuthCallbackURLInbox.shared.drain() {
-          handleAuthReturn(url)
-        }
+        drainPendingAuthCallbackURLs()
       }
       .task(id: appState.didInitializeAuth) {
         guard appState.didInitializeAuth, didHydrateNativeSession == false else {
@@ -83,11 +82,24 @@ struct LiveRootContainer: View {
   }
 
   @MainActor
+  private func drainPendingAuthCallbackURLs() {
+    for url in MobileAuthCallbackURLInbox.shared.drain() {
+      handleAuthReturn(url)
+    }
+  }
+
+  @MainActor
   private func handleAuthReturn(_ url: URL) {
     Observability.addBreadcrumb(
       .deepLinkReceived,
       context: ["url": url]
     )
+
+    let callbackKey = url.absoluteString
+    if seenAuthCallbackURLs.contains(callbackKey) {
+      return
+    }
+    seenAuthCallbackURLs.insert(callbackKey)
 
     if let state = MobileAuthReturnParser.callbackState(url),
        handledAuthReturnStates.contains(state)
@@ -131,6 +143,8 @@ struct LiveRootContainer: View {
         return
       }
 
+      claimAuthCallbackStateBeforeConsumingVerifier(url)
+
       if let authReturn = await MobileAuthReturnParser.parse(url, pendingStore: .shared) {
         Observability.addBreadcrumb(
           .deepLinkRouteMatched,
@@ -156,36 +170,78 @@ struct LiveRootContainer: View {
 
       try? await Task.sleep(nanoseconds: 250_000_000)
 
-      guard let authReturn = await MobileAuthReturnParser.parse(url, pendingStore: .shared) else {
+      if let state = MobileAuthReturnParser.callbackState(url),
+         handledAuthReturnStates.contains(state)
+      {
+        return
+      }
+
+      claimAuthCallbackStateBeforeConsumingVerifier(url)
+
+      if let authReturn = await MobileAuthReturnParser.parse(url, pendingStore: .shared) {
         Observability.addBreadcrumb(
-          .deepLinkParseFailed,
-          level: .warning,
-          context: ["reason": "missing_pending_verifier", "url": url]
+          .deepLinkRouteMatched,
+          context: ["route": "auth_return", "url": url]
         )
-        await appState.signOut()
-        authErrorMessage = "Couldn't finish sign-in. Try again."
-        MobileAuthDiagnostics.record("auth_callback_missing_verifier")
-#if DEBUG
-        LiveAuthUITestStatus.set(
-          "error",
-          error: "Missing pending native auth code verifier."
-        )
-#endif
+        handleAuthReturn(authReturn)
+        return
+      }
+
+      guard shouldSignOutAfterMissingVerifier(
+        callbackState: MobileAuthReturnParser.callbackState(url),
+        handledStates: handledAuthReturnStates,
+        hasFinalizeInFlight: isAuthFinalizeInFlight(for: url),
+        hasStoredSession: NativeSessionTokenStore.load() != nil
+      ) else {
         return
       }
 
       Observability.addBreadcrumb(
-        .deepLinkRouteMatched,
-        context: ["route": "auth_return", "url": url]
+        .deepLinkParseFailed,
+        level: .warning,
+        context: ["reason": "missing_pending_verifier", "url": url]
       )
-      handleAuthReturn(authReturn)
+      await appState.signOut()
+      authErrorMessage = "Couldn't finish sign-in. Try again."
+      MobileAuthDiagnostics.record("auth_callback_missing_verifier")
+#if DEBUG
+      LiveAuthUITestStatus.set(
+        "error",
+        error: "Missing pending native auth code verifier."
+      )
+#endif
     }
   }
 
   @MainActor
+  private func claimAuthCallbackStateBeforeConsumingVerifier(_ url: URL) {
+    guard MobileAuthPendingStore.shared.hasCodeVerifier(),
+          let state = MobileAuthReturnParser.callbackState(url)
+    else {
+      return
+    }
+
+    handledAuthReturnStates.insert(state)
+  }
+
+  @MainActor
+  private func isAuthFinalizeInFlight(for url: URL) -> Bool {
+    if authReturnTask != nil {
+      return true
+    }
+
+    guard let state = MobileAuthReturnParser.callbackState(url) else {
+      return false
+    }
+
+    return startedAuthFinalizeStates.contains(state)
+  }
+
+  @MainActor
   private func handleAuthReturn(_ authReturn: MobileAuthReturn) {
-    guard !handledAuthReturnStates.contains(authReturn.state) else { return }
     handledAuthReturnStates.insert(authReturn.state)
+    guard !startedAuthFinalizeStates.contains(authReturn.state) else { return }
+    startedAuthFinalizeStates.insert(authReturn.state)
 
     authReturnTask?.cancel()
     authErrorMessage = nil
