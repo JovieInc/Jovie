@@ -286,6 +286,25 @@ export {
   type TrackArtist,
   trackArtists,
 } from './content';
+// Private creator documents and exact-revision capture handoffs (JOV-5173)
+export {
+  type CreatorDocument,
+  type CreatorDocumentContent,
+  type CreatorDocumentRevision,
+  creatorCaptureHandoffs,
+  creatorClaimEvidenceStateEnum,
+  creatorClaimKindEnum,
+  creatorDocumentKindEnum,
+  creatorDocumentRevisions,
+  creatorDocumentStageEnum,
+  creatorDocuments,
+  creatorRevisionApprovals,
+  creatorRevisionClaims,
+  insertCreatorDocumentRevisionSchema,
+  insertCreatorDocumentSchema,
+  selectCreatorDocumentRevisionSchema,
+  selectCreatorDocumentSchema,
+} from './creator-documents';
 // DSP Bio Sync (Bio update pushes to DSPs)
 export {
   type DspBioSyncMetadata,

@@ -1,0 +1,131 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const {
+  getSessionContext,
+  requireCreatorDocumentAccess,
+  saveCreatorDocumentRevision,
+  approveCreatorRevisionForCapture,
+} = vi.hoisted(() => ({
+  getSessionContext: vi.fn(),
+  requireCreatorDocumentAccess: vi.fn(),
+  saveCreatorDocumentRevision: vi.fn(),
+  approveCreatorRevisionForCapture: vi.fn(),
+}));
+
+vi.mock('@/lib/auth/session', () => ({
+  getSessionContext,
+  isUnauthorizedSessionError: (error: unknown) =>
+    error instanceof Error && error.message === 'Unauthorized',
+}));
+vi.mock('@/lib/creator-documents/access', () => ({
+  requireCreatorDocumentAccess,
+}));
+vi.mock('@/lib/db/creator-documents/store', () => ({
+  CreatorDocumentConflictError: class extends Error {},
+  saveCreatorDocumentRevision,
+  approveCreatorRevisionForCapture,
+}));
+vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
+
+import { POST as approve } from './[id]/approve/route';
+import { PATCH as saveRevision } from './[id]/route';
+
+const context = {
+  params: Promise.resolve({ id: '11111111-1111-4111-8111-111111111111' }),
+};
+
+describe('creator document route authorization', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getSessionContext.mockResolvedValue({
+      profile: { id: '22222222-2222-4222-8222-222222222222' },
+      user: { id: '33333333-3333-4333-8333-333333333333' },
+    });
+  });
+
+  it('reauthorizes the exact active profile before saving a revision', async () => {
+    saveCreatorDocumentRevision.mockResolvedValue(2);
+    const response = await saveRevision(
+      new Request('https://jov.ie/api/library/documents/1', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          expectedRevision: 1,
+          title: 'Exact revision',
+          kind: 'script',
+          content: { type: 'doc', content: [{ type: 'paragraph' }] },
+          plainText: 'Exact revision',
+        }),
+      }),
+      context
+    );
+
+    expect(response.status).toBe(200);
+    expect(requireCreatorDocumentAccess).toHaveBeenCalledWith({
+      userId: '33333333-3333-4333-8333-333333333333',
+      profileId: '22222222-2222-4222-8222-222222222222',
+    });
+  });
+
+  it('requires canonical owner access for exact approval', async () => {
+    approveCreatorRevisionForCapture.mockResolvedValue(undefined);
+    const response = await approve(
+      new Request('https://jov.ie/api/library/documents/1/approve', {
+        method: 'POST',
+        body: JSON.stringify({ revision: 2 }),
+      }),
+      context
+    );
+
+    expect(response.status).toBe(200);
+    expect(requireCreatorDocumentAccess).toHaveBeenCalledWith({
+      userId: '33333333-3333-4333-8333-333333333333',
+      profileId: '22222222-2222-4222-8222-222222222222',
+      ownerOnly: true,
+    });
+  });
+
+  it('fails closed before mutation when profile access is rejected', async () => {
+    requireCreatorDocumentAccess.mockRejectedValueOnce(
+      new Error('Unauthorized')
+    );
+    const response = await approve(
+      new Request('https://jov.ie/api/library/documents/1/approve', {
+        method: 'POST',
+        body: JSON.stringify({ revision: 2 }),
+      }),
+      context
+    );
+
+    expect(response.status).toBe(401);
+    expect(approveCreatorRevisionForCapture).not.toHaveBeenCalled();
+  });
+
+  it('never derives document ownership from the requested URL', async () => {
+    getSessionContext.mockResolvedValueOnce({
+      profile: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      user: { id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' },
+    });
+    saveCreatorDocumentRevision.mockResolvedValueOnce(2);
+
+    await saveRevision(
+      new Request('https://jov.ie/api/library/documents/owner-a-document', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          expectedRevision: 1,
+          title: 'Profile B attempt',
+          kind: 'script',
+          content: { type: 'doc', content: [{ type: 'paragraph' }] },
+          plainText: 'Profile B attempt',
+        }),
+      }),
+      context
+    );
+
+    expect(saveCreatorDocumentRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        creatorProfileId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        documentId: '11111111-1111-4111-8111-111111111111',
+      })
+    );
+  });
+});
