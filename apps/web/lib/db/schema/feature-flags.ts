@@ -1,4 +1,11 @@
-import { boolean, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  index,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 /**
  * Per-environment runtime overrides for code-defined feature flags.
@@ -25,3 +32,45 @@ export const featureFlagOverrides = pgTable('feature_flag_overrides', {
 });
 
 export type FeatureFlagOverrideRow = typeof featureFlagOverrides.$inferSelect;
+
+/**
+ * Append-only audit log for runtime feature flag changes.
+ *
+ * One row per write to `feature_flag_overrides` (enable, disable, reset) plus
+ * rollback events that re-apply a previously recorded value. `previousValue` /
+ * `newValue` store the raw override cell: `null` means "inherit the code
+ * default" for that environment. Written by `/api/admin/feature-flags` and
+ * `/api/admin/feature-flags/rollback`; read by the admin Features page audit
+ * section. Never updated or deleted by app code.
+ */
+export const featureFlagAuditEvents = pgTable(
+  'feature_flag_audit_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    flagKey: text('flag_key').notNull(),
+    envTier: text('env_tier').notNull(),
+    // 'enable' | 'disable' | 'reset' | 'rollback'
+    action: text('action').notNull(),
+    // App users.id of the admin who made the change (text, matches
+    // feature_flag_overrides.updated_by). Nullable for safety.
+    actor: text('actor'),
+    previousValue: boolean('previous_value'),
+    newValue: boolean('new_value'),
+    reason: text('reason'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    flagKeyIdx: index('idx_feature_flag_audit_events_flag_key').on(
+      table.flagKey
+    ),
+    envTierIdx: index('idx_feature_flag_audit_events_env_tier').on(
+      table.envTier
+    ),
+    createdAtIdx: index('idx_feature_flag_audit_events_created_at').on(
+      table.createdAt
+    ),
+  })
+);
+
+export type FeatureFlagAuditEventRow =
+  typeof featureFlagAuditEvents.$inferSelect;
