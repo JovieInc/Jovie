@@ -312,6 +312,10 @@ private struct AppContentView: View {
   }
 
   private var usesPreviewActionLoops: Bool {
+    if appState.launchMode.holdsActionLoopLoading {
+      return false
+    }
+
     switch appState.launchMode {
     case .uiTestingAudience,
          .uiTestingReady,
@@ -335,6 +339,14 @@ private struct AppContentView: View {
 
   @MainActor
   private func reloadActionLoops(for userID: String?) async {
+    if appState.launchMode.holdsActionLoopLoading {
+      calendarResponse = nil
+      inboxResponse = nil
+      isLoadingCalendar = appState.launchMode == .uiTestingCalendarLoading
+      isLoadingInbox = appState.launchMode == .uiTestingInboxLoading
+      return
+    }
+
     if usesPreviewActionLoops {
       calendarResponse = .preview
       inboxResponse = .preview

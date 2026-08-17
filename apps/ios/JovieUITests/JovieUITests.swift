@@ -942,6 +942,25 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "inbox-offline", app: app)
   }
 
+  func testInboxLoadingLaunchReservesAskJovieCTA() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-inbox-loading",
+      expectedElementDescription: "\"inbox-ask-jovie\""
+    ) {
+      $0.buttons["inbox-ask-jovie"]
+    }
+
+    XCTAssertTrue(
+      app.descendants(matching: .any)["inbox-surface"].exists,
+      "Loading inbox launch did not expose inbox-surface.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.buttons["inbox-ask-jovie"].exists,
+      "Loading inbox must reserve the Ask Jovie CTA so loaded content cannot shift it.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "inbox-loading", app: app)
+  }
+
   func testCalendarLaunchShowsSurface() {
     let app = launchMockApp(
       launchArgument: "-ui-testing-calendar",
@@ -971,6 +990,25 @@ final class JovieUITests: XCTestCase {
     )
     XCTAssertTrue(app.staticTexts["Offline — showing cached calendar when available."].exists)
     attachScreenshot(named: "calendar-offline", app: app)
+  }
+
+  func testCalendarLoadingLaunchReservesAskJovieCTA() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-calendar-loading",
+      expectedElementDescription: "\"calendar-ask-jovie\""
+    ) {
+      $0.buttons["calendar-ask-jovie"]
+    }
+
+    XCTAssertTrue(
+      app.descendants(matching: .any)["calendar-surface"].exists,
+      "Loading calendar launch did not expose calendar-surface.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.buttons["calendar-ask-jovie"].exists,
+      "Loading calendar must reserve the Ask Jovie CTA so loaded content cannot shift it.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "calendar-loading", app: app)
   }
 
   func testShellDrawerAndSettingsNavigation() {

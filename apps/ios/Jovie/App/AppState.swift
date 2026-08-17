@@ -87,7 +87,9 @@ final class AppState {
          .uiTestingLibrary,
          .uiTestingLibraryEmpty,
          .uiTestingInbox,
-         .uiTestingCalendar:
+         .uiTestingInboxLoading,
+         .uiTestingCalendar,
+         .uiTestingCalendarLoading:
       route = .ready
       dashboardState = .loaded(.previewReady)
       isOffline = false

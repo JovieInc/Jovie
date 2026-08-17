@@ -120,6 +120,13 @@ struct LibraryInboxCalendarLaunchModeTests {
     #expect(LaunchMode.uiTestingInboxOffline.defaultInitialTab == .inbox)
     #expect(LaunchMode.uiTestingInbox.usesLiveAuth == false)
     #expect(LaunchMode.uiTestingInboxOffline.usesLiveAuth == false)
+    #expect(
+      LaunchMode.resolving(arguments: ["-ui-testing-inbox-loading"], isXCTest: false)
+        == .uiTestingInboxLoading
+    )
+    #expect(LaunchMode.uiTestingInboxLoading.defaultInitialTab == .inbox)
+    #expect(LaunchMode.uiTestingInboxLoading.holdsActionLoopLoading)
+    #expect(LaunchMode.uiTestingInbox.holdsActionLoopLoading == false)
   }
 
   @Test func calendarArgumentsParseToCalendarFixtures() {
@@ -133,6 +140,12 @@ struct LibraryInboxCalendarLaunchModeTests {
     )
     #expect(LaunchMode.uiTestingCalendar.defaultInitialTab == .calendar)
     #expect(LaunchMode.uiTestingCalendarOffline.defaultInitialTab == .calendar)
+    #expect(
+      LaunchMode.resolving(arguments: ["-ui-testing-calendar-loading"], isXCTest: false)
+        == .uiTestingCalendarLoading
+    )
+    #expect(LaunchMode.uiTestingCalendarLoading.defaultInitialTab == .calendar)
+    #expect(LaunchMode.uiTestingCalendarLoading.holdsActionLoopLoading)
   }
 }
 
