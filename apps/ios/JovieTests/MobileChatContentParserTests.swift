@@ -177,6 +177,36 @@ struct MobileChatContentParserTests {
     #expect(payload.designs[0].isReady)
   }
 
+  @Test func hydratesVideoProposalFromToolResultJson() {
+    let content = #"<tool_call><name>proposeVideoRecording</name><parameters></parameters></tool_call><tool_result><name>proposeVideoRecording</name><state>success</state><json>{"success":true,"kind":"promo","title":"Release day shout-out","script":"Hey, my new single is out today.","showcaseVariant":"direct","label":"Promo video"}</json></tool_result>"#
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    guard case let .videoProposal(payload) = segments.last else {
+      Issue.record("Expected video proposal segment")
+      return
+    }
+    #expect(payload.kind == .promo)
+    #expect(payload.title == "Release day shout-out")
+    #expect(payload.script == "Hey, my new single is out today.")
+    #expect(payload.id == "video-proposal:promo:Release day shout-out")
+  }
+
+  @Test func skipsVideoProposalWhenToolResultFailed() {
+    let content = #"<tool_call><name>proposeVideoRecording</name><parameters></parameters></tool_call><tool_result><name>proposeVideoRecording</name><state>failed</state><json>{"success":false}</json></tool_result>"#
+
+    let segments = MobileChatContentParser.segments(from: content, isStreaming: false)
+
+    #expect(!segments.contains { if case .videoProposal = $0 { return true } else { return false } })
+  }
+
+  @Test func rejectsVideoProposalWithUnknownKind() {
+    let data = #"{"success":true,"kind":"tutorial","title":"T","script":"Some script text."}"#
+      .data(using: .utf8)!
+
+    #expect(MobileChatContentParser.decodeVideoProposal(from: data) == nil)
+  }
+
 }
 
 // MARK: - Entity + skill token parsing (JOV-3608)

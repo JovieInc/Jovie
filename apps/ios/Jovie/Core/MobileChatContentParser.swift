@@ -83,6 +83,7 @@ enum MobileChatContentParser {
   ) -> [MobileChatRenderableSegment] {
     let toolResults = parseToolResults(from: content)
     let merchArtifacts = toolResults.merchArtifacts
+    let videoProposals = toolResults.videoProposals
     let resultStates = toolResults.states
     let sanitized = suppressIncompleteToolMarkup(
       stripToolResultMarkup(from: content),
@@ -146,6 +147,13 @@ enum MobileChatContentParser {
           model.state == .succeeded
         {
           segments.append(.merchArtifact(artifact))
+        }
+        if
+          let toolName,
+          let proposal = videoProposals[toolName],
+          model.state == .succeeded
+        {
+          segments.append(.videoProposal(proposal))
         }
       }
 
@@ -293,11 +301,13 @@ enum MobileChatContentParser {
   private struct ParsedToolResults {
     let states: [String: MobileChatToolCallState]
     let merchArtifacts: [String: MobileChatMerchArtifact]
+    let videoProposals: [String: MobileChatVideoProposalPayload]
   }
 
   private static func parseToolResults(from content: String) -> ParsedToolResults {
     var states: [String: MobileChatToolCallState] = [:]
     var merchArtifacts: [String: MobileChatMerchArtifact] = [:]
+    var videoProposals: [String: MobileChatVideoProposalPayload] = [:]
     let fallbackToolName = extractMostRecentToolName(from: content)
     let patterns = [
       "<tool_result>([\\s\\S]*?)</tool_result>",
@@ -332,6 +342,15 @@ enum MobileChatContentParser {
 
         states[trimmedName] = resolveResultState(from: block)
 
+        if
+          videoProposalToolNames.contains(trimmedName),
+          let jsonPayload = extractJsonPayload(from: block),
+          let proposal = decodeVideoProposal(from: jsonPayload)
+        {
+          videoProposals[trimmedName] = proposal
+          return
+        }
+
         guard
           merchArtifactToolNames.contains(trimmedName),
           let jsonPayload = extractJsonPayload(from: block),
@@ -344,7 +363,11 @@ enum MobileChatContentParser {
       }
     }
 
-    return ParsedToolResults(states: states, merchArtifacts: merchArtifacts)
+    return ParsedToolResults(
+      states: states,
+      merchArtifacts: merchArtifacts,
+      videoProposals: videoProposals
+    )
   }
 
   private static func extractMostRecentToolName(from content: String) -> String? {
