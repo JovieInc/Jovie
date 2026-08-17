@@ -104,60 +104,12 @@ jobs:
           persist-credentials: false
       - name: Require fresh exact-main deployment authority
         id: policy
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          GEM_PRIORITY_GATE_REPO: ${{ github.repository }}
-          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          receipt="$RUNNER_TEMP/jovie-fleet-gate.json"
-          set +e
-          # This exact-main evaluation also persists the canonical fleet gate
-          # receipt under the gate's one-writer lock, so a completed production
-          # controller run refreshes the persisted deployment-authority state.
-          python3 scripts/hermes/gem-priority-gate.py \
-            --consumer deployment >"$receipt"
-          gate_rc=$?
-          set -e
-          jq -e '
-            .schema == "jovie-fleet-gate/v1" and
-            (.signals.main.sha == env.EXPECTED_SHA) and
-            (.deploymentAdmission.allowed | type == "boolean") and
-            (.promotionAdmission.allowed | type == "boolean") and
-            (.isolatedPromotionAdmission.deploymentsAllowed == false)
-          ' "$receipt" >/dev/null || {
-            echo '::error::Fleet gate emitted a malformed deployment receipt.' >&2
-            exit 2
-          }
-          deployment_allowed=false
-          mode=blocked
-          if [ "$gate_rc" -eq 0 ] && jq -e '
-            .signals.main.sha == env.EXPECTED_SHA and
-            .deploymentAdmission.allowed == true
-          ' "$receipt" >/dev/null; then
-            deployment_allowed=true
-            mode=normal
-          elif jq -e '
-            .signals.main.status == "green" and
-            .signals.production.status == "red" and
-            .isolatedPromotionAdmission.allowed == true
-          ' "$receipt" >/dev/null; then
-            mode=isolated-only
-            echo '::notice::Production is red; main may accept a proven isolated delta, but deployment remains frozen.'
-          elif jq -e '
-            .signals.main.status == "red" and
-            (.signals.integrity.status | IN("clear", "resolved"))
-          ' "$receipt" >/dev/null; then
-            mode=draft-only
-            echo '::notice::Main is red; deployment remains frozen.'
-          else
-            echo '::notice::Fleet deployment evidence is blocked or unknown; no production mutation is authorized.'
-          fi
-          {
-            echo "deployment_allowed=$deployment_allowed"
-            echo "mode=$mode"
-          } >>"$GITHUB_OUTPUT"
+        uses: ./.github/actions/evaluate-fleet-gate
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          dry-run: 'false'
+          consumer: deployment
+          expected-sha: ${{ github.event.workflow_run.head_sha }}
 
   authorize-production:
     name: Authorize exact main CI evidence

@@ -51,7 +51,7 @@ def signals(**overrides):
     return payload
 
 
-def run_wrapper(payload):
+def run_wrapper(payload, *, consumer="fleet", expected_sha=None):
     with tempfile.TemporaryDirectory() as tmp:
         out = pathlib.Path(tmp) / "github-output"
         receipt = pathlib.Path(tmp) / "receipt.json"
@@ -59,7 +59,10 @@ def run_wrapper(payload):
         env["FLEET_GATE_EVALUATE_JSON"] = json.dumps(payload)
         env["FLEET_GATE_DRY_RUN"] = "1"
         env["FLEET_GATE_RECEIPT"] = str(receipt)
+        env["FLEET_GATE_CONSUMER"] = consumer
         env["GITHUB_OUTPUT"] = str(out)
+        if expected_sha is not None:
+            env["EXPECTED_SHA"] = expected_sha
         result = subprocess.run(
             ["bash", str(SCRIPT)],
             capture_output=True,
@@ -128,6 +131,65 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertEqual(outputs["promotion_allowed"], "false")
+
+    def test_deployment_consumer_uses_deployment_admission_not_promotion(self):
+        action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text()
+        self.assertIn("FLEET_GATE_CONSUMER", action)
+        self.assertIn("deployment_allowed", action)
+
+        code, outputs, receipt = run_wrapper(signals(), consumer="deployment", expected_sha=SHA)
+        self.assertEqual(code, 0)
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertTrue(receipt["deploymentAdmission"]["allowed"])
+        self.assertEqual(outputs["deployment_allowed"], "true")
+        self.assertEqual(outputs["mode"], "normal")
+        self.assertEqual(outputs["gate_rc"], "0")
+
+        code, outputs, receipt = run_wrapper(
+            signals(
+                independentReview={
+                    "schema": "jovie-independent-review/v1",
+                    "accepted": False,
+                    "reason": "independent-review-receipt-missing",
+                }
+            ),
+            consumer="deployment",
+            expected_sha=SHA,
+        )
+        self.assertEqual(code, 0)
+        self.assertTrue(receipt["deploymentAdmission"]["allowed"])
+        self.assertEqual(outputs["deployment_allowed"], "true")
+        self.assertEqual(outputs["promotion_allowed"], "false")
+        self.assertEqual(outputs["mode"], "normal")
+
+        code, outputs, receipt = run_wrapper(
+            signals(
+                integrity={
+                    "status": "active",
+                    "reason": "credential-compromise",
+                    "detail": "keys leaked",
+                }
+            ),
+            consumer="deployment",
+            expected_sha=SHA,
+        )
+        self.assertEqual(code, 0)
+        self.assertFalse(receipt["deploymentAdmission"]["allowed"])
+        self.assertEqual(outputs["deployment_allowed"], "false")
+        self.assertEqual(outputs["gate_rc"], "2")
+        self.assertEqual(outputs["mode"], "blocked")
+
+        code, outputs, receipt = run_wrapper(
+            signals(), consumer="deployment", expected_sha="b" * 40
+        )
+        self.assertEqual(code, 2)
+        self.assertEqual(receipt["signals"]["main"]["sha"], SHA)
+        self.assertNotEqual(outputs.get("mode"), "normal")
+
+    def test_unknown_consumer_fails_closed(self):
+        code, outputs, receipt = run_wrapper(signals(), consumer="promotion")
+        self.assertEqual(code, 2)
+        self.assertEqual(receipt, {})
 
 
 if __name__ == "__main__":
