@@ -24,6 +24,9 @@ inputs:
     description: Minimum baseline errors required to use rate comparison.
     required: false
     default: '5'
+  expected_sha:
+    description: Exact production revision being observed.
+    required: true
 
 outputs:
   gate_status:
@@ -35,6 +38,9 @@ outputs:
   post_deploy_errors:
     description: Number of errors in the post-deploy window.
     value: ${{ steps.post-deploy.outputs.error_count }}
+  candidate_release_errors:
+    description: Number of post-deploy errors tagged to the candidate release.
+    value: ${{ steps.candidate-release.outputs.error_count }}
 
 runs:
   using: composite
@@ -60,11 +66,13 @@ runs:
         baseline_minutes="${{ inputs.baseline_window_minutes }}"
         threshold_multiplier="${{ inputs.threshold_multiplier }}"
         min_baseline_errors="${{ inputs.min_baseline_errors }}"
+        expected_sha="${{ inputs.expected_sha }}"
         [[ "$soak_minutes" =~ ^[1-9][0-9]*$ ]] && [ "$soak_minutes" -le 60 ] &&
           [[ "$baseline_minutes" =~ ^[1-9][0-9]*$ ]] && [ "$baseline_minutes" -le 1440 ] &&
           [[ "$threshold_multiplier" =~ ^[1-9][0-9]*$ ]] && [ "$threshold_multiplier" -le 100 ] &&
-          [[ "$min_baseline_errors" =~ ^[0-9]+$ ]] && [ "$min_baseline_errors" -le 100000 ] || {
-          echo "::error::Sentry gate numeric inputs are outside safe positive bounds."
+          [[ "$min_baseline_errors" =~ ^[0-9]+$ ]] && [ "$min_baseline_errors" -le 100000 ] &&
+          [[ "$expected_sha" =~ ^[0-9a-f]{40}$ ]] || {
+          echo "::error::Sentry gate inputs are outside safe bounds."
           exit 1
         }
         project_response="$(curl --fail --silent --show-error \
@@ -77,6 +85,7 @@ runs:
         }
         echo "project_id=$project_id" >> "$GITHUB_OUTPUT"
         echo "gate_start_epoch=$(date +%s)" >> "$GITHUB_OUTPUT"
+        echo "candidate_release=$expected_sha" >> "$GITHUB_OUTPUT"
 
     - name: Query baseline error rate (pre-deploy)
       id: baseline
@@ -186,12 +195,59 @@ runs:
         echo "Post-deploy error count: $ERROR_COUNT"
         echo "error_count=$ERROR_COUNT" >> "$GITHUB_OUTPUT"
 
+    - name: Query candidate-release errors for attribution
+      id: candidate-release
+      shell: bash
+      env:
+        SENTRY_AUTH_TOKEN: ${{ inputs['sentry-auth-token'] }}
+        SENTRY_ORG: jovie
+        SENTRY_PROJECT_ID: ${{ steps.sentry-config.outputs.project_id }}
+        CANDIDATE_RELEASE: ${{ steps.sentry-config.outputs.candidate_release }}
+      run: |
+        set -euo pipefail
+        SOAK_MINUTES="${{ inputs.soak_minutes }}"
+        GATE_START_EPOCH="${{ steps.sentry-config.outputs.gate_start_epoch }}"
+        START_EPOCH=$GATE_START_EPOCH
+        END_EPOCH=$((GATE_START_EPOCH + SOAK_MINUTES * 60))
+        START_ISO=$(date -u -d "@$START_EPOCH" '+%Y-%m-%dT%H:%M:%S')
+        END_ISO=$(date -u -d "@$END_EPOCH" '+%Y-%m-%dT%H:%M:%S')
+
+        STATS_RESPONSE=$(curl --fail --silent --show-error --get \
+          -H "Authorization: Bearer $SENTRY_AUTH_TOKEN" \
+          --data-urlencode "project=$SENTRY_PROJECT_ID" \
+          --data-urlencode "field=count()" \
+          --data-urlencode "query=event.type:error environment:vercel-production release:$CANDIDATE_RELEASE" \
+          --data-urlencode "start=$START_ISO" \
+          --data-urlencode "end=$END_ISO" \
+          --data-urlencode "interval=1m" \
+          "https://sentry.io/api/0/organizations/$SENTRY_ORG/events-stats/")
+
+        jq -e '
+          type == "object" and
+          (.data | type == "array") and
+          all(.data[];
+            type == "array" and length >= 2 and
+            (.[1] | type == "array") and
+            all(.[1][]; (.count | type == "number"))
+          )
+        ' >/dev/null <<<"$STATS_RESPONSE"
+        ERROR_COUNT=$(jq -r '[.data[]?[1][]?.count] | add // 0' <<<"$STATS_RESPONSE")
+        [[ "$ERROR_COUNT" =~ ^[0-9]+$ ]] || {
+          echo "::error::Sentry candidate-release count is not a non-negative integer."
+          exit 1
+        }
+
+        echo "Candidate-release ($CANDIDATE_RELEASE) error count: $ERROR_COUNT"
+        echo "error_count=$ERROR_COUNT" >> "$GITHUB_OUTPUT"
+
     - name: Evaluate error rate comparison
       id: evaluate
       shell: bash
       run: |
         BASELINE="${{ steps.baseline.outputs.error_count }}"
         POST_DEPLOY="${{ steps.post-deploy.outputs.error_count }}"
+        CANDIDATE_RELEASE="${{ steps.sentry-config.outputs.candidate_release }}"
+        CANDIDATE_RELEASE_ERRORS="${{ steps.candidate-release.outputs.error_count }}"
         THRESHOLD="${{ inputs.threshold_multiplier }}"
         MIN_BASELINE="${{ inputs.min_baseline_errors }}"
         BASELINE_MINUTES="${{ inputs.baseline_window_minutes }}"
@@ -267,5 +323,7 @@ runs:
         echo "| Status | $STATUS |" >> "$GITHUB_STEP_SUMMARY"
         echo "| Baseline errors | $BASELINE |" >> "$GITHUB_STEP_SUMMARY"
         echo "| Post-deploy errors | $POST_DEPLOY |" >> "$GITHUB_STEP_SUMMARY"
+        echo "| Candidate release | $CANDIDATE_RELEASE |" >> "$GITHUB_STEP_SUMMARY"
+        echo "| Candidate-release errors | $CANDIDATE_RELEASE_ERRORS |" >> "$GITHUB_STEP_SUMMARY"
         echo "| Threshold | ${{ inputs.threshold_multiplier }}x |" >> "$GITHUB_STEP_SUMMARY"
         echo "| Reason | $REASON |" >> "$GITHUB_STEP_SUMMARY"

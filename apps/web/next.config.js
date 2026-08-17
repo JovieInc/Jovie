@@ -521,6 +521,13 @@ const nextConfig = {
       process.env.VERCEL_GIT_COMMIT_SHA ||
       ''
     ).slice(0, 7),
+    // Sentry's release tag must retain the full build identity. The UI only
+    // needs a short SHA, but production-gate attribution must be exact.
+    NEXT_PUBLIC_SENTRY_RELEASE:
+      process.env.NEXT_PUBLIC_SENTRY_RELEASE ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      process.env.NEXT_PUBLIC_BUILD_SHA ||
+      '',
     NEXT_PUBLIC_CI: process.env.CI === 'true' ? 'true' : 'false',
   },
   // Keep @statsig/statsig-node-core external so Next.js does not webpack-bundle
