@@ -602,7 +602,10 @@ export async function tryGitHubRebase({
   repo,
   pr,
   expectedBaseRefName,
+  expectedBaseOid,
+  expectedHeadOid,
   dryRun,
+  preMutationCheckImpl = null,
   ghJsonImpl = ghJson,
   integrationProofImpl = gitIntegrationProof,
   sleepImpl = sleep,
@@ -680,6 +683,30 @@ export async function tryGitHubRebase({
       baseRefName: before.baseRefName,
       reason:
         'GitHub PR snapshot omitted id, headRefOid, or exact baseRefOid; refusing mutation',
+    };
+  }
+  if (expectedBaseOid && before.baseRefOid !== expectedBaseOid) {
+    return {
+      ...NO_MUTATION,
+      ok: false,
+      conflict: false,
+      category: 'stale_base',
+      baseRefName: before.baseRefName,
+      expectedHeadOid: expectedHeadOid ?? before.headRefOid,
+      observedHeadOid: before.headRefOid,
+      reason: `exact base changed before GitHub rebase (${expectedBaseOid.slice(0, 12)} -> ${before.baseRefOid.slice(0, 12)})`,
+    };
+  }
+  if (expectedHeadOid && before.headRefOid !== expectedHeadOid) {
+    return {
+      ...NO_MUTATION,
+      ok: false,
+      conflict: false,
+      category: 'stale_pr',
+      baseRefName: before.baseRefName,
+      expectedHeadOid,
+      observedHeadOid: before.headRefOid,
+      reason: `exact head changed before GitHub rebase (${expectedHeadOid.slice(0, 12)} -> ${before.headRefOid.slice(0, 12)})`,
     };
   }
   if (before.mergeable === 'CONFLICTING') {
@@ -797,6 +824,50 @@ export async function tryGitHubRebase({
       reason:
         'GitHub PR snapshot or local merge proof omitted the pre-mutation integration tree; refusing mutation',
     };
+  }
+
+  if (preMutationCheckImpl) {
+    let preMutationCheck;
+    try {
+      preMutationCheck = await runWithinDeadline(
+        deadline,
+        'pre-mutation eligibility revalidation',
+        timeoutMs =>
+          preMutationCheckImpl({
+            repo,
+            prNumber: pr.number,
+            expectedBaseRefName: before.baseRefName,
+            expectedBaseOid: before.baseRefOid,
+            expectedHeadOid: before.headRefOid,
+            timeoutMs,
+          })
+      );
+    } catch (error) {
+      return {
+        ...NO_MUTATION,
+        ok: false,
+        conflict: false,
+        category: 'verification_failure',
+        baseRefName: before.baseRefName,
+        expectedHeadOid: before.headRefOid,
+        observedHeadOid: null,
+        reason: `could not revalidate current PR eligibility at the mutation boundary: ${errorText(error)}`,
+      };
+    }
+    if (preMutationCheck?.ok !== true) {
+      return {
+        ...NO_MUTATION,
+        ok: false,
+        conflict: false,
+        category: preMutationCheck?.category ?? 'stale_pr',
+        baseRefName: before.baseRefName,
+        expectedHeadOid: before.headRefOid,
+        observedHeadOid: preMutationCheck?.observedHeadOid ?? null,
+        reason:
+          preMutationCheck?.reason ??
+          'current PR eligibility could not be proven at the mutation boundary',
+      };
+    }
   }
 
   let mutation;

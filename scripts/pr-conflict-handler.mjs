@@ -238,6 +238,8 @@ async function executePlan(plan, options) {
           repo: options.repo,
           pr: item.pr,
           expectedBaseRefName: item.pr.baseRefName,
+          expectedBaseOid: item.pr.baseRefOid,
+          expectedHeadOid: item.pr.headRefOid,
           dryRun: false,
         });
         if (!result.ok && result.conflict) {

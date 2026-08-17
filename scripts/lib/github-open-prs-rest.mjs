@@ -40,7 +40,9 @@ export function normalizeRestPullRequest(detail, statusCheckRollup) {
     mergeable: mergeableValue(detail.mergeable),
     mergeStateStatus: upper(detail.mergeable_state || 'UNKNOWN'),
     baseRefName: detail.base?.ref ?? '',
+    baseRefOid: detail.base?.sha ?? '',
     headRefName: detail.head?.ref ?? '',
+    headRefOid: detail.head?.sha ?? '',
     headRepository: detail.head?.repo
       ? {
           name: detail.head.repo.name,
@@ -112,8 +114,10 @@ export async function fetchOpenPrsRest({ repo, limit = 200, request }) {
   for (const summary of summaries.slice(0, limit)) {
     const detail = await request(`repos/${repo}/pulls/${summary.number}`);
     const sha = detail.head?.sha;
-    if (!sha) {
-      throw new Error(`REST PR #${summary.number} is missing head.sha`);
+    if (!detail.base?.sha || !sha) {
+      throw new Error(
+        `REST PR #${summary.number} is missing exact base.sha or head.sha`
+      );
     }
     const checkRuns = await fetchCompleteCollection({
       request,
