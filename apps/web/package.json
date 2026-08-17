@@ -268,7 +268,7 @@
     "exceljs": "4.4.0",
     "flags": "^4.2.0",
     "heic2any": "^0.0.4",
-    "isomorphic-dompurify": "3.12.0",
+    "isomorphic-dompurify": "3.22.0",
     "jose": "^6.2.2",
     "jszip": "^3.10.1",
     "langfuse": "^3.38.20",
