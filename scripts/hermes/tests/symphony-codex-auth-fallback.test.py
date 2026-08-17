@@ -713,6 +713,8 @@ class FallbackTests(unittest.TestCase):
         self.assertIn("blocked", module.BLOCKED_ADMISSION_LABELS)
         self.assertIn("needs-human", module.BLOCKED_ADMISSION_LABELS)
         self.assertIn("needs:human", module.BLOCKED_ADMISSION_LABELS)
+        for label in ("held", "decision-required", "manual-incident"):
+            self.assertIn(label, module.BLOCKED_ADMISSION_LABELS)
         # admission_decision is one predicate shared front-to-back.
         ok, _reason = module.admission_decision(
             "JOV", "JOV-1", {"symphony", "plan-approved", "admission-approved"}
@@ -724,6 +726,12 @@ class FallbackTests(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertEqual(reason, "blocked")
+        for label in ("held", "decision-required", "manual-incident"):
+            ok, reason = module.admission_decision(
+                "JOV", "JOV-1", {"symphony", "plan-approved", "admission-approved", label}
+            )
+            self.assertFalse(ok)
+            self.assertEqual(reason, "blocked")
         symphony_only, reason = module.admission_decision("JOV", "JOV-2", {"symphony"})
         self.assertTrue(symphony_only, reason)
 

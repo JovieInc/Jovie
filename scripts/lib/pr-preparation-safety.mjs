@@ -289,7 +289,6 @@ function invariantSnapshot(pr) {
     labels: pr.labels.nodes.map(label => label.name).sort(),
   });
 }
-
 export async function fetchPrSnapshot(
   repo,
   number,
@@ -379,6 +378,8 @@ export function cancelledReceipt(receipt, signal, nowMs = Date.now()) {
     reason: `${signal} received; mutation outcome must be re-read from GitHub`,
     mutationAttempted: null,
     mutationApplied: null,
+    observedHeadOid: null,
+    requiresExactRereadBeforeRetry: true,
   };
 }
 

@@ -6,6 +6,7 @@
  * fail-closed on ownership, plan evidence, and mutation read-back.
  */
 
+import { preAdmissionDecision } from './admission-policy.mjs';
 import { scoreIssue } from './scorer.mjs';
 import { verifyRoutingReceipt } from './symphony-routing.mjs';
 
@@ -596,14 +597,6 @@ export function evaluateFleetGate(
   };
 }
 
-const PROTECTED_LABELS = new Set([
-  'human-review-required',
-  'needs-human',
-  'no-auto',
-  'protected',
-  'tim-approved',
-  'tim-owned',
-]);
 const PLAN_LABELS = new Set(['plan-approved', 'approved-plan']);
 const ADMISSION_LABELS = new Set([
   'admission-approved',
@@ -675,20 +668,23 @@ function issueForClassification(classification) {
   return classification.issue || classification;
 }
 
-function eligibleCandidate(classification, bundledIds) {
+function candidateAdmissionDecision(classification, bundledIds) {
   const issue = issueForClassification(classification);
+  const preAdmission = preAdmissionDecision(issue);
+  if (!preAdmission.allowed) return { eligible: false, preAdmission };
   const evidence = hasAdmissionEvidence(issue, classification);
   const state = issue.state?.name || classification.state;
-  return (
-    isConcreteJovieIssue(issue) &&
-    !bundledIds.has(classification.identifier) &&
-    classification.category === 'triageable' &&
-    ['Triage', 'Backlog', 'Todo'].includes(state) &&
-    !namesOf(issue).some(label => PROTECTED_LABELS.has(label)) &&
-    !isTimOwned(issue) &&
-    !issue.pullRequestUrl &&
-    evidence.eligible
-  );
+  return {
+    eligible:
+      isConcreteJovieIssue(issue) &&
+      !bundledIds.has(classification.identifier) &&
+      classification.category === 'triageable' &&
+      ['Triage', 'Backlog', 'Todo'].includes(state) &&
+      !isTimOwned(issue) &&
+      !issue.pullRequestUrl &&
+      evidence.eligible,
+    preAdmission,
+  };
 }
 
 /**
@@ -719,9 +715,22 @@ export async function selectNextToAdmit(
   const bundledIds = new Set(
     (workstreams || []).flatMap(workstream => workstream.issueIds || [])
   );
-  const candidates = classifications
-    .filter(classification => eligibleCandidate(classification, bundledIds))
-    .map(classification => ({
+  const evaluations = classifications.map(classification => ({
+    classification,
+    decision: candidateAdmissionDecision(classification, bundledIds),
+  }));
+  const admissionDecisions = evaluations.map(
+    ({ classification, decision }) => ({
+      identifier:
+        classification.identifier ||
+        issueForClassification(classification).identifier,
+      allowed: decision.eligible,
+      preAdmission: decision.preAdmission,
+    })
+  );
+  const candidates = evaluations
+    .filter(({ decision }) => decision.eligible)
+    .map(({ classification }) => ({
       ...classification,
       type: 'issue',
       issue: issueForClassification(classification),
@@ -737,6 +746,7 @@ export async function selectNextToAdmit(
       reason: bundledIds.size
         ? 'no concrete evidence-backed issue (synthetic bundles are report-only)'
         : 'no eligible candidates',
+      admissionDecisions,
     };
   }
   const selected = candidates[0];
@@ -744,6 +754,7 @@ export async function selectNextToAdmit(
     admit: [selected],
     reason: `selected: ${selected.identifier} (score ${selected.score})`,
     fleetGate,
+    admissionDecisions,
   };
 }
 
@@ -785,6 +796,13 @@ export async function admitIssue({
 }) {
   if (!isConcreteJovieIssue(issue))
     return { status: 'rejected', reason: 'not-concrete-routed-issue' };
+  const preAdmission = preAdmissionDecision(issue);
+  if (!preAdmission.allowed)
+    return {
+      status: 'rejected',
+      reason: preAdmission.reason.code,
+      preAdmission,
+    };
   if (!hasAdmissionEvidence(issue, classification).eligible) {
     return { status: 'rejected', reason: 'plan-or-admission-evidence-missing' };
   }
@@ -819,6 +837,14 @@ export async function admitIssue({
     );
   }
 
+  const currentPreAdmission = preAdmissionDecision(current);
+  if (!currentPreAdmission.allowed)
+    return {
+      status: 'rejected',
+      reason: currentPreAdmission.reason.code,
+      preAdmission: currentPreAdmission,
+    };
+
   if (!namesOf(current).includes(SYMPHONY_LABEL)) {
     const existing = (current.labels?.nodes || []).find(
       label => label.name === SYMPHONY_LABEL
@@ -839,6 +865,14 @@ export async function admitIssue({
     );
   }
 
+  const beforeReceiptPreAdmission = preAdmissionDecision(current);
+  if (!beforeReceiptPreAdmission.allowed)
+    return {
+      status: 'rejected',
+      reason: beforeReceiptPreAdmission.reason.code,
+      preAdmission: beforeReceiptPreAdmission,
+    };
+
   const result = await client.addComment(current.id, receipt);
   if (!mutationSucceeded(result)) throw new Error('receipt-mutation-failed');
   current = await rereadOrThrow(
@@ -856,6 +890,7 @@ export async function admitIssue({
     reread =>
       reread.state?.name === 'Todo' &&
       namesOf(reread).includes(SYMPHONY_LABEL) &&
+      preAdmissionDecision(reread).allowed &&
       commentsOf(reread).some(comment =>
         (comment.body || comment).includes(receipt)
       ),

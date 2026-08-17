@@ -1,6 +1,7 @@
 /** Deterministic approval boundary between a verified plan and Symphony. */
 
 import { createHash } from 'node:crypto';
+import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
 import { PLAN_APPROVED_LABEL, planGateReceipt } from './plan-gate.mjs';
 
 export const ADMISSION_GATE_SCHEMA = 'admission-gate/v1';
@@ -9,20 +10,6 @@ export const ADMISSION_GATE_SUFFIX = '<!--/admission-gate-->';
 export const ADMISSION_APPROVED_LABEL = 'admission-approved';
 
 const ALLOWED_STATES = new Set(['Triage', 'Backlog', 'Todo']);
-const PROTECTED_LABELS = new Set([
-  'blocked',
-  'codex-blocked',
-  'codex-in-progress',
-  'human-review-required',
-  'incident',
-  'needs-human',
-  'no-auto',
-  'protected',
-  'risk:high',
-  'tim-approved',
-  'tim-owned',
-]);
-
 function labelsOf(issue) {
   return (issue?.labels?.nodes || issue?.labels || [])
     .map(label => (typeof label === 'string' ? label : label?.name))
@@ -58,8 +45,7 @@ export function validateAdmissionCandidate(issue) {
   if (!ALLOWED_STATES.has(issue.state?.name || issue.state))
     return 'ambiguous-or-active-state';
   if (isTimOwned(issue)) return 'tim-owned';
-  if (labelsOf(issue).some(label => PROTECTED_LABELS.has(label)))
-    return 'protected-or-human-review';
+  if (hasProtectedAdmissionLabel(issue)) return 'protected-or-human-review';
   if (!hasLabel(issue, PLAN_APPROVED_LABEL)) return 'plan-label-missing';
   if (!planGateReceipt(issue)) return 'plan-receipt-missing-or-invalid';
   return null;

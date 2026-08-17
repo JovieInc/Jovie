@@ -1592,6 +1592,10 @@ describe('remediation mutations', () => {
 
     expect(summary.applied).toBe(0);
     expect(summary.mutationBudgetUsed).toBe(1);
+    expect(summary.results[0]).toMatchObject({
+      mutationApplied: false,
+      requiresExactRereadBeforeRetry: false,
+    });
     expect(labelPrImpl).not.toHaveBeenCalled();
     expect(commentPrImpl).not.toHaveBeenCalled();
   });
@@ -1600,7 +1604,9 @@ describe('remediation mutations', () => {
     const rebaseImpl = vi.fn(async () => ({
       ok: false,
       mutationAttempted: true,
-      mutationApplied: true,
+      mutationApplied: null,
+      observedHeadOid: null,
+      requiresExactRereadBeforeRetry: true,
       conflict: false,
       category: 'verification_failure',
       reason: 'updated head did not converge before timeout',
@@ -1627,7 +1633,9 @@ describe('remediation mutations', () => {
     expect(summary.results).toHaveLength(1);
     expect(summary.results[0]).toMatchObject({
       mutationAttempted: true,
-      mutationApplied: true,
+      mutationApplied: null,
+      observedHeadOid: null,
+      requiresExactRereadBeforeRetry: true,
       consumedBudget: true,
     });
     expect(labelPrImpl).not.toHaveBeenCalled();

@@ -147,7 +147,6 @@ describe('reusable exact eligibility gate', () => {
       ).toThrow(/dry-run|integrity/);
     }
   });
-
   it('keeps canonical fast parity and excludes Graphite queue work', () => {
     expect(HOLD_LABELS).toContain('fast');
     expect(eligibility({ labels: [{ name: 'fast' }] }).outcome).toBe(
@@ -364,7 +363,7 @@ describe('mutation and receipt races', () => {
       const mod=await import(process.argv[1]);
       const writer=mod.createAtomicReceiptWriter(process.argv[2],{beforeRenameImpl:async({receipt})=>{if(receipt.outcome==='started'){console.log('READY');await new Promise(r=>setTimeout(r,200));}}});
       mod.installProcessSignalHandlers({getLatest:writer.getLatest,writeReceiptImpl:writer.write});
-      writer.write({schema:mod.RECEIPT_SCHEMA,outcome:'started',mutationAttempted:false,mutationApplied:false});
+      writer.write({schema:mod.RECEIPT_SCHEMA,outcome:'started',mutationAttempted:true,mutationApplied:null,observedHeadOid:'${HEAD}',requiresExactRereadBeforeRetry:false});
       setInterval(()=>{},1000);`;
     const child = spawn(process.execPath, [
       '--input-type=module',
@@ -387,8 +386,12 @@ describe('mutation and receipt races', () => {
     });
     child.kill(signal === 'SIGINT' ? 'SIGINT' : 'SIGTERM');
     await new Promise(resolve => child.once('exit', resolve));
-    expect(JSON.parse(await readFile(target, 'utf8')).outcome).toBe(
-      'cancelled_indeterminate'
-    );
+    expect(JSON.parse(await readFile(target, 'utf8'))).toMatchObject({
+      outcome: 'cancelled_indeterminate',
+      mutationAttempted: null,
+      mutationApplied: null,
+      observedHeadOid: null,
+      requiresExactRereadBeforeRetry: true,
+    });
   });
 });

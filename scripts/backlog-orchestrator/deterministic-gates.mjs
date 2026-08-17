@@ -1,27 +1,10 @@
 /** No-model plan and admission gate orchestration. */
 
 import { ADMISSION_APPROVED_LABEL } from './admission-gate.mjs';
+import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
 import { ADMISSION_RECEIPT_PREFIX, SYMPHONY_LABEL } from './admitter.mjs';
 import { PLAN_APPROVED_LABEL } from './plan-gate.mjs';
 
-const PROTECTED_LABELS = new Set([
-  'blocked',
-  'codex-blocked',
-  'codex-in-progress',
-  'founder-fast-track',
-  'human-review-required',
-  'incident',
-  'launch-blocker',
-  'missed-work',
-  'needs-human',
-  'no-auto',
-  'protected',
-  'risk:high',
-  'symphony',
-  'tim-approved',
-  'tim-owned',
-  'type:epic',
-]);
 export const TEAM_ROUTES = Object.freeze({
   JOV: Object.freeze({
     key: 'JOV',
@@ -125,12 +108,12 @@ export function validateDeterministicPlanCandidate(
     return 'inactive-or-active-state';
   if (isTimOwned(issue)) return 'tim-owned';
   if (issue.assignee) return 'already-assigned';
-  const labels = labelsOf(issue);
   // Ordinary complete, unowned, non-sensitive work is machine-authorized by
   // this deterministic policy. Readiness, plan, and admission labels are
   // durable evidence written by the control plane, not a human prerequisite.
   // Explicit opt-out, ownership, and security labels remain fail-closed below.
-  if (labels.some(label => PROTECTED_LABELS.has(label)))
+  const labels = labelsOf(issue);
+  if (hasProtectedAdmissionLabel(issue) || labels.includes('symphony'))
     return 'protected-or-human-review';
   if ((issue.children?.nodes || []).length > 0) return 'parent-or-bundle';
 

@@ -156,6 +156,27 @@ describe('deterministic no-model gates', () => {
     }
   });
 
+  it('rejects every explicit human hold before plan or admission approval', () => {
+    for (const label of [
+      'needs-human',
+      'held',
+      'decision-required',
+      'manual-incident',
+    ]) {
+      const candidate = issue({ labels: { nodes: [{ name: label }] } });
+      assert.equal(
+        deterministicGates.validateDeterministicPlanCandidate(candidate),
+        'protected-or-human-review'
+      );
+      assert.equal(
+        admissionGate.validateAdmissionCandidate(
+          plannedIssue({ labels: { nodes: [{ name: label }] } })
+        ),
+        'protected-or-human-review'
+      );
+    }
+  });
+
   it('selects exactly one eligible issue deterministically', () => {
     const result = deterministicGates.selectDeterministicPlanCandidate(
       [

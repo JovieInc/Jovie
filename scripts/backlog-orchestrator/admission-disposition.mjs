@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 
+import { preAdmissionDecision } from './admission-policy.mjs';
+
 export const ADMISSION_SCAN_SCHEMA = 'symphony-admission-scan/v1';
 
 const ACTIVE_STATES = new Set([
@@ -10,21 +12,6 @@ const ACTIVE_STATES = new Set([
   'In Review',
 ]);
 const CLAIMED_STATES = new Set(['In Progress', 'In Review']);
-const PROTECTED_LABELS = new Set([
-  'blocked',
-  'codex-blocked',
-  'founder-fast-track',
-  'human-review-required',
-  'incident',
-  'launch-blocker',
-  'needs-human',
-  'no-auto',
-  'protected',
-  'risk:high',
-  'tim-approved',
-  'tim-owned',
-  'type:epic',
-]);
 const PROHIBITED_TEXT =
   /credential|secret|password|api[ -]?key|access token|private key|billing|payment|checkout|database migration|schema migration|production deploy|publish externally|delete (?:customer|production|user) data|destructive/i;
 const ACTIVE_PULL_REQUEST =
@@ -76,7 +63,7 @@ function typedReason(code) {
     reason: {
       code,
       layer,
-      retryable: outcome === 'deferred',
+      retryable: outcome === 'deferred' && code !== 'protected-policy',
       detail: code.replaceAll('-', ' '),
     },
   };
@@ -357,6 +344,7 @@ function disposition(issue, outcome, why, context) {
     retry: context.retry,
     ownership: context.ownership,
     evidence: context.evidence,
+    preAdmission: context.preAdmission,
   };
 }
 
@@ -368,7 +356,8 @@ export function classifyAdmissionDisposition(issue, options = {}) {
   const ownership = ownershipFor(issue, options, evidence);
   const retry = retryEvidence(history, options);
   const fairness = fairnessFor(issue, history);
-  const context = { evidence, ownership, retry, fairness };
+  const preAdmission = preAdmissionDecision(issue);
+  const context = { evidence, ownership, retry, fairness, preAdmission };
   const emit = code => {
     const typed = typedReason(code);
     return disposition(issue, typed.outcome, typed.reason, context);
@@ -399,8 +388,7 @@ export function classifyAdmissionDisposition(issue, options = {}) {
   if (ownership.status === 'active' || ownership.status === 'queued')
     return emit('owned-by-other');
 
-  if (evidence.labels.some(label => PROTECTED_LABELS.has(label)))
-    return emit('protected-policy');
+  if (!preAdmission.allowed) return emit(preAdmission.reason.code);
   if (evidence.activePullRequest) return emit('active-pull-request');
   if (childrenOf(issue).length > 0 || evidence.labels.includes('type:epic'))
     return emit('parent-or-bundle');

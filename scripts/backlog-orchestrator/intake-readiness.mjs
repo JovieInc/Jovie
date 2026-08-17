@@ -1,25 +1,11 @@
 import { createHash } from 'node:crypto';
 
+import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
+
 export const INTAKE_READINESS_SCHEMA = 'intake-readiness/v1';
 export const INTAKE_CONTROL_LOOP_SCHEMA = 'intake-control-loop/v1';
 
 const INTAKE_STATES = new Set(['Triage', 'Backlog', 'Todo', 'To Do']);
-const PROTECTED_LABELS = new Set([
-  'blocked',
-  'codex-blocked',
-  'founder-fast-track',
-  'human-review-required',
-  'incident',
-  'launch-blocker',
-  'missed-work',
-  'needs-human',
-  'no-auto',
-  'protected',
-  'risk:high',
-  'tim-approved',
-  'tim-owned',
-  'type:epic',
-]);
 const SENSITIVE_TEXT =
   /credential|secret|password|api[ -]?key|access token|private key|billing|payment|checkout|database migration|schema migration|production deploy|publish externally|delete (?:customer|production|user) data|destructive/i;
 const SECTION_ALIASES = [
@@ -145,7 +131,7 @@ export function classifyIntakeReadiness(issue, options = {}) {
       'existing-symphony-or-active-state',
       options
     );
-  if (labels.some(label => PROTECTED_LABELS.has(label)))
+  if (hasProtectedAdmissionLabel(issue))
     return disposition(issue, 'decision-required', 'protected-policy', options);
   if ((issue?.children?.nodes || issue?.children || []).length > 0)
     return disposition(issue, 'decision-required', 'parent-or-bundle', options);

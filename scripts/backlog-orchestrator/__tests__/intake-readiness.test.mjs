@@ -51,6 +51,22 @@ describe('intake readiness classifier', () => {
     );
   });
 
+  it('routes explicit human holds as decision-required', () => {
+    for (const label of [
+      'needs-human',
+      'held',
+      'decision-required',
+      'manual-incident',
+    ]) {
+      const result = classifyIntakeReadiness(
+        issue({ labels: { nodes: [{ name: label }] } })
+      );
+      assert.equal(result.disposition, 'decision-required');
+      assert.equal(result.reason, 'protected-policy');
+      assert.equal(result.requiresHumanDecision, true);
+    }
+  });
+
   it('chooses at most four independent normal candidates in a control-loop receipt', () => {
     const first = classifyIntakeReadiness(issue({ identifier: 'JOV-1' }));
     const second = classifyIntakeReadiness(issue({ identifier: 'JOV-2' }));
