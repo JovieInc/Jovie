@@ -1128,6 +1128,16 @@ describe('deterministic Symphony admission boundary', () => {
         'independent-review-receipt-malformed',
       ],
       [
+        'missing schema',
+        { ...valid, schema: undefined },
+        'independent-review-receipt-malformed',
+      ],
+      [
+        'missing scope',
+        { ...valid, scope: undefined },
+        'independent-review-receipt-malformed',
+      ],
+      [
         'stale',
         { ...valid, observedAt: '2026-08-09T04:40:00.000Z' },
         'independent-review-receipt-stale',

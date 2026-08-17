@@ -116,13 +116,13 @@ function isFreshTimestamp(value, nowMs, maxAgeMs) {
 
 function reviewReceiptFields(candidate) {
   return {
-    schema: candidate?.schema ?? INDEPENDENT_REVIEW_RECEIPT_SCHEMA,
+    schema: candidate?.schema ?? null,
     status: candidate?.status ?? null,
     authority: candidate?.authority ?? null,
     reviewer: candidate?.reviewer ?? null,
     reviewId: candidate?.reviewId ?? null,
     headSha: candidate?.headSha ?? null,
-    scope: candidate?.scope ?? INDEPENDENT_REVIEW_SCOPE,
+    scope: candidate?.scope ?? null,
     observedAt: candidate?.observedAt ?? null,
   };
 }
