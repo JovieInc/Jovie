@@ -14,8 +14,7 @@ export const TODO_STATE_ID = 'c6c00506-dc9f-4910-8ff7-3874dd77174c';
 export const ADMISSION_RECEIPT_PREFIX = '<!-- symphony-admission:v1 ';
 export const FLEET_GATE_SCHEMA = 'jovie-fleet-gate/v1';
 export const GEM_CONCURRENCY_EVIDENCE_SCHEMA = 'gem-concurrency-evidence/v1';
-export const INDEPENDENT_REVIEW_RECEIPT_SCHEMA =
-  'jovie-independent-review/v1';
+export const INDEPENDENT_REVIEW_RECEIPT_SCHEMA = 'jovie-independent-review/v1';
 export const INDEPENDENT_REVIEW_AUTHORITY = 'Gem';
 export const INDEPENDENT_REVIEW_SCOPE = 'exact-main-head';
 export const FLEET_GATE_STATE = Object.freeze({
@@ -134,6 +133,9 @@ function reviewReceiptFields(candidate) {
  * This is deliberately separate from GitHub review state: the receipt names
  * the authority, the exact current-main head, and its bounded observation
  * window. A caller may not turn a boolean or a stale review into admission.
+ *
+ * @param {unknown} candidate
+ * @param {{ expectedHeadSha?: string, now?: string, maxAgeMs?: number }} [options]
  */
 export function validateIndependentReviewReceipt(
   candidate,
@@ -238,6 +240,10 @@ function independentReviewReason(validation) {
   return FLEET_GATE_REASON.INDEPENDENT_REVIEW_MALFORMED;
 }
 
+/**
+ * @param {unknown} candidate
+ * @param {{ expectedHeadSha?: string, now?: string, maxAgeMs?: number }} [options]
+ */
 export function evaluateIndependentReviewReceipt(
   candidate,
   { expectedHeadSha, now = new Date().toISOString(), maxAgeMs } = {}

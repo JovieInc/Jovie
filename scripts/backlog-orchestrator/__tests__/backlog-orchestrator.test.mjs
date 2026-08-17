@@ -1120,6 +1120,7 @@ describe('deterministic Symphony admission boundary', () => {
 
   it('rejects malformed, stale, future, and wrong-head review receipts', () => {
     const valid = fleetEvidence().independentReview;
+    /** @type {Array<[string, object, string]>} */
     const cases = [
       [
         'malformed',
