@@ -33,6 +33,7 @@ GUARD = ROOT / "scripts/hermes/symphony-lease-guard"
 RECONCILER = ROOT / "scripts/hermes/symphony-reconciler.py"
 MODEL_ROUTER = ROOT / "scripts/hermes/model-router.py"
 MODEL_REGISTRY = ROOT / "scripts/hermes/config/model-registry.json"
+CAPABILITY_MANIFEST = ROOT / "scripts/hermes/config/symphony-reconciler-capabilities.json"
 RECONCILER_SERVICE = ROOT / "scripts/hermes/systemd/symphony-reconciler.service"
 RECONCILER_TIMER = ROOT / "scripts/hermes/systemd/symphony-reconciler.timer"
 INSTALLER = ROOT / "scripts/hermes/install-symphony-ui-pilot.sh"
@@ -315,6 +316,8 @@ def test_installer_deploys_workflow_and_unit(tmp_path: Path) -> None:
     reconciler = tmp_path / ".local/bin/symphony-reconciler"
     model_router = tmp_path / ".local/lib/symphony-reconciler/model-router.py"
     model_registry = tmp_path / ".local/lib/symphony-reconciler/model-registry.json"
+    capability_manifest = tmp_path / ".local/lib/symphony-reconciler/symphony-reconciler-capabilities.json"
+    runtime_receipt = tmp_path / ".local/lib/symphony-reconciler/runtime-receipt.json"
     reconciler_service = tmp_path / ".config/systemd/user/symphony-reconciler.service"
     reconciler_timer = tmp_path / ".config/systemd/user/symphony-reconciler.timer"
     assert workflow.read_text() == WORKFLOW.read_text()
@@ -328,12 +331,14 @@ def test_installer_deploys_workflow_and_unit(tmp_path: Path) -> None:
     assert model_router.read_text() == MODEL_ROUTER.read_text()
     assert model_router.stat().st_mode & 0o111
     assert model_registry.read_text() == MODEL_REGISTRY.read_text()
+    assert capability_manifest.read_text() == CAPABILITY_MANIFEST.read_text()
+    assert json.loads(runtime_receipt.read_text())["schema"] == "symphony-runtime-receipt/v1"
     assert reconciler_service.read_text() == RECONCILER_SERVICE.read_text()
     assert reconciler_timer.read_text() == RECONCILER_TIMER.read_text()
     # Freshly installed state must pass drift detection.
     check = _run_installer(tmp_path, "--check")
     assert check.returncode == 0, check.stdout
-    assert check.stdout.count("OK") == 8
+    assert check.stdout.count("OK") == 10
 
 
 def test_reconciler_records_exact_first_failure_without_escalating(tmp_path: Path) -> None:
@@ -499,6 +504,15 @@ def test_reconciler_hands_repeated_failure_to_local_model_then_returns_to_normal
     assert first_receipt["transition"] == "returned_to_normal_loop"
     assert first_receipt["nextAutomatedAction"] == "normal_model_update_test_ready_native_merge"
     assert first_receipt["headBaseCurrent"]["dirty"] is True
+    assert len(first_receipt["runtimeRevision"]) == 64
+    assert first_receipt["runtimeCapabilities"] == [
+        "immutable-runtime-revision",
+        "isolated-repair",
+        "router-selection",
+        "workspace-observation",
+        "workspace-upgrade",
+    ]
+    assert first_receipt["headBaseCurrent"]["workspaceRevision"]["schema"] == "symphony-workspace-revision/v1"
     assert first_receipt["authoritativeOwner"] == "symphony-reconciler"
     assert first_receipt["attemptedRepairs"][1]["result"] == "acquired"
     assert "transition=alternate_local_repair_started" in result.stdout

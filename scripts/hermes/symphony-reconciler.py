@@ -17,6 +17,7 @@ import json
 import os
 import pathlib
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -25,13 +26,310 @@ import urllib.request
 
 
 SCHEMA = "symphony-reconciliation-receipt/v1"
+RUNTIME_CAPABILITY_SCHEMA = "symphony-runtime-capabilities/v1"
+RUNTIME_RECEIPT_SCHEMA = "symphony-runtime-receipt/v1"
+WORKSPACE_REVISION_SCHEMA = "symphony-workspace-revision/v1"
 DEFAULT_API = "http://127.0.0.1:4041/api/v1/state"
 DEFAULT_WORKSPACES = "~/symphony-workspaces"
 DEFAULT_STATE = "~/.local/state/symphony-reconciler"
+DEFAULT_CAPABILITY_MANIFEST = "config/symphony-reconciler-capabilities.json"
 MODEL_ID = "qwen-coder-local"
 MODEL_TIMEOUT_SECONDS = 12 * 60
 RETRY_MINUTES = 15
 SYMPHONY_SERVICE = "symphony-ui-pilot.service"
+REQUIRED_RUNTIME_CAPABILITIES = frozenset(
+    {
+        "workspace-observation",
+        "workspace-upgrade",
+        "immutable-runtime-revision",
+        "router-selection",
+        "isolated-repair",
+    }
+)
+
+
+def _sha256_bytes(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
+
+def _sha256_file(path: pathlib.Path) -> str | None:
+    try:
+        return _sha256_bytes(path.read_bytes())
+    except OSError:
+        return None
+
+
+def _runtime_paths() -> dict[str, pathlib.Path]:
+    root = pathlib.Path(__file__).resolve().parent
+    registry = pathlib.Path(
+        os.path.expanduser(
+            os.environ.get(
+                "SYMPHONY_MODEL_REGISTRY", str(root / "config" / "model-registry.json")
+            )
+        )
+    )
+    manifest = pathlib.Path(
+        os.path.expanduser(
+            os.environ.get(
+                "SYMPHONY_RUNTIME_CAPABILITY_MANIFEST",
+                str(root / DEFAULT_CAPABILITY_MANIFEST),
+            )
+        )
+    )
+    router = pathlib.Path(
+        os.path.expanduser(
+            os.environ.get("SYMPHONY_MODEL_ROUTER", str(root / "model-router.py"))
+        )
+    )
+    receipt_value = os.environ.get("SYMPHONY_RUNTIME_RECEIPT")
+    receipt = (
+        pathlib.Path(os.path.expanduser(receipt_value))
+        if receipt_value
+        else manifest.with_name("runtime-receipt.json")
+    )
+    return {
+        "runtime": pathlib.Path(__file__).resolve(),
+        "router": router,
+        "registry": registry,
+        "manifest": manifest,
+        "receipt": receipt,
+    }
+
+
+def _runtime_revision(files: dict[str, pathlib.Path]) -> tuple[str | None, dict[str, str]]:
+    hashes: dict[str, str] = {}
+    for name, path in sorted(files.items()):
+        digest = _sha256_file(path)
+        if digest is None:
+            return None, hashes
+        hashes[name] = digest
+    canonical = json.dumps(hashes, sort_keys=True, separators=(",", ":")).encode()
+    return _sha256_bytes(canonical), hashes
+
+
+def _load_json(path: pathlib.Path) -> dict[str, object] | None:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _is_runnable(path: pathlib.Path, *, python_script: bool = False) -> bool:
+    if os.access(path, os.X_OK):
+        return True
+    if not python_script:
+        return False
+    try:
+        first_line = path.read_text(encoding="utf-8", errors="ignore").splitlines()[0]
+    except (OSError, IndexError):
+        return False
+    return first_line.startswith("#!") and "python" in first_line
+
+
+def _source_bundle_available() -> bool:
+    value = os.environ.get("SYMPHONY_RUNTIME_SOURCE_ROOT")
+    if not value:
+        return False
+    root = pathlib.Path(os.path.expanduser(value))
+    if not root.is_dir():
+        return False
+    if not all(
+        path.is_file()
+        for path in (
+            root / "symphony-reconciler.py",
+            root / "model-router.py",
+            root / "config" / "model-registry.json",
+            root / "config" / "symphony-reconciler-capabilities.json",
+        )
+    ):
+        return False
+    manifest = _load_json(root / "config" / "symphony-reconciler-capabilities.json")
+    return bool(
+        manifest
+        and manifest.get("schema") == RUNTIME_CAPABILITY_SCHEMA
+        and manifest.get("runtime") == "symphony-reconciler"
+    )
+
+
+def _runtime_receipt(
+    paths: dict[str, pathlib.Path], manifest: dict[str, object]
+) -> dict[str, object] | None:
+    revision, files = _runtime_revision(
+        {name: paths[name] for name in ("runtime", "router", "registry", "manifest")}
+    )
+    if revision is None:
+        return None
+    return {
+        "schema": RUNTIME_RECEIPT_SCHEMA,
+        "runtime": "symphony-reconciler",
+        "runtimeRevision": revision,
+        "capabilities": sorted(manifest["capabilities"]),
+        "files": files,
+    }
+
+
+def write_runtime_receipt(
+    paths: dict[str, pathlib.Path] | None = None,
+) -> dict[str, object] | None:
+    resolved = paths or _runtime_paths()
+    manifest = _load_json(resolved["manifest"])
+    if manifest is None:
+        return None
+    receipt = _runtime_receipt(resolved, manifest)
+    if receipt is None:
+        return None
+    destination = resolved["receipt"]
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{destination.name}.", dir=destination.parent
+    )
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(receipt, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_name, destination)
+    finally:
+        if os.path.exists(temporary_name):
+            os.unlink(temporary_name)
+    return receipt
+
+
+def runtime_preflight(
+    paths: dict[str, pathlib.Path] | None = None,
+) -> dict[str, object]:
+    """Verify the installed recovery bundle before observing or mutating work.
+
+    A missing generated receipt or missing installed file is recoverable only
+    when the source bundle is explicitly available for bootstrap. A malformed
+    capability contract is permanent: retrying the same runtime cannot add a
+    capability that its manifest does not declare.
+    """
+
+    resolved = paths or _runtime_paths()
+    manifest = _load_json(resolved["manifest"])
+    if manifest is None:
+        return {
+            "status": "permanent_failure",
+            "reason": "capability_manifest_invalid",
+            "runtimeRevision": None,
+            "capabilities": [],
+        }
+    if (
+        manifest.get("schema") != RUNTIME_CAPABILITY_SCHEMA
+        or manifest.get("runtime") != "symphony-reconciler"
+        or not isinstance(manifest.get("capabilities"), list)
+        or not all(isinstance(value, str) for value in manifest["capabilities"])
+        or not isinstance(manifest.get("requiredFiles"), list)
+        or not all(isinstance(value, str) for value in manifest["requiredFiles"])
+    ):
+        return {
+            "status": "permanent_failure",
+            "reason": "capability_manifest_invalid",
+            "runtimeRevision": None,
+            "capabilities": [],
+        }
+
+    capabilities = set(manifest["capabilities"])
+    missing_capabilities = sorted(REQUIRED_RUNTIME_CAPABILITIES - capabilities)
+    if missing_capabilities:
+        return {
+            "status": "permanent_failure",
+            "reason": "required_capability_missing",
+            "missingCapabilities": missing_capabilities,
+            "runtimeRevision": None,
+            "capabilities": sorted(capabilities),
+        }
+
+    required_files = set(manifest["requiredFiles"])
+    known_files = set(resolved) - {"receipt"}
+    missing_manifest_files = sorted(required_files - known_files)
+    if missing_manifest_files:
+        return {
+            "status": "permanent_failure",
+            "reason": "capability_manifest_file_contract_invalid",
+            "missingFiles": missing_manifest_files,
+            "runtimeRevision": None,
+            "capabilities": sorted(capabilities),
+        }
+
+    missing_files = sorted(
+        name
+        for name in required_files
+        if not resolved[name].is_file()
+    )
+    non_executable = sorted(
+        name
+        for name in ("runtime", "router")
+        if name in required_files
+        and resolved[name].is_file()
+        and not _is_runnable(resolved[name], python_script=name == "router")
+    )
+    if missing_files or non_executable:
+        source_available = _source_bundle_available()
+        return {
+            "status": "recoverable" if source_available else "permanent_failure",
+            "reason": "runtime_bootstrap_required"
+            if source_available
+            else "required_runtime_executable_missing",
+            "missingFiles": missing_files,
+            "nonExecutable": non_executable,
+            "runtimeRevision": None,
+            "capabilities": sorted(capabilities),
+            "bootstrapSourceAvailable": source_available,
+        }
+
+    receipt = _runtime_receipt(resolved, manifest)
+    if receipt is None:
+        return {
+            "status": "permanent_failure",
+            "reason": "runtime_revision_unavailable",
+            "runtimeRevision": None,
+            "capabilities": sorted(capabilities),
+        }
+
+    configured_receipt = bool(os.environ.get("SYMPHONY_RUNTIME_RECEIPT"))
+    installed_receipt = _load_json(resolved["receipt"])
+    if installed_receipt is None:
+        if configured_receipt:
+            return {
+                "status": "recoverable",
+                "reason": "runtime_receipt_missing",
+                "runtimeRevision": receipt["runtimeRevision"],
+                "capabilities": sorted(capabilities),
+                "receipt": receipt,
+            }
+        return {
+            "status": "ready",
+            "reason": "source_runtime_verified",
+            "runtimeRevision": receipt["runtimeRevision"],
+            "capabilities": sorted(capabilities),
+            "receipt": receipt,
+        }
+
+    if (
+        installed_receipt.get("schema") != RUNTIME_RECEIPT_SCHEMA
+        or installed_receipt.get("runtime") != receipt["runtime"]
+        or installed_receipt.get("runtimeRevision") != receipt["runtimeRevision"]
+        or installed_receipt.get("capabilities") != receipt["capabilities"]
+        or installed_receipt.get("files") != receipt["files"]
+    ):
+        return {
+            "status": "recoverable",
+            "reason": "runtime_receipt_stale",
+            "runtimeRevision": receipt["runtimeRevision"],
+            "capabilities": sorted(capabilities),
+            "receipt": receipt,
+        }
+    return {
+        "status": "ready",
+        "reason": "runtime_receipt_verified",
+        "runtimeRevision": receipt["runtimeRevision"],
+        "capabilities": sorted(capabilities),
+        "receipt": installed_receipt,
+    }
 
 
 def _now() -> dt.datetime:
@@ -123,6 +421,135 @@ def _git(workspace: pathlib.Path, *args: str) -> str | None:
     return result.stdout.strip() if result.returncode == 0 else None
 
 
+def _git_result(workspace: pathlib.Path, *args: str) -> subprocess.CompletedProcess[str] | None:
+    try:
+        return _captured(["git", *args], workspace)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def _parse_ahead_behind(value: str | None) -> tuple[int | None, int | None]:
+    if not value:
+        return None, None
+    parts = value.split()
+    if len(parts) != 2 or not all(part.isdigit() for part in parts):
+        return None, None
+    return int(parts[1]), int(parts[0])
+
+
+def _workspace_revision(
+    *,
+    head: str | None,
+    base: str | None,
+    merge_base: str | None,
+    status: str | None,
+    ahead: int | None,
+    behind: int | None,
+) -> dict[str, object]:
+    status_value = status or ""
+    return {
+        "schema": WORKSPACE_REVISION_SCHEMA,
+        "head": head,
+        "baseRef": "origin/main",
+        "base": base,
+        "mergeBase": merge_base,
+        "ahead": ahead,
+        "behind": behind,
+        "dirty": bool(status_value),
+        "statusDigest": _sha256_bytes(status_value.encode()),
+    }
+
+
+def _upgrade_stale_workspace(path: pathlib.Path) -> dict[str, object]:
+    """Refresh only a clean workspace with no local commits.
+
+    Fetching the remote advances only the remote-tracking ref. The hard reset
+    is allowed only when the workspace is clean and has no commits ahead of
+    the fetched exact base, so partial repairs are preserved fail-closed.
+    """
+
+    before_head = _git(path, "rev-parse", "HEAD")
+    status_result = _git_result(path, "status", "--porcelain=v1")
+    if status_result is None or status_result.returncode != 0:
+        return {
+            "status": "unavailable",
+            "reason": "workspace_status_unavailable",
+            "beforeHead": before_head,
+        }
+    before_status = status_result.stdout.strip()
+    before_base = _git(path, "rev-parse", "origin/main")
+    if not before_head:
+        return {"status": "unavailable", "reason": "head_unavailable"}
+
+    shallow = _git(path, "rev-parse", "--is-shallow-repository") == "true"
+    fetch_args = (
+        ["fetch", "--unshallow", "origin", "main"]
+        if shallow
+        else ["fetch", "origin", "main"]
+    )
+    fetched = _git_result(path, *fetch_args)
+    if fetched is None or fetched.returncode != 0:
+        return {
+            "status": "unavailable",
+            "reason": "origin_main_fetch_failed",
+            "beforeHead": before_head,
+            "beforeBase": before_base,
+        }
+
+    after_base = _git(path, "rev-parse", "origin/main")
+    counts = _git(path, "rev-list", "--left-right", "--count", "origin/main...HEAD")
+    ahead, behind = _parse_ahead_behind(counts)
+    if not after_base or ahead is None or behind is None:
+        return {
+            "status": "unavailable",
+            "reason": "origin_main_revision_unavailable",
+            "beforeHead": before_head,
+            "beforeBase": before_base,
+        }
+    if before_status:
+        return {
+            "status": "preserved",
+            "reason": "workspace_dirty",
+            "beforeHead": before_head,
+            "afterBase": after_base,
+            "ahead": ahead,
+            "behind": behind,
+        }
+    if ahead > 0:
+        return {
+            "status": "preserved",
+            "reason": "workspace_has_local_commits",
+            "beforeHead": before_head,
+            "afterBase": after_base,
+            "ahead": ahead,
+            "behind": behind,
+        }
+    if behind <= 0 or before_head == after_base:
+        return {
+            "status": "current",
+            "reason": "workspace_matches_fetched_base",
+            "beforeHead": before_head,
+            "afterBase": after_base,
+            "ahead": ahead,
+            "behind": behind,
+        }
+
+    reset = _git_result(path, "reset", "--hard", "origin/main")
+    if reset is None or reset.returncode != 0:
+        return {
+            "status": "unavailable",
+            "reason": "workspace_upgrade_failed",
+            "beforeHead": before_head,
+            "afterBase": after_base,
+        }
+    return {
+        "status": "upgraded",
+        "reason": "clean_workspace_replanted_on_fetched_base",
+        "beforeHead": before_head,
+        "afterBase": after_base,
+    }
+
+
 def _workspace_state(raw_path: object, identifier: str) -> dict[str, object]:
     root = _workspace_root()
     path = pathlib.Path(str(raw_path or root / identifier)).resolve()
@@ -134,8 +561,17 @@ def _workspace_state(raw_path: object, identifier: str) -> dict[str, object]:
             "head": None,
             "baseRef": "origin/main",
             "base": None,
+            "workspaceRevision": _workspace_revision(
+                head=None,
+                base=None,
+                merge_base=None,
+                status=None,
+                ahead=None,
+                behind=None,
+            ),
         }
 
+    upgrade = _upgrade_stale_workspace(path)
     head = _git(path, "rev-parse", "HEAD")
     base = _git(path, "rev-parse", "origin/main")
     merge_base = _git(path, "merge-base", "HEAD", "origin/main") if head and base else None
@@ -143,11 +579,7 @@ def _workspace_state(raw_path: object, identifier: str) -> dict[str, object]:
     status = _git(path, "status", "--porcelain=v1")
     conflicts = _git(path, "diff", "--name-only", "--diff-filter=U")
     counts = _git(path, "rev-list", "--left-right", "--count", "origin/main...HEAD") if head and base else None
-    behind = ahead = None
-    if counts:
-        parts = counts.split()
-        if len(parts) == 2 and all(part.isdigit() for part in parts):
-            behind, ahead = (int(parts[0]), int(parts[1]))
+    ahead, behind = _parse_ahead_behind(counts)
     return {
         "workspace": str(path),
         "valid": bool(head and base),
@@ -161,10 +593,24 @@ def _workspace_state(raw_path: object, identifier: str) -> dict[str, object]:
         "behind": behind,
         "dirty": bool(status),
         "conflictedPaths": conflicts.splitlines() if conflicts else [],
+        "upgrade": upgrade,
+        "workspaceRevision": _workspace_revision(
+            head=head,
+            base=base,
+            merge_base=merge_base,
+            status=status,
+            ahead=ahead,
+            behind=behind,
+        ),
     }
 
 
-def _generation(identifier: str, error: str, state: dict[str, object]) -> str:
+def _generation(
+    identifier: str,
+    error: str,
+    state: dict[str, object],
+    runtime: dict[str, object] | None = None,
+) -> str:
     raw = json.dumps(
         {
             "issue": identifier,
@@ -172,6 +618,8 @@ def _generation(identifier: str, error: str, state: dict[str, object]) -> str:
             "head": state.get("head"),
             "base": state.get("base"),
             "conflicts": state.get("conflictedPaths"),
+            "workspaceRevision": state.get("workspaceRevision"),
+            "runtimeRevision": runtime.get("runtimeRevision") if runtime else None,
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -193,14 +641,23 @@ def _is_repeated_or_conflict(item: dict[str, object], source: str, state: dict[s
     )
 
 
-def _alternate_due(item: dict[str, object], source: str) -> bool:
+def _alternate_due(
+    item: dict[str, object],
+    source: str,
+    runtime: dict[str, object] | None = None,
+) -> bool:
     identifier = str(item.get("issue_identifier", ""))
     if not identifier:
         return False
     state = _workspace_state(item.get("workspace_path"), identifier)
     if not state.get("valid") or not _is_repeated_or_conflict(item, source, state):
         return False
-    generation = _generation(identifier, str(item.get("error") or f"runtime_{source}"), state)
+    generation = _generation(
+        identifier,
+        str(item.get("error") or f"runtime_{source}"),
+        state,
+        runtime,
+    )
     previous = _read_receipt(identifier)
     if not previous or previous.get("generation") != generation:
         return True
@@ -237,21 +694,24 @@ def _write_receipt(identifier: str, payload: dict[str, object]) -> None:
 
 
 def _router_selection() -> tuple[dict[str, object] | None, str]:
-    root = pathlib.Path(__file__).resolve().parent
-    router = pathlib.Path(os.path.expanduser(os.environ.get("SYMPHONY_MODEL_ROUTER", str(root / "model-router.py"))))
-    registry = pathlib.Path(
-        os.path.expanduser(os.environ.get("SYMPHONY_MODEL_REGISTRY", str(root / "config" / "model-registry.json")))
-    )
-    if not registry.is_file():
-        registry = root / ".symphony-codex-auth-fallback" / "current" / "model-registry.json"
-    if not router.is_file() or not registry.is_file():
-        return None, "router_bundle_unavailable"
+    runtime = runtime_preflight()
+    if runtime.get("status") != "ready":
+        return None, str(runtime.get("reason") or "runtime_preflight_failed")
+    paths = _runtime_paths()
+    router = paths["router"]
+    registry = paths["registry"]
     try:
-        router_command = [sys.executable, str(router)] if router.read_bytes().startswith(b"#!/usr/bin/env python") else [str(router)]
-    except OSError:
-        return None, "router_bundle_unavailable"
+        first_line = router.read_text(encoding="utf-8").splitlines()[0]
+        python_router = first_line.startswith("#!") and "python" in first_line
+        router_command = (
+            [sys.executable, str(router)]
+            if python_router
+            else [str(router)]
+        )
+    except (OSError, IndexError):
+        return None, "router_runtime_missing"
     if router_command[0] == str(router) and not os.access(router, os.X_OK):
-        return None, "router_not_executable"
+        return None, "router_runtime_not_executable"
     env = os.environ.copy()
     env["GEM_MODEL_REGISTRY"] = str(registry)
     try:
@@ -263,9 +723,22 @@ def _router_selection() -> tuple[dict[str, object] | None, str]:
             timeout=30,
             env=env,
         )
-        payload = json.loads(result.stdout)
-    except (OSError, subprocess.TimeoutExpired, ValueError, json.JSONDecodeError):
+    except (OSError, subprocess.TimeoutExpired, ValueError):
         return None, "router_unavailable"
+    if result.returncode != 0:
+        return None, "router_unavailable"
+    try:
+        payload = json.loads(result.stdout)
+    except (TypeError, ValueError):
+        return None, "router_invalid_receipt"
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema_version") != 1
+        or payload.get("workflow") != "remediation"
+        or payload.get("capability") != "code"
+        or payload.get("deterministic_first") is not True
+    ):
+        return None, "router_capability_missing"
     selected = payload.get("selected") if isinstance(payload, dict) else None
     if not isinstance(selected, dict):
         return None, "no_remediation_model_ready"
@@ -277,6 +750,11 @@ def _router_selection() -> tuple[dict[str, object] | None, str]:
     argv = executor.get("argv")
     if not isinstance(argv, list) or not all(isinstance(value, str) for value in argv):
         return None, "local_model_argv_invalid"
+    executable = str(executor["executable"])
+    resolved = executable if pathlib.Path(executable).is_absolute() else shutil.which(executable)
+    if not resolved or not pathlib.Path(resolved).is_file() or not os.access(resolved, os.X_OK):
+        return None, "local_model_executor_missing"
+    executor["executable"] = resolved
     return selected, "local_model_ready"
 
 
@@ -301,6 +779,7 @@ def _alternate_repair(
 Issue: {identifier}
 Exact current head: {state.get('head')}
 Exact current base origin/main: {state.get('base')}
+Workspace revision receipt: {json.dumps(state.get('workspaceRevision'), sort_keys=True)}
 Branch: {state.get('branch')}
 Failure: {error}
 
@@ -343,7 +822,12 @@ def _fetch_state() -> dict[str, object]:
     return payload
 
 
-def _reconcile_item(item: dict[str, object], source: str, alternate_permitted: bool) -> None:
+def _reconcile_item(
+    item: dict[str, object],
+    source: str,
+    alternate_permitted: bool,
+    runtime: dict[str, object] | None = None,
+) -> None:
     identifier = str(item.get("issue_identifier", ""))
     if not identifier or not identifier.replace("-", "").isalnum():
         _event("unknown", "invalid_runtime_item", reason="invalid_identifier")
@@ -354,7 +838,8 @@ def _reconcile_item(item: dict[str, object], source: str, alternate_permitted: b
     except (TypeError, ValueError):
         attempt = 0
     state_before = _workspace_state(item.get("workspace_path"), identifier)
-    generation = _generation(identifier, error, state_before)
+    runtime = runtime or runtime_preflight()
+    generation = _generation(identifier, error, state_before, runtime)
     previous = _read_receipt(identifier)
     next_retry = _parse_time(item.get("due_at")) or (_now() + dt.timedelta(minutes=RETRY_MINUTES))
     repeated = _is_repeated_or_conflict(item, source, state_before)
@@ -447,12 +932,18 @@ def _reconcile_item(item: dict[str, object], source: str, alternate_permitted: b
             "workspace": state_after.get("workspace"),
             "head": state_after.get("head"),
             "base": state_after.get("base"),
+            "workspaceRevision": state_after.get("workspaceRevision"),
+            "runtimeRevision": runtime.get("runtimeRevision"),
+            "capabilities": runtime.get("capabilities", []),
         },
         "deadline": _iso(_now() + dt.timedelta(seconds=_model_timeout_seconds())) if alternate_permitted else _iso(next_retry),
         "runtimeState": source,
         "attempt": attempt,
         "headBaseBefore": state_before,
         "headBaseCurrent": state_after,
+        "runtimeRevision": runtime.get("runtimeRevision"),
+        "runtimeCapabilities": runtime.get("capabilities", []),
+        "runtimeReceipt": runtime.get("receipt"),
         "attemptedRepairs": attempted,
         "transition": transition,
         "nextAutomatedAction": next_action,
@@ -473,6 +964,23 @@ def _reconcile_item(item: dict[str, object], source: str, alternate_permitted: b
 
 
 def main() -> int:
+    runtime = runtime_preflight()
+    if runtime.get("status") != "ready":
+        transition = (
+            "runtime_bootstrap_required"
+            if runtime.get("status") == "recoverable"
+            else "runtime_permanent_failure"
+        )
+        _event(
+            "control-plane",
+            transition,
+            reason=runtime.get("reason"),
+            runtime_revision=runtime.get("runtimeRevision"),
+            capabilities=runtime.get("capabilities"),
+            missing_files=runtime.get("missingFiles"),
+            missing_capabilities=runtime.get("missingCapabilities"),
+        )
+        return 2 if runtime.get("status") == "recoverable" else 3
     try:
         state = _fetch_state()
     except (OSError, ValueError, urllib.error.URLError, json.JSONDecodeError) as exc:
@@ -488,7 +996,11 @@ def main() -> int:
         _event("control-plane", "healthy_or_idle", reason="no_stopped_work")
         return 0
     running = state.get("running", [])
-    candidates = [(source, item) for source, item in items if _alternate_due(item, source)]
+    candidates = [
+        (source, item)
+        for source, item in items
+        if _alternate_due(item, source, runtime)
+    ]
     handoff_acquired = False
     if candidates and isinstance(running, list) and not running:
         handoff_acquired = _stop_scheduler()
@@ -503,7 +1015,7 @@ def main() -> int:
     try:
         for source, item in items:
             permitted = handoff_acquired and not alternate_used and (source, item) in candidates
-            _reconcile_item(item, source, permitted)
+            _reconcile_item(item, source, permitted, runtime)
             alternate_used = alternate_used or permitted
     finally:
         if handoff_acquired:
@@ -525,4 +1037,10 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if len(sys.argv) == 2 and sys.argv[1] == "runtime-receipt":
+        raise SystemExit(0 if write_runtime_receipt() else 2)
+    if len(sys.argv) == 2 and sys.argv[1] == "runtime-preflight":
+        result = runtime_preflight()
+        print(json.dumps(result, sort_keys=True))
+        raise SystemExit(0 if result.get("status") == "ready" else 1)
     raise SystemExit(main())
