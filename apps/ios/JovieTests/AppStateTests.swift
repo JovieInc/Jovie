@@ -516,6 +516,26 @@ struct AppStateTests {
     #expect(await repository.loadCount() == 2)
   }
 
+  @Test func cachedProfileThen401RevalidationSignsOut() async throws {
+    let repository = MockRepository(
+      nextResult: .failure(APIClientError.requestFailed(statusCode: 401)),
+      cached: .previewReady
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+    appState.didInitializeAuth = true
+
+    await appState.handleSignedInUserChange("user_123")
+
+    #expect(appState.route == .signedOut)
+    #expect(appState.dashboardState == .idle)
+    #expect(appState.isOffline == false)
+  }
+
   @Test func staleProfileSnapshotShowsOfflineStateAndRetryClearsIt() async throws {
     let repository = MockRepository(
       nextResult: .success(

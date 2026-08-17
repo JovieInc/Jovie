@@ -76,6 +76,33 @@ struct MeRepositoryTests {
     #expect(staleResult.response == .previewReady)
   }
 
+  @Test func authFailuresRethrowInsteadOfReturningStaleCache() async throws {
+    let defaults = UserDefaults(suiteName: "MeRepositoryTests-F")!
+    defaults.removePersistentDomain(forName: "MeRepositoryTests-F")
+    let cache = MeCache(defaults: defaults)
+    let apiClient = MutableAPIClient(mode: .success(.previewReady))
+    let repository = MeRepository(apiClient: apiClient, cache: cache)
+
+    let first = try await repository.loadMe(for: "user_auth")
+    #expect(first.isStale == false)
+    #expect(first.response == .previewReady)
+
+    await apiClient.updateMode(.failure(APIClientError.requestFailed(statusCode: 401)))
+    await #expect(throws: APIClientError.requestFailed(statusCode: 401)) {
+      try await repository.loadMe(for: "user_auth")
+    }
+
+    await apiClient.updateMode(.failure(APIClientError.missingToken))
+    await #expect(throws: APIClientError.missingToken) {
+      try await repository.loadMe(for: "user_auth")
+    }
+
+    await apiClient.updateMode(.failure(APIClientError.requestFailed(statusCode: 500)))
+    let stale = try await repository.loadMe(for: "user_auth")
+    #expect(stale.isStale == true)
+    #expect(stale.response == .previewReady)
+  }
+
   @Test func cachedSnapshotReturnsNilBeforeFirstLoad() async throws {
     let defaults = UserDefaults(suiteName: "MeRepositoryTests-D")!
     defaults.removePersistentDomain(forName: "MeRepositoryTests-D")
