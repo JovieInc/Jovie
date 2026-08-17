@@ -5,6 +5,7 @@ import { FounderMorningWalkCard } from '@/components/features/admin/hud/FounderM
 import { HudFullscreenControl } from '@/components/features/admin/hud/HudFullscreenControl';
 import { HudShipperPanels } from '@/components/features/admin/hud/HudShipperPanels';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { OperationalControlPanel } from '@/components/features/admin/OperationalControlPanel';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { authorizeHud } from '@/lib/auth/hud';
@@ -111,6 +112,7 @@ export default async function HudPage({
         {walk}
         <HudShipperPanels />
         {dashboard}
+        <OperationalControlPanel />
       </AdminPage>
     </StandaloneProductPage>
   );

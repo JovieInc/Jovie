@@ -1,32 +1,47 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
-  getAuthSignupOnboardingCanaryStatusMock,
+  authorizeHudMock,
+  getCurrentAdminPageAccessMock,
   getHudMetricsMock,
-  getNightlyTestingAgentStatusMock,
-  getPublicProfileCanaryStatusMock,
-  requireCurrentAdminPageAccessMock,
+  unauthorizedMock,
+  forbiddenMock,
 } = vi.hoisted(() => ({
-  getAuthSignupOnboardingCanaryStatusMock: vi.fn(),
+  authorizeHudMock: vi.fn(),
+  getCurrentAdminPageAccessMock: vi.fn(),
   getHudMetricsMock: vi.fn(),
-  getNightlyTestingAgentStatusMock: vi.fn(),
-  getPublicProfileCanaryStatusMock: vi.fn(),
-  requireCurrentAdminPageAccessMock: vi.fn(),
+  unauthorizedMock: vi.fn(() => {
+    throw new Error('NEXT_UNAUTHORIZED');
+  }),
+  forbiddenMock: vi.fn(() => {
+    throw new Error('NEXT_FORBIDDEN');
+  }),
 }));
 
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/admin/page-access', () => ({
-  requireCurrentAdminPageAccess: requireCurrentAdminPageAccessMock,
+vi.mock('next/navigation', () => ({
+  unauthorized: unauthorizedMock,
+  forbidden: forbiddenMock,
 }));
-vi.mock('@/lib/admin/ops-queries', () => ({
-  getAuthSignupOnboardingCanaryStatus: getAuthSignupOnboardingCanaryStatusMock,
-  getNightlyTestingAgentStatus: getNightlyTestingAgentStatusMock,
-  getPublicProfileCanaryStatus: getPublicProfileCanaryStatusMock,
+vi.mock('@/lib/admin/page-access', () => ({
+  getCurrentAdminPageAccess: getCurrentAdminPageAccessMock,
+}));
+vi.mock('@/lib/auth/hud', () => ({
+  authorizeHud: authorizeHudMock,
 }));
 vi.mock('@/lib/hud/metrics', () => ({ getHudMetrics: getHudMetricsMock }));
 vi.mock('@/lib/env-server', () => ({ env: { HUD_AGENT_RUNS_FIXTURES: '0' } }));
-vi.mock('@/lib/utils/logger', () => ({
-  logger: { error: vi.fn() },
+vi.mock('@/lib/hud/source-trust', () => ({
+  isHudMetricValueAvailable: () => false,
+}));
+vi.mock('@/components/features/admin/hud/FounderMorningWalkCard', () => ({
+  FounderMorningWalkCard: () => null,
+}));
+vi.mock('@/components/features/admin/hud/HudFullscreenControl', () => ({
+  HudFullscreenControl: () => null,
+}));
+vi.mock('@/components/features/admin/hud/HudShipperPanels', () => ({
+  HudShipperPanels: () => null,
 }));
 vi.mock('@/components/features/admin/OperationalControlPanel', () => ({
   OperationalControlPanel: () => null,
@@ -34,31 +49,33 @@ vi.mock('@/components/features/admin/OperationalControlPanel', () => ({
 vi.mock('@/app/app/(shell)/admin/ops/HudDashboardClient', () => ({
   HudDashboardClient: () => null,
 }));
-vi.mock('@/app/app/(shell)/admin/ops/ReleaseToRevenueGmvPanel', () => ({
-  ReleaseToRevenueGmvPanel: () => null,
+vi.mock('@/components/features/admin/layout/AdminPage', () => ({
+  AdminPage: ({ children }: { children: unknown }) => children,
+}));
+vi.mock('@/components/organisms/StandaloneProductPage', () => ({
+  StandaloneProductPage: ({ children }: { children: unknown }) => children,
 }));
 
-import AdminOpsPage from '@/app/app/(shell)/admin/ops/page';
+import HudPage from '@/app/hud/page';
 
-describe('AdminOpsPage access boundary', () => {
+describe('HudPage access boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    requireCurrentAdminPageAccessMock.mockRejectedValue(
-      new Error('NEXT_REDIRECT:/app')
-    );
+    authorizeHudMock.mockResolvedValue({ ok: false, reason: 'unauthorized' });
+    getCurrentAdminPageAccessMock.mockResolvedValue({
+      isAuthenticated: false,
+      hasAdminRole: false,
+    });
   });
 
   it('starts no admin data work before a non-admin is rejected', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch');
 
     await expect(
-      AdminOpsPage({ searchParams: Promise.resolve({}) })
-    ).rejects.toThrow('NEXT_REDIRECT:/app');
+      HudPage({ searchParams: Promise.resolve({}) })
+    ).rejects.toThrow('NEXT_UNAUTHORIZED');
 
     expect(getHudMetricsMock).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(getPublicProfileCanaryStatusMock).not.toHaveBeenCalled();
-    expect(getAuthSignupOnboardingCanaryStatusMock).not.toHaveBeenCalled();
-    expect(getNightlyTestingAgentStatusMock).not.toHaveBeenCalled();
   });
 });
