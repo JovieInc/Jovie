@@ -45,6 +45,16 @@ export interface DashboardContact {
   isSystemDefault?: boolean;
 }
 
+/** Presentation + local editor state layered onto a persisted contact. */
+export interface EditableContact extends DashboardContact {
+  isExpanded?: boolean;
+  isSaving?: boolean;
+  isDeleting?: boolean;
+  error?: string | null;
+  customTerritory?: string;
+  isNew?: boolean;
+}
+
 export interface DashboardContactInput {
   id?: string;
   profileId: string;
