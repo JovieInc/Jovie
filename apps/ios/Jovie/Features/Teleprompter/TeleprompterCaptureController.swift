@@ -1,4 +1,4 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import Foundation
 import Observation
 import Speech
@@ -6,6 +6,7 @@ import Speech
 enum TeleprompterCaptureError: LocalizedError, Equatable {
   case cameraDenied
   case microphoneDenied
+  case microphoneUnavailable
   case speechDenied
   case cameraUnavailable
   case recognizerUnavailable
@@ -18,6 +19,8 @@ enum TeleprompterCaptureError: LocalizedError, Equatable {
       "Camera access is off. Enable it in Settings → Jovie."
     case .microphoneDenied:
       "Microphone access is off. Enable it in Settings → Jovie."
+    case .microphoneUnavailable:
+      "No microphone is available for this recording."
     case .speechDenied:
       "Speech recognition is off. Enable it in Settings → Jovie."
     case .cameraUnavailable:
@@ -64,6 +67,10 @@ enum TeleprompterSpeechMode: Equatable, Sendable {
 @MainActor
 @Observable
 final class TeleprompterCaptureController {
+  private static let finalRecognitionDrainDelay: Duration = .milliseconds(180)
+  private static let recordingStartPollInterval: Duration = .milliseconds(50)
+  private static let recordingStartPollLimit = 20
+
   /// Exposed for the preview layer. All mutation happens on `sessionQueue`.
   let captureSession = AVCaptureSession()
 
@@ -72,9 +79,13 @@ final class TeleprompterCaptureController {
   private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
   private var recognitionTask: SFSpeechRecognitionTask?
   private var movieOutput: AVCaptureMovieFileOutput?
+  private var audioInput: AVCaptureDeviceInput?
+  private var audioOutput: AVCaptureAudioDataOutput?
   /// Strong retain: `AVCaptureAudioDataOutput.sampleBufferDelegate` is weak.
   private var audioSink: TeleprompterAudioSink?
   private var isConfigured = false
+  private var configurationTask: Task<Void, Error>?
+  private(set) var isAudioCaptureConfigured = false
   /// Monotonic session id so late delegate callbacks cannot rewrite state
   /// after cancel/stop.
   private var sessionID: UInt64 = 0
@@ -84,6 +95,7 @@ final class TeleprompterCaptureController {
   private var finishDelegate: RecordingFinishDelegate?
 
   private(set) var isRecording = false
+  private(set) var isPreviewing = false
   private(set) var lastErrorMessage: String?
   /// Whether the current/last session preferred on-device recognition.
   private(set) var isUsingOnDeviceRecognition = false
@@ -102,11 +114,29 @@ final class TeleprompterCaptureController {
     VoiceCaptureRecognitionConfig.preferOnDevice(for: recognizer)
   }
 
+  func startPreview() async throws {
+    guard !isPreviewing else { return }
+    let cameraGranted = await AVCaptureDevice.requestAccess(for: .video)
+    guard cameraGranted else { throw TeleprompterCaptureError.cameraDenied }
+    try await configureSessionIfNeeded()
+
+    await withCheckedContinuation { continuation in
+      sessionQueue.async { [captureSession] in
+        if !captureSession.isRunning {
+          captureSession.startRunning()
+        }
+        continuation.resume()
+      }
+    }
+    isPreviewing = true
+  }
+
   func start(videoURL: URL) async throws {
     guard !isRecording else { return }
     let speechAuthorized = try await ensurePermissions()
     guard !isRecording else { return }
     try await configureSessionIfNeeded()
+    try await configureAudioCaptureIfNeeded()
     guard let movieOutput else {
       throw TeleprompterCaptureError.cameraUnavailable
     }
@@ -130,6 +160,7 @@ final class TeleprompterCaptureController {
       let request = SFSpeechAudioBufferRecognitionRequest()
       _ = VoiceCaptureRecognitionConfig.configure(request, recognizer: recognizer)
       recognitionRequest = request
+      audioSink?.setRecognitionRequest(request)
 
       recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
         Task { @MainActor in
@@ -173,9 +204,12 @@ final class TeleprompterCaptureController {
     let delegate = RecordingFinishDelegate()
     finishDelegate = delegate
     sessionQueue.async { [captureSession, movieOutput] in
-      captureSession.startRunning()
+      if !captureSession.isRunning {
+        captureSession.startRunning()
+      }
       movieOutput.startRecording(to: videoURL, recordingDelegate: delegate)
     }
+    isPreviewing = true
     isRecording = true
   }
 
@@ -188,8 +222,9 @@ final class TeleprompterCaptureController {
     let usedOnDevice = activeOnDevicePreference
 
     recognitionRequest?.endAudio()
+    audioSink?.setRecognitionRequest(nil)
     // Allow the final partial result to land before tearing down the task.
-    try? await Task.sleep(for: .milliseconds(180))
+    try? await Task.sleep(for: Self.finalRecognitionDrainDelay)
     guard sessionID == captureSessionID else {
       throw TeleprompterCaptureError.notRecording
     }
@@ -201,8 +236,8 @@ final class TeleprompterCaptureController {
     // `stopRecording()` before the output has started never fires the finish
     // delegate, which would suspend the continuation forever. Wait briefly
     // for the sessionQueue start to land.
-    for _ in 0..<20 where !movieOutput.isRecording {
-      try? await Task.sleep(for: .milliseconds(50))
+    for _ in 0..<Self.recordingStartPollLimit where !movieOutput.isRecording {
+      try? await Task.sleep(for: Self.recordingStartPollInterval)
     }
     guard movieOutput.isRecording else {
       finishDelegate = nil
@@ -216,10 +251,8 @@ final class TeleprompterCaptureController {
     }
     finishDelegate = nil
 
-    let captureSession = self.captureSession
-    sessionQueue.async {
-      captureSession.stopRunning()
-    }
+    isPreviewing = false
+    await stopSessionAndRemoveAudioCapture()
 
     guard FileManager.default.fileExists(atPath: videoURL.path) else {
       Observability.captureMessage(
@@ -246,26 +279,27 @@ final class TeleprompterCaptureController {
     )
   }
 
-  func cancel() {
-    guard isRecording || recognitionRequest != nil else { return }
+  func cancel() async {
+    guard isPreviewing || isRecording || recognitionRequest != nil else { return }
     sessionID &+= 1
     isRecording = false
     recognitionRequest?.endAudio()
+    audioSink?.setRecognitionRequest(nil)
     recognitionTask?.cancel()
     recognitionTask = nil
     recognitionRequest = nil
     isSpeechRecognitionActive = false
+    isPreviewing = false
     let movieOutput = self.movieOutput
-    let captureSession = self.captureSession
     let delegate = finishDelegate
     finishDelegate = nil
-    sessionQueue.async {
-      if movieOutput?.isRecording == true {
-        movieOutput?.stopRecording()
-      }
-      captureSession.stopRunning()
-    }
     delegate?.discard()
+    let shouldWaitForFileClose = movieOutput?.isRecording == true && delegate != nil
+    async let fileClose: Void = shouldWaitForFileClose
+      ? delegate?.waitUntilFinished() ?? ()
+      : ()
+    await stopSessionAndRemoveAudioCapture(stopping: movieOutput)
+    await fileClose
   }
 
   private func ensurePermissions() async throws -> Bool {
@@ -285,7 +319,18 @@ final class TeleprompterCaptureController {
 
   private func configureSessionIfNeeded() async throws {
     guard !isConfigured else { return }
+    if let configurationTask {
+      try await configurationTask.value
+      return
+    }
 
+    let task = Task { try await performBaseSessionConfiguration() }
+    configurationTask = task
+    defer { configurationTask = nil }
+    try await task.value
+  }
+
+  private func performBaseSessionConfiguration() async throws {
     try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
       sessionQueue.async { [captureSession] in
         do {
@@ -312,14 +357,6 @@ final class TeleprompterCaptureController {
           }
           captureSession.addInput(videoInput)
 
-          if
-            let microphone = AVCaptureDevice.default(for: .audio),
-            let audioInput = try? AVCaptureDeviceInput(device: microphone),
-            captureSession.canAddInput(audioInput)
-          {
-            captureSession.addInput(audioInput)
-          }
-
           let movieOutput = AVCaptureMovieFileOutput()
           guard captureSession.canAddOutput(movieOutput) else {
             captureSession.commitConfiguration()
@@ -338,24 +375,6 @@ final class TeleprompterCaptureController {
             }
           }
 
-          let audioOutput = AVCaptureAudioDataOutput()
-          let audioSink = TeleprompterAudioSink()
-          audioOutput.setSampleBufferDelegate(
-            audioSink,
-            queue: DispatchQueue(label: "ie.jov.jovie.teleprompter.speech")
-          )
-          if captureSession.canAddOutput(audioOutput) {
-            captureSession.addOutput(audioOutput)
-            Task { @MainActor [weak self] in
-              self?.audioSink = audioSink
-              // No session-id guard here: `recognitionRequest` is nil outside
-              // an active capture, so late buffers are no-ops.
-              audioSink.onPCMBuffer = { [weak self] buffer in
-                self?.recognitionRequest?.append(buffer)
-              }
-            }
-          }
-
           captureSession.commitConfiguration()
           Task { @MainActor [weak self] in
             self?.movieOutput = movieOutput
@@ -369,6 +388,81 @@ final class TeleprompterCaptureController {
       }
     }
   }
+
+  private func configureAudioCaptureIfNeeded() async throws {
+    guard !isAudioCaptureConfigured else { return }
+
+    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+      sessionQueue.async { [captureSession] in
+        guard let microphone = AVCaptureDevice.default(for: .audio) else {
+          continuation.resume(throwing: TeleprompterCaptureError.microphoneUnavailable)
+          return
+        }
+
+        do {
+          let audioInput = try AVCaptureDeviceInput(device: microphone)
+          let audioOutput = AVCaptureAudioDataOutput()
+          let audioSink = TeleprompterAudioSink()
+          audioOutput.setSampleBufferDelegate(
+            audioSink,
+            queue: DispatchQueue(label: "ie.jov.jovie.teleprompter.speech")
+          )
+
+          captureSession.beginConfiguration()
+          guard captureSession.canAddInput(audioInput) else {
+            captureSession.commitConfiguration()
+            continuation.resume(throwing: TeleprompterCaptureError.microphoneUnavailable)
+            return
+          }
+          captureSession.addInput(audioInput)
+          guard captureSession.canAddOutput(audioOutput) else {
+            captureSession.removeInput(audioInput)
+            captureSession.commitConfiguration()
+            continuation.resume(throwing: TeleprompterCaptureError.microphoneUnavailable)
+            return
+          }
+          captureSession.addOutput(audioOutput)
+          captureSession.commitConfiguration()
+
+          Task { @MainActor [weak self] in
+            self?.audioInput = audioInput
+            self?.audioOutput = audioOutput
+            self?.audioSink = audioSink
+            self?.isAudioCaptureConfigured = true
+            continuation.resume()
+          }
+        } catch {
+          continuation.resume(throwing: error)
+        }
+      }
+    }
+  }
+
+  private func stopSessionAndRemoveAudioCapture(
+    stopping movieOutput: AVCaptureMovieFileOutput? = nil
+  ) async {
+    let captureSession = self.captureSession
+    let audioInput = self.audioInput
+    let audioOutput = self.audioOutput
+    self.audioInput = nil
+    self.audioOutput = nil
+    audioSink = nil
+    isAudioCaptureConfigured = false
+
+    await withCheckedContinuation { continuation in
+      sessionQueue.async {
+        if movieOutput?.isRecording == true {
+          movieOutput?.stopRecording()
+        }
+        captureSession.stopRunning()
+        captureSession.beginConfiguration()
+        if let audioInput { captureSession.removeInput(audioInput) }
+        if let audioOutput { captureSession.removeOutput(audioOutput) }
+        captureSession.commitConfiguration()
+        continuation.resume()
+      }
+    }
+  }
 }
 
 /// Converts capture audio sample buffers into PCM buffers for the Speech
@@ -376,8 +470,14 @@ final class TeleprompterCaptureController {
 private final class TeleprompterAudioSink: NSObject, AVCaptureAudioDataOutputSampleBufferDelegate,
   @unchecked Sendable
 {
-  /// Set once from the main actor before the session starts running.
-  var onPCMBuffer: (@MainActor (AVAudioPCMBuffer) -> Void)?
+  private let lock = NSLock()
+  private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
+
+  func setRecognitionRequest(_ request: SFSpeechAudioBufferRecognitionRequest?) {
+    lock.lock()
+    recognitionRequest = request
+    lock.unlock()
+  }
 
   func captureOutput(
     _ output: AVCaptureOutput,
@@ -385,7 +485,6 @@ private final class TeleprompterAudioSink: NSObject, AVCaptureAudioDataOutputSam
     from connection: AVCaptureConnection
   ) {
     guard
-      let onPCMBuffer,
       let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer),
       let streamDescription = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription),
       streamDescription.pointee.mFormatID == kAudioFormatLinearPCM
@@ -412,30 +511,46 @@ private final class TeleprompterAudioSink: NSObject, AVCaptureAudioDataOutputSam
     )
     guard status == noErr else { return }
 
-    // `recognitionRequest.append` is safe off-main; hop only to respect the
-    // controller's MainActor isolation.
-    Task { @MainActor in
-      onPCMBuffer(buffer)
-    }
+    lock.lock()
+    let request = recognitionRequest
+    lock.unlock()
+    request?.append(buffer)
   }
 }
 
 /// One-shot delegate bridging `AVCaptureFileOutputRecordingDelegate` into
 /// async/await. Kept alive by the controller until finish or cancel.
-private final class RecordingFinishDelegate: NSObject, AVCaptureFileOutputRecordingDelegate,
+final class RecordingFinishDelegate: NSObject, AVCaptureFileOutputRecordingDelegate,
   @unchecked Sendable
 {
+  private let lock = NSLock()
   private var continuation: CheckedContinuation<URL, Error>?
+  private var finishWaiters: [CheckedContinuation<Void, Never>] = []
+  private var didFinish = false
 
   func arm(_ continuation: CheckedContinuation<URL, Error>) {
+    lock.lock()
     self.continuation = continuation
+    lock.unlock()
   }
 
   /// Cancel path: resume any pending waiter so nothing suspends forever.
   func discard() {
-    let pending = continuation
-    continuation = nil
+    let pending = takeContinuation()
     pending?.resume(throwing: TeleprompterCaptureError.recordingFailed)
+  }
+
+  func waitUntilFinished() async {
+    await withCheckedContinuation { waiter in
+      lock.lock()
+      if didFinish {
+        lock.unlock()
+        waiter.resume()
+      } else {
+        finishWaiters.append(waiter)
+        lock.unlock()
+      }
+    }
   }
 
   func fileOutput(
@@ -444,8 +559,7 @@ private final class RecordingFinishDelegate: NSObject, AVCaptureFileOutputRecord
     from connections: [AVCaptureConnection],
     error: (any Error)?
   ) {
-    let pending = continuation
-    continuation = nil
+    let (pending, waiters) = takeCompletionState()
     if let error {
       // `recordingWasInterrupted`-style errors still leave a playable file in
       // many cases; the controller verifies file existence separately.
@@ -453,5 +567,30 @@ private final class RecordingFinishDelegate: NSObject, AVCaptureFileOutputRecord
     } else {
       pending?.resume(returning: outputFileURL)
     }
+    for waiter in waiters {
+      waiter.resume()
+    }
+  }
+
+  private func takeContinuation() -> CheckedContinuation<URL, Error>? {
+    lock.lock()
+    defer { lock.unlock() }
+    let pending = continuation
+    continuation = nil
+    return pending
+  }
+
+  private func takeCompletionState() -> (
+    CheckedContinuation<URL, Error>?,
+    [CheckedContinuation<Void, Never>]
+  ) {
+    lock.lock()
+    defer { lock.unlock() }
+    let pending = continuation
+    continuation = nil
+    didFinish = true
+    let waiters = finishWaiters
+    finishWaiters.removeAll()
+    return (pending, waiters)
   }
 }

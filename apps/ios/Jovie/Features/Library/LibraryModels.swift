@@ -6,6 +6,7 @@ enum LibraryAssetType: String, CaseIterable, Identifiable, Sendable {
   case smartLink
   case photo
   case press
+  case video
 
   var id: String { rawValue }
 
@@ -16,6 +17,7 @@ enum LibraryAssetType: String, CaseIterable, Identifiable, Sendable {
     case .smartLink: return "Smart Links"
     case .photo: return "Photos"
     case .press: return "Press"
+    case .video: return "Videos"
     }
   }
 
@@ -26,6 +28,7 @@ enum LibraryAssetType: String, CaseIterable, Identifiable, Sendable {
     case .smartLink: return "Smart Links"
     case .photo: return "Photos"
     case .press: return "Press"
+    case .video: return "Videos"
     }
   }
 
@@ -36,6 +39,7 @@ enum LibraryAssetType: String, CaseIterable, Identifiable, Sendable {
     case .smartLink: return "Smart Link"
     case .photo: return "Photo"
     case .press: return "Press"
+    case .video: return "Video"
     }
   }
 }
@@ -70,9 +74,71 @@ struct LibraryAsset: Identifiable, Equatable, Sendable {
   let coverURL: URL?
   let liveStatLabel: String
   let publicURL: String?
+  /// On-device file for locally recorded videos (teleprompter sessions).
+  /// Nil for every remote storefront asset.
+  let localVideoURL: URL?
+
+  init(
+    id: String,
+    name: String,
+    type: LibraryAssetType,
+    isPublic: Bool,
+    coverURL: URL?,
+    liveStatLabel: String,
+    publicURL: String?,
+    localVideoURL: URL? = nil
+  ) {
+    self.id = id
+    self.name = name
+    self.type = type
+    self.isPublic = isPublic
+    self.coverURL = coverURL
+    self.liveStatLabel = liveStatLabel
+    self.publicURL = publicURL
+    self.localVideoURL = localVideoURL
+  }
 
   var typeBadge: String { type.singularTitle }
   var visibilityBadge: String { isPublic ? "Public" : "Private" }
+}
+
+/// Maps completed teleprompter sessions into Library video assets
+/// (JOV-5075). Only sessions whose recording finished *and* whose video file
+/// still exists on disk surface here — recording/failed sessions never leak
+/// into Library.
+enum LibraryVlogVideos {
+  static func assets(
+    from sessions: [VlogSessionRecord],
+    store: VlogSessionStore,
+    fileManager: FileManager = .default,
+    now: Date = Date()
+  ) -> [LibraryAsset] {
+    sessions.compactMap { session in
+      guard session.status == .completed else { return nil }
+      let videoURL = store.videoURL(for: session)
+      guard fileManager.fileExists(atPath: videoURL.path) else { return nil }
+
+      return LibraryAsset(
+        id: "vlog-\(session.id.uuidString)",
+        name: session.scriptTitle,
+        type: .video,
+        isPublic: false,
+        coverURL: nil,
+        liveStatLabel: statLabel(for: session, now: now),
+        publicURL: nil,
+        localVideoURL: videoURL
+      )
+    }
+  }
+
+  private static func statLabel(for session: VlogSessionRecord, now: Date) -> String {
+    let minutes = max(0, Int(now.timeIntervalSince(session.createdAt) / 60))
+    if minutes < 1 { return "Recorded just now" }
+    if minutes < 60 { return "Recorded \(minutes)m ago" }
+    let hours = minutes / 60
+    if hours < 24 { return "Recorded \(hours)h ago" }
+    return "Recorded \(hours / 24)d ago"
+  }
 }
 
 enum LibraryFeed {
