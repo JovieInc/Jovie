@@ -26,6 +26,49 @@ const PR_INVARIANT_QUERY = `query($owner:String!,$name:String!,$number:Int!){rep
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 
+export function createApplyConfirmation({
+  planHash,
+  controllerSha,
+  dryRunReceiptSha256,
+}) {
+  return hash(
+    `jovie-pr-preparation-apply/v1\n${planHash}\n${controllerSha}\n${dryRunReceiptSha256}\n`
+  );
+}
+
+export function validateApplyEvidence(options, entry) {
+  const dryRun = options.dryRunReceipt;
+  if (!dryRun || typeof dryRun !== 'object' || Array.isArray(dryRun))
+    throw new Error('apply requires a dry-run receipt');
+  const { receiptSha256, ...body } = dryRun;
+  if (envelope(body).receiptSha256 !== receiptSha256)
+    throw new Error('dry-run receipt integrity check failed');
+  if (
+    !/^[0-9a-f]{40}$/u.test(options.controllerSha ?? '') ||
+    options.controllerSha !== options.trustedDefaultBranchSha ||
+    dryRun.kind !== 'item' ||
+    dryRun.mode !== 'dry-run' ||
+    dryRun.outcome !== 'eligible_dry_run' ||
+    dryRun.planHash !== options.planHash ||
+    dryRun.trustedDefaultBranchSha !== options.trustedDefaultBranchSha ||
+    dryRun.pr !== entry.number ||
+    dryRun.expectedHeadOid !== entry.headOid ||
+    dryRun.observedHeadOid !== entry.headOid ||
+    dryRun.mutationAttempted !== false ||
+    dryRun.mutationApplied !== false
+  )
+    throw new Error(
+      'apply requires a matching trusted-main exact-head dry-run receipt'
+    );
+  const expected = createApplyConfirmation({
+    planHash: options.planHash,
+    controllerSha: options.controllerSha,
+    dryRunReceiptSha256: receiptSha256,
+  });
+  if (options.confirmation !== expected)
+    throw new Error('apply confirmation does not match bound dry-run evidence');
+}
+
 export const envelope = value => {
   const { receiptSha256: _discarded, ...body } = value;
   return { ...body, receiptSha256: hash(`${JSON.stringify(body)}\n`) };

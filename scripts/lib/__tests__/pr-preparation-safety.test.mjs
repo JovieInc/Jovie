@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,14 +7,18 @@ import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { tryGitHubRebase } from '../github-update-branch.mjs';
 import {
+  createApplyConfirmation,
   createAtomicReceiptWriter,
   evaluateEligibility,
   fetchPrSnapshot,
   HOLD_LABELS,
+  RECEIPT_SCHEMA,
+  validateApplyEvidence,
 } from '../pr-preparation-safety.mjs';
 
 const BASE = 'a'.repeat(40);
 const HEAD = '1'.repeat(40);
+const hash = value => createHash('sha256').update(value).digest('hex');
 const MODULE_URL = pathToFileURL(
   join(process.cwd(), 'scripts/lib/pr-preparation-safety.mjs')
 ).href;
@@ -102,6 +107,47 @@ function page({ nodes, totalCount, hasNextPage, endCursor, metadata = false }) {
 }
 
 describe('reusable exact eligibility gate', () => {
+  it('binds apply to the trusted controller, plan, and exact dry-run receipt', () => {
+    const body = {
+      schema: RECEIPT_SCHEMA,
+      kind: 'item',
+      mode: 'dry-run',
+      outcome: 'eligible_dry_run',
+      planHash: 'p'.repeat(64),
+      trustedDefaultBranchSha: BASE,
+      pr: 16001,
+      expectedHeadOid: HEAD,
+      observedHeadOid: HEAD,
+      mutationAttempted: false,
+      mutationApplied: false,
+    };
+    const receipt = {
+      ...body,
+      receiptSha256: hash(`${JSON.stringify(body)}\n`),
+    };
+    const options = {
+      planHash: body.planHash,
+      trustedDefaultBranchSha: BASE,
+      controllerSha: BASE,
+      dryRunReceipt: receipt,
+      confirmation: createApplyConfirmation({
+        planHash: body.planHash,
+        controllerSha: BASE,
+        dryRunReceiptSha256: receipt.receiptSha256,
+      }),
+    };
+    expect(() => validateApplyEvidence(options, entry())).not.toThrow();
+    for (const patch of [
+      { controllerSha: 'b'.repeat(40) },
+      { planHash: 'q'.repeat(64) },
+      { dryRunReceipt: { ...receipt, observedHeadOid: 'c'.repeat(40) } },
+    ]) {
+      expect(() =>
+        validateApplyEvidence({ ...options, ...patch }, entry())
+      ).toThrow(/dry-run|integrity/);
+    }
+  });
+
   it('keeps canonical fast parity and excludes Graphite queue work', () => {
     expect(HOLD_LABELS).toContain('fast');
     expect(eligibility({ labels: [{ name: 'fast' }] }).outcome).toBe(
