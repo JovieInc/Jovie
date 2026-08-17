@@ -95,12 +95,16 @@ function registryEntries(source) {
     const body = match[2];
     const penRootExpression =
       body.match(/\n\s+penRootId:\s+([^,\n]+),/)?.[1]?.trim() ?? null;
+    const familyMapExpression =
+      body.match(/\n\s+penRootByVariantKey:\s+([^,\n]+),/)?.[1]?.trim() ?? null;
     entries.push({
       id: match[1],
       source: body.match(/\n\s+source:\s+'([^']+)'/)?.[1] ?? null,
       referenceEligible:
         body.match(/\n\s+referenceEligible:\s+(true|false)/)?.[1] === 'true',
-      hasPenRoot: penRootExpression !== null && penRootExpression !== 'null',
+      hasPenRoot:
+        (penRootExpression !== null && penRootExpression !== 'null') ||
+        (familyMapExpression !== null && familyMapExpression !== 'null'),
     });
   }
   return entries;
@@ -311,8 +315,10 @@ export function validateDesignConformance({
         resolve(repoRoot, component.contractSource),
         'utf8'
       );
-      const contractRoot = contractSource.match(/\brootId:\s*'([^']+)'/)?.[1];
-      if (contractRoot !== component.penRootId) {
+      const contractRoots = [
+        ...contractSource.matchAll(/\brootId:\s*'([^']+)'/g),
+      ].map(item => item[1]);
+      if (!contractRoots.includes(component.penRootId)) {
         add('contract-pen-root-mismatch', component.id);
       }
     }

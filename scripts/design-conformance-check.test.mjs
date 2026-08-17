@@ -188,6 +188,16 @@ test('manifest Pen roots must match their source contract', () => {
   assert.ok(issueCodes(input).includes('contract-pen-root-mismatch'));
 });
 
+test('family-map Button bindings count as a Pen root and reject the retired scalar', () => {
+  const input = fixture();
+  assert.equal(
+    issueCodes(input).includes('registry-pen-binding-missing'),
+    false
+  );
+  input.manifest.components[0].penRootId = 'L2SRKu';
+  assert.ok(issueCodes(input).includes('contract-pen-root-mismatch'));
+});
+
 test('unsafe or ambiguous changed paths fail selector validation', () => {
   assert.equal(classifyDesignPath('../copied.pen').valid, false);
   assert.equal(classifyDesignPath('/absolute/file.swift').valid, false);
