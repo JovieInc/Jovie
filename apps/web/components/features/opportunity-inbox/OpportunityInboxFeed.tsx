@@ -1,5 +1,6 @@
 'use client';
 
+import type { RefObject } from 'react';
 import { OpportunityRow } from '@/components/organisms/opportunity-card/OpportunityRow';
 import type { OpportunityRowState } from '@/components/organisms/opportunity-card/types';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
@@ -23,6 +24,12 @@ export interface OpportunityInboxFeedProps {
   readonly pendingNextStepId?: string | null;
   /** When true, render the swipe/keyboard card stack (JOV-3932). */
   readonly enableStackInteractions?: boolean;
+  /** Restores focus to the current stack control after a stack action. */
+  readonly stackKeyboardControlRef?: RefObject<HTMLButtonElement | null>;
+  /** Marks that a stack action may require parent-level focus recovery. */
+  readonly onStackActionInitiated?: (id: string) => void;
+  /** Queues a report next step and restores focus only after it succeeds. */
+  readonly onStackNextStep?: (id: string) => void;
   readonly className?: string;
 }
 
@@ -47,18 +54,28 @@ export function OpportunityInboxFeed({
   pendingFeedbackId: _pendingFeedbackId = null,
   pendingNextStepId = null,
   enableStackInteractions = false,
+  stackKeyboardControlRef,
+  onStackActionInitiated,
+  onStackNextStep,
   className,
 }: OpportunityInboxFeedProps) {
   if (enableStackInteractions) {
     return (
       <OpportunityCardStack
         cards={cards}
-        onAccept={onApprove}
-        onReject={onDismiss}
+        onAccept={id => {
+          onStackActionInitiated?.(id);
+          onApprove(id);
+        }}
+        onReject={id => {
+          onStackActionInitiated?.(id);
+          onDismiss(id);
+        }}
         onOpen={onOpen ?? onApprove}
-        onNextStep={onNextStep}
+        onNextStep={onStackNextStep ?? onNextStep ?? onApprove}
         pendingActionId={pendingActionId}
         pendingNextStepId={pendingNextStepId}
+        keyboardControlRef={stackKeyboardControlRef}
         className={className}
       />
     );

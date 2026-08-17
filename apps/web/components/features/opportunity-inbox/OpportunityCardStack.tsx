@@ -3,8 +3,9 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
+  type RefObject,
   useCallback,
-  useRef,
+  useId,
 } from 'react';
 import { OpportunityRow } from '@/components/organisms/opportunity-card/OpportunityRow';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
@@ -21,6 +22,8 @@ export interface OpportunityCardStackProps {
   readonly onNextStep?: (id: string) => void;
   readonly pendingActionId?: string | null;
   readonly pendingNextStepId?: string | null;
+  /** Receives focus when the parent restores context after an action. */
+  readonly keyboardControlRef?: RefObject<HTMLButtonElement | null>;
   readonly className?: string;
 }
 
@@ -29,8 +32,8 @@ export interface OpportunityCardStackProps {
  *
  * - Swipe right / ArrowRight → accept
  * - Swipe left / ArrowLeft → reject
- * - Tap / Enter → open chat with the card pinned
- * - Visible accept/reject buttons remain for a11y (44px targets on OpportunityRow)
+ * - Enter on the focused keyboard control → open chat with the card pinned
+ * - Visible accept/reject buttons remain alongside gesture input
  * - prefers-reduced-motion: fade out, no drag
  */
 export function OpportunityCardStack({
@@ -41,28 +44,39 @@ export function OpportunityCardStack({
   onNextStep,
   pendingActionId = null,
   pendingNextStepId = null,
+  keyboardControlRef,
   className,
 }: OpportunityCardStackProps) {
   const reducedMotion = useReducedMotion();
-  const stackRef = useRef<HTMLDivElement>(null);
+  const instructionsId = useId();
   const topCard = cards[0] ?? null;
   const peekCards = cards.slice(1, 3);
 
   const handleKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    (event: ReactKeyboardEvent<HTMLButtonElement>) => {
       if (!topCard) return;
+      // This handler belongs to the dedicated native button. It cannot hijack
+      // keyboard behavior from the visible child controls in the stack.
+      if (
+        event.defaultPrevented ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.shiftKey ||
+        event.repeat ||
+        event.target !== event.currentTarget
+      ) {
+        return;
+      }
       if (event.key === 'ArrowRight') {
         event.preventDefault();
         onAccept(topCard.id);
       } else if (event.key === 'ArrowLeft') {
         event.preventDefault();
         onReject(topCard.id);
-      } else if (event.key === 'Enter') {
-        event.preventDefault();
-        onOpen(topCard.id);
       }
     },
-    [onAccept, onOpen, onReject, topCard]
+    [onAccept, onReject, topCard]
   );
 
   if (!topCard) {
@@ -70,25 +84,32 @@ export function OpportunityCardStack({
   }
 
   return (
-    <div
-      ref={stackRef}
-      role='listbox'
-      aria-orientation='vertical'
-      className={cn('relative outline-none', className)}
+    <section
+      className={cn('relative', className)}
       data-testid='opportunity-card-stack'
       aria-label='Opportunity Card Stack'
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
     >
+      <button
+        type='button'
+        ref={keyboardControlRef}
+        className='sr-only focus-visible:absolute focus-visible:top-0 focus-visible:left-0 focus-visible:z-20 focus-visible:not-sr-only focus-visible:rounded-sm focus-visible:bg-surface-1 focus-visible:px-2 focus-visible:py-1 focus-visible:text-2xs focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface)'
+        aria-describedby={instructionsId}
+        onClick={() => onOpen(topCard.id)}
+        onKeyDown={handleKeyDown}
+      >
+        Review Current Opportunity
+      </button>
       <div className='system-b-opportunity-inbox-section-label'>Today</div>
 
       {/* Peek stack behind the top card */}
       <div className='relative min-h-20'>
         {peekCards.map((card, index) => (
-          <div
+          <ul
             key={card.id}
             aria-hidden='true'
-            className='pointer-events-none absolute inset-x-0 top-0 opacity-40'
+            inert
+            className='pointer-events-none absolute inset-x-0 top-0 m-0 list-none p-0 opacity-40'
+            data-testid={`opportunity-stack-peek-${card.id}`}
             style={{
               transform: `translateY(${(index + 1) * 6}px) scale(${1 - (index + 1) * 0.02})`,
               zIndex: peekCards.length - index,
@@ -101,7 +122,7 @@ export function OpportunityCardStack({
               metadata={card.why}
               hideDot={false}
             />
-          </div>
+          </ul>
         ))}
 
         <AnimatePresence mode='popLayout'>
@@ -119,11 +140,15 @@ export function OpportunityCardStack({
               }
             }}
             initial={
-              reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.98 }
+              reducedMotion
+                ? { opacity: 0 }
+                : { opacity: 0, transform: 'translateY(8px) scale(0.98)' }
             }
-            animate={{ opacity: 1, y: 0, scale: 1 }}
+            animate={{ opacity: 1, transform: 'translateY(0) scale(1)' }}
             exit={
-              reducedMotion ? { opacity: 0 } : { opacity: 0, x: 0, scale: 0.96 }
+              reducedMotion
+                ? { opacity: 0 }
+                : { opacity: 0, transform: 'translateX(0) scale(0.96)' }
             }
             transition={{
               duration: reducedMotion ? 0.15 : 0.22,
@@ -140,36 +165,34 @@ export function OpportunityCardStack({
                 isDismissing={pendingActionId === topCard.id}
               />
             ) : (
-              <OpportunityRow
-                id={topCard.id}
-                state='new'
-                title={topCard.title}
-                metadata={topCard.why}
-                hideDot={false}
-                primaryActionLabel={
-                  topCard.category === 'brand_deal'
-                    ? topCard.primaryActionLabel
-                    : undefined
-                }
-                onPrimaryAction={id => {
-                  // Primary pill accepts; open is Enter/tap via stack focus.
-                  onAccept(id);
-                }}
-                onDismiss={id => {
-                  onReject(id);
-                }}
-                isBusy={pendingActionId === topCard.id}
-                dataTestId={`opportunity-stack-top-${topCard.id}`}
-              />
+              <ul className='m-0 list-none p-0'>
+                <OpportunityRow
+                  id={topCard.id}
+                  state='new'
+                  title={topCard.title}
+                  metadata={topCard.why}
+                  hideDot={false}
+                  primaryActionLabel={topCard.primaryActionLabel}
+                  onPrimaryAction={id => {
+                    // Primary pill accepts; open is Enter/tap via stack focus.
+                    onAccept(id);
+                  }}
+                  onDismiss={id => {
+                    onReject(id);
+                  }}
+                  isBusy={pendingActionId === topCard.id}
+                  dataTestId={`opportunity-stack-top-${topCard.id}`}
+                />
+              </ul>
             )}
           </motion.div>
         </AnimatePresence>
       </div>
 
-      <p className='mt-3 text-2xs text-quaternary-token'>
-        Swipe right to accept, left to dismiss. Arrow keys when focused. Enter
-        opens chat.
+      <p id={instructionsId} className='mt-3 text-2xs text-quaternary-token'>
+        Swipe right to accept, left to dismiss. From the current opportunity
+        keyboard control, arrow keys act and Enter opens chat.
       </p>
-    </div>
+    </section>
   );
 }
