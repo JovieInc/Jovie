@@ -527,6 +527,89 @@ class DeploymentBindingTests(unittest.TestCase):
 
         self.assertEqual(observed["status"], "unknown")
 
+    def test_queue_observation_writes_and_reuses_last_known_after_transient_blip(self):
+        completed = subprocess.CompletedProcess(
+            args=["gh"],
+            returncode=0,
+            stdout=json.dumps([
+                {"number": 1, "isDraft": False, "labels": [], "mergeStateStatus": "CLEAN"}
+            ]),
+            stderr="",
+        )
+        timeout = subprocess.CalledProcessError(
+            1, ["gh"], stderr="HTTP 503: No server is currently available"
+        )
+        now = MODULE.datetime(2026, 8, 17, 18, 30, tzinfo=MODULE.UTC)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "queue-snapshot.json"
+            with mock.patch.object(MODULE.subprocess, "run", return_value=completed):
+                live = MODULE.observe_queue(
+                    "JovieInc/Jovie", 16, snapshot_path=path, now=now
+                )
+            written = json.loads(path.read_text(encoding="utf-8"))
+            with (
+                mock.patch.object(MODULE.subprocess, "run", side_effect=timeout),
+                mock.patch.object(MODULE.time, "sleep"),
+            ):
+                cached = MODULE.observe_queue(
+                    "JovieInc/Jovie",
+                    16,
+                    snapshot_path=path,
+                    now=now + MODULE.timedelta(minutes=2),
+                )
+
+        self.assertEqual(live["status"], "known")
+        self.assertEqual(live["source"], "live")
+        self.assertEqual(written["schema"], "jovie-queue-snapshot/v1")
+        self.assertEqual(written["greenReadyPrs"], 1)
+        self.assertEqual(cached["status"], "known")
+        self.assertEqual(cached["source"], "last-known")
+        self.assertEqual(cached["greenReadyPrs"], 1)
+        self.assertEqual(cached["target"], 16)
+        self.assertIn("queue-observation-failed-used-last-known", cached["error"])
+
+    def test_queue_observation_does_not_reuse_stale_or_auth_last_known(self):
+        timeout = subprocess.CalledProcessError(
+            1, ["gh"], stderr="HTTP 503: No server is currently available"
+        )
+        auth = subprocess.CalledProcessError(1, ["gh"], stderr="authentication required")
+        now = MODULE.datetime(2026, 8, 17, 18, 30, tzinfo=MODULE.UTC)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "queue-snapshot.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema": "jovie-queue-snapshot/v1",
+                        "status": "known",
+                        "eligiblePrs": 4,
+                        "greenReadyPrs": 2,
+                        "target": 16,
+                        "observedAt": MODULE.isoformat(now),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with (
+                mock.patch.object(MODULE.subprocess, "run", side_effect=timeout),
+                mock.patch.object(MODULE.time, "sleep"),
+            ):
+                stale = MODULE.observe_queue(
+                    "JovieInc/Jovie",
+                    16,
+                    snapshot_path=path,
+                    now=now + MODULE.timedelta(minutes=11),
+                )
+            with mock.patch.object(MODULE.subprocess, "run", side_effect=auth):
+                denied = MODULE.observe_queue(
+                    "JovieInc/Jovie",
+                    16,
+                    snapshot_path=path,
+                    now=now + MODULE.timedelta(minutes=1),
+                )
+
+        self.assertEqual(stale["status"], "unknown")
+        self.assertEqual(denied["status"], "unknown")
+
     def test_stale_deployment_sha_freezes_promotion_but_allows_catchup_deploy(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
@@ -798,6 +881,53 @@ class IndependentReviewTests(unittest.TestCase):
         self.assertTrue(receipt["reviewAdmission"]["allowed"])
         self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 8)
+
+    def test_refresh_writes_receipt_only_when_main_release_ready_is_green(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "independent-review.json"
+            main = {
+                "status": "green",
+                "sha": MAIN_SHA,
+                "sourceGate": {
+                    "name": "Main Release Ready",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "completedAt": "2026-08-13T12:00:00Z",
+                },
+            }
+            observed = MODULE.refresh_independent_review_receipt(path, main, self.NOW)
+            written = json.loads(path.read_text(encoding="utf-8"))
+
+        self.assertTrue(observed["accepted"])
+        self.assertEqual(observed["reason"], "fresh-exact-head-independent-review")
+        self.assertEqual(written["headSha"], MAIN_SHA)
+        self.assertEqual(written["authority"], "Gem")
+        self.assertEqual(written["reviewer"], "Gem")
+        self.assertTrue(written["reviewId"].startswith("main-release-ready:"))
+        verdict = MODULE.validate_independent_review(written, MAIN_SHA, self.NOW)
+        self.assertTrue(verdict["accepted"], verdict)
+
+    def test_refresh_does_not_write_when_main_is_red(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "independent-review.json"
+            observed = MODULE.refresh_independent_review_receipt(
+                path,
+                {"status": "red", "sha": MAIN_SHA},
+                self.NOW,
+            )
+            self.assertFalse(path.exists())
+        self.assertFalse(observed["accepted"])
+        self.assertEqual(observed["reason"], "independent-review-receipt-missing")
+
+    def test_unbound_production_plus_fresh_review_is_hold_intake(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 40}
+        signals["independentReview"] = self.valid_review()
+        receipt = MODULE.evaluate(signals, MODULE.isoformat(self.NOW))
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertTrue(receipt["reviewAdmission"]["allowed"])
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
 
 
 class SemanticReadbackTests(unittest.TestCase):
