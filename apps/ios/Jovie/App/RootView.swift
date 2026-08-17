@@ -428,6 +428,15 @@ private struct AppContentView: View {
 }
 
 
+/// Live hydrate is owned by `LiveRootContainer`. Applying nil here on the
+/// first `didInitializeAuth` flip would wipe a just-hydrated session.
+func shouldApplyAuthenticatedUserIDChange(
+  launchMode: LaunchMode,
+  authenticatedUserID: String?
+) -> Bool {
+  authenticatedUserID != nil || launchMode.usesLiveAuth == false
+}
+
 struct RootView: View {
   @Bindable var appState: AppState
   let isAuthAvailable: Bool
@@ -462,6 +471,13 @@ struct RootView: View {
         }
 
         if let authenticatedUserID, appState.activeUserID == authenticatedUserID {
+          return
+        }
+
+        guard shouldApplyAuthenticatedUserIDChange(
+          launchMode: appState.launchMode,
+          authenticatedUserID: authenticatedUserID
+        ) else {
           return
         }
 

@@ -1067,3 +1067,32 @@ struct WhatsNewPresentationPolicyTests {
     ))
   }
 }
+
+struct AuthenticatedUserIDChangePolicyTests {
+  @Test func skipsNilOnlyWhenLiveAuthOwnsHydrate() {
+    #expect(
+      shouldApplyAuthenticatedUserIDChange(
+        launchMode: .live,
+        authenticatedUserID: nil
+      ) == false
+    )
+    #expect(
+      shouldApplyAuthenticatedUserIDChange(
+        launchMode: .live,
+        authenticatedUserID: "user"
+      )
+    )
+    #expect(
+      shouldApplyAuthenticatedUserIDChange(
+        launchMode: .uiTestingReady,
+        authenticatedUserID: nil
+      )
+    )
+    #expect(
+      shouldApplyAuthenticatedUserIDChange(
+        launchMode: .unitTesting,
+        authenticatedUserID: nil
+      )
+    )
+  }
+}
