@@ -297,6 +297,10 @@ private struct AppContentView: View {
         }
       }
     }
+    .task(id: chatRepository?.sessionExpired) {
+      guard chatRepository?.sessionExpired == true else { return }
+      await appState.handleExpiredSession()
+    }
   }
 
   private var currentAppVersion: String {

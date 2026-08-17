@@ -1,5 +1,19 @@
 import Foundation
 
+/// Terminal chat auth: missing token or a 401 after retry. Not a transport outage.
+func isTerminalChatAuthFailure(_ error: Error) -> Bool {
+  if case APIClientError.missingToken = error {
+    return true
+  }
+  if case APIClientError.requestFailed(statusCode: 401) = error {
+    return true
+  }
+  if case MobileChatClientError.requestFailed(statusCode: 401) = error {
+    return true
+  }
+  return false
+}
+
 @MainActor
 @Observable
 final class ChatRepository {
@@ -9,6 +23,7 @@ final class ChatRepository {
   private(set) var isLoadingConversations = false
   private(set) var isSending = false
   private(set) var isOffline = false
+  private(set) var sessionExpired = false
   private(set) var lastErrorMessage: String?
 
   private let client: MobileChatClientProtocol
@@ -57,8 +72,7 @@ final class ChatRepository {
       await persistCache()
     } catch {
       await hydrateFromCache()
-      isOffline = true
-      lastErrorMessage = error.localizedDescription
+      applyFailure(error)
     }
   }
 
@@ -77,8 +91,7 @@ final class ChatRepository {
       )
     } catch {
       await hydrateConversationFromCache(conversationID)
-      isOffline = true
-      lastErrorMessage = error.localizedDescription
+      applyFailure(error)
       donateConversationActivity(
         conversationID: conversationID,
         title: conversations.first(where: { $0.id == conversationID })?.title
@@ -164,12 +177,7 @@ final class ChatRepository {
       }
       await persistCache()
     } catch {
-      if assistantStatus(clientTurnId: clientTurnId) != .completed {
-        markAssistantFailed(clientTurnId: clientTurnId, message: error.localizedDescription)
-        isOffline = true
-      } else {
-        lastErrorMessage = error.localizedDescription
-      }
+      applySendFailure(error, clientTurnId: clientTurnId)
       await persistCache()
     }
   }
@@ -183,6 +191,37 @@ final class ChatRepository {
 
     timeline.removeAll { $0.clientTurnId == clientTurnId }
     await send(text: userItem.content)
+  }
+
+  private func applyFailure(_ error: Error) {
+    if isTerminalChatAuthFailure(error) {
+      sessionExpired = true
+      isOffline = false
+      lastErrorMessage = nil
+      return
+    }
+
+    isOffline = true
+    lastErrorMessage = error.localizedDescription
+  }
+
+  private func applySendFailure(_ error: Error, clientTurnId: String) {
+    if isTerminalChatAuthFailure(error) {
+      if assistantStatus(clientTurnId: clientTurnId) != .completed {
+        markAssistantFailed(clientTurnId: clientTurnId, message: error.localizedDescription)
+      }
+      sessionExpired = true
+      isOffline = false
+      lastErrorMessage = nil
+      return
+    }
+
+    if assistantStatus(clientTurnId: clientTurnId) != .completed {
+      markAssistantFailed(clientTurnId: clientTurnId, message: error.localizedDescription)
+      isOffline = true
+    } else {
+      lastErrorMessage = error.localizedDescription
+    }
   }
 
   private func apply(events: [MobileChatStreamEvent], clientTurnId: String) {
