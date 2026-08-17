@@ -466,6 +466,52 @@ def validate_independent_review(
     }
 
 
+def build_independent_review_receipt(main: dict[str, Any], now: datetime) -> dict[str, Any]:
+    """Gem review of the exact main head after Main Release Ready succeeded."""
+    sha = main.get("sha")
+    gate = main.get("sourceGate") or {}
+    completed = gate.get("completedAt") or isoformat(now)
+    return {
+        "schema": INDEPENDENT_REVIEW_SCHEMA,
+        "status": "passed",
+        "authority": INDEPENDENT_REVIEW_AUTHORITY,
+        "reviewer": INDEPENDENT_REVIEWER,
+        "reviewId": f"main-release-ready:{sha}:{completed}",
+        "headSha": sha,
+        "scope": INDEPENDENT_REVIEW_SCOPE,
+        "observedAt": isoformat(now),
+        "evidence": {
+            "check": "Main Release Ready",
+            "status": gate.get("status"),
+            "conclusion": gate.get("conclusion"),
+            "completedAt": gate.get("completedAt"),
+        },
+    }
+
+
+def write_independent_review_receipt(path: Path, receipt: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    temporary.replace(path)
+
+
+def refresh_independent_review_receipt(
+    path: Path, main: dict[str, Any], now: datetime
+) -> dict[str, Any]:
+    """Persist a typed review receipt only when the exact-head source gate is green."""
+    if main.get("status") != "green" or not valid_commit_sha(main.get("sha"), exact=True):
+        return observe_independent_review(path, main.get("sha"), now)
+    receipt = build_independent_review_receipt(main, now)
+    verdict = validate_independent_review(receipt, main["sha"], now)
+    if not verdict.get("accepted"):
+        return {**observe_independent_review(path, main.get("sha"), now), "writeReason": verdict.get("reason")}
+    write_independent_review_receipt(path, receipt)
+    return {**verdict, "source": str(path), "writeReason": "wrote-fresh-exact-head-independent-review"}
+
+
 def observe_independent_review(
     path: Path, expected_head_sha: object, now: datetime
 ) -> dict[str, Any]:
@@ -1200,8 +1246,8 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
         "integrity": observe_integrity(integrity_path),
         "queue": observe_queue(args.repo, args.queue_target),
         "concurrencyEvidence": observe_concurrency(concurrency_path, now),
-        "independentReview": observe_independent_review(
-            review_path, main.get("sha"), now
+        "independentReview": refresh_independent_review_receipt(
+            review_path, main, now
         ),
         "lease": observe_lease(args.lease_guard_bin),
     }

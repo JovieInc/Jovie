@@ -799,6 +799,53 @@ class IndependentReviewTests(unittest.TestCase):
         self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 8)
 
+    def test_refresh_writes_receipt_only_when_main_release_ready_is_green(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "independent-review.json"
+            main = {
+                "status": "green",
+                "sha": MAIN_SHA,
+                "sourceGate": {
+                    "name": "Main Release Ready",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "completedAt": "2026-08-13T12:00:00Z",
+                },
+            }
+            observed = MODULE.refresh_independent_review_receipt(path, main, self.NOW)
+            written = json.loads(path.read_text(encoding="utf-8"))
+
+        self.assertTrue(observed["accepted"])
+        self.assertEqual(observed["reason"], "fresh-exact-head-independent-review")
+        self.assertEqual(written["headSha"], MAIN_SHA)
+        self.assertEqual(written["authority"], "Gem")
+        self.assertEqual(written["reviewer"], "Gem")
+        self.assertTrue(written["reviewId"].startswith("main-release-ready:"))
+        verdict = MODULE.validate_independent_review(written, MAIN_SHA, self.NOW)
+        self.assertTrue(verdict["accepted"], verdict)
+
+    def test_refresh_does_not_write_when_main_is_red(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "independent-review.json"
+            observed = MODULE.refresh_independent_review_receipt(
+                path,
+                {"status": "red", "sha": MAIN_SHA},
+                self.NOW,
+            )
+            self.assertFalse(path.exists())
+        self.assertFalse(observed["accepted"])
+        self.assertEqual(observed["reason"], "independent-review-receipt-missing")
+
+    def test_unbound_production_plus_fresh_review_is_hold_intake(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 40}
+        signals["independentReview"] = self.valid_review()
+        receipt = MODULE.evaluate(signals, MODULE.isoformat(self.NOW))
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertTrue(receipt["reviewAdmission"]["allowed"])
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+
 
 class SemanticReadbackTests(unittest.TestCase):
     def test_exact_persisted_receipt_passes(self):
