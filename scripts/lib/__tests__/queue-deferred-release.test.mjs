@@ -100,7 +100,7 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
       "github.event.workflow_run.conclusion != 'cancelled'"
     );
     expect(fleetGateRefreshWorkflow).toContain(
-      "github.event.pull_request.merged != true"
+      'github.event.pull_request.merged != true'
     );
     expect(fleetGateRefreshWorkflow).not.toContain('schedule:');
     expect(workflow).toContain('workflow_dispatch:');
