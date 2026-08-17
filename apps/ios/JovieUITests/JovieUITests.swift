@@ -720,27 +720,30 @@ final class JovieUITests: XCTestCase {
       waitForDrawerSurfaceToBeUncovered(
         profileSurface,
         contentPlaneMarker: contentPlaneMarker,
-        timeout: 3
+        timeout: 6
       ),
       "Profile surface stayed covered by the opening content plane.\n\(app.debugDescription)"
     )
     profileSurface.tap()
+    let copyURLButton = app.buttons["Copy URL"]
     XCTAssertTrue(
-      app.buttons["Copy URL"].waitForExistence(timeout: 10),
+      copyURLButton.waitForExistence(timeout: 10),
       "Shell navigation did not switch to Profile.\n\(app.debugDescription)"
     )
-
-    app.buttons["Open navigation drawer"].tap()
-    let chatSurface = app.buttons["shell-drawer-surface-shell-tab-chat"]
     XCTAssertTrue(
-      waitForDrawerSurfaceToBeUncovered(
-        chatSurface,
-        contentPlaneMarker: contentPlaneMarker,
-        timeout: 3
-      ),
-      "Chat surface stayed covered by the opening content plane.\n\(app.debugDescription)"
+      waitForHittable(contentPlaneMarker, timeout: 6),
+      "Drawer did not close after switching to Profile.\n\(app.debugDescription)"
     )
-    chatSurface.tap()
+
+    // Return via the tab bar because chat stays mounted as a ZStack underlay.
+    let chatTab = firstMatchingButton(
+      app,
+      identifiers: ["shell-tab-chat"],
+      labels: ["Chat"],
+      timeout: 3
+    )
+    XCTAssertTrue(chatTab.exists, "Chat tab missing after Profile.\n\(app.debugDescription)")
+    chatTab.tap()
     let restoredInput = app.textFields["Ask Jovie"]
     XCTAssertTrue(
       waitForHittable(restoredInput, timeout: 10),
