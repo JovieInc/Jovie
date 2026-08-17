@@ -26,6 +26,8 @@ import { z } from 'zod';
 import { BASE_URL } from '@/constants/app';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
+import { db } from '@/lib/db';
+import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
 import { getReleasesForProfileLite } from '@/lib/discography/queries';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
@@ -41,6 +43,12 @@ import {
 } from '@/lib/profile/public-profile-indexing-policy';
 import { getProfileByUsername } from '@/lib/services/profile';
 import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
+import {
+  getVideoMetricsForProfile,
+  getVideoPkForProfile,
+  insertThumbnailCandidate,
+  listVideosForProfile,
+} from '@/lib/youtube-library';
 
 export const revalidate = 0;
 export const dynamic = 'force-dynamic';
@@ -291,6 +299,11 @@ function buildResourceDescriptors(username: string) {
       name: 'Merch catalog',
       mimeType: 'application/json',
     },
+    {
+      uri: `${base}/videos`,
+      name: 'YouTube video library',
+      mimeType: 'application/json',
+    },
   ];
 }
 
@@ -380,6 +393,81 @@ function buildToolDescriptors() {
         required: ['merchCardId'],
       },
     },
+    {
+      name: 'list_videos',
+      description:
+        "List videos from the artist's synced YouTube library. Optionally filter by content type, approved release linkage, or thumbnail experiment id.",
+      inputSchema: {
+        type: 'object',
+        properties: {
+          contentType: {
+            type: 'string',
+            enum: [
+              'music_video',
+              'live_performance',
+              'lyric_video',
+              'short',
+              'vlog',
+              'other',
+            ],
+          },
+          hasApprovedReleaseLink: { type: 'boolean' },
+          experimentId: { type: 'string', maxLength: 120 },
+          limit: { type: 'integer', minimum: 1, maximum: 100 },
+        },
+      },
+    },
+    {
+      name: 'get_video_metrics',
+      description:
+        'Get analytics metric snapshots for one video in the library. Requires authenticated ownership of this artist profile.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          videoId: {
+            type: 'string',
+            description: 'YouTube video ID from the videos resource',
+          },
+          window: {
+            type: 'string',
+            enum: [
+              'day_1',
+              'day_7',
+              'day_28',
+              'day_90',
+              'lifetime',
+              'experiment',
+            ],
+          },
+          from: { type: 'string', format: 'date-time' },
+          to: { type: 'string', format: 'date-time' },
+        },
+        required: ['videoId'],
+      },
+    },
+    {
+      name: 'register_thumbnail_version',
+      description:
+        'Register a candidate thumbnail version for a video (pending human approval). Never performs a YouTube-side thumbnail swap. Requires authenticated ownership of this artist profile.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          videoId: { type: 'string' },
+          imageUrl: { type: 'string', format: 'uri' },
+          provenance: {
+            type: 'object',
+            properties: {
+              generator: { type: 'string', maxLength: 120 },
+              prompt: { type: 'string', maxLength: 2000 },
+              model: { type: 'string', maxLength: 120 },
+            },
+          },
+          experimentId: { type: 'string', maxLength: 120 },
+          cohortId: { type: 'string', maxLength: 120 },
+        },
+        required: ['videoId', 'imageUrl'],
+      },
+    },
   ];
 }
 
@@ -440,6 +528,10 @@ async function readResource(uri: string, profile: NonNullable<ProfileData>) {
       retailPriceCents: m.retailPriceCents,
       available: true,
     }));
+  }
+
+  if (uri === `${base}/videos`) {
+    return listVideosForProfile({ creatorProfileId: profile.id });
   }
 
   return null;
@@ -603,6 +695,118 @@ async function callTool(
     } catch {
       return { error: 'Unable to publish merch card' };
     }
+  }
+
+  if (name === 'list_videos') {
+    const parsed = z
+      .object({
+        contentType: z
+          .enum([
+            'music_video',
+            'live_performance',
+            'lyric_video',
+            'short',
+            'vlog',
+            'other',
+          ])
+          .optional(),
+        hasApprovedReleaseLink: z.boolean().optional(),
+        experimentId: z.string().max(120).optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+      })
+      .safeParse(args);
+    if (!parsed.success) return { error: 'Invalid list_videos arguments' };
+
+    const videos = await listVideosForProfile({
+      creatorProfileId: profile.id,
+      ...parsed.data,
+    });
+    return { data: videos };
+  }
+
+  if (name === 'get_video_metrics' || name === 'register_thumbnail_version') {
+    const { userId } = await getCachedAuth();
+    if (!userId) {
+      return { error: 'Authentication required for video library access' };
+    }
+    const ownedProfile = await getAuthenticatedProfile(db, profile.id, userId);
+    if (!ownedProfile) {
+      return { error: 'You do not own this artist profile' };
+    }
+
+    if (name === 'get_video_metrics') {
+      const parsed = z
+        .object({
+          videoId: z.string().min(1),
+          window: z
+            .enum([
+              'day_1',
+              'day_7',
+              'day_28',
+              'day_90',
+              'lifetime',
+              'experiment',
+            ])
+            .optional(),
+          from: z.string().datetime({ offset: true }).optional(),
+          to: z.string().datetime({ offset: true }).optional(),
+        })
+        .safeParse(args);
+      if (!parsed.success)
+        return { error: 'Invalid get_video_metrics arguments' };
+
+      const metrics = await getVideoMetricsForProfile({
+        creatorProfileId: profile.id,
+        videoId: parsed.data.videoId,
+        window: parsed.data.window,
+        from: parsed.data.from ? new Date(parsed.data.from) : undefined,
+        to: parsed.data.to ? new Date(parsed.data.to) : undefined,
+      });
+      if (!metrics) return { error: `Video not found: ${parsed.data.videoId}` };
+      return { data: metrics };
+    }
+
+    const parsed = z
+      .object({
+        videoId: z.string().min(1),
+        imageUrl: z.string().url(),
+        provenance: z
+          .object({
+            generator: z.string().max(120).optional(),
+            prompt: z.string().max(2000).optional(),
+            model: z.string().max(120).optional(),
+          })
+          .optional(),
+        experimentId: z.string().max(120).optional(),
+        cohortId: z.string().max(120).optional(),
+      })
+      .safeParse(args);
+    if (!parsed.success)
+      return { error: 'Invalid register_thumbnail_version arguments' };
+
+    const videoPk = await getVideoPkForProfile({
+      creatorProfileId: profile.id,
+      videoId: parsed.data.videoId,
+    });
+    if (!videoPk) return { error: `Video not found: ${parsed.data.videoId}` };
+
+    // Registers a pending candidate only — a YouTube-side thumbnail swap is
+    // NEVER performed here (that flow is JOV-3935).
+    const inserted = await insertThumbnailCandidate({
+      videoId: videoPk,
+      imageUrl: parsed.data.imageUrl,
+      provenance: { source: 'generated', ...parsed.data.provenance },
+      experimentId: parsed.data.experimentId ?? null,
+      cohortId: parsed.data.cohortId ?? null,
+    });
+    return {
+      data: {
+        thumbnailVersionId: inserted.id,
+        approvalStatus: 'pending',
+        nextStep:
+          'A human must approve this candidate before any swap is considered.',
+      },
+    };
   }
 
   return { error: `Unknown tool: ${name}` };

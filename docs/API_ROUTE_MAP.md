@@ -238,6 +238,14 @@
 | `/api/dsp/matches/[id]/confirm` | POST | `auth` | Confirm a DSP artist match |
 | `/api/dsp/matches/[id]/reject` | POST | `auth` | Reject a DSP artist match |
 
+### YouTube Library
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/youtube-library/links` | GET | `auth` | Approval queue: pending_review video↔release ISRC links for the user's profiles |
+| `/api/youtube-library/links/[id]/approve` | POST | `auth` | Approve a pending ISRC release link (owner only) |
+| `/api/youtube-library/links/[id]/reject` | POST | `auth` | Reject a pending ISRC release link with a reason (owner only) |
+
 ### Email
 
 | Route | Methods | Auth | Description |

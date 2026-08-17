@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -89,16 +90,18 @@ export function OpportunityCardStack({
       data-testid='opportunity-card-stack'
       aria-label='Opportunity Card Stack'
     >
-      <button
+      <Button
         type='button'
         ref={keyboardControlRef}
+        variant='ghost'
+        size='sm'
         className='sr-only focus-visible:absolute focus-visible:top-0 focus-visible:left-0 focus-visible:z-20 focus-visible:not-sr-only focus-visible:rounded-sm focus-visible:bg-surface-1 focus-visible:px-2 focus-visible:py-1 focus-visible:text-2xs focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface)'
         aria-describedby={instructionsId}
         onClick={() => onOpen(topCard.id)}
         onKeyDown={handleKeyDown}
       >
         Review Current Opportunity
-      </button>
+      </Button>
       <div className='system-b-opportunity-inbox-section-label'>Today</div>
 
       {/* Peek stack behind the top card */}

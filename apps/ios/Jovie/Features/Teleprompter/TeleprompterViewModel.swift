@@ -23,6 +23,28 @@ enum TeleprompterPresentationMode: String, Equatable, Sendable, CaseIterable {
   }
 }
 
+enum TeleprompterContentMode: String, Equatable, Sendable, CaseIterable {
+  case script
+  case prompt
+}
+
+enum TeleprompterOverlayVisibility: String, Equatable, Sendable {
+  case visible
+  case liveOnly
+}
+
+enum TeleprompterFramingGrid: String, Equatable, Sendable {
+  case off
+  case thirds
+}
+
+enum TeleprompterPromptFeedback: String, Equatable, Sendable {
+  case idle
+  case useful
+  case notUseful
+  case queuedOffline
+}
+
 /// Pure speed-override math (unit-testable without audio/camera hardware):
 /// advances the prompt at a fixed reading speed from the word where auto
 /// mode was engaged.
@@ -52,12 +74,19 @@ struct TeleprompterAutoScroller: Equatable, Sendable {
 @MainActor
 @Observable
 final class TeleprompterViewModel {
+  nonisolated static let defaultOverlayAutoResumeDelay: Duration = .seconds(3)
+
   let proposal: MobileChatVideoProposalPayload
   var scriptTitle: String
   var scriptText: String
 
   private(set) var follower: KaraokeScriptFollower
   var presentationMode: TeleprompterPresentationMode = .notch
+  var contentMode: TeleprompterContentMode = .script
+  private(set) var overlayVisibility: TeleprompterOverlayVisibility = .visible
+  private(set) var framingGrid: TeleprompterFramingGrid = .off
+  private(set) var promptFeedback: TeleprompterPromptFeedback = .idle
+  private(set) var pendingPromptFeedback: TeleprompterPromptFeedback?
   private(set) var followMode: TeleprompterFollowMode = .voice
   var speedWordsPerMinute: Double = TeleprompterAutoScroller.defaultWordsPerMinute
   var isEditingScript = false
@@ -67,17 +96,18 @@ final class TeleprompterViewModel {
   private(set) var isFinishing = false
   private(set) var elapsedSeconds: TimeInterval = 0
   private(set) var errorMessage: String?
-  private(set) var savedRecord: VlogSessionRecord?
 
   let captureController: TeleprompterCaptureController
   private let store: VlogSessionStore
   private var activeRecord: VlogSessionRecord?
-  private var activeVideoURL: URL?
   private var autoScroller = TeleprompterAutoScroller()
   private var autoStartIndex = 0
   private var autoStartElapsed: TimeInterval = 0
   private var autoIndex = 0
   private var tickerTask: Task<Void, Never>?
+  private var overlayAutoResumeTask: Task<Void, Never>?
+  private let overlayAutoResumeDelay: Duration
+  private let overlayAutoResumeSleeper: (Duration) async -> Void
 
   /// Called after a recording is saved to the on-disk session store. The
   /// shell uses this to dismiss the overlay and surface Library.
@@ -86,6 +116,10 @@ final class TeleprompterViewModel {
   init(
     proposal: MobileChatVideoProposalPayload,
     store: VlogSessionStore = .localDocuments(),
+    overlayAutoResumeDelay: Duration = TeleprompterViewModel.defaultOverlayAutoResumeDelay,
+    overlayAutoResumeSleeper: @escaping (Duration) async -> Void = { duration in
+      try? await Task.sleep(for: duration)
+    },
     // Default-argument expressions are evaluated outside the enclosing
     // @MainActor context. Keep the default inert and construct the actor-
     // isolated controller inside this initializer instead.
@@ -96,6 +130,8 @@ final class TeleprompterViewModel {
     scriptText = proposal.script
     follower = KaraokeScriptFollower(script: proposal.script)
     self.store = store
+    self.overlayAutoResumeDelay = overlayAutoResumeDelay
+    self.overlayAutoResumeSleeper = overlayAutoResumeSleeper
     self.captureController = captureController ?? TeleprompterCaptureController()
   }
 
@@ -122,6 +158,53 @@ final class TeleprompterViewModel {
 
   var progress: Double {
     follower.progress
+  }
+
+  var promptText: String {
+    proposal.title
+  }
+
+  func setOverlayVisible(_ isVisible: Bool) {
+    overlayAutoResumeTask?.cancel()
+    overlayVisibility = isVisible ? .visible : .liveOnly
+    guard !isVisible else { return }
+
+    overlayAutoResumeTask = Task { [weak self, overlayAutoResumeDelay, overlayAutoResumeSleeper] in
+      await overlayAutoResumeSleeper(overlayAutoResumeDelay)
+      guard !Task.isCancelled else { return }
+      self?.overlayVisibility = .visible
+    }
+  }
+
+  func setFramingGridEnabled(_ isEnabled: Bool) {
+    framingGrid = isEnabled ? .thirds : .off
+  }
+
+  func submitPromptFeedback(_ feedback: TeleprompterPromptFeedback) {
+    guard feedback == .useful || feedback == .notUseful else { return }
+    promptFeedback = feedback
+    pendingPromptFeedback = feedback
+    do {
+      _ = try store.queuePromptFeedback(
+        proposalID: proposal.id,
+        feedback: feedback.rawValue
+      )
+      promptFeedback = .queuedOffline
+    } catch {
+      promptFeedback = .idle
+      pendingPromptFeedback = nil
+      errorMessage = "Couldn't save feedback on this iPhone. Try again."
+    }
+  }
+
+  func startPreview() async {
+    errorMessage = nil
+    do {
+      try await captureController.startPreview()
+    } catch {
+      errorMessage = (error as? LocalizedError)?.errorDescription
+        ?? "Couldn't start the camera preview."
+    }
   }
 
   /// Inline script edit (pre-recording only): rebuild the follower so the
@@ -175,7 +258,6 @@ final class TeleprompterViewModel {
         scriptText: scriptText
       )
       activeRecord = record
-      activeVideoURL = videoURL
 
       captureController.onPartialTranscript = { [weak self] transcript in
         guard let self else { return }
@@ -190,7 +272,7 @@ final class TeleprompterViewModel {
       errorMessage = (error as? LocalizedError)?.errorDescription
         ?? "Couldn't start the recording."
       markActiveRecordFailed()
-      captureController.cancel()
+      await captureController.cancel()
     }
   }
 
@@ -211,27 +293,36 @@ final class TeleprompterViewModel {
       record.segments = result.segments
       try store.save(record)
       activeRecord = nil
-      activeVideoURL = nil
-      savedRecord = record
       onSaved?(record)
     } catch {
       isRecording = false
       errorMessage = (error as? LocalizedError)?.errorDescription
         ?? "The recording couldn't be saved."
       markActiveRecordFailed()
-      captureController.cancel()
+      await captureController.cancel()
     }
   }
 
-  /// Dismiss path: stop capture, mark the session failed, keep whatever
-  /// partial file exists for debugging but never surface it in Library.
-  func cancelRecording() {
+  /// Dismiss path: close the capture file before deleting the private draft.
+  /// A failed deletion keeps the overlay visible so the creator is never left
+  /// with hidden, unreviewable media.
+  func cancelRecording() async -> Bool {
+    overlayAutoResumeTask?.cancel()
+    overlayAutoResumeTask = nil
     stopTicker()
-    guard isRecording || isStarting else { return }
     isRecording = false
     isStarting = false
-    markActiveRecordFailed()
-    captureController.cancel()
+    await captureController.cancel()
+
+    guard let record = activeRecord else { return true }
+    do {
+      try store.delete(record)
+      activeRecord = nil
+      return true
+    } catch {
+      errorMessage = "Couldn't discard this private take. Try again before closing."
+      return false
+    }
   }
 
   private func startTicker() {
@@ -270,6 +361,5 @@ final class TeleprompterViewModel {
     record.endedAt = Date()
     try? store.save(record)
     activeRecord = nil
-    activeVideoURL = nil
   }
 }

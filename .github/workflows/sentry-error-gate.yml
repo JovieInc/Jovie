@@ -13,6 +13,10 @@ on:
         description: The deployment URL that was just deployed.
         required: true
         type: string
+      expected_sha:
+        description: Exact production revision being observed.
+        required: true
+        type: string
       soak_minutes:
         description: Minutes to wait after deploy before checking error rates.
         required: false
@@ -72,6 +76,7 @@ jobs:
         with:
           sentry-auth-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
           deployment_url: ${{ inputs.deployment_url }}
+          expected_sha: ${{ inputs.expected_sha }}
           soak_minutes: ${{ inputs.soak_minutes }}
           baseline_window_minutes: ${{ inputs.baseline_window_minutes }}
           threshold_multiplier: ${{ inputs.threshold_multiplier }}

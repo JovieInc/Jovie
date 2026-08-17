@@ -13,6 +13,7 @@ struct MobileChatView: View {
   @Binding var voiceCaptureTrigger: Int
   let webBaseURL: URL
   let onEntityTap: (EntityContextItem) -> Void
+  let onRecordVideo: (MobileChatVideoProposalPayload) -> Void
 
   @FocusState private var isComposerFocused: Bool
   @State private var isAtBottom = true
@@ -23,13 +24,15 @@ struct MobileChatView: View {
     draft: Binding<String>,
     voiceCaptureTrigger: Binding<Int>,
     webBaseURL: URL,
-    onEntityTap: @escaping (EntityContextItem) -> Void = { _ in }
+    onEntityTap: @escaping (EntityContextItem) -> Void = { _ in },
+    onRecordVideo: @escaping (MobileChatVideoProposalPayload) -> Void = { _ in }
   ) {
     self.repository = repository
     _draft = draft
     _voiceCaptureTrigger = voiceCaptureTrigger
     self.webBaseURL = webBaseURL
     self.onEntityTap = onEntityTap
+    self.onRecordVideo = onRecordVideo
   }
 
   var body: some View {
@@ -72,7 +75,8 @@ struct MobileChatView: View {
               onSubmitPrompt: { prompt in
                 Task { await repository.send(text: prompt) }
               },
-              onEntityTap: onEntityTap
+              onEntityTap: onEntityTap,
+              onRecordVideo: onRecordVideo
             )
             .transition(.opacity.combined(with: .offset(y: 6)))
           }

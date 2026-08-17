@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import Speech
 import Testing
@@ -76,6 +77,60 @@ struct VoiceCaptureServiceTests {
     #expect(FileManager.default.fileExists(atPath: store.metadataURL(for: loaded).path))
   }
 
+  @Test func localVlogStoreDeletesCancelledPrivateTake() throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = VlogSessionStore(rootURL: root)
+    let (record, videoURL) = try store.create(
+      scriptTitle: "Cancelled take",
+      scriptText: "private draft"
+    )
+    try Data("partial creator media".utf8).write(to: videoURL)
+
+    try store.delete(record)
+
+    #expect(!FileManager.default.fileExists(atPath: store.metadataURL(for: record).path))
+    #expect(!FileManager.default.fileExists(atPath: videoURL.path))
+  }
+
+  @Test func recordingFinishDelegateResumesOnlyOnceWhenCancelRacesCallback() async {
+    for _ in 0..<100 {
+      let delegate = RecordingFinishDelegate()
+      let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString)
+
+      _ = try? await withCheckedThrowingContinuation {
+        (continuation: CheckedContinuation<URL, Error>) in
+        delegate.arm(continuation)
+        DispatchQueue.global().async {
+          delegate.discard()
+        }
+        DispatchQueue.global().async {
+          delegate.fileOutput(
+            AVCaptureMovieFileOutput(),
+            didFinishRecordingTo: url,
+            from: [],
+            error: nil
+          )
+        }
+      }
+    }
+  }
+
+  #if !targetEnvironment(simulator)
+    @MainActor
+    @Test func cameraPreviewDoesNotActivateAudioCaptureBeforeRecord() async throws {
+      let controller = TeleprompterCaptureController()
+      try await controller.startPreview()
+
+      #expect(controller.isPreviewing)
+      #expect(!controller.isAudioCaptureConfigured)
+
+      await controller.cancel()
+    }
+  #endif
+
   @Test func actionDraftTrimsWhitespace() {
     #expect(VoiceMemoActionDraft.make(fromTranscript: "  launch single Friday  ") == "launch single Friday")
     #expect(VoiceMemoActionDraft.make(fromTranscript: "\n\tpromo plan\n") == "promo plan")
@@ -147,5 +202,217 @@ struct VoiceCaptureServiceTests {
     #expect(empty.chatDraft == "")
     #expect(empty.autoSendMessage == nil)
     #expect(VoiceMemoActionDraft.isReady(empty.chatDraft) == false)
+  }
+
+  @Test func autoScrollerAdvancesAtConfiguredSpeedAndClamps() {
+    let scroller = TeleprompterAutoScroller(wordsPerMinute: 120)
+
+    // 120 wpm = 2 words/second. Start at word 4.
+    #expect(scroller.wordIndex(startIndex: 4, elapsedSeconds: 0, wordCount: 20) == 4)
+    #expect(scroller.wordIndex(startIndex: 4, elapsedSeconds: 1.4, wordCount: 20) == 6)
+    #expect(scroller.wordIndex(startIndex: 4, elapsedSeconds: 3, wordCount: 20) == 10)
+    // Clamp at the end of the script, never beyond.
+    #expect(scroller.wordIndex(startIndex: 4, elapsedSeconds: 60, wordCount: 20) == 20)
+    // Empty scripts never crash and pin to 0.
+    #expect(scroller.wordIndex(startIndex: 4, elapsedSeconds: 5, wordCount: 0) == 0)
+  }
+
+  @Test func teleprompterFallsBackToManualPromptWithoutOnDeviceSpeech() {
+    #expect(
+      TeleprompterSpeechMode.resolve(
+        isAuthorized: false,
+        isAvailable: true,
+        supportsOnDevice: true
+      ) == .manual
+    )
+    #expect(
+      TeleprompterSpeechMode.resolve(
+        isAuthorized: true,
+        isAvailable: false,
+        supportsOnDevice: true
+      ) == .manual
+    )
+    #expect(
+      TeleprompterSpeechMode.resolve(
+        isAuthorized: true,
+        isAvailable: true,
+        supportsOnDevice: false
+      ) == .manual
+    )
+    #expect(
+      TeleprompterSpeechMode.resolve(
+        isAuthorized: true,
+        isAvailable: true,
+        supportsOnDevice: true
+      ) == .onDevice
+    )
+  }
+
+  @Test func karaokeHoldsDuringTangentAndRejoinsOnlyOnStrongSuffix() {
+    var follower = KaraokeScriptFollower(
+      script: "one two three four five six seven eight"
+    )
+
+    follower.ingest(transcript: "one two")
+    #expect(follower.nextWordIndex == 2)
+
+    follower.ingest(transcript: "one two tangent tangent")
+    #expect(follower.alignment == .offScript)
+    #expect(follower.nextWordIndex == 2)
+
+    // A single coincidental script word does not move the held prompt.
+    follower.ingest(transcript: "one two tangent tangent three")
+    #expect(follower.nextWordIndex == 2)
+
+    // A long, unambiguous suffix re-anchors automatically while recording.
+    follower.ingest(
+      transcript: "one two tangent tangent three four five six seven eight"
+    )
+    #expect(follower.alignment == .aligned)
+    #expect(follower.nextWordIndex == 8)
+  }
+
+  @Test func librarySurfacesOnlyCompletedVlogSessionsWithVideoOnDisk() throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = VlogSessionStore(rootURL: root)
+
+    let (completed, completedVideoURL) = try store.create(
+      scriptTitle: "Release day shout-out",
+      scriptText: "hello artists"
+    )
+    FileManager.default.createFile(atPath: completedVideoURL.path, contents: Data([0x00]))
+    var completedRecord = completed
+    completedRecord.status = .completed
+    try store.save(completedRecord)
+
+    let (recording, _) = try store.create(scriptTitle: "In progress", scriptText: "still talking")
+    let (missingFile, _) = try store.create(scriptTitle: "Lost file", scriptText: "gone")
+    var missingFileRecord = missingFile
+    missingFileRecord.status = .completed
+    try store.save(missingFileRecord)
+
+    let assets = LibraryVlogVideos.assets(
+      from: store.recent(),
+      store: store,
+      now: completedRecord.createdAt.addingTimeInterval(90)
+    )
+
+    #expect(assets.count == 1)
+    #expect(assets[0].id == "vlog-\(completedRecord.id.uuidString)")
+    #expect(assets[0].name == "Release day shout-out")
+    #expect(assets[0].type == .video)
+    #expect(assets[0].isPublic == false)
+    #expect(assets[0].localVideoURL == completedVideoURL)
+    #expect(assets[0].liveStatLabel == "Recorded 1m ago")
+    // Recording-in-progress sessions never surface.
+    #expect(assets.contains { $0.id == "vlog-\(recording.id.uuidString)" } == false)
+  }
+
+  @MainActor
+  @Test func teleprompterViewModelTracksEditsSeekAndSpeedOverride() {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let proposal = MobileChatVideoProposalPayload(
+      kind: .promo,
+      title: "Release day shout-out",
+      script: "one two three four"
+    )
+    let viewModel = TeleprompterViewModel(
+      proposal: proposal,
+      store: VlogSessionStore(rootURL: root)
+    )
+
+    // Script auto-loads from the proposing context.
+    #expect(viewModel.scriptTitle == "Release day shout-out")
+    #expect(viewModel.displayWords == ["one", "two", "three", "four"])
+
+    // Inline edit rebuilds the follower from the top.
+    viewModel.isEditingScript = true
+    viewModel.scriptText = "alpha beta gamma"
+    viewModel.commitScriptEdits()
+    #expect(viewModel.displayWords == ["alpha", "beta", "gamma"])
+    #expect(viewModel.currentWordIndex == 0)
+
+    // Tap-to-seek re-anchors voice follow.
+    viewModel.seek(to: 2)
+    #expect(viewModel.currentWordIndex == 2)
+    #expect(viewModel.alignment == .aligned)
+
+    // Speed override switches to auto from the current word; voice resumes.
+    viewModel.engageSpeedOverride()
+    #expect(viewModel.followMode == .auto)
+    viewModel.resumeVoiceFollow()
+    #expect(viewModel.followMode == .voice)
+    #expect(viewModel.currentWordIndex == 2)
+  }
+
+  @MainActor
+  @Test func teleprompterOverlayStatesStayIndependentAndFeedbackQueuesLocally() async throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let proposal = MobileChatVideoProposalPayload(
+      kind: .bts,
+      title: "What changed when the ferry arrived?",
+      script: "The ferry is not where the story starts."
+    )
+    let store = VlogSessionStore(rootURL: root)
+    let viewModel = TeleprompterViewModel(
+      proposal: proposal,
+      store: store,
+      overlayAutoResumeDelay: .milliseconds(20),
+      overlayAutoResumeSleeper: { _ in }
+    )
+
+    #expect(viewModel.promptText == "What changed when the ferry arrived?")
+    #expect(viewModel.overlayVisibility == .visible)
+    #expect(viewModel.framingGrid == .off)
+    #expect(viewModel.promptFeedback == .idle)
+    #expect(TeleprompterViewModel.defaultOverlayAutoResumeDelay == .seconds(3))
+
+    viewModel.setFramingGridEnabled(true)
+    viewModel.setOverlayVisible(false)
+    #expect(viewModel.overlayVisibility == .liveOnly)
+    #expect(viewModel.framingGrid == .thirds)
+
+    for _ in 0..<20 where viewModel.overlayVisibility == .liveOnly {
+      await Task.yield()
+    }
+    #expect(viewModel.overlayVisibility == .visible)
+    #expect(viewModel.framingGrid == .thirds)
+
+    viewModel.setFramingGridEnabled(false)
+    #expect(viewModel.framingGrid == .off)
+
+    // The still-visible control can restore the prompt immediately, without
+    // waiting for the temporary live-only window to expire.
+    viewModel.setOverlayVisible(false)
+    viewModel.setOverlayVisible(true)
+    #expect(viewModel.overlayVisibility == .visible)
+
+    viewModel.submitPromptFeedback(.useful)
+    #expect(viewModel.promptFeedback == .queuedOffline)
+    #expect(viewModel.pendingPromptFeedback == .useful)
+    let queuedFeedback = store.queuedPromptFeedback()
+    #expect(queuedFeedback.count == 1)
+    #expect(queuedFeedback[0].proposalID == proposal.id)
+    #expect(queuedFeedback[0].feedback == TeleprompterPromptFeedback.useful.rawValue)
+    #expect(queuedFeedback[0].storageMode == "local_only_no_upload")
+
+    viewModel.submitPromptFeedback(.notUseful)
+    #expect(viewModel.promptFeedback == .queuedOffline)
+    #expect(viewModel.pendingPromptFeedback == .notUseful)
+    #expect(store.queuedPromptFeedback().contains { record in
+      record.feedback == TeleprompterPromptFeedback.notUseful.rawValue
+    })
+
+    let queuedCount = store.queuedPromptFeedback().count
+    viewModel.submitPromptFeedback(.idle)
+    #expect(store.queuedPromptFeedback().count == queuedCount)
   }
 }
