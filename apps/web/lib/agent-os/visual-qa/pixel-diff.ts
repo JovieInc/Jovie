@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import type { VisualQaWeightedRegion } from '@/lib/agent-os/visual-qa/thresholds';
+import type { VisualQaViewportRegion } from '@/lib/visual-qa/types';
 
 export const DEFAULT_PIXEL_DIFF_THRESHOLD = 34;
 
@@ -19,6 +20,7 @@ export interface PixelDiffRegionScore {
 export interface PixelDiffResult {
   readonly diffPixelCount: number;
   readonly totalPixelCount: number;
+  readonly maskedPixelCount: number;
   readonly rawDiffRatio: number;
   readonly weightedDriftScore: number;
   readonly regionScores: readonly PixelDiffRegionScore[];
@@ -28,6 +30,7 @@ export interface PixelDiffResult {
 export interface ComputePixelDiffOptions {
   readonly pixelThreshold?: number;
   readonly regions?: readonly VisualQaWeightedRegion[];
+  readonly masks?: readonly VisualQaViewportRegion[];
 }
 
 interface RawImageData {
@@ -90,6 +93,16 @@ function resolvePixelWeight(
   return weight;
 }
 
+function isMaskedPixel(
+  x: number,
+  y: number,
+  masks: readonly ReturnType<typeof normalizeRegion>[]
+): boolean {
+  return masks.some(
+    mask => x >= mask.left && x < mask.right && y >= mask.top && y < mask.bottom
+  );
+}
+
 function computeChannelDelta(
   baseline: Buffer,
   after: Buffer,
@@ -142,6 +155,13 @@ export async function computePixelDiff(
   const normalizedRegions = (options.regions ?? []).map(region =>
     normalizeRegion(region, baseline.width, baseline.height)
   );
+  const normalizedMasks = (options.masks ?? []).map(mask =>
+    normalizeRegion(
+      { ...mask, id: 'dynamic-mask', weight: 1 },
+      baseline.width,
+      baseline.height
+    )
+  );
   const overlay = Buffer.alloc(baseline.data.length, 0);
   const regionDiffPixels = new Map<string, number>(
     normalizedRegions.map(region => [region.id, 0])
@@ -151,12 +171,17 @@ export async function computePixelDiff(
   );
 
   let diffPixelCount = 0;
+  let maskedPixelCount = 0;
   let weightedDiffTotal = 0;
   let weightedPixelTotal = 0;
 
   for (let y = 0; y < baseline.height; y += 1) {
     for (let x = 0; x < baseline.width; x += 1) {
       const index = (y * baseline.width + x) * 4;
+      if (isMaskedPixel(x, y, normalizedMasks)) {
+        maskedPixelCount += 1;
+        continue;
+      }
       const weight = resolvePixelWeight(x, y, normalizedRegions);
       const delta = computeChannelDelta(baseline.data, after.data, index);
       const isDifferent = delta >= pixelThreshold;
@@ -232,6 +257,7 @@ export async function computePixelDiff(
   return {
     diffPixelCount,
     totalPixelCount,
+    maskedPixelCount,
     rawDiffRatio,
     weightedDriftScore,
     regionScores,

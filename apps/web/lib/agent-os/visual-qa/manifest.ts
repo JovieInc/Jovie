@@ -1,8 +1,13 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import {
+  getVisualQaCoverageForCaptureSurface,
+  type VisualQaCoverageEntry,
+} from '@/lib/agent-os/visual-qa/coverage';
+import { hashVisualQaLockedRegions } from '@/lib/agent-os/visual-qa/locked-regions';
 import {
   resolveVisualQaManifestPath,
   resolveVisualQaRunDirectory,
-  toVisualQaRelativePath,
 } from '@/lib/agent-os/visual-qa/paths';
 import { getVisualQaSurface } from '@/lib/visual-qa/registry';
 import type { VisualQaColorScheme } from '@/lib/visual-qa/themes';
@@ -12,6 +17,7 @@ import {
   type VisualQaPhaseCaptureRecord,
   type VisualQaRunManifest,
   type VisualQaSurfaceCaptureRecord,
+  type VisualQaViewportSize,
 } from '@/lib/visual-qa/types';
 import { VISUAL_QA_VIEWPORTS } from '@/lib/visual-qa/viewports';
 
@@ -22,6 +28,30 @@ interface RecordVisualQaCaptureInput {
   readonly colorScheme: VisualQaColorScheme;
   readonly screenshotPath: string;
   readonly gitSha?: string | null;
+  readonly coverageId?: string;
+  readonly surfaceDefinition?: {
+    readonly title: string;
+    readonly viewport: VisualQaViewportSize;
+  };
+}
+
+function toVisualQaRunRelativePath(
+  runDirectory: string,
+  screenshotPath: string
+): string {
+  const relativePath = path.relative(runDirectory, screenshotPath);
+  if (
+    relativePath.length === 0 ||
+    relativePath.startsWith(`..${path.sep}`) ||
+    relativePath === '..' ||
+    path.isAbsolute(relativePath)
+  ) {
+    throw new Error(
+      `Visual QA screenshot must be inside its run directory: ${screenshotPath}`
+    );
+  }
+
+  return relativePath;
 }
 
 async function readManifest(
@@ -58,26 +88,35 @@ function createThemeCaptureRecord(
   };
 }
 
-function createSurfaceRecord(surfaceId: string): VisualQaSurfaceCaptureRecord {
+function createSurfaceRecord(
+  surfaceId: string,
+  surfaceDefinition?: RecordVisualQaCaptureInput['surfaceDefinition']
+): VisualQaSurfaceCaptureRecord {
   const surface = getVisualQaSurface(surfaceId);
-  if (!surface) {
+  if (!surface && !surfaceDefinition) {
     throw new Error(`Unknown Visual QA surface: ${surfaceId}`);
   }
 
-  const viewport = VISUAL_QA_VIEWPORTS[surface.baseline.viewport];
-  const themes = (surface.themes ?? ['dark', 'light']).reduce<
+  const viewport = surface
+    ? VISUAL_QA_VIEWPORTS[surface.baseline.viewport]
+    : surfaceDefinition?.viewport;
+  const title = surface?.title ?? surfaceDefinition?.title;
+  if (!viewport || !title) {
+    throw new Error(
+      `Visual QA surface ${surfaceId} is missing capture metadata.`
+    );
+  }
+
+  const themes = (surface?.themes ?? ['dark', 'light']).reduce<
     Partial<Record<VisualQaColorScheme, VisualQaPhaseCaptureRecord>>
   >((accumulator, colorScheme) => {
-    accumulator[colorScheme] = createThemeCaptureRecord(
-      surface.id,
-      colorScheme
-    );
+    accumulator[colorScheme] = createThemeCaptureRecord(surfaceId, colorScheme);
     return accumulator;
   }, {});
 
   return {
-    surfaceId: surface.id,
-    title: surface.title,
+    surfaceId,
+    title,
     viewport,
     themes,
   };
@@ -85,12 +124,25 @@ function createSurfaceRecord(surfaceId: string): VisualQaSurfaceCaptureRecord {
 
 function upsertSurfaceRecord(
   manifest: VisualQaRunManifest,
-  surfaceId: string
+  surfaceId: string,
+  surfaceDefinition?: RecordVisualQaCaptureInput['surfaceDefinition']
 ): VisualQaSurfaceCaptureRecord {
   const existing = manifest.surfaces.find(
     surface => surface.surfaceId === surfaceId
   );
-  return existing ?? createSurfaceRecord(surfaceId);
+  return existing ?? createSurfaceRecord(surfaceId, surfaceDefinition);
+}
+
+function resolveCoverageEntry(
+  surfaceId: string,
+  coverageId?: string
+): VisualQaCoverageEntry | undefined {
+  if (coverageId) {
+    const coverage = getVisualQaCoverageForCaptureSurface(coverageId);
+    if (coverage) return coverage;
+  }
+
+  return getVisualQaCoverageForCaptureSurface(surfaceId);
 }
 
 export async function recordVisualQaCapture(
@@ -100,9 +152,19 @@ export async function recordVisualQaCapture(
   const runDirectory = resolveVisualQaRunDirectory(input.runId);
   await mkdir(runDirectory, { recursive: true });
 
-  const relativeScreenshotPath = toVisualQaRelativePath(input.screenshotPath);
+  const relativeScreenshotPath = toVisualQaRunRelativePath(
+    runDirectory,
+    input.screenshotPath
+  );
   const existingManifest = await readManifest(input.runId);
   const gitSha = input.gitSha ?? existingManifest?.gitSha ?? null;
+  const coverage = resolveCoverageEntry(input.surfaceId, input.coverageId);
+  const lockedRegionHashes = coverage
+    ? await hashVisualQaLockedRegions(
+        await readFile(input.screenshotPath),
+        coverage.lockedRegions
+      )
+    : [];
 
   const nextSurfaceRecord = upsertSurfaceRecord(
     existingManifest ?? {
@@ -112,7 +174,8 @@ export async function recordVisualQaCapture(
       gitSha,
       surfaces: [],
     },
-    input.surfaceId
+    input.surfaceId,
+    input.surfaceDefinition
   );
 
   const existingThemeRecord =
@@ -145,6 +208,17 @@ export async function recordVisualQaCapture(
       ...nextSurfaceRecord.themes,
       [input.colorScheme]: updatedThemeRecord,
     },
+    ...(coverage && coverage.lockedRegions.length > 0
+      ? {
+          lockedRegionHashes: {
+            ...nextSurfaceRecord.lockedRegionHashes,
+            [input.phase]: {
+              ...nextSurfaceRecord.lockedRegionHashes?.[input.phase],
+              [input.colorScheme]: lockedRegionHashes,
+            },
+          },
+        }
+      : {}),
   };
 
   const remainingSurfaces =

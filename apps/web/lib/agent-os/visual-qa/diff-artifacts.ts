@@ -10,18 +10,26 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 import {
+  getVisualQaCoverageForCaptureSurface,
+  type VisualQaCoverageEntry,
+} from '@/lib/agent-os/visual-qa/coverage';
+import {
   assertValidVisualQaRunId,
   getVisualQaRootDirectory,
   resolveVisualQaDiffOverlayPath,
   resolveVisualQaDiffSummaryPath,
   resolveVisualQaManifestPath,
-  resolveVisualQaRunDirectory,
   resolveVisualQaRunRelativePath,
   toVisualQaRelativePath,
 } from '@/lib/agent-os/visual-qa/paths';
 import { computePixelDiff } from '@/lib/agent-os/visual-qa/pixel-diff';
 import { getVisualQaDiffThreshold } from '@/lib/agent-os/visual-qa/thresholds';
 import { validatePathTraversal } from '@/lib/security/path-traversal';
+import {
+  isVisualQaRunManifest,
+  type VisualQaLockedRegionHashRecord,
+  type VisualQaPhase,
+} from '@/lib/visual-qa/types';
 
 export type VisualQaDiffStatus =
   | 'no_significant_change'
@@ -30,11 +38,16 @@ export type VisualQaDiffStatus =
 
 export interface VisualQaCaptureManifestSurface {
   readonly surfaceId: string;
+  readonly coverageSurfaceId?: string;
   readonly title: string;
+  readonly colorScheme?: 'dark' | 'light';
   readonly baselinePath: string;
   readonly afterPath: string;
   readonly baselineCapturedAt: string | null;
   readonly afterCapturedAt: string | null;
+  readonly lockedRegionHashes?: Partial<
+    Record<VisualQaPhase, readonly VisualQaLockedRegionHashRecord[]>
+  >;
 }
 
 export interface VisualQaCaptureManifest {
@@ -50,13 +63,28 @@ export interface VisualQaSurfaceDiffRecord {
   readonly overlayPath: string | null;
   readonly rawDiffRatio: number | null;
   readonly weightedDriftScore: number | null;
+  readonly maskedPixelCount?: number | null;
   readonly threshold: number;
   readonly status: VisualQaDiffStatus;
+  readonly lockedRegionStatus?:
+    | 'not_configured'
+    | 'verified'
+    | 'mismatch'
+    | 'unverified';
+  readonly lockedRegionResults?: readonly VisualQaLockedRegionDiffResult[];
   readonly regionScores: readonly {
     readonly id: string;
     readonly diffRatio: number;
     readonly weight: number;
   }[];
+}
+
+export interface VisualQaLockedRegionDiffResult {
+  readonly id: string;
+  readonly expectedSha256: string | null;
+  readonly baselineSha256: string | null;
+  readonly afterSha256: string | null;
+  readonly unchanged: boolean;
 }
 
 export interface VisualQaDiffRunSummary {
@@ -577,18 +605,121 @@ async function readCaptureManifest(
   const raw = await readFile(manifestPath, 'utf8');
   const parsed = JSON.parse(raw) as unknown;
 
-  if (!isVisualQaCaptureManifest(parsed) || parsed.runId !== runId) {
-    throw new Error(`Invalid Visual QA capture manifest for run ${runId}.`);
+  if (isVisualQaCaptureManifest(parsed) && parsed.runId === runId) {
+    return parsed;
   }
 
-  return parsed;
+  if (isVisualQaRunManifest(parsed) && parsed.runId === runId) {
+    const surfaces = parsed.surfaces.flatMap(surface =>
+      Object.entries(surface.themes).flatMap(([colorScheme, capture]) => {
+        if (!capture) return [];
+
+        const theme: 'dark' | 'light' =
+          colorScheme === 'light' ? 'light' : 'dark';
+        const themeSurfaceId = `${surface.surfaceId}-${theme}`;
+        const hashes = {
+          baseline: surface.lockedRegionHashes?.baseline?.[theme],
+          after: surface.lockedRegionHashes?.after?.[theme],
+        };
+
+        return [
+          {
+            surfaceId: themeSurfaceId,
+            coverageSurfaceId: surface.surfaceId,
+            title: `${surface.title} (${theme})`,
+            colorScheme: theme,
+            baselinePath: capture.baselinePath,
+            afterPath: capture.afterPath,
+            baselineCapturedAt: capture.baselineCapturedAt,
+            afterCapturedAt: capture.afterCapturedAt,
+            lockedRegionHashes: hashes,
+          },
+        ];
+      })
+    );
+
+    return { runId, surfaces };
+  }
+
+  throw new Error(`Invalid Visual QA capture manifest for run ${runId}.`);
+}
+
+function resolveCoverageEntry(
+  surface: VisualQaCaptureManifestSurface
+): VisualQaCoverageEntry | undefined {
+  return getVisualQaCoverageForCaptureSurface(
+    surface.coverageSurfaceId ?? surface.surfaceId
+  );
+}
+
+function resolveLockedRegionResults(
+  coverage: VisualQaCoverageEntry | undefined,
+  hashes: VisualQaCaptureManifestSurface['lockedRegionHashes']
+): {
+  readonly status: 'not_configured' | 'verified' | 'mismatch' | 'unverified';
+  readonly results: readonly VisualQaLockedRegionDiffResult[];
+} {
+  if (!coverage || coverage.lockedRegions.length === 0) {
+    return { status: 'not_configured', results: [] };
+  }
+
+  const baselineById = new Map(
+    (hashes?.baseline ?? []).map(hash => [hash.id, hash.sha256])
+  );
+  const afterById = new Map(
+    (hashes?.after ?? []).map(hash => [hash.id, hash.sha256])
+  );
+  let missing = false;
+  let mismatch = false;
+  const results = coverage.lockedRegions.map(region => {
+    const baselineSha256 = baselineById.get(region.id) ?? null;
+    const afterSha256 = afterById.get(region.id) ?? null;
+    const expectedSha256 = region.expectedSha256 ?? null;
+    const unchanged =
+      baselineSha256 !== null &&
+      afterSha256 !== null &&
+      baselineSha256 === afterSha256 &&
+      (expectedSha256 === null || baselineSha256 === expectedSha256);
+
+    if (baselineSha256 === null || afterSha256 === null) missing = true;
+    if (!unchanged && baselineSha256 !== null && afterSha256 !== null) {
+      mismatch = true;
+    }
+
+    return {
+      id: region.id,
+      expectedSha256,
+      baselineSha256,
+      afterSha256,
+      unchanged,
+    };
+  });
+
+  return {
+    status: mismatch ? 'mismatch' : missing ? 'unverified' : 'verified',
+    results,
+  };
 }
 
 async function computeSurfaceDiff(params: {
   readonly runId: string;
   readonly surface: VisualQaCaptureManifestSurface;
 }): Promise<VisualQaSurfaceDiffRecord> {
-  const threshold = getVisualQaDiffThreshold(params.surface.surfaceId);
+  const coverage = resolveCoverageEntry(params.surface);
+  const legacyThreshold = getVisualQaDiffThreshold(
+    params.surface.coverageSurfaceId ?? params.surface.surfaceId
+  );
+  const threshold = coverage
+    ? {
+        ...legacyThreshold,
+        maxWeightedDriftScore: coverage.diffThreshold.maxWeightedDriftScore,
+        pixelThreshold: coverage.diffThreshold.pixelThreshold,
+      }
+    : legacyThreshold;
+  const lockedRegionVerification = resolveLockedRegionResults(
+    coverage,
+    params.surface.lockedRegionHashes
+  );
 
   if (
     params.surface.baselineCapturedAt === null ||
@@ -604,6 +735,8 @@ async function computeSurfaceDiff(params: {
       weightedDriftScore: null,
       threshold: threshold.maxWeightedDriftScore,
       status: 'missing_capture',
+      lockedRegionStatus: lockedRegionVerification.status,
+      lockedRegionResults: lockedRegionVerification.results,
       regionScores: [],
     };
   }
@@ -618,18 +751,27 @@ async function computeSurfaceDiff(params: {
   ]);
 
   const diff = await computePixelDiff(baselineImage, afterImage, {
+    pixelThreshold:
+      'pixelThreshold' in threshold ? threshold.pixelThreshold : undefined,
     regions: threshold.regions,
+    masks: coverage?.dynamicMasks
+      .map(mask => mask.region)
+      .filter((region): region is NonNullable<typeof region> =>
+        Boolean(region)
+      ),
   });
 
   const overlayPath = resolveVisualQaDiffOverlayPath(
     params.runId,
     params.surface.surfaceId
   );
-  await mkdir(resolveVisualQaRunDirectory(params.runId), { recursive: true });
+  await mkdir(path.dirname(overlayPath), { recursive: true });
   await writeFile(overlayPath, diff.overlay);
 
   const status: VisualQaDiffStatus =
-    diff.weightedDriftScore <= threshold.maxWeightedDriftScore
+    diff.weightedDriftScore <= threshold.maxWeightedDriftScore &&
+    (lockedRegionVerification.status === 'not_configured' ||
+      lockedRegionVerification.status === 'verified')
       ? 'no_significant_change'
       : 'drift_detected';
 
@@ -641,8 +783,11 @@ async function computeSurfaceDiff(params: {
     overlayPath: toVisualQaRelativePath(overlayPath),
     rawDiffRatio: diff.rawDiffRatio,
     weightedDriftScore: diff.weightedDriftScore,
+    maskedPixelCount: diff.maskedPixelCount,
     threshold: threshold.maxWeightedDriftScore,
     status,
+    lockedRegionStatus: lockedRegionVerification.status,
+    lockedRegionResults: lockedRegionVerification.results,
     regionScores: diff.regionScores,
   };
 }

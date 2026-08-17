@@ -17,6 +17,7 @@ import {
   computeVisualQaDiffArtifacts,
   pruneCompletedVisualQaRuns,
 } from '@/lib/agent-os/visual-qa/diff-artifacts';
+import { hashVisualQaLockedRegions } from '@/lib/agent-os/visual-qa/locked-regions';
 import {
   getVisualQaRootDirectory,
   resolveVisualQaDiffSummaryPath,
@@ -55,6 +56,16 @@ describe('computeVisualQaDiffArtifacts', () => {
 
     const baseline = await createSolidPng({ r: 10, g: 20, b: 30 });
     const after = await createSolidPng({ r: 10, g: 20, b: 30 });
+    const lockedRegion = {
+      id: 'app-shell-chrome',
+      x: 0,
+      y: 0,
+      width: 1,
+      height: 0.18,
+    };
+    const lockedRegionHashes = await hashVisualQaLockedRegions(baseline, [
+      lockedRegion,
+    ]);
 
     await Promise.all([
       writeFile(path.join(surfaceDirectory, 'baseline.png'), baseline),
@@ -71,11 +82,19 @@ describe('computeVisualQaDiffArtifacts', () => {
               {
                 surfaceId: 'shell-desktop-idle',
                 title: 'Shell — desktop idle',
-                baselinePath: 'shell-desktop-idle/baseline.png',
-                afterPath: 'shell-desktop-idle/after.png',
-                baselineCapturedAt: '2026-06-08T00:00:00.000Z',
-                afterCapturedAt: '2026-06-08T00:00:00.000Z',
                 viewport: { width: 1440, height: 900 },
+                themes: {
+                  dark: {
+                    baselinePath: 'shell-desktop-idle/baseline.png',
+                    afterPath: 'shell-desktop-idle/after.png',
+                    baselineCapturedAt: '2026-06-08T00:00:00.000Z',
+                    afterCapturedAt: '2026-06-08T00:00:00.000Z',
+                  },
+                },
+                lockedRegionHashes: {
+                  baseline: { dark: lockedRegionHashes },
+                  after: { dark: lockedRegionHashes },
+                },
               },
             ],
           },
@@ -91,9 +110,9 @@ describe('computeVisualQaDiffArtifacts', () => {
 
     expect(summary.passed).toBe(true);
     expect(summary.surfaces[0]).toMatchObject({
-      surfaceId: 'shell-desktop-idle',
+      surfaceId: 'shell-desktop-idle-dark',
       status: 'no_significant_change',
-      overlayPath: 'unit-diff-demo/shell-desktop-idle/diff-overlay.png',
+      overlayPath: 'unit-diff-demo/shell-desktop-idle-dark/diff-overlay.png',
     });
 
     const persistedSummary = JSON.parse(
