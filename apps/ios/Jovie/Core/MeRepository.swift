@@ -31,6 +31,12 @@ struct MeRepository: MeRepositoryProtocol, Sendable {
       let response = try await apiClient.fetchMe()
       await cache.store(response, for: userID)
       return MeRepositoryResult(response: response, isStale: false)
+    } catch let error as APIClientError
+      where error == .missingToken || error == .requestFailed(statusCode: 401)
+    {
+      // Auth failures must surface so AppState can sign out. Stale cache is
+      // only a fallback for transport / 5xx / decode failures.
+      throw error
     } catch {
       if let cached = await cache.load(for: userID) {
         return MeRepositoryResult(response: cached.response, isStale: true)

@@ -210,11 +210,7 @@ final class AppState {
       if let error = error as? APIClientError {
         switch error {
         case .missingToken, .requestFailed(statusCode: 401):
-          Observability.clearUser()
-          route = .signedOut
-          dashboardState = .idle
-          isOffline = false
-          MobileAuthDiagnostics.record("route_signed_out", detail: error.localizedDescription)
+          await handleExpiredSession()
           return
         case .transportFailed:
           didTransportFail = true
