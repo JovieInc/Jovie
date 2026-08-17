@@ -77,6 +77,18 @@ private func makeIsolatedChatCache(suiteName: String) -> ChatCache {
   return ChatCache(defaults: defaults)
 }
 
+private func makeIsolatedAudienceHighlightsCache(suiteName: String) -> AudienceHighlightsCache {
+  let defaults = UserDefaults(suiteName: suiteName)!
+  defaults.removePersistentDomain(forName: suiteName)
+  return AudienceHighlightsCache(defaults: defaults)
+}
+
+private func makeIsolatedActionLoopCache(suiteName: String) -> ActionLoopCache {
+  let defaults = UserDefaults(suiteName: suiteName)!
+  defaults.removePersistentDomain(forName: suiteName)
+  return ActionLoopCache(defaults: defaults)
+}
+
 private func makeChatSnapshot() -> CachedChatSnapshot {
   CachedChatSnapshot(
     conversations: [
@@ -405,6 +417,86 @@ struct AppStateTests {
     #expect(appState.route == .signedOut)
     #expect(appState.activeUserID == nil)
     #expect(await chatCache.load(for: userID) == nil)
+  }
+
+  @Test func signOutClearsActionLoopAndAudienceCaches() async throws {
+    let userID = "user_action_loop_signout"
+    let audienceCache = makeIsolatedAudienceHighlightsCache(
+      suiteName: "AppStateAudienceCacheSignOut"
+    )
+    let actionLoopCache = makeIsolatedActionLoopCache(
+      suiteName: "AppStateActionLoopCacheSignOut"
+    )
+    await audienceCache.store(.preview, for: userID)
+    await actionLoopCache.storeInbox(.preview, for: userID)
+    await actionLoopCache.storeCalendar(.preview, for: userID)
+    #expect(await audienceCache.load(for: userID) != nil)
+    #expect(await actionLoopCache.loadInbox(for: userID) != nil)
+    #expect(await actionLoopCache.loadCalendar(for: userID) != nil)
+
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController(),
+      audienceHighlightsCache: audienceCache,
+      actionLoopCache: actionLoopCache
+    )
+    appState.didInitializeAuth = true
+
+    await appState.handleSignedInUserChange(userID)
+    await appState.signOut()
+
+    #expect(appState.route == .signedOut)
+    #expect(appState.activeUserID == nil)
+    #expect(await audienceCache.load(for: userID) == nil)
+    #expect(await actionLoopCache.loadInbox(for: userID) == nil)
+    #expect(await actionLoopCache.loadCalendar(for: userID) == nil)
+  }
+
+  @Test func expiredSessionClearsActionLoopAndAudienceCaches() async throws {
+    let userID = "user_action_loop_expired"
+    let audienceCache = makeIsolatedAudienceHighlightsCache(
+      suiteName: "AppStateAudienceCacheExpired"
+    )
+    let actionLoopCache = makeIsolatedActionLoopCache(
+      suiteName: "AppStateActionLoopCacheExpired"
+    )
+    await audienceCache.store(.preview, for: userID)
+    await actionLoopCache.storeInbox(.preview, for: userID)
+    await actionLoopCache.storeCalendar(.preview, for: userID)
+    #expect(await audienceCache.load(for: userID) != nil)
+    #expect(await actionLoopCache.loadInbox(for: userID) != nil)
+    #expect(await actionLoopCache.loadCalendar(for: userID) != nil)
+
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController(),
+      audienceHighlightsCache: audienceCache,
+      actionLoopCache: actionLoopCache
+    )
+    appState.didInitializeAuth = true
+
+    await appState.handleSignedInUserChange(userID)
+    await appState.handleExpiredSession()
+
+    #expect(appState.route == .signedOut)
+    #expect(appState.activeUserID == nil)
+    #expect(await audienceCache.load(for: userID) == nil)
+    #expect(await actionLoopCache.loadInbox(for: userID) == nil)
+    #expect(await actionLoopCache.loadCalendar(for: userID) == nil)
   }
 
   @Test func signedInUserSetsObservabilityUserID() async throws {

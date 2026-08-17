@@ -530,6 +530,13 @@ actor ActionLoopCache {
     }
   }
 
+  func remove(for userID: String) {
+    inboxMemory[userID] = nil
+    calendarMemory[userID] = nil
+    defaults.removeObject(forKey: inboxCacheKey(for: userID))
+    defaults.removeObject(forKey: calendarCacheKey(for: userID))
+  }
+
   private func inboxCacheKey(for userID: String) -> String {
     "ie.jov.Jovie.actionLoopInbox.\(userID)"
   }
