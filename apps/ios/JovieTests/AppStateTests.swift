@@ -71,6 +71,29 @@ private actor MockSessionRevoker: NativeSessionRevoking {
   }
 }
 
+private func makeIsolatedChatCache(suiteName: String) -> ChatCache {
+  let defaults = UserDefaults(suiteName: suiteName)!
+  defaults.removePersistentDomain(forName: suiteName)
+  return ChatCache(defaults: defaults)
+}
+
+private func makeChatSnapshot() -> CachedChatSnapshot {
+  CachedChatSnapshot(
+    conversations: [
+      MobileConversationSummary(
+        id: "conv_cached",
+        title: "Cached chat",
+        createdAt: "2026-06-01T00:00:00.000Z",
+        updatedAt: "2026-06-01T00:00:00.000Z",
+        latestMessageRole: "assistant",
+        latestTurnStatus: "completed"
+      ),
+    ],
+    messagesByConversationID: [:],
+    cachedAt: Date(timeIntervalSince1970: 1_700_000_000)
+  )
+}
+
 @Suite(.serialized)
 @MainActor
 struct AppStateTests {
@@ -326,6 +349,62 @@ struct AppStateTests {
     #expect(appState.activeUserID == nil)
     #expect(await sessionRevoker.calls() == 0)
     #expect(await repository.clearedUsers() == ["user_123"])
+  }
+
+  @Test func signOutClearsChatDiskCache() async throws {
+    let userID = "user_chat_signout"
+    let chatCache = makeIsolatedChatCache(suiteName: "AppStateChatCacheSignOut")
+    await chatCache.store(makeChatSnapshot(), for: userID)
+    #expect(await chatCache.load(for: userID) != nil)
+
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController(),
+      chatCache: chatCache
+    )
+    appState.didInitializeAuth = true
+
+    await appState.handleSignedInUserChange(userID)
+    await appState.signOut()
+
+    #expect(appState.route == .signedOut)
+    #expect(appState.activeUserID == nil)
+    #expect(await chatCache.load(for: userID) == nil)
+  }
+
+  @Test func expiredSessionClearsChatDiskCache() async throws {
+    let userID = "user_chat_expired"
+    let chatCache = makeIsolatedChatCache(suiteName: "AppStateChatCacheExpired")
+    await chatCache.store(makeChatSnapshot(), for: userID)
+    #expect(await chatCache.load(for: userID) != nil)
+
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: .previewReady, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController(),
+      chatCache: chatCache
+    )
+    appState.didInitializeAuth = true
+
+    await appState.handleSignedInUserChange(userID)
+    await appState.handleExpiredSession()
+
+    #expect(appState.route == .signedOut)
+    #expect(appState.activeUserID == nil)
+    #expect(await chatCache.load(for: userID) == nil)
   }
 
   @Test func signedInUserSetsObservabilityUserID() async throws {

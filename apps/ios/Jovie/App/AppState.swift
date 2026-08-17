@@ -37,6 +37,7 @@ final class AppState {
 
   private let repository: AppStateRepository
   private let sessionRevoker: NativeSessionRevoking
+  private let chatCache: ChatCache
   private let launchDate = Date()
   private var loadingUserID: String?
   // Matches SplashView's cinematic entrance (JovieMotion.cinematicDuration)
@@ -48,13 +49,15 @@ final class AppState {
     launchMode: LaunchMode = .current(),
     repository: AppStateRepository,
     brightnessManager: BrightnessControlling,
-    sessionRevoker: NativeSessionRevoking? = nil
+    sessionRevoker: NativeSessionRevoking? = nil,
+    chatCache: ChatCache? = nil
   ) {
     self.configuration = configuration
     self.launchMode = launchMode
     self.repository = repository
     self.brightnessManager = brightnessManager
     self.sessionRevoker = sessionRevoker ?? NativeSessionRevoker(baseURL: configuration.apiBaseURL)
+    self.chatCache = chatCache ?? ChatCache()
   }
 
   func completeLaunch() async {
@@ -289,6 +292,7 @@ final class AppState {
 
     if let userID {
       await repository.clearCachedUser(userID)
+      await chatCache.remove(for: userID)
     }
   }
 
