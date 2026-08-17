@@ -26,12 +26,12 @@
 # 1. Query Sentry for current event count (last 60 min, all event types).
 # 2. Query Sentry for baseline event count: same hour-of-week from the
 #    prior 4 weeks, averaged.
-# 3. Anomaly if current > max(baseline * threshold_multiplier, absolute_floor).
+# 3. Anomaly if current exceeds either the baseline multiplier or absolute floor.
 # 4. On anomaly: Slack alert + GitHub issue. No production mutation.
 #
 # SAFETY:
 # - Alert-only by construction; it has no Vercel credentials or rollback step.
-# - Absolute floor prevents low-traffic-hour false positives.
+# - The absolute floor catches high volume even when a stale baseline is elevated.
 # - One open incident is the cooldown boundary: only the first observation
 #   creates an issue and sends Slack; later runs stay quiet until it is closed.
 
@@ -48,7 +48,7 @@ on:
         default: '5'
         type: string
       absolute_floor:
-        description: 'Minimum event count required to consider anomaly real (prevents low-traffic noise)'
+        description: 'Standalone event count that triggers an anomaly even when the baseline is elevated'
         required: false
         default: '1000'
         type: string
@@ -205,23 +205,25 @@ jobs:
           echo "Multiplier:      ${THRESHOLD_MULTIPLIER}x"
           echo "Absolute floor:  $ABSOLUTE_FLOOR"
 
-          # Threshold = max(baseline * multiplier, absolute_floor)
-          # The floor prevents low-traffic-hour false positives where
-          # baseline=10 and current=60 would otherwise fire.
+          # These are independent incident thresholds. Requiring both would
+          # suppress a genuine 5x-baseline spike during lower-traffic hours.
           MULTIPLIED=$((BASELINE * THRESHOLD_MULTIPLIER))
-          if [[ "$MULTIPLIED" -gt "$ABSOLUTE_FLOOR" ]]; then
-            THRESHOLD=$MULTIPLIED
-          else
-            THRESHOLD=$ABSOLUTE_FLOOR
+          RATIO_TRIGGERED=false
+          FLOOR_TRIGGERED=false
+          if [[ "$BASELINE" -gt 0 && "$CURRENT" -gt "$MULTIPLIED" ]]; then
+            RATIO_TRIGGERED=true
           fi
-          echo "Effective threshold: $THRESHOLD"
+          if [[ "$CURRENT" -gt "$ABSOLUTE_FLOOR" ]]; then
+            FLOOR_TRIGGERED=true
+          fi
+          echo "Baseline threshold: $MULTIPLIED"
 
-          if [[ "$CURRENT" -gt "$THRESHOLD" ]]; then
-            if [[ "$BASELINE" -gt 0 ]]; then
+          if [[ "$RATIO_TRIGGERED" == true || "$FLOOR_TRIGGERED" == true ]]; then
+            if [[ "$RATIO_TRIGGERED" == true ]]; then
               RATIO=$((CURRENT * 100 / BASELINE))
               REASON="Event volume spike: ${RATIO}% of baseline (${CURRENT} vs ${BASELINE}, threshold ${THRESHOLD_MULTIPLIER}x)"
             else
-              REASON="Event volume spike: ${CURRENT} events (no baseline; absolute floor ${ABSOLUTE_FLOOR} exceeded)"
+              REASON="Event volume spike: ${CURRENT} events (absolute floor ${ABSOLUTE_FLOOR} exceeded)"
             fi
             echo "ANOMALY DETECTED: $REASON"
             echo "status=anomaly" >> "$GITHUB_OUTPUT"
@@ -229,7 +231,7 @@ jobs:
           else
             echo "Event volume within normal range"
             echo "status=normal" >> "$GITHUB_OUTPUT"
-            echo "reason=Within normal range (current=${CURRENT}, threshold=${THRESHOLD})" >> "$GITHUB_OUTPUT"
+            echo "reason=Within normal range (current=${CURRENT}, baseline_threshold=${MULTIPLIED}, absolute_floor=${ABSOLUTE_FLOOR})" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create one open cost-anomaly incident

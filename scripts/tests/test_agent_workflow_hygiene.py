@@ -811,6 +811,53 @@ def test_cost_monitoring_docs_match_activation_gated_observer() -> None:
     assert "Keep activation-gated" in audit
 
 
+def test_cost_anomaly_alerts_on_ratio_or_absolute_floor(tmp_path: Path) -> None:
+    """Either standing threshold must independently open an incident."""
+    step = _step_block("cost-anomaly-gate.yml", "Evaluate anomaly")
+    script = textwrap.dedent(step.split("        run: |\n", 1)[1])
+    script = script.replace(
+        'CURRENT="${{ steps.current.outputs.count }}"',
+        'CURRENT="$TEST_CURRENT"',
+    ).replace(
+        'BASELINE="${{ steps.baseline.outputs.average }}"',
+        'BASELINE="$TEST_BASELINE"',
+    )
+
+    cases = (
+        # Regression: 695 is above 5 * 134, despite staying below the floor.
+        ("695", "134", "1000", "anomaly", "518% of baseline"),
+        # The floor remains independent when the ratio threshold is higher.
+        ("1100", "500", "1000", "anomaly", "absolute floor 1000 exceeded"),
+        ("600", "134", "1000", "normal", "Within normal range"),
+        ("1001", "0", "1000", "anomaly", "absolute floor 1000 exceeded"),
+    )
+    for index, (current, baseline, floor, status, reason) in enumerate(cases):
+        output = tmp_path / f"github-output-{index}"
+        env = os.environ.copy()
+        env.update(
+            {
+                "TEST_CURRENT": current,
+                "TEST_BASELINE": baseline,
+                "THRESHOLD_MULTIPLIER": "5",
+                "ABSOLUTE_FLOOR": floor,
+                "LOOKBACK_MINUTES": "60",
+                "GITHUB_OUTPUT": str(output),
+            }
+        )
+        result = subprocess.run(
+            ["bash", "-euo", "pipefail", "-c", script],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert result.returncode == 0, result.stderr
+        outputs = output.read_text(encoding="utf-8")
+        assert f"status={status}" in outputs
+        assert reason in outputs
+
+
 def test_auto_pr_compares_trigger_branch_without_executing_its_checkout() -> None:
     """The pushed branch is controller input; current main supplies helpers."""
     block = _job_block("auto-pr-on-push.yml", "open-pr")
