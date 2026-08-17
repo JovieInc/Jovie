@@ -139,39 +139,41 @@ struct APIClientTests {
   }
 
   @Test func fetchMeDoesNotRetryUnauthorizedWhenTokenCannotRefresh() async throws {
-    NativeSessionTokenStore.clear()
-    defer { NativeSessionTokenStore.clear() }
-    NativeSessionTokenStore.save(
-      token: "stale-native-token",
-      userID: "user_401",
-      expiresAt: Date().addingTimeInterval(60 * 60)
-    )
-    #expect(NativeSessionTokenStore.load()?.token == "stale-native-token")
+    try await NativeSessionTokenStoreTestLock.shared.withExclusive {
+      NativeSessionTokenStore.clear()
+      defer { NativeSessionTokenStore.clear() }
+      NativeSessionTokenStore.save(
+        token: "stale-native-token",
+        userID: "user_401",
+        expiresAt: Date().addingTimeInterval(60 * 60)
+      )
+      #expect(NativeSessionTokenStore.load()?.token == "stale-native-token")
 
-    var requestCount = 0
-    MockURLProtocol.requestHandler = { request in
-      requestCount += 1
-      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer stale-native-token")
-      let response = HTTPURLResponse(
-        url: request.url!,
-        statusCode: 401,
-        httpVersion: nil,
-        headerFields: nil
-      )!
-      return (response, Data())
+      var requestCount = 0
+      MockURLProtocol.requestHandler = { request in
+        requestCount += 1
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer stale-native-token")
+        let response = HTTPURLResponse(
+          url: request.url!,
+          statusCode: 401,
+          httpVersion: nil,
+          headerFields: nil
+        )!
+        return (response, Data())
+      }
+
+      let client = APIClient(
+        baseURL: URL(string: "https://jov.ie")!,
+        session: makeSession(),
+        tokenProvider: NativeSessionTokenProvider()
+      )
+
+      await #expect(throws: APIClientError.missingToken) {
+        _ = try await client.fetchMe()
+      }
+      #expect(requestCount == 1)
+      #expect(NativeSessionTokenStore.load() == nil)
     }
-
-    let client = APIClient(
-      baseURL: URL(string: "https://jov.ie")!,
-      session: makeSession(),
-      tokenProvider: NativeSessionTokenProvider()
-    )
-
-    await #expect(throws: APIClientError.missingToken) {
-      _ = try await client.fetchMe()
-    }
-    #expect(requestCount == 1)
-    #expect(NativeSessionTokenStore.load() == nil)
   }
 
   @Test func completesProfileWithBearerAuthenticatedJSON() async throws {
