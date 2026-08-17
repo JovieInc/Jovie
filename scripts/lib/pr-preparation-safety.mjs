@@ -22,8 +22,52 @@ const FAILED = new Set(
 const CHECK_CONTEXT_FIELDS = `nodes{... on CheckRun{__typename name status conclusion} ... on StatusContext{__typename context state}} pageInfo{hasNextPage endCursor} totalCount`;
 const PR_QUERY = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){number title state isDraft baseRefName baseRefOid headRefName headRefOid isCrossRepository mergeable mergeStateStatus reviewDecision author{login} headRepositoryOwner{login} headRepository{nameWithOwner} mergeQueueEntry{id position} autoMergeRequest{enabledAt} labels(first:100){nodes{name} pageInfo{hasNextPage endCursor} totalCount} commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100){${CHECK_CONTEXT_FIELDS}}}}}}}}}}`;
 const PR_CONTEXT_PAGE_QUERY = `query($owner:String!,$name:String!,$number:Int!,$cursor:String!){repository(owner:$owner,name:$name){pullRequest(number:$number){headRefOid commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100,after:$cursor){${CHECK_CONTEXT_FIELDS}}}}}}}}}}`;
+const PR_INVARIANT_QUERY = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){number title state isDraft baseRefName baseRefOid headRefName headRefOid isCrossRepository mergeable mergeStateStatus reviewDecision author{login} headRepositoryOwner{login} headRepository{nameWithOwner} mergeQueueEntry{id position} autoMergeRequest{enabledAt} labels(first:100){nodes{name} pageInfo{hasNextPage endCursor} totalCount}}}}}`;
 
 const hash = value => createHash('sha256').update(value).digest('hex');
+
+export function createApplyConfirmation({
+  planHash,
+  controllerSha,
+  dryRunReceiptSha256,
+}) {
+  return hash(
+    `jovie-pr-preparation-apply/v1\n${planHash}\n${controllerSha}\n${dryRunReceiptSha256}\n`
+  );
+}
+
+export function validateApplyEvidence(options, entry) {
+  const dryRun = options.dryRunReceipt;
+  if (!dryRun || typeof dryRun !== 'object' || Array.isArray(dryRun))
+    throw new Error('apply requires a dry-run receipt');
+  const { receiptSha256, ...body } = dryRun;
+  if (envelope(body).receiptSha256 !== receiptSha256)
+    throw new Error('dry-run receipt integrity check failed');
+  if (
+    !/^[0-9a-f]{40}$/u.test(options.controllerSha ?? '') ||
+    options.controllerSha !== options.trustedDefaultBranchSha ||
+    dryRun.kind !== 'item' ||
+    dryRun.mode !== 'dry-run' ||
+    dryRun.outcome !== 'eligible_dry_run' ||
+    dryRun.planHash !== options.planHash ||
+    dryRun.trustedDefaultBranchSha !== options.trustedDefaultBranchSha ||
+    dryRun.pr !== entry.number ||
+    dryRun.expectedHeadOid !== entry.headOid ||
+    dryRun.observedHeadOid !== entry.headOid ||
+    dryRun.mutationAttempted !== false ||
+    dryRun.mutationApplied !== false
+  )
+    throw new Error(
+      'apply requires a matching trusted-main exact-head dry-run receipt'
+    );
+  const expected = createApplyConfirmation({
+    planHash: options.planHash,
+    controllerSha: options.controllerSha,
+    dryRunReceiptSha256: receiptSha256,
+  });
+  if (options.confirmation !== expected)
+    throw new Error('apply confirmation does not match bound dry-run evidence');
+}
 
 export const envelope = value => {
   const { receiptSha256: _discarded, ...body } = value;
@@ -213,6 +257,38 @@ function readContextPage(pr, expected = {}) {
   return { commit, contexts };
 }
 
+function invariantSnapshot(pr) {
+  if (
+    !pr ||
+    !Array.isArray(pr.labels?.nodes) ||
+    pr.labels?.pageInfo?.hasNextPage !== false ||
+    pr.labels.totalCount !== pr.labels.nodes.length
+  ) {
+    throw new Error(
+      'GitHub final PR invariant read was incomplete; refusing eligibility'
+    );
+  }
+  return JSON.stringify({
+    number: pr.number,
+    title: pr.title,
+    state: pr.state,
+    isDraft: pr.isDraft,
+    baseRefName: pr.baseRefName,
+    baseRefOid: pr.baseRefOid,
+    headRefName: pr.headRefName,
+    headRefOid: pr.headRefOid,
+    isCrossRepository: pr.isCrossRepository,
+    mergeable: pr.mergeable,
+    mergeStateStatus: pr.mergeStateStatus,
+    reviewDecision: pr.reviewDecision,
+    author: pr.author?.login ?? null,
+    headRepositoryOwner: pr.headRepositoryOwner?.login ?? null,
+    headRepository: pr.headRepository?.nameWithOwner ?? null,
+    mergeQueueEntry: pr.mergeQueueEntry ?? null,
+    autoMergeRequest: pr.autoMergeRequest ?? null,
+    labels: pr.labels.nodes.map(label => label.name).sort(),
+  });
+}
 export async function fetchPrSnapshot(
   repo,
   number,
@@ -280,9 +356,16 @@ export async function fetchPrSnapshot(
     throw new Error(
       'GitHub statusCheckRollup pagination ended before all contexts were read'
     );
+  const finalResponse = await request(PR_INVARIANT_QUERY);
+  const finalPr = finalResponse?.data?.repository?.pullRequest;
+  if (invariantSnapshot(finalPr) !== invariantSnapshot(pr)) {
+    throw new Error(
+      'PR queue, hold, review, auto-merge, label, identity, base, or head state changed after statusCheckRollup pagination'
+    );
+  }
   return {
-    ...pr,
-    labels: pr.labels.nodes,
+    ...finalPr,
+    labels: finalPr.labels.nodes,
     statusCheckRollup: contexts,
   };
 }
@@ -295,6 +378,8 @@ export function cancelledReceipt(receipt, signal, nowMs = Date.now()) {
     reason: `${signal} received; mutation outcome must be re-read from GitHub`,
     mutationAttempted: null,
     mutationApplied: null,
+    observedHeadOid: null,
+    requiresExactRereadBeforeRetry: true,
   };
 }
 

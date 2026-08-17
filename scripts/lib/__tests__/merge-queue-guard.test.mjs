@@ -1208,11 +1208,12 @@ describe('exact-head GitHub Update Branch rebase', () => {
     expect(result).toMatchObject({
       ok: false,
       mutationAttempted: true,
-      mutationApplied: false,
+      mutationApplied: null,
       conflict: false,
       category: 'verification_failure',
       expectedHeadOid: ORIGINAL_HEAD,
-      observedHeadOid: RACING_HEAD,
+      observedHeadOid: null,
+      requiresExactRereadBeforeRetry: true,
     });
     expect(result.reason).toContain('integration-tree proof');
     expect(sleepImpl).toHaveBeenCalledOnce();
@@ -1238,7 +1239,10 @@ describe('exact-head GitHub Update Branch rebase', () => {
     expect(result).toMatchObject({
       ok: false,
       category: 'verification_failure',
-      observedHeadOid: UPDATED_HEAD,
+      mutationAttempted: true,
+      mutationApplied: null,
+      observedHeadOid: null,
+      requiresExactRereadBeforeRetry: true,
     });
     expect(result.reason).toContain('base-ancestry');
   });
@@ -1336,11 +1340,12 @@ describe('exact-head GitHub Update Branch rebase', () => {
     expect(result).toMatchObject({
       ok: false,
       mutationAttempted: true,
-      mutationApplied: false,
+      mutationApplied: null,
       conflict: false,
       category: 'verification_failure',
       expectedHeadOid: ORIGINAL_HEAD,
-      observedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: null,
+      requiresExactRereadBeforeRetry: true,
     });
     expect(clock.sleepImpl.mock.calls.map(([delayMs]) => delayMs)).toEqual([
       250, 500, 1000, 2000, 4000, 8000, 14000, 250,
@@ -1460,11 +1465,12 @@ describe('exact-head GitHub Update Branch rebase', () => {
     expect(result).toMatchObject({
       ok: false,
       mutationAttempted: true,
-      mutationApplied: false,
+      mutationApplied: null,
       conflict: false,
       category: 'stale_head',
       expectedHeadOid: ORIGINAL_HEAD,
-      observedHeadOid: UPDATED_HEAD,
+      observedHeadOid: null,
+      requiresExactRereadBeforeRetry: true,
     });
   });
 
@@ -1586,6 +1592,10 @@ describe('remediation mutations', () => {
 
     expect(summary.applied).toBe(0);
     expect(summary.mutationBudgetUsed).toBe(1);
+    expect(summary.results[0]).toMatchObject({
+      mutationApplied: false,
+      requiresExactRereadBeforeRetry: false,
+    });
     expect(labelPrImpl).not.toHaveBeenCalled();
     expect(commentPrImpl).not.toHaveBeenCalled();
   });
@@ -1594,7 +1604,9 @@ describe('remediation mutations', () => {
     const rebaseImpl = vi.fn(async () => ({
       ok: false,
       mutationAttempted: true,
-      mutationApplied: true,
+      mutationApplied: null,
+      observedHeadOid: null,
+      requiresExactRereadBeforeRetry: true,
       conflict: false,
       category: 'verification_failure',
       reason: 'updated head did not converge before timeout',
@@ -1621,7 +1633,9 @@ describe('remediation mutations', () => {
     expect(summary.results).toHaveLength(1);
     expect(summary.results[0]).toMatchObject({
       mutationAttempted: true,
-      mutationApplied: true,
+      mutationApplied: null,
+      observedHeadOid: null,
+      requiresExactRereadBeforeRetry: true,
       consumedBudget: true,
     });
     expect(labelPrImpl).not.toHaveBeenCalled();

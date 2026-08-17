@@ -218,7 +218,13 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
       expectedHeadOid: rebase.expectedHeadOid ?? null,
       observedHeadOid: rebase.observedHeadOid ?? null,
       mutationAttempted: Boolean(rebase.mutationAttempted),
-      mutationApplied: Boolean(rebase.mutationApplied),
+      mutationApplied:
+        rebase.mutationApplied === null
+          ? null
+          : Boolean(rebase.mutationApplied),
+      requiresExactRereadBeforeRetry: Boolean(
+        rebase.requiresExactRereadBeforeRetry
+      ),
       consumedBudget,
     };
     results.push(item);
