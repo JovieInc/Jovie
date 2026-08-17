@@ -33,13 +33,26 @@ concurrency:
 jobs:
   refresh:
     name: Refresh persisted fleet gate receipt
-    # A merged PR also emits push(main); skip its redundant closed event so one
-    # landing cannot enqueue two admission attempts. Unmerged closure still
-    # frees green-ready capacity and remains an admission event.
+    # Skip cancelled workflow_run so a superseded CI does not occupy a
+    # 5-minute jovie-fixed slot. A merged PR also emits push(main); skip
+    # its redundant closed event so one landing cannot enqueue two
+    # admission attempts. Unmerged closure still frees green-ready
+    # capacity. Labeled/unlabeled only run when the label can change
+    # green-ready depth or a queue/area hold.
     if: >-
-      github.event_name != 'pull_request' ||
+      (github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion != 'cancelled') &&
+      (github.event_name != 'pull_request' ||
       github.event.action != 'closed' ||
-      github.event.pull_request.merged != true
+      github.event.pull_request.merged != true) &&
+      (
+        github.event_name != 'pull_request' ||
+        (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
+        github.event.label.name == 'hold' ||
+        github.event.label.name == 'gated' ||
+        github.event.label.name == 'queue-deferred' ||
+        github.event.label.name == 'needs-human'
+      )
     # The canonical receipt lives on the Gem host; exact-main gate code only.
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 5
