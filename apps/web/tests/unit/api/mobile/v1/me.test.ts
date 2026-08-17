@@ -43,10 +43,13 @@ vi.mock('@/lib/wallet/apple/profile-pass', () => ({
 
 const routeModulePromise = import('@/app/api/mobile/v1/me/route');
 
-function makeRequest() {
+function makeRequest(options?: { readonly supportsWaitlistPending?: boolean }) {
   return new Request('https://jov.ie/api/mobile/v1/me', {
     headers: {
       Authorization: 'Bearer session-token',
+      ...(options?.supportsWaitlistPending
+        ? { 'X-Jovie-Mobile-Capabilities': 'waitlist_pending' }
+        : {}),
     },
   });
 }
@@ -78,6 +81,23 @@ describe('GET /api/mobile/v1/me', () => {
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     await expect(response.json()).resolves.toEqual({
       error: 'Unauthorized',
+    });
+  });
+
+  it('keeps the legacy onboarding state for waitlisted clients without the capability', async () => {
+    hoisted.getSessionContextMock.mockResolvedValue({
+      user: {
+        userStatus: 'waitlist_pending',
+      },
+      profile: null,
+    });
+
+    const { GET } = await routeModulePromise;
+    const response = await GET(makeRequest());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      state: 'needs_onboarding',
     });
   });
 
@@ -226,7 +246,7 @@ describe('GET /api/mobile/v1/me', () => {
     });
 
     const { GET } = await routeModulePromise;
-    const response = await GET(makeRequest());
+    const response = await GET(makeRequest({ supportsWaitlistPending: true }));
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');

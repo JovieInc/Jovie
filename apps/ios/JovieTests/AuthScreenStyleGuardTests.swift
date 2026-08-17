@@ -9,15 +9,16 @@ struct AuthScreenStyleGuardTests {
       .appendingPathComponent("Jovie/App/RootView.swift")
     let source = try String(contentsOf: sourceURL, encoding: .utf8)
 
-    let routeStart = try #require(source.range(of: "case .needsOnboarding:"))
+    let routeStart = try #require(source.range(of: "case .waitlistPending:"))
     let readyStart = try #require(
       source.range(of: "case .ready:", range: routeStart.upperBound..<source.endIndex)
     )
     let routeSource = source[routeStart.lowerBound..<readyStart.lowerBound]
 
-    #expect(routeSource.contains("if appState.loadedDashboardResponse?.state == .waitlistPending"))
     #expect(routeSource.contains("WaitlistPendingView(onUseDifferentAccount: onLogout)"))
     #expect(source.contains("accessibilityIdentifier(\"waitlist-use-different-account\")"))
+    #expect(source.contains(".disabled(isSwitchingAccount)"))
+    #expect(source.contains("ScrollView"))
   }
 
   @Test func continueInBrowserLoadingSpinnerUsesNeutralForeground() throws {

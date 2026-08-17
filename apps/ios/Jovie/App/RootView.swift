@@ -84,11 +84,7 @@ private struct AppContentView: View {
         )
         .transition(.opacity)
       case .needsOnboarding:
-        if appState.loadedDashboardResponse?.state == .waitlistPending {
-          WaitlistPendingView(onUseDifferentAccount: onLogout)
-            .transition(.opacity)
-        } else {
-          AppShellView(
+        AppShellView(
           profile: AppShellProfile(response: appState.loadedDashboardResponse),
           isOffline: false,
           initialTab: .profile,
@@ -161,8 +157,10 @@ private struct AppContentView: View {
             MobileChatPlaceholderView(isOffline: false, draft: draft)
           }
         }
+        .transition(.opacity)
+      case .waitlistPending:
+        WaitlistPendingView(onUseDifferentAccount: onLogout)
           .transition(.opacity)
-        }
       case .ready:
         AppShellView(
           profile: AppShellProfile(response: appState.loadedDashboardResponse),
@@ -454,30 +452,47 @@ private struct AppContentView: View {
 
 private struct WaitlistPendingView: View {
   let onUseDifferentAccount: @MainActor () async -> Void
+  @State private var isSwitchingAccount = false
 
   var body: some View {
     ZStack {
       JovieColor.backgroundBase.ignoresSafeArea()
 
-      VStack(alignment: .leading, spacing: JovieSpacing.large) {
-        VStack(alignment: .leading, spacing: JovieSpacing.small) {
-          Text("You're on the Waitlist")
-            .font(JovieFont.display(size: 28))
-            .foregroundStyle(JovieColor.textPrimary)
+      ScrollView {
+        VStack(alignment: .leading, spacing: JovieSpacing.large) {
+          VStack(alignment: .leading, spacing: JovieSpacing.small) {
+            Text("You're on the Waitlist")
+              .font(.title.bold())
+              .foregroundStyle(JovieColor.textPrimary)
+              .accessibilityAddTraits(.isHeader)
 
-          Text("This account doesn't have access yet. You can use a different account instead.")
-            .font(JovieFont.body(size: 16))
-            .foregroundStyle(JovieColor.textSecondary)
-        }
+            Text("This account doesn't have access yet. You can use a different account instead.")
+              .font(.body)
+              .foregroundStyle(JovieColor.textSecondary)
+          }
 
-        Button("Use a Different Account") {
-          Task { await onUseDifferentAccount() }
+          Button {
+            guard !isSwitchingAccount else { return }
+            isSwitchingAccount = true
+            Task { await onUseDifferentAccount() }
+          } label: {
+            HStack(spacing: JovieSpacing.small) {
+              if isSwitchingAccount {
+                ProgressView()
+                  .tint(JovieColor.backgroundBase)
+              }
+              Text(isSwitchingAccount ? "Switching Account…" : "Use a Different Account")
+            }
+            .frame(maxWidth: .infinity)
+          }
+          .buttonStyle(JoviePillButtonStyle(filled: true))
+          .disabled(isSwitchingAccount)
+          .accessibilityIdentifier("waitlist-use-different-account")
         }
-        .buttonStyle(JoviePillButtonStyle(filled: true))
-        .accessibilityIdentifier("waitlist-use-different-account")
+        .frame(maxWidth: 420, alignment: .leading)
+        .padding(JovieSpacing.xLarge)
+        .frame(maxWidth: .infinity, alignment: .center)
       }
-      .frame(maxWidth: 420, alignment: .leading)
-      .padding(JovieSpacing.xLarge)
     }
   }
 }

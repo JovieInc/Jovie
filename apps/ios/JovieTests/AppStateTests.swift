@@ -254,7 +254,7 @@ struct AppStateTests {
 
     await appState.handleSignedInUserChange("user_pending")
 
-    #expect(appState.route == .needsOnboarding)
+    #expect(appState.route == .waitlistPending)
     #expect(appState.dashboardState == .loaded(pending))
   }
 

@@ -9,6 +9,7 @@ import { getMobileSessionUserId } from '@/lib/mobile/session-auth';
 import { isAppleWalletProfilePassAvailable } from '@/lib/wallet/apple/profile-pass';
 
 export const runtime = 'nodejs';
+const WAITLIST_PENDING_CAPABILITY = 'waitlist_pending';
 
 export interface MobileMeResponse {
   state: 'ready' | 'needs_onboarding' | 'waitlist_pending';
@@ -101,7 +102,16 @@ export async function GET(request: Request) {
     }
 
     if (session.user.userStatus === 'waitlist_pending') {
-      return buildWaitlistPendingResponse();
+      const capabilities =
+        request.headers.get('x-jovie-mobile-capabilities')?.split(',') ?? [];
+      if (
+        capabilities.some(
+          capability => capability.trim() === WAITLIST_PENDING_CAPABILITY
+        )
+      ) {
+        return buildWaitlistPendingResponse();
+      }
+      return buildNeedsOnboardingResponse();
     }
 
     const { profile } = session;

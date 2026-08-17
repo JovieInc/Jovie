@@ -4,6 +4,7 @@ const hoisted = vi.hoisted(() => ({
   signOut: vi.fn(),
   getCachedAuth: vi.fn(),
   createStoredAuthState: vi.fn(),
+  readStoredAuthState: vi.fn(),
   captureError: vi.fn().mockResolvedValue(undefined),
   generalLimiter: {
     limit: vi.fn().mockResolvedValue({ success: true }),
@@ -28,6 +29,7 @@ vi.mock('@/lib/auth/cached', () => ({
 
 vi.mock('@/lib/auth/routing-state.server', () => ({
   createStoredAuthState: hoisted.createStoredAuthState,
+  readStoredAuthState: hoisted.readStoredAuthState,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -94,6 +96,16 @@ describe('GET /auth/start', () => {
       expiresAt: 601_000,
       consumedAt: null,
     });
+    hoisted.readStoredAuthState.mockResolvedValue({
+      client: 'electron',
+      intent: 'sign_in',
+      returnTo: '/app/chat?runtime=electron',
+      state: 'state_1234567890',
+      codeChallenge: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ',
+      createdAt: 1_000,
+      expiresAt: 601_000,
+      consumedAt: null,
+    });
   });
 
   it('requires explicit account switching instead of reusing a signed-in native browser session', async () => {
@@ -126,6 +138,7 @@ describe('GET /auth/start', () => {
         headers: {
           'content-type': 'application/x-www-form-urlencoded',
           cookie: 'better-auth.session_token=signed-session',
+          origin: 'http://localhost:3112',
         },
         body: 'auth_state=state_1234567890&intent=sign_in',
       })
@@ -142,6 +155,62 @@ describe('GET /auth/start', () => {
     expect(response.headers.getSetCookie()).toContain(
       'better-auth.session_token=; Path=/; Max-Age=0'
     );
+  });
+
+  it('rejects cross-origin account switching without signing out', async () => {
+    const response = await POST(
+      new Request('http://localhost:3112/auth/start', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          origin: 'https://attacker.example',
+        },
+        body: 'auth_state=state_1234567890&intent=sign_in',
+      })
+    );
+
+    expect(response.status).toBe(403);
+    expect(hoisted.signOut).not.toHaveBeenCalled();
+    expect(hoisted.readStoredAuthState).not.toHaveBeenCalled();
+  });
+
+  it('preserves the browser session when account-switch state is expired', async () => {
+    hoisted.readStoredAuthState.mockResolvedValueOnce(null);
+    const response = await POST(
+      new Request('http://localhost:3112/auth/start', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          origin: 'http://localhost:3112',
+        },
+        body: 'auth_state=state_1234567890&intent=sign_in',
+      })
+    );
+
+    expect(response.status).toBe(410);
+    expect(hoisted.signOut).not.toHaveBeenCalled();
+  });
+
+  it('shows account selection for signed-in iOS auth starts', async () => {
+    hoisted.createStoredAuthState.mockResolvedValueOnce({
+      client: 'ios',
+      intent: 'sign_in',
+      returnTo: '/app',
+      state: 'state_ios_123456',
+      codeChallenge: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ',
+      createdAt: 1_000,
+      expiresAt: 601_000,
+      consumedAt: null,
+    });
+
+    const response = await GET(
+      new Request(
+        'http://localhost:3112/auth/start?client=ios&intent=sign_in&return_to=%2Fapp&code_challenge=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQ&code_challenge_method=S256'
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('Choose an account');
   });
 
   it('falls back to local memory rate limiting when Redis is unavailable outside production', async () => {

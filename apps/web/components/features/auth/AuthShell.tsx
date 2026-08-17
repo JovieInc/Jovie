@@ -42,9 +42,16 @@ function getCallbackUrl(mode: AuthShellMode): string {
   return mode === 'sign-up' ? APP_ROUTES.SIGNUP : APP_ROUTES.SIGNIN;
 }
 
-function getErrorCallbackUrl(mode: AuthShellMode): string {
+function getErrorCallbackUrl(mode: AuthShellMode, callbackURL: string): string {
   const base = getCallbackUrl(mode);
-  return `${base}?error=oauth_failed`;
+  const errorUrl = new URL(base, 'https://jov.ie');
+  const callback = new URL(callbackURL, 'https://jov.ie');
+  if (callback.pathname === '/auth/callback') {
+    const state = callback.searchParams.get('state');
+    if (state) errorUrl.searchParams.set('auth_state', state);
+  }
+  errorUrl.searchParams.set('error', 'oauth_failed');
+  return errorUrl.pathname + errorUrl.search;
 }
 
 function getNewUserCallbackUrl(): string {
@@ -174,9 +181,9 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       // (staging OAuth runtime proof / real users on slow first paint).
       if (!hasHydrated || pendingProvider) return;
 
-      const callbackURL = getCallbackUrl(mode);
-      const errorCallbackURL = getErrorCallbackUrl(mode);
-      const newUserCallbackURL = getNewUserCallbackUrl();
+      const callbackURL = fallbackRedirectUrl ?? getCallbackUrl(mode);
+      const errorCallbackURL = getErrorCallbackUrl(mode, callbackURL);
+      const newUserCallbackURL = fallbackRedirectUrl ?? getNewUserCallbackUrl();
       const attempt = ++oauthAttemptRef.current;
 
       setPendingProvider(provider);
@@ -222,7 +229,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
         );
       }
     },
-    [hasHydrated, mode, pendingProvider]
+    [fallbackRedirectUrl, hasHydrated, mode, pendingProvider]
   );
 
   if (hasHydrated && isAuthLoaded && isSignedIn) {

@@ -259,7 +259,7 @@ final class AppState {
       // stay instant — .idle forced a generic fallback URL and extra reload work.
       dashboardState = .loaded(response)
     case .waitlistPending:
-      route = .needsOnboarding
+      route = .waitlistPending
       dashboardState = .loaded(response)
     }
   }

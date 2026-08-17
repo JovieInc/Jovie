@@ -35,6 +35,8 @@ enum LiveAuthUITestStatus {
       set("ready", userID: userID)
     case .needsOnboarding:
       set("needs_onboarding", userID: userID)
+    case .waitlistPending:
+      set("waitlist_pending", userID: userID)
     case .launching:
       set("launching", userID: userID)
     case .signedOut:

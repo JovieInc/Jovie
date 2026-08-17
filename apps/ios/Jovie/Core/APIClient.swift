@@ -237,6 +237,10 @@ struct APIClient: APIClientProtocol, Sendable {
     request.timeoutInterval = requestTimeout
     request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     request.setValue("application/json", forHTTPHeaderField: "Accept")
+    request.setValue(
+      "waitlist_pending",
+      forHTTPHeaderField: "X-Jovie-Mobile-Capabilities"
+    )
 
     let data: Data
     let response: URLResponse
