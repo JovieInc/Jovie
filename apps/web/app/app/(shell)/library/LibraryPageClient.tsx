@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -51,8 +52,10 @@ export function LibraryPageClient({
         aria-label='Library Sections'
         className='flex h-10 shrink-0 items-center gap-1 border-b border-subtle px-3'
       >
-        <button
+        <Button
           type='button'
+          size='sm'
+          variant='ghost'
           id='library-assets-tab'
           role='tab'
           aria-selected={mode === 'assets'}
@@ -61,9 +64,11 @@ export function LibraryPageClient({
           className='rounded-md px-3 py-1 text-sm text-secondary-token aria-selected:bg-surface-1 aria-selected:text-primary-token'
         >
           Assets
-        </button>
-        <button
+        </Button>
+        <Button
           type='button'
+          size='sm'
+          variant='ghost'
           id='library-documents-tab'
           role='tab'
           aria-selected={mode === 'documents'}
@@ -71,8 +76,8 @@ export function LibraryPageClient({
           onClick={() => setMode('documents')}
           className='rounded-md px-3 py-1 text-sm text-secondary-token aria-selected:bg-surface-1 aria-selected:text-primary-token'
         >
-          Ideas &amp; scripts
-        </button>
+          Ideas &amp; Scripts
+        </Button>
       </div>
       {mode === 'documents' ? (
         <div

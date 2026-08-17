@@ -33,7 +33,7 @@ describe('LibraryPageClient sections', () => {
       'aria-selected',
       'true'
     );
-    fireEvent.click(screen.getByRole('tab', { name: 'Ideas & scripts' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Ideas & Scripts' }));
     expect(replace).toHaveBeenCalledWith('/app/library?section=documents', {
       scroll: false,
     });
@@ -44,7 +44,7 @@ describe('LibraryPageClient sections', () => {
     render(<LibraryPageClient merchCards={[]} />);
 
     expect(
-      screen.getByRole('tab', { name: 'Ideas & scripts' })
+      screen.getByRole('tab', { name: 'Ideas & Scripts' })
     ).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tabpanel')).toHaveTextContent('Documents panel');
   });

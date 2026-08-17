@@ -503,9 +503,10 @@ export function CreatorDocumentsWorkspace({
             </div>
           ) : (
             documents.map(document => (
-              <button
+              <Button
                 key={document.id}
                 type='button'
+                variant='ghost'
                 onClick={() => setSelectedId(document.id)}
                 className='flex w-full items-center justify-between gap-4 px-3 py-3 text-left hover:bg-surface-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2'
               >
@@ -515,7 +516,7 @@ export function CreatorDocumentsWorkspace({
                 <span className='shrink-0 text-xs text-secondary-token'>
                   {capitalizeFirst(document.kind)} · R{document.currentRevision}
                 </span>
-              </button>
+              </Button>
             ))
           )}
         </div>
