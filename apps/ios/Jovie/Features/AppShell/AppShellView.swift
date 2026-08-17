@@ -70,13 +70,18 @@ func appShellDrawerBasePlaneOpacity(
   (isShowingDrawer || drawerDragOffset != 0) ? 1 : 0
 }
 
-// File-level so unit tests can assert the shipped identity policy.
-// Returning nil keeps Chat (and other tabs) mounted across tab switches;
-// `.id(selectedTab)` remounts and re-runs MobileChatView.task.
-func appShellPagedContentIdentity(for selectedTab: AppShellTab) -> AnyHashable? {
+// File-level so unit tests can assert the shipped keep-mounted policy.
+func appShellKeepsChatMountedAcrossTabs() -> Bool {
+  true
+}
+
+// Chat stays in the tree for every tab when chat is enabled so
+// MobileChatView.task does not re-run refreshConversations().
+func appShellShowsChatUnderlay(selectedTab: AppShellTab, chatEnabled: Bool) -> Bool {
+  guard chatEnabled, appShellKeepsChatMountedAcrossTabs() else { return false }
   switch selectedTab {
   case .chat, .library, .calendar, .inbox, .profile, .audience:
-    return nil
+    return true
   }
 }
 
@@ -345,7 +350,6 @@ struct AppShellView<
         JovieColor.backgroundBase.ignoresSafeArea()
 
         pagedContent
-          .id(appShellPagedContentIdentity(for: selectedTab))
           .transition(pageTransition)
           .frame(maxWidth: .infinity, maxHeight: .infinity)
           .clipped()
@@ -550,13 +554,31 @@ struct AppShellView<
 
   @ViewBuilder
   private var pagedContent: some View {
+    let showsChatUnderlay = appShellShowsChatUnderlay(
+      selectedTab: selectedTab,
+      chatEnabled: chatEnabled
+    )
+    let isChatSelected = selectedTab == .chat
+
+    ZStack {
+      if showsChatUnderlay {
+        chatContent($chatDraft, $voiceCaptureTrigger, presentEntity)
+          .opacity(isChatSelected ? 1 : 0)
+          .allowsHitTesting(isChatSelected)
+          .accessibilityHidden(!isChatSelected)
+      }
+
+      if !isChatSelected || !chatEnabled {
+        nonChatPagedContent
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var nonChatPagedContent: some View {
     switch selectedTab {
     case .chat:
-      if chatEnabled {
-        chatContent($chatDraft, $voiceCaptureTrigger, presentEntity)
-      } else {
-        profileContent
-      }
+      profileContent
     case .library:
       libraryContent(presentEntityFromLibrary)
     case .calendar:

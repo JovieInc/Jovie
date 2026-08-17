@@ -60,21 +60,21 @@ struct AppShellChatFirstTests {
     #expect(MobileChatKeyboardPolicy.shouldDismissOnStreamingStart(userEditedSinceSend: true) == false)
   }
 
-  // AppShell must not remount Chat via a per-tab `.id`; the shipped helper is
-  // the policy the view applies.
-  @Test func pagedContentIdentityDoesNotResetPerTab() {
-    let chat = appShellPagedContentIdentity(for: .chat)
-    let library = appShellPagedContentIdentity(for: .library)
-    let calendar = appShellPagedContentIdentity(for: .calendar)
-    let inbox = appShellPagedContentIdentity(for: .inbox)
-    let profile = appShellPagedContentIdentity(for: .profile)
-    let audience = appShellPagedContentIdentity(for: .audience)
+  @Test func keepsChatMountedAcrossTabs() {
+    #expect(appShellKeepsChatMountedAcrossTabs())
+  }
 
-    #expect(chat == nil)
-    #expect(chat == library)
-    #expect(chat == calendar)
-    #expect(chat == inbox)
-    #expect(chat == profile)
-    #expect(chat == audience)
+  @Test func showsChatUnderlayForEveryTabWhenChatEnabled() {
+    #expect(appShellShowsChatUnderlay(selectedTab: .chat, chatEnabled: true))
+    #expect(appShellShowsChatUnderlay(selectedTab: .library, chatEnabled: true))
+    #expect(appShellShowsChatUnderlay(selectedTab: .calendar, chatEnabled: true))
+    #expect(appShellShowsChatUnderlay(selectedTab: .inbox, chatEnabled: true))
+    #expect(appShellShowsChatUnderlay(selectedTab: .profile, chatEnabled: true))
+    #expect(appShellShowsChatUnderlay(selectedTab: .audience, chatEnabled: true))
+  }
+
+  @Test func hidesChatUnderlayWhenChatDisabled() {
+    #expect(appShellShowsChatUnderlay(selectedTab: .chat, chatEnabled: false) == false)
+    #expect(appShellShowsChatUnderlay(selectedTab: .library, chatEnabled: false) == false)
   }
 }
