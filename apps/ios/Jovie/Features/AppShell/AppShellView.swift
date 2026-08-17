@@ -70,6 +70,16 @@ func appShellDrawerBasePlaneOpacity(
   (isShowingDrawer || drawerDragOffset != 0) ? 1 : 0
 }
 
+// File-level so unit tests can assert the shipped identity policy.
+// Returning nil keeps Chat (and other tabs) mounted across tab switches;
+// `.id(selectedTab)` remounts and re-runs MobileChatView.task.
+func appShellPagedContentIdentity(for selectedTab: AppShellTab) -> AnyHashable? {
+  switch selectedTab {
+  case .chat, .library, .calendar, .inbox, .profile, .audience:
+    return nil
+  }
+}
+
 private enum AppShellRoute: Hashable {
   case settings
 }
@@ -335,7 +345,7 @@ struct AppShellView<
         JovieColor.backgroundBase.ignoresSafeArea()
 
         pagedContent
-          .id(selectedTab)
+          .id(appShellPagedContentIdentity(for: selectedTab))
           .transition(pageTransition)
           .frame(maxWidth: .infinity, maxHeight: .infinity)
           .clipped()

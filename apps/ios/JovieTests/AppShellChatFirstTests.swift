@@ -59,4 +59,22 @@ struct AppShellChatFirstTests {
   @Test func keyboardStaysOpenOnStreamingStartWhenUserEditedSinceSend() {
     #expect(MobileChatKeyboardPolicy.shouldDismissOnStreamingStart(userEditedSinceSend: true) == false)
   }
+
+  // AppShell must not remount Chat via a per-tab `.id`; the shipped helper is
+  // the policy the view applies.
+  @Test func pagedContentIdentityDoesNotResetPerTab() {
+    let chat = appShellPagedContentIdentity(for: .chat)
+    let library = appShellPagedContentIdentity(for: .library)
+    let calendar = appShellPagedContentIdentity(for: .calendar)
+    let inbox = appShellPagedContentIdentity(for: .inbox)
+    let profile = appShellPagedContentIdentity(for: .profile)
+    let audience = appShellPagedContentIdentity(for: .audience)
+
+    #expect(chat == nil)
+    #expect(chat == library)
+    #expect(chat == calendar)
+    #expect(chat == inbox)
+    #expect(chat == profile)
+    #expect(chat == audience)
+  }
 }
