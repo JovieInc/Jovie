@@ -322,7 +322,13 @@ async function runLauncher(argv) {
     process.env.SYMPHONY_ISSUE_IDENTIFIER ||
     basename(workspace);
   const fail = message => {
-    console.error(`symphony-routing launch: ${message}`);
+    const reason = String(message || 'launcher configuration failure').replace(
+      /\s+/g,
+      ' '
+    );
+    console.error(
+      `SYMPHONY_LAUNCHER_FAILURE schema=symphony-launcher-failure/v1 class=deterministic-launcher retryable=false maxAttempts=1 reason=${JSON.stringify(reason)}`
+    );
     process.exit(EXIT_CONFIG);
   };
   let issue;

@@ -7,6 +7,7 @@
  */
 
 import { createHash } from 'node:crypto';
+import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
 
 export const PLAN_GATE_SCHEMA = 'plan-gate/v1';
 export const PLAN_GATE_PREFIX = '<!-- plan-gate/v1 -->';
@@ -14,15 +15,6 @@ export const PLAN_GATE_SUFFIX = '<!--/plan-gate-->';
 export const PLAN_APPROVED_LABEL = 'plan-approved';
 
 const ALLOWED_STATES = new Set(['Triage', 'Backlog', 'Todo']);
-const PROTECTED_LABELS = new Set([
-  'human-review-required',
-  'needs-human',
-  'no-auto',
-  'protected',
-  'tim-approved',
-  'tim-owned',
-  'synthetic',
-]);
 const CREDENTIAL_PATTERN =
   /credential|secret|password|api[ -]?key|access token|private key/i;
 const SYNTHETIC_PATTERN = /synthetic|bundle|workstream|batch|epic-only/i;
@@ -125,7 +117,10 @@ export function validatePlanCandidate(issue, evidence) {
   if (['Done', 'Canceled', 'Cancelled', 'Closed'].includes(state))
     return 'closed-issue';
   if (isTimOwned(issue)) return 'tim-owned';
-  if (labelsOf(issue).some(label => PROTECTED_LABELS.has(label)))
+  if (
+    hasProtectedAdmissionLabel(issue) ||
+    labelsOf(issue).includes('synthetic')
+  )
     return 'protected-or-human-review';
   if (
     SYNTHETIC_PATTERN.test(`${labelsOf(issue).join(' ')} ${issueText(issue)}`)

@@ -1864,6 +1864,62 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
     assert.equal(result.admit.length, 0);
   });
 
+  it('reports typed pre-admission holds before selecting an issue', async () => {
+    const held = [
+      'needs-human',
+      'held',
+      'decision-required',
+      'manual-incident',
+    ].map((label, index) =>
+      admissionIssue({
+        identifier: `JOV-${4520 + index}`,
+        labels: ['plan-approved', 'admission-approved', label],
+      })
+    );
+    const safe = admissionIssue({ identifier: 'JOV-4529' });
+    const result = await admitter.selectNextToAdmit(
+      [...held.map(classification), classification(safe)],
+      [],
+      { currentlyShipping: 0, fleetGate: greenFleetGate() }
+    );
+
+    assert.equal(result.admit[0].identifier, 'JOV-4529');
+    for (const [index, label] of [
+      'needs-human',
+      'held',
+      'decision-required',
+      'manual-incident',
+    ].entries()) {
+      const decision = result.admissionDecisions.find(
+        item => item.identifier === `JOV-${4520 + index}`
+      );
+      assert.equal(decision.allowed, false);
+      assert.equal(decision.preAdmission.reason.code, 'protected-policy');
+      assert.deepEqual(decision.preAdmission.matchedLabels, [label]);
+      assert.equal(decision.preAdmission.reason.retryable, false);
+    }
+  });
+
+  it('rejects a protected issue before any admission mutation', async () => {
+    const issue = admissionIssue({
+      identifier: 'JOV-4530',
+      labels: ['plan-approved', 'admission-approved', 'held'],
+    });
+    const client = fakeClient(issue);
+    const result = await admitter.admitIssue({
+      issue,
+      classification: classification(issue),
+      client,
+    });
+
+    assert.equal(result.status, 'rejected');
+    assert.equal(result.reason, 'protected-policy');
+    assert.equal(result.preAdmission.reason.retryable, false);
+    assert.deepEqual(client.calls.transitions, []);
+    assert.deepEqual(client.calls.labels, []);
+    assert.deepEqual(client.calls.comments, []);
+  });
+
   it('fails closed when the canonical fleet gate is unavailable', async () => {
     const issue = admissionIssue({ identifier: 'JOV-4580' });
     const result = await admitter.selectNextToAdmit(

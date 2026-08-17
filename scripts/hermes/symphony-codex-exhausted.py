@@ -59,7 +59,18 @@ REQUIRED_ADMISSION_LABELS = frozenset(("symphony",))
 # included because human-review flags (needs-human / needs:human / blocked / hold)
 # must gate out of auto-ship; reconcile and grok-ship-one both use this set.
 BLOCKED_ADMISSION_LABELS = frozenset(
-    ("human-review-required", "needs:human", "needs-human", "needs:decision", "needs-decision", "hold", "blocked")
+    (
+        "human-review-required",
+        "needs:human",
+        "needs-human",
+        "needs:decision",
+        "needs-decision",
+        "decision-required",
+        "held",
+        "hold",
+        "manual-incident",
+        "blocked",
+    )
 )
 SUPPORTED_TEAMS = frozenset(("JOV", "LYB"))
 
