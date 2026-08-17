@@ -117,3 +117,100 @@ struct AudienceHighlightsLoadingPolicyTests {
     #expect(audienceHighlightsShouldShowLoading(current: .error("Couldn't load")))
   }
 }
+
+private let otherActionLoopInbox = MobileActionLoopInboxResponse(
+  pendingCount: 2,
+  items: [],
+  emptyActionCards: [],
+  chatPrompt: "other-inbox"
+)
+
+private let otherActionLoopCalendar = MobileActionLoopCalendarResponse(
+  rangeLabel: "Other",
+  pendingReviewCount: 0,
+  upcomingEvents: [],
+  pendingEvents: [],
+  upcomingReleases: [],
+  chatPrompt: "other-calendar"
+)
+
+struct ActionLoopCacheTests {
+  @Test func storeInboxThenLoadInboxReturnsSnapshot() async {
+    let suiteName = "ActionLoopCacheTests-inbox-roundtrip"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    let cache = ActionLoopCache(defaults: defaults)
+
+    await cache.storeInbox(.preview, for: "user_inbox")
+
+    #expect(await cache.loadInbox(for: "user_inbox") == .preview)
+  }
+
+  @Test func storeCalendarThenLoadCalendarReturnsSnapshot() async {
+    let suiteName = "ActionLoopCacheTests-calendar-roundtrip"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    let cache = ActionLoopCache(defaults: defaults)
+
+    await cache.storeCalendar(.preview, for: "user_calendar")
+
+    #expect(await cache.loadCalendar(for: "user_calendar") == .preview)
+  }
+
+  @Test func persistedSnapshotsSurviveNewCacheInstance() async {
+    let suiteName = "ActionLoopCacheTests-persist"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+
+    let writer = ActionLoopCache(defaults: defaults)
+    await writer.storeInbox(.preview, for: "user_persist")
+    await writer.storeCalendar(.preview, for: "user_persist")
+
+    let reader = ActionLoopCache(defaults: defaults)
+    #expect(await reader.loadInbox(for: "user_persist") == .preview)
+    #expect(await reader.loadCalendar(for: "user_persist") == .preview)
+  }
+
+  @Test func differentUserDoesNotSeeOtherUsersSnapshot() async {
+    let suiteName = "ActionLoopCacheTests-user-keyed"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    let cache = ActionLoopCache(defaults: defaults)
+
+    await cache.storeInbox(.preview, for: "user_a")
+    await cache.storeCalendar(.preview, for: "user_a")
+    await cache.storeInbox(otherActionLoopInbox, for: "user_b")
+    await cache.storeCalendar(otherActionLoopCalendar, for: "user_b")
+
+    #expect(await cache.loadInbox(for: "user_a") == .preview)
+    #expect(await cache.loadCalendar(for: "user_a") == .preview)
+    #expect(await cache.loadInbox(for: "user_b") == otherActionLoopInbox)
+    #expect(await cache.loadCalendar(for: "user_b") == otherActionLoopCalendar)
+
+    let reader = ActionLoopCache(defaults: defaults)
+    #expect(await reader.loadInbox(for: "user_a") == .preview)
+    #expect(await reader.loadInbox(for: "user_b") == otherActionLoopInbox)
+    #expect(await reader.loadCalendar(for: "user_a") == .preview)
+    #expect(await reader.loadCalendar(for: "user_b") == otherActionLoopCalendar)
+  }
+
+  @Test func failedDiskDecodeKeepsInMemorySnapshot() async {
+    let suiteName = "ActionLoopCacheTests-fail-keeps-snapshot"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    let cache = ActionLoopCache(defaults: defaults)
+
+    await cache.storeInbox(.preview, for: "user_keep")
+    await cache.storeCalendar(.preview, for: "user_keep")
+
+    defaults.set(Data("not-json".utf8), forKey: "ie.jov.Jovie.actionLoopInbox.user_keep")
+    defaults.set(Data("not-json".utf8), forKey: "ie.jov.Jovie.actionLoopCalendar.user_keep")
+
+    #expect(await cache.loadInbox(for: "user_keep") == .preview)
+    #expect(await cache.loadCalendar(for: "user_keep") == .preview)
+
+    let reader = ActionLoopCache(defaults: defaults)
+    #expect(await reader.loadInbox(for: "user_keep") == nil)
+    #expect(await reader.loadCalendar(for: "user_keep") == nil)
+  }
+}
