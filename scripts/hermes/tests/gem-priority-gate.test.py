@@ -527,6 +527,89 @@ class DeploymentBindingTests(unittest.TestCase):
 
         self.assertEqual(observed["status"], "unknown")
 
+    def test_queue_observation_writes_and_reuses_last_known_after_transient_blip(self):
+        completed = subprocess.CompletedProcess(
+            args=["gh"],
+            returncode=0,
+            stdout=json.dumps([
+                {"number": 1, "isDraft": False, "labels": [], "mergeStateStatus": "CLEAN"}
+            ]),
+            stderr="",
+        )
+        timeout = subprocess.CalledProcessError(
+            1, ["gh"], stderr="HTTP 503: No server is currently available"
+        )
+        now = MODULE.datetime(2026, 8, 17, 18, 30, tzinfo=MODULE.UTC)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "queue-snapshot.json"
+            with mock.patch.object(MODULE.subprocess, "run", return_value=completed):
+                live = MODULE.observe_queue(
+                    "JovieInc/Jovie", 16, snapshot_path=path, now=now
+                )
+            written = json.loads(path.read_text(encoding="utf-8"))
+            with (
+                mock.patch.object(MODULE.subprocess, "run", side_effect=timeout),
+                mock.patch.object(MODULE.time, "sleep"),
+            ):
+                cached = MODULE.observe_queue(
+                    "JovieInc/Jovie",
+                    16,
+                    snapshot_path=path,
+                    now=now + MODULE.timedelta(minutes=2),
+                )
+
+        self.assertEqual(live["status"], "known")
+        self.assertEqual(live["source"], "live")
+        self.assertEqual(written["schema"], "jovie-queue-snapshot/v1")
+        self.assertEqual(written["greenReadyPrs"], 1)
+        self.assertEqual(cached["status"], "known")
+        self.assertEqual(cached["source"], "last-known")
+        self.assertEqual(cached["greenReadyPrs"], 1)
+        self.assertEqual(cached["target"], 16)
+        self.assertIn("queue-observation-failed-used-last-known", cached["error"])
+
+    def test_queue_observation_does_not_reuse_stale_or_auth_last_known(self):
+        timeout = subprocess.CalledProcessError(
+            1, ["gh"], stderr="HTTP 503: No server is currently available"
+        )
+        auth = subprocess.CalledProcessError(1, ["gh"], stderr="authentication required")
+        now = MODULE.datetime(2026, 8, 17, 18, 30, tzinfo=MODULE.UTC)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "queue-snapshot.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema": "jovie-queue-snapshot/v1",
+                        "status": "known",
+                        "eligiblePrs": 4,
+                        "greenReadyPrs": 2,
+                        "target": 16,
+                        "observedAt": MODULE.isoformat(now),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with (
+                mock.patch.object(MODULE.subprocess, "run", side_effect=timeout),
+                mock.patch.object(MODULE.time, "sleep"),
+            ):
+                stale = MODULE.observe_queue(
+                    "JovieInc/Jovie",
+                    16,
+                    snapshot_path=path,
+                    now=now + MODULE.timedelta(minutes=11),
+                )
+            with mock.patch.object(MODULE.subprocess, "run", side_effect=auth):
+                denied = MODULE.observe_queue(
+                    "JovieInc/Jovie",
+                    16,
+                    snapshot_path=path,
+                    now=now + MODULE.timedelta(minutes=1),
+                )
+
+        self.assertEqual(stale["status"], "unknown")
+        self.assertEqual(denied["status"], "unknown")
+
     def test_stale_deployment_sha_freezes_promotion_but_allows_catchup_deploy(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}

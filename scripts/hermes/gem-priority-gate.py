@@ -30,6 +30,8 @@ INDEPENDENT_REVIEW_SCHEMA = "jovie-independent-review/v1"
 INDEPENDENT_REVIEW_AUTHORITY = "Gem"
 INDEPENDENT_REVIEWER = "Gem"
 INDEPENDENT_REVIEW_SCOPE = "exact-main-head"
+QUEUE_SNAPSHOT_SCHEMA = "jovie-queue-snapshot/v1"
+QUEUE_SNAPSHOT_TTL = timedelta(minutes=10)
 # Schema-padding sentinel for evaluation-failed receipts. Auto-Enroll jq
 # requires a 40-hex main SHA; this value never authorizes promotion.
 UNKNOWN_MAIN_SHA = "0" * 40
@@ -576,13 +578,66 @@ def run_gh_queue_snapshot(repo: str) -> subprocess.CompletedProcess[str]:
     raise last_error
 
 
-def observe_queue(repo: str, target: int) -> dict[str, Any]:
+def write_queue_snapshot(path: Path, snapshot: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(snapshot, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    temporary.replace(path)
+
+
+def load_last_known_queue(
+    path: Path, now: datetime, target: int
+) -> dict[str, Any] | None:
+    """Reuse a fresh typed queue snapshot after a transient GitHub blip."""
+    if not path.exists():
+        return None
+    try:
+        data = read_json(path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+    if data.get("schema") != QUEUE_SNAPSHOT_SCHEMA or data.get("status") != "known":
+        return None
+    observed_at = parse_time(data.get("observedAt"))
+    if observed_at is None or now - observed_at > QUEUE_SNAPSHOT_TTL:
+        return None
+    eligible = data.get("eligiblePrs")
+    green_ready = data.get("greenReadyPrs")
+    if (
+        not isinstance(eligible, int)
+        or isinstance(eligible, bool)
+        or eligible < 0
+        or not isinstance(green_ready, int)
+        or isinstance(green_ready, bool)
+        or green_ready < 0
+    ):
+        return None
+    return {
+        "status": "known",
+        "eligiblePrs": eligible,
+        "greenReadyPrs": green_ready,
+        "target": target,
+        "source": "last-known",
+        "observedAt": data.get("observedAt"),
+    }
+
+
+def observe_queue(
+    repo: str,
+    target: int,
+    snapshot_path: Path | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
     """Observe queue demand without a 100-PR nested check-rollup query.
 
     GitHub's ``mergeStateStatus == CLEAN`` is the compact merge-ready signal
     used here for throughput/backpressure. Exact-head queue admission still
     fetches and classifies required checks immediately before mutation.
+    Transient provider 5xx must not flip a live hold-intake fleet to blocked:
+    reuse a fresh last-known snapshot instead of emitting queue-unknown.
     """
+    observed_at = now or utc_now()
     try:
         result = run_gh_queue_snapshot(repo)
         prs = json.loads(result.stdout)
@@ -595,13 +650,33 @@ def observe_queue(repo: str, target: int) -> dict[str, Any]:
             }.intersection({"hold", "gated", "queue-deferred", "needs-human"})
         ]
         green_ready = [pr for pr in eligible if pr.get("mergeStateStatus") == "CLEAN"]
-        return {
+        observed = {
             "status": "known",
             "eligiblePrs": len(eligible),
             "greenReadyPrs": len(green_ready),
             "target": target,
+            "source": "live",
+            "observedAt": isoformat(observed_at),
         }
+        if snapshot_path is not None:
+            write_queue_snapshot(
+                snapshot_path,
+                {
+                    "schema": QUEUE_SNAPSHOT_SCHEMA,
+                    **observed,
+                },
+            )
+        return observed
     except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
+        if snapshot_path is not None and (
+            isinstance(error, OSError) or transient_gh_observation_error(error)
+        ):
+            cached = load_last_known_queue(snapshot_path, observed_at, target)
+            if cached is not None:
+                return {
+                    **cached,
+                    "error": f"queue-observation-failed-used-last-known: {error}",
+                }
         return {
             "status": "unknown",
             "eligiblePrs": None,
@@ -1244,7 +1319,12 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
         "production": observe_production(args.production_url),
         "controller": observe_controller(args.symphony_url),
         "integrity": observe_integrity(integrity_path),
-        "queue": observe_queue(args.repo, args.queue_target),
+        "queue": observe_queue(
+            args.repo,
+            args.queue_target,
+            snapshot_path=args.state_dir.parent / "queue-snapshot.json",
+            now=now,
+        ),
         "concurrencyEvidence": observe_concurrency(concurrency_path, now),
         "independentReview": refresh_independent_review_receipt(
             review_path, main, now
