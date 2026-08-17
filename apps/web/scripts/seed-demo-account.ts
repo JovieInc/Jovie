@@ -32,6 +32,9 @@ const {
   users,
   creatorProfiles,
   creatorContacts,
+  creatorContactAssignments,
+  creatorContactPeople,
+  creatorContactResponsibilities,
   socialLinks,
   discogReleases,
   discogTracks,
@@ -396,6 +399,9 @@ async function cleanDemoChildData(profileId: string, userId: string) {
     .delete(creatorContacts)
     .where(eq(creatorContacts.creatorProfileId, profileId));
   await db
+    .delete(creatorContactPeople)
+    .where(eq(creatorContactPeople.creatorProfileId, profileId));
+  await db
     .delete(emailThreads)
     .where(eq(emailThreads.creatorProfileId, profileId));
   await db
@@ -451,18 +457,15 @@ async function seedDemoContacts(profileId: string): Promise<string[]> {
 
   const contactData = [
     {
-      creatorProfileId: profileId,
       role: 'bookings' as const,
       personName: 'Mike Chen',
       companyName: 'Live Nation Touring',
       email: 'bookings@livenationtouring.example.com',
       territories: ['US', 'CA'],
-      forwardInboxEmails: true,
       isActive: true,
       sortOrder: 0,
     },
     {
-      creatorProfileId: profileId,
       role: 'management' as const,
       personName: 'Sarah Johnson',
       companyName: 'Maverick Management',
@@ -472,7 +475,6 @@ async function seedDemoContacts(profileId: string): Promise<string[]> {
       sortOrder: 1,
     },
     {
-      creatorProfileId: profileId,
       role: 'press_pr' as const,
       personName: 'Amanda Torres',
       companyName: 'Shore Fire Media',
@@ -485,11 +487,32 @@ async function seedDemoContacts(profileId: string): Promise<string[]> {
 
   const ids: string[] = [];
   for (const contact of contactData) {
-    const [created] = await db
-      .insert(creatorContacts)
-      .values(contact)
-      .returning({ id: creatorContacts.id });
-    ids.push(created.id);
+    const [person] = await db
+      .insert(creatorContactPeople)
+      .values({
+        creatorProfileId: profileId,
+        displayName: contact.personName,
+        companyName: contact.companyName,
+        email: contact.email,
+        preferredChannel: 'email',
+      })
+      .returning({ id: creatorContactPeople.id });
+    const [responsibility] = await db
+      .insert(creatorContactResponsibilities)
+      .values({
+        creatorProfileId: profileId,
+        role: contact.role,
+      })
+      .returning({ id: creatorContactResponsibilities.id });
+    await db.insert(creatorContactAssignments).values({
+      personId: person.id,
+      responsibilityId: responsibility.id,
+      territories: contact.territories,
+      isActive: contact.isActive,
+      isPrimary: true,
+      sortOrder: contact.sortOrder,
+    });
+    ids.push(person.id);
   }
 
   console.log(`    Created ${ids.length} contacts`);
@@ -1204,7 +1227,7 @@ async function seedDemoInbox(profileId: string, contactIds: string[]) {
       category: 'booking' as const,
       priority: 'high' as const,
       status: 'routed' as const,
-      routedToContactId: bookingContactId,
+      routedToContactPersonId: bookingContactId,
       categoryConfidence: 0.98,
       aiSummary:
         'The Fillmore offering a headlining slot in October 2026. Routed to booking agent Mike Chen.',
@@ -1271,9 +1294,10 @@ async function seedDemoInbox(profileId: string, contactIds: string[]) {
         categoryConfidence: thread.categoryConfidence,
         aiSummary: thread.aiSummary,
         aiExtractedData: thread.aiExtractedData,
-        routedToContactId:
-          'routedToContactId' in thread
-            ? (thread as { routedToContactId: string }).routedToContactId
+        routedToContactPersonId:
+          'routedToContactPersonId' in thread
+            ? (thread as { routedToContactPersonId: string })
+                .routedToContactPersonId
             : null,
         routedAt: thread.status === 'routed' ? threadDate : null,
         latestMessageAt: threadDate,

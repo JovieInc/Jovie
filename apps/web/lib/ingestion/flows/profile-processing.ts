@@ -7,11 +7,16 @@
  * Extracted to reduce cognitive complexity of the creator-ingest route.
  */
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import type { DbOrTransaction } from '@/lib/db';
 import type { DiscoveredPixels } from '@/lib/db/schema/profiles';
-import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
+import {
+  creatorContactAssignments,
+  creatorContactPeople,
+  creatorContactResponsibilities,
+  creatorProfiles,
+} from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import {
   calculateAndStoreFitScore,
@@ -169,49 +174,85 @@ export async function processProfileExtraction(
 }
 
 /**
- * Store an extracted contact email for a profile.
- * Creates a new contact record if one doesn't exist.
+ * Store an extracted contact email as a directory person with a reusable
+ * general-contact responsibility. Ingestion never replaces a human's
+ * existing contact method with an inferred value.
  */
 async function storeContactEmail(
   tx: DbOrTransaction,
   profileId: string,
   email: string
 ): Promise<void> {
-  // Check if we already have a contact with this email
-  const [existingContact] = await tx
-    .select({ id: creatorContacts.id })
-    .from(creatorContacts)
-    .where(eq(creatorContacts.creatorProfileId, profileId))
+  const [existingPerson] = await tx
+    .select({ id: creatorContactPeople.id })
+    .from(creatorContactPeople)
+    .where(
+      and(
+        eq(creatorContactPeople.creatorProfileId, profileId),
+        eq(creatorContactPeople.email, email)
+      )
+    )
     .limit(1);
 
-  if (existingContact) {
-    // Update existing contact with email if it doesn't have one
-    await tx
-      .update(creatorContacts)
-      .set({
-        email,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorContacts.id, existingContact.id));
-
-    logger.info('Updated contact with extracted email', {
+  if (existingPerson) {
+    logger.info('Extracted contact email already exists in directory', {
       profileId,
-      contactId: existingContact.id,
+      personId: existingPerson.id,
     });
-  } else {
-    // Create new contact
-    await tx.insert(creatorContacts).values({
+    return;
+  }
+
+  const [existingResponsibility] = await tx
+    .select({ id: creatorContactResponsibilities.id })
+    .from(creatorContactResponsibilities)
+    .where(
+      and(
+        eq(creatorContactResponsibilities.creatorProfileId, profileId),
+        eq(creatorContactResponsibilities.role, 'fan_general'),
+        eq(creatorContactResponsibilities.customLabel, '')
+      )
+    )
+    .limit(1);
+  const responsibilityId =
+    existingResponsibility?.id ??
+    (
+      await tx
+        .insert(creatorContactResponsibilities)
+        .values({
+          creatorProfileId: profileId,
+          role: 'fan_general',
+          customLabel: '',
+        })
+        .returning({ id: creatorContactResponsibilities.id })
+    )[0]?.id;
+  if (!responsibilityId) {
+    throw new Error('Unable to create a directory responsibility');
+  }
+
+  const [person] = await tx
+    .insert(creatorContactPeople)
+    .values({
       creatorProfileId: profileId,
       email,
-      role: 'fan_general', // Default role for extracted contacts
-      isActive: true,
-      sortOrder: 0,
-    });
-
-    logger.info('Created contact from extracted email', {
-      profileId,
-    });
+      preferredChannel: 'email',
+    })
+    .returning({ id: creatorContactPeople.id });
+  if (!person) {
+    throw new Error('Unable to create a directory person');
   }
+
+  await tx.insert(creatorContactAssignments).values({
+    personId: person.id,
+    responsibilityId,
+    isActive: true,
+    isPrimary: true,
+    sortOrder: 0,
+  });
+
+  logger.info('Created directory person from extracted email', {
+    profileId,
+    personId: person.id,
+  });
 }
 
 /**

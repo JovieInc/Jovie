@@ -30,7 +30,11 @@ import {
 } from '@/lib/contacts/constants';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { cn } from '@/lib/utils';
-import type { ContactChannel, ContactRole } from '@/types/contacts';
+import type {
+  ContactChannel,
+  ContactResponsibilityAssignment,
+  ContactRole,
+} from '@/types/contacts';
 import { useContactDetailHeaderParts } from './ContactDetailHeader';
 
 function getPreferredChannelLabel(
@@ -78,7 +82,9 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   onDelete,
   contextMenuItems,
 }: ContactDetailSidebarProps) {
-  const [activeTab, setActiveTab] = useState<'info' | 'territories'>('info');
+  const [activeTab, setActiveTab] = useState<
+    'info' | 'responsibilities' | 'territories'
+  >('info');
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Use a ref so the debounced timeout always calls the latest onSave,
@@ -123,12 +129,60 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     };
   }, []);
 
+  const updatePrimaryResponsibility = useCallback(
+    (
+      update: (
+        responsibility: ContactResponsibilityAssignment
+      ) => ContactResponsibilityAssignment
+    ) => {
+      if (!contact) return;
+      const responsibilities = contact.responsibilities?.length
+        ? contact.responsibilities
+        : [
+            {
+              id: `legacy-${contact.id}`,
+              role: contact.role,
+              customLabel: contact.customLabel,
+              territories: contact.territories,
+              isActive: contact.isActive,
+              isPrimary: true,
+              sortOrder: contact.sortOrder,
+              startedAt: null,
+              endedAt: null,
+            },
+          ];
+      const primaryIndex = Math.max(
+        0,
+        responsibilities.findIndex(responsibility => responsibility.isPrimary)
+      );
+      const nextResponsibilities = responsibilities.map(
+        (responsibility, index) =>
+          index === primaryIndex ? update(responsibility) : responsibility
+      );
+      const selected = nextResponsibilities[primaryIndex];
+      if (!selected) return;
+      onUpdate({
+        role: selected.role,
+        customLabel: selected.customLabel,
+        territories: selected.territories,
+        isActive: selected.isActive,
+        sortOrder: selected.sortOrder,
+        responsibilities: nextResponsibilities,
+      });
+    },
+    [contact, onUpdate]
+  );
+
   const handleRoleChange = useCallback(
     (newRole: string) => {
-      onUpdate({ role: newRole as ContactRole });
+      updatePrimaryResponsibility(responsibility => ({
+        ...responsibility,
+        role: newRole as ContactRole,
+        customLabel: newRole === 'other' ? responsibility.customLabel : null,
+      }));
       debouncedSave();
     },
-    [onUpdate, debouncedSave]
+    [updatePrimaryResponsibility, debouncedSave]
   );
 
   const handlePreferredChannelChange = useCallback(
@@ -160,10 +214,108 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
         ];
       }
 
-      onUpdate({ territories: newTerritories });
+      updatePrimaryResponsibility(responsibility => ({
+        ...responsibility,
+        territories: newTerritories,
+      }));
       debouncedSave();
     },
-    [contact, onUpdate, debouncedSave]
+    [contact, updatePrimaryResponsibility, debouncedSave]
+  );
+
+  const handleAddResponsibility = useCallback(
+    (role: ContactRole) => {
+      if (!contact) return;
+      const responsibilities = contact.responsibilities ?? [];
+      if (
+        role !== 'other' &&
+        responsibilities.some(responsibility => responsibility.role === role)
+      ) {
+        return;
+      }
+      const customResponsibilityCount = responsibilities.filter(
+        responsibility => responsibility.role === 'other'
+      ).length;
+      onUpdate({
+        responsibilities: [
+          ...responsibilities,
+          {
+            id:
+              role === 'other'
+                ? `temp-${contact.id}-${role}-${customResponsibilityCount + 1}`
+                : `temp-${contact.id}-${role}`,
+            role,
+            customLabel:
+              role === 'other'
+                ? `Other responsibility ${customResponsibilityCount + 1}`
+                : null,
+            territories: [],
+            isActive: true,
+            isPrimary: false,
+            sortOrder: responsibilities.length,
+            startedAt: null,
+            endedAt: null,
+          },
+        ],
+      });
+      debouncedSave();
+    },
+    [contact, debouncedSave, onUpdate]
+  );
+
+  const handleSelectResponsibility = useCallback(
+    (responsibilityId: string) => {
+      if (!contact) return;
+      const selected = (contact.responsibilities ?? []).find(
+        responsibility => responsibility.id === responsibilityId
+      );
+      if (!selected || !selected.isActive) return;
+
+      onUpdate({
+        role: selected.role,
+        customLabel: selected.customLabel,
+        territories: selected.territories,
+        isActive: selected.isActive,
+        sortOrder: selected.sortOrder,
+        responsibilities: (contact.responsibilities ?? []).map(
+          responsibility => ({
+            ...responsibility,
+            isPrimary: responsibility.id === responsibilityId,
+          })
+        ),
+      });
+      setActiveTab('territories');
+      debouncedSave();
+    },
+    [contact, debouncedSave, onUpdate]
+  );
+
+  const handleDeactivateResponsibility = useCallback(
+    (responsibilityId: string) => {
+      if (!contact) return;
+      const responsibilities = contact.responsibilities ?? [];
+      const activeCount = responsibilities.filter(
+        responsibility => responsibility.isActive
+      ).length;
+      const current = responsibilities.find(
+        responsibility => responsibility.id === responsibilityId
+      );
+      if (!current || !current.isActive || activeCount <= 1) return;
+      onUpdate({
+        responsibilities: responsibilities.map(responsibility =>
+          responsibility.id === responsibilityId
+            ? {
+                ...responsibility,
+                isActive: false,
+                isPrimary: false,
+                endedAt: new Date().toISOString(),
+              }
+            : responsibility
+        ),
+      });
+      debouncedSave();
+    },
+    [contact, debouncedSave, onUpdate]
   );
 
   const { title: headerTitle, actions: headerActions } =
@@ -171,7 +323,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       role: contact?.role ?? 'other',
       customLabel: contact?.customLabel,
       email: contact?.email,
-      onDelete,
+      onDelete: contact?.isSystemDefault ? () => undefined : onDelete,
       onClose: handleClose,
       menuItems: contextMenuItems,
     });
@@ -282,9 +434,15 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
           tabs={
             <DrawerTabs
               value={activeTab}
-              onValueChange={v => setActiveTab(v as 'info' | 'territories')}
+              onValueChange={v =>
+                setActiveTab(v as 'info' | 'responsibilities' | 'territories')
+              }
               options={[
                 { value: 'info' as const, label: 'Info' },
+                {
+                  value: 'responsibilities' as const,
+                  label: 'Responsibilities',
+                },
                 { value: 'territories' as const, label: 'Territories' },
               ]}
               ariaLabel='Contact tabs'
@@ -292,7 +450,16 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
           }
           contentClassName='pt-2'
         >
-          {activeTab === 'info' && (
+          {contact.isSystemDefault && (
+            <DrawerSection title='Default Manager' className='space-y-2'>
+              <p className='text-app text-secondary-token'>
+                Jovie manages this profile by default until you assign an active
+                human manager.
+              </p>
+            </DrawerSection>
+          )}
+
+          {!contact.isSystemDefault && activeTab === 'info' && (
             <>
               <DrawerSection
                 title='Role'
@@ -357,6 +524,39 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                 </div>
               </DrawerSection>
 
+              {contact.role === 'other' && (
+                <DrawerSection
+                  title='Custom Responsibility'
+                  className='space-y-2 border-b border-subtle pb-3'
+                >
+                  <DrawerPropertyRow
+                    label='Label'
+                    value={
+                      <DrawerEditableTextField
+                        label='Custom Responsibility Label'
+                        value={contact.customLabel}
+                        editable
+                        placeholder='e.g., Licensing or Tour manager' // ui-casing-allow: literal example placeholder
+                        emptyLabel='Add a label'
+                        onSave={async nextValue => {
+                          updatePrimaryResponsibility(responsibility => ({
+                            ...responsibility,
+                            customLabel: nextValue,
+                          }));
+                          debouncedSave();
+                        }}
+                        displayClassName='truncate text-app text-primary-token'
+                        emptyClassName='text-tertiary-token italic'
+                        inputClassName='h-8 text-app'
+                      />
+                    }
+                    labelWidth={96}
+                    labelClassName='normal-case tracking-normal text-xs'
+                    valueClassName='overflow-visible'
+                  />
+                </DrawerSection>
+              )}
+
               {/* Preferred Channel */}
               {hasEmailAndPhone && (
                 <DrawerSection
@@ -387,7 +587,94 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             </>
           )}
 
-          {activeTab === 'territories' && (
+          {!contact.isSystemDefault && activeTab === 'responsibilities' && (
+            <DrawerSection title='Responsibilities' className='space-y-3'>
+              <p className='text-app text-secondary-token'>
+                A person can hold several responsibilities. Territory stays with
+                each assignment.
+              </p>
+              <div className='space-y-2'>
+                {(contact.responsibilities ?? []).map(responsibility => (
+                  <div
+                    key={responsibility.id}
+                    className='flex min-h-11 items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-2.5 py-2'
+                  >
+                    <Badge size='sm'>
+                      {getContactRoleLabel(
+                        responsibility.role,
+                        responsibility.customLabel
+                      )}
+                    </Badge>
+                    <span className='min-w-0 flex-1 truncate text-2xs text-tertiary-token'>
+                      {summarizeTerritories(responsibility.territories).summary}
+                    </span>
+                    {responsibility.isActive && !responsibility.isPrimary && (
+                      <button
+                        type='button'
+                        onClick={() =>
+                          handleSelectResponsibility(responsibility.id)
+                        }
+                        className='h-8 rounded-md px-2 text-2xs text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
+                        aria-label={`Edit territory for ${getContactRoleLabel(
+                          responsibility.role,
+                          responsibility.customLabel
+                        )}`}
+                      >
+                        Edit territory
+                      </button>
+                    )}
+                    {responsibility.isActive && (
+                      <button
+                        type='button'
+                        onClick={() =>
+                          handleDeactivateResponsibility(responsibility.id)
+                        }
+                        disabled={
+                          (contact.responsibilities ?? []).filter(
+                            item => item.isActive
+                          ).length <= 1
+                        }
+                        className='h-8 rounded-md px-2 text-2xs text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token disabled:cursor-not-allowed disabled:opacity-50'
+                        aria-label={`Deactivate ${getContactRoleLabel(
+                          responsibility.role,
+                          responsibility.customLabel
+                        )} responsibility`}
+                      >
+                        Deactivate
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className='flex flex-wrap gap-1'>
+                {CONTACT_ROLE_OPTIONS.filter(
+                  option =>
+                    option.value !== 'other' &&
+                    !(contact.responsibilities ?? []).some(
+                      responsibility => responsibility.role === option.value
+                    )
+                ).map(option => (
+                  <button
+                    key={option.value}
+                    type='button'
+                    onClick={() => handleAddResponsibility(option.value)}
+                    className='h-11 rounded-md border border-subtle bg-surface-0 px-2 text-2xs text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token sm:h-7'
+                  >
+                    Add {option.label}
+                  </button>
+                ))}
+                <button
+                  type='button'
+                  onClick={() => handleAddResponsibility('other')}
+                  className='h-11 rounded-md border border-subtle bg-surface-0 px-2 text-2xs text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token sm:h-7'
+                >
+                  Add custom responsibility
+                </button>
+              </div>
+            </DrawerSection>
+          )}
+
+          {!contact.isSystemDefault && activeTab === 'territories' && (
             <DrawerSection title='Territories' className='space-y-2'>
               <div className='space-y-2'>
                 <DrawerPropertyRow

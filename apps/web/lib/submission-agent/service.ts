@@ -21,7 +21,8 @@ import {
   metadataSubmissionTargets,
 } from '@/lib/db/schema/metadata-submissions';
 import {
-  creatorContacts,
+  creatorContactAssignments,
+  creatorContactPeople,
   creatorProfiles,
   profilePhotos,
 } from '@/lib/db/schema/profiles';
@@ -279,17 +280,24 @@ export async function loadCanonicalSubmissionContext(params: {
       .then(rows => rows[0] ?? null),
     db
       .select({
-        email: creatorContacts.email,
+        email: creatorContactPeople.email,
       })
-      .from(creatorContacts)
+      .from(creatorContactAssignments)
+      .innerJoin(
+        creatorContactPeople,
+        eq(creatorContactPeople.id, creatorContactAssignments.personId)
+      )
       .where(
         and(
-          eq(creatorContacts.creatorProfileId, profileId),
-          eq(creatorContacts.isActive, true),
-          isNotNull(creatorContacts.email)
+          eq(creatorContactPeople.creatorProfileId, profileId),
+          eq(creatorContactAssignments.isActive, true),
+          isNotNull(creatorContactPeople.email)
         )
       )
-      .orderBy(asc(creatorContacts.sortOrder), asc(creatorContacts.createdAt))
+      .orderBy(
+        asc(creatorContactAssignments.sortOrder),
+        asc(creatorContactAssignments.createdAt)
+      )
       .limit(1)
       .then(rows => rows[0] ?? null),
     releaseId

@@ -8,7 +8,8 @@ import { and, sql as drizzleSql, eq, gte, inArray, isNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   creatorClaimInvites,
-  creatorContacts,
+  creatorContactAssignments,
+  creatorContactPeople,
   creatorProfiles,
 } from '@/lib/db/schema/profiles';
 
@@ -33,14 +34,20 @@ export async function fetchProfilesById(
       username: creatorProfiles.username,
       displayName: creatorProfiles.displayName,
       fitScore: creatorProfiles.fitScore,
-      contactEmail: creatorContacts.email,
+      contactEmail: drizzleSql<
+        string | null
+      >`case when ${creatorContactAssignments.id} is not null then ${creatorContactPeople.email} else null end`,
     })
     .from(creatorProfiles)
     .leftJoin(
-      creatorContacts,
+      creatorContactPeople,
+      eq(creatorContactPeople.creatorProfileId, creatorProfiles.id)
+    )
+    .leftJoin(
+      creatorContactAssignments,
       and(
-        eq(creatorContacts.creatorProfileId, creatorProfiles.id),
-        eq(creatorContacts.isActive, true)
+        eq(creatorContactAssignments.personId, creatorContactPeople.id),
+        eq(creatorContactAssignments.isActive, true)
       )
     )
     .where(
@@ -66,14 +73,20 @@ export async function fetchProfilesByFitScore(
       username: creatorProfiles.username,
       displayName: creatorProfiles.displayName,
       fitScore: creatorProfiles.fitScore,
-      contactEmail: creatorContacts.email,
+      contactEmail: drizzleSql<
+        string | null
+      >`case when ${creatorContactAssignments.id} is not null then ${creatorContactPeople.email} else null end`,
     })
     .from(creatorProfiles)
     .leftJoin(
-      creatorContacts,
+      creatorContactPeople,
+      eq(creatorContactPeople.creatorProfileId, creatorProfiles.id)
+    )
+    .leftJoin(
+      creatorContactAssignments,
       and(
-        eq(creatorContacts.creatorProfileId, creatorProfiles.id),
-        eq(creatorContacts.isActive, true)
+        eq(creatorContactAssignments.personId, creatorContactPeople.id),
+        eq(creatorContactAssignments.isActive, true)
       )
     )
     .leftJoin(

@@ -9,12 +9,14 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- **Contacts now model people and reusable responsibilities:** one person can hold multiple assignments, several people can share an assignment type, and regional coverage stays on the assignment instead of the person. Existing contact records backfill without deleting the legacy source rows.
 - **Ovie is one morning screen:** `/hud` now carries the brief, a Loom-style screen walk, shipper, and dashboard. Fullscreen asks the logged-in admin for the kiosk token and reloads `/hud?fs=1&kiosk=…`. `/app/ov/ops` and `/hud-tv` redirect there.
 - **Screen walks reuse one account-video store:** founder walks and later creator screen recordings upload through `lib/capture` into the Jovie account blob. The walk is stored and not admitted until Summer classifies it.
 
 ### Changed
 - [internal] **@types/node is 26.2.0 across workspace packages including desktop:** types-only bump; no DMG.
 
+- **Inbox routing now records internal ownership only:** Jovie is the visible default manager until a human manager is assigned; routing neither forwards personal email nor configures external jovi.fm mail delivery.
 - **Ops and the TV HUD are aliases now:** admin nav “Ovie” opens `/hud`. The Mac app grants display-capture only on that route.
 - [internal] **Demo-video stories preserve document scrolling (JOV-4946):** both canonical route aliases now inherit the production marketing context without fixed-height overflow clipping at tablet or mobile viewports.
 - [internal] **Capital policy now protects survival before selectivity:** pre-PMF runway gets a fast path for credible, clean SAFE financing, while investor filtering tightens only after the company can afford to make capital optional.

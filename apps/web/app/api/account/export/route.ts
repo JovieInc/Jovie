@@ -5,7 +5,12 @@ import { setupDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { userSettings, users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
-import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
+import {
+  creatorContactAssignments,
+  creatorContactPeople,
+  creatorContactResponsibilities,
+  creatorProfiles,
+} from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
@@ -95,23 +100,41 @@ export async function GET() {
               .where(inArray(socialLinks.creatorProfileId, profileIds)),
             db
               .select({
-                id: creatorContacts.id,
-                creatorProfileId: creatorContacts.creatorProfileId,
-                role: creatorContacts.role,
-                customLabel: creatorContacts.customLabel,
-                personName: creatorContacts.personName,
-                companyName: creatorContacts.companyName,
-                territories: creatorContacts.territories,
-                email: creatorContacts.email,
-                phone: creatorContacts.phone,
-                preferredChannel: creatorContacts.preferredChannel,
-                isActive: creatorContacts.isActive,
-                sortOrder: creatorContacts.sortOrder,
-                createdAt: creatorContacts.createdAt,
-                updatedAt: creatorContacts.updatedAt,
+                id: creatorContactAssignments.id,
+                personId: creatorContactPeople.id,
+                responsibilityId: creatorContactResponsibilities.id,
+                creatorProfileId: creatorContactPeople.creatorProfileId,
+                role: creatorContactResponsibilities.role,
+                customLabel: creatorContactResponsibilities.customLabel,
+                personName: creatorContactPeople.displayName,
+                companyName: creatorContactPeople.companyName,
+                territories: creatorContactAssignments.territories,
+                email: creatorContactPeople.email,
+                phone: creatorContactPeople.phone,
+                preferredChannel: creatorContactPeople.preferredChannel,
+                isActive: creatorContactAssignments.isActive,
+                isPrimary: creatorContactAssignments.isPrimary,
+                sortOrder: creatorContactAssignments.sortOrder,
+                startedAt: creatorContactAssignments.startedAt,
+                endedAt: creatorContactAssignments.endedAt,
+                createdAt: creatorContactAssignments.createdAt,
+                updatedAt: creatorContactAssignments.updatedAt,
               })
-              .from(creatorContacts)
-              .where(inArray(creatorContacts.creatorProfileId, profileIds)),
+              .from(creatorContactPeople)
+              .leftJoin(
+                creatorContactAssignments,
+                eq(creatorContactAssignments.personId, creatorContactPeople.id)
+              )
+              .leftJoin(
+                creatorContactResponsibilities,
+                eq(
+                  creatorContactResponsibilities.id,
+                  creatorContactAssignments.responsibilityId
+                )
+              )
+              .where(
+                inArray(creatorContactPeople.creatorProfileId, profileIds)
+              ),
           ])
         : [[], []];
 

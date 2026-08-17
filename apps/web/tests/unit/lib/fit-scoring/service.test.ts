@@ -38,6 +38,7 @@ function makeChain(resolvedValue: unknown = []) {
     'select',
     'from',
     'where',
+    'innerJoin',
     'leftJoin',
     'groupBy',
     'orderBy',
@@ -115,9 +116,14 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     displayName: 'display_name',
     spotifyUrl: 'spotify_url',
   },
-  creatorContacts: {
+  creatorContactPeople: {
     creatorProfileId: 'creator_profile_id',
     email: 'email',
+  },
+  creatorContactAssignments: {
+    id: 'id',
+    personId: 'person_id',
+    isActive: 'is_active',
   },
 }));
 

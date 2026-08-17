@@ -24,7 +24,11 @@ import type {
   DiscoveredPixels,
   FitScoreBreakdown,
 } from '@/lib/db/schema/profiles';
-import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
+import {
+  creatorContactAssignments,
+  creatorContactPeople,
+  creatorProfiles,
+} from '@/lib/db/schema/profiles';
 import { SUPPRESSED_PIXEL_IDS } from '@/lib/ingestion/strategies/linktree/config';
 import { getCreatorOwnedPixels } from '@/lib/ingestion/strategies/linktree/tracking-pixels';
 
@@ -148,12 +152,17 @@ export async function calculateAndStoreFitScore(
 
   // Check if we have a contact email
   const [contact] = await db
-    .select({ email: creatorContacts.email })
-    .from(creatorContacts)
+    .select({ email: creatorContactPeople.email })
+    .from(creatorContactAssignments)
+    .innerJoin(
+      creatorContactPeople,
+      eq(creatorContactPeople.id, creatorContactAssignments.personId)
+    )
     .where(
       and(
-        eq(creatorContacts.creatorProfileId, creatorProfileId),
-        isNotNull(creatorContacts.email)
+        eq(creatorContactPeople.creatorProfileId, creatorProfileId),
+        eq(creatorContactAssignments.isActive, true),
+        isNotNull(creatorContactPeople.email)
       )
     )
     .limit(1);
@@ -424,7 +433,10 @@ export async function recalculateAllFitScores(
           max(${discogReleases.releaseDate})
         `,
         hasContactEmail: drizzleSql<boolean>`
-          bool_or(${creatorContacts.email} is not null)
+          bool_or(
+            ${creatorContactPeople.email} is not null
+            AND ${creatorContactAssignments.id} is not null
+          )
         `,
         paidVerificationPlatforms: drizzleSql<string[]>`
           (SELECT coalesce(
@@ -459,8 +471,15 @@ export async function recalculateAllFitScores(
         )
       )
       .leftJoin(
-        creatorContacts,
-        eq(creatorContacts.creatorProfileId, creatorProfiles.id)
+        creatorContactPeople,
+        eq(creatorContactPeople.creatorProfileId, creatorProfiles.id)
+      )
+      .leftJoin(
+        creatorContactAssignments,
+        and(
+          eq(creatorContactAssignments.personId, creatorContactPeople.id),
+          eq(creatorContactAssignments.isActive, true)
+        )
       )
       .where(inArray(creatorProfiles.id, profileIds))
       .groupBy(creatorProfiles.id)

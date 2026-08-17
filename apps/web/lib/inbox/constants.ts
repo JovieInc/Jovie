@@ -2,7 +2,9 @@
  * Jovie Inbox constants — email domain, category-to-role mapping, territory specificity.
  */
 
-/** The domain used for artist inbound email addresses. */
+import type { ContactRole } from '@/types/contacts';
+
+/** A reserved inbox identity string; this is not provider configuration. */
 export const INBOX_DOMAIN = 'jovie.fm';
 
 /** Maximum inbound emails per artist per hour before rate limiting kicks in. */
@@ -12,7 +14,7 @@ export const INBOUND_RATE_LIMIT_PER_HOUR = 100;
  * Maps AI email categories to creator contact roles for routing.
  * If a category maps to null, no automatic routing is attempted.
  */
-export const CATEGORY_TO_CONTACT_ROLE: Record<string, string | null> = {
+export const CATEGORY_TO_CONTACT_ROLE: Record<string, ContactRole | null> = {
   booking: 'bookings',
   music_collaboration: 'music_collaboration',
   brand_partnership: 'brand_partnerships',
