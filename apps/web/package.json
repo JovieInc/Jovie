@@ -243,7 +243,7 @@
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-toggle": "^1.1.18",
     "@radix-ui/react-toggle-group": "^1.1.19",
-    "@radix-ui/react-tooltip": "^1.2.13",
+    "@radix-ui/react-tooltip": "^1.2.16",
     "@sentry/nextjs": "^10.70.0",
     "@statsig/statsig-node-core": "^0.19.3",
     "@tanstack/react-pacer": "^0.21.1",
