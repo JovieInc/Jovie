@@ -187,6 +187,7 @@ function buildSocialProviders(): NonNullable<
     providers.google = {
       clientId: env.AUTH_GOOGLE_CLIENT_ID,
       clientSecret: env.AUTH_GOOGLE_CLIENT_SECRET,
+      prompt: 'select_account',
     };
   }
   if (

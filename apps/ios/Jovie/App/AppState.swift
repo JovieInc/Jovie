@@ -131,6 +131,10 @@ final class AppState {
       route = .needsOnboarding
       dashboardState = .idle
       isOffline = false
+    case .uiTestingWaitlistPending:
+      route = .waitlistPending
+      dashboardState = .loaded(.previewWaitlistPending)
+      isOffline = false
     case .uiTestingSplash:
       route = .launching
       dashboardState = .idle
@@ -210,6 +214,16 @@ final class AppState {
           "route_needs_onboarding",
           detail: "state=needs_onboarding"
         )
+      case .waitlistPending:
+        apply(response: result.response)
+        Observability.addBreadcrumb(
+          .appRouteAfterLogin,
+          context: ["route": "waitlist_pending"]
+        )
+        MobileAuthDiagnostics.record(
+          "route_waitlist_pending",
+          detail: "state=waitlist_pending"
+        )
       }
     } catch {
       guard activeUserID == userID, loadingUserID == userID else { return }
@@ -247,6 +261,9 @@ final class AppState {
       route = .needsOnboarding
       // Keep the resolved profile payload so continueOnWebURL and cache paint
       // stay instant — .idle forced a generic fallback URL and extra reload work.
+      dashboardState = .loaded(response)
+    case .waitlistPending:
+      route = .waitlistPending
       dashboardState = .loaded(response)
     }
   }

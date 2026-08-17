@@ -9,8 +9,12 @@ import {
 } from '@jovie/auth-routing';
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
+import { auth } from '@/lib/auth/better-auth';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { createStoredAuthState } from '@/lib/auth/routing-state.server';
+import {
+  createStoredAuthState,
+  readStoredAuthState,
+} from '@/lib/auth/routing-state.server';
 import { env } from '@/lib/env';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
@@ -33,6 +37,7 @@ const LOCAL_AUTH_START_LIMITER = createRateLimiter(RATE_LIMITERS.general, {
 });
 
 const DESKTOP_AUTH_FLOW_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
+const AUTH_STATE_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 
 function createState(): string {
   return crypto.randomUUID().replaceAll('-', '');
@@ -116,6 +121,45 @@ function createRateLimitedHtmlResponse(
       ...createRateLimitHeaders(rateLimit),
       'Content-Type': 'text/html; charset=utf-8',
       'Retry-After': String(retryAfterSeconds),
+    },
+  });
+}
+
+function createAccountSwitchHtmlResponse(state: string): NextResponse {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Choose an account — Jovie</title>
+<style>
+:root { color-scheme: dark; }
+body { margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center; background: Canvas; color: CanvasText; font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+main { max-width: 400px; padding: max(32px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); text-align: center; }
+h1 { margin: 0 0 12px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+p { margin: 0 0 24px; font-size: 16px; line-height: 1.5; color: GrayText; }
+input[type=submit] { appearance: none; min-height: 44px; border: 0; cursor: pointer; background: CanvasText; color: Canvas; font: 600 15px/1 Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 10px 24px; border-radius: 9999px; }
+input[type=submit]:focus-visible { outline: 2px solid Highlight; outline-offset: 3px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Choose an account</h1>
+<p>Continue to choose which Jovie account to use in the app.</p>
+<form method="post" action="/auth/start">
+<input type="hidden" name="auth_state" value="${state}" />
+<input type="hidden" name="intent" value="sign_in" />
+<input type="submit" value="Choose an Account" />
+</form>
+</main>
+</body>
+</html>`;
+
+  return new NextResponse(html, {
+    status: 200,
+    headers: {
+      ...NO_STORE_HEADERS,
+      'Content-Type': 'text/html; charset=utf-8',
     },
   });
 }
@@ -244,6 +288,10 @@ export async function GET(request: Request) {
     });
 
     const { userId } = await getCachedAuth();
+    if (userId && rawClient !== 'web' && rawIntent === 'sign_in') {
+      return createAccountSwitchHtmlResponse(record.state);
+    }
+
     if (userId) {
       return NextResponse.redirect(
         new URL(buildAuthCallbackPath(record.state), request.url),
@@ -268,6 +316,66 @@ export async function GET(request: Request) {
       intent: rawIntent,
     });
 
+    return NextResponse.json(
+      { error: 'Auth is temporarily unavailable' },
+      { status: 503, headers: NO_STORE_HEADERS }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const requestUrl = new URL(request.url);
+    if (request.headers.get('origin') !== requestUrl.origin) {
+      return NextResponse.json(
+        { error: 'Invalid account switch origin' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const formData = await request.formData();
+    const state = formData.get('auth_state');
+    const intent = formData.get('intent');
+    if (
+      typeof state !== 'string' ||
+      !AUTH_STATE_PATTERN.test(state) ||
+      intent !== 'sign_in'
+    ) {
+      return NextResponse.json(
+        { error: 'Invalid account switch request' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const stateRecord = await readStoredAuthState({ state });
+    if (
+      !stateRecord ||
+      stateRecord.client === 'web' ||
+      stateRecord.intent !== 'sign_in'
+    ) {
+      return NextResponse.json(
+        { error: 'Account switch expired' },
+        { status: 410, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const signOutResponse = await auth.api.signOut({
+      headers: request.headers,
+      asResponse: true,
+    });
+    const authPage = new URL(APP_ROUTES.SIGNIN, request.url);
+    authPage.searchParams.set('auth_state', state);
+    const response = NextResponse.redirect(authPage, {
+      headers: NO_STORE_HEADERS,
+    });
+    for (const cookie of signOutResponse.headers.getSetCookie()) {
+      response.headers.append('set-cookie', cookie);
+    }
+    return response;
+  } catch (error) {
+    await captureError('Auth account switch failed', error, {
+      route: '/auth/start',
+    });
     return NextResponse.json(
       { error: 'Auth is temporarily unavailable' },
       { status: 503, headers: NO_STORE_HEADERS }

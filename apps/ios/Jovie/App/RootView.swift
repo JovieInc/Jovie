@@ -158,6 +158,9 @@ private struct AppContentView: View {
           }
         }
         .transition(.opacity)
+      case .waitlistPending:
+        WaitlistPendingView(onUseDifferentAccount: onLogout)
+          .transition(.opacity)
       case .ready:
         AppShellView(
           profile: AppShellProfile(response: appState.loadedDashboardResponse),
@@ -444,6 +447,53 @@ private struct AppContentView: View {
         return
       }
       audienceHighlightsState = .error("Couldn't load audience highlights.")
+    }
+  }
+}
+
+private struct WaitlistPendingView: View {
+  let onUseDifferentAccount: @MainActor () async -> Void
+  @State private var isSwitchingAccount = false
+
+  var body: some View {
+    ZStack {
+      JovieColor.backgroundBase.ignoresSafeArea()
+
+      ScrollView {
+        VStack(alignment: .leading, spacing: JovieSpacing.large) {
+          VStack(alignment: .leading, spacing: JovieSpacing.small) {
+            Text("You're on the Waitlist")
+              .font(.title.bold())
+              .foregroundStyle(JovieColor.textPrimary)
+              .accessibilityAddTraits(.isHeader)
+
+            Text("This account doesn't have access yet. You can use a different account instead.")
+              .font(.body)
+              .foregroundStyle(JovieColor.textSecondary)
+          }
+
+          Button {
+            guard !isSwitchingAccount else { return }
+            isSwitchingAccount = true
+            Task { await onUseDifferentAccount() }
+          } label: {
+            HStack(spacing: JovieSpacing.small) {
+              if isSwitchingAccount {
+                ProgressView()
+                  .tint(JovieColor.backgroundBase)
+              }
+              Text(isSwitchingAccount ? "Switching Account…" : "Use a Different Account")
+            }
+            .frame(maxWidth: .infinity)
+          }
+          .buttonStyle(JoviePillButtonStyle(filled: true))
+          .disabled(isSwitchingAccount)
+          .accessibilityIdentifier("waitlist-use-different-account")
+        }
+        .frame(maxWidth: 420, alignment: .leading)
+        .padding(JovieSpacing.xLarge)
+        .frame(maxWidth: .infinity, alignment: .center)
+      }
     }
   }
 }
