@@ -88,10 +88,17 @@ SUPPORTED_TEAMS = frozenset(("JOV", "LYB"))
 EXIT_SAFE_FAIL_CLOSED = 2
 EXIT_DEGRADED = 3
 
+# Linear pages are bounded; walk cursors until pageInfo.hasNextPage is false
+# so admitted work past the first page is not hidden. Exceeding LINEAR_MAX_PAGES
+# without a terminal page is treated as an incomplete listing (fail-closed).
+LINEAR_PAGE_SIZE = 50
+LINEAR_MAX_PAGES = 40
+
 LINEAR_QUERY = """
-query {
+query($first: Int!, $after: String) {
   issues(
-    first: 20
+    first: $first
+    after: $after
     filter: {
       labels: { name: { eq: "symphony" } }
       state: { name: { in: ["Todo", "In Progress"] } }
@@ -101,6 +108,10 @@ query {
       identifier updatedAt
       team { key }
       labels { nodes { name } }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }
@@ -488,48 +499,83 @@ def admission_decision(team_key: str, identifier: str, labels: set[str]) -> tupl
     return True, "admitted"
 
 
-def _linear_identifiers() -> list[str] | None:
+def _linear_issues_list_request(after: str | None = None) -> dict:
+    variables: dict[str, int | str | None] = {"first": LINEAR_PAGE_SIZE}
+    if after is not None:
+        variables["after"] = after
+    return {"query": LINEAR_QUERY, "variables": variables}
+
+
+def _linear_graphql(payload: dict) -> dict | None:
     key = os.environ.get("LINEAR_API_KEY") or _linear_api_key_from_file()
     if not key:
         return None
     request = urllib.request.Request(
         os.environ.get("LINEAR_API_URL", LINEAR_API),
-        data=json.dumps({"query": LINEAR_QUERY}).encode(),
+        data=json.dumps(payload).encode(),
         headers={"Authorization": key, "Content-Type": "application/json"},
     )
     try:
         with urllib.request.urlopen(request, timeout=CONTROL_TIMEOUT_SECONDS) as response:
-            payload = json.load(response)
+            body = json.load(response)
     except (OSError, ValueError, TypeError, urllib.error.URLError):
         return None
-    try:
-        nodes = payload["data"]["issues"]["nodes"]
-    except (KeyError, TypeError):
-        return None
-    if not isinstance(nodes, list) or payload.get("errors"):
-        return None
+    return body if isinstance(body, dict) else None
+
+
+def _admitted_issue_identifier(node: object) -> str | None:
+    if not isinstance(node, dict) or not isinstance(node.get("identifier"), str):
+        raise ValueError("malformed issue node")
+    team = node.get("team")
+    label_connection = node.get("labels")
+    if not isinstance(team, dict) or not isinstance(label_connection, dict):
+        raise ValueError("malformed issue node")
+    team_key = team.get("key")
+    label_nodes = label_connection.get("nodes")
+    if not isinstance(team_key, str) or not isinstance(label_nodes, list):
+        raise ValueError("malformed issue node")
+    labels: set[str] = set()
+    for label in label_nodes:
+        if not isinstance(label, dict) or not isinstance(label.get("name"), str):
+            raise ValueError("malformed issue node")
+        labels.add(label["name"].strip().lower())
+    identifier = node["identifier"]
+    ok, _reason = admission_decision(team_key, identifier, labels)
+    return identifier if ok else None
+
+
+def _linear_identifiers() -> list[str] | None:
     identifiers: list[str] = []
-    for node in nodes:
-        if not isinstance(node, dict) or not isinstance(node.get("identifier"), str):
+    after: str | None = None
+    for _ in range(LINEAR_MAX_PAGES):
+        payload = _linear_graphql(_linear_issues_list_request(after))
+        if payload is None or payload.get("errors"):
             return None
-        team = node.get("team")
-        label_connection = node.get("labels")
-        if not isinstance(team, dict) or not isinstance(label_connection, dict):
+        try:
+            issues = payload["data"]["issues"]
+            nodes = issues["nodes"]
+            page_info = issues["pageInfo"]
+        except (KeyError, TypeError):
             return None
-        team_key = team.get("key")
-        label_nodes = label_connection.get("nodes")
-        if not isinstance(team_key, str) or not isinstance(label_nodes, list):
+        if not isinstance(nodes, list) or not isinstance(page_info, dict):
             return None
-        labels: set[str] = set()
-        for label in label_nodes:
-            if not isinstance(label, dict) or not isinstance(label.get("name"), str):
+        has_next = page_info.get("hasNextPage")
+        if not isinstance(has_next, bool):
+            return None
+        for node in nodes:
+            try:
+                identifier = _admitted_issue_identifier(node)
+            except ValueError:
                 return None
-            labels.add(label["name"].strip().lower())
-        identifier = node["identifier"]
-        ok, _reason = admission_decision(team_key, identifier, labels)
-        if ok:
-            identifiers.append(identifier)
-    return identifiers
+            if identifier is not None and identifier not in identifiers:
+                identifiers.append(identifier)
+        if not has_next:
+            return identifiers
+        end_cursor = page_info.get("endCursor")
+        if not isinstance(end_cursor, str) or not end_cursor or end_cursor == after:
+            return None
+        after = end_cursor
+    return None
 
 
 def _fetch_single_issue(identifier: str) -> dict | None:
