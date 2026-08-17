@@ -26,6 +26,9 @@ from typing import Any
 SCHEMA = "jovie-fleet-gate/v1"
 INTEGRITY_SCHEMA = "jovie-integrity/v1"
 CONCURRENCY_SCHEMA = "gem-concurrency-evidence/v1"
+INDEPENDENT_REVIEW_SCHEMA = "jovie-independent-review/v1"
+INDEPENDENT_REVIEW_AUTHORITY = "Gem"
+INDEPENDENT_REVIEW_SCOPE = "exact-main-head"
 # Schema-padding sentinel for evaluation-failed receipts. Auto-Enroll jq
 # requires a 40-hex main SHA; this value never authorizes promotion.
 UNKNOWN_MAIN_SHA = "0" * 40
@@ -371,6 +374,117 @@ def observe_concurrency(path: Path, now: datetime) -> dict[str, Any] | None:
     return {**receipt, "accepted": eligible}
 
 
+def validate_independent_review(
+    receipt: object, expected_head_sha: object, now: datetime
+) -> dict[str, Any]:
+    """Accept only a typed, fresh review of the exact current main head."""
+    if receipt is None:
+        return {
+            "schema": INDEPENDENT_REVIEW_SCHEMA,
+            "status": "missing",
+            "authority": None,
+            "reviewer": None,
+            "reviewId": None,
+            "headSha": None,
+            "scope": INDEPENDENT_REVIEW_SCOPE,
+            "observedAt": None,
+            "accepted": False,
+            "reason": "independent-review-receipt-missing",
+        }
+    if not isinstance(receipt, dict):
+        return {
+            "schema": INDEPENDENT_REVIEW_SCHEMA,
+            "status": None,
+            "authority": None,
+            "reviewer": None,
+            "reviewId": None,
+            "headSha": None,
+            "scope": None,
+            "observedAt": None,
+            "accepted": False,
+            "reason": "independent-review-receipt-malformed",
+        }
+    fields = {
+        "schema": receipt.get("schema"),
+        "status": receipt.get("status"),
+        "authority": receipt.get("authority"),
+        "reviewer": receipt.get("reviewer"),
+        "reviewId": receipt.get("reviewId"),
+        "headSha": receipt.get("headSha"),
+        "scope": receipt.get("scope"),
+        "observedAt": receipt.get("observedAt"),
+    }
+    required_shape = (
+        fields["schema"] == INDEPENDENT_REVIEW_SCHEMA
+        and fields["status"] == "passed"
+        and fields["authority"] == INDEPENDENT_REVIEW_AUTHORITY
+        and isinstance(fields["reviewer"], str)
+        and bool(fields["reviewer"].strip())
+        and fields["reviewer"].strip().casefold() != "symphony"
+        and isinstance(fields["reviewId"], str)
+        and bool(fields["reviewId"])
+        and fields["scope"] == INDEPENDENT_REVIEW_SCOPE
+        and valid_commit_sha(fields["headSha"], exact=True)
+        and valid_commit_sha(expected_head_sha, exact=True)
+    )
+    if not required_shape:
+        return {
+            **fields,
+            "accepted": False,
+            "reason": "independent-review-receipt-malformed",
+        }
+    if fields["headSha"] != expected_head_sha:
+        return {
+            **fields,
+            "accepted": False,
+            "reason": "independent-review-head-mismatch",
+        }
+    observed_at = parse_time(fields["observedAt"])
+    if observed_at is None:
+        return {
+            **fields,
+            "accepted": False,
+            "reason": "independent-review-receipt-malformed",
+        }
+    age = now - observed_at
+    if age < -timedelta(minutes=1):
+        return {
+            **fields,
+            "accepted": False,
+            "reason": "independent-review-receipt-future",
+        }
+    if age > RECEIPT_STALE_AFTER:
+        return {
+            **fields,
+            "accepted": False,
+            "reason": "independent-review-receipt-stale",
+        }
+    return {
+        **fields,
+        "observedAt": isoformat(observed_at),
+        "accepted": True,
+        "reason": "fresh-exact-head-independent-review",
+    }
+
+
+def observe_independent_review(
+    path: Path, expected_head_sha: object, now: datetime
+) -> dict[str, Any]:
+    if not path.exists():
+        return {**validate_independent_review(None, expected_head_sha, now), "source": str(path)}
+    try:
+        receipt = read_json(path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {
+            **validate_independent_review({}, expected_head_sha, now),
+            "source": str(path),
+        }
+    return {
+        **validate_independent_review(receipt, expected_head_sha, now),
+        "source": str(path),
+    }
+
+
 def transient_gh_observation_error(error: BaseException) -> bool:
     """Whether a GitHub CLI failure is worth a bounded observer retry."""
     if isinstance(error, subprocess.TimeoutExpired):
@@ -478,6 +592,12 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     )
     queue_value = signals.get("queue")
     queue = queue_value if isinstance(queue_value, dict) else {"status": "unknown"}
+    review = validate_independent_review(
+        signals.get("independentReview"),
+        main.get("sha"),
+        parse_time(observed_at) or utc_now(),
+    )
+    review_allowed = review["accepted"] is True
 
     if integrity.get("status") == "active" and integrity.get("reason") in SEVERE_REASONS:
         reasons.append(
@@ -575,6 +695,15 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         # fails closed above.
 
     critical = any(reason["severity"] == "critical" for reason in reasons)
+    if not critical and not review_allowed:
+        reasons.append(
+            typed_reason(
+                str(review["reason"]),
+                "review",
+                "warning",
+                "Normal admission requires a fresh independent review of the exact current main head.",
+            )
+        )
     state = "RED" if critical else "AMBER" if reasons else "GREEN"
     # Deployment is the operation that can make an unbound healthy production
     # deployment catch up to current main. It therefore cannot require the
@@ -590,6 +719,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and valid_commit_sha(main.get("sha"), exact=True)
         and production.get("status") == "green"
         and valid_commit_sha(production.get("deployedSha"))
+        and review_allowed
     )
     evidence = signals.get("concurrencyEvidence") or {}
     gem_concurrency = 8 if evidence.get("accepted") is True else DEFAULT_GEM_CONCURRENCY
@@ -607,6 +737,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     queue_below_backpressure = queue_shape_valid and green_ready_prs < queue_target
     isolated_promotion_allowed = (
         state == "AMBER"
+        and review_allowed
         and controller.get("status") == "green"
         and main.get("status") == "green"
         and production.get("status") == "red"
@@ -626,6 +757,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     )
     unbound_repair_allowed = (
         hold_intake_allowed
+        and review_allowed
         and valid_commit_sha(main.get("sha"), exact=True)
         and valid_commit_sha(production.get("deployedSha"))
     )
@@ -649,7 +781,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         else (
             (
                 ["approved-issue-lease"]
-                if not queue_shape_valid or queue_below_backpressure
+                if review_allowed and (not queue_shape_valid or queue_below_backpressure)
                 else []
             )
             + ["isolated-implementation", "tests", "review", "draft-pr"]
@@ -676,13 +808,24 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "alreadyAdmittedCohort": already_admitted_cohort_semantics(promotion_mode),
         "signals": signals,
         "reasons": reasons,
+        "reviewAdmission": {
+            "allowed": review_allowed,
+            "required": True,
+            "authority": INDEPENDENT_REVIEW_AUTHORITY,
+            "scope": INDEPENDENT_REVIEW_SCOPE,
+            "headSha": review.get("headSha"),
+            "observedAt": review.get("observedAt"),
+            "reviewId": review.get("reviewId"),
+            "reviewer": review.get("reviewer"),
+            "reason": review.get("reason"),
+        },
         "workAdmission": {
             "allowed": state != "RED",
             "activities": work_activities,
             "newIssueLeaseAllowed": "approved-issue-lease" in work_activities,
         },
         "promotionAdmission": {
-            "allowed": state == "GREEN",
+            "allowed": state == "GREEN" and review_allowed,
             "activities": ["ready-for-merge", "merge"]
             if state == "GREEN"
             else [],
@@ -730,6 +873,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "ownership": {
             "controller": "Gem",
             "implementation": "Symphony",
+            "review": INDEPENDENT_REVIEW_AUTHORITY,
             "directGemPickup": False,
             "reason": "single implementation owner prevents duplicate pickup",
         },
@@ -870,6 +1014,12 @@ def failed_evaluation_receipt(
             "controller": {"status": "unknown"},
             "integrity": {"status": "invalid", "detail": str(error)},
             "queue": {"status": "unknown", "eligiblePrs": None, "target": 0},
+            "independentReview": {
+                "schema": INDEPENDENT_REVIEW_SCHEMA,
+                "status": "unknown",
+                "accepted": False,
+                "reason": "independent-review-receipt-malformed",
+            },
         },
         "reasons": [
             typed_reason(
@@ -879,6 +1029,17 @@ def failed_evaluation_receipt(
                 str(error),
             )
         ],
+        "reviewAdmission": {
+            "allowed": False,
+            "required": True,
+            "authority": INDEPENDENT_REVIEW_AUTHORITY,
+            "scope": INDEPENDENT_REVIEW_SCOPE,
+            "headSha": None,
+            "observedAt": None,
+            "reviewId": None,
+            "reviewer": None,
+            "reason": "independent-review-receipt-malformed",
+        },
         "workAdmission": {
             "allowed": False,
             "activities": [],
@@ -915,6 +1076,7 @@ def failed_evaluation_receipt(
         "ownership": {
             "controller": "Gem",
             "implementation": "Symphony",
+            "review": INDEPENDENT_REVIEW_AUTHORITY,
             "directGemPickup": False,
             "reason": "single implementation owner prevents duplicate pickup",
         },
@@ -1021,19 +1183,28 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--integrity-receipt", type=Path)
     parser.add_argument("--concurrency-evidence", type=Path)
+    parser.add_argument("--independent-review-receipt", type=Path)
     return parser.parse_args()
 
 
 def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
     integrity_path = args.integrity_receipt or args.state_dir.parent / "integrity.json"
     concurrency_path = args.concurrency_evidence or args.state_dir.parent / "concurrency.json"
+    main = observe_main(args.repo)
+    review_path = (
+        args.independent_review_receipt
+        or args.state_dir.parent / "independent-review.json"
+    )
     return {
-        "main": observe_main(args.repo),
+        "main": main,
         "production": observe_production(args.production_url),
         "controller": observe_controller(args.symphony_url),
         "integrity": observe_integrity(integrity_path),
         "queue": observe_queue(args.repo, args.queue_target),
         "concurrencyEvidence": observe_concurrency(concurrency_path, now),
+        "independentReview": observe_independent_review(
+            review_path, main.get("sha"), now
+        ),
         "lease": observe_lease(args.lease_guard_bin),
     }
 
