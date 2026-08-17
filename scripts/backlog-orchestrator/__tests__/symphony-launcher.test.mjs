@@ -108,6 +108,10 @@ describe('Symphony launcher closed loop', () => {
         () => runRouter(env, issue),
         error => {
           assert.equal(/** @type {any} */ (error).status, 78);
+          assert.match(
+            String(/** @type {any} */ (error).stderr),
+            /SYMPHONY_LAUNCHER_FAILURE.*class=deterministic-launcher.*retryable=false.*maxAttempts=1/
+          );
           return true;
         }
       );

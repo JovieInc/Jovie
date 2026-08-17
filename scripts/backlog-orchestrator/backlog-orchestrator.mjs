@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 import * as admissionGate from './admission-gate.mjs';
+import { preAdmissionDecision } from './admission-policy.mjs';
 // Keep the complete control-plane dependency closure visible to source sync and
 // module tooling. These are canonical sibling modules, not host-only copies.
 import * as admitter from './admitter.mjs';
@@ -263,6 +264,13 @@ async function runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun) {
 }
 
 async function approveSymphonyRoute(issue, isDryRun) {
+  const preAdmission = preAdmissionDecision(issue);
+  if (!preAdmission.allowed)
+    return {
+      status: 'blocked',
+      reason: preAdmission.reason.code,
+      preAdmission,
+    };
   const existing = verifyRoutingReceipt(issue, {
     requireCapacityEvidence: true,
   });
@@ -833,10 +841,10 @@ async function runTeamAdmitNext(team, isDryRun) {
   if (result.admit.length > 0 && !isDryRun) {
     const item = result.admit[0];
     try {
+      item.issue = await linear.fetchIssue(item.identifier);
       const routing = await approveSymphonyRoute(item.issue, false);
       if (routing.status === 'blocked')
         throw new Error(`symphony routing blocked: ${routing.reason}`);
-      item.issue = await linear.fetchIssue(item.identifier);
       const receipt = await admitter.admitIssue({
         issue: item.issue,
         classification: item,
@@ -844,9 +852,18 @@ async function runTeamAdmitNext(team, isDryRun) {
         teamId: team.id,
         todoStateId: team.todoStateId,
       });
-      console.log(
-        `  ${receipt.status}: ${item.identifier} model=${routing.route.model}`
-      );
+      if (['admitted', 'already-admitted'].includes(receipt.status)) {
+        console.log(
+          `  ${receipt.status}: ${item.identifier} model=${routing.route.model}`
+        );
+      } else {
+        result.admit = [];
+        result.admissionFailure = receipt;
+        result.reason = `admission rejected: ${receipt.reason}`;
+        console.error(
+          `  Admission rejected for ${item.identifier}: ${JSON.stringify(receipt)}`
+        );
+      }
     } catch (err) {
       console.error(
         `  Admission failed for ${item.identifier}: ${err.message}`

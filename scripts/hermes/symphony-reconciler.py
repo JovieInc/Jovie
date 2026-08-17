@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import shlex
 import shutil
 import subprocess
@@ -29,6 +30,7 @@ SCHEMA = "symphony-reconciliation-receipt/v1"
 RUNTIME_CAPABILITY_SCHEMA = "symphony-runtime-capabilities/v1"
 RUNTIME_RECEIPT_SCHEMA = "symphony-runtime-receipt/v1"
 WORKSPACE_REVISION_SCHEMA = "symphony-workspace-revision/v1"
+LAUNCHER_FAILURE_SCHEMA = "symphony-launcher-failure/v1"
 DEFAULT_API = "http://127.0.0.1:4041/api/v1/state"
 DEFAULT_WORKSPACES = "~/symphony-workspaces"
 DEFAULT_STATE = "~/.local/state/symphony-reconciler"
@@ -332,6 +334,28 @@ def runtime_preflight(
     }
 
 
+DETERMINISTIC_LAUNCHER_ATTEMPTS = 1
+TRANSIENT_LAUNCHER_ATTEMPTS = 3
+
+DETERMINISTIC_LAUNCHER_PATTERN = re.compile(
+    r"SYMPHONY_LAUNCHER_FAILURE.*deterministic-launcher"
+    r"|bwrap:.*(?:uid map|permission denied|operation not permitted)"
+    r"|sandbox.*(?:permission denied|operation not permitted|failed)"
+    r"|permission denied"
+    r"|interactive input.*approval"
+    r"|approval.*interactive input"
+    r"|human approval.*(?:required|unavailable|disabled|not supported|never)"
+    r"|(?:approval|configuration|config|auth).*(?:invalid|missing|unavailable|not found|failed)"
+    r"|(?:command not found|no such file or directory|executable.*(?:missing|not found))",
+    re.IGNORECASE,
+)
+TRANSIENT_LAUNCHER_PATTERN = re.compile(
+    r"CAPACITY_UNAVAILABLE|account_busy|rate limit|quota|usage limit"
+    r"|provider.*(?:temporarily )?unavailable|temporarily unavailable",
+    re.IGNORECASE,
+)
+
+
 def _now() -> dt.datetime:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
 
@@ -355,6 +379,34 @@ def _parse_time(value: object) -> dt.datetime | None:
         return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+def classify_launcher_failure(error: object) -> dict[str, object]:
+    """Classify launcher evidence into a bounded, observable retry policy."""
+    evidence = str(error or "")
+    if DETERMINISTIC_LAUNCHER_PATTERN.search(evidence):
+        return {
+            "schema": LAUNCHER_FAILURE_SCHEMA,
+            "class": "deterministic-launcher",
+            "code": "deterministic-launcher-failure",
+            "retryable": False,
+            "maxAttempts": DETERMINISTIC_LAUNCHER_ATTEMPTS,
+        }
+    if TRANSIENT_LAUNCHER_PATTERN.search(evidence):
+        return {
+            "schema": LAUNCHER_FAILURE_SCHEMA,
+            "class": "transient-launcher",
+            "code": "capacity-or-provider-unavailable",
+            "retryable": True,
+            "maxAttempts": TRANSIENT_LAUNCHER_ATTEMPTS,
+        }
+    return {
+        "schema": LAUNCHER_FAILURE_SCHEMA,
+        "class": "unknown-launcher",
+        "code": "unclassified-launcher-failure",
+        "retryable": True,
+        "maxAttempts": TRANSIENT_LAUNCHER_ATTEMPTS,
+    }
 
 
 def _state_root() -> pathlib.Path:
@@ -661,6 +713,9 @@ def _alternate_due(
     previous = _read_receipt(identifier)
     if not previous or previous.get("generation") != generation:
         return True
+    launcher_failure = previous.get("launcherFailure")
+    if isinstance(launcher_failure, dict) and launcher_failure.get("retryable") is False:
+        return False
     retry = _parse_time(previous.get("nextRetryAt"))
     return retry is None or retry <= _now()
 
@@ -841,14 +896,50 @@ def _reconcile_item(
     runtime = runtime or runtime_preflight()
     generation = _generation(identifier, error, state_before, runtime)
     previous = _read_receipt(identifier)
-    next_retry = _parse_time(item.get("due_at")) or (_now() + dt.timedelta(minutes=RETRY_MINUTES))
-    repeated = _is_repeated_or_conflict(item, source, state_before)
+    launcher_failure = classify_launcher_failure(error)
+    previous_launcher_failure = previous.get("launcherFailure") if previous else None
+    if (
+        previous
+        and previous.get("generation") == generation
+        and isinstance(previous_launcher_failure, dict)
+        and previous_launcher_failure.get("retryable") is False
+    ):
+        _event(
+            identifier,
+            "deterministic_launcher_held",
+            reason=error,
+            failure_class=previous_launcher_failure.get("class"),
+            retryable=False,
+            next="manual_or_environment_repair",
+            retry_at=None,
+        )
+        return
+    next_retry = (
+        None
+        if launcher_failure["retryable"] is False
+        else _parse_time(item.get("due_at"))
+        or (_now() + dt.timedelta(minutes=RETRY_MINUTES))
+    )
+    repeated = launcher_failure["retryable"] and _is_repeated_or_conflict(
+        item, source, state_before
+    )
     attempted: list[dict[str, object]] = [
         {
-            "kind": "normal_model_bounded_retry",
+            "kind": (
+                "launcher_failure_classification"
+                if launcher_failure["retryable"] is False
+                else "normal_model_bounded_retry"
+            ),
             "attempt": attempt,
-            "result": "failed" if repeated else "scheduled",
+            "result": (
+                "blocked"
+                if launcher_failure["retryable"] is False
+                else "failed"
+                if repeated
+                else "scheduled"
+            ),
             "runtimeError": error,
+            "launcherFailure": launcher_failure,
         }
     ]
     alternate: dict[str, object] = {
@@ -856,9 +947,19 @@ def _reconcile_item(
         "path": "model-router:remediation/code:local-only",
         "status": "not_due",
     }
-    transition = "normal_retry_scheduled"
-    next_action = "normal_model_retry"
+    transition = (
+        "deterministic_launcher_blocked"
+        if launcher_failure["retryable"] is False
+        else "normal_retry_scheduled"
+    )
+    next_action = (
+        "manual_or_environment_repair"
+        if launcher_failure["retryable"] is False
+        else "normal_model_retry"
+    )
     state_after = state_before
+    if launcher_failure["retryable"] is False:
+        alternate["status"] = "not_permitted"
 
     already_attempted = bool(previous and previous.get("generation") == generation and previous.get("alternateModel", {}).get("status") in {"repair_handoff_ready", "repair_failed", "repair_timed_out", "repair_not_started"})
     previous_retry = _parse_time(previous.get("nextRetryAt")) if previous else None
@@ -925,6 +1026,11 @@ def _reconcile_item(
             "url": item.get("issue_url"),
         },
         "reason": error,
+        "launcherFailure": launcher_failure,
+        "retryPolicy": {
+            "retryable": launcher_failure["retryable"],
+            "maxAttempts": launcher_failure["maxAttempts"],
+        },
         "entryCriteria": "runtime retry/blocked after bounded normal-model attempt",
         "authoritativeOwner": "symphony-reconciler" if alternate_permitted else "symphony-ui-pilot",
         "resourceScope": {
@@ -936,7 +1042,15 @@ def _reconcile_item(
             "runtimeRevision": runtime.get("runtimeRevision"),
             "capabilities": runtime.get("capabilities", []),
         },
-        "deadline": _iso(_now() + dt.timedelta(seconds=_model_timeout_seconds())) if alternate_permitted else _iso(next_retry),
+        "deadline": (
+            None
+            if launcher_failure["retryable"] is False
+            else _iso(_now() + dt.timedelta(seconds=_model_timeout_seconds()))
+            if alternate_permitted
+            else _iso(next_retry)
+            if next_retry
+            else None
+        ),
         "runtimeState": source,
         "attempt": attempt,
         "headBaseBefore": state_before,
@@ -947,7 +1061,7 @@ def _reconcile_item(
         "attemptedRepairs": attempted,
         "transition": transition,
         "nextAutomatedAction": next_action,
-        "nextRetryAt": _iso(next_retry),
+        "nextRetryAt": _iso(next_retry) if next_retry else None,
         "alternateModel": alternate,
     }
     _write_receipt(identifier, receipt)
@@ -958,7 +1072,7 @@ def _reconcile_item(
         head=state_after.get("head"),
         base=state_after.get("base"),
         next=next_action,
-        retry_at=_iso(next_retry),
+        retry_at=_iso(next_retry) if next_retry else None,
         alternate=alternate.get("status"),
     )
 

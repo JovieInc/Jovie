@@ -18,6 +18,7 @@ exactly the keys this contract depends on.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import re
@@ -41,6 +42,14 @@ FLEET_INSTALLER = ROOT / "scripts/hermes/install-gem-fleet-controller.sh"
 INTAKE_WORKFLOW = ROOT / ".github/workflows/jovie-intake-controller.yml"
 ACTIVATION_WORKFLOW = ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
 ACTIONLINT_CONFIG = ROOT / ".github/actionlint.yaml"
+
+
+def _load_reconciler_module():
+    spec = importlib.util.spec_from_file_location("symphony_reconciler", RECONCILER)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _front_matter_lines() -> list[str]:
@@ -403,6 +412,58 @@ def test_reconciler_records_exact_first_failure_without_escalating(tmp_path: Pat
     assert receipt["alternateModel"]["nominatedModel"] == "qwen-coder-local"
     assert receipt["nextAutomatedAction"] == "normal_model_retry"
     assert "transition=normal_retry_scheduled" in result.stdout
+
+
+def test_deterministic_launcher_failure_is_parked_without_retry(tmp_path: Path, monkeypatch) -> None:
+    reconciler = _load_reconciler_module()
+    for error in (
+        "bwrap: setting up uid map: Permission denied",
+        "Linear MCP interactive input despite approval never completed",
+        "launcher configuration missing approval policy",
+    ):
+        assert reconciler.classify_launcher_failure(error)["retryable"] is False
+    assert reconciler.classify_launcher_failure("CAPACITY_UNAVAILABLE account_busy")["retryable"] is True
+    workspace_root = tmp_path / "workspaces"
+    workspace = workspace_root / "JOV-DET"
+    workspace.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=workspace, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=workspace, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=workspace, check=True)
+    (workspace / "proof.txt").write_text("base\n")
+    subprocess.run(["git", "add", "proof.txt"], cwd=workspace, check=True)
+    subprocess.run(["git", "commit", "-qm", "base"], cwd=workspace, check=True)
+    subprocess.run(["git", "remote", "add", "origin", "."], cwd=workspace, check=True)
+    subprocess.run(["git", "update-ref", "refs/remotes/origin/main", "HEAD"], cwd=workspace, check=True)
+    monkeypatch.setenv("SYMPHONY_WORKSPACE_ROOT", str(workspace_root))
+    monkeypatch.setenv("SYMPHONY_RECONCILER_STATE", str(tmp_path / "state"))
+
+    item = {
+        "issue_identifier": "JOV-DET",
+        "workspace_path": str(workspace),
+        "attempt": 1,
+        "error": "bwrap: setting up uid map: Permission denied",
+        "due_at": "2030-01-01T00:00:00Z",
+    }
+    reconciler._reconcile_item(item, "retrying", False)
+    receipt_path = tmp_path / "state/receipts/JOV-DET.json"
+    receipt = json.loads(receipt_path.read_text())
+    assert receipt["launcherFailure"] == {
+        "class": "deterministic-launcher",
+        "code": "deterministic-launcher-failure",
+        "maxAttempts": 1,
+        "retryable": False,
+        "schema": "symphony-launcher-failure/v1",
+    }
+    assert receipt["retryPolicy"] == {"maxAttempts": 1, "retryable": False}
+    assert receipt["nextRetryAt"] is None
+    assert receipt["deadline"] is None
+    assert receipt["transition"] == "deterministic_launcher_blocked"
+    assert receipt["nextAutomatedAction"] == "manual_or_environment_repair"
+    # A later reconciler tick observes the same generation but does not create
+    # another attempt or reopen the timer.
+    before = receipt_path.read_text()
+    reconciler._reconcile_item(item, "retrying", False)
+    assert receipt_path.read_text() == before
 
 
 def test_reconciler_hands_repeated_failure_to_local_model_then_returns_to_normal_loop(

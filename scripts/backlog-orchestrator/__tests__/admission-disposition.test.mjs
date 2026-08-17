@@ -190,6 +190,31 @@ describe('exhaustive Symphony admission dispositions', () => {
       expect(candidate, outcome, reason);
   });
 
+  it('hard-stops every human hold label but preserves exact-label boundaries', () => {
+    for (const label of [
+      'needs-human',
+      'held',
+      'decision-required',
+      'manual-incident',
+    ]) {
+      const result = expect(
+        issue(`JOV-${label.length}`, { labels: { nodes: [{ name: label }] } }),
+        'deferred',
+        'protected-policy'
+      );
+      assert.equal(result.reason.retryable, false);
+      assert.deepEqual(result.preAdmission.matchedLabels, [label]);
+    }
+
+    const nearMiss = classify(
+      issue('JOV-39', {
+        labels: { nodes: [{ name: 'needs-human-follow-up' }] },
+      })
+    );
+    assert.equal(nearMiss.outcome, 'eligible');
+    assert.equal(nearMiss.preAdmission.allowed, true);
+  });
+
   it('immutably isolates a second failure and clears it after success', () => {
     const original = { 'JOV-40': { attempts: 0 }, other: { attempts: 1 } };
     const first = recordAdmissionFailure(original, 'JOV-40', {
