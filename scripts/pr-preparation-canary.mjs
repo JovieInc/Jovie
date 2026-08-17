@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFile } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { readFile, rename, writeFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -9,14 +9,15 @@ import { tryGitHubRebase } from './lib/github-update-branch.mjs';
 
 const execFileAsync = promisify(execFile);
 export const PLAN_SCHEMA = 'jovie-pr-preparation-canary-plan/v1';
-const RECEIPT_SCHEMA = 'jovie-pr-preparation-canary-receipt/v1';
+export const RECEIPT_SCHEMA = 'jovie-pr-preparation-canary-receipt/v1';
 const MAX_PLAN_AGE_MS = 86_400_000;
 const REQUIRED_CHECKS =
   'PR Ready,Migration Guard,Fork PR Gate,PR Size Guard'.split(',');
-const HOLD_LABELS =
-  'needs-human,hold,gated,queue-deferred,needs-conflict-resolution,needs-manual-rebase'.split(
+export const HOLD_LABELS = Object.freeze(
+  'needs-human,hold,gated,queue-deferred,needs-conflict-resolution,needs-manual-rebase,fast'.split(
     ','
-  );
+  )
+);
 const PLAN_KEYS = new Set(
   'schema,repository,baseRef,enabled,expiresAt,maxParallel,entries'.split(',')
 );
@@ -32,7 +33,9 @@ const FAILED = new Set(
   'FAILURE,ERROR,TIMED_OUT,ACTION_REQUIRED,STARTUP_FAILURE,STALE'.split(',')
 );
 
-const PR_QUERY = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){number state isDraft baseRefName baseRefOid headRefName headRefOid isCrossRepository mergeable mergeStateStatus reviewDecision author{login} headRepositoryOwner{login} headRepository{nameWithOwner} mergeQueueEntry{id position} autoMergeRequest{enabledAt} labels(first:100){nodes{name}} commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100){nodes{... on CheckRun{__typename name status conclusion} ... on StatusContext{__typename context state}}}}}}}}}}}`;
+const CHECK_CONTEXT_FIELDS = `nodes{... on CheckRun{__typename name status conclusion} ... on StatusContext{__typename context state}} pageInfo{hasNextPage endCursor} totalCount`;
+const PR_QUERY = `query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){number title state isDraft baseRefName baseRefOid headRefName headRefOid isCrossRepository mergeable mergeStateStatus reviewDecision author{login} headRepositoryOwner{login} headRepository{nameWithOwner} mergeQueueEntry{id position} autoMergeRequest{enabledAt} labels(first:100){nodes{name} pageInfo{hasNextPage endCursor} totalCount} commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100){${CHECK_CONTEXT_FIELDS}}}}}}}}}}`;
+const PR_CONTEXT_PAGE_QUERY = `query($owner:String!,$name:String!,$number:Int!,$cursor:String!){repository(owner:$owner,name:$name){pullRequest(number:$number){headRefOid commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100,after:$cursor){${CHECK_CONTEXT_FIELDS}}}}}}}}}}`;
 
 const isObject = value =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -41,16 +44,56 @@ const isSha = value =>
 const onlyKeys = (value, allowed) =>
   Object.keys(value).every(key => allowed.has(key));
 const hash = value => createHash('sha256').update(value).digest('hex');
-const envelope = value => ({
-  ...value,
-  receiptSha256: hash(`${JSON.stringify(value)}\n`),
-});
+export const envelope = value => {
+  const { receiptSha256: _discarded, ...body } = value;
+  return {
+    ...body,
+    receiptSha256: hash(`${JSON.stringify(body)}\n`),
+  };
+};
 
-async function writeReceipt(path, value) {
+export function createAtomicReceiptWriter(path, dependencies = {}) {
   const target = resolve(path);
-  const temporary = `${target}.tmp-${process.pid}`;
-  await writeFile(temporary, `${JSON.stringify(envelope(value), null, 2)}\n`);
-  await rename(temporary, target);
+  const writeFileImpl = dependencies.writeFileImpl ?? writeFile;
+  const renameImpl = dependencies.renameImpl ?? rename;
+  const unlinkImpl = dependencies.unlinkImpl ?? unlink;
+  const randomIdImpl = dependencies.randomIdImpl ?? randomUUID;
+  const beforeRenameImpl = dependencies.beforeRenameImpl ?? (async () => {});
+  let chain = Promise.resolve();
+  let latest = null;
+  let sealed = false;
+
+  const write = (value, { terminal = false } = {}) => {
+    if (sealed) return chain.then(() => latest);
+    if (terminal) sealed = true;
+    latest = envelope(value);
+    const captured = latest;
+    const temporary = `${target}.tmp-${process.pid}-${randomIdImpl()}`;
+    const operation = chain
+      .catch(() => {})
+      .then(async () => {
+        try {
+          await writeFileImpl(
+            temporary,
+            `${JSON.stringify(captured, null, 2)}\n`
+          );
+          await beforeRenameImpl({ temporary, target, receipt: captured });
+          await renameImpl(temporary, target);
+        } catch (error) {
+          await unlinkImpl(temporary).catch(() => {});
+          throw error;
+        }
+        return captured;
+      });
+    chain = operation;
+    return operation;
+  };
+
+  return {
+    getLatest: () => latest,
+    write,
+    flush: () => chain,
+  };
 }
 
 export function validatePlan(plan, { nowMs = Date.now() } = {}) {
@@ -118,6 +161,8 @@ export function validatePlan(plan, { nowMs = Date.now() } = {}) {
       )
     ) {
       errors.push(`${at}.headRefName is invalid`);
+    } else if (entry.headRefName.startsWith('gtmq_')) {
+      errors.push(`${at}.headRefName cannot be a Graphite merge-queue ref`);
     }
     if (!isSha(entry.headOid))
       errors.push(`${at}.headOid must be a lowercase 40-character SHA`);
@@ -234,6 +279,15 @@ export function evaluateEligibility({ entry, plan, pr, livePolicy }) {
   )
     return no('no_op_identity_changed', 'head ref or author changed');
   if (
+    pr.headRefName.startsWith('gtmq_') ||
+    /\[graphite mq\]/iu.test(pr.title ?? '')
+  ) {
+    return no(
+      'no_op_graphite_merge_queue',
+      'Graphite merge-queue branches are never preparation targets'
+    );
+  }
+  if (
     pr.isCrossRepository ||
     pr.headRepositoryOwner?.login !== entry.expectedHeadOwner ||
     pr.headRepository?.nameWithOwner !== plan.repository
@@ -268,49 +322,156 @@ export function evaluateEligibility({ entry, plan, pr, livePolicy }) {
   };
 }
 
-async function ghJson(args) {
+async function ghJson(args, { timeoutMs = 30_000 } = {}) {
   const { stdout } = await execFileAsync('gh', args, {
     encoding: 'utf8',
     maxBuffer: 20 * 1024 * 1024,
-    timeout: 30_000,
+    timeout: timeoutMs,
     killSignal: 'SIGKILL',
   });
   return JSON.parse(stdout);
 }
 
-export async function fetchRepositoryPolicy(repo) {
-  const metadata = await ghJson(['api', `repos/${repo}`]);
-  const ref = await ghJson([
-    'api',
-    `repos/${repo}/git/ref/heads/${encodeURIComponent(metadata.default_branch)}`,
-  ]);
+export async function fetchRepositoryPolicy(
+  repo,
+  { ghJsonImpl = ghJson, timeoutMs = 30_000 } = {}
+) {
+  const metadata = await ghJsonImpl(['api', `repos/${repo}`], { timeoutMs });
+  const ref = await ghJsonImpl(
+    [
+      'api',
+      `repos/${repo}/git/ref/heads/${encodeURIComponent(metadata.default_branch)}`,
+    ],
+    { timeoutMs }
+  );
   return {
     defaultBranch: metadata.default_branch,
     sha: ref?.object?.sha ?? null,
   };
 }
 
-export async function fetchPrSnapshot(repo, number) {
+function readContextPage(pr, expected = {}) {
+  const commit = pr?.commits?.nodes?.[0]?.commit;
+  const contexts = commit?.statusCheckRollup?.contexts;
+  if (
+    !commit?.oid ||
+    !contexts ||
+    !Array.isArray(contexts.nodes) ||
+    typeof contexts.pageInfo?.hasNextPage !== 'boolean' ||
+    !Number.isInteger(contexts.totalCount) ||
+    contexts.totalCount < 0
+  ) {
+    throw new Error(
+      'GitHub statusCheckRollup contexts page was incomplete; refusing eligibility'
+    );
+  }
+  if (
+    expected.headRefOid &&
+    (pr.headRefOid !== expected.headRefOid || commit.oid !== expected.commitOid)
+  ) {
+    throw new Error(
+      'PR head changed while paginating statusCheckRollup contexts'
+    );
+  }
+  if (
+    contexts.pageInfo.hasNextPage &&
+    (typeof contexts.pageInfo.endCursor !== 'string' ||
+      !contexts.pageInfo.endCursor)
+  ) {
+    throw new Error(
+      'GitHub statusCheckRollup pagination omitted the next cursor'
+    );
+  }
+  return { commit, contexts };
+}
+
+export async function fetchPrSnapshot(
+  repo,
+  number,
+  { ghJsonImpl = ghJson, timeoutMs = 30_000 } = {}
+) {
   const [owner, name] = repo.split('/');
-  const response = await ghJson([
-    'api',
-    'graphql',
-    '-f',
-    `query=${PR_QUERY}`,
-    '-f',
-    `owner=${owner}`,
-    '-f',
-    `name=${name}`,
-    '-F',
-    `number=${number}`,
-  ]);
+  const response = await ghJsonImpl(
+    [
+      'api',
+      'graphql',
+      '-f',
+      `query=${PR_QUERY}`,
+      '-f',
+      `owner=${owner}`,
+      '-f',
+      `name=${name}`,
+      '-F',
+      `number=${number}`,
+    ],
+    { timeoutMs }
+  );
   const pr = response?.data?.repository?.pullRequest;
   if (!pr) return null;
+  if (
+    !Array.isArray(pr.labels?.nodes) ||
+    pr.labels?.pageInfo?.hasNextPage !== false ||
+    pr.labels.totalCount !== pr.labels.nodes.length
+  ) {
+    throw new Error(
+      'GitHub labels page was incomplete; refusing to infer current hold state'
+    );
+  }
+  const first = readContextPage(pr);
+  const expected = { headRefOid: pr.headRefOid, commitOid: first.commit.oid };
+  const contexts = [...first.contexts.nodes];
+  const seenCursors = new Set();
+  let pageInfo = first.contexts.pageInfo;
+  const totalCount = first.contexts.totalCount;
+  while (pageInfo.hasNextPage) {
+    if (seenCursors.has(pageInfo.endCursor)) {
+      throw new Error('GitHub statusCheckRollup pagination repeated a cursor');
+    }
+    seenCursors.add(pageInfo.endCursor);
+    const pageResponse = await ghJsonImpl(
+      [
+        'api',
+        'graphql',
+        '-f',
+        `query=${PR_CONTEXT_PAGE_QUERY}`,
+        '-f',
+        `owner=${owner}`,
+        '-f',
+        `name=${name}`,
+        '-F',
+        `number=${number}`,
+        '-f',
+        `cursor=${pageInfo.endCursor}`,
+      ],
+      { timeoutMs }
+    );
+    const pagePr = pageResponse?.data?.repository?.pullRequest;
+    if (!pagePr) {
+      throw new Error('PR disappeared while paginating statusCheckRollup');
+    }
+    const page = readContextPage(pagePr, expected);
+    if (page.contexts.totalCount !== totalCount) {
+      throw new Error(
+        'GitHub statusCheckRollup context count changed during pagination'
+      );
+    }
+    contexts.push(...page.contexts.nodes);
+    if (contexts.length > totalCount) {
+      throw new Error(
+        'GitHub statusCheckRollup pagination returned duplicate or excess contexts'
+      );
+    }
+    pageInfo = page.contexts.pageInfo;
+  }
+  if (contexts.length !== totalCount) {
+    throw new Error(
+      'GitHub statusCheckRollup pagination ended before all contexts were read'
+    );
+  }
   return {
     ...pr,
     labels: pr.labels?.nodes ?? [],
-    statusCheckRollup:
-      pr.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.nodes ?? [],
+    statusCheckRollup: contexts,
   };
 }
 
@@ -325,52 +486,119 @@ export function cancelledReceipt(receipt, signal, nowMs = Date.now()) {
   };
 }
 
-export async function runPreparedEntry(options, dependencies = {}) {
-  const now = dependencies.nowImpl ?? Date.now;
-  const save = dependencies.writeReceiptImpl ?? writeReceipt;
-  const rawPlan = await readFile(options.planPath, 'utf8');
-  const plan = JSON.parse(rawPlan);
-  const validation = validatePlan(plan, { nowMs: now() });
-  if (!validation.ok) throw new Error(validation.errors.join('; '));
-  if (!['dry-run', 'apply'].includes(options.mode))
-    throw new Error('mode must be dry-run or apply');
-  const planHash = hash(rawPlan);
-  if (planHash !== options.planHash) throw new Error('plan SHA-256 changed');
-  if (options.mode === 'apply' && options.confirmation !== planHash)
-    throw new Error('apply confirmation does not match plan');
-  const entry = plan.entries.find(
-    candidate => candidate.number === options.prNumber
-  );
-  if (!entry) throw new Error('planned PR entry is missing');
-  let receipt = {
+function errorReceipt(receipt, error, nowMs = Date.now()) {
+  return {
+    ...receipt,
+    completedAt: new Date(nowMs).toISOString(),
+    outcome: 'error',
+    reason: String(error?.message ?? error),
+  };
+}
+
+function bootstrapReceipt(kind, options, nowMs = Date.now()) {
+  return {
     schema: RECEIPT_SCHEMA,
-    kind: 'item',
-    repository: plan.repository,
-    baseRef: plan.baseRef,
-    trustedDefaultBranchSha: options.trustedDefaultBranchSha,
-    planHash,
-    mode: options.mode,
-    runId: String(options.runId),
-    runAttempt: String(options.runAttempt),
-    pr: entry.number,
-    entry,
-    startedAt: new Date(now()).toISOString(),
+    kind,
+    repository: null,
+    baseRef: null,
+    trustedDefaultBranchSha: options.trustedDefaultBranchSha ?? null,
+    planHash: options.planHash ?? null,
+    mode: options.mode ?? 'dry-run',
+    runId: String(options.runId ?? ''),
+    runAttempt: String(options.runAttempt ?? ''),
+    pr: Number.isInteger(options.prNumber) ? options.prNumber : null,
+    startedAt: new Date(nowMs).toISOString(),
     completedAt: null,
-    outcome: 'started',
-    reason: 'receipt persisted before live GitHub reads',
+    outcome: 'initializing',
+    reason: 'receipt persisted before plan parsing or validation',
     mutationAttempted: false,
     mutationApplied: false,
   };
+}
+
+export function installProcessSignalHandlers({
+  getLatest,
+  writeReceiptImpl,
+  nowImpl = Date.now,
+  exitImpl = code => process.exit(code),
+  processImpl = process,
+}) {
+  let handling = false;
+  const handlers = new Map();
+  for (const signal of ['SIGINT', 'SIGTERM']) {
+    const handler = () => {
+      if (handling) return;
+      handling = true;
+      const latest = getLatest();
+      Promise.resolve(
+        latest
+          ? writeReceiptImpl(cancelledReceipt(latest, signal, nowImpl()), {
+              terminal: true,
+            })
+          : undefined
+      )
+        .catch(error => {
+          console.error(
+            `could not persist ${signal} receipt: ${error.message}`
+          );
+        })
+        .finally(() => exitImpl(signal === 'SIGINT' ? 130 : 143));
+    };
+    handlers.set(signal, handler);
+    processImpl.once(signal, handler);
+  }
+  return () => {
+    for (const [signal, handler] of handlers) {
+      processImpl.removeListener(signal, handler);
+    }
+  };
+}
+
+export async function runPreparedEntry(options, dependencies = {}) {
+  const now = dependencies.nowImpl ?? Date.now;
+  const ownedWriter = dependencies.writeReceiptImpl
+    ? null
+    : createAtomicReceiptWriter(options.receiptPath);
+  const save =
+    dependencies.writeReceiptImpl ??
+    (async (_path, value) => ownedWriter.write(value));
+  const fetchPolicy =
+    dependencies.fetchRepositoryPolicyImpl ?? fetchRepositoryPolicy;
+  const fetchPr = dependencies.fetchPrImpl ?? fetchPrSnapshot;
+  let receipt = bootstrapReceipt('item', options, now());
   const persist = async next => {
     receipt = next;
-    await save(options.receiptPath, receipt);
     options.onReceipt?.(receipt);
+    await save(options.receiptPath, receipt);
   };
-  await persist(receipt);
   try {
-    const livePolicy = await (
-      dependencies.fetchRepositoryPolicyImpl ?? fetchRepositoryPolicy
-    )(plan.repository);
+    await persist(receipt);
+    const rawPlan = await readFile(options.planPath, 'utf8');
+    const plan = JSON.parse(rawPlan);
+    const validation = validatePlan(plan, { nowMs: now() });
+    if (!validation.ok) throw new Error(validation.errors.join('; '));
+    if (!['dry-run', 'apply'].includes(options.mode))
+      throw new Error('mode must be dry-run or apply');
+    const planHash = hash(rawPlan);
+    if (planHash !== options.planHash) throw new Error('plan SHA-256 changed');
+    if (options.mode === 'apply' && options.confirmation !== planHash)
+      throw new Error('apply confirmation does not match plan');
+    const entry = plan.entries.find(
+      candidate => candidate.number === options.prNumber
+    );
+    if (!entry) throw new Error('planned PR entry is missing');
+    await persist({
+      ...receipt,
+      repository: plan.repository,
+      baseRef: plan.baseRef,
+      trustedDefaultBranchSha: options.trustedDefaultBranchSha,
+      planHash,
+      pr: entry.number,
+      entry,
+      outcome: 'started',
+      reason: 'validated plan receipt persisted before live GitHub reads',
+    });
+    const livePolicy = await fetchPolicy(plan.repository);
     if (
       livePolicy.sha !== options.trustedDefaultBranchSha ||
       livePolicy.defaultBranch !== plan.baseRef
@@ -383,10 +611,7 @@ export async function runPreparedEntry(options, dependencies = {}) {
       });
       return receipt;
     }
-    const pr = await (dependencies.fetchPrImpl ?? fetchPrSnapshot)(
-      plan.repository,
-      entry.number
-    );
+    const pr = await fetchPr(plan.repository, entry.number);
     const eligibility = evaluateEligibility({ entry, plan, pr, livePolicy });
     if (!eligibility.eligible) {
       await persist({
@@ -405,6 +630,26 @@ export async function runPreparedEntry(options, dependencies = {}) {
       expectedBaseOid: options.trustedDefaultBranchSha,
       expectedHeadOid: entry.headOid,
       dryRun: options.mode !== 'apply',
+      preMutationCheckImpl: async ({ timeoutMs }) => {
+        const currentPolicy = await fetchPolicy(plan.repository, { timeoutMs });
+        const currentPr = await fetchPr(plan.repository, entry.number, {
+          timeoutMs,
+        });
+        const currentEligibility = evaluateEligibility({
+          entry,
+          plan,
+          pr: currentPr,
+          livePolicy: currentPolicy,
+        });
+        return {
+          ok: currentEligibility.eligible,
+          category: currentEligibility.outcome,
+          reason: currentEligibility.eligible
+            ? 'current queue, auto-merge, hold, review, and check state revalidated'
+            : `pre-mutation eligibility changed: ${currentEligibility.reason}`,
+          observedHeadOid: currentPr?.headRefOid ?? null,
+        };
+      },
     });
     const outcome =
       options.mode !== 'apply'
@@ -427,12 +672,66 @@ export async function runPreparedEntry(options, dependencies = {}) {
     });
     return receipt;
   } catch (error) {
-    await persist({
-      ...receipt,
-      completedAt: new Date(now()).toISOString(),
-      outcome: 'error',
-      reason: error.message,
+    try {
+      await persist(errorReceipt(receipt, error, now()));
+    } catch (receiptError) {
+      console.error(
+        `could not update failure receipt: ${receiptError.message}`
+      );
+    }
+    throw error;
+  }
+}
+
+export async function runPlanCommand(options, dependencies = {}) {
+  const now = dependencies.nowImpl ?? Date.now;
+  const ownedWriter = dependencies.writeReceiptImpl
+    ? null
+    : createAtomicReceiptWriter(options.receiptPath);
+  const save =
+    dependencies.writeReceiptImpl ??
+    (async (_path, value) => ownedWriter.write(value));
+  let receipt = bootstrapReceipt('plan', options, now());
+  const persist = async next => {
+    receipt = next;
+    options.onReceipt?.(receipt);
+    await save(options.receiptPath, receipt);
+  };
+  try {
+    await persist(receipt);
+    const rawPlan = await readFile(options.planPath, 'utf8');
+    const plan = JSON.parse(rawPlan);
+    const validation = validatePlan(plan, { nowMs: now() });
+    if (!validation.ok) throw new Error(validation.errors.join('; '));
+    const trustedDefaultBranchSha = options.trustedDefaultBranchSha;
+    const livePolicy = await (
+      dependencies.fetchRepositoryPolicyImpl ?? fetchRepositoryPolicy
+    )(plan.repository);
+    const bundle = createPlanBundle({
+      rawPlan,
+      plan,
+      trustedDefaultBranchSha,
+      livePolicy,
+      mode: options.mode,
+      confirmation: options.confirmation,
+      runId: options.runId,
+      runAttempt: options.runAttempt,
+      nowMs: now(),
     });
+    await persist(bundle.receipt);
+    await (dependencies.writeFileImpl ?? writeFile)(
+      options.matrixPath,
+      `${JSON.stringify(bundle.matrix)}\n`
+    );
+    return bundle;
+  } catch (error) {
+    try {
+      await persist(errorReceipt(receipt, error, now()));
+    } catch (receiptError) {
+      console.error(
+        `could not update failure receipt: ${receiptError.message}`
+      );
+    }
     throw error;
   }
 }
@@ -454,70 +753,92 @@ const need = (options, key) =>
     throw new Error(`--${key} is required`);
   })();
 
-async function main() {
-  const options = parseArgs(process.argv.slice(2));
-  const planPath = need(options, 'plan');
-  if (options.command === 'plan') {
-    const rawPlan = await readFile(planPath, 'utf8');
-    const plan = JSON.parse(rawPlan);
-    const trustedDefaultBranchSha = need(options, 'trustedDefaultSha');
-    const bundle = createPlanBundle({
-      rawPlan,
-      plan,
-      trustedDefaultBranchSha,
-      livePolicy: await fetchRepositoryPolicy(plan.repository),
-      mode: options.mode,
-      confirmation: options.confirmation,
-      runId: options.runId,
-      runAttempt: options.runAttempt,
-    });
-    await writeFile(
-      need(options, 'matrix'),
-      `${JSON.stringify(bundle.matrix)}\n`
-    );
-    await writeFile(
-      need(options, 'receipt'),
-      `${JSON.stringify(bundle.receipt, null, 2)}\n`
-    );
-    console.log(
-      JSON.stringify({
-        planHash: bundle.planHash,
-        trustedDefaultBranchSha,
-        hasEntries: bundle.matrix.include.length > 0,
-        outcome: bundle.outcome,
-      })
-    );
-    return;
-  }
-  if (options.command !== 'run') throw new Error('command must be plan or run');
-  let latest;
-  const receiptPath = need(options, 'receipt');
-  for (const signal of ['SIGINT', 'SIGTERM'])
-    process.once(signal, async () => {
-      if (latest)
-        await writeReceipt(receiptPath, cancelledReceipt(latest, signal));
-      process.exit(signal === 'SIGINT' ? 130 : 143);
-    });
-  const result = await runPreparedEntry({
-    planPath,
-    planHash: need(options, 'planHash'),
-    trustedDefaultBranchSha: need(options, 'trustedDefaultSha'),
-    mode: options.mode,
-    confirmation: options.confirmation,
-    prNumber: Number(need(options, 'pr')),
-    receiptPath,
-    runId: options.runId,
-    runAttempt: options.runAttempt,
-    onReceipt: value => {
-      latest = value;
-    },
+function flagValue(argv, flag) {
+  const index = argv.indexOf(flag);
+  return index >= 0 ? argv[index + 1] : null;
+}
+
+export async function runCli(argv) {
+  const receiptPath = flagValue(argv, '--receipt');
+  if (!receiptPath) throw new Error('--receipt is required');
+  const writer = createAtomicReceiptWriter(receiptPath);
+  const command = argv[0] ?? 'unknown';
+  const initial = bootstrapReceipt(command === 'plan' ? 'plan' : 'item', {
+    mode: flagValue(argv, '--mode') ?? 'dry-run',
+    planHash: flagValue(argv, '--plan-hash'),
+    trustedDefaultBranchSha: flagValue(argv, '--trusted-default-sha'),
+    prNumber: Number(flagValue(argv, '--pr')) || null,
+    runId: flagValue(argv, '--run-id'),
+    runAttempt: flagValue(argv, '--run-attempt'),
   });
-  console.log(JSON.stringify(result));
-  if (['update_failed', 'error'].includes(result.outcome)) process.exitCode = 1;
+  const initialWrite = writer.write(initial);
+  const removeSignalHandlers = installProcessSignalHandlers({
+    getLatest: writer.getLatest,
+    writeReceiptImpl: writer.write,
+  });
+  try {
+    await initialWrite;
+    const options = parseArgs([...argv]);
+    const planPath = need(options, 'plan');
+    if (options.command === 'plan') {
+      const trustedDefaultBranchSha = need(options, 'trustedDefaultSha');
+      const bundle = await runPlanCommand(
+        {
+          planPath,
+          trustedDefaultBranchSha,
+          mode: options.mode,
+          confirmation: options.confirmation,
+          runId: options.runId,
+          runAttempt: options.runAttempt,
+          matrixPath: need(options, 'matrix'),
+          receiptPath,
+        },
+        {
+          writeReceiptImpl: async (_path, value) => writer.write(value),
+        }
+      );
+      console.log(
+        JSON.stringify({
+          planHash: bundle.planHash,
+          trustedDefaultBranchSha,
+          hasEntries: bundle.matrix.include.length > 0,
+          outcome: bundle.outcome,
+        })
+      );
+      return bundle.receipt;
+    }
+    if (options.command !== 'run')
+      throw new Error('command must be plan or run');
+    const result = await runPreparedEntry(
+      {
+        planPath,
+        planHash: need(options, 'planHash'),
+        trustedDefaultBranchSha: need(options, 'trustedDefaultSha'),
+        mode: options.mode,
+        confirmation: options.confirmation,
+        prNumber: Number(need(options, 'pr')),
+        receiptPath,
+        runId: options.runId,
+        runAttempt: options.runAttempt,
+      },
+      {
+        writeReceiptImpl: async (_path, value) => writer.write(value),
+      }
+    );
+    console.log(JSON.stringify(result));
+    if (['update_failed', 'error'].includes(result.outcome))
+      process.exitCode = 1;
+    return result;
+  } catch (error) {
+    await writer.write(errorReceipt(writer.getLatest() ?? initial, error));
+    throw error;
+  } finally {
+    removeSignalHandlers();
+  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main().catch(error => {
+  runCli(process.argv.slice(2)).catch(error => {
     console.error(error.stack ?? error.message);
     process.exitCode = 1;
   });

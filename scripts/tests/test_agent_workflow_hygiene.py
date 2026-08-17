@@ -228,7 +228,7 @@ try {
     {nowImpl:()=>now,fetchRepositoryPolicyImpl:async()=>policy,fetchPrImpl:async()=>pr,
       rebaseImpl:async args=>{calls.push(args);return {ok:true,updated:true,reason:'dry-run'};},
       writeReceiptImpl:async(_path,receipt)=>receipts.push(receipt)});
-  assert.equal(result.outcome,'eligible_dry_run'); assert.deepEqual(receipts.map(x=>x.outcome),['started','eligible_dry_run']);
+  assert.equal(result.outcome,'eligible_dry_run'); assert.deepEqual(receipts.map(x=>x.outcome),['initializing','started','eligible_dry_run']);
   assert.equal(calls[0].expectedHeadOid,entry.headOid); assert.equal(calls[0].expectedBaseOid,sha);
 } finally { await rm(temp,{recursive:true,force:true}); }
 const cancelled=canary.cancelledReceipt({outcome:'started',mutationAttempted:false},'SIGTERM',now); assert.equal(cancelled.outcome,'cancelled_indeterminate'); assert.equal(cancelled.mutationAttempted,null);

@@ -14,7 +14,9 @@ on:
         required: false
         type: string
 concurrency:
-  group: pr-preparation-canary-${{ github.repository }}
+  # Share the native admission writer mutex so branch updates cannot race
+  # auto-enrollment's queue/hold revalidation.
+  group: merge-queue-drain-mutex
   cancel-in-progress: false
 permissions:
   contents: read
@@ -64,7 +66,7 @@ jobs:
         with:
           name: pr-preparation-plan-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/plan-receipt.json
-          if-no-files-found: ignore
+          if-no-files-found: error
           retention-days: 14
   prepare:
     name: '${{ inputs.mode }} PR #${{ matrix.number }}'
