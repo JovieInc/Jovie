@@ -174,6 +174,70 @@ export const LoadingDisabled: Story = {
   },
 };
 
+export const FocusVisible: Story = {
+  args: {
+    children: 'Focus visible',
+    variant: 'primary',
+    size: 'lg',
+    autoFocus: true,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Keyboard focus-visible spec: canonical ring-2 focus ring with page-colored offset on the primary/lg master selection.',
+      },
+    },
+  },
+};
+
+// Production-backed primary/lg fixtures (Pen master button/primary/lg/idle)
+export const ProductionPrimaryLgFixtures: Story = {
+  render: () => (
+    <div className='flex flex-col gap-4 p-8'>
+      <div>
+        <h3 className='text-sm font-semibold mb-2'>
+          /download — label override (icon composed in source)
+        </h3>
+        <Button variant='primary' size='lg' className='gap-2 px-6'>
+          <svg
+            className='size-4'
+            fill='none'
+            stroke='currentColor'
+            viewBox='0 0 24 24'
+            aria-hidden='true'
+          >
+            <path
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              strokeWidth={2}
+              d='M12 3v12m0 0 4-4m-4 4-4-4M4 21h16'
+            />
+          </svg>
+          Download for Mac
+        </Button>
+      </div>
+      <div>
+        <h3 className='text-sm font-semibold mb-2'>
+          Footer / final CTA — label override
+        </h3>
+        <Button variant='primary' size='lg'>
+          Get started
+        </Button>
+      </div>
+    </div>
+  ),
+  parameters: {
+    layout: 'fullscreen',
+    docs: {
+      description: {
+        story:
+          'Exact production-backed primary/lg selections that resolve to the same Pen master (button/primary/lg/idle) with independent label overrides. The /download leading icon is source-composed child content: live Pen readback shows the master exposes no leading-icon slot, so icon overrides fail closed.',
+      },
+    },
+  },
+};
+
 // Composition Examples
 export const WithIcon: Story = {
   args: {

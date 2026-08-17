@@ -168,10 +168,15 @@ function hasSourceBackedButtonFixture(
           ])
       );
       const body = node.getText(sourceFile);
+      // Fixtures with a labelSource receive the label through props or copy
+      // data; the literal label is proved against the labelSource file below.
+      const matchesLabel = fixture.labelSource
+        ? true
+        : body.includes(fixture.label);
       matchesButton ||=
         attributes.get('variant') === fixture.variant &&
         attributes.get('size') === fixture.size &&
-        body.includes(fixture.label) &&
+        matchesLabel &&
         (!fixture.leadingIcon || body.includes(`<${fixture.leadingIcon}`));
     }
 
@@ -179,6 +184,17 @@ function hasSourceBackedButtonFixture(
   }
 
   visit(sourceFile);
+
+  if (
+    'labelSource' in fixture &&
+    fixture.labelSource &&
+    !fs
+      .readFileSync(path.join(repoRoot, fixture.labelSource), 'utf8')
+      .includes(`'${fixture.label}'`)
+  ) {
+    return false;
+  }
+
   return importsSharedButton && matchesButton;
 }
 
@@ -550,7 +566,8 @@ describe('canonical shared source atom registry', () => {
     expect(
       DESIGN_SYSTEM_COMPONENT_REGISTRY.find(entry => entry.id === 'atom.button')
     ).toMatchObject({
-      penRootId: BUTTON_PEN_CONTRACT.rootId,
+      penRootId: null,
+      penRootByVariantKey: BUTTON_PEN_CONTRACT.rootByVariantKey,
       referenceEligible: true,
       variantAxes: {
         destructive: ['false', 'true'],
@@ -591,51 +608,93 @@ describe('canonical shared source atom registry', () => {
     ).toThrow('Unsupported atom.button axis: visualGuess');
   });
 
-  it('normalizes Button imports to stable Pen refs and descendant overrides', () => {
+  it('resolves Button imports to their exact Pen master and descendant slots', () => {
     const input = {
       componentId: 'atom.button',
       variant: 'primary',
       size: 'lg',
       label: 'Download for Mac',
-      leadingIcon: 'ArrowDownToLine',
     } as const;
+
+    const master =
+      BUTTON_PEN_CONTRACT.rootByVariantKey['button/primary/lg/idle'];
+    expect(master).toBeDefined();
 
     const normalized = normalizeButtonPenRef(input);
     expect(normalizeButtonPenRef(input)).toEqual(normalized);
     expect(normalized).toEqual({
       componentId: 'atom.button',
-      ref: BUTTON_PEN_CONTRACT.rootId,
+      ref: master?.rootId,
+      master,
+      variantKey: 'button/primary/lg/idle',
       variant: { destructive: 'false', size: 'lg', variant: 'primary' },
       overrides: [
         {
-          nodeId: BUTTON_PEN_CONTRACT.descendants.leadingIcon,
-          property: 'icon',
-          value: 'ArrowDownToLine',
-        },
-        {
-          nodeId: BUTTON_PEN_CONTRACT.descendants.label,
+          nodeId: master?.descendants.label,
           property: 'content',
           value: 'Download for Mac',
         },
-      ].sort((a, b) =>
-        `${a.nodeId}:${a.property}`.localeCompare(`${b.nodeId}:${b.property}`)
-      ),
+      ],
     });
   });
 
-  it('normalizes omitted and deprecated Button source props canonically', () => {
-    expect(
+  it('fails closed for leading-icon overrides without a verified Pen slot', () => {
+    const master =
+      BUTTON_PEN_CONTRACT.rootByVariantKey['button/primary/lg/idle'];
+
+    // Live Pen readback shows master g3IC1 has no leading-icon descendant, so
+    // an icon override must throw instead of claiming an unproven slot.
+    expect(master?.descendants.leadingIcon).toBeUndefined();
+    expect(() =>
+      normalizeButtonPenRef({
+        componentId: 'atom.button',
+        variant: 'primary',
+        size: 'lg',
+        label: 'Download for Mac',
+        leadingIcon: 'ArrowDownToLine',
+      })
+    ).toThrow(
+      `Unsupported atom.button Pen override: button/primary/lg/idle master ${master?.rootId} has no leading-icon slot`
+    );
+  });
+
+  it('fails closed for selections without a source-backed Pen master', () => {
+    // The default primary/md selection has no mapped master; normalization
+    // must throw instead of returning inert metadata on the primary master.
+    expect(() =>
       normalizeButtonPenRef({ componentId: 'atom.button', label: 'Default' })
-        .variant
-    ).toEqual({ destructive: 'false', size: 'md', variant: 'primary' });
-    expect(
+    ).toThrow(
+      'Unsupported atom.button Pen selection: button/primary/md/idle has no source-backed master'
+    );
+    // Deprecated aliases normalize first, then resolve against the family map.
+    expect(() =>
       normalizeButtonPenRef({
         componentId: 'atom.button',
         label: 'Delete',
         variant: 'destructive',
         size: 'hero',
-      }).variant
-    ).toEqual({ destructive: 'true', size: 'lg', variant: 'primary' });
+      })
+    ).toThrow(
+      'Unsupported atom.button Pen selection: button/primary/lg/destructive has no source-backed master'
+    );
+  });
+
+  it('normalizes deprecated aliases before resolving the exact master', () => {
+    const normalized = normalizeButtonPenRef({
+      componentId: 'atom.button',
+      label: 'Get started',
+      variant: 'whitePill',
+      size: 'xl',
+    });
+    expect(normalized.variantKey).toBe('button/primary/lg/idle');
+    expect(normalized.variant).toEqual({
+      destructive: 'false',
+      size: 'lg',
+      variant: 'primary',
+    });
+    expect(normalized.ref).toBe(
+      BUTTON_PEN_CONTRACT.rootByVariantKey['button/primary/lg/idle']?.rootId
+    );
   });
 
   it('keeps two production CTAs on one Button master with label overrides', () => {
@@ -648,13 +707,19 @@ describe('canonical shared source atom registry', () => {
     );
 
     expect(new Set(refs.map(ref => ref.ref))).toEqual(
-      new Set([BUTTON_PEN_CONTRACT.rootId])
+      new Set([
+        BUTTON_PEN_CONTRACT.rootByVariantKey['button/primary/lg/idle']?.rootId,
+      ])
     );
     expect(
       refs.map(
         ref =>
           ref.overrides.find(override => override.property === 'content')?.value
       )
-    ).toEqual(['Download for Mac', 'Request Access']);
+    ).toEqual(['Download for Mac', 'Get started']);
+    // Both instances carry only their independent label override; neither
+    // claims a leading-icon slot the Pen master does not expose.
+    expect(refs[0]?.overrides).toHaveLength(1);
+    expect(refs[1]?.overrides).toHaveLength(1);
   });
 });

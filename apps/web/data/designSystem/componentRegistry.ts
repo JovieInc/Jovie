@@ -2,6 +2,8 @@ import {
   BUTTON_PEN_CONTRACT,
   BUTTON_SIZE_NAMES,
   BUTTON_VARIANT_NAMES,
+  type ButtonPenMaster,
+  type ButtonPenVariantKey,
 } from '@jovie/ui';
 
 export const DESIGN_SYSTEM_COMPONENT_IDS = [
@@ -29,6 +31,14 @@ export interface DesignSystemComponentRegistryEntry {
   readonly testSources: readonly string[];
   readonly dependsOn: readonly DesignSystemComponentId[];
   readonly penRootId: string | null;
+  /**
+   * Executable Pen family for components whose visual selections resolve to
+   * explicit per-selection masters. Every mapped root is part of this same
+   * component identity, never a second component.
+   */
+  readonly penRootByVariantKey?: Readonly<
+    Partial<Record<ButtonPenVariantKey, ButtonPenMaster>>
+  >;
   readonly referenceEligible: boolean;
   readonly penIdentityReason?: string;
   readonly variantAxes: Readonly<Record<string, readonly string[]>>;
@@ -51,7 +61,8 @@ export const DESIGN_SYSTEM_COMPONENT_REGISTRY = [
     storyExport: 'Primary',
     testSources: ['packages/ui/atoms/button.test.tsx'],
     dependsOn: [],
-    penRootId: BUTTON_PEN_CONTRACT.rootId,
+    penRootId: null,
+    penRootByVariantKey: BUTTON_PEN_CONTRACT.rootByVariantKey,
     referenceEligible: true,
     variantAxes: {
       destructive: ['false', 'true'],
@@ -151,6 +162,21 @@ export function getDesignSystemComponent(
   return COMPONENT_BY_ID.get(id) ?? null;
 }
 
+/** Unique source-backed Pen root for a design-system entry, or null. */
+export function designSystemCanonicalPenRoot(
+  entry: DesignSystemComponentRegistryEntry
+): string | null {
+  if (entry.penRootId) return entry.penRootId;
+  const familyRoots = [
+    ...new Set(
+      Object.values(entry.penRootByVariantKey ?? {}).map(
+        master => master.rootId
+      )
+    ),
+  ];
+  return familyRoots.length === 1 ? familyRoots[0] : null;
+}
+
 export function designSystemVariantKey(
   id: DesignSystemComponentId,
   selection: Readonly<Record<string, string>>
@@ -215,7 +241,11 @@ export function validateDesignSystemComponentRegistry(
     ) {
       issues.push({ code: 'missing-source-evidence', id: entry.id });
     }
-    if (entry.referenceEligible && !entry.penRootId) {
+    if (
+      entry.referenceEligible &&
+      !entry.penRootId &&
+      Object.keys(entry.penRootByVariantKey ?? {}).length === 0
+    ) {
       issues.push({ code: 'reference-without-pen-root', id: entry.id });
     }
     if (!entry.referenceEligible && !entry.penIdentityReason) {
@@ -224,11 +254,17 @@ export function validateDesignSystemComponentRegistry(
         id: entry.id,
       });
     }
-    if (entry.penRootId) {
-      if (roots.has(entry.penRootId)) {
+    const entryRoots = [
+      ...(entry.penRootId ? [entry.penRootId] : []),
+      ...Object.values(entry.penRootByVariantKey ?? {}).map(
+        master => master.rootId
+      ),
+    ];
+    for (const root of entryRoots) {
+      if (roots.has(root)) {
         issues.push({ code: 'duplicate-pen-root', id: entry.id });
       }
-      roots.add(entry.penRootId);
+      roots.add(root);
     }
   }
 

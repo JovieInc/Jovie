@@ -8,6 +8,7 @@ export type {
 export {
   DESIGN_SYSTEM_COMPONENT_IDS,
   DESIGN_SYSTEM_COMPONENT_REGISTRY,
+  designSystemCanonicalPenRoot,
   designSystemVariantKey,
   getDesignSystemComponent,
   validateDesignSystemComponentRegistry,

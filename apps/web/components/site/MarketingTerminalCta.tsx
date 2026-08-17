@@ -73,7 +73,7 @@ export function MarketingTerminalCta({
       <div className={variantStyles.actions}>
         <Button
           variant='primary'
-          size='md'
+          size='lg'
           asChild
           className={variantStyles.primary}
         >

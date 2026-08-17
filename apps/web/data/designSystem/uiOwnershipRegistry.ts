@@ -8,6 +8,7 @@ import {
 } from '@/data/marketing';
 import {
   type DesignSystemComponentId,
+  designSystemCanonicalPenRoot,
   getDesignSystemComponent,
 } from './componentRegistry';
 
@@ -186,8 +187,9 @@ const canonicalPen = (
 const dsPen = (id: DesignSystemComponentId): UIPenIdentity => {
   const e = getDesignSystemComponent(id);
   if (!e) throw new Error(`Unknown design-system component: ${id}`);
-  return e.referenceEligible && e.penRootId
-    ? canonicalPen(e.penRootId, [e.contractSource ?? e.source])
+  const root = designSystemCanonicalPenRoot(e);
+  return e.referenceEligible && root
+    ? canonicalPen(root, [e.contractSource ?? e.source])
     : unresolved(e.penIdentityReason ?? 'No source-backed Pen identity.');
 };
 const marketingPen = (id: MarketingShellRegistryEntry['id']): UIPenIdentity => {
