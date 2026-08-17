@@ -528,6 +528,7 @@ describe('queue workflow mutation safety', () => {
       workflow,
       'Rebase blocked agent PRs onto main (Phase 2)'
     );
+    const remediator = readRepoFile('scripts/drain-pr-remediate.mjs');
     const drain = readRepoFile('scripts/drain-pr-queue.sh');
     const tokenAction =
       'actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1';
@@ -573,6 +574,8 @@ describe('queue workflow mutation safety', () => {
     ).toBeLessThan(
       drain.indexOf('node scripts/merge-queue-backend.mjs list-state')
     );
+    expect(rebaseMutation).toContain("DRAIN_REMEDIATE_MAX_PER_RUN: '24'");
+    expect(remediator).toContain("DRAIN_REMEDIATE_MAX_PER_RUN ?? '24'");
   });
 });
 

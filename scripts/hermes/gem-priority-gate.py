@@ -124,6 +124,28 @@ def gh_json(repo: str, endpoint: str) -> dict[str, Any]:
     return value
 
 
+def select_main_release_ready(attempts: list[dict[str, Any]]) -> dict[str, Any]:
+    """Pick the latest real Main Release Ready attempt.
+
+    Merge-group / source-inactive jobs complete as ``skipped``. Those are not
+    a red main — treating the newest skip as the source gate flips the fleet
+    to draft-only after every land and zeroes enroll.
+    """
+    if not attempts:
+        raise ValueError("Main Release Ready check is missing")
+
+    def sort_key(run: dict[str, Any]) -> str:
+        return str(run.get("started_at") or run.get("completed_at") or "")
+
+    scored = [
+        run
+        for run in attempts
+        if run.get("conclusion") not in {"skipped", "cancelled", "neutral"}
+    ]
+    pool = scored if scored else attempts
+    return max(pool, key=sort_key)
+
+
 def observe_main(repo: str) -> dict[str, Any]:
     try:
         branch = gh_json(repo, "branches/main")
@@ -140,13 +162,7 @@ def observe_main(repo: str) -> dict[str, Any]:
             )
             if len(page_runs) < 100:
                 break
-        if not release_attempts:
-            raise ValueError("Main Release Ready check is missing")
-        release_attempts.sort(
-            key=lambda run: str(run.get("started_at") or run.get("completed_at") or ""),
-            reverse=True,
-        )
-        latest = release_attempts[0]
+        latest = select_main_release_ready(release_attempts)
         combined_state = str(combined.get("state") or "unknown")
         if latest.get("status") != "completed":
             status = "unknown"

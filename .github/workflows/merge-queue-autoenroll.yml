@@ -302,6 +302,6 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           DRAIN_REMEDIATE_APPLY: '1'
-          DRAIN_REMEDIATE_MAX_PER_RUN: '3'
+          DRAIN_REMEDIATE_MAX_PER_RUN: '24'
           DRAIN_REMEDIATE_COOLDOWN_HOURS: '4'
         run: node scripts/drain-pr-remediate.mjs --apply

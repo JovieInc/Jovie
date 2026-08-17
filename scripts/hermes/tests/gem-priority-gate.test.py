@@ -68,6 +68,57 @@ def urlopen_router(payloads: dict[str, object]):
     return _open
 
 
+class MainReleaseReadySelectionTests(unittest.TestCase):
+    def test_ignores_newer_skipped_check_when_a_success_exists(self):
+        latest = MODULE.select_main_release_ready(
+            [
+                {
+                    "conclusion": "skipped",
+                    "started_at": "2026-08-17T19:46:00Z",
+                    "completed_at": "2026-08-17T19:46:00Z",
+                },
+                {
+                    "conclusion": "success",
+                    "started_at": "2026-08-17T19:45:12Z",
+                    "completed_at": "2026-08-17T19:45:16Z",
+                },
+            ]
+        )
+        self.assertEqual(latest["conclusion"], "success")
+
+    def test_prefers_in_progress_over_stale_success(self):
+        latest = MODULE.select_main_release_ready(
+            [
+                {
+                    "conclusion": "success",
+                    "started_at": "2026-08-17T19:40:00Z",
+                    "completed_at": "2026-08-17T19:40:10Z",
+                },
+                {
+                    "conclusion": None,
+                    "status": "in_progress",
+                    "started_at": "2026-08-17T19:47:00Z",
+                },
+            ]
+        )
+        self.assertEqual(latest.get("status"), "in_progress")
+
+    def test_all_skipped_falls_back_to_latest_skip(self):
+        latest = MODULE.select_main_release_ready(
+            [
+                {
+                    "conclusion": "skipped",
+                    "started_at": "2026-08-17T19:40:00Z",
+                },
+                {
+                    "conclusion": "skipped",
+                    "started_at": "2026-08-17T19:41:00Z",
+                },
+            ]
+        )
+        self.assertEqual(latest["started_at"], "2026-08-17T19:41:00Z")
+
+
 class ProductionHealthTests(unittest.TestCase):
     def test_default_uses_the_dedicated_deploy_health_contract(self):
         with (
