@@ -23,6 +23,7 @@ describe('Spinner', () => {
     const spinner = screen.getByRole('status');
     expect(spinner).toHaveAttribute('data-tone', 'inverse');
     expect(spinner).toHaveClass('custom-class');
+    expect(spinner).toHaveClass('text-btn-primary-foreground');
   });
 
   it('animates the ring under normal motion', () => {
