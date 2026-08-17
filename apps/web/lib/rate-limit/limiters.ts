@@ -584,41 +584,41 @@ export async function checkSpotifyRefreshRateLimit(
 export const aiChatLimiter = createRateLimiter(RATE_LIMITERS.aiChat);
 
 /**
- * Plan-specific daily AI chat limiters.
- * Each plan has a separate daily quota on top of the hourly burst limiter.
+ * Plan-specific weekly AI chat limiters.
+ * Each plan has a separate seven-day quota on top of the hourly burst limiter.
  *
- * @deprecated Use aiChatDailyPlanAwareLimiter instead for new code.
+ * @deprecated Use aiChatWeeklyPlanAwareLimiter instead for new code.
  * These individual limiters are kept for backward compatibility.
  */
-export const aiChatDailyFreeLimiter = createRateLimiter(
-  RATE_LIMITERS.aiChatDailyFree
+export const aiChatWeeklyFreeLimiter = createRateLimiter(
+  RATE_LIMITERS.aiChatWeeklyFree
 );
-export const aiChatDailyProLimiter = createRateLimiter(
-  RATE_LIMITERS.aiChatDailyPro
+export const aiChatWeeklyProLimiter = createRateLimiter(
+  RATE_LIMITERS.aiChatWeeklyPro
 );
-export const aiChatDailyMaxLimiter = createRateLimiter(
-  RATE_LIMITERS.aiChatDailyMax
+export const aiChatWeeklyMaxLimiter = createRateLimiter(
+  RATE_LIMITERS.aiChatWeeklyMax
 );
 
 /**
- * Plan-aware AI chat daily limiter.
- * Automatically selects the correct daily quota based on the user's plan tier.
- * - Free: 10 messages/day
- * - Pro: 100 messages/day
- * - Max: 500 messages/day
+ * Plan-aware AI chat weekly limiter.
+ * Automatically selects the correct seven-day quota based on the user's plan tier.
+ * - Free: 15 messages/week
+ * - Pro: 70 messages/week
+ * - Max: 250 messages/week
  */
-export const aiChatDailyPlanAwareLimiter: PlanAwareRateLimiter =
+export const aiChatWeeklyPlanAwareLimiter: PlanAwareRateLimiter =
   createPlanAwareRateLimiter({
     configs: {
-      free: RATE_LIMITERS.aiChatDailyFree,
-      pro: RATE_LIMITERS.aiChatDailyPro,
+      free: RATE_LIMITERS.aiChatWeeklyFree,
+      pro: RATE_LIMITERS.aiChatWeeklyPro,
       // founding falls back to pro automatically via the factory
-      max: RATE_LIMITERS.aiChatDailyMax,
+      max: RATE_LIMITERS.aiChatWeeklyMax,
     },
     errorMessage: plan =>
       plan === 'max' || plan === 'pro'
-        ? 'You have reached your daily AI message limit. Your quota resets tomorrow.'
-        : 'You have reached your daily AI message limit. Upgrade to Pro for 100 messages per day.',
+        ? 'You have reached your weekly AI message limit. Your quota resets when the current seven-day window ends.'
+        : 'You have reached your weekly AI message limit. Upgrade to Pro for 70 messages per week.',
   });
 
 /**
@@ -637,7 +637,7 @@ export async function checkAiChatRateLimit(
 
 /**
  * Check AI chat rate limits for a specific plan.
- * Applies both the hourly burst limiter (all plans) and the daily plan quota.
+ * Applies both the hourly burst limiter (all plans) and the weekly plan quota.
  * Returns the first failure or success if all pass.
  *
  * Fail-open when the durable rate-limit backend is degraded/unavailable
@@ -665,10 +665,10 @@ export async function checkAiChatRateLimitForPlan(
       return burstAllowed;
     }
 
-    // 2. Check daily plan-specific quota using the plan-aware limiter
-    const dailyResult = await aiChatDailyPlanAwareLimiter.limit(userId, plan);
-    return allowIfRateLimitBackendDegraded(dailyResult, {
-      limiter: 'ai-chat-daily',
+    // 2. Check weekly plan-specific quota using the plan-aware limiter
+    const weeklyResult = await aiChatWeeklyPlanAwareLimiter.limit(userId, plan);
+    return allowIfRateLimitBackendDegraded(weeklyResult, {
+      limiter: 'ai-chat-weekly',
       userId,
       plan,
     });

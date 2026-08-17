@@ -52,7 +52,7 @@ describe('Knowledge Accuracy Eval — Golden Cases', () => {
 
         const systemPrompt = buildSystemPrompt(artistContext, releases, {
           aiCanUseTools: true,
-          aiDailyMessageLimit: 50,
+          aiWeeklyMessageLimit: 50,
           knowledgeContext: knowledgeContext || undefined,
         });
 

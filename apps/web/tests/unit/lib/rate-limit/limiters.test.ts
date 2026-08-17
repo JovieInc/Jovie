@@ -215,23 +215,23 @@ vi.mock('@/lib/rate-limit/config', () => ({
       prefix: 'dsp:apple-music:search',
     },
     aiChat: { name: 'AI Chat', limit: 30, window: '1 h', prefix: 'ai:chat' },
-    aiChatDailyFree: {
-      name: 'AI Chat Daily (Free)',
-      limit: 10,
-      window: '1 d',
-      prefix: 'ai:chat:daily:free',
+    aiChatWeeklyFree: {
+      name: 'AI Chat Weekly (Free)',
+      limit: 15,
+      window: '7 d',
+      prefix: 'ai:chat:weekly:free',
     },
-    aiChatDailyPro: {
-      name: 'AI Chat Daily (Pro)',
-      limit: 100,
-      window: '1 d',
-      prefix: 'ai:chat:daily:pro',
+    aiChatWeeklyPro: {
+      name: 'AI Chat Weekly (Pro)',
+      limit: 70,
+      window: '7 d',
+      prefix: 'ai:chat:weekly:pro',
     },
-    aiChatDailyMax: {
-      name: 'AI Chat Daily (Max)',
-      limit: 200,
-      window: '1 d',
-      prefix: 'ai:chat:daily:max',
+    aiChatWeeklyMax: {
+      name: 'AI Chat Weekly (Max)',
+      limit: 250,
+      window: '7 d',
+      prefix: 'ai:chat:weekly:max',
     },
     bandsintownSync: {
       name: 'Bandsintown Sync',
@@ -682,7 +682,7 @@ describe('limiters.ts', () => {
       expect(mockLimit).toHaveBeenCalledTimes(1);
     });
 
-    it('returns daily quota failure with upgrade message for free plan', async () => {
+    it('returns weekly quota failure with upgrade message for free plan', async () => {
       mockLimit
         .mockResolvedValueOnce(makeAllowedResult()) // burst passes
         .mockResolvedValueOnce(makeDeniedResult()); // daily fails
@@ -696,7 +696,7 @@ describe('limiters.ts', () => {
       expect(result.reason).toContain('Upgrade to Pro');
     });
 
-    it('returns daily quota failure without upgrade message for pro plan', async () => {
+    it('returns weekly quota failure without upgrade message for pro plan', async () => {
       mockLimit
         .mockResolvedValueOnce(makeAllowedResult())
         .mockResolvedValueOnce(makeDeniedResult());
@@ -708,11 +708,11 @@ describe('limiters.ts', () => {
 
       expect(result.success).toBe(false);
       expect(result.reason).toBe(
-        'You have reached your daily AI message limit. Your quota resets tomorrow.'
+        'You have reached your weekly AI message limit. Your quota resets when the current seven-day window ends.'
       );
     });
 
-    it('returns daily quota failure without upgrade message for max plan', async () => {
+    it('returns weekly quota failure without upgrade message for max plan', async () => {
       mockLimit
         .mockResolvedValueOnce(makeAllowedResult())
         .mockResolvedValueOnce(makeDeniedResult());
@@ -724,7 +724,7 @@ describe('limiters.ts', () => {
 
       expect(result.success).toBe(false);
       expect(result.reason).toBe(
-        'You have reached your daily AI message limit. Your quota resets tomorrow.'
+        'You have reached your weekly AI message limit. Your quota resets when the current seven-day window ends.'
       );
     });
 

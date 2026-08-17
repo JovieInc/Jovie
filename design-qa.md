@@ -98,3 +98,88 @@ is tracked as candidate follow-up JOV-4627.
 - P1: none
 - P2: none
 - P3: none
+
+---
+
+# Usage dropdown design QA
+
+## Source and implementation
+
+- Reference: `/var/folders/94/18gm8rr177124d51gsv4qj4m0000gn/T/TemporaryItems/NSIRD_screencaptureui_YUfzEQ/Screenshot 2026-08-17 at 8.19.03 AM.png`
+- Implementation capture: `/Users/timwhite/.codex/visualizations/2026/08/16/01a00cb2-2b7c-7ec1-bf6e-d2ab79b8c17c/jovie-usage-dropdown.jpg`
+- Rendered state: `Organisms/UserButton/UsageMenuItem / Expanded`
+- Viewport: 1280 × 720; component width: 320 px; dark theme
+
+## Adopt-first receipt
+
+- Decision: **extend** Jovie's existing `UsageMenuItem`, settings usage panel,
+  chat-usage query, and plan-usage summary query.
+- Considered: the shared `ProgressBar` atom. It remains correct for uploads and
+  imports, but does not model quota thresholds, reset windows, stale data, or
+  conflicting upstream counters.
+- Differentiating requirement: one fail-closed remaining-capacity model shared
+  by every quota surface, with exact threshold markers and independently
+  degradable data sources.
+- Revisit trigger: move normalization server-side when one authoritative usage
+  endpoint owns daily messages, weekly suggestions, live actions, and a trusted
+  burn-rate signal.
+
+## Comparison evidence
+
+- Matched the reference hierarchy: quota name, percent left, horizontal fill,
+  visible thresholds, status copy, and reset timing.
+- Kept Jovie's compact System B surface and token palette instead of copying
+  macOS translucency or CodexBar's standalone panel chrome.
+- Used real Jovie windows: daily messages, weekly suggestions, and rolling
+  five-hour live actions. Removed the prior monthly visualization because its
+  endpoint did not contain true monthly consumption.
+- Omitted projected run-out copy because Jovie has no verified burn-rate input;
+  the UI does not manufacture a forecast.
+- Watch and critical markers remain visible at 25% and 10%. Status is repeated
+  in text and `aria-valuetext`, so color is not the only signal.
+
+## Interaction and state checks
+
+- Disclosure opens and closes by pointer, Enter, and Space in component tests.
+- `aria-expanded`, `aria-controls`, progress values, and readable status text
+  are present.
+- Loading, empty, total failure, partial-source failure, stale data, healthy,
+  near-limit, and exhausted states retain the reserved panel geometry.
+- Stale product-summary fallback zeros are hidden rather than rendered as full
+  remaining capacity.
+- The rendered Storybook fixture opened successfully and exposed all three
+  progress bars in the accessibility tree.
+
+## Patches after comparison
+
+- Kept the compact 320 px menu width already established by Jovie's user menu.
+- Preserved sparse spacing and quiet borders; no extra card nesting was added.
+- Added deterministic Storybook data so visual and accessibility checks do not
+  depend on live billing state.
+
+final result: passed
+
+## Weekly simplification follow-up
+
+The first reference-matching pass above was intentionally superseded after
+product review. Jovie now exposes one user-facing quota only: weekly AI
+messages. Suggestions and live-action bars, the monthly projection, the 25%
+watch marker, and the 10% critical marker were removed.
+
+- One warning marker remains at 20% capacity.
+- Healthy capacity uses the normal accent; at or below the marker it changes to
+  warning; only a zero balance uses the error treatment.
+- Exhaustion colors the empty track and repeats `Limit reached` in visible text,
+  so a zero-width fill does not hide the error state and color is never the only
+  signal.
+- The dropdown retains keyboard disclosure semantics, one progressbar, exact
+  remaining count, reset timing, stale/error copy, and a contextual upgrade
+  action.
+- Settings uses the same shared meter model and keeps a reserved minimum height
+  across loading, error, unavailable, warning, and exhausted states.
+
+Fresh evidence: 26 focused files / 392 tests passed, production TypeScript
+passed, Biome passed on all changed web files, and the complete Storybook
+production build completed successfully with the updated expanded-menu story.
+
+final result: passed

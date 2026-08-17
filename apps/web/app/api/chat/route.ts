@@ -2693,7 +2693,7 @@ export async function POST(req: Request) {
     }
   }
 
-  // Rate limiting - plan-aware daily quota + burst protection. For clients
+  // Rate limiting - plan-aware weekly quota + burst protection. For clients
   // that send clientTurnId, reservation/replay happens before quota charging.
   const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan);
   if (!rateLimitResult.success) {

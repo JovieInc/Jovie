@@ -66,7 +66,7 @@ describe('Entitlement Registry Consistency', () => {
       'analyticsRetentionDays',
       'contactsLimit',
       'smartLinksLimit',
-      'aiDailyMessageLimit',
+      'aiWeeklyMessageLimit',
       'aiPitchGenPerRelease',
     ];
 
@@ -96,7 +96,7 @@ describe('Entitlement Registry Consistency', () => {
 
     const numericKeys: NumericEntitlement[] = [
       'analyticsRetentionDays',
-      'aiDailyMessageLimit',
+      'aiWeeklyMessageLimit',
     ];
 
     for (const key of numericKeys) {

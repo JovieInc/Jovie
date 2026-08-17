@@ -55,7 +55,7 @@ export type NumericEntitlement =
   | 'analyticsRetentionDays'
   | 'contactsLimit'
   | 'smartLinksLimit'
-  | 'aiDailyMessageLimit'
+  | 'aiWeeklyMessageLimit'
   | 'aiPitchGenPerRelease'
   | 'aiRetouchDailyLimit'
   | 'chatFileUploadLimit'
@@ -71,7 +71,7 @@ export interface PlanEntitlements {
     analyticsRetentionDays: number | null;
     contactsLimit: number | null;
     smartLinksLimit: number | null;
-    aiDailyMessageLimit: number;
+    aiWeeklyMessageLimit: number;
     aiPitchGenPerRelease: number | null;
     /** Max AI retouch operations per day. Null = no access (free). */
     aiRetouchDailyLimit: number | null;
@@ -127,7 +127,7 @@ const PRO_LIMITS: PlanEntitlements['limits'] = {
   analyticsRetentionDays: 180,
   contactsLimit: null,
   smartLinksLimit: null,
-  aiDailyMessageLimit: 100,
+  aiWeeklyMessageLimit: 70,
   aiPitchGenPerRelease: 5,
   aiRetouchDailyLimit: 10,
   chatFileUploadLimit: null,
@@ -152,7 +152,7 @@ const PRO_FEATURES: readonly string[] = [
   'URL encryption',
   'Ad pixel tracking',
   'Verified badge',
-  'AI assistant (100 messages/day)',
+  'AI assistant (70 messages/week)',
   'Unlimited chat file uploads',
   'AI pitch generation (5 per release)',
   'Priority support',
@@ -198,7 +198,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       analyticsRetentionDays: 30,
       contactsLimit: 100,
       smartLinksLimit: null,
-      aiDailyMessageLimit: 10,
+      aiWeeklyMessageLimit: 15,
       aiPitchGenPerRelease: 1,
       aiRetouchDailyLimit: null,
       chatFileUploadLimit: 5,
@@ -227,7 +227,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
         'Basic analytics (30 days)',
         'Audience intelligence',
         'Up to 100 contacts',
-        'AI assistant (10 msgs/day)',
+        'AI assistant (15 messages/week)',
         '1 AI pitch generation per release',
         'Chat file uploads (5 files/batch)',
       ],
@@ -282,7 +282,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       analyticsRetentionDays: null,
       contactsLimit: null,
       smartLinksLimit: null,
-      aiDailyMessageLimit: 500,
+      aiWeeklyMessageLimit: 250,
       aiPitchGenPerRelease: null,
       aiRetouchDailyLimit: 50,
       chatFileUploadLimit: null,
@@ -296,7 +296,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
         'Release plan generation',
         'Metadata submission agent',
         'Unlimited analytics',
-        'AI assistant (500 messages/day)',
+        'AI assistant (250 messages/week)',
         'Unlimited AI pitch generation',
         'Stripe Connect payouts',
         'Email campaigns',
@@ -319,7 +319,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       analyticsRetentionDays: 180,
       contactsLimit: 250,
       smartLinksLimit: null,
-      aiDailyMessageLimit: 25,
+      aiWeeklyMessageLimit: 50,
       aiPitchGenPerRelease: 3,
       aiRetouchDailyLimit: 10,
       chatFileUploadLimit: 15,
