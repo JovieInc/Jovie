@@ -33,6 +33,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 HERMES = ROOT / "scripts/hermes"
 REGISTRY_SOURCE = HERMES / "gem_repo_registry.py"
 INSTALLER = HERMES / "install-gem-pr-rehabilitation.sh"
+FLEET_INSTALLER = HERMES / "install-gem-fleet-controller.sh"
 ACTIVATION = ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
 SPEC = importlib.util.spec_from_file_location("gem_repo_registry", REGISTRY_SOURCE)
 if SPEC is None or SPEC.loader is None:
@@ -108,6 +109,191 @@ class DeploymentContractTests(unittest.TestCase):
             )
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertIn("install sources verified", process.stdout)
+
+
+class FleetControllerInstallerContractTests(unittest.TestCase):
+    def _fixture(
+        self, directory: str, *, policy_source=None
+    ) -> pathlib.Path:
+        fixture = pathlib.Path(directory) / "repo"
+        shutil.copytree(HERMES, fixture / "scripts/hermes")
+        if policy_source is not None:
+            (fixture / "scripts/hermes/gem_rehabilitation_policy.py").write_text(
+                policy_source, encoding="utf-8"
+            )
+        git_env = _git_env()
+        subprocess.run(
+            ["git", "init", "-q", str(fixture)], check=True, env=git_env
+        )
+        subprocess.run(
+            ["git", "-C", str(fixture), "add", "scripts/hermes"],
+            check=True,
+            env=git_env,
+        )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(fixture),
+                "-c",
+                "user.name=Gem Test",
+                "-c",
+                "user.email=gem-test@example.invalid",
+                "commit",
+                "-qm",
+                "fixture",
+            ],
+            check=True,
+            env=git_env,
+        )
+        return fixture
+
+    def _runtime(self, directory: str) -> tuple[dict[str, pathlib.Path], dict[str, str]]:
+        root = pathlib.Path(directory)
+        gem = root / "gem"
+        symphony = root / "symphony"
+        home = root / "home"
+        fake_bin = root / "bin"
+        paths = {
+            "gem": gem,
+            "policy": gem / "scripts/gem_rehabilitation_policy.py",
+            "gate": gem / "scripts/gem-priority-gate.py",
+            "consumer": gem / "scripts/gem-pr-drain.py",
+            "workflow": symphony / "WORKFLOW.jovie-ui-pilot.md",
+            "attestation": gem / "state/gem-service-attestation.json",
+        }
+        (gem / "scripts").mkdir(parents=True)
+        symphony.mkdir(parents=True)
+        (home / ".config/systemd/user").mkdir(parents=True)
+        fake_bin.mkdir()
+        paths["gate"].write_text("old gate\n", encoding="utf-8")
+        paths["consumer"].write_text("old consumer\n", encoding="utf-8")
+        paths["workflow"].write_text("old workflow\n", encoding="utf-8")
+
+        systemctl = fake_bin / "systemctl"
+        systemctl.write_text(
+            """#!/bin/sh
+case "$*" in
+  *"show-environment"*) exit 0 ;;
+  *"is-active --quiet gem-pr-drain.timer"*) exit 1 ;;
+  *"is-active --quiet gem-pr-drain.service"*) exit 1 ;;
+  *"restart symphony-ui-pilot.service"*)
+    [ "${FAKE_RESTART_FAILURE:-false}" != true ]
+    exit
+    ;;
+  *"is-active --quiet symphony-ui-pilot.service"*) exit 0 ;;
+esac
+exit 0
+""",
+            encoding="utf-8",
+        )
+        systemctl.chmod(0o755)
+        curl = fake_bin / "curl"
+        curl.write_text(
+            "#!/bin/sh\n"
+            "printf '%s\\n' "
+            "'{\"counts\":{\"running\":0,\"retrying\":0,\"blocked\":0}}'\n",
+            encoding="utf-8",
+        )
+        curl.chmod(0o755)
+        env = {
+            "HOME": str(home),
+            "GEM_WORKSPACE": str(gem),
+            "SYMPHONY_RUNTIME": str(symphony),
+            "PATH": f"{fake_bin}:/usr/bin:/bin:/usr/sbin:/sbin",
+        }
+        return paths, env
+
+    def _install(
+        self,
+        fixture: pathlib.Path,
+        env: dict[str, str],
+        *,
+        fail_restart: bool = False,
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["bash", str(fixture / FLEET_INSTALLER.relative_to(ROOT)), str(fixture)],
+            env={
+                **env,
+                "FAKE_RESTART_FAILURE": "true" if fail_restart else "false",
+            },
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+    def _verify(
+        self, fixture: pathlib.Path, directory: str
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["bash", str(fixture / FLEET_INSTALLER.relative_to(ROOT)), str(fixture)],
+            env={
+                "HOME": directory,
+                "GEM_WORKSPACE": str(pathlib.Path(directory) / "gem"),
+                "SYMPHONY_RUNTIME": str(pathlib.Path(directory) / "symphony"),
+                "FLEET_INSTALL_VERIFY_ONLY": "true",
+                "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+            },
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+    def test_verify_only_hashes_the_runtime_policy_and_imports_the_consumer(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            process = self._verify(fixture, directory)
+
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertIn("fleet controller install sources verified", process.stdout)
+        self.assertIn("scripts/hermes/gem_rehabilitation_policy.py", process.stdout)
+
+    def test_verify_only_fails_when_policy_cannot_satisfy_the_consumer_import(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(
+                directory, policy_source="POLICY_FIXTURE = True\n"
+            )
+            process = self._verify(fixture, directory)
+
+        self.assertNotEqual(process.returncode, 0)
+        self.assertIn("cannot import name 'bounded_selection'", process.stderr)
+
+    def test_install_attests_the_exact_runtime_policy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            process = self._install(fixture, env)
+            installed_policy = paths["policy"].read_bytes()
+            attestation = json.loads(paths["attestation"].read_text(encoding="utf-8"))
+
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertEqual(
+            installed_policy,
+            (HERMES / "gem_rehabilitation_policy.py").read_bytes(),
+        )
+        self.assertTrue(attestation["policy"]["matches"])
+        self.assertEqual(
+            attestation["policy"]["sourceSha256"],
+            attestation["policy"]["installedSha256"],
+        )
+
+    def test_failed_install_removes_a_new_policy_during_atomic_rollback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            process = self._install(fixture, env, fail_restart=True)
+            restored = {
+                name: paths[name].read_text(encoding="utf-8")
+                for name in ("gate", "consumer", "workflow")
+            }
+            policy_exists = paths["policy"].exists()
+
+        self.assertNotEqual(process.returncode, 0)
+        self.assertEqual(restored["gate"], "old gate\n")
+        self.assertEqual(restored["consumer"], "old consumer\n")
+        self.assertEqual(restored["workflow"], "old workflow\n")
+        self.assertFalse(policy_exists)
+        self.assertIn("fleet controller install rolled back", process.stderr)
 
 
 class ModelPolicyContractTests(unittest.TestCase):

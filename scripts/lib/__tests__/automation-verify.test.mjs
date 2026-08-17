@@ -68,6 +68,7 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/hermes/gem_gate_contract.py',
   'scripts/hermes/gem_repo_registry.py',
   'scripts/hermes/gem_rehabilitation_policy.py',
+  'scripts/hermes/install-gem-fleet-controller.sh',
   'scripts/hermes/install-gem-pr-rehabilitation.sh',
   'scripts/hermes/model-router.py',
   'scripts/hermes/systemd/gem-pr-drain.service',
@@ -680,6 +681,24 @@ describe('automation-verify affected scope', () => {
         'apps/web/lib/unknown-safe-remediation-peer.ts',
       ]).mode
     ).toBe('full');
+  });
+
+  it('routes fleet controller installer repairs to the Gem rehabilitation lane', () => {
+    expect(
+      buildAffectedTestPlan([
+        'scripts/hermes/install-gem-fleet-controller.sh',
+        'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+      ])
+    ).toMatchObject({
+      mode: 'selected',
+      pythonUnittestTests: expect.arrayContaining([
+        'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+      ]),
+      scriptVitestTests: expect.arrayContaining([
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ]),
+    });
   });
 
   it('fails closed on an unresolved base and retains mandatory risk policy', () => {

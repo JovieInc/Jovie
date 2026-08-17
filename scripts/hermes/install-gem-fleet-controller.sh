@@ -16,11 +16,13 @@ readonly BACKUP_DIR="${GEM_ROOT}/state/backups/fleet-controller-${STAMP}"
 readonly GATE_SOURCE="${SOURCE_ROOT}/scripts/hermes/gem-priority-gate.py"
 readonly CONTRACT_SOURCE="${SOURCE_ROOT}/scripts/hermes/gem_gate_contract.py"
 readonly CONSUMER_SOURCE="${SOURCE_ROOT}/scripts/hermes/gem-pr-drain.py"
+readonly POLICY_SOURCE="${SOURCE_ROOT}/scripts/hermes/gem_rehabilitation_policy.py"
 readonly WORKFLOW_SOURCE="${SOURCE_ROOT}/scripts/hermes/WORKFLOW.jovie-ui-pilot.md"
 readonly SERVICE_UNIT_SOURCE="${SOURCE_ROOT}/scripts/hermes/systemd/symphony-ui-pilot.service"
 readonly GATE_TARGET="${GEM_ROOT}/scripts/gem-priority-gate.py"
 readonly CONTRACT_TARGET="${GEM_ROOT}/scripts/gem_gate_contract.py"
 readonly CONSUMER_TARGET="${GEM_ROOT}/scripts/gem-pr-drain.py"
+readonly POLICY_TARGET="${GEM_ROOT}/scripts/gem_rehabilitation_policy.py"
 readonly WORKFLOW_TARGET="${SYMPHONY_ROOT}/WORKFLOW.jovie-ui-pilot.md"
 readonly SERVICE_UNIT_TARGET="${HOME}/.config/systemd/user/symphony-ui-pilot.service"
 
@@ -38,13 +40,41 @@ prepare_user_systemd_context() {
   fi
 }
 
+smoke_consumer_import() {
+  local consumer="$1" module_root
+  module_root="$(dirname "${consumer}")"
+  CONSUMER_IMPORT_TARGET="${consumer}" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH="${module_root}" \
+    python3 - <<'PY'
+import os
+import runpy
+
+namespace = runpy.run_path(
+    os.environ["CONSUMER_IMPORT_TARGET"],
+    run_name="gem_pr_drain_import_smoke",
+)
+required = ("bounded_selection", "decide_action", "lease_key")
+missing = [name for name in required if not callable(namespace.get(name))]
+if missing:
+    raise SystemExit(f"Gem PR drain import smoke missing callables: {', '.join(missing)}")
+PY
+}
+
 if [[ "${PREFLIGHT_ONLY}" == true ]]; then
   prepare_user_systemd_context
   printf 'Gem user systemd preflight passed (XDG_RUNTIME_DIR=%s)\n' "${XDG_RUNTIME_DIR}"
   exit 0
 fi
 
-for source in "${GATE_SOURCE}" "${CONTRACT_SOURCE}" "${CONSUMER_SOURCE}" "${WORKFLOW_SOURCE}" "${SERVICE_UNIT_SOURCE}"; do
+for source in \
+  "${GATE_SOURCE}" \
+  "${CONTRACT_SOURCE}" \
+  "${CONSUMER_SOURCE}" \
+  "${POLICY_SOURCE}" \
+  "${WORKFLOW_SOURCE}" \
+  "${SERVICE_UNIT_SOURCE}"
+do
   [[ -f "${source}" ]] || { printf 'missing install source: %s\n' "${source}" >&2; exit 2; }
 done
 
@@ -52,12 +82,14 @@ git -C "${SOURCE_ROOT}" diff --quiet -- \
   scripts/hermes/gem-priority-gate.py \
   scripts/hermes/gem_gate_contract.py \
   scripts/hermes/gem-pr-drain.py \
+  scripts/hermes/gem_rehabilitation_policy.py \
   scripts/hermes/WORKFLOW.jovie-ui-pilot.md \
   scripts/hermes/systemd/symphony-ui-pilot.service
 git -C "${SOURCE_ROOT}" diff --cached --quiet -- \
   scripts/hermes/gem-priority-gate.py \
   scripts/hermes/gem_gate_contract.py \
   scripts/hermes/gem-pr-drain.py \
+  scripts/hermes/gem_rehabilitation_policy.py \
   scripts/hermes/WORKFLOW.jovie-ui-pilot.md
 
 SOURCE_REVISION="$(git -C "${SOURCE_ROOT}" rev-parse HEAD)"
@@ -73,10 +105,17 @@ if [[ -n "${EXPECTED_SOURCE_REVISION}" ]]; then
   }
 fi
 
-python3 -m py_compile "${GATE_SOURCE}" "${CONTRACT_SOURCE}" "${CONSUMER_SOURCE}"
+python3 -m py_compile "${GATE_SOURCE}" "${CONTRACT_SOURCE}" "${CONSUMER_SOURCE}" "${POLICY_SOURCE}"
+smoke_consumer_import "${CONSUMER_SOURCE}"
 if [[ "${VERIFY_ONLY}" == true ]]; then
   printf 'fleet controller install sources verified\n'
-  sha256sum "${GATE_SOURCE}" "${CONTRACT_SOURCE}" "${CONSUMER_SOURCE}" "${WORKFLOW_SOURCE}" "${SERVICE_UNIT_SOURCE}"
+  sha256sum \
+    "${GATE_SOURCE}" \
+    "${CONTRACT_SOURCE}" \
+    "${CONSUMER_SOURCE}" \
+    "${POLICY_SOURCE}" \
+    "${WORKFLOW_SOURCE}" \
+    "${SERVICE_UNIT_SOURCE}"
   exit 0
 fi
 prepare_user_systemd_context
@@ -84,15 +123,19 @@ mkdir -p "${BACKUP_DIR}"
 cp -p "${GATE_TARGET}" "${BACKUP_DIR}/gem-priority-gate.py"
 cp -p "${CONSUMER_TARGET}" "${BACKUP_DIR}/gem-pr-drain.py"
 [[ ! -e "${CONTRACT_TARGET}" ]] || cp -p "${CONTRACT_TARGET}" "${BACKUP_DIR}/gem_gate_contract.py"
+[[ ! -e "${POLICY_TARGET}" ]] || \
+  cp -p "${POLICY_TARGET}" "${BACKUP_DIR}/gem_rehabilitation_policy.py"
 cp -p "${WORKFLOW_TARGET}" "${BACKUP_DIR}/WORKFLOW.jovie-ui-pilot.md"
 [[ ! -e "${SERVICE_UNIT_TARGET}" ]] || cp -p "${SERVICE_UNIT_TARGET}" "${BACKUP_DIR}/symphony-ui-pilot.service"
 
 timer_was_active=false
 contract_existed=false
+policy_existed=false
 service_unit_existed=false
 install_started=false
 install_complete=false
 [[ ! -e "${CONTRACT_TARGET}" ]] || contract_existed=true
+[[ ! -e "${POLICY_TARGET}" ]] || policy_existed=true
 [[ ! -e "${SERVICE_UNIT_TARGET}" ]] || service_unit_existed=true
 
 restore_atomic() {
@@ -114,6 +157,11 @@ finish_or_rollback() {
         restore_atomic "${BACKUP_DIR}/gem_gate_contract.py" "${CONTRACT_TARGET}"
       else
         rm -f "${CONTRACT_TARGET}"
+      fi
+      if [[ "${policy_existed}" == true ]]; then
+        restore_atomic "${BACKUP_DIR}/gem_rehabilitation_policy.py" "${POLICY_TARGET}"
+      else
+        rm -f "${POLICY_TARGET}"
       fi
       if [[ "${service_unit_existed}" == true ]]; then
         restore_atomic "${BACKUP_DIR}/symphony-ui-pilot.service" "${SERVICE_UNIT_TARGET}"
@@ -156,10 +204,12 @@ install_started=true
 install_atomic "${GATE_SOURCE}" "${GATE_TARGET}" 0755
 install_atomic "${CONTRACT_SOURCE}" "${CONTRACT_TARGET}" 0644
 install_atomic "${CONSUMER_SOURCE}" "${CONSUMER_TARGET}" 0755
+install_atomic "${POLICY_SOURCE}" "${POLICY_TARGET}" 0644
 install_atomic "${WORKFLOW_SOURCE}" "${WORKFLOW_TARGET}" 0644
 mkdir -p "$(dirname "${SERVICE_UNIT_TARGET}")"
 install_atomic "${SERVICE_UNIT_SOURCE}" "${SERVICE_UNIT_TARGET}" 0644
-python3 -m py_compile "${GATE_TARGET}" "${CONTRACT_TARGET}" "${CONSUMER_TARGET}"
+python3 -m py_compile "${GATE_TARGET}" "${CONTRACT_TARGET}" "${CONSUMER_TARGET}" "${POLICY_TARGET}"
+smoke_consumer_import "${CONSUMER_TARGET}"
 
 systemctl --user daemon-reload
 systemctl --user restart "${SERVICE}"
@@ -181,7 +231,17 @@ WORKFLOW_SOURCE_SHA="$(sha256sum "${WORKFLOW_SOURCE}" | awk '{print $1}')"
 WORKFLOW_TARGET_SHA="$(sha256sum "${WORKFLOW_TARGET}" | awk '{print $1}')"
 UNIT_SOURCE_SHA="$(sha256sum "${SERVICE_UNIT_SOURCE}" | awk '{print $1}')"
 UNIT_TARGET_SHA="$(sha256sum "${SERVICE_UNIT_TARGET}" | awk '{print $1}')"
-export SOURCE_REVISION WORKFLOW_SOURCE_SHA WORKFLOW_TARGET_SHA UNIT_SOURCE_SHA UNIT_TARGET_SHA GEM_ROOT
+POLICY_SOURCE_SHA="$(sha256sum "${POLICY_SOURCE}" | awk '{print $1}')"
+POLICY_TARGET_SHA="$(sha256sum "${POLICY_TARGET}" | awk '{print $1}')"
+export \
+  SOURCE_REVISION \
+  WORKFLOW_SOURCE_SHA \
+  WORKFLOW_TARGET_SHA \
+  UNIT_SOURCE_SHA \
+  UNIT_TARGET_SHA \
+  POLICY_SOURCE_SHA \
+  POLICY_TARGET_SHA \
+  GEM_ROOT
 python3 - <<'PY'
 import json
 import os
@@ -210,8 +270,13 @@ receipt = {
         "installedSha256": os.environ["UNIT_TARGET_SHA"],
         "matches": os.environ["UNIT_SOURCE_SHA"] == os.environ["UNIT_TARGET_SHA"],
     },
+    "policy": {
+        "sourceSha256": os.environ["POLICY_SOURCE_SHA"],
+        "installedSha256": os.environ["POLICY_TARGET_SHA"],
+        "matches": os.environ["POLICY_SOURCE_SHA"] == os.environ["POLICY_TARGET_SHA"],
+    },
 }
-if not receipt["workflow"]["matches"] or not receipt["unit"]["matches"]:
+if not all(receipt[artifact]["matches"] for artifact in ("workflow", "unit", "policy")):
     raise SystemExit("refusing stale Gem service attestation")
 temporary.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
 temporary.replace(destination)
@@ -224,4 +289,10 @@ fi
 install_complete=true
 trap - EXIT
 printf 'installed fleet controller backup=%s\n' "${BACKUP_DIR}"
-sha256sum "${GATE_TARGET}" "${CONTRACT_TARGET}" "${CONSUMER_TARGET}" "${WORKFLOW_TARGET}" "${SERVICE_UNIT_TARGET}"
+sha256sum \
+  "${GATE_TARGET}" \
+  "${CONTRACT_TARGET}" \
+  "${CONSUMER_TARGET}" \
+  "${POLICY_TARGET}" \
+  "${WORKFLOW_TARGET}" \
+  "${SERVICE_UNIT_TARGET}"
