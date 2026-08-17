@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "id": "awal",
+      "sourcePath": "apps/web/components/features/home/label-logos.tsx#AwalLogo",
+      "visibleBounds": {
+        "x": 0,
+        "y": 0,
+        "width": 717.2625,
+        "height": 188.26047
+      },
+      "cropInset": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
+      "targetInkHeight": 16,
+      "opticalScale": 1,
+      "baselineOffsetY": 0,
+      "opticalOffsetX": 0,
+      "allowedOverflow": 0,
+      "provenance": {
+        "source": "Wikimedia-derived vector in label-logos.tsx",
+        "version": "component:AwalLogo:v1",
+        "measuredAt": "2026-08-12T00:00:00.000Z",
+        "measurement": "vector-raster-alpha",
+        "owner": "design-system"
+      }
+    },
+    {
+      "id": "orchard",
+      "sourcePath": "apps/web/components/features/home/label-logos.tsx#TheOrchardLogo",
+      "visibleBounds": { "x": 8.75, "y": 6.75, "width": 102.5, "height": 38.5 },
+      "cropInset": {
+        "top": 6.75,
+        "right": 8.75,
+        "bottom": 14.75,
+        "left": 8.75
+      },
+      "targetInkHeight": 16,
+      "opticalScale": 1,
+      "baselineOffsetY": 0,
+      "opticalOffsetX": 0,
+      "allowedOverflow": 0,
+      "provenance": {
+        "source": "vectorlogo.zone-derived vector in label-logos.tsx",
+        "version": "component:TheOrchardLogo:v1",
+        "measuredAt": "2026-08-12T00:00:00.000Z",
+        "measurement": "vector-raster-alpha",
+        "owner": "design-system"
+      }
+    },
+    {
+      "id": "umg",
+      "sourcePath": "apps/web/components/features/home/label-logos.tsx#UniversalMusicGroupLogo",
+      "visibleBounds": { "x": 0, "y": 3, "width": 1000, "height": 35.5 },
+      "cropInset": { "top": 3, "right": 0, "bottom": 3.5, "left": 0 },
+      "targetInkHeight": 16,
+      "opticalScale": 1,
+      "baselineOffsetY": 0,
+      "opticalOffsetX": 0,
+      "allowedOverflow": 0,
+      "provenance": {
+        "source": "Wikimedia-derived vector in label-logos.tsx",
+        "version": "component:UniversalMusicGroupLogo:v1",
+        "measuredAt": "2026-08-12T00:00:00.000Z",
+        "measurement": "vector-raster-alpha",
+        "owner": "design-system"
+      }
+    },
+    {
+      "id": "armada",
+      "sourcePath": "apps/web/components/features/home/label-logos.tsx#ArmadaMusicLogo",
+      "visibleBounds": {
+        "x": 1,
+        "y": 1,
+        "width": 597.84375,
+        "height": 100.1875
+      },
+      "cropInset": { "top": 1, "right": 1, "bottom": 1, "left": 1 },
+      "targetInkHeight": 16,
+      "opticalScale": 1,
+      "baselineOffsetY": 0,
+      "opticalOffsetX": 0,
+      "allowedOverflow": 0,
+      "provenance": {
+        "source": "Wikimedia-derived vector in label-logos.tsx",
+        "version": "component:ArmadaMusicLogo:v1",
+        "measuredAt": "2026-08-12T00:00:00.000Z",
+        "measurement": "vector-raster-alpha",
+        "owner": "design-system"
+      }
+    },
+    {
+      "id": "black-hole-recordings",
+      "sourcePath": "apps/web/public/brand-logos/black-hole-recordings.png",
+      "visibleBounds": { "x": 11, "y": 9, "width": 1095, "height": 123 },
+      "cropInset": { "top": 9, "right": 13, "bottom": 14, "left": 11 },
+      "targetInkHeight": 16,
+      "opticalScale": 1,
+      "baselineOffsetY": 0,
+      "opticalOffsetX": 0,
+      "allowedOverflow": 0,
+      "provenance": {
+        "source": "apps/web/public/brand-logos/black-hole-recordings.png",
+        "version": "component:BlackHoleRecordingsLogo:v1",
+        "measuredAt": "2026-08-12T00:00:00.000Z",
+        "measurement": "alpha",
+        "owner": "design-system"
+      }
+    }
+  ]
+}

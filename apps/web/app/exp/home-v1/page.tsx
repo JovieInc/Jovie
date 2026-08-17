@@ -20,12 +20,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import {
-  ArmadaMusicLogo,
-  AwalLogo,
-  BlackHoleRecordingsLogo,
-  TheOrchardLogo,
-} from '@/components/features/home/label-logos';
+import { NormalizedTrustLogo } from '@/components/media/NormalizedTrustLogo';
 import { cn } from '@/lib/utils';
 
 const EASE_CINEMATIC = 'var(--ease-drawer)';
@@ -783,10 +778,10 @@ function Trust({ variant }: { variant: Variant }) {
             onCream ? 'text-(--color-bg-surface-0)/72' : 'text-white/55'
           )}
         >
-          <AwalLogo className='h-6 w-auto select-none' />
-          <TheOrchardLogo className='h-8 w-auto select-none' />
-          <ArmadaMusicLogo className='h-6 w-auto select-none' />
-          <BlackHoleRecordingsLogo className='h-5 w-auto select-none' />
+          <NormalizedTrustLogo id='awal' />
+          <NormalizedTrustLogo id='orchard' />
+          <NormalizedTrustLogo id='armada' />
+          <NormalizedTrustLogo id='black-hole-recordings' />
         </div>
       </div>
     </section>

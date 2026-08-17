@@ -1,15 +1,6 @@
-import type { ComponentType, SVGProps } from 'react';
 import { FALLBACK_AVATARS } from '@/components/features/home/featured-creators-fallback';
-import {
-  ArmadaMusicLogo,
-  AwalLogo,
-  TheOrchardLogo,
-  UniversalMusicGroupLogo,
-} from '@/components/features/home/label-logos';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
-
-type LogoComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
 export interface ArtistProfileSocialProofCard {
   readonly id: string;
@@ -28,9 +19,8 @@ export interface ArtistProfileQuote {
 }
 
 export interface ArtistProfileSocialProofLogo {
-  readonly id: 'awal' | 'the-orchard' | 'universal' | 'armada';
+  readonly id: 'awal' | 'orchard' | 'umg' | 'armada';
   readonly label: string;
-  readonly component: LogoComponent;
 }
 
 export interface ArtistProfileFounderQuote {
@@ -57,22 +47,18 @@ const ARTIST_PROFILE_PROOF_LOGOS: readonly ArtistProfileSocialProofLogo[] = [
   {
     id: 'awal',
     label: 'AWAL',
-    component: AwalLogo,
   },
   {
-    id: 'the-orchard',
+    id: 'orchard',
     label: 'The Orchard',
-    component: TheOrchardLogo,
   },
   {
-    id: 'universal',
+    id: 'umg',
     label: 'Universal Music Group',
-    component: UniversalMusicGroupLogo,
   },
   {
     id: 'armada',
     label: 'Armada Music',
-    component: ArmadaMusicLogo,
   },
 ] as const;
 
