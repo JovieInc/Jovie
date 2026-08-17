@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import datetime as dt
 import importlib.util
+import json
 import pathlib
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -21,7 +23,8 @@ SPEC.loader.exec_module(HUD)
 
 
 def fixture_state():
-    stamp = "2026-08-16T12:00:00Z"
+    stamp = HUD.iso()
+    next_retry = HUD.iso(HUD.now() + dt.timedelta(minutes=1))
     return {
         "symphony": {
             "updated": stamp,
@@ -34,7 +37,7 @@ def fixture_state():
                 "ownership_input": 0, "other": 0,
             },
             "slots": {"total": 4, "available": 0},
-            "next_retry": "2026-08-16T12:01:00Z",
+            "next_retry": next_retry,
             "jobs": [],
             "blockers": [],
         },
@@ -51,6 +54,36 @@ def fixture_state():
             "merged_recent": 7,
             "production_completions": 2,
             "latency": {"ci": {"sample": 4, "typical_seconds": 240, "slow_tail_seconds": 420}},
+        },
+        "fleet": {
+            "schema": "jovie-fleet-gate/v1",
+            "observedAt": stamp,
+            "updated": stamp,
+            "error": None,
+            "state": "GREEN",
+            "promotionMode": "normal",
+            "reasons": [],
+            "alreadyAdmittedCohort": {
+                "preserve": True,
+                "newIntakeAllowed": True,
+                "semantics": "normal",
+            },
+            "signals": {
+                "queue": {
+                    "status": "known",
+                    "eligiblePrs": 19,
+                    "greenReadyPrs": 4,
+                    "target": 15,
+                }
+            },
+            "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True},
+            "promotionAdmission": {"allowed": True},
+            "remediationAdmission": {
+                "allowed": True,
+                "localAllowed": True,
+                "pushAllowed": True,
+            },
+            "deploymentAdmission": {"allowed": True},
         },
         "issues": {
             "updated": stamp,
@@ -78,12 +111,146 @@ class VersionedHudContractTests(unittest.TestCase):
         self.assertTrue(all(len(line) == HUD.GRID_WIDTH for line in lines))
         for title in (
             "GEM OPERATIONS", "[ SYMPHONY ]", "[ WAIT REASONS ]",
-            "[ DELIVERY FUNNEL ]", "[ CYCLE TIME ]", "[ DETAILS / NEXT ACTION ]",
+            "[ FLEET POLICY ]", "[ DELIVERY FUNNEL ]", "[ CYCLE TIME ]",
+            "[ DETAILS / NEXT ACTION ]",
         ):
             self.assertIn(title, output)
         self.assertIn("LINEAR", output)
         self.assertIn("AUTHORITATIVE", output)
         self.assertIn("Linear Backlog state", output)
+
+    def test_production_unbound_is_rendered_as_release_pause_not_fleet_hold(self):
+        state = fixture_state()
+        state["fleet"].update(
+            {
+                "state": "AMBER",
+                "promotionMode": "hold-intake",
+                "reasons": [
+                    {
+                        "code": "production-deployment-unbound",
+                        "layer": "promotion",
+                        "severity": "warning",
+                    }
+                ],
+                "promotionAdmission": {"allowed": False},
+            }
+        )
+
+        with mock.patch.dict(HUD.os.environ, {"HUD_COLOR": "never"}):
+            output = HUD.render(state)
+
+        rows = {
+            label: next(line for line in output.splitlines() if f"| {label}" in line)
+            for label in (
+                "Fleet work",
+                "Issue leasing",
+                "PR remediation",
+                "Native queue",
+                "Production promotion",
+            )
+        }
+        self.assertIn("ACTIVE", rows["Fleet work"])
+        self.assertIn("ACTIVE", rows["Issue leasing"])
+        self.assertIn("ACTIVE", rows["PR remediation"])
+        self.assertIn("FLOWING", rows["Native queue"])
+        self.assertIn("PAUSED", rows["Production promotion"])
+        self.assertIn("exact-main release only", rows["Production promotion"])
+
+    def test_red_fleet_keeps_local_diagnosis_but_blocks_remote_mutation(self):
+        state = fixture_state()
+        state["fleet"].update(
+            {
+                "state": "RED",
+                "promotionMode": "blocked",
+                "reasons": [
+                    {
+                        "code": "credential-compromise",
+                        "layer": "integrity",
+                        "severity": "critical",
+                    }
+                ],
+                "alreadyAdmittedCohort": {
+                    "preserve": False,
+                    "newIntakeAllowed": False,
+                    "semantics": "dequeue-until-exact-production-recovers",
+                },
+                "workAdmission": {
+                    "allowed": False,
+                    "newIssueLeaseAllowed": False,
+                },
+                "promotionAdmission": {"allowed": False},
+                "remediationAdmission": {
+                    "allowed": True,
+                    "localAllowed": True,
+                    "pushAllowed": False,
+                },
+                "deploymentAdmission": {"allowed": False},
+            }
+        )
+
+        lanes = HUD.fleet_lane_statuses(state["fleet"])
+
+        self.assertEqual(lanes["work"][0], "BLOCKED")
+        self.assertEqual(lanes["leases"][0], "BLOCKED")
+        self.assertEqual(lanes["remediation"][0], "LOCAL ONLY")
+        self.assertEqual(lanes["queue"][0], "BLOCKED")
+        self.assertEqual(lanes["promotion"][0], "BLOCKED")
+        self.assertEqual(lanes["deployment"][0], "BLOCKED")
+
+    def test_stale_or_failed_fleet_receipt_never_projects_active_authority(self):
+        for receipt in (
+            {
+                **fixture_state()["fleet"],
+                "observedAt": "2020-01-01T00:00:00Z",
+                "updated": "2020-01-01T00:00:00Z",
+            },
+            {**fixture_state()["fleet"], "error": "OSError"},
+        ):
+            with self.subTest(receipt=receipt):
+                lanes = HUD.fleet_lane_statuses(receipt)
+                self.assertEqual(
+                    {status for status, _detail in lanes.values()}, {"UNKNOWN"}
+                )
+
+    def test_mixed_blocked_reasons_never_describe_promotion_as_safe_pause(self):
+        receipt = fixture_state()["fleet"]
+        receipt.update(
+            {
+                "state": "AMBER",
+                "promotionMode": "blocked",
+                "reasons": [
+                    {"code": "production-deployment-unbound"},
+                    {"code": "queue-unknown"},
+                ],
+                "promotionAdmission": {"allowed": False},
+            }
+        )
+
+        lanes = HUD.fleet_lane_statuses(receipt)
+
+        self.assertEqual(lanes["promotion"][0], "BLOCKED")
+        self.assertNotIn("clean queue stay separate", lanes["promotion"][1])
+
+    def test_fleet_receipt_reader_fails_closed_on_untyped_admission(self):
+        receipt = fixture_state()["fleet"]
+        receipt["workAdmission"] = {"allowed": "true", "newIssueLeaseAllowed": True}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "latest.json"
+            path.write_text(json.dumps(receipt), encoding="utf-8")
+
+            with self.assertRaises(ValueError):
+                HUD.fetch_fleet_gate(path)
+
+    def test_fleet_receipt_reader_rejects_naive_and_future_timestamps(self):
+        for observed_at in ("2026-08-17T22:00:00", "2099-01-01T00:00:00Z"):
+            receipt = fixture_state()["fleet"]
+            receipt["observedAt"] = observed_at
+            with self.subTest(observed_at=observed_at), tempfile.TemporaryDirectory() as tmp:
+                path = pathlib.Path(tmp) / "latest.json"
+                path.write_text(json.dumps(receipt), encoding="utf-8")
+
+                with self.assertRaises(ValueError):
+                    HUD.fetch_fleet_gate(path)
 
     def test_linear_is_authoritative_when_available(self):
         with (
@@ -183,6 +350,7 @@ class VersionedHudContractTests(unittest.TestCase):
         state = fixture_state()
         with (
             mock.patch.object(HUD, "fetch_symphony", return_value=state["symphony"]),
+            mock.patch.object(HUD, "fetch_fleet_gate", return_value=state["fleet"]),
             mock.patch.object(HUD, "fetch_delivery", return_value=state["delivery"]),
             mock.patch.object(
                 HUD,
@@ -207,6 +375,7 @@ class VersionedHudContractTests(unittest.TestCase):
         del state["issues"]
         with (
             mock.patch.object(HUD, "fetch_symphony", return_value=state["symphony"]),
+            mock.patch.object(HUD, "fetch_fleet_gate", return_value=state["fleet"]),
             mock.patch.object(HUD, "fetch_delivery", return_value=state["delivery"]),
             mock.patch.object(
                 HUD,
