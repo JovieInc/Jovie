@@ -24,13 +24,23 @@ from typing import Any
 REPO = "JovieInc/Jovie"
 LOCAL_INTERVAL = max(10, int(os.environ.get("HUD_LOCAL_INTERVAL", "15")))
 REMOTE_INTERVAL = max(60, int(os.environ.get("HUD_REMOTE_INTERVAL", "120")))
+FLEET_RECEIPT_STALE_SECONDS = 10 * 60
+FLEET_RECEIPT_FUTURE_SKEW_SECONDS = 5
 STALE_AFTER = {
     "symphony": LOCAL_INTERVAL * 3,
+    "fleet": FLEET_RECEIPT_STALE_SECONDS,
     "delivery": REMOTE_INTERVAL * 3,
     "issues": REMOTE_INTERVAL * 3,
 }
 STATE_DIR = Path(os.environ.get("HUD_STATE_DIR", "~/.local/state/gem-ops-hud")).expanduser()
 STATE_FILE = STATE_DIR / "state.json"
+FLEET_GATE_RECEIPT = Path(
+    os.environ.get(
+        "HUD_FLEET_GATE_RECEIPT",
+        "/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json",
+    )
+).expanduser()
+FLEET_GATE_SCHEMA = "jovie-fleet-gate/v1"
 WORKFLOWS = {
     "CI",
     "Production Controller",
@@ -63,6 +73,200 @@ def parse_time(value: str | None) -> dt.datetime | None:
         return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+def _typed_bool(value: Any, name: str) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(f"{name} must be boolean")
+    return value
+
+
+def fetch_fleet_gate(path: Path | None = None) -> dict[str, Any]:
+    """Read the canonical typed fleet receipt without inventing lane state."""
+    source = path or FLEET_GATE_RECEIPT
+    receipt = json.loads(source.read_text(encoding="utf-8"))
+    if not isinstance(receipt, dict) or receipt.get("schema") != FLEET_GATE_SCHEMA:
+        raise ValueError("invalid fleet gate schema")
+    observed_at = receipt.get("observedAt")
+    observed_stamp = parse_time(observed_at) if isinstance(observed_at, str) else None
+    if (
+        observed_stamp is None
+        or observed_stamp.tzinfo is None
+        or observed_stamp.utcoffset() is None
+        or (observed_stamp - now()).total_seconds()
+        > FLEET_RECEIPT_FUTURE_SKEW_SECONDS
+    ):
+        raise ValueError("invalid fleet gate observedAt")
+    if receipt.get("state") not in {"GREEN", "AMBER", "RED"}:
+        raise ValueError("invalid fleet gate state")
+    if receipt.get("promotionMode") not in {
+        "normal",
+        "isolated-only",
+        "draft-only",
+        "hold-intake",
+        "blocked",
+    }:
+        raise ValueError("invalid fleet promotion mode")
+    if not isinstance(receipt.get("reasons"), list):
+        raise ValueError("invalid fleet gate reasons")
+
+    cohort = receipt.get("alreadyAdmittedCohort")
+    if not isinstance(cohort, dict):
+        raise ValueError("missing admitted cohort contract")
+    _typed_bool(cohort.get("newIntakeAllowed"), "alreadyAdmittedCohort.newIntakeAllowed")
+
+    required_admissions = {
+        "workAdmission": ("allowed", "newIssueLeaseAllowed"),
+        "promotionAdmission": ("allowed",),
+        "remediationAdmission": ("allowed", "localAllowed", "pushAllowed"),
+        "deploymentAdmission": ("allowed",),
+    }
+    for section_name, fields in required_admissions.items():
+        section = receipt.get(section_name)
+        if not isinstance(section, dict):
+            raise ValueError(f"missing {section_name}")
+        for field in fields:
+            _typed_bool(section.get(field), f"{section_name}.{field}")
+
+    result = dict(receipt)
+    result["updated"] = observed_at
+    result["error"] = None
+    return result
+
+
+def fleet_lane_statuses(receipt: dict[str, Any]) -> dict[str, tuple[str, str]]:
+    """Project independent fleet lanes; unknown input always fails closed."""
+    unknown = ("UNKNOWN", "typed fleet receipt unavailable; no authority inferred")
+    unknown_lanes = {
+        lane: unknown
+        for lane in (
+            "work",
+            "leases",
+            "remediation",
+            "queue",
+            "promotion",
+            "deployment",
+        )
+    }
+    try:
+        observed_at = receipt["observedAt"]
+        observed_stamp = parse_time(observed_at)
+        if (
+            receipt.get("error")
+            or observed_stamp is None
+            or observed_stamp.tzinfo is None
+            or observed_stamp.utcoffset() is None
+        ):
+            return unknown_lanes
+        age_seconds = (now() - observed_stamp).total_seconds()
+        if (
+            age_seconds > FLEET_RECEIPT_STALE_SECONDS
+            or age_seconds < -FLEET_RECEIPT_FUTURE_SKEW_SECONDS
+        ):
+            return unknown_lanes
+        work = _typed_bool(receipt["workAdmission"]["allowed"], "work")
+        leases = _typed_bool(
+            receipt["workAdmission"]["newIssueLeaseAllowed"], "leases"
+        )
+        remediation_local = _typed_bool(
+            receipt["remediationAdmission"]["localAllowed"], "remediation.local"
+        )
+        remediation_push = _typed_bool(
+            receipt["remediationAdmission"]["pushAllowed"], "remediation.push"
+        )
+        promotion = _typed_bool(
+            receipt["promotionAdmission"]["allowed"], "promotion"
+        )
+        deployment = _typed_bool(
+            receipt["deploymentAdmission"]["allowed"], "deployment"
+        )
+        cohort_intake = _typed_bool(
+            receipt["alreadyAdmittedCohort"]["newIntakeAllowed"], "cohort intake"
+        )
+        state = receipt["state"]
+        mode = receipt["promotionMode"]
+        reasons = {
+            reason.get("code")
+            for reason in receipt.get("reasons", [])
+            if isinstance(reason, dict)
+        }
+    except (KeyError, TypeError, ValueError):
+        return unknown_lanes
+
+    work_lane = (
+        ("ACTIVE", "implementation, tests, and review remain admitted")
+        if work
+        else ("BLOCKED", "fleet work admission is closed")
+    )
+    if leases:
+        lease_lane = ("ACTIVE", "approved issue leases may be claimed")
+    elif work:
+        queue = receipt.get("signals", {}).get("queue", {})
+        ready = queue.get("greenReadyPrs", "?") if isinstance(queue, dict) else "?"
+        target = queue.get("target", "?") if isinstance(queue, dict) else "?"
+        lease_lane = (
+            "BACKPRESSURE",
+            f"new issue leases paused at green-ready {ready}/{target}; total open is not used",
+        )
+    else:
+        lease_lane = ("BLOCKED", "fleet work admission is closed")
+
+    if remediation_local and remediation_push:
+        remediation_lane = (
+            "ACTIVE",
+            "bounded exact-head diagnosis, tests, repair, and push are admitted",
+        )
+    elif remediation_local:
+        remediation_lane = (
+            "LOCAL ONLY",
+            "diagnosis/tests allowed; remote PR head mutation is closed",
+        )
+    else:
+        remediation_lane = ("BLOCKED", "PR remediation admission is closed")
+
+    if state == "RED" or not work:
+        queue_lane = ("BLOCKED", "native queue controller is fail-closed")
+    elif mode == "normal":
+        queue_lane = (
+            "ACTIVE",
+            "exact-head checks, review, labels, conflicts, and dependencies still apply",
+        )
+    elif mode in {"hold-intake", "draft-only"} and cohort_intake:
+        queue_lane = (
+            "FLOWING",
+            "clean unrelated PRs continue; PR-specific dependency gates still apply",
+        )
+    elif mode == "isolated-only":
+        queue_lane = (
+            "BOUNDED",
+            "only exact-head semantically isolated admission is allowed",
+        )
+    else:
+        queue_lane = ("BLOCKED", "native queue admission is paused by fleet policy")
+
+    if promotion:
+        promotion_lane = ("ACTIVE", "release promotion authority is open")
+    elif mode == "hold-intake" and reasons == {"production-deployment-unbound"}:
+        promotion_lane = (
+            "PAUSED",
+            "exact-main release only; fleet work, remediation, and clean queue stay separate",
+        )
+    else:
+        promotion_lane = ("BLOCKED", "release promotion authority is closed")
+
+    deployment_lane = (
+        ("ACTIVE", "exact-main Production Controller catch-up is authorized")
+        if deployment
+        else ("BLOCKED", "production deployment authority is closed")
+    )
+    return {
+        "work": work_lane,
+        "leases": lease_lane,
+        "remediation": remediation_lane,
+        "queue": queue_lane,
+        "promotion": promotion_lane,
+        "deployment": deployment_lane,
+    }
 
 
 def age_text(value: str | None) -> str:
@@ -637,7 +841,12 @@ def section_health(state: dict[str, Any], key: str) -> str:
     section = state.get(key) or {}
     age = age_text(section.get("updated"))
     stamp = parse_time(section.get("updated"))
-    stale = not stamp or (now() - stamp).total_seconds() > STALE_AFTER[key]
+    stale = (
+        not stamp
+        or stamp.tzinfo is None
+        or stamp.utcoffset() is None
+        or (now() - stamp).total_seconds() > STALE_AFTER[key]
+    )
     if section.get("error"):
         return f"ERROR last-good {age} ago ({compact(section['error'], 32)})"
     if stale:
@@ -647,6 +856,7 @@ def section_health(state: dict[str, Any], key: str) -> str:
 
 def render(state: dict[str, Any]) -> str:
     local = state.get("symphony") or {}
+    fleet = state.get("fleet") or {}
     delivery = state.get("delivery") or {}
     issues = state.get("issues") or {}
     workers = local.get("workers") or {}
@@ -675,6 +885,7 @@ def render(state: dict[str, Any]) -> str:
     if issues.get("error"):
         issue_status = "LAST GOOD" if has_issue_counts else "UNAVAILABLE"
     issue_count_status = issue_status if issues.get("error") else issue_source
+    fleet_lanes = fleet_lane_statuses(fleet)
     heartbeat = iso()
 
     rows = [
@@ -697,6 +908,15 @@ def render(state: dict[str, Any]) -> str:
         rows.append(grid_row("Active issue", 0, "NONE", "retry and ready-queue counts remain visible above"))
 
     rows += [
+        grid_bar(),
+        grid_title("[ FLEET POLICY ]"),
+        grid_row("Fleet receipt", fleet.get("state", "?"), section_health(state, "fleet"), f"promotion mode {fleet.get('promotionMode', 'unknown')}"),
+        grid_row("Fleet work", "", *fleet_lanes["work"]),
+        grid_row("Issue leasing", "", *fleet_lanes["leases"]),
+        grid_row("PR remediation", "", *fleet_lanes["remediation"]),
+        grid_row("Native queue", "", *fleet_lanes["queue"]),
+        grid_row("Production promotion", "", *fleet_lanes["promotion"]),
+        grid_row("Catch-up deploy", "", *fleet_lanes["deployment"]),
         grid_bar(),
         grid_title("[ WAIT REASONS ]"),
         grid_row("Capacity", reasons.get("capacity", "?"), "AUTO RETRY" if reasons.get("capacity") else "CLEAR", f"slots busy/cooling; not code/CI; next {until_text(next_retry)}"),
@@ -783,7 +1003,7 @@ def render(state: dict[str, Any]) -> str:
             "Data freshness",
             age_text(local.get("updated")),
             section_health(state, "symphony"),
-            f"delivery {age_text(delivery.get('updated'))}; issues {age_text(issues.get('updated'))}",
+            f"fleet {age_text(fleet.get('updated'))}; delivery {age_text(delivery.get('updated'))}; issues {age_text(issues.get('updated'))}",
         ),
         grid_row("Refresh / fallback", "15s / 120s", "LOCAL / REMOTE", "last-known cache; ANSI auto; NO_COLOR plain text; errors sanitized"),
         grid_bar("="),
@@ -796,6 +1016,11 @@ def refresh(state: dict[str, Any], remote: bool) -> dict[str, Any]:
         state["symphony"] = fetch_symphony()
     except Exception as exc:
         section = state.setdefault("symphony", {})
+        section["error"] = type(exc).__name__
+    try:
+        state["fleet"] = fetch_fleet_gate()
+    except Exception as exc:
+        section = state.setdefault("fleet", {})
         section["error"] = type(exc).__name__
     if remote:
         try:

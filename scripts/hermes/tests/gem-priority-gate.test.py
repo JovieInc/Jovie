@@ -696,6 +696,31 @@ class DeploymentBindingTests(unittest.TestCase):
             {reason["code"] for reason in receipt["reasons"]},
         )
 
+    def test_unbound_release_does_not_turn_total_open_prs_into_a_fleet_hold(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 7}
+        signals["queue"] = {
+            "status": "known",
+            "eligiblePrs": 400,
+            "greenReadyPrs": 14,
+            "target": 15,
+        }
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertEqual(
+            {reason["layer"] for reason in receipt["reasons"]}, {"promotion"}
+        )
+        self.assertTrue(receipt["workAdmission"]["allowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
+        self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
+        self.assertTrue(receipt["alreadyAdmittedCohort"]["newIntakeAllowed"])
+        self.assertTrue(receipt["deploymentAdmission"]["allowed"])
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+
     def test_same_prefix_different_commit_never_binds(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {
