@@ -15,7 +15,7 @@ function parseArgs(argv) {
     baseRef: 'main',
     dryRun: process.env.DRAIN_REMEDIATE_APPLY !== '1',
     maxPerRun: Number.parseInt(
-      process.env.DRAIN_REMEDIATE_MAX_PER_RUN ?? '3',
+      process.env.DRAIN_REMEDIATE_MAX_PER_RUN ?? '24',
       10
     ),
     cooldownHours: Number.parseInt(
