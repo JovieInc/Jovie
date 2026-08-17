@@ -62,7 +62,10 @@ def executor(model, *, require_cwd=False):
     argv = model.get("agent_argv")
     if not executable_value or not isinstance(argv, list) or not all(isinstance(x, str) for x in argv):
         return None
-    if require_cwd and not any("{cwd}" in argument for argument in argv):
+    if require_cwd and not (
+        any("{cwd}" in argument for argument in argv)
+        or model.get("agent_cwd_mode") == "process"
+    ):
         return None
     return {
         "executable": executable_value,

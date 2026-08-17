@@ -14,6 +14,7 @@
       "executable_default": "/usr/local/bin/ollama",
       "agent_executable_env": "GEM_QWEN_AGENT_EXECUTABLE",
       "agent_executable_default": "/home/timwhite/.local/bin/hermes",
+      "agent_cwd_mode": "process",
       "agent_argv": [
         "--provider",
         "ollama",
