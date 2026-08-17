@@ -170,7 +170,10 @@ export function buildDeterministicPlanEvidence(issue) {
       bounded: true,
       repo: route.repo,
       project: issue.project?.name || route.name,
-      owner: 'Gem',
+      owners: {
+        implementation: 'Symphony',
+        verification: 'Gem',
+      },
       scope: scope.slice(0, 1800),
       acceptance,
       test: [

@@ -8,6 +8,8 @@
 
 import { createHash } from 'node:crypto';
 import { hasProtectedAdmissionLabel } from './admission-policy.mjs';
+import { contextGateReceipt } from './context-gate.mjs';
+import { researchGateReceipt } from './research-gate.mjs';
 
 export const PLAN_GATE_SCHEMA = 'plan-gate/v1';
 export const PLAN_GATE_PREFIX = '<!-- plan-gate/v1 -->';
@@ -99,7 +101,6 @@ export function validatePlanCandidate(issue, evidence) {
   const required = [
     ['repo', evidence.repo],
     ['project', evidence.project],
-    ['owner', evidence.owner],
     ['scope', evidence.scope],
     ['acceptance', evidence.acceptance],
     ['test', evidence.test],
@@ -111,6 +112,12 @@ export function validatePlanCandidate(issue, evidence) {
       : !nonEmptyString(value)
   );
   if (missing) return `missing-${missing[0]}-evidence`;
+
+  if (
+    evidence.owners?.implementation !== 'Symphony' ||
+    evidence.owners?.verification !== 'Gem'
+  )
+    return 'ownership-roles-invalid';
 
   const state = issue.state?.name || issue.state;
   if (!ALLOWED_STATES.has(state)) return 'ambiguous-or-inactive-state';
@@ -143,7 +150,10 @@ function normalizedEvidence(evidence) {
     bounded: true,
     repo: evidence.repo.trim(),
     project: evidence.project.trim(),
-    owner: evidence.owner.trim(),
+    owners: {
+      implementation: evidence.owners.implementation.trim(),
+      verification: evidence.owners.verification.trim(),
+    },
     scope: evidence.scope.trim(),
     acceptance: Array.isArray(evidence.acceptance)
       ? evidence.acceptance.map(item => item.trim())
@@ -162,11 +172,15 @@ export function planGateFingerprint(issue, evidence) {
   return createHash('sha256').update(canonical).digest('hex').slice(0, 24);
 }
 
-export function buildPlanGateReceipt(issue, evidence) {
+export function buildPlanGateReceipt(issue, evidence, options = {}) {
   const payload = {
     schema: PLAN_GATE_SCHEMA,
     issue: issue.identifier,
     fingerprint: planGateFingerprint(issue, evidence),
+    contextFingerprint:
+      contextGateReceipt(issue, options)?.payload?.fingerprint || null,
+    researchFingerprint:
+      researchGateReceipt(issue, options)?.payload?.fingerprint || null,
     evidence: normalizedEvidence(evidence),
   };
   return `${PLAN_GATE_PREFIX}\n${JSON.stringify(payload)}\n${PLAN_GATE_SUFFIX}`;
@@ -176,10 +190,10 @@ function hasReceipt(issue, receipt) {
   return commentsOf(issue).some(comment => commentBody(comment) === receipt);
 }
 
-export function planGateReceipt(issue) {
+export function planGateReceipt(issue, options = {}) {
   const body = commentsOf(issue)
     .map(commentBody)
-    .find(
+    .findLast(
       value =>
         value.startsWith(`${PLAN_GATE_PREFIX}\n`) &&
         value.endsWith(`\n${PLAN_GATE_SUFFIX}`)
@@ -199,6 +213,15 @@ export function planGateReceipt(issue) {
       !payload?.evidence ||
       validatePlanCandidate(issue, payload.evidence) ||
       planGateFingerprint(issue, payload.evidence) !== payload.fingerprint
+    )
+      return null;
+    const context = contextGateReceipt(issue, options);
+    const research = researchGateReceipt(issue, options);
+    if (
+      !context ||
+      !research ||
+      payload.contextFingerprint !== context.payload.fingerprint ||
+      payload.researchFingerprint !== research.payload.fingerprint
     )
       return null;
     return { body, payload };
@@ -232,11 +255,24 @@ function labelIds(issue, labelId) {
  * Write exactly one plan receipt, or return an idempotent no-op. The client is
  * injected so this boundary remains unit-testable without touching Linear.
  */
-export async function approvePlan({ issue, evidence, client, teamId = null }) {
+export async function approvePlan({
+  issue,
+  evidence,
+  client,
+  teamId = null,
+  now = new Date().toISOString(),
+}) {
   const reason = validatePlanCandidate(issue, evidence);
   if (reason) return { status: 'rejected', reason };
+  if (!contextGateReceipt(issue, { now }))
+    return { status: 'rejected', reason: 'context-receipt-missing-or-invalid' };
+  if (!researchGateReceipt(issue, { now }))
+    return {
+      status: 'rejected',
+      reason: 'research-receipt-missing-or-invalid',
+    };
 
-  const receipt = buildPlanGateReceipt(issue, evidence);
+  const receipt = buildPlanGateReceipt(issue, evidence, { now });
   if (hasReceipt(issue, receipt) && hasLabel(issue, PLAN_APPROVED_LABEL)) {
     return {
       status: 'already-approved',

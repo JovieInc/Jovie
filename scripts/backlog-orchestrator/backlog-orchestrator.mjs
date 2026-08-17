@@ -32,12 +32,15 @@ import { preAdmissionDecision } from './admission-policy.mjs';
 import * as admitter from './admitter.mjs';
 import * as backlogReduction from './backlog-reduction.mjs';
 import * as classifier from './classifier.mjs';
+import * as contextGate from './context-gate.mjs';
 import * as deterministicGates from './deterministic-gates.mjs';
+import { cliGbrainClient } from './gbrain-client.mjs';
 import * as intakeReadiness from './intake-readiness.mjs';
 import * as linear from './linear-client.mjs';
 import * as planGate from './plan-gate.mjs';
 import * as reconciler from './reconcile.mjs';
 import * as reporter from './reporter.mjs';
+import * as researchGate from './research-gate.mjs';
 import * as runtimeState from './runtime-state.mjs';
 import * as scorer from './scorer.mjs';
 import * as staleLeaseGuard from './stale-lease-guard.mjs';
@@ -138,6 +141,7 @@ Usage:
   node backlog-orchestrator.mjs intake-readiness      Classify changed intake work (always dry-run)
   node backlog-orchestrator.mjs backlog-reduction     Audit high-confidence duplicate reduction (dry-run)
   node backlog-orchestrator.mjs approve-plan --issue=JOV-123 --evidence-file=/path/evidence.json
+  node backlog-orchestrator.mjs approve-research --issue=JOV-123 --evidence-file=/path/research.json
   node backlog-orchestrator.mjs report                Generate shadow report
 `);
     return;
@@ -159,6 +163,8 @@ Usage:
     await runBacklogReduction(cache);
   } else if (command === 'approve-plan') {
     await runApprovePlan(issueArg, evidenceFile, evidenceJson, isDryRun);
+  } else if (command === 'approve-research') {
+    await runApproveResearch(issueArg, evidenceFile, evidenceJson, isDryRun);
   } else {
     console.error(`Unknown command: ${command}`);
     process.exit(1);
@@ -290,6 +296,76 @@ async function approveSymphonyRoute(issue, isDryRun) {
   if (!verified || verified.fingerprint !== decision.route.fingerprint)
     throw new Error('symphony-routing-receipt-verification-failed');
   return { status: 'routed', route: verified };
+}
+
+/**
+ * Bind caller-supplied primary-source research evidence (queries, dated
+ * citations, findings) for a research-required issue to one
+ * symphony-research/v1 receipt. Validation is deterministic and fail-closed.
+ */
+async function runApproveResearch(
+  issueArg,
+  evidenceFile,
+  evidenceJson,
+  isDryRun
+) {
+  if (!issueArg || (!evidenceFile && !evidenceJson))
+    throw new Error(
+      'approve-research requires --issue and --evidence-file or --evidence'
+    );
+  const supplied = evidenceFile
+    ? JSON.parse(readFileSync(evidenceFile, 'utf8'))
+    : JSON.parse(evidenceJson);
+  const issue = await linear.fetchIssue(issueArg);
+  if (!issue) throw new Error(`Issue ${issueArg} not found`);
+  const team = teamForIdentifier(issue.identifier);
+  if (!team)
+    throw new Error(`Issue ${issue.identifier} has no repository route`);
+  const evidence = {
+    issue: issue.identifier,
+    issueHash: contextGate.issueContentHash(issue),
+    classification: supplied.classification,
+    rationale: supplied.rationale,
+    queries: supplied.queries || [],
+    citations: supplied.citations || [],
+    findings: supplied.findings || [],
+    observedAt: supplied.observedAt || new Date().toISOString(),
+  };
+  const invalid = researchGate.validateResearchEvidence(issue, evidence);
+  if (isDryRun) {
+    console.log(
+      JSON.stringify(
+        {
+          schema: researchGate.RESEARCH_GATE_SCHEMA,
+          status: invalid ? 'rejected' : 'would-approve',
+          reason: invalid,
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+  if (invalid) {
+    console.log(
+      JSON.stringify(
+        {
+          schema: researchGate.RESEARCH_GATE_SCHEMA,
+          status: 'rejected',
+          reason: invalid,
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+  const receipt = await researchGate.approveResearch({
+    issue,
+    evidence,
+    client: linear,
+  });
+  console.log(JSON.stringify(receipt, null, 2));
 }
 
 async function teamProductionStatus(team) {
@@ -438,7 +514,7 @@ async function runGateNext(isDryRun, issueArg) {
   console.log(
     JSON.stringify(
       {
-        schema: 'deterministic-gates/run/v2',
+        schema: 'deterministic-gates/run/v3',
         status: results.some(result => result.status === 'admitted')
           ? 'admitted'
           : results.some(result => result.status === 'would-admit')
@@ -513,6 +589,8 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
     };
   }
 
+  const researchNeed = researchGate.classifyResearchNeed(selected);
+
   if (isDryRun) {
     const routing = await approveSymphonyRoute(selected, true);
     return {
@@ -521,14 +599,79 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
       issue: selected.identifier,
       plan: plan.evidence,
       routing,
+      research: researchNeed,
       fleetGate: preflight.fleetGate,
       staleLeaseRecovery,
       mutations: 0,
     };
   }
 
-  const planResult = await planGate.approvePlan({
+  const contextResult = await contextGate.approveContext({
     issue: selected,
+    gbrain: cliGbrainClient,
+    client: linear,
+  });
+  if (contextResult.status === 'rejected') {
+    return {
+      team: team.key,
+      status: 'blocked',
+      stage: 'context',
+      issue: selected.identifier,
+      reason: contextResult.reason,
+      detail: contextResult.detail || null,
+      fleetGate: preflight.fleetGate,
+      staleLeaseRecovery,
+      mutations: 0,
+    };
+  }
+
+  let current = await linear.fetchIssue(selected.identifier);
+
+  let researchResult;
+  if (researchNeed.decision === 'not-required') {
+    researchResult = await researchGate.approveResearch({
+      issue: current,
+      evidence: {
+        issue: current.identifier,
+        issueHash: contextGate.issueContentHash(current),
+        classification: researchNeed.decision,
+        rationale: researchNeed.rationale,
+        queries: [],
+        citations: [],
+        findings: [],
+        observedAt: new Date().toISOString(),
+      },
+      client: linear,
+    });
+  } else if (researchGate.researchGateReceipt(current)) {
+    researchResult = {
+      status: 'already-approved',
+      fingerprint:
+        researchGate.researchGateReceipt(current).payload.fingerprint,
+    };
+  } else {
+    researchResult = {
+      status: 'rejected',
+      reason: 'research-evidence-required',
+    };
+  }
+  if (researchResult.status === 'rejected') {
+    return {
+      team: team.key,
+      status: 'blocked',
+      stage: 'research',
+      issue: selected.identifier,
+      reason: researchResult.reason,
+      fleetGate: preflight.fleetGate,
+      staleLeaseRecovery,
+      mutations: 0,
+    };
+  }
+
+  current = await linear.fetchIssue(selected.identifier);
+
+  const planResult = await planGate.approvePlan({
+    issue: current,
     evidence: plan.evidence,
     client: linear,
     teamId: team.id,
@@ -536,7 +679,7 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
   if (planResult.status === 'rejected')
     throw new Error(`plan gate rejected: ${planResult.reason}`);
 
-  let current = await linear.fetchIssue(selected.identifier);
+  current = await linear.fetchIssue(selected.identifier);
   const finalPreflight = await admissionPreflight(team);
   if (!finalPreflight.open)
     throw new Error(`admission preflight blocked: ${finalPreflight.reason}`);
@@ -587,6 +730,10 @@ async function runTeamGateNext(team, isDryRun, issueArg) {
     team: team.key,
     status: 'admitted',
     issue: selected.identifier,
+    contextGate: contextResult.status,
+    contextFingerprint: contextResult.fingerprint,
+    researchGate: researchResult.status,
+    researchFingerprint: researchResult.fingerprint,
     planGate: planResult.status,
     admissionGate: admissionResult.status,
     lease: lease.status,

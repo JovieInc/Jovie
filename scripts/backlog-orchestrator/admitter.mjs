@@ -6,7 +6,11 @@
  * fail-closed on ownership, plan evidence, and mutation read-back.
  */
 
+import { admissionGateReceipt } from './admission-gate.mjs';
 import { preAdmissionDecision } from './admission-policy.mjs';
+import { contextGateReceipt } from './context-gate.mjs';
+import { planGateReceipt } from './plan-gate.mjs';
+import { researchGateReceipt } from './research-gate.mjs';
 import { scoreIssue } from './scorer.mjs';
 import { verifyRoutingReceipt } from './symphony-routing.mjs';
 
@@ -654,7 +658,16 @@ export function buildAdmissionReceipt(
   issue,
   { now = new Date().toISOString(), fingerprint = '' } = {}
 ) {
-  return `${ADMISSION_RECEIPT_PREFIX}${JSON.stringify({ issue: issue.identifier, fingerprint, action: 'lease', at: now })} -->`;
+  return `${ADMISSION_RECEIPT_PREFIX}${JSON.stringify({
+    issue: issue.identifier,
+    fingerprint,
+    contextFingerprint:
+      contextGateReceipt(issue, { now })?.payload?.fingerprint || '',
+    researchFingerprint:
+      researchGateReceipt(issue, { now })?.payload?.fingerprint || '',
+    action: 'lease',
+    at: now,
+  })} -->`;
 }
 
 function hasReceipt(issue, receipt) {
@@ -802,9 +815,13 @@ export async function admitIssue({
       reason: preAdmission.reason.code,
       preAdmission,
     };
-  if (!hasAdmissionEvidence(issue, classification).eligible) {
-    return { status: 'rejected', reason: 'plan-or-admission-evidence-missing' };
-  }
+  if (!planGateReceipt(issue, { now }))
+    return { status: 'rejected', reason: 'plan-receipt-missing-or-invalid' };
+  if (!admissionGateReceipt(issue, { now }))
+    return {
+      status: 'rejected',
+      reason: 'admission-receipt-missing-or-invalid',
+    };
   const routing = verifyRoutingReceipt(issue);
   if (!routing)
     return { status: 'rejected', reason: 'routing-receipt-missing-or-invalid' };
@@ -822,6 +839,14 @@ export async function admitIssue({
   ) {
     return { status: 'already-admitted', identifier: issue.identifier };
   }
+
+  if (!contextGateReceipt(issue, { now }))
+    return { status: 'rejected', reason: 'context-receipt-missing-or-invalid' };
+  if (!researchGateReceipt(issue, { now }))
+    return {
+      status: 'rejected',
+      reason: 'research-receipt-missing-or-invalid',
+    };
 
   let current = issue;
   if (current.state?.name !== 'Todo') {
