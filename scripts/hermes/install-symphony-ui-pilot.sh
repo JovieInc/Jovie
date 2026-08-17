@@ -28,6 +28,7 @@ GUARD_SRC="$REPO_ROOT/scripts/hermes/symphony-lease-guard"
 RECONCILER_SRC="$REPO_ROOT/scripts/hermes/symphony-reconciler.py"
 MODEL_ROUTER_SRC="$REPO_ROOT/scripts/hermes/model-router.py"
 MODEL_REGISTRY_SRC="$REPO_ROOT/scripts/hermes/config/model-registry.json"
+CAPABILITY_MANIFEST_SRC="$REPO_ROOT/scripts/hermes/config/symphony-reconciler-capabilities.json"
 RECONCILER_SERVICE_SRC="$REPO_ROOT/scripts/hermes/systemd/symphony-reconciler.service"
 RECONCILER_TIMER_SRC="$REPO_ROOT/scripts/hermes/systemd/symphony-reconciler.timer"
 WORKFLOW_DST="$TARGET_HOME/symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
@@ -36,6 +37,8 @@ GUARD_DST="$TARGET_HOME/.local/bin/symphony-lease-guard"
 RECONCILER_DST="$TARGET_HOME/.local/bin/symphony-reconciler"
 MODEL_ROUTER_DST="$TARGET_HOME/.local/lib/symphony-reconciler/model-router.py"
 MODEL_REGISTRY_DST="$TARGET_HOME/.local/lib/symphony-reconciler/model-registry.json"
+CAPABILITY_MANIFEST_DST="$TARGET_HOME/.local/lib/symphony-reconciler/symphony-reconciler-capabilities.json"
+RUNTIME_RECEIPT_DST="$TARGET_HOME/.local/lib/symphony-reconciler/runtime-receipt.json"
 RECONCILER_SERVICE_DST="$TARGET_HOME/.config/systemd/user/symphony-reconciler.service"
 RECONCILER_TIMER_DST="$TARGET_HOME/.config/systemd/user/symphony-reconciler.timer"
 
@@ -98,8 +101,24 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
     check_one "$RECONCILER_SRC" "$RECONCILER_DST" || rc=1
     check_one "$MODEL_ROUTER_SRC" "$MODEL_ROUTER_DST" || rc=1
     check_one "$MODEL_REGISTRY_SRC" "$MODEL_REGISTRY_DST" || rc=1
+    check_one "$CAPABILITY_MANIFEST_SRC" "$CAPABILITY_MANIFEST_DST" || rc=1
     check_one "$RECONCILER_SERVICE_SRC" "$RECONCILER_SERVICE_DST" || rc=1
     check_one "$RECONCILER_TIMER_SRC" "$RECONCILER_TIMER_DST" || rc=1
+    if [ -f "$RUNTIME_RECEIPT_DST" ]; then
+      if ! SYMPHONY_MODEL_ROUTER="$MODEL_ROUTER_DST" \
+        SYMPHONY_MODEL_REGISTRY="$MODEL_REGISTRY_DST" \
+        SYMPHONY_RUNTIME_CAPABILITY_MANIFEST="$CAPABILITY_MANIFEST_DST" \
+        SYMPHONY_RUNTIME_RECEIPT="$RUNTIME_RECEIPT_DST" \
+        python3 "$RECONCILER_DST" runtime-preflight >/dev/null; then
+        echo "DRIFT $RUNTIME_RECEIPT_DST"
+        rc=1
+      else
+        echo "OK $RUNTIME_RECEIPT_DST"
+      fi
+    else
+      echo "MISSING $RUNTIME_RECEIPT_DST"
+      rc=1
+    fi
   fi
   check_one "$GUARD_SRC" "$GUARD_DST" || rc=1
   exit "$rc"
@@ -111,6 +130,13 @@ if [ "$LEASE_GUARD_ONLY" -eq 0 ]; then
   install_one "$RECONCILER_SRC" "$RECONCILER_DST" 0755
   install_one "$MODEL_ROUTER_SRC" "$MODEL_ROUTER_DST" 0755
   install_one "$MODEL_REGISTRY_SRC" "$MODEL_REGISTRY_DST"
+  install_one "$CAPABILITY_MANIFEST_SRC" "$CAPABILITY_MANIFEST_DST"
+  SYMPHONY_MODEL_ROUTER="$MODEL_ROUTER_DST" \
+    SYMPHONY_MODEL_REGISTRY="$MODEL_REGISTRY_DST" \
+    SYMPHONY_RUNTIME_CAPABILITY_MANIFEST="$CAPABILITY_MANIFEST_DST" \
+    SYMPHONY_RUNTIME_RECEIPT="$RUNTIME_RECEIPT_DST" \
+    python3 "$RECONCILER_DST" runtime-receipt >/dev/null
+  echo "INSTALLED $RUNTIME_RECEIPT_DST"
   install_one "$RECONCILER_SERVICE_SRC" "$RECONCILER_SERVICE_DST"
   install_one "$RECONCILER_TIMER_SRC" "$RECONCILER_TIMER_DST"
 fi
