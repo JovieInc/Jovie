@@ -2,6 +2,16 @@ import Foundation
 import Testing
 @testable import Jovie
 
+/// Keychain session store is process-wide. Parallel Swift Testing cases that
+/// seed it will clobber each other and flake merge-group iOS tests.
+actor NativeSessionTokenStoreTestLock {
+  static let shared = NativeSessionTokenStoreTestLock()
+
+  func withExclusive<T: Sendable>(_ body: @Sendable () async throws -> T) async rethrows -> T {
+    try await body()
+  }
+}
+
 private actor MockChatTokenProvider: TokenProviding {
   private var forceRefreshValues: [Bool] = []
   private let tokens: [String]
@@ -339,63 +349,67 @@ struct MobileChatClientTests {
   }
 
   @Test func listConversationsDoesNotRetryUnauthorizedWhenTokenCannotRefresh() async throws {
-    NativeSessionTokenStore.clear()
-    defer { NativeSessionTokenStore.clear() }
-    NativeSessionTokenStore.save(
-      token: "stale-native-token",
-      userID: "user_chat_401",
-      expiresAt: Date().addingTimeInterval(60 * 60)
-    )
-    #expect(NativeSessionTokenStore.load()?.token == "stale-native-token")
+    try await NativeSessionTokenStoreTestLock.shared.withExclusive {
+      NativeSessionTokenStore.clear()
+      defer { NativeSessionTokenStore.clear() }
+      NativeSessionTokenStore.save(
+        token: "stale-native-token",
+        userID: "user_chat_401",
+        expiresAt: Date().addingTimeInterval(60 * 60)
+      )
+      #expect(NativeSessionTokenStore.load()?.token == "stale-native-token")
 
-    var requestCount = 0
-    MockChatURLProtocol.requestHandler = { request in
-      requestCount += 1
-      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer stale-native-token")
-      return (makeResponse(for: request, statusCode: 401), Data())
+      var requestCount = 0
+      MockChatURLProtocol.requestHandler = { request in
+        requestCount += 1
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer stale-native-token")
+        return (makeResponse(for: request, statusCode: 401), Data())
+      }
+
+      let client = MobileChatClient(
+        baseURL: URL(string: "https://jov.ie")!,
+        session: makeSession(),
+        tokenProvider: NativeSessionTokenProvider()
+      )
+
+      await #expect(throws: MobileChatClientError.requestFailed(statusCode: 401)) {
+        _ = try await client.listConversations(limit: 20)
+      }
+      #expect(requestCount == 1)
+      #expect(NativeSessionTokenStore.load() == nil)
     }
-
-    let client = MobileChatClient(
-      baseURL: URL(string: "https://jov.ie")!,
-      session: makeSession(),
-      tokenProvider: NativeSessionTokenProvider()
-    )
-
-    await #expect(throws: MobileChatClientError.requestFailed(statusCode: 401)) {
-      _ = try await client.listConversations(limit: 20)
-    }
-    #expect(requestCount == 1)
-    #expect(NativeSessionTokenStore.load() == nil)
   }
 
   @Test func sendTurnDoesNotRetryUnauthorizedWhenTokenCannotRefresh() async throws {
-    NativeSessionTokenStore.clear()
-    defer { NativeSessionTokenStore.clear() }
-    NativeSessionTokenStore.save(
-      token: "stale-native-token",
-      userID: "user_sendturn_401",
-      expiresAt: Date().addingTimeInterval(60 * 60)
-    )
-    #expect(NativeSessionTokenStore.load()?.token == "stale-native-token")
+    try await NativeSessionTokenStoreTestLock.shared.withExclusive {
+      NativeSessionTokenStore.clear()
+      defer { NativeSessionTokenStore.clear() }
+      NativeSessionTokenStore.save(
+        token: "stale-native-token",
+        userID: "user_sendturn_401",
+        expiresAt: Date().addingTimeInterval(60 * 60)
+      )
+      #expect(NativeSessionTokenStore.load()?.token == "stale-native-token")
 
-    var requestCount = 0
-    MockChatURLProtocol.requestHandler = { request in
-      requestCount += 1
-      #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer stale-native-token")
-      return (makeResponse(for: request, statusCode: 401), Data())
+      var requestCount = 0
+      MockChatURLProtocol.requestHandler = { request in
+        requestCount += 1
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer stale-native-token")
+        return (makeResponse(for: request, statusCode: 401), Data())
+      }
+
+      let client = MobileChatClient(
+        baseURL: URL(string: "https://jov.ie")!,
+        session: makeSession(),
+        tokenProvider: NativeSessionTokenProvider()
+      )
+
+      await #expect(throws: MobileChatClientError.requestFailed(statusCode: 401)) {
+        _ = try await client.sendTurn(makeTurnRequest())
+      }
+      #expect(requestCount == 1)
+      #expect(NativeSessionTokenStore.load() == nil)
     }
-
-    let client = MobileChatClient(
-      baseURL: URL(string: "https://jov.ie")!,
-      session: makeSession(),
-      tokenProvider: NativeSessionTokenProvider()
-    )
-
-    await #expect(throws: MobileChatClientError.requestFailed(statusCode: 401)) {
-      _ = try await client.sendTurn(makeTurnRequest())
-    }
-    #expect(requestCount == 1)
-    #expect(NativeSessionTokenStore.load() == nil)
   }
 
   @Test func sendTurnMapsNonSuccessStatusToRequestFailed() async throws {
