@@ -245,7 +245,7 @@ private struct AppContentView: View {
     .sheet(isPresented: $showWhatsNew, onDismiss: markWhatsNewPresented) {
       JovieWhatsNewView(version: currentAppVersion)
     }
-    .task(id: "\(appState.route)-\(appState.launchMode)") {
+    .task(id: "\(appState.route)-\(appState.launchMode)-\(appState.activeUserID ?? "")") {
       guard appState.route == .ready else { return }
       showWhatsNew = WhatsNewPresentationPolicy.shouldPresent(
         currentVersion: currentAppVersion,
@@ -261,6 +261,8 @@ private struct AppContentView: View {
         if Self.previewAudienceHighlightsState(for: appState.launchMode) == .idle {
           audienceHighlightsState = .idle
         }
+        calendarResponse = nil
+        inboxResponse = nil
         return
       }
 
@@ -294,8 +296,6 @@ private struct AppContentView: View {
           Task { await repository.bootstrap() }
         }
       }
-
-      await reloadAudienceHighlights(for: activeUserID)
     }
   }
 
@@ -361,7 +361,14 @@ private struct AppContentView: View {
       return
     }
 
-    _ = userID
+    let cache = ActionLoopCache()
+    if calendarResponse == nil {
+      calendarResponse = await cache.loadCalendar(for: userID)
+    }
+    if inboxResponse == nil {
+      inboxResponse = await cache.loadInbox(for: userID)
+    }
+
     let client = APIClient(
       baseURL: appState.configuration.apiBaseURL,
       tokenProvider: NativeSessionTokenProvider()
@@ -370,17 +377,18 @@ private struct AppContentView: View {
     isLoadingCalendar = calendarResponse == nil
     isLoadingInbox = inboxResponse == nil
 
-    do {
-      calendarResponse = try await client.fetchActionLoopCalendar()
-    } catch {
-      // Keep stale calendar if revalidation fails.
+    async let fetchedCalendar = client.fetchActionLoopCalendar()
+    async let fetchedInbox = client.fetchActionLoopInbox()
+
+    if let calendar = try? await fetchedCalendar {
+      calendarResponse = calendar
+      await cache.storeCalendar(calendar, for: userID)
     }
     isLoadingCalendar = false
 
-    do {
-      inboxResponse = try await client.fetchActionLoopInbox()
-    } catch {
-      // Keep stale inbox if revalidation fails.
+    if let inbox = try? await fetchedInbox {
+      inboxResponse = inbox
+      await cache.storeInbox(inbox, for: userID)
     }
     isLoadingInbox = false
   }
@@ -409,19 +417,27 @@ private struct AppContentView: View {
       return
     }
 
-    audienceHighlightsState = .loading
-
     let repository = AudienceHighlightsRepository(
       apiClient: APIClient(
         baseURL: appState.configuration.apiBaseURL,
         tokenProvider: NativeSessionTokenProvider()
-      )
+      ),
+      cache: AudienceHighlightsCache()
     )
+
+    if let cached = await repository.cachedSnapshot(for: userID) {
+      audienceHighlightsState = .loaded(cached)
+    } else if audienceHighlightsShouldShowLoading(current: audienceHighlightsState) {
+      audienceHighlightsState = .loading
+    }
 
     do {
       let result = try await repository.load(for: userID)
       audienceHighlightsState = .loaded(result.response)
     } catch {
+      if case .loaded = audienceHighlightsState {
+        return
+      }
       audienceHighlightsState = .error("Couldn't load audience highlights.")
     }
   }
@@ -436,6 +452,91 @@ func shouldApplyAuthenticatedUserIDChange(
   liveHydrateOwnsSession: Bool
 ) -> Bool {
   authenticatedUserID != nil || liveHydrateOwnsSession == false
+}
+
+func audienceHighlightsShouldShowLoading(current: AudienceHighlightsLoadState) -> Bool {
+  if case .loaded = current {
+    return false
+  }
+  return true
+}
+
+struct CachedActionLoopInboxSnapshot: Codable, Equatable, Sendable {
+  let response: MobileActionLoopInboxResponse
+  let cachedAt: Date
+}
+
+struct CachedActionLoopCalendarSnapshot: Codable, Equatable, Sendable {
+  let response: MobileActionLoopCalendarResponse
+  let cachedAt: Date
+}
+
+actor ActionLoopCache {
+  private var inboxMemory: [String: CachedActionLoopInboxSnapshot] = [:]
+  private var calendarMemory: [String: CachedActionLoopCalendarSnapshot] = [:]
+  private let defaults: UserDefaults
+  private let encoder = JSONEncoder()
+  private let decoder = JSONDecoder()
+
+  init(defaults: UserDefaults = .standard) {
+    self.defaults = defaults
+  }
+
+  func loadInbox(for userID: String) -> MobileActionLoopInboxResponse? {
+    if let snapshot = inboxMemory[userID] {
+      return snapshot.response
+    }
+
+    guard
+      let data = defaults.data(forKey: inboxCacheKey(for: userID)),
+      let snapshot = try? decoder.decode(CachedActionLoopInboxSnapshot.self, from: data)
+    else {
+      return nil
+    }
+
+    inboxMemory[userID] = snapshot
+    return snapshot.response
+  }
+
+  func storeInbox(_ response: MobileActionLoopInboxResponse, for userID: String) {
+    let snapshot = CachedActionLoopInboxSnapshot(response: response, cachedAt: Date())
+    inboxMemory[userID] = snapshot
+    if let data = try? encoder.encode(snapshot) {
+      defaults.set(data, forKey: inboxCacheKey(for: userID))
+    }
+  }
+
+  func loadCalendar(for userID: String) -> MobileActionLoopCalendarResponse? {
+    if let snapshot = calendarMemory[userID] {
+      return snapshot.response
+    }
+
+    guard
+      let data = defaults.data(forKey: calendarCacheKey(for: userID)),
+      let snapshot = try? decoder.decode(CachedActionLoopCalendarSnapshot.self, from: data)
+    else {
+      return nil
+    }
+
+    calendarMemory[userID] = snapshot
+    return snapshot.response
+  }
+
+  func storeCalendar(_ response: MobileActionLoopCalendarResponse, for userID: String) {
+    let snapshot = CachedActionLoopCalendarSnapshot(response: response, cachedAt: Date())
+    calendarMemory[userID] = snapshot
+    if let data = try? encoder.encode(snapshot) {
+      defaults.set(data, forKey: calendarCacheKey(for: userID))
+    }
+  }
+
+  private func inboxCacheKey(for userID: String) -> String {
+    "ie.jov.Jovie.actionLoopInbox.\(userID)"
+  }
+
+  private func calendarCacheKey(for userID: String) -> String {
+    "ie.jov.Jovie.actionLoopCalendar.\(userID)"
+  }
 }
 
 struct RootView: View {
