@@ -10,6 +10,8 @@ Read in this order:
 4. [`ENGINEERING.md`](./ENGINEERING.md) — engineering priorities and technology posture.
 5. [`DESIGN.md`](./DESIGN.md) — UX, trust, clarity, and design bottlenecks.
 6. [`MARKETING.md`](./MARKETING.md) — qualified demand and funnel bottlenecks.
-7. [`VOICE.md`](./VOICE.md) — messaging, tone, and agent communication.
+7. [`POSITIONING.md`](./POSITIONING.md) — founder-locked customer positioning and
+   message roles; read for product, marketing, partnership, and brand work.
+8. [`VOICE.md`](./VOICE.md) — messaging, tone, and agent communication.
 
 Operational files (`CLAUDE.md`, `.claude/rules/*`, `docs/*`, skills, scripts, workflows) implement this canon. If they conflict, update the lower-level file or escalate to Tim.
