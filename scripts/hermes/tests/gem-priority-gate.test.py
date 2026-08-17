@@ -953,16 +953,22 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("./.github/actions/evaluate-fleet-gate", content)
         self.assertIn("dry-run: 'false'", content)
         wrapper = (ROOT / "scripts/hermes/evaluate-fleet-gate.sh").read_text(encoding="utf-8")
-        self.assertIn("--consumer fleet", wrapper)
+        self.assertIn('--consumer "$consumer"', wrapper)
+        self.assertIn("fleet | deployment", wrapper)
         self.assertIn(AUTOENROLL_RECEIPT_JQ.split(" and\n")[0], wrapper)
 
     def test_production_controller_uses_exact_subject_deployment_admission(self):
         content = (self.WORKFLOWS / "production-controller.yml").read_text(encoding="utf-8")
-        self.assertIn("--consumer deployment", content)
-        self.assertIn("EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}", content)
-        self.assertIn(".signals.main.sha == env.EXPECTED_SHA", content)
-        self.assertIn(".deploymentAdmission.allowed == true", content)
-        self.assertNotIn("--dry-run", content)
+        self.assertIn("./.github/actions/evaluate-fleet-gate", content)
+        self.assertIn("consumer: deployment", content)
+        self.assertIn(
+            "expected-sha: ${{ github.event.workflow_run.head_sha }}", content
+        )
+        self.assertIn("dry-run: 'false'", content)
+        self.assertNotIn("python3 scripts/hermes/gem-priority-gate.py", content)
+        wrapper = (ROOT / "scripts/hermes/evaluate-fleet-gate.sh").read_text(encoding="utf-8")
+        self.assertIn(".deploymentAdmission.allowed", wrapper)
+        self.assertIn("EXPECTED_SHA", wrapper)
 
     def test_refresh_is_event_driven_and_bounds_one_admission(self):
         content = (self.WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
