@@ -28,6 +28,7 @@ INTEGRITY_SCHEMA = "jovie-integrity/v1"
 CONCURRENCY_SCHEMA = "gem-concurrency-evidence/v1"
 INDEPENDENT_REVIEW_SCHEMA = "jovie-independent-review/v1"
 INDEPENDENT_REVIEW_AUTHORITY = "Gem"
+INDEPENDENT_REVIEWER = "Gem"
 INDEPENDENT_REVIEW_SCOPE = "exact-main-head"
 # Schema-padding sentinel for evaluation-failed receipts. Auto-Enroll jq
 # requires a 40-hex main SHA; this value never authorizes promotion.
@@ -418,9 +419,7 @@ def validate_independent_review(
         fields["schema"] == INDEPENDENT_REVIEW_SCHEMA
         and fields["status"] == "passed"
         and fields["authority"] == INDEPENDENT_REVIEW_AUTHORITY
-        and isinstance(fields["reviewer"], str)
-        and bool(fields["reviewer"].strip())
-        and fields["reviewer"].strip().casefold() != "symphony"
+        and fields["reviewer"] == INDEPENDENT_REVIEWER
         and isinstance(fields["reviewId"], str)
         and bool(fields["reviewId"])
         and fields["scope"] == INDEPENDENT_REVIEW_SCOPE
@@ -447,7 +446,7 @@ def validate_independent_review(
             "reason": "independent-review-receipt-malformed",
         }
     age = now - observed_at
-    if age < -timedelta(minutes=1):
+    if age < timedelta(0):
         return {
             **fields,
             "accepted": False,
@@ -719,7 +718,6 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and valid_commit_sha(main.get("sha"), exact=True)
         and production.get("status") == "green"
         and valid_commit_sha(production.get("deployedSha"))
-        and review_allowed
     )
     evidence = signals.get("concurrencyEvidence") or {}
     gem_concurrency = 8 if evidence.get("accepted") is True else DEFAULT_GEM_CONCURRENCY

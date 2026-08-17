@@ -1144,8 +1144,13 @@ describe('deterministic Symphony admission boundary', () => {
       ],
       [
         'future',
-        { ...valid, observedAt: '2026-08-09T05:03:00.000Z' },
+        { ...valid, observedAt: '2026-08-09T05:01:59.000Z' },
         'independent-review-receipt-future',
+      ],
+      [
+        'spoofed reviewer',
+        { ...valid, reviewer: 'Symphony Agent' },
+        'independent-review-receipt-malformed',
       ],
       [
         'wrong head',

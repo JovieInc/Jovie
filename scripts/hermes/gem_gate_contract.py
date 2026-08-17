@@ -12,6 +12,7 @@ from typing import Any
 SCHEMA = "jovie-fleet-gate/v1"
 INDEPENDENT_REVIEW_SCHEMA = "jovie-independent-review/v1"
 INDEPENDENT_REVIEW_AUTHORITY = "Gem"
+INDEPENDENT_REVIEWER = "Gem"
 INDEPENDENT_REVIEW_SCOPE = "exact-main-head"
 JOVIE_REPO = "JovieInc/Jovie"
 
@@ -131,8 +132,8 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
             raise GateContractError("accepted review observation time is missing")
         if not isinstance(review_signal.get("reviewId"), str) or not review_signal["reviewId"]:
             raise GateContractError("accepted review id is missing")
-        if not isinstance(review_signal.get("reviewer"), str) or not review_signal["reviewer"]:
-            raise GateContractError("accepted reviewer identity is missing")
+        if review_signal.get("reviewer") != INDEPENDENT_REVIEWER:
+            raise GateContractError("accepted reviewer identity is not Gem")
     new_issue_lease = receipt.get("workAdmission", {}).get("newIssueLeaseAllowed")
     if not isinstance(new_issue_lease, bool):
         raise GateContractError("new issue lease admission is missing or is not boolean")

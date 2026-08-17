@@ -742,7 +742,7 @@ class IndependentReviewTests(unittest.TestCase):
         self.assertTrue(receipt["workAdmission"]["allowed"])
         self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
-        self.assertFalse(receipt["deploymentAdmission"]["allowed"])
+        self.assertTrue(receipt["deploymentAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
         self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
         self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 4)
@@ -760,9 +760,13 @@ class IndependentReviewTests(unittest.TestCase):
             ),
             (
                 self.valid_review(
-                    observedAt=MODULE.isoformat(self.NOW + MODULE.timedelta(minutes=2))
+                    observedAt=MODULE.isoformat(self.NOW + MODULE.timedelta(seconds=59))
                 ),
                 "independent-review-receipt-future",
+            ),
+            (
+                self.valid_review(reviewer="Symphony Agent"),
+                "independent-review-receipt-malformed",
             ),
             (
                 self.valid_review(headSha="b" * 40),

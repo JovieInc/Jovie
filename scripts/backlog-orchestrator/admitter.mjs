@@ -16,6 +16,7 @@ export const FLEET_GATE_SCHEMA = 'jovie-fleet-gate/v1';
 export const GEM_CONCURRENCY_EVIDENCE_SCHEMA = 'gem-concurrency-evidence/v1';
 export const INDEPENDENT_REVIEW_RECEIPT_SCHEMA = 'jovie-independent-review/v1';
 export const INDEPENDENT_REVIEW_AUTHORITY = 'Gem';
+export const INDEPENDENT_REVIEWER = 'Gem';
 export const INDEPENDENT_REVIEW_SCOPE = 'exact-main-head';
 export const FLEET_GATE_STATE = Object.freeze({
   GREEN: 'GREEN',
@@ -166,12 +167,8 @@ export function validateIndependentReviewReceipt(
   if (fields.authority !== INDEPENDENT_REVIEW_AUTHORITY) {
     errors.push(`authority must be ${INDEPENDENT_REVIEW_AUTHORITY}`);
   }
-  if (
-    typeof fields.reviewer !== 'string' ||
-    fields.reviewer.trim().length === 0 ||
-    fields.reviewer.trim().toLowerCase() === 'symphony'
-  ) {
-    errors.push('reviewer must be a non-empty independent identity');
+  if (fields.reviewer !== INDEPENDENT_REVIEWER) {
+    errors.push(`reviewer must be ${INDEPENDENT_REVIEWER}`);
   }
   if (typeof fields.reviewId !== 'string' || fields.reviewId.length === 0) {
     errors.push('reviewId must be a non-empty string');
@@ -197,7 +194,7 @@ export function validateIndependentReviewReceipt(
   const nowMs = Date.parse(String(now ?? ''));
   if (!Number.isFinite(observedMs) || !Number.isFinite(nowMs)) {
     errors.push('observedAt and now must be valid timestamps');
-  } else if (observedMs > nowMs + 60_000) {
+  } else if (observedMs > nowMs) {
     return {
       ok: false,
       errors: ['review receipt is from the future'],
