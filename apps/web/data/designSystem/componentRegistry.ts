@@ -162,6 +162,21 @@ export function getDesignSystemComponent(
   return COMPONENT_BY_ID.get(id) ?? null;
 }
 
+/** Unique source-backed Pen root for a design-system entry, or null. */
+export function designSystemCanonicalPenRoot(
+  entry: DesignSystemComponentRegistryEntry
+): string | null {
+  if (entry.penRootId) return entry.penRootId;
+  const familyRoots = [
+    ...new Set(
+      Object.values(entry.penRootByVariantKey ?? {}).map(
+        master => master.rootId
+      )
+    ),
+  ];
+  return familyRoots.length === 1 ? familyRoots[0] : null;
+}
+
 export function designSystemVariantKey(
   id: DesignSystemComponentId,
   selection: Readonly<Record<string, string>>

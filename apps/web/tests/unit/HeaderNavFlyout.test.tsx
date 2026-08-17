@@ -1,4 +1,3 @@
-import { BUTTON_PEN_CONTRACT } from '@jovie/ui';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
@@ -57,10 +56,7 @@ describe('HeaderNav flyout interactions', () => {
       screen.getByRole('link', { name: 'Request Access' })
     ).toHaveAttribute('href', '/signup');
     const publicCta = screen.getByRole('link', { name: 'Request Access' });
-    expect(publicCta).toHaveAttribute(
-      'data-pen-contract',
-      BUTTON_PEN_CONTRACT.rootId
-    );
+    expect(publicCta).not.toHaveAttribute('data-pen-contract');
     expect(publicCta).toHaveAttribute('data-variant', 'primary');
     expect(publicCta).toHaveAttribute('data-size', 'md');
   });
@@ -75,10 +71,7 @@ describe('HeaderNav flyout interactions', () => {
     );
 
     const signIn = screen.getByRole('link', { name: 'Sign in' });
-    expect(signIn).toHaveAttribute(
-      'data-pen-contract',
-      BUTTON_PEN_CONTRACT.rootId
-    );
+    expect(signIn).not.toHaveAttribute('data-pen-contract');
     expect(signIn).toHaveAttribute('data-variant', 'primary');
     expect(signIn).toHaveAttribute('data-size', 'md');
   });
