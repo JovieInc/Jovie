@@ -5,7 +5,7 @@ import { Maximize2 } from 'lucide-react';
 import { useCallback } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 
-export function HudFullscreenButton() {
+export function HudFullscreenControl() {
   const openFullscreen = useCallback(async () => {
     let token: string | null = null;
     try {

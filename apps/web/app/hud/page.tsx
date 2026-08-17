@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { forbidden, unauthorized } from 'next/navigation';
 import { HudDashboardClient } from '@/app/app/(shell)/admin/ops/HudDashboardClient';
 import { FounderMorningWalkCard } from '@/components/features/admin/hud/FounderMorningWalkCard';
-import { HudFullscreenButton } from '@/components/features/admin/hud/HudFullscreenButton';
+import { HudFullscreenControl } from '@/components/features/admin/hud/HudFullscreenControl';
 import { HudShipperPanels } from '@/components/features/admin/hud/HudShipperPanels';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
@@ -106,7 +106,7 @@ export default async function HudPage({
         title='Ovie'
         description='Need, then noise.'
         testId='hud-admin-page'
-        actions={<HudFullscreenButton />}
+        actions={<HudFullscreenControl />}
       >
         {walk}
         <HudShipperPanels />
