@@ -281,6 +281,69 @@ describe('sitemap', () => {
     expect(urls).not.toContain('https://jov.ie/a_unclaimed');
   });
 
+  it('excludes synthetic profiles and their content without hiding similar real handles', async () => {
+    getBlogPosts.mockResolvedValue([]);
+    whereMock
+      .mockResolvedValueOnce([
+        {
+          username: 'dualipa',
+          updatedAt: new Date('2026-01-01'),
+          isClaimed: true,
+          settings: {},
+        },
+        {
+          username: 'testartist',
+          updatedAt: new Date('2026-01-01'),
+          isClaimed: true,
+          settings: {},
+        },
+        {
+          username: 'dualipa-official',
+          updatedAt: new Date('2026-01-01'),
+          isClaimed: true,
+          settings: {},
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          username: 'dualipa',
+          slug: 'fixture-release',
+          updatedAt: new Date('2026-01-02'),
+          artworkUrl: null,
+        },
+        {
+          username: 'dualipa-official',
+          slug: 'real-release',
+          updatedAt: new Date('2026-01-02'),
+          artworkUrl: null,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          username: 'testartist',
+          slug: 'fixture-track',
+          updatedAt: new Date('2026-01-03'),
+        },
+        {
+          username: 'dualipa-official',
+          slug: 'real-track',
+          updatedAt: new Date('2026-01-03'),
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const { default: sitemap } = await import('../../app/sitemap');
+    const urls = (await sitemap()).map(entry => entry.url);
+
+    expect(urls).not.toContain('https://jov.ie/dualipa');
+    expect(urls).not.toContain('https://jov.ie/dualipa/fixture-release');
+    expect(urls).not.toContain('https://jov.ie/testartist');
+    expect(urls).not.toContain('https://jov.ie/testartist/fixture-track');
+    expect(urls).toContain('https://jov.ie/dualipa-official');
+    expect(urls).toContain('https://jov.ie/dualipa-official/real-release');
+    expect(urls).toContain('https://jov.ie/dualipa-official/real-track');
+  });
+
   it('is non-empty (at minimum static marketing pages are included)', async () => {
     getBlogPosts.mockResolvedValue([]);
     whereMock

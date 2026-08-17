@@ -3,6 +3,7 @@
  * Single source of truth for username rules and reserved words.
  */
 
+import { isReservedPublicProfileIdentity } from '@/lib/profile/public-profile-identity-policy';
 import { checkContent } from './content-filter';
 
 // ============================================================================
@@ -256,6 +257,16 @@ export function validateUsernameCore(
 
   // Normalize username
   const normalized = username.toLowerCase().trim();
+
+  // Proven synthetic identities stay reserved even if another format limit
+  // changes. Do not suggest a derivative handle for fabricated celebrities or
+  // QA fixtures.
+  if (isReservedPublicProfileIdentity(normalized)) {
+    return createValidationError(
+      'RESERVED',
+      'This handle is reserved and cannot be used'
+    );
+  }
 
   // Check length
   if (normalized.length < USERNAME_MIN_LENGTH) {

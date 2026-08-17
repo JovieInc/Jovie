@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import { AlertGrowthLanding } from '@/components/features/alerts/AlertGrowthLanding';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
 import { convertCreatorProfileToArtist } from '@/types/db';
 import { getProfileAndLinks } from '../_lib/public-profile-loader';
 
@@ -47,7 +48,7 @@ export async function generateMetadata({
       title: `${title} — ${APP_NAME}`,
       description,
     },
-    robots: { index: true, follow: true },
+    robots: getPublicProfileRobots(result.profile.username),
   };
 }
 

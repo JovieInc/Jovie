@@ -75,6 +75,18 @@ describe('GET /{username}/llms.txt', () => {
     expect(res.status).toBe(404);
   });
 
+  it('excludes protected synthetic identities before profile lookup', async () => {
+    const res = await GET(
+      new Request('https://jov.ie/dualipa/llms.txt'),
+      makeParams('dualipa')
+    );
+
+    expect(res.status).toBe(404);
+    expect(res.headers.get('X-Robots-Tag')).toContain('noindex');
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    expect(mockGetProfileAndLinks).not.toHaveBeenCalled();
+  });
+
   it('returns 404 when profile is not found', async () => {
     mockGetProfileAndLinks.mockResolvedValueOnce({
       profile: null,

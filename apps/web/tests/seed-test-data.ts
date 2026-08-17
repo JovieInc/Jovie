@@ -327,6 +327,13 @@ const TEST_PROFILES: TestProfile[] = [
     avatarUrl: DEFAULT_TEST_AVATAR_URL,
   },
   {
+    username: E2E_PREBUILT_CLAIM_USERNAME,
+    displayName: 'E2E Claim Artist',
+    bio: 'Non-indexed claim-flow fixture',
+    spotifyUrl: 'https://open.spotify.com/artist/e2eclaimartist',
+    avatarUrl: DEFAULT_TEST_AVATAR_URL,
+  },
+  {
     // Public, claimed profile with a normal name/avatar but nothing else:
     // no socials/DSPs, releases, tour dates, contacts, venmo, bio, or merch.
     // Exercises every empty state (docs/qa/public-profile-stories.md).
@@ -2214,8 +2221,9 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           console.log('    ✓ Ensured Shopify URL for edgecase-long');
         }
 
-        // Add Venmo payment link for tipping tests + GTM prebuilt claim fixture
-        if (profile.username === E2E_PREBUILT_CLAIM_USERNAME) {
+        // Keep tipping coverage on the legacy payment fixture. It is reserved
+        // and must never double as a claim-flow identity.
+        if (profile.username === 'testartist') {
           await ensureSocialLink(db, {
             creatorProfileId: createdProfileId,
             platform: 'venmo',
@@ -2227,7 +2235,9 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
             state: 'active',
           });
           console.log(`    ✓ Added Venmo link for ${profile.username}`);
+        }
 
+        if (profile.username === E2E_PREBUILT_CLAIM_USERNAME) {
           // Unclaimed public profile with a stable claim token + release data so
           // claim-prebuilt.smoke can exercise the GTM claim-link canary (JOV-1880).
           const claimTokenHash = await hashClaimToken(E2E_PREBUILT_CLAIM_TOKEN);

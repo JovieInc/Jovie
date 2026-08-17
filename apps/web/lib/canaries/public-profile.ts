@@ -13,8 +13,13 @@
  *    browser rendering pipeline.
  */
 
-export const CANARY_CREATOR_HANDLE = 'tim';
-export const CANARY_CREATOR_SPOTIFY_ID = '4u';
+import { PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE } from '@/lib/profile/public-profile-indexing-policy';
+
+/**
+ * Synthetic production identity owned by this canary. The indexing policy
+ * must keep it out of search while the route remains available for monitoring.
+ */
+export const CANARY_CREATOR_HANDLE = PUBLIC_PROFILE_PRODUCTION_CANARY_HANDLE;
 export const CANARY_AUDIENCE_VISIT_PATH = '/api/audience/visit';
 export const CANARY_REDIS_KEY = 'canary:public_profile:last_run';
 
@@ -26,7 +31,7 @@ const CANARY_FETCH_BACKOFF_MS = 200;
 export const CANARY_ROUTES = {
   profile: `/${CANARY_CREATOR_HANDLE}`,
   alerts: `/${CANARY_CREATOR_HANDLE}/alerts`,
-  pay: `/${CANARY_CREATOR_HANDLE}/pay`,
+  listen: `/${CANARY_CREATOR_HANDLE}/listen`,
 } as const;
 
 export type CanaryRouteName = keyof typeof CANARY_ROUTES;
@@ -60,9 +65,8 @@ export interface CanaryReport {
 
 /**
  * Validate that an HTTP status code represents a successful non-redirect response.
- * Pay subroute redirects to `?mode=pay` via 307 — the fetch follows that, so the
- * final response should be 200. The raw 307 is acceptable if `redirect:'follow'`
- * is used.
+ * Mode subroutes may redirect to their canonical query-backed view. The fetch
+ * follows redirects, while a raw 3xx remains an acceptable route response.
  */
 export function isOkStatus(status: number): boolean {
   return status >= 200 && status < 400;

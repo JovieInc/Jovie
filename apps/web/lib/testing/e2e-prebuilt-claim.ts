@@ -6,5 +6,5 @@
  * {@link E2E_PREBUILT_CLAIM_USERNAME}. Keep these values in lockstep with
  * `apps/web/tests/seed-test-data.ts` and `claim-prebuilt.smoke.spec.ts`.
  */
-export const E2E_PREBUILT_CLAIM_USERNAME = 'testartist';
+export const E2E_PREBUILT_CLAIM_USERNAME = 'e2eclaimartist';
 export const E2E_PREBUILT_CLAIM_TOKEN = 'e2e-prebuilt-claim-token';

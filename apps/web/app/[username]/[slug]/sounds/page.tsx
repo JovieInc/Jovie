@@ -16,6 +16,7 @@ import {
   VIDEO_PROVIDER_CONFIG,
   VIDEO_PROVIDER_KEYS,
 } from '@/lib/discography/video-providers';
+import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
 import {
   getContentBySlug,
   getCreatorByUsername,
@@ -155,6 +156,7 @@ export async function generateMetadata({
   return {
     title,
     description,
+    robots: getPublicProfileRobots(creator.usernameNormalized),
     metadataBase: new URL(BASE_URL),
     alternates: {
       canonical: canonicalUrl,

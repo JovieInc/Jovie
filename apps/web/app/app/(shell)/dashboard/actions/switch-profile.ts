@@ -9,6 +9,7 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import { isReservedPublicProfileIdentity } from '@/lib/profile/public-profile-identity-policy';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -138,6 +139,9 @@ export async function createAdditionalProfile(input: {
     }
     if (!normalizedUsername) {
       return { success: false, error: 'Username is required' };
+    }
+    if (isReservedPublicProfileIdentity(normalizedUsername)) {
+      return { success: false, error: 'Username is reserved' };
     }
     if (
       normalizedUsername.length < MIN_USERNAME_LENGTH ||

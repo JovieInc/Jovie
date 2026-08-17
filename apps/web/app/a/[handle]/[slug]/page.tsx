@@ -8,6 +8,7 @@ import {
   buildLibraryAssetSharePendingViewBySlug,
   buildLibraryAssetSharePublicViewBySlug,
 } from '@/lib/library/asset-share-public.server';
+import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
 import type { Artist } from '@/types/db';
 
 export const runtime = 'nodejs';
@@ -50,7 +51,7 @@ export async function generateMetadata({
     return {
       title,
       description: `Public asset page for ${view.title} by ${view.artistName}.`,
-      robots: { index: true, follow: true },
+      robots: getPublicProfileRobots(handle),
       openGraph: {
         title,
         description: `Public asset page for ${view.title} by ${view.artistName}.`,

@@ -36,6 +36,7 @@ import {
 import { attributeLeadSignupFromClerkUserId } from '@/lib/leads/funnel-events';
 import { cacheHandleAvailability } from '@/lib/onboarding/handle-availability-cache';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
+import { isTokenBackedClaimFixture } from '@/lib/profile/public-profile-identity-policy';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { isContentClean } from '@/lib/validation/content-filter';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
@@ -57,6 +58,18 @@ import {
 } from './profile-setup';
 import type { CompletionResult } from './types';
 import { ensureEmailAvailable, ensureHandleAvailable } from './validation';
+
+function hasVerifiedTokenBackedFixtureClaim(
+  normalizedUsername: string,
+  pendingClaim: PendingClaimContext | null
+): boolean {
+  return (
+    isTokenBackedClaimFixture(normalizedUsername) &&
+    pendingClaim?.mode === 'token_backed' &&
+    pendingClaim.username === normalizedUsername &&
+    Boolean(pendingClaim.claimTokenHash)
+  );
+}
 
 async function recoverConcurrentProfileClaim(
   clerkUserId: string,
@@ -130,6 +143,7 @@ async function applyPendingClaimTx(
     expectedUsername: normalizedUsername,
     displayName,
     source: 'token_backed_onboarding',
+    claimTokenHash: pendingClaim.claimTokenHash,
     finalizeOnboarding: true,
   });
 }
@@ -225,9 +239,20 @@ export async function completeOnboarding({
       throw onboardingErrorToError(error);
     }
 
-    // Step 2: Input validation
+    const normalizedUsername = normalizeUsername(username);
+    pendingClaim = await readPendingClaimContext({
+      username: normalizedUsername,
+    });
+    const hasVerifiedFixtureClaimContext = hasVerifiedTokenBackedFixtureClaim(
+      normalizedUsername,
+      pendingClaim
+    );
+
+    // Step 2: Input validation. Reserved fixtures stay unavailable to general
+    // onboarding; only a signed token-backed pending context may proceed to
+    // the transaction, where its token hash is checked against the locked row.
     const validation = validateUsername(username);
-    if (!validation.isValid) {
+    if (!validation.isValid && !hasVerifiedFixtureClaimContext) {
       const error = createOnboardingError(
         OnboardingErrorCode.INVALID_USERNAME,
         validation.error || 'Invalid username'
@@ -283,11 +308,6 @@ export async function completeOnboarding({
     });
 
     // Step 4-6: Parallel operations for performance optimization
-    const normalizedUsername = normalizeUsername(username);
-    pendingClaim = await readPendingClaimContext({
-      username: normalizedUsername,
-    });
-
     const userEmail = email ?? clerkIdentity.email ?? null;
 
     // CRITICAL: Use SERIALIZABLE isolation level to prevent race conditions

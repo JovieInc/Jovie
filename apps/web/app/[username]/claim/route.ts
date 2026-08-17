@@ -15,6 +15,10 @@ import {
   markLeadClaimPageViewedFromToken,
   setLeadAttributionCookieFromToken,
 } from '@/lib/leads/funnel-events';
+import {
+  isReservedPublicProfileIdentity,
+  isTokenBackedClaimFixture,
+} from '@/lib/profile/public-profile-identity-policy';
 import { hashClaimToken } from '@/lib/security/claim-token';
 import {
   getProfileByUsername,
@@ -95,10 +99,13 @@ export async function GET(
 ): Promise<NextResponse> {
   const { username } = await params;
   const normalizedUsername = username.toLowerCase();
+  const isProtectedTokenFixture = isTokenBackedClaimFixture(normalizedUsername);
 
   if (
     username.length > USERNAME_MAX_LENGTH ||
-    !USERNAME_PATTERN.test(username)
+    !USERNAME_PATTERN.test(username) ||
+    (isReservedPublicProfileIdentity(normalizedUsername) &&
+      !isProtectedTokenFixture)
   ) {
     return redirectTo(request, '/');
   }
@@ -153,7 +160,17 @@ export async function GET(
 
     await clearLeadAttributionCookie();
     await clearPendingClaimContext();
-    return redirectTo(request, claimPreviewUrl);
+    return redirectTo(request, isProtectedTokenFixture ? '/' : claimPreviewUrl);
+  }
+
+  const hasVerifiedTokenContext =
+    existingPendingClaim?.mode === 'token_backed' &&
+    existingPendingClaim.creatorProfileId === profile.id &&
+    existingPendingClaim.username === profile.usernameNormalized &&
+    Boolean(existingPendingClaim.claimTokenHash);
+
+  if (isProtectedTokenFixture && !hasVerifiedTokenContext) {
+    return redirectTo(request, '/');
   }
 
   if (searchParams.get('next') === 'auth') {

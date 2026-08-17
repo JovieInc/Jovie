@@ -10,6 +10,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { IngestionStatusManager } from '@/lib/ingestion/status-manager';
 import { isValidHandle } from '@/lib/ingestion/strategies/linktree';
+import { isReservedPublicProfileIdentity } from '@/lib/profile/public-profile-identity-policy';
 
 /**
  * Result of checking for an existing profile.
@@ -55,7 +56,10 @@ export async function findAvailableHandle(
     const suffix = i === 0 ? '' : `_${i}`;
     const trimmedBase = normalizedBase.slice(0, MAX_LEN - suffix.length);
     const candidate = `${trimmedBase}${suffix}`;
-    if (isValidHandle(candidate)) {
+    if (
+      isValidHandle(candidate) &&
+      !isReservedPublicProfileIdentity(candidate)
+    ) {
       candidates.push(candidate);
     }
   }
@@ -87,6 +91,17 @@ export async function checkExistingProfile(
   usernameNormalized: string
 ): Promise<ExistingProfileCheck> {
   return withSystemIngestionSession(async tx => {
+    // Protected identities are never reingestion targets, even if a legacy or
+    // fixture row already exists. Skip the exact-handle lookup entirely so the
+    // existing/unclaimed branch cannot mark the protected row as processing.
+    if (isReservedPublicProfileIdentity(usernameNormalized)) {
+      return {
+        existing: null,
+        isReingest: false,
+        finalHandle: await findAvailableHandle(tx, usernameNormalized),
+      };
+    }
+
     const [existing] = await tx
       .select({
         id: creatorProfiles.id,
