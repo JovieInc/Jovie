@@ -1,6 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { type DspAvatarItem, DspAvatarStack } from './DspAvatarStack';
+import {
+  DSP_GLYPH_ON_BRAND_TEXT_CLASS,
+  type DspAvatarItem,
+  DspAvatarStack,
+} from './DspAvatarStack';
 
 const ITEMS: DspAvatarItem[] = [
   {
@@ -130,7 +134,7 @@ describe('DspAvatarStack', () => {
     // Glyph avatars keep white text on hover — the brand bg would make the
     // glyph invisible if the hover text color matched it.
     expect(glyphAvatar?.className).not.toContain('group-hover/dsps:text-');
-    expect(glyphAvatar?.className).toContain('text-white');
+    expect(glyphAvatar?.className).toContain(DSP_GLYPH_ON_BRAND_TEXT_CLASS);
   });
 
   it('keeps missing glyph avatars faded at opacity-40 without opacity-75', () => {

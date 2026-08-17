@@ -21,7 +21,7 @@ const sizeClasses: Record<SpinnerSize, string> = {
 const toneClasses: Record<SpinnerTone, string> = {
   primary: 'text-primary-token',
   muted: 'text-muted-foreground',
-  inverse: 'text-white',
+  inverse: 'text-btn-primary-foreground',
 };
 
 /**

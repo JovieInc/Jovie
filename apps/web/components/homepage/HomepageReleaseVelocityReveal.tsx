@@ -61,10 +61,10 @@ export function HomepageReleaseVelocityReveal() {
       >
         <span aria-hidden='true'>
           <RevealWords
-            className='mr-[0.18em] inline-block text-white dark:text-white'
+            className='mr-[0.18em] inline-block text-primary-token'
             testId='homepage-release-velocity-lead'
             text={LEAD_TEXT}
-            wrapperClassName='text-white'
+            wrapperClassName='text-primary-token'
           />
           <RevealWords
             className='mr-[0.18em] inline-block text-white/36'
