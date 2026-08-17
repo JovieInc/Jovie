@@ -291,6 +291,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/hermes/config/gem-repo-registry.json',
   'scripts/hermes/config/model-registry.json',
   'scripts/hermes/gem-pr-drain.py',
+  'scripts/hermes/gem-ops-hud.py',
   'scripts/hermes/gem-priority-gate.py',
   'scripts/hermes/gem-repo-drain-cycle.py',
   'scripts/hermes/gem_gate_contract.py',
@@ -301,6 +302,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/hermes/systemd/gem-pr-drain.service',
   'scripts/hermes/systemd/gem-pr-drain.timer',
   'scripts/hermes/tests/gem-pr-drain.test.py',
+  'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
@@ -314,6 +316,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
 const GEM_PR_REHABILITATION_PYTHON_TESTS = [
   'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-pr-drain.test.py',
+  'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
   'scripts/hermes/tests/test-model-router.py',
@@ -321,6 +324,7 @@ const GEM_PR_REHABILITATION_PYTHON_TESTS = [
 const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/config/gem-repo-registry.json',
   'scripts/hermes/gem-pr-drain.py',
+  'scripts/hermes/gem-ops-hud.py',
   'scripts/hermes/gem-repo-drain-cycle.py',
   'scripts/hermes/gem_repo_registry.py',
   'scripts/hermes/gem_rehabilitation_policy.py',
@@ -328,6 +332,7 @@ const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/systemd/gem-pr-drain.service',
   'scripts/hermes/systemd/gem-pr-drain.timer',
   'scripts/hermes/tests/gem-pr-drain.test.py',
+  'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
 ]);
