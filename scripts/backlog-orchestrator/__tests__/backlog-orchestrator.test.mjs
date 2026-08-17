@@ -1086,7 +1086,7 @@ describe('deterministic Symphony admission boundary', () => {
     );
   });
 
-  it('requires a fresh exact-head independent review before normal issue leasing', async () => {
+  it('keeps isolated leasing open when independent review is missing; promotion stays frozen', async () => {
     const evidence = fleetEvidence();
     delete evidence.independentReview;
     const fleetGate = admitter.evaluateFleetGate(evidence, {
@@ -1111,11 +1111,12 @@ describe('deterministic Symphony admission boundary', () => {
       'independent-review-receipt-missing'
     );
     assert.equal(fleetGate.workAdmission.allowed, true);
-    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, true);
     assert.equal(fleetGate.promotionAdmission.allowed, false);
     assert.equal(fleetGate.isolatedPromotionAdmission.allowed, false);
     assert.equal(fleetGate.concurrency.gem.maxConcurrent, 4);
-    assert.equal(result.admit.length, 0);
+    assert.equal(result.admit.length, 1);
+    assert.equal(result.admit[0].identifier, 'JOV-4898');
   });
 
   it('rejects malformed, stale, future, and wrong-head review receipts', () => {
@@ -1166,7 +1167,7 @@ describe('deterministic Symphony admission boundary', () => {
       );
       assert.equal(fleetGate.reviewAdmission.allowed, false, name);
       assert.equal(fleetGate.reviewAdmission.reason, reason, name);
-      assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false, name);
+      assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, true, name);
       assert.equal(fleetGate.promotionAdmission.allowed, false, name);
     }
   });
@@ -1567,7 +1568,7 @@ receipt = {
     "signals": {"main": {"status": "red", "sha": "a" * 40}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}},
     "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "main red"}],
     "reviewAdmission": {"allowed": False, "required": True, "authority": "Gem", "scope": "exact-main-head", "headSha": None, "observedAt": None, "reviewId": None, "reviewer": None, "reason": "independent-review-receipt-missing"},
-    "workAdmission": {"allowed": True, "newIssueLeaseAllowed": False},
+    "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True},
     "promotionAdmission": {"allowed": False},
     "remediationAdmission": {
         "allowed": True,
@@ -1709,7 +1710,7 @@ receipt = {
     "signals": {"main": {"status": "red", "sha": "a" * 40}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}},
     "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "test"}],
     "reviewAdmission": {"allowed": False, "required": True, "authority": "Gem", "scope": "exact-main-head", "headSha": None, "observedAt": None, "reviewId": None, "reviewer": None, "reason": "independent-review-receipt-missing"},
-    "workAdmission": {"allowed": True, "newIssueLeaseAllowed": False},
+    "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True},
     "promotionAdmission": {"allowed": False},
     "remediationAdmission": {
         "allowed": True,

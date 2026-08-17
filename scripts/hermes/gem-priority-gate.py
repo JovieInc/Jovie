@@ -779,7 +779,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         else (
             (
                 ["approved-issue-lease"]
-                if review_allowed and (not queue_shape_valid or queue_below_backpressure)
+                if not queue_shape_valid or queue_below_backpressure
                 else []
             )
             + ["isolated-implementation", "tests", "review", "draft-pr"]

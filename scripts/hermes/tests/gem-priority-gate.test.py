@@ -730,7 +730,7 @@ class IndependentReviewTests(unittest.TestCase):
         self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertTrue(receipt["promotionAdmission"]["allowed"])
 
-    def test_missing_receipt_blocks_normal_admission_but_keeps_remediation_live(self):
+    def test_missing_receipt_blocks_promotion_but_keeps_isolated_leasing_live(self):
         receipt = self.evaluate(None)
 
         self.assertEqual(receipt["state"], "AMBER")
@@ -740,7 +740,7 @@ class IndependentReviewTests(unittest.TestCase):
             "independent-review-receipt-missing",
         )
         self.assertTrue(receipt["workAdmission"]["allowed"])
-        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
         self.assertTrue(receipt["deploymentAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
@@ -778,7 +778,7 @@ class IndependentReviewTests(unittest.TestCase):
                 receipt = self.evaluate(review)
                 self.assertFalse(receipt["reviewAdmission"]["allowed"])
                 self.assertEqual(receipt["reviewAdmission"]["reason"], reason)
-                self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+                self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
                 self.assertFalse(receipt["promotionAdmission"]["allowed"])
 
     def test_review_does_not_bypass_bounded_concurrency_evidence(self):
