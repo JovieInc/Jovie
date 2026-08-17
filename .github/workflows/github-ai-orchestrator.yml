@@ -298,7 +298,7 @@ jobs:
         run: git checkout -b "$BRANCH_NAME"
 
       - name: Run Claude Code for implementation
-        uses: anthropics/claude-code-action@1623c36729ac1cd5895198cded705a287de7db79 # v1
+        uses: anthropics/claude-code-action@9d7150bc8a3dae8149739a88019d192b579ad90c # v1
         env:
           JOVIE_AGENT_PROFILE: coder
         with:
