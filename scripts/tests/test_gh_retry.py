@@ -1744,6 +1744,8 @@ class TestReleaseQueueDeferred:
         assert "workflows: ['CI', 'Production Controller', 'Fleet Gate Refresh']" not in workflow
         assert "pull_request:" in fleet_gate_refresh
         assert "branches: [main]" in fleet_gate_refresh
+        assert "github.event.workflow_run.conclusion != 'cancelled'" in fleet_gate_refresh
+        assert "github.event.pull_request.merged != true" in fleet_gate_refresh
         # The trigger allowlist owns workflow identity. Job admission must not
         # compare `workflow_run.name`: custom `run-name` values include dynamic
         # SHAs and caused successful Production Controller wakes to skip.

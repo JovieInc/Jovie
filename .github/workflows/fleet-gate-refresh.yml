@@ -33,13 +33,26 @@ concurrency:
 jobs:
   refresh:
     name: Refresh persisted fleet gate receipt
-    # A merged PR also emits push(main); skip its redundant closed event so one
-    # landing cannot enqueue two admission attempts. Unmerged closure still
-    # frees green-ready capacity and remains an admission event.
+    # Skip cancelled workflow_run so a superseded CI does not occupy a
+    # 5-minute jovie-fixed slot. A merged PR also emits push(main); skip
+    # its redundant closed event so one landing cannot enqueue two
+    # admission attempts. Unmerged closure still frees green-ready
+    # capacity. Labeled/unlabeled only run when the label can change
+    # green-ready depth or a queue/area hold.
     if: >-
-      github.event_name != 'pull_request' ||
+      (github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion != 'cancelled') &&
+      (github.event_name != 'pull_request' ||
       github.event.action != 'closed' ||
-      github.event.pull_request.merged != true
+      github.event.pull_request.merged != true) &&
+      (
+        github.event_name != 'pull_request' ||
+        (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
+        github.event.label.name == 'hold' ||
+        github.event.label.name == 'gated' ||
+        github.event.label.name == 'queue-deferred' ||
+        github.event.label.name == 'needs-human'
+      )
     # The canonical receipt lives on the Gem host; exact-main gate code only.
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 5
@@ -63,38 +76,10 @@ jobs:
           node-version: '22'
       - name: Refresh canonical receipt
         id: refresh
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          GEM_PRIORITY_GATE_REPO: ${{ github.repository }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          receipt="$RUNNER_TEMP/jovie-fleet-gate.json"
-          set +e
-          python3 scripts/hermes/gem-priority-gate.py \
-            --consumer fleet >"$receipt"
-          gate_rc=$?
-          set -e
-          jq -e '
-            .schema == "jovie-fleet-gate/v1" and
-            (.observedAt | type == "string")
-          ' "$receipt" >/dev/null || {
-            echo '::error::Fleet gate refresh emitted a malformed receipt.' >&2
-            exit 2
-          }
-          # A non-GREEN gate (rc 2) is a truthful persisted state, not a
-          # refresh failure; only unexpected exits fail this lane.
-          if [ "$gate_rc" -ne 0 ] && [ "$gate_rc" -ne 2 ]; then
-            echo "::error::Fleet gate refresh exited unexpectedly: $gate_rc" >&2
-            exit 2
-          fi
-          if [ "$gate_rc" -eq 0 ]; then
-            echo "work_allowed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "work_allowed=false" >> "$GITHUB_OUTPUT"
-          fi
-          echo "gate_rc=$gate_rc" >> "$GITHUB_OUTPUT"
-          echo "Fleet gate receipt refreshed (consumer rc=$gate_rc)."
+        uses: ./.github/actions/evaluate-fleet-gate
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          dry-run: 'false'
 
       - name: Reconcile Symphony pressure-driven concurrency
         if: always() && steps.refresh.outcome == 'success'

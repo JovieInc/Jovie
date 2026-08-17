@@ -96,6 +96,13 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
       'types: [closed, labeled, unlabeled, ready_for_review, reopened]'
     );
     expect(fleetGateRefreshWorkflow).toContain('push:\n    branches: [main]');
+    expect(fleetGateRefreshWorkflow).toContain(
+      "github.event.workflow_run.conclusion != 'cancelled'"
+    );
+    expect(fleetGateRefreshWorkflow).toContain(
+      'github.event.pull_request.merged != true'
+    );
+    expect(fleetGateRefreshWorkflow).not.toContain('schedule:');
     expect(workflow).toContain('workflow_dispatch:');
   });
 });

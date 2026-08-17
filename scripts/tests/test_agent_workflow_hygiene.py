@@ -790,6 +790,26 @@ def test_background_controllers_never_consume_fixed_ci_capacity() -> None:
         assert "CI_UNIT_RUNNER" not in block, (workflow, job_name)
 
 
+def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
+    """Cancelled CI and non-hold labels must not occupy a jovie-fixed slot."""
+    workflow = (WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
+    trigger = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
+    block = _job_block("fleet-gate-refresh.yml", "refresh")
+
+    assert "schedule:" not in trigger
+    assert "workflows: [CI, Production Controller]" in trigger
+    assert "workflows: [CI, Production Controller, Queue-Deferred Release]" not in trigger
+    assert "group: fleet-gate-event-admission" in workflow
+    assert "cancel-in-progress: false" in workflow
+    assert "github.event.workflow_run.conclusion != 'cancelled'" in block
+    assert "github.event.pull_request.merged != true" in block
+    assert "github.event.label.name == 'hold'" in block
+    assert "github.event.label.name == 'gated'" in block
+    assert "github.event.label.name == 'queue-deferred'" in block
+    assert "github.event.label.name == 'needs-human'" in block
+    assert "runs-on: [self-hosted, Linux, X64, jovie-fixed]" in block
+
+
 def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None:
     """Schedules cannot silently compete with the bounded merge unit pool."""
     scheduled_fixed: list[str] = []
@@ -811,3 +831,35 @@ def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None
             scheduled_fixed.append(workflow_path.name)
 
     assert scheduled_fixed == ["runner-heartbeat.yml"]
+
+
+def test_fleet_controllers_share_one_evaluate_action() -> None:
+    """FGR, QDR, and merge-queue must not copy-paste the gate CLI."""
+    action = ".github/actions/evaluate-fleet-gate"
+    script = REPO_ROOT / "scripts/hermes/evaluate-fleet-gate.sh"
+    assert script.is_file(), "shared evaluate script missing"
+    callers = (
+        ("fleet-gate-refresh.yml", "refresh", "refresh"),
+        ("queue-deferred-release.yml", "fleet-policy", "policy"),
+        ("merge-queue-autoenroll.yml", "fleet-policy", "policy"),
+    )
+    for workflow, job_name, _step in callers:
+        text = (WORKFLOWS / workflow).read_text(encoding="utf-8")
+        assert f"uses: ./{action}" in text, workflow
+        assert "python3 scripts/hermes/gem-priority-gate.py" not in text, workflow
+
+
+def test_github_ai_dispatcher_wakes_on_capacity_and_uses_idle_slots() -> None:
+    """Agent-ready work must not sit while org runner concurrency is idle."""
+    workflow = (WORKFLOWS / "github-ai-dispatcher.yml").read_text(encoding="utf-8")
+    block = _job_block("github-ai-dispatcher.yml", "dispatch")
+
+    assert "workflow_run:" in workflow
+    assert "pull_request:" in workflow
+    assert "issues:" in workflow
+    assert "github.event.workflow_run.conclusion != 'cancelled'" in block
+    assert "github.event.label.name == 'agent-ready'" in block
+    assert "MAX_OPEN_AGENT_PRS: '24'" in block
+    assert "MAX_DISPATCH: ${{ inputs.max_dispatch || '8' }}" in block
+    assert "MAX_OPEN_AGENT_PRS: '5'" not in block
+    assert "schedule:" not in workflow.split("\njobs:", 1)[0]

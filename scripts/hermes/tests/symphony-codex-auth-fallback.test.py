@@ -53,12 +53,62 @@ class LinearHandler(http.server.BaseHTTPRequestHandler):
     # Override for single-issue admission re-checks (simulates a label guard
     # flagging an issue AFTER the reconcile list query observed it as admitted).
     single_issue_labels: dict[str, list[str]] = {}
+    pages: list[list[dict]] | None = None
+    list_responses: list[dict] | None = None
+
+    @classmethod
+    def _paged_issues(cls, body: str) -> dict:
+        after = None
+        try:
+            parsed = json.loads(body)
+        except ValueError:
+            parsed = None
+        if isinstance(parsed, dict):
+            variables = parsed.get("variables")
+            if isinstance(variables, dict):
+                after = variables.get("after")
+        pages = cls.pages if cls.pages is not None else [cls.nodes]
+        if after is None:
+            index = 0
+        else:
+            prefix = "cursor-"
+            if not isinstance(after, str) or not after.startswith(prefix):
+                return {"data": {"issues": {}}}
+            try:
+                index = int(after[len(prefix):]) + 1
+            except ValueError:
+                return {"data": {"issues": {}}}
+        if index >= len(pages):
+            return {
+                "data": {
+                    "issues": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    }
+                }
+            }
+        has_next = index + 1 < len(pages)
+        return {
+            "data": {
+                "issues": {
+                    "nodes": pages[index],
+                    "pageInfo": {
+                        "hasNextPage": has_next,
+                        "endCursor": f"cursor-{index}" if has_next else None,
+                    },
+                }
+            }
+        }
 
     def do_POST(self):  # noqa: N802 - stdlib handler API
         body = self.rfile.read(int(self.headers["Content-Length"])).decode()
         self.__class__.requests.append((self.headers.get("Authorization"), body))
         if "issues(" in body:
-            payload = {"data": {"issues": {"nodes": self.__class__.nodes}}}
+            responses = self.__class__.list_responses
+            if responses is not None:
+                payload = responses.pop(0) if responses else {"errors": [{"message": "empty"}]}
+            else:
+                payload = self._paged_issues(body)
         else:
             match = re.search(r'"id"\s*:\s*"([^"]+)"', body)
             identifier = match.group(1) if match else ""
@@ -306,6 +356,8 @@ class FallbackTests(unittest.TestCase):
     def linear_url(self):
         LinearHandler.requests = []
         LinearHandler.single_issue_labels = {}
+        LinearHandler.pages = None
+        LinearHandler.list_responses = None
         server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), LinearHandler)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.addCleanup(server.shutdown)
@@ -703,8 +755,71 @@ class FallbackTests(unittest.TestCase):
         self.assertTrue(any("fallback-ship-LYB-3" in line for line in events))
         self.assertFalse(any("fallback-ship-JOV-4" in line or "fallback-ship-LYB-5" in line for line in events))
         self.assertNotIn("linear-secret", result.stdout + result.stderr + self.events.read_text())
-        self.assertIn("first: 20", LinearHandler.requests[0][1])
-        self.assertIn("labels { nodes { name } }", LinearHandler.requests[0][1])
+        request_body = LinearHandler.requests[0][1]
+        self.assertIn("labels { nodes { name } }", request_body)
+        self.assertIn("pageInfo", request_body)
+        self.assertIn("hasNextPage", request_body)
+        self.assertNotIn("first: 20", request_body)
+
+    def _issue_node(self, identifier, *labels):
+        return {
+            "identifier": identifier,
+            "team": {"key": identifier.split("-", 1)[0]},
+            "labels": {"nodes": [{"name": name} for name in labels]},
+        }
+
+    def test_linear_identifiers_paginates_until_no_next_page(self):
+        module = self.load_controller_module()
+        url = self.linear_url()
+        LinearHandler.pages = [
+            [
+                self._issue_node("JOV-21", "symphony"),
+                self._issue_node("JOV-22", "symphony", "needs:human"),
+            ],
+            [
+                self._issue_node("LYB-23", "symphony"),
+                self._issue_node("JOV-24", "symphony", "hold"),
+                self._issue_node("JOV-25", "symphony"),
+            ],
+        ]
+        with mock.patch.dict(os.environ, {"LINEAR_API_KEY": "linear-secret", "LINEAR_API_URL": url}):
+            identifiers = module._linear_identifiers()
+        self.assertEqual(identifiers, ["JOV-21", "LYB-23", "JOV-25"])
+        self.assertEqual(len(LinearHandler.requests), 2)
+        first = json.loads(LinearHandler.requests[0][1])
+        second = json.loads(LinearHandler.requests[1][1])
+        self.assertEqual(first["query"], module.LINEAR_QUERY)
+        self.assertEqual(second["query"], module.LINEAR_QUERY)
+        self.assertEqual(first["variables"]["first"], module.LINEAR_PAGE_SIZE)
+        self.assertNotIn("after", first["variables"])
+        self.assertEqual(second["variables"]["after"], "cursor-0")
+        self.assertGreater(module.LINEAR_PAGE_SIZE, 20)
+        self.assertNotIn("first: 20", first["query"])
+        self.assertEqual(module.REQUIRED_ADMISSION_LABELS, frozenset(("symphony",)))
+
+    def test_linear_identifiers_fails_closed_on_malformed_page_info(self):
+        module = self.load_controller_module()
+        url = self.linear_url()
+        LinearHandler.list_responses = [
+            {
+                "data": {
+                    "issues": {
+                        "nodes": [self._issue_node("JOV-21", "symphony")],
+                        "pageInfo": {"hasNextPage": True, "endCursor": "cursor-0"},
+                    }
+                }
+            },
+            {
+                "data": {
+                    "issues": {
+                        "nodes": [self._issue_node("JOV-22", "symphony")],
+                    }
+                }
+            },
+        ]
+        with mock.patch.dict(os.environ, {"LINEAR_API_KEY": "linear-secret", "LINEAR_API_URL": url}):
+            self.assertIsNone(module._linear_identifiers())
+        self.assertEqual(len(LinearHandler.requests), 2)
 
     def test_default_grok_limit_is_four_and_blocked_labels_are_gates(self):
         module = self.load_controller_module()

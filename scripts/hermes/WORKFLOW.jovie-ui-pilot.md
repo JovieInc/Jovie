@@ -121,7 +121,7 @@ Gem owns the controller and queue observation. Symphony is the only implementati
 
 ## Hard rules
 
-0. On `Todo`, evaluate the fleet receipt first. Only `GREEN` with `workAdmission.newIssueLeaseAllowed=true` may claim new work and move it to `In Progress`. `AMBER` may continue an existing lease but may not create one; `RED` may not claim or continue. After a ready-but-held PR exists with a real commit, move to `In Review` using `gh` plus one Linear GraphQL mutation if needed. Never use an interactive connector approval path.
+0. On `Todo`, evaluate the fleet receipt first. `GREEN` or `AMBER` with `workAdmission.newIssueLeaseAllowed=true` may claim new work and move it to `In Progress`. `RED` may not claim or continue. Promotion and hold-lift still require a fresh `GREEN` plus independent review. After a ready-but-held PR exists with a real commit, move to `In Review` using `gh` plus one Linear GraphQL mutation if needed. Never use an interactive connector approval path.
 1. Work only inside this workspace. Do not touch other paths and do not ask a human to perform routine follow-up.
 2. Prefer the smallest correct fix. No drive-by refactors.
 3. Do not weaken CI, delete tests, skip hooks, use `--no-verify`, or bypass a failed gate.

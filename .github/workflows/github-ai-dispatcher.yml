@@ -1,11 +1,19 @@
 # GitHub AI Dispatcher
 #
-# Scheduled retry loop for issues labeled agent-ready. The dispatcher is
+# Event-driven dispatch for issues labeled agent-ready. The dispatcher is
 # label-scoped so the orchestrator can open more work only when capacity allows.
+# A 5-PR cap left ~100 org runner slots idle; fill eligible work instead.
 
 name: GitHub AI Dispatcher
 
 on:
+  issues:
+    types: [labeled]
+  pull_request:
+    types: [closed]
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
   workflow_dispatch:
     inputs:
       ready_label:
@@ -15,7 +23,7 @@ on:
       max_dispatch:
         description: 'Maximum issues to dispatch this run'
         required: false
-        default: '2'
+        default: '8'
       dry_run:
         description: 'Log candidates without dispatching'
         required: false
@@ -30,6 +38,9 @@ concurrency:
 jobs:
   dispatch:
     name: Dispatch Ready GitHub Issues
+    if: >-
+      (github.event_name != 'issues' || github.event.label.name == 'agent-ready') &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion != 'cancelled')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -38,9 +49,9 @@ jobs:
       actions: write
     env:
       READY_LABEL: ${{ inputs.ready_label || 'agent-ready' }}
-      MAX_DISPATCH: ${{ inputs.max_dispatch || '2' }}
+      MAX_DISPATCH: ${{ inputs.max_dispatch || '8' }}
       DRY_RUN: ${{ inputs.dry_run || 'false' }}
-      MAX_OPEN_AGENT_PRS: '5'
+      MAX_OPEN_AGENT_PRS: '24'
     steps:
       - name: Generate Jovie Bot token
         id: app-token

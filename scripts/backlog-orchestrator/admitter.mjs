@@ -525,8 +525,7 @@ export function evaluateFleetGate(
     state === FLEET_GATE_STATE.RED
       ? []
       : [
-          ...(reviewAdmission.allowed &&
-          (!queueShapeValid || queueBelowBackpressure)
+          ...(!queueShapeValid || queueBelowBackpressure
             ? ['approved-issue-lease']
             : []),
           'isolated-implementation',

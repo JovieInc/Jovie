@@ -137,8 +137,6 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
     new_issue_lease = receipt.get("workAdmission", {}).get("newIssueLeaseAllowed")
     if not isinstance(new_issue_lease, bool):
         raise GateContractError("new issue lease admission is missing or is not boolean")
-    if new_issue_lease and not review_allowed:
-        raise GateContractError("new issue lease admission bypasses independent review")
     if promotion_allowed and not review_allowed:
         raise GateContractError("promotion admission bypasses independent review")
     if direct_gem_allowed:

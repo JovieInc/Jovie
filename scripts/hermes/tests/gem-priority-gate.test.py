@@ -217,11 +217,11 @@ AUTOENROLL_RECEIPT_JQ = """
 
 
 def autoenroll_receipt_query() -> str:
-    content = AUTOENROLL_WORKFLOW.read_text(encoding="utf-8")
+    content = (ROOT / "scripts/hermes/evaluate-fleet-gate.sh").read_text(encoding="utf-8")
     for clause in AUTOENROLL_RECEIPT_JQ.split(" and\n"):
         if clause not in content:
             raise AssertionError(
-                f"merge-queue-autoenroll.yml is missing fleet receipt jq clause: {clause}"
+                f"evaluate-fleet-gate.sh is missing fleet receipt jq clause: {clause}"
             )
     return AUTOENROLL_RECEIPT_JQ
 
@@ -730,7 +730,7 @@ class IndependentReviewTests(unittest.TestCase):
         self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertTrue(receipt["promotionAdmission"]["allowed"])
 
-    def test_missing_receipt_blocks_normal_admission_but_keeps_remediation_live(self):
+    def test_missing_receipt_blocks_promotion_but_keeps_isolated_leasing_live(self):
         receipt = self.evaluate(None)
 
         self.assertEqual(receipt["state"], "AMBER")
@@ -740,7 +740,7 @@ class IndependentReviewTests(unittest.TestCase):
             "independent-review-receipt-missing",
         )
         self.assertTrue(receipt["workAdmission"]["allowed"])
-        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertFalse(receipt["promotionAdmission"]["allowed"])
         self.assertTrue(receipt["deploymentAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
@@ -778,7 +778,7 @@ class IndependentReviewTests(unittest.TestCase):
                 receipt = self.evaluate(review)
                 self.assertFalse(receipt["reviewAdmission"]["allowed"])
                 self.assertEqual(receipt["reviewAdmission"]["reason"], reason)
-                self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+                self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
                 self.assertFalse(receipt["promotionAdmission"]["allowed"])
 
     def test_review_does_not_bypass_bounded_concurrency_evidence(self):
@@ -950,10 +950,11 @@ class WorkflowContractTests(unittest.TestCase):
 
     def test_autoenroll_persists_fleet_receipt_without_dry_run(self):
         content = (self.WORKFLOWS / "merge-queue-autoenroll.yml").read_text(encoding="utf-8")
-        self.assertIn("--consumer fleet", content)
-        self.assertNotIn("--dry-run", content)
-        self.assertIn("receipt is the authority", content)
-        self.assertIn(AUTOENROLL_RECEIPT_JQ.split(" and\n")[0], content)
+        self.assertIn("./.github/actions/evaluate-fleet-gate", content)
+        self.assertIn("dry-run: 'false'", content)
+        wrapper = (ROOT / "scripts/hermes/evaluate-fleet-gate.sh").read_text(encoding="utf-8")
+        self.assertIn("--consumer fleet", wrapper)
+        self.assertIn(AUTOENROLL_RECEIPT_JQ.split(" and\n")[0], wrapper)
 
     def test_production_controller_uses_exact_subject_deployment_admission(self):
         content = (self.WORKFLOWS / "production-controller.yml").read_text(encoding="utf-8")
@@ -975,11 +976,16 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("branches: [main]", content)
         self.assertIn("ref: main", content)
         self.assertIn("node-version: '22'", content)
-        self.assertIn("gem-priority-gate.py", content)
-        self.assertNotIn("--dry-run", content)
+        self.assertIn("./.github/actions/evaluate-fleet-gate", content)
+        self.assertIn("dry-run: 'false'", content)
         self.assertIn("jovie-fixed", content)
         self.assertIn("cancel-in-progress: false", content)
+        self.assertIn("github.event.workflow_run.conclusion != 'cancelled'", content)
         self.assertIn("github.event.pull_request.merged != true", content)
+        self.assertIn("github.event.label.name == 'hold'", content)
+        self.assertIn("github.event.label.name == 'gated'", content)
+        self.assertIn("github.event.label.name == 'queue-deferred'", content)
+        self.assertIn("github.event.label.name == 'needs-human'", content)
         self.assertIn("JOVIE_AGENT_PROFILE: no_agent", content)
         self.assertIn("timeout 180s scripts/backlog-orchestrator/run-backlog.sh reconcile", content)
         self.assertIn("timeout 60s scripts/backlog-orchestrator/run-backlog.sh gate-next", content)
