@@ -2,6 +2,24 @@ import Foundation
 import Testing
 
 struct AuthScreenStyleGuardTests {
+  @Test func waitlistPendingUsesStandaloneAccountSwitchInsteadOfAppShell() throws {
+    let sourceURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Jovie/App/RootView.swift")
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+    let routeStart = try #require(source.range(of: "case .needsOnboarding:"))
+    let readyStart = try #require(
+      source.range(of: "case .ready:", range: routeStart.upperBound..<source.endIndex)
+    )
+    let routeSource = source[routeStart.lowerBound..<readyStart.lowerBound]
+
+    #expect(routeSource.contains("if appState.loadedDashboardResponse?.state == .waitlistPending"))
+    #expect(routeSource.contains("WaitlistPendingView(onUseDifferentAccount: onLogout)"))
+    #expect(source.contains("accessibilityIdentifier(\"waitlist-use-different-account\")"))
+  }
+
   @Test func continueInBrowserLoadingSpinnerUsesNeutralForeground() throws {
     let sourceURL = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent()

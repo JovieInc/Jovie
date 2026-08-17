@@ -9,6 +9,7 @@ import {
 } from '@jovie/auth-routing';
 import { NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
+import { auth } from '@/lib/auth/better-auth';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { createStoredAuthState } from '@/lib/auth/routing-state.server';
 import { env } from '@/lib/env';
@@ -33,6 +34,7 @@ const LOCAL_AUTH_START_LIMITER = createRateLimiter(RATE_LIMITERS.general, {
 });
 
 const DESKTOP_AUTH_FLOW_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
+const AUTH_STATE_PATTERN = /^[A-Za-z0-9_-]{16,128}$/;
 
 function createState(): string {
   return crypto.randomUUID().replaceAll('-', '');
@@ -116,6 +118,36 @@ function createRateLimitedHtmlResponse(
       ...createRateLimitHeaders(rateLimit),
       'Content-Type': 'text/html; charset=utf-8',
       'Retry-After': String(retryAfterSeconds),
+    },
+  });
+}
+
+function createAccountSwitchHtmlResponse(state: string): NextResponse {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Choose an account — Jovie</title>
+</head>
+<body style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0b0b0b;color:#f5f4f0;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+<main style="max-width:400px;padding:32px 24px;text-align:center;">
+<h1 style="margin:0 0 12px;font-size:20px;font-weight:600;letter-spacing:-0.01em;">Choose an account</h1>
+<p style="margin:0 0 24px;font-size:15px;line-height:1.5;color:#a1a1a6;">Continue to choose which Jovie account to use in the app.</p>
+<form method="post" action="/auth/start">
+<input type="hidden" name="auth_state" value="${state}" />
+<input type="hidden" name="intent" value="sign_in" />
+<button type="submit" style="appearance:none;border:0;cursor:pointer;background:#f5f4f0;color:#0b0b0b;font-size:15px;font-weight:600;font-family:inherit;padding:10px 24px;border-radius:9999px;">Choose an Account</button>
+</form>
+</main>
+</body>
+</html>`;
+
+  return new NextResponse(html, {
+    status: 200,
+    headers: {
+      ...NO_STORE_HEADERS,
+      'Content-Type': 'text/html; charset=utf-8',
     },
   });
 }
@@ -244,6 +276,10 @@ export async function GET(request: Request) {
     });
 
     const { userId } = await getCachedAuth();
+    if (userId && rawClient !== 'web' && rawIntent === 'sign_in') {
+      return createAccountSwitchHtmlResponse(record.state);
+    }
+
     if (userId) {
       return NextResponse.redirect(
         new URL(buildAuthCallbackPath(record.state), request.url),
@@ -268,6 +304,46 @@ export async function GET(request: Request) {
       intent: rawIntent,
     });
 
+    return NextResponse.json(
+      { error: 'Auth is temporarily unavailable' },
+      { status: 503, headers: NO_STORE_HEADERS }
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const formData = await request.formData();
+    const state = formData.get('auth_state');
+    const intent = formData.get('intent');
+    if (
+      typeof state !== 'string' ||
+      !AUTH_STATE_PATTERN.test(state) ||
+      intent !== 'sign_in'
+    ) {
+      return NextResponse.json(
+        { error: 'Invalid account switch request' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const signOutResponse = await auth.api.signOut({
+      headers: request.headers,
+      asResponse: true,
+    });
+    const authPage = new URL(APP_ROUTES.SIGNIN, request.url);
+    authPage.searchParams.set('auth_state', state);
+    const response = NextResponse.redirect(authPage, {
+      headers: NO_STORE_HEADERS,
+    });
+    for (const cookie of signOutResponse.headers.getSetCookie()) {
+      response.headers.append('set-cookie', cookie);
+    }
+    return response;
+  } catch (error) {
+    await captureError('Auth account switch failed', error, {
+      route: '/auth/start',
+    });
     return NextResponse.json(
       { error: 'Auth is temporarily unavailable' },
       { status: 503, headers: NO_STORE_HEADERS }

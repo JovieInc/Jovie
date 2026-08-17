@@ -47,4 +47,24 @@ struct MobileMeResponseTests {
     #expect(response.continueOnWebURL == "https://jov.ie/app")
     #expect(response.chatEnabled == false)
   }
+
+  @Test func decodesWaitlistPendingResponse() throws {
+    let data = """
+      {
+        "state": "waitlist_pending",
+        "displayName": null,
+        "username": null,
+        "publicProfileUrl": null,
+        "qrPayload": null,
+        "avatarUrl": null,
+        "appleWalletProfilePassAvailable": false,
+        "chatEnabled": false,
+        "continueOnWebUrl": "https://jov.ie/app"
+      }
+      """.data(using: .utf8)!
+
+    let response = try JSONDecoder().decode(MobileMeResponse.self, from: data)
+
+    #expect(response.state == .waitlistPending)
+  }
 }

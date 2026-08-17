@@ -217,6 +217,32 @@ describe('GET /api/mobile/v1/me', () => {
     });
   });
 
+  it('returns waitlist_pending instead of an impossible profile-completion state', async () => {
+    hoisted.getSessionContextMock.mockResolvedValue({
+      user: {
+        userStatus: 'waitlist_pending',
+      },
+      profile: null,
+    });
+
+    const { GET } = await routeModulePromise;
+    const response = await GET(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({
+      state: 'waitlist_pending',
+      displayName: null,
+      username: null,
+      publicProfileUrl: null,
+      qrPayload: null,
+      avatarUrl: null,
+      continueOnWebUrl: 'https://jov.ie/app',
+      appleWalletProfilePassAvailable: false,
+      chatEnabled: false,
+    });
+  });
+
   it('returns needs_onboarding when the profile is incomplete', async () => {
     hoisted.isProfileCompleteMock.mockReturnValue(false);
     hoisted.getSessionContextMock.mockResolvedValue({

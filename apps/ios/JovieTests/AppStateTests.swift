@@ -227,6 +227,37 @@ struct AppStateTests {
     #expect(appState.continueOnWebURL.absoluteString == "https://jov.ie/app")
   }
 
+  @Test func mapsWaitlistPendingResponseAwayFromProfileCompletion() async throws {
+    let pending = MobileMeResponse(
+      state: .waitlistPending,
+      displayName: nil,
+      username: nil,
+      publicProfileURL: nil,
+      qrPayload: nil,
+      avatarURL: nil,
+      appleWalletProfilePassAvailable: false,
+      chatEnabled: false,
+      continueOnWebURL: "https://jov.ie/app"
+    )
+    let repository = MockRepository(
+      nextResult: .success(
+        MeRepositoryResult(response: pending, isStale: false)
+      )
+    )
+    let appState = AppState(
+      configuration: configuration,
+      launchMode: .live,
+      repository: repository,
+      brightnessManager: MockBrightnessController()
+    )
+    appState.didInitializeAuth = true
+
+    await appState.handleSignedInUserChange("user_pending")
+
+    #expect(appState.route == .needsOnboarding)
+    #expect(appState.dashboardState == .loaded(pending))
+  }
+
   @Test func coldProfileLoadShowsInteractiveShellBeforeNetworkReturns() async throws {
     let repository = MockRepository(
       nextResult: .success(

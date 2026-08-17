@@ -84,7 +84,11 @@ private struct AppContentView: View {
         )
         .transition(.opacity)
       case .needsOnboarding:
-        AppShellView(
+        if appState.loadedDashboardResponse?.state == .waitlistPending {
+          WaitlistPendingView(onUseDifferentAccount: onLogout)
+            .transition(.opacity)
+        } else {
+          AppShellView(
           profile: AppShellProfile(response: appState.loadedDashboardResponse),
           isOffline: false,
           initialTab: .profile,
@@ -157,7 +161,8 @@ private struct AppContentView: View {
             MobileChatPlaceholderView(isOffline: false, draft: draft)
           }
         }
-        .transition(.opacity)
+          .transition(.opacity)
+        }
       case .ready:
         AppShellView(
           profile: AppShellProfile(response: appState.loadedDashboardResponse),
@@ -443,6 +448,36 @@ private struct AppContentView: View {
         return
       }
       audienceHighlightsState = .error("Couldn't load audience highlights.")
+    }
+  }
+}
+
+private struct WaitlistPendingView: View {
+  let onUseDifferentAccount: @MainActor () async -> Void
+
+  var body: some View {
+    ZStack {
+      JovieColor.backgroundBase.ignoresSafeArea()
+
+      VStack(alignment: .leading, spacing: JovieSpacing.large) {
+        VStack(alignment: .leading, spacing: JovieSpacing.small) {
+          Text("You're on the Waitlist")
+            .font(JovieFont.display(size: 28))
+            .foregroundStyle(JovieColor.textPrimary)
+
+          Text("This account doesn't have access yet. You can use a different account instead.")
+            .font(JovieFont.body(size: 16))
+            .foregroundStyle(JovieColor.textSecondary)
+        }
+
+        Button("Use a Different Account") {
+          Task { await onUseDifferentAccount() }
+        }
+        .buttonStyle(JoviePillButtonStyle(filled: true))
+        .accessibilityIdentifier("waitlist-use-different-account")
+      }
+      .frame(maxWidth: 420, alignment: .leading)
+      .padding(JovieSpacing.xLarge)
     }
   }
 }

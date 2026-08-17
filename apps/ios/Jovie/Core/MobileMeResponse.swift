@@ -4,6 +4,7 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
   enum State: String, Codable, Sendable {
     case ready
     case needsOnboarding = "needs_onboarding"
+    case waitlistPending = "waitlist_pending"
   }
 
   let state: State
@@ -54,6 +55,18 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
 
   static let previewNeedsOnboarding = MobileMeResponse(
     state: .needsOnboarding,
+    displayName: nil,
+    username: nil,
+    publicProfileURL: nil,
+    qrPayload: nil,
+    avatarURL: nil,
+    appleWalletProfilePassAvailable: false,
+    chatEnabled: false,
+    continueOnWebURL: "https://jov.ie/app"
+  )
+
+  static let previewWaitlistPending = MobileMeResponse(
+    state: .waitlistPending,
     displayName: nil,
     username: nil,
     publicProfileURL: nil,
