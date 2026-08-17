@@ -328,7 +328,7 @@ export function cancelledReceipt(receipt, signal, nowMs = Date.now()) {
 export async function runPreparedEntry(options, dependencies = {}) {
   const now = dependencies.nowImpl ?? Date.now;
   const save = dependencies.writeReceiptImpl ?? writeReceipt;
-  const rawPlan = await readFile(options.planPath);
+  const rawPlan = await readFile(options.planPath, 'utf8');
   const plan = JSON.parse(rawPlan);
   const validation = validatePlan(plan, { nowMs: now() });
   if (!validation.ok) throw new Error(validation.errors.join('; '));
@@ -458,7 +458,7 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const planPath = need(options, 'plan');
   if (options.command === 'plan') {
-    const rawPlan = await readFile(planPath);
+    const rawPlan = await readFile(planPath, 'utf8');
     const plan = JSON.parse(rawPlan);
     const trustedDefaultBranchSha = need(options, 'trustedDefaultSha');
     const bundle = createPlanBundle({
