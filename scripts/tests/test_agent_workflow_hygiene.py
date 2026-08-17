@@ -260,10 +260,18 @@ for (const expected of [{expectedBaseOid:'e'.repeat(40)},{expectedHeadOid:'f'.re
 
 def test_pr_preparation_canary_workflow_is_manual_bounded_and_queue_inert() -> None:
     workflow = (WORKFLOWS / "pr-preparation-canary.yml").read_text(encoding="utf-8")
-    trigger = workflow.split("\non:\n", 1)[1].split("\nconcurrency:", 1)[0]
+    trigger = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
     assert "workflow_dispatch:" in trigger
     assert all(event not in trigger for event in ("schedule:", "push:", "pull_request:"))
     assert "max-parallel: 4" in workflow and "fail-fast: false" in workflow
+    assert workflow.count("timeout-minutes: 10") == 2
+    assert "merge-queue-drain-mutex" not in workflow
+    assert "JOVIE_BOT_PRIVATE_KEY" not in workflow
+    assert "create-github-app-token" not in workflow
+    assert "--mode dry-run" in workflow and "--mode apply" not in workflow
+    assert workflow.count("if-no-files-found: error") == 2
+    assert "if-no-files-found: ignore" not in workflow
+    assert "continue-on-error: true" not in workflow
     assert "ref: main" in workflow
     assert "ref: ${{ needs.plan.outputs.trusted_default_sha }}" in workflow
     source = (REPO_ROOT / "scripts/pr-preparation-canary.mjs").read_text(encoding="utf-8")

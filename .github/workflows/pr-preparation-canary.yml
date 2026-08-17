@@ -1,29 +1,14 @@
 name: PR Preparation Canary
-# Manual only; native auto-enrollment remains the sole admission owner.
+# Manual evidence only; native auto-enrollment remains the sole admission owner.
 on:
   workflow_dispatch:
-    inputs:
-      mode:
-        description: 'Dry-run eligibility or apply the exact trusted plan.'
-        required: true
-        default: dry-run
-        type: choice
-        options: [dry-run, apply]
-      confirm_plan_sha:
-        description: 'Apply only: SHA-256 printed by the prior dry-run.'
-        required: false
-        type: string
-concurrency:
-  # Share the native admission writer mutex so branch updates cannot race
-  # auto-enrollment's queue/hold revalidation.
-  group: merge-queue-drain-mutex
-  cancel-in-progress: false
 permissions:
   contents: read
   pull-requests: read
 jobs:
   plan:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
       has_entries: ${{ steps.plan.outputs.has_entries }}
@@ -42,8 +27,6 @@ jobs:
         id: plan
         env:
           GH_TOKEN: ${{ github.token }}
-          MODE: ${{ inputs.mode }}
-          CONFIRM_PLAN_SHA: ${{ inputs.confirm_plan_sha }}
         run: |
           set -euo pipefail
           matrix="$RUNNER_TEMP/matrix.json"
@@ -51,7 +34,7 @@ jobs:
           result=$(node scripts/pr-preparation-canary.mjs plan \
             --plan .github/pr-preparation-canary-plan.json \
             --trusted-default-sha "$(git rev-parse HEAD)" \
-            --mode "$MODE" --confirmation "$CONFIRM_PLAN_SHA" \
+            --mode dry-run --confirmation '' \
             --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" \
             --matrix "$matrix" --receipt "$receipt")
           {
@@ -69,10 +52,11 @@ jobs:
           if-no-files-found: error
           retention-days: 14
   prepare:
-    name: '${{ inputs.mode }} PR #${{ matrix.number }}'
+    name: 'dry-run PR #${{ matrix.number }}'
     needs: plan
     if: needs.plan.outputs.has_entries == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       max-parallel: 4
@@ -86,35 +70,24 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: '.nvmrc'
-      - name: Generate narrowly scoped apply token
-        if: inputs.mode == 'apply'
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-          permission-contents: write
-          permission-pull-requests: write
       - name: Run isolated preparation
         env:
-          GH_TOKEN: ${{ inputs.mode == 'apply' && steps.app-token.outputs.token || github.token }}
+          GH_TOKEN: ${{ github.token }}
           PLAN_HASH: ${{ needs.plan.outputs.plan_hash }}
           TRUSTED_DEFAULT_SHA: ${{ needs.plan.outputs.trusted_default_sha }}
           PR_NUMBER: ${{ matrix.number }}
-          MODE: ${{ inputs.mode }}
-          CONFIRM_PLAN_SHA: ${{ inputs.confirm_plan_sha }}
         run: |
           set -euo pipefail
           node scripts/pr-preparation-canary.mjs run \
             --plan .github/pr-preparation-canary-plan.json \
             --plan-hash "$PLAN_HASH" --trusted-default-sha "$TRUSTED_DEFAULT_SHA" \
-            --mode "$MODE" --confirmation "$CONFIRM_PLAN_SHA" \
+            --mode dry-run --confirmation '' \
             --pr "$PR_NUMBER" --receipt "$RUNNER_TEMP/pr-$PR_NUMBER.json" \
             --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: pr-preparation-${{ inputs.mode }}-${{ matrix.number }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: pr-preparation-dry-run-${{ matrix.number }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/pr-${{ matrix.number }}.json
           if-no-files-found: error
           retention-days: 14

@@ -6,12 +6,14 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  createApplyConfirmation,
   createAtomicReceiptWriter,
   createPlanBundle,
   evaluateEligibility,
   fetchPrSnapshot,
   HOLD_LABELS,
   PLAN_SCHEMA,
+  RECEIPT_SCHEMA,
   runPlanCommand,
   runPreparedEntry,
   validatePlan,
@@ -26,6 +28,24 @@ const MODULE_URL = pathToFileURL(
 ).href;
 const tempDirs = [];
 const hash = value => createHash('sha256').update(value).digest('hex');
+const signedReceipt = body => ({
+  ...body,
+  receiptSha256: hash(`${JSON.stringify(body)}\n`),
+});
+const dryRunReceiptFor = planHash =>
+  signedReceipt({
+    schema: RECEIPT_SCHEMA,
+    kind: 'item',
+    mode: 'dry-run',
+    outcome: 'eligible_dry_run',
+    planHash,
+    trustedDefaultBranchSha: BASE,
+    pr: 16001,
+    expectedHeadOid: HEAD,
+    observedHeadOid: HEAD,
+    mutationAttempted: false,
+    mutationApplied: false,
+  });
 
 async function makeTemp() {
   const directory = await import('node:fs/promises').then(({ mkdtemp }) =>
@@ -131,13 +151,20 @@ async function runApply({
 }) {
   const fixture = await preparedFixture();
   const receiptPath = join(fixture.directory, receiptName);
+  const dryRunReceipt = dryRunReceiptFor(fixture.bundle.planHash);
   const result = await runPreparedEntry(
     {
       planPath: fixture.planPath,
       planHash: fixture.bundle.planHash,
       trustedDefaultBranchSha: BASE,
       mode: 'apply',
-      confirmation: fixture.bundle.planHash,
+      controllerSha: BASE,
+      dryRunReceipt,
+      confirmation: createApplyConfirmation({
+        planHash: fixture.bundle.planHash,
+        controllerSha: BASE,
+        dryRunReceiptSha256: dryRunReceipt.receiptSha256,
+      }),
       prNumber: 16001,
       receiptPath,
       runId: '1',
@@ -248,6 +275,15 @@ describe('statusCheckRollup pagination', () => {
     const snapshot = await fetchPrSnapshot('JovieInc/Jovie', 16001, {
       ghJsonImpl: async args => {
         calls.push(args);
+        if (calls.length === 3) {
+          return contextPage({
+            nodes: [],
+            totalCount: 0,
+            hasNextPage: false,
+            endCursor: null,
+            includeMetadata: true,
+          });
+        }
         return calls.length === 1
           ? contextPage({
               nodes: first,
@@ -265,7 +301,7 @@ describe('statusCheckRollup pagination', () => {
       },
     });
     expect(snapshot.statusCheckRollup).toHaveLength(101);
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(3);
     expect(calls[1]).toContain('cursor=cursor-1');
   });
 
@@ -427,6 +463,26 @@ describe('mutation-boundary race closure', () => {
 });
 
 describe('apply outcomes and idempotency', () => {
+  it('preserves an unverified attempted mutation as indeterminate', async () => {
+    const { result } = await runApply({
+      rebaseImpl: async () => ({
+        ok: false,
+        mutationAttempted: true,
+        mutationApplied: null,
+        observedHeadOid: null,
+        requiresExactRereadBeforeRetry: true,
+        reason: 'outcome unknown',
+      }),
+    });
+    expect(result).toMatchObject({
+      outcome: 'update_failed',
+      mutationAttempted: true,
+      mutationApplied: null,
+      observedHeadOid: null,
+      requiresExactRereadBeforeRetry: true,
+    });
+  });
+
   it.each([
     [
       'successful apply',
@@ -485,11 +541,17 @@ describe('apply outcomes and idempotency', () => {
       planHash: fixture.bundle.planHash,
       trustedDefaultBranchSha: BASE,
       mode: 'apply',
-      confirmation: fixture.bundle.planHash,
+      controllerSha: BASE,
+      dryRunReceipt: dryRunReceiptFor(fixture.bundle.planHash),
       prNumber: 16001,
       runId: '1',
       runAttempt: '1',
     };
+    options.confirmation = createApplyConfirmation({
+      planHash: fixture.bundle.planHash,
+      controllerSha: BASE,
+      dryRunReceiptSha256: options.dryRunReceipt.receiptSha256,
+    });
     const dependencies = {
       nowImpl: () => NOW,
       fetchRepositoryPolicyImpl: async () => policy(),
@@ -711,23 +773,5 @@ describe('receipt durability', () => {
     expect(
       (await readdir(directory)).some(name => name.includes('.tmp-'))
     ).toBe(false);
-  });
-});
-
-describe('workflow safety contract', () => {
-  it('shares the auto-enroll mutex and never ignores a missing receipt', async () => {
-    const workflow = await readFile(
-      join(process.cwd(), '.github/workflows/pr-preparation-canary.yml'),
-      'utf8'
-    );
-    const autoEnroll = await readFile(
-      join(process.cwd(), '.github/workflows/merge-queue-autoenroll.yml'),
-      'utf8'
-    );
-    expect(workflow).toContain('group: merge-queue-drain-mutex');
-    expect(autoEnroll).toContain('group: merge-queue-drain-mutex');
-    expect(workflow.match(/if-no-files-found: error/gu)).toHaveLength(2);
-    expect(workflow).not.toContain('if-no-files-found: ignore');
-    expect(workflow).not.toContain('continue-on-error: true');
   });
 });

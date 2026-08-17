@@ -6,6 +6,7 @@ import { tryGitHubRebase } from './lib/github-update-branch.mjs';
 import {
   bootstrapReceipt,
   cancelledReceipt,
+  createApplyConfirmation,
   createAtomicReceiptWriter,
   envelope,
   errorReceipt,
@@ -15,10 +16,12 @@ import {
   HOLD_LABELS,
   installProcessSignalHandlers,
   RECEIPT_SCHEMA,
+  validateApplyEvidence,
 } from './lib/pr-preparation-safety.mjs';
 
 export {
   cancelledReceipt,
+  createApplyConfirmation,
   createAtomicReceiptWriter,
   evaluateEligibility,
   fetchPrSnapshot,
@@ -26,6 +29,7 @@ export {
   HOLD_LABELS,
   installProcessSignalHandlers,
   RECEIPT_SCHEMA,
+  validateApplyEvidence,
 };
 
 export const PLAN_SCHEMA = 'jovie-pr-preparation-canary-plan/v1';
@@ -46,6 +50,8 @@ const isSha = value =>
 const onlyKeys = (value, allowed) =>
   Object.keys(value).every(key => allowed.has(key));
 const hash = value => createHash('sha256').update(value).digest('hex');
+const triState = value =>
+  value === true ? true : value === false ? false : null;
 
 export function validatePlan(plan, { nowMs = Date.now() } = {}) {
   const errors = [];
@@ -213,12 +219,11 @@ export async function runPreparedEntry(options, dependencies = {}) {
       throw new Error('mode must be dry-run or apply');
     const planHash = hash(rawPlan);
     if (planHash !== options.planHash) throw new Error('plan SHA-256 changed');
-    if (options.mode === 'apply' && options.confirmation !== planHash)
-      throw new Error('apply confirmation does not match plan');
     const entry = plan.entries.find(
       candidate => candidate.number === options.prNumber
     );
     if (!entry) throw new Error('planned PR entry is missing');
+    if (options.mode === 'apply') validateApplyEvidence(options, entry);
     await persist({
       ...receipt,
       repository: plan.repository,
@@ -297,9 +302,11 @@ export async function runPreparedEntry(options, dependencies = {}) {
       outcome,
       reason: rebase.reason,
       expectedHeadOid: rebase.expectedHeadOid ?? entry.headOid,
-      observedHeadOid: rebase.observedHeadOid ?? entry.headOid,
-      mutationAttempted: Boolean(rebase.mutationAttempted),
-      mutationApplied: Boolean(rebase.mutationApplied),
+      observedHeadOid: rebase.observedHeadOid ?? null,
+      mutationAttempted: triState(rebase.mutationAttempted),
+      mutationApplied: triState(rebase.mutationApplied),
+      requiresExactRereadBeforeRetry:
+        rebase.requiresExactRereadBeforeRetry === true,
       category: rebase.category ?? null,
     });
     return receipt;
@@ -448,6 +455,11 @@ export async function runCli(argv) {
         trustedDefaultBranchSha: need(options, 'trustedDefaultSha'),
         mode: options.mode,
         confirmation: options.confirmation,
+        controllerSha: options.controllerSha,
+        dryRunReceipt:
+          options.mode === 'apply'
+            ? JSON.parse(await readFile(need(options, 'dryRunReceipt'), 'utf8'))
+            : null,
         prNumber: Number(need(options, 'pr')),
         receiptPath,
         runId: options.runId,
