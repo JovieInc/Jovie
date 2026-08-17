@@ -15,7 +15,11 @@ function detail(number, sha = `sha-${number}`) {
     draft: false,
     mergeable: true,
     mergeable_state: 'behind',
-    base: { ref: 'main', repo: { full_name: 'JovieInc/Jovie' } },
+    base: {
+      ref: 'main',
+      sha: `base-${number}`,
+      repo: { full_name: 'JovieInc/Jovie' },
+    },
     head: {
       ref: `codex/pr-${number}`,
       sha,
@@ -230,7 +234,9 @@ describe('REST open PR inventory', () => {
       number: 9,
       mergeable: 'MERGEABLE',
       mergeStateStatus: 'BEHIND',
+      baseRefOid: 'base-9',
       headRefName: 'codex/pr-9',
+      headRefOid: 'sha-9',
       headRepositoryOwner: { login: 'JovieInc' },
       isCrossRepository: false,
       changedFiles: 2,
