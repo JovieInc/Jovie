@@ -97,6 +97,7 @@ describe('SettingsContactsSection', () => {
 
     const sidebar = await screen.findByTestId('contact-detail-sidebar');
     expect(sidebar).toHaveAttribute('data-open', 'false');
+    expect(screen.getByText('Team Contacts')).toBeVisible();
 
     const label = screen.getByText('Management');
     const row = label.closest('button');
