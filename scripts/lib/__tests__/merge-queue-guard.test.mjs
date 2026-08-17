@@ -1208,11 +1208,12 @@ describe('exact-head GitHub Update Branch rebase', () => {
     expect(result).toMatchObject({
       ok: false,
       mutationAttempted: true,
-      mutationApplied: false,
+      mutationApplied: null,
       conflict: false,
       category: 'verification_failure',
       expectedHeadOid: ORIGINAL_HEAD,
-      observedHeadOid: RACING_HEAD,
+      observedHeadOid: null,
+      requiresExactRereadBeforeRetry: true,
     });
     expect(result.reason).toContain('integration-tree proof');
     expect(sleepImpl).toHaveBeenCalledOnce();
@@ -1238,7 +1239,10 @@ describe('exact-head GitHub Update Branch rebase', () => {
     expect(result).toMatchObject({
       ok: false,
       category: 'verification_failure',
-      observedHeadOid: UPDATED_HEAD,
+      mutationAttempted: true,
+      mutationApplied: null,
+      observedHeadOid: null,
+      requiresExactRereadBeforeRetry: true,
     });
     expect(result.reason).toContain('base-ancestry');
   });
@@ -1336,11 +1340,12 @@ describe('exact-head GitHub Update Branch rebase', () => {
     expect(result).toMatchObject({
       ok: false,
       mutationAttempted: true,
-      mutationApplied: false,
+      mutationApplied: null,
       conflict: false,
       category: 'verification_failure',
       expectedHeadOid: ORIGINAL_HEAD,
-      observedHeadOid: ORIGINAL_HEAD,
+      observedHeadOid: null,
+      requiresExactRereadBeforeRetry: true,
     });
     expect(clock.sleepImpl.mock.calls.map(([delayMs]) => delayMs)).toEqual([
       250, 500, 1000, 2000, 4000, 8000, 14000, 250,
@@ -1460,11 +1465,12 @@ describe('exact-head GitHub Update Branch rebase', () => {
     expect(result).toMatchObject({
       ok: false,
       mutationAttempted: true,
-      mutationApplied: false,
+      mutationApplied: null,
       conflict: false,
       category: 'stale_head',
       expectedHeadOid: ORIGINAL_HEAD,
-      observedHeadOid: UPDATED_HEAD,
+      observedHeadOid: null,
+      requiresExactRereadBeforeRetry: true,
     });
   });
 

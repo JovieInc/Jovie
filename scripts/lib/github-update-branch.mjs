@@ -9,6 +9,12 @@ const POST_UPDATE_VERIFY_DELAYS_MS = [
 const UPDATE_OPERATION_BUDGET_MS = 30_000;
 const SUBPROCESS_CLEANUP_GRACE_MS = 250;
 const NO_MUTATION = { mutationAttempted: false, mutationApplied: false };
+const INDETERMINATE_MUTATION = {
+  mutationAttempted: true,
+  mutationApplied: null,
+  observedHeadOid: null,
+  requiresExactRereadBeforeRetry: true,
+};
 const PROOF_FETCH_DEPTH = '256';
 
 class DeadlineExceededError extends Error {
@@ -890,14 +896,12 @@ export async function tryGitHubRebase({
   } catch (error) {
     if (isDeadlineExceeded(error)) {
       return {
-        mutationAttempted: true,
-        mutationApplied: false,
+        ...INDETERMINATE_MUTATION,
         ok: false,
         conflict: false,
         category: 'verification_failure',
         baseRefName: before.baseRefName,
         expectedHeadOid: before.headRefOid,
-        observedHeadOid: null,
         reason: `GitHub rebase could not be verified before the absolute deadline: ${errorText(error)}`,
       };
     }
@@ -906,33 +910,30 @@ export async function tryGitHubRebase({
       after = await tryFetchPrSnapshot(repo, pr.number, ghJsonImpl, deadline);
     } catch (afterError) {
       return {
-        mutationAttempted: true,
-        mutationApplied: false,
+        ...INDETERMINATE_MUTATION,
         ok: false,
         conflict: false,
         category: 'verification_failure',
         baseRefName: before.baseRefName,
         expectedHeadOid: before.headRefOid,
-        observedHeadOid: null,
         reason: `GitHub rebase failure could not be verified before the absolute deadline: ${errorText(afterError)}`,
       };
     }
     return {
       ...classifyGitHubRebaseFailure({ error, before, after }),
-      mutationAttempted: true,
-      mutationApplied: false,
+      ...INDETERMINATE_MUTATION,
       baseRefName: before.baseRefName,
       expectedHeadOid: before.headRefOid,
-      observedHeadOid: after?.headRefOid ?? null,
     };
   }
 
   const mutated = mutation?.data?.updatePullRequestBranch?.pullRequest;
   const mutationState = {
     mutationAttempted: true,
-    mutationApplied: Boolean(
+    mutationApplied:
       mutated?.headRefOid && mutated.headRefOid !== before.headRefOid
-    ),
+        ? true
+        : null,
   };
   if (
     !mutated?.headRefOid ||
@@ -942,6 +943,12 @@ export async function tryGitHubRebase({
   ) {
     return {
       ...mutationState,
+      ...(mutationState.mutationApplied === null
+        ? {
+            observedHeadOid: null,
+            requiresExactRereadBeforeRetry: true,
+          }
+        : {}),
       ok: false,
       conflict: false,
       category: 'verification_failure',
@@ -967,7 +974,10 @@ export async function tryGitHubRebase({
   const verifiedMutationState = {
     ...mutationState,
     mutationApplied:
-      mutationState.mutationApplied || verification.asynchronousUpdate === true,
+      mutationState.mutationApplied === true ||
+      verification.asynchronousUpdate === true
+        ? true
+        : null,
   };
   if (verification.identityChanged || verification.headChanged) {
     return {
@@ -977,7 +987,13 @@ export async function tryGitHubRebase({
       category: 'verification_failure',
       baseRefName: before.baseRefName,
       expectedHeadOid: before.headRefOid,
-      observedHeadOid: after.headRefOid,
+      observedHeadOid:
+        verifiedMutationState.mutationApplied === true
+          ? after.headRefOid
+          : null,
+      ...(verifiedMutationState.mutationApplied === null
+        ? { requiresExactRereadBeforeRetry: true }
+        : {}),
       reason: verification.semanticProofFailed
         ? 'post-update head failed exact base-ancestry or integration-tree proof; refusing enrollment mutation'
         : 'PR identity, exact base, or head changed after GitHub rebase; refusing enrollment mutation',
@@ -991,7 +1007,13 @@ export async function tryGitHubRebase({
       category: 'verification_failure',
       baseRefName: before.baseRefName,
       expectedHeadOid: before.headRefOid,
-      observedHeadOid: after?.headRefOid ?? null,
+      observedHeadOid:
+        verifiedMutationState.mutationApplied === true
+          ? (after?.headRefOid ?? null)
+          : null,
+      ...(verifiedMutationState.mutationApplied === null
+        ? { requiresExactRereadBeforeRetry: true }
+        : {}),
       reason: verification.asynchronousUpdateIndeterminate
         ? `GitHub acknowledged the rebase without a new head; the ${operationBudgetMs}ms absolute verification deadline elapsed, so the result remains indeterminate and enrollment is refused`
         : `GitHub rebase head was not verifiable within the ${operationBudgetMs}ms absolute deadline; refusing enrollment mutation`,

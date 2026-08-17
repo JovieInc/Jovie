@@ -137,6 +137,15 @@ describe('complete GitHub snapshots', () => {
     const result = await fetchPrSnapshot('JovieInc/Jovie', 16001, {
       ghJsonImpl: async () => {
         call += 1;
+        if (call === 3) {
+          return page({
+            nodes: [],
+            totalCount: 0,
+            hasNextPage: false,
+            endCursor: null,
+            metadata: true,
+          });
+        }
         return call === 1
           ? page({
               nodes: Array.from({ length: 100 }, (_, index) => ({
@@ -159,6 +168,42 @@ describe('complete GitHub snapshots', () => {
       },
     });
     expect(result.statusCheckRollup).toHaveLength(101);
+    expect(call).toBe(3);
+  });
+
+  it.each([
+    ['queue', { mergeQueueEntry: { id: 'MQE', position: 1 } }],
+    ['auto-merge', { autoMergeRequest: { enabledAt: 'now' } }],
+    ['review', { reviewDecision: 'CHANGES_REQUESTED' }],
+    ['hold label', { labels: [{ name: 'hold' }] }],
+  ])('fails closed when final %s state changes after context pagination', async (_name, change) => {
+    let call = 0;
+    await expect(
+      fetchPrSnapshot('JovieInc/Jovie', 16001, {
+        ghJsonImpl: async () => {
+          call += 1;
+          const response = page({
+            nodes: checks(),
+            totalCount: checks().length,
+            hasNextPage: false,
+            endCursor: null,
+            metadata: true,
+          });
+          if (call === 2) {
+            const finalPr = response.data.repository.pullRequest;
+            Object.assign(finalPr, change);
+            if ('labels' in change && change.labels) {
+              finalPr.labels = {
+                nodes: change.labels,
+                totalCount: change.labels.length,
+                pageInfo: { hasNextPage: false, endCursor: null },
+              };
+            }
+          }
+          return response;
+        },
+      })
+    ).rejects.toThrow(/state changed after statusCheckRollup pagination/);
   });
 
   it.each([
