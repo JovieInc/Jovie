@@ -128,6 +128,103 @@ struct MobileAuthFinalizationTests {
     #expect(result.authErrorMessage == nil)
   }
 
+  @Test func missingVerifierDoesNotSignOutWhenCallbackStateAlreadyHandled() {
+    #expect(
+      !shouldSignOutAfterMissingVerifier(
+        callbackState: "state_123",
+        handledStates: ["state_123"],
+        hasFinalizeInFlight: false,
+        hasStoredSession: false
+      )
+    )
+  }
+
+  @Test func missingVerifierDoesNotSignOutWhenFinalizeIsInFlight() {
+    #expect(
+      !shouldSignOutAfterMissingVerifier(
+        callbackState: "state_123",
+        handledStates: [],
+        hasFinalizeInFlight: true,
+        hasStoredSession: false
+      )
+    )
+  }
+
+  @Test func missingVerifierDoesNotSignOutWhenNativeSessionExists() {
+    #expect(
+      !shouldSignOutAfterMissingVerifier(
+        callbackState: "state_123",
+        handledStates: [],
+        hasFinalizeInFlight: false,
+        hasStoredSession: true
+      )
+    )
+  }
+
+  @Test func missingVerifierMaySignOutWhenNothingElseClaimsTheCallback() {
+    #expect(
+      shouldSignOutAfterMissingVerifier(
+        callbackState: "state_123",
+        handledStates: [],
+        hasFinalizeInFlight: false,
+        hasStoredSession: false
+      )
+    )
+  }
+
+  @Test @MainActor func duplicateCallbackAfterConsumedVerifierDoesNotSignOut() async {
+    let store = MobileAuthPendingStore(
+      defaults: UserDefaults(
+        suiteName: "MobileAuthFinalizationDuplicateCallback-\(UUID().uuidString)"
+      )!
+    )
+    let callbackURL = URL(
+      string: "ie.jov.jovie://auth/complete?code=code_123&state=state_123"
+    )!
+    store.save(codeVerifier: "verifier_123")
+
+    var handledStates: Set<String> = []
+    if let state = MobileAuthReturnParser.callbackState(callbackURL) {
+      handledStates.insert(state)
+    }
+
+    let first = await MobileAuthReturnParser.parse(
+      callbackURL,
+      pendingStore: store
+    )
+    let second = await MobileAuthReturnParser.parse(
+      callbackURL,
+      pendingStore: store
+    )
+
+    #expect(first != nil)
+    #expect(second == nil)
+    #expect(
+      !shouldSignOutAfterMissingVerifier(
+        callbackState: MobileAuthReturnParser.callbackState(callbackURL),
+        handledStates: handledStates,
+        hasFinalizeInFlight: true,
+        hasStoredSession: false
+      )
+    )
+    #expect(
+      !shouldSignOutAfterMissingVerifier(
+        callbackState: MobileAuthReturnParser.callbackState(callbackURL),
+        handledStates: handledStates,
+        hasFinalizeInFlight: false,
+        hasStoredSession: true
+      )
+    )
+    #expect(
+      shouldSignOutAfterMissingVerifier(
+        callbackState: MobileAuthReturnParser.callbackState(callbackURL),
+        handledStates: [],
+        hasFinalizeInFlight: false,
+        hasStoredSession: false
+      )
+    )
+  }
+
   private func testConfiguration() -> AppConfiguration {
     AppConfiguration(
       apiBaseURL: URL(string: "https://jov.ie")!,

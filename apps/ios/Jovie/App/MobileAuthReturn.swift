@@ -101,13 +101,38 @@ func shouldHandleMobileAuthProviderError(
   route == .signedOut && hasPendingVerifier
 }
 
+/// Duplicate Better Auth callbacks arrive via ASWebAuthenticationSession,
+/// `onOpenURL`, and the inbox notification. After the verifier is consumed,
+/// a later miss must not sign out a finalize that already started.
+func shouldSignOutAfterMissingVerifier(
+  callbackState: String?,
+  handledStates: Set<String>,
+  hasFinalizeInFlight: Bool,
+  hasStoredSession: Bool
+) -> Bool {
+  if hasFinalizeInFlight || hasStoredSession {
+    return false
+  }
+
+  if let callbackState, handledStates.contains(callbackState) {
+    return false
+  }
+
+  return true
+}
+
 @MainActor
 final class MobileAuthCallbackURLInbox {
   static let shared = MobileAuthCallbackURLInbox()
 
   private var pendingURLs: [URL] = []
+  private var seenURLKeys: Set<String> = []
 
   func enqueue(_ url: URL) {
+    let key = url.absoluteString
+    guard !seenURLKeys.contains(key) else { return }
+
+    seenURLKeys.insert(key)
     pendingURLs.append(url)
     NotificationCenter.default.post(name: .jovieAuthCallbackURL, object: url)
   }

@@ -212,7 +212,6 @@ final class MobileAuthCoordinator: NSObject, ASWebAuthenticationPresentationCont
           .authCallbackURLParsed,
           context: ["callback_url": callbackURL]
         )
-        self.pendingStore.clear()
         MobileAuthDiagnostics.record("auth_callback_parsed")
         completion(.success(authReturn))
       }
