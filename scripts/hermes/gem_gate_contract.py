@@ -10,6 +10,10 @@ from typing import Any
 
 
 SCHEMA = "jovie-fleet-gate/v1"
+INDEPENDENT_REVIEW_SCHEMA = "jovie-independent-review/v1"
+INDEPENDENT_REVIEW_AUTHORITY = "Gem"
+INDEPENDENT_REVIEWER = "Gem"
+INDEPENDENT_REVIEW_SCOPE = "exact-main-head"
 JOVIE_REPO = "JovieInc/Jovie"
 
 
@@ -85,8 +89,62 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
         raise GateContractError(
             f"{state} admission invariant disagrees with typed work/promotion fields"
         )
+    review_admission = receipt.get("reviewAdmission")
+    if not isinstance(review_admission, dict):
+        raise GateContractError("independent review admission is missing")
+    review_allowed = review_admission.get("allowed")
+    if not isinstance(review_allowed, bool):
+        raise GateContractError("independent review admission must be boolean")
+    if review_admission.get("required") is not True:
+        raise GateContractError("independent review must be required")
+    if review_admission.get("authority") != INDEPENDENT_REVIEW_AUTHORITY:
+        raise GateContractError("independent review authority is not explicit")
+    if review_admission.get("scope") != INDEPENDENT_REVIEW_SCOPE:
+        raise GateContractError("independent review scope must be exact-main-head")
+    if not isinstance(review_admission.get("reason"), str):
+        raise GateContractError("independent review reason is missing")
+    review_signal = receipt.get("signals", {}).get("independentReview")
+    if not isinstance(review_signal, dict):
+        raise GateContractError("independent review signal is missing")
+    if review_signal.get("schema") != INDEPENDENT_REVIEW_SCHEMA:
+        raise GateContractError("independent review signal schema is invalid")
+    if not isinstance(review_signal.get("accepted"), bool):
+        raise GateContractError("independent review signal acceptance is not boolean")
+    if review_allowed != review_signal["accepted"]:
+        raise GateContractError("independent review admission disagrees with its signal")
+    if review_allowed:
+        main_sha = receipt.get("signals", {}).get("main", {}).get("sha")
+        if not isinstance(main_sha, str) or len(main_sha) != 40 or any(
+            character not in "0123456789abcdef" for character in main_sha
+        ):
+            raise GateContractError("accepted review must name an exact main head")
+        if review_admission.get("headSha") != main_sha:
+            raise GateContractError("accepted review head is not the exact main head")
+        if review_signal.get("headSha") != main_sha:
+            raise GateContractError("review signal head is not the exact main head")
+        if review_signal.get("status") != "passed":
+            raise GateContractError("accepted review signal must be passed")
+        if review_signal.get("authority") != INDEPENDENT_REVIEW_AUTHORITY:
+            raise GateContractError("accepted review signal authority is invalid")
+        if review_signal.get("scope") != INDEPENDENT_REVIEW_SCOPE:
+            raise GateContractError("accepted review signal scope is invalid")
+        if not isinstance(review_signal.get("observedAt"), str):
+            raise GateContractError("accepted review observation time is missing")
+        if not isinstance(review_signal.get("reviewId"), str) or not review_signal["reviewId"]:
+            raise GateContractError("accepted review id is missing")
+        if review_signal.get("reviewer") != INDEPENDENT_REVIEWER:
+            raise GateContractError("accepted reviewer identity is not Gem")
+    new_issue_lease = receipt.get("workAdmission", {}).get("newIssueLeaseAllowed")
+    if not isinstance(new_issue_lease, bool):
+        raise GateContractError("new issue lease admission is missing or is not boolean")
+    if new_issue_lease and not review_allowed:
+        raise GateContractError("new issue lease admission bypasses independent review")
+    if promotion_allowed and not review_allowed:
+        raise GateContractError("promotion admission bypasses independent review")
     if direct_gem_allowed:
         raise GateContractError("direct Gem pickup must remain disabled")
+    if receipt.get("ownership", {}).get("review") != INDEPENDENT_REVIEW_AUTHORITY:
+        raise GateContractError("review ownership must remain with Gem")
     remediation = receipt.get("remediationAdmission", {})
     if not remediation_allowed or remediation.get("localAllowed") is not True:
         raise GateContractError("observation and bounded local remediation must remain live")

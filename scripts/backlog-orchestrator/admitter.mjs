@@ -14,6 +14,10 @@ export const TODO_STATE_ID = 'c6c00506-dc9f-4910-8ff7-3874dd77174c';
 export const ADMISSION_RECEIPT_PREFIX = '<!-- symphony-admission:v1 ';
 export const FLEET_GATE_SCHEMA = 'jovie-fleet-gate/v1';
 export const GEM_CONCURRENCY_EVIDENCE_SCHEMA = 'gem-concurrency-evidence/v1';
+export const INDEPENDENT_REVIEW_RECEIPT_SCHEMA = 'jovie-independent-review/v1';
+export const INDEPENDENT_REVIEW_AUTHORITY = 'Gem';
+export const INDEPENDENT_REVIEWER = 'Gem';
+export const INDEPENDENT_REVIEW_SCOPE = 'exact-main-head';
 export const FLEET_GATE_STATE = Object.freeze({
   GREEN: 'GREEN',
   AMBER: 'AMBER',
@@ -36,6 +40,11 @@ export const FLEET_GATE_REASON = Object.freeze({
   REPOSITORY_CORRUPTION: 'repository-or-artifact-corruption',
   SEVERE_INTEGRITY_INCIDENT: 'severe-integrity-incident',
   INVALID_INTEGRITY_RECEIPT: 'invalid-integrity-receipt',
+  INDEPENDENT_REVIEW_MISSING: 'independent-review-receipt-missing',
+  INDEPENDENT_REVIEW_MALFORMED: 'independent-review-receipt-malformed',
+  INDEPENDENT_REVIEW_STALE: 'independent-review-receipt-stale',
+  INDEPENDENT_REVIEW_FUTURE: 'independent-review-receipt-future',
+  INDEPENDENT_REVIEW_HEAD_MISMATCH: 'independent-review-head-mismatch',
 });
 
 const SEVERE_INTEGRITY_REASONS = new Set([
@@ -104,6 +113,157 @@ function isFreshTimestamp(value, nowMs, maxAgeMs) {
     observedMs <= nowMs + 60_000 &&
     nowMs - observedMs <= maxAgeMs
   );
+}
+
+function reviewReceiptFields(candidate) {
+  return {
+    schema: candidate?.schema ?? null,
+    status: candidate?.status ?? null,
+    authority: candidate?.authority ?? null,
+    reviewer: candidate?.reviewer ?? null,
+    reviewId: candidate?.reviewId ?? null,
+    headSha: candidate?.headSha ?? null,
+    scope: candidate?.scope ?? null,
+    observedAt: candidate?.observedAt ?? null,
+  };
+}
+
+/**
+ * Validate the independent verification receipt used by normal admission.
+ *
+ * This is deliberately separate from GitHub review state: the receipt names
+ * the authority, the exact current-main head, and its bounded observation
+ * window. A caller may not turn a boolean or a stale review into admission.
+ *
+ * @param {unknown} candidate
+ * @param {{ expectedHeadSha?: string, now?: string, maxAgeMs?: number }} [options]
+ */
+export function validateIndependentReviewReceipt(
+  candidate,
+  {
+    expectedHeadSha,
+    now = new Date().toISOString(),
+    maxAgeMs = CONTROLLER_RECEIPT_MAX_AGE_MS,
+  } = {}
+) {
+  const fields = reviewReceiptFields(candidate);
+  const errors = [];
+  const malformed = reason => ({
+    ok: false,
+    errors: [...errors, reason],
+    receipt: null,
+  });
+
+  if (candidate == null) {
+    return { ok: false, errors: ['receipt is missing'], receipt: null };
+  }
+  if (typeof candidate !== 'object' || Array.isArray(candidate)) {
+    return malformed('receipt must be an object');
+  }
+  if (fields.schema !== INDEPENDENT_REVIEW_RECEIPT_SCHEMA) {
+    errors.push(`schema must be ${INDEPENDENT_REVIEW_RECEIPT_SCHEMA}`);
+  }
+  if (fields.status !== 'passed') errors.push('status must be passed');
+  if (fields.authority !== INDEPENDENT_REVIEW_AUTHORITY) {
+    errors.push(`authority must be ${INDEPENDENT_REVIEW_AUTHORITY}`);
+  }
+  if (fields.reviewer !== INDEPENDENT_REVIEWER) {
+    errors.push(`reviewer must be ${INDEPENDENT_REVIEWER}`);
+  }
+  if (typeof fields.reviewId !== 'string' || fields.reviewId.length === 0) {
+    errors.push('reviewId must be a non-empty string');
+  }
+  if (fields.scope !== INDEPENDENT_REVIEW_SCOPE) {
+    errors.push(`scope must be ${INDEPENDENT_REVIEW_SCOPE}`);
+  }
+  const headShaValid = validCommitSha(fields.headSha, { exact: true });
+  const expectedHeadValid = validCommitSha(expectedHeadSha, { exact: true });
+  if (!headShaValid) {
+    errors.push('headSha must be an exact lowercase SHA');
+  }
+  if (!expectedHeadValid) {
+    errors.push('expected main head must be an exact lowercase SHA');
+  } else if (headShaValid && fields.headSha !== expectedHeadSha) {
+    return {
+      ok: false,
+      errors: ['review head does not match current main head'],
+      receipt: null,
+    };
+  }
+  const observedMs = Date.parse(String(fields.observedAt ?? ''));
+  const nowMs = Date.parse(String(now ?? ''));
+  if (!Number.isFinite(observedMs) || !Number.isFinite(nowMs)) {
+    errors.push('observedAt and now must be valid timestamps');
+  } else if (observedMs > nowMs) {
+    return {
+      ok: false,
+      errors: ['review receipt is from the future'],
+      receipt: null,
+    };
+  } else if (!isFreshTimestamp(fields.observedAt, nowMs, maxAgeMs)) {
+    return {
+      ok: false,
+      errors: ['review receipt is stale'],
+      receipt: null,
+    };
+  }
+  if (errors.length > 0) return { ok: false, errors, receipt: null };
+  return {
+    ok: true,
+    errors: [],
+    receipt: {
+      schema: INDEPENDENT_REVIEW_RECEIPT_SCHEMA,
+      status: 'passed',
+      authority: INDEPENDENT_REVIEW_AUTHORITY,
+      reviewer: fields.reviewer,
+      reviewId: fields.reviewId,
+      headSha: fields.headSha,
+      scope: INDEPENDENT_REVIEW_SCOPE,
+      observedAt: new Date(observedMs).toISOString(),
+    },
+  };
+}
+
+function independentReviewReason(validation) {
+  const first = validation.errors[0] || '';
+  if (first === 'receipt is missing')
+    return FLEET_GATE_REASON.INDEPENDENT_REVIEW_MISSING;
+  if (first === 'review receipt is stale')
+    return FLEET_GATE_REASON.INDEPENDENT_REVIEW_STALE;
+  if (first === 'review receipt is from the future')
+    return FLEET_GATE_REASON.INDEPENDENT_REVIEW_FUTURE;
+  if (first === 'review head does not match current main head')
+    return FLEET_GATE_REASON.INDEPENDENT_REVIEW_HEAD_MISMATCH;
+  return FLEET_GATE_REASON.INDEPENDENT_REVIEW_MALFORMED;
+}
+
+/**
+ * @param {unknown} candidate
+ * @param {{ expectedHeadSha?: string, now?: string, maxAgeMs?: number }} [options]
+ */
+export function evaluateIndependentReviewReceipt(
+  candidate,
+  { expectedHeadSha, now = new Date().toISOString(), maxAgeMs } = {}
+) {
+  const validation = validateIndependentReviewReceipt(candidate, {
+    expectedHeadSha,
+    now,
+    ...(maxAgeMs === undefined ? {} : { maxAgeMs }),
+  });
+  const fields = reviewReceiptFields(candidate);
+  return {
+    allowed: validation.ok,
+    required: true,
+    authority: INDEPENDENT_REVIEW_AUTHORITY,
+    scope: INDEPENDENT_REVIEW_SCOPE,
+    headSha: validation.receipt?.headSha ?? fields.headSha,
+    observedAt: validation.receipt?.observedAt ?? fields.observedAt,
+    reviewId: validation.receipt?.reviewId ?? fields.reviewId,
+    reviewer: validation.receipt?.reviewer ?? fields.reviewer,
+    reason: validation.ok
+      ? 'fresh-exact-head-independent-review'
+      : independentReviewReason(validation),
+  };
 }
 
 function validCommitSha(value, { exact = false } = {}) {
@@ -183,6 +343,13 @@ export function evaluateFleetGate(
   const controllerFresh =
     controllerReceiptPresent &&
     isFreshTimestamp(evidence.observedAt, nowMs, controllerMaxAgeMs);
+  const reviewAdmission = evaluateIndependentReviewReceipt(
+    evidence?.independentReview,
+    {
+      expectedHeadSha: evidence?.main?.sha,
+      now,
+    }
+  );
 
   if (
     integrityStatus === 'active' &&
@@ -209,6 +376,16 @@ export function evaluateFleetGate(
 
   const redReasons = reasons.filter(reason => reason.severity === 'critical');
   if (redReasons.length === 0) {
+    if (!reviewAdmission.allowed) {
+      reasons.push(
+        typedReason(
+          reviewAdmission.reason,
+          'review',
+          'warning',
+          'Normal admission requires a fresh independent review of the exact current main head.'
+        )
+      );
+    }
     if (!controllerFresh) {
       reasons.push(
         typedReason(
@@ -333,6 +510,7 @@ export function evaluateFleetGate(
   const queueBelowBackpressure = queueShapeValid && greenReadyPrs < queueTarget;
   const isolatedPromotionAllowed =
     state === FLEET_GATE_STATE.AMBER &&
+    reviewAdmission.allowed &&
     controllerFresh &&
     controllerStatus === 'green' &&
     mainStatus === 'green' &&
@@ -346,7 +524,8 @@ export function evaluateFleetGate(
     state === FLEET_GATE_STATE.RED
       ? []
       : [
-          ...(!queueShapeValid || queueBelowBackpressure
+          ...(reviewAdmission.allowed &&
+          (!queueShapeValid || queueBelowBackpressure)
             ? ['approved-issue-lease']
             : []),
           'isolated-implementation',
@@ -375,7 +554,6 @@ export function evaluateFleetGate(
         : holdIntakeAllowed
           ? FLEET_PROMOTION_MODE.HOLD_INTAKE
           : FLEET_PROMOTION_MODE.BLOCKED;
-
   return {
     schema: FLEET_GATE_SCHEMA,
     observedAt: evidence.observedAt || null,
@@ -384,13 +562,14 @@ export function evaluateFleetGate(
     promotionMode,
     alreadyAdmittedCohort: alreadyAdmittedCohortSemantics(promotionMode),
     reasons,
+    reviewAdmission,
     workAdmission: {
       allowed: state !== FLEET_GATE_STATE.RED,
       activities: workActivities,
       newIssueLeaseAllowed: workActivities.includes('approved-issue-lease'),
     },
     promotionAdmission: {
-      allowed: state === FLEET_GATE_STATE.GREEN,
+      allowed: state === FLEET_GATE_STATE.GREEN && reviewAdmission.allowed,
       activities:
         state === FLEET_GATE_STATE.GREEN ? ['ready-for-merge', 'merge'] : [],
     },
@@ -407,6 +586,7 @@ export function evaluateFleetGate(
     ownership: {
       controller: 'Gem',
       implementation: 'Symphony',
+      review: INDEPENDENT_REVIEW_AUTHORITY,
       directGemPickup: false,
     },
     concurrency: {

@@ -339,6 +339,7 @@ async function fleetGateForTeam(team, now = new Date().toISOString()) {
       integrity: receipt?.signals?.integrity || { status: 'clear' },
       queue: receipt?.signals?.queue,
       concurrencyEvidence: receipt?.signals?.concurrencyEvidence,
+      independentReview: receipt?.signals?.independentReview,
       observedAt: receipt?.observedAt,
     },
     { now }

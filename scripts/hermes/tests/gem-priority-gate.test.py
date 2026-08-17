@@ -172,6 +172,16 @@ GREEN_SIGNALS: dict[str, object] = {
         "greenReadyPrs": 0,
         "target": 15,
     },
+    "independentReview": {
+        "schema": "jovie-independent-review/v1",
+        "status": "passed",
+        "authority": "Gem",
+        "reviewer": "Gem",
+        "reviewId": "review-2026-08-13-1200",
+        "headSha": MAIN_SHA,
+        "scope": "exact-main-head",
+        "observedAt": MODULE.isoformat(MODULE.utc_now()),
+    },
     "concurrencyEvidence": None,
 }
 
@@ -694,6 +704,102 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertFalse(receipt["alreadyAdmittedCohort"]["preserve"])
 
 
+class IndependentReviewTests(unittest.TestCase):
+    NOW = MODULE.datetime(2026, 8, 13, 12, 0, tzinfo=MODULE.UTC)
+
+    def valid_review(self, **overrides: object) -> dict[str, object]:
+        return {
+            **GREEN_SIGNALS["independentReview"],
+            "observedAt": MODULE.isoformat(self.NOW),
+            **overrides,
+        }
+
+    def evaluate(self, review: object) -> dict[str, object]:
+        signals = dict(GREEN_SIGNALS)
+        signals["independentReview"] = review
+        return MODULE.evaluate(signals, MODULE.isoformat(self.NOW))
+
+    def test_valid_receipt_is_exact_head_and_explicitly_authorized(self):
+        receipt = self.evaluate(self.valid_review())
+
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertTrue(receipt["reviewAdmission"]["allowed"])
+        self.assertEqual(receipt["reviewAdmission"]["authority"], "Gem")
+        self.assertEqual(receipt["reviewAdmission"]["scope"], "exact-main-head")
+        self.assertEqual(receipt["reviewAdmission"]["headSha"], MAIN_SHA)
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["promotionAdmission"]["allowed"])
+
+    def test_missing_receipt_blocks_normal_admission_but_keeps_remediation_live(self):
+        receipt = self.evaluate(None)
+
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertFalse(receipt["reviewAdmission"]["allowed"])
+        self.assertEqual(
+            receipt["reviewAdmission"]["reason"],
+            "independent-review-receipt-missing",
+        )
+        self.assertTrue(receipt["workAdmission"]["allowed"])
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertTrue(receipt["deploymentAdmission"]["allowed"])
+        self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
+        self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 4)
+
+    def test_malformed_stale_future_and_wrong_head_receipts_fail_closed(self):
+        cases = (
+            ({"schema": MODULE.INDEPENDENT_REVIEW_SCHEMA}, "independent-review-receipt-malformed"),
+            (
+                self.valid_review(
+                    observedAt=MODULE.isoformat(
+                        self.NOW - MODULE.RECEIPT_STALE_AFTER - MODULE.timedelta(seconds=1)
+                    )
+                ),
+                "independent-review-receipt-stale",
+            ),
+            (
+                self.valid_review(
+                    observedAt=MODULE.isoformat(self.NOW + MODULE.timedelta(seconds=59))
+                ),
+                "independent-review-receipt-future",
+            ),
+            (
+                self.valid_review(reviewer="Symphony Agent"),
+                "independent-review-receipt-malformed",
+            ),
+            (
+                self.valid_review(headSha="b" * 40),
+                "independent-review-head-mismatch",
+            ),
+        )
+        for review, reason in cases:
+            with self.subTest(reason=reason):
+                receipt = self.evaluate(review)
+                self.assertFalse(receipt["reviewAdmission"]["allowed"])
+                self.assertEqual(receipt["reviewAdmission"]["reason"], reason)
+                self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+                self.assertFalse(receipt["promotionAdmission"]["allowed"])
+
+    def test_review_does_not_bypass_bounded_concurrency_evidence(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["independentReview"] = self.valid_review()
+        signals["concurrencyEvidence"] = {
+            "schema": MODULE.CONCURRENCY_SCHEMA,
+            "target": 8,
+            "approved": True,
+            "cleanRuns": 20,
+            "severeIncidents": 0,
+            "observedAt": MODULE.isoformat(self.NOW),
+            "accepted": True,
+        }
+        receipt = MODULE.evaluate(signals, MODULE.isoformat(self.NOW))
+
+        self.assertTrue(receipt["reviewAdmission"]["allowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 8)
+
+
 class SemanticReadbackTests(unittest.TestCase):
     def test_exact_persisted_receipt_passes(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -799,11 +905,16 @@ class ScheduledFreshnessTests(unittest.TestCase):
     def run_at(self, state_dir: pathlib.Path, moment) -> tuple[int, str, str]:
         stdout = io.StringIO()
         stderr = io.StringIO()
+        signals = dict(GREEN_SIGNALS)
+        signals["independentReview"] = {
+            **signals["independentReview"],
+            "observedAt": MODULE.isoformat(moment),
+        }
         with (
             mock.patch.object(
                 sys, "argv", [str(GATE), "--state-dir", str(state_dir), "--consumer", "fleet"]
             ),
-            mock.patch.object(MODULE, "observe_signals", return_value=dict(GREEN_SIGNALS)),
+            mock.patch.object(MODULE, "observe_signals", return_value=signals),
             mock.patch.object(MODULE, "utc_now", return_value=moment),
             contextlib.redirect_stdout(stdout),
             contextlib.redirect_stderr(stderr),

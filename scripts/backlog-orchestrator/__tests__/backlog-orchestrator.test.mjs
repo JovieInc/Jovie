@@ -956,6 +956,16 @@ describe('deterministic Symphony admission boundary', () => {
         greenReadyPrs: 1,
         target: 15,
       },
+      independentReview: {
+        schema: admitter.INDEPENDENT_REVIEW_RECEIPT_SCHEMA,
+        status: 'passed',
+        authority: admitter.INDEPENDENT_REVIEW_AUTHORITY,
+        reviewer: 'Gem',
+        reviewId: 'review-2026-08-09-0500',
+        headSha: 'a3eeefdd4dc681d1c9b5b4385720d661f5129137',
+        scope: admitter.INDEPENDENT_REVIEW_SCOPE,
+        observedAt: '2026-08-09T05:00:00.000Z',
+      },
       observedAt: '2026-08-09T05:00:00.000Z',
       ...overrides,
     };
@@ -1076,10 +1086,121 @@ describe('deterministic Symphony admission boundary', () => {
     );
   });
 
+  it('requires a fresh exact-head independent review before normal issue leasing', async () => {
+    const evidence = fleetEvidence();
+    delete evidence.independentReview;
+    const fleetGate = admitter.evaluateFleetGate(evidence, {
+      now: '2026-08-09T05:01:00.000Z',
+    });
+    const issue = admissionIssue({ identifier: 'JOV-4898' });
+    const result = await admitter.selectNextToAdmit(
+      [classification(issue)],
+      [],
+      { currentlyShipping: 0, fleetGate }
+    );
+
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(fleetGate.reviewAdmission.allowed, false);
+    assert.equal(
+      fleetGate.reviewAdmission.authority,
+      admitter.INDEPENDENT_REVIEW_AUTHORITY
+    );
+    assert.equal(fleetGate.reviewAdmission.scope, 'exact-main-head');
+    assert.equal(
+      fleetGate.reviewAdmission.reason,
+      'independent-review-receipt-missing'
+    );
+    assert.equal(fleetGate.workAdmission.allowed, true);
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(fleetGate.promotionAdmission.allowed, false);
+    assert.equal(fleetGate.isolatedPromotionAdmission.allowed, false);
+    assert.equal(fleetGate.concurrency.gem.maxConcurrent, 4);
+    assert.equal(result.admit.length, 0);
+  });
+
+  it('rejects malformed, stale, future, and wrong-head review receipts', () => {
+    const valid = fleetEvidence().independentReview;
+    /** @type {Array<[string, object, string]>} */
+    const cases = [
+      [
+        'malformed',
+        { schema: admitter.INDEPENDENT_REVIEW_RECEIPT_SCHEMA },
+        'independent-review-receipt-malformed',
+      ],
+      [
+        'missing schema',
+        { ...valid, schema: undefined },
+        'independent-review-receipt-malformed',
+      ],
+      [
+        'missing scope',
+        { ...valid, scope: undefined },
+        'independent-review-receipt-malformed',
+      ],
+      [
+        'stale',
+        { ...valid, observedAt: '2026-08-09T04:40:00.000Z' },
+        'independent-review-receipt-stale',
+      ],
+      [
+        'future',
+        { ...valid, observedAt: '2026-08-09T05:01:59.000Z' },
+        'independent-review-receipt-future',
+      ],
+      [
+        'spoofed reviewer',
+        { ...valid, reviewer: 'Symphony Agent' },
+        'independent-review-receipt-malformed',
+      ],
+      [
+        'wrong head',
+        { ...valid, headSha: 'b'.repeat(40) },
+        'independent-review-head-mismatch',
+      ],
+    ];
+
+    for (const [name, independentReview, reason] of cases) {
+      const fleetGate = admitter.evaluateFleetGate(
+        fleetEvidence({ independentReview }),
+        { now: '2026-08-09T05:01:00.000Z' }
+      );
+      assert.equal(fleetGate.reviewAdmission.allowed, false, name);
+      assert.equal(fleetGate.reviewAdmission.reason, reason, name);
+      assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false, name);
+      assert.equal(fleetGate.promotionAdmission.allowed, false, name);
+    }
+  });
+
+  it('keeps the bounded concurrency receipt independent from review freshness', () => {
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        concurrencyEvidence: {
+          schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
+          target: 8,
+          approved: true,
+          cleanRuns: 20,
+          severeIncidents: 0,
+          observedAt: '2026-08-09T05:00:00.000Z',
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.reviewAdmission.allowed, true);
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, true);
+    assert.equal(fleetGate.concurrency.gem.maxConcurrent, 8);
+    assert.equal(fleetGate.concurrency.gem.evidenceAccepted, true);
+  });
+
   it('treats main-red as draft-only AMBER while continuing new issue pickup', async () => {
     const now = '2026-08-09T05:01:00.000Z';
     const fleetGate = admitter.evaluateFleetGate(
-      fleetEvidence({ main: { status: 'red' } }),
+      fleetEvidence({
+        main: {
+          status: 'red',
+          sha: 'a3eeefdd4dc681d1c9b5b4385720d661f5129137',
+        },
+      }),
       { now }
     );
     const issue = admissionIssue({ identifier: 'JOV-4900' });
@@ -1197,7 +1318,12 @@ describe('deterministic Symphony admission boundary', () => {
   it('recovers AMBER to GREEN and degrades stale controller state without stranding work', () => {
     const now = '2026-08-09T05:20:00.000Z';
     const amber = admitter.evaluateFleetGate(
-      fleetEvidence({ main: { status: 'red' } }),
+      fleetEvidence({
+        main: {
+          status: 'red',
+          sha: 'a3eeefdd4dc681d1c9b5b4385720d661f5129137',
+        },
+      }),
       { now: '2026-08-09T05:01:00.000Z' }
     );
     const green = admitter.evaluateFleetGate(fleetEvidence(), {
@@ -1250,13 +1376,18 @@ describe('deterministic Symphony admission boundary', () => {
       '../hermes/WORKFLOW.jovie-ui-pilot.md'
     );
     const runController = async (signals, consumer = 'fleet') => {
+      const controllerSignals = JSON.parse(JSON.stringify(signals));
+      controllerSignals.independentReview = {
+        ...controllerSignals.independentReview,
+        observedAt: new Date().toISOString(),
+      };
       try {
         const { stdout } = await execFileAsync(
           'python3',
           [
             controller,
             '--evaluate-json',
-            JSON.stringify(signals),
+            JSON.stringify(controllerSignals),
             '--consumer',
             consumer,
           ],
@@ -1272,12 +1403,20 @@ describe('deterministic Symphony admission boundary', () => {
     };
     const amber = await runController(
       fleetEvidence({
-        main: { status: 'red', failedChecks: ['Production Synthetic Tests'] },
+        main: {
+          status: 'red',
+          sha: 'a3eeefdd4dc681d1c9b5b4385720d661f5129137',
+          failedChecks: ['Production Synthetic Tests'],
+        },
       })
     );
     const amberPromotion = await runController(
       fleetEvidence({
-        main: { status: 'red', failedChecks: ['Production Synthetic Tests'] },
+        main: {
+          status: 'red',
+          sha: 'a3eeefdd4dc681d1c9b5b4385720d661f5129137',
+          failedChecks: ['Production Synthetic Tests'],
+        },
       }),
       'promotion'
     );
@@ -1425,9 +1564,10 @@ from gem_gate_contract import GateContractError, drain_state_dir, gate_state_dir
 receipt = {
     "schema": "jovie-fleet-gate/v1",
     "state": "AMBER",
-    "signals": {"main": {"status": "red"}},
+    "signals": {"main": {"status": "red", "sha": "a" * 40}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}},
     "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "main red"}],
-    "workAdmission": {"allowed": True},
+    "reviewAdmission": {"allowed": False, "required": True, "authority": "Gem", "scope": "exact-main-head", "headSha": None, "observedAt": None, "reviewId": None, "reviewer": None, "reason": "independent-review-receipt-missing"},
+    "workAdmission": {"allowed": True, "newIssueLeaseAllowed": False},
     "promotionAdmission": {"allowed": False},
     "remediationAdmission": {
         "allowed": True,
@@ -1436,7 +1576,7 @@ receipt = {
         "maxConcurrent": 1,
         "authority": "single-pr-writer-exact-head",
     },
-    "ownership": {"directGemPickup": False},
+    "ownership": {"review": "Gem", "directGemPickup": False},
 }
 validate_gate_result(0, json.dumps(receipt), "fleet")
 validate_gate_result(0, json.dumps(receipt), "remediation")
@@ -1508,9 +1648,10 @@ def by_github(_repo):
 receipt = {
     "schema": "jovie-fleet-gate/v1",
     "state": "RED",
-    "signals": {"main": {"status": "red"}},
+    "signals": {"main": {"status": "red", "sha": "a" * 40}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-malformed"}},
     "reasons": [{"code": "repository-or-artifact-corruption", "layer": "integrity", "severity": "critical", "detail": "test"}],
-    "workAdmission": {"allowed": False},
+    "reviewAdmission": {"allowed": False, "required": True, "authority": "Gem", "scope": "exact-main-head", "headSha": None, "observedAt": None, "reviewId": None, "reviewer": None, "reason": "independent-review-receipt-malformed"},
+    "workAdmission": {"allowed": False, "newIssueLeaseAllowed": False},
     "promotionAdmission": {"allowed": False},
     "remediationAdmission": {
         "allowed": True,
@@ -1519,7 +1660,7 @@ receipt = {
         "maxConcurrent": 1,
         "authority": "single-pr-writer-exact-head",
     },
-    "ownership": {"directGemPickup": False},
+    "ownership": {"review": "Gem", "directGemPickup": False},
 }
 print(json.dumps(receipt))
 raise SystemExit(0)
@@ -1565,9 +1706,10 @@ print(json.dumps(result))
 receipt = {
     "schema": "jovie-fleet-gate/v1",
     "state": "AMBER",
-    "signals": {"main": {"status": "red"}},
+    "signals": {"main": {"status": "red", "sha": "a" * 40}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}},
     "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "test"}],
-    "workAdmission": {"allowed": True},
+    "reviewAdmission": {"allowed": False, "required": True, "authority": "Gem", "scope": "exact-main-head", "headSha": None, "observedAt": None, "reviewId": None, "reviewer": None, "reason": "independent-review-receipt-missing"},
+    "workAdmission": {"allowed": True, "newIssueLeaseAllowed": False},
     "promotionAdmission": {"allowed": False},
     "remediationAdmission": {
         "allowed": True,
@@ -1576,7 +1718,7 @@ receipt = {
         "maxConcurrent": 1,
         "authority": "single-pr-writer-exact-head",
     },
-    "ownership": {"directGemPickup": False},
+    "ownership": {"review": "Gem", "directGemPickup": False},
 }
 print(json.dumps(receipt))
 raise SystemExit(0)
