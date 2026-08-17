@@ -18,6 +18,7 @@
 import { ArrowDown, ArrowRight, ArrowUp, Mic, Sparkles } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import {
   ArmadaMusicLogo,
@@ -97,13 +98,14 @@ const FEATURED_CREATORS = [
 ] as const;
 
 export default function HomeV1Page() {
+  const router = useRouter();
   const [variant, setVariant] = useState<Variant>('a');
   const [draft, setDraft] = useState('');
   const logoRef = useRef<HTMLDivElement | null>(null);
 
   function submit() {
     if (!draft.trim() && variant !== 'd') return;
-    window.location.href = '/exp/auth-v1';
+    router.push('/exp/auth-v1');
   }
 
   function scrollToLogos() {
@@ -226,14 +228,14 @@ function Nav({ variant }: { variant: Variant }) {
     <nav
       className={cn(
         'absolute top-0 left-0 right-0 z-30 max-w-300 mx-auto flex items-center justify-between h-16 px-6 lg:px-10',
-        onCream ? 'text-(--color-bg-surface-0)' : 'text-white'
+        onCream ? 'text-(--color-bg-surface-0)' : 'text-primary-token'
       )}
     >
       <div className='flex items-center gap-2.5'>
         <JovieMark
           className={cn(
             'h-5 w-5',
-            onCream ? 'text-(--color-bg-surface-0)' : 'text-white'
+            onCream ? 'text-(--color-bg-surface-0)' : 'text-primary-token'
           )}
         />
         <span className='text-mid font-semibold tracking-[-0.018em]'>
@@ -950,7 +952,7 @@ function Outcomes({ variant }: { variant: Variant }) {
             <h3
               className={cn(
                 'mt-2 text-lg font-semibold leading-tight',
-                onCream ? 'text-(--color-bg-surface-0)' : 'text-white'
+                onCream ? 'text-(--color-bg-surface-0)' : 'text-primary-token'
               )}
               style={{ letterSpacing: '-0.022em' }}
             >
@@ -987,7 +989,7 @@ function FinalCta({ variant }: { variant: Variant }) {
         <h2
           className={cn(
             'mt-3 text-3xl lg:text-4xl font-semibold leading-tight max-w-[20ch] mx-auto',
-            onCream ? 'text-(--color-bg-surface-0)' : 'text-white'
+            onCream ? 'text-(--color-bg-surface-0)' : 'text-primary-token'
           )}
           style={{ letterSpacing: '-0.022em' }}
         >

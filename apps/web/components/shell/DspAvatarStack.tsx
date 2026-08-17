@@ -56,6 +56,9 @@ const STATUS_LABEL: Record<DspStatus, string> = {
   missing: 'Missing',
 };
 
+/** Always-light type on a brand-color fill so the glyph stays visible. */
+export const DSP_GLYPH_ON_BRAND_TEXT_CLASS = 'text-white dark:text-white';
+
 /**
  * DspAvatarStack — stacked (overlapping) DSP avatars + "+N" overflow chip
  * with a hover popover listing every DSP and its status. `maxVisible`
@@ -131,14 +134,17 @@ export function DspAvatarStack({
                 'ring-2 ring-(--system-b-bg-page)',
                 'transition-colors duration-subtle ease-subtle',
                 // Brand text color on hover applies only to SVG icon avatars —
-                // glyph-only avatars keep white text so the glyph stays visible
-                // against its brand-colored background.
+                // glyph-only avatars keep always-light type so the glyph stays
+                // visible against its brand-colored background.
                 dsp.iconPath &&
                   'group-hover/dsps:text-(--system-b-dsp-avatar-color) group-focus-within/dsps:text-(--system-b-dsp-avatar-color)',
                 index > 0 && '-ml-1.5',
                 dsp.status === 'missing' && 'opacity-40',
                 !dsp.iconPath &&
-                  'font-semibold text-white dark:text-white bg-(--system-b-dsp-avatar-color)',
+                  cn(
+                    'font-semibold bg-(--system-b-dsp-avatar-color)',
+                    DSP_GLYPH_ON_BRAND_TEXT_CLASS
+                  ),
                 // opacity-75 must not apply to 'missing' glyph avatars — it wins
                 // the tailwind-merge conflict against opacity-40 and erases the
                 // faded missing state.
@@ -230,7 +236,8 @@ export function DspAvatarStack({
                 <span
                   className={cn(
                     'grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full',
-                    'bg-(--system-b-dsp-avatar-color) text-white dark:text-white',
+                    'bg-(--system-b-dsp-avatar-color)',
+                    DSP_GLYPH_ON_BRAND_TEXT_CLASS,
                     dsp.status === 'missing' ? 'opacity-45' : 'opacity-90'
                   )}
                   style={

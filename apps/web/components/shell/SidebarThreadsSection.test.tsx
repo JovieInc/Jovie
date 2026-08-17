@@ -145,7 +145,7 @@ describe('SidebarThreadsSection', () => {
     expect(activeThread).toHaveAttribute('aria-current', 'page');
     expect(activeThread).toHaveClass('h-6');
     expect(activeThread).toHaveClass('bg-sidebar-accent-active');
-    expect(activeThread).toHaveClass('text-white');
+    expect(activeThread).toHaveClass('text-primary-token');
     expect(activeThread).not.toHaveClass(
       'shadow-[inset_2px_0_0_0_var(--color-accent)]'
     );
