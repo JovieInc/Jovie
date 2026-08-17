@@ -428,6 +428,16 @@ private struct AppContentView: View {
 }
 
 
+/// Skip nil only when `LiveRootContainer` is mounted. The JovieApp fallback
+/// still applies nil so an unavailable live build can leave `.launching`.
+func shouldApplyAuthenticatedUserIDChange(
+  launchMode _: LaunchMode,
+  authenticatedUserID: String?,
+  liveHydrateOwnsSession: Bool
+) -> Bool {
+  authenticatedUserID != nil || liveHydrateOwnsSession == false
+}
+
 struct RootView: View {
   @Bindable var appState: AppState
   let isAuthAvailable: Bool
@@ -462,6 +472,14 @@ struct RootView: View {
         }
 
         if let authenticatedUserID, appState.activeUserID == authenticatedUserID {
+          return
+        }
+
+        guard shouldApplyAuthenticatedUserIDChange(
+          launchMode: appState.launchMode,
+          authenticatedUserID: authenticatedUserID,
+          liveHydrateOwnsSession: isAuthAvailable && appState.launchMode.usesLiveAuth
+        ) else {
           return
         }
 
