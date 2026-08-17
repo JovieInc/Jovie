@@ -36,6 +36,7 @@
 | `services/insights/` | AI-powered insight generation from artist metric snapshots | `generateInsights`, `MetricSnapshot` |
 | `services/tips/` | Post-tip-completion: fan upsert, cumulative totals, thank-you emails | `processTipCompleted` |
 | `services/link-wrapping/` | Smart link wrapping with anti-cloaking and URL encryption | `WrappedLink`, `generateShortId` |
+| `youtube-library/` | YouTube channel video sync substrate: heuristic content classification, metric snapshots, append-only thumbnail history, ISRC release linkage (JOV-5136; provider interface plugs in with JOV-3189) | `syncChannelVideos`, `runScheduledRefreshes`, `classifyYouTubeVideo`, `resolveReleaseLink`, `listVideosForProfile` |
 
 ## Communication
 
