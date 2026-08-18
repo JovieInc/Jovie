@@ -20,6 +20,10 @@ const meta: Meta<typeof Dialog> = {
       control: 'select',
       options: ['xs', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl'],
     },
+    hideClose: {
+      control: 'boolean',
+      description: 'Hide the canonical close control for blocking flows.',
+    },
   },
 };
 
@@ -166,6 +170,31 @@ export const DeleteConfirmation: Story = {
         <DialogActions>
           <Button variant='outline'>Cancel</Button>
           <Button variant='destructive'>Delete</Button>
+        </DialogActions>
+      </>
+    ),
+  },
+};
+
+export const BlockingFlow: Story = {
+  args: {
+    open: true,
+    onClose: () => console.log('Close'),
+    size: 'sm',
+    hideClose: true,
+    children: (
+      <>
+        <DialogTitle>Finish account setup</DialogTitle>
+        <DialogDescription>
+          Complete this step before returning to your workspace.
+        </DialogDescription>
+        <DialogBody>
+          <p className='text-secondary'>
+            Your progress is saved automatically.
+          </p>
+        </DialogBody>
+        <DialogActions>
+          <Button variant='primary'>Continue</Button>
         </DialogActions>
       </>
     ),
