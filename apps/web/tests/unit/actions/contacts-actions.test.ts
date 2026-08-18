@@ -1,81 +1,45 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { DashboardContact, DashboardContactInput } from '@/types/contacts';
 
-import type { DashboardContactInput } from '@/types/contacts';
-
-// ---------------------------------------------------------------------------
-// Hoisted mocks
-// ---------------------------------------------------------------------------
-const {
-  mockGetCachedAuth,
-  mockWithDbSessionTx,
-  mockRevalidatePath,
-  mockRevalidateTag,
-  mockUnstableCache,
-  mockNoStore,
-  mockGetEntitlements,
-  mockSanitizeContactInput,
-  mockInvalidateProfileCache,
-  mockEq,
-} = vi.hoisted(() => ({
-  mockGetCachedAuth: vi.fn(),
-  mockWithDbSessionTx: vi.fn(),
-  mockRevalidatePath: vi.fn(),
-  mockRevalidateTag: vi.fn(),
-  mockUnstableCache: vi.fn(),
-  mockNoStore: vi.fn(),
-  mockGetEntitlements: vi.fn(),
-  mockSanitizeContactInput: vi.fn(),
-  mockInvalidateProfileCache: vi.fn(),
-  mockEq: vi.fn((a: unknown, b: unknown) => [a, b]),
+const mocked = vi.hoisted(() => ({
+  getCachedAuth: vi.fn(),
+  withDbSessionTx: vi.fn(),
+  getEntitlements: vi.fn(),
+  getDashboardContacts: vi.fn(),
+  invalidateProfileCache: vi.fn(),
+  revalidateTag: vi.fn(),
+  noStore: vi.fn(),
 }));
 
-// ---------------------------------------------------------------------------
-// Module mocks
-// ---------------------------------------------------------------------------
 vi.mock('@/lib/auth/cached', () => ({
-  getCachedAuth: mockGetCachedAuth,
+  getCachedAuth: mocked.getCachedAuth,
 }));
-
 vi.mock('@/lib/auth/session', () => ({
-  withDbSessionTx: mockWithDbSessionTx,
+  withDbSessionTx: mocked.withDbSessionTx,
 }));
-
-vi.mock('next/cache', () => ({
-  unstable_cache: mockUnstableCache,
-  unstable_noStore: mockNoStore,
-  revalidatePath: mockRevalidatePath,
-  revalidateTag: mockRevalidateTag,
-}));
-
 vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: mockGetEntitlements,
+  getCurrentUserEntitlements: mocked.getEntitlements,
 }));
-
-vi.mock('@/lib/contacts/validation', () => ({
-  sanitizeContactInput: mockSanitizeContactInput,
+vi.mock('@/lib/contacts/queries', () => ({
+  getDashboardContacts: mocked.getDashboardContacts,
 }));
-
 vi.mock('@/lib/cache/profile', () => ({
-  invalidateProfileCache: mockInvalidateProfileCache,
+  invalidateProfileCache: mocked.invalidateProfileCache,
 }));
-
-vi.mock('@/constants/routes', () => ({
-  APP_ROUTES: { SETTINGS_CONTACTS: '/app/settings/contacts' },
+vi.mock('next/cache', () => ({
+  unstable_cache: (fn: () => unknown) => fn,
+  unstable_noStore: mocked.noStore,
+  revalidateTag: mocked.revalidateTag,
 }));
-
-// Mock drizzle-orm operators used in query building
 vi.mock('drizzle-orm', () => ({
-  and: vi.fn((...args: unknown[]) => args),
-  asc: vi.fn((col: unknown) => col),
-  count: vi.fn(() => 'count'),
-  eq: mockEq,
+  and: (...args: unknown[]) => args,
+  eq: (left: unknown, right: unknown) => [left, right],
+  notInArray: (left: unknown, right: unknown) => [left, right],
+  sql: (strings: TemplateStringsArray) => strings.join(''),
 }));
-
-// Mock DB schema tables
 vi.mock('@/lib/db/schema/auth', () => ({
-  users: { id: 'users.id', clerkId: 'users.clerkId' },
+  users: { id: 'users.id' },
 }));
-
 vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: {
     id: 'creatorProfiles.id',
@@ -86,568 +50,295 @@ vi.mock('@/lib/db/schema/profiles', () => ({
   creatorContacts: {
     id: 'creatorContacts.id',
     creatorProfileId: 'creatorContacts.creatorProfileId',
-    sortOrder: 'creatorContacts.sortOrder',
-    createdAt: 'creatorContacts.createdAt',
+  },
+  creatorContactPeople: {
+    id: 'creatorContactPeople.id',
+    creatorProfileId: 'creatorContactPeople.creatorProfileId',
+    displayName: 'creatorContactPeople.displayName',
+    companyName: 'creatorContactPeople.companyName',
+    email: 'creatorContactPeople.email',
+    phone: 'creatorContactPeople.phone',
+    preferredChannel: 'creatorContactPeople.preferredChannel',
+  },
+  creatorContactResponsibilities: {
+    id: 'creatorContactResponsibilities.id',
+    creatorProfileId: 'creatorContactResponsibilities.creatorProfileId',
+    role: 'creatorContactResponsibilities.role',
+    customLabel: 'creatorContactResponsibilities.customLabel',
+  },
+  creatorContactAssignments: {
+    personId: 'creatorContactAssignments.personId',
+    responsibilityId: 'creatorContactAssignments.responsibilityId',
   },
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: {},
-}));
+const profile = {
+  id: 'profile-1',
+  username: 'artist',
+  usernameNormalized: 'artist',
+};
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const savedContact: DashboardContact = {
+  id: 'person-1',
+  creatorProfileId: 'profile-1',
+  role: 'management',
+  customLabel: null,
+  personName: 'Alex Agent',
+  companyName: 'Agency',
+  territories: ['Worldwide'],
+  email: 'alex@example.com',
+  phone: null,
+  preferredChannel: 'email',
+  isActive: true,
+  sortOrder: 0,
+  responsibilities: [
+    {
+      id: 'assignment-management',
+      role: 'management',
+      customLabel: null,
+      territories: ['Worldwide'],
+      isActive: true,
+      isPrimary: true,
+      sortOrder: 0,
+    },
+    {
+      id: 'assignment-bookings',
+      role: 'bookings',
+      customLabel: null,
+      territories: ['Europe'],
+      isActive: true,
+      isPrimary: false,
+      sortOrder: 1,
+    },
+  ],
+};
 
-/** Builds a fake DB row that mapContact expects. */
-function fakeContactRow(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 'contact_1',
-    creatorProfileId: 'prof_1',
-    role: 'manager' as const,
-    customLabel: null,
-    personName: 'Jane Doe',
-    companyName: 'Acme Inc',
-    territories: ['US', 'UK'],
-    email: 'jane@example.com',
-    phone: '+1234567890',
-    preferredChannel: 'email' as const,
-    isActive: true,
-    sortOrder: 0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ...overrides,
-  };
-}
-
-/** A valid DashboardContactInput for creating a new contact. */
 function validInput(
   overrides: Partial<DashboardContactInput> = {}
 ): DashboardContactInput {
   return {
-    profileId: 'prof_1',
+    profileId: 'profile-1',
     role: 'management',
-    personName: 'Jane Doe',
-    companyName: 'Acme Inc',
-    territories: ['US'],
-    email: 'jane@example.com',
-    phone: '+1234567890',
+    personName: 'Alex Agent',
+    companyName: 'Agency',
+    territories: ['Worldwide'],
+    email: 'alex@example.com',
+    phone: null,
     preferredChannel: 'email',
-    isActive: true,
-    sortOrder: 0,
+    responsibilities: [
+      {
+        role: 'management',
+        territories: ['Worldwide'],
+        isPrimary: true,
+        sortOrder: 0,
+      },
+      {
+        role: 'bookings',
+        territories: ['Europe'],
+        sortOrder: 1,
+      },
+    ],
     ...overrides,
   };
 }
 
-/**
- * Make withDbSessionTx execute the operation callback with a fake tx object.
- * The fake tx simulates drizzle's chainable query builder.
- */
-function setupTxMock(
-  opts: {
-    ownershipResult?: Record<string, unknown> | null;
-    selectRows?: Record<string, unknown>[];
-    insertReturning?: Record<string, unknown>[];
-    updateReturning?: Record<string, unknown>[];
-    countResult?: number;
-    deleteResult?: unknown;
-  } = {}
-) {
-  const {
-    ownershipResult = {
-      id: 'prof_1',
-      username: 'janedoe',
-      usernameNormalized: 'janedoe',
-    },
-    selectRows = [],
-    insertReturning = [],
-    updateReturning = [],
-    deleteResult = undefined,
-  } = opts;
+function awaitableRows(rows: unknown[]) {
+  const promise = Promise.resolve(rows);
+  return {
+    limit: vi.fn().mockResolvedValue(rows),
+    orderBy: vi.fn().mockResolvedValue(rows),
+    then: promise.then.bind(promise),
+    catch: promise.catch.bind(promise),
+  };
+}
 
-  // Track call order so we can return different results for successive selects
-  let selectCallIndex = 0;
-
-  const fakeTx = {
+function transactionForCreate(count = 0) {
+  let selectIndex = 0;
+  const insert = vi.fn().mockImplementation(() => ({
+    values: vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([{ id: 'person-1' }]),
+      onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+    }),
+  }));
+  const tx = {
     select: vi.fn().mockImplementation(() => {
-      const idx = selectCallIndex++;
-      // First select in assertProfileOwnership (innerJoin query)
-      if (idx === 0) {
+      const index = selectIndex++;
+      if (index === 0) {
         return {
           from: vi.fn().mockReturnValue({
             innerJoin: vi.fn().mockReturnValue({
-              where: vi.fn().mockReturnValue({
-                limit: vi
-                  .fn()
-                  .mockResolvedValue(ownershipResult ? [ownershipResult] : []),
-              }),
-            }),
-            // For plain selects (no join) — e.g. fetchContactsCore
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockResolvedValue(selectRows),
-              limit: vi.fn().mockResolvedValue(selectRows),
+              where: vi.fn().mockReturnValue(awaitableRows([profile])),
             }),
           }),
         };
       }
-      // Subsequent selects: contact existence check or count
+      const rows =
+        index === 1
+          ? [{ count }]
+          : index === 2
+            ? []
+            : [
+                {
+                  id: 'responsibility-management',
+                  role: 'management',
+                  customLabel: '',
+                },
+                {
+                  id: 'responsibility-bookings',
+                  role: 'bookings',
+                  customLabel: '',
+                },
+              ];
       return {
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockResolvedValue(selectRows),
-            limit: vi.fn().mockResolvedValue(selectRows),
-          }),
-          orderBy: vi.fn().mockResolvedValue(selectRows),
-        }),
+        from: vi
+          .fn()
+          .mockReturnValue({ where: vi.fn(() => awaitableRows(rows)) }),
       };
     }),
-    insert: vi.fn().mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue(insertReturning),
-      }),
-    }),
+    insert,
     update: vi.fn().mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          returning: vi.fn().mockResolvedValue(updateReturning),
-        }),
-      }),
+      set: vi
+        .fn()
+        .mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
     }),
     delete: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(deleteResult),
+      where: vi.fn().mockResolvedValue(undefined),
     }),
   };
-
-  mockWithDbSessionTx.mockImplementation(async (operation: Function) => {
-    return operation(fakeTx, 'user_123');
-  });
-
-  return fakeTx;
+  mocked.withDbSessionTx.mockImplementation(operation =>
+    operation(tx, 'user-1')
+  );
+  return tx;
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-describe('contacts/actions.ts', () => {
+function transactionForDelete(personExists: boolean) {
+  let selectIndex = 0;
+  const remove = vi.fn().mockReturnValue({
+    where: vi.fn().mockResolvedValue(undefined),
+  });
+  const tx = {
+    select: vi.fn().mockImplementation(() => {
+      const index = selectIndex++;
+      const rows =
+        index === 0 ? [profile] : personExists ? [{ id: 'person-1' }] : [];
+      const query = awaitableRows(rows);
+      return {
+        from: vi.fn().mockReturnValue(
+          index === 0
+            ? {
+                innerJoin: vi
+                  .fn()
+                  .mockReturnValue({ where: vi.fn(() => query) }),
+              }
+            : { where: vi.fn(() => query) }
+        ),
+      };
+    }),
+    delete: remove,
+  };
+  mocked.withDbSessionTx.mockImplementation(operation =>
+    operation(tx, 'user-1')
+  );
+  return { tx, remove };
+}
+
+describe('contacts actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
-    mockInvalidateProfileCache.mockResolvedValue(undefined);
+    mocked.getCachedAuth.mockResolvedValue({ userId: 'user-1' });
+    mocked.getEntitlements.mockResolvedValue({ contactsLimit: null });
+    mocked.getDashboardContacts.mockResolvedValue([savedContact]);
+    mocked.invalidateProfileCache.mockResolvedValue(undefined);
+  });
 
-    // Default: unstable_cache just invokes the passed function immediately
-    mockUnstableCache.mockImplementation((fn: Function) => fn);
-
-    // Default: sanitizeContactInput returns input as-is
-    mockSanitizeContactInput.mockImplementation(
-      (input: DashboardContactInput) => input
+  it('persists one person with multiple reusable responsibility assignments', async () => {
+    const tx = transactionForCreate();
+    const { saveContact } = await import(
+      '@/app/(shell)/dashboard/contacts/actions'
     );
+
+    await expect(saveContact(validInput())).resolves.toEqual(savedContact);
+
+    expect(tx.insert).toHaveBeenCalledTimes(3);
+    expect(mocked.getDashboardContacts).toHaveBeenCalledWith(tx, 'profile-1');
+    expect(mocked.revalidateTag).toHaveBeenCalledWith(
+      'contacts:user-1:profile-1',
+      'max'
+    );
+    expect(mocked.invalidateProfileCache).toHaveBeenCalledWith('artist');
   });
 
-  // -----------------------------------------------------------------------
-  // getProfileContactsForOwner
-  // -----------------------------------------------------------------------
-  describe('getProfileContactsForOwner', () => {
-    it('returns cached contacts for authenticated owner', async () => {
-      const row = fakeContactRow();
-      setupTxMock({ selectRows: [row] });
+  it('enforces the person limit before any directory write', async () => {
+    const tx = transactionForCreate(1);
+    mocked.getEntitlements.mockResolvedValue({ contactsLimit: 1 });
+    const { saveContact } = await import(
+      '@/app/(shell)/dashboard/contacts/actions'
+    );
 
-      // unstable_cache wraps the core function: mock it to invoke the fn
-      mockUnstableCache.mockImplementation((fn: Function) => fn);
-
-      const { getProfileContactsForOwner } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      const contacts = await getProfileContactsForOwner('prof_1');
-
-      expect(contacts).toHaveLength(1);
-      expect(contacts[0].id).toBe('contact_1');
-      expect(contacts[0].email).toBe('jane@example.com');
-      expect(mockEq).toHaveBeenCalledWith('users.id', 'user_123');
-      expect(mockEq).not.toHaveBeenCalledWith('users.clerkId', 'user_123');
-    });
-
-    it('throws Unauthorized when not authenticated', async () => {
-      mockGetCachedAuth.mockResolvedValue({ userId: null });
-
-      const { getProfileContactsForOwner } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      await expect(getProfileContactsForOwner('prof_1')).rejects.toThrow(
-        'Unauthorized'
-      );
-    });
-
-    it('passes correct cache key and tags to unstable_cache', async () => {
-      setupTxMock();
-      mockUnstableCache.mockImplementation((fn: Function) => fn);
-
-      const { getProfileContactsForOwner } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      await getProfileContactsForOwner('prof_1');
-
-      expect(mockUnstableCache).toHaveBeenCalledWith(
-        expect.any(Function),
-        ['contacts', 'user_123', 'prof_1'],
-        expect.objectContaining({
-          revalidate: 30,
-          tags: ['contacts:user_123:prof_1'],
-        })
-      );
-    });
+    await expect(saveContact(validInput())).rejects.toThrow(
+      'Contact limit reached'
+    );
+    expect(tx.insert).not.toHaveBeenCalled();
   });
 
-  // -----------------------------------------------------------------------
-  // saveContact — create
-  // -----------------------------------------------------------------------
-  describe('saveContact — create new contact', () => {
-    it('inserts a new contact when no id is provided', async () => {
-      const input = validInput();
-      const savedRow = fakeContactRow();
-      const fakeTx = setupTxMock({ insertReturning: [savedRow] });
+  it('degrades safely when entitlement lookup is unavailable', async () => {
+    transactionForCreate();
+    mocked.getEntitlements.mockRejectedValue(new Error('billing unavailable'));
+    const { saveContact } = await import(
+      '@/app/(shell)/dashboard/contacts/actions'
+    );
 
-      // No entitlement limit
-      mockGetEntitlements.mockResolvedValue({ contactsLimit: null });
-
-      const { saveContact } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      const result = await saveContact(input);
-
-      expect(result.id).toBe('contact_1');
-      expect(fakeTx.insert).toHaveBeenCalled();
-      expect(mockNoStore).toHaveBeenCalled();
-    });
-
-    it('calls sanitizeContactInput before saving', async () => {
-      const input = validInput();
-      const sanitized = { ...input, personName: 'Sanitized Name' };
-      mockSanitizeContactInput.mockReturnValue(sanitized);
-
-      setupTxMock({ insertReturning: [fakeContactRow()] });
-      mockGetEntitlements.mockResolvedValue({ contactsLimit: null });
-
-      const { saveContact } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      await saveContact(input);
-
-      expect(mockSanitizeContactInput).toHaveBeenCalledWith(input);
-    });
-
-    it('invalidates caches after successful save', async () => {
-      const input = validInput();
-      setupTxMock({ insertReturning: [fakeContactRow()] });
-      mockGetEntitlements.mockResolvedValue({ contactsLimit: null });
-
-      const { saveContact } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      await saveContact(input);
-
-      // Profile cache invalidation inside the transaction
-      expect(mockInvalidateProfileCache).toHaveBeenCalledWith('janedoe');
-
-      // Tag invalidation after the transaction (path skipped to preserve sidebar state)
-      expect(mockRevalidateTag).toHaveBeenCalledWith(
-        'contacts:user_123:prof_1',
-        'max'
-      );
-      expect(mockRevalidatePath).not.toHaveBeenCalled();
-    });
+    await expect(saveContact(validInput())).resolves.toEqual(savedContact);
   });
 
-  // -----------------------------------------------------------------------
-  // saveContact — update
-  // -----------------------------------------------------------------------
-  describe('saveContact — update existing contact', () => {
-    it('updates an existing contact when id is provided', async () => {
-      const input = validInput({ id: 'contact_1' });
-      const updatedRow = fakeContactRow({ personName: 'Updated Name' });
+  it('does not retire unseen assignments from an older single-role client', async () => {
+    const tx = transactionForCreate();
+    const { saveContact } = await import(
+      '@/app/(shell)/dashboard/contacts/actions'
+    );
 
-      // For update path: first select is ownership, second select is existence check
-      const fakeTx = setupTxMock({
-        selectRows: [{ id: 'contact_1' }],
-        updateReturning: [updatedRow],
-      });
+    await expect(
+      saveContact(validInput({ responsibilities: undefined }))
+    ).resolves.toEqual(savedContact);
 
-      const { saveContact } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      const result = await saveContact(input);
-
-      expect(result.personName).toBe('Updated Name');
-      expect(fakeTx.update).toHaveBeenCalled();
-      // Should NOT check entitlements for updates
-      expect(mockGetEntitlements).not.toHaveBeenCalled();
-    });
-
-    it('throws when updating a non-existent contact', async () => {
-      const input = validInput({ id: 'nonexistent' });
-
-      // Return empty for the existence check
-      setupTxMock({ selectRows: [] });
-
-      const { saveContact } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      await expect(saveContact(input)).rejects.toThrow('Contact not found');
-    });
+    expect(tx.update).not.toHaveBeenCalled();
   });
 
-  // -----------------------------------------------------------------------
-  // saveContact — plan limit enforcement
-  // -----------------------------------------------------------------------
-  describe('saveContact — plan limit enforcement', () => {
-    it('throws ContactLimitError when contact limit is reached', async () => {
-      const input = validInput();
+  it('requires an authenticated owner', async () => {
+    mocked.getCachedAuth.mockResolvedValue({ userId: null });
+    const { saveContact } = await import(
+      '@/app/(shell)/dashboard/contacts/actions'
+    );
 
-      // Setup tx so count query returns the limit
-      mockWithDbSessionTx.mockImplementation(async (operation: Function) => {
-        let callIdx = 0;
-        const fakeTx = {
-          select: vi.fn().mockImplementation(() => {
-            callIdx++;
-            if (callIdx === 1) {
-              // assertProfileOwnership
-              return {
-                from: vi.fn().mockReturnValue({
-                  innerJoin: vi.fn().mockReturnValue({
-                    where: vi.fn().mockReturnValue({
-                      limit: vi.fn().mockResolvedValue([
-                        {
-                          id: 'prof_1',
-                          username: 'janedoe',
-                          usernameNormalized: 'janedoe',
-                        },
-                      ]),
-                    }),
-                  }),
-                }),
-              };
-            }
-            // count query
-            return {
-              from: vi.fn().mockReturnValue({
-                where: vi.fn().mockResolvedValue([{ total: 5 }]),
-              }),
-            };
-          }),
-          insert: vi.fn(),
-          update: vi.fn(),
-          delete: vi.fn(),
-        };
-        return operation(fakeTx, 'user_123');
-      });
-
-      mockGetEntitlements.mockResolvedValue({ contactsLimit: 5 });
-
-      const { saveContact } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      await expect(saveContact(input)).rejects.toThrow('Contact limit reached');
-    });
-
-    it('allows insert when under the contact limit', async () => {
-      const input = validInput();
-
-      mockWithDbSessionTx.mockImplementation(async (operation: Function) => {
-        let callIdx = 0;
-        const fakeTx = {
-          select: vi.fn().mockImplementation(() => {
-            callIdx++;
-            if (callIdx === 1) {
-              return {
-                from: vi.fn().mockReturnValue({
-                  innerJoin: vi.fn().mockReturnValue({
-                    where: vi.fn().mockReturnValue({
-                      limit: vi.fn().mockResolvedValue([
-                        {
-                          id: 'prof_1',
-                          username: 'janedoe',
-                          usernameNormalized: 'janedoe',
-                        },
-                      ]),
-                    }),
-                  }),
-                }),
-              };
-            }
-            // count query — under limit
-            return {
-              from: vi.fn().mockReturnValue({
-                where: vi.fn().mockResolvedValue([{ total: 2 }]),
-              }),
-            };
-          }),
-          insert: vi.fn().mockReturnValue({
-            values: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([fakeContactRow()]),
-            }),
-          }),
-          update: vi.fn(),
-          delete: vi.fn(),
-        };
-        return operation(fakeTx, 'user_123');
-      });
-
-      mockGetEntitlements.mockResolvedValue({ contactsLimit: 5 });
-
-      const { saveContact } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      const result = await saveContact(input);
-      expect(result.id).toBe('contact_1');
-    });
-
-    it('allows insert when entitlements are unavailable (billing down)', async () => {
-      const input = validInput();
-
-      mockGetEntitlements.mockRejectedValue(
-        new Error('Billing service unavailable')
-      );
-
-      setupTxMock({ insertReturning: [fakeContactRow()] });
-
-      const { saveContact } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      // Should not throw — gracefully degrades when billing is down
-      const result = await saveContact(input);
-      expect(result.id).toBe('contact_1');
-    });
-
-    it('allows insert when contactsLimit is null (pro/unlimited plan)', async () => {
-      const input = validInput();
-
-      mockGetEntitlements.mockResolvedValue({ contactsLimit: null });
-      setupTxMock({ insertReturning: [fakeContactRow()] });
-
-      const { saveContact } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      const result = await saveContact(input);
-      expect(result.id).toBe('contact_1');
-    });
+    await expect(saveContact(validInput())).rejects.toThrow('Unauthorized');
   });
 
-  // -----------------------------------------------------------------------
-  // deleteContact
-  // -----------------------------------------------------------------------
-  describe('deleteContact', () => {
-    it('deletes an owned contact', async () => {
-      const fakeTx = setupTxMock({
-        selectRows: [{ id: 'contact_1' }],
-      });
+  it('deletes only an owned directory person and invalidates both caches', async () => {
+    const { remove } = transactionForDelete(true);
+    const { deleteContact } = await import(
+      '@/app/(shell)/dashboard/contacts/actions'
+    );
 
-      const { deleteContact } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
+    await expect(
+      deleteContact('person-1', 'profile-1')
+    ).resolves.toBeUndefined();
 
-      await deleteContact('contact_1', 'prof_1');
-
-      expect(fakeTx.delete).toHaveBeenCalled();
-      expect(mockNoStore).toHaveBeenCalled();
-    });
-
-    it('throws when contact does not exist', async () => {
-      setupTxMock({ selectRows: [] });
-
-      const { deleteContact } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      await expect(deleteContact('nonexistent', 'prof_1')).rejects.toThrow(
-        'Contact not found'
-      );
-    });
-
-    it('throws Unauthorized when not authenticated', async () => {
-      mockGetCachedAuth.mockResolvedValue({ userId: null });
-
-      const { deleteContact } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      await expect(deleteContact('contact_1', 'prof_1')).rejects.toThrow(
-        'Unauthorized'
-      );
-    });
-
-    it('invalidates caches after successful delete', async () => {
-      setupTxMock({ selectRows: [{ id: 'contact_1' }] });
-
-      const { deleteContact } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      await deleteContact('contact_1', 'prof_1');
-
-      expect(mockInvalidateProfileCache).toHaveBeenCalledWith('janedoe');
-      expect(mockRevalidateTag).toHaveBeenCalledWith(
-        'contacts:user_123:prof_1',
-        'max'
-      );
-      // revalidatePath is intentionally skipped to avoid resetting client-side
-      // state (closing the sidebar). Local state handles cache updates.
-      expect(mockRevalidatePath).not.toHaveBeenCalled();
-    });
+    expect(remove).toHaveBeenCalledTimes(2);
+    expect(mocked.revalidateTag).toHaveBeenCalledWith(
+      'contacts:user-1:profile-1',
+      'max'
+    );
+    expect(mocked.invalidateProfileCache).toHaveBeenCalledWith('artist');
   });
 
-  // -----------------------------------------------------------------------
-  // Auth rejection across all actions
-  // -----------------------------------------------------------------------
-  describe('auth rejection for all actions', () => {
-    it('saveContact rejects unauthenticated users', async () => {
-      mockGetCachedAuth.mockResolvedValue({ userId: null });
+  it('rejects deletion of a person outside the directory', async () => {
+    transactionForDelete(false);
+    const { deleteContact } = await import(
+      '@/app/(shell)/dashboard/contacts/actions'
+    );
 
-      const { saveContact } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      await expect(saveContact(validInput())).rejects.toThrow('Unauthorized');
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // Profile ownership verification
-  // -----------------------------------------------------------------------
-  describe('profile ownership verification', () => {
-    it('saveContact throws when profile is not owned by the user', async () => {
-      setupTxMock({ ownershipResult: null });
-      mockGetEntitlements.mockResolvedValue({ contactsLimit: null });
-
-      const { saveContact } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      await expect(saveContact(validInput())).rejects.toThrow(
-        'Unauthorized to access this profile'
-      );
-    });
-
-    it('deleteContact throws when profile is not owned by the user', async () => {
-      setupTxMock({ ownershipResult: null });
-
-      const { deleteContact } = await import(
-        '@/app/(shell)/dashboard/contacts/actions'
-      );
-
-      await expect(deleteContact('contact_1', 'prof_1')).rejects.toThrow(
-        'Unauthorized to access this profile'
-      );
-    });
+    await expect(deleteContact('missing', 'profile-1')).rejects.toThrow(
+      'Contact not found'
+    );
   });
 });
