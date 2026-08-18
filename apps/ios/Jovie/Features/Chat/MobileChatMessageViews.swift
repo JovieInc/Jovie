@@ -219,66 +219,87 @@ enum MobileChatProseTone {
 
 // MARK: - Inline prose flow (GH-12708 entity chip thumbnails v2)
 
-enum MobileChatFlowToken: Hashable {
-  case textWord(String)
-  case entity(kind: MobileChatEntityKind, id: String, label: String)
-  case skill(id: String, label: String)
-}
-
-/// Word-wrap layout for inline transcript prose. Mixes plain `Text` words with
-/// entity pill chips and skill labels without shredding sentence flow.
+/// Mixes wrapping `Text` runs with entity chips. Used only when a chip must
+/// break the attributed string; plain prose uses one `Text` so wrapping
+/// stays a single Messages-style flow (JOV-5204).
 private struct MobileChatInlineFlowLayout: Layout {
   var horizontalSpacing: CGFloat = 0
   var verticalSpacing: CGFloat = 2
 
   func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-    guard !subviews.isEmpty else { return .zero }
+    arrange(proposal: proposal, subviews: subviews).size
+  }
+
+  func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    let frames = arrange(
+      proposal: ProposedViewSize(width: bounds.width, height: bounds.height),
+      subviews: subviews
+    ).frames
+    for (index, subview) in subviews.enumerated() {
+      let frame = frames[index]
+      subview.place(
+        at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
+        anchor: .topLeading,
+        proposal: ProposedViewSize(width: frame.width, height: frame.height)
+      )
+    }
+  }
+
+  private func arrange(proposal: ProposedViewSize, subviews: Subviews) -> (
+    size: CGSize,
+    frames: [CGRect]
+  ) {
+    guard !subviews.isEmpty else { return (.zero, []) }
 
     let maxWidth = proposal.width ?? .greatestFiniteMagnitude
     var x: CGFloat = 0
     var y: CGFloat = 0
     var rowHeight: CGFloat = 0
     var maxLineWidth: CGFloat = 0
+    var rowStart = 0
+    var frames = Array(repeating: CGRect.zero, count: subviews.count)
 
-    for subview in subviews {
-      let size = subview.sizeThatFits(.unspecified)
-      if x > 0, x + size.width > maxWidth {
-        maxLineWidth = max(maxLineWidth, x - horizontalSpacing)
+    func flushRow(upTo end: Int) {
+      guard rowStart < end else { return }
+      for index in rowStart..<end {
+        let frame = frames[index]
+        frames[index] = CGRect(
+          x: frame.minX,
+          y: y + (rowHeight - frame.height) / 2,
+          width: frame.width,
+          height: frame.height
+        )
+      }
+      maxLineWidth = max(maxLineWidth, x > 0 ? x - horizontalSpacing : 0)
+    }
+
+    for (index, subview) in subviews.enumerated() {
+      let unconstrained = subview.sizeThatFits(.unspecified)
+      let remaining = max(maxWidth - x, 0)
+      let needsWrap = x > 0 && unconstrained.width > remaining
+      if needsWrap {
+        flushRow(upTo: index)
         x = 0
         y += rowHeight + verticalSpacing
         rowHeight = 0
+        rowStart = index
       }
+
+      let available = x == 0 ? maxWidth : max(maxWidth - x, 0)
+      let size: CGSize
+      if unconstrained.width <= available {
+        size = unconstrained
+      } else {
+        size = subview.sizeThatFits(ProposedViewSize(width: available, height: nil))
+      }
+
+      frames[index] = CGRect(x: x, y: 0, width: size.width, height: size.height)
       rowHeight = max(rowHeight, size.height)
       x += size.width + horizontalSpacing
     }
 
-    maxLineWidth = max(maxLineWidth, x > 0 ? x - horizontalSpacing : 0)
-    return CGSize(width: maxLineWidth, height: y + rowHeight)
-  }
-
-  func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-    guard !subviews.isEmpty else { return }
-
-    let maxWidth = bounds.width
-    var x = bounds.minX
-    var y = bounds.minY
-    var rowHeight: CGFloat = 0
-
-    for subview in subviews {
-      let size = subview.sizeThatFits(.unspecified)
-      if x > bounds.minX, x + size.width > bounds.minX + maxWidth {
-        x = bounds.minX
-        y += rowHeight + verticalSpacing
-        rowHeight = 0
-      }
-      subview.place(
-        at: CGPoint(x: x, y: y + (rowHeight - size.height) / 2),
-        anchor: .topLeading,
-        proposal: ProposedViewSize(width: size.width, height: size.height)
-      )
-      rowHeight = max(rowHeight, size.height)
-      x += size.width + horizontalSpacing
-    }
+    flushRow(upTo: subviews.count)
+    return (CGSize(width: maxLineWidth, height: y + rowHeight), frames)
   }
 }
 
@@ -390,7 +411,7 @@ private struct MobileChatEntityChipView: View {
 
 /// Renders an ordered `[MobileChatProseRun]` inline within a chat bubble.
 /// Entity mentions use transcript pill chips with cached thumbnails (GH-12708);
-/// skill invocations stay text-only; plain text wraps word-by-word.
+/// skill invocations stay text-only; plain text is one wrap flow (JOV-5204).
 struct MobileChatProseText: View {
   let runs: [MobileChatProseRun]
   let tone: MobileChatProseTone
@@ -398,9 +419,20 @@ struct MobileChatProseText: View {
 
   var body: some View {
     let tokens = Self.flowTokens(from: runs)
-    MobileChatInlineFlowLayout(horizontalSpacing: 0, verticalSpacing: 2) {
-      ForEach(Array(tokens.enumerated()), id: \.offset) { _, token in
-        flowSubview(for: token)
+    if tokens.contains(where: \.isEntityChip) {
+      MobileChatInlineFlowLayout(horizontalSpacing: 0, verticalSpacing: 2) {
+        ForEach(Array(tokens.enumerated()), id: \.offset) { _, token in
+          flowSubview(for: token)
+        }
+      }
+    } else {
+      let attributed = Self.attributedText(from: tokens)
+      ViewThatFits(in: .horizontal) {
+        Text(attributed)
+          .foregroundStyle(primaryTextColor)
+          .fixedSize()
+        Text(attributed)
+          .foregroundStyle(primaryTextColor)
       }
     }
   }
@@ -408,7 +440,7 @@ struct MobileChatProseText: View {
   @ViewBuilder
   private func flowSubview(for token: MobileChatFlowToken) -> some View {
     switch token {
-    case let .textWord(value):
+    case let .text(value):
       Text(verbatim: value)
         .foregroundStyle(primaryTextColor)
     case let .entity(kind, id, label):
@@ -445,40 +477,10 @@ struct MobileChatProseText: View {
   }
 
   static func flowTokens(from runs: [MobileChatProseRun]) -> [MobileChatFlowToken] {
-    runs.flatMap { run -> [MobileChatFlowToken] in
-      switch run {
-      case let .text(value):
-        return splitTextIntoFlowTokens(value)
-      case let .entity(kind, id, label):
-        return [.entity(kind: kind, id: id, label: label)]
-      case let .skill(id, label):
-        return [.skill(id: id, label: label)]
-      }
-    }
+    MobileChatBubbleText.wrapUnits(from: runs)
   }
 
-  private static func splitTextIntoFlowTokens(_ text: String) -> [MobileChatFlowToken] {
-    guard !text.isEmpty else { return [] }
-
-    var tokens: [MobileChatFlowToken] = []
-    var current = ""
-
-    for character in text {
-      if character.isWhitespace {
-        if !current.isEmpty {
-          tokens.append(.textWord(current))
-          current = ""
-        }
-        tokens.append(.textWord(String(character)))
-      } else {
-        current.append(character)
-      }
-    }
-
-    if !current.isEmpty {
-      tokens.append(.textWord(current))
-    }
-
-    return tokens
+  static func attributedText(from tokens: [MobileChatFlowToken]) -> AttributedString {
+    MobileChatBubbleText.attributedText(from: tokens)
   }
 }

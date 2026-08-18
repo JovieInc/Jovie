@@ -37,6 +37,67 @@ enum MobileChatProseRun: Equatable, Sendable {
   case skill(id: String, label: String)
 }
 
+/// Inline wrap units for a chat bubble. Contiguous text stays one flow so
+/// SwiftUI/TextKit wrap like Messages. Entity chips are the only hard break;
+/// skill labels stay in the same attributed string.
+enum MobileChatFlowToken: Hashable, Sendable {
+  case text(String)
+  case entity(kind: MobileChatEntityKind, id: String, label: String)
+  case skill(id: String, label: String)
+
+  var isEntityChip: Bool {
+    if case .entity = self { return true }
+    return false
+  }
+}
+
+/// Builds the attributed bubble string the transcript actually renders.
+/// Word-splitting here is what detached the first word ("Yo", "Jovie") into
+/// its own column — keep one text flow unless a chip must break the run.
+enum MobileChatBubbleText {
+  static func wrapUnits(from runs: [MobileChatProseRun]) -> [MobileChatFlowToken] {
+    var tokens: [MobileChatFlowToken] = []
+    for run in runs {
+      switch run {
+      case let .text(value):
+        guard !value.isEmpty else { continue }
+        if case let .text(existing) = tokens.last {
+          tokens[tokens.count - 1] = .text(existing + value)
+        } else {
+          tokens.append(.text(value))
+        }
+      case let .entity(kind, id, label):
+        tokens.append(.entity(kind: kind, id: id, label: label))
+      case let .skill(id, label):
+        tokens.append(.skill(id: id, label: label))
+      }
+    }
+    return tokens
+  }
+
+  static func attributedText(from tokens: [MobileChatFlowToken]) -> AttributedString {
+    var result = AttributedString()
+    for token in tokens {
+      switch token {
+      case let .text(value):
+        guard !value.isEmpty else { continue }
+        result += AttributedString(value)
+      case let .skill(_, label):
+        var skill = AttributedString(label)
+        skill.inlinePresentationIntent = .stronglyEmphasized
+        result += skill
+      case .entity:
+        continue
+      }
+    }
+    return result
+  }
+
+  static func attributedText(from runs: [MobileChatProseRun]) -> AttributedString {
+    attributedText(from: wrapUnits(from: runs))
+  }
+}
+
 enum MobileChatMerchArtifact: Equatable, Identifiable, Sendable {
   case productOptions(MobileChatMerchOptionsPayload)
   case designCarousel(MobileChatMerchDesignsPayload)
