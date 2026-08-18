@@ -22,7 +22,13 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { AgentOsRunsPanel } from '@/components/features/admin/agent-os';
 import { DesignProposalReviewPanel } from '@/components/features/admin/design-lab';
+import { FounderMorningWalkCard } from '@/components/features/admin/hud/FounderMorningWalkCard';
+import { HudCashMrrBand } from '@/components/features/admin/hud/HudCashMrrBand';
 import { HudKpiSubgrid } from '@/components/features/admin/hud/HudKpiSubgrid';
+import {
+  HudGithubBudgetPanel,
+  HudShipperNeedPanel,
+} from '@/components/features/admin/hud/HudShipperPanels';
 import { HudSystemHealthStrip } from '@/components/features/admin/hud/HudSystemHealthStrip';
 import { VisualQaReviewPanel } from '@/components/features/admin/hud/VisualQaReviewPanel';
 import type { DailyBucket } from '@/components/features/admin/ShippingVelocityChart';
@@ -31,17 +37,18 @@ import { TimActionRequiredSection } from '@/components/features/admin/TimActionR
 import { WhatShipped } from '@/components/features/admin/WhatShipped';
 import { toast } from '@/components/feedback';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
-import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { QRCode } from '@/components/molecules/QRCode';
 import { ShellListRowFrame } from '@/components/organisms/table';
 import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
 import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
-import { isHudMetricValueAvailable } from '@/lib/hud/source-trust';
+import {
+  composeHudForPresentation,
+  type HudComposedSection,
+  type HudPresentation,
+} from '@/lib/hud/compose-hud-bands';
 import {
   getDefaultStatusTone,
-  getDeploymentLabel,
-  getDeploymentTone,
   type HudTone,
 } from '@/lib/hud/tone-determination';
 import type { HermesCliRuntime, HermesDispatchRequest } from '@/types/ai-ops';
@@ -62,21 +69,6 @@ type HermesDispatchKind =
   | 'qa'
   | 'investigation'
   | 'support_draft';
-
-function formatUsd(value: number): string {
-  return value.toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: value >= 1000 ? 0 : 2,
-  });
-}
-
-function formatRunway(runwayMonths: number | null): string {
-  if (runwayMonths == null) return '\u221E';
-  if (!Number.isFinite(runwayMonths)) return '\u221E';
-  if (runwayMonths < 0) return '0';
-  return `${runwayMonths.toFixed(1)} mo`;
-}
 
 function formatUpdatedTime(value: string): string {
   return new Date(value).toLocaleTimeString('en-US', {
@@ -245,8 +237,6 @@ const DEPLOYMENT_STATE_DOT_CLASSNAMES: Record<HudDeploymentState, string> = {
 };
 
 const DISPATCH_SOURCE_PLACEHOLDER = 'Linear, GitHub, or Sentry URL';
-const RUNWAY_BURN_LABEL = 'Burn (30d)';
-const OVERVIEW_BURN_LABEL = 'Burn (30d)';
 
 function getAiOpsTone(aiOps: HudMetrics['aiOps']): HudTone {
   if (aiOps.counts.failed > 0 || aiOps.counts.blocked > 0) return 'bad';
@@ -712,6 +702,15 @@ function metricSubtitleWithTrust(
   );
 }
 
+function resolveHudPresentation(
+  density: HudDensity,
+  presentationMode: HudPresentationMode
+): HudPresentation {
+  if (presentationMode === 'token') return 'token';
+  if (density === 'shell') return 'shell';
+  return 'kiosk';
+}
+
 export function HudDashboardClient({
   initialMetrics,
   density = 'kiosk',
@@ -746,13 +745,9 @@ export function HudDashboardClient({
   }
 
   const defaultTone = getDefaultStatusTone(metrics.overview.defaultStatus);
-  const deploymentsTone = getDeploymentTone(metrics.deployments);
-  const deploymentLabel = getDeploymentLabel(metrics.deployments);
   const deploymentDetail = getDeploymentDetail(metrics.deployments);
   const aiOpsTone = getAiOpsTone(metrics.aiOps);
   const aiOpsLabel = getAiOpsLabel(metrics.aiOps);
-  const stripeSource = metrics.sources.stripe;
-  const mercurySource = metrics.sources.mercury;
   const databaseSource = metrics.sources.database;
   const sentrySource = metrics.sources.sentry;
   const githubSource = metrics.sources.github;
@@ -763,23 +758,17 @@ export function HudDashboardClient({
   const isShell = density === 'shell';
   const showDispatch = presentationMode !== 'token';
   const showQrPanel = presentationMode === 'token' && Boolean(hudUrl);
+  const presentation = resolveHudPresentation(density, presentationMode);
+  const sections = composeHudForPresentation(presentation);
 
-  // Outer layout: shell defers width to the AdminPage container (no
-  // additional centering or max-width so metrics fill the full horizontal
-  // space at any viewport). Kiosk keeps its own padding for breathing room
-  // on TV displays but also removes the max-width cap so wide monitors get
-  // full-bleed density.
   const outerClass = isShell
     ? 'flex w-full flex-col gap-3'
     : 'flex w-full flex-col gap-3 px-4 py-4 sm:px-6 sm:py-6 xl:px-8';
 
-  // MRR scale: shell matches Overview KPIs (~28-32px); kiosk keeps the
-  // TV-readable 44/56/72 ramp.
   const mrrValueClass = isShell
     ? 'text-3xl font-[620] leading-none tracking-[-0.03em] sm:text-3xl'
     : 'text-5xl font-[620] leading-none tracking-[-0.045em] sm:text-[56px] lg:text-7xl';
 
-  // Operations / Reliability / Runway KPIs likewise scale down in shell.
   const secondaryValueClass = isShell
     ? 'text-2xl font-[620] leading-none tracking-[-0.03em] sm:text-3xl'
     : 'text-4xl font-[620] leading-none tracking-[-0.04em] sm:text-[42px]';
@@ -796,110 +785,263 @@ export function HudDashboardClient({
     </span>
   );
 
-  if (isShell) {
-    return (
-      <div className={outerClass}>
-        <HudSystemHealthStrip metrics={metrics} />
-        <TimActionRequiredSection />
-        <HudKpiSubgrid metrics={metrics} />
-
-        <div className='grid gap-3 md:grid-cols-2 xl:grid-cols-4'>
-          <ContentMetricCard
-            label='MRR'
-            value={
-              isHudMetricValueAvailable(stripeSource)
-                ? formatUsd(metrics.overview.mrrUsd)
-                : '\u2014'
-            }
-            subtitle={metricSubtitleWithTrust(
-              <span>
-                {isHudMetricValueAvailable(stripeSource)
-                  ? `${metrics.overview.activeSubscribers.toLocaleString('en-US')} subscribers`
-                  : 'Stripe data unavailable'}
-              </span>,
-              stripeSource,
-              handleSourceRetry
-            )}
-            headerRight={
-              <HudStatusPill label={deploymentLabel} tone={deploymentsTone} />
-            }
-            className='p-3'
-            valueClassName={mrrValueClass}
+  function renderSection(section: HudComposedSection) {
+    switch (section.id) {
+      case 'morning-walk':
+        return (
+          <FounderMorningWalkCard
+            key={section.id}
+            defaultStatus={metrics.overview.defaultStatusDetail}
           />
-          <ContentMetricCard
-            label='Runway'
-            value={
-              isHudMetricValueAvailable(mercurySource)
-                ? formatRunway(metrics.overview.runwayMonths)
-                : '\u2014'
-            }
-            subtitle={metricSubtitleWithTrust(
-              isHudMetricValueAvailable(mercurySource) ? (
-                <div className='grid gap-1.5'>
-                  <ContentMetricRow
-                    label='Cash'
-                    value={formatUsd(metrics.overview.balanceUsd)}
-                  />
-                  <ContentMetricRow
-                    label={RUNWAY_BURN_LABEL}
-                    value={formatUsd(metrics.overview.burnRateUsd)}
-                  />
-                </div>
-              ) : (
-                <span>Mercury data unavailable</span>
-              ),
-              mercurySource,
-              handleSourceRetry
-            )}
-            className='p-3'
-            valueClassName={secondaryValueClass}
-          />
-          <HudHealthMetricCards
+        );
+      case 'cash-mrr':
+        return (
+          <HudCashMrrBand
+            key={section.id}
             metrics={metrics}
-            secondaryValueClass={secondaryValueClass}
-            databaseSource={databaseSource}
-            sentrySource={sentrySource}
-            handleSourceRetry={handleSourceRetry}
+            mrrValueClass={mrrValueClass}
+            runwayValueClass={secondaryValueClass}
+            onRetry={handleSourceRetry}
           />
-        </div>
-
-        {metrics.accessMode === 'admin' ? (
-          <AgentOsRunsPanel
-            artifacts={agentOsArtifacts}
-            summary={aiOpsSummary}
-            status={<HudStatusPill label={aiOpsLabel} tone={aiOpsTone} />}
-            deploymentsPanel={
-              <DeploymentsPanelWithTrust
-                deployments={metrics.deployments}
-                detail={deploymentDetail}
-                githubSource={githubSource}
-                onRetry={handleSourceRetry}
+        );
+      case 'factory-health':
+        return <HudSystemHealthStrip key={section.id} metrics={metrics} />;
+      case 'shipper':
+        return (
+          <HudShipperNeedPanel
+            key={section.id}
+            source={presentation === 'token' ? 'kiosk-token' : 'admin-session'}
+          />
+        );
+      case 'design-jury':
+        return (
+          <div
+            key={section.id}
+            className='flex flex-col gap-3'
+            data-testid={section.testId}
+          >
+            <DesignProposalReviewPanel />
+            <VisualQaReviewPanel />
+          </div>
+        );
+      case 'velocity':
+        return (
+          <div
+            key={section.id}
+            className='flex flex-col gap-3'
+            data-testid={section.testId}
+          >
+            <HudKpiSubgrid metrics={metrics} />
+            <ContentSurfaceCard
+              surface='details'
+              className='overflow-hidden p-0'
+            >
+              <ShippingVelocityChart
+                initialData={initialShippingData}
+                initialRange='7d'
+                cachedAt={initialShippingCachedAt}
               />
-            }
-          />
-        ) : null}
-
-        <WhatShipped kioskToken={kioskToken} />
-        <DesignProposalReviewPanel />
-        <VisualQaReviewPanel />
-        <ContentSurfaceCard
-          surface='details'
-          className='overflow-hidden p-0'
-          data-testid='hud-bottom-marker'
-        >
-          <ShippingVelocityChart
-            initialData={initialShippingData}
-            initialRange='7d'
-            cachedAt={initialShippingCachedAt}
-          />
-        </ContentSurfaceCard>
-      </div>
-    );
+            </ContentSurfaceCard>
+          </div>
+        );
+      case 'agent-runs':
+        return (
+          <div
+            key={section.id}
+            className='flex flex-col gap-3'
+            data-testid={section.testId}
+          >
+            {metrics.accessMode === 'admin' ? (
+              <AgentOsRunsPanel
+                artifacts={agentOsArtifacts}
+                summary={aiOpsSummary}
+                status={<HudStatusPill label={aiOpsLabel} tone={aiOpsTone} />}
+                deploymentsPanel={
+                  <DeploymentsPanelWithTrust
+                    deployments={metrics.deployments}
+                    detail={deploymentDetail}
+                    githubSource={githubSource}
+                    onRetry={handleSourceRetry}
+                  />
+                }
+              />
+            ) : (
+              <ContentSurfaceCard surface='details' className='space-y-4 p-3'>
+                <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+                  <div className='space-y-1'>
+                    <SectionLabel>AI ops</SectionLabel>
+                    <p className='text-2xl font-[620] leading-none text-primary-token sm:text-3xl'>
+                      Hermes control plane
+                    </p>
+                    <p className='text-app leading-5 text-secondary-token'>
+                      {aiOpsSummary}
+                    </p>
+                  </div>
+                  <HudStatusPill label={aiOpsLabel} tone={aiOpsTone} />
+                </div>
+                {(() => {
+                  const visible = metrics.aiOps.blockers
+                    .slice(0, 4)
+                    .filter(item => !dismissedKeys.has(makeItemKey(item)));
+                  const dismissed = metrics.aiOps.blockers
+                    .slice(0, 4)
+                    .filter(item => dismissedKeys.has(makeItemKey(item)));
+                  return (
+                    <div className='space-y-2'>
+                      <SectionLabel>Blockers</SectionLabel>
+                      {visible.length > 0 ? (
+                        <div className='grid gap-2'>
+                          {visible.map(item => (
+                            <AiOpsItemRow
+                              key={`${item.source}-${item.kind}-${item.url ?? item.summary}`}
+                              item={item}
+                              onDismiss={() => dismissItem(item)}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <p className='text-app text-secondary-token'>
+                          No blocked worker runs or agent PRs.
+                        </p>
+                      )}
+                      {dismissed.length > 0 ? (
+                        <details className='group'>
+                          <summary className='cursor-pointer list-none text-2xs font-medium text-tertiary-token hover:text-secondary-token'>
+                            Dismissed ({dismissed.length})
+                          </summary>
+                          <div className='mt-2 grid gap-2'>
+                            {dismissed.map(item => (
+                              <AiOpsItemRow
+                                key={`dismissed-${item.source}-${item.kind}-${item.url ?? item.summary}`}
+                                item={item}
+                                isDismissed
+                                onUndismiss={() => undismissItem(item)}
+                              />
+                            ))}
+                          </div>
+                        </details>
+                      ) : null}
+                    </div>
+                  );
+                })()}
+              </ContentSurfaceCard>
+            )}
+          </div>
+        );
+      case 'what-shipped':
+        return <WhatShipped key={section.id} kioskToken={kioskToken} />;
+      case 'action-required':
+        return (
+          <div key={section.id} data-testid={section.testId}>
+            <TimActionRequiredSection />
+          </div>
+        );
+      case 'dispatch-details':
+        return (
+          <div
+            key={section.id}
+            className='flex flex-col gap-3'
+            data-testid={section.testId}
+          >
+            {metrics.accessMode === 'admin' ? null : (
+              <HudDeploymentsSurfaceCard
+                metrics={metrics}
+                deploymentDetail={deploymentDetail}
+                githubSource={githubSource}
+                handleSourceRetry={handleSourceRetry}
+              />
+            )}
+            {showQrPanel ? (
+              <ContentSurfaceCard surface='details' className='space-y-4 p-3'>
+                <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
+                  <div className='space-y-1'>
+                    <SectionLabel>Open on phone</SectionLabel>
+                    <p className='text-xl font-[620] tracking-[-0.03em] text-primary-token'>
+                      Scan to view
+                    </p>
+                    <p className='max-w-[28ch] text-app leading-5 text-secondary-token'>
+                      Open the live HUD on another device using this kiosk link.
+                    </p>
+                  </div>
+                  <div className='rounded-xl border border-subtle bg-surface-0 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+                    <QRCode
+                      data={hudUrl ?? ''}
+                      size={196}
+                      label='HUD Link'
+                      className='rounded-lg bg-white dark:bg-white'
+                    />
+                  </div>
+                </div>
+              </ContentSurfaceCard>
+            ) : null}
+            {presentation === 'token' ? null : <HudGithubBudgetPanel />}
+            {showDispatch && metrics.accessMode === 'admin' ? (
+              <ContentSurfaceCard surface='details' className='space-y-4 p-3'>
+                <SectionLabel>Dispatch</SectionLabel>
+                <HermesDispatchControls
+                  aiOps={metrics.aiOps}
+                  onDispatchComplete={() => {
+                    refetch().catch(() => {});
+                  }}
+                />
+              </ContentSurfaceCard>
+            ) : null}
+            <div className='grid gap-3 md:grid-cols-3'>
+              <HudHealthMetricCards
+                metrics={metrics}
+                secondaryValueClass={secondaryValueClass}
+                databaseSource={databaseSource}
+                sentrySource={sentrySource}
+                handleSourceRetry={handleSourceRetry}
+              />
+            </div>
+            <ContentSurfaceCard
+              surface='details'
+              className='p-3'
+              data-testid='hud-bottom-marker'
+            >
+              <div className='flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'>
+                <div className='space-y-2'>
+                  <SectionLabel>Default status</SectionLabel>
+                  <p
+                    className={
+                      isShell
+                        ? 'text-2xl font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-3xl'
+                        : 'text-4xl font-[620] leading-none tracking-[-0.045em] text-primary-token sm:text-5xl'
+                    }
+                  >
+                    {formatDefaultStatusLabel(metrics.overview.defaultStatus)}
+                  </p>
+                  <p
+                    className={
+                      isShell
+                        ? 'max-w-4xl text-app leading-6 text-secondary-token'
+                        : 'max-w-4xl text-mid leading-7 text-secondary-token'
+                    }
+                  >
+                    {metrics.overview.defaultStatusDetail}
+                  </p>
+                </div>
+                <HudStatusPill
+                  label={formatDefaultStatusLabel(
+                    metrics.overview.defaultStatus
+                  )}
+                  tone={defaultTone}
+                />
+              </div>
+            </ContentSurfaceCard>
+          </div>
+        );
+      default: {
+        const _exhaustive: never = section.id;
+        return _exhaustive;
+      }
+    }
   }
 
   return (
     <div className={outerClass}>
-      {!isShell ? (
+      {isShell ? null : (
         <ContentSurfaceCard
           surface='details'
           className='flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5'
@@ -931,336 +1073,8 @@ export function HudDashboardClient({
             </p>
           </div>
         </ContentSurfaceCard>
-      ) : null}
-
-      <WhatShipped kioskToken={kioskToken} />
-
-      {/* Tim Action Required — personal manual items, surfaces above everything else */}
-      {/* ContentSurfaceCard is rendered by TimActionRequiredSection itself so it can self-hide */}
-      <TimActionRequiredSection />
-
-      {/* Top section: chart + metrics side-by-side on XL screens */}
-      <div className='grid gap-3 xl:grid-cols-[2fr_1fr]'>
-        {/* Shipping Velocity Chart */}
-        <ContentSurfaceCard surface='details' className='p-0 overflow-hidden'>
-          <ShippingVelocityChart
-            initialData={initialShippingData}
-            initialRange='7d'
-            cachedAt={initialShippingCachedAt}
-          />
-        </ContentSurfaceCard>
-
-        {/* MRR + small metric tiles */}
-        <div className='grid gap-3 content-start'>
-          <ContentMetricCard
-            label='Monthly Recurring Revenue'
-            value={
-              isHudMetricValueAvailable(stripeSource)
-                ? formatUsd(metrics.overview.mrrUsd)
-                : '\u2014'
-            }
-            subtitle={metricSubtitleWithTrust(
-              <span className='text-sm text-secondary-token'>
-                {isHudMetricValueAvailable(stripeSource)
-                  ? `${metrics.overview.activeSubscribers.toLocaleString('en-US')} subscribers`
-                  : 'Stripe data unavailable'}
-              </span>,
-              stripeSource,
-              handleSourceRetry
-            )}
-            headerRight={
-              <HudStatusPill label={deploymentLabel} tone={deploymentsTone} />
-            }
-            className='p-3'
-            valueClassName={mrrValueClass}
-          />
-
-          <div className='grid grid-cols-2 gap-3'>
-            <ContentMetricCard
-              label='Runway'
-              value={
-                isHudMetricValueAvailable(mercurySource)
-                  ? formatRunway(metrics.overview.runwayMonths)
-                  : '\u2014'
-              }
-              subtitle={metricSubtitleWithTrust(
-                isHudMetricValueAvailable(mercurySource) ? (
-                  <div className='grid gap-1.5'>
-                    <ContentMetricRow
-                      label='Cash'
-                      value={formatUsd(metrics.overview.balanceUsd)}
-                    />
-                    <ContentMetricRow
-                      label={OVERVIEW_BURN_LABEL}
-                      value={formatUsd(metrics.overview.burnRateUsd)}
-                    />
-                  </div>
-                ) : (
-                  <span>Mercury data unavailable</span>
-                ),
-                mercurySource,
-                handleSourceRetry
-              )}
-              className='p-3'
-              valueClassName={secondaryValueClass}
-            />
-            <HudHealthMetricCards
-              metrics={metrics}
-              secondaryValueClass={secondaryValueClass}
-              databaseSource={databaseSource}
-              sentrySource={sentrySource}
-              handleSourceRetry={handleSourceRetry}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Deployments + optional QR panel */}
-      {showQrPanel ? (
-        <div className='grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)]'>
-          <HudDeploymentsSurfaceCard
-            metrics={metrics}
-            deploymentDetail={deploymentDetail}
-            githubSource={githubSource}
-            handleSourceRetry={handleSourceRetry}
-          />
-
-          <ContentSurfaceCard surface='details' className='space-y-4 p-3'>
-            <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
-              <div className='space-y-1'>
-                <SectionLabel>Open on phone</SectionLabel>
-                <p className='text-xl font-[620] tracking-[-0.03em] text-primary-token'>
-                  Scan to view
-                </p>
-                <p className='max-w-[28ch] text-app leading-5 text-secondary-token'>
-                  Open the live HUD on another device using this kiosk link.
-                </p>
-              </div>
-              <div className='rounded-xl border border-subtle bg-surface-0 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
-                <QRCode
-                  data={hudUrl ?? ''}
-                  size={196}
-                  label='HUD Link'
-                  className='rounded-lg bg-white dark:bg-white'
-                />
-              </div>
-            </div>
-          </ContentSurfaceCard>
-        </div>
-      ) : (
-        <HudDeploymentsSurfaceCard
-          metrics={metrics}
-          deploymentDetail={deploymentDetail}
-          githubSource={githubSource}
-          handleSourceRetry={handleSourceRetry}
-        />
       )}
-
-      {/* AI Ops / Hermes control plane */}
-      <ContentSurfaceCard surface='details' className='space-y-4 p-3'>
-        <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
-          <div className='space-y-1'>
-            <SectionLabel>AI ops</SectionLabel>
-            <p className='text-2xl font-[620] leading-none text-primary-token sm:text-3xl'>
-              Hermes control plane
-            </p>
-            <p className='text-app leading-5 text-secondary-token'>
-              {metrics.aiOps.mergeQueue.openAgentPrs} /{' '}
-              {metrics.aiOps.mergeQueue.openAgentPrThreshold} agent PRs open
-            </p>
-          </div>
-          <HudStatusPill label={aiOpsLabel} tone={aiOpsTone} />
-        </div>
-
-        <div className='grid gap-3 sm:grid-cols-3 lg:grid-cols-6'>
-          <ContentMetricRow
-            label='Queued'
-            value={metrics.aiOps.counts.queued.toLocaleString('en-US')}
-          />
-          <ContentMetricRow
-            label='Running'
-            value={metrics.aiOps.counts.running.toLocaleString('en-US')}
-          />
-          <ContentMetricRow
-            label='Review'
-            value={metrics.aiOps.counts.review.toLocaleString('en-US')}
-          />
-          <ContentMetricRow
-            label='Blocked'
-            value={metrics.aiOps.counts.blocked.toLocaleString('en-US')}
-          />
-          <ContentMetricRow
-            label='Failed'
-            value={metrics.aiOps.counts.failed.toLocaleString('en-US')}
-          />
-          <ContentMetricRow
-            label='Stale'
-            value={metrics.aiOps.counts.stale.toLocaleString('en-US')}
-          />
-        </div>
-
-        <div className='grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]'>
-          <div className='space-y-3'>
-            <div className='flex items-center justify-between gap-3'>
-              <SectionLabel>Blockers</SectionLabel>
-              <p className='text-xs text-secondary-token'>
-                {metrics.aiOps.availability}
-              </p>
-            </div>
-            {(() => {
-              const visible = metrics.aiOps.blockers
-                .slice(0, 4)
-                .filter(item => !dismissedKeys.has(makeItemKey(item)));
-              const dismissed = metrics.aiOps.blockers
-                .slice(0, 4)
-                .filter(item => dismissedKeys.has(makeItemKey(item)));
-
-              return (
-                <>
-                  {visible.length > 0 ? (
-                    <div className='grid gap-2'>
-                      {visible.map(item => (
-                        <AiOpsItemRow
-                          key={`${item.source}-${item.kind}-${item.url ?? item.summary}`}
-                          item={item}
-                          onDismiss={() => dismissItem(item)}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <p className='text-app text-secondary-token'>
-                      No blocked worker runs or agent PRs.
-                    </p>
-                  )}
-                  {dismissed.length > 0 ? (
-                    <details className='group'>
-                      <summary className='cursor-pointer list-none text-2xs font-medium text-tertiary-token hover:text-secondary-token'>
-                        Dismissed ({dismissed.length})
-                      </summary>
-                      <div className='mt-2 grid gap-2'>
-                        {dismissed.map(item => (
-                          <AiOpsItemRow
-                            key={`dismissed-${item.source}-${item.kind}-${item.url ?? item.summary}`}
-                            item={item}
-                            isDismissed
-                            onUndismiss={() => undismissItem(item)}
-                          />
-                        ))}
-                      </div>
-                    </details>
-                  ) : null}
-                </>
-              );
-            })()}
-          </div>
-
-          <div className='space-y-3'>
-            <SectionLabel>Dispatch</SectionLabel>
-            {showDispatch && metrics.accessMode === 'admin' ? (
-              <HermesDispatchControls
-                aiOps={metrics.aiOps}
-                onDispatchComplete={() => {
-                  refetch().catch(() => {});
-                }}
-              />
-            ) : (
-              <p className='text-app leading-5 text-secondary-token'>
-                {showDispatch
-                  ? 'Admin access required for worker dispatch.'
-                  : 'Dispatch is hidden on the TV/wallboard view.'}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {(() => {
-          const allRecs = metrics.aiOps.recommendations.slice(0, 3);
-          const visibleRecs = allRecs.filter(
-            item => !dismissedKeys.has(makeItemKey(item))
-          );
-          const dismissedRecs = allRecs.filter(item =>
-            dismissedKeys.has(makeItemKey(item))
-          );
-
-          if (allRecs.length === 0) return null;
-
-          return (
-            <div className='border-t border-subtle pt-3'>
-              <SectionLabel>Next actions</SectionLabel>
-              {visibleRecs.length > 0 ? (
-                <div className='mt-2 grid gap-2'>
-                  {visibleRecs.map(item => (
-                    <AiOpsItemRow
-                      key={`${item.source}-${item.priority}-${item.summary}`}
-                      item={item}
-                      onDismiss={() => dismissItem(item)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className='mt-2 text-app text-secondary-token'>
-                  All next actions dismissed.
-                </p>
-              )}
-              {dismissedRecs.length > 0 ? (
-                <details className='mt-2'>
-                  <summary className='cursor-pointer list-none text-2xs font-medium text-tertiary-token hover:text-secondary-token'>
-                    Dismissed ({dismissedRecs.length})
-                  </summary>
-                  <div className='mt-2 grid gap-2'>
-                    {dismissedRecs.map(item => (
-                      <AiOpsItemRow
-                        key={`dismissed-rec-${item.source}-${item.priority}-${item.summary}`}
-                        item={item}
-                        isDismissed
-                        onUndismiss={() => undismissItem(item)}
-                      />
-                    ))}
-                  </div>
-                </details>
-              ) : null}
-            </div>
-          );
-        })()}
-      </ContentSurfaceCard>
-
-      {isShell && metrics.accessMode === 'admin' ? (
-        <AgentOsRunsPanel artifacts={agentOsArtifacts} />
-      ) : null}
-
-      <ContentSurfaceCard
-        surface='details'
-        className='p-3'
-        data-testid='hud-bottom-marker'
-      >
-        <div className='flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'>
-          <div className='space-y-2'>
-            <SectionLabel>Default status</SectionLabel>
-            <p
-              className={
-                isShell
-                  ? 'text-2xl font-[620] leading-none tracking-[-0.03em] text-primary-token sm:text-3xl'
-                  : 'text-4xl font-[620] leading-none tracking-[-0.045em] text-primary-token sm:text-5xl'
-              }
-            >
-              {formatDefaultStatusLabel(metrics.overview.defaultStatus)}
-            </p>
-            <p
-              className={
-                isShell
-                  ? 'max-w-4xl text-app leading-6 text-secondary-token'
-                  : 'max-w-4xl text-mid leading-7 text-secondary-token'
-              }
-            >
-              {metrics.overview.defaultStatusDetail}
-            </p>
-          </div>
-          <HudStatusPill
-            label={formatDefaultStatusLabel(metrics.overview.defaultStatus)}
-            tone={defaultTone}
-          />
-        </div>
-      </ContentSurfaceCard>
+      {sections.map(section => renderSection(section))}
     </div>
   );
 }

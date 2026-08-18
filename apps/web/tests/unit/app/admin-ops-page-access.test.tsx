@@ -34,14 +34,8 @@ vi.mock('@/lib/env-server', () => ({ env: { HUD_AGENT_RUNS_FIXTURES: '0' } }));
 vi.mock('@/lib/hud/source-trust', () => ({
   isHudMetricValueAvailable: () => false,
 }));
-vi.mock('@/components/features/admin/hud/FounderMorningWalkCard', () => ({
-  FounderMorningWalkCard: () => null,
-}));
 vi.mock('@/components/features/admin/hud/HudFullscreenControl', () => ({
   HudFullscreenControl: () => null,
-}));
-vi.mock('@/components/features/admin/hud/HudShipperPanels', () => ({
-  HudShipperPanels: () => null,
 }));
 vi.mock('@/components/features/admin/OperationalControlPanel', () => ({
   OperationalControlPanel: () => null,

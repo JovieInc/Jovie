@@ -8,7 +8,6 @@ import type {
 } from '@/app/api/admin/hud/shipping-velocity/route';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { medianNumber } from '@/lib/hud/number-series';
-import { isHudMetricValueAvailable } from '@/lib/hud/source-trust';
 import type { HudTone } from '@/lib/hud/tone-determination';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 import { getAccentCssVars, HUD_TONE_ACCENT } from '@/lib/ui/accent-palette';
@@ -17,14 +16,6 @@ import type { HudMetrics } from '@/types/hud';
 const KPI_TILE_CLASS = 'rounded-(--radius-md) p-3 shadow-card-elevated';
 const KPI_VALUE_CLASS =
   'text-2xl font-[620] leading-none tracking-[-0.03em] tabular-nums sm:text-3xl';
-
-function formatUsd(value: number): string {
-  return value.toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: value >= 1000 ? 0 : 2,
-  });
-}
 
 function formatHours(hours: number | null): string {
   if (hours === null || !Number.isFinite(hours)) return '—';
@@ -174,10 +165,8 @@ function KpiMetricCard({
 }
 
 /**
- * Dense 4-up KPI subgrid for the operator HUD (#12887): ship velocity,
- * PR merge time, cash, and active agents. Each tile keeps its existing
- * data source (shipping-velocity route, Mercury via HudMetrics, Hermes
- * aiOps counts) and stacks to one column below 768px.
+ * Velocity/agent noise tiles for the operator HUD: ship velocity,
+ * PR merge time, and active agents. Cash lives once in the need band.
  */
 export function HudKpiSubgrid({
   metrics,
@@ -204,7 +193,6 @@ export function HudKpiSubgrid({
     mergeTimeLast7 !== null && mergeTimePrior7 !== null
       ? deltaPercent(mergeTimeLast7, mergeTimePrior7)
       : null;
-  const cashAvailable = isHudMetricValueAvailable(metrics.sources.mercury);
   const cards: Array<{
     label: string;
     value: string;
@@ -212,7 +200,7 @@ export function HudKpiSubgrid({
     testId: string;
   }> = [
     {
-      label: 'Ship velocity',
+      label: 'Ship Velocity',
       value: hasVelocityData ? mergedLast7.toLocaleString('en-US') : '—',
       subtitle: (
         <MetricSubtitle>
@@ -224,7 +212,7 @@ export function HudKpiSubgrid({
       testId: 'hud-kpi-ship-velocity',
     },
     {
-      label: 'PR merge time',
+      label: 'PR Merge Time',
       value: hasVelocityData ? formatHours(mergeTimeLast7) : '—',
       subtitle: (
         <MetricSubtitle>
@@ -236,26 +224,7 @@ export function HudKpiSubgrid({
       testId: 'hud-kpi-merge-time',
     },
     {
-      label: 'Cash',
-      value: cashAvailable ? formatUsd(metrics.overview.balanceUsd) : '—',
-      subtitle: (
-        <MetricSubtitle>
-          <span className='tabular-nums'>
-            {cashAvailable
-              ? `Burn ${formatUsd(metrics.overview.burnRateUsd)} / 30d`
-              : 'Mercury data unavailable'}
-          </span>
-          {cashAvailable && metrics.overview.runwayMonths !== null ? (
-            <span className='tabular-nums'>
-              Runway {metrics.overview.runwayMonths.toFixed(1)} mo
-            </span>
-          ) : null}
-        </MetricSubtitle>
-      ),
-      testId: 'hud-kpi-cash',
-    },
-    {
-      label: 'Active agents',
+      label: 'Active Agents',
       value: metrics.aiOps.counts.running.toLocaleString('en-US'),
       subtitle: (
         <MetricSubtitle>
@@ -275,7 +244,7 @@ export function HudKpiSubgrid({
 
   return (
     <div
-      className='grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4'
+      className='grid grid-cols-1 gap-3 md:grid-cols-3'
       data-testid='hud-kpi-subgrid'
     >
       {cards.map(card => (
