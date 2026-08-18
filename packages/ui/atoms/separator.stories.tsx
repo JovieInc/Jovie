@@ -29,3 +29,13 @@ export const Vertical: Story = {
     </div>
   ),
 };
+
+export const SemanticSections: Story = {
+  render: () => (
+    <div className='w-64 space-y-3 text-sm text-secondary-token'>
+      <p>Audience overview</p>
+      <Separator decorative={false} />
+      <p>Traffic sources</p>
+    </div>
+  ),
+};

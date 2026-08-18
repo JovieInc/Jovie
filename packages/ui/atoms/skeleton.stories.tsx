@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { LoadingSkeleton, Skeleton } from './skeleton';
 
 const meta: Meta<typeof Skeleton> = {
-  title: 'shadcn/Skeleton',
+  title: 'UI/Atoms/Skeleton',
   component: Skeleton,
   parameters: {
     layout: 'centered',
@@ -48,7 +48,14 @@ export const StaticPlaceholder: Story = {
 };
 
 export const MultiLine: Story = {
-  render: () => <LoadingSkeleton lines={3} height='h-4' width='w-64' />,
+  render: () => (
+    <LoadingSkeleton
+      lines={3}
+      height='h-4'
+      width='w-64'
+      label='Loading profile details'
+    />
+  ),
   parameters: {
     docs: {
       description: {
@@ -56,4 +63,15 @@ export const MultiLine: Story = {
       },
     },
   },
+};
+
+export const IdentityRow: Story = {
+  render: () => (
+    <div className='flex w-72 items-center gap-3'>
+      <Skeleton className='size-10 shrink-0' rounded='full' />
+      <div className='min-w-0 flex-1'>
+        <LoadingSkeleton lines={2} height='h-3' label='Loading identity' />
+      </div>
+    </div>
+  ),
 };

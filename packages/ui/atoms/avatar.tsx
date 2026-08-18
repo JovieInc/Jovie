@@ -107,8 +107,10 @@ const Avatar = React.forwardRef<HTMLSpanElement, AvatarProps>(
     return (
       <span
         ref={ref}
+        data-ring={ring ? 'true' : 'false'}
+        data-size={size}
         className={cn(
-          'relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10',
+          'relative isolate inline-flex shrink-0 items-center justify-center overflow-visible rounded-full outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10',
           ring && 'ring-2 ring-surface-page',
           className
         )}
@@ -134,7 +136,7 @@ const AvatarImage = React.forwardRef<HTMLImageElement, AvatarImageProps>(
     <img
       ref={ref}
       alt={alt}
-      className={cn('h-full w-full object-cover', className)}
+      className={cn('h-full w-full rounded-full object-cover', className)}
       {...props}
     />
   )
@@ -157,7 +159,7 @@ const AvatarFallback = React.forwardRef<HTMLSpanElement, AvatarFallbackProps>(
       ref={ref}
       className={cn(
         'flex h-full w-full items-center justify-center rounded-full font-medium select-none',
-        'bg-surface-2 text-secondary-token',
+        'overflow-hidden bg-surface-2 text-secondary-token',
         SIZE_MAP[size].text,
         className
       )}
@@ -191,6 +193,10 @@ function AvatarStatusDot({
   const { dot, dotOffset } = SIZE_MAP[size];
   return (
     <span
+      role='img'
+      aria-label={`${status} status`}
+      data-size={size}
+      data-status={status}
       className={cn(
         'absolute rounded-full ring-2 ring-surface-page',
         dot,
@@ -236,13 +242,19 @@ function UserAvatar({
   ring = false,
   className,
 }: UserAvatarProps) {
+  const [failedSrc, setFailedSrc] = React.useState<string>();
   const initials = name ? getInitials(name) : '?';
   const altText = name || 'Avatar';
+  const showImage = Boolean(src) && failedSrc !== src;
 
   return (
     <Avatar size={size} ring={ring} className={className}>
-      {src ? (
-        <AvatarImage src={src} alt={altText} />
+      {showImage ? (
+        <AvatarImage
+          src={src}
+          alt={altText}
+          onError={() => setFailedSrc(src)}
+        />
       ) : (
         <AvatarFallback size={size}>{initials}</AvatarFallback>
       )}
