@@ -86,7 +86,7 @@ export function buildTaskUpdateFieldPatch(
       data.metadata ?? existingTask.metadata,
       data.descriptionContent
     );
-  } else if (data.description !== undefined) {
+  } else if (data.description !== undefined && data.metadata !== null) {
     patch.metadata = writeTaskDescriptionContent(
       data.metadata ?? existingTask.metadata,
       plainTextToRichTextDocument(data.description ?? '')

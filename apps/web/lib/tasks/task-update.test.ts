@@ -89,6 +89,34 @@ describe('buildTaskUpdateFieldPatch', () => {
     });
   });
 
+  it('preserves an explicit metadata clear during a plain-text update', () => {
+    expect(
+      buildTaskUpdateFieldPatch(
+        { description: 'Fresh plain text', metadata: null },
+        {
+          ...createExistingTask(),
+          metadata: {
+            source: 'release',
+            descriptionRichTextV1: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Stale rich text' }],
+                },
+              ],
+            },
+          },
+        },
+        now
+      )
+    ).toEqual({
+      description: 'Fresh plain text',
+      metadata: null,
+      updatedAt: now,
+    });
+  });
+
   it('merges rich description content into existing metadata', () => {
     const content = {
       type: 'doc' as const,
