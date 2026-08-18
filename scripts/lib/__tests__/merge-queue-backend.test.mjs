@@ -398,8 +398,12 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('--json number,headRefOid,baseRefName');
     expect(scope).toContain('select(.baseRefName == "main")');
     expect(scope).toContain('No unique open main PR owns workflow_run head');
-    expect(scope).toContain('Untargeted manual dispatch; maintenance-only');
-    expect(scope).toContain('Main push; maintenance-only');
+    expect(scope).toContain(
+      'Untargeted manual dispatch; no primary target (bounded reconciliation remains enabled)'
+    );
+    expect(scope).toContain(
+      'Main push; no primary target (bounded reconciliation remains enabled)'
+    );
     expect(enroll).toContain(
       'DRAIN_ADMISSION_PR: ${{ steps.admission.outputs.pr_number }}'
     );
@@ -410,6 +414,9 @@ describe('queue workflow mutation safety', () => {
     expect(enroll).not.toContain("github.event_name == 'push' && '1' || '0'");
     expect(drain).toContain(
       'admission scope: maintenance-only (no new enrollment)'
+    );
+    expect(drain).toContain(
+      'admission scope: no primary target (bounded missed-admission recovery enabled)'
     );
     expect(drain).toContain(
       'no typed pressure-deferral provenance; owner release required'
@@ -461,14 +468,23 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('.workflow_run.event // empty');
     expect(scope).toContain('== "merge_group"');
     expect(enroll).toContain('DRAIN_RECONCILE_QUEUE_REENTRY:');
+    expect(enroll).toContain('DRAIN_RECONCILE_MISSED_ADMISSION:');
+    expect(enroll).toContain("steps.admission.outputs.deferred_release != '1'");
+    expect(enroll).toContain(
+      "needs.fleet-policy.outputs.mode == 'hold-intake'"
+    );
+    expect(enroll).toContain("needs.fleet-policy.outputs.mode == 'draft-only'");
     expect(enroll).toContain("DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '2'");
     expect(drain).toContain('QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"');
-    expect(drain).toContain(
-      'bounded exact-head native re-entry after composite CI'
-    );
-    expect(drain).toContain('DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 3');
+    expect(drain).toContain('bounded exact-head native admission');
+    expect(drain).toContain('DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 2');
     expect(drain).toContain('queue_reentry_receipt_is_recoverable "$head_oid"');
     expect(drain).toContain('check_failures_for_pr "$n"');
+    expect(drain).toContain(
+      '[[ "$ENROLLED_THIS_RUN" -ge "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" ]]'
+    );
+    expect(drain).toContain('select((.n | tostring) != $admission_pr)');
+    expect(drain).toContain('enroll_if_still_eligible "$n" "$n" "$head_oid"');
   });
 
   it('excludes stacked non-main PRs from admission and live eligibility', () => {
