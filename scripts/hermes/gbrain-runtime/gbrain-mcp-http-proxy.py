@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import pathlib
@@ -11,9 +12,7 @@ import stat
 import sys
 import threading
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -33,32 +32,14 @@ MAX_TOKEN_BYTES = 16 * 1024
 OUTPUT_LOCK = threading.Lock()
 
 
-class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        raise urllib.error.HTTPError(
-            req.full_url, code, "redirects are disabled", headers, fp
-        )
-
-
-# Never let inherited HTTP(S)_PROXY settings receive the MCP bearer. Remote
-# endpoints, when explicitly enabled, are also contacted directly.
-HTTP_OPENER = urllib.request.build_opener(
-    urllib.request.ProxyHandler({}), NoRedirectHandler()
-)
-
-
 def validate_mcp_url() -> None:
     parsed = urllib.parse.urlsplit(MCP_URL)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        raise RuntimeError("GBRAIN_MCP_URL must be an absolute HTTP(S) URL")
+    if parsed.scheme != "http" or not parsed.hostname:
+        raise RuntimeError("GBRAIN_MCP_URL must be an absolute HTTP URL")
     if parsed.username or parsed.password or parsed.fragment:
         raise RuntimeError("GBRAIN_MCP_URL must not contain credentials or a fragment")
-    if parsed.hostname not in {"127.0.0.1", "::1", "localhost"}:
-        if os.environ.get("GBRAIN_MCP_ALLOW_REMOTE") != "1":
-            raise RuntimeError(
-                "refusing non-loopback GBRAIN_MCP_URL without "
-                "GBRAIN_MCP_ALLOW_REMOTE=1"
-            )
+    if parsed.hostname not in {"127.0.0.1", "::1"}:
+        raise RuntimeError("refusing non-loopback GBRAIN_MCP_URL")
 
 
 def resolve_worker_budget() -> int:
@@ -140,12 +121,29 @@ def error_response(request_id: object, message: str) -> dict:
     }
 
 
-def abort_response_at_deadline(response, expired: threading.Event) -> None:
-    expired.set()
+def abort_connection_at_deadline(
+    connection: http.client.HTTPConnection,
+    expired: threading.Event,
+    completed: threading.Event,
+    outcome_lock: threading.Lock,
+) -> None:
+    with outcome_lock:
+        if completed.is_set():
+            return
+        expired.set()
     try:
-        response.fp.raw._sock.shutdown(socket.SHUT_RDWR)
-    except (AttributeError, OSError):
-        response.close()
+        if connection.sock is not None:
+            connection.sock.shutdown(socket.SHUT_RDWR)
+    except OSError:
+        pass
+    finally:
+        connection.close()
+
+
+def valid_request_id(value: object) -> bool:
+    return isinstance(value, str) or (
+        isinstance(value, int) and not isinstance(value, bool)
+    )
 
 
 def iter_response(response, deadline: float):
@@ -195,115 +193,150 @@ def iter_response(response, deadline: float):
 def forward(payload: dict, token: str, total_deadline: float) -> None:
     data = json.dumps(payload, separators=(",", ":")).encode()
     last_error: Exception | None = None
+    expects_response = "id" in payload
     # tools/call can mutate state. An ambiguous response failure must surface to
     # the client instead of replaying a write that may already have committed.
     delays = (0.0,) if payload.get("method") == "tools/call" else RETRY_DELAYS
     for delay in delays:
-        emitted = False
         if time.monotonic() >= total_deadline:
             raise RuntimeError("shared gbrain HTTP exceeded total deadline")
         if delay:
             time.sleep(delay)
         if time.monotonic() >= total_deadline:
             raise RuntimeError("shared gbrain HTTP exceeded total deadline")
-        request = urllib.request.Request(
-            MCP_URL,
-            data=data,
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-                "Accept": "application/json, text/event-stream",
-            },
+        parsed_url = urllib.parse.urlsplit(MCP_URL)
+        connection = http.client.HTTPConnection(
+            parsed_url.hostname,
+            parsed_url.port,
+            timeout=max(0.001, min(90.0, total_deadline - time.monotonic())),
         )
+        request_path = urllib.parse.urlunsplit(
+            ("", "", parsed_url.path or "/", parsed_url.query, "")
+        )
+        deadline_expired = threading.Event()
+        terminal_completed = threading.Event()
+        outcome_lock = threading.Lock()
+        deadline_timer = threading.Timer(
+            max(0.001, total_deadline - time.monotonic()),
+            abort_connection_at_deadline,
+            args=(
+                connection,
+                deadline_expired,
+                terminal_completed,
+                outcome_lock,
+            ),
+        )
+        deadline_timer.daemon = True
+        deadline_timer.start()
+        emitted = False
         try:
-            remaining = max(0.001, total_deadline - time.monotonic())
-            with HTTP_OPENER.open(request, timeout=min(90.0, remaining)) as response:
-                deadline_expired = threading.Event()
-                deadline_timer = threading.Timer(
-                    max(0.001, total_deadline - time.monotonic()),
-                    abort_response_at_deadline,
-                    args=(response, deadline_expired),
-                )
-                deadline_timer.daemon = True
-                deadline_timer.start()
-                emitted = False
+            connection.request(
+                "POST",
+                request_path,
+                body=data,
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Content-Type": "application/json",
+                    "Accept": "application/json, text/event-stream",
+                },
+            )
+            response = connection.getresponse()
+            if deadline_expired.is_set():
+                raise RuntimeError("shared gbrain HTTP exceeded total deadline")
+            if 300 <= response.status < 400:
+                raise RuntimeError("shared gbrain HTTP redirect rejected")
+            if 400 <= response.status < 500 and response.status != 429:
+                raise RuntimeError(f"shared gbrain HTTP returned {response.status}")
+            if response.status == 429 or response.status >= 500:
+                last_error = RuntimeError(f"shared gbrain HTTP returned {response.status}")
+                continue
+            if not 200 <= response.status < 300:
+                raise RuntimeError(f"shared gbrain HTTP returned {response.status}")
+            try:
                 terminal_emitted = False
-                try:
-                    for response_payload in iter_response(response, total_deadline):
-                        if not isinstance(response_payload, dict):
-                            error = RuntimeError(
-                                "shared gbrain returned non-object JSON-RPC"
-                            )
-                            if terminal_emitted:
-                                raise PostResponseProtocolError(str(error))
-                            raise error
-                        if response_payload.get("jsonrpc") != "2.0":
-                            error = RuntimeError(
-                                "shared gbrain returned invalid JSON-RPC version"
-                            )
-                            if terminal_emitted:
-                                raise PostResponseProtocolError(str(error))
-                            raise error
-                        response_id = response_payload.get("id")
-                        if response_id is not None:
-                            if response_id != payload.get("id"):
-                                error = RuntimeError(
-                                    "shared gbrain returned mismatched JSON-RPC id"
-                                )
-                                if terminal_emitted:
-                                    raise PostResponseProtocolError(str(error))
-                                raise error
-                            if terminal_emitted:
-                                raise PostResponseProtocolError(
-                                    "shared gbrain returned multiple terminal responses"
-                                )
-                            has_result = "result" in response_payload
-                            has_error = "error" in response_payload
-                            if has_result == has_error:
-                                raise RuntimeError(
-                                    "shared gbrain returned invalid terminal response shape"
-                                )
-                            if has_error:
-                                error_payload = response_payload["error"]
-                                if (
-                                    not isinstance(error_payload, dict)
-                                    or not isinstance(error_payload.get("code"), int)
-                                    or isinstance(error_payload.get("code"), bool)
-                                    or not isinstance(error_payload.get("message"), str)
-                                ):
-                                    raise RuntimeError(
-                                        "shared gbrain returned invalid JSON-RPC error shape"
-                                    )
-                            terminal_emitted = True
-                        elif not isinstance(response_payload.get("method"), str):
-                            raise RuntimeError(
-                                "shared gbrain returned invalid JSON-RPC notification"
-                            )
-                        emit(response_payload)
-                        emitted = True
+                for response_payload in iter_response(response, total_deadline):
+                    if not isinstance(response_payload, dict):
+                        error = RuntimeError(
+                            "shared gbrain returned non-object JSON-RPC"
+                        )
                         if terminal_emitted:
-                            break
-                except Exception as exc:
-                    if deadline_expired.is_set():
+                            raise PostResponseProtocolError(str(error))
+                        raise error
+                    if response_payload.get("jsonrpc") != "2.0":
+                        error = RuntimeError(
+                            "shared gbrain returned invalid JSON-RPC version"
+                        )
+                        if terminal_emitted:
+                            raise PostResponseProtocolError(str(error))
+                        raise error
+                    if "id" in response_payload:
+                        response_id = response_payload["id"]
+                        if not valid_request_id(response_id):
+                            error = RuntimeError(
+                                "shared gbrain returned invalid JSON-RPC response id"
+                            )
+                            if terminal_emitted:
+                                raise PostResponseProtocolError(str(error))
+                            raise error
+                        if type(response_id) is not type(payload.get("id")) or (
+                            response_id != payload.get("id")
+                        ):
+                            error = RuntimeError(
+                                "shared gbrain returned mismatched JSON-RPC id"
+                            )
+                            if terminal_emitted:
+                                raise PostResponseProtocolError(str(error))
+                            raise error
+                        if terminal_emitted:
+                            raise PostResponseProtocolError(
+                                "shared gbrain returned multiple terminal responses"
+                            )
+                        has_result = "result" in response_payload
+                        has_error = "error" in response_payload
+                        if has_result == has_error:
+                            raise RuntimeError(
+                                "shared gbrain returned invalid terminal response shape"
+                            )
+                        if has_error:
+                            error_payload = response_payload["error"]
+                            if (
+                                not isinstance(error_payload, dict)
+                                or not isinstance(error_payload.get("code"), int)
+                                or isinstance(error_payload.get("code"), bool)
+                                or not isinstance(error_payload.get("message"), str)
+                            ):
+                                raise RuntimeError(
+                                    "shared gbrain returned invalid JSON-RPC error shape"
+                                )
+                        with outcome_lock:
+                            if deadline_expired.is_set():
+                                raise RuntimeError(
+                                    "shared gbrain HTTP exceeded total deadline"
+                                )
+                            emit(response_payload)
+                            terminal_completed.set()
+                        terminal_emitted = True
+                    elif not isinstance(response_payload.get("method"), str):
                         raise RuntimeError(
-                            "shared gbrain HTTP exceeded total deadline"
-                        ) from exc
-                    raise
-                finally:
-                    deadline_timer.cancel()
+                            "shared gbrain returned invalid JSON-RPC notification"
+                        )
+                    else:
+                        emit(response_payload)
+                    emitted = True
+                    if terminal_emitted:
+                        break
+            except Exception as exc:
                 if deadline_expired.is_set():
-                    raise RuntimeError("shared gbrain HTTP exceeded total deadline")
-                if payload.get("id") is not None and not terminal_emitted:
-                    raise RuntimeError("shared gbrain returned no terminal response")
-                return
-        except urllib.error.HTTPError as exc:
-            if 300 <= exc.code < 400:
-                raise RuntimeError("shared gbrain HTTP redirect rejected") from exc
-            # Authentication and request-shape failures are deterministic.
-            if 400 <= exc.code < 500 and exc.code != 429:
-                raise RuntimeError(f"shared gbrain HTTP returned {exc.code}") from exc
-            last_error = exc
-        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                    raise RuntimeError(
+                        "shared gbrain HTTP exceeded total deadline"
+                    ) from exc
+                raise
+            if deadline_expired.is_set() and not terminal_completed.is_set():
+                raise RuntimeError("shared gbrain HTTP exceeded total deadline")
+            if expects_response and not terminal_emitted:
+                raise RuntimeError("shared gbrain returned no terminal response")
+            return
+        except (http.client.HTTPException, TimeoutError, OSError) as exc:
             if time.monotonic() >= total_deadline:
                 raise RuntimeError("shared gbrain HTTP exceeded total deadline") from exc
             if emitted:
@@ -311,6 +344,10 @@ def forward(payload: dict, token: str, total_deadline: float) -> None:
                     "shared gbrain HTTP interrupted after response began"
                 ) from exc
             last_error = exc
+        finally:
+            deadline_timer.cancel()
+            deadline_timer.join()
+            connection.close()
     raise RuntimeError(
         "shared gbrain HTTP unavailable after retries: "
         f"{type(last_error).__name__}"
@@ -333,6 +370,9 @@ def handle_line(raw_line: bytes, token: str, total_deadline: float) -> None:
             payload.get("method"), str
         ):
             emit(error_response(payload.get("id"), "invalid JSON-RPC request"))
+            return
+        if "id" in payload and not valid_request_id(payload["id"]):
+            emit(error_response(None, "invalid JSON-RPC request id"))
             return
         request_id = payload.get("id")
         forward(payload, token, total_deadline)

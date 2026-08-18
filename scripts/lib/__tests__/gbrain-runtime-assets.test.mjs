@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { createServer as createTcpServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -493,6 +494,16 @@ describe('repository-owned GBrain runtime assets', () => {
       200,
       '{"jsonrpc":"2.0","id":17,"error":{"code":-1,"message":42}}',
     ],
+    [
+      'boolean-response-id',
+      200,
+      '{"jsonrpc":"2.0","id":true,"result":{"ok":true}}',
+    ],
+    [
+      'null-response-id',
+      200,
+      '{"jsonrpc":"2.0","id":null,"result":{"ok":true}}',
+    ],
   ])('rejects an invalid %s daemon response', async (_name, status, body) => {
     const port = await listen((_request, response) => {
       response.writeHead(status, { 'content-type': 'application/json' });
@@ -571,15 +582,36 @@ describe('repository-owned GBrain runtime assets', () => {
     });
   });
 
-  it('refuses to send a bearer token to a remote host without explicit opt-in', async () => {
+  it('refuses to send a bearer token to any remote host', async () => {
     const result = await runProxy({
-      url: 'https://example.invalid/mcp',
+      url: 'http://example.invalid/mcp',
       rawInput: '',
     });
 
     expect(result.code).toBe(1);
     expect(result.stderr).toContain('refusing non-loopback GBRAIN_MCP_URL');
   });
+
+  it.each([true, false, null, 1.5, {}, []])(
+    'rejects invalid request id %j before forwarding',
+    async id => {
+      let requests = 0;
+      const port = await listen((_request, response) => {
+        requests += 1;
+        response.writeHead(500).end();
+      });
+      const result = await runProxy({
+        port,
+        payload: { jsonrpc: '2.0', id, method: 'tools/list' },
+      });
+
+      expect(requests).toBe(0);
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        id: null,
+        error: { code: -32000, message: 'invalid JSON-RPC request id' },
+      });
+    }
+  );
 
   it('refuses token files readable by group or others', async () => {
     const result = await runProxy({
@@ -746,7 +778,7 @@ describe('repository-owned GBrain runtime assets', () => {
     15_000
   );
 
-  it('applies one absolute deadline to active and queued requests', async () => {
+  it('reclaims a worker at the deadline for an immediately queued request', async () => {
     const port = await listen(async (request, response) => {
       const chunks = [];
       for await (const chunk of request) chunks.push(chunk);
@@ -762,6 +794,7 @@ describe('repository-owned GBrain runtime assets', () => {
         JSON.stringify({ jsonrpc: '2.0', id: payload.id, result: { ok: true } })
       );
     });
+    const started = performance.now();
     const result = await runProxy({
       port,
       rawInput:
@@ -784,14 +817,9 @@ describe('repository-owned GBrain runtime assets', () => {
         error: expect.objectContaining({ code: -32000 }),
       })
     );
-    expect(responses).toContainEqual(
-      expect.objectContaining({
-        id: 22,
-        error: expect.objectContaining({
-          message: 'shared gbrain HTTP exceeded total deadline',
-        }),
-      })
-    );
+    expect(performance.now() - started).toBeLessThan(1600);
+    expect(responses).toHaveLength(2);
+    expect(responses.map(response => response.id).sort()).toEqual([21, 22]);
   }, 10_000);
 
   it.each(['text/event-stream', 'application/json'])(
@@ -823,6 +851,65 @@ describe('repository-owned GBrain runtime assets', () => {
     5000
   );
 
+  it('interrupts a slow HTTP header at the absolute request deadline', async () => {
+    const server = createTcpServer(socket => {
+      socket.write('HTTP/1.1 200 OK\r\nX-Slow: ');
+      const interval = setInterval(() => socket.write('x'), 100);
+      socket.on('close', () => clearInterval(interval));
+      socket.on('error', () => clearInterval(interval));
+    });
+    servers.push(server);
+    await new Promise(resolveListen => server.listen(0, '127.0.0.1', resolveListen));
+    const started = performance.now();
+    const result = await runProxy({
+      port: server.address().port,
+      payload: { jsonrpc: '2.0', id: 27, method: 'tools/list' },
+      extraEnv: { GBRAIN_MCP_REQUEST_DEADLINE_SECONDS: '1' },
+    });
+
+    expect(performance.now() - started).toBeLessThan(1600);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      id: 27,
+      error: {
+        code: -32000,
+        message: 'shared gbrain HTTP exceeded total deadline',
+      },
+    });
+  }, 5000);
+
+  it('emits exactly one terminal outcome when responses race the deadline', async () => {
+    const port = await listen(async (request, response) => {
+      const chunks = [];
+      for await (const chunk of request) chunks.push(chunk);
+      const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      setTimeout(() => {
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(
+          JSON.stringify({ jsonrpc: '2.0', id: payload.id, result: { ok: true } })
+        );
+      }, 950);
+    });
+    const result = await runProxy({
+      port,
+      rawInput: [28, 29, 30, 31]
+        .map(id => JSON.stringify({ jsonrpc: '2.0', id, method: 'tools/list' }))
+        .join('\n') + '\n',
+      extraEnv: {
+        GBRAIN_MCP_MAX_WORKERS: '4',
+        GBRAIN_MCP_REQUEST_DEADLINE_SECONDS: '1',
+      },
+    });
+    const responses = result.stdout
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line));
+
+    expect(responses).toHaveLength(4);
+    for (const id of [28, 29, 30, 31]) {
+      expect(responses.filter(response => response.id === id)).toHaveLength(1);
+    }
+  }, 5000);
+
   it('includes executor queue time in the absolute request deadline', async () => {
     const port = await listen(async (request, response) => {
       const chunks = [];
@@ -837,7 +924,7 @@ describe('repository-owned GBrain runtime assets', () => {
           response.end(
             'data: {"jsonrpc":"2.0","id":25,"result":{"ok":true}}\n\n'
           );
-        }, 900);
+        }, 500);
       }
     });
     const started = performance.now();
