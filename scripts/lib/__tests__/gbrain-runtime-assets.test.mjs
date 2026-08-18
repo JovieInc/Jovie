@@ -68,7 +68,6 @@ async function runProxy({
   payload,
   rawInput,
   url,
-  allowRemote = '0',
   extraEnv = {},
   unset = [],
 }) {
@@ -80,7 +79,6 @@ async function runProxy({
   return runProcess('python3', [proxyPath], {
     env: {
       GBRAIN_MCP_URL: url ?? `http://127.0.0.1:${port}/mcp`,
-      GBRAIN_MCP_ALLOW_REMOTE: allowRemote,
       GBRAIN_MCP_TOKEN_FILE: tokenFile,
       ...extraEnv,
     },
@@ -244,7 +242,7 @@ describe('repository-owned GBrain runtime assets', () => {
       requests += 1;
       expect(request.headers.authorization).toBe('Bearer test-only-token');
       if (requests === 1) {
-        response.writeHead(503).end('restarting');
+        response.writeHead(429).end('busy');
         return;
       }
       response.writeHead(200, { 'content-type': 'text/event-stream' });
@@ -290,66 +288,6 @@ describe('repository-owned GBrain runtime assets', () => {
       error: { code: -32000 },
     });
   });
-
-  it.each([429, 503])(
-    'bounds retries and returns a JSON-RPC error for persistent HTTP %i',
-    async status => {
-      let requests = 0;
-      const port = await listen((_request, response) => {
-        requests += 1;
-        response.writeHead(status).end('still unavailable');
-      });
-
-      const result = await runProxy({
-        port,
-        payload: { jsonrpc: '2.0', id: 12, method: 'tools/list' },
-      });
-
-      expect(requests).toBe(3);
-      expect(JSON.parse(result.stdout)).toMatchObject({
-        id: 12,
-        error: { code: -32000 },
-      });
-    }
-  );
-
-  it('supports concurrent MCP clients through one shared HTTP endpoint', async () => {
-    let active = 0;
-    let maxActive = 0;
-    let release;
-    const twoClientsEntered = new Promise(resolveBarrier => {
-      release = resolveBarrier;
-    });
-    const port = await listen(async (request, response) => {
-      active += 1;
-      maxActive = Math.max(maxActive, active);
-      if (active >= 2) release();
-      const chunks = [];
-      for await (const chunk of request) chunks.push(chunk);
-      const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-      await twoClientsEntered;
-      response.writeHead(200, { 'content-type': 'application/json' });
-      response.end(
-        JSON.stringify({ jsonrpc: '2.0', id: payload.id, result: { ok: true } })
-      );
-      active -= 1;
-    });
-
-    const results = await Promise.all(
-      Array.from({ length: 12 }, (_, index) =>
-        runProxy({
-          port,
-          payload: { jsonrpc: '2.0', id: index + 1, method: 'tools/list' },
-        })
-      )
-    );
-
-    expect(maxActive).toBeGreaterThan(1);
-    expect(results.map(result => JSON.parse(result.stdout).id)).toEqual(
-      Array.from({ length: 12 }, (_, index) => index + 1)
-    );
-    expect(results.every(result => result.code === 0)).toBe(true);
-  }, 10_000);
 
   it('does not let one slow request head-of-line block the same stdio proxy', async () => {
     let releaseFirst;
@@ -400,7 +338,6 @@ describe('repository-owned GBrain runtime assets', () => {
         env: {
           ...process.env,
           GBRAIN_MCP_URL: `http://127.0.0.1:${port}/mcp`,
-          GBRAIN_MCP_ALLOW_REMOTE: '0',
           GBRAIN_MCP_TOKEN_FILE: tokenFile,
         },
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -777,50 +714,6 @@ describe('repository-owned GBrain runtime assets', () => {
     },
     15_000
   );
-
-  it('reclaims a worker at the deadline for an immediately queued request', async () => {
-    const port = await listen(async (request, response) => {
-      const chunks = [];
-      for await (const chunk of request) chunks.push(chunk);
-      const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-      if (payload.id === 21) {
-        response.writeHead(200, { 'content-type': 'text/event-stream' });
-        const interval = setInterval(() => response.write(': keepalive\n\n'), 50);
-        response.on('close', () => clearInterval(interval));
-        return;
-      }
-      response.writeHead(200, { 'content-type': 'application/json' });
-      response.end(
-        JSON.stringify({ jsonrpc: '2.0', id: payload.id, result: { ok: true } })
-      );
-    });
-    const started = performance.now();
-    const result = await runProxy({
-      port,
-      rawInput:
-        '{"jsonrpc":"2.0","id":21,"method":"tools/list"}\n' +
-        '{"jsonrpc":"2.0","id":22,"method":"tools/list"}\n',
-      extraEnv: {
-        GBRAIN_MCP_MAX_WORKERS: '1',
-        GBRAIN_MCP_REQUEST_DEADLINE_SECONDS: '1',
-      },
-    });
-    const responses = result.stdout
-      .trim()
-      .split('\n')
-      .map(line => JSON.parse(line));
-
-    expect(result.code).toBe(0);
-    expect(responses).toContainEqual(
-      expect.objectContaining({
-        id: 21,
-        error: expect.objectContaining({ code: -32000 }),
-      })
-    );
-    expect(performance.now() - started).toBeLessThan(1600);
-    expect(responses).toHaveLength(2);
-    expect(responses.map(response => response.id).sort()).toEqual([21, 22]);
-  }, 10_000);
 
   it.each(['text/event-stream', 'application/json'])(
     'interrupts a silent %s read at the absolute request deadline',

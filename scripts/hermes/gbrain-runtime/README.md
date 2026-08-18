@@ -1,24 +1,19 @@
 # GBrain local runtime
 
-These files are the repository-owned definition of the shared GBrain HTTP
-transport on a Mac operator host. They are deliberately **not** installed by
-either Hermes bootstrap script yet: replacing a live database-backed service is
-a separate, approval-gated operation.
+These files define the shared GBrain HTTP transport on a Mac operator host.
+They are deliberately **not** installed by either Hermes bootstrap script;
+replacement is a separate, approval-gated operation.
 
 ## Ownership boundary
 
 - `gbrain-serve-wrapper.sh` runs an installed, verified GBrain release binary.
   A source checkout is never treated as the deployed application.
 - `gbrain-mcp-http-proxy.py` gives each MCP client a JSON-lines stdio bridge to
-  the shared authenticated loopback endpoint. Remote URLs require an explicit
-  opt-in, token files must deny group/other access, and `tools/call` is never
-  retried automatically because it may have committed a write before an
-  ambiguous transport failure. A bounded worker pool prevents one stalled
-  request from blocking every client request on the same stdio connection, and
-  SSE events are emitted as they arrive instead of being buffered to EOF.
-  Requests have a 120-second absolute deadline, response/request/token byte
-  limits, and validated JSON-RPC correlation. Provider URLs are parsed from one
-  config snapshot and passed to helpers over stdin, never process arguments.
+  the authenticated loopback endpoint; remote URLs are rejected. Token files
+  deny group/other access, and `tools/call` is never retried because an
+  interrupted write may have committed. A bounded worker pool, incremental SSE,
+  absolute deadlines, byte limits, and JSON-RPC validation bound the transport.
+  Provider URLs are parsed once over stdin, never process arguments.
 - The plist template is a reviewable candidate for the future launchd unit. It
   is kept outside `launchd/` and `launchd/pro/` so no existing bootstrap command
   can activate it accidentally.
@@ -27,14 +22,10 @@ a separate, approval-gated operation.
 
 ### Service pool budget
 
-The candidate deliberately preserves the observed long-lived daemon budget:
-read pool `3`, direct pool `1`, total connection clamp `3`, with the direct pool
-enabled. This is different from `scripts/lib/gbrain-pool-env.mjs`, whose
-`2`/`1`/`15` single-pool policy is for overlapping short-lived CLI and sync
-workers. The daemon keeps one direct connection available for GBrain operations
-that require the direct URL while placing a lower total bound on its persistent
-process. Changing either policy requires an isolated pooled-connection test and
-a fresh provider connection-budget receipt.
+The candidate preserves the observed daemon budget: read pool `3`, direct pool
+`1`, total clamp `3`. The `2`/`1`/`15` policy in
+`scripts/lib/gbrain-pool-env.mjs` is for overlapping short-lived CLI and sync
+workers. Changing either requires an isolated pool test and provider receipt.
 
 ## Preconditions for activation
 
@@ -69,9 +60,5 @@ use a tested provider restore/PITR receipt rather than this service rollback.
 The current daemon exposes `/health`; `/ready` is not a supported readiness
 endpoint in the verified release.
 
-The corresponding automated contract is
-`scripts/lib/__tests__/gbrain-runtime-assets.test.mjs`. It executes the wrapper
-against a fake release binary and the proxy against a real loopback HTTP server,
-including transient retry, SSE parsing, bearer forwarding, and deterministic
-authentication failure behavior. It is collected by the repository's existing
-`ci:harness:test` selector.
+`scripts/lib/__tests__/gbrain-runtime-assets.test.mjs` exercises the wrapper and
+real loopback HTTP transport under the existing `ci:harness:test` selector.

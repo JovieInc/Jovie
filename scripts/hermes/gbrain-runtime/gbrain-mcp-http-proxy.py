@@ -309,7 +309,10 @@ def forward(payload: dict, token: str, total_deadline: float) -> None:
                                     "shared gbrain returned invalid JSON-RPC error shape"
                                 )
                         with outcome_lock:
-                            if deadline_expired.is_set():
+                            if deadline_expired.is_set() or (
+                                time.monotonic() >= total_deadline
+                            ):
+                                deadline_expired.set()
                                 raise RuntimeError(
                                     "shared gbrain HTTP exceeded total deadline"
                                 )
