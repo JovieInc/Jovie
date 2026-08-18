@@ -217,6 +217,52 @@ final class JovieUITests: XCTestCase {
     )
   }
 
+  func testWaitlistPendingHasNoShellChromeAndReservedAction() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-waitlist-pending",
+      expectedElementDescription: "\"You're on the Waitlist\"",
+      timeout: 10
+    ) {
+      $0.staticTexts["You're on the Waitlist"]
+    }
+
+    XCTAssertTrue(
+      app.descendants(matching: .any)["waitlist-pending"].exists,
+      "Waitlist surface identifier missing.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.buttons["Open navigation drawer"].exists,
+      "Waitlist must not mount the authenticated drawer.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      shellControlExists(app, identifier: "shell-tab-bar"),
+      "Waitlist must not render the primary tab bar.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      shellControlExists(app, identifier: "shell-talk-fab"),
+      "Waitlist must not render the Talk FAB.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      shellControlExists(app, identifier: "shell-tab-chat"),
+      "Waitlist must not render Chat as a primary tab.\n\(app.debugDescription)"
+    )
+
+    let header = app.staticTexts["You're on the Waitlist"]
+    let action = app.buttons["waitlist-use-different-account"]
+    XCTAssertTrue(action.exists)
+    XCTAssertGreaterThan(
+      action.frame.minY,
+      header.frame.maxY,
+      "Waitlist action overlapped the header.\n\(app.debugDescription)"
+    )
+    XCTAssertGreaterThanOrEqual(
+      action.frame.height,
+      44,
+      "Waitlist action lost its reserved touch target.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "waitlist-layout", app: app)
+  }
+
   func testExpiredProfileCompletionReturnsToNativeSignIn() {
     let app = launchMockApp(
       launchArgument: "-ui-testing-needs-onboarding-unauthorized",
@@ -714,6 +760,76 @@ final class JovieUITests: XCTestCase {
       "Make merch for my latest release.",
       "Workflow selection did not prefill the composer draft.\n\(app.debugDescription)"
     )
+  }
+
+  func testChatComposerSendSlotDoesNotShiftBarHeight() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+
+    let composer = app.descendants(matching: .any)["chat-composer"]
+    XCTAssertTrue(
+      composer.waitForExistence(timeout: 3),
+      "Chat composer identifier missing.\n\(app.debugDescription)"
+    )
+    let heightBefore = composer.frame.height
+    XCTAssertEqual(
+      heightBefore,
+      76,
+      accuracy: 2,
+      "Empty composer left the reserved 76pt bar.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.descendants(matching: .any)["chat-composer-send"].exists,
+      "Send control must stay out of the tree while the reserved slot is empty.\n\(app.debugDescription)"
+    )
+
+    let input = app.textFields["Ask Jovie"]
+    XCTAssertTrue(waitForHittable(input, timeout: 3))
+    input.tap()
+    input.typeText("Draft a follow-up")
+
+    XCTAssertEqual(
+      composer.frame.height,
+      heightBefore,
+      accuracy: 1,
+      "Typing into the composer shifted the reserved bar height.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.descendants(matching: .any)["chat-composer-send"].waitForExistence(timeout: 2),
+      "Send control did not appear in the reserved trailing slot.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "chat-composer-send-slot", app: app)
+  }
+
+  func testChatComposerSlashPaletteOpensAboveBar() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
+      $0.textFields["Ask Jovie"]
+    }
+
+    let plus = app.buttons["chat-composer-plus"]
+    let input = app.textFields["Ask Jovie"]
+    XCTAssertTrue(waitForHittable(input, timeout: 3))
+    XCTAssertTrue(plus.exists)
+
+    input.tap()
+    _ = app.keyboards.firstMatch.waitForExistence(timeout: 3)
+    let plusMinY = plus.frame.minY
+    input.typeText("/")
+
+    let palette = app.descendants(matching: .any)["composer-slash-palette"]
+    let merchRow = app.descendants(matching: .any)["composer-slash-workflow-makeMerch"]
+    XCTAssertTrue(
+      palette.waitForExistence(timeout: 5) || merchRow.waitForExistence(timeout: 2),
+      "Typing / did not open the slash palette.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(
+      plus.frame.minY,
+      plusMinY,
+      accuracy: 1,
+      "Slash palette shifted the composer plus control instead of overlaying above the bar.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "chat-composer-slash-palette", app: app)
   }
 
   func testChatComposerPreservesDraftAcrossShellNavigation() {

@@ -13,6 +13,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - **Screen walks reuse one account-video store:** founder walks and later creator screen recordings upload through `lib/capture` into the Jovie account blob. The walk is stored and not admitted until Summer classifies it.
 
 ### Changed
+- [internal] **iOS chat composer, waitlist, and shell now have focused QA coverage:** reserved composer send slot, slash palette overlay, waitlist action geometry, and keyboard-locked edge-drag are locked by unit and UI tests. No tab-bar redesign.
+
 - [internal] **@types/node is 26.2.0 across workspace packages including desktop:** types-only bump; no DMG.
 
 - **Ops and the TV HUD are aliases now:** admin nav “Ovie” opens `/hud`. The Mac app grants display-capture only on that route.

@@ -477,24 +477,32 @@ private struct WaitlistPendingView: View {
             isSwitchingAccount = true
             Task { await onUseDifferentAccount() }
           } label: {
-            HStack(spacing: JovieSpacing.small) {
-              if isSwitchingAccount {
+            ZStack {
+              Text(WaitlistPendingLayout.actionTitle(isSwitchingAccount: false))
+                .opacity(isSwitchingAccount ? 0 : 1)
+                .accessibilityHidden(isSwitchingAccount)
+
+              HStack(spacing: JovieSpacing.small) {
                 ProgressView()
                   .tint(JovieColor.backgroundBase)
+                Text(WaitlistPendingLayout.actionTitle(isSwitchingAccount: true))
               }
-              Text(isSwitchingAccount ? "Switching Account…" : "Use a Different Account")
+              .opacity(isSwitchingAccount ? 1 : 0)
+              .accessibilityHidden(!isSwitchingAccount)
             }
             .frame(maxWidth: .infinity)
+            .frame(minHeight: WaitlistPendingLayout.reservedActionMinHeight)
           }
           .buttonStyle(JoviePillButtonStyle(filled: true))
           .disabled(isSwitchingAccount)
           .accessibilityIdentifier("waitlist-use-different-account")
         }
-        .frame(maxWidth: 420, alignment: .leading)
+        .frame(maxWidth: WaitlistPendingLayout.maxContentWidth, alignment: .leading)
         .padding(JovieSpacing.xLarge)
         .frame(maxWidth: .infinity, alignment: .center)
       }
     }
+    .accessibilityIdentifier("waitlist-pending")
   }
 }
 

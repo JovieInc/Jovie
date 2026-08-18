@@ -7,6 +7,18 @@ enum MobileChatKeyboardPolicy {
   }
 }
 
+enum MobileChatScrollPolicy {
+  /// Auto-stick to the latest message only while the user is still pinned.
+  static func shouldAutoScrollToLatest(isAtBottom: Bool) -> Bool {
+    isAtBottom
+  }
+
+  /// Jump control appears only after the user has scrolled away from latest.
+  static func shouldShowJumpToLatest(isAtBottom: Bool) -> Bool {
+    !isAtBottom
+  }
+}
+
 struct MobileChatView: View {
   @Bindable var repository: ChatRepository
   @Binding var draft: String
@@ -50,6 +62,7 @@ struct MobileChatView: View {
         composerChrome
       }
     }
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier("mobile-chat")
     .task {
       await repository.refreshConversations()
@@ -119,7 +132,7 @@ struct MobileChatView: View {
         scrollToBottomIfPinned(using: proxy, animated: true)
       }
       .overlay(alignment: .bottom) {
-        if !isAtBottom {
+        if MobileChatScrollPolicy.shouldShowJumpToLatest(isAtBottom: isAtBottom) {
           Button {
             isAtBottom = true
             withAnimation(.easeOut(duration: 0.25)) {
@@ -133,6 +146,7 @@ struct MobileChatView: View {
           .transition(.opacity.combined(with: .scale(scale: 0.85)))
           .animation(.spring(duration: 0.2), value: isAtBottom)
           .accessibilityLabel("Scroll to latest message")
+          .accessibilityIdentifier("chat-scroll-to-latest")
         }
       }
     }
@@ -178,7 +192,7 @@ struct MobileChatView: View {
     using proxy: ScrollViewProxy,
     animated: Bool
   ) {
-    guard isAtBottom else { return }
+    guard MobileChatScrollPolicy.shouldAutoScrollToLatest(isAtBottom: isAtBottom) else { return }
     if animated {
       withAnimation(.easeOut(duration: 0.25)) {
         proxy.scrollTo("chat-bottom", anchor: .bottom)
