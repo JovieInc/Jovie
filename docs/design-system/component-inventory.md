@@ -7,7 +7,7 @@ This inventory records the current canonical component owners, known duplicates,
 | Family | Canonical file | Duplicate files to retire or constrain | Current canonical routes | Current duplicate routes | Target slice |
 | --- | --- | --- | --- | --- | --- |
 | Public shell | `apps/web/components/site/PublicPageShell.tsx` | route-local public layout wrappers | `(marketing)`, `(dynamic)/legal`, `[username]/not-found` | legacy wrappers in untouched public routes | Slice 2 |
-| Public header | `apps/web/components/site/MarketingHeader.tsx` via `HeaderNav` | `btn-linear-*` route-local CTA/header usages | public marketing/legal | homepage/detail routes still using raw classes | Slice 2 |
+| Public header | `apps/web/components/site/MarketingHeader.tsx` via `HeaderNav` | none in `HeaderNav` / `AuthActions` — leftover `btn-linear-login` remains on `OnboardingShell` | public marketing/legal | onboarding sign-in header still uses the leftover class | Slice 2 |
 | Public footer | `apps/web/components/site/MarketingFooter.tsx` | route-local footer/action clusters | public marketing/legal | profile/footer-module is a different family | Slice 2 |
 | Internal app shell | `apps/web/components/organisms/AppShellFrame.tsx` | route-level shell composition | app shell routes | page-local spacing/layout forks | Slice 6 |
 | Internal content panel | `apps/web/components/organisms/AppShellContentPanel.tsx` | route-local content wrappers | dashboard/settings/admin routes using panel | route-local wrappers not using panel | Slice 6 |
@@ -17,7 +17,7 @@ This inventory records the current canonical component owners, known duplicates,
 | Family | Canonical file | Duplicate files to retire or constrain | Current canonical routes | Current duplicate routes | Target slice |
 | --- | --- | --- | --- | --- | --- |
 | General CTA | `apps/web/components/molecules/CTAButton.tsx` | `PrimaryCTA.tsx`, `marketing-cta`, raw `btn-linear-*`, route-local pricing/support links | profile CTA, CTA sections, stories | launch pages, pricing page, support page, homepage hero variants | Slice 2 |
-| Public auth action links | `apps/web/components/molecules/AuthActions.tsx` | direct `btn-linear-login`, `btn-linear-signup` usage in route components | shared header/auth action areas | homepage hero/detail pages, error page | Slice 2 |
+| Public auth action links | `apps/web/components/molecules/AuthActions.tsx` | none — `AuthActions` uses `@jovie/ui` `Button` | shared header/auth action areas | none | Slice 2 |
 | Pricing upgrade CTA | `apps/web/components/features/pricing/PricingCTA.tsx` | route-local motion button styling | pricing-specific product surfaces | any route-local upgrade card CTA | Slice 2 |
 
 ## Content/document

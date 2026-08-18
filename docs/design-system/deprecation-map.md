@@ -14,7 +14,7 @@ This file tracks legacy implementations that should not be used for new work and
 | Legacy item | Status | Replacement | Notes |
 | --- | --- | --- | --- |
 | Route-specific legal/blog TOCs | Deprecated | `apps/web/components/molecules/PublicTableOfContents.tsx` | Investor long-form surfaces still need migration |
-| Direct `btn-linear-login` / `btn-linear-signup` route-level usage | Deprecated for new work | shared public CTA classes / `AuthActions` | Existing untouched routes still need migration |
+| Direct `btn-linear-login` / `btn-linear-signup` route-level usage | Retired from public header/auth actions | `@jovie/ui` `Button` via `HeaderNav` / `AuthActions` | Public header login/signup and `AuthActions` now use the System B Button contract. `btn-linear-signup` CSS is removed. `btn-linear-login` CSS remains only for `OnboardingShell` until that surface migrates. |
 
 ## CTA duplication
 

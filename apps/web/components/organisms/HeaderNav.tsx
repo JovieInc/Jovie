@@ -1,4 +1,4 @@
-// @coverage-via apps/web/tests/unit/HeaderNavFlyout.test.tsx
+// @coverage-via apps/web/tests/unit/app/public-cta-guard.test.ts
 'use client';
 
 import './HeaderNav.css';
@@ -97,12 +97,14 @@ function PublicAuthActions({
   }
   return (
     <div className='flex items-center gap-2'>
-      <Link
-        href={APP_ROUTES.SIGNIN}
-        className='btn-linear-login focus-ring-themed shrink-0 whitespace-nowrap'
+      <Button
+        asChild
+        size='sm'
+        variant='ghost'
+        className='focus-ring-themed shrink-0 whitespace-nowrap'
       >
-        Log in
-      </Link>
+        <Link href={APP_ROUTES.SIGNIN}>Log in</Link>
+      </Button>
       <Button
         asChild
         size='md'
