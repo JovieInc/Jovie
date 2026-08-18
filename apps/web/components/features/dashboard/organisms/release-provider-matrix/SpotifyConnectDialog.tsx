@@ -1,9 +1,9 @@
 'use client';
 
+import { Spinner as LoadingSpinner } from '@jovie/ui';
 import { BadgeCheck, Link2, Search } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
 import {

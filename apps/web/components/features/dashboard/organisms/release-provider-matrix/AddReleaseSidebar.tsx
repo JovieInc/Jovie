@@ -3,6 +3,7 @@
 import {
   Button,
   Input,
+  Spinner as LoadingSpinner,
   Select,
   SelectContent,
   SelectItem,
@@ -20,7 +21,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRelease } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Calendar } from '@/components/atoms/Calendar';
 import { Icon } from '@/components/atoms/Icon';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { toast } from '@/components/feedback';
 import {
   DrawerButton,

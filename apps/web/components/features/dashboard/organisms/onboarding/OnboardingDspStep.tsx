@@ -1,10 +1,9 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Spinner as LoadingSpinner } from '@jovie/ui';
 import { Search } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useReducer, useRef } from 'react';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useSpotifyConnect } from '@/features/dashboard/organisms/release-provider-matrix/releases-empty-state/hooks/useSpotifyConnect';
 import {
@@ -147,7 +146,7 @@ export function OnboardingDspStep({
                   autoCapitalize='none'
                   autoCorrect='off'
                   spellCheck={false}
-                  aria-label='Search for your artist or paste a Spotify link'
+                  aria-label='Search For Your Artist Or Paste A Spotify Link'
                   aria-invalid={Boolean(state.error)}
                   aria-describedby={
                     state.error ? 'onboarding-dsp-search-error' : undefined
@@ -233,7 +232,7 @@ export function OnboardingDspStep({
               static
               disabled={isTransitioning}
             >
-              Skip for now
+              Skip For Now
             </Button>
           </div>
         </ContentSurfaceCard>

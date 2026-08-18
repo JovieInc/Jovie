@@ -1,5 +1,5 @@
+import { Spinner as LoadingSpinner } from '@jovie/ui';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { cn } from '@/lib/utils';
 
 export const CONTENT_TABLE_WRAPPER_CLASS = 'overflow-x-auto px-4 py-4 sm:px-6';

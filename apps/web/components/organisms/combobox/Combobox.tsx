@@ -5,6 +5,7 @@ import {
   ComboboxInput,
   Combobox as HeadlessCombobox,
 } from '@headlessui/react';
+import { Spinner as LoadingSpinner } from '@jovie/ui';
 import { clsx } from 'clsx';
 import { ChevronDown, Search } from 'lucide-react';
 import {
@@ -16,7 +17,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ComboboxDropdown } from './ComboboxDropdown';
 import type { ComboboxOption, ComboboxProps } from './types';
 import { useComboboxKeyboard } from './useComboboxKeyboard';

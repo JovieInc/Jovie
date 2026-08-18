@@ -1,7 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-
+import { Button, Spinner as LoadingSpinner } from '@jovie/ui';
 import { BadgeCheck, Link2 } from 'lucide-react';
 import Image from 'next/image';
 import {
@@ -13,7 +12,6 @@ import {
   useState,
 } from 'react';
 import { AuthTextInput } from '@/components/atoms/AuthTextInput';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';

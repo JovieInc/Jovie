@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Spinner as LoadingSpinner } from '@jovie/ui';
 import { ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
@@ -11,7 +11,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthSafe } from '@/hooks/useClerkSafe';

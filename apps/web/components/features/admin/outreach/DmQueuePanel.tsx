@@ -1,7 +1,7 @@
 'use client';
 
+import { Spinner as LoadingSpinner } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { toast } from '@/components/feedback';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';

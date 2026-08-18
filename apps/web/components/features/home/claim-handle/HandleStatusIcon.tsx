@@ -1,7 +1,7 @@
 'use client';
 
+import { Spinner as LoadingSpinner } from '@jovie/ui';
 import { Check, X } from 'lucide-react';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
 interface HandleStatusIconProps {
   readonly showChecking: boolean;
@@ -20,7 +20,7 @@ export function HandleStatusIcon({
 }: HandleStatusIconProps) {
   if (showChecking) {
     return (
-      <LoadingSpinner size='sm' tone='muted' label='Checking availability' />
+      <LoadingSpinner size='sm' tone='muted' label='Checking Availability' />
     );
   }
   if (!handle) return null;
