@@ -119,7 +119,7 @@ export default async function ContactsPage({
 
   return (
     <div
-      className='flex h-full min-h-0 flex-col'
+      className='flex h-full min-h-0 flex-col bg-(--app-shell-content-surface)'
       data-testid='contacts-workspace'
     >
       <ContactsWorkspaceTabs

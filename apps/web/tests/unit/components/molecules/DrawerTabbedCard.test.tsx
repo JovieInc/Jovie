@@ -42,4 +42,26 @@ describe('DrawerTabbedCard', () => {
       'overscroll-contain'
     );
   });
+
+  it('can compose tabs and content directly on one flat rail surface', () => {
+    render(
+      <DrawerTabbedCard
+        testId='flat-drawer-tabbed-card'
+        surfaceVariant='flat'
+        tabs={<div>Flat tabs</div>}
+      >
+        <div>Flat details</div>
+      </DrawerTabbedCard>
+    );
+
+    const surface = screen.getByTestId('flat-drawer-tabbed-card');
+
+    expect(surface).toHaveAttribute('data-surface-variant', 'flat');
+    expect(surface).toHaveClass('border-0', 'bg-transparent', 'shadow-none');
+    expect(surface).not.toHaveClass(
+      'rounded-lg',
+      'border-subtle',
+      'bg-surface-1'
+    );
+  });
 });

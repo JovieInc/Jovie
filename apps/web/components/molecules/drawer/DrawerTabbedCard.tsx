@@ -13,6 +13,7 @@ export interface DrawerTabbedCardProps {
   readonly tabsContainerClassName?: string;
   readonly contentClassName?: string;
   readonly testId?: string;
+  readonly surfaceVariant?: 'card' | 'flat';
 }
 
 export function DrawerTabbedCard({
@@ -24,10 +25,11 @@ export function DrawerTabbedCard({
   tabsContainerClassName,
   contentClassName,
   testId,
+  surfaceVariant = 'card',
 }: DrawerTabbedCardProps) {
   return (
     <DrawerSurfaceCard
-      variant='card'
+      variant={surfaceVariant}
       data-right-rail-section={sectionKind}
       className={cn(
         'flex min-h-0 flex-1 flex-col overflow-hidden',

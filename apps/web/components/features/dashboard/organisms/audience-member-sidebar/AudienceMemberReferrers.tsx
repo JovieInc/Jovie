@@ -115,9 +115,7 @@ export function AudienceMemberReferrers({
   const sources = [...actionSources, ...utmSource, ...referrers];
 
   if (sources.length === 0) {
-    return (
-      <DrawerInlineNote className='min-h-22' message='No source data yet.' />
-    );
+    return <DrawerInlineNote message='No source data yet.' />;
   }
 
   return (

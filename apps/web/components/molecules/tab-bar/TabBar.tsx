@@ -19,13 +19,13 @@ import { cn } from '@/lib/utils';
 
 /** Classname constants for drawer-variant tab styling (re-exported by DrawerTabs) */
 export const TAB_BAR_RAIL_CLASSNAME =
-  'flex min-w-0 items-center gap-1 rounded-full border-0 bg-transparent p-0';
+  'flex min-w-0 items-center gap-1 rounded-md border-0 bg-transparent p-0';
 
 export const TAB_BAR_DRAWER_TRIGGER_CLASSNAME =
-  'inline-flex min-h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full bg-transparent px-2.5 py-1 text-2xs font-caption tracking-tight text-tertiary-token transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-0 hover:text-primary-token';
+  'inline-flex min-h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-md border border-transparent bg-transparent px-2.5 py-1 text-2xs font-caption tracking-tight text-tertiary-token shadow-none transition-[background-color,border-color,color] duration-subtle hover:border-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/35';
 
 export const TAB_BAR_DRAWER_TRIGGER_ACTIVE_CLASSNAME =
-  'ring-2 ring-(--color-accent) text-primary-token';
+  'border-subtle bg-surface-0 font-medium text-primary-token';
 
 export const TAB_BAR_SEGMENT_TRIGGER_CLASSNAME =
   'inline-flex h-7 shrink-0 items-center justify-center whitespace-nowrap rounded-full border-0 bg-transparent px-2.5 text-xs font-caption tracking-tight text-tertiary-token transition-[background-color,color] duration-fast hover:bg-surface-0 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16';

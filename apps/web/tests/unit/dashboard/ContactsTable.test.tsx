@@ -75,16 +75,13 @@ vi.mock(
   () => ({
     ContactDetailSidebar: ({
       contact,
-      entityHeaderSurface,
       isOpen,
     }: {
       readonly contact: EditableContact | null;
-      readonly entityHeaderSurface?: string;
       readonly isOpen: boolean;
     }) => (
       <div
         data-contact-id={contact?.id ?? ''}
-        data-entity-header-surface={entityHeaderSurface ?? 'card'}
         data-open={String(isOpen)}
         data-testid='contact-detail-sidebar'
       />

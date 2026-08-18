@@ -13,12 +13,12 @@ import {
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
+  DrawerChoiceChipGroup,
   DrawerEditableTextField,
+  DrawerEntityAvatar,
   DrawerPropertyRow,
-  DrawerTabbedCard,
-  DrawerTabs,
   EntityHeaderCard,
-  EntitySidebarShell,
+  EntityTabbedRail,
 } from '@/components/molecules/drawer';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
@@ -29,7 +29,6 @@ import {
   summarizeTerritories,
 } from '@/lib/contacts/constants';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
-import { cn } from '@/lib/utils';
 import type { ContactChannel, ContactRole } from '@/types/contacts';
 import { useContactDetailHeaderParts } from './ContactDetailHeader';
 
@@ -40,6 +39,16 @@ function getPreferredChannelLabel(
   if (channel === 'phone') return 'Phone';
   return 'Select preferred';
 }
+
+const CONTACT_TAB_OPTIONS = [
+  { value: 'info' as const, label: 'Info' },
+  { value: 'territories' as const, label: 'Territories' },
+];
+
+const CONTACT_TERRITORY_OPTIONS = CONTACT_TERRITORY_PRESETS.map(territory => ({
+  value: territory,
+  label: territory,
+}));
 
 function contactFieldActions(field: string, value: string | null | undefined) {
   if (field === 'email' && value) {
@@ -234,21 +243,26 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   };
 
   return (
-    <EntitySidebarShell
+    <EntityTabbedRail
       isOpen={isOpen}
       ariaLabel='Contact details'
       title={headerTitle}
       onClose={hasContact ? undefined : handleClose}
-      headerMode='minimal'
       hideMinimalHeaderBar={hasContact}
-      entityHeaderSurface='flat'
-      workspaceSurface='raised'
       contextMenuItems={contextMenuItems}
       isEmpty={!hasContact}
       emptyMessage='Select a contact to view details'
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      tabOptions={CONTACT_TAB_OPTIONS}
+      tabsAriaLabel='Contact tabs'
+      sectionKind={activeTab === 'info' ? 'facts' : 'details'}
+      tabbedCardTestId='contact-detail-tabbed-card'
+      contentClassName='pt-2'
       entityHeader={
         contact ? (
           <EntityHeaderCard
+            layout='grid'
             title={contactDisplayName}
             subtitle={roleLabel}
             stableLayout
@@ -257,6 +271,12 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             reserveSubtitleSlot
             reserveMetaSlot
             metaOverflow='scroll'
+            image={
+              <DrawerEntityAvatar
+                name={contactDisplayName}
+                testId='contact-entity-avatar-frame'
+              />
+            }
             meta={
               territorySummary ? (
                 <div className='flex items-center gap-1.5 text-2xs text-tertiary-token'>
@@ -270,28 +290,15 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
               ) : undefined
             }
             actions={headerActions}
-            bodyClassName='pr-8'
+            className='px-2 py-2'
+            titleClassName='text-base leading-5 tracking-[-0.02em]'
             data-testid='contact-detail-entity-header'
           />
         ) : undefined
       }
     >
-      {contact && (
-        <DrawerTabbedCard
-          testId='contact-detail-tabbed-card'
-          tabs={
-            <DrawerTabs
-              value={activeTab}
-              onValueChange={v => setActiveTab(v as 'info' | 'territories')}
-              options={[
-                { value: 'info' as const, label: 'Info' },
-                { value: 'territories' as const, label: 'Territories' },
-              ]}
-              ariaLabel='Contact tabs'
-            />
-          }
-          contentClassName='pt-2'
-        >
+      {contact ? (
+        <>
           {activeTab === 'info' && (
             <>
               <DrawerSection
@@ -302,16 +309,12 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                   Contact Type
                 </Label>
                 <Select value={contact.role} onValueChange={handleRoleChange}>
-                  <SelectTrigger className='h-8 rounded-lg border border-subtle bg-surface-0 px-2.5 text-app'>
+                  <SelectTrigger aria-label='Contact Type'>
                     <SelectValue>{roleLabel}</SelectValue>
                   </SelectTrigger>
-                  <SelectContent className='rounded-lg border-subtle bg-(--linear-app-content-surface) p-1'>
+                  <SelectContent>
                     {CONTACT_ROLE_OPTIONS.map(option => (
-                      <SelectItem
-                        key={option.value}
-                        value={option.value}
-                        className='rounded-md px-2 py-1.5 text-app font-caption text-secondary-token data-highlighted:bg-surface-0 data-highlighted:text-primary-token'
-                      >
+                      <SelectItem key={option.value} value={option.value}>
                         <div className='flex items-center gap-2'>
                           <Icon
                             name={option.iconName}
@@ -371,12 +374,12 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                       value={contact.preferredChannel || ''}
                       onValueChange={handlePreferredChannelChange}
                     >
-                      <SelectTrigger className='h-8 rounded-lg border border-subtle bg-surface-0 px-2.5 text-app'>
+                      <SelectTrigger aria-label='Preferred Contact Method'>
                         <SelectValue placeholder='Select preferred channel'>
                           {getPreferredChannelLabel(contact.preferredChannel)}
                         </SelectValue>
                       </SelectTrigger>
-                      <SelectContent className='rounded-lg border-subtle bg-(--linear-app-content-surface) p-1'>
+                      <SelectContent>
                         <SelectItem value='email'>Email</SelectItem>
                         <SelectItem value='phone'>Phone</SelectItem>
                       </SelectContent>
@@ -403,46 +406,35 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                   labelWidth={96}
                   labelClassName='normal-case tracking-normal text-xs'
                 />
-                <div className='flex flex-wrap gap-1'>
-                  {CONTACT_TERRITORY_PRESETS.map(territory => {
-                    const isSelected = contact.territories.includes(territory);
-                    return (
-                      <button
-                        key={territory}
-                        type='button'
-                        onClick={() => handleTerritoryToggle(territory)}
-                        aria-pressed={isSelected}
-                        title={territory}
-                        className={cn(
-                          'inline-flex h-11 max-w-full shrink-0 items-center whitespace-nowrap rounded-md border px-2 text-2xs font-caption leading-none transition-[background-color,border-color,color] duration-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring sm:h-7',
-                          isSelected
-                            ? 'border-(--linear-border-focus)/35 bg-surface-1 text-primary-token'
-                            : 'border-subtle bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'
-                        )}
-                      >
-                        {territory}
-                      </button>
-                    );
-                  })}
-                </div>
+                <DrawerChoiceChipGroup
+                  options={CONTACT_TERRITORY_OPTIONS}
+                  selectedValues={contact.territories}
+                  onToggle={handleTerritoryToggle}
+                  ariaLabel='Contact territories'
+                  testId='contact-territory-choices'
+                />
               </div>
             </DrawerSection>
           )}
           {/* Error display */}
           {contact.error && (
-            <div className='rounded-lg border border-destructive/15 bg-destructive/5 px-3 py-2'>
+            <div role='alert' className='px-1 py-2'>
               <p className='text-app text-destructive'>{contact.error}</p>
             </div>
           )}
 
           {/* Saving indicator */}
           {contact.isSaving && (
-            <div className='rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-center text-app text-tertiary-token'>
+            <div
+              role='status'
+              aria-live='polite'
+              className='px-1 py-2 text-center text-app text-tertiary-token'
+            >
               Saving…
             </div>
           )}
-        </DrawerTabbedCard>
-      )}
-    </EntitySidebarShell>
+        </>
+      ) : null}
+    </EntityTabbedRail>
   );
 });

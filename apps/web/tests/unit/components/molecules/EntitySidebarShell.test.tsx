@@ -7,13 +7,19 @@ vi.mock('@/components/organisms/RightDrawer', () => ({
   RightDrawer: ({
     children,
     ariaLabel,
+    className,
     'data-testid': testId,
   }: {
     readonly children: ReactNode;
     readonly ariaLabel?: string;
+    readonly className?: string;
     readonly 'data-testid'?: string;
   }) => (
-    <aside data-testid={testId ?? 'right-drawer'} aria-label={ariaLabel}>
+    <aside
+      data-testid={testId ?? 'right-drawer'}
+      aria-label={ariaLabel}
+      className={className}
+    >
       {children}
     </aside>
   ),
@@ -38,6 +44,26 @@ describe('EntitySidebarShell', () => {
       'shadow-none'
     );
     expect(workspace).not.toHaveClass('rounded-(--linear-app-shell-radius)');
+  });
+
+  it('forwards a route-specific surface class to the outer drawer', () => {
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Contact details'
+        drawerClassName='rounded-none border-y-0 border-r-0 bg-surface-2 shadow-none'
+      >
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    expect(screen.getByTestId('right-drawer')).toHaveClass(
+      'rounded-none',
+      'border-y-0',
+      'border-r-0',
+      'bg-surface-2',
+      'shadow-none'
+    );
   });
 
   it('keeps the entity header pinned and leaves minimal-mode tab composition to the body', () => {
@@ -256,6 +282,30 @@ describe('EntitySidebarShell', () => {
       screen.getByText('Select a release to view details.')
     ).toBeInTheDocument();
     expect(screen.queryByText('Body content')).not.toBeInTheDocument();
+  });
+
+  it('keeps empty state content on the uninterrupted workspace when flat', () => {
+    const { container } = render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Empty contact drawer'
+        workspaceSurface='flat'
+        isEmpty
+        emptyMessage='Select a contact to view details.'
+      >
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    expect(
+      screen.getByText('Select a contact to view details.')
+    ).toBeInTheDocument();
+    expect(
+      container.querySelectorAll('[data-surface-variant="card"]')
+    ).toHaveLength(0);
+    expect(
+      container.querySelector('[data-surface-variant="flat"]')
+    ).toBeInTheDocument();
   });
 
   it('renders raised identity before the ordered section stack', () => {

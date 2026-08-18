@@ -153,4 +153,32 @@ describe('TabBar distribution', () => {
     expect(activeTab).not.toHaveAttribute('data-focus-origin');
     canvas.remove();
   });
+
+  it('uses flat drawer tabs with neutral selection and explicit keyboard focus', () => {
+    render(
+      <TabBar
+        value='overview'
+        onValueChange={() => undefined}
+        options={OPTIONS}
+        ariaLabel='Drawer tabs'
+        variant='drawer'
+      />
+    );
+
+    const activeTab = screen.getByRole('tab', { name: 'Overview' });
+    const inactiveTab = screen.getByRole('tab', { name: 'Activity' });
+
+    expect(activeTab).toHaveClass(
+      'rounded-md',
+      'border-subtle',
+      'bg-surface-0',
+      'shadow-none'
+    );
+    expect(activeTab.className).not.toContain('ring-(--color-accent)');
+    expect(inactiveTab).toHaveClass(
+      'border-transparent',
+      'focus-visible:ring-2',
+      'focus-visible:ring-focus/35'
+    );
+  });
 });
