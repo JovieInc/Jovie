@@ -305,6 +305,105 @@ export const creatorContacts = pgTable(
   })
 );
 
+/**
+ * A person in a creator's private business directory.
+ *
+ * This is intentionally separate from responsibilities. One person can hold
+ * more than one responsibility, and a responsibility can be assigned to more
+ * than one person.
+ */
+export const creatorContactPeople = pgTable(
+  'creator_contact_people',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    displayName: text('display_name'),
+    companyName: text('company_name'),
+    email: text('email'),
+    phone: text('phone'),
+    preferredChannel: contactChannelEnum('preferred_channel'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    profileIdx: index('idx_creator_contact_people_profile').on(
+      table.creatorProfileId,
+      table.createdAt
+    ),
+  })
+);
+
+/**
+ * A reusable responsibility within one creator's business directory.
+ *
+ * `customLabel` is an empty string for standard roles so the database can
+ * enforce one reusable definition for each role/label pair.
+ */
+export const creatorContactResponsibilities = pgTable(
+  'creator_contact_responsibilities',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    role: contactRoleEnum('role').notNull(),
+    customLabel: text('custom_label').notNull().default(''),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    profileRoleLabelUnique: uniqueIndex(
+      'idx_creator_contact_responsibilities_profile_role_label'
+    ).on(table.creatorProfileId, table.role, table.customLabel),
+  })
+);
+
+/**
+ * Associates a person with a reusable responsibility.
+ *
+ * Territory belongs here, rather than on the person, because it describes
+ * the scope of this responsibility (for example, a regional tour manager).
+ */
+export const creatorContactAssignments = pgTable(
+  'creator_contact_assignments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    personId: uuid('person_id')
+      .notNull()
+      .references(() => creatorContactPeople.id, { onDelete: 'cascade' }),
+    responsibilityId: uuid('responsibility_id')
+      .notNull()
+      .references(() => creatorContactResponsibilities.id, {
+        onDelete: 'cascade',
+      }),
+    territories: jsonb('territories').$type<string[]>().notNull().default([]),
+    isActive: boolean('is_active').notNull().default(true),
+    isPrimary: boolean('is_primary').notNull().default(false),
+    sortOrder: integer('sort_order').notNull().default(0),
+    startedAt: timestamp('started_at'),
+    endedAt: timestamp('ended_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    personResponsibilityUnique: uniqueIndex(
+      'idx_creator_contact_assignments_person_responsibility'
+    ).on(table.personId, table.responsibilityId),
+    responsibilitySelectionIdx: index(
+      'idx_creator_contact_assignments_responsibility_selection'
+    ).on(
+      table.responsibilityId,
+      table.isActive,
+      table.isPrimary,
+      table.sortOrder,
+      table.createdAt,
+      table.personId
+    ),
+  })
+);
+
 // Creator avatar candidates table for ingestion suggestions
 export const creatorAvatarCandidates = pgTable(
   'creator_avatar_candidates',
@@ -548,6 +647,25 @@ export const selectCreatorProfileSchema = createSelectSchema(creatorProfiles);
 export const insertCreatorContactSchema = createInsertSchema(creatorContacts);
 export const selectCreatorContactSchema = createSelectSchema(creatorContacts);
 
+export const insertCreatorContactPersonSchema =
+  createInsertSchema(creatorContactPeople);
+export const selectCreatorContactPersonSchema =
+  createSelectSchema(creatorContactPeople);
+
+export const insertCreatorContactResponsibilitySchema = createInsertSchema(
+  creatorContactResponsibilities
+);
+export const selectCreatorContactResponsibilitySchema = createSelectSchema(
+  creatorContactResponsibilities
+);
+
+export const insertCreatorContactAssignmentSchema = createInsertSchema(
+  creatorContactAssignments
+);
+export const selectCreatorContactAssignmentSchema = createSelectSchema(
+  creatorContactAssignments
+);
+
 export const insertProfilePhotoSchema = createInsertSchema(profilePhotos);
 export const selectProfilePhotoSchema = createSelectSchema(profilePhotos);
 
@@ -582,6 +700,19 @@ export type NewCreatorProfile = typeof creatorProfiles.$inferInsert;
 
 export type CreatorContact = typeof creatorContacts.$inferSelect;
 export type NewCreatorContact = typeof creatorContacts.$inferInsert;
+
+export type CreatorContactPerson = typeof creatorContactPeople.$inferSelect;
+export type NewCreatorContactPerson = typeof creatorContactPeople.$inferInsert;
+
+export type CreatorContactResponsibility =
+  typeof creatorContactResponsibilities.$inferSelect;
+export type NewCreatorContactResponsibility =
+  typeof creatorContactResponsibilities.$inferInsert;
+
+export type CreatorContactAssignment =
+  typeof creatorContactAssignments.$inferSelect;
+export type NewCreatorContactAssignment =
+  typeof creatorContactAssignments.$inferInsert;
 
 export type ProfilePhoto = typeof profilePhotos.$inferSelect;
 export type NewProfilePhoto = typeof profilePhotos.$inferInsert;
