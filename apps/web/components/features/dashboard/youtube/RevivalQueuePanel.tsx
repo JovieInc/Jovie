@@ -1,9 +1,12 @@
 'use client';
 
+// @coverage-via apps/web/components/features/dashboard/youtube/RevivalQueuePanel.test.tsx
+
 import { Icon } from '@/components/atoms/Icon';
 import { ChannelIntelligencePanel } from '@/components/features/dashboard/youtube/ChannelIntelligencePanel';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { PageShell } from '@/components/organisms/PageShell';
+import { EmptyState } from '@/components/molecules/EmptyState';
+import { AppShellContentPanel } from '@/components/organisms/AppShellContentPanel';
 import { PageToolbar } from '@/components/organisms/table';
 import { computeRatePercent } from '@/lib/analytics/metrics';
 import type { ChannelIntelligenceReport } from '@/lib/services/channel-intelligence';
@@ -238,18 +241,14 @@ function QuotaBar({ quota }: QuotaBarProps) {
 
 function NotConnectedState() {
   return (
-    <ContentSurfaceCard className='flex flex-col items-center justify-center px-6 py-10 text-center'>
-      <div className='flex h-10 w-10 items-center justify-center rounded-xl bg-surface-0'>
-        <Icon name='Youtube' className='h-5 w-5 text-tertiary-token' />
-      </div>
-      <h3 className='mt-3 text-app font-semibold text-primary-token'>
-        Connect Your YouTube Channel
-      </h3>
-      <p className='mt-1 max-w-sm text-app text-secondary-token leading-snug'>
-        The revival queue needs your YouTube analytics. Connect your channel in
-        Settings to start identifying packaging opportunities.
-      </p>
-    </ContentSurfaceCard>
+    <EmptyState
+      icon={<Icon name='Youtube' className='h-5 w-5' />}
+      heading='Connect Your YouTube Channel'
+      description='The revival queue needs your YouTube analytics. Connect your channel in Settings to start identifying packaging opportunities.'
+      presentation='workspace'
+      testId='youtube-revival-not-connected'
+      className='min-h-64'
+    />
   );
 }
 
@@ -281,6 +280,7 @@ export function RevivalQueuePanel({
 }: RevivalQueuePanelProps) {
   const toolbar = (
     <PageToolbar
+      data-testid='youtube-revival-toolbar'
       start={
         <span className='text-xs text-tertiary-token'>
           {isConnected
@@ -293,70 +293,71 @@ export function RevivalQueuePanel({
   );
 
   return (
-    <PageShell
-      frame='none'
-      contentPadding='none'
+    <AppShellContentPanel
+      frame='content-container'
+      contentPadding='compact'
+      scroll='page'
       toolbar={toolbar}
       data-testid={testId}
     >
-      <div className='min-h-0 flex-1 overflow-y-auto overflow-x-hidden'>
-        <div className='flex flex-col gap-6 px-3 py-2.5 sm:px-4 sm:py-3.5'>
-          <ChannelIntelligencePanel
-            report={intelligenceReport}
-            isConnected={isConnected}
-          />
+      <div className='flex flex-col gap-6'>
+        <ChannelIntelligencePanel
+          report={intelligenceReport}
+          isConnected={isConnected}
+        />
 
-          {!isConnected ? (
-            <NotConnectedState />
-          ) : (
-            <>
-              {/* Quota bar */}
-              {quota && <QuotaBar quota={quota} />}
+        {!isConnected ? (
+          <NotConnectedState />
+        ) : (
+          <>
+            {/* Quota bar */}
+            {quota && <QuotaBar quota={quota} />}
 
-              {/* Revival queue */}
-              <section aria-labelledby='revival-queue-heading'>
+            {/* Revival queue */}
+            <section aria-labelledby='revival-queue-heading'>
+              <h2
+                id='revival-queue-heading'
+                className='mb-3 text-app font-caption tracking-normal text-secondary-token'
+              >
+                Revival Candidates
+              </h2>
+              {candidates.length === 0 ? (
+                <ContentSurfaceCard className='overflow-hidden p-0'>
+                  <EmptyState
+                    heading='No underperforming videos found.'
+                    description='All videos are meeting channel baselines.'
+                    testId='youtube-revival-empty-queue'
+                    className='min-h-40'
+                  />
+                </ContentSurfaceCard>
+              ) : (
+                <div className='space-y-3'>
+                  {candidates.map(c => (
+                    <RevivalCandidateCard key={c.videoId} candidate={c} />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Experiments dashboard */}
+            {experiments.length > 0 && (
+              <section aria-labelledby='experiments-heading'>
                 <h2
-                  id='revival-queue-heading'
+                  id='experiments-heading'
                   className='mb-3 text-app font-caption tracking-normal text-secondary-token'
                 >
-                  Revival Candidates
+                  Experiments
                 </h2>
-                {candidates.length === 0 ? (
-                  <ContentSurfaceCard className='px-4 py-6 text-center'>
-                    <p className='text-app text-secondary-token'>
-                      No underperforming videos found. All videos are meeting
-                      channel baselines.
-                    </p>
-                  </ContentSurfaceCard>
-                ) : (
-                  <div className='space-y-3'>
-                    {candidates.map(c => (
-                      <RevivalCandidateCard key={c.videoId} candidate={c} />
-                    ))}
-                  </div>
-                )}
+                <ContentSurfaceCard className='divide-y divide-subtle p-0'>
+                  {experiments.map(exp => (
+                    <ExperimentRow key={exp.experimentId} experiment={exp} />
+                  ))}
+                </ContentSurfaceCard>
               </section>
-
-              {/* Experiments dashboard */}
-              {experiments.length > 0 && (
-                <section aria-labelledby='experiments-heading'>
-                  <h2
-                    id='experiments-heading'
-                    className='mb-3 text-app font-caption tracking-normal text-secondary-token'
-                  >
-                    Experiments
-                  </h2>
-                  <ContentSurfaceCard className='divide-y divide-subtle p-0'>
-                    {experiments.map(exp => (
-                      <ExperimentRow key={exp.experimentId} experiment={exp} />
-                    ))}
-                  </ContentSurfaceCard>
-                </section>
-              )}
-            </>
-          )}
-        </div>
+            )}
+          </>
+        )}
       </div>
-    </PageShell>
+    </AppShellContentPanel>
   );
 }
