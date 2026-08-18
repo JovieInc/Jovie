@@ -15,10 +15,21 @@ vi.mock('@/components/atoms/ImageWithFallback', () => ({
   ImageWithFallback: ({
     alt,
     src,
+    priority,
+    loading,
   }: {
     readonly alt: string;
     readonly src?: string | null;
-  }) => <img alt={alt} src={src ?? undefined} />,
+    readonly priority?: boolean;
+    readonly loading?: 'eager' | 'lazy';
+  }) => (
+    <img
+      alt={alt}
+      src={src ?? undefined}
+      data-priority={priority ? 'true' : 'false'}
+      data-loading={loading}
+    />
+  ),
 }));
 
 const releases: PublicRelease[] = [
@@ -28,7 +39,7 @@ const releases: PublicRelease[] = [
     slug: 'older-song',
     releaseType: 'single',
     releaseDate: '2024-01-01T00:00:00.000Z',
-    artworkUrl: null,
+    artworkUrl: 'https://example.com/older-song.jpg',
     artistNames: ['Tim White'],
   },
   {
@@ -37,7 +48,7 @@ const releases: PublicRelease[] = [
     slug: 'newest-song',
     releaseType: 'album',
     releaseDate: '2026-01-01T00:00:00.000Z',
-    artworkUrl: null,
+    artworkUrl: 'https://example.com/newest-song.jpg',
     artistNames: ['Tim White'],
   },
 ];
@@ -59,6 +70,14 @@ describe('ReleasesView', () => {
     expect(screen.getByText('Latest')).toBeVisible();
     expect(screen.queryByText('Latest Release')).not.toBeInTheDocument();
     expect(screen.queryByText('More Releases')).not.toBeInTheDocument();
+    expect(screen.getByAltText('Newest Song')).toHaveAttribute(
+      'data-priority',
+      'true'
+    );
+    expect(screen.getByAltText('Older Song')).toHaveAttribute(
+      'data-priority',
+      'false'
+    );
   });
 
   it('tracks release clicks with profile context', () => {

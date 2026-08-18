@@ -337,3 +337,38 @@ export function resolveProfileSurfaceState(params: {
     }),
   };
 }
+
+export function hasPublicProfileHistoryDestination(params: {
+  readonly historyLength: number;
+  readonly referrer: string;
+}): boolean {
+  return params.historyLength > 1 && params.referrer.trim().length > 0;
+}
+
+export function shouldShowPublicProfileBackChevron(params: {
+  readonly isProfileRoot: boolean;
+  readonly hasHistoryDestination: boolean;
+  readonly forceHidden?: boolean;
+}): boolean {
+  if (params.forceHidden) {
+    return false;
+  }
+  if (!params.isProfileRoot) {
+    return true;
+  }
+  return params.hasHistoryDestination;
+}
+
+export function resolvePublicProfileBackAction(params: {
+  readonly isProfileRoot: boolean;
+  readonly historyLength: number;
+  readonly referrer: string;
+}): 'profile-root' | 'history-back' | 'none' {
+  if (!params.isProfileRoot) {
+    return 'profile-root';
+  }
+  if (hasPublicProfileHistoryDestination(params)) {
+    return 'history-back';
+  }
+  return 'none';
+}

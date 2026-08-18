@@ -737,6 +737,7 @@ export function ProfilePacCard({
           onClick={() => handleSecondaryClick('tip')}
         >
           Tip
+          <span className='sr-only'>{` Support ${artist.name}`}</span>
         </PrimaryPill>
       );
       break;
@@ -830,7 +831,11 @@ export function ProfilePacCard({
   return (
     <section
       ref={sectionRef}
-      aria-label={`${artist.name} primary action`}
+      aria-label={
+        state.kind === 'tip'
+          ? `Support ${artist.name}`
+          : `${artist.name} primary action`
+      }
       data-testid='profile-pac'
       data-state={state.kind}
       data-stage={state.stage}
@@ -860,6 +865,7 @@ export function ProfilePacCard({
             alt={artImageAlt}
             fill
             priority={artPriority}
+            loading={artPriority ? undefined : 'eager'}
             sizes={
               isProfileLandscape
                 ? '(max-width: 767px) 44vw, 180px'

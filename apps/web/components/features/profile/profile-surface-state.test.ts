@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist, LegacySocialLink } from '@/types/db';
-import { resolveProfileSurfaceState } from './profile-surface-state';
+import {
+  resolveProfileSurfaceState,
+  resolvePublicProfileBackAction,
+  shouldShowPublicProfileBackChevron,
+} from './profile-surface-state';
 
 const artist = {
   id: 'artist-1',
@@ -206,5 +210,37 @@ describe('resolveProfileSurfaceState', () => {
       'instagram',
       'twitter',
     ]);
+  });
+
+  it('hides the public-profile root back chevron without a history destination', () => {
+    expect(
+      shouldShowPublicProfileBackChevron({
+        isProfileRoot: true,
+        hasHistoryDestination: false,
+      })
+    ).toBe(false);
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: true,
+        historyLength: 1,
+        referrer: '',
+      })
+    ).toBe('none');
+  });
+
+  it('keeps nested-mode back pointed at the profile root', () => {
+    expect(
+      shouldShowPublicProfileBackChevron({
+        isProfileRoot: false,
+        hasHistoryDestination: false,
+      })
+    ).toBe(true);
+    expect(
+      resolvePublicProfileBackAction({
+        isProfileRoot: false,
+        historyLength: 1,
+        referrer: '',
+      })
+    ).toBe('profile-root');
   });
 });
