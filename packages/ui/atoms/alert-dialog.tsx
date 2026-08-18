@@ -20,12 +20,17 @@ const AlertDialogTrigger = AlertDialogPrimitive.Trigger;
 
 const AlertDialogPortal = AlertDialogPrimitive.Portal;
 
+type AlertDialogOverlayProps = React.ComponentPropsWithoutRef<
+  typeof AlertDialogPrimitive.Overlay
+>;
+
 const AlertDialogOverlay = React.forwardRef<
   React.ComponentRef<typeof AlertDialogPrimitive.Overlay>,
-  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Overlay>
+  AlertDialogOverlayProps
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Overlay
     className={cn(overlayClassName, className)}
+    data-slot='alert-dialog-overlay'
     data-testid='alert-dialog-overlay'
     {...props}
     ref={ref}
@@ -35,6 +40,11 @@ AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName;
 
 interface AlertDialogContentProps
   extends React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content> {
+  readonly portalProps?: React.ComponentPropsWithoutRef<
+    typeof AlertDialogPrimitive.Portal
+  >;
+  readonly overlayProps?: AlertDialogOverlayProps;
+  readonly disablePortal?: boolean;
   /**
    * Test ID for the alert dialog content.
    * @default "alert-dialog-content"
@@ -46,6 +56,12 @@ const AlertDialogContent = React.forwardRef<
   React.ComponentRef<typeof AlertDialogPrimitive.Content>,
   AlertDialogContentProps
 >(({ className, testId = 'alert-dialog-content', ...props }, ref) => {
+  const {
+    portalProps,
+    overlayProps,
+    disablePortal = false,
+    ...contentProps
+  } = props;
   const contentClassName = cn(
     centeredContentStyles.position,
     centeredContentStyles.layout,
@@ -56,15 +72,29 @@ const AlertDialogContent = React.forwardRef<
     className
   );
 
+  const content = (
+    <AlertDialogPrimitive.Content
+      ref={ref}
+      className={contentClassName}
+      data-slot='alert-dialog-content'
+      data-testid={testId}
+      {...contentProps}
+    />
+  );
+
+  if (disablePortal) {
+    return (
+      <>
+        <AlertDialogOverlay {...overlayProps} />
+        {content}
+      </>
+    );
+  }
+
   return (
-    <AlertDialogPortal>
-      <AlertDialogOverlay />
-      <AlertDialogPrimitive.Content
-        ref={ref}
-        className={contentClassName}
-        data-testid={testId}
-        {...props}
-      />
+    <AlertDialogPortal {...portalProps}>
+      <AlertDialogOverlay {...overlayProps} />
+      {content}
     </AlertDialogPortal>
   );
 });
@@ -85,6 +115,7 @@ const AlertDialogHeader = ({
 }: AlertDialogHeaderProps) => (
   <div
     className={cn(headerStyles.base, className)}
+    data-slot='alert-dialog-header'
     data-testid={testId}
     {...props}
   />
@@ -106,6 +137,7 @@ const AlertDialogFooter = ({
 }: AlertDialogFooterProps) => (
   <div
     className={cn(footerStyles.base, className)}
+    data-slot='alert-dialog-footer'
     data-testid={testId}
     {...props}
   />
@@ -119,6 +151,7 @@ const AlertDialogTitle = React.forwardRef<
   <AlertDialogPrimitive.Title
     ref={ref}
     className={cn(titleStyles.base, className)}
+    data-slot='alert-dialog-title'
     data-testid='alert-dialog-title'
     {...props}
   />
@@ -132,6 +165,7 @@ const AlertDialogDescription = React.forwardRef<
   <AlertDialogPrimitive.Description
     ref={ref}
     className={cn(descriptionStyles.base, className)}
+    data-slot='alert-dialog-description'
     data-testid='alert-dialog-description'
     {...props}
   />
@@ -168,6 +202,10 @@ const AlertDialogAction = React.forwardRef<
     >
       <AlertDialogPrimitive.Action
         ref={ref}
+        data-slot='alert-dialog-action'
+        data-variant={
+          destructive || variant === 'destructive' ? 'destructive' : variant
+        }
         data-testid='alert-dialog-action'
         {...props}
       />
@@ -180,9 +218,10 @@ const AlertDialogCancel = React.forwardRef<
   React.ComponentRef<typeof AlertDialogPrimitive.Cancel>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Cancel>
 >(({ className, ...props }, ref) => (
-  <Button asChild variant='secondary' className={cn('mt-2 sm:mt-0', className)}>
+  <Button asChild variant='secondary' className={className}>
     <AlertDialogPrimitive.Cancel
       ref={ref}
+      data-slot='alert-dialog-cancel'
       data-testid='alert-dialog-cancel'
       {...props}
     />

@@ -266,6 +266,26 @@ describe('AlertDialog', () => {
       );
       expect(screen.getByTestId('custom-alert')).toBeInTheDocument();
     });
+
+    it('supports inline rendering and custom overlay props', () => {
+      const { container } = render(
+        <AlertDialog open={true}>
+          <AlertDialogContent
+            disablePortal
+            overlayProps={{ className: 'custom-overlay' }}
+          >
+            <AlertDialogTitle>Inline alert</AlertDialogTitle>
+          </AlertDialogContent>
+        </AlertDialog>
+      );
+
+      expect(
+        container.querySelector('[data-slot="alert-dialog-content"]')
+      ).toBeInTheDocument();
+      expect(
+        container.querySelector('[data-slot="alert-dialog-overlay"]')
+      ).toHaveClass('custom-overlay');
+    });
   });
 
   describe('AlertDialogOverlay', () => {

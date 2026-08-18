@@ -1,9 +1,19 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { SearchableSubmenuItem } from './searchable-submenu';
-import { SearchableList } from './searchable-submenu';
+import type {
+  SearchableSubmenuItem,
+  SearchableSubmenuSection,
+} from './searchable-submenu';
+import { SearchableList, SearchableSubmenu } from './searchable-submenu';
 
 // Sample items for testing
 const sampleItems: SearchableSubmenuItem[] = [
@@ -75,6 +85,24 @@ describe('SearchableList', () => {
         />
       );
       expect(screen.getByPlaceholderText('Find fruits...')).toBeInTheDocument();
+    });
+
+    it('supports controlled query and placeholder aliases', () => {
+      const onQueryChange = vi.fn();
+      render(
+        <SearchableList
+          items={sampleItems}
+          onSelect={vi.fn()}
+          query='apple'
+          onQueryChange={onQueryChange}
+          placeholder='Filter fruit'
+        />
+      );
+
+      const input = screen.getByRole('combobox', { name: 'Filter fruit' });
+      expect(input).toHaveValue('apple');
+      fireEvent.change(input, { target: { value: 'banana' } });
+      expect(onQueryChange).toHaveBeenCalledWith('banana');
     });
 
     it('renders header when provided', () => {
@@ -282,6 +310,29 @@ describe('SearchableList', () => {
       expect(secondItem).toHaveAttribute('data-highlighted', 'true');
     });
 
+    it('skips disabled options during keyboard navigation', () => {
+      const items: SearchableSubmenuItem[] = [
+        { id: '1', label: 'First' },
+        { id: '2', label: 'Unavailable', disabled: true },
+        { id: '3', label: 'Third' },
+      ];
+      const { container } = render(
+        <SearchableList items={items} onSelect={vi.fn()} />
+      );
+
+      fireEvent.keyDown(screen.getByPlaceholderText('Search...'), {
+        key: 'ArrowDown',
+      });
+
+      expect(getItemButton(container, 'Third')).toHaveAttribute(
+        'data-highlighted',
+        'true'
+      );
+      expect(getItemButton(container, 'Unavailable')).not.toHaveAttribute(
+        'data-highlighted'
+      );
+    });
+
     it('moves highlight up with ArrowUp', () => {
       const { container } = render(
         <SearchableList items={sampleItems} onSelect={vi.fn()} />
@@ -410,5 +461,67 @@ describe('SearchableList', () => {
       render(<SearchableList items={items} onSelect={vi.fn()} />);
       expect(screen.getByTestId('custom-icon')).toBeInTheDocument();
     });
+  });
+});
+
+describe('SearchableSubmenu', () => {
+  const sections = [
+    {
+      id: 'platforms',
+      label: 'Platforms',
+      items: [
+        { id: 'spotify', label: 'Spotify' },
+        { id: 'youtube', label: 'YouTube', disabled: true },
+        { id: 'apple', label: 'Apple Music' },
+      ],
+    },
+  ] satisfies SearchableSubmenuSection[];
+
+  function renderSubmenu(onSelect = vi.fn()) {
+    return render(
+      <DropdownMenuPrimitive.Root defaultOpen>
+        <DropdownMenuPrimitive.Trigger>Actions</DropdownMenuPrimitive.Trigger>
+        <DropdownMenuPrimitive.Portal>
+          <DropdownMenuPrimitive.Content>
+            <SearchableSubmenu
+              triggerLabel='Choose platform'
+              sections={sections}
+              onSelect={onSelect}
+            />
+          </DropdownMenuPrimitive.Content>
+        </DropdownMenuPrimitive.Portal>
+      </DropdownMenuPrimitive.Root>
+    );
+  }
+
+  it('opens, exposes stable anatomy, and filters sections', async () => {
+    const user = userEvent.setup({ delay: null });
+    renderSubmenu();
+
+    await user.hover(screen.getByText('Choose platform'));
+    const input = await screen.findByRole('combobox', { name: 'Search...' });
+    expect(input).toHaveFocus();
+    expect(
+      document.querySelector('[data-slot="searchable-submenu-content"]')
+    ).toBeInTheDocument();
+
+    await user.type(input, 'apple', { skipClick: true });
+    await waitFor(() => {
+      expect(screen.getAllByText('Apple Music').length).toBeGreaterThan(0);
+      expect(screen.queryByText('Spotify')).not.toBeInTheDocument();
+    });
+  });
+
+  it('skips disabled results and selects the next enabled item', async () => {
+    const onSelect = vi.fn();
+    const user = userEvent.setup({ delay: null });
+    renderSubmenu(onSelect);
+
+    await user.hover(screen.getByText('Choose platform'));
+    const input = await screen.findByRole('combobox', { name: 'Search...' });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onSelect).toHaveBeenCalledWith(sections[0].items[2]);
   });
 });

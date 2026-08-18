@@ -138,12 +138,17 @@ export function SearchableContent({
   );
 
   return (
-    <div data-menu-header className={MENU_SEARCH_HEADER_BASE}>
+    <div
+      data-menu-header
+      data-slot='common-dropdown-search-header'
+      className={MENU_SEARCH_HEADER_BASE}
+    >
       <div className='relative'>
-        <Search className={MENU_SEARCH_ICON_BASE} />
+        <Search aria-hidden='true' className={MENU_SEARCH_ICON_BASE} />
         <input
           ref={setInputRef}
-          type='text'
+          type='search'
+          data-slot='common-dropdown-search-input'
           placeholder={placeholder}
           aria-label={placeholder}
           value={query}
@@ -183,6 +188,7 @@ export function SearchableContent({
               localInputRef.current?.focus();
             }}
             className={MENU_SEARCH_CLEAR_BUTTON_BASE}
+            data-slot='common-dropdown-search-clear'
             aria-label='Clear search'
           >
             <X className='h-3 w-3' />
@@ -195,7 +201,12 @@ export function SearchableContent({
 
 function LoadingState() {
   return (
-    <div role='status' aria-live='polite' className={MENU_LOADING_STATE_BASE}>
+    <div
+      role='status'
+      aria-live='polite'
+      data-slot='common-dropdown-loading'
+      className={MENU_LOADING_STATE_BASE}
+    >
       <Loader2
         aria-hidden='true'
         className='h-4 w-4 animate-spin motion-reduce:animate-none'
@@ -206,7 +217,16 @@ function LoadingState() {
 }
 
 function EmptyState({ message }: { readonly message: string }) {
-  return <div className={MENU_EMPTY_STATE_BASE}>{message}</div>;
+  return (
+    <div
+      role='status'
+      aria-live='polite'
+      data-slot='common-dropdown-empty'
+      className={MENU_EMPTY_STATE_BASE}
+    >
+      {message}
+    </div>
+  );
 }
 
 export function renderRootBody({
@@ -365,6 +385,8 @@ function CommonDropdownSubmenuRenderer({
     <SubContent
       ref={contentRef}
       data-menu-surface='toolbar'
+      data-slot='common-dropdown-subcontent'
+      aria-busy={item.isLoading || undefined}
       className={cn(subMenuContentClasses, transformOrigin)}
       style={getContentStyle(item.minWidth ?? measuredMinWidth, item.maxHeight)}
       onFocusOutside={event => {
@@ -431,6 +453,7 @@ function CommonDropdownSubmenuRenderer({
         ref={triggerRef}
         disabled={item.disabled}
         data-menu-row=''
+        data-slot='common-dropdown-subtrigger'
         className={cn(context.itemBase, item.className)}
       >
         <span className={MENU_LEADING_SLOT_BASE}>

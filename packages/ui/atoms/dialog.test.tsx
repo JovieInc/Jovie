@@ -218,6 +218,23 @@ describe('Dialog', () => {
       render(<TestDialog open={true} />);
       expect(screen.getByTestId('dialog-overlay')).toBeInTheDocument();
     });
+
+    it('exposes stable anatomy slots for composition', () => {
+      render(<TestDialog open={true} />);
+
+      expect(screen.getByTestId('dialog-overlay')).toHaveAttribute(
+        'data-slot',
+        'dialog-overlay'
+      );
+      expect(screen.getByTestId('dialog-content')).toHaveAttribute(
+        'data-slot',
+        'dialog-content'
+      );
+      expect(screen.getByTestId('dialog-header')).toHaveAttribute(
+        'data-slot',
+        'dialog-header'
+      );
+    });
   });
 
   describe('Accessibility', () => {

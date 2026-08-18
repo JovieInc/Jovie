@@ -55,3 +55,41 @@ export const Narrow: Story = {
   ),
   parameters: { viewport: { defaultViewport: 'mobile1' } },
 };
+
+export const ScrollContained: Story = {
+  render: () => (
+    <Dialog defaultOpen>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Review profile changes</DialogTitle>
+          <DialogDescription>
+            The panel remains inside the viewport while long content scrolls.
+          </DialogDescription>
+        </DialogHeader>
+        <div className='grid gap-3'>
+          {['Identity', 'Links', 'Audience', 'Territories', 'Sources'].map(
+            section => (
+              <div
+                key={section}
+                className='rounded-(--system-b-radius-panel-inner) border border-subtle bg-surface-1 p-4'
+              >
+                <p className='text-sm font-medium text-primary-token'>
+                  {section}
+                </p>
+                <p className='mt-1 text-xs text-secondary-token'>
+                  Review the current {section.toLowerCase()} settings before
+                  saving.
+                </p>
+              </div>
+            )
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant='secondary'>Cancel</Button>
+          <Button>Save changes</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  ),
+  parameters: { viewport: { defaultViewport: 'mobile1' } },
+};

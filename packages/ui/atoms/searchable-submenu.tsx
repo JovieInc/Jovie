@@ -120,6 +120,26 @@ function defaultFilterFn(item: SearchableSubmenuItem, query: string): boolean {
   return searchableText.includes(normalizedQuery);
 }
 
+function firstEnabledIndex(items: readonly SearchableSubmenuItem[]): number {
+  const index = items.findIndex(item => !item.disabled);
+  return Math.max(index, 0);
+}
+
+function nextEnabledIndex(
+  items: readonly SearchableSubmenuItem[],
+  currentIndex: number,
+  direction: 1 | -1
+): number {
+  if (items.length === 0 || items.every(item => item.disabled)) return 0;
+
+  let candidate = currentIndex;
+  do {
+    candidate = (candidate + direction + items.length) % items.length;
+  } while (items[candidate]?.disabled);
+
+  return candidate;
+}
+
 // ============================================================================
 // COMPONENT
 // ============================================================================
@@ -180,8 +200,8 @@ export function SearchableSubmenu({
 
   // Reset highlighted index when search results change
   useEffect(() => {
-    setHighlightedIndex(0);
-  }, [flatItems.length]);
+    setHighlightedIndex(firstEnabledIndex(flatItems));
+  }, [flatItems]);
 
   // Scroll highlighted item into view
   useEffect(() => {
@@ -224,20 +244,12 @@ export function SearchableSubmenu({
       switch (e.key) {
         case 'ArrowDown': {
           e.preventDefault();
-          if (flatItems.length > 0) {
-            setHighlightedIndex(prev =>
-              prev < flatItems.length - 1 ? prev + 1 : 0
-            );
-          }
+          setHighlightedIndex(prev => nextEnabledIndex(flatItems, prev, 1));
           break;
         }
         case 'ArrowUp': {
           e.preventDefault();
-          if (flatItems.length > 0) {
-            setHighlightedIndex(prev =>
-              prev > 0 ? prev - 1 : flatItems.length - 1
-            );
-          }
+          setHighlightedIndex(prev => nextEnabledIndex(flatItems, prev, -1));
           break;
         }
         case 'Enter': {
@@ -259,12 +271,17 @@ export function SearchableSubmenu({
         }
         case 'Home': {
           e.preventDefault();
-          setHighlightedIndex(0);
+          setHighlightedIndex(firstEnabledIndex(flatItems));
           break;
         }
         case 'End': {
           e.preventDefault();
-          setHighlightedIndex(Math.max(0, flatItems.length - 1));
+          const lastEnabledIndex = [...flatItems]
+            .reverse()
+            .findIndex(item => !item.disabled);
+          setHighlightedIndex(
+            lastEnabledIndex < 0 ? 0 : flatItems.length - lastEnabledIndex - 1
+          );
           break;
         }
       }
@@ -299,6 +316,7 @@ export function SearchableSubmenu({
     <DropdownMenuPrimitive.Sub open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuPrimitive.SubTrigger
         disabled={disabled}
+        data-slot='searchable-submenu-trigger'
         className={cn(MENU_ITEM_BASE)}
       >
         {triggerIcon}
@@ -309,10 +327,10 @@ export function SearchableSubmenu({
       <DropdownMenuPrimitive.Portal>
         <DropdownMenuPrimitive.SubContent
           ref={contentRef}
+          data-slot='searchable-submenu-content'
           className={contentClasses}
           sideOffset={2}
           alignOffset={-5}
-          onKeyDown={handleKeyDown}
           // Prevent closing when clicking inside (important for search input)
           onPointerDownOutside={e => {
             // Allow clicking inside the content
@@ -336,9 +354,9 @@ export function SearchableSubmenu({
           }}
         >
           {/* Search Input */}
-          <div className={MENU_SEARCH_HEADER_BASE}>
+          <div className={MENU_SEARCH_HEADER_BASE} data-slot='search-header'>
             <div className='relative'>
-              <Search className={MENU_SEARCH_ICON_BASE} />
+              <Search aria-hidden='true' className={MENU_SEARCH_ICON_BASE} />
               <input
                 ref={searchInputRef}
                 id={searchId}
@@ -346,6 +364,12 @@ export function SearchableSubmenu({
                 placeholder={searchPlaceholder}
                 value={searchQuery}
                 onChange={handleSearchChange}
+                onKeyDown={event => {
+                  handleKeyDown(event);
+                  if (event.key !== 'Escape' || searchQuery) {
+                    event.stopPropagation();
+                  }
+                }}
                 className={MENU_SEARCH_INPUT_BASE}
                 aria-label={searchPlaceholder}
                 aria-controls={listId}
@@ -363,6 +387,7 @@ export function SearchableSubmenu({
                   type='button'
                   onClick={handleClearSearch}
                   className={MENU_SEARCH_CLEAR_BUTTON_BASE}
+                  data-slot='search-clear'
                   aria-label='Clear search'
                 >
                   <X className='h-3.5 w-3.5' />
@@ -403,12 +428,21 @@ export function SearchableSubmenu({
 
           {/* Scrollable Content */}
           <div
+            data-slot='search-results'
             className='flex-1 overflow-y-auto overflow-x-hidden p-1.5 pt-0'
             aria-hidden='true'
           >
             {isLoading && (
-              <div className={MENU_LOADING_STATE_BASE}>
-                <Loader2 className='h-5 w-5 animate-spin text-tertiary-token' />
+              <div
+                role='status'
+                aria-live='polite'
+                className={MENU_LOADING_STATE_BASE}
+              >
+                <Loader2
+                  aria-hidden='true'
+                  className='h-5 w-5 animate-spin text-tertiary-token motion-reduce:animate-none'
+                />
+                <span className='sr-only'>Loading results</span>
               </div>
             )}
             {!isLoading && !hasResults && (
@@ -479,7 +513,9 @@ export function SearchableSubmenu({
           {footer && (
             <>
               <div className={cn(MENU_SEPARATOR_BASE, 'mx-1.5')} />
-              <div className='p-1.5 pt-0'>{footer}</div>
+              <div className='p-1.5 pt-0' data-slot='search-footer'>
+                {footer}
+              </div>
             </>
           )}
         </DropdownMenuPrimitive.SubContent>
@@ -499,6 +535,12 @@ export interface SearchableListProps {
   readonly onSelect: (item: SearchableSubmenuItem) => void;
   /** Search placeholder text */
   readonly searchPlaceholder?: string;
+  /** Controlled search query. */
+  readonly query?: string;
+  /** Controlled search query callback. */
+  readonly onQueryChange?: (query: string) => void;
+  /** Alias for searchPlaceholder used by form-style consumers. */
+  readonly placeholder?: string;
   /** Empty state message when no results */
   readonly emptyMessage?: string;
   /** Filter function */
@@ -519,13 +561,18 @@ export function SearchableList({
   items,
   onSelect,
   searchPlaceholder = 'Search...',
+  query,
+  onQueryChange,
+  placeholder,
   emptyMessage = 'No results found',
   filterFn = defaultFilterFn,
   header,
   footer,
   className,
 }: SearchableListProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [internalSearchQuery, setInternalSearchQuery] = useState('');
+  const searchQuery = query ?? internalSearchQuery;
+  const resolvedPlaceholder = placeholder ?? searchPlaceholder;
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const itemRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
@@ -535,10 +582,18 @@ export function SearchableList({
     return items.filter(item => filterFn(item, searchQuery));
   }, [items, searchQuery, filterFn]);
 
+  const setSearchQuery = useCallback(
+    (nextQuery: string) => {
+      if (query === undefined) setInternalSearchQuery(nextQuery);
+      onQueryChange?.(nextQuery);
+    },
+    [onQueryChange, query]
+  );
+
   // Reset highlighted index when results change
   useEffect(() => {
-    setHighlightedIndex(0);
-  }, [filteredItems.length]);
+    setHighlightedIndex(firstEnabledIndex(filteredItems));
+  }, [filteredItems]);
 
   // Scroll highlighted item into view
   useEffect(() => {
@@ -553,14 +608,12 @@ export function SearchableList({
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
-          setHighlightedIndex(prev =>
-            prev < filteredItems.length - 1 ? prev + 1 : 0
-          );
+          setHighlightedIndex(prev => nextEnabledIndex(filteredItems, prev, 1));
           break;
         case 'ArrowUp':
           e.preventDefault();
           setHighlightedIndex(prev =>
-            prev > 0 ? prev - 1 : filteredItems.length - 1
+            nextEnabledIndex(filteredItems, prev, -1)
           );
           break;
         case 'Enter': {
@@ -588,22 +641,50 @@ export function SearchableList({
   );
 
   return (
-    <div className={cn('flex flex-col', className)} tabIndex={-1}>
+    <div
+      className={cn('flex flex-col', className)}
+      data-slot='searchable-list'
+      tabIndex={-1}
+    >
       {header}
 
       {/* Search Input */}
-      <div className={MENU_SEARCH_HEADER_BASE}>
+      <div className={MENU_SEARCH_HEADER_BASE} data-slot='search-header'>
         <div className='relative'>
-          <Search className={MENU_SEARCH_ICON_BASE} />
+          <Search aria-hidden='true' className={MENU_SEARCH_ICON_BASE} />
           <input
             ref={searchInputRef}
             type='text'
-            placeholder={searchPlaceholder}
+            placeholder={resolvedPlaceholder}
+            aria-label={resolvedPlaceholder}
+            aria-controls={listId}
+            aria-autocomplete='list'
+            aria-expanded='true'
+            aria-activedescendant={
+              filteredItems[highlightedIndex]
+                ? `item-${filteredItems[highlightedIndex].id}`
+                : undefined
+            }
+            role='combobox'
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             className={MENU_SEARCH_INPUT_BASE}
           />
+          {searchQuery ? (
+            <button
+              type='button'
+              className={MENU_SEARCH_CLEAR_BUTTON_BASE}
+              data-slot='search-clear'
+              aria-label='Clear search'
+              onClick={() => {
+                setSearchQuery('');
+                searchInputRef.current?.focus();
+              }}
+            >
+              <X aria-hidden='true' className='h-3.5 w-3.5' />
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -634,7 +715,11 @@ export function SearchableList({
       </select>
 
       {/* Items */}
-      <div className='flex-1 overflow-y-auto p-1.5 pt-0' aria-hidden='true'>
+      <div
+        className='flex-1 overflow-y-auto p-1.5 pt-0'
+        data-slot='search-results'
+        aria-hidden='true'
+      >
         {filteredItems.length === 0 ? (
           <div className={MENU_EMPTY_STATE_BASE}>{emptyMessage}</div>
         ) : (

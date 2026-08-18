@@ -94,6 +94,7 @@ function renderBadge(
   return (
     <span
       className={MENU_BADGE_BASE}
+      data-slot='common-dropdown-badge'
       style={
         badge.color
           ? { backgroundColor: badge.color, color: 'white' }
@@ -107,7 +108,11 @@ function renderBadge(
 
 function renderCount(count: number | undefined): React.ReactNode {
   if (count === undefined) return null;
-  return <span className={MENU_BADGE_BASE}>{count}</span>;
+  return (
+    <span className={MENU_BADGE_BASE} data-slot='common-dropdown-count'>
+      {count}
+    </span>
+  );
 }
 
 export function renderSeparator(
@@ -122,6 +127,7 @@ export function renderSeparator(
   return (
     <Separator
       key={item.id}
+      data-slot='common-dropdown-separator'
       className={cn(MENU_SEPARATOR_BASE, item.className)}
     />
   );
@@ -141,6 +147,7 @@ export function renderLabel(
   return (
     <Label
       key={item.id}
+      data-slot='common-dropdown-label'
       className={cn(MENU_LABEL_BASE, item.inset && 'pl-10', item.className)}
     >
       {item.label}
@@ -165,7 +172,9 @@ export function renderActionItem(
     <MenuItem
       key={item.id}
       aria-label={item.content ? item.label : undefined}
+      aria-busy={item.loading || undefined}
       data-menu-row=''
+      data-slot='common-dropdown-item'
       data-menu-variant={isDestructive ? 'danger' : undefined}
       data-selected={isSelected ? 'true' : undefined}
       disabled={isDisabled}
@@ -207,7 +216,7 @@ export function renderActionItem(
               </span>
             ) : null}
             {item.shortcut ? (
-              <span className={MENU_SHORTCUT_BASE}>{item.shortcut}</span>
+              <kbd className={MENU_SHORTCUT_BASE}>{item.shortcut}</kbd>
             ) : null}
             {renderIcon(item.iconAfter, 'h-4 w-4')}
             {isSelected &&
@@ -233,6 +242,7 @@ export function renderActionRow(
     <div
       key={item.id}
       data-menu-action-row={item.id}
+      data-slot='common-dropdown-action-row'
       className={cn(item.className)}
     >
       {item.items.map(action => renderActionItem(action, context))}
@@ -257,7 +267,9 @@ export function renderCheckboxItem(
   return (
     <CheckboxItem
       key={item.id}
+      aria-busy={item.loading || undefined}
       data-menu-row=''
+      data-slot='common-dropdown-checkbox-item'
       checked={item.checked}
       onCheckedChange={checked => item.onCheckedChange(Boolean(checked))}
       onSelect={event => event.preventDefault()}
@@ -294,6 +306,7 @@ export function renderRadioGroup(
   return (
     <RadioGroup
       key={item.id}
+      data-slot='common-dropdown-radio-group'
       value={item.value}
       onValueChange={item.onValueChange}
     >
@@ -319,7 +332,9 @@ function renderRadioItem(
   return (
     <RadioItem
       key={item.id}
+      aria-busy={item.loading || undefined}
       data-menu-row=''
+      data-slot='common-dropdown-radio-item'
       value={item.value}
       disabled={isDisabled}
       className={cn(CHECKBOX_RADIO_ITEM_BASE, 'gap-1.5', item.className)}
