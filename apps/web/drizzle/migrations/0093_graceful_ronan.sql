@@ -359,6 +359,7 @@ $$;
 --> statement-breakpoint
 
 DROP TRIGGER IF EXISTS creator_handoff_integrity_guard ON creator_capture_handoffs;
-CREATE TRIGGER creator_handoff_integrity_guard
-  BEFORE INSERT OR UPDATE ON creator_capture_handoffs
+CREATE CONSTRAINT TRIGGER creator_handoff_integrity_guard
+  AFTER INSERT OR UPDATE ON creator_capture_handoffs
+  DEFERRABLE INITIALLY DEFERRED
   FOR EACH ROW EXECUTE FUNCTION enforce_creator_handoff_integrity();

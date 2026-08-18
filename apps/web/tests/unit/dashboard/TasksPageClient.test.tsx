@@ -1022,6 +1022,18 @@ describe('TasksPageClient', () => {
     expect(descriptionEditor).toHaveStyle({ boxShadow: 'none' });
   });
 
+  it('remounts the shared editor when switching tasks to clear undo history', () => {
+    renderPage();
+    openTask(mockTask);
+    const firstEditor = screen.getByLabelText('Task Description');
+
+    openTask(mockTaskTwo);
+
+    const secondEditor = screen.getByLabelText('Task Description');
+    expect(secondEditor).not.toBe(firstEditor);
+    expect(secondEditor).toHaveValue(mockTaskTwo.description);
+  });
+
   it('keeps the tasks subheader at the same compact header height as the page header', () => {
     renderPage();
 

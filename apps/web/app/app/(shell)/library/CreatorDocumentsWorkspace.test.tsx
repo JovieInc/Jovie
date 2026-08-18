@@ -308,6 +308,57 @@ describe('CreatorDocumentsWorkspace', () => {
     expect(vi.mocked(fetch).mock.calls[1]?.[0]).toContain('/review');
   });
 
+  it('keeps evidence review disabled while a claim draft is unsaved', () => {
+    render(
+      <CreatorDocumentsWorkspace
+        initialDocuments={[{ ...document, kind: 'script' }]}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    if (!panel) throw new Error('Expected a document panel');
+    render(panel);
+
+    const reviewButton = screen.getByRole('button', {
+      name: 'Complete Evidence Review',
+    });
+    expect(reviewButton).toBeEnabled();
+
+    fireEvent.change(screen.getByLabelText('Claim Text'), {
+      target: { value: 'An unsaved factual claim' },
+    });
+
+    expect(reviewButton).toBeDisabled();
+  });
+
+  it('does not offer permanently blocking evidence states for factual claims', () => {
+    render(
+      <CreatorDocumentsWorkspace
+        initialDocuments={[{ ...document, kind: 'script' }]}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    if (!panel) throw new Error('Expected a document panel');
+    render(panel);
+
+    expect(screen.queryByRole('option', { name: 'Contested' })).toBeNull();
+    expect(screen.queryByRole('option', { name: 'Unresolved' })).toBeNull();
+
+    fireEvent.change(screen.getByLabelText('Claim Type'), {
+      target: { value: 'opinion' },
+    });
+    fireEvent.change(screen.getByLabelText('Evidence State'), {
+      target: { value: 'contested' },
+    });
+    fireEvent.change(screen.getByLabelText('Claim Type'), {
+      target: { value: 'fact' },
+    });
+
+    expect(screen.getByLabelText('Evidence State')).toHaveValue('supported');
+    expect(screen.queryByRole('option', { name: 'Contested' })).toBeNull();
+  });
+
   it('retains claim evidence after a failed submission', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 500 }));
     render(

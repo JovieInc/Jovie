@@ -31,6 +31,10 @@ describe('creator documents private migration', () => {
     expect(sql).toContain('creator_approval_integrity_guard');
     expect(sql).toContain('creator_handoff_integrity_guard');
     expect(sql).toContain('a.revoked_at IS NULL');
+    expect(sql).toContain(
+      'CREATE CONSTRAINT TRIGGER creator_handoff_integrity_guard'
+    );
+    expect(sql).toContain('DEFERRABLE INITIALLY DEFERRED');
   });
 
   it('requires canonical claims for private creator documents', async () => {

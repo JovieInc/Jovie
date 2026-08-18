@@ -853,6 +853,7 @@ function TaskDocumentPanel({
 
             <div className='relative min-h-130'>
               <RichTextEditor
+                key={task.id}
                 ref={descriptionEditorRef}
                 content={descriptionContent}
                 onChange={onDescriptionChange}

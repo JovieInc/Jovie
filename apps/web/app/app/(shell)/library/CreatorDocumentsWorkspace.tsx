@@ -164,6 +164,8 @@ function DocumentEditor({
     if (!response) return;
     if (claimVersionRef.current === claimVersionAtSave) {
       setClaimText('');
+      setClaimKind('fact');
+      setEvidenceState('supported');
       setSourceRecordId('');
       setStatus('claim-saved');
     } else {
@@ -205,6 +207,11 @@ function DocumentEditor({
   }, [document, isDirty, onStageChanged, post, router]);
 
   const claimNeedsSource = evidenceState === 'supported';
+  const hasClaimDraft =
+    claimText.trim().length > 0 ||
+    sourceRecordId.trim().length > 0 ||
+    claimKind !== 'fact' ||
+    evidenceState !== 'supported';
   const canAddClaim =
     document.stage === 'private_draft' &&
     !isDirty &&
@@ -378,7 +385,9 @@ function DocumentEditor({
                 value={claimKind}
                 onChange={event => {
                   claimVersionRef.current += 1;
-                  setClaimKind(event.target.value as typeof claimKind);
+                  const nextKind = event.target.value as typeof claimKind;
+                  setClaimKind(nextKind);
+                  if (nextKind === 'fact') setEvidenceState('supported');
                 }}
                 className='rounded-md border border-subtle bg-surface-1 px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-offset-2'
               >
@@ -397,8 +406,12 @@ function DocumentEditor({
                 className='rounded-md border border-subtle bg-surface-1 px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-offset-2'
               >
                 <option value='supported'>Supported</option>
-                <option value='contested'>Contested</option>
-                <option value='unresolved'>Unresolved</option>
+                {claimKind === 'fact' ? null : (
+                  <>
+                    <option value='contested'>Contested</option>
+                    <option value='unresolved'>Unresolved</option>
+                  </>
+                )}
               </select>
             </div>
             <input
@@ -424,7 +437,7 @@ function DocumentEditor({
                 size='sm'
                 variant='secondary'
                 onClick={completeEvidenceReview}
-                disabled={status === 'saving' || isDirty}
+                disabled={status === 'saving' || isDirty || hasClaimDraft}
               >
                 Complete Evidence Review
               </Button>
