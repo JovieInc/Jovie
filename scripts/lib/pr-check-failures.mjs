@@ -135,7 +135,18 @@ export const MERGE_GATE_CHECK_NAMES = Object.freeze(
 );
 
 export function isAdvisoryCheckName(name) {
-  return ADVISORY_CHECK_NAMES.includes(name ?? '');
+  const normalized = name ?? '';
+  return (
+    ADVISORY_CHECK_NAMES.includes(normalized) ||
+    [
+      'jovie-fleet-queue-hold/v1',
+      'jovie-gem-queue-remediation/v1',
+      'jovie-queue-reentry/v1',
+    ].some(
+      context =>
+        normalized === context || normalized.startsWith(`${context}/pr-`)
+    )
+  );
 }
 
 export function isAdvisoryCheck(check) {
@@ -422,20 +433,33 @@ export function extractTerminalControlPlaneFailures(checks) {
 
 export const GEM_QUEUE_REMEDIATION_CONTEXT = 'jovie-gem-queue-remediation/v1';
 
-export function extractExactHeadControllerFailures(combinedStatus, repo) {
+export function gemQueueRemediationContextForPr(prNumber) {
+  if (!Number.isInteger(Number(prNumber)) || Number(prNumber) < 1) {
+    throw new Error('Gem queue remediation context requires a PR number');
+  }
+  return `${GEM_QUEUE_REMEDIATION_CONTEXT}/pr-${Number(prNumber)}`;
+}
+
+const AUTO_ENROLL_WORKFLOW_NAME = 'Merge Queue Auto-Enroll';
+const AUTO_ENROLL_WORKFLOW_PATH =
+  '.github/workflows/merge-queue-autoenroll.yml';
+const JOVIE_BOT_LOGIN = 'jovie-bot[bot]';
+
+function latestExactHeadControllerReceipt(combinedStatus, repo, prNumber) {
   const actionsPrefix = `https://github.com/${repo}/actions/runs/`;
-  const latest = (combinedStatus?.statuses ?? [])
-    .filter(status => {
+  const descriptionPrefix = `PR #${prNumber}: `;
+  const context = gemQueueRemediationContextForPr(prNumber);
+  const status = (combinedStatus?.statuses ?? [])
+    .filter(candidate => {
       if (
-        status?.context !== GEM_QUEUE_REMEDIATION_CONTEXT ||
-        status?.creator?.type !== 'Bot' ||
-        status?.creator?.login !== 'jovie-bot[bot]' ||
-        !status?.target_url?.startsWith(actionsPrefix)
+        candidate?.context !== context ||
+        !candidate?.target_url?.startsWith(actionsPrefix) ||
+        !candidate?.description?.startsWith(descriptionPrefix)
       ) {
         return false;
       }
       return /^[1-9][0-9]*$/.test(
-        status.target_url.slice(actionsPrefix.length)
+        candidate.target_url.slice(actionsPrefix.length)
       );
     })
     .sort((left, right) =>
@@ -444,7 +468,70 @@ export function extractExactHeadControllerFailures(combinedStatus, repo) {
       )
     )
     .at(-1);
-  return latest && ['error', 'failure'].includes(latest.state)
+  if (!status) return null;
+  return {
+    runId: status.target_url.slice(actionsPrefix.length),
+    status,
+  };
+}
+
+function isControllerStatusCreatorProvenance(
+  status,
+  repo,
+  {
+    headRefOid = '',
+    botAvatarUrl = '',
+    apiBaseUrl = 'https://api.github.com',
+  } = {}
+) {
+  if (
+    status?.creator?.type === 'Bot' &&
+    status.creator.login === JOVIE_BOT_LOGIN
+  ) {
+    return true;
+  }
+  return Boolean(
+    status?.creator === null &&
+      /^[0-9a-f]{40}$/.test(headRefOid) &&
+      typeof botAvatarUrl === 'string' &&
+      botAvatarUrl.length > 0 &&
+      status?.avatar_url === botAvatarUrl &&
+      status?.url === `${apiBaseUrl}/repos/${repo}/statuses/${headRefOid}`
+  );
+}
+
+export function isAutoEnrollRunProvenance(run, repo, runId) {
+  const targetUrl = `https://github.com/${repo}/actions/runs/${runId}`;
+  return Boolean(
+    String(run?.id ?? '') === runId &&
+      run?.name === AUTO_ENROLL_WORKFLOW_NAME &&
+      (run?.path === AUTO_ENROLL_WORKFLOW_PATH ||
+        run?.path?.startsWith(`${AUTO_ENROLL_WORKFLOW_PATH}@`)) &&
+      run?.html_url === targetUrl &&
+      run?.repository?.full_name === repo &&
+      run?.head_repository?.full_name === repo &&
+      typeof run?.workflow_id === 'number' &&
+      typeof run?.run_attempt === 'number' &&
+      run.run_attempt >= 1
+  );
+}
+
+export function extractExactHeadControllerFailures(
+  combinedStatus,
+  repo,
+  prNumber,
+  run,
+  creatorProof = {}
+) {
+  const receipt = latestExactHeadControllerReceipt(
+    combinedStatus,
+    repo,
+    prNumber
+  );
+  return receipt &&
+    ['error', 'failure'].includes(receipt.status.state) &&
+    isControllerStatusCreatorProvenance(receipt.status, repo, creatorProof) &&
+    isAutoEnrollRunProvenance(run, repo, receipt.runId)
     ? [GEM_QUEUE_REMEDIATION_CONTEXT]
     : [];
 }
@@ -477,10 +564,47 @@ export async function fetchControlPlaneFailures(repo, prNumber, headRefOid) {
   let exactHeadFailures = [];
   if (/^[0-9a-f]{40}$/.test(headRefOid ?? '')) {
     try {
-      exactHeadFailures = extractExactHeadControllerFailures(
-        await ghJson(['api', `repos/${repo}/commits/${headRefOid}/status`]),
-        repo
+      const combinedStatus = await ghJson([
+        'api',
+        `repos/${repo}/commits/${headRefOid}/status`,
+      ]);
+      const receipt = latestExactHeadControllerReceipt(
+        combinedStatus,
+        repo,
+        prNumber
       );
+      if (receipt && ['error', 'failure'].includes(receipt.status.state)) {
+        let botAvatarUrl = '';
+        if (receipt.status.creator === null) {
+          const bot = await ghJson([
+            'api',
+            `users/${encodeURIComponent(JOVIE_BOT_LOGIN)}`,
+          ]);
+          if (
+            bot?.login !== JOVIE_BOT_LOGIN ||
+            bot?.type !== 'Bot' ||
+            typeof bot?.avatar_url !== 'string'
+          ) {
+            throw new Error('Jovie Bot identity provenance is unavailable');
+          }
+          botAvatarUrl = bot.avatar_url;
+        }
+        const run = await ghJson([
+          'api',
+          `repos/${repo}/actions/runs/${receipt.runId}`,
+        ]);
+        exactHeadFailures = extractExactHeadControllerFailures(
+          combinedStatus,
+          repo,
+          prNumber,
+          run,
+          {
+            headRefOid,
+            botAvatarUrl,
+            apiBaseUrl: process.env.GITHUB_API_URL ?? 'https://api.github.com',
+          }
+        );
+      }
     } catch {
       // Unknown exact-head receipt is a no-mutation signal, not permission.
     }
@@ -502,6 +626,68 @@ export async function fetchOpenPrSummaries(repo, limit = 200) {
     ],
     { repo }
   );
+}
+
+const REMEDIATION_RECEIPT_SCHEMA = 'jovie-gem-remediation/v1';
+const REMEDIATION_COMMENT_MARKER = 'drain-auto-rebase';
+
+export function isTrustedExactHeadConflictReceipt(
+  comment,
+  { repo, prNumber, headRefOid }
+) {
+  if (
+    comment?.user?.login !== JOVIE_BOT_LOGIN ||
+    comment?.user?.type !== 'Bot' ||
+    !/^[0-9a-f]{40}$/.test(headRefOid ?? '')
+  ) {
+    return false;
+  }
+  const body = comment?.body ?? '';
+  if (
+    !body.includes(
+      `<!-- bot-comment:${REMEDIATION_COMMENT_MARKER}-${headRefOid} -->`
+    )
+  ) {
+    return false;
+  }
+  const match = body.match(/```json\s*([\s\S]*?)```/);
+  if (!match) return false;
+  try {
+    const receipt = JSON.parse(match[1]);
+    return (
+      receipt?.schema === REMEDIATION_RECEIPT_SCHEMA &&
+      receipt?.repo === repo &&
+      receipt?.pr === prNumber &&
+      receipt?.expectedHead === headRefOid &&
+      receipt?.category === 'conflict' &&
+      receipt?.result === 'escalated'
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function hasTrustedExactHeadConflictReceipt(repo, prNumber, headRefOid) {
+  try {
+    const pages = await ghJson([
+      'api',
+      '--paginate',
+      '--slurp',
+      `repos/${repo}/issues/${prNumber}/comments?per_page=100`,
+    ]);
+    const comments = Array.isArray(pages?.[0]) ? pages.flat() : (pages ?? []);
+    return comments.some(comment =>
+      isTrustedExactHeadConflictReceipt(comment, {
+        repo,
+        prNumber,
+        headRefOid,
+      })
+    );
+  } catch {
+    // A missing read cannot prove the exact-head escalation exists. Re-select
+    // the confirmed conflict so the idempotent trusted-author upsert retries.
+    return false;
+  }
 }
 
 const HARD_GATE_LABELS = new Set([
@@ -589,14 +775,27 @@ export function classifyRemediationCandidate(
 
   const reasons = [];
   if (pr.mergeable === 'CONFLICTING' || pr.mergeStateStatus === 'DIRTY') {
+    // A confirmed conflict is escalated once. The durable label + exact-head
+    // receipt is the human/Symphony selector; repeatedly selecting the same
+    // unchanged conflict would starve later stale heads in a bounded pass.
+    if (pr.hasTrustedExactHeadConflictReceipt === true) {
+      return null;
+    }
     reasons.push('merge_conflict');
   } else if (pr.mergeStateStatus === 'BEHIND') {
     reasons.push('branch_behind');
+  } else if (
+    pr.mergeable === 'MERGEABLE' &&
+    (pr.labels ?? []).some(
+      label => (label.name ?? label) === 'needs-conflict-resolution'
+    )
+  ) {
+    reasons.push('stale_conflict_label');
   }
-  if (failures.length > 0) reasons.push('required_checks_failed');
-  if (controlPlaneFailures.length > 0) {
-    reasons.push('control_plane_checks_failed');
-  }
+  // Pure product-check failures belong to Symphony, while exact controller
+  // failure receipts are replayed by drain-pr-queue.sh. Neither is a reason to
+  // mutate a current branch; retain them only as context when a stale/conflict
+  // reason independently authorizes mechanical remediation.
   if (reasons.length === 0) return null;
 
   return {
@@ -621,6 +820,19 @@ export async function listBlockedAgentPrs(repo, { limit = 200 } = {}) {
       nativeQueueState: nativeQueueStates[String(summary.number)] ?? null,
     };
     if (!hasRemediationIdentity(pr, repo)) continue;
+    if (
+      (pr.mergeable === 'CONFLICTING' || pr.mergeStateStatus === 'DIRTY') &&
+      (pr.labels ?? []).some(
+        label => (label.name ?? label) === 'needs-conflict-resolution'
+      )
+    ) {
+      pr.hasTrustedExactHeadConflictReceipt =
+        await hasTrustedExactHeadConflictReceipt(
+          repo,
+          pr.number,
+          pr.headRefOid
+        );
+    }
     const [failures, controlPlaneFailures] = await Promise.all([
       fetchRequiredCheckFailures(repo, pr.number),
       fetchControlPlaneFailures(repo, pr.number, pr.headRefOid),

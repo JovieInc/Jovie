@@ -15,6 +15,14 @@ marker="${2:?marker required}"
 body="${3:?body required}"
 dedupe_key="${4:-}"
 repo="${GITHUB_REPOSITORY:-JovieInc/Jovie}"
+trusted_authors_json="${BOT_COMMENT_TRUSTED_AUTHORS_JSON:-}"
+
+if [[ -n "${trusted_authors_json}" ]] \
+  && ! jq -e 'type == "array" and all(.[]; type == "string" and length > 0)' \
+    <<<"${trusted_authors_json}" >/dev/null; then
+  echo "BOT_COMMENT_TRUSTED_AUTHORS_JSON must be a JSON array of logins" >&2
+  exit 2
+fi
 
 hidden="<!-- bot-comment:${marker} -->"
 dedupe_hidden=""
@@ -27,7 +35,7 @@ ${body}"
 
 comments=$(gh api "repos/${repo}/issues/${pr_number}/comments" --paginate --slurp 2>/dev/null)
 comments="${comments:-[]}"
-existing=$(jq -c --arg hidden "${hidden}" '
+existing=$(jq -c --arg hidden "${hidden}" --argjson trusted "${trusted_authors_json:-[]}" '
   def comments:
     if type != "array" then []
     elif length == 0 then []
@@ -35,7 +43,10 @@ existing=$(jq -c --arg hidden "${hidden}" '
     else .
     end;
   comments
-  | map(select((.body // "") | contains($hidden)))
+  | map(select(
+      ((.body // "") | contains($hidden)) and
+      (($trusted | length) == 0 or (.user.login as $login | $trusted | index($login)) != null)
+    ))
   | first // empty
 ' <<<"${comments}")
 existing_id=""

@@ -220,13 +220,18 @@ const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   'docs/PR_FLOW.md',
   'scripts/ci-merge-queue-check.mjs',
   'scripts/drain-pr-queue.sh',
+  'scripts/drain-pr-remediate.mjs',
   'scripts/lib/merge-queue-guard.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
+  'scripts/lib/ownerless-recovery-policy.mjs',
+  'scripts/lib/pr-check-failures.mjs',
+  'scripts/lib/upsert-pr-comment.sh',
   'scripts/merge-queue-backend.mjs',
+  'scripts/ownerless-recovery-sweeper.mjs',
   'scripts/tests/test_gh_retry.py',
 ]);
 const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
@@ -235,6 +240,7 @@ const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
 ];
 const MERGE_QUEUE_CONTROLLER_PYTHON_TESTS = ['scripts/tests/test_gh_retry.py'];
@@ -288,8 +294,11 @@ const SYMPHONY_THROUGHPUT_PYTHON_TESTS = [
   'scripts/hermes/tests/codex-rotate.test.py',
 ];
 const FLEET_PROMOTION_GATE_INPUTS = new Set([
+  '.github/actions/evaluate-fleet-gate/action.yml',
+  'scripts/hermes/evaluate-fleet-gate.sh',
   'scripts/hermes/gem-priority-gate.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
 ]);
 const FLEET_PROMOTION_GATE_LANE = new Set([
   ...FLEET_PROMOTION_GATE_INPUTS,
@@ -299,6 +308,7 @@ const FLEET_PROMOTION_GATE_LANE = new Set([
 ]);
 const FLEET_PROMOTION_GATE_PYTHON_TESTS = [
   'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
 ];
 const GEM_PR_REHABILITATION_LANE = new Set([
   '.github/requirements/pytest.in',
@@ -323,6 +333,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
   'scripts/hermes/tests/test-model-router.py',
@@ -333,6 +344,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
 ]);
 const GEM_PR_REHABILITATION_PYTHON_TESTS = [
   'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
   'scripts/hermes/tests/gem-pr-drain.test.py',
   'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',

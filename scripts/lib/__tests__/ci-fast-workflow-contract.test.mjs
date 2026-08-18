@@ -214,6 +214,12 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain(
       "'python3 scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py'"
     );
+    expect(CI_FAST_SOURCE).toContain(
+      "'python3 scripts/hermes/tests/gem-priority-gate.test.py'"
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      "'python3 scripts/hermes/tests/test_evaluate_fleet_gate.py'"
+    );
   });
 
   it('always materializes ci-fast-lanes.json even when setup fails (JOV-4446)', () => {

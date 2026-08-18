@@ -13,6 +13,7 @@ const execFileAsync = promisify(execFile);
 const repo =
   process.env.REPO || process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
 const dryRun = /^(1|true)$/i.test(process.env.DRY_RUN || 'false');
+const EXACT_SHA = /^[0-9a-f]{40}$/;
 
 async function gh(args) {
   const { stdout } = await execFileAsync('gh', args, {
@@ -31,7 +32,12 @@ const apiJson = endpoint => ghJson(['api', endpoint]);
 const prCommand = (command, number, ...args) =>
   gh(['pr', command, String(number), '-R', repo, ...args]);
 
-const dispatchExactAdmission = (number, expectedHead) =>
+const dispatchExactAdmission = (
+  number,
+  expectedHead,
+  mainSha,
+  ownerlessSince
+) =>
   gh([
     'api',
     '-X',
@@ -43,10 +49,40 @@ const dispatchExactAdmission = (number, expectedHead) =>
     `client_payload[pr_number]=${number}`,
     '-f',
     `client_payload[head_sha]=${expectedHead}`,
+    '-f',
+    `client_payload[main_sha]=${mainSha}`,
+    '-f',
+    `client_payload[ownerless_since]=${ownerlessSince}`,
   ]);
 
 async function mainHead() {
   return gh(['api', `repos/${repo}/git/ref/heads/main`, '--jq', '.object.sha']);
+}
+
+async function policyHead() {
+  const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+    env: process.env,
+  });
+  return stdout.trim();
+}
+
+export async function resolveExactMainPolicyHead(dependencies = {}) {
+  const { mainHeadImpl = mainHead, policyHeadImpl = policyHead } = dependencies;
+  const [checkedOutHead, liveMain] = await Promise.all([
+    policyHeadImpl(),
+    mainHeadImpl(),
+  ]);
+  if (!EXACT_SHA.test(checkedOutHead) || !EXACT_SHA.test(liveMain)) {
+    throw new Error(
+      'ownerless recovery requires exact lowercase policy and main SHAs'
+    );
+  }
+  if (checkedOutHead !== liveMain) {
+    throw new Error(
+      `ownerless recovery policy head ${checkedOutHead} is not live main ${liveMain}`
+    );
+  }
+  return liveMain;
 }
 
 const openPulls = (base = '') =>
@@ -158,7 +194,11 @@ async function upsertReceipt(number, body, dedupeKey) {
       dedupeKey,
     ],
     {
-      env: { ...process.env, GITHUB_REPOSITORY: repo },
+      env: {
+        ...process.env,
+        GITHUB_REPOSITORY: repo,
+        BOT_COMMENT_TRUSTED_AUTHORS_JSON: '["jovie-bot[bot]"]',
+      },
       maxBuffer: 5 * 1024 * 1024,
     }
   );
@@ -218,7 +258,27 @@ async function candidateEvidence(summary, mainSha, openHeadShas) {
   };
 }
 
-async function promote(summary, mainSha, evidence, decision) {
+export async function dispatchRecoveryIntent(
+  summary,
+  mainSha,
+  evidence,
+  decision,
+  dependencies = {}
+) {
+  const {
+    apiJsonImpl = apiJson,
+    candidateEvidenceImpl = candidateEvidence,
+    checksAreGreenImpl = checksAreGreen,
+    dispatchExactAdmissionImpl = dispatchExactAdmission,
+    evaluateRecoveryCandidateImpl = evaluateRecoveryCandidate,
+    mainHeadImpl = mainHead,
+    nowImpl = () => new Date().toISOString(),
+    openStackHeadShasImpl = openStackHeadShas,
+    pagesImpl = pages,
+    prCommandImpl = prCommand,
+    readPullRequestQueueStateImpl = readPullRequestQueueState,
+    upsertReceiptImpl = upsertReceipt,
+  } = dependencies;
   const number = summary.number;
   const expectedHead = evidence.pr.head.sha;
   if (dryRun) {
@@ -226,17 +286,17 @@ async function promote(summary, mainSha, evidence, decision) {
     return { queued: false, dryRun: true };
   }
 
-  const liveMain = await mainHead();
-  const live = await apiJson(`repos/${repo}/pulls/${number}`);
-  const liveTimeline = await pages(
+  const liveMain = await mainHeadImpl();
+  const live = await apiJsonImpl(`repos/${repo}/pulls/${number}`);
+  const liveTimeline = await pagesImpl(
     `repos/${repo}/issues/${number}/timeline?per_page=100`
   );
-  const liveDecision = evaluateRecoveryCandidate({
+  const liveDecision = evaluateRecoveryCandidateImpl({
     ...evidence,
     pr: live,
     timeline: liveTimeline,
     mainSha: liveMain,
-    checksPassing: await checksAreGreen(number),
+    checksPassing: await checksAreGreenImpl(number),
   });
   if (
     liveMain !== mainSha ||
@@ -248,7 +308,7 @@ async function promote(summary, mainSha, evidence, decision) {
   }
 
   const writeReceipt = outcome =>
-    upsertReceipt(
+    upsertReceiptImpl(
       number,
       renderRecoveryReceipt({
         pr: number,
@@ -258,7 +318,7 @@ async function promote(summary, mainSha, evidence, decision) {
         lanes: liveDecision.lanes,
         action: 'dispatch-to-merge-queue-autoenroll',
         outcome,
-        observedAt: new Date().toISOString(),
+        observedAt: nowImpl(),
       }),
       `${expectedHead}-${outcome}`
     );
@@ -266,7 +326,7 @@ async function promote(summary, mainSha, evidence, decision) {
   let queueOwnership;
   try {
     queueOwnership = classifyQueueOwnership(
-      await readPullRequestQueueState({
+      await readPullRequestQueueStateImpl({
         backend: 'native',
         repository: repo,
         number,
@@ -292,12 +352,12 @@ async function promote(summary, mainSha, evidence, decision) {
   const restoreDraft = live.draft;
   const compensate = async () => {
     const failures = [];
-    const current = await apiJson(`repos/${repo}/pulls/${number}`).catch(
+    const current = await apiJsonImpl(`repos/${repo}/pulls/${number}`).catch(
       () => null
     );
     if (!current) failures.push('state-read');
     if (restoreDraft && current?.draft !== true) {
-      await prCommand('ready', number, '--undo').catch(() =>
+      await prCommandImpl('ready', number, '--undo').catch(() =>
         failures.push('draft-restore')
       );
     }
@@ -306,21 +366,21 @@ async function promote(summary, mainSha, evidence, decision) {
 
   try {
     if (live.draft) {
-      await prCommand('ready', number);
+      await prCommandImpl('ready', number);
     }
 
-    const postMutationEvidence = await candidateEvidence(
+    const postMutationEvidence = await candidateEvidenceImpl(
       summary,
       mainSha,
-      await openStackHeadShas(mainSha)
+      await openStackHeadShasImpl(mainSha)
     );
     const postMutationChecksPassing =
-      restoreDraft || (await checksAreGreen(number));
+      restoreDraft || (await checksAreGreenImpl(number));
     const [postMutationMain, postMutationPr] = await Promise.all([
-      mainHead(),
-      apiJson(`repos/${repo}/pulls/${number}`),
+      mainHeadImpl(),
+      apiJsonImpl(`repos/${repo}/pulls/${number}`),
     ]);
-    const postMutationDecision = evaluateRecoveryCandidate({
+    const postMutationDecision = evaluateRecoveryCandidateImpl({
       ...postMutationEvidence,
       pr: postMutationPr,
       mainSha: postMutationMain,
@@ -353,7 +413,12 @@ async function promote(summary, mainSha, evidence, decision) {
       return { queued: false };
     }
 
-    await dispatchExactAdmission(number, expectedHead);
+    await dispatchExactAdmissionImpl(
+      number,
+      expectedHead,
+      mainSha,
+      liveDecision.ownerlessSince
+    );
   } catch (error) {
     const failures = await compensate();
     await writeReceipt(
@@ -371,11 +436,12 @@ async function promote(summary, mainSha, evidence, decision) {
 }
 
 export async function run() {
-  const mainSha = await mainHead();
+  const mainSha = await resolveExactMainPolicyHead();
   const open = await openPulls('main');
   const openHeadShas = await openStackHeadShas(mainSha);
-  let promoted = 0;
-  let unproven = 0;
+  let dispatched = 0;
+  let alreadyQueued = 0;
+  let failed = 0;
   for (const summary of open) {
     try {
       const evidence = await candidateEvidence(summary, mainSha, openHeadShas);
@@ -396,20 +462,26 @@ export async function run() {
         console.log(`#${summary.number} skipped: ${decision.reason}`);
         continue;
       }
-      const result = await promote(summary, mainSha, evidence, decision);
-      if (result.queued) promoted += 1;
-      else if (!result.dryRun && !result.pending) unproven += 1;
+      const result = await dispatchRecoveryIntent(
+        summary,
+        mainSha,
+        evidence,
+        decision
+      );
+      if (result.queued) alreadyQueued += 1;
+      else if (result.pending) dispatched += 1;
+      else if (!result.dryRun) failed += 1;
     } catch (error) {
-      unproven += 1;
+      failed += 1;
       console.error(
         `#${summary.number} recovery failed: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
   console.log(
-    `Ownerless recovery sweep complete: promoted=${promoted} unproven=${unproven} dryRun=${dryRun}`
+    `Ownerless recovery sweep complete: dispatched=${dispatched} alreadyQueued=${alreadyQueued} failed=${failed} dryRun=${dryRun}`
   );
-  if (unproven > 0) process.exitCode = 1;
+  if (failed > 0) process.exitCode = 1;
 }
 
 if (import.meta.url === new URL(process.argv[1], 'file:').href) {

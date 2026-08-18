@@ -12,7 +12,10 @@ import {
   isSameRepoPr,
   listBlockedAgentPrs,
 } from './lib/pr-check-failures.mjs';
-import { readPullRequestQueueState } from './merge-queue-backend.mjs';
+import {
+  createGhRunner,
+  readPullRequestQueueState,
+} from './merge-queue-backend.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -20,6 +23,7 @@ function parseArgs(argv) {
   const options = {
     repo: process.env.REPO ?? process.env.GITHUB_REPOSITORY ?? 'JovieInc/Jovie',
     baseRef: 'main',
+    expectedBaseOid: process.env.DRAIN_REMEDIATE_EXPECTED_MAIN_SHA ?? '',
     dryRun: process.env.DRAIN_REMEDIATE_APPLY !== '1',
     maxPerRun: Number.parseInt(
       process.env.DRAIN_REMEDIATE_MAX_PER_RUN ?? '24',
@@ -41,6 +45,9 @@ function parseArgs(argv) {
         break;
       case '--base':
         options.baseRef = argv[++index];
+        break;
+      case '--expected-base-oid':
+        options.expectedBaseOid = argv[++index];
         break;
       case '--apply':
         options.dryRun = false;
@@ -66,6 +73,7 @@ function parseArgs(argv) {
   --apply / --dry-run
   --repo OWNER/REPO
   --base REF
+  --expected-base-oid SHA
   --max-per-run N
   --cooldown-hours N
   --limit N
@@ -84,6 +92,11 @@ function parseArgs(argv) {
   if (!Number.isInteger(options.cooldownHours) || options.cooldownHours < 0) {
     throw new Error('--cooldown-hours must be a non-negative integer');
   }
+  if (!/^[0-9a-f]{40}$/.test(options.expectedBaseOid)) {
+    throw new Error(
+      'DRAIN_REMEDIATE_EXPECTED_MAIN_SHA/--expected-base-oid must be an exact lowercase 40-character SHA'
+    );
+  }
 
   return options;
 }
@@ -91,12 +104,39 @@ function parseArgs(argv) {
 function hoursSince(isoTimestamp, nowMs = Date.now()) {
   if (!isoTimestamp) return Number.POSITIVE_INFINITY;
   const deltaMs = nowMs - Date.parse(isoTimestamp);
-  if (!Number.isFinite(deltaMs)) return Number.POSITIVE_INFINITY;
-  return deltaMs / (1000 * 60 * 60);
+  if (!Number.isFinite(deltaMs) || deltaMs < -5 * 60 * 1000) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return Math.max(0, deltaMs) / (1000 * 60 * 60);
 }
 
 function hasPrLabel(pr, labelName) {
   return (pr.labels ?? []).some(label => (label.name ?? label) === labelName);
+}
+
+export function rotateRemediationCandidates(
+  candidates,
+  nowMs,
+  intervalMs = 15 * 60 * 1000
+) {
+  if (!Array.isArray(candidates) || candidates.length < 2) {
+    return [...(candidates ?? [])];
+  }
+  const ordered = [...candidates].sort(
+    (left, right) => Number(left.number) - Number(right.number)
+  );
+  const slot = Math.floor(nowMs / intervalMs);
+  const start = ((slot % ordered.length) + ordered.length) % ordered.length;
+  return [...ordered.slice(start), ...ordered.slice(0, start)];
+}
+
+function recordLabelReconciliationFailure(item, operation, error) {
+  const detail = `${error?.stderr ?? error?.message ?? error ?? 'unknown error'}`
+    .trim()
+    .slice(0, 500);
+  item.result = 'escalated';
+  item.category = 'label_reconciliation_failure';
+  item.reason = `${item.reason}; ${operation} failed: ${detail}`;
 }
 
 export function classifyLiveRemediationEligibility({
@@ -206,6 +246,7 @@ async function revalidateRemediationEligibility({
       backend: 'native',
       repository: repo,
       number: pr.number,
+      runner: createGhRunner({ timeoutMs: Math.max(1, timeoutMs) }),
     }),
   ]);
   return classifyLiveRemediationEligibility({
@@ -249,7 +290,8 @@ function receiptDisposition(pr, item) {
     item.category === 'transient' ||
     item.category === 'verification_failure' ||
     item.category === 'snapshot_failure' ||
-    item.category === 'api_failure'
+    item.category === 'api_failure' ||
+    item.category === 'label_reconciliation_failure'
   ) {
     return { owner: 'Gem', nextAction: 'retry_exact_head' };
   }
@@ -380,12 +422,21 @@ async function commentPr(repo, prNumber, marker, body, receiptFingerprint) {
     ],
     {
       encoding: 'utf8',
-      env: { ...process.env, GITHUB_REPOSITORY: repo },
+      env: {
+        ...process.env,
+        GITHUB_REPOSITORY: repo,
+        BOT_COMMENT_TRUSTED_AUTHORS_JSON: '["jovie-bot[bot]"]',
+      },
     }
   );
 }
 
 export async function remediateBlockedPrs(options, dependencies = {}) {
+  if (!/^[0-9a-f]{40}$/.test(options.expectedBaseOid ?? '')) {
+    throw new Error(
+      'remediation requires expectedBaseOid as an exact lowercase 40-character SHA'
+    );
+  }
   const listBlockedAgentPrsImpl =
     dependencies.listBlockedAgentPrsImpl ?? listBlockedAgentPrs;
   const rebaseImpl = dependencies.rebaseImpl ?? tryGitHubRebase;
@@ -405,23 +456,29 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
   const blocked = await listBlockedAgentPrsImpl(options.repo, {
     limit: options.limit,
   });
+  const candidates = rotateRemediationCandidates(blocked, nowMs);
 
   const results = [];
   let applied = 0;
   let mutationBudgetUsed = 0;
+  let processed = 0;
 
   console.log('=== REMEDIATE (exact stale agent heads → refresh/escalate) ===');
   console.log(
     `mode=${options.dryRun ? 'dry-run' : 'apply'} maxPerRun=${options.maxPerRun} cooldownHours=${options.cooldownHours}`
   );
 
-  for (const pr of blocked) {
-    if (mutationBudgetUsed >= options.maxPerRun) {
+  for (const pr of candidates) {
+    if (processed >= options.maxPerRun) {
       console.log(
-        `  mutation cap reached (${mutationBudgetUsed}/${options.maxPerRun}); remaining candidates skipped`
+        `  remediation cap reached (${processed}/${options.maxPerRun}); remaining candidates skipped`
       );
       break;
     }
+    // No-op and escalation paths can still query or write a receipt. Charge
+    // the pass budget before candidate-specific external work so high-frequency
+    // controller events cannot make receipt handling unbounded.
+    processed += 1;
 
     // PR updatedAt includes labels/comments, including our own receipt upsert.
     // Cooldown must bind to the exact head commit or controller chatter can
@@ -432,7 +489,7 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
       [
         'branch_behind',
         'merge_conflict',
-        'control_plane_checks_failed',
+        'stale_conflict_label',
       ].includes(reason)
     );
     if (!Number.isFinite(hours)) {
@@ -514,6 +571,7 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
       repo: options.repo,
       pr,
       expectedBaseRefName: options.baseRef,
+      expectedBaseOid: options.expectedBaseOid,
       expectedHeadOid: pr.headRefOid,
       preMutationCheckImpl: input =>
         revalidateRemediationEligibility({ ...input, pr }),
@@ -524,19 +582,27 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
       : Boolean(rebase.mutationAttempted);
     if (consumedBudget) mutationBudgetUsed += 1;
 
+    const baseDriftNoAction =
+      !rebase.ok &&
+      rebase.category === 'stale_base' &&
+      !rebase.mutationAttempted;
     const item = {
       number: pr.number,
       headRefName: pr.headRefName,
-      action: rebase.ok
-        ? rebase.updated
-          ? 'rebased'
-          : 'rebase_noop'
-        : 'rebase_failed',
-      result: rebase.ok
-        ? rebase.updated
-          ? 'refreshed'
-          : 'no_action'
-        : 'escalated',
+      action: baseDriftNoAction
+        ? 'skip_stale_base'
+        : rebase.ok
+          ? rebase.updated
+            ? 'rebased'
+            : 'rebase_noop'
+          : 'rebase_failed',
+      result: baseDriftNoAction
+        ? 'no_action'
+        : rebase.ok
+          ? rebase.updated
+            ? 'refreshed'
+            : 'no_action'
+          : 'escalated',
       reason: rebase.reason,
       failures: pr.failures,
       conflict: Boolean(rebase.conflict),
@@ -558,9 +624,6 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
     results.push(item);
 
     if (!rebase.ok) {
-      if (!options.dryRun && rebase.conflict) {
-        await labelPrImpl(options.repo, pr.number, 'needs-conflict-resolution');
-      }
       if (!options.dryRun) {
         const receipt = buildRemediationReceipt({
           repo: options.repo,
@@ -576,6 +639,43 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
           formatRemediationReceipt(receipt),
           receipt.receiptFingerprint
         );
+        // The exact-head receipt is the durable escalation selector; the label
+        // is only a PR-scoped routing aid. Persist the receipt first so a
+        // failed comment cannot leave a non-head-bound label that suppresses
+        // escalation for this or a later conflicting head.
+        if (rebase.conflict) {
+          let labelReconciliationFailed = false;
+          try {
+            await labelPrImpl(
+              options.repo,
+              pr.number,
+              'needs-conflict-resolution'
+            );
+          } catch (error) {
+            recordLabelReconciliationFailure(
+              item,
+              'recording needs-conflict-resolution',
+              error
+            );
+            labelReconciliationFailed = true;
+          }
+          if (labelReconciliationFailed) {
+            const reconciliationReceipt = buildRemediationReceipt({
+              repo: options.repo,
+              pr,
+              item,
+              observedAt,
+              runUrl,
+            });
+            await commentPrImpl(
+              options.repo,
+              pr.number,
+              `${REMEDIATION_COMMENT_MARKER}-${reconciliationReceipt.expectedHead}`,
+              formatRemediationReceipt(reconciliationReceipt),
+              reconciliationReceipt.receiptFingerprint
+            );
+          }
+        }
       }
       console.log(`    !! ${rebase.reason}`);
       continue;
@@ -583,11 +683,19 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
 
     if (!rebase.updated) {
       if (!options.dryRun && hasConflictLabel) {
-        await removeLabelPrImpl(
-          options.repo,
-          pr.number,
-          'needs-conflict-resolution'
-        );
+        try {
+          await removeLabelPrImpl(
+            options.repo,
+            pr.number,
+            'needs-conflict-resolution'
+          );
+        } catch (error) {
+          recordLabelReconciliationFailure(
+            item,
+            'clearing stale needs-conflict-resolution',
+            error
+          );
+        }
       }
       if (!options.dryRun) {
         const receipt = buildRemediationReceipt({
@@ -613,11 +721,19 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
 
     if (!options.dryRun) {
       if (hasConflictLabel) {
-        await removeLabelPrImpl(
-          options.repo,
-          pr.number,
-          'needs-conflict-resolution'
-        );
+        try {
+          await removeLabelPrImpl(
+            options.repo,
+            pr.number,
+            'needs-conflict-resolution'
+          );
+        } catch (error) {
+          recordLabelReconciliationFailure(
+            item,
+            'clearing stale needs-conflict-resolution after refresh',
+            error
+          );
+        }
       }
       const receipt = buildRemediationReceipt({
         repo: options.repo,
@@ -644,10 +760,11 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
   }
 
   console.log(
-    `=== remediate done (applied=${applied}, mutationBudgetUsed=${mutationBudgetUsed}, dryRun=${options.dryRun}) ===`
+    `=== remediate done (processed=${processed}, applied=${applied}, mutationBudgetUsed=${mutationBudgetUsed}, dryRun=${options.dryRun}) ===`
   );
   return {
     blocked: blocked.length,
+    processed,
     applied,
     mutationBudgetUsed,
     results,

@@ -48,9 +48,12 @@ const CI_UI_DRIFT_GUARDRAIL_INPUTS = [
   'scripts/setup.sh',
 ];
 const FLEET_PROMOTION_GATE_LANE = [
+  '.github/actions/evaluate-fleet-gate/action.yml',
   'apps/web/tests/unit/api/health/deploy.critical.test.ts',
+  'scripts/hermes/evaluate-fleet-gate.sh',
   'scripts/hermes/gem-priority-gate.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/run-affected-tests.mjs',
 ];
@@ -77,6 +80,7 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
   'scripts/hermes/tests/test-model-router.py',
@@ -90,13 +94,18 @@ const MERGE_QUEUE_CONTROLLER_INPUTS = [
   'docs/PR_FLOW.md',
   'scripts/ci-merge-queue-check.mjs',
   'scripts/drain-pr-queue.sh',
+  'scripts/drain-pr-remediate.mjs',
   'scripts/lib/merge-queue-guard.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
+  'scripts/lib/ownerless-recovery-policy.mjs',
+  'scripts/lib/pr-check-failures.mjs',
+  'scripts/lib/upsert-pr-comment.sh',
   'scripts/merge-queue-backend.mjs',
+  'scripts/ownerless-recovery-sweeper.mjs',
   'scripts/tests/test_gh_retry.py',
 ];
 const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
@@ -105,6 +114,7 @@ const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
 ];
 
@@ -629,7 +639,10 @@ describe('automation-verify affected scope', () => {
         selectedTests: [
           'apps/web/tests/unit/api/health/deploy.critical.test.ts',
         ],
-        pythonUnittestTests: ['scripts/hermes/tests/gem-priority-gate.test.py'],
+        pythonUnittestTests: [
+          'scripts/hermes/tests/gem-priority-gate.test.py',
+          'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+        ],
         scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
       });
     }
@@ -648,6 +661,7 @@ describe('automation-verify affected scope', () => {
       selectedTests: [],
       pythonUnittestTests: [
         'scripts/hermes/tests/gem-priority-gate.test.py',
+        'scripts/hermes/tests/test_evaluate_fleet_gate.py',
         'scripts/hermes/tests/gem-pr-drain.test.py',
         'scripts/hermes/tests/gem-ops-hud.test.py',
         'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',

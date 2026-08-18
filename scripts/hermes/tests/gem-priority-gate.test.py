@@ -1158,9 +1158,11 @@ class WorkflowContractTests(unittest.TestCase):
         content = (self.WORKFLOWS / "merge-queue-autoenroll.yml").read_text(encoding="utf-8")
         self.assertIn("./.github/actions/evaluate-fleet-gate", content)
         self.assertIn("dry-run: 'false'", content)
+        self.assertIn("expected-sha: ${{ steps.main-head.outputs.sha }}", content)
         wrapper = (ROOT / "scripts/hermes/evaluate-fleet-gate.sh").read_text(encoding="utf-8")
         self.assertIn('--consumer "$consumer"', wrapper)
         self.assertIn("fleet | deployment", wrapper)
+        self.assertIn('.signals.main.sha == $expected', wrapper)
         self.assertIn(AUTOENROLL_RECEIPT_JQ.split(" and\n")[0], wrapper)
 
     def test_production_controller_uses_exact_subject_deployment_admission(self):

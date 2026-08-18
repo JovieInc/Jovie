@@ -9,7 +9,7 @@
 #   FLEET_GATE_DRY_RUN       1 to pass --dry-run (no persisted receipt)
 #   FLEET_GATE_EVALUATE_JSON optional fixture for tests (skips live observe)
 #   FLEET_GATE_CONSUMER      fleet (default) or deployment
-#   EXPECTED_SHA             when set, receipt main.sha must match (deployment)
+#   EXPECTED_SHA             when set, receipt main.sha must match for every consumer
 #   FLEET_GATE_RECEIPT       output path (default $RUNNER_TEMP/jovie-fleet-gate.json)
 #   GITHUB_OUTPUT            optional Actions output file
 set -euo pipefail
@@ -55,6 +55,13 @@ jq -e '
   exit 2
 }
 
+if [[ -n "${EXPECTED_SHA:-}" ]]; then
+  jq -e --arg expected "$EXPECTED_SHA" '.signals.main.sha == $expected' "$receipt" >/dev/null || {
+    echo '::error::Fleet gate main.sha is not the exact expected subject.' >&2
+    exit 2
+  }
+fi
+
 if [[ "$consumer" == "deployment" ]]; then
   jq -e '
     (.deploymentAdmission.allowed | type == "boolean") and
@@ -63,12 +70,6 @@ if [[ "$consumer" == "deployment" ]]; then
     echo '::error::Fleet gate emitted a malformed deployment receipt.' >&2
     exit 2
   }
-  if [[ -n "${EXPECTED_SHA:-}" ]]; then
-    jq -e --arg expected "$EXPECTED_SHA" '.signals.main.sha == $expected' "$receipt" >/dev/null || {
-      echo '::error::Fleet gate main.sha is not the exact expected subject.' >&2
-      exit 2
-    }
-  fi
 fi
 
 if [[ "$gate_rc" -ne 0 && "$gate_rc" -ne 2 ]]; then
