@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildCreateCommitVariables,
@@ -10,6 +10,7 @@ import {
   classifyEveLockDrift,
   validatePlanAuthority,
   validateRemediationArtifact,
+  waitForCommittedPrHead,
 } from '../safe-pr-remediation.mjs';
 
 const HEAD = 'a'.repeat(40);
@@ -362,6 +363,96 @@ describe('secretless test receipt and atomic writer', () => {
       buildCreateCommitVariables({ plan, receipt, lockfileBytes }).input
         .fileChanges.additions[0].path
     ).toBe('apps/eve-pilot/pnpm-lock.yaml');
+  });
+
+  it('waits through bounded REST lag after the atomic commit succeeds', async () => {
+    const committedHead = 'c'.repeat(40);
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({ head: { sha: HEAD } })
+      .mockResolvedValueOnce({ head: { sha: HEAD } })
+      .mockResolvedValueOnce({ head: { sha: committedHead } });
+    const sleep = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      waitForCommittedPrHead({
+        repository: REPO,
+        prNumber: 16096,
+        previousHeadOid: HEAD,
+        committedHeadOid: committedHead,
+        token: 'app-token',
+        request,
+        sleep,
+        delaysMs: [10, 20, 40],
+      })
+    ).resolves.toMatchObject({ readAttempts: 3 });
+    expect(request).toHaveBeenCalledTimes(3);
+    expect(request).toHaveBeenCalledWith(`/repos/${REPO}/pulls/16096`, {
+      token: 'app-token',
+    });
+    expect(sleep.mock.calls).toEqual([[10], [20]]);
+  });
+
+  it('accepts an immediate exact committed-head readback without waiting', async () => {
+    const committedHead = 'c'.repeat(40);
+    const request = vi.fn().mockResolvedValue({ head: { sha: committedHead } });
+    const sleep = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      waitForCommittedPrHead({
+        repository: REPO,
+        prNumber: 16096,
+        previousHeadOid: HEAD,
+        committedHeadOid: committedHead,
+        token: 'app-token',
+        request,
+        sleep,
+      })
+    ).resolves.toMatchObject({ readAttempts: 1 });
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a third head', { head: { sha: 'd'.repeat(40) } }],
+    ['a missing head', { head: {} }],
+  ])('fails immediately if readback exposes %s', async (_name, readback) => {
+    const request = vi.fn().mockResolvedValue(readback);
+    const sleep = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      waitForCommittedPrHead({
+        repository: REPO,
+        prNumber: 16096,
+        previousHeadOid: HEAD,
+        committedHeadOid: 'c'.repeat(40),
+        token: 'app-token',
+        request,
+        sleep,
+      })
+    ).rejects.toThrow('observed unexpected PR head');
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it('fails closed after the bounded old-head propagation budget', async () => {
+    const request = vi.fn().mockResolvedValue({ head: { sha: HEAD } });
+    const sleep = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      waitForCommittedPrHead({
+        repository: REPO,
+        prNumber: 16096,
+        previousHeadOid: HEAD,
+        committedHeadOid: 'c'.repeat(40),
+        token: 'app-token',
+        request,
+        sleep,
+        delaysMs: [10, 20],
+      })
+    ).rejects.toThrow('did not expose committed head');
+    expect(request).toHaveBeenCalledTimes(3);
+    expect(sleep.mock.calls).toEqual([[10], [20]]);
   });
 });
 

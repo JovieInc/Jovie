@@ -392,6 +392,53 @@ async function githubRequest(path, { token, method = 'GET', body }) {
   return contentType.includes('json') ? JSON.parse(text) : text;
 }
 
+/**
+ * GitHub can acknowledge createCommitOnBranch before the pull-request REST
+ * read model exposes the new head. Retry only that read-only propagation gap;
+ * any missing or third head still fails closed immediately.
+ *
+ * @param {{
+ *   repository: string;
+ *   prNumber: number;
+ *   previousHeadOid: string;
+ *   committedHeadOid: string;
+ *   token: string;
+ *   request?: (path: string, options: {token: string}) => Promise<any>;
+ *   sleep?: (delayMs: number) => Promise<void>;
+ *   delaysMs?: number[];
+ * }} options
+ */
+export async function waitForCommittedPrHead({
+  repository,
+  prNumber,
+  previousHeadOid,
+  committedHeadOid,
+  token,
+  request = githubRequest,
+  sleep = delayMs =>
+    new Promise(resolve => {
+      setTimeout(resolve, delayMs);
+    }),
+  delaysMs = [1000, 2000, 4000, 8000],
+}) {
+  for (let readIndex = 0; readIndex <= delaysMs.length; readIndex += 1) {
+    const readback = await request(`/repos/${repository}/pulls/${prNumber}`, {
+      token,
+    });
+    const observedHeadOid = readback?.head?.sha;
+    if (observedHeadOid === committedHeadOid)
+      return { readAttempts: readIndex + 1, readback };
+    if (observedHeadOid !== previousHeadOid)
+      throw new Error(
+        `atomic commit readback observed unexpected PR head ${observedHeadOid ?? 'missing'}`
+      );
+    if (readIndex < delaysMs.length) await sleep(delaysMs[readIndex]);
+  }
+  throw new Error(
+    `atomic commit readback did not expose committed head ${committedHeadOid}`
+  );
+}
+
 async function fetchRepositoryFile(repository, path, ref, token) {
   const encodedPath = path.split('/').map(encodeURIComponent).join('/');
   const payload = await githubRequest(
@@ -586,12 +633,13 @@ async function commitCommand(args) {
   const commit = graphql.data?.createCommitOnBranch?.commit;
   if (!commit?.oid) throw new Error('atomic commit returned no oid');
 
-  const readback = await githubRequest(
-    `/repos/${plan.repository}/pulls/${plan.prNumber}`,
-    { token }
-  );
-  if (readback.head?.sha !== commit.oid)
-    throw new Error('atomic commit readback did not match PR head');
+  await waitForCommittedPrHead({
+    repository: plan.repository,
+    prNumber: plan.prNumber,
+    previousHeadOid: plan.expectedHeadOid,
+    committedHeadOid: commit.oid,
+    token,
+  });
 
   const targetUrl = `${process.env.GITHUB_SERVER_URL}/${plan.repository}/actions/runs/${process.env.GITHUB_RUN_ID}`;
   await githubRequest(`/repos/${plan.repository}/statuses/${commit.oid}`, {
