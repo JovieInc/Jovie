@@ -14,27 +14,6 @@ vi.mock('@jovie/ui', () => ({
       {children}
     </button>
   ),
-  Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  TooltipTrigger: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
-  TooltipContent: ({ children }: { children: React.ReactNode }) => (
-    <span className='tooltip-content'>{children}</span>
-  ),
-}));
-
-vi.mock('@/components/atoms/Icon', () => ({
-  Icon: ({ name }: { name: string }) => <span data-testid={`icon-${name}`} />,
-}));
-
-// Mock TableContextMenu to avoid deep @jovie/ui dependency
-vi.mock('@/components/organisms/table', () => ({
-  TableContextMenu: ({ children }: { children: React.ReactNode }) => (
-    <>{children}</>
-  ),
-}));
-
-vi.mock('@/components/molecules/ConfirmDialog', () => ({
   ConfirmDialog: ({
     open,
     onOpenChange,
@@ -61,6 +40,24 @@ vi.mock('@/components/molecules/ConfirmDialog', () => ({
         {confirmLabel ?? 'Confirm'}
       </button>
     ) : null,
+  Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  TooltipTrigger: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
+  TooltipContent: ({ children }: { children: React.ReactNode }) => (
+    <span className='tooltip-content'>{children}</span>
+  ),
+}));
+
+vi.mock('@/components/atoms/Icon', () => ({
+  Icon: ({ name }: { name: string }) => <span data-testid={`icon-${name}`} />,
+}));
+
+// Mock TableContextMenu to avoid deep @jovie/ui dependency
+vi.mock('@/components/organisms/table', () => ({
+  TableContextMenu: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
 }));
 
 describe('LinkActions click interactions', () => {

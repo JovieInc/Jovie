@@ -1,6 +1,6 @@
 'use client';
 
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { ConfirmDialog } from '@jovie/ui';
 import { getContactRoleLabel } from '@/lib/contacts/constants';
 import type { EditableContact } from '@/types/contacts';
 

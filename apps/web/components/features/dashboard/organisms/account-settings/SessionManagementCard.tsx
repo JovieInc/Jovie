@@ -7,9 +7,8 @@
  * Allows users to view and revoke sessions on other devices.
  */
 
-import { Badge, Button } from '@jovie/ui';
+import { Badge, Button, ConfirmDialog } from '@jovie/ui';
 import { useEffect, useState } from 'react';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { captureError } from '@/lib/error-tracking';

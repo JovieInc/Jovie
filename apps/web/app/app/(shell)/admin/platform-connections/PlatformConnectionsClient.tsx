@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Button, Input, Switch } from '@jovie/ui';
+import { Badge, Button, ConfirmDialog, Input, Switch } from '@jovie/ui';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { APP_ROUTES } from '@/constants/routes';
 import { useUserSafe } from '@/hooks/useClerkSafe';
 import {

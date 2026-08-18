@@ -1,11 +1,10 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, ConfirmDialog } from '@jovie/ui';
 import { Search } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   readThreadReadState,

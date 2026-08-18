@@ -15,6 +15,24 @@ vi.mock('@jovie/ui', () => ({
       {children}
     </button>
   ),
+  ConfirmDialog: ({
+    open,
+    onConfirm,
+    confirmLabel,
+  }: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    title: string;
+    description: string;
+    confirmLabel?: string;
+    variant?: string;
+    onConfirm: () => void;
+  }) =>
+    open ? (
+      <button type='button' data-testid='confirm-delete' onClick={onConfirm}>
+        {confirmLabel ?? 'Confirm'}
+      </button>
+    ) : null,
   Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   TooltipTrigger: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
@@ -34,28 +52,6 @@ vi.mock('@/components/organisms/table', () => ({
   TableContextMenu: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
   ),
-}));
-
-// Mock ConfirmDialog to render a simple confirm button when open
-vi.mock('@/components/molecules/ConfirmDialog', () => ({
-  ConfirmDialog: ({
-    open,
-    onConfirm,
-    confirmLabel,
-  }: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    title: string;
-    description: string;
-    confirmLabel?: string;
-    variant?: string;
-    onConfirm: () => void;
-  }) =>
-    open ? (
-      <button type='button' data-testid='confirm-delete' onClick={onConfirm}>
-        {confirmLabel ?? 'Confirm'}
-      </button>
-    ) : null,
 }));
 
 describe('LinkActions Keyboard Accessibility', () => {

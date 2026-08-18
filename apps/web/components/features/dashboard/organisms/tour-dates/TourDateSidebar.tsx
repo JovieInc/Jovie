@@ -1,7 +1,12 @@
 'use client';
 
-import type { CommonDropdownItem } from '@jovie/ui';
-import { Button, Input, Label } from '@jovie/ui';
+import {
+  Button,
+  type CommonDropdownItem,
+  ConfirmDialog,
+  Input,
+  Label,
+} from '@jovie/ui';
 import {
   Popover,
   PopoverContent,
@@ -19,7 +24,6 @@ import {
 import { Calendar } from '@/components/atoms/Calendar';
 import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import {
   DrawerAnalyticsSummaryCard,
   DrawerCardActionBar,

@@ -1,9 +1,8 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import { Button, ConfirmDialog, Input } from '@jovie/ui';
 import { Download, Trash2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { useAuthSafe } from '@/hooks/useClerkSafe';

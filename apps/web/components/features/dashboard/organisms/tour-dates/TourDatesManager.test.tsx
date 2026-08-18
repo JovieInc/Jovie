@@ -22,6 +22,7 @@ vi.mock('@jovie/ui', () => ({
       {children}
     </button>
   ),
+  ConfirmDialog: () => null,
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/tour-dates/actions', () => ({
@@ -45,10 +46,6 @@ vi.mock('@/lib/queries', () => ({
 
 vi.mock('@/components/feedback', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
-}));
-
-vi.mock('@/components/molecules/ConfirmDialog', () => ({
-  ConfirmDialog: () => null,
 }));
 
 vi.mock('@/components/atoms/Icon', () => ({

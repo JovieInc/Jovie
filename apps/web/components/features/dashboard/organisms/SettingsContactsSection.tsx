@@ -1,11 +1,10 @@
 'use client';
 
-import { Badge, Button } from '@jovie/ui';
+import { Badge, Button, ConfirmDialog } from '@jovie/ui';
 import { Plus, UserPlus } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
-import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ContactsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
 import { UsageLimitUpgradePrompt } from '@/components/molecules/UsageLimitUpgradePrompt';
