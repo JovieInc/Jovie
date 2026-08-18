@@ -33,17 +33,12 @@ async function listen(handler) {
   return server.address().port;
 }
 
-async function runProxy({ port, token = 'test-only-token', payload }) {
-  const dir = await mkdtemp(join(tmpdir(), 'gbrain-proxy-'));
-  const tokenFile = join(dir, 'token');
-  await writeFile(tokenFile, token, { mode: 0o600 });
+function runProcess(command, args, { env = {}, unset = [], stdin = '' } = {}) {
   return new Promise((resolveRun, rejectRun) => {
-    const child = spawn('python3', [proxyPath], {
-      env: {
-        ...process.env,
-        GBRAIN_MCP_URL: `http://127.0.0.1:${port}/mcp`,
-        GBRAIN_MCP_TOKEN_FILE: tokenFile,
-      },
+    const childEnv = { ...process.env, ...env };
+    for (const key of unset) delete childEnv[key];
+    const child = spawn(command, args, {
+      env: childEnv,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     let stdout = '';
@@ -56,29 +51,38 @@ async function runProxy({ port, token = 'test-only-token', payload }) {
     });
     child.on('error', rejectRun);
     child.on('close', code => resolveRun({ code, stdout, stderr }));
-    child.stdin.end(`${JSON.stringify(payload)}\n`);
+    child.stdin.end(stdin);
+  });
+}
+
+async function runProxy({
+  port = 9,
+  token = 'test-only-token',
+  tokenFile: suppliedTokenFile,
+  tokenMode = 0o600,
+  createToken = true,
+  payload,
+  rawInput,
+  url,
+  allowRemote = '0',
+}) {
+  const dir = await mkdtemp(join(tmpdir(), 'gbrain-proxy-'));
+  const tokenFile = suppliedTokenFile ?? join(dir, 'token');
+  if (createToken) {
+    await writeFile(tokenFile, token, { mode: tokenMode });
+  }
+  return runProcess('python3', [proxyPath], {
+    env: {
+      GBRAIN_MCP_URL: url ?? `http://127.0.0.1:${port}/mcp`,
+      GBRAIN_MCP_ALLOW_REMOTE: allowRemote,
+      GBRAIN_MCP_TOKEN_FILE: tokenFile,
+    },
+    stdin: rawInput ?? `${JSON.stringify(payload)}\n`,
   });
 }
 
 async function runWrapper(env, unset = []) {
-  const childEnv = { ...process.env, ...env };
-  for (const key of unset) delete childEnv[key];
-  return new Promise((resolveRun, rejectRun) => {
-    const child = spawn('bash', [wrapperPath], {
-      env: childEnv,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', chunk => {
-      stdout += chunk;
-    });
-    child.stderr.on('data', chunk => {
-      stderr += chunk;
-    });
-    child.on('error', rejectRun);
-    child.on('close', code => resolveRun({ code, stdout, stderr }));
-  });
+  return runProcess('bash', [wrapperPath], { env, unset });
 }
 
 describe('repository-owned GBrain runtime assets', () => {
@@ -97,6 +101,12 @@ describe('repository-owned GBrain runtime assets', () => {
     expect(assets).not.toMatch(/postgres(?:ql)?:\/\//i);
     expect(assets).not.toMatch(/Bearer\s+[A-Za-z0-9._-]{12,}/);
     expect(assets).not.toContain('/ready');
+
+    const wrapperPort = wrapper.match(/GBRAIN_SERVE_PORT="\$\{[^}]+:-([0-9]+)\}"/);
+    const proxyPort = proxy.match(/127\.0\.0\.1:([0-9]+)\/mcp/);
+    expect(wrapperPort?.[1]).toBe('7801');
+    expect(proxyPort?.[1]).toBe(wrapperPort?.[1]);
+    expect(plist).toContain(`<string>${wrapperPort?.[1]}</string>`);
   });
 
   it('refuses accidental network exposure before starting the binary', async () => {
@@ -193,6 +203,31 @@ describe('repository-owned GBrain runtime assets', () => {
     });
   });
 
+  it('fails closed before launching when operator config is malformed', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'gbrain-wrapper-malformed-'));
+    const configFile = join(dir, 'config.json');
+    const markerFile = join(dir, 'launched');
+    const fakeBinary = join(dir, 'gbrain');
+    await writeFile(configFile, '{not-json');
+    await writeFile(
+      fakeBinary,
+      `#!/usr/bin/env bash\ntouch "$MARKER_FILE"\n`,
+      { mode: 0o755 }
+    );
+
+    const result = await runWrapper(
+      {
+        GBRAIN_BIN: fakeBinary,
+        GBRAIN_CONFIG_FILE: configFile,
+        MARKER_FILE: markerFile,
+      },
+      ['GBRAIN_DATABASE_URL', 'GBRAIN_DIRECT_DATABASE_URL']
+    );
+
+    expect(result.code).not.toBe(0);
+    await expect(readFile(markerFile)).rejects.toThrow();
+  });
+
   it('retries a transient daemon failure and parses an SSE JSON-RPC response', async () => {
     let requests = 0;
     const port = await listen((request, response) => {
@@ -221,16 +256,68 @@ describe('repository-owned GBrain runtime assets', () => {
     expect(requests).toBe(2);
   });
 
+  it('does not replay a potentially mutating tool call after a transient failure', async () => {
+    let requests = 0;
+    const port = await listen((_request, response) => {
+      requests += 1;
+      response.writeHead(503).end('ambiguous failure');
+    });
+
+    const result = await runProxy({
+      port,
+      payload: {
+        jsonrpc: '2.0',
+        id: 9,
+        method: 'tools/call',
+        params: { name: 'put_page', arguments: { slug: 'test/no-replay' } },
+      },
+    });
+
+    expect(result.code).toBe(0);
+    expect(requests).toBe(1);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      id: 9,
+      error: { code: -32000 },
+    });
+  });
+
+  it.each([429, 503])(
+    'bounds retries and returns a JSON-RPC error for persistent HTTP %i',
+    async status => {
+      let requests = 0;
+      const port = await listen((_request, response) => {
+        requests += 1;
+        response.writeHead(status).end('still unavailable');
+      });
+
+      const result = await runProxy({
+        port,
+        payload: { jsonrpc: '2.0', id: 12, method: 'tools/list' },
+      });
+
+      expect(requests).toBe(3);
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        id: 12,
+        error: { code: -32000 },
+      });
+    }
+  );
+
   it('supports concurrent MCP clients through one shared HTTP endpoint', async () => {
     let active = 0;
     let maxActive = 0;
+    let release;
+    const twoClientsEntered = new Promise(resolveBarrier => {
+      release = resolveBarrier;
+    });
     const port = await listen(async (request, response) => {
       active += 1;
       maxActive = Math.max(maxActive, active);
+      if (active >= 2) release();
       const chunks = [];
       for await (const chunk of request) chunks.push(chunk);
       const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-      await new Promise(resolveDelay => setTimeout(resolveDelay, 25));
+      await twoClientsEntered;
       response.writeHead(200, { 'content-type': 'application/json' });
       response.end(
         JSON.stringify({ jsonrpc: '2.0', id: payload.id, result: { ok: true } })
@@ -252,7 +339,7 @@ describe('repository-owned GBrain runtime assets', () => {
       Array.from({ length: 12 }, (_, index) => index + 1)
     );
     expect(results.every(result => result.code === 0)).toBe(true);
-  });
+  }, 10_000);
 
   it('does not retry deterministic authentication failures and keeps JSON-RPC shaped errors', async () => {
     let requests = 0;
@@ -275,5 +362,112 @@ describe('repository-owned GBrain runtime assets', () => {
       error: { code: -32000 },
     });
     expect(response.error.message).toContain('returned 401');
+  });
+
+  it('rejects redirects without forwarding the bearer token', async () => {
+    let redirectedRequests = 0;
+    const destinationPort = await listen((_request, response) => {
+      redirectedRequests += 1;
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end('{"jsonrpc":"2.0","id":14,"result":{}}');
+    });
+    const redirectPort = await listen((_request, response) => {
+      response
+        .writeHead(302, {
+          location: `http://127.0.0.1:${destinationPort}/capture`,
+        })
+        .end();
+    });
+
+    const result = await runProxy({
+      port: redirectPort,
+      payload: { jsonrpc: '2.0', id: 14, method: 'tools/list' },
+    });
+
+    expect(redirectedRequests).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      id: 14,
+      error: { code: -32000, message: 'shared gbrain HTTP redirect rejected' },
+    });
+  });
+
+  it('refuses to send a bearer token to a remote host without explicit opt-in', async () => {
+    const result = await runProxy({
+      url: 'https://example.invalid/mcp',
+      rawInput: '',
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain('refusing non-loopback GBRAIN_MCP_URL');
+  });
+
+  it('refuses token files readable by group or others', async () => {
+    const result = await runProxy({
+      tokenMode: 0o644,
+      rawInput: '',
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(
+      'token file must not be accessible by group or others'
+    );
+  });
+
+  it.each([
+    ['missing', false, 'test-only-token', 'startup validation failed'],
+    ['empty', true, '', 'token file is empty'],
+  ])('fails closed for a %s token file', async (_name, createToken, token, message) => {
+    const dir = await mkdtemp(join(tmpdir(), 'gbrain-proxy-token-'));
+    const result = await runProxy({
+      tokenFile: join(dir, 'token'),
+      createToken,
+      token,
+      rawInput: '',
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain(message);
+  });
+
+  it('rejects multiline bearer material without reflecting it', async () => {
+    const secretMarker = 'active-token-marker';
+    const result = await runProxy({
+      token: `${secretMarker}\nextra`,
+      rawInput: '',
+    });
+
+    expect(result.code).toBe(1);
+    expect(`${result.stdout}${result.stderr}`).not.toContain(secretMarker);
+    expect(result.stderr).toContain('token must be one printable ASCII line');
+  });
+
+  it('survives malformed input before serving the next valid request', async () => {
+    const port = await listen(async (request, response) => {
+      const chunks = [];
+      for await (const chunk of request) chunks.push(chunk);
+      const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify({ jsonrpc: '2.0', id: payload.id, result: { ok: true } })
+      );
+    });
+    const result = await runProxy({
+      port,
+      rawInput:
+        '\n{bad-json}\n{"jsonrpc":"2.0","method":"notify"}\n' +
+        '{"jsonrpc":"2.0","id":13,"method":"tools/list"}\n',
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.stderr).toContain('notification failed');
+    const responses = result.stdout
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line));
+    expect(responses.at(-1)).toMatchObject({
+      id: 13,
+      result: { ok: true },
+    });
   });
 });

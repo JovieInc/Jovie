@@ -10,12 +10,26 @@ a separate, approval-gated operation.
 - `gbrain-serve-wrapper.sh` runs an installed, verified GBrain release binary.
   A source checkout is never treated as the deployed application.
 - `gbrain-mcp-http-proxy.py` gives each MCP client a JSON-lines stdio bridge to
-  the shared authenticated loopback endpoint.
+  the shared authenticated loopback endpoint. Remote URLs require an explicit
+  opt-in, token files must deny group/other access, and `tools/call` is never
+  retried automatically because it may have committed a write before an
+  ambiguous transport failure.
 - The plist template is a reviewable candidate for the future launchd unit. It
   is kept outside `launchd/` and `launchd/pro/` so no existing bootstrap command
   can activate it accidentally.
 - Provider URLs and bearer tokens stay in operator-owned files under
   `~/.gbrain`; they must never be rendered into a plist, repository, or log.
+
+### Service pool budget
+
+The candidate deliberately preserves the observed long-lived daemon budget:
+read pool `3`, direct pool `1`, total connection clamp `3`, with the direct pool
+enabled. This is different from `scripts/lib/gbrain-pool-env.mjs`, whose
+`2`/`1`/`15` single-pool policy is for overlapping short-lived CLI and sync
+workers. The daemon keeps one direct connection available for GBrain operations
+that require the direct URL while placing a lower total bound on its persistent
+process. Changing either policy requires an isolated pooled-connection test and
+a fresh provider connection-budget receipt.
 
 ## Preconditions for activation
 

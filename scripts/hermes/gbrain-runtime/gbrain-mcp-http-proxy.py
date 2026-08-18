@@ -9,6 +9,7 @@ import pathlib
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 
@@ -20,6 +21,48 @@ TOKEN_FILE = pathlib.Path(
     )
 )
 RETRY_DELAYS = (0.0, 0.25, 1.0)
+
+
+class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise urllib.error.HTTPError(
+            req.full_url, code, "redirects are disabled", headers, fp
+        )
+
+
+HTTP_OPENER = urllib.request.build_opener(NoRedirectHandler())
+
+
+def validate_mcp_url() -> None:
+    parsed = urllib.parse.urlsplit(MCP_URL)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise RuntimeError("GBRAIN_MCP_URL must be an absolute HTTP(S) URL")
+    if parsed.username or parsed.password or parsed.fragment:
+        raise RuntimeError("GBRAIN_MCP_URL must not contain credentials or a fragment")
+    if parsed.hostname not in {"127.0.0.1", "::1", "localhost"}:
+        if os.environ.get("GBRAIN_MCP_ALLOW_REMOTE") != "1":
+            raise RuntimeError(
+                "refusing non-loopback GBRAIN_MCP_URL without "
+                "GBRAIN_MCP_ALLOW_REMOTE=1"
+            )
+
+
+def validate_token_file() -> None:
+    if TOKEN_FILE.stat().st_mode & 0o077:
+        raise RuntimeError("token file must not be accessible by group or others")
+
+
+def validate_token(token: str) -> None:
+    if not token:
+        raise RuntimeError("token file is empty")
+    if any(ord(character) < 0x21 or ord(character) > 0x7E for character in token):
+        raise RuntimeError("token must be one printable ASCII line")
+
+
+def public_error(exc: Exception) -> str:
+    if isinstance(exc, RuntimeError):
+        return str(exc)
+    return f"gbrain proxy request failed: {type(exc).__name__}"
 
 
 def emit(payload: dict) -> None:
@@ -50,7 +93,10 @@ def parse_response(body: str, content_type: str) -> list[dict]:
 def forward(payload: dict, token: str) -> list[dict]:
     data = json.dumps(payload, separators=(",", ":")).encode()
     last_error: Exception | None = None
-    for delay in RETRY_DELAYS:
+    # tools/call can mutate state. An ambiguous response failure must surface to
+    # the client instead of replaying a write that may already have committed.
+    delays = (0.0,) if payload.get("method") == "tools/call" else RETRY_DELAYS
+    for delay in delays:
         if delay:
             time.sleep(delay)
         request = urllib.request.Request(
@@ -63,12 +109,14 @@ def forward(payload: dict, token: str) -> list[dict]:
             },
         )
         try:
-            with urllib.request.urlopen(request, timeout=90) as response:
+            with HTTP_OPENER.open(request, timeout=90) as response:
                 return parse_response(
                     response.read().decode(),
                     response.headers.get("content-type", "application/json"),
                 )
         except urllib.error.HTTPError as exc:
+            if 300 <= exc.code < 400:
+                raise RuntimeError("shared gbrain HTTP redirect rejected") from exc
             # Authentication and request-shape failures are deterministic.
             if 400 <= exc.code < 500 and exc.code != 429:
                 raise RuntimeError(f"shared gbrain HTTP returned {exc.code}") from exc
@@ -83,14 +131,13 @@ def forward(payload: dict, token: str) -> list[dict]:
 
 def main() -> int:
     try:
+        validate_mcp_url()
+        validate_token_file()
         token = TOKEN_FILE.read_text().strip()
-    except OSError as exc:
-        sys.stderr.write(f"gbrain proxy: cannot read token file: {exc}\n")
+        validate_token(token)
+    except (OSError, RuntimeError) as exc:
+        sys.stderr.write(f"gbrain proxy: startup validation failed: {exc}\n")
         return 1
-    if not token:
-        sys.stderr.write("gbrain proxy: token file is empty\n")
-        return 1
-
     for line in sys.stdin:
         if not line.strip():
             continue
@@ -102,7 +149,7 @@ def main() -> int:
                 emit(response)
         except Exception as exc:
             # Keep stdio alive. A daemon restart fails one call, not the task.
-            message = str(exc)
+            message = public_error(exc)
             if request_id is not None:
                 emit(error_response(request_id, message))
             else:

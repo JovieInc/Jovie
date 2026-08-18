@@ -27,31 +27,28 @@ fi
 
 # launchd starts with a sparse environment. Load connection URLs from GBrain's
 # operator-owned configuration without printing or copying them into this repo.
-if [[ -f "$GBRAIN_CONFIG_FILE" ]]; then
-  while IFS= read -r -d '' entry; do
-    key="${entry%%=*}"
-    value="${entry#*=}"
-    if [[ -n "$value" ]]; then
-      export "$key=$value"
-    fi
-  done < <(python3 - "$GBRAIN_CONFIG_FILE" <<'PY'
+read_config_value() {
+  python3 - "$GBRAIN_CONFIG_FILE" "$1" <<'PY'
 import json
-import os
 import sys
 
 with open(sys.argv[1], encoding="utf-8") as handle:
     config = json.load(handle)
-for config_key, env_key in (
-    ("database_url", "GBRAIN_DATABASE_URL"),
-    ("direct_database_url", "GBRAIN_DIRECT_DATABASE_URL"),
-):
-    if os.environ.get(env_key):
-        continue
-    value = config.get(config_key)
-    if isinstance(value, str) and value:
-        sys.stdout.buffer.write(f"{env_key}={value}".encode() + b"\0")
+value = config.get(sys.argv[2])
+if isinstance(value, str):
+    sys.stdout.write(value)
 PY
-  )
+}
+
+if [[ -f "$GBRAIN_CONFIG_FILE" ]]; then
+  if [[ -z "${GBRAIN_DATABASE_URL:-}" ]]; then
+    GBRAIN_DATABASE_URL="$(read_config_value database_url)"
+    export GBRAIN_DATABASE_URL
+  fi
+  if [[ -z "${GBRAIN_DIRECT_DATABASE_URL:-}" ]]; then
+    GBRAIN_DIRECT_DATABASE_URL="$(read_config_value direct_database_url)"
+    export GBRAIN_DIRECT_DATABASE_URL
+  fi
 fi
 
 # Bound each long-lived process. Operators can lower these values, while a
