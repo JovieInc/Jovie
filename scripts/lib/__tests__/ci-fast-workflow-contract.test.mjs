@@ -4,6 +4,10 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  CI_CONTROL_TEST_FILES,
+  runCiControlTests,
+} from '../../ci-control-tests.mjs';
+import {
   LANE_COMMANDS,
   LANE_GROUPS,
   selectLanes,
@@ -133,7 +137,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
       structural:
-        'pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+        'pnpm ci:harness:check && node scripts/ci-control-tests.mjs && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm component-ship-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
     });
   });
 
@@ -177,17 +181,46 @@ describe('ci-fast bounded parallel workflow', () => {
   it('keeps workflow contracts in the bounded CI control suite', () => {
     const controlTest = PACKAGE_JSON.scripts['ci:control:test'];
 
-    expect(controlTest).toContain(
-      'lib/__tests__/ci-fast-workflow-contract.test.mjs'
+    expect(controlTest).toBe('node scripts/ci-control-tests.mjs');
+    expect(CI_CONTROL_TEST_FILES).toContain(
+      'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs'
     );
-    expect(controlTest).toContain(
-      'lib/__tests__/merge-group-workflow-contract.test.mjs'
+    expect(CI_CONTROL_TEST_FILES).toContain(
+      'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs'
     );
-    expect(controlTest).toContain('lib/__tests__/merge-queue-backend.test.mjs');
-    expect(controlTest).toContain(
-      'lib/__tests__/ownerless-recovery-policy.test.mjs'
+    expect(CI_CONTROL_TEST_FILES).toContain(
+      'scripts/lib/__tests__/merge-queue-backend.test.mjs'
     );
-    expect(controlTest).toContain('lib/__tests__/automation-verify.test.mjs');
+    expect(CI_CONTROL_TEST_FILES).toContain(
+      'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs'
+    );
+    expect(CI_CONTROL_TEST_FILES).toContain(
+      'scripts/lib/__tests__/automation-verify.test.mjs'
+    );
+  });
+
+  it('fails closed when the CI control runner cannot complete', () => {
+    let observedArgs;
+    const status = runCiControlTests({
+      spawnSyncImpl: (_command, args) => {
+        observedArgs = args;
+        return { status: 7 };
+      },
+    });
+
+    expect(status).toBe(7);
+    expect(observedArgs).toContain('run');
+    for (const testFile of CI_CONTROL_TEST_FILES) {
+      expect(observedArgs).toContain(testFile.replace(/^scripts\//, ''));
+    }
+    expect(runCiControlTests({ spawnSyncImpl: () => ({ status: null }) })).toBe(
+      1
+    );
+    expect(() =>
+      runCiControlTests({
+        spawnSyncImpl: () => ({ error: new Error('spawn failed') }),
+      })
+    ).toThrow('spawn failed');
   });
 
   it('enforces meaningful Gem rehabilitation policy coverage in structural CI', () => {
@@ -197,16 +230,19 @@ describe('ci-fast bounded parallel workflow', () => {
     );
 
     expect(remaining).toContain(
-      'scripts/hermes/(evaluate-fleet-gate\\.sh$|gem-|gem_|install-gem-pr-rehabilitation)'
+      'scripts/hermes/(config/(gem-repo-registry|model-registry)\\.json$|evaluate-fleet-gate\\.sh$|gem-(pr-drain|priority-gate|repo-drain-cycle)\\.py$|gem_|install-gem-(fleet-controller|pr-rehabilitation)\\.sh$|model-router\\.py$|systemd/gem-pr-drain\\.(service|timer)$)'
     );
     expect(remaining).toContain(
-      'scripts/hermes/tests/(gem-|test_evaluate_fleet_gate\\.py$)'
+      'scripts/hermes/tests/(gem-(pr-drain|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\\.test\\.py$|test-model-router\\.py$|test_evaluate_fleet_gate\\.py$)'
     );
     expect(CI_FAST_SOURCE).toContain(
       'coverage run --branch scripts/hermes/tests/gem-rehabilitation-policy.test.py'
     );
     expect(CI_FAST_SOURCE).toContain(
       'coverage report --include="*/scripts/hermes/gem_rehabilitation_policy.py" --fail-under=90'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'python3 scripts/hermes/tests/test-model-router.py'
     );
     expect(CI_FAST_SOURCE).toContain(
       "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs"
@@ -386,7 +422,9 @@ describe('ci-fast bounded parallel workflow', () => {
 
     const selectsStructural = new RegExp(selectorPattern);
     for (const requiredPath of [
-      'package.json',
+      'scripts/ci-control-tests.mjs',
+      'scripts/run-affected-tests.mjs',
+      'scripts/automation-verify.sh',
       'scripts/merge-queue-backend.mjs',
       'scripts/drain-pr-queue.sh',
       'scripts/drain-pr-remediate.mjs',
@@ -406,6 +444,13 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
       'scripts/hermes/tests/gem-priority-gate.test.py',
       'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+      'scripts/hermes/config/gem-repo-registry.json',
+      'scripts/hermes/config/model-registry.json',
+      'scripts/hermes/install-gem-fleet-controller.sh',
+      'scripts/hermes/model-router.py',
+      'scripts/hermes/systemd/gem-pr-drain.service',
+      'scripts/hermes/systemd/gem-pr-drain.timer',
+      'scripts/hermes/tests/test-model-router.py',
       'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
     ]) {
       expect(
@@ -414,6 +459,11 @@ describe('ci-fast bounded parallel workflow', () => {
       ).toMatch(selectsStructural);
     }
     expect('apps/web/lib/unrelated.ts').not.toMatch(selectsStructural);
+    expect('package.json').not.toMatch(selectsStructural);
+    expect('scripts/hermes/gem-ops-hud.py').not.toMatch(selectsStructural);
+    expect('scripts/hermes/tests/gem-ops-hud.test.py').not.toMatch(
+      selectsStructural
+    );
   });
 
   it('skips the aggregate when the original ci-fast eligibility is skipped', () => {

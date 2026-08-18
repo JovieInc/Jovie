@@ -1655,6 +1655,9 @@ describe('automation-verify affected scope', () => {
     expect(buildAffectedTestPlan(['apps/web/tests/setup.ts']).mode).toBe(
       'full'
     );
+    expect(buildAffectedTestPlan(['scripts/ci-control-tests.mjs']).mode).toBe(
+      'full'
+    );
   });
 
   it('fails closed when a web source has no test lane', () => {

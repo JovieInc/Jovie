@@ -3,6 +3,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CI_CONTROL_TEST_FILES } from './ci-control-tests.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 // Full-suite shards are deliberately independent so one Vitest process cannot
@@ -19,6 +20,7 @@ const GLOBAL_TEST_INPUTS = new Set([
   'apps/web/package.json',
   'apps/web/vitest.config.mjs',
   'apps/web/tests/setup.ts',
+  'scripts/ci-control-tests.mjs',
 ]);
 const TESTABLE_FILE = /\.(?:[cm]?[jt]sx?|json)$/;
 const INVESTOR_NOTE_INGESTION_TESTS = [
@@ -191,30 +193,7 @@ const EVENT_DRIVEN_SHIPPER_MANIFEST = new Set([
   ...EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
-const CI_CONTROL_SCRIPT_TESTS = [
-  'scripts/lib/__tests__/automation-verify.test.mjs',
-  'scripts/lib/__tests__/ci-harness.test.mjs',
-  'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
-  'scripts/lib/__tests__/ci-branching-guard.test.mjs',
-  'scripts/lib/__tests__/merge-queue-backend.test.mjs',
-  'scripts/lib/__tests__/merge-queue-guard.test.mjs',
-  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
-  'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
-  'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
-  'scripts/lib/__tests__/eval-main-health-action.test.mjs',
-  'scripts/lib/__tests__/pr-check-failures.test.mjs',
-  'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
-  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-  'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
-  'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
-  'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
-  'scripts/lib/__tests__/golden-path-lock.test.mjs',
-  'scripts/lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
-  'scripts/lib/__tests__/queue-deferral-receipt.test.mjs',
-  'scripts/lib/__tests__/queue-deferred-release.test.mjs',
-  'scripts/lib/__tests__/queue-deferred-release-admission.test.mjs',
-  'scripts/lib/__tests__/setup-worktree-health.test.mjs',
-];
+const CI_CONTROL_SCRIPT_TESTS = [...CI_CONTROL_TEST_FILES];
 const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   '.github/workflows/merge-queue-autoenroll.yml',
   'docs/PR_FLOW.md',
