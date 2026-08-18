@@ -1438,7 +1438,13 @@ export function validateNativeDrainQueueLabelIsolation(drainScript = '') {
   }
 
   const dequeue = areas.get('dequeue') ?? '';
-  if (!/merge-queue-backend\.mjs dequeue "\$n"/.test(dequeue)) {
+  if (
+    !/merge-queue-backend\.mjs dequeue "\$n"/.test(dequeue) &&
+    !(
+      /dequeue_args=\(dequeue "\$n"\)/.test(dequeue) &&
+      /merge-queue-backend\.mjs "\$\{dequeue_args\[@\]\}"/.test(dequeue)
+    )
+  ) {
     errors.push('native drain dequeue must prove the backend postcondition');
   }
 

@@ -5,6 +5,7 @@ readonly SOURCE_ROOT="${1:-$(git rev-parse --show-toplevel)}"
 readonly GEM_ROOT="${GEM_WORKSPACE:-/home/timwhite/gem-workspace}"
 readonly EXPECTED_SOURCE_REVISION="${GEM_CONTROLLER_EXPECTED_REVISION:-}"
 readonly VERIFY_ONLY="${GEM_REHABILITATION_VERIFY_ONLY:-false}"
+readonly PREFLIGHT_ONLY="${GEM_REHABILITATION_PREFLIGHT_ONLY:-false}"
 readonly UNIT_ROOT="${HOME}/.config/systemd/user"
 readonly TIMER="gem-pr-drain.timer"
 readonly SERVICE="gem-pr-drain.service"
@@ -40,6 +41,27 @@ readonly -a TARGETS=(
   "${UNIT_ROOT}/gem-pr-drain.service"
   "${UNIT_ROOT}/gem-pr-drain.timer"
 )
+
+prepare_user_systemd_context() {
+  if [[ -z "${XDG_RUNTIME_DIR:-}" ]]; then
+    XDG_RUNTIME_DIR="/run/user/$(id -u)"
+    export XDG_RUNTIME_DIR
+  fi
+  DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+  export DBUS_SESSION_BUS_ADDRESS
+  if ! systemctl --user show-environment >/dev/null; then
+    printf 'Gem PR rehabilitation user systemd preflight failed; refusing controller writes (XDG_RUNTIME_DIR=%s)\n' \
+      "${XDG_RUNTIME_DIR}" >&2
+    return 4
+  fi
+}
+
+if [[ "${PREFLIGHT_ONLY}" == true ]]; then
+  prepare_user_systemd_context
+  printf 'Gem PR rehabilitation user systemd preflight passed (XDG_RUNTIME_DIR=%s)\n' \
+    "${XDG_RUNTIME_DIR}"
+  exit 0
+fi
 
 for relative in "${RELATIVE_SOURCES[@]}"; do
   [[ -f "${SOURCE_ROOT}/${relative}" ]] || {
@@ -80,6 +102,8 @@ if [[ "${VERIFY_ONLY}" == true ]]; then
   sha256sum "${RELATIVE_SOURCES[@]/#/${SOURCE_ROOT}/}"
   exit 0
 fi
+
+prepare_user_systemd_context
 
 mkdir -p "${BACKUP_DIR}" "${GEM_ROOT}/scripts" "${GEM_ROOT}/config" "${UNIT_ROOT}"
 timer_was_active=false

@@ -186,6 +186,25 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(receipt["signals"]["main"]["sha"], SHA)
         self.assertNotEqual(outputs.get("mode"), "normal")
 
+    def test_fleet_consumer_fails_closed_when_receipt_subject_mismatches(self):
+        code, outputs, receipt = run_wrapper(
+            signals(), consumer="fleet", expected_sha="b" * 40
+        )
+
+        self.assertEqual(code, 2)
+        self.assertEqual(receipt["signals"]["main"]["sha"], SHA)
+        self.assertEqual(outputs, {})
+
+    def test_fleet_consumer_accepts_exact_receipt_subject(self):
+        code, outputs, receipt = run_wrapper(
+            signals(), consumer="fleet", expected_sha=SHA
+        )
+
+        self.assertEqual(code, 0)
+        self.assertEqual(receipt["signals"]["main"]["sha"], SHA)
+        self.assertEqual(outputs["mode"], "normal")
+        self.assertEqual(outputs["gate_rc"], "0")
+
     def test_unknown_consumer_fails_closed(self):
         code, outputs, receipt = run_wrapper(signals(), consumer="promotion")
         self.assertEqual(code, 2)

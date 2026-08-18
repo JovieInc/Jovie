@@ -352,6 +352,14 @@ def update_one(pr):
             expected_head=head_sha,
             attempt=int(pr.get("repair_attempt", 0)),
         )
+        if IS_JOVIE_REPOSITORY and action == "exact_head_branch_update":
+            return {
+                **result,
+                "action": "github_actions_single_writer",
+                "result": "skipped",
+                "reason": "jovie_branch_updates_owned_by_merge_queue_autoenroll",
+                "classified_action": action,
+            }
         if action != "exact_head_branch_update":
             return {
                 **result,

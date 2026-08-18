@@ -1,18 +1,20 @@
 name: Merge Queue Auto-Enroll
 
-# Fully event-driven — zero polling crons.
+# Event-driven admission plus one bounded maintenance heartbeat.
 #
 # Eligibility changes wake one repo-wide writer mutex. GitHub may replace an
-# older pending run in that mutex, so every surviving clean-admitting pass also
-# performs one bounded exact-head reconciliation. This controller is native-only after
-# cutover: a missing or non-native repository variable fails closed before any
-# queue/rebase mutation. Existing labels are intent/audit evidence, never an
-# alternate transport.
+# older pending run in that mutex, so every surviving pass also performs bounded,
+# idempotent receipt recovery and stale-head remediation. This controller is
+# native-only after cutover: a missing or non-native repository variable fails
+# closed before any queue/rebase mutation. Existing labels are intent/audit
+# evidence, never an alternate transport.
 #
 # Triggers:
-#   pull_request      — PR label changes and reopen (maintenance only)
+#   pull_request      — exact PR label/reopen event
 #   workflow_run      — CI completion (green PRs are now enrollable)
+#   repository_dispatch — ownerless-recovery maintenance nudge from the existing sweeper
 #   push (main)       — main moved → queued PRs may conflict or get stale
+#   schedule          — liveness heartbeat; no unique maintenance authority
 #   workflow_dispatch — maintenance-only unless exact PR + head are supplied
 #
 # Two jobs run (not at the same time — concurrency group serializes):
@@ -21,12 +23,18 @@ name: Merge Queue Auto-Enroll
 #               dequeue broken ones,
 #               flag conflicts for the fix agent (no pytest/Python setup;
 #               drain regression tests run in CI Structural Contract instead)
-#   rebase    — mechanically rebase blocked agent PRs onto latest main
+#   rebase    — refresh or escalate exact stale agent PR heads
 #
 # GH-13630 scope boundary: pr-conflict-handler debounce + lighter model are
 # follow-ups — handler lacks a durable "recently resolved" marker contract.
 #
-# No schedule. No watchdog label-cycling. No polling.
+# GitHub concurrency retains only one pending run, so any newer event can
+# replace a pending CI-completion or cron event. Every surviving run therefore
+# consumes bounded exact bot-authored hold/controller receipts and remediates at
+# most two stale heads. In a clean-admitting fleet mode it also reconciles at
+# most two otherwise-eligible same-repository heads.
+# Every candidate still crosses the same fresh-check, exact-head, and native
+# positioned-readback gates; this is eventual event repair, not a bulk queue.
 
 on:
   pull_request:
@@ -37,8 +45,13 @@ on:
   workflow_run:
     workflows: ['CI', 'Production Controller']
     types: [completed]
+  repository_dispatch:
+    types: [ownerless-recovery-admission]
   push:
     branches: [main]
+  schedule:
+    # Offset from both the hour boundary and Ownerless Recovery's :07 cadence.
+    - cron: '12,27,42,57 * * * *'
   workflow_dispatch:
     inputs:
       pr_number:
@@ -55,8 +68,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  pull-requests: write
-  contents: write
+  contents: read
 
 jobs:
   fleet-policy:
@@ -70,6 +82,7 @@ jobs:
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 5
     outputs:
+      main_sha: ${{ steps.main-head.outputs.sha }}
       mode: ${{ steps.policy.outputs.promotion_mode }}
       receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}
     steps:
@@ -86,12 +99,23 @@ jobs:
         with:
           ref: main
           persist-credentials: false
+      - name: Resolve immutable main policy head
+        id: main-head
+        shell: bash
+        run: |
+          main_sha="$(git rev-parse HEAD)"
+          if [[ ! "$main_sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Checkout HEAD is not an exact lowercase commit SHA" >&2
+            exit 2
+          fi
+          echo "sha=$main_sha" >>"$GITHUB_OUTPUT"
       - name: Evaluate fresh fleet policy
         id: policy
         uses: ./.github/actions/evaluate-fleet-gate
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           dry-run: 'false'
+          expected-sha: ${{ steps.main-head.outputs.sha }}
 
   enroll:
     needs: fleet-policy
@@ -110,6 +134,7 @@ jobs:
     # API-only fleet controller. ubuntu-latest deterministically includes gh;
     # the heterogeneous self-hosted fast pool does not.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Generate Jovie Bot token
         id: app-token
@@ -117,10 +142,15 @@ jobs:
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+          permission-checks: read
+          permission-statuses: write
       - name: Checkout main policy code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ needs.fleet-policy.outputs.main_sha }}
           persist-credentials: false
       - name: Verify GitHub CLI
         run: gh --version
@@ -132,10 +162,16 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           MANUAL_PR: ${{ inputs.pr_number || '' }}
           MANUAL_HEAD: ${{ inputs.head_sha || '' }}
+          FLEET_POLICY_MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}
         run: |
           pr_number=''
           head_sha=''
-          recover_holds=0
+          # A pending cron can be replaced by any newer event in this mutex.
+          # Maintenance authority therefore belongs to every surviving pass;
+          # exact receipt provenance, live gates, caps, and idempotent readback
+          # keep this continuous without creating another writer.
+          recover_holds=1
+          recover_controller_failures=1
           deferred_release=0
           reconcile_queue_reentry=0
 
@@ -168,7 +204,6 @@ jobs:
               workflow_conclusion="$(jq -er '.workflow_run.conclusion' "$GITHUB_EVENT_PATH")"
               if [[ "$workflow_path" == ".github/workflows/production-controller.yml" ]]; then
                 echo "Production Controller completed; maintenance-only exact fleet-hold recovery signal"
-                [[ "$workflow_conclusion" == "success" ]] && recover_holds=1
                 head_sha=''
               else
                 prs_json="$(gh pr list -R "$REPO" --state open --limit 200 --json number,headRefOid,baseRefName)"
@@ -211,8 +246,34 @@ jobs:
                 exit 2
               fi
               ;;
+            repository_dispatch)
+              sender="$(jq -er '.sender.login' "$GITHUB_EVENT_PATH")"
+              pr_number="$(jq -er '.client_payload.pr_number | tostring | select(test("^[1-9][0-9]*$"))' "$GITHUB_EVENT_PATH")"
+              head_sha="$(jq -er '.client_payload.head_sha | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
+              payload_main_sha="$(jq -r '(.client_payload.main_sha // empty) | strings | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
+              payload_ownerless_since="$(jq -r '(.client_payload.ownerless_since // empty) | strings | select(test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"))' "$GITHUB_EVENT_PATH")"
+              if [[ "$sender" != 'jovie-bot[bot]' ]]; then
+                echo "::error::Ownerless recovery admission requires the Jovie Bot sender" >&2
+                exit 2
+              fi
+              if [[ "$payload_main_sha" == "$FLEET_POLICY_MAIN_SHA" && -n "$payload_ownerless_since" ]]; then
+                echo "Ownerless recovery nudge for #$pr_number at $head_sha on main $payload_main_sha; maintenance-only"
+              else
+                echo "Ownerless recovery nudge is malformed or not bound to immutable main; maintenance-only"
+              fi
+              # Ownerless eligibility can change without moving the head. Do
+              # not turn this asynchronous event into exact-PR admission
+              # authority. The sweeper may ready a narrowly proven draft, but
+              # all queue admission flows through the controller's fresh,
+              # bounded same-repository reconciliation below.
+              pr_number=''
+              head_sha=''
+              ;;
             push)
               echo 'Main push; no primary target (bounded reconciliation remains enabled)'
+              ;;
+            schedule)
+              echo 'Scheduled maintenance; bounded receipt and lost-event reconciliation only'
               ;;
             *)
               echo "::error::Unsupported admission event: $EVENT_NAME" >&2
@@ -224,10 +285,12 @@ jobs:
             echo "pr_number=$pr_number"
             echo "head_sha=$head_sha"
             echo "recover_holds=$recover_holds"
+            echo "recover_controller_failures=$recover_controller_failures"
             echo "deferred_release=$deferred_release"
             echo "reconcile_queue_reentry=$reconcile_queue_reentry"
           } >>"$GITHUB_OUTPUT"
       - name: Enroll clean PRs
+        id: drain
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
@@ -249,7 +312,11 @@ jobs:
           # not a general AMBER admission path.
           DRAIN_PROMOTION_MODE: ${{ steps.admission.outputs.deferred_release == '1' && 'deferred-release-only' || needs.fleet-policy.outputs.mode }}
           DRAIN_FLEET_GATE_B64: ${{ needs.fleet-policy.outputs.receipt_b64 }}
-          DRAIN_RECOVER_FLEET_HOLDS: ${{ needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.recover_holds == '1' && '1' || '0' }}
+          DRAIN_EXPECTED_MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}
+          DRAIN_RECOVER_FLEET_HOLDS: ${{ steps.admission.outputs.recover_holds == '1' && contains(fromJSON('["normal","hold-intake"]'), needs.fleet-policy.outputs.mode) && '1' || '0' }}
+          DRAIN_FLEET_HOLD_RECOVERY_MAX_PER_RUN: '2'
+          DRAIN_RECOVER_CONTROLLER_FAILURES: ${{ steps.admission.outputs.recover_controller_failures == '1' && contains(fromJSON('["normal","hold-intake"]'), needs.fleet-policy.outputs.mode) && '1' || '0' }}
+          DRAIN_CONTROLLER_RECOVERY_MAX_PER_RUN: '2'
           # Composite CI heads cannot map to source PRs. The drain consumes
           # only bot-authored exact-head native-admission receipts, with fresh
           # checks and the shared total cap below; it is never a global sweep.
@@ -258,7 +325,7 @@ jobs:
           # even with cancel-in-progress=false. Reconcile only in the same fleet
           # modes that already permit clean exact-head admission, sharing the
           # total cap below with the event-scoped candidate and native re-entry.
-          DRAIN_RECONCILE_MISSED_ADMISSION: ${{ steps.admission.outputs.deferred_release != '1' && (needs.fleet-policy.outputs.mode == 'normal' || needs.fleet-policy.outputs.mode == 'hold-intake' || needs.fleet-policy.outputs.mode == 'draft-only') && '1' || '0' }}
+          DRAIN_RECONCILE_MISSED_ADMISSION: ${{ steps.admission.outputs.deferred_release != '1' && (needs.fleet-policy.outputs.mode == 'normal' || needs.fleet-policy.outputs.mode == 'hold-intake') && '1' || '0' }}
           DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '2'
           # `queue-deferred` has no typed provenance separating a temporary
           # pressure deferral from an explicit repair/human hold. Main-push
@@ -270,12 +337,115 @@ jobs:
             exit 2
           fi
           bash scripts/drain-pr-queue.sh
+      - name: Record exact-head controller outcome
+        # Ownerless intents are re-emitted by the sweeper only while the PR is
+        # still ownerless. Never convert a failed/stale ownerless attempt into
+        # the generic replay authority consumed by scheduled controller repair.
+        if: ${{ always() && !cancelled() && github.event_name != 'repository_dispatch' && steps.admission.outputs.pr_number != '' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.admission.outputs.pr_number }}
+          HEAD_SHA: ${{ steps.admission.outputs.head_sha }}
+          CONTROLLER_STATE: ${{ steps.drain.outcome == 'success' && 'success' || 'failure' }}
+          CONTROLLER_DESCRIPTION: ${{ steps.drain.outcome == 'success' && 'Exact-head queue controller completed' || 'Exact-head queue controller requires Gem remediation' }}
+        run: |
+          gh api -X POST "repos/$REPO/statuses/$HEAD_SHA" \
+            -f state="$CONTROLLER_STATE" \
+            -f context="jovie-gem-queue-remediation/v1/pr-$PR_NUMBER" \
+            -f description="PR #$PR_NUMBER: $CONTROLLER_DESCRIPTION" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >/dev/null
+
+  fleet-policy-failure-receipt:
+    name: Record unavailable fleet-policy receipt
+    needs: fleet-policy
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.fleet-policy.result != 'success' &&
+      github.event_name != 'repository_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Generate receipt-only Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: read
+          permission-pull-requests: read
+          permission-statuses: write
+      - name: Record exact-head fleet-policy failure receipt
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          MANUAL_PR: ${{ inputs.pr_number || '' }}
+          MANUAL_HEAD: ${{ inputs.head_sha || '' }}
+        run: |
+          pr_number=''
+          head_sha=''
+          case "$EVENT_NAME" in
+            pull_request)
+              if [[ "$(jq -er '.pull_request.base.ref' "$GITHUB_EVENT_PATH")" == 'main' ]]; then
+                pr_number="$(jq -er '.pull_request.number | tostring' "$GITHUB_EVENT_PATH")"
+                head_sha="$(jq -er '.pull_request.head.sha | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
+              fi
+              ;;
+            workflow_run)
+              workflow_path="$(jq -er '.workflow_run.path | select(type == "string" and length > 0)' "$GITHUB_EVENT_PATH")"
+              workflow_path="${workflow_path%%@*}"
+              workflow_event="$(jq -r '.workflow_run.event // empty' "$GITHUB_EVENT_PATH")"
+              workflow_conclusion="$(jq -r '.workflow_run.conclusion // empty' "$GITHUB_EVENT_PATH")"
+              if [[ "$workflow_path" == '.github/workflows/ci.yml' \
+                && "$workflow_conclusion" != 'cancelled' \
+                && "$workflow_event" =~ ^(pull_request|push|merge_group)$ ]]; then
+                head_sha="$(jq -er '.workflow_run.head_sha | ascii_downcase | select(test("^[0-9a-f]{40}$"))' "$GITHUB_EVENT_PATH")"
+                pulls="$(gh api --paginate --slurp \
+                  -H 'Accept: application/vnd.github+json' \
+                  "repos/$REPO/pulls?state=open&base=main&per_page=100")"
+                pr_number="$(jq -r --arg head "$head_sha" '
+                  [.[][] | select(((.head.sha // "") | ascii_downcase) == $head)]
+                  | if length == 1 then (.[0].number | tostring) else empty end
+                ' <<<"$pulls")"
+              fi
+              ;;
+            workflow_dispatch)
+              if [[ "$MANUAL_PR" =~ ^[1-9][0-9]*$ && "${MANUAL_HEAD,,}" =~ ^[0-9a-f]{40}$ ]]; then
+                pr_number="$MANUAL_PR"
+                head_sha="${MANUAL_HEAD,,}"
+              fi
+              ;;
+          esac
+
+          if [[ -z "$pr_number" || -z "$head_sha" ]]; then
+            echo 'Fleet policy failed without one exact admission target; no PR-scoped receipt'
+            exit 0
+          fi
+          current="$(gh pr view "$pr_number" -R "$REPO" --json state,baseRefName,headRefOid)"
+          if ! jq -e --arg head "$head_sha" '
+            .state == "OPEN" and .baseRefName == "main" and
+            ((.headRefOid // "") | ascii_downcase) == $head
+          ' <<<"$current" >/dev/null; then
+            echo "Exact target #$pr_number@$head_sha changed before failure receipt; no write"
+            exit 0
+          fi
+          gh api -X POST "repos/$REPO/statuses/$head_sha" \
+            -f state=failure \
+            -f context="jovie-gem-queue-remediation/v1/pr-$pr_number" \
+            -f description="PR #$pr_number: Fleet promotion policy unavailable; replay required" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >/dev/null
 
   rebase:
-    needs: enroll
+    needs: [fleet-policy, enroll]
     if: >-
-      github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+      !cancelled() &&
+      needs.fleet-policy.result == 'success' &&
+      needs.enroll.result == 'success' &&
+      needs.fleet-policy.outputs.main_sha != ''
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Generate Jovie Bot token
         id: app-token
@@ -283,10 +453,15 @@ jobs:
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+          permission-checks: read
+          permission-statuses: read
       - name: Checkout main policy code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ needs.fleet-policy.outputs.main_sha }}
           persist-credentials: false
       - name: Verify GitHub CLI
         run: gh --version
@@ -306,11 +481,14 @@ jobs:
             exit 2
           fi
           node scripts/merge-queue-backend.mjs preflight
-      - name: Rebase blocked agent PRs onto main (Phase 2)
+      - name: Refresh or escalate stale agent PR heads (Phase 2)
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           DRAIN_REMEDIATE_APPLY: '1'
-          DRAIN_REMEDIATE_MAX_PER_RUN: '24'
+          # Every surviving mutex owner makes bounded maintenance progress, so
+          # keep branch mutation far below the standalone/manual default.
+          DRAIN_REMEDIATE_MAX_PER_RUN: '2'
           DRAIN_REMEDIATE_COOLDOWN_HOURS: '4'
+          DRAIN_REMEDIATE_EXPECTED_MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}
         run: node scripts/drain-pr-remediate.mjs --apply

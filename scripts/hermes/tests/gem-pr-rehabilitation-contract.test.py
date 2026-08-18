@@ -71,6 +71,60 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertIn("gem-pr-rehabilitation-attestation/v1", workflow)
         self.assertIn(".sourceRevision == $sha", workflow)
         self.assertIn("([.artifacts[].matches] | all)", workflow)
+        fleet_preflight = "FLEET_INSTALL_PREFLIGHT_ONLY=true bash scripts/hermes/install-gem-fleet-controller.sh"
+        rehabilitation_preflight = "GEM_REHABILITATION_PREFLIGHT_ONLY=true bash scripts/hermes/install-gem-pr-rehabilitation.sh"
+        fleet_verify = "FLEET_INSTALL_VERIFY_ONLY=true bash scripts/hermes/install-gem-fleet-controller.sh"
+        rehabilitation_verify = "GEM_REHABILITATION_VERIFY_ONLY=true bash scripts/hermes/install-gem-pr-rehabilitation.sh"
+        fleet_install = "bash scripts/hermes/install-gem-fleet-controller.sh"
+        rehabilitation_install = "bash scripts/hermes/install-gem-pr-rehabilitation.sh"
+        self.assertIn(fleet_verify, workflow)
+        self.assertIn(rehabilitation_verify, workflow)
+        self.assertIn(fleet_preflight, workflow)
+        self.assertIn(rehabilitation_preflight, workflow)
+        workflow_commands = [line.strip() for line in workflow.splitlines()]
+        first_install = min(
+            workflow_commands.index(fleet_install),
+            workflow_commands.index(rehabilitation_install),
+        )
+        for prewrite_check in (
+            fleet_verify,
+            rehabilitation_verify,
+            fleet_preflight,
+            rehabilitation_preflight,
+        ):
+            self.assertLess(workflow_commands.index(prewrite_check), first_install)
+
+    def test_rehabilitation_preflight_establishes_user_systemd_bus_without_writes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fake_bin = pathlib.Path(directory) / "bin"
+            fake_bin.mkdir()
+            log = pathlib.Path(directory) / "systemd-env.log"
+            systemctl = fake_bin / "systemctl"
+            systemctl.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s|%s\\n' \"$XDG_RUNTIME_DIR\" \"$DBUS_SESSION_BUS_ADDRESS\" >\"$SYSTEMD_ENV_LOG\"\n",
+                encoding="utf-8",
+            )
+            systemctl.chmod(0o755)
+            process = subprocess.run(
+                ["bash", str(INSTALLER), str(ROOT)],
+                env={
+                    "HOME": directory,
+                    "GEM_WORKSPACE": str(pathlib.Path(directory) / "gem"),
+                    "GEM_REHABILITATION_PREFLIGHT_ONLY": "true",
+                    "PATH": f"{fake_bin}:/usr/bin:/bin:/usr/sbin:/sbin",
+                    "SYSTEMD_ENV_LOG": str(log),
+                },
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            systemd_environment = log.read_text(encoding="utf-8").strip()
+        self.assertEqual(process.returncode, 0, process.stderr)
+        runtime_dir, bus = systemd_environment.split("|", 1)
+        self.assertRegex(runtime_dir, r"^/run/user/[0-9]+$")
+        self.assertEqual(bus, f"unix:path={runtime_dir}/bus")
+        self.assertIn("user systemd preflight passed", process.stdout)
 
     def test_verify_only_installer_is_source_clean_and_side_effect_free(self):
         with tempfile.TemporaryDirectory() as directory:

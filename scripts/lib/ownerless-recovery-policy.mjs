@@ -6,10 +6,16 @@ export const RECOVERY_RECEIPT_MARKER =
 
 const HOLD_LABELS = new Set([
   'blocked',
+  'fast',
   'gated',
   'hold',
+  'human-review-required',
   'needs-conflict-resolution',
   'needs-human',
+  'needs-human-review',
+  'needs-manual-rebase',
+  'no-auto',
+  'queue-deferred',
   'risk:high',
 ]);
 
@@ -204,38 +210,6 @@ export function evaluateRecoveryCandidate({
     lanes: scope.lanes,
     ownerlessSince: new Date(sinceMs).toISOString(),
   };
-}
-
-const QUEUED_STATES = new Set([
-  'AWAITING_CHECKS',
-  'LOCKED',
-  'MERGEABLE',
-  'QUEUED',
-]);
-
-export function validateRecoveryMergeProof(proof, expectedHead) {
-  if (!SHA.test(expectedHead) || proof?.headRefOid !== expectedHead) {
-    return { proven: false, outcome: 'requested-unproven' };
-  }
-  if (
-    proof.state === 'MERGED' &&
-    typeof proof.mergedAt === 'string' &&
-    SHA.test(proof?.mergeCommit?.oid ?? '')
-  ) {
-    return { proven: true, outcome: 'merged' };
-  }
-  const entry = proof?.mergeQueueEntry;
-  if (
-    proof?.isInMergeQueue === true &&
-    typeof entry?.id === 'string' &&
-    entry.id.length > 0 &&
-    Number.isInteger(entry.position) &&
-    entry.position > 0 &&
-    QUEUED_STATES.has(entry.state)
-  ) {
-    return { proven: true, outcome: 'queued' };
-  }
-  return { proven: false, outcome: 'requested-unproven' };
 }
 
 export function renderRecoveryReceipt(receipt) {

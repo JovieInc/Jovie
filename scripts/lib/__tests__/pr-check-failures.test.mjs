@@ -5,11 +5,17 @@ import {
   ADVISORY_CHECK_NAMES,
   AGENT_BRANCH_RE,
   classifyQueueCheckBlockers,
+  classifyRemediationCandidate,
   collapseNewestCheckAttempts,
+  extractExactHeadControllerFailures,
+  extractTerminalControlPlaneFailures,
   extractTerminalFailures,
+  gemQueueRemediationContextForPr,
   isAdvisoryCheck,
   isAgentBranch,
+  isAutoEnrollRunProvenance,
   isTerminalFailure,
+  isTrustedExactHeadConflictReceipt,
   MERGE_GATE_CHECK_NAMES,
   normalizeCheckName,
 } from '../pr-check-failures.mjs';
@@ -17,6 +23,330 @@ import {
 const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
 
 describe('pr-check-failures', () => {
+  it('selects stale, conflicting, or failed exact heads without admitting held work', () => {
+    const candidate = (overrides = {}) => ({
+      number: 16060,
+      title: 'repair the control loop',
+      isDraft: false,
+      mergeable: 'MERGEABLE',
+      mergeStateStatus: 'CLEAN',
+      labels: [],
+      headRefName: 'codex/control-loop',
+      headRefOid: 'a'.repeat(40),
+      baseRefName: 'main',
+      nativeQueueState: {
+        headRefOid: 'a'.repeat(40),
+        queued: false,
+        autoMergeEnabled: false,
+      },
+      headRepositoryOwner: { login: 'JovieInc' },
+      ...overrides,
+    });
+
+    expect(
+      classifyRemediationCandidate(
+        candidate({ mergeStateStatus: 'BEHIND' }),
+        'JovieInc/Jovie',
+        []
+      )
+    ).toMatchObject({ reasons: ['branch_behind'] });
+    expect(
+      classifyRemediationCandidate(
+        candidate({ mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY' }),
+        'JovieInc/Jovie',
+        []
+      )
+    ).toMatchObject({ reasons: ['merge_conflict'] });
+    expect(
+      classifyRemediationCandidate(
+        candidate({
+          mergeable: 'CONFLICTING',
+          mergeStateStatus: 'DIRTY',
+          labels: [{ name: 'needs-conflict-resolution' }],
+        }),
+        'JovieInc/Jovie',
+        []
+      )
+    ).toMatchObject({ reasons: ['merge_conflict'] });
+    expect(
+      classifyRemediationCandidate(
+        candidate({
+          mergeable: 'CONFLICTING',
+          mergeStateStatus: 'DIRTY',
+          labels: [{ name: 'needs-conflict-resolution' }],
+          hasTrustedExactHeadConflictReceipt: true,
+        }),
+        'JovieInc/Jovie',
+        []
+      )
+    ).toBeNull();
+    expect(
+      classifyRemediationCandidate(candidate(), 'JovieInc/Jovie', ['PR Ready'])
+    ).toBeNull();
+    expect(
+      classifyRemediationCandidate(
+        candidate(),
+        'JovieInc/Jovie',
+        [],
+        ['enroll']
+      )
+    ).toBeNull();
+    expect(
+      classifyRemediationCandidate(
+        candidate({ labels: [{ name: 'needs-conflict-resolution' }] }),
+        'JovieInc/Jovie',
+        []
+      )
+    ).toMatchObject({ reasons: ['stale_conflict_label'] });
+    expect(
+      classifyRemediationCandidate(candidate(), 'JovieInc/Jovie', [])
+    ).toBeNull();
+
+    for (const excluded of [
+      { isDraft: true },
+      { baseRefName: 'release' },
+      { headRefName: 'human/manual-fix' },
+      { headRefName: 'dependabot/npm_and_yarn/example' },
+      ...[
+        'blocked',
+        'fast',
+        'gated',
+        'hold',
+        'human-review-required',
+        'needs-human',
+        'needs-human-review',
+        'needs-manual-rebase',
+        'no-auto',
+        'queue-deferred',
+        'risk:high',
+      ].map(name => ({ labels: [{ name }] })),
+      { headRepositoryOwner: { login: 'fork-owner' } },
+      { isCrossRepository: true },
+      { headRepository: { nameWithOwner: 'JovieInc/another-repo' } },
+      {
+        nativeQueueState: {
+          headRefOid: 'a'.repeat(40),
+          queued: true,
+          autoMergeEnabled: true,
+        },
+      },
+    ]) {
+      expect(
+        classifyRemediationCandidate(
+          candidate({ mergeStateStatus: 'BEHIND', ...excluded }),
+          'JovieInc/Jovie',
+          []
+        )
+      ).toBeNull();
+    }
+
+    for (const advisoryTasteLabel of [
+      'needs-human-taste',
+      'needs:taste',
+      'taste',
+    ]) {
+      expect(
+        classifyRemediationCandidate(
+          candidate({
+            mergeStateStatus: 'BEHIND',
+            labels: [{ name: advisoryTasteLabel }],
+          }),
+          'JovieInc/Jovie',
+          []
+        )
+      ).toMatchObject({ reasons: ['branch_behind'] });
+    }
+  });
+
+  it('trusts only a Jovie Bot conflict receipt bound to this PR and exact head', () => {
+    const headRefOid = 'a'.repeat(40);
+    const receipt = {
+      schema: 'jovie-gem-remediation/v1',
+      repo: 'JovieInc/Jovie',
+      pr: 16060,
+      expectedHead: headRefOid,
+      category: 'conflict',
+      result: 'escalated',
+    };
+    const comment = overrides => ({
+      user: { login: 'jovie-bot[bot]', type: 'Bot' },
+      body: `<!-- bot-comment:drain-auto-rebase-${headRefOid} -->\n\n\`\`\`json\n${JSON.stringify(receipt)}\n\`\`\``,
+      ...overrides,
+    });
+    const input = { repo: 'JovieInc/Jovie', prNumber: 16060, headRefOid };
+
+    expect(isTrustedExactHeadConflictReceipt(comment(), input)).toBe(true);
+    expect(
+      isTrustedExactHeadConflictReceipt(
+        comment({ user: { login: 'participant', type: 'User' } }),
+        input
+      )
+    ).toBe(false);
+    expect(
+      isTrustedExactHeadConflictReceipt(comment(), {
+        ...input,
+        prNumber: 16061,
+      })
+    ).toBe(false);
+    expect(
+      isTrustedExactHeadConflictReceipt(comment(), {
+        ...input,
+        headRefOid: 'b'.repeat(40),
+      })
+    ).toBe(false);
+  });
+
+  it('keeps terminal controller failures actionable without making them product gates', () => {
+    const controllerStatus = overrides => ({
+      context: gemQueueRemediationContextForPr(16060),
+      state: 'failure',
+      updated_at: '2026-08-18T00:00:00Z',
+      creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+      target_url: 'https://github.com/JovieInc/Jovie/actions/runs/123',
+      description:
+        'PR #16060: Exact-head queue controller requires Gem remediation',
+      ...overrides,
+    });
+    const controllerRun = overrides => ({
+      id: 123,
+      name: 'Merge Queue Auto-Enroll',
+      path: '.github/workflows/merge-queue-autoenroll.yml',
+      html_url: 'https://github.com/JovieInc/Jovie/actions/runs/123',
+      repository: { full_name: 'JovieInc/Jovie' },
+      head_repository: { full_name: 'JovieInc/Jovie' },
+      workflow_id: 456,
+      run_attempt: 1,
+      ...overrides,
+    });
+    expect(
+      extractTerminalControlPlaneFailures([
+        {
+          name: 'enroll',
+          workflow: 'Merge Queue Auto-Enroll',
+          bucket: 'fail',
+          state: 'FAILURE',
+        },
+        {
+          name: 'PR Ready',
+          workflow: 'CI',
+          bucket: 'fail',
+          state: 'FAILURE',
+        },
+      ])
+    ).toEqual(['enroll']);
+
+    expect(
+      extractExactHeadControllerFailures(
+        {
+          statuses: [
+            controllerStatus(),
+            controllerStatus({
+              state: 'success',
+              updated_at: '2026-08-18T00:01:00Z',
+            }),
+          ],
+        },
+        'JovieInc/Jovie',
+        16060,
+        controllerRun()
+      )
+    ).toEqual([]);
+    expect(
+      extractExactHeadControllerFailures(
+        {
+          statuses: [controllerStatus({ updated_at: '2026-08-18T00:02:00Z' })],
+        },
+        'JovieInc/Jovie',
+        16060,
+        controllerRun()
+      )
+    ).toEqual(['jovie-gem-queue-remediation/v1']);
+    for (const untrusted of [
+      controllerStatus({ creator: { type: 'Bot', login: 'other-bot[bot]' } }),
+      controllerStatus({
+        target_url: 'https://github.com/Other/Repo/actions/runs/123',
+      }),
+      controllerStatus({ target_url: 'https://example.com/actions/runs/123' }),
+      controllerStatus({
+        context: gemQueueRemediationContextForPr(16061),
+      }),
+      controllerStatus({
+        description:
+          'PR #16061: Exact-head queue controller requires Gem remediation',
+      }),
+    ]) {
+      expect(
+        extractExactHeadControllerFailures(
+          { statuses: [untrusted] },
+          'JovieInc/Jovie',
+          16060,
+          controllerRun()
+        )
+      ).toEqual([]);
+    }
+    for (const untrustedRun of [
+      controllerRun({ name: 'Another Workflow' }),
+      controllerRun({ path: '.github/workflows/another.yml' }),
+      controllerRun({ repository: { full_name: 'Other/Repo' } }),
+      controllerRun({ head_repository: { full_name: 'Other/Repo' } }),
+      controllerRun({
+        html_url: 'https://github.com/Other/Repo/actions/runs/123',
+      }),
+    ]) {
+      expect(
+        extractExactHeadControllerFailures(
+          { statuses: [controllerStatus()] },
+          'JovieInc/Jovie',
+          16060,
+          untrustedRun
+        )
+      ).toEqual([]);
+    }
+    expect(
+      isAutoEnrollRunProvenance(
+        controllerRun({
+          path: '.github/workflows/merge-queue-autoenroll.yml@refs/heads/main',
+        }),
+        'JovieInc/Jovie',
+        '123'
+      )
+    ).toBe(true);
+
+    const botAvatarUrl = 'https://avatars.example/jovie-bot';
+    const nullCreatorStatus = controllerStatus({
+      creator: null,
+      avatar_url: botAvatarUrl,
+      url: `https://api.github.com/repos/JovieInc/Jovie/statuses/${'a'.repeat(40)}`,
+    });
+    expect(
+      extractExactHeadControllerFailures(
+        { statuses: [nullCreatorStatus] },
+        'JovieInc/Jovie',
+        16060,
+        controllerRun(),
+        { headRefOid: 'a'.repeat(40), botAvatarUrl }
+      )
+    ).toEqual(['jovie-gem-queue-remediation/v1']);
+    for (const creatorProof of [
+      {
+        headRefOid: 'a'.repeat(40),
+        botAvatarUrl: 'https://avatars.example/other',
+      },
+      { headRefOid: 'b'.repeat(40), botAvatarUrl },
+      { headRefOid: 'a'.repeat(40), botAvatarUrl: '' },
+    ]) {
+      expect(
+        extractExactHeadControllerFailures(
+          { statuses: [nullCreatorStatus] },
+          'JovieInc/Jovie',
+          16060,
+          controllerRun(),
+          creatorProof
+        )
+      ).toEqual([]);
+    }
+  });
+
   it('treats bucket=fail as terminal like drain-pr-queue.sh', () => {
     expect(
       isTerminalFailure({ bucket: 'fail', state: 'SUCCESS', name: 'PR Ready' })
@@ -103,6 +433,25 @@ describe('pr-check-failures', () => {
         { ...controllerFailure, workflow: 'Real Safety Workflow' },
       ])
     ).toEqual(['enroll']);
+  });
+
+  it('keeps an exact-head Gem failure receipt advisory while required gates stay authoritative', () => {
+    const required = [
+      'PR Ready',
+      'Migration Guard',
+      'Fork PR Gate',
+      'PR Size Guard',
+    ].map(name => ({ name, bucket: 'pass', state: 'SUCCESS' }));
+    expect(
+      classifyQueueCheckBlockers([
+        ...required,
+        {
+          name: 'jovie-gem-queue-remediation/v1/pr-16060',
+          bucket: 'fail',
+          state: 'FAILURE',
+        },
+      ])
+    ).toEqual([]);
   });
 
   it('treats a red Fork PR Gate Controller receipt with SKIPPED twin as advisory (JOV-4782)', () => {

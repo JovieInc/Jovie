@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   CANONICAL_NATIVE_MUTATION_ACTOR,
+  createGhRunner,
   DEFAULT_MERGE_QUEUE_BACKEND,
   dequeuePullRequest,
   enrollPullRequest,
@@ -53,6 +54,7 @@ function prState(overrides = {}) {
     state: 'OPEN',
     isDraft: false,
     headRefOid: HEAD,
+    baseRefName: 'main',
     labels: { nodes: [] },
     isInMergeQueue: false,
     mergeQueueEntry: null,
@@ -121,7 +123,7 @@ function createNativeRunner({
       if (!state) throw new Error('Test runner exhausted PR states');
       return ok(nativeStatePayload(state));
     }
-    if (query.includes('enablePullRequestAutoMerge')) return enableResult;
+    if (args[0] === 'pr' && args[1] === 'merge') return enableResult;
     if (
       query.includes('dequeuePullRequest') ||
       query.includes('disablePullRequestAutoMerge')
@@ -146,15 +148,20 @@ const enroll = (runner, overrides) =>
     nativeOptions(runner, { expectedHeadOid: HEAD, ...overrides })
   );
 const dequeue = runner => dequeuePullRequest(nativeOptions(runner));
+const dequeueCompensation = (runner, expectedHeadOid = HEAD) =>
+  dequeuePullRequest(nativeOptions(runner, { expectedHeadOid }));
 const invokedEnrollment = runner =>
-  runner.mock.calls.some(([args]) =>
-    queryText(args).includes('enablePullRequestAutoMerge')
+  runner.mock.calls.some(
+    ([args]) =>
+      args[0] === 'pr' &&
+      args[1] === 'merge' &&
+      args.includes('--match-head-commit')
   );
 const invokedNativeMutation = runner =>
-  runner.mock.calls.some(([args]) =>
-    /enablePullRequestAutoMerge|dequeuePullRequest|disablePullRequestAutoMerge/.test(
-      queryText(args)
-    )
+  runner.mock.calls.some(
+    ([args]) =>
+      (args[0] === 'pr' && args[1] === 'merge') ||
+      /dequeuePullRequest|disablePullRequestAutoMerge/.test(queryText(args))
   );
 const invokedMutationActorCheck = runner =>
   runner.mock.calls.some(([args]) =>
@@ -225,11 +232,14 @@ function workflowRunScript(workflow, name) {
     .join('\n');
 }
 
-function executeAdmissionScope({
+function runAdmissionScope({
   path,
   conclusion,
   name,
   workflowEvent = 'pull_request',
+  eventName = 'workflow_run',
+  eventPayload,
+  fleetPolicyMainSha = OTHER_HEAD,
 }) {
   const workflow = readRepoFile('.github/workflows/merge-queue-autoenroll.yml');
   const script = workflowRunScript(workflow, 'Resolve exact admission scope');
@@ -238,15 +248,17 @@ function executeAdmissionScope({
   const outputPath = join(directory, 'output.txt');
   writeFileSync(
     eventPath,
-    JSON.stringify({
-      workflow_run: {
-        path,
-        conclusion,
-        name,
-        event: workflowEvent,
-        head_sha: HEAD,
-      },
-    })
+    JSON.stringify(
+      eventPayload ?? {
+        workflow_run: {
+          path,
+          conclusion,
+          name,
+          event: workflowEvent,
+          head_sha: HEAD,
+        },
+      }
+    )
   );
   writeFileSync(outputPath, '');
   try {
@@ -257,29 +269,111 @@ function executeAdmissionScope({
         encoding: 'utf8',
         env: {
           ...process.env,
-          EVENT_NAME: 'workflow_run',
+          EVENT_NAME: eventName,
           GITHUB_EVENT_PATH: eventPath,
           GITHUB_OUTPUT: outputPath,
           MANUAL_PR: '',
           MANUAL_HEAD: '',
+          FLEET_POLICY_MAIN_SHA: fleetPolicyMainSha,
           REPO: REPOSITORY,
         },
       }
     );
-    if (result.status !== 0) {
-      throw new Error(
-        `Admission scope failed (${result.status}): ${result.stderr || result.stdout}`
-      );
-    }
-    return Object.fromEntries(
-      readFileSync(outputPath, 'utf8')
-        .trim()
-        .split('\n')
-        .map(line => line.split('=', 2))
-    );
+    return {
+      status: result.status,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      output: readFileSync(outputPath, 'utf8'),
+    };
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+}
+
+function runFleetPolicyFailureReceipt({
+  eventName,
+  eventPayload,
+  liveHead = HEAD,
+  openPullPages = [[]],
+}) {
+  const workflow = readRepoFile('.github/workflows/merge-queue-autoenroll.yml');
+  const script = workflowRunScript(
+    extractWorkflowJobBlock(workflow, 'fleet-policy-failure-receipt'),
+    'Record exact-head fleet-policy failure receipt'
+  )
+    .replaceAll('${{ github.server_url }}', 'https://github.com')
+    .replaceAll('${{ github.repository }}', REPOSITORY)
+    .replaceAll('${{ github.run_id }}', '4242');
+  const directory = mkdtempSync(join(tmpdir(), 'fleet-policy-failure-'));
+  const eventPath = join(directory, 'event.json');
+  const callsPath = join(directory, 'gh-calls.txt');
+  const ghPath = join(directory, 'gh');
+  writeFileSync(eventPath, JSON.stringify(eventPayload));
+  writeFileSync(callsPath, '');
+  writeFileSync(
+    ghPath,
+    `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >>"$FAKE_GH_CALLS"
+if [[ "$1 $2" == 'pr view' ]]; then
+  printf '{"state":"OPEN","baseRefName":"main","headRefOid":"%s"}\n' "$FAKE_LIVE_HEAD"
+  exit 0
+fi
+if [[ "$1 $2" == 'api --paginate' ]]; then
+  printf '%s\n' "$FAKE_OPEN_PULL_PAGES"
+  exit 0
+fi
+if [[ "$1 $2 $3" == 'api -X POST' ]]; then
+  echo '{}'
+  exit 0
+fi
+echo "unexpected gh args: $*" >&2
+exit 2
+`,
+    { mode: 0o755 }
+  );
+  try {
+    const result = spawnSync(
+      'bash',
+      ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${directory}:${process.env.PATH}`,
+          EVENT_NAME: eventName,
+          GITHUB_EVENT_PATH: eventPath,
+          REPO: REPOSITORY,
+          MANUAL_PR: '',
+          MANUAL_HEAD: '',
+          FAKE_GH_CALLS: callsPath,
+          FAKE_LIVE_HEAD: liveHead,
+          FAKE_OPEN_PULL_PAGES: JSON.stringify(openPullPages),
+        },
+      }
+    );
+    return {
+      ...result,
+      calls: readFileSync(callsPath, 'utf8').trim().split('\n').filter(Boolean),
+    };
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+function executeAdmissionScope(options) {
+  const result = runAdmissionScope(options);
+  if (result.status !== 0) {
+    throw new Error(
+      `Admission scope failed (${result.status}): ${result.stderr || result.stdout}`
+    );
+  }
+  return Object.fromEntries(
+    result.output
+      .trim()
+      .split('\n')
+      .map(line => line.split('=', 2))
+  );
 }
 
 describe('merge queue backend resolution', () => {
@@ -311,9 +405,362 @@ describe('merge queue backend resolution', () => {
     ).rejects.toMatchObject({ code: 'native_mutation_unauthorized' });
     expect(runner).not.toHaveBeenCalled();
   });
+
+  it('bounds GitHub CLI calls with the configured runner timeout', async () => {
+    const spawn = vi.fn(() => ({ status: 0, stdout: '{}', stderr: '' }));
+    const runner = createGhRunner({ env: {}, spawn, timeoutMs: 12_345 });
+
+    await expect(runner(['api', 'user'])).resolves.toMatchObject({ code: 0 });
+    expect(spawn).toHaveBeenCalledWith(
+      'gh',
+      ['api', 'user'],
+      expect.objectContaining({ timeout: 12_345 })
+    );
+    expect(() => createGhRunner({ timeoutMs: 0 })).toThrowError(
+      expect.objectContaining({ code: 'invalid_gh_timeout' })
+    );
+  });
 });
 
 describe('queue workflow mutation safety', () => {
+  it('treats a trusted ownerless-recovery event as a maintenance nudge', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const scope = workflowStep(workflow, 'Resolve exact admission scope');
+
+    expect(scope).toContain(
+      'FLEET_POLICY_MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}'
+    );
+    expect(scope).toContain(
+      '[[ "$payload_main_sha" == "$FLEET_POLICY_MAIN_SHA" && -n "$payload_ownerless_since" ]]'
+    );
+    expect(scope).toMatch(
+      /repository_dispatch\)[\s\S]*pr_number=''[\s\S]*head_sha=''[\s\S]*;;/
+    );
+    expect(
+      executeAdmissionScope({
+        eventName: 'repository_dispatch',
+        eventPayload: {
+          sender: { login: 'jovie-bot[bot]' },
+          client_payload: {
+            pr_number: 14359,
+            head_sha: HEAD,
+            main_sha: OTHER_HEAD,
+            ownerless_since: '2026-08-17T00:00:00Z',
+          },
+        },
+      })
+    ).toEqual(
+      expect.objectContaining({
+        pr_number: '',
+        head_sha: '',
+        recover_holds: '1',
+        recover_controller_failures: '1',
+      })
+    );
+  });
+
+  it.each([
+    [
+      'a foreign sender',
+      {
+        sender: { login: 'untrusted-user' },
+        client_payload: {
+          pr_number: 14359,
+          head_sha: HEAD,
+          main_sha: OTHER_HEAD,
+        },
+      },
+    ],
+    [
+      'a missing PR number',
+      {
+        sender: { login: 'jovie-bot[bot]' },
+        client_payload: { head_sha: HEAD, main_sha: OTHER_HEAD },
+      },
+    ],
+    [
+      'a malformed PR number',
+      {
+        sender: { login: 'jovie-bot[bot]' },
+        client_payload: {
+          pr_number: '14359x',
+          head_sha: HEAD,
+          main_sha: OTHER_HEAD,
+        },
+      },
+    ],
+    [
+      'a missing head SHA',
+      {
+        sender: { login: 'jovie-bot[bot]' },
+        client_payload: { pr_number: 14359, main_sha: OTHER_HEAD },
+      },
+    ],
+    [
+      'a malformed head SHA',
+      {
+        sender: { login: 'jovie-bot[bot]' },
+        client_payload: {
+          pr_number: 14359,
+          head_sha: 'not-an-exact-head',
+          main_sha: OTHER_HEAD,
+        },
+      },
+    ],
+  ])('rejects repository_dispatch with %s before enrollment', (_, eventPayload) => {
+    const result = runAdmissionScope({
+      eventName: 'repository_dispatch',
+      eventPayload,
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.output).toBe('');
+  });
+
+  it.each([
+    ['stale', 'c'.repeat(40)],
+    ['missing', undefined],
+    ['malformed', 'not-an-exact-main'],
+  ])('treats a %s ownerless policy main as maintenance-only', (_, payloadMainSha) => {
+    const result = runAdmissionScope({
+      eventName: 'repository_dispatch',
+      eventPayload: {
+        sender: { login: 'jovie-bot[bot]' },
+        client_payload: {
+          pr_number: 14359,
+          head_sha: HEAD,
+          ...(payloadMainSha ? { main_sha: payloadMainSha } : {}),
+        },
+      },
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('maintenance-only');
+    expect(
+      Object.fromEntries(
+        result.output
+          .trim()
+          .split('\n')
+          .map(line => line.split('=', 2))
+      )
+    ).toEqual(
+      expect.objectContaining({
+        pr_number: '',
+        head_sha: '',
+        recover_holds: '1',
+        recover_controller_failures: '1',
+      })
+    );
+  });
+
+  it('records the exact-head controller outcome against the current run', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const outcome = workflowStep(
+      workflow,
+      'Record exact-head controller outcome'
+    );
+
+    expect(outcome).toContain(
+      "if: ${{ always() && !cancelled() && github.event_name != 'repository_dispatch' && steps.admission.outputs.pr_number != '' }}"
+    );
+    expect(outcome).toContain(
+      'HEAD_SHA: ${{ steps.admission.outputs.head_sha }}'
+    );
+    expect(outcome).toContain(
+      'PR_NUMBER: ${{ steps.admission.outputs.pr_number }}'
+    );
+    expect(outcome).toContain(
+      "CONTROLLER_STATE: ${{ steps.drain.outcome == 'success' && 'success' || 'failure' }}"
+    );
+    expect(outcome).toContain(
+      '-f context="jovie-gem-queue-remediation/v1/pr-$PR_NUMBER"'
+    );
+    expect(outcome).toContain(
+      '-f description="PR #$PR_NUMBER: $CONTROLLER_DESCRIPTION"'
+    );
+    expect(outcome).toContain(
+      '-f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"'
+    );
+  });
+
+  it('records a receipt-only exact target when fleet policy is unavailable', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const receiptJob = extractWorkflowJobBlock(
+      workflow,
+      'fleet-policy-failure-receipt'
+    );
+
+    expect(receiptJob).toContain('needs: fleet-policy');
+    expect(receiptJob).toContain('always()');
+    expect(receiptJob).toContain("needs.fleet-policy.result != 'success'");
+    expect(receiptJob).toContain("github.event_name != 'repository_dispatch'");
+    expect(receiptJob).toContain('timeout-minutes: 5');
+    expect(receiptJob).toContain('permission-statuses: write');
+    expect(receiptJob).toContain('--paginate --slurp');
+    expect(receiptJob).toContain('.state == "OPEN" and .baseRefName == "main"');
+    expect(receiptJob).toContain(
+      '-f context="jovie-gem-queue-remediation/v1/pr-$pr_number"'
+    );
+    expect(receiptJob).toContain('-f state=failure');
+    expect(receiptJob).not.toContain('scripts/drain-pr-queue.sh');
+    expect(receiptJob).not.toContain('scripts/drain-pr-remediate.mjs');
+    expect(receiptJob).not.toContain('gh pr merge');
+  });
+
+  it('writes one exact-head failure receipt when pull-request fleet policy is unavailable', () => {
+    const result = runFleetPolicyFailureReceipt({
+      eventName: 'pull_request',
+      eventPayload: {
+        pull_request: {
+          number: 14359,
+          base: { ref: 'main' },
+          head: { sha: HEAD },
+        },
+      },
+    });
+
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.calls).toEqual([
+      `pr view 14359 -R ${REPOSITORY} --json state,baseRefName,headRefOid`,
+      expect.stringContaining(
+        `api -X POST repos/${REPOSITORY}/statuses/${HEAD}`
+      ),
+    ]);
+    expect(result.calls[1]).toContain('-f state=failure');
+    expect(result.calls[1]).toContain(
+      '-f context=jovie-gem-queue-remediation/v1/pr-14359'
+    );
+    expect(result.calls.join('\n')).not.toContain('pr merge');
+    expect(result.calls.join('\n')).not.toContain('dequeue');
+  });
+
+  it('does not write a fleet-policy failure receipt after the exact head moves', () => {
+    const result = runFleetPolicyFailureReceipt({
+      eventName: 'pull_request',
+      eventPayload: {
+        pull_request: {
+          number: 14359,
+          base: { ref: 'main' },
+          head: { sha: HEAD },
+        },
+      },
+      liveHead: OTHER_HEAD,
+    });
+
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.calls).toEqual([
+      `pr view 14359 -R ${REPOSITORY} --json state,baseRefName,headRefOid`,
+    ]);
+  });
+
+  it('does not write a fleet-policy receipt for an ambiguous workflow-run head', () => {
+    const result = runFleetPolicyFailureReceipt({
+      eventName: 'workflow_run',
+      eventPayload: {
+        workflow_run: {
+          path: '.github/workflows/ci.yml',
+          event: 'pull_request',
+          conclusion: 'success',
+          head_sha: HEAD,
+        },
+      },
+      openPullPages: [
+        [
+          { number: 14359, head: { sha: HEAD } },
+          { number: 14360, head: { sha: HEAD } },
+        ],
+      ],
+    });
+
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.calls).toEqual([
+      expect.stringContaining('api --paginate --slurp'),
+    ]);
+    expect(result.calls.join('\n')).not.toContain('statuses/');
+  });
+
+  it('writes one scoped fleet-policy receipt for a unique CI workflow-run head', () => {
+    const result = runFleetPolicyFailureReceipt({
+      eventName: 'workflow_run',
+      eventPayload: {
+        workflow_run: {
+          path: '.github/workflows/ci.yml',
+          event: 'pull_request',
+          conclusion: 'success',
+          head_sha: HEAD,
+        },
+      },
+      openPullPages: [[{ number: 14359, head: { sha: HEAD } }]],
+    });
+
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(result.calls).toEqual([
+      expect.stringContaining('api --paginate --slurp'),
+      `pr view 14359 -R ${REPOSITORY} --json state,baseRefName,headRefOid`,
+      expect.stringContaining(
+        `api -X POST repos/${REPOSITORY}/statuses/${HEAD}`
+      ),
+    ]);
+    expect(result.calls[2]).toContain(
+      '-f context=jovie-gem-queue-remediation/v1/pr-14359'
+    );
+  });
+
+  it('makes bounded maintenance part of every surviving writer pass', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const scope = workflowStep(workflow, 'Resolve exact admission scope');
+    const rebaseJob = extractWorkflowJobBlock(workflow, 'rebase');
+    const enrollJob = extractWorkflowJobBlock(workflow, 'enroll');
+
+    expect(workflow).toMatch(/schedule:\n(?:\s+#.*\n)*\s+- cron: '[^']+'/);
+    expect(scope).toContain('schedule)');
+    expect(scope).toContain(
+      'Scheduled maintenance; bounded receipt and lost-event reconciliation only'
+    );
+    expect(workflow).not.toContain('queue: max');
+    expect(rebaseJob).toContain('needs: [fleet-policy, enroll]');
+    expect(enrollJob).toContain('timeout-minutes: 20');
+    expect(rebaseJob).toContain('timeout-minutes: 20');
+    expect(rebaseJob).toContain('!cancelled()');
+    expect(rebaseJob).not.toContain("github.event_name == 'schedule'");
+    expect(rebaseJob).toContain("needs.fleet-policy.result == 'success'");
+    expect(rebaseJob).toContain("needs.fleet-policy.outputs.main_sha != ''");
+    expect(scope).toContain('recover_holds=1');
+    expect(scope).toContain('recover_controller_failures=1');
+    expect(scope).not.toContain('recover_holds=0');
+    expect(scope).not.toContain('recover_controller_failures=0');
+    expect(
+      executeAdmissionScope({
+        eventName: 'schedule',
+        path: '',
+        conclusion: '',
+        name: '',
+      })
+    ).toEqual(
+      expect.objectContaining({
+        pr_number: '',
+        head_sha: '',
+        recover_holds: '1',
+        recover_controller_failures: '1',
+      })
+    );
+    const enroll = workflowStep(workflow, 'Enroll clean PRs');
+    expect(enroll).toContain('DRAIN_RECONCILE_MISSED_ADMISSION:');
+    expect(enroll).toContain("steps.admission.outputs.deferred_release != '1'");
+    expect(enroll).toContain('fromJSON(\'["normal","hold-intake"]\')');
+    expect(enroll).not.toContain(
+      "needs.fleet-policy.outputs.mode == 'draft-only'"
+    );
+  });
+
   it.each([
     ['success', '.github/workflows/production-controller.yml', true, '1'],
     [
@@ -322,19 +769,19 @@ describe('queue workflow mutation safety', () => {
       true,
       '1',
     ],
-    ['failure', '.github/workflows/production-controller.yml', true, '0'],
+    ['failure', '.github/workflows/production-controller.yml', true, '1'],
     [
       'failure',
       '.github/workflows/production-controller.yml@refs/heads/main',
       true,
-      '0',
+      '1',
     ],
-    ['cancelled', '.github/workflows/production-controller.yml', false, '0'],
+    ['cancelled', '.github/workflows/production-controller.yml', false, '1'],
     [
       'cancelled',
       '.github/workflows/production-controller.yml@refs/heads/main',
       false,
-      '0',
+      '1',
     ],
   ])('classifies a %s Production Controller run at %s', (conclusion, path, admitted, recoverHolds) => {
     const workflow = readRepoFile(
@@ -371,9 +818,7 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain(
       '[[ "$workflow_path" == ".github/workflows/production-controller.yml" ]]'
     );
-    expect(scope).toContain(
-      '[[ "$workflow_conclusion" == "success" ]] && recover_holds=1'
-    );
+    expect(scope).toContain('recover_holds=1');
   });
 
   it('scopes each new admission to the triggering PR and exact published head', () => {
@@ -425,8 +870,9 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain('"$expected_head" != "$authorized_head"');
     expect(drain).toContain('select((.n | tostring) == $admission_pr)');
     expect(drain).toContain(
-      'enrollment_receipt="$(node scripts/merge-queue-backend.mjs enroll "$n" "$head_oid")"'
+      'node scripts/merge-queue-backend.mjs enroll "$n" "$head_oid" 2>"$enrollment_error_file"'
     );
+    expect(drain).toContain('cat "$enrollment_error_file" >&2');
     expect(drain).toContain(
       '.state.mergeQueueEntry.state | IN("QUEUED", "AWAITING_CHECKS", "MERGEABLE", "UNMERGEABLE", "LOCKED")'
     );
@@ -473,12 +919,16 @@ describe('queue workflow mutation safety', () => {
     expect(enroll).toContain(
       "needs.fleet-policy.outputs.mode == 'hold-intake'"
     );
-    expect(enroll).toContain("needs.fleet-policy.outputs.mode == 'draft-only'");
+    expect(enroll).not.toContain(
+      "needs.fleet-policy.outputs.mode == 'draft-only'"
+    );
     expect(enroll).toContain("DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '2'");
     expect(drain).toContain('QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"');
     expect(drain).toContain('bounded exact-head native admission');
     expect(drain).toContain('DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 2');
-    expect(drain).toContain('queue_reentry_receipt_is_recoverable "$head_oid"');
+    expect(drain).toContain(
+      'queue_reentry_receipt_is_recoverable "$n" "$head_oid"'
+    );
     expect(drain).toContain('check_failures_for_pr "$n"');
     expect(drain).toContain(
       '[[ "$ENROLLED_THIS_RUN" -ge "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" ]]'
@@ -550,8 +1000,17 @@ describe('queue workflow mutation safety', () => {
     const workflow = readRepoFile(
       '.github/workflows/merge-queue-autoenroll.yml'
     );
+    const fleetJob = extractWorkflowJobBlock(workflow, 'fleet-policy');
     const enrollJob = extractWorkflowJobBlock(workflow, 'enroll');
     const rebaseJob = extractWorkflowJobBlock(workflow, 'rebase');
+    const resolveMain = workflowStep(
+      workflow,
+      'Resolve immutable main policy head'
+    );
+    const evaluatePolicy = workflowStep(
+      workflow,
+      'Evaluate fresh fleet policy'
+    );
     const enroll = workflowStep(workflow, 'Enroll clean PRs');
     const rebasePreflight = workflowStep(
       workflow,
@@ -559,7 +1018,7 @@ describe('queue workflow mutation safety', () => {
     );
     const rebaseMutation = workflowStep(
       workflow,
-      'Rebase blocked agent PRs onto main (Phase 2)'
+      'Refresh or escalate stale agent PR heads (Phase 2)'
     );
     const remediator = readRepoFile('scripts/drain-pr-remediate.mjs');
     const drain = readRepoFile('scripts/drain-pr-queue.sh');
@@ -574,7 +1033,19 @@ describe('queue workflow mutation safety', () => {
       'MERGE_QUEUE_BACKEND="${MERGE_QUEUE_BACKEND:-native}"'
     );
     expect(drain).not.toContain('MERGE_QUEUE_BACKEND:-graphite');
-    expect(workflow).toContain('  rebase:\n    needs: enroll\n');
+    expect(workflow).toContain(
+      '  rebase:\n    needs: [fleet-policy, enroll]\n'
+    );
+    expect(fleetJob).toContain('main_sha: ${{ steps.main-head.outputs.sha }}');
+    expect(resolveMain).toContain('main_sha="$(git rev-parse HEAD)"');
+    expect(resolveMain).toContain('^[0-9a-f]{40}$');
+    expect(evaluatePolicy).toContain(
+      'expected-sha: ${{ steps.main-head.outputs.sha }}'
+    );
+    for (const job of [enrollJob, rebaseJob]) {
+      expect(job).toContain('ref: ${{ needs.fleet-policy.outputs.main_sha }}');
+      expect(job).not.toContain('          ref: main\n');
+    }
     for (const job of [enrollJob, rebaseJob]) {
       expect(job).toContain(tokenAction);
       expect(job).toContain('id: app-token');
@@ -589,6 +1060,9 @@ describe('queue workflow mutation safety', () => {
       expect(step).not.toContain('secrets.GITHUB_TOKEN');
     }
     expect(enroll).toContain('if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]');
+    expect(enroll).toContain(
+      'DRAIN_EXPECTED_MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}'
+    );
     expect(enroll).toContain('bash scripts/drain-pr-queue.sh');
     expect(rebasePreflight).toContain(
       'if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]'
@@ -605,9 +1079,14 @@ describe('queue workflow mutation safety', () => {
     expect(
       drain.indexOf('node scripts/merge-queue-backend.mjs preflight')
     ).toBeLessThan(
-      drain.indexOf('node scripts/merge-queue-backend.mjs list-state')
+      drain.indexOf(
+        'NATIVE_QUEUE_STATE="$(node scripts/merge-queue-backend.mjs list-state)"'
+      )
     );
-    expect(rebaseMutation).toContain("DRAIN_REMEDIATE_MAX_PER_RUN: '24'");
+    expect(rebaseMutation).toContain("DRAIN_REMEDIATE_MAX_PER_RUN: '2'");
+    expect(rebaseMutation).toContain(
+      'DRAIN_REMEDIATE_EXPECTED_MAIN_SHA: ${{ needs.fleet-policy.outputs.main_sha }}'
+    );
     expect(remediator).toContain("DRAIN_REMEDIATE_MAX_PER_RUN ?? '24'");
   });
 });
@@ -991,7 +1470,7 @@ describe('native mutation actor boundary', () => {
 });
 
 describe('native enrollment', () => {
-  it('uses the native GraphQL mutation and proves a positioned queue receipt', async () => {
+  it('uses atomic expected-head native admission and proves a positioned queue receipt', async () => {
     const runner = createNativeRunner({
       states: [
         prState(),
@@ -1007,17 +1486,21 @@ describe('native enrollment', () => {
       changed: true,
       mutationActor: CANONICAL_NATIVE_MUTATION_ACTOR,
     });
-    const mutationCall = runner.mock.calls.find(([args]) =>
-      queryText(args).includes('enablePullRequestAutoMerge')
+    const mutationCall = runner.mock.calls.find(
+      ([args]) => args[0] === 'pr' && args[1] === 'merge'
     )?.[0];
-    expect(mutationCall).toEqual(
-      expect.arrayContaining([
-        '-f',
-        `pullRequestId=${PR_ID}`,
-        '-f',
-        'mergeMethod=SQUASH',
-      ])
-    );
+    expect(mutationCall).toEqual([
+      'pr',
+      'merge',
+      '14359',
+      '-R',
+      REPOSITORY,
+      '--auto',
+      '--squash',
+      '--match-head-commit',
+      HEAD,
+    ]);
+    expect(mutationCall).not.toContain('--admin');
   });
 
   it('polls through stale reads until the exact-head enrollment is authoritative', async () => {
@@ -1068,9 +1551,9 @@ describe('native enrollment', () => {
         wait,
       })
     ).rejects.toMatchObject({
-      code: 'enrollment_postcondition_failed',
+      code: 'enrollment_ownership_unproven',
       message: expect.stringContaining(
-        'mutation error: enrolling PR #14359 with native failed with exit code 1: GraphQL: Pull request head SHA changed'
+        'enrolling PR #14359 with native failed with exit code 1: GraphQL: Pull request head SHA changed'
       ),
       details: {
         mutationError: {
@@ -1094,13 +1577,31 @@ describe('native enrollment', () => {
     expect(invokedEnrollment(runner)).toBe(false);
   });
 
-  it('refuses a held exact head before invoking the enrollment mutation', async () => {
+  it('refuses a retargeted base before invoking the enrollment mutation', async () => {
     const runner = createNativeRunner({
-      states: [prState({ labels: { nodes: [{ name: 'queue-deferred' }] } })],
+      states: [prState({ baseRefName: 'release' })],
+    });
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'base_changed',
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it.each([
+    'blocked',
+    'human-review-required',
+    'needs-human-review',
+    'needs-manual-rebase',
+    'no-auto',
+    'risk:high',
+    'queue-deferred',
+  ])('refuses an exact head held by %s before invoking the enrollment mutation', async label => {
+    const runner = createNativeRunner({
+      states: [prState({ labels: { nodes: [{ name: label }] } })],
     });
     await expect(enroll(runner)).rejects.toMatchObject({
       code: 'held_pull_request',
-      details: { labels: ['queue-deferred'] },
+      details: { labels: [label] },
     });
     expect(invokedEnrollment(runner)).toBe(false);
   });
@@ -1114,17 +1615,8 @@ describe('native enrollment', () => {
     });
     await expect(
       enroll(runner, { postconditionAttempts: 1 })
-    ).rejects.toMatchObject({
-      code: 'enrollment_postcondition_failed',
-      details: {
-        state: {
-          autoMergeEnabled: true,
-          mergeQueueEntry: null,
-          queued: false,
-        },
-      },
-    });
-    expect(invokedEnrollment(runner)).toBe(true);
+    ).rejects.toMatchObject({ code: 'auto_merge_owned_elsewhere' });
+    expect(invokedEnrollment(runner)).toBe(false);
   });
 
   it('no-ops only after GraphQL proves queue state and position', async () => {
@@ -1181,7 +1673,7 @@ describe('native enrollment', () => {
     expect(invokedEnrollment(runner)).toBe(false);
   });
 
-  it('reconciles an errored mutation only when a later read proves queue membership', async () => {
+  it('treats a positioned queue state after a transport error as evidence only', async () => {
     const runner = createNativeRunner({
       states: [
         prState(),
@@ -1194,11 +1686,65 @@ describe('native enrollment', () => {
       },
     });
 
-    await expect(enroll(runner)).resolves.toMatchObject({
-      changed: true,
-      reconciledAfterCommandError: true,
-      state: { mergeQueueEntry: QUEUE_ENTRY },
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'enrollment_ownership_unproven',
+      message: expect.stringContaining('later queue state is evidence only'),
+      details: {
+        mutationError: { code: 'gh_command_failed' },
+        postconditionAttempts: 1,
+        state: { queued: true, mergeQueueEntry: QUEUE_ENTRY },
+      },
     });
+  });
+
+  it.each([
+    [
+      'a CLI GraphQL ownership refusal',
+      {
+        code: 1,
+        stdout: '',
+        stderr: 'GraphQL: Pull request already has auto-merge enabled',
+      },
+      'gh_command_failed',
+    ],
+    [
+      'an HTTP refusal',
+      {
+        code: 1,
+        stdout: '',
+        stderr: 'HTTP 422: Pull request already has auto-merge enabled',
+      },
+      'gh_command_failed',
+    ],
+  ])('does not claim a foreign enrollment after %s', async (_name, enableResult, mutationErrorCode) => {
+    const runner = createNativeRunner({
+      states: [
+        prState(),
+        prState({
+          autoMergeRequest: AUTO_MERGE,
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+        }),
+      ],
+      enableResult,
+    });
+
+    await expect(
+      enroll(runner, { postconditionAttempts: 1 })
+    ).rejects.toMatchObject({
+      code: 'enrollment_ownership_unproven',
+      message: expect.stringContaining('later queue state is evidence only'),
+      details: {
+        mutationError: { code: mutationErrorCode },
+        postconditionAttempts: 1,
+        state: {
+          autoMergeRequest: AUTO_MERGE,
+          queued: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+        },
+      },
+    });
+    expect(invokedEnrollment(runner)).toBe(true);
   });
 
   it('fails closed when the head changes after the mutation', async () => {
@@ -1207,22 +1753,39 @@ describe('native enrollment', () => {
     });
 
     await expect(enroll(runner)).rejects.toMatchObject({
-      code: 'head_changed',
+      code: 'enrollment_postcondition_failed',
+      details: { observationError: { code: 'head_changed' } },
     });
     expect(invokedEnrollment(runner)).toBe(true);
   });
 
-  it('treats GraphQL errors as an unproven mutation and fails after bounded reads', async () => {
+  it('treats a base retarget after mutation as an unproven enrollment', async () => {
+    const runner = createNativeRunner({
+      states: [prState(), prState({ baseRefName: 'release' })],
+    });
+
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'enrollment_postcondition_failed',
+      details: { observationError: { code: 'base_changed' } },
+    });
+    expect(invokedEnrollment(runner)).toBe(true);
+  });
+
+  it('treats CLI admission errors as an unproven mutation and fails after bounded reads', async () => {
     const runner = createNativeRunner({
       states: [prState(), prState()],
-      enableResult: ok({ errors: [{ message: 'auto-merge unavailable' }] }),
+      enableResult: {
+        code: 1,
+        stdout: '',
+        stderr: 'GraphQL: auto-merge unavailable',
+      },
     });
 
     await expect(
       enroll(runner, { postconditionAttempts: 1 })
     ).rejects.toMatchObject({
-      code: 'enrollment_postcondition_failed',
-      details: { mutationError: { code: 'github_graphql_error' } },
+      code: 'enrollment_ownership_unproven',
+      details: { mutationError: { code: 'gh_command_failed' } },
     });
   });
 
@@ -1239,17 +1802,37 @@ describe('native enrollment', () => {
         postconditionDelayMs: 2_000,
         wait,
       })
-    ).rejects.toMatchObject({
-      code: 'enrollment_postcondition_failed',
-      details: {
-        postconditionAttempts: 2,
-        state: {
+    ).rejects.toMatchObject({ code: 'auto_merge_owned_elsewhere' });
+    expect(invokedEnrollment(runner)).toBe(false);
+    expect(wait).not.toHaveBeenCalled();
+  });
+
+  it('waits through controller-owned auto-merge until a positioned queue entry appears', async () => {
+    const wait = vi.fn(async () => {});
+    const runner = createNativeRunner({
+      states: [
+        prState(),
+        prState({ autoMergeRequest: AUTO_MERGE }),
+        prState({
           autoMergeRequest: AUTO_MERGE,
-          mergeQueueEntry: null,
-        },
-      },
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+        }),
+      ],
+    });
+
+    await expect(
+      enroll(runner, {
+        postconditionAttempts: 2,
+        postconditionDelayMs: 1,
+        wait,
+      })
+    ).resolves.toMatchObject({
+      changed: true,
+      state: { queued: true, mergeQueueEntry: QUEUE_ENTRY },
     });
     expect(invokedEnrollment(runner)).toBe(true);
+    expect(wait).toHaveBeenCalledOnce();
   });
 });
 
@@ -1266,7 +1849,7 @@ describe('native dequeue', () => {
         prState(),
       ],
     });
-    await expect(dequeue(runner)).resolves.toMatchObject({
+    await expect(dequeueCompensation(runner)).resolves.toMatchObject({
       backend: 'native',
       changed: true,
       mutationActor: CANONICAL_NATIVE_MUTATION_ACTOR,
@@ -1293,6 +1876,99 @@ describe('native dequeue', () => {
       code: 'dequeue_postcondition_failed',
     });
   });
+
+  it('refuses exact-head compensation after a newer head appears', async () => {
+    const runner = createNativeRunner({
+      states: [
+        prState({
+          headRefOid: OTHER_HEAD,
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+          autoMergeRequest: AUTO_MERGE,
+        }),
+      ],
+    });
+
+    await expect(dequeueCompensation(runner)).rejects.toMatchObject({
+      code: 'head_changed',
+    });
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+
+  it('threads the optional exact-head compensation fence through the CLI', async () => {
+    const runner = createNativeRunner({
+      states: [
+        prState({
+          headRefOid: OTHER_HEAD,
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+          autoMergeRequest: AUTO_MERGE,
+        }),
+      ],
+    });
+
+    await expect(
+      runCli(['dequeue', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'test-fixture',
+          REPO: REPOSITORY,
+        },
+        runner,
+        write: vi.fn(),
+      })
+    ).rejects.toMatchObject({ code: 'head_changed' });
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+
+  it('refuses to disable foreign auto-merge during compensation', async () => {
+    const runner = createNativeRunner({
+      states: [prState({ autoMergeRequest: AUTO_MERGE })],
+    });
+
+    await expect(dequeueCompensation(runner)).rejects.toMatchObject({
+      code: 'auto_merge_owned_elsewhere',
+    });
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+
+  it('disarms an exact-head auto-merge after an acknowledged controller enable', async () => {
+    const runner = createNativeRunner({
+      states: [
+        prState({ autoMergeRequest: AUTO_MERGE }),
+        prState({ autoMergeRequest: AUTO_MERGE }),
+        prState(),
+      ],
+    });
+
+    await expect(
+      dequeuePullRequest({
+        ...nativeOptions(runner),
+        expectedHeadOid: HEAD,
+        controllerEnrollmentCompensation: true,
+      })
+    ).resolves.toMatchObject({
+      changed: true,
+      state: { autoMergeRequest: null, queued: false },
+    });
+    expect(invokedNativeMutation(runner)).toBe(true);
+  });
+
+  it('keeps ordinary policy dequeue able to target current auto-merge state', async () => {
+    const runner = createNativeRunner({
+      states: [
+        prState({ autoMergeRequest: AUTO_MERGE }),
+        prState({ autoMergeRequest: AUTO_MERGE }),
+        prState(),
+      ],
+    });
+
+    await expect(dequeue(runner)).resolves.toMatchObject({
+      changed: true,
+      state: { autoMergeRequest: null, queued: false },
+    });
+    expect(invokedNativeMutation(runner)).toBe(true);
+  });
 });
 
 describe('authoritative native state listing', () => {
@@ -1308,5 +1984,18 @@ describe('authoritative native state listing', () => {
     ).resolves.toMatchObject({
       99: { backend: 'native', queued: true, id: PR_ID },
     });
+  });
+
+  it.each([
+    ['membership without an entry', { isInMergeQueue: true }],
+    [
+      'an entry without membership',
+      { isInMergeQueue: false, mergeQueueEntry: QUEUE_ENTRY },
+    ],
+  ])('rejects %s as incomplete queue evidence', async (_name, mismatch) => {
+    const runner = createNativeRunner({ states: [prState(mismatch)] });
+    await expect(
+      listPullRequestQueueStates(nativeOptions(runner))
+    ).rejects.toMatchObject({ code: 'incomplete_queue_state' });
   });
 });

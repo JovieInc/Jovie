@@ -1769,13 +1769,13 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
       }
     );
     const allowedResult = JSON.parse(allowed.stdout);
-    assert.equal(allowedResult.behind.action, 'api_update_branch');
-    assert.equal(allowedResult.behind.result, 'ok');
-    assert.ok(
-      allowedResult.calls[0].includes(
-        'expected_head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-      )
+    assert.equal(allowedResult.behind.action, 'github_actions_single_writer');
+    assert.equal(allowedResult.behind.result, 'skipped');
+    assert.equal(
+      allowedResult.behind.reason,
+      'jovie_branch_updates_owned_by_merge_queue_autoenroll'
     );
+    assert.deepEqual(allowedResult.calls, []);
     assert.equal(allowedResult.clean.action, 'observe_only');
     assert.equal(
       allowedResult.clean.reason,
