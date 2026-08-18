@@ -148,11 +148,7 @@ import {
   showMerchSales,
   updateMerchCardDetails,
 } from '@/lib/merch/service';
-import {
-  assertEveChatFactoryLock,
-  bindEveIdentityForChatMode,
-} from '@/lib/ovie/identity';
-import { applyOvieDumpBeforeModel } from '@/lib/ovie/ingest';
+import { prepareOvieChatTurn } from '@/lib/ovie/chat-entry';
 import {
   albumArtGenerationBurstLimiter,
   albumArtGenerationLimiter,
@@ -2452,13 +2448,11 @@ export async function POST(req: Request) {
     );
   }
   const userText = extractLastUserText(uiMessages);
-  // JOV-5215/5216: bind the Eve pack at chat entry (not a prompt flag).
-  // Persist + Linear-route dump receipts before executeChatTurn.
-  const eveTurn = bindEveIdentityForChatMode(chatMode);
-  assertEveChatFactoryLock(eveTurn);
-  const ovieIngestReceipts = eveTurn.pack.canIngestAck
-    ? applyOvieDumpBeforeModel(userText)
-    : [];
+  // JOV-5215/5216: bind Eve pack + persist/Linear-route dump before model.
+  const { eveTurn, receipts: ovieIngestReceipts } = prepareOvieChatTurn(
+    chatMode,
+    userText
+  );
   const clientTurnId = normalizeClientId(body.clientTurnId);
   const clientMessageId = normalizeClientId(body.clientMessageId);
   const source = normalizeChatTurnSource(body.source);

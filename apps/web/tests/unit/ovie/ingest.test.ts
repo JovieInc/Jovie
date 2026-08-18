@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { prepareOvieChatTurn } from '@/lib/ovie/chat-entry';
 import {
   applyOvieDump,
-  applyOvieDumpBeforeModel,
   DEST_LINEAR,
   DEST_PERSONAL,
   readOvieLinearRoutes,
@@ -9,27 +9,28 @@ import {
   resetOvieIngestLog,
 } from '@/lib/ovie/ingest';
 
+const MIXED = [
+  'post this tweet',
+  'research 23 growth ideas and write evals',
+  'Jovie signup returns 500 on /start',
+  'remind me to text Liv about Catalina',
+  'taste: is the hero too salesy',
+] as const;
+
 describe('Ovie dump ingest (JOV-5215)', () => {
   beforeEach(() => {
     resetOvieIngestLog();
   });
 
   it('acks a mixed dump without spawning workers', () => {
-    const items = [
-      'post this tweet',
-      'research 23 growth ideas and write evals',
-      'Jovie signup returns 500 on /start',
-      'remind me to text Liv about Catalina',
-      'taste: is the hero too salesy',
-    ];
     const spawned: string[] = [];
-    const receipts = applyOvieDump(items, {
+    const receipts = applyOvieDump(MIXED, {
       spawn: goal => {
         spawned.push(goal);
       },
     });
 
-    expect(receipts).toHaveLength(items.length);
+    expect(receipts).toHaveLength(MIXED.length);
     expect(spawned).toEqual([]);
     expect(receipts.map(r => r.lane)).toEqual([
       'flash',
@@ -45,23 +46,34 @@ describe('Ovie dump ingest (JOV-5215)', () => {
       expect(receipt.ack.startsWith('stored:')).toBe(true);
       expect(receipt.workerSpawned).toBe(false);
     }
-
     expect(readOvieReceiptLog()).toEqual(receipts);
     expect(readOvieLinearRoutes()).toEqual([receipts[2]]);
-    expect(readOvieLinearRoutes()[0]?.destination).toBe(DEST_LINEAR);
-    expect(
-      readOvieLinearRoutes().some(route => route.destination === DEST_PERSONAL)
-    ).toBe(false);
   });
 
-  it('persists and Linear-routes before model on the chat hook', () => {
-    const receipts = applyOvieDumpBeforeModel(
-      'Jovie signup returns 500 on /start'
-    );
+  it('persists mixed dump on the shipped chat entry and skips spawn', () => {
+    const spawned: string[] = [];
+    const { eveTurn, receipts } = prepareOvieChatTurn('ov', MIXED[2], {
+      spawn: goal => {
+        spawned.push(goal);
+      },
+    });
+    expect(eveTurn.pack.id).toBe('ovie');
+    expect(spawned).toEqual([]);
     expect(receipts).toHaveLength(1);
     expect(receipts[0]?.lane).toBe('engineering');
     expect(receipts[0]?.destination).toBe(DEST_LINEAR);
     expect(readOvieReceiptLog()).toEqual(receipts);
     expect(readOvieLinearRoutes()).toEqual(receipts);
+  });
+
+  it('does not ingest on the Jovie artist chat entry', () => {
+    const { eveTurn, receipts } = prepareOvieChatTurn(
+      null,
+      'Jovie signup returns 500 on /start'
+    );
+    expect(eveTurn.pack.id).toBe('jovie');
+    expect(receipts).toEqual([]);
+    expect(readOvieReceiptLog()).toEqual([]);
+    expect(readOvieLinearRoutes()).toEqual([]);
   });
 });
