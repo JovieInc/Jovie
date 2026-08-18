@@ -1,6 +1,7 @@
 import {
   Dialog as UiDialog,
   DialogContent as UiDialogContent,
+  DialogFooter as UiDialogFooter,
 } from '@jovie/ui';
 
 export { DialogDescription, DialogTitle } from '@jovie/ui';
@@ -56,7 +57,7 @@ export function Dialog({
         hideClose={hideClose}
         className={cn(
           sizes[size],
-          'rounded-dialog border border-(--app-shell-frame-seam) bg-(--app-shell-content-surface) p-6 shadow-popover',
+          'gap-0 [&>[data-slot=dialog-description]]:mt-1.5 [&>[data-slot=dialog-description]]:pr-10 [&>[data-slot=dialog-title]]:pr-10',
           className
         )}
       >
@@ -70,7 +71,13 @@ export function DialogBody({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<'div'>) {
-  return <div {...props} className={cn('mt-5', className)} />;
+  return (
+    <div
+      data-slot='dialog-body'
+      {...props}
+      className={cn('mt-5 min-w-0', className)}
+    />
+  );
 }
 
 export function DialogActions({
@@ -78,12 +85,15 @@ export function DialogActions({
   ...props
 }: React.ComponentPropsWithoutRef<'div'>) {
   return (
-    <div
+    <UiDialogFooter
       {...props}
       className={cn(
-        'mt-6 flex flex-col-reverse items-center justify-end gap-3 *:w-full sm:flex-row sm:*:w-auto',
+        'mt-6 items-center gap-3 pt-0 *:w-full sm:*:w-auto',
         className
       )}
     />
   );
 }
+
+DialogBody.displayName = 'DialogBody';
+DialogActions.displayName = 'DialogActions';
