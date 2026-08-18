@@ -1170,7 +1170,7 @@ jobs:
           # origin/<base>; a --depth=1 fetch leaves the base tip shallow and fails
           # desktop-release-guard / version-fanout-guard on PRs.
           git fetch origin "${{ github.base_ref }}" --no-tags
-          if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE '^(\.github/|\.claude/|AGENTS\.md|CODEX\.md|scripts/(drain-pr-|ownerless-recovery-)|scripts/lib/(ci-|merge-queue|ownerless-recovery-policy|pr-check-failures|upsert-pr-comment)|scripts/lib/__tests__/(ci-fast-workflow-contract|merge-group-workflow-contract)\.test\.mjs|scripts/ci-|scripts/hermes/(gem-|gem_|install-gem-pr-rehabilitation)|scripts/brand-scrub\.py|scripts/tests/test_(brand_scrub|agent_workflow_hygiene|vercel_prebuilt_deploy)\.py)'; then
+          if git diff --name-only "origin/${{ github.base_ref }}" HEAD | grep -qE '^(\.github/|\.claude/|AGENTS\.md|CODEX\.md|package\.json$|scripts/(ci-|drain-pr-|merge-queue-|ownerless-recovery-)|scripts/backlog-orchestrator/__tests__/backlog-orchestrator\.test\.mjs$|scripts/lib/(ci-|merge-queue|ownerless-recovery-policy|pr-check-failures|upsert-pr-comment)|scripts/lib/__tests__/(automation-verify|ci-fast-workflow-contract|merge-group-workflow-contract|merge-queue-backend|merge-queue-guard|ownerless-recovery-policy|pr-check-failures)\.test\.mjs$|scripts/hermes/(evaluate-fleet-gate\.sh$|gem-|gem_|install-gem-pr-rehabilitation)|scripts/hermes/tests/(gem-|test_evaluate_fleet_gate\.py$)|scripts/brand-scrub\.py$|scripts/tests/test_(brand_scrub|agent_workflow_hygiene|gh_retry|vercel_prebuilt_deploy)\.py$)'; then
             echo "skip=false" >> "$GITHUB_OUTPUT"
           else
             echo "skip=true" >> "$GITHUB_OUTPUT"

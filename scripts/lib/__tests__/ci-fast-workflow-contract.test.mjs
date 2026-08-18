@@ -197,7 +197,10 @@ describe('ci-fast bounded parallel workflow', () => {
     );
 
     expect(remaining).toContain(
-      'scripts/hermes/(gem-|gem_|install-gem-pr-rehabilitation)'
+      'scripts/hermes/(evaluate-fleet-gate\\.sh$|gem-|gem_|install-gem-pr-rehabilitation)'
+    );
+    expect(remaining).toContain(
+      'scripts/hermes/tests/(gem-|test_evaluate_fleet_gate\\.py$)'
     );
     expect(CI_FAST_SOURCE).toContain(
       'coverage run --branch scripts/hermes/tests/gem-rehabilitation-policy.test.py'
@@ -371,7 +374,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(browser).toContain('git diff --diff-filter=ACDMRT --name-only');
   });
 
-  it('path-selects both workflow contracts and excludes unrelated tests', () => {
+  it('path-selects every controller and fleet contract before structural CI', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
@@ -382,19 +385,35 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(selectorPattern).toBeDefined();
 
     const selectsStructural = new RegExp(selectorPattern);
-    expect(
-      selectsStructural.test(
-        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs'
-      )
-    ).toBe(true);
-    expect(
-      selectsStructural.test(
-        'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs'
-      )
-    ).toBe(true);
-    expect(
-      selectsStructural.test('scripts/lib/__tests__/merge-queue-guard.test.mjs')
-    ).toBe(false);
+    for (const requiredPath of [
+      'package.json',
+      'scripts/merge-queue-backend.mjs',
+      'scripts/drain-pr-queue.sh',
+      'scripts/drain-pr-remediate.mjs',
+      'scripts/ownerless-recovery-sweeper.mjs',
+      'scripts/lib/pr-check-failures.mjs',
+      'scripts/lib/upsert-pr-comment.sh',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+      'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+      'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+      'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+      'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+      'scripts/lib/__tests__/pr-check-failures.test.mjs',
+      'scripts/tests/test_gh_retry.py',
+      'scripts/hermes/evaluate-fleet-gate.sh',
+      'scripts/hermes/tests/gem-pr-drain.test.py',
+      'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+      'scripts/hermes/tests/gem-priority-gate.test.py',
+      'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+      'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
+    ]) {
+      expect(
+        requiredPath,
+        `structural selector missed ${requiredPath}`
+      ).toMatch(selectsStructural);
+    }
+    expect('apps/web/lib/unrelated.ts').not.toMatch(selectsStructural);
   });
 
   it('skips the aggregate when the original ci-fast eligibility is skipped', () => {

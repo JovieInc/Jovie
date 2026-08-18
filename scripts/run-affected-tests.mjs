@@ -226,6 +226,7 @@ const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
   'scripts/lib/ownerless-recovery-policy.mjs',
   'scripts/lib/pr-check-failures.mjs',
