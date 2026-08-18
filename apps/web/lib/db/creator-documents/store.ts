@@ -299,7 +299,7 @@ export async function approveCreatorRevisionForCapture(input: {
       select document_id, revision_id, ${input.userId}, null
       from eligible
       on conflict (document_id, revision_id)
-      do update set revoked_at = null, approved_by_user_id = excluded.approved_by_user_id
+      do nothing
       returning id, document_id, revision_id
     ), handed_off as (
       insert into creator_capture_handoffs (

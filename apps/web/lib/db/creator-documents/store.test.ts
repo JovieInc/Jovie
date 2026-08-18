@@ -166,6 +166,18 @@ describe('creator document persistence boundaries', () => {
         revision: 3,
       })
     ).resolves.toBeUndefined();
+
+    const source = await readFile(
+      join(process.cwd(), 'lib/db/creator-documents/store.ts'),
+      'utf8'
+    );
+    const approval = source.slice(
+      source.indexOf('export async function approveCreatorRevisionForCapture'),
+      source.indexOf('export async function completeCreatorEvidenceReview')
+    );
+    expect(approval).toContain('on conflict (document_id, revision_id)');
+    expect(approval).toContain('do nothing');
+    expect(approval).not.toContain('approved_by_user_id = excluded');
   });
 
   it('fails closed when factual evidence review is incomplete', async () => {

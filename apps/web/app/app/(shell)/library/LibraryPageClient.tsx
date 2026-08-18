@@ -12,6 +12,7 @@ import { ReleaseCatalogPageClient } from '../dashboard/releases/ReleaseCatalogPa
 import { CreatorDocumentsWorkspace } from './CreatorDocumentsWorkspace';
 
 export function LibraryPageClient({
+  creatorProfileId,
   merchCards,
   archivedMerchCards = [],
   archivedReleases = [],
@@ -22,6 +23,7 @@ export function LibraryPageClient({
   creatorDocumentsNextCursor = null,
   creatorDocumentsLoadFailed = false,
 }: {
+  readonly creatorProfileId: string;
   readonly merchCards: readonly LibraryMerchCard[];
   readonly archivedMerchCards?: readonly LibraryMerchCard[];
   readonly archivedReleases?: readonly ReleaseViewModel[];
@@ -127,6 +129,7 @@ export function LibraryPageClient({
           className='flex min-h-0 flex-1'
         >
           <CreatorDocumentsWorkspace
+            creatorProfileId={creatorProfileId}
             initialDocuments={creatorDocuments}
             initialNextCursor={creatorDocumentsNextCursor}
             initialLoadFailed={creatorDocumentsLoadFailed}

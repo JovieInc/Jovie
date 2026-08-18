@@ -5,9 +5,25 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
-import { CreatorDocumentsWorkspace } from './CreatorDocumentsWorkspace';
+import { CreatorDocumentsWorkspace as CreatorDocumentsWorkspaceComponent } from './CreatorDocumentsWorkspace';
+
+function CreatorDocumentsWorkspace({
+  creatorProfileId = '22222222-2222-4222-8222-222222222222',
+  ...props
+}: Omit<
+  ComponentProps<typeof CreatorDocumentsWorkspaceComponent>,
+  'creatorProfileId'
+> & { readonly creatorProfileId?: string }) {
+  return (
+    <CreatorDocumentsWorkspaceComponent
+      creatorProfileId={creatorProfileId}
+      {...props}
+    />
+  );
+}
 
 vi.mock('@/hooks/useRegisterRightPanel', () => ({
   useRegisterRightPanel: vi.fn(),
@@ -145,6 +161,55 @@ describe('CreatorDocumentsWorkspace', () => {
       String(vi.mocked(fetch).mock.calls[1]?.[1]?.body)
     );
     expect(second.idempotencyKey).toBe(first.idempotencyKey);
+  });
+
+  it('restores a capture retry with the same key after navigation', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ documentId: document.id }), {
+          status: 200,
+        })
+      );
+    vi.stubGlobal('location', { reload: vi.fn() });
+    const firstView = render(
+      <CreatorDocumentsWorkspace initialDocuments={[]} />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save Idea' }));
+    fireEvent.change(screen.getByLabelText('Idea Title'), {
+      target: { value: 'Navigation-safe idea' },
+    });
+    fireEvent.change(screen.getByLabelText('Idea Details'), {
+      target: { value: 'Keep one capture identity.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Privately' }));
+    await screen.findByRole('button', { name: 'Retry Private Save' });
+    const first = JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body));
+    firstView.unmount();
+
+    render(<CreatorDocumentsWorkspace initialDocuments={[]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Save Privately' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    const second = JSON.parse(
+      String(vi.mocked(fetch).mock.calls[1]?.[1]?.body)
+    );
+    expect(second.idempotencyKey).toBe(first.idempotencyKey);
+  });
+
+  it('does not restore an idea draft from another creator profile', () => {
+    globalThis.sessionStorage.setItem(
+      'jovie:creator-idea-draft:v1:profile-a',
+      JSON.stringify({ title: 'Private A', body: 'Only for A' })
+    );
+
+    render(
+      <CreatorDocumentsWorkspace
+        creatorProfileId='profile-b'
+        initialDocuments={[]}
+      />
+    );
+
+    expect(screen.queryByLabelText('Idea Title')).toBeNull();
   });
 
   it('opens a Tasks-like accessible right panel for the selected revision', () => {
@@ -390,6 +455,75 @@ describe('CreatorDocumentsWorkspace', () => {
     expect(screen.getByLabelText('Claim Text')).toHaveValue(
       'Recovered evidence draft'
     );
+  });
+
+  it('keeps a restored draft bound to its original base revision', async () => {
+    const firstWorkspace = render(
+      <CreatorDocumentsWorkspace initialDocuments={[document]} />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const firstPanel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    if (!firstPanel) throw new Error('Expected a document panel');
+    const panelView = render(firstPanel);
+    fireEvent.change(screen.getByLabelText('Document Title'), {
+      target: { value: 'Stale but recoverable draft' },
+    });
+    await waitFor(() => expect(globalThis.sessionStorage.length).toBe(1));
+    panelView.unmount();
+    firstWorkspace.unmount();
+
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 409 }));
+    render(
+      <CreatorDocumentsWorkspace
+        initialDocuments={[{ ...document, currentRevision: 2 }]}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const restoredPanel = vi
+      .mocked(useRegisterRightPanel)
+      .mock.calls.at(-1)?.[0];
+    if (!restoredPanel) throw new Error('Expected a restored document panel');
+    render(restoredPanel);
+    await waitFor(() =>
+      expect(screen.getByLabelText('Document Title')).toHaveValue(
+        'Stale but recoverable draft'
+      )
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save Revision' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    expect(
+      JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body))
+        .expectedRevision
+    ).toBe(1);
+    expect(
+      await screen.findByText('Revision changed. Reload before continuing.')
+    ).toBeInTheDocument();
+  });
+
+  it('removes a persisted document draft when discard is confirmed', async () => {
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal('confirm', confirm);
+    render(<CreatorDocumentsWorkspace initialDocuments={[document]} />);
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const firstPanel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    if (!firstPanel) throw new Error('Expected a document panel');
+    const panelView = render(firstPanel);
+    fireEvent.change(screen.getByLabelText('Document Title'), {
+      target: { value: 'Discard me' },
+    });
+    await waitFor(() => expect(globalThis.sessionStorage.length).toBe(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Close document' }));
+    panelView.unmount();
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const reopenedPanel = vi
+      .mocked(useRegisterRightPanel)
+      .mock.calls.at(-1)?.[0];
+    if (!reopenedPanel) throw new Error('Expected a reopened document panel');
+    render(reopenedPanel);
+
+    expect(globalThis.sessionStorage.length).toBe(0);
+    expect(screen.getByLabelText('Document Title')).toHaveValue(document.title);
   });
 
   it('shows a completed status after exact-revision capture approval', async () => {

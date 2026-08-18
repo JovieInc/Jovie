@@ -15,7 +15,7 @@ import { richTextDocumentSchema } from '@/lib/rich-text/document';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 
 const DOCUMENT_DRAFT_KEY_PREFIX = 'jovie:creator-document-draft:v1:';
-const IDEA_DRAFT_KEY = 'jovie:creator-idea-draft:v1';
+const IDEA_DRAFT_KEY_PREFIX = 'jovie:creator-idea-draft:v1:';
 
 type EditorStatus =
   | 'idle'
@@ -64,6 +64,7 @@ function DocumentEditor({
   const [sourceRecordId, setSourceRecordId] = useState('');
   const editVersionRef = useRef(0);
   const claimVersionRef = useRef(0);
+  const baseRevisionRef = useRef(document.currentRevision);
   const draftRestoredRef = useRef(false);
   const router = useRouter();
 
@@ -81,8 +82,11 @@ function DocumentEditor({
             draft.kind === 'research' ||
             draft.kind === 'script') &&
           content.success &&
-          typeof draft.plainText === 'string'
+          typeof draft.plainText === 'string' &&
+          Number.isInteger(draft.baseRevision) &&
+          Number(draft.baseRevision) > 0
         ) {
+          baseRevisionRef.current = Number(draft.baseRevision);
           setTitle(draft.title);
           setKind(draft.kind);
           setEditorContent(content.data);
@@ -175,7 +179,7 @@ function DocumentEditor({
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          expectedRevision: document.currentRevision,
+          expectedRevision: baseRevisionRef.current,
           title: savedTitle,
           kind: savedKind,
           content: savedContent,
@@ -188,6 +192,7 @@ function DocumentEditor({
       }
       if (!response.ok) throw new Error('Save failed');
       const payload = (await response.json()) as { revision: number };
+      baseRevisionRef.current = payload.revision;
       onSaved(
         payload.revision,
         savedTitle,
@@ -294,6 +299,7 @@ function DocumentEditor({
         JSON.stringify({
           title,
           kind,
+          baseRevision: baseRevisionRef.current,
           content: editorContent,
           plainText: editorPlainText,
           claimText,
@@ -567,11 +573,13 @@ function DocumentEditor({
 }
 
 export function CreatorDocumentsWorkspace({
+  creatorProfileId,
   initialDocuments,
   initialNextCursor = null,
   initialLoadFailed = false,
   onUnsavedDraftChange,
 }: Readonly<{
+  creatorProfileId: string;
   initialDocuments: readonly CreatorDocumentListItem[];
   initialNextCursor?: string | null;
   initialLoadFailed?: boolean;
@@ -590,6 +598,7 @@ export function CreatorDocumentsWorkspace({
     'idle'
   );
   const ideaIdempotencyKey = useRef<string | null>(null);
+  const ideaDraftKey = `${IDEA_DRAFT_KEY_PREFIX}${creatorProfileId}`;
   const ideaDraftRestoredRef = useRef(false);
   const [hasDocumentDraft, setHasDocumentDraft] = useState(false);
   const hasIdeaDraft =
@@ -602,13 +611,16 @@ export function CreatorDocumentsWorkspace({
 
   useEffect(() => {
     try {
-      const raw = globalThis.sessionStorage.getItem(IDEA_DRAFT_KEY);
+      const raw = globalThis.sessionStorage.getItem(ideaDraftKey);
       if (raw) {
         const draft = JSON.parse(raw) as Record<string, unknown>;
         if (typeof draft.title === 'string' && typeof draft.body === 'string') {
           setTitle(draft.title);
           setBody(draft.body);
           setShowCapture(true);
+          if (typeof draft.idempotencyKey === 'string') {
+            ideaIdempotencyKey.current = draft.idempotencyKey;
+          }
         }
       }
     } catch {
@@ -616,23 +628,27 @@ export function CreatorDocumentsWorkspace({
     } finally {
       ideaDraftRestoredRef.current = true;
     }
-  }, []);
+  }, [ideaDraftKey]);
 
   useEffect(() => {
     if (!ideaDraftRestoredRef.current) return;
     try {
       if (!title.trim() && !body.trim()) {
-        globalThis.sessionStorage.removeItem(IDEA_DRAFT_KEY);
+        globalThis.sessionStorage.removeItem(ideaDraftKey);
       } else {
         globalThis.sessionStorage.setItem(
-          IDEA_DRAFT_KEY,
-          JSON.stringify({ title, body })
+          ideaDraftKey,
+          JSON.stringify({
+            title,
+            body,
+            idempotencyKey: ideaIdempotencyKey.current,
+          })
         );
       }
     } catch {
       // Keep the in-memory draft even when browser storage is unavailable.
     }
-  }, [body, title]);
+  }, [body, ideaDraftKey, title]);
 
   useEffect(() => {
     onUnsavedDraftChange?.(hasUnsavedDraft);
@@ -654,13 +670,32 @@ export function CreatorDocumentsWorkspace({
     return globalThis.confirm('Discard your unsaved document changes?');
   }, [hasUnsavedDraft]);
 
+  const discardPersistedDrafts = useCallback(() => {
+    try {
+      globalThis.sessionStorage.removeItem(ideaDraftKey);
+      if (selectedId) {
+        globalThis.sessionStorage.removeItem(
+          `${DOCUMENT_DRAFT_KEY_PREFIX}${selectedId}`
+        );
+      }
+    } catch {
+      // The in-memory draft is still discarded if storage is unavailable.
+    }
+    setTitle('');
+    setBody('');
+    setShowCapture(false);
+    setIdeaStatus('idle');
+    ideaIdempotencyKey.current = null;
+    setHasDocumentDraft(false);
+  }, [ideaDraftKey, selectedId]);
+
   const selectDocument = useCallback(
     (documentId: string | null) => {
       if (documentId === selectedId || !confirmDiscardDraft()) return;
-      setHasDocumentDraft(false);
+      discardPersistedDrafts();
       setSelectedId(documentId);
     },
-    [confirmDiscardDraft, selectedId]
+    [confirmDiscardDraft, discardPersistedDrafts, selectedId]
   );
 
   const updateSelected = useCallback(
@@ -730,6 +765,18 @@ export function CreatorDocumentsWorkspace({
   const saveIdea = useCallback(async () => {
     if (ideaStatus === 'saving') return;
     ideaIdempotencyKey.current ??= globalThis.crypto.randomUUID();
+    try {
+      globalThis.sessionStorage.setItem(
+        ideaDraftKey,
+        JSON.stringify({
+          title,
+          body,
+          idempotencyKey: ideaIdempotencyKey.current,
+        })
+      );
+    } catch {
+      // The request remains idempotent for this mounted session.
+    }
     setIdeaStatus('saving');
     try {
       const response = await fetch('/api/library/documents', {
@@ -743,7 +790,7 @@ export function CreatorDocumentsWorkspace({
       });
       if (!response.ok) throw new Error('Capture failed');
       try {
-        globalThis.sessionStorage.removeItem(IDEA_DRAFT_KEY);
+        globalThis.sessionStorage.removeItem(ideaDraftKey);
       } catch {
         // The durable server write succeeded even if browser cleanup is blocked.
       }
@@ -751,7 +798,7 @@ export function CreatorDocumentsWorkspace({
     } catch {
       setIdeaStatus('error');
     }
-  }, [body, ideaStatus, title]);
+  }, [body, ideaDraftKey, ideaStatus, title]);
 
   return (
     <section
@@ -788,14 +835,12 @@ export function CreatorDocumentsWorkspace({
           <Button
             size='sm'
             onClick={() => {
-              if (showCapture && !confirmDiscardDraft()) return;
-              setShowCapture(value => !value);
               if (showCapture) {
-                setTitle('');
-                setBody('');
-                ideaIdempotencyKey.current = null;
-                setIdeaStatus('idle');
+                if (!confirmDiscardDraft()) return;
+                discardPersistedDrafts();
+                return;
               }
+              setShowCapture(true);
             }}
           >
             <Plus className='h-4 w-4' aria-hidden='true' /> Save Idea

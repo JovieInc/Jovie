@@ -1347,6 +1347,7 @@ describe('TasksPageClient', () => {
         ...mockTaskTwo,
         priority: 'urgent',
         assigneeKind: 'human',
+        mutationVersion: 8,
       },
       mockTask,
     ];
@@ -1374,6 +1375,7 @@ describe('TasksPageClient', () => {
         title: 'Unsaved metadata-safe title',
         description: mockTaskTwo.description,
         descriptionContent: expect.objectContaining({ type: 'doc' }),
+        expectedMutationVersion: 8,
       }),
     });
   });

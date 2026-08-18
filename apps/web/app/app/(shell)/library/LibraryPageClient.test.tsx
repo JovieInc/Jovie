@@ -42,7 +42,7 @@ describe('LibraryPageClient sections', () => {
   });
 
   it('uses accessible tabs and persists the document section in the URL', () => {
-    render(<LibraryPageClient merchCards={[]} />);
+    render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
 
     expect(screen.getByRole('tab', { name: 'Assets' })).toHaveAttribute(
       'aria-selected',
@@ -56,7 +56,7 @@ describe('LibraryPageClient sections', () => {
 
   it('restores the document panel from the URL', () => {
     search.value = 'section=documents';
-    render(<LibraryPageClient merchCards={[]} />);
+    render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
 
     expect(
       screen.getByRole('tab', { name: 'Ideas & Scripts' })
@@ -65,7 +65,7 @@ describe('LibraryPageClient sections', () => {
   });
 
   it('uses roving focus and arrow keys across library tabs', () => {
-    render(<LibraryPageClient merchCards={[]} />);
+    render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
 
     const assets = screen.getByRole('tab', { name: 'Assets' });
     const documents = screen.getByRole('tab', { name: 'Ideas & Scripts' });
@@ -85,7 +85,7 @@ describe('LibraryPageClient sections', () => {
     search.value = 'section=documents';
     const confirm = vi.fn(() => false);
     vi.stubGlobal('confirm', confirm);
-    render(<LibraryPageClient merchCards={[]} />);
+    render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
     fireEvent.click(
       screen.getByRole('button', { name: 'Mark document dirty' })
     );

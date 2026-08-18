@@ -1645,6 +1645,18 @@ export function TasksPageClient() {
   );
 
   useEffect(() => {
+    if (
+      selectedTaskEditorId &&
+      selectedTaskEditorId === editorTaskId &&
+      selectedTask?.mutationVersion !== undefined &&
+      selectedTask.mutationVersion >
+        (editorExpectedMutationVersionRef.current ?? 0)
+    ) {
+      editorExpectedMutationVersionRef.current = selectedTask.mutationVersion;
+    }
+  }, [editorTaskId, selectedTask?.mutationVersion, selectedTaskEditorId]);
+
+  useEffect(() => {
     if (selectedTaskEditorId === editorTaskId) return;
     editorSaveRequestRef.current += 1;
     if (!selectedTaskEditorId) {

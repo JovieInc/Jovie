@@ -144,6 +144,7 @@ export default async function LibraryPage({
   return (
     <HydrateClient state={getDehydratedState()}>
       <LibraryPageClient
+        creatorProfileId={profileId ?? 'unavailable'}
         merchCards={merchCards}
         archivedMerchCards={archivedMerchCards}
         archivedReleases={archivedReleases}
