@@ -3,6 +3,7 @@
 import { Badge, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIcons';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
+import { formatPublicContactSubtitle } from '@/lib/contacts/mapper';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
 
 interface ProfileContactDrawerContentProps {
@@ -82,12 +83,7 @@ export function ProfileContactDrawerContent({
       data-testid='profile-contact-drawer-content'
     >
       {contacts.map(contact => {
-        const metadata = [
-          contact.companyLabel ?? contact.secondaryLabel,
-          contact.contactName ?? contact.primaryContactLabel,
-        ]
-          .filter(Boolean)
-          .join(' · ');
+        const metadata = formatPublicContactSubtitle(contact);
         const channelLabels: Record<string, string> = {
           email: 'Email',
           sms: 'Text',
