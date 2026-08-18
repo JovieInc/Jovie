@@ -672,6 +672,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/safe-pr-remediation.test.mjs',
         'scripts/lib/__tests__/automation-verify.test.mjs',
       ],
+      nodeTests: ['scripts/typecheck-scripts.mjs'],
     });
     expect(
       buildAffectedTestPlan([

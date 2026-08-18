@@ -155,6 +155,7 @@ const SAFE_PR_REMEDIATION_SCRIPT_TESTS = [
   'scripts/lib/__tests__/safe-pr-remediation.test.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const SAFE_PR_REMEDIATION_NODE_TESTS = ['scripts/typecheck-scripts.mjs'];
 const CI_UI_DRIFT_GUARDRAIL_INPUTS = new Set([
   '.github/workflows/ci.yml',
   'apps/desktop/scripts/desktop-shell-contract.test.mjs',
@@ -648,7 +649,7 @@ export function buildAffectedTestPlan(
       pythonTests: [],
       pythonUnittestTests: [],
       scriptVitestTests: SAFE_PR_REMEDIATION_SCRIPT_TESTS,
-      nodeTests: [],
+      nodeTests: SAFE_PR_REMEDIATION_NODE_TESTS,
     };
   }
   const isBoundedGemPrRehabilitationChange =

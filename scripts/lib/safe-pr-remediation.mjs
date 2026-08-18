@@ -129,7 +129,7 @@ function validatePrIdentity({
   files,
   repository,
   expectedHeadOid,
-  expectedBaseOid,
+  expectedBaseOid = undefined,
 }) {
   if (!pr || !Array.isArray(files) || files.length === 0)
     return 'missing-pr-evidence';
@@ -368,7 +368,11 @@ export function buildCreateCommitVariables({ plan, receipt, lockfileBytes }) {
   };
 }
 
-async function githubRequest(path, { token, method = 'GET', body } = {}) {
+/**
+ * @param {string} path
+ * @param {{token: string, method?: string, body?: unknown}} options
+ */
+async function githubRequest(path, { token, method = 'GET', body }) {
   const response = await fetch(`https://api.github.com${path}`, {
     method,
     redirect: 'follow',
