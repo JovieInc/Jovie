@@ -64,4 +64,26 @@ describe('AdminPeopleRightPanelProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close Detail' }));
     expect(rail).toBeEmptyDOMElement();
   });
+
+  it('clears the shell rail when the People workspace unmounts', () => {
+    const { rerender } = render(
+      <RightPanelProvider>
+        <AdminPeopleRightPanelProvider>
+          <AdminPeopleFixture />
+        </AdminPeopleRightPanelProvider>
+        <RightPanelOutlet />
+      </RightPanelProvider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open User' }));
+    expect(screen.getByTestId('global-right-rail')).not.toBeEmptyDOMElement();
+
+    rerender(
+      <RightPanelProvider>
+        <RightPanelOutlet />
+      </RightPanelProvider>
+    );
+
+    expect(screen.getByTestId('global-right-rail')).toBeEmptyDOMElement();
+  });
 });

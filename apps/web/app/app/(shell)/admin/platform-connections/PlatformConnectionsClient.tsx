@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { useUserSafe } from '@/hooks/useClerkSafe';
 import {
@@ -87,7 +88,10 @@ function StatusSummaryItem({
   ok,
 }: Readonly<{ label: string; value: string; ok: boolean }>) {
   return (
-    <div className='min-w-44 flex-1 rounded-md bg-surface-0 px-3 py-2'>
+    <ContentSurfaceCard
+      surface='nested'
+      className='min-w-44 flex-1 bg-surface-0 px-3 py-2'
+    >
       <div className='flex items-center gap-2 text-xs font-medium text-primary-token'>
         {ok ? (
           <CheckCircle2 className='size-3.5 text-success' aria-hidden />
@@ -97,7 +101,7 @@ function StatusSummaryItem({
         {label}
       </div>
       <p className='mt-1 text-xs text-secondary-token'>{value}</p>
-    </div>
+    </ContentSurfaceCard>
   );
 }
 
@@ -224,7 +228,11 @@ function SpotifyTabContent({
   else if (currentUser.hasSpotify) connectButtonLabel = 'Reconnect Spotify';
 
   return (
-    <div className='divide-y divide-(--linear-app-frame-seam) rounded-lg border border-(--linear-app-frame-seam) bg-surface-1'>
+    <ContentSurfaceCard
+      surface='settings'
+      className='divide-y divide-(--linear-app-frame-seam) overflow-hidden'
+      data-testid='platform-connections-spotify-surface'
+    >
       <div className='flex flex-wrap items-start justify-between gap-3 px-4 py-3'>
         <div className='flex min-w-0 flex-1 flex-wrap gap-2'>
           <StatusSummaryItem
@@ -326,7 +334,7 @@ function SpotifyTabContent({
         </Button>
         <ResultMessage result={result} />
       </div>
-    </div>
+    </ContentSurfaceCard>
   );
 }
 
@@ -409,7 +417,11 @@ function EngineTabContent({
 
   return (
     <>
-      <div className='divide-y divide-(--linear-app-frame-seam) rounded-lg border border-(--linear-app-frame-seam) bg-surface-1'>
+      <ContentSurfaceCard
+        surface='settings'
+        className='divide-y divide-(--linear-app-frame-seam) overflow-hidden'
+        data-testid='platform-connections-engine-surface'
+      >
         <div className='flex flex-wrap items-center justify-between gap-3 px-4 py-3'>
           <div className='flex min-w-0 flex-wrap items-center gap-2'>
             <StatusBadge ok={enabled} label={enabled ? 'Enabled' : 'Paused'} />
@@ -500,7 +512,7 @@ function EngineTabContent({
           </Button>
           <ResultMessage result={result} />
         </div>
-      </div>
+      </ContentSurfaceCard>
 
       <ConfirmDialog
         open={confirmOpen}

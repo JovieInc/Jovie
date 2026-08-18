@@ -12,11 +12,20 @@ const ADMIN_PLAYLISTS_ROUTE = join(
   TEST_DIR,
   '../../../app/app/(shell)/admin/playlists/page.tsx'
 );
+const ADMIN_PLAYLISTS_CONTENT = join(
+  TEST_DIR,
+  '../../../app/app/(shell)/admin/playlists/AdminPlaylistsContent.tsx'
+);
 
 describe('admin playlists surface guard', () => {
   it('keeps playlist rows on the canonical content surface card', () => {
-    const contents = readFileSync(ADMIN_PLAYLISTS_ROUTE, 'utf8');
+    const route = readFileSync(ADMIN_PLAYLISTS_ROUTE, 'utf8');
+    const contents = readFileSync(ADMIN_PLAYLISTS_CONTENT, 'utf8');
 
+    expect(route).toContain(
+      "import { AdminPlaylistsContent } from './AdminPlaylistsContent';"
+    );
+    expect(route).toContain('<AdminPlaylistsContent');
     expect(contents).toContain(
       "import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';"
     );
@@ -27,7 +36,7 @@ describe('admin playlists surface guard', () => {
   });
 
   it('keeps row actions and metadata on shared tokens', () => {
-    const contents = readFileSync(ADMIN_PLAYLISTS_ROUTE, 'utf8');
+    const contents = readFileSync(ADMIN_PLAYLISTS_CONTENT, 'utf8');
 
     expect(contents).toContain("import { Button } from '@jovie/ui';");
     expect(contents).toContain('text-primary-token');

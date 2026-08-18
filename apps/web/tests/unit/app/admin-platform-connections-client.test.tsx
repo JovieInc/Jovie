@@ -29,6 +29,18 @@ vi.mock('@jovie/ui', () => ({
       {children}
     </button>
   ),
+  Card: ({
+    children,
+    className,
+  }: {
+    children: React.ReactElement<{ className?: string }>;
+    className?: string;
+  }) =>
+    React.cloneElement(children, {
+      className: [className, children.props.className]
+        .filter(Boolean)
+        .join(' '),
+    }),
   ConfirmDialog: ({
     open,
     title,
@@ -133,6 +145,9 @@ describe('PlatformConnectionsClient', () => {
     expect(
       screen.getByRole('button', { name: /Use This Account/i })
     ).toBeDisabled();
+    expect(
+      screen.getByTestId('platform-connections-spotify-surface')
+    ).toHaveClass('overflow-hidden');
   });
 
   it('opens the generate confirmation dialog from the engine tab', async () => {
@@ -151,6 +166,9 @@ describe('PlatformConnectionsClient', () => {
     );
 
     expect(screen.getByText('Paused')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('platform-connections-engine-surface')
+    ).toHaveClass('overflow-hidden');
     await user.click(
       screen.getByRole('button', { name: 'Generate Test Playlist' })
     );
