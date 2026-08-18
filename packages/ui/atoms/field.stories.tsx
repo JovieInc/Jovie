@@ -49,3 +49,23 @@ export const LongContent: Story = {
     </div>
   ),
 };
+
+export const PreservesControlDescription: Story = {
+  render: () => (
+    <div className='w-72'>
+      <p
+        id='external-profile-help'
+        className='mb-2 text-xs text-tertiary-token'
+      >
+        This note belongs to the surrounding workflow.
+      </p>
+      <Field
+        label='Profile handle'
+        description='You can change this later.'
+        id='field-handle'
+      >
+        <Input aria-describedby='external-profile-help' defaultValue='jovie' />
+      </Field>
+    </div>
+  ),
+};

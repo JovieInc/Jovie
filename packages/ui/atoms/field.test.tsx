@@ -90,6 +90,19 @@ describe('Field', () => {
       expect(input).toHaveAttribute('aria-describedby');
       expect(input.getAttribute('aria-describedby')).toContain('description');
     });
+
+    it('preserves a child-owned description id', () => {
+      render(
+        <Field description='Field help' id='email'>
+          <Input aria-describedby='external-help' />
+        </Field>
+      );
+
+      expect(screen.getByRole('textbox')).toHaveAttribute(
+        'aria-describedby',
+        'external-help email-description'
+      );
+    });
   });
 
   describe('Error Handling', () => {
@@ -102,6 +115,8 @@ describe('Field', () => {
       const error = screen.getByText('Invalid email address');
       expect(error).toBeInTheDocument();
       expect(error).toHaveAttribute('role', 'alert');
+      expect(error).toHaveAttribute('aria-live', 'polite');
+      expect(error).toHaveAttribute('aria-atomic', 'true');
     });
 
     it('sets aria-invalid on input when error is present', () => {
@@ -150,6 +165,18 @@ describe('Field', () => {
       expect(input).toHaveAttribute('id', 'custom-email');
     });
 
+    it('preserves a child id when the field does not provide one', () => {
+      render(
+        <Field label='Email'>
+          <Input id='child-email' />
+        </Field>
+      );
+      expect(screen.getByLabelText('Email')).toHaveAttribute(
+        'id',
+        'child-email'
+      );
+    });
+
     it('generates unique id when not provided', () => {
       render(
         <Field label='Email'>
@@ -170,6 +197,19 @@ describe('Field', () => {
       );
       const input = screen.getByRole('textbox');
       expect(input).toHaveAttribute('aria-required', 'true');
+      expect(input).toBeRequired();
+    });
+
+    it('preserves a child-owned aria-required contract', () => {
+      render(
+        <Field>
+          <Input aria-required='true' />
+        </Field>
+      );
+      expect(screen.getByRole('textbox')).toHaveAttribute(
+        'aria-required',
+        'true'
+      );
     });
 
     it('error message has aria-live for dynamic updates', () => {
@@ -203,7 +243,7 @@ describe('Field', () => {
         </Field>
       );
       const fieldDiv = container.firstChild;
-      expect((fieldDiv as HTMLElement).className).toContain('space-y-2');
+      expect(fieldDiv as HTMLElement).toHaveClass('grid', 'gap-1.5');
     });
 
     it('merges custom className', () => {
@@ -214,7 +254,19 @@ describe('Field', () => {
       );
       const fieldDiv = container.firstChild;
       expect((fieldDiv as HTMLElement).className).toContain('custom-class');
-      expect((fieldDiv as HTMLElement).className).toContain('space-y-2');
+      expect(fieldDiv as HTMLElement).toHaveClass('grid', 'gap-1.5');
+    });
+
+    it('exposes required and invalid state for styling hooks', () => {
+      const { container } = render(
+        <Field error='Required' required>
+          <Input />
+        </Field>
+      );
+
+      expect(container.firstChild).toHaveAttribute('data-slot', 'field');
+      expect(container.firstChild).toHaveAttribute('data-required', 'true');
+      expect(container.firstChild).toHaveAttribute('data-invalid', 'true');
     });
   });
 
