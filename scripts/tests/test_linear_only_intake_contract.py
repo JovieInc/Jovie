@@ -3,29 +3,23 @@ import re
 ROOT = Path(__file__).resolve().parents[2]
 WF = ROOT / ".github" / "workflows"
 RETIRED = "if: ${{ github.event_name == '__retired_linear_only__' }}"
-
-
 def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
-
 
 def block(text: str, indent: int, name: str) -> str:
     prefix = " " * indent
     match = re.search(
         rf"^{prefix}{re.escape(name)}:\n(.*?)(?=^{prefix}[A-Za-z0-9_-]+:\n|\Z)",
-        text,
-        re.MULTILINE | re.DOTALL,
+        text, re.MULTILINE | re.DOTALL,
     )
     assert match, f"missing block: {name}"
     return match.group(1)
-
 
 def step(text: str, name: str) -> str:
     marker = f"      - name: {name}\n"
     assert marker in text
     tail = text.split(marker, 1)[1]
     return tail.split("\n      - name:", 1)[0]
-
 
 def test_dispatchers_and_claude_cannot_select_github_issues() -> None:
     dispatcher = read(WF / "github-ai-dispatcher.yml")
@@ -44,14 +38,12 @@ def test_dispatchers_and_claude_cannot_select_github_issues() -> None:
     assert "issues:" not in block(claude, 0, "on")
     assert "github.event.issue.pull_request" in block(claude, 2, "claude")
 
-
 def test_workflow_issue_writers_are_removed_or_hard_retired() -> None:
     retired_steps = {
         "production-controller-health.yml": ["Open one manual-recovery incident"],
         "runner-health-monitor.yml": ["Open one fixed-runner degradation incident"],
         "test-coverage-audit.yml": ["Notify on failure"],
-        "test-flakiness-report.yml": ["Find or create tracking issue",
-            "Create or update tracking issue", "Auto-file deflake issues for high-severity tests"],
+        "test-flakiness-report.yml": ["Find or create tracking issue", "Create or update tracking issue", "Auto-file deflake issues for high-severity tests"],
     }
     for name, steps in retired_steps.items():
         workflow = read(WF / name)
@@ -67,17 +59,13 @@ def test_workflow_issue_writers_are_removed_or_hard_retired() -> None:
     assert "gh issue" not in visual and "github-ai-orchestrator.yml" not in visual
     assert "actions: write" not in block(visual, 2, "review")
 
-
 def test_active_facades_are_linear_only_and_fail_closed() -> None:
     tracker = read(ROOT / "scripts/hermes/lib/tracker-client.ts")
     assert "api.linear.app/graphql" in tracker and "issueCreate" in tracker
     assert "node:child_process" not in tracker and "gh issue" not in tracker
     legacy = read(ROOT / "scripts/lib/tracker.mjs")
     assert "GITHUB_ISSUE_INTAKE_RETIRED = true" in legacy
-    for name in (
-        "buildIssueCreateArgs", "fileGithubIssue", "shouldMirrorLinear", "claimIssue",
-        "finalizeIssueClaim", "transitionIssue", "queryTodoIssues", "shouldDispatchIssue",
-    ):
+    for name in ("buildIssueCreateArgs", "fileGithubIssue", "shouldMirrorLinear", "claimIssue", "finalizeIssueClaim", "transitionIssue", "queryTodoIssues", "shouldDispatchIssue"):
         prefix = legacy.split(f"export function {name}", 1)[1][:500]
         assert "if (GITHUB_ISSUE_INTAKE_RETIRED)" in prefix
     dispatch = legacy.split("export function shouldDispatchIssue", 1)[1]
@@ -92,7 +80,6 @@ def test_active_facades_are_linear_only_and_fail_closed() -> None:
     assert autofix.index("createGoldenPathLinearIssue") < autofix.index("if (!linear.ok)")
     gate = autofix.index("if (!linear.ok)")
     assert gate < autofix.index("cursorRequest", gate)
-
 
 def test_local_and_manual_github_issue_shippers_are_source_guarded() -> None:
     shipper = read(ROOT / "scripts/hermes/jobs/codex-issue-shipper.ts")
@@ -113,7 +100,6 @@ def test_local_and_manual_github_issue_shippers_are_source_guarded() -> None:
     body = sync.split("export async function syncObservabilityIssue", 1)[1]
     assert body.index("GITHUB_OBSERVABILITY_ISSUE_SYNC_RETIRED") < body.index("findIssueByFingerprint")
 
-
 def test_reporting_and_instructions_cannot_restore_canonical_github_intake() -> None:
     report = read(WF / "agent-harness-health-report.yml")
     hud = read(ROOT / "scripts/hermes/gem-ops-hud.py")
@@ -122,9 +108,7 @@ def test_reporting_and_instructions_cannot_restore_canonical_github_intake() -> 
     assert "GITHUB_ISSUE_FALLBACK_RETIRED = True" in hud
     issue_source = hud.split("def fetch_issue_source", 1)[1].split("def process_count", 1)[0]
     guard = issue_source.index("if GITHUB_ISSUE_FALLBACK_RETIRED")
-    assert guard < issue_source.index("return", guard) < issue_source.index(
-        "fetch_github_issues"
-    )
+    assert guard < issue_source.index("return", guard) < issue_source.index("fetch_github_issues")
     assert "githubIssueFallbackRetired = true" in menu
     assert menu.count("fetchGitHubInProgressCount") == 1
     assert "no GitHub Issue fallback" in menu

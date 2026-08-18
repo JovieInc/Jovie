@@ -238,25 +238,25 @@ jobs:
         if: ${{ github.event_name == '__retired_linear_only__' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
+          if [ "${{ github.event_name }}" = "__retired_linear_only__" ]; then echo "::error::GitHub Issue intake is retired; this historical step cannot run."; exit 78; fi
           CURRENT="${{ steps.current.outputs.count }}"
           BASELINE="${{ steps.baseline.outputs.average }}"
           REASON="${{ steps.evaluate.outputs.reason }}"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          INCIDENT_TITLE="[Cost Anomaly] Production event-volume incident"
+          RETIRED_TITLE="[Cost Anomaly] Production event-volume incident"
 
           # Concurrency serializes evaluators. A fixed open-incident identity
           # then deduplicates sequential 15-minute runs until operators close it.
-          gh label create cost-monitoring --force \
+          retired_github_cli label create cost-monitoring --force \
             --description "Cost monitoring and anomaly detection" --color "e4e669"
-          gh label create incident --force \
+          retired_github_cli label create incident --force \
             --description "Production incident requiring investigation" --color "d93f0b"
-          issues_json="$(gh issue list --state open --label cost-monitoring \
+          issues_json="$(retired_github_cli issue list --state open --label cost-monitoring \
             --limit 100 --json number,title,url)"
           jq -e 'type == "array"' >/dev/null <<<"$issues_json"
-          existing_json="$(jq -c --arg title "$INCIDENT_TITLE" \
+          existing_json="$(jq -c --arg title "$RETIRED_TITLE" \
             '[.[] | select(.title == $title)] | sort_by(.number) | first // empty' \
             <<<"$issues_json")"
           if [ -n "$existing_json" ]; then
@@ -293,8 +293,8 @@ jobs:
             printf '## Runbook\nSee `docs/COST_MONITORING.md`.\n'
           } > "$BODY_FILE"
 
-          incident_url="$(gh issue create \
-            --title "$INCIDENT_TITLE" \
+          incident_url="$(retired_github_cli issue create \
+            --title "$RETIRED_TITLE" \
             --label "cost-monitoring,incident" \
             --body-file "$BODY_FILE")"
           [[ "$incident_url" == https://github.com/* ]] || {
