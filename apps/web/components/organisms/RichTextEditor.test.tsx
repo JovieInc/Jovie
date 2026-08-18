@@ -146,4 +146,23 @@ describe('RichTextEditor', () => {
     );
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it('does not expose an underline shortcut outside the shared schema', () => {
+    const onChange = vi.fn();
+    render(
+      <RichTextEditor
+        content={content}
+        onChange={onChange}
+        ariaLabel='Document Body'
+      />
+    );
+    onChange.mockClear();
+
+    fireEvent.keyDown(screen.getByLabelText('Document Body'), {
+      key: 'u',
+      metaKey: true,
+    });
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });

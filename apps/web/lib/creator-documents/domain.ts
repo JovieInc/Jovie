@@ -20,7 +20,6 @@ export const saveRevisionInputSchema = z.object({
   title: z.string().trim().min(1).max(160),
   kind: z.enum(['idea', 'research', 'script']),
   content: creatorDocumentContentSchema,
-  plainText: z.string().max(100_000),
 });
 
 export type EvidenceClaim = {
@@ -33,12 +32,31 @@ export function ideaContent(body: string): CreatorDocumentContent {
   return plainTextToRichTextDocument(body);
 }
 
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    const serialized = JSON.stringify(value);
+    if (serialized === undefined) {
+      throw new TypeError('Revision content must be JSON serializable');
+    }
+    return serialized;
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalJson).join(',')}]`;
+  }
+  return `{${Object.keys(value)
+    .sort()
+    .map(
+      key => `${JSON.stringify(key)}:${canonicalJson(Reflect.get(value, key))}`
+    )
+    .join(',')}}`;
+}
+
 export function hashRevision(input: {
   readonly title: string;
   readonly kind: string;
   readonly content: CreatorDocumentContent;
 }): string {
-  return createHash('sha256').update(JSON.stringify(input)).digest('hex');
+  return createHash('sha256').update(canonicalJson(input)).digest('hex');
 }
 
 export function assertScriptCanBeApproved(claims: readonly EvidenceClaim[]) {

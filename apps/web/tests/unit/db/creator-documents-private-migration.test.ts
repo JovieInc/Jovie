@@ -32,4 +32,19 @@ describe('creator documents private migration', () => {
     expect(sql).toContain('creator_handoff_integrity_guard');
     expect(sql).toContain('a.revoked_at IS NULL');
   });
+
+  it('requires canonical claims for private creator documents', async () => {
+    const sql = await readFile(migrationPath, 'utf8');
+    const ownershipFunctions = sql.slice(
+      sql.indexOf(
+        'CREATE OR REPLACE FUNCTION can_manage_private_creator_profile'
+      ),
+      sql.indexOf('CREATE POLICY "creator_documents_select_private"')
+    );
+
+    expect(ownershipFunctions).not.toContain('cp.user_id');
+    expect(
+      ownershipFunctions.match(/FROM user_profile_claims upc/g)
+    ).toHaveLength(2);
+  });
 });

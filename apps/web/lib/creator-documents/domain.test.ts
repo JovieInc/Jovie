@@ -45,6 +45,33 @@ describe('creator document domain', () => {
     expect(hashRevision(revision)).not.toBe(
       hashRevision({ ...revision, title: 'Changed title' })
     );
+    expect(
+      hashRevision({
+        ...revision,
+        content: {
+          type: 'doc',
+          content: [
+            {
+              attrs: { level: 2, textAlign: 'left' },
+              type: 'heading',
+            },
+          ],
+        },
+      })
+    ).toBe(
+      hashRevision({
+        ...revision,
+        content: {
+          content: [
+            {
+              type: 'heading',
+              attrs: { textAlign: 'left', level: 2 },
+            },
+          ],
+          type: 'doc',
+        },
+      })
+    );
   });
 
   it('requires evidence for factual claims but not labeled opinion', () => {

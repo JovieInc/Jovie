@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { requireCreatorDocumentAccess } from '@/lib/creator-documents/access';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import { listCreatorDocuments } from '@/lib/db/creator-documents/store';
 import { captureError } from '@/lib/error-tracking';
@@ -48,8 +49,24 @@ export default async function LibraryPage() {
   let profileVisibilityByAssetId: Record<string, LibraryProfileVisibility> = {};
   let assetShareByAssetId: Record<string, LibraryAssetShareViewModel> = {};
   let creatorDocuments: CreatorDocumentListItem[] = [];
+  let creatorDocumentsNextCursor: string | null = null;
+  let creatorDocumentsLoadFailed = false;
   if (profileId && selectedProfile) {
     const queryClient = getQueryClient();
+    const privateDocumentsPromise = requireCreatorDocumentAccess({
+      userId: routeContext.userId,
+      profileId,
+    })
+      .then(() => listCreatorDocuments(profileId))
+      .then(result => ({ ...result, failed: false }))
+      .catch(error => {
+        void captureError(
+          'Private creator documents load failed on library page',
+          error,
+          { route: APP_ROUTES.LIBRARY }
+        );
+        return { documents: [], nextCursor: null, failed: true };
+      });
     try {
       const assetSharesPromise = loadArtistHandleForProfile(profileId).then(
         artistHandle =>
@@ -66,16 +83,6 @@ export default async function LibraryPage() {
         appleMusicId: selectedProfile.appleMusicId ?? null,
         settings: selectedProfile.settings ?? null,
       };
-      const privateDocumentsPromise = listCreatorDocuments(profileId).catch(
-        error => {
-          void captureError(
-            'Private creator documents load failed on library page',
-            error,
-            { route: APP_ROUTES.LIBRARY }
-          );
-          return [];
-        }
-      );
       const [
         _releases,
         archivedReleaseRows,
@@ -83,7 +90,6 @@ export default async function LibraryPage() {
         archivedMerch,
         profileStates,
         assetShares,
-        privateDocuments,
       ] = await Promise.all([
         queryClient.fetchQuery({
           queryKey: queryKeys.releases.matrix(profileId),
@@ -94,7 +100,6 @@ export default async function LibraryPage() {
         getLibraryMerchCardsForProfile(profileId, { lifecycle: 'archived' }),
         getLibraryProfileStateMapForProfile(profileId),
         assetSharesPromise,
-        privateDocumentsPromise,
       ]);
       merchCards = merch;
       archivedMerchCards = archivedMerch;
@@ -112,7 +117,6 @@ export default async function LibraryPage() {
         ])
       );
       assetShareByAssetId = Object.fromEntries(assetShares);
-      creatorDocuments = privateDocuments;
     } catch (error) {
       void captureError(
         'Release matrix prefetch failed on library page',
@@ -122,6 +126,10 @@ export default async function LibraryPage() {
         }
       );
     }
+    const privateDocuments = await privateDocumentsPromise;
+    creatorDocuments = [...privateDocuments.documents];
+    creatorDocumentsNextCursor = privateDocuments.nextCursor;
+    creatorDocumentsLoadFailed = privateDocuments.failed;
   }
 
   return (
@@ -134,6 +142,8 @@ export default async function LibraryPage() {
         profileVisibilityByAssetId={profileVisibilityByAssetId}
         assetShareByAssetId={assetShareByAssetId}
         creatorDocuments={creatorDocuments}
+        creatorDocumentsNextCursor={creatorDocumentsNextCursor}
+        creatorDocumentsLoadFailed={creatorDocumentsLoadFailed}
       />
     </HydrateClient>
   );

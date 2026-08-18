@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import type { KeyboardEvent } from 'react';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
@@ -18,6 +19,8 @@ export function LibraryPageClient({
   profileVisibilityByAssetId = {},
   assetShareByAssetId = {},
   creatorDocuments = [],
+  creatorDocumentsNextCursor = null,
+  creatorDocumentsLoadFailed = false,
 }: {
   readonly merchCards: readonly LibraryMerchCard[];
   readonly archivedMerchCards?: readonly LibraryMerchCard[];
@@ -30,6 +33,8 @@ export function LibraryPageClient({
     Record<string, LibraryAssetShareViewModel>
   >;
   readonly creatorDocuments?: readonly CreatorDocumentListItem[];
+  readonly creatorDocumentsNextCursor?: string | null;
+  readonly creatorDocumentsLoadFailed?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -44,6 +49,29 @@ export function LibraryPageClient({
     router.replace(query ? `${pathname}?${query}` : pathname, {
       scroll: false,
     });
+  };
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const tabs = Array.from(
+      event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+        '[role="tab"]'
+      ) ?? []
+    );
+    const currentIndex = tabs.indexOf(event.currentTarget);
+    const nextIndex =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? tabs.length - 1
+          : event.key === 'ArrowRight'
+            ? (currentIndex + 1) % tabs.length
+            : event.key === 'ArrowLeft'
+              ? (currentIndex - 1 + tabs.length) % tabs.length
+              : -1;
+    const nextTab = tabs[nextIndex];
+    if (!nextTab) return;
+    event.preventDefault();
+    nextTab.focus();
+    nextTab.click();
   };
   return (
     <div className='flex min-h-0 flex-1 flex-col'>
@@ -60,6 +88,8 @@ export function LibraryPageClient({
           role='tab'
           aria-selected={mode === 'assets'}
           aria-controls='library-assets-panel'
+          tabIndex={mode === 'assets' ? 0 : -1}
+          onKeyDown={handleTabKeyDown}
           onClick={() => setMode('assets')}
           className='rounded-md px-3 py-1 text-sm text-secondary-token aria-selected:bg-surface-1 aria-selected:text-primary-token'
         >
@@ -73,6 +103,8 @@ export function LibraryPageClient({
           role='tab'
           aria-selected={mode === 'documents'}
           aria-controls='library-documents-panel'
+          tabIndex={mode === 'documents' ? 0 : -1}
+          onKeyDown={handleTabKeyDown}
           onClick={() => setMode('documents')}
           className='rounded-md px-3 py-1 text-sm text-secondary-token aria-selected:bg-surface-1 aria-selected:text-primary-token'
         >
@@ -86,7 +118,11 @@ export function LibraryPageClient({
           aria-labelledby='library-documents-tab'
           className='flex min-h-0 flex-1'
         >
-          <CreatorDocumentsWorkspace initialDocuments={creatorDocuments} />
+          <CreatorDocumentsWorkspace
+            initialDocuments={creatorDocuments}
+            initialNextCursor={creatorDocumentsNextCursor}
+            initialLoadFailed={creatorDocumentsLoadFailed}
+          />
         </div>
       ) : (
         <div

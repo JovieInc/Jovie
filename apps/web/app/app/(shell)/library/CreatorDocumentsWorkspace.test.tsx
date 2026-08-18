@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { CreatorDocumentsWorkspace } from './CreatorDocumentsWorkspace';
@@ -172,6 +178,77 @@ describe('CreatorDocumentsWorkspace', () => {
     ).toBeInTheDocument();
   });
 
+  it('keeps rich content and plain text aligned across later revisions', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ revision: 2 }), { status: 200 })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ revision: 3 }), { status: 200 })
+      );
+    render(<CreatorDocumentsWorkspace initialDocuments={[document]} />);
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const firstPanel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    if (!firstPanel) throw new Error('Expected a document panel');
+    const firstPanelView = render(firstPanel);
+
+    fireEvent.change(screen.getByLabelText('Document Content'), {
+      target: { value: 'Updated body' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Revision' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    await screen.findByText('Saved as a new revision');
+    firstPanelView.unmount();
+
+    const secondPanel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    if (!secondPanel) throw new Error('Expected the saved document panel');
+    render(secondPanel);
+    fireEvent.change(screen.getByLabelText('Document Title'), {
+      target: { value: 'Title-only follow-up' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Revision' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    const secondRequest = vi.mocked(fetch).mock.calls[1]?.[1];
+    expect(JSON.parse(String(secondRequest?.body))).toMatchObject({
+      expectedRevision: 2,
+      title: 'Title-only follow-up',
+      plainText: 'Updated body',
+    });
+  });
+
+  it('keeps edits made while a revision save is in flight dirty', async () => {
+    let finishSave: ((response: Response) => void) | undefined;
+    vi.mocked(fetch).mockReturnValueOnce(
+      new Promise(resolve => {
+        finishSave = resolve;
+      })
+    );
+    render(<CreatorDocumentsWorkspace initialDocuments={[document]} />);
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    if (!panel) throw new Error('Expected a document panel');
+    render(panel);
+
+    fireEvent.change(screen.getByLabelText('Document Title'), {
+      target: { value: 'Submitted title' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Revision' }));
+    fireEvent.change(screen.getByLabelText('Document Title'), {
+      target: { value: 'Newer unsaved title' },
+    });
+    await act(async () => {
+      finishSave?.(
+        new Response(JSON.stringify({ revision: 2 }), { status: 200 })
+      );
+    });
+
+    expect(screen.getByLabelText('Document Title')).toHaveValue(
+      'Newer unsaved title'
+    );
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+  });
+
   it('keeps exact-revision approval disabled while visible edits are unsaved', () => {
     render(
       <CreatorDocumentsWorkspace
@@ -257,6 +334,180 @@ describe('CreatorDocumentsWorkspace', () => {
     );
     expect(screen.getByLabelText('Memory Source Record ID')).toHaveValue(
       '44444444-4444-4444-8444-444444444444'
+    );
+  });
+
+  it('does not clear newer evidence entered during claim submission', async () => {
+    let finishClaim: ((response: Response) => void) | undefined;
+    vi.mocked(fetch).mockReturnValueOnce(
+      new Promise(resolve => {
+        finishClaim = resolve;
+      })
+    );
+    render(
+      <CreatorDocumentsWorkspace
+        initialDocuments={[{ ...document, kind: 'script' }]}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    if (!panel) throw new Error('Expected a document panel');
+    render(panel);
+
+    fireEvent.change(screen.getByLabelText('Claim Text'), {
+      target: { value: 'Submitted evidence' },
+    });
+    fireEvent.change(screen.getByLabelText('Memory Source Record ID'), {
+      target: { value: '44444444-4444-4444-8444-444444444444' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Claim' }));
+    fireEvent.change(screen.getByLabelText('Claim Text'), {
+      target: { value: 'Newer evidence' },
+    });
+    await act(async () => {
+      finishClaim?.(
+        new Response(JSON.stringify({ claimId: 'claim-1' }), { status: 201 })
+      );
+    });
+
+    expect(screen.getByLabelText('Claim Text')).toHaveValue('Newer evidence');
+  });
+
+  it('requires a source for every supported claim kind', () => {
+    render(
+      <CreatorDocumentsWorkspace
+        initialDocuments={[{ ...document, kind: 'script' }]}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    if (!panel) throw new Error('Expected a document panel');
+    render(panel);
+
+    fireEvent.change(screen.getByLabelText('Claim Type'), {
+      target: { value: 'opinion' },
+    });
+    fireEvent.change(screen.getByLabelText('Claim Text'), {
+      target: { value: 'This framing is strongest.' },
+    });
+    expect(screen.getByRole('button', { name: 'Add Claim' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Memory Source Record ID'), {
+      target: { value: '44444444-4444-4444-8444-444444444444' },
+    });
+    expect(screen.getByRole('button', { name: 'Add Claim' })).toBeEnabled();
+  });
+
+  it('explains how to recover from incomplete evidence review', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          error: 'Evidence incomplete',
+          code: 'evidence_incomplete',
+        }),
+        { status: 409 }
+      )
+    );
+    render(
+      <CreatorDocumentsWorkspace
+        initialDocuments={[{ ...document, kind: 'script' }]}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    if (!panel) throw new Error('Expected a document panel');
+    render(panel);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Complete Evidence Review' })
+    );
+
+    expect(
+      await screen.findByText(
+        'Resolve or source every factual claim, then retry.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('labels a stale evidence-review revision as a conflict', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          error: 'Revision changed',
+          code: 'revision_conflict',
+        }),
+        { status: 409 }
+      )
+    );
+    render(
+      <CreatorDocumentsWorkspace
+        initialDocuments={[{ ...document, kind: 'script' }]}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /A durable idea/ }));
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    if (!panel) throw new Error('Expected a document panel');
+    render(panel);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Complete Evidence Review' })
+    );
+
+    expect(
+      await screen.findByText('Revision changed. Reload before continuing.')
+    ).toBeInTheDocument();
+  });
+
+  it('keeps load failures distinct from an empty library and retries', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ documents: [document], nextCursor: null }),
+        {
+          status: 200,
+        }
+      )
+    );
+    render(
+      <CreatorDocumentsWorkspace initialDocuments={[]} initialLoadFailed />
+    );
+
+    expect(screen.queryByText('No ideas yet. Save the first one.')).toBeNull();
+    expect(
+      screen.getByText(
+        'Private documents could not be loaded. Your work is still saved.'
+      )
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByText('A durable idea')).toBeInTheDocument();
+  });
+
+  it('loads older documents through the opaque cursor', async () => {
+    const olderDocument = {
+      ...document,
+      id: '22222222-2222-4222-8222-222222222222',
+      title: 'An older script',
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ documents: [olderDocument], nextCursor: null }),
+        { status: 200 }
+      )
+    );
+    render(
+      <CreatorDocumentsWorkspace
+        initialDocuments={[document]}
+        initialNextCursor='opaque cursor'
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Load Older Documents' })
+    );
+
+    expect(await screen.findByText('An older script')).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/library/documents?cursor=opaque%20cursor'
     );
   });
 });

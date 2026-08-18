@@ -14,15 +14,16 @@ import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { profile, user } = await getSessionContext({ requireProfile: true });
     await requireCreatorDocumentAccess({
       userId: user.id,
       profileId: profile!.id,
     });
-    const documents = await listCreatorDocuments(profile!.id);
-    return NextResponse.json({ documents }, { headers: NO_STORE_HEADERS });
+    const cursor = new URL(request.url).searchParams.get('cursor');
+    const page = await listCreatorDocuments(profile!.id, { cursor });
+    return NextResponse.json(page, { headers: NO_STORE_HEADERS });
   } catch (error) {
     if (isUnauthorizedSessionError(error)) {
       return NextResponse.json(

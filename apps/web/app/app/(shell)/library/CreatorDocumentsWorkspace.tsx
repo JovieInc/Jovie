@@ -19,6 +19,8 @@ type EditorStatus =
   | 'saved'
   | 'claim-saved'
   | 'reviewed'
+  | 'evidence-incomplete'
+  | 'claim-ineligible'
   | 'conflict'
   | 'error';
 
@@ -34,7 +36,8 @@ function DocumentEditor({
     revision: number,
     title: string,
     kind: CreatorDocumentListItem['kind'],
-    content: CreatorDocumentListItem['content']
+    content: CreatorDocumentListItem['content'],
+    plainText: string
   ) => void;
   onStageChanged: (stage: CreatorDocumentListItem['stage']) => void;
 }>) {
@@ -52,35 +55,60 @@ function DocumentEditor({
     'supported' | 'contested' | 'unresolved'
   >('supported');
   const [sourceRecordId, setSourceRecordId] = useState('');
+  const editVersionRef = useRef(0);
+  const claimVersionRef = useRef(0);
   const router = useRouter();
   const handleEditorChange = useCallback((change: RichTextEditorChange) => {
+    editVersionRef.current += 1;
     setEditorContent(change.content);
     setEditorPlainText(change.plainText);
     setIsDirty(true);
     setStatus('idle');
   }, []);
 
-  const post = useCallback(async (url: string, body: unknown) => {
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (response.status === 409) {
-        setStatus('conflict');
+  const post = useCallback(
+    async (
+      url: string,
+      body: unknown,
+      conflictStatus: Extract<
+        EditorStatus,
+        'conflict' | 'evidence-incomplete' | 'claim-ineligible'
+      > = 'conflict'
+    ) => {
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (response.status === 409) {
+          const payload = (await response.json().catch(() => null)) as {
+            code?: unknown;
+          } | null;
+          setStatus(
+            payload?.code === 'evidence_incomplete'
+              ? 'evidence-incomplete'
+              : conflictStatus
+          );
+          return null;
+        }
+        if (!response.ok) throw new Error('Request failed');
+        return response;
+      } catch {
+        setStatus('error');
         return null;
       }
-      if (!response.ok) throw new Error('Request failed');
-      return response;
-    } catch {
-      setStatus('error');
-      return null;
-    }
-  }, []);
+    },
+    []
+  );
 
   const save = useCallback(async () => {
     if (status === 'saving') return;
+    const editVersionAtSave = editVersionRef.current;
+    const savedTitle = title;
+    const savedKind = kind;
+    const savedContent = editorContent;
+    const savedPlainText = editorPlainText;
     setStatus('saving');
     try {
       const response = await fetch(`/api/library/documents/${document.id}`, {
@@ -88,10 +116,10 @@ function DocumentEditor({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           expectedRevision: document.currentRevision,
-          title,
-          kind,
-          content: editorContent,
-          plainText: editorPlainText,
+          title: savedTitle,
+          kind: savedKind,
+          content: savedContent,
+          plainText: savedPlainText,
         }),
       });
       if (response.status === 409) {
@@ -100,9 +128,19 @@ function DocumentEditor({
       }
       if (!response.ok) throw new Error('Save failed');
       const payload = (await response.json()) as { revision: number };
-      onSaved(payload.revision, title, kind, editorContent);
-      setIsDirty(false);
-      setStatus('saved');
+      onSaved(
+        payload.revision,
+        savedTitle,
+        savedKind,
+        savedContent,
+        savedPlainText
+      );
+      if (editVersionRef.current === editVersionAtSave) {
+        setIsDirty(false);
+        setStatus('saved');
+      } else {
+        setStatus('idle');
+      }
     } catch {
       setStatus('error');
     }
@@ -110,6 +148,7 @@ function DocumentEditor({
 
   const addClaim = useCallback(async () => {
     if (status === 'saving') return;
+    const claimVersionAtSave = claimVersionRef.current;
     setStatus('saving');
     const response = await post(
       `/api/library/documents/${document.id}/claims`,
@@ -119,12 +158,17 @@ function DocumentEditor({
         kind: claimKind,
         evidenceState,
         sourceRecordId: sourceRecordId.trim() || null,
-      }
+      },
+      'claim-ineligible'
     );
     if (!response) return;
-    setClaimText('');
-    setSourceRecordId('');
-    setStatus('claim-saved');
+    if (claimVersionRef.current === claimVersionAtSave) {
+      setClaimText('');
+      setSourceRecordId('');
+      setStatus('claim-saved');
+    } else {
+      setStatus('idle');
+    }
   }, [
     claimKind,
     claimText,
@@ -160,8 +204,7 @@ function DocumentEditor({
     }
   }, [document, isDirty, onStageChanged, post, router]);
 
-  const claimNeedsSource =
-    claimKind === 'fact' && evidenceState === 'supported';
+  const claimNeedsSource = evidenceState === 'supported';
   const canAddClaim =
     document.stage === 'private_draft' &&
     !isDirty &&
@@ -191,13 +234,17 @@ function DocumentEditor({
                   ? 'Claim added to this revision'
                   : status === 'reviewed'
                     ? 'Evidence review complete'
-                    : status === 'conflict'
-                      ? 'Revision changed. Reload before continuing.'
-                      : status === 'error'
-                        ? 'Action failed. Retry safely.'
-                        : isDirty
-                          ? 'Unsaved changes'
-                          : 'Private document'}
+                    : status === 'evidence-incomplete'
+                      ? 'Resolve or source every factual claim, then retry.'
+                      : status === 'claim-ineligible'
+                        ? 'The revision changed or that source is not available.'
+                        : status === 'conflict'
+                          ? 'Revision changed. Reload before continuing.'
+                          : status === 'error'
+                            ? 'Action failed. Retry safely.'
+                            : isDirty
+                              ? 'Unsaved changes'
+                              : 'Private document'}
           </span>
           <Button
             size='sm'
@@ -224,6 +271,7 @@ function DocumentEditor({
           aria-label='Document Title'
           value={title}
           onChange={event => {
+            editVersionRef.current += 1;
             setTitle(event.target.value);
             setIsDirty(true);
           }}
@@ -235,6 +283,7 @@ function DocumentEditor({
             aria-label='Document Type'
             value={kind}
             onChange={event => {
+              editVersionRef.current += 1;
               setKind(event.target.value as CreatorDocumentListItem['kind']);
               setIsDirty(true);
             }}
@@ -281,18 +330,25 @@ function DocumentEditor({
                 ? `Saved · R${document.currentRevision}`
                 : status === 'conflict'
                   ? 'Conflict'
-                  : status === 'error'
-                    ? 'Not saved'
-                    : isDirty
-                      ? 'Edited'
-                      : `Revision ${document.currentRevision}`
+                  : status === 'evidence-incomplete'
+                    ? 'Evidence incomplete'
+                    : status === 'claim-ineligible'
+                      ? 'Evidence unavailable'
+                      : status === 'error'
+                        ? 'Not saved'
+                        : isDirty
+                          ? 'Edited'
+                          : `Revision ${document.currentRevision}`
           }
           statusTone={
             status === 'saving'
               ? 'pending'
               : status === 'saved'
                 ? 'success'
-                : status === 'conflict' || status === 'error'
+                : status === 'conflict' ||
+                    status === 'evidence-incomplete' ||
+                    status === 'claim-ineligible' ||
+                    status === 'error'
                   ? 'error'
                   : 'neutral'
           }
@@ -309,7 +365,10 @@ function DocumentEditor({
             <textarea
               aria-label='Claim Text'
               value={claimText}
-              onChange={event => setClaimText(event.target.value)}
+              onChange={event => {
+                claimVersionRef.current += 1;
+                setClaimText(event.target.value);
+              }}
               placeholder='One factual statement from this exact script revision'
               className='min-h-20 resize-y rounded-md border border-subtle bg-surface-1 p-2 text-sm'
             />
@@ -317,9 +376,10 @@ function DocumentEditor({
               <select
                 aria-label='Claim Type'
                 value={claimKind}
-                onChange={event =>
-                  setClaimKind(event.target.value as typeof claimKind)
-                }
+                onChange={event => {
+                  claimVersionRef.current += 1;
+                  setClaimKind(event.target.value as typeof claimKind);
+                }}
                 className='rounded-md border border-subtle bg-surface-1 px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-offset-2'
               >
                 <option value='fact'>Fact</option>
@@ -330,9 +390,10 @@ function DocumentEditor({
               <select
                 aria-label='Evidence State'
                 value={evidenceState}
-                onChange={event =>
-                  setEvidenceState(event.target.value as typeof evidenceState)
-                }
+                onChange={event => {
+                  claimVersionRef.current += 1;
+                  setEvidenceState(event.target.value as typeof evidenceState);
+                }}
                 className='rounded-md border border-subtle bg-surface-1 px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-offset-2'
               >
                 <option value='supported'>Supported</option>
@@ -343,7 +404,10 @@ function DocumentEditor({
             <input
               aria-label='Memory Source Record ID'
               value={sourceRecordId}
-              onChange={event => setSourceRecordId(event.target.value)}
+              onChange={event => {
+                claimVersionRef.current += 1;
+                setSourceRecordId(event.target.value);
+              }}
               placeholder='Private memory source record ID'
               className='rounded-md border border-subtle bg-surface-1 px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-offset-2'
             />
@@ -380,8 +444,18 @@ function DocumentEditor({
 
 export function CreatorDocumentsWorkspace({
   initialDocuments,
-}: Readonly<{ initialDocuments: readonly CreatorDocumentListItem[] }>) {
+  initialNextCursor = null,
+  initialLoadFailed = false,
+}: Readonly<{
+  initialDocuments: readonly CreatorDocumentListItem[];
+  initialNextCursor?: string | null;
+  initialLoadFailed?: boolean;
+}>) {
   const [documents, setDocuments] = useState([...initialDocuments]);
+  const [nextCursor, setNextCursor] = useState(initialNextCursor);
+  const [listStatus, setListStatus] = useState<'idle' | 'loading' | 'error'>(
+    initialLoadFailed ? 'error' : 'idle'
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCapture, setShowCapture] = useState(false);
   const [title, setTitle] = useState('');
@@ -412,11 +486,12 @@ export function CreatorDocumentsWorkspace({
           key={selected.id}
           document={selected}
           onClose={() => setSelectedId(null)}
-          onSaved={(revision, savedTitle, savedKind, content) =>
+          onSaved={(revision, savedTitle, savedKind, content, plainText) =>
             updateSelected({
               title: savedTitle,
               kind: savedKind,
               content,
+              plainText,
               currentRevision: revision,
               stage: 'private_draft',
             })
@@ -427,6 +502,33 @@ export function CreatorDocumentsWorkspace({
     [selected, updateSelected]
   );
   useRegisterRightPanel(panel);
+
+  const loadDocuments = useCallback(async (cursor: string | null) => {
+    setListStatus('loading');
+    try {
+      const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+      const response = await fetch(`/api/library/documents${query}`);
+      if (!response.ok) throw new Error('Document load failed');
+      const page = (await response.json()) as {
+        documents: CreatorDocumentListItem[];
+        nextCursor: string | null;
+      };
+      setDocuments(current =>
+        cursor
+          ? [
+              ...current,
+              ...page.documents.filter(
+                incoming => !current.some(item => item.id === incoming.id)
+              ),
+            ]
+          : page.documents
+      );
+      setNextCursor(page.nextCursor);
+      setListStatus('idle');
+    } catch {
+      setListStatus('error');
+    }
+  }, []);
 
   const saveIdea = useCallback(async () => {
     if (ideaStatus === 'saving') return;
@@ -455,6 +557,23 @@ export function CreatorDocumentsWorkspace({
       className='min-h-0 flex-1 overflow-auto p-4'
     >
       <div className='mx-auto flex w-full max-w-4xl flex-col gap-4'>
+        {listStatus === 'error' ? (
+          <div
+            role='alert'
+            className='flex min-h-12 items-center justify-between gap-3 rounded-lg border border-subtle bg-surface-1 px-3 py-2 text-sm'
+          >
+            <span>
+              Private documents could not be loaded. Your work is still saved.
+            </span>
+            <Button
+              size='sm'
+              variant='secondary'
+              onClick={() => void loadDocuments(null)}
+            >
+              Retry
+            </Button>
+          </div>
+        ) : null}
         <div className='flex items-center justify-between gap-3'>
           <div>
             <h1 className='text-lg font-semibold text-primary-token'>
@@ -521,7 +640,7 @@ export function CreatorDocumentsWorkspace({
           </div>
         ) : null}
         <div className='divide-y divide-subtle border-y border-subtle'>
-          {documents.length === 0 ? (
+          {documents.length === 0 && listStatus !== 'error' ? (
             <div className='flex flex-col items-center gap-2 py-12 text-center text-secondary-token'>
               <FileText className='h-5 w-5' aria-hidden='true' />
               <p className='text-sm'>No ideas yet. Save the first one.</p>
@@ -545,6 +664,16 @@ export function CreatorDocumentsWorkspace({
             ))
           )}
         </div>
+        {nextCursor ? (
+          <Button
+            type='button'
+            variant='secondary'
+            disabled={listStatus === 'loading'}
+            onClick={() => void loadDocuments(nextCursor)}
+          >
+            {listStatus === 'loading' ? 'Loading…' : 'Load Older Documents'}
+          </Button>
+        ) : null}
       </div>
     </section>
   );

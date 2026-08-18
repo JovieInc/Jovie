@@ -1,10 +1,13 @@
-import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq, lt, or } from 'drizzle-orm';
 import {
   hashRevision,
   ideaContent,
   nextRevision,
 } from '@/lib/creator-documents/domain';
-import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
+import type {
+  CreatorDocumentListItem,
+  CreatorDocumentPage,
+} from '@/lib/creator-documents/types';
 import { db } from '@/lib/db';
 import {
   type CreatorDocumentContent,
@@ -18,21 +21,67 @@ export class CreatorDocumentConflictError extends Error {
       | 'revision_conflict'
       | 'evidence_incomplete'
       | 'approval_ineligible'
+      | 'claim_ineligible'
+      | 'claim_ledger_frozen'
+      | 'claim_source_inaccessible'
   ) {
     super(
       code === 'revision_conflict'
         ? 'Document changed in another session'
         : code === 'evidence_incomplete'
           ? 'Every factual script claim needs supporting evidence'
-          : 'Only the current evidence-backed script can be approved'
+          : code === 'approval_ineligible'
+            ? 'Only the current evidence-backed script can be approved'
+            : code === 'claim_ledger_frozen'
+              ? 'Claim ledger is frozen for review'
+              : code === 'claim_source_inaccessible'
+                ? 'Evidence source is inaccessible'
+                : 'Claim does not belong to the current document revision'
     );
     this.name = 'CreatorDocumentConflictError';
   }
 }
 
+const CREATOR_DOCUMENT_PAGE_SIZE = 50;
+
+function encodeDocumentCursor(input: {
+  readonly updatedAt: Date;
+  readonly id: string;
+}) {
+  return Buffer.from(
+    JSON.stringify({ updatedAt: input.updatedAt.toISOString(), id: input.id })
+  ).toString('base64url');
+}
+
+function decodeDocumentCursor(cursor: string | null | undefined) {
+  if (!cursor) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString()) as {
+      updatedAt?: unknown;
+      id?: unknown;
+    };
+    const updatedAt = new Date(String(parsed.updatedAt));
+    if (
+      Number.isNaN(updatedAt.getTime()) ||
+      typeof parsed.id !== 'string' ||
+      !/^[0-9a-f-]{36}$/i.test(parsed.id)
+    ) {
+      return null;
+    }
+    return { updatedAt, id: parsed.id };
+  } catch {
+    return null;
+  }
+}
+
 export async function listCreatorDocuments(
-  creatorProfileId: string
-): Promise<CreatorDocumentListItem[]> {
+  creatorProfileId: string,
+  options: { readonly cursor?: string | null } = {}
+): Promise<CreatorDocumentPage> {
+  const cursor = decodeDocumentCursor(options.cursor);
+  if (options.cursor && !cursor) {
+    throw new Error('Invalid creator document cursor');
+  }
   const rows = await db
     .select({
       id: creatorDocuments.id,
@@ -52,14 +101,36 @@ export async function listCreatorDocuments(
         eq(creatorDocumentRevisions.revision, creatorDocuments.currentRevision)
       )
     )
-    .where(eq(creatorDocuments.creatorProfileId, creatorProfileId))
-    .orderBy(desc(creatorDocuments.updatedAt))
-    .limit(100);
+    .where(
+      and(
+        eq(creatorDocuments.creatorProfileId, creatorProfileId),
+        cursor
+          ? or(
+              lt(creatorDocuments.updatedAt, cursor.updatedAt),
+              and(
+                eq(creatorDocuments.updatedAt, cursor.updatedAt),
+                lt(creatorDocuments.id, cursor.id)
+              )
+            )
+          : undefined
+      )
+    )
+    .orderBy(desc(creatorDocuments.updatedAt), desc(creatorDocuments.id))
+    .limit(CREATOR_DOCUMENT_PAGE_SIZE + 1);
 
-  return rows.map(row => ({
+  const pageRows = rows.slice(0, CREATOR_DOCUMENT_PAGE_SIZE);
+  const documents: CreatorDocumentListItem[] = pageRows.map(row => ({
     ...row,
     updatedAt: row.updatedAt.toISOString(),
   }));
+  const last = pageRows.at(-1);
+  return {
+    documents,
+    nextCursor:
+      rows.length > CREATOR_DOCUMENT_PAGE_SIZE && last
+        ? encodeDocumentCursor(last)
+        : null,
+  };
 }
 
 export async function captureCreatorIdea(input: {
@@ -138,7 +209,11 @@ export async function saveCreatorDocumentRevision(input: {
   readonly plainText: string;
 }): Promise<number> {
   const revision = nextRevision(input.expectedRevision);
-  const contentHash = hashRevision(input);
+  const contentHash = hashRevision({
+    title: input.title,
+    kind: input.kind,
+    content: input.content,
+  });
   const saved = await db.execute<{ revision: number }>(drizzleSql`
     with advanced as (
       update ${creatorDocuments}
@@ -190,25 +265,26 @@ export async function approveCreatorRevisionForCapture(input: {
   readonly revision: number;
 }): Promise<void> {
   const result = await db.execute<{ id: string }>(drizzleSql`
-    with eligible as (
+    with locked_document as (
       select
         ${creatorDocuments.id} as document_id,
-        ${creatorDocumentRevisions.id} as revision_id
+        ${creatorDocuments.currentRevision} as current_revision,
+        ${creatorDocuments.stage} as stage
       from ${creatorDocuments}
-      join ${creatorDocumentRevisions}
-        on ${creatorDocumentRevisions.documentId} = ${creatorDocuments.id}
-        and ${creatorDocumentRevisions.revision} = ${creatorDocuments.currentRevision}
       where ${creatorDocuments.id} = ${input.documentId}
         and ${creatorDocuments.creatorProfileId} = ${input.creatorProfileId}
-        and ${creatorDocuments.currentRevision} = ${input.revision}
-        and ${creatorDocuments.stage} = 'evidence_review'
+      for update
+    ), eligible as (
+      select
+        locked_document.document_id,
+        ${creatorDocumentRevisions.id} as revision_id
+      from locked_document
+      join ${creatorDocumentRevisions}
+        on ${creatorDocumentRevisions.documentId} = locked_document.document_id
+        and ${creatorDocumentRevisions.revision} = locked_document.current_revision
+      where locked_document.current_revision = ${input.revision}
+        and locked_document.stage = 'evidence_review'
         and ${creatorDocumentRevisions.kind} = 'script'
-        and exists (
-          select 1
-          from creator_revision_claims claim
-          where claim.revision_id = ${creatorDocumentRevisions.id}
-            and claim.kind = 'fact'
-        )
         and not exists (
           select 1
           from creator_revision_claims claim
@@ -255,36 +331,19 @@ export async function completeCreatorEvidenceReview(input: {
   readonly documentId: string;
   readonly revision: number;
 }): Promise<void> {
-  const result = await db.execute<{ id: string }>(drizzleSql`
-    update ${creatorDocuments}
-    set "stage" = 'evidence_review', "updated_at" = now()
-    where ${creatorDocuments.id} = ${input.documentId}
-      and ${creatorDocuments.creatorProfileId} = ${input.creatorProfileId}
-      and ${creatorDocuments.currentRevision} = ${input.revision}
-      and ${creatorDocuments.stage} = 'private_draft'
-      and ${creatorDocuments.kind} = 'script'
-      and exists (
-        select 1
-        from ${creatorDocumentRevisions} revision
-        join creator_revision_claims claim on claim.revision_id = revision.id
-        where revision.document_id = ${creatorDocuments.id}
-          and revision.revision = ${input.revision}
-          and claim.kind = 'fact'
-      )
-      and not exists (
-        select 1
-        from ${creatorDocumentRevisions} revision
-        join creator_revision_claims claim on claim.revision_id = revision.id
-        where revision.document_id = ${creatorDocuments.id}
-          and revision.revision = ${input.revision}
-          and claim.kind = 'fact'
-          and (claim.evidence_state <> 'supported' or claim.source_record_id is null)
-      )
-    returning ${creatorDocuments.id} as id
+  const result = await db.execute<{ outcome: string }>(drizzleSql`
+    select complete_creator_evidence_review(
+      ${input.creatorProfileId}::uuid,
+      ${input.documentId}::uuid,
+      ${input.revision}::integer
+    ) as outcome
   `);
-  if (!result.rows[0]?.id) {
+  const outcome = result.rows[0]?.outcome;
+  if (outcome === 'updated') return;
+  if (outcome === 'evidence_incomplete') {
     throw new CreatorDocumentConflictError('evidence_incomplete');
   }
+  throw new CreatorDocumentConflictError('revision_conflict');
 }
 
 export async function addCreatorRevisionClaim(input: {
@@ -297,29 +356,27 @@ export async function addCreatorRevisionClaim(input: {
   readonly evidenceState: 'supported' | 'contested' | 'unresolved';
   readonly sourceRecordId: string | null;
 }): Promise<string> {
-  const result = await db.execute<{ id: string }>(drizzleSql`
-    insert into creator_revision_claims (
-      revision_id,
-      claim_text,
-      kind,
-      evidence_state,
-      source_record_id
-    )
-    select
-      ${creatorDocumentRevisions.id},
-      ${input.claimText},
-      ${input.kind},
-      ${input.evidenceState},
-      ${input.sourceRecordId}
-    from ${creatorDocumentRevisions}
-    join ${creatorDocuments}
-      on ${creatorDocuments.id} = ${creatorDocumentRevisions.documentId}
-    where ${creatorDocuments.id} = ${input.documentId}
-      and ${creatorDocuments.creatorProfileId} = ${input.creatorProfileId}
-      and ${creatorDocuments.currentRevision} = ${input.revision}
-      and ${creatorDocuments.stage} = 'private_draft'
-      and ${creatorDocumentRevisions.revision} = ${input.revision}
-      and (
+  const result = await db.execute<{
+    id: string | null;
+    currentRevision: number | null;
+    stage: string | null;
+    revisionExists: boolean;
+    sourceAccessible: boolean;
+  }>(drizzleSql`
+    with locked_context as (
+      select
+        ${creatorDocuments.currentRevision} as current_revision,
+        ${creatorDocuments.stage} as stage,
+        ${creatorDocumentRevisions.id} as revision_id
+      from ${creatorDocuments}
+      left join ${creatorDocumentRevisions}
+        on ${creatorDocumentRevisions.documentId} = ${creatorDocuments.id}
+        and ${creatorDocumentRevisions.revision} = ${input.revision}
+      where ${creatorDocuments.id} = ${input.documentId}
+        and ${creatorDocuments.creatorProfileId} = ${input.creatorProfileId}
+      for update of ${creatorDocuments}
+    ), source_access as (
+      select (
         ${input.sourceRecordId}::uuid is null
         or exists (
           select 1 from memory_source_records source
@@ -327,14 +384,48 @@ export async function addCreatorRevisionClaim(input: {
             and source.creator_profile_id = ${input.creatorProfileId}
             and source.user_id::text = ${input.userId}
         )
-      )
-    returning id
+      ) as accessible
+    ), inserted as (
+      insert into creator_revision_claims (
+      revision_id,
+      claim_text,
+      kind,
+      evidence_state,
+      source_record_id
+    )
+      select
+      locked_context.revision_id,
+      ${input.claimText},
+      ${input.kind},
+      ${input.evidenceState},
+      ${input.sourceRecordId}
+      from locked_context, source_access
+      where locked_context.current_revision = ${input.revision}
+        and locked_context.stage = 'private_draft'
+        and locked_context.revision_id is not null
+        and source_access.accessible
+      returning id
+    )
+    select
+      (select id from inserted) as id,
+      (select current_revision from locked_context) as "currentRevision",
+      (select stage from locked_context) as stage,
+      coalesce((select revision_id is not null from locked_context), false) as "revisionExists",
+      (select accessible from source_access) as "sourceAccessible"
   `);
-  const id = result.rows[0]?.id;
-  if (!id) {
-    throw new Error(
-      'Claim ledger is frozen or evidence is not private to this profile'
-    );
+  const outcome = result.rows[0];
+  if (outcome?.id) return outcome.id;
+  if (outcome?.currentRevision == null) {
+    throw new CreatorDocumentConflictError('claim_ineligible');
   }
-  return id;
+  if (outcome.currentRevision !== input.revision || !outcome.revisionExists) {
+    throw new CreatorDocumentConflictError('revision_conflict');
+  }
+  if (outcome.stage !== 'private_draft') {
+    throw new CreatorDocumentConflictError('claim_ledger_frozen');
+  }
+  if (!outcome.sourceAccessible) {
+    throw new CreatorDocumentConflictError('claim_source_inaccessible');
+  }
+  throw new CreatorDocumentConflictError('claim_ineligible');
 }

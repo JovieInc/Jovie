@@ -48,4 +48,21 @@ describe('LibraryPageClient sections', () => {
     ).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tabpanel')).toHaveTextContent('Documents panel');
   });
+
+  it('uses roving focus and arrow keys across library tabs', () => {
+    render(<LibraryPageClient merchCards={[]} />);
+
+    const assets = screen.getByRole('tab', { name: 'Assets' });
+    const documents = screen.getByRole('tab', { name: 'Ideas & Scripts' });
+    expect(assets).toHaveAttribute('tabindex', '0');
+    expect(documents).toHaveAttribute('tabindex', '-1');
+
+    assets.focus();
+    fireEvent.keyDown(assets, { key: 'ArrowRight' });
+
+    expect(documents).toHaveFocus();
+    expect(replace).toHaveBeenCalledWith('/app/library?section=documents', {
+      scroll: false,
+    });
+  });
 });

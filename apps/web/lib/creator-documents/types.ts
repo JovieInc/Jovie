@@ -14,3 +14,8 @@ export type CreatorDocumentListItem = {
   readonly plainText: string;
   readonly updatedAt: string;
 };
+
+export type CreatorDocumentPage = {
+  readonly documents: readonly CreatorDocumentListItem[];
+  readonly nextCursor: string | null;
+};

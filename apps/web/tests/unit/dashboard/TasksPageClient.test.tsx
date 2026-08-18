@@ -281,6 +281,7 @@ const mockHelperTask = {
 const mockCreateTask = vi.fn();
 const mockDeleteTask = vi.fn();
 const mockUpdateTask = vi.fn();
+const mockUpdateTaskAsync = vi.fn();
 const mockMoveTask = vi.fn();
 let mockIsXlUp = true;
 let mockIs2xlUp = true;
@@ -464,6 +465,7 @@ vi.mock('@/lib/queries/useTaskMutations', () => ({
   }),
   useUpdateTaskMutation: () => ({
     mutate: mockUpdateTask,
+    mutateAsync: mockUpdateTaskAsync,
     isPending: false,
   }),
   useMoveTaskMutation: () => ({
@@ -757,6 +759,7 @@ describe('TasksPageClient', () => {
     mockCreateTask.mockReset();
     mockDeleteTask.mockReset();
     mockUpdateTask.mockReset();
+    mockUpdateTaskAsync.mockReset().mockResolvedValue(undefined);
     mockMoveTask.mockReset();
     mockSetViewMode.mockClear();
     mockRegisterRightPanel.mockReset();
@@ -1225,46 +1228,44 @@ describe('TasksPageClient', () => {
       vi.advanceTimersByTime(500);
     });
 
-    expect(mockUpdateTask).toHaveBeenCalledWith(
-      {
-        taskId: 'task-2',
-        data: expect.objectContaining({
-          title: 'Updated release handoff title',
-          description: mockTaskTwo.description,
-          descriptionContent: expect.objectContaining({ type: 'doc' }),
-        }),
-      },
-      expect.objectContaining({
-        onError: expect.any(Function),
-      })
-    );
+    expect(mockUpdateTaskAsync).toHaveBeenCalledWith({
+      taskId: 'task-2',
+      data: expect.objectContaining({
+        title: 'Updated release handoff title',
+        description: mockTaskTwo.description,
+        descriptionContent: expect.objectContaining({ type: 'doc' }),
+      }),
+    });
   });
 
-  it('retains failed task edits and retries from the stable save slot', () => {
-    mockUpdateTask
-      .mockImplementationOnce((_input, options) => options.onError?.())
-      .mockImplementationOnce((_input, options) => options.onSuccess?.());
+  it('retains failed task edits and retries from the stable save slot', async () => {
+    mockUpdateTaskAsync
+      .mockRejectedValueOnce(new Error('save failed'))
+      .mockResolvedValueOnce(undefined);
     renderPage();
     openTask();
 
     fireEvent.change(screen.getByLabelText('Task Description'), {
       target: { value: 'Keep this unsaved context intact.' },
     });
-    act(() => vi.advanceTimersByTime(500));
+    await act(async () => vi.advanceTimersByTime(500));
 
     expect(screen.getByText('Not saved')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-    act(() => vi.advanceTimersByTime(500));
+    await act(async () => vi.advanceTimersByTime(500));
 
-    expect(mockUpdateTask).toHaveBeenCalledTimes(2);
+    expect(mockUpdateTaskAsync).toHaveBeenCalledTimes(2);
     expect(screen.getByText('Saved')).toBeInTheDocument();
   });
 
-  it('does not mark a newer edit saved when an older request finishes', () => {
+  it('does not mark a newer edit saved when an older request finishes', async () => {
     let finishFirstSave: (() => void) | undefined;
-    mockUpdateTask.mockImplementationOnce((_input, options) => {
-      finishFirstSave = options.onSuccess;
-    });
+    mockUpdateTaskAsync.mockImplementationOnce(
+      () =>
+        new Promise<void>(resolve => {
+          finishFirstSave = resolve;
+        })
+    );
     renderPage();
     openTask();
 
@@ -1278,11 +1279,44 @@ describe('TasksPageClient', () => {
     fireEvent.change(descriptionEditor, {
       target: { value: 'Newer draft that must remain dirty' },
     });
-    act(() => finishFirstSave?.());
+    act(() => vi.advanceTimersByTime(500));
+    expect(mockUpdateTaskAsync).toHaveBeenCalledTimes(1);
+    await act(async () => finishFirstSave?.());
 
     expect(screen.getByText('Edited')).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(500));
-    expect(mockUpdateTask).toHaveBeenCalledTimes(2);
+    expect(mockUpdateTaskAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores an autosave completion from a previously selected task', async () => {
+    let finishFirstSave: (() => void) | undefined;
+    mockUpdateTaskAsync.mockImplementationOnce(
+      () =>
+        new Promise<void>(resolve => {
+          finishFirstSave = resolve;
+        })
+    );
+    renderPage();
+    openTask(mockTask);
+
+    fireEvent.change(screen.getByLabelText('Task Description'), {
+      target: { value: 'Edit task A' },
+    });
+    act(() => vi.advanceTimersByTime(500));
+
+    openTask(mockTaskTwo);
+    fireEvent.change(screen.getByLabelText('Task Description'), {
+      target: { value: 'Edit task B and keep it' },
+    });
+    await act(async () => finishFirstSave?.());
+
+    expect(screen.getByText('Edited')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(500));
+    expect(mockUpdateTaskAsync).toHaveBeenCalledTimes(2);
+    expect(mockUpdateTaskAsync.mock.calls[1]?.[0]).toMatchObject({
+      taskId: 'task-2',
+      data: { description: 'Edit task B and keep it' },
+    });
   });
 
   it('does not reset unsaved title text when task metadata refreshes', () => {
@@ -1320,19 +1354,14 @@ describe('TasksPageClient', () => {
       vi.advanceTimersByTime(500);
     });
 
-    expect(mockUpdateTask).toHaveBeenCalledWith(
-      {
-        taskId: 'task-2',
-        data: expect.objectContaining({
-          title: 'Unsaved metadata-safe title',
-          description: mockTaskTwo.description,
-          descriptionContent: expect.objectContaining({ type: 'doc' }),
-        }),
-      },
-      expect.objectContaining({
-        onError: expect.any(Function),
-      })
-    );
+    expect(mockUpdateTaskAsync).toHaveBeenCalledWith({
+      taskId: 'task-2',
+      data: expect.objectContaining({
+        title: 'Unsaved metadata-safe title',
+        description: mockTaskTwo.description,
+        descriptionContent: expect.objectContaining({ type: 'doc' }),
+      }),
+    });
   });
 
   it('shows the empty-description helper for supported release tasks', () => {

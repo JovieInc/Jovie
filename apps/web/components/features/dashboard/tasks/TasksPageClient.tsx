@@ -1340,8 +1340,10 @@ export function TasksPageClient() {
     useState<RichTextDocument>(emptyRichTextDocument);
   const [editorSaveStatus, setEditorSaveStatus] =
     useState<TaskEditorSaveStatus>('idle');
+  const [editorSaveInFlight, setEditorSaveInFlight] = useState(false);
   const [editorTaskId, setEditorTaskId] = useState<string | null>(null);
   const editorRevisionRef = useRef(0);
+  const editorSaveRequestRef = useRef(0);
   const latestSelectedTaskIdRef = useRef<string | null>(null);
   const deferredPills = useDeferredValue(pills);
   const searchFilter = useMemo(
@@ -1369,7 +1371,8 @@ export function TasksPageClient() {
   const updateTaskMutation = useUpdateTaskMutation();
   const moveTaskMutation = useMoveTaskMutation();
   const { mutateAsync: deleteTaskAsync } = deleteTaskMutation;
-  const { mutate: updateTask } = updateTaskMutation;
+  const { mutate: updateTask, mutateAsync: updateTaskAsync } =
+    updateTaskMutation;
   const { mutate: moveTask } = moveTaskMutation;
   const selectedReleaseQuery = useReleaseEntityQuery(
     profileId ?? '',
@@ -1639,6 +1642,7 @@ export function TasksPageClient() {
 
   useEffect(() => {
     if (selectedTaskEditorId === editorTaskId) return;
+    editorSaveRequestRef.current += 1;
     if (!selectedTaskEditorId) {
       setEditorTitle('');
       setEditorDescription('');
@@ -1813,12 +1817,18 @@ export function TasksPageClient() {
       nextDescription !== currentDescription ||
       contentChanged;
 
-    if (!hasChanges || !nextTitle || editorSaveStatus !== 'dirty') {
+    if (
+      !hasChanges ||
+      !nextTitle ||
+      editorSaveStatus !== 'dirty' ||
+      editorSaveInFlight
+    ) {
       return;
     }
 
     const selectedTaskIdAtSchedule = selectedTaskEditorId;
     const revisionAtSchedule = editorRevisionRef.current;
+    const requestAtSchedule = ++editorSaveRequestRef.current;
 
     const timeoutId = globalThis.setTimeout(() => {
       if (selectedTaskIdAtSchedule !== latestSelectedTaskIdRef.current) {
@@ -1826,30 +1836,39 @@ export function TasksPageClient() {
       }
 
       setEditorSaveStatus('saving');
-      updateTask(
-        {
-          taskId: selectedTaskIdAtSchedule,
-          data: {
-            title: nextTitle,
-            description: nextDescription || null,
-            descriptionContent: editorDescriptionContent,
-          },
+      setEditorSaveInFlight(true);
+      void updateTaskAsync({
+        taskId: selectedTaskIdAtSchedule,
+        data: {
+          title: nextTitle,
+          description: nextDescription || null,
+          descriptionContent: editorDescriptionContent,
         },
-        {
-          onError: () => {
-            setEditorSaveStatus(
-              editorRevisionRef.current === revisionAtSchedule
-                ? 'error'
-                : 'dirty'
-            );
-            toast.error("Couldn't update task");
-          },
-          onSuccess: () =>
-            setEditorSaveStatus(
-              editorRevisionRef.current === revisionAtSchedule
-                ? 'saved'
-                : 'dirty'
-            ),
+      }).then(
+        () => {
+          setEditorSaveInFlight(false);
+          if (
+            latestSelectedTaskIdRef.current !== selectedTaskIdAtSchedule ||
+            editorSaveRequestRef.current !== requestAtSchedule
+          ) {
+            return;
+          }
+          setEditorSaveStatus(
+            editorRevisionRef.current === revisionAtSchedule ? 'saved' : 'dirty'
+          );
+        },
+        () => {
+          setEditorSaveInFlight(false);
+          if (
+            latestSelectedTaskIdRef.current !== selectedTaskIdAtSchedule ||
+            editorSaveRequestRef.current !== requestAtSchedule
+          ) {
+            return;
+          }
+          setEditorSaveStatus(
+            editorRevisionRef.current === revisionAtSchedule ? 'error' : 'dirty'
+          );
+          toast.error("Couldn't update task");
         }
       );
     }, 450);
@@ -1860,6 +1879,7 @@ export function TasksPageClient() {
   }, [
     editorDescription,
     editorDescriptionContent,
+    editorSaveInFlight,
     editorSaveStatus,
     editorTaskId,
     editorTitle,
@@ -1867,7 +1887,7 @@ export function TasksPageClient() {
     selectedTaskEditorId,
     selectedTaskEditorContent,
     selectedTaskEditorTitle,
-    updateTask,
+    updateTaskAsync,
   ]);
 
   const handleCloseShortcut = useCallback(

@@ -11,6 +11,7 @@ import {
 } from '@/lib/db/creator-documents/store';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { richTextDocumentToPlainText } from '@/lib/rich-text/extensions';
 
 export const runtime = 'nodejs';
 
@@ -37,8 +38,16 @@ export async function PATCH(
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
+    const plainText = richTextDocumentToPlainText(parsed.data.content);
+    if (plainText.length > 100_000) {
+      return NextResponse.json(
+        { error: 'Invalid document revision' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
     const revision = await saveCreatorDocumentRevision({
       ...parsed.data,
+      plainText,
       creatorProfileId: profile!.id,
       userId: user!.id,
     });

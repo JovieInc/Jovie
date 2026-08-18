@@ -115,8 +115,7 @@ AS $$
     FROM creator_profiles cp
     WHERE cp.id = p_profile_id
       AND (
-        cp.user_id = current_app_user_uuid()
-        OR EXISTS (
+        EXISTS (
           SELECT 1 FROM user_profile_claims upc
           WHERE upc.creator_profile_id = cp.id
             AND upc.user_id = current_app_user_uuid()
@@ -138,8 +137,7 @@ AS $$
     FROM creator_profiles cp
     WHERE cp.id = p_profile_id
       AND (
-        cp.user_id = current_app_user_uuid()
-        OR EXISTS (
+        EXISTS (
           SELECT 1 FROM user_profile_claims upc
           WHERE upc.creator_profile_id = cp.id
             AND upc.user_id = current_app_user_uuid()
@@ -258,6 +256,57 @@ DROP TRIGGER IF EXISTS creator_claim_ledger_open_guard ON creator_revision_claim
 CREATE TRIGGER creator_claim_ledger_open_guard
   BEFORE INSERT OR UPDATE OR DELETE ON creator_revision_claims
   FOR EACH ROW EXECUTE FUNCTION enforce_creator_claim_ledger_open();
+--> statement-breakpoint
+
+-- Lock and inspect in separate PL/pgSQL commands so READ COMMITTED takes a
+-- fresh snapshot after any in-flight claim insertion releases the row lock.
+CREATE OR REPLACE FUNCTION complete_creator_evidence_review(
+  p_creator_profile_id uuid,
+  p_document_id uuid,
+  p_revision integer
+)
+RETURNS text
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_current_revision integer;
+  v_stage creator_document_stage;
+  v_kind creator_document_kind;
+BEGIN
+  SELECT current_revision, stage, kind
+    INTO v_current_revision, v_stage, v_kind
+    FROM creator_documents
+    WHERE id = p_document_id
+      AND creator_profile_id = p_creator_profile_id
+    FOR UPDATE;
+
+  IF NOT FOUND
+    OR v_current_revision IS DISTINCT FROM p_revision
+    OR v_stage IS DISTINCT FROM 'private_draft'
+    OR v_kind IS DISTINCT FROM 'script'
+  THEN
+    RETURN 'revision_conflict';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM creator_document_revisions revision
+    JOIN creator_revision_claims claim ON claim.revision_id = revision.id
+    WHERE revision.document_id = p_document_id
+      AND revision.revision = p_revision
+      AND claim.kind = 'fact'
+      AND (claim.evidence_state <> 'supported' OR claim.source_record_id IS NULL)
+  ) THEN
+    RETURN 'evidence_incomplete';
+  END IF;
+
+  UPDATE creator_documents
+    SET stage = 'evidence_review', updated_at = now()
+    WHERE id = p_document_id;
+  RETURN 'updated';
+END;
+$$;
 --> statement-breakpoint
 
 CREATE OR REPLACE FUNCTION enforce_creator_approval_integrity()

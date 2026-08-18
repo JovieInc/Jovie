@@ -40,6 +40,51 @@ describe('buildTaskUpdateFieldPatch', () => {
     ).toEqual({
       description: null,
       assigneeKind: 'jovie',
+      metadata: {
+        descriptionRichTextV1: {
+          type: 'doc',
+          content: [{ type: 'paragraph' }],
+        },
+      },
+      updatedAt: now,
+    });
+  });
+
+  it('reconciles rich metadata when a plain-text caller changes description', () => {
+    expect(
+      buildTaskUpdateFieldPatch(
+        { description: 'Fresh plain text' },
+        {
+          ...createExistingTask(),
+          metadata: {
+            source: 'release',
+            descriptionRichTextV1: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Stale rich text' }],
+                },
+              ],
+            },
+          },
+        },
+        now
+      )
+    ).toEqual({
+      description: 'Fresh plain text',
+      metadata: {
+        source: 'release',
+        descriptionRichTextV1: {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Fresh plain text' }],
+            },
+          ],
+        },
+      },
       updatedAt: now,
     });
   });

@@ -71,9 +71,32 @@ describe('/api/library/documents privacy boundary', () => {
 
   it('does not list private documents without a session', async () => {
     getSessionContext.mockRejectedValueOnce(new Error('Unauthorized'));
-    const response = await GET();
+    const response = await GET(
+      new Request('https://jov.ie/api/library/documents')
+    );
     expect(response.status).toBe(401);
     expect(listCreatorDocuments).not.toHaveBeenCalled();
+  });
+
+  it('passes the pagination cursor through the private listing boundary', async () => {
+    getSessionContext.mockResolvedValueOnce({
+      profile: { id: '22222222-2222-4222-8222-222222222222' },
+      user: { id: 'user_1' },
+    });
+    listCreatorDocuments.mockResolvedValueOnce({
+      documents: [],
+      nextCursor: null,
+    });
+
+    const response = await GET(
+      new Request('https://jov.ie/api/library/documents?cursor=next-page')
+    );
+
+    expect(response.status).toBe(200);
+    expect(listCreatorDocuments).toHaveBeenCalledWith(
+      '22222222-2222-4222-8222-222222222222',
+      { cursor: 'next-page' }
+    );
   });
 
   it('returns 200 when an identical private capture is deduplicated', async () => {

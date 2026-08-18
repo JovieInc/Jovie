@@ -1,3 +1,5 @@
+import type { RichTextDocument } from '@/lib/rich-text/document';
+
 export type TaskStatus =
   | 'backlog'
   | 'todo'
@@ -143,5 +145,3 @@ export interface UpdateTaskInput {
   readonly sourceTemplateId?: string | null;
   readonly metadata?: Record<string, unknown> | null;
 }
-
-import type { RichTextDocument } from '@/lib/rich-text/document';

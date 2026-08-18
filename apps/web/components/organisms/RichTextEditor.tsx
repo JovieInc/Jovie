@@ -4,7 +4,6 @@ import { Button } from '@jovie/ui';
 import type { Editor } from '@tiptap/core';
 import Placeholder from '@tiptap/extension-placeholder';
 import { EditorContent, useEditor } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
 import {
   Bold,
   Code2,
@@ -18,6 +17,7 @@ import {
 } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, useReducer } from 'react';
 import type { RichTextDocument } from '@/lib/rich-text/document';
+import { createRichTextStarterKit } from '@/lib/rich-text/extensions';
 import { cn } from '@/lib/utils';
 import styles from './RichTextEditor.module.css';
 
@@ -220,14 +220,7 @@ export const RichTextEditor = forwardRef<
   const [, refreshToolbar] = useReducer(value => value + 1, 0);
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
-        link: {
-          autolink: true,
-          openOnClick: false,
-          protocols: ['http', 'https', 'mailto'],
-        },
-      }),
+      createRichTextStarterKit(),
       Placeholder.configure({ placeholder }),
     ],
     content,

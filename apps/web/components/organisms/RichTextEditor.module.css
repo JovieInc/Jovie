@@ -2,9 +2,14 @@
   min-height: var(--editor-min-height, 16rem);
   padding: 1rem 1.125rem 4rem;
   color: var(--color-text-primary-token);
-  font-size: 0.9375rem;
+  font-size: 1rem;
   line-height: 1.75;
-  outline: none;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+}
+
+.editor:focus-visible {
+  outline-color: var(--color-border-focus);
 }
 
 .editor p,

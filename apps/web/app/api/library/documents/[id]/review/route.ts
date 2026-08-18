@@ -58,12 +58,9 @@ export async function POST(
         { status: 401, headers: NO_STORE_HEADERS }
       );
     }
-    if (
-      error instanceof CreatorDocumentConflictError &&
-      error.code === 'evidence_incomplete'
-    ) {
+    if (error instanceof CreatorDocumentConflictError) {
       return NextResponse.json(
-        { error: error.message },
+        { error: error.message, code: error.code },
         { status: 409, headers: NO_STORE_HEADERS }
       );
     }
