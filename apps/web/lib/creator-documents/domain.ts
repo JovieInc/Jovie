@@ -44,7 +44,7 @@ function canonicalJson(value: unknown): string {
     return `[${value.map(canonicalJson).join(',')}]`;
   }
   return `{${Object.keys(value)
-    .sort()
+    .sort((left, right) => left.localeCompare(right, 'en'))
     .map(
       key => `${JSON.stringify(key)}:${canonicalJson(Reflect.get(value, key))}`
     )

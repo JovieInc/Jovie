@@ -431,7 +431,7 @@ function DocumentEditor({
           className='w-full bg-transparent text-lg font-semibold text-primary-token outline-none focus-visible:outline-2 focus-visible:outline-offset-2'
         />
         <label className='flex items-center justify-between gap-3 text-xs text-secondary-token'>
-          Document Type
+          <span>Document Type</span>
           <select
             aria-label='Document Type'
             value={kind}
