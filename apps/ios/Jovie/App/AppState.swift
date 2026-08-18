@@ -90,6 +90,7 @@ final class AppState {
       dashboardState = .idle
     case .uiTestingReady,
          .uiTestingChat,
+         .uiTestingWhatsNew,
          .uiTestingSettings,
          .uiTestingVenueMode,
          .uiTestingAudience,

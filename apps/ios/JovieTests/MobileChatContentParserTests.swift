@@ -60,6 +60,18 @@ struct MobileChatContentParserTests {
     #expect(MobileChatContentParser.displayText(from: content, isStreaming: false).isEmpty)
   }
 
+  @Test func qualityEvalHidesRawEntitySkillAndToolMarkup() {
+    let content = """
+    Check @release:rel_1[Midnight Drive] and /skill:merch then
+    <tool_call><name>createMerch</name><parameters></parameters></tool_call>
+    """
+    let display = MobileChatContentParser.displayText(from: content, isStreaming: false)
+    #expect(display.contains("@release:") == false)
+    #expect(display.contains("/skill:") == false)
+    #expect(display.contains("<tool_call>") == false)
+    #expect(display.contains("Midnight Drive"))
+  }
+
   @Test func leavesPlainTextUntouched() {
     let content = "Just a normal assistant reply."
 

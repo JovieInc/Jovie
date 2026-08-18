@@ -1451,6 +1451,33 @@ struct FeatureIntroPresentationTests {
     let url = FeatureIntroCatalog.changelogURL(from: URL(string: "https://jov.ie")!)
     #expect(url.absoluteString == "https://jov.ie/changelog")
   }
+
+  @Test func versionedItemsNameTestableChanges() {
+    let items = WhatsNewCatalog.items(for: "1.0")
+    #expect(items.isEmpty == false)
+    #expect(items.allSatisfy { !$0.title.isEmpty && !$0.testHint.isEmpty })
+    #expect(items.contains(where: { $0.testHint.localizedCaseInsensitiveContains("Ask Jovie") }))
+    #expect(items.contains(where: { $0.testHint.localizedCaseInsensitiveContains("bottom tab") }))
+    #expect(items.contains(where: { $0.testHint.localizedCaseInsensitiveContains("sidebar") }))
+  }
+
+  @Test func unknownVersionStillShipsATestableItem() {
+    let items = WhatsNewCatalog.items(for: "9.9")
+    #expect(items.isEmpty == false)
+    #expect(items.allSatisfy { !$0.testHint.isEmpty })
+    #expect(items[0].testHint.contains("9.9"))
+  }
+
+  @Test func whatsNewLaunchModePresentsOnReadyChat() {
+    #expect(
+      LaunchMode.resolving(arguments: ["-ui-testing-whats-new"], isXCTest: false)
+        == .uiTestingWhatsNew
+    )
+    #expect(LaunchMode.uiTestingWhatsNew.presentsWhatsNew)
+    #expect(LaunchMode.uiTestingWhatsNew.defaultInitialTab == .chat)
+    #expect(LaunchMode.uiTestingChat.presentsWhatsNew == false)
+    #expect(LaunchMode.live.presentsWhatsNew)
+  }
 }
 
 struct AuthenticatedUserIDChangePolicyTests {

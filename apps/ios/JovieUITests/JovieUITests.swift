@@ -28,6 +28,36 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "signed-out", app: app)
   }
 
+  func testChatFirstHomeAndWhatsNewTestCard() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-whats-new",
+      expectedElementDescription: "\"What’s New\"",
+      timeout: 8
+    ) {
+      $0.staticTexts["What’s New"]
+    }
+
+    XCTAssertTrue(app.staticTexts["Chat is home"].waitForExistence(timeout: 3))
+    XCTAssertTrue(
+      app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Ask Jovie")).firstMatch.exists
+    )
+    XCTAssertTrue(
+      app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "bottom tab")).firstMatch.exists
+    )
+    XCTAssertFalse(
+      shellControlExists(app, identifier: "shell-tab-bar"),
+      "What’s New launch must not restore the bottom tab bar.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "whats-new-test-card", app: app)
+
+    app.buttons["whats-new-done"].tap()
+    XCTAssertTrue(
+      app.textFields["Ask Jovie"].waitForExistence(timeout: 5),
+      "Dismissing What’s New must land on chat home.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "chat-first-home", app: app)
+  }
+
   func testSignedOutLaunchPerformance() throws {
     guard testEnvironmentValue("JOVIE_IOS_LAUNCH_PERFORMANCE") == "1" else {
       throw XCTSkip("Set JOVIE_IOS_LAUNCH_PERFORMANCE=1 to run launch performance evidence.")
@@ -383,60 +413,43 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "drawer-base-plane-occluded-closed", app: app)
   }
 
-  // JOV-3632: primary bottom tabs + Talk FAB. Profile is drawer-only (no shell-tab-profile).
+  // Chat-first shell: no bottom tab bar. Talk lives in the toolbar/sidebar.
   func testPrimaryTabBarAndTalkFAB() {
     let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"Ask Jovie\"") {
       $0.textFields["Ask Jovie"]
     }
 
-    // Prefer the per-tab identifiers; fall back to label if AX grouping regresses.
-    let chatTab = firstMatchingButton(
-      app,
-      identifiers: ["shell-tab-chat"],
-      labels: ["Chat"],
-      timeout: 3
+    XCTAssertFalse(
+      shellControlExists(app, identifier: "shell-tab-bar"),
+      "Bottom tab bar must be gone on the chat-first shell.\n\(app.debugDescription)"
     )
-    XCTAssertTrue(
-      chatTab.exists,
-      "Primary tab bar did not appear.\n\(app.debugDescription)"
+    XCTAssertFalse(
+      shellControlExists(app, identifier: "shell-tab-chat"),
+      "Chat must not be a bottom tab.\n\(app.debugDescription)"
     )
-    XCTAssertTrue(
-      firstMatchingButton(app, identifiers: ["shell-tab-library"], labels: ["Library"]).exists,
-      "Library tab missing"
-    )
-    XCTAssertTrue(
-      firstMatchingButton(app, identifiers: ["shell-tab-calendar"], labels: ["Calendar"]).exists,
-      "Calendar tab missing"
-    )
-    XCTAssertTrue(
-      firstMatchingButton(app, identifiers: ["shell-tab-inbox"], labels: ["Inbox"]).exists,
-      "Inbox tab missing"
+    XCTAssertFalse(
+      shellControlExists(app, identifier: "shell-tab-library"),
+      "Library must not be a bottom tab.\n\(app.debugDescription)"
     )
     XCTAssertTrue(
       firstMatchingButton(app, identifiers: ["shell-talk-fab"], labels: ["Talk"]).exists,
-      "Talk FAB missing on primary tab bar.\n\(app.debugDescription)"
+      "Talk must stay reachable off the bottom bar.\n\(app.debugDescription)"
     )
-    // Profile + Audience are drawer-only — must not be primary tab buttons.
-    XCTAssertFalse(
-      shellControlExists(app, identifier: "shell-tab-profile"),
-      "Profile must not be a primary bottom tab.\n\(app.debugDescription)"
-    )
-    XCTAssertFalse(
-      shellControlExists(app, identifier: "shell-tab-audience"),
-      "Audience must not be a primary bottom tab.\n\(app.debugDescription)"
-    )
-    // Composer no longer hosts a mic (JOV-3636).
     XCTAssertFalse(
       app.buttons["chat-voice-button"].exists,
-      "Composer mic should be removed; Talk FAB is the only voice entry.\n\(app.debugDescription)"
+      "Composer mic should stay removed.\n\(app.debugDescription)"
     )
 
     app.buttons["Open navigation drawer"].tap()
-    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
     XCTAssertTrue(
-      profileSurface.waitForExistence(timeout: 3),
-      "Drawer still exposes Profile surface.\n\(app.debugDescription)"
+      app.buttons["shell-drawer-surface-shell-tab-library"].waitForExistence(timeout: 3),
+      "Sidebar must expose Library.\n\(app.debugDescription)"
     )
+    XCTAssertTrue(app.buttons["shell-drawer-surface-shell-tab-calendar"].exists)
+    XCTAssertTrue(app.buttons["shell-drawer-surface-shell-tab-inbox"].exists)
+    XCTAssertTrue(app.buttons["shell-drawer-surface-shell-tab-profile"].exists)
+    XCTAssertTrue(app.buttons["shell-drawer-talk"].exists)
+    attachScreenshot(named: "chat-first-sidebar", app: app)
   }
 
   func testShellVlogControlOpensPromptCaptureDirectly() {
@@ -580,7 +593,11 @@ final class JovieUITests: XCTestCase {
     )
     XCTAssertTrue(
       talkFAB.exists,
-      "Talk FAB did not appear on the primary tab bar.\n\(app.debugDescription)"
+      "Talk did not appear in the chat-first toolbar.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      shellControlExists(app, identifier: "shell-tab-bar"),
+      "Talk must not require a bottom tab bar.\n\(app.debugDescription)"
     )
     XCTAssertFalse(
       app.buttons["chat-voice-button"].exists,
@@ -1489,6 +1506,119 @@ final class JovieUITests: XCTestCase {
     )
   }
 
+  func testLiveDeviceChatTalksBack() throws {
+    guard testEnvironmentValue("JOVIE_IOS_LIVE_CHAT") == "1" else {
+      throw XCTSkip("Set JOVIE_IOS_LIVE_CHAT=1 to send a live chat turn on device.")
+    }
+
+    let callbackURL = try requiredEnvironmentValue("JOVIE_IOS_AUTH_CALLBACK_URL")
+    let codeVerifier = try requiredEnvironmentValue("JOVIE_IOS_PENDING_CODE_VERIFIER")
+    let apiBaseURL =
+      testEnvironmentValue("JOVIE_IOS_API_BASE_URL") ??
+      testEnvironmentValue("API_BASE_URL") ??
+      "http://192.168.86.53:3100"
+    let webBaseURL =
+      testEnvironmentValue("JOVIE_IOS_WEB_BASE_URL") ??
+      testEnvironmentValue("WEB_BASE_URL") ??
+      apiBaseURL
+    let prompt =
+      testEnvironmentValue("JOVIE_IOS_LIVE_CHAT_PROMPT") ??
+      "What should I work on next?"
+
+    let app = XCUIApplication()
+    app.launchArguments.append("-ui-testing-live-auth")
+    app.launchArguments.append("-ui-testing-allow-exit")
+    app.launchArguments.append("-ui-testing-open-auth-callback")
+    app.launchArguments.append(callbackURL)
+    app.launchEnvironment["API_BASE_URL"] = apiBaseURL
+    app.launchEnvironment["WEB_BASE_URL"] = webBaseURL
+    app.launchEnvironment["JOVIE_IOS_PENDING_CODE_VERIFIER"] = codeVerifier
+    addTeardownBlock { [app] in
+      self.endUITestSession(app)
+    }
+
+    app.launch()
+    dismissWhatsNewIfNeeded(app)
+
+    if app.staticTexts["Couldn't finish sign-in. Try again."].waitForExistence(timeout: 3) {
+      attachScreenshot(named: "live-chat-auth-error", app: app)
+      XCTFail("Live auth callback failed before chat.\n\(app.debugDescription)")
+      return
+    }
+
+    if app.buttons["Continue in Browser"].waitForExistence(timeout: 2) {
+      attachScreenshot(named: "live-chat-signed-out", app: app)
+      XCTFail("Live auth stayed signed out.\n\(app.debugDescription)")
+      return
+    }
+
+    let composer = app.textFields["Ask Jovie"]
+    XCTAssertTrue(
+      composer.waitForExistence(timeout: 45),
+      "Live auth did not reach the chat composer.\n\(app.debugDescription)"
+    )
+    dismissWhatsNewIfNeeded(app)
+    XCTAssertTrue(
+      waitForHittable(composer, timeout: 10),
+      "Chat composer was not hittable after live auth.\n\(app.debugDescription)"
+    )
+
+    composer.tap()
+    composer.typeText(prompt)
+
+    let send = app.buttons["Send"]
+    XCTAssertTrue(
+      send.waitForExistence(timeout: 5),
+      "Send button did not appear after typing.\n\(app.debugDescription)"
+    )
+    send.tap()
+
+    XCTAssertTrue(
+      app.staticTexts[prompt].waitForExistence(timeout: 10),
+      "Typed chat turn did not appear in the transcript.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "live-chat-sent", app: app)
+
+    let errorDeadline = Date().addingTimeInterval(90)
+    var sawAssistantReply = false
+    while Date() < errorDeadline {
+      if app.buttons["Retry"].exists {
+        attachScreenshot(named: "live-chat-retry", app: app)
+        XCTFail("Chat turn failed and showed Retry.\n\(app.debugDescription)")
+        return
+      }
+
+      let errorMatch = app.staticTexts.matching(
+        NSPredicate(
+          format: "label CONTAINS[c] %@ OR label CONTAINS[c] %@ OR label CONTAINS[c] %@ OR label CONTAINS[c] %@",
+          "Unauthorized",
+          "Complete onboarding",
+          "couldn't",
+          "chat limit"
+        )
+      ).firstMatch
+      if errorMatch.exists {
+        attachScreenshot(named: "live-chat-error", app: app)
+        XCTFail("Chat surfaced an error: \(errorMatch.label)\n\(app.debugDescription)")
+        return
+      }
+
+      if liveChatAssistantReplyExists(in: app, prompt: prompt) {
+        sawAssistantReply = true
+        break
+      }
+
+      RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+    }
+
+    attachScreenshot(named: "live-chat-reply", app: app)
+    XCTAssertTrue(
+      sawAssistantReply,
+      "Chat did not return a non-error assistant reply.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(app.buttons["Retry"].exists, "Chat reply still showed Retry.")
+  }
+
   func testRealBrowserAuthProviderCompleteReachesAuthenticatedShell() throws {
     guard testEnvironmentValue("JOVIE_IOS_REAL_BROWSER_AUTH") == "1" else {
       throw XCTSkip("Set JOVIE_IOS_REAL_BROWSER_AUTH=1 to run the HTTPS browser auth flow.")
@@ -1608,6 +1738,50 @@ final class JovieUITests: XCTestCase {
       "Provider error callback did not expose the retry action.\n\(app.debugDescription)"
     )
     attachScreenshot(named: "auth-cancel-recovery", app: app)
+  }
+
+  private func dismissWhatsNewIfNeeded(_ app: XCUIApplication) {
+    let done = app.buttons["whats-new-done"]
+    if done.waitForExistence(timeout: 3), done.isHittable {
+      done.tap()
+    }
+  }
+
+  private func liveChatAssistantReplyExists(in app: XCUIApplication, prompt: String) -> Bool {
+    let thinking = app.staticTexts["Thinking"]
+    if thinking.exists {
+      return false
+    }
+
+    let texts = app.staticTexts.allElementsBoundByIndex
+    for element in texts {
+      guard element.exists else { continue }
+      let label = element.label.trimmingCharacters(in: .whitespacesAndNewlines)
+      if label.isEmpty || label == prompt {
+        continue
+      }
+      if [
+        "Ask Jovie",
+        "Ask Jovie about your profile, releases, and next moves.",
+        "Send",
+        "Chat",
+        "Library",
+        "Inbox",
+        "Calendar",
+        "Done",
+        "Thinking",
+      ].contains(label) {
+        continue
+      }
+      if label.hasPrefix("Skill:") {
+        continue
+      }
+      if label.count >= 8 {
+        return true
+      }
+    }
+
+    return false
   }
 
   private func makeLiveAuthApp(launchArgument: String) -> XCUIApplication {

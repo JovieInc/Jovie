@@ -220,3 +220,60 @@ struct EntityContextSheet: View {
     }
   }
 }
+
+struct AppShellRightRail: View {
+  let item: EntityContextItem?
+  let onTalk: () -> Void
+  let onEditInChat: (String) -> Void
+  let onClose: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: JovieSpacing.large) {
+      HStack {
+        Text(item?.kindTitle ?? "Context")
+          .font(JovieFont.display(size: 22))
+          .foregroundStyle(JovieColor.textPrimary)
+        Spacer()
+        Button("Done", action: onClose)
+          .font(JovieFont.body(size: 16, weight: .semibold))
+          .accessibilityIdentifier("shell-rail-done")
+      }
+
+      if let item {
+        Text(item.title)
+          .font(JovieFont.body(size: 18, weight: .semibold))
+          .foregroundStyle(JovieColor.textPrimary)
+          .accessibilityIdentifier("entity-sheet-title")
+
+        let stats = EntityContextStats.snapshot(for: item)
+        VStack(alignment: .leading, spacing: JovieSpacing.small) {
+          Text("Visits \(stats.visits)")
+          Text("Merch \(stats.attachedMerch)")
+        }
+        .font(JovieFont.body(size: 15))
+        .foregroundStyle(JovieColor.textSecondary)
+        .accessibilityIdentifier("entity-sheet-stats")
+
+        Button("Edit in chat") {
+          onEditInChat("Tell me more about \(item.label).")
+        }
+        .buttonStyle(JoviePillButtonStyle(filled: true))
+        .accessibilityIdentifier("entity-rail-edit-in-chat")
+      } else {
+        Text("Open an entity in chat, or start Talk from here.")
+          .font(JovieFont.body(size: 16))
+          .foregroundStyle(JovieColor.textSecondary)
+
+        Button("Talk", action: onTalk)
+          .buttonStyle(JoviePillButtonStyle(filled: true))
+          .accessibilityIdentifier("shell-rail-talk")
+      }
+
+      Spacer(minLength: 0)
+    }
+    .padding(JovieSpacing.large)
+    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    .background(JovieColor.backgroundBase)
+    .accessibilityIdentifier("shell-right-rail")
+  }
+}

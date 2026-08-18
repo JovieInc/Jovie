@@ -134,4 +134,10 @@ struct AppShellChatFirstTests {
     #expect(LaunchMode.uiTestingWaitlistPending.opensChatOnLaunch == false)
     #expect(LaunchMode.uiTestingWaitlistPending.needsChatRepository == false)
   }
+
+  @Test func chatFirstHomeDoesNotUseBottomTabs() {
+    #expect(appShellHomeSurface(chatEnabled: true) == .chat)
+    #expect(AppShellPanePolicy.showsBottomTabBar() == false)
+    #expect(AppShellGesturePolicy.shouldSwitchTabFromHorizontalSwipe() == false)
+  }
 }

@@ -2,16 +2,19 @@ import Testing
 @testable import Jovie
 
 struct AppShellTabBarTests {
-  @Test func primaryTabsMatchChatLibraryCalendarInbox() {
-    let tabs = AppShellPrimaryTab.allCases.map(\.shellTab)
-    #expect(tabs == [.chat, .library, .calendar, .inbox])
+  @Test func primaryBottomTabsAreUnused() {
+    #expect(AppShellPanePolicy.primaryBottomTabs().isEmpty)
+    #expect(AppShellPanePolicy.showsBottomTabBar() == false)
+    #expect(AppShellPrimaryTab.allCases.map(\.shellTab) == [.chat, .library, .calendar, .inbox])
   }
 
-  @Test func profileAndAudienceAreNotPrimary() {
+  @Test func noSurfaceIsABottomBarPrimaryTab() {
     #expect(AppShellTab.profile.isPrimaryTab == false)
     #expect(AppShellTab.audience.isPrimaryTab == false)
-    #expect(AppShellTab.chat.isPrimaryTab)
-    #expect(AppShellTab.library.isPrimaryTab)
+    #expect(AppShellTab.chat.isPrimaryTab == false)
+    #expect(AppShellTab.library.isPrimaryTab == false)
+    #expect(AppShellTab.calendar.isPrimaryTab == false)
+    #expect(AppShellTab.inbox.isPrimaryTab == false)
   }
 
   @Test func accessibilityIDsAreStable() {
@@ -103,7 +106,33 @@ struct AppShellTabBarTests {
     )
   }
 
-  @Test func resolveInitialTabKeepsPrimaryWhenChatEnabled() {
+  @Test func homeSurfaceIsChatWhenChatEnabled() {
+    #expect(appShellHomeSurface(chatEnabled: true) == .chat)
+    #expect(AppShellPanePolicy.homeSurface(chatEnabled: true) == .chat)
+    #expect(appShellHomeSurface(chatEnabled: false) == .profile)
+  }
+
+  @Test func leadingSwipeOpensSidebarAndTrailingSwipeOpensRail() {
+    #expect(AppShellPanePolicy.paneAfterLeadingSwipe(current: .none) == .sidebar)
+    #expect(AppShellPanePolicy.paneAfterTrailingSwipe(current: .none) == .rail)
+    #expect(AppShellPanePolicy.paneAfterLeadingSwipe(current: .rail) == .sidebar)
+    #expect(AppShellPanePolicy.paneAfterTrailingSwipe(current: .sidebar) == .rail)
+    #expect(AppShellPanePolicy.paneAfterDismiss() == .none)
+  }
+
+  @Test func sidebarHoldsFormerBottomDestinations() {
+    let destinations = AppShellPanePolicy.sidebarDestinations(
+      chatEnabled: true,
+      audienceEnabled: true
+    )
+    #expect(destinations == [.chat, .library, .calendar, .inbox, .profile, .audience])
+    #expect(
+      AppShellPanePolicy.sidebarDestinations(chatEnabled: false, audienceEnabled: false)
+        == [.library, .calendar, .inbox, .profile]
+    )
+  }
+
+  @Test func resolveInitialTabKeepsFixtureDestinationWhenChatEnabled() {
     #expect(resolveShellInitialTab(.library, chatEnabled: true) == .library)
     #expect(resolveShellInitialTab(.calendar, chatEnabled: true) == .calendar)
     #expect(resolveShellInitialTab(.inbox, chatEnabled: true) == .inbox)

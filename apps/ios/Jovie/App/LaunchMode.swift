@@ -29,6 +29,7 @@ enum LaunchMode: Equatable {
   case uiTestingCalendar
   case uiTestingCalendarOffline
   case uiTestingCalendarLoading
+  case uiTestingWhatsNew
 
   var usesLiveAuth: Bool {
     switch self {
@@ -58,7 +59,8 @@ enum LaunchMode: Equatable {
          .uiTestingInboxLoading,
          .uiTestingCalendar,
          .uiTestingCalendarOffline,
-         .uiTestingCalendarLoading:
+         .uiTestingCalendarLoading,
+         .uiTestingWhatsNew:
       return false
     }
   }
@@ -72,6 +74,7 @@ enum LaunchMode: Equatable {
       || self == .uiTestingChatOffline
       || self == .uiTestingChatEntityFixture
       || self == .uiTestingChatAllComponents
+      || self == .uiTestingWhatsNew
   }
 
   /// When set, `RootView` seeds `ChatRepository` with a deterministic
@@ -149,6 +152,10 @@ enum LaunchMode: Equatable {
 
   var recoversProfileErrorOnRetry: Bool {
     self == .uiTestingProfileError
+  }
+
+  var presentsWhatsNew: Bool {
+    self == .live || self == .uiTestingWhatsNew
   }
 
   static func current(processInfo: ProcessInfo = .processInfo) -> LaunchMode {
@@ -263,6 +270,10 @@ enum LaunchMode: Equatable {
 
     if arguments.contains("-ui-testing-calendar") {
       return .uiTestingCalendar
+    }
+
+    if arguments.contains("-ui-testing-whats-new") {
+      return .uiTestingWhatsNew
     }
 
     if isXCTest {

@@ -55,6 +55,7 @@ struct AppShellLeftDrawer: View {
   let onStartNewChat: () -> Void
   let onSelectConversation: (String) -> Void
   let onOpenSettings: () -> Void
+  let onTalk: () -> Void
 
   @State private var threadSearch = ""
   // Decorative open-stagger only; the drawer is fully interactive regardless
@@ -95,6 +96,9 @@ struct AppShellLeftDrawer: View {
             .drawerRowReveal(isRevealed: contentRevealed, delay: 0.04, reduceMotion: reduceMotion)
 
           if chatEnabled {
+            DrawerTalkRow(action: onTalk)
+              .drawerRowReveal(isRevealed: contentRevealed, delay: 0.06, reduceMotion: reduceMotion)
+
             DrawerNewChatButton(action: onStartNewChat)
               .drawerRowReveal(isRevealed: contentRevealed, delay: 0.08, reduceMotion: reduceMotion)
 
@@ -210,14 +214,10 @@ private struct DrawerSurfaceSwitcher: View {
   let onSelectTab: (AppShellTab) -> Void
 
   private var surfaces: [AppShellTab] {
-    var tabs: [AppShellTab] = [.profile]
-    if audienceEnabled {
-      tabs.append(.audience)
-    }
-    if chatEnabled {
-      tabs.append(.chat)
-    }
-    return tabs
+    AppShellPanePolicy.sidebarDestinations(
+      chatEnabled: chatEnabled,
+      audienceEnabled: audienceEnabled
+    )
   }
 
   var body: some View {
@@ -226,7 +226,7 @@ private struct DrawerSurfaceSwitcher: View {
         .font(JovieFont.body(size: 13, weight: .semibold))
         .foregroundStyle(JovieColor.textTertiary)
 
-      HStack(spacing: JovieSpacing.small) {
+      VStack(spacing: JovieSpacing.small) {
         ForEach(surfaces, id: \.self) { tab in
           DrawerSurfaceButton(
             tab: tab,
@@ -235,7 +235,6 @@ private struct DrawerSurfaceSwitcher: View {
           )
         }
       }
-      .frame(height: 62)
     }
   }
 }
@@ -247,21 +246,22 @@ private struct DrawerSurfaceButton: View {
 
   var body: some View {
     Button(action: action) {
-      VStack(spacing: JovieSpacing.xSmall) {
+      HStack(spacing: JovieSpacing.medium) {
         Image(systemName: tab.systemImage)
-          .font(.system(size: 14, weight: .semibold))
+          .font(.system(size: 16, weight: .semibold))
+          .frame(width: 22)
 
         Text(tab.title)
-          .font(JovieFont.body(size: 15, weight: .semibold))
+          .font(JovieFont.body(size: 16, weight: .semibold))
           .lineLimit(1)
           .minimumScaleFactor(AppShellDrawerSurfaceLayout.labelMinimumScaleFactor)
-          .multilineTextAlignment(.center)
-          .frame(maxWidth: .infinity)
+
+        Spacer(minLength: 0)
       }
       .foregroundStyle(isSelected ? JovieColor.textPrimary : JovieColor.textSecondary)
-      .padding(.horizontal, JovieSpacing.small)
+      .padding(.horizontal, JovieSpacing.medium)
       .padding(.vertical, 11)
-      .frame(maxWidth: .infinity, minHeight: 62, maxHeight: 62)
+      .frame(maxWidth: .infinity, minHeight: 48, maxHeight: 48, alignment: .leading)
       .background(
         isSelected ? JovieColor.surface1 : JovieColor.surface1.opacity(0.001),
         in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous)
@@ -272,10 +272,36 @@ private struct DrawerSurfaceButton: View {
       }
     }
     .buttonStyle(JoviePressFeedbackButtonStyle())
-    .frame(maxWidth: .infinity, minHeight: 62, maxHeight: 62)
+    .frame(maxWidth: .infinity, minHeight: 48, maxHeight: 48)
     .accessibilityLabel(tab.title)
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     .accessibilityIdentifier("shell-drawer-surface-\(tab.accessibilityID)")
+  }
+}
+
+private struct DrawerTalkRow: View {
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: JovieSpacing.medium) {
+        Image(systemName: "mic.fill")
+          .frame(width: 22)
+
+        Text("Talk")
+          .lineLimit(1)
+
+        Spacer(minLength: 0)
+      }
+      .font(JovieFont.body(size: 18, weight: .semibold))
+      .foregroundStyle(JovieColor.textPrimary)
+      .padding(.vertical, 13)
+      .padding(.horizontal, JovieSpacing.medium)
+      .background(JovieColor.surface1, in: RoundedRectangle(cornerRadius: JovieRadius.medium, style: .continuous))
+    }
+    .buttonStyle(JoviePressFeedbackButtonStyle())
+    .accessibilityLabel("Talk")
+    .accessibilityIdentifier("shell-drawer-talk")
   }
 }
 
