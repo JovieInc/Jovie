@@ -242,19 +242,13 @@ function UserAvatar({
   ring = false,
   className,
 }: UserAvatarProps) {
-  const [failedSrc, setFailedSrc] = React.useState<string>();
   const initials = name ? getInitials(name) : '?';
   const altText = name || 'Avatar';
-  const showImage = Boolean(src) && failedSrc !== src;
 
   return (
     <Avatar size={size} ring={ring} className={className}>
-      {showImage ? (
-        <AvatarImage
-          src={src}
-          alt={altText}
-          onError={() => setFailedSrc(src)}
-        />
+      {src ? (
+        <AvatarImage src={src} alt={altText} />
       ) : (
         <AvatarFallback size={size}>{initials}</AvatarFallback>
       )}

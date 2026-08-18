@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -75,12 +75,11 @@ describe('Avatar', () => {
     expect(screen.getByRole('img', { name: 'offline status' })).toBeVisible();
   });
 
-  it('falls back to initials when the user image fails', () => {
-    render(<UserAvatar name='Tim White' src='/missing-avatar.png' />);
+  it('renders identity images with a circular crop and descriptive alt text', () => {
+    render(<UserAvatar name='Tim White' src='/tim-white.png' />);
 
-    fireEvent.error(screen.getByRole('img', { name: 'Tim White' }));
-
-    expect(screen.getByText('TW')).toBeInTheDocument();
-    expect(screen.queryByRole('img', { name: 'Tim White' })).toBeNull();
+    const image = screen.getByRole('img', { name: 'Tim White' });
+    expect(image).toHaveAttribute('src', '/tim-white.png');
+    expect(image).toHaveClass('rounded-full', 'object-cover');
   });
 });
