@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  CANONICAL_NATIVE_MUTATION_ACTOR,
   DEFAULT_MERGE_QUEUE_BACKEND,
   dequeuePullRequest,
   enrollPullRequest,
@@ -76,6 +77,9 @@ function createNativeRunner({
   states = [],
   listPages = null,
   enableResult = ok({ data: {} }),
+  viewerPayload = /** @type {unknown} */ ({
+    data: { viewer: { login: CANONICAL_NATIVE_MUTATION_ACTOR } },
+  }),
 } = {}) {
   const stateQueue = [...states];
   const restResponses = new Map([
@@ -90,6 +94,9 @@ function createNativeRunner({
     }
 
     const query = queryText(args);
+    if (query.includes('MergeQueueNativeMutationActor')) {
+      return ok(viewerPayload);
+    }
     if (query.includes('MergeQueueBranchProtection')) {
       return ok({ data: { repository: { ref: branchProtectionRef } } });
     }
@@ -142,6 +149,16 @@ const dequeue = runner => dequeuePullRequest(nativeOptions(runner));
 const invokedEnrollment = runner =>
   runner.mock.calls.some(([args]) =>
     queryText(args).includes('enablePullRequestAutoMerge')
+  );
+const invokedNativeMutation = runner =>
+  runner.mock.calls.some(([args]) =>
+    /enablePullRequestAutoMerge|dequeuePullRequest|disablePullRequestAutoMerge/.test(
+      queryText(args)
+    )
+  );
+const invokedMutationActorCheck = runner =>
+  runner.mock.calls.some(([args]) =>
+    queryText(args).includes('MergeQueueNativeMutationActor')
   );
 
 function readRepoFile(path) {
@@ -869,6 +886,94 @@ describe('native live preflight', () => {
   });
 });
 
+describe('native mutation actor boundary', () => {
+  it('rejects an authorized CLI intent when GitHub identifies the Tim user', async () => {
+    const runner = createNativeRunner({
+      viewerPayload: { data: { viewer: { login: 'itstimwhite' } } },
+    });
+
+    await expect(
+      runCli(['enroll', '14359', HEAD], {
+        env: {
+          MERGE_QUEUE_BACKEND: 'native',
+          GITHUB_REPOSITORY: REPOSITORY,
+          MERGE_QUEUE_NATIVE_AUTHORIZATION: 'merge-queue-autoenroll',
+        },
+        runner,
+        write: vi.fn(),
+      })
+    ).rejects.toMatchObject({
+      code: 'native_mutation_actor_unauthorized',
+      details: {
+        expectedActor: CANONICAL_NATIVE_MUTATION_ACTOR,
+        observedActor: 'itstimwhite',
+      },
+    });
+    expect(runner.mock.calls).toHaveLength(1);
+    expect(invokedMutationActorCheck(runner)).toBe(true);
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+
+  it.each([
+    ['enroll', runner => enroll(runner)],
+    ['dequeue', runner => dequeue(runner)],
+  ])('protects direct %s imports from bypassing actor identity', async (_name, invoke) => {
+    const runner = createNativeRunner({
+      viewerPayload: { data: { viewer: { login: 'itstimwhite' } } },
+    });
+
+    await expect(invoke(runner)).rejects.toMatchObject({
+      code: 'native_mutation_actor_unauthorized',
+    });
+    expect(runner.mock.calls).toHaveLength(1);
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+
+  it.each([
+    [
+      'missing viewer',
+      { data: { viewer: null } },
+      'native_mutation_actor_unauthorized',
+    ],
+    [
+      'malformed login',
+      { data: { viewer: { login: 42 } } },
+      'native_mutation_actor_unauthorized',
+    ],
+    [
+      'GraphQL error',
+      { errors: [{ message: 'viewer unavailable' }] },
+      'github_graphql_error',
+    ],
+  ])('fails closed on %s evidence', async (_name, viewerPayload, code) => {
+    const runner = createNativeRunner({ viewerPayload });
+
+    await expect(enroll(runner)).rejects.toMatchObject({ code });
+    expect(invokedNativeMutation(runner)).toBe(false);
+  });
+
+  it('keeps preflight and state listing read-only for noncanonical actors', async () => {
+    const viewerPayload = { data: { viewer: { login: 'itstimwhite' } } };
+    const preflightRunner = createNativeRunner({ viewerPayload });
+    const listRunner = createNativeRunner({
+      viewerPayload,
+      states: [prState({ number: 99 })],
+    });
+
+    await expect(
+      preflightMergeQueue({
+        repository: REPOSITORY,
+        runner: preflightRunner,
+      })
+    ).resolves.toMatchObject({ ready: true });
+    await expect(
+      listPullRequestQueueStates(nativeOptions(listRunner))
+    ).resolves.toMatchObject({ 99: { backend: 'native' } });
+    expect(invokedMutationActorCheck(preflightRunner)).toBe(false);
+    expect(invokedMutationActorCheck(listRunner)).toBe(false);
+  });
+});
+
 describe('native enrollment', () => {
   it('uses the native GraphQL mutation and proves a positioned queue receipt', async () => {
     const runner = createNativeRunner({
@@ -881,7 +986,11 @@ describe('native enrollment', () => {
       ],
     });
     const result = await enroll(runner);
-    expect(result).toMatchObject({ backend: 'native', changed: true });
+    expect(result).toMatchObject({
+      backend: 'native',
+      changed: true,
+      mutationActor: CANONICAL_NATIVE_MUTATION_ACTOR,
+    });
     const mutationCall = runner.mock.calls.find(([args]) =>
       queryText(args).includes('enablePullRequestAutoMerge')
     )?.[0];
@@ -1144,6 +1253,7 @@ describe('native dequeue', () => {
     await expect(dequeue(runner)).resolves.toMatchObject({
       backend: 'native',
       changed: true,
+      mutationActor: CANONICAL_NATIVE_MUTATION_ACTOR,
     });
     const dequeueCall = runner.mock.calls.find(([args]) =>
       queryText(args).includes('dequeuePullRequest')
