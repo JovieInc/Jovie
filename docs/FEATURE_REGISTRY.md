@@ -63,6 +63,7 @@ This document is the canonical feature list for Jovie. It is designed for onboar
 | Monetization | Tips & payments (Venmo) | Shipped | Pro+ | None | Venmo today, Stripe Connect coming |
 | Monetization | Earnings dashboard | Shipped | Pro+ | None | /dashboard/earnings |
 | Monetization | Chat-generated merch cards, checkout, fulfillment, and payout ledger | Shipped (internal v1 default-on) | Trial/Pro/Max | Former key: `merch_mvp` | Jovie-owned merch cards; Stripe Checkout under Jovie; Printful fulfillment; manual artist payout ledger |
+| Monetization | First merch-sale SMS to the artist | Shipped (dry-run) | Flag-gated | `FIRST_SALE_TEXT_LIVE` (default off) | One-time celebratory text on the first paid merch order; uses existing Twilio `sendNotification` rail |
 | AI Assistant | AI assistant (daily message limits by plan) | Shipped | Free+/Pro+/Growth | None | Plan limits: 25/100/500 msgs |
 | AI Assistant | Merch creation tools | Shipped (internal v1 default-on) | Trial/Pro/Max | Former key: `merch_mvp` | Entitlement-backed (`canAccessMerchCreation`); generates exactly 3 deterministic production-art options |
 | AI Connectors | Gmail booking email to Google Calendar auto-add | Shipped (internal v1 default-on) | Internal team | Former key: `ai_connectors_beta` | Product rollout flag defaults on |
