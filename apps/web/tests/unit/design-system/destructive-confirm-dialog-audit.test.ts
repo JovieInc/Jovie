@@ -46,7 +46,7 @@ const REQUIRED_DESTRUCTIVE_FLOWS = [
   },
   {
     name: 'remove contact',
-    file: 'components/features/dashboard/organisms/ContactsManager.tsx',
+    file: 'components/features/dashboard/molecules/ContactDeleteConfirmDialog.tsx',
   },
   {
     name: 'disconnect platform',

@@ -30,6 +30,12 @@ import {
 import { getAudienceServerData } from '../dashboard/audience/audience-data';
 import { loadUpcomingTourDates } from '../dashboard/tour-dates/actions';
 import { ContactsPageClient } from './ContactsPageClient';
+import {
+  type ContactsWorkspaceTab,
+  resolveContactsWorkspaceTab,
+} from './contacts-workspace';
+
+export { resolveContactsWorkspaceTab } from './contacts-workspace';
 
 export const runtime = 'nodejs';
 
@@ -37,14 +43,6 @@ export const metadata: Metadata = {
   title: 'Contacts',
   description: 'Manage bookings, management, and press contacts',
 };
-
-type ContactsWorkspaceTab = 'contacts' | 'audience';
-
-export function resolveContactsWorkspaceTab(
-  value: string | readonly string[] | undefined
-): ContactsWorkspaceTab {
-  return value === 'audience' ? 'audience' : 'contacts';
-}
 
 function buildAudienceWorkspaceHref(searchParams: SearchParams): string {
   const params = new URLSearchParams();
