@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import {
   Copy,
   LayoutGrid,
@@ -14,7 +14,7 @@ import { useState } from 'react';
 import { CommonDropdown } from './common-dropdown';
 
 const meta: Meta<typeof CommonDropdown> = {
-  title: 'Atoms/CommonDropdown',
+  title: 'UI/Atoms/CommonDropdown',
   component: CommonDropdown,
   parameters: {
     layout: 'centered',

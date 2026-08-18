@@ -162,7 +162,11 @@ export function CommonDropdown(props: CommonDropdownProps) {
   if (variant === 'context') {
     return (
       <ContextMenuPrimitive.Root onOpenChange={handleOpenChange}>
-        <ContextMenuPrimitive.Trigger asChild disabled={disabled}>
+        <ContextMenuPrimitive.Trigger
+          asChild
+          disabled={disabled}
+          data-slot='common-dropdown-trigger'
+        >
           {children}
         </ContextMenuPrimitive.Trigger>
         {renderContextMenuContent()}
@@ -179,6 +183,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
       <DropdownMenuPrimitive.Trigger
         asChild
         disabled={disabled}
+        data-slot='common-dropdown-trigger'
         className={triggerClassName}
       >
         {trigger || renderDefaultTrigger()}
@@ -193,6 +198,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
         <button
           type='button'
           className={cn(SELECT_TRIGGER_BASE, triggerClassName)}
+          data-slot='common-dropdown-trigger-control'
           aria-label={ariaLabel || 'Open dropdown'}
         >
           <span>Select...</span>
@@ -205,6 +211,7 @@ export function CommonDropdown(props: CommonDropdownProps) {
       <button
         type='button'
         className={cn(MENU_ICON_TRIGGER_BASE, triggerClassName)}
+        data-slot='common-dropdown-trigger-control'
         aria-label={ariaLabel || 'More actions'}
         onClick={event => event.stopPropagation()}
       >
@@ -220,6 +227,8 @@ export function CommonDropdown(props: CommonDropdownProps) {
         side={side}
         sideOffset={sideOffset}
         data-menu-surface='toolbar'
+        data-slot='common-dropdown-content'
+        aria-busy={isLoading || undefined}
         className={cn(dropdownContentBase, contentClassName)}
         style={getContentStyle(minWidth, maxHeight)}
         onEscapeKeyDown={event => {
@@ -266,6 +275,8 @@ export function CommonDropdown(props: CommonDropdownProps) {
     const content = (
       <ContextMenuPrimitive.Content
         data-menu-surface='toolbar'
+        data-slot='common-dropdown-content'
+        aria-busy={isLoading || undefined}
         className={cn(contextContentBase, contentClassName)}
         style={getContentStyle(minWidth, maxHeight)}
         onEscapeKeyDown={event => {
