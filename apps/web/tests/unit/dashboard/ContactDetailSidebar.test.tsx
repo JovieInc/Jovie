@@ -124,4 +124,61 @@ describe('ContactDetailSidebar', () => {
       'sm:h-7'
     );
   });
+
+  it('exposes assignment-specific responsibility actions accessibly', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ContactDetailSidebar
+        contact={{
+          ...contact,
+          responsibilities: [
+            {
+              id: 'assignment-management',
+              role: 'management',
+              customLabel: null,
+              territories: ['Worldwide'],
+              isActive: true,
+              isPrimary: true,
+              sortOrder: 0,
+              startedAt: null,
+              endedAt: null,
+            },
+            {
+              id: 'assignment-bookings',
+              role: 'bookings',
+              customLabel: null,
+              territories: ['North America'],
+              isActive: true,
+              isPrimary: false,
+              sortOrder: 1,
+              startedAt: null,
+              endedAt: null,
+            },
+          ],
+        }}
+        isOpen
+        onClose={() => undefined}
+        onUpdate={() => undefined}
+        onSave={() => undefined}
+        onDelete={() => undefined}
+      />
+    );
+
+    await user.click(screen.getByRole('tab', { name: 'Responsibilities' }));
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Edit territory for Bookings / Touring',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: 'Deactivate Bookings / Touring responsibility',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Add Custom Responsibility' })
+    ).toBeInTheDocument();
+  });
 });

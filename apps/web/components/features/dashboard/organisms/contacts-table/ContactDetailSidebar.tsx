@@ -2,6 +2,7 @@
 
 import {
   Badge,
+  Button,
   type CommonDropdownItem,
   Label,
   Select,
@@ -609,8 +610,9 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                       {summarizeTerritories(responsibility.territories).summary}
                     </span>
                     {responsibility.isActive && !responsibility.isPrimary && (
-                      <button
-                        type='button'
+                      <Button
+                        variant='tertiary'
+                        size='marketing'
                         onClick={() =>
                           handleSelectResponsibility(responsibility.id)
                         }
@@ -620,12 +622,13 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                           responsibility.customLabel
                         )}`}
                       >
-                        Edit territory
-                      </button>
+                        Edit Territory
+                      </Button>
                     )}
                     {responsibility.isActive && (
-                      <button
-                        type='button'
+                      <Button
+                        variant='tertiary'
+                        size='marketing'
                         onClick={() =>
                           handleDeactivateResponsibility(responsibility.id)
                         }
@@ -641,7 +644,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                         )} responsibility`}
                       >
                         Deactivate
-                      </button>
+                      </Button>
                     )}
                   </div>
                 ))}
@@ -654,22 +657,24 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                       responsibility => responsibility.role === option.value
                     )
                 ).map(option => (
-                  <button
+                  <Button
                     key={option.value}
-                    type='button'
+                    variant='secondary'
+                    size='sm'
                     onClick={() => handleAddResponsibility(option.value)}
                     className='h-11 rounded-md border border-subtle bg-surface-0 px-2 text-2xs text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token sm:h-7'
                   >
                     Add {option.label}
-                  </button>
+                  </Button>
                 ))}
-                <button
-                  type='button'
+                <Button
+                  variant='secondary'
+                  size='sm'
                   onClick={() => handleAddResponsibility('other')}
                   className='h-11 rounded-md border border-subtle bg-surface-0 px-2 text-2xs text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token sm:h-7'
                 >
-                  Add custom responsibility
-                </button>
+                  Add Custom Responsibility
+                </Button>
               </div>
             </DrawerSection>
           )}
